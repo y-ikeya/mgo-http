@@ -376,7 +376,7 @@ export default function Calibrator(props: {
       `// 非構えの上半身の向き補正: ${twistFix().toFixed(2)}`,
       `// しゃがみ時の上半身の旋回: ${torsoYaw().toFixed(0)}度`,
       `// ボルトに手を掛けるまで: ${boltDelay().toFixed(2)}秒`,
-      `// 手榴弾が手を離れるまで: ${grenadeRelease().toFixed(2)}秒`,
+      `// 手榴弾が手を離れる時刻: ${grenadeRelease().toFixed(2)}秒 (振りかぶりは 1.50秒)`,
       `// 吹き飛び ${sweepRate().toFixed(2)}倍 (着地まで ${(0.92 / sweepRate()).toFixed(2)}秒)`,
       `// 起き上がり ${standRate().toFixed(2)}倍 (${(2.4 / standRate()).toFixed(2)}秒)`,
       `// リロード音の開始: ${reloadSound().toFixed(2)}`,
@@ -577,8 +577,8 @@ export default function Calibrator(props: {
           <span class="calib-label">手榴弾</span>
           <input
             type="range"
-            min="0"
-            max="5"
+            min="1.5"
+            max="2.33"
             step="0.02"
             value={grenadeRelease()}
             onInput={(e) => {
@@ -589,7 +589,8 @@ export default function Calibrator(props: {
           />
           <span class="calib-value">{grenadeRelease().toFixed(2)}s</span>
           <span class="calib-hint">
-            キーを離してから手を離れるまで。腕を振り切る所に合わせる
+            投擲モーション内で手を離れる時刻。1.50s で振りかぶって止まるので、
+            離してから飛ぶまではその差になる
           </span>
         </label>
         <label class="calib-row">

@@ -259,15 +259,31 @@ const GRENADE_SPEED = 15;
 const GRENADE_RELEASE_HEIGHT = 1.35;
 
 /**
- * キーを離してから手榴弾が手を離れるまで (秒)。
+ * 手榴弾が手を離れる時刻 (投擲クリップ内の秒)。
  *
  * 投げる型は腕を後ろへ引いてから前へ振る。その振り切る所で放さないと、
  * 構えたまま物だけ飛んでいくように見える。
  *
- * 向きはこの瞬間に取り直す。キーを離した時点の向きを使うと、投げる間に
- * 視点を振っても軌道が変わらず、手だけが別の方を向く。
+ * 向きはこの瞬間に取り直す。キーを離した時点の向きを使うと、振っている間に
+ * 視点を動かしても軌道が変わらず、手だけが別の方を向く。
  */
 const GRENADE_RELEASE_AT = 1.66;
+
+/**
+ * 振りかぶりで止まる時刻 (投擲クリップ内の秒)。animation.ts の THROW_HOLD_AT と揃える。
+ *
+ * 押している間はここで止まっているので、キーを離してから手を離れるまでは
+ * その差 (0.16 秒) しかない。既に引き切っているので、あとは振るだけ。
+ */
+const GRENADE_HOLD_AT = 1.5;
+
+/**
+ * 空撃ちの音を鳴らす間隔 (秒)。
+ *
+ * 押しっぱなしでも連射の速さでは鳴らさない。カチカチ鳴り続けると
+ * 音そのものが情報にならなくなるし、単にうるさい。
+ */
+const EMPTY_INTERVAL = 0.45;
 
 /** 集中してから音の輪が出そろうまで (秒) */
 const RING_SETTLE = 1
@@ -314,6 +330,8 @@ export class Game {
   private grenadeAiming = false;
   /** 手を離れるまでの残り (秒)。0 なら投げていない */
   private grenadeRelease = 0;
+  /** 空撃ちの音を次に鳴らせるまで (秒) */
+  private emptyCooldown = 0;
   private grenadeReleaseAt = GRENADE_RELEASE_AT;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
@@ -891,10 +909,11 @@ export class Game {
    * 描画は結局 20Hz 分の情報しか使わない。
    */
   private broadcast(): void {
-    this.net.send({
-      type: "state",
-      snapshot: this.player.snapshot(this.net.id, Date.now()),
-    });
+    const snapshot = this.player.snapshot(this.net.id, Date.now());
+    // 視点の向きはカメラが持っている。体の向きとは別 (構えていないと体は進行方向を向く)。
+    // サーバーはこれで「どこから見ているか」を出し、可視の判定に使う
+    snapshot.cameraYaw = this.follow.aimYaw;
+    this.net.send({ type: "state", snapshot });
   }
 
   /** 他プレイヤーからのメッセージ。自分宛ての被弾はここで受ける */
@@ -994,6 +1013,7 @@ export class Game {
 
       case "knockdown":
         this.player.knockDown();
+        this.audio.play("blastScream", this.player.position);
         break;
 
       case "join":
@@ -1207,6 +1227,25 @@ export class Game {
     if (this.input.consumeAction("reload", "KeyR")) this.startReload();
 
     this.fireCooldown -= dt;
+
+    // 弾が無いのに引き金を引いた。撃てないことを音で返す。
+    //
+    // 何も起きないと、撃てているのか当たっていないのかが分からない。
+    // 自動でリロードはしない — 弾を切らしたこと自体が代償なので、
+    // そこを黙って埋めると弾数を数える意味が消える。
+    if (this.emptyCooldown > 0) this.emptyCooldown -= dt;
+    if (
+      this.input.firing &&
+      this.player.isAiming &&
+      !this.player.isDead &&
+      this.reloadTimer <= 0 &&
+      this.ammo <= 0 &&
+      this.emptyCooldown <= 0
+    ) {
+      this.audio.play("empty", this.player.position);
+      this.emptyCooldown = EMPTY_INTERVAL;
+    }
+
     // 構えていないと撃てない。空になっても自動でリロードはしない。
     const firing =
       this.input.firing &&
@@ -1417,6 +1456,10 @@ export class Game {
     const held = canThrow && this.input.isActionDown("grenade", "KeyE");
 
     if (held) {
+      // 押した瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
+      // 落下点はその間ずっと見える — どこへ落とすかを見てから離せるように
+      if (!this.grenadeAiming) this.player.playThrow();
+      this.grenadeAiming = true;
       this.follow.aimDirection(this.aimDir);
       this.grenadeOrigin.set(
         this.player.position.x,
@@ -1429,7 +1472,6 @@ export class Game {
         GRENADE_SPEED,
         this.stageBoxes,
       );
-      this.grenadeAiming = true;
       // 体を照準の方へ向ける。投げる向きと見た目を一致させる
       this.player.setThrowing(true);
       return;
@@ -1442,13 +1484,20 @@ export class Game {
     }
     this.grenadeAiming = false;
     this.grenades.hidePreview();
-    // 構えを解いただけ (死んだ・箱に入った) なら投げない
-    if (!canThrow) return;
+
+    // 構えを解かされただけ (倒された・箱に入った・死んだ) なら投げない。
+    // 腕を下ろして構えに戻す。抜いたピンは無かったことになるが、
+    // ここで爆発させると理不尽な死に方が増えるだけで読み合いにならない
+    if (!canThrow) {
+      this.player.cancelThrow();
+      this.player.setThrowing(false);
+      return;
+    }
 
     this.grenadeCount--;
-    this.player.playThrow();
-    // 実際に手を離れるのは型の途中。ここでは時計を始めるだけ
-    this.grenadeRelease = this.grenadeReleaseAt;
+    // 止めていた続きから振り切る。手を離れるのはその途中
+    this.player.releaseThrow();
+    this.grenadeRelease = Math.max(0.01, this.grenadeReleaseAt - GRENADE_HOLD_AT);
   }
 
   /** 投げる型が振り切る所で手を離す */
@@ -1525,6 +1574,11 @@ export class Game {
       if (remote.rollStarted) {
         const gain = this.audio.play("roll", remote.object.position);
         this.addPing("roll", remote.object.position, gain);
+      }
+      // 吹き飛ばされた叫び。倒れたのではなく、まだ生きて転がっている
+      if (remote.sweptThisFrame) {
+        const gain = this.audio.play("blastScream", remote.object.position);
+        this.addPing("shot", remote.object.position, gain);
       }
       if (remote.step) this.playStep(remote.step, remote.object.position, true);
     }

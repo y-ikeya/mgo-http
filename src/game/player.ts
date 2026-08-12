@@ -406,6 +406,8 @@ export class Player {
       z: this.object.position.z,
       yaw: this.yaw,
       pitch: this.aimPitch,
+      // 視点の向きはカメラが持っている。呼ぶ側が上書きする
+      cameraYaw: this.yaw,
       locomotion: this.locomotion,
       aiming: this.aiming,
       weapon: this.weaponKind,
@@ -413,6 +415,8 @@ export class Player {
       boxed: this.boxed,
       concentrating: this.isConcentrating,
       saluteHeld: this.saluteHeld,
+      // 振りかぶって持っている間だけ。倒されたら足元に落ちる
+      holdingGrenade: this.throwing,
     }
   }
 
@@ -501,6 +505,17 @@ export class Player {
     this.down = false
     this.boxed = false
     this.velocityY = 0
+    // 爆風で転んだまま倒された場合、ここで戻さないと復帰しても転んだまま。
+    // 姿勢は毎フレーム downed から引き直しているので、他の人の画面では
+    // 湧いた直後にもう一度吹き飛ぶ形になる
+    this.downed_ = false
+    this.downElapsed = 0
+    this.standing = false
+    this.standTimer = 0
+    this.aimLatched = false
+    // 振りかぶったまま倒された場合も解く。手榴弾はサーバーが足元へ落としている
+    this.throwing = false
+    this.animator?.cancelThrow()
     // 移動状態もここで戻す。update() は描画ループから呼ばれるので、
     // 裏に回ったタブでは走らない。ここで戻さないと復帰したのに
     // 他プレイヤーへは死亡状態を送り続けることになる。
@@ -544,9 +559,29 @@ export class Player {
     this.animator.refreshKnockdownRates()
   }
 
-  /** 手榴弾を投げる型。上半身だけなので走りながらでも出る */
+  /**
+   * 手榴弾を構え始める。振りかぶった所で止まる。
+   *
+   * 上半身だけなので走りながらでも出る。退きながら足元へ落とすのが
+   * 使い方の一つなので、投げるために止まらせない。
+   */
   playThrow(): void {
     this.animator?.playThrow()
+  }
+
+  /** 振り切って投げる */
+  releaseThrow(): void {
+    this.animator?.releaseThrow()
+  }
+
+  /** 投げるのをやめる (倒された・箱に入った・死んだ) */
+  cancelThrow(): void {
+    this.animator?.cancelThrow()
+  }
+
+  /** 振りかぶり切ったか。投げられる状態になったかの判定に使う */
+  get throwWoundUp(): boolean {
+    return this.animator?.throwWoundUp ?? false
   }
 
   playBolt(): void {

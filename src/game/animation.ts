@@ -245,6 +245,18 @@ const STAND_CLIP = 'stand_front'
 const STAND_RATE = 1.2
 /** 手榴弾を投げる。上半身だけで済むので走りながらでも投げられる */
 const THROW_KEY = 'throw'
+
+/**
+ * 振りかぶりで止める位置 (クリップ内の時刻、秒)。
+ *
+ * 実測: 2.33 秒のクリップで、手が一番後ろ (腰から -0.48m) かつ高い (1.57m) のが
+ * 1.46〜1.56 秒。その中間で止めると、腕を引き切って構えた形で固まる。
+ *
+ * ピンを抜いて振りかぶるまでを押している間に済ませ、離すと振り切って投げる。
+ * 押している間は信管が進まない — 現実には抜いた時点で燃え始めるが、
+ * 溜められると「持ったまま間合いを計る」が最善手になって読み合いが消える。
+ */
+const THROW_HOLD_AT = 1.5
 const ROLL_KEY = 'roll'
 const DEATH_KEY = 'death'
 const HIT_KEY = 'hit'
@@ -410,6 +422,8 @@ export class CharacterAnimator {
   standDuration = 0
   /** 投擲の尺 (秒) */
   throwDuration = 0
+  /** 振りかぶりで止めているか */
+  private throwHeld = false
 
   /** 吹き飛ばされる型の再生速度 (調整用)。着地の時刻もこれで割る */
   sweepRate = SWEEP_RATE
@@ -768,6 +782,7 @@ export class CharacterAnimator {
   update(dt: number): void {
     this.releaseRollIfSettling()
     this.updateSalute()
+    this.updateThrow()
 
     // 前フレームの上乗せを取り消してから mixer を回す。
     // three が書き込みを省略した回でも、ボーンが素のアニメ値から始まることを保証する。
@@ -1282,12 +1297,45 @@ export class CharacterAnimator {
    * 上半身だけなので、走りながらでも投げられる。手榴弾は退きながら足元へ
    * 落とすのが使い方の一つなので、投げるために止まらせない。
    */
+  /**
+   * 投げ始める。振りかぶった所で止まる。
+   *
+   * 放すまでその姿勢を保つ。投げ切るには releaseThrow を呼ぶ。
+   */
   playThrow(): void {
     if (this.dead) return
     const upper = this.upper.get(THROW_KEY)
     if (!upper) return
-    upper.reset().play()
+    upper.reset().setEffectiveTimeScale(1).play()
     this.upperState = 'throw'
+    this.throwHeld = true
+  }
+
+  /** 振り切って投げる。止めていた続きから流す */
+  releaseThrow(): void {
+    this.throwHeld = false
+  }
+
+  /** 投げるのをやめる。腕を下ろして構えに戻す (倒された・箱に入った) */
+  cancelThrow(): void {
+    if (this.upperState !== 'throw') return
+    this.throwHeld = false
+    this.upper.get(THROW_KEY)?.stop()
+    this.upperState = 'stance'
+  }
+
+  /** いま振りかぶった所で止まっているか */
+  get throwWoundUp(): boolean {
+    const upper = this.upper.get(THROW_KEY)
+    return this.throwHeld && !!upper && upper.time >= THROW_HOLD_AT
+  }
+
+  /** 振りかぶりを保つ。敬礼と同じで、再生速度を 0 にして止める */
+  private updateThrow(): void {
+    if (this.upperState !== 'throw') return
+    const upper = this.upper.get(THROW_KEY)
+    if (!upper) return
+    upper.setEffectiveTimeScale(this.throwHeld && upper.time >= THROW_HOLD_AT ? 0 : 1)
   }
 
   playBolt(): void {

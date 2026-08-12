@@ -156,6 +156,8 @@ export class RemotePlayer {
    * 倒れる見た目もそれに従わせるのが筋。
    */
   private serverDead = false;
+  /** このフレームに吹き飛ばされたか。叫びを 1 回だけ鳴らすのに使う */
+  sweptThisFrame = false;
   /** 箱の浮き上がり量 (m)。自機と同じ計算を同じアニメーションに対して行う */
   private lift = 0;
   private readonly buffer: PlayerSnapshot[] = [];
@@ -212,6 +214,7 @@ export class RemotePlayer {
 
     // 全身モーションは重みの補間では出せない。状態が切り替わった瞬間に頭から流す。
     this.rollStarted = false;
+    this.sweptThisFrame = false;
     if (locomotion !== this.locomotion && WHOLE_BODY.has(locomotion)) {
       if (locomotion === "roll") {
         animator.playRoll();
@@ -221,7 +224,11 @@ export class RemotePlayer {
       else if (locomotion === "salute") animator.playSalute();
       // 爆風で倒れる / 起き上がる。ここを書き忘れると着地モーションに落ちて、
       // 上半身がどこにも割り当たらず素の姿勢 (T ポーズ) が出る
-      else if (locomotion === "sweep") animator.playSweep();
+      else if (locomotion === "sweep") {
+        animator.playSweep();
+        // 叫んだことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
+        this.sweptThisFrame = true;
+      }
       else if (locomotion === "stand") animator.playStand();
       else animator.playLanding();
     }

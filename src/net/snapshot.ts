@@ -65,7 +65,14 @@ const OFF_YAW = 23
 const OFF_PITCH = 27
 const OFF_LOCOMOTION = 31 // u8
 const OFF_FLAGS = 32 // u8
-export const SNAPSHOT_BYTES = 33
+/**
+ * 視点の向き。u16 で 0..2π を刻む (1 目盛り 0.005°)。
+ *
+ * f32 を足すと 4 バイト増える。これは可視の判定にしか使わないので、
+ * その精度は要らない。0.005° の誤差は 100m 先で 1cm。
+ */
+const OFF_CAMERA_YAW = 33 // u16
+export const SNAPSHOT_BYTES = 35
 
 const FLAG_AIMING = 1
 const FLAG_CROUCHING = 2
@@ -74,6 +81,8 @@ const FLAG_CONCENTRATING = 8
 const FLAG_SALUTE = 16
 /** 銃。1 ビットで足りるうちは種類を増やすたびにビットを足す */
 const FLAG_SNIPER = 32
+/** 手榴弾を振りかぶって持っている。倒されたら足元に落ちる */
+const FLAG_GRENADE = 64
 
 /** 位置を詰める。slot は送る側では 0 (サーバーが書き込む) */
 export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer {
@@ -97,7 +106,11 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   if (snapshot.concentrating) flags |= FLAG_CONCENTRATING
   if (snapshot.saluteHeld) flags |= FLAG_SALUTE
   if (snapshot.weapon === 'sniper') flags |= FLAG_SNIPER
+  if (snapshot.holdingGrenade) flags |= FLAG_GRENADE
   view.setUint8(OFF_FLAGS, flags)
+
+  const turns = snapshot.cameraYaw / (Math.PI * 2)
+  view.setUint16(OFF_CAMERA_YAW, Math.round((turns - Math.floor(turns)) * 65536) & 0xffff)
 
   return buffer
 }
@@ -120,6 +133,8 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     concentrating: (flags & FLAG_CONCENTRATING) !== 0,
     saluteHeld: (flags & FLAG_SALUTE) !== 0,
     weapon: (flags & FLAG_SNIPER) !== 0 ? 'sniper' : 'rifle',
+    holdingGrenade: (flags & FLAG_GRENADE) !== 0,
+    cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,
   }
 }
 

@@ -47,6 +47,15 @@ export function headHeight(crouching: boolean, boxed: boolean): number {
  */
 export const SAMPLE_RATIOS = [1, 0.55, 0.15]
 
+/**
+ * 体の幅の半分 (m)。中心線から左右へこれだけ離した点も見る。
+ *
+ * 中心線だけを見ていると、**角から覗いている相手が丸ごと消える**。
+ * 肩と頭が壁の端から出ていても、体の中心が壁の裏にあれば通らないため。
+ * 見えているのに映らないので、覗く側が一方的に得をする。
+ */
+const SHOULDER = 0.22
+
 /** 線分と箱の交差 (slab 法)。当たれば true */
 export function segmentHitsBox(
   ax: number,
@@ -132,11 +141,79 @@ export function hasLineOfSight(
   targetHead: number,
   boxes: StageBox[],
 ): boolean {
+  // 見る方向に対して横向きの単位ベクトル。肩の位置を出すのに使う
+  const dx = targetX - eyeX
+  const dz = targetZ - eyeZ
+  const length = Math.hypot(dx, dz)
+  const sideX = length > 1e-6 ? (-dz / length) * SHOULDER : SHOULDER
+  const sideZ = length > 1e-6 ? (dx / length) * SHOULDER : 0
+
+  // 中心線を先に見る。通れば即座に返るので、見えている相手の費用は 1 本のまま。
+  // 増えた点の費用を払うのは、隠れている相手を確かめるときだけ
   for (const ratio of SAMPLE_RATIOS) {
     const ty = targetFeetY + targetHead * ratio
     if (isPathClear(eyeX, eyeY, eyeZ, targetX, ty, targetZ, boxes)) return true
   }
+
+  // 左右の肩。頭と胸の高さだけ見る (足は幅が無い)
+  for (const ratio of [1, 0.55]) {
+    const ty = targetFeetY + targetHead * ratio
+    if (isPathClear(eyeX, eyeY, eyeZ, targetX + sideX, ty, targetZ + sideZ, boxes)) return true
+    if (isPathClear(eyeX, eyeY, eyeZ, targetX - sideX, ty, targetZ - sideZ, boxes)) return true
+  }
   return false
+}
+
+/**
+ * 線分が最初に箱へ入る位置 (0..1)。遮る物が無ければ null。
+ *
+ * isPathClear は「遮られたか」しか返さないが、カメラを壁の手前へ寄せるには
+ * **どこで当たったか**が要る。
+ */
+export function firstBlockedAt(
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  boxes: StageBox[],
+): number | null {
+  const origin = [ax, ay, az]
+  const delta = [bx - ax, by - ay, bz - az]
+  let best: number | null = null
+
+  for (const box of boxes) {
+    let near = 0
+    let far = 1
+    let miss = false
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(delta[i]) < 1e-9) {
+        if (origin[i] < box.min[i] || origin[i] > box.max[i]) {
+          miss = true
+          break
+        }
+        continue
+      }
+      const inv = 1 / delta[i]
+      let t0 = (box.min[i] - origin[i]) * inv
+      let t1 = (box.max[i] - origin[i]) * inv
+      if (t0 > t1) {
+        const tmp = t0
+        t0 = t1
+        t1 = tmp
+      }
+      if (t0 > near) near = t0
+      if (t1 < far) far = t1
+      if (near > far) {
+        miss = true
+        break
+      }
+    }
+    if (miss) continue
+    if (best === null || near < best) best = near
+  }
+  return best
 }
 
 /** 2 点を結ぶ線分を遮る箱が 1 つも無いか */

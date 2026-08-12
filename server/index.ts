@@ -24,6 +24,7 @@ import {
   solidBlockers,
   type StageBox,
 } from '../src/sim/vision'
+import { cameraPoint } from '../src/sim/eyepoint'
 import type { Locomotion } from '../src/game/animation'
 import type { NetMessage, Team } from '../src/net/types'
 
@@ -128,8 +129,25 @@ interface Player {
   /** 姿勢。頭の高さが変わるので、遮蔽の判定に要る */
   crouching: boolean
   boxed: boolean
+  /**
+   * 姿勢が低くなった時刻 (Date.now)。0 なら低くない。
+   *
+   * しゃがむ操作は押した瞬間に届くが、体が実際に沈むのは補間で 0.3 秒ほどかかる。
+   * 届いた瞬間から低い頭で線を引くと、**まだ立っている相手を先に消す**ことになり、
+   * 物陰でしゃがんだ相手が一瞬で画面から消える。沈み切るまでは高いほうで見る。
+   */
+  loweredAt: number
   /** 体の向き (rad)。ナイフの背後判定に要る */
   yaw: number
+  /**
+   * 視点の向きと上下 (rad)、構えているか。
+   *
+   * どこから見ているかを出すのに要る。三人称なので、画面に映るものを
+   * 決めているのはカメラの位置であって目の位置ではない (src/sim/eyepoint.ts)。
+   */
+  cameraYaw: number
+  pitch: number
+  aiming: boolean
   /**
    * 一度でも位置を知らせてきたか。
    *
@@ -146,6 +164,8 @@ interface Player {
   concentratingSince: number
   /** 残りの手榴弾。倒れて復帰するたびに戻る */
   grenades: number
+  /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
+  holdingGrenade: boolean
   socket: Bun.ServerWebSocket<Client>
 }
 
@@ -273,6 +293,7 @@ function resetPlayers(roomName: string, room: Match): void {
     player.health = MAX_HEALTH
     player.concentratingSince = 0
     player.grenades = GRENADES_PER_LIFE
+    player.holdingGrenade = false
     broadcast(roomName, { type: 'respawn', id: player.id })
     sendHealth(roomName, player, 0, false)
   }
@@ -304,12 +325,22 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   player.x = snapshot.x
   player.y = snapshot.y
   player.z = snapshot.z
+  // 低くなった瞬間を控える。高くなったら即座に解く
+  // (立ち上がりは「見えるようになる」方向なので、遅らせる理由が無い)
+  const lowered = snapshot.crouching || snapshot.boxed
+  if (!lowered) player.loweredAt = 0
+  else if (player.loweredAt === 0) player.loweredAt = Date.now()
   player.crouching = snapshot.crouching
   player.boxed = snapshot.boxed
   player.yaw = snapshot.yaw
+  player.cameraYaw = snapshot.cameraYaw
+  player.pitch = snapshot.pitch
+  player.aiming = snapshot.aiming
   player.locomotion = snapshot.locomotion
   // 持っている銃。威力と連射の上限をこれで引く
   player.weapon = snapshot.weapon
+  // 振りかぶって持っているか。倒された瞬間に足元へ落とすのに要る
+  player.holdingGrenade = snapshot.holdingGrenade
   player.positioned = true
   recordPose(player)
 
@@ -338,6 +369,21 @@ const SHOT_RANGE = 130
 
 /** 乗り越えられる段差 (m)。collision.ts の STEP_UP と揃える */
 const STEP_UP = 0.25
+
+/**
+ * しゃがみが体に現れるまで (ms)。
+ *
+ * クライアント側のモーション補間に合わせてある。この間は立った高さで見る。
+ * 迷ったら送る側に倒す — 見えるはずの相手を送り忘れるほうが、
+ * 見えない相手を少し長く送ってしまうより困る。
+ */
+const LOWER_SETTLE_MS = 300
+
+/** 遮蔽の判定に使う頭の高さ。沈み切るまでは立った高さで見る */
+function visibleHead(player: Player, now: number): number {
+  const settled = player.loweredAt > 0 && now - player.loweredAt >= LOWER_SETTLE_MS
+  return settled ? headHeight(player.crouching, player.boxed) : headHeight(false, false)
+}
 
 /**
  * 飛んでいる手榴弾。
@@ -414,6 +460,42 @@ function throwGrenade(roomName: string, from: Player, event: NetMessage): void {
   })
 }
 
+/**
+ * 倒された人が握っていた手榴弾を足元に落とす。
+ *
+ * 振りかぶった所で止めて持てるようにした以上、持ちっぱなしにできてはいけない。
+ * 落ちて爆ぜるなら、**振りかぶっている間ずっと自分が的**になる。
+ * 撃つ側にも「今撃てば道連れになる」という読みが生まれる。
+ *
+ * 投げるときと同じ経路に乗せるので、見た目も音も爆風も全部そのまま働く。
+ */
+function dropGrenade(roomName: string, from: Player): void {
+  if (!from.holdingGrenade || from.grenades <= 0) return
+  from.holdingGrenade = false
+  from.grenades--
+
+  const id = ++grenadeId
+  const body: Projectile = {
+    x: from.x,
+    // 手から落ちる高さ。地面に埋まった状態で始めない
+    y: from.y + 0.6,
+    z: from.z,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    bounces: 0,
+    resting: false,
+  }
+  grenades.push({ id, room: roomName, owner: from.id, team: from.team, body, fuse: FUSE })
+  broadcast(roomName, {
+    type: 'grenade',
+    id,
+    from: [body.x, body.y, body.z],
+    velocity: [0, 0, 0],
+    fuse: FUSE,
+  })
+}
+
 /** 爆発させる。届いた相手を削って、近ければ吹き飛ばす */
 function detonate(nade: Grenade): void {
   const room = rooms.get(nade.room)
@@ -454,6 +536,8 @@ function detonate(nade: Grenade): void {
 
     victim.deaths++
     victim.respawnAt = Date.now() + RESPAWN_MS
+    // 握っていたものは足元に落ちる。誘爆する
+    dropGrenade(nade.room, victim)
     const killer = room.players.get(nade.owner)
     // 自爆は得点にしない。倒された数だけが残る
     if (killer && killer.id !== victim.id) {
@@ -510,12 +594,15 @@ function emitNoise(
     const distance = Math.hypot(from.x - listener.x, from.z - listener.z)
     if (distance > reach) continue
 
-    // 見えているなら位置が届いている。二重に鳴らさない
-    const eye = listener.y + headHeight(listener.crouching, listener.boxed)
+    // 見えているなら位置が届いている。二重に鳴らさない。
+    // 「見えている」の定義は位置を配るときと同じでなければならない —
+    // ずれると、姿が見えている相手の音が輪にも出る (二重) か、
+    // 見えていないのに音が出ない (無音の敵) のどちらかになる
+    const eye = viewOf(listener)
     const visible =
       listener.team === from.team ||
       stageBoxes.length === 0 ||
-      hasLineOfSight(listener.x, eye, listener.z, from.x, from.y, from.z, head, stageBoxes)
+      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
     if (visible) continue
 
     listener.socket.send(
@@ -545,12 +632,12 @@ function relayShot(roomName: string, from: Player, message: NetMessage): void {
   for (const listener of connected(room)) {
     if (listener.id === from.id) continue
 
-    const eye = listener.y + headHeight(listener.crouching, listener.boxed)
+    const eye = viewOf(listener)
     const visible =
       listener.team === from.team ||
       stageBoxes.length === 0 ||
       !listener.positioned ||
-      hasLineOfSight(listener.x, eye, listener.z, from.x, from.y, from.z, head, stageBoxes)
+      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
 
     if (visible) listener.socket.send(payload)
   }
@@ -596,22 +683,53 @@ function recordPose(player: Player): void {
   if (player.history.length > HISTORY_SIZE) player.history.shift()
 }
 
+/** カメラ位置の置き場。毎フレーム作らないよう使い回す */
+const viewEye = { x: 0, y: 0, z: 0 }
+
+/**
+ * その人の画面がどこから見ているか。
+ *
+ * 可視を問うところは全部これを通す。位置を配るとき・銃声を配るとき・
+ * 足音を配るときで別々に出すと、定義がずれて「姿も音も無い敵」が生まれる。
+ */
+function viewOf(player: Player): { x: number; y: number; z: number } {
+  return cameraPoint(
+    player.x,
+    player.y,
+    player.z,
+    player.cameraYaw,
+    player.pitch,
+    player.aiming,
+    // 壁に寄せる。省くと壁を背にした瞬間にカメラが壁の中へ入り、
+    // その人だけ全方位が見えなくなる
+    stageBoxes,
+    viewEye,
+  )
+}
+
 function relayState(roomName: string, from: Player, payload: Uint8Array): void {
   const room = rooms.get(roomName)
   if (!room) return
 
-  const head = headHeight(from.crouching, from.boxed)
+  const now = Date.now()
+  const head = visibleHead(from, now)
   for (const viewer of connected(room)) {
     if (viewer.id === from.id) continue
 
     if (viewer.team !== from.team && stageBoxes.length > 0) {
       // どこに居るか分からない相手には配らない
       if (!viewer.positioned) continue
-      const eye = viewer.y + headHeight(viewer.crouching, viewer.boxed)
+      // **目ではなくカメラから**線を引く。三人称なので、画面に映るものを
+      // 決めているのはカメラの位置。目で見ると、遮蔽の裏にしゃがんだ相手が
+      // 「カメラからは見えているのに送られてこない」ことになる。
+      //
+      // カメラのほうが後ろ上から見下ろすぶん、目より広く見える。そこは許す —
+      // 描いている物と送る物がずれているほうが困る
+      const eye = viewOf(viewer)
       const visible = hasLineOfSight(
-        viewer.x,
-        eye,
-        viewer.z,
+        eye.x,
+        eye.y,
+        eye.z,
         from.x,
         from.y,
         from.z,
@@ -766,6 +884,9 @@ function applyDamage(roomName: string, attacker: Player, event: NetMessage): voi
 
   victim.respawnAt = Date.now() + RESPAWN_MS
   victim.deaths++
+  // 振りかぶったまま倒されたら、足元に落ちて爆ぜる。
+  // 撃った側にとっては「今撃つと道連れになる」という読みになる
+  dropGrenade(roomName, victim)
   attacker.kills++
   if (attacker.team === 'blue') room.blue++
   else room.red++
@@ -868,6 +989,7 @@ setInterval(() => {
         player.respawnAt = 0
         player.health = MAX_HEALTH
         player.grenades = GRENADES_PER_LIFE
+        player.holdingGrenade = false
         broadcast(roomName, { type: 'respawn', id: player.id })
         sendHealth(roomName, player, 0, false)
         continue
@@ -1046,6 +1168,7 @@ const server = Bun.serve<Client, Record<string, never>>({
         seat.lastShotAt = 0
         seat.concentratingSince = 0
         seat.grenades = GRENADES_PER_LIFE
+        seat.holdingGrenade = false
       } else {
         // 名前は発行元が持っていればそれ、無ければ join で名乗るまで仮のもの
         room.players.set(socket.data.id, {
@@ -1059,6 +1182,9 @@ const server = Bun.serve<Client, Record<string, never>>({
           y: 0,
           z: 0,
           yaw: 0,
+          cameraYaw: 0,
+          pitch: 0,
+          aiming: false,
           crouching: false,
           boxed: false,
           history: [],
@@ -1074,6 +1200,8 @@ const server = Bun.serve<Client, Record<string, never>>({
           positioned: false,
           concentratingSince: 0,
           grenades: GRENADES_PER_LIFE,
+          holdingGrenade: false,
+          loweredAt: 0,
           socket,
         })
       }

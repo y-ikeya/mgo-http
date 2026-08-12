@@ -31,6 +31,14 @@ export interface PlayerSnapshot {
   yaw: number
   /** 照準の上下 (rad)。上半身の傾きに使う */
   pitch: number
+  /**
+   * 視点 (カメラ) の向き (rad)。体の向きとは別物。
+   *
+   * 構えていないとき、体は進行方向を向くのでカメラとずれる。
+   * サーバーが**どこから見ているか**を出すのに要る — 三人称なので
+   * 画面に映るものを決めているのはカメラの位置で、目の位置ではない。
+   */
+  cameraYaw: number
   /** 再生すべき移動アニメ。速度から推定するより確実で、帯域も食わない */
   locomotion: Locomotion
   aiming: boolean
@@ -44,6 +52,14 @@ export interface PlayerSnapshot {
   crouching: boolean
   /** ダンボールを被っているか。受け取った側は箱を出す */
   boxed: boolean
+  /**
+   * 手榴弾を振りかぶって持っているか。
+   *
+   * サーバーが要る。**この状態で倒されると、足元に落ちて爆発する**ので、
+   * 倒した瞬間に持っていたかどうかを知らないと決められない。
+   * 見た目には既にモーションで出ているので、隠す情報ではない。
+   */
+  holdingGrenade: boolean
   /**
    * 集中しているか (しゃがんで動いていない)。
    *

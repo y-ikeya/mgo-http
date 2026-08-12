@@ -9,6 +9,20 @@ import * as THREE from "three";
  *
  * <audio> ではなく Web Audio を使うのは、660 RPM = 90ms 間隔の発砲に
  * 再生の重なりと遅延で耐えられないため。three.js の Audio は Web Audio の薄い包み。
+ *
+ * --- 音源の名前 ---
+ * public/audio/ に `<出どころ><番号>_<種類><番号>.mp3` で置く。
+ *
+ *   ak47_shot1.mp3      銃ごとに分ける。同じ AK でも撃つ音とリロード音は別
+ *   man1_scream1.mp3    声は「誰の声か」で括る。man2 を足せば別人の声になる
+ *   step_concrete1.mp3  足音は踏んだ材質で分ける
+ *
+ * 末尾の番号は**同じ音の別テイク**。ピッチを揺らすだけでは繰り返しが機械的に
+ * 聞こえるので、いずれ複数持って選ぶことになる。その時に名前を変えずに済ませたい。
+ *
+ * 下の表が「どの音源をどの役に使っているか」の唯一の記録になる。ファイル名は
+ * 出どころを表し、役 (rifle / scream / bounce …) はこの表が決める。
+ * 差し替えは file を書き換えるだけで済み、鳴らす側は何も知らなくていい。
  */
 
 /**
@@ -22,32 +36,32 @@ import * as THREE from "three";
  *   max       … ここで完全に無音になる (linear モデル)
  */
 const SOUNDS = {
-  rifle: { file: "rifle.mp3", reference: 6, max: 130 },
+  rifle: { file: "ak47_shot1.mp3", reference: 6, max: 130 },
   /**
    * 狙撃銃。1 発が 1.57 秒あり、後半にボルト操作の音が入っている。
    *
    * 届く距離を突撃銃より伸ばしてある。遠くから撃つ武器なので、
    * 撃った本人には安全でも**音は遠くまで届く**、という交換にする。
    */
-  snipe: { file: "snipe.mp3", reference: 8, max: 170 },
+  snipe: { file: "xm2010_shot1.mp3", reference: 8, max: 170 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
-  reload: { file: "reload.mp3", reference: 2, max: 24 },
+  reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
   /**
    * 足音。20m で消える。
    *
    * 走り (音量 1.0) が 20m、しゃがみ (0.3) は実質 8m ほどで聞こえなくなる。
    * 姿勢ごとに max を変えなくても、音量の違いが届く距離の違いになる。
    */
-  step: { file: "step.mp3", reference: 2, max: 20 },
+  step: { file: "step_concrete1.mp3", reference: 2, max: 20 },
   /** 金属の上を歩いたとき。届く距離はコンクリートと同じにして、材質の差だけ出す */
-  metalStep: { file: "metal_step.mp3", reference: 2, max: 20 },
+  metalStep: { file: "step_metal1.mp3", reference: 2, max: 20 },
   /**
    * 木の上を歩いたとき。
    *
    * 専用の音源がまだ無いので、コンクリートの足音を低く落として代用している。
    * wood_step.mp3 を用意したら file を差し替えるだけでよい。
    */
-  woodStep: { file: "step.mp3", reference: 2, max: 20, rate: 0.78 },
+  woodStep: { file: "step_concrete1.mp3", reference: 2, max: 20, rate: 0.78 },
   /**
    * 転がり。体が地面に接する 1 回の音。
    *
@@ -55,7 +69,7 @@ const SOUNDS = {
    * roll.mp3 を用意したら file を差し替えるだけでよい。
    * 走るより遠くまで届く (26m) のは、体ごと投げ出す動作だから。
    */
-  roll: { file: "step.mp3", reference: 3, max: 26, rate: 0.55 },
+  roll: { file: "step_concrete1.mp3", reference: 3, max: 26, rate: 0.55 },
   /**
    * 投げた物が落ちた音。
    *
@@ -63,7 +77,7 @@ const SOUNDS = {
    * 届かなければ道具として成立しない。金属の音を少し高めにして、
    * 足音と取り違えないようにしてある。
    */
-  clink: { file: "metal_step.mp3", reference: 3, max: 30, rate: 1.15 },
+  clink: { file: "step_metal1.mp3", reference: 3, max: 30, rate: 1.15 },
   /**
    * 倒れたときの叫び。
    *
@@ -71,7 +85,7 @@ const SOUNDS = {
    * 「今そこで撃ち合いが終わった」を全員が知ってよい。
    * 撃った側にとっては当てた手応えになり、周りにとっては近づく合図になる。
    */
-  scream: { file: "scream.mp3", reference: 8, max: 110 },
+  scream: { file: "man1_scream1.mp3", reference: 8, max: 110 },
   /**
    * 頭に当たったのに倒れなかったときのうめき。
    *
@@ -79,7 +93,18 @@ const SOUNDS = {
    * 耐えたことは当人の事情で、遠くの人に知らせる筋のものではない。
    * 近くの相手にだけ「仕留め損ねた」と伝わる。
    */
-  pain: { file: "pain.mp3", reference: 3, max: 26 },
+  pain: { file: "man1_pain1.mp3", reference: 3, max: 26 },
+  /**
+   * 爆風で吹き飛ばされたときの叫び。
+   *
+   * 倒れたときの叫び (scream, 0.94 秒) とは別の音源で、3.34 秒と長い。
+   * 死んだのではなく**まだ生きて転がっている**ことが伝わってほしいので、
+   * 短く切れる音では役目が違う。
+   *
+   * 届く範囲は倒れたときの叫びと同じ。転んでいる相手が近くに居ることは、
+   * 詰めるか退くかの判断に直に効く。
+   */
+  blastScream: { file: "man1_scream2.mp3", reference: 8, max: 110 },
   /**
    * 爆発。
    *
@@ -87,14 +112,24 @@ const SOUNDS = {
    * 「どこかで爆ぜた」は隠しようがない。見えない相手の位置は伏せているが、
    * 爆発だけは全員へ配っている (server の detonate) のと同じ理由。
    */
-  explosion: { file: "explosion.mp3", reference: 12, max: 160 },
+  explosion: { file: "explosion1.mp3", reference: 12, max: 160 },
   /**
    * 手榴弾が跳ねた音。
    *
    * 弾倉の囮 (clink) より低く、少し遠くまで届く。足元へ転がってきたことに
    * 気付けないと、逃げるという手が最初から無い。
    */
-  bounce: { file: "metal_step.mp3", reference: 4, max: 38, rate: 0.82 },
+  bounce: { file: "step_metal1.mp3", reference: 4, max: 38, rate: 0.82 },
+  /**
+   * 弾が無いのに引き金を引いた音。
+   *
+   * 撃鉄が落ちるだけの小さい音なので、ほぼ本人にしか聞こえない (3.5m)。
+   * ナイフが届く間合いで、そこまで詰められているならもう音は要らない。
+   *
+   * 0 にはしない。この距離で聞こえるということは、隠れている相手のすぐ横で
+   * 空撃ちしたら気付かれるということで、それは正しい。
+   */
+  empty: { file: "gun_empty1.mp3", reference: 1, max: 3.5 },
 } as const;
 
 export type SoundName = keyof typeof SOUNDS;

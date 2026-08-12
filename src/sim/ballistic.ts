@@ -40,19 +40,32 @@ const GROUND_Y = 0
 export interface ThrowTuning {
   /** 跳ね返りで面に垂直な速度がどれだけ残るか */
   restitution: number
-  /** 面に沿う速度がどれだけ残るか。1 なら滑り続ける */
+  /** 跳ねた瞬間、面に沿う速度がどれだけ残るか */
   friction: number
+  /**
+   * 転がっている間に速さが落ちる割合 (1 秒あたり)。
+   *
+   * 跳ねるときの摩擦とは別に持つ。同じ値を使うと、接地した途端に
+   * 止まるか、いつまでも滑り続けるかのどちらかにしかならない。
+   */
+  rollFriction: number
   /** これ以下の速さで止まったとみなす (m/s) */
   restSpeed: number
-  /** 跳ねる回数の上限。無限に細かく跳ね続けるのを防ぐ */
-  maxBounces: number
+  /**
+   * 跳ね返りをやめて転がりに移る垂直方向の速さ (m/s)。
+   *
+   * これを入れないと、跳ねる高さが 0 に近づくにつれて 1 フレームに何度も
+   * 接触するようになり、計算が細かくなるだけで見た目は震えて見える。
+   */
+  contactSpeed: number
 }
 
 export const DEFAULT_THROW: ThrowTuning = {
   restitution: 0.36,
   friction: 0.72,
-  restSpeed: 1.1,
-  maxBounces: 3,
+  rollFriction: 7,
+  restSpeed: 0.35,
+  contactSpeed: 0.9,
 }
 
 export interface Projectile {
@@ -65,9 +78,16 @@ export interface Projectile {
   bounces: number
   /** 止まったか */
   resting: boolean
+  /** 面に接して転がっているか。跳ね返りが小さくなったらここへ移る */
+  rolling?: boolean
 }
 
-/** 1 刻み進める。当たったら跳ねる */
+/**
+ * 1 刻み進める。
+ *
+ * 跳ねる → 転がる → 止まる、の 3 段。跳ね返りが小さくなったら転がりへ移り、
+ * 転がっている間は重力を面に沿わせる。斜面に落とせば下る。
+ */
 export function stepProjectile(
   p: Projectile,
   boxes: StageBox[],
@@ -94,6 +114,7 @@ export function stepProjectile(
     p.x = nx
     p.y = ny
     p.z = nz
+    p.rolling = false
     return
   }
 
@@ -108,18 +129,46 @@ export function stepProjectile(
   const ty = p.vy - hit.ny * into
   const tz = p.vz - hit.nz * into
 
+  // 面へ入る速さが小さければ、跳ねずに接している扱いにする。
+  // ここを分けないと、跳ねる高さが 0 に近づくにつれて 1 フレームに何度も
+  // 接触するようになり、震えて見えるだけで止まらない
+  if (-into < tuning.contactSpeed) {
+    // 跳ねた回数には数えない。**音を鳴らす回数**として使っているので、
+    // 転がっている間の接触を数えると鳴りっぱなしになる。
+    // (面から浮かせる 2cm ぶん、接地中も毎フレーム落ちて触れ直している)
+    p.rolling = true
+
+    // 重力から面に垂直な成分を抜く。残るのが面に沿う力。
+    //
+    // **ここが「坂を転がる」の中身**。水平な面なら全部が法線成分になって 0 に、
+    // 斜面なら下り方向だけが残る。面の法線を見ていないと出てこない。
+    const gDotN = -GRAVITY * hit.ny
+    const vx = tx + (0 - hit.nx * gDotN) * FIXED_STEP
+    const vy = ty + (-GRAVITY - hit.ny * gDotN) * FIXED_STEP
+    const vz = tz + (0 - hit.nz * gDotN) * FIXED_STEP
+
+    // 転がりの摩擦。速さに比例して落とす (指数減衰)。
+    // 手榴弾は球ではないので、よく転がる物として扱わない
+    const damping = Math.max(0, 1 - tuning.rollFriction * FIXED_STEP)
+    p.vx = vx * damping
+    p.vy = vy * damping
+    p.vz = vz * damping
+
+    if (Math.hypot(p.vx, p.vy, p.vz) < tuning.restSpeed) {
+      p.resting = true
+      p.vx = 0
+      p.vy = 0
+      p.vz = 0
+    }
+    return
+  }
+
+  // 跳ね返る
+  p.rolling = false
   p.vx = tx * tuning.friction - hit.nx * into * tuning.restitution
   p.vy = ty * tuning.friction - hit.ny * into * tuning.restitution
   p.vz = tz * tuning.friction - hit.nz * into * tuning.restitution
-
   p.bounces++
-  const speed = Math.hypot(p.vx, p.vy, p.vz)
-  if (p.bounces >= tuning.maxBounces || speed < tuning.restSpeed) {
-    p.resting = true
-    p.vx = 0
-    p.vy = 0
-    p.vz = 0
-  }
 }
 
 interface Hit {
@@ -149,32 +198,81 @@ function sweep(
   bz: number,
   boxes: StageBox[],
 ): Hit | null {
-  let best = Infinity
-  let axis = -1
-  let sign = 0
+  let best: Hit | null = null
 
   for (const box of boxes) {
     // 移動を止めない面は通り抜ける (金網の上に乗らない、など)
     if (box.flags?.player === false) continue
 
+    const slope = box.top
+    if (slope && (slope.dx !== 0 || slope.dz !== 0)) {
+      // 上面が傾いている箱は**平面そのもの**で見る。
+      //
+      // AABB の出入りで見ると、坂の上に乗せた物が次の刻みで「箱の中から
+      // 始まっている」ことになり、箱ごと無視されて地面まで落ちる。
+      const hit = slopeEntry(ax, ay, az, bx, by, bz, box, slope)
+      if (hit && (!best || hit.t < best.t)) best = hit
+      continue
+    }
+
     const enter = entryOf(ax, ay, az, bx, by, bz, box)
-    if (!enter || enter.t >= best) continue
-    // 上面が傾いていても、跳ねる向きは箱の面で決める。楔の斜面まで見ると
-    // 転がりが読めなくなるので、そこは割り切る
-    best = enter.t
-    axis = enter.axis
-    sign = enter.sign
+    if (!enter || (best && enter.t >= best.t)) continue
+    best = {
+      t: enter.t,
+      x: ax + (bx - ax) * enter.t,
+      y: ay + (by - ay) * enter.t,
+      z: az + (bz - az) * enter.t,
+      nx: enter.axis === 0 ? enter.sign : 0,
+      ny: enter.axis === 1 ? enter.sign : 0,
+      nz: enter.axis === 2 ? enter.sign : 0,
+    }
   }
 
-  if (axis < 0) return null
+  return best
+}
+
+/**
+ * 傾いた上面との交点。
+ *
+ * 上を斜めに切り落とした楔の、その斜面だけを見る。側面は見ない —
+ * 坂は下から当たるものではなく、上に乗って転がるものなので。
+ */
+function slopeEntry(
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  box: StageBox,
+  slope: { h: number; dx: number; dz: number },
+): Hit | null {
+  const surfaceAt = (x: number, z: number) =>
+    slope.h + slope.dx * (x - box.min[0]) + slope.dz * (z - box.min[2])
+
+  // 面からの符号付き距離。上が +
+  const above = ay - surfaceAt(ax, az)
+  const below = by - surfaceAt(bx, bz)
+  // 上から下へ跨いだときだけ当たり。下から上は通す (坂の裏側は素通り)
+  if (above < 0 || below >= 0) return null
+
+  const span = above - below
+  const t = span > 1e-9 ? above / span : 0
+  const x = ax + (bx - ax) * t
+  const z = az + (bz - az) * t
+  // 箱の外まで伸ばした平面に当たっても意味が無い
+  if (x < box.min[0] || x > box.max[0] || z < box.min[2] || z > box.max[2]) return null
+
+  // 面 y = h + dx*(x-minX) + dz*(z-minZ) の法線は (-dx, 1, -dz)
+  const length = Math.hypot(slope.dx, 1, slope.dz)
   return {
-    t: best,
-    x: ax + (bx - ax) * best,
-    y: ay + (by - ay) * best,
-    z: az + (bz - az) * best,
-    nx: axis === 0 ? sign : 0,
-    ny: axis === 1 ? sign : 0,
-    nz: axis === 2 ? sign : 0,
+    t,
+    x,
+    y: surfaceAt(x, z),
+    z,
+    nx: -slope.dx / length,
+    ny: 1 / length,
+    nz: -slope.dz / length,
   }
 }
 
