@@ -1,0 +1,570 @@
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #c8d4c0;
+}
+
+/*
+ * 左上の列。パネルとキル表示を縦に積む。
+ *
+ * それぞれを絶対位置で置くと、パネルの行数が変わるたびにキル表示の
+ * 開始位置を手で直すことになる。列にまとめて gap で並べれば、
+ * 中身が増えても勝手にずれる。
+ */
+/* 左上の列。体力と、その下にキル表示 */
+.hud-left {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hud-panel {
+  padding: 10px 14px;
+  min-width: 150px;
+  background: rgba(10, 14, 18, 0.55);
+  border: 1px solid rgba(160, 190, 140, 0.25);
+  border-radius: 2px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  line-height: 1.7;
+}
+
+.hud-label {
+  color: rgba(160, 190, 140, 0.6);
+}
+
+.hud-value {
+  color: #d8e6cc;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-help {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(200, 212, 192, 0.45);
+}
+
+/* --- クロスヘア --- */
+
+.crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  /* 中心から各アームまでの距離。散布界に応じて Hud.tsx が上書きする */
+  --crosshair-gap: 9px;
+  --crosshair-arm: 7px;
+}
+
+.crosshair-dot,
+.crosshair-arm {
+  position: absolute;
+  background: rgba(230, 240, 220, 0.85);
+  /* 暗い背景でも明るい壁でも視認できるよう縁取りする */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+.crosshair-dot {
+  width: 2px;
+  height: 2px;
+  transform: translate(-1px, -1px);
+}
+
+.crosshair-arm {
+  width: 2px;
+  height: 7px;
+}
+
+.crosshair-arm-up {
+  transform: translate(-1px, calc(-1 * (var(--crosshair-gap) + var(--crosshair-arm))));
+}
+
+.crosshair-arm-down {
+  transform: translate(-1px, var(--crosshair-gap));
+}
+
+.crosshair-arm-left {
+  width: var(--crosshair-arm);
+  height: 2px;
+  transform: translate(calc(-1 * (var(--crosshair-gap) + var(--crosshair-arm))), -1px);
+}
+
+.crosshair-arm-right {
+  width: var(--crosshair-arm);
+  height: 2px;
+  transform: translate(var(--crosshair-gap), -1px);
+}
+
+/* --- 命中表示 --- */
+
+.hud-hit {
+  position: absolute;
+  top: calc(50% + 34px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #ff8a72;
+}
+
+/* --- 残弾 --- */
+
+.hud-ammo {
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  text-align: right;
+  line-height: 1;
+}
+
+.hud-ammo-count {
+  font-size: 34px;
+  letter-spacing: 0.04em;
+  color: #d8e6cc;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-ammo-magazine {
+  margin-left: 6px;
+  font-size: 14px;
+  color: rgba(160, 190, 140, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-ammo-empty .hud-ammo-count {
+  color: #e07a5f;
+}
+
+.hud-ammo-state {
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: rgba(200, 212, 192, 0.6);
+}
+
+.hud-ammo-state-warn {
+  color: #e07a5f;
+}
+
+/* --- ポインタロック待ち --- */
+
+/* 接続人数。1 人以上いるときだけ色を変えて、対戦中だと分かるようにする */
+.hud-value-live {
+  color: #ffd27a;
+}
+
+/* 倒れている間。操作不能であることが一目で分かればよく、情報は残り時間だけ */
+.hud-down {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(40, 6, 4, 0.35);
+  pointer-events: none;
+}
+
+.hud-down-title {
+  font-size: 40px;
+  letter-spacing: 0.28em;
+  color: #e0533c;
+}
+
+.hud-down-sub {
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  color: rgba(220, 190, 180, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+
+/* キル表示。STAGE のパネルの真下に積む */
+.hud-kills {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.hud-kill {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 3px 10px;
+  background: rgba(10, 16, 8, 0.55);
+  border: 1px solid rgba(160, 190, 140, 0.18);
+  font-size: 12px;
+  color: rgba(200, 212, 192, 0.75);
+  white-space: nowrap;
+}
+
+/*
+ * 自分が絡む行は枠で示す。文字の色は所属を表しているので、そちらは動かさない。
+ * 「誰が誰を」は色で、「自分に関係があるか」は枠で読む。
+ */
+.hud-kill-mine {
+  border-color: rgba(160, 190, 140, 0.55);
+  background: rgba(24, 34, 18, 0.65);
+}
+
+.hud-kill-death {
+  border-color: rgba(224, 83, 60, 0.6);
+  background: rgba(40, 14, 10, 0.65);
+}
+
+.hud-kill-name {
+  font-weight: 600;
+}
+
+/* 名前は所属の色。得点の表示と同じ色を使って対応が付くようにする */
+.hud-kill-blue {
+  color: #7ea6ff;
+}
+
+.hud-kill-red {
+  color: #ff8a72;
+}
+
+.hud-kill-arrow {
+  color: rgba(160, 190, 140, 0.8);
+}
+
+.hud-kill-death .hud-kill-arrow {
+  color: #e0533c;
+}
+
+.hud-kill-weapon {
+  font-size: 11px;
+  color: rgba(160, 190, 140, 0.55);
+}
+
+/* 投げ物の残り。残弾の下に小さく添える */
+.hud-throwables {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(160, 190, 140, 0.65);
+}
+
+.hud-throwables-empty {
+  color: rgba(160, 190, 140, 0.25);
+}
+
+/*
+ * 被弾の表現。画面の縁が赤く狭まる。
+ *
+ * 中央は透明のまま残す。ここを濁らせると狙っている相手が見えなくなり、
+ * 「傷ついているから当てられない」という悪循環になる。奪うのは周辺視野だけ。
+ */
+.hud-damage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(120, 10, 4, 0) 34%,
+    rgba(120, 10, 4, 0.32) 74%,
+    rgba(96, 6, 2, 0.72) 100%
+  );
+  /* 減った瞬間に飛ばず少し遅れて濃くなる。どれだけ削られたかが目で追える */
+  transition: opacity 0.25s ease-out;
+}
+
+/* 残りわずか。脈打たせて、次の一発で終わることを伝える */
+.hud-damage-critical {
+  animation: hud-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes hud-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-damage-critical {
+    animation: none;
+  }
+}
+
+/* --- 試合 --- */
+
+.hud-match {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 5px 16px;
+  background: rgba(10, 14, 18, 0.5);
+  border: 1px solid rgba(160, 190, 140, 0.2);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-score {
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+
+.hud-score-blue {
+  color: #7ea6ff;
+}
+
+.hud-score-red {
+  color: #ff8a72;
+}
+
+/* 自分の陣営に下線。左右の位置は固定なので、色だけでは自分側が分かりにくい */
+.hud-score-own {
+  border-bottom: 2px solid currentColor;
+}
+
+.hud-clock {
+  font-size: 15px;
+  color: rgba(200, 212, 192, 0.8);
+}
+
+/* --- 決着 --- */
+
+.hud-result {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(6, 10, 14, 0.55);
+  pointer-events: none;
+}
+
+.hud-result-title {
+  font-size: 46px;
+  letter-spacing: 0.3em;
+  color: #d8e6cc;
+}
+
+.hud-result-win {
+  color: #9ec97a;
+}
+
+.hud-result-lose {
+  color: #e0533c;
+}
+
+.hud-result-score {
+  font-size: 20px;
+  letter-spacing: 0.2em;
+  color: rgba(200, 212, 192, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-result-next {
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: rgba(160, 190, 140, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 人待ち / 支度 --- */
+
+.hud-standby {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.hud-standby-title {
+  font-size: 30px;
+  letter-spacing: 0.32em;
+  color: rgba(200, 212, 192, 0.8);
+}
+
+/* 支度の数字。大きく出して、始まる瞬間を外さないようにする */
+.hud-standby-count {
+  font-size: 76px;
+  line-height: 1;
+  color: #d8e6cc;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-standby-sub {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: rgba(160, 190, 140, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 敬礼で味方と繋がったときの通知。
+ *
+ * 味方の位置は既定では映らない。互いに手を挙げて初めて壁越しに見えるので、
+ * 繋がった瞬間だけは文字でも返す。数秒で消える。
+ */
+.hud-link {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 3px 10px;
+  background: rgba(12, 22, 30, 0.6);
+  border: 1px solid rgba(120, 170, 255, 0.35);
+  font-size: 12px;
+  color: rgba(190, 214, 255, 0.9);
+  white-space: nowrap;
+}
+
+.hud-link-mark {
+  color: #7ea6ff;
+  letter-spacing: -1px;
+}
+
+/*
+ * スコープ。
+ *
+ * 円の外を黒く落とすのは、覗いている実感のためだけではない。**視界の情報量を
+ * 減らす**のが本体で、周りが見えなくなるぶん背後を取られやすくなる。
+ * 遠くを見る代わりに近くを失う、という交換にする。
+ *
+ * 画面いっぱいに広げず、正方形の内側に収める。横長の画面で楕円になると
+ * レンズに見えない。
+ */
+.scope {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 円の外側。中心から少し外れた所で一気に暗くする */
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent 0,
+    transparent min(41vh, 41vw),
+    rgba(0, 0, 0, 0.72) min(43vh, 43vw),
+    rgba(0, 0, 0, 0.97) min(46vh, 46vw),
+    #000 100%
+  );
+}
+
+.scope-glass {
+  position: relative;
+  width: min(86vh, 86vw);
+  height: min(86vh, 86vw);
+  border-radius: 50%;
+  /* レンズの縁。内側にわずかな光を残すと硝子に見える */
+  box-shadow:
+    inset 0 0 0 1px rgba(150, 170, 140, 0.28),
+    inset 0 0 40px rgba(0, 0, 0, 0.55);
+}
+
+/* 十字線。中心は空けて的を隠さない */
+.scope-cross {
+  position: absolute;
+  background: rgba(20, 24, 18, 0.85);
+}
+
+.scope-cross-v {
+  left: 50%;
+  top: 4%;
+  bottom: 4%;
+  width: 1px;
+  transform: translateX(-0.5px);
+}
+
+.scope-cross-h {
+  top: 50%;
+  left: 4%;
+  right: 4%;
+  height: 1px;
+  transform: translateY(-0.5px);
+}
+
+.scope-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  background: rgba(20, 24, 18, 0.9);
+  border-radius: 50%;
+}
+
+/* 縦の目盛り。中心より下に並べて落差の目安にする */
+.scope-ticks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5.5%;
+  padding-top: 6%;
+  transform: translateX(-50%);
+}
+
+.scope-ticks span {
+  display: block;
+  width: 12px;
+  height: 1px;
+  background: rgba(20, 24, 18, 0.7);
+}
+
+.scope-ticks span:nth-child(even) {
+  width: 7px;
+}
+
+/* 倍率。レンズの下側、視界の邪魔にならない位置 */
+.scope-zoom {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: rgba(190, 206, 176, 0.75);
+}
+
+/* 覗ける、という案内。肩越しで構えている間だけ */
+.scope-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 14%;
+  transform: translateX(-50%);
+  z-index: 14;
+  pointer-events: none;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(170, 186, 156, 0.55);
+}

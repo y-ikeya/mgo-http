@@ -1,0 +1,122 @@
+/*
+ * 入り口。
+ *
+ * ゲームの HUD と同じ色域に置く。別のアプリに見えると、
+ * 入った瞬間の切り替わりが強すぎる。
+ */
+.login {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 35%, #1c2118 0%, #0b0e0a 70%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  z-index: 50;
+}
+
+.login-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(340px, calc(100vw - 48px));
+  padding: 30px 28px 26px;
+  background: rgba(12, 18, 10, 0.82);
+  border: 1px solid rgba(160, 190, 140, 0.22);
+}
+
+.login-title {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 19px;
+  letter-spacing: 0.16em;
+  color: rgba(214, 226, 200, 0.95);
+}
+
+.login-sub {
+  font-size: 12px;
+  color: rgba(170, 186, 156, 0.7);
+  margin-top: -8px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.login-field span {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(170, 186, 156, 0.72);
+}
+
+.login-field input {
+  padding: 9px 11px;
+  background: rgba(6, 10, 5, 0.7);
+  border: 1px solid rgba(160, 190, 140, 0.25);
+  color: rgba(220, 230, 210, 0.95);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.login-field input:focus {
+  outline: none;
+  border-color: rgba(180, 214, 150, 0.6);
+}
+
+.login-field input:disabled {
+  opacity: 0.5;
+}
+
+.login-error,
+.login-notice {
+  font-size: 12px;
+  padding: 7px 10px;
+  line-height: 1.5;
+}
+
+.login-error {
+  background: rgba(60, 16, 12, 0.6);
+  border: 1px solid rgba(255, 138, 114, 0.4);
+  color: rgba(255, 190, 176, 0.95);
+}
+
+.login-notice {
+  background: rgba(12, 30, 40, 0.6);
+  border: 1px solid rgba(126, 166, 255, 0.4);
+  color: rgba(190, 214, 255, 0.95);
+}
+
+.login-submit {
+  padding: 10px;
+  background: rgba(120, 156, 96, 0.28);
+  border: 1px solid rgba(180, 214, 150, 0.5);
+  color: rgba(226, 236, 214, 0.96);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.login-submit:hover:not(:disabled) {
+  background: rgba(140, 178, 112, 0.4);
+}
+
+.login-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.login-toggle {
+  background: none;
+  border: none;
+  color: rgba(160, 178, 146, 0.65);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.login-toggle:hover:not(:disabled) {
+  color: rgba(200, 216, 186, 0.9);
+}

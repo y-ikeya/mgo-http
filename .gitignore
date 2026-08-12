@@ -1,0 +1,24 @@
+node_modules
+dist
+.DS_Store
+
+# --- 素材の元データ ---
+# 変換前の FBX、落としてきたモデル、FBX に付いてくるテクスチャ (.fbm)、
+# Poly Haven の .blend フォルダ。合計 800MB 以上あり、一度変換したら普段は触らない。
+# どの FBX がどのクリップになったかは tools/soldier.json に記録がある。
+tools/raw/
+# Blender の自動退避 (stage.blend1)
+*.blend[0-9]
+*.fbx
+*.rar
+*.zip
+
+# --- 変換の中間物 ---
+# public/ に入った glb と jpg は成果物なので追跡する (数 MB)。
+# ステージの .blend は編集の元なので追跡する (100KB 程度)。
+
+# --- 秘密 ---
+# Supabase の URL と鍵。anon key は公開前提のものだが、
+# プロジェクトごとに違うので追跡しない
+.env
+.env.local

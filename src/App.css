@@ -1,0 +1,56 @@
+.app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #0e1116;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+}
+
+.viewport canvas {
+  display: block;
+}
+
+/*
+ * 入り直す口。操作中は消える (ポインタを掴んでいる間)。
+ * 常時出しておくと、撃ち合いの最中に押せてしまう。
+ */
+.app-leave {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  z-index: 20;
+  padding: 5px 11px;
+  background: rgba(12, 18, 10, 0.6);
+  border: 1px solid rgba(160, 190, 140, 0.28);
+  color: rgba(190, 206, 176, 0.85);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.app-leave:hover {
+  color: rgba(224, 236, 212, 0.98);
+  border-color: rgba(180, 214, 150, 0.55);
+}
+
+/* 設定が足りないとき。黙って遊ばせず、何が無いかを出す */
+.app-misconfigured {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  background: #0b0e0a;
+  color: rgba(255, 190, 176, 0.95);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  text-align: center;
+  padding: 24px;
+}

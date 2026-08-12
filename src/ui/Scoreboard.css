@@ -1,0 +1,154 @@
+/*
+ * 成績表。対戦画面の上に重ねる。
+ *
+ * 背景を完全には塞がない。試合は続いているので、後ろで何が起きているかは
+ * 見えていたほうがよい (音も鳴り続ける)。
+ */
+.score {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 9, 5, 0.68);
+  backdrop-filter: blur(2px);
+  z-index: 40;
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+}
+
+.score-panel {
+  width: min(560px, calc(100vw - 40px));
+  background: rgba(10, 15, 9, 0.9);
+  border: 1px solid rgba(160, 190, 140, 0.24);
+  display: flex;
+  flex-direction: column;
+}
+
+.score-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.16);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-blue { color: #7ea6ff; }
+.score-red { color: #ff8a72; }
+.score-dash { color: rgba(150, 166, 140, 0.5); }
+
+.score-teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.score-team {
+  padding: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.score-team:first-child {
+  border-right: 1px solid rgba(160, 190, 140, 0.14);
+}
+
+.score-team-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 16px 8px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+/* K / D の見出し。数字の列と同じ幅にして真上に来るようにする */
+.score-cols {
+  display: flex;
+  gap: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  color: rgba(150, 166, 140, 0.55);
+}
+
+.score-cols span {
+  width: 2.4em;
+  text-align: right;
+}
+
+.score-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 16px;
+  font-size: 13px;
+}
+
+/* 自分の行。色は所属を表しているので変えず、地の色で示す */
+.score-mine {
+  background: rgba(180, 214, 150, 0.1);
+}
+
+.score-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-num {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  width: 2.4em;
+  text-align: right;
+  color: rgba(214, 226, 200, 0.9);
+}
+
+.score-deaths {
+  color: rgba(150, 166, 140, 0.6);
+}
+
+.score-none {
+  padding: 4px 16px;
+  font-size: 12px;
+  color: rgba(150, 166, 140, 0.45);
+}
+
+.score-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(160, 190, 140, 0.16);
+}
+
+.score-leave,
+.score-close {
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.3);
+  color: rgba(190, 206, 176, 0.85);
+}
+
+.score-close {
+  background: rgba(120, 156, 96, 0.24);
+  border-color: rgba(180, 214, 150, 0.45);
+  color: rgba(226, 236, 214, 0.95);
+}
+
+.score-leave:hover,
+.score-close:hover {
+  border-color: rgba(180, 214, 150, 0.7);
+  color: rgba(230, 240, 220, 0.98);
+}
+
+.score-key {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  color: rgba(150, 166, 140, 0.6);
+  margin-left: 4px;
+}

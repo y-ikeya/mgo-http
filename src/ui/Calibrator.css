@@ -1,0 +1,176 @@
+.calib {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  /* 画面からはみ出さない高さに収める。項目が増えると本文側がスクロールする */
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  width: 330px;
+  padding: 10px 12px;
+  background: rgba(10, 14, 18, 0.88);
+  border: 1px solid rgba(160, 190, 140, 0.25);
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #c8d4c0;
+  /* HUD 全体は pointer-events: none なので、この層だけ操作可能に戻す */
+  pointer-events: auto;
+}
+
+.calib-toggle,
+.calib-reset {
+  width: 100%;
+  padding: 5px 8px;
+  background: rgba(160, 190, 140, 0.12);
+  border: 1px solid rgba(160, 190, 140, 0.3);
+  border-radius: 2px;
+  color: #d8e6cc;
+  font: inherit;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.calib-toggle:hover,
+.calib-reset:hover {
+  background: rgba(160, 190, 140, 0.22);
+}
+
+.calib-body {
+  /* 縦にあふれたぶんだけスクロールさせる。開閉ボタンは上に固定されたまま */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* スクロールバーが値の桁に重ならないよう余白を足す */
+  padding-right: 4px;
+}
+
+/* 畳んでいるときは中身の高さを持たない (画面下端まで枠が伸びるのを防ぐ) */
+.calib-closed {
+  bottom: auto;
+}
+
+.calib-closed .calib-body {
+  display: none;
+}
+
+/* 細い操作しやすいスクロールバー。既定のものは幅を取りすぎる */
+.calib-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calib-body::-webkit-scrollbar-thumb {
+  background: rgba(160, 190, 140, 0.3);
+  border-radius: 3px;
+}
+
+.calib-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.calib-section {
+  margin: 12px 0 6px;
+  color: rgba(160, 190, 140, 0.65);
+  letter-spacing: 0.1em;
+}
+
+.calib-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 46px;
+  grid-template-areas:
+    'label slider value'
+    'hint  hint   hint';
+  align-items: center;
+  gap: 2px 8px;
+  margin-bottom: 7px;
+}
+
+.calib-label {
+  grid-area: label;
+  color: rgba(200, 212, 192, 0.75);
+}
+
+.calib-row input {
+  grid-area: slider;
+  width: 100%;
+  accent-color: #8fae70;
+}
+
+.calib-value {
+  grid-area: value;
+  text-align: right;
+  color: #d8e6cc;
+  font-variant-numeric: tabular-nums;
+}
+
+.calib-hint {
+  grid-area: hint;
+  padding-left: 48px;
+  font-size: 10px;
+  color: rgba(200, 212, 192, 0.4);
+}
+
+.calib-snippet {
+  margin: 10px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #b9d19a;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+.calib-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.calib-tab {
+  flex: 1;
+  padding: 4px 6px;
+  background: rgba(160, 190, 140, 0.08);
+  border: 1px solid rgba(160, 190, 140, 0.25);
+  border-radius: 2px;
+  color: rgba(200, 212, 192, 0.6);
+  font: inherit;
+  cursor: pointer;
+}
+
+.calib-tab-on {
+  background: rgba(160, 190, 140, 0.28);
+  color: #e6f0da;
+}
+
+/* 説明書き。値ではなく前提を伝える行 */
+.calib-note {
+  margin: 6px 0 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: rgba(200, 212, 192, 0.5);
+}
+
+/* 実行中の数値。調整の値と混ざらないよう、区切りを付けて並べる */
+.calib-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 2px 12px;
+}
+
+.calib-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  line-height: 1.7;
+}
+
+.calib-stat-label {
+  color: rgba(160, 190, 140, 0.6);
+}
+
+.calib-stat-value {
+  color: #d8e6cc;
+  font-variant-numeric: tabular-nums;
+}
