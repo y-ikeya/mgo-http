@@ -293,7 +293,7 @@ export class Player {
   private down = false
   /** ダンボールを被っているか */
   private boxed = false
-  private box: THREE.Mesh | null = null
+  private box: THREE.Object3D | null = null
   /** 箱の浮き上がり量 (m)。姿勢に遅れて追う */
   private boxLift = 0
   /** 鉛直方向の速度 (m/s)。接地中は 0 */

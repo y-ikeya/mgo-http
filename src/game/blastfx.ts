@@ -74,23 +74,26 @@ export class BlastFx {
   constructor(scene: THREE.Scene) {
     scene.add(this.group)
 
-    const atlas = new THREE.TextureLoader().load(
-      `${import.meta.env.BASE_URL}textures/particles.png`,
-      undefined,
-      undefined,
-      (error) => console.warn('[爆発] particles.png が読めない', error),
-    )
-    atlas.colorSpace = THREE.SRGBColorSpace
-
     // 粒ごとに別のマテリアルを持たせる。
     //
     // 濃さを 1 つずつ変えるので共有できない。格子のどのコマを出すかは
     // テクスチャの offset で決まるので、テクスチャも粒ごとに複製する
     // (画像は共有されるので、複製しても中身は増えない)。
+    //
+    // **読み込む先を粒ごとに分ける。** 1 枚を読んで複製すると、複製した時点では
+    // 画像がまだ無く、届いた瞬間に 25 個ぶんの作り直しが走る。three r185 の
+    // WebGPU では、それが提出中のバッファの破棄になって以後ずっと描画が崩れる
+    // (箱の影が出ず、人の影が置き去りになる)。同じ URL なので HTTP は 1 回で済む。
+    const loader = new THREE.TextureLoader()
     for (const kind of RECIPE) {
       for (let i = 0; i < kind.count; i++) {
-        const texture = atlas.clone()
-        texture.needsUpdate = true
+        const texture = loader.load(
+          `${import.meta.env.BASE_URL}textures/particles.png`,
+          undefined,
+          undefined,
+          (error) => console.warn('[爆発] particles.png が読めない', error),
+        )
+        texture.colorSpace = THREE.SRGBColorSpace
         texture.repeat.set(1 / COLS, 1 / ROWS)
         // 行は上から数える。UV は下からなので反転する
         texture.offset.set((i % COLS) / COLS, 1 - (kind.row + 1) / ROWS)

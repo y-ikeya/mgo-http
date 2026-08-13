@@ -302,14 +302,21 @@ export class Weapon {
   /** 左手を持っていく先のワールド座標。片手武器なら null */
 
 
+  /**
+   * 手から外す。
+   *
+   * **ジオメトリとマテリアルは捨てない。** 読み込みは URL でキャッシュしていて、
+   * 持ち主ごとの複製 (SkeletonUtils.clone) は元とジオメトリ・マテリアルを
+   * 共有している。ここで捨てると、同じ銃を持っている他の人の描画まで壊れる。
+   *
+   * WebGPU では黙って壊れない。まだ提出中のバッファが破棄されて
+   * 「used in submit while destroyed」が出続け、影の描画物も一緒に捨てられる
+   * (箱の影が出ず、人の影が置き去りになる)。持ち替えと湧き直しのたびに起きる。
+   *
+   * 捨てないことで残るのは、読み込んだ銃のぶんの記憶だけ。銃は数種類しか
+   * 無いので、抱えたままで構わない。
+   */
   dispose(): void {
-    this.object.traverse((obj) => {
-      if (!isMesh(obj)) return
-      obj.geometry.dispose()
-      const material = obj.material
-      if (Array.isArray(material)) material.forEach((m) => m.dispose())
-      else material.dispose()
-    })
     this.object.removeFromParent()
   }
 }

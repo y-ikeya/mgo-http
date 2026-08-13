@@ -146,7 +146,7 @@ export class RemotePlayer {
 
   private animator: CharacterAnimator | null = null;
   private weapon: Weapon | null = null;
-  private readonly box: THREE.Mesh;
+  private readonly box: THREE.Object3D;
   private boxed = false;
   /**
    * サーバーが「倒れている」と言っているか。
