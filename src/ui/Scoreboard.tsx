@@ -17,6 +17,17 @@ export default function Scoreboard(props: {
   onClose: () => void
   onLeave: () => void
 }) {
+  /** 決着したあとか。そのときは成績表がそのままリザルト画面になる */
+  const over = () => props.stats?.match?.phase === 'over'
+  const winner = () => props.stats?.match?.winner
+  /** 自分の陣営。勝ったかどうかの言い方を変えるのに使う */
+  const mine = () => props.stats?.scores?.find((p) => p.id === props.selfId)?.team
+  const verdict = () =>
+    winner() === 'draw' ? 'DRAW' : winner() === mine() ? 'VICTORY' : 'DEFEAT'
+  /** 次の試合まで (秒) */
+  const nextIn = () =>
+    Math.max(0, Math.ceil(((props.stats?.match?.endsAt ?? 0) - Date.now()) / 1000))
+
   // 陣営ごとに分けて、キルの多い順。同数ならデスの少ない順
   const side = (team: 'blue' | 'red') =>
     (props.stats?.scores ?? [])
@@ -26,6 +37,18 @@ export default function Scoreboard(props: {
   return (
     <div class="score">
       <div class="score-panel">
+        <Show when={over()}>
+          <div
+            class="score-verdict"
+            classList={{
+              'score-verdict-win': verdict() === 'VICTORY',
+              'score-verdict-lose': verdict() === 'DEFEAT',
+            }}
+          >
+            {verdict()}
+          </div>
+        </Show>
+
         <header class="score-head">
           <span class="score-blue">青 {props.stats?.match?.blue ?? 0}</span>
           <span class="score-dash">–</span>
@@ -64,8 +87,11 @@ export default function Scoreboard(props: {
 
         <footer class="score-foot">
           <button class="score-leave" onClick={props.onLeave}>
-            部屋を出る
+            Leave
           </button>
+          <Show when={over()}>
+            <span class="score-next">NEXT MATCH IN {nextIn()}</span>
+          </Show>
           <button class="score-close" onClick={props.onClose}>
             戻る <span class="score-key">Tab</span>
           </button>

@@ -68,6 +68,56 @@ export const DEFAULT_THROW: ThrowTuning = {
   contactSpeed: 0.9,
 }
 
+/**
+ * 投げ出す速さ (m/s)。
+ *
+ * サーバーが上限として使い、予測線もこれで引く。申告された速さは信じない。
+ */
+export const THROW_SPEED = 12
+
+/**
+ * 狙った向きより何度上へ投げるか。
+ *
+ * 狙いの向きそのままだと、水平に狙ったとき水平に飛ぶ。速いぶん低く伸びて、
+ * 野球の送球のような射線になる。手榴弾は放物線で置きに行く物なので、
+ * 常に上へ下駄を履かせて山なりにする。
+ *
+ * 狙う側は落下点の印を見て決めるので、向きと着地点がずれても困らない。
+ */
+const LOFT = (28 * Math.PI) / 180
+
+/**
+ * 狙った向きから初速を作る。
+ *
+ * **サーバーと予測線が同じ式を使う。** 別々に書くと、見えている軌道と
+ * 実際に飛ぶ軌道が食い違う。
+ *
+ * @param dx 狙いの向き (正規化済み)
+ */
+export function throwVelocity(
+  dx: number,
+  dy: number,
+  dz: number,
+  out: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 },
+): { x: number; y: number; z: number } {
+  const flat = Math.hypot(dx, dz)
+  // 真上か真下を向いている。下駄の履かせようが無いのでそのまま
+  if (flat < 1e-6) {
+    out.x = 0
+    out.y = Math.sign(dy) * THROW_SPEED
+    out.z = 0
+    return out
+  }
+
+  // 真上を越えて後ろへ回らないよう頭打ちにする
+  const pitch = Math.min(Math.atan2(dy, flat) + LOFT, (80 * Math.PI) / 180)
+  const cos = Math.cos(pitch)
+  out.x = (dx / flat) * cos * THROW_SPEED
+  out.y = Math.sin(pitch) * THROW_SPEED
+  out.z = (dz / flat) * cos * THROW_SPEED
+  return out
+}
+
 export interface Projectile {
   x: number
   y: number

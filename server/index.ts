@@ -13,7 +13,7 @@ import { decodeSnapshot, isSnapshot, stampSlot } from '../src/net/snapshot'
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
-import { FIXED_STEP, stepProjectile, type Projectile } from '../src/sim/ballistic'
+import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/ballistic'
 import { bulletDamage, weaponOf, type WeaponId } from '../src/sim/weapons'
 import { verifyHit, type Pose } from '../src/sim/hitcheck'
 import {
@@ -294,6 +294,7 @@ function resetPlayers(roomName: string, room: Match): void {
     player.concentratingSince = 0
     player.grenades = GRENADES_PER_LIFE
     player.holdingGrenade = false
+    player.footsteps.warp(player.x, player.z)
     broadcast(roomName, { type: 'respawn', id: player.id })
     sendHealth(roomName, player, 0, false)
   }
@@ -410,11 +411,22 @@ let grenadeId = 0
 /** 信管 (秒)。投げてから爆発するまで */
 const FUSE = 3
 
-/** 投げ出す速さ (m/s)。申告された初速はこれを超えられない */
-const THROW_SPEED = 15
+/**
+ * 手を離れる高さ (m)。足元からの差。
+ *
+ * 投擲モーションで手が一番高くなる所 (実測 1.74m) に合わせてある。
+ * クライアントの GRENADE_RELEASE_HEIGHT と揃えること — ずれると、
+ * 落下点の予測線と実際に飛ぶ軌道が食い違う。
+ */
+const RELEASE_HEIGHT = 1.7
 
-/** 手を離れる高さ (m)。足元からの差 */
-const RELEASE_HEIGHT = 1.35
+/**
+ * 手を離れる位置を、投げる向きへどれだけ前に出すか (m)。
+ * クライアントの GRENADE_RELEASE_FORWARD と揃える。
+ *
+ * 体の中心から出すと、真下へ投げたときに自分の足元をすり抜ける。
+ */
+const RELEASE_FORWARD = 0.45
 
 /** 1 つの命で投げられる数 */
 const GRENADES_PER_LIFE = 3
@@ -426,22 +438,25 @@ function throwGrenade(roomName: string, from: Player, event: NetMessage): void {
   if (from.health <= 0 || from.grenades <= 0) return
 
   // 向きは信じる (どこを向いているかは本人にしか分からない) が、
-  // 位置と速さは信じない。位置は控えてあるものを使い、速さは上限で切る。
+  // 位置と速さは信じない。位置は控えてあるものを使い、初速はこちらで作り直す。
   // 壁の中から投げる / 地図の反対側まで飛ばす、を初速の捏造で作れなくする
-  const [vx, vy, vz] = event.velocity
-  const speed = Math.hypot(vx, vy, vz)
-  if (!(speed > 0.001)) return
-  const scale = THROW_SPEED / speed
+  const [dx, dy, dz] = event.velocity
+  const length = Math.hypot(dx, dy, dz)
+  if (!(length > 0.001)) return
+  // 速さと上向きの下駄は共有の式で決める。予測線と同じ軌道になる
+  const v = throwVelocity(dx / length, dy / length, dz / length)
 
   from.grenades--
   const id = ++grenadeId
+  // 前へ出す量は水平方向だけで測る (上下を向いても手の位置が動かないように)
+  const flat = Math.hypot(v.x, v.z) || 1
   const body: Projectile = {
-    x: from.x,
+    x: from.x + (v.x / flat) * RELEASE_FORWARD,
     y: from.y + RELEASE_HEIGHT,
-    z: from.z,
-    vx: vx * scale,
-    vy: vy * scale,
-    vz: vz * scale,
+    z: from.z + (v.z / flat) * RELEASE_FORWARD,
+    vx: v.x,
+    vy: v.y,
+    vz: v.z,
     bounces: 0,
     resting: false,
   }
@@ -990,6 +1005,8 @@ setInterval(() => {
         player.health = MAX_HEALTH
         player.grenades = GRENADES_PER_LIFE
         player.holdingGrenade = false
+        // 湧き地点へ跳ぶ。歩いた距離として積むと、着いた先で足音が連打される
+        player.footsteps.warp(player.x, player.z)
         broadcast(roomName, { type: 'respawn', id: player.id })
         sendHealth(roomName, player, 0, false)
         continue

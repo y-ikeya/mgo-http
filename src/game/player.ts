@@ -1,3 +1,4 @@
+import { carrySpeedScale, weaponOf, type WeaponId } from '../sim/weapons'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import {
@@ -32,8 +33,13 @@ export const PLAYER_RADIUS = CAPSULE_RADIUS
  * クリップ実測値 (run 3.11 / run_back 2.55 / strafe 2.78〜3.26) に対して
  * 再生速度を補正するので足は滑らないが、離れるほどモーションが速回しになる。
  * 補正が 1.4 倍を超えるあたりから動きが漫画的に見え始める。
+ *
+ * ここを変えれば全部に効く。しゃがみ・構え・ダンボール・銃の重さは
+ * すべてこの値への倍率として掛かるので、姿勢や武器ごとに直して回る必要が無い。
+ * 3.8 → 3.04 に落としてある (0.8 倍)。クリップの実測に近づいたぶん、
+ * 速回しも収まる方向。
  */
-const MOVE_SPEED = 3.8
+const MOVE_SPEED = 3.04
 
 /**
  * 構えている間の移動速度の倍率。
@@ -246,7 +252,7 @@ export class Player {
   /** 読み込んだ体。銃を差し替えるときに手ボーンを引き直すのに要る */
   private model: THREE.Object3D | null = null
   /** いま持っている銃 */
-  private weaponKind: 'rifle' | 'sniper' = 'rifle'
+  private weaponKind: WeaponId = 'rifle'
   /**
    * 爆風で倒れているか。起き上がる操作をするまで続く。
    *
@@ -499,6 +505,16 @@ export class Player {
     return true
   }
 
+  /**
+   * 瞬間移動した。足音の積算を捨てる。
+   *
+   * 位置を直に書き換える側 (湧き地点への配置) が呼ぶ。呼ばないと、跳んだ距離が
+   * 歩いた距離として積まれて、着いた先で何歩ぶんも連続して鳴る。
+   */
+  warpTo(x: number, z: number): void {
+    this.footsteps.warp(x, z)
+  }
+
   /** 復帰。位置は呼び出し側が決める */
   respawn(): void {
     this.health = MAX_HEALTH
@@ -577,6 +593,11 @@ export class Player {
   /** 投げるのをやめる (倒された・箱に入った・死んだ) */
   cancelThrow(): void {
     this.animator?.cancelThrow()
+  }
+
+  /** 投擲モーションの再生位置 (秒) */
+  get throwTime(): number {
+    return this.animator?.throwTime ?? 0
   }
 
   /** 振りかぶり切ったか。投げられる状態になったかの判定に使う */
@@ -811,7 +832,11 @@ export class Player {
     }
     // 持っていない銃への調整は捨てる。パネル側が持ち替えに追従するので、
     // 通常はここで落ちない
-    const kind = target.startsWith('sniper') ? 'sniper' : 'rifle'
+    const kind: WeaponId = target.startsWith('sniper')
+      ? 'sniper'
+      : target.startsWith('pistol')
+        ? 'pistol'
+        : 'rifle'
     if (kind !== this.weaponKind) return
     this.weapon?.setStanceValues(target.endsWith('Crouch'), grip, rotation)
   }
@@ -881,7 +906,7 @@ export class Player {
   }
 
   /** いま持っている銃 */
-  get equipped(): 'rifle' | 'sniper' {
+  get equipped(): WeaponId {
     return this.weaponKind
   }
 
@@ -966,11 +991,17 @@ export class Player {
     // 意味が出る。挙げると決めたら、下ろし切るまでは無防備でいる。
     if (this.saluting) moveDir = ZERO_MOVE
 
+    // 銃の重さはどの姿勢でも効く。担いでいる物が軽くなるわけではないので。
+    //
+    // 構えている間だけは重さを見ない。あちらは狙いを保つために遅くしている
+    // (aimSpeedScale) ので、重さと二重に掛けると狙撃銃が止まってしまう。
+    const carrying = carrySpeedScale(weaponOf(this.weaponKind))
     let targetSpeed = this.crouching
-      ? this.moveSpeed * CROUCH_SPEED_SCALE
-      : this.moveSpeed * (this.aiming ? this.aimSpeedScale : 1)
+      ? this.moveSpeed * CROUCH_SPEED_SCALE * carrying
+      : this.moveSpeed * (this.aiming ? this.aimSpeedScale : carrying)
     if (this.stabbing) targetSpeed *= STAB_SPEED_SCALE
-    if (this.boxed) targetSpeed = this.moveSpeed * BOX_SPEED_SCALE
+    // ダンボールを被っている間も担いでいる物は同じ
+    if (this.boxed) targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * carrying
     if (this.down) targetSpeed = 0
     this.currentSpeed = damp(this.currentSpeed, targetSpeed, SPEED_LAMBDA, dt)
 
@@ -1087,7 +1118,12 @@ export class Player {
       //   箱の中  … 持ったまま屈むと箱からはみ出るし、構えられないので意味がない
       //   敬礼中  … 銃を握った手で敬礼はできない。手が空いている前提の型
       const saluting = this.animator.saluting
-      const holstered = this.boxed || saluting
+      // 拳銃は構えるまで抜かない。**ホルスターに納まっている**という扱い。
+      //
+      // 副武器なので、持っていること自体は見せなくてよい。抜いていないぶん
+      // 「今どちらを持っているか」が相手からも読みにくくなる。
+      const holstered =
+        this.boxed || saluting || (this.weaponKind === 'pistol' && !this.aiming)
       if (this.knife) this.knife.visible = (stabbing || this.knifePreview) && !holstered
       if (this.weapon) this.weapon.visible = !stabbing && !holstered
     }
@@ -1133,6 +1169,9 @@ export class Player {
 
     // 読み込み前に速度を変えられている場合があるので、定数ではなく現在値を渡す
     this.animator = new CharacterAnimator(model, gltf.animations, this.moveSpeed)
+    // モデルは非同期で読むので、ここより前に受けた設定を流し込み直す。
+    // 呼ばれた時点では animator がまだ無く、素通りしている
+    this.animator.setPistol(this.weaponKind === 'pistol')
 
     disposeTree(this.placeholder)
     this.placeholder = null
@@ -1183,9 +1222,10 @@ export class Player {
    * 計算し直す必要がある。モデルの読み込みは共有のキャッシュに乗るので、
    * 2 回目以降は待ち時間が出ない。
    */
-  async equip(kind: 'rifle' | 'sniper'): Promise<void> {
+  async equip(kind: WeaponId): Promise<void> {
     if (kind === this.weaponKind) return
     this.weaponKind = kind
+    this.animator?.setPistol(kind === 'pistol')
     const model = this.model
     if (!model) return
 
@@ -1197,7 +1237,7 @@ export class Player {
 
   private async attachWeapon(
     model: THREE.Object3D,
-    kind: 'rifle' | 'sniper' = this.weaponKind,
+    kind: WeaponId = this.weaponKind,
   ): Promise<void> {
     let weapon: Weapon
     try {

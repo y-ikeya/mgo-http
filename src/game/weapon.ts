@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadRifle, loadSniper } from './assets'
+import { loadKnife, loadRifle, loadSniper, loadPistol } from './assets'
 import { isMesh } from './guards'
 
 /**
@@ -80,7 +80,23 @@ function lerpAngle(from: number, to: number, t: number): number {
   return from + (diff < -Math.PI ? diff + Math.PI * 2 : diff) * t
 }
 
-export const WEAPON_CONFIGS = { rifle: RIFLE, sniper: SNIPER, knife: KNIFE } as const
+/**
+ * 拳銃。
+ *
+ * 片手で握るので、長物と違って手のひらの中に収まる。握り位置が原点寄りで
+ * 追加回転が 0 なのはそのため — モデルの向きがそのまま手の向きになる。
+ */
+const PISTOL: WeaponConfig = {
+  grip: new THREE.Vector3(0.05, 0.005, 0.125),
+  rotation: new THREE.Euler(degrees(-5), 0, 0),
+  crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
+  crouchRotation: new THREE.Euler(degrees(-5), 0, 0),
+  // 銃口。モデルの先端 5mm を測ると y 0.051〜0.083 で、その中央。
+  // 置き値のままだと 4.7cm 低く 6.6cm 手前から弾が出ていた
+  tip: new THREE.Vector3(0, 0.067, -0.172),
+}
+
+export const WEAPON_CONFIGS = { rifle: RIFLE, sniper: SNIPER, pistol: PISTOL, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
 
 /**
@@ -93,6 +109,8 @@ export type WeaponTarget =
   | 'rifleCrouch'
   | 'sniper'
   | 'sniperCrouch'
+  | 'pistol'
+  | 'pistolCrouch'
   | 'knife'
 
 /**
@@ -147,7 +165,13 @@ export class Weapon {
   /** 読み込みは共有キャッシュ。持ち主ごとに複製して返す */
   static async load(kind: WeaponKind = 'rifle'): Promise<Weapon> {
     const gltf =
-      kind === 'knife' ? await loadKnife() : kind === 'sniper' ? await loadSniper() : await loadRifle()
+      kind === 'knife'
+        ? await loadKnife()
+        : kind === 'sniper'
+          ? await loadSniper()
+          : kind === 'pistol'
+            ? await loadPistol()
+            : await loadRifle()
     return new Weapon(cloneSkinned(gltf.scene), WEAPON_CONFIGS[kind])
   }
 

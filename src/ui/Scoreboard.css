@@ -152,3 +152,39 @@
   color: rgba(150, 166, 140, 0.6);
   margin-left: 4px;
 }
+
+/*
+ * 決着したときの見出し。
+ *
+ * 成績表をそのままリザルト画面として使う。専用の画面を別に作らないのは、
+ * 見たいものが同じだから — 誰が何点取ったか。勝ち負けはその上に一行足せば済む。
+ */
+.score-verdict {
+  padding: 18px 16px 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-align: center;
+  color: rgba(206, 214, 196, 0.9);
+}
+
+.score-verdict-win {
+  color: rgba(150, 214, 132, 0.95);
+  text-shadow: 0 0 22px rgba(120, 200, 100, 0.35);
+}
+
+.score-verdict-lose {
+  color: rgba(214, 132, 120, 0.9);
+}
+
+/* 次の試合まで。押せるものではないので、ボタンとは見た目を分ける */
+.score-next {
+  align-self: center;
+  margin-left: auto;
+  margin-right: 10px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: rgba(190, 206, 176, 0.55);
+}

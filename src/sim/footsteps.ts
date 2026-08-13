@@ -102,11 +102,33 @@ function profileFor(locomotion: Locomotion): StepProfile | null {
  * 位置の差分を積んで、歩幅ぶん進むごとに 1 歩返す。速度そのものではなく
  * 実際に動いた距離を見るので、壁に押し付けて足踏みしている間は鳴らない。
  */
+/**
+ * 1 回の呼び出しで進んだとみなす上限 (m)。これを超えたら瞬間移動。
+ *
+ * 走っても 64Hz で 1 回あたり 0.1m 程度なので、3m は明らかに歩いていない。
+ * 湧き直しで 70m 跳ぶと、その距離が積算に入って**そのあと 1 歩ずつ吐き出される**。
+ * 実際に起きた: 試合が始まった瞬間に足音が 0.9 秒ほど連打された。
+ */
+const TELEPORT = 3;
+
 export class Footsteps {
   private travelled = 0;
   private lastX = 0;
   private lastZ = 0;
   private started = false;
+
+  /**
+   * 瞬間移動した。積んだ距離を捨てる。
+   *
+   * 湧き直しや繋ぎ直しで呼ぶ。update 側でも距離で弾いているが、
+   * 呼べる場面では呼んだほうが確実 (跳んだ距離が短いときも取りこぼさない)。
+   */
+  warp(x: number, z: number): void {
+    this.started = true;
+    this.lastX = x;
+    this.lastZ = z;
+    this.travelled = 0;
+  }
 
   /**
    * @returns この呼び出しで踏んだなら鳴らし方、鳴らないなら null
@@ -122,6 +144,12 @@ export class Footsteps {
     const moved = Math.hypot(x - this.lastX, z - this.lastZ);
     this.lastX = x;
     this.lastZ = z;
+
+    // 歩いて着いた距離ではない。積まずに捨てる
+    if (moved > TELEPORT) {
+      this.travelled = 0;
+      return null;
+    }
 
     const profile = grounded ? profileFor(locomotion) : null;
     if (!profile) return null;

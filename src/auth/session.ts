@@ -96,18 +96,18 @@ async function call(path: string, body: unknown): Promise<Record<string, unknown
  */
 function translate(data: Record<string, unknown>): string {
   const code = typeof data.error_code === 'string' ? data.error_code : ''
-  const message = typeof data.msg === 'string' ? data.msg : '通信に失敗した'
+  const message = typeof data.msg === 'string' ? data.msg : 'サーバーに繋がりませんでした'
   switch (code) {
     case 'invalid_credentials':
-      return '名前かパスワードが違う'
+      return '名前かパスワードが違います'
     case 'email_not_confirmed':
-      return 'メールの確認がまだ。届いたリンクを開いてから入り直す'
+      return 'メールの確認がまだです。届いたリンクを開いてから Login してください'
     case 'user_already_exists':
-      return 'その名前はもう使われている'
+      return 'その名前は既に使われています'
     case 'weak_password':
-      return 'パスワードが短い (6 文字以上)'
+      return 'パスワードが短すぎます (6 文字以上)'
     case 'over_email_send_rate_limit':
-      return '確認メールの送りすぎ。少し待つ'
+      return '確認メールの送信が続きました。少し待ってからやり直してください'
     default:
       return message
   }

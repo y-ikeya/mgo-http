@@ -763,7 +763,17 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   ambient = sky
 
   const sun = new THREE.DirectionalLight(0xfff4e6, SUN_INTENSITY)
+  // 闘技場の真ん中に固定する。動かさない。
+  //
+  // 追従させると、**エリア中の影が一斉にプレイヤーへ付いてくる**。
+  // 影マップは光から見た固定の格子に地形を焼き付けたもので、範囲を動かすと
+  // 焼き付けの位置がずれる。升目に丸めても完全には止まらなかった。
+  //
+  // 壁が ±40m、影の範囲が ±45m なので、**最初から全域が入っている**。
+  // 動かす理由が無かった。ステージがこれより広くなったら、そのときは
+  // 追従ではなく影マップを分ける (カスケード) 方を考える。
   sun.position.set(18, 30, 12)
+  sun.target.position.set(0, 0, 0)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048)
   // 影の濃さ。1 で完全に直射を遮る。
@@ -785,8 +795,3 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   return sun
 }
 
-/** 影の範囲をプレイヤーに追従させる。光の向きは変えず、範囲だけ動かす */
-export function followShadow(sun: THREE.DirectionalLight, focus: THREE.Vector3): void {
-  sun.target.position.copy(focus)
-  sun.position.set(focus.x + 18, focus.y + 30, focus.z + 12)
-}

@@ -21,7 +21,22 @@
 
 import type { HitZone } from './damage'
 
-export type WeaponId = 'rifle' | 'sniper'
+export type WeaponId = 'rifle' | 'sniper' | 'pistol'
+
+/**
+ * 武器の枠。
+ *
+ * 持ち物は「主 1 丁 + 副 1 丁 + 投擲」で、枠に何を入れるかを湧き地点で選ぶ。
+ * 銃を並べて順に持ち替える形にしないのは、選ぶこと自体を手にしたいため —
+ * 狙撃銃を選んだなら、詰められたときに突撃銃は無い。
+ */
+export type Slot = 'primary' | 'secondary'
+
+/** その枠に入れられる銃 */
+export const CHOICES: Record<Slot, WeaponId[]> = {
+  primary: ['rifle', 'sniper'],
+  secondary: ['pistol'],
+}
 
 export interface WeaponSpec {
   id: WeaponId
@@ -30,9 +45,9 @@ export interface WeaponSpec {
   /** キル表示に出す名前。実銃の呼び名 */
   kill: string
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe'
+  shotSound: 'rifle' | 'snipe' | 'pistol'
   /** モデルのファイル名 (拡張子なし) */
-  model: 'rifle' | 'sniper'
+  model: WeaponId
 
   // --- 威力 ---
   /**
@@ -62,6 +77,34 @@ export interface WeaponSpec {
    */
   bolt: boolean
   magazine: number
+  /** どの枠に入る銃か */
+  slot: Slot
+  /**
+   * 重さ (kg)。実銃の値。
+   *
+   * 移動の速さはここから導く (carrySpeedScale)。銃ごとに速さの倍率を
+   * 直接持たせると、銃が増えるたびに勘で数字を決めることになる。
+   * **重さは実物から引ける**ので、決める余地が無いぶん揉めない。
+   */
+  weight: number
+  /**
+   * 持ち点 (DP)。湧き地点で組むときの値段。
+   *
+   * MGO2 は上限つきの持ち点で装備を組ませていた。強い銃ほど高く、
+   * 全部は持てない。「なぜ常に最強を選ばないのか」への答えがこれ。
+   *
+   * 今は選べる物が少なく、値段を付けても選択にならないので全部 0。
+   * 増えたときに UI を作り直さずに済むよう、欄だけ先に置いてある。
+   */
+  cost: number
+  /**
+   * 弾倉の外に持っている弾 (発)。1 つの命ぶん。
+   *
+   * 弾倉の数ではなく**発数の池**として持つ。半分残った弾倉を替えても
+   * 残りは池へ戻るので、こまめに替えることが損にならない。
+   * 「撃つ前に替えておく」を選べるようにしたい。
+   */
+  reserve: number
   /** リロードにかかる時間 (秒)。クリップの尺が取れればそちらを使う */
   reload: number
 
@@ -118,6 +161,10 @@ const RIFLE: WeaponSpec = {
   model: 'rifle',
 
   // 頭 1 発 / 胴 5 発 / 脚 10 発
+  slot: 'primary',
+  cost: 0,
+  // AK47 の実重量。速さの基準になる
+  weight: 3.5,
   zone: { HEAD: 100, BODY: 20, LEGS: 10 },
   fullRange: 25,
   minRange: 70,
@@ -127,6 +174,8 @@ const RIFLE: WeaponSpec = {
   auto: true,
   bolt: false,
   magazine: 30,
+  // 弾倉 3 つぶん。全弾を胴に当てれば 24 人だが、当てられなければ 6〜8 人で尽きる
+  reserve: 90,
   reload: 2.5,
 
   bulletSpeed: 420,
@@ -167,6 +216,10 @@ const SNIPER: WeaponSpec = {
   //
   // 当てさえすれば良い武器にしない。外れ気味に当たった脚では決まらないので、
   // 狙った所に当たったときだけ 1.57 秒の間隔が報われる。
+  slot: 'primary',
+  cost: 0,
+  // XM2010。長物のうえに照準器が乗るので重い
+  weight: 5.5,
   zone: { HEAD: 130, BODY: 65, LEGS: 25 },
   // 遠くから撃つ武器なので減衰させない。近距離で強すぎる分は連射の遅さで払う
   fullRange: 200,
@@ -177,6 +230,8 @@ const SNIPER: WeaponSpec = {
   auto: false,
   bolt: true,
   magazine: 5,
+  // 弾倉 3 つぶん。胴なら 10 人ぶんだが、外すと一気に減る
+  reserve: 15,
   reload: 3.2,
 
   bulletSpeed: 820,
@@ -205,9 +260,60 @@ const SNIPER: WeaponSpec = {
   ],
 }
 
+/**
+ * 拳銃。副武器。
+ *
+ * 近ければ強く、離れると急に落ちる。主武器を撃ち切ったときの逃げ道であり、
+ * 狙撃銃を選んだ人が詰められたときの最後の手でもある。
+ *
+ * 頭は 1 発。この作りでは全部の銃がそうなっている — 当てた側が勝つ、を
+ * 距離や銃の格で覆さない。
+ */
+const PISTOL: WeaponSpec = {
+  id: 'pistol',
+  slot: 'secondary',
+  cost: 0,
+  // M9。この作りで一番軽い
+  weight: 0.95,
+  label: '拳銃',
+  kill: 'M9',
+  shotSound: 'pistol',
+  model: 'pistol',
+  // 胴 4 発。突撃銃 (5 発) よりわずかに速いだけで、離れると減衰で届かなくなる
+  zone: { HEAD: 100, BODY: 25, LEGS: 12 },
+  // 減衰が早い。25m を過ぎると落ち始め、45m で半分になる
+  fullRange: 25,
+  minRange: 45,
+  minScale: 0.5,
+  // 引き金を引くたび 1 発。押しっぱなしでは撃てない。
+  // 連射の下限も遅くしてある — 速く押しても撃てる速さは変わらない
+  fireInterval: 0.28,
+  auto: false,
+  bolt: false,
+  magazine: 12,
+  reserve: 48,
+  reload: 2.1,
+  bulletSpeed: 380,
+  bulletGravity: 9.8,
+  // 片手で構えるので跳ねる。連射するほど散る
+  spreadPerShot: 0.28,
+  spreadMax: 2.2,
+  spreadPerSpeed: 0.34,
+  spreadCrouchScale: 0.5,
+  spreadAirborne: 2,
+  spreadPerStance: 0.12,
+  // 覗く倍率は持たない。肩越しのまま撃つ銃
+  aimFov: 44,
+  aimDistance: 1.5,
+  aimShoulder: 0.46,
+  aimSpeedScale: 0.72,
+  scope: [],
+}
+
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   rifle: RIFLE,
   sniper: SNIPER,
+  pistol: PISTOL,
 }
 
 export const DEFAULT_WEAPON: WeaponId = 'rifle'
@@ -230,6 +336,27 @@ export function falloff(spec: WeaponSpec, distance: number): number {
 }
 
 /** その武器で、その部位に、その距離で当てたときのダメージ */
+/**
+ * 重さの基準 (kg)。突撃銃をここに置く。
+ *
+ * これより軽ければ速く、重ければ遅い。基準を実在の銃に置いておくと、
+ * 新しい銃を足すときに「AK より重いか軽いか」だけで速さが決まる。
+ */
+const REFERENCE_WEIGHT = 3.5
+
+/** 1kg あたり何割速さが変わるか */
+const WEIGHT_EFFECT = 0.06
+
+/**
+ * 提げているときの移動の速さ (倍率)。
+ *
+ * 構えている間の速さは別 (aimSpeedScale)。あちらは狙いの安定の話で、
+ * こちらは荷物の重さの話なので、同じ数字にまとめない。
+ */
+export function carrySpeedScale(spec: WeaponSpec): number {
+  return 1 + (REFERENCE_WEIGHT - spec.weight) * WEIGHT_EFFECT
+}
+
 export function bulletDamage(spec: WeaponSpec, zone: HitZone, distance: number): number {
   return spec.zone[zone] * falloff(spec, distance)
 }

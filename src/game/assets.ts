@@ -12,6 +12,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 const SOLDIER_URL = `${import.meta.env.BASE_URL}models/soldier.glb`
 const RIFLE_URL = `${import.meta.env.BASE_URL}models/rifle.glb`
 const SNIPER_URL = `${import.meta.env.BASE_URL}models/sniper.glb`
+const PISTOL_URL = `${import.meta.env.BASE_URL}models/pistol.glb`
 const KNIFE_URL = `${import.meta.env.BASE_URL}models/knife.glb`
 const GRENADE_URL = `${import.meta.env.BASE_URL}models/grenade.glb`
 const STAGE_URL = `${import.meta.env.BASE_URL}models/stage.glb`
@@ -59,6 +60,10 @@ export function loadRifle(): Promise<GLTF> {
 
 export function loadSniper(): Promise<GLTF> {
   return load(SNIPER_URL)
+}
+
+export function loadPistol(): Promise<GLTF> {
+  return load(PISTOL_URL)
 }
 
 export function loadKnife(): Promise<GLTF> {

@@ -28,6 +28,14 @@ const INITIAL_WEAPONS = {
     grip: { x: -0.01, y: 0.3, z: 0.02 },
     rotation: { x: -37, y: 3, z: 173 },
   },
+  pistol: {
+    grip: { x: 0.05, y: 0.005, z: 0.125 },
+    rotation: { x: -5, y: 0, z: 0 },
+  },
+  pistolCrouch: {
+    grip: { x: 0.035, y: 0, z: 0.11 },
+    rotation: { x: -5, y: 0, z: 0 },
+  },
   knife: {
     grip: { x: 0.02, y: -0.07, z: 0.025 },
     rotation: { x: 0, y: 0, z: 0 },
@@ -63,6 +71,22 @@ const BOX_AXES: {
 ]
 
 type WeaponTarget = keyof typeof INITIAL_WEAPONS
+type Vec3 = { x: number; y: number; z: number }
+
+/**
+ * 調整値の初期状態。
+ *
+ * 表から作る。武器を足したときにここを書き足し忘れると、タブは出るのに
+ * 値が無くて落ちる (拳銃を足したときに実際に踏んだ)。
+ */
+function freshWeapons(): Record<WeaponTarget, { grip: Vec3; rotation: Vec3 }> {
+  return Object.fromEntries(
+    (Object.keys(INITIAL_WEAPONS) as WeaponTarget[]).map((key) => [
+      key,
+      { grip: { ...INITIAL_WEAPONS[key].grip }, rotation: { ...INITIAL_WEAPONS[key].rotation } },
+    ]),
+  ) as Record<WeaponTarget, { grip: Vec3; rotation: Vec3 }>
+}
 
 const DEVICE_OPTIONS: { key: InputDevice; label: string }[] = [
   { key: 'auto', label: '自動' },
@@ -175,22 +199,7 @@ export default function Calibrator(props: {
   inputStatus: () => { active: 'keyboard' | 'gamepad'; connected: boolean }
 }) {
   const [target, setTarget] = createSignal<WeaponTarget>('rifle')
-  const [weapons, setWeapons] = createSignal({
-    rifle: { grip: { ...INITIAL_WEAPONS.rifle.grip }, rotation: { ...INITIAL_WEAPONS.rifle.rotation } },
-    rifleCrouch: {
-      grip: { ...INITIAL_WEAPONS.rifleCrouch.grip },
-      rotation: { ...INITIAL_WEAPONS.rifleCrouch.rotation },
-    },
-    sniper: {
-      grip: { ...INITIAL_WEAPONS.sniper.grip },
-      rotation: { ...INITIAL_WEAPONS.sniper.rotation },
-    },
-    sniperCrouch: {
-      grip: { ...INITIAL_WEAPONS.sniperCrouch.grip },
-      rotation: { ...INITIAL_WEAPONS.sniperCrouch.rotation },
-    },
-    knife: { grip: { ...INITIAL_WEAPONS.knife.grip }, rotation: { ...INITIAL_WEAPONS.knife.rotation } },
-  })
+  const [weapons, setWeapons] = createSignal(freshWeapons())
   const grip = () => weapons()[target()].grip
   const rotation = () => weapons()[target()].rotation
   const [box, setBox] = createSignal({ ...INITIAL_BOX })
@@ -336,22 +345,7 @@ export default function Calibrator(props: {
   }
 
   const reset = () => {
-    setWeapons({
-      rifle: { grip: { ...INITIAL_WEAPONS.rifle.grip }, rotation: { ...INITIAL_WEAPONS.rifle.rotation } },
-      rifleCrouch: {
-        grip: { ...INITIAL_WEAPONS.rifleCrouch.grip },
-        rotation: { ...INITIAL_WEAPONS.rifleCrouch.rotation },
-      },
-      sniper: {
-        grip: { ...INITIAL_WEAPONS.sniper.grip },
-        rotation: { ...INITIAL_WEAPONS.sniper.rotation },
-      },
-      sniperCrouch: {
-        grip: { ...INITIAL_WEAPONS.sniperCrouch.grip },
-        rotation: { ...INITIAL_WEAPONS.sniperCrouch.rotation },
-      },
-      knife: { grip: { ...INITIAL_WEAPONS.knife.grip }, rotation: { ...INITIAL_WEAPONS.knife.rotation } },
-    })
+    setWeapons(freshWeapons())
     updateAimGain(INITIAL_AIM_GAIN)
     updateRelaxedLean(INITIAL_RELAXED_LEAN)
     updateExposure(INITIAL_EXPOSURE)
@@ -469,6 +463,15 @@ export default function Calibrator(props: {
             onClick={() => selectTarget(props.stats?.crouching ? 'sniperCrouch' : 'sniper')}
           >
             スナイパー
+          </button>
+          <button
+            classList={{
+              'calib-tab': true,
+              'calib-tab-on': target() === 'pistol' || target() === 'pistolCrouch',
+            }}
+            onClick={() => selectTarget(props.stats?.crouching ? 'pistolCrouch' : 'pistol')}
+          >
+            ハンドガン
           </button>
           <button
             classList={{ 'calib-tab': true, 'calib-tab-on': target() === 'knife' }}

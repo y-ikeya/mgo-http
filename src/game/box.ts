@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { damp } from './math'
+import { createHandleAlpha } from './cardboard'
 
 /**
  * ダンボール箱。
@@ -118,11 +119,110 @@ export function placeBox(box: THREE.Mesh, lift: number): void {
 }
 
 /** 側面の色。彩度を落とした段ボール色 */
-const SIDE_COLOR = 0x9d7748
+const SIDE_COLOR = 0xffffff
 /** 上面。フラップが陰になるので側面より暗い */
-const TOP_COLOR = 0x7d5e38
+const TOP_COLOR = 0xbdb3a4
 /** 底面。接地して見えないが、下から覗かれたときのために暗く */
-const BOTTOM_COLOR = 0x4a3722
+const BOTTOM_COLOR = 0x7a7066
+
+/**
+ * 箱を 1 つ作る。足元 (y=0) に置く前提で、原点が底面に来るようずらしてある。
+ *
+ * マテリアルは面ごとに分ける。単色の立方体は陰影が付かず、
+ * 平行光の向きによっては輪郭が消えて板に見える。
+ */
+/**
+ * 全部の面に共通の設定。
+ *
+ * **裏面も描く。** 持ち手の穴からも、被っている本人の視点からも箱の内側が見えるので、
+ * 表しか描かないと壁が消えて外の景色が透ける。
+ *
+ * shadowSide は触らない。DoubleSide のときは three が裏面を影の深度に使う
+ * (奥の面で深度を書くので、手前の面が自分の影に入らない)。
+ * FrontSide を指定したら、手前の面が自分自身を影にして大きな黒い塊が出た。
+ */
+const INTERIOR = {
+  side: THREE.DoubleSide,
+} as const
+
+/**
+ * 箱の見た目は全員で 1 組を共有する。
+ *
+ * 箱は誰が被っても同じ物なので、人数分作る理由が無い。それ以上に、
+ * **人ごとに作って人ごとに捨てる形が壊れやすい**。退出のたびにマテリアルと
+ * テクスチャを捨てることになり、まだ描画に使われている物を破棄すると
+ * WebGPU が「破棄済みのバッファが使われた」と言って以後ずっと描画が崩れる。
+ */
+let shared: { geometry: THREE.BoxGeometry; materials: THREE.Material[] } | null = null
+
+function sharedParts(): { geometry: THREE.BoxGeometry; materials: THREE.Material[] } {
+  if (shared) return shared
+
+  // 1m 角で作って scale で寸法を出す。調整のたびにジオメトリを作り直さずに済む。
+  const geometry = new THREE.BoxGeometry(1, 1, 1)
+
+  // クラフト紙の写真。全部の面で 1 枚を共有する。
+  //
+  // **読み終わってから map を差し替えない。** loader.load は入れ物を即座に返し、
+  // 画像が届いたら中身だけ入れ替わる。あとから material.map を代入して
+  // needsUpdate を立てると、WebGPU では描画物が作り直しになり、
+  // まだ提出中のバッファが破棄されて以後ずっと描画が崩れる。
+  const photo = new THREE.TextureLoader().load(
+    `${import.meta.env.BASE_URL}textures/cardboard.jpg`,
+    undefined,
+    undefined,
+    (error) => console.warn('[Box] cardboard.jpg が読めない', error),
+  )
+  photo.colorSpace = THREE.SRGBColorSpace
+  photo.anisotropy = 4
+
+  // 前後の面。持ち手の穴が開く
+  const side = new THREE.MeshStandardMaterial({
+    color: SIDE_COLOR,
+    map: photo,
+    // 穴は塗らずに抜く。transparent ではなく alphaTest を使う —
+    // 半透明にすると描画順の問題が出るし、穴は開いているか閉じているかしかない
+    alphaMap: createHandleAlpha(),
+    alphaTest: 0.5,
+    ...INTERIOR,
+    roughness: 0.95,
+    metalness: 0,
+  })
+  // 左右の面
+  const flank = new THREE.MeshStandardMaterial({
+    color: SIDE_COLOR,
+    map: photo,
+    ...INTERIOR,
+    roughness: 0.95,
+    metalness: 0,
+  })
+  const top = new THREE.MeshStandardMaterial({
+    color: TOP_COLOR,
+    map: photo,
+    ...INTERIOR,
+    roughness: 0.95,
+    metalness: 0,
+  })
+  const bottom = new THREE.MeshStandardMaterial({
+    color: BOTTOM_COLOR,
+    map: photo,
+    ...INTERIOR,
+    roughness: 1,
+    metalness: 0,
+  })
+
+  // BoxGeometry のマテリアル順は +X, -X, +Y, -Y, +Z, -Z。
+  //
+  // **同じ実体を 2 面で使わない。** 見た目が同じでも複製して渡す。
+  // three の WebGPU は (オブジェクト, マテリアル, ジオメトリ) の組で描画物を
+  // 索引しているので、同じ組み合わせが 2 つあると互いを追い出し合い、
+  // 毎フレーム作り直しになる。
+  shared = {
+    geometry,
+    materials: [flank, flank.clone(), top, bottom, side, side.clone()],
+  }
+  return shared
+}
 
 /**
  * 箱を 1 つ作る。足元 (y=0) に置く前提で、原点が底面に来るようずらしてある。
@@ -131,18 +231,8 @@ const BOTTOM_COLOR = 0x4a3722
  * 平行光の向きによっては輪郭が消えて板に見える。
  */
 export function createCardboardBox(): THREE.Mesh {
-  // 1m 角で作って scale で寸法を出す。調整のたびにジオメトリを作り直さずに済む。
-  const geometry = new THREE.BoxGeometry(1, 1, 1)
-  const side = new THREE.MeshStandardMaterial({ color: SIDE_COLOR, roughness: 0.95, metalness: 0 })
-  const top = new THREE.MeshStandardMaterial({ color: TOP_COLOR, roughness: 0.95, metalness: 0 })
-  const bottom = new THREE.MeshStandardMaterial({
-    color: BOTTOM_COLOR,
-    roughness: 1,
-    metalness: 0,
-  })
-
-  // BoxGeometry のマテリアル順は +X, -X, +Y, -Y, +Z, -Z
-  const box = new THREE.Mesh(geometry, [side, side, top, bottom, side, side])
+  const { geometry, materials } = sharedParts()
+  const box = new THREE.Mesh(geometry, materials)
   box.castShadow = true
   box.receiveShadow = true
   box.visible = false
@@ -168,10 +258,12 @@ function applyOpacity(box: THREE.Mesh): void {
   }
 }
 
-/** 箱を捨てる。マテリアルは面で共有しているので重複して dispose しない */
+/**
+ * 箱を捨てる。
+ *
+ * 見た目は全員で共有しているので、ここでは何も捨てない。捨てると、
+ * まだ箱を被っている他の人の描画が壊れる。
+ */
 export function disposeBox(box: THREE.Mesh): void {
-  box.geometry.dispose()
-  const materials = Array.isArray(box.material) ? box.material : [box.material]
-  for (const material of new Set(materials)) material.dispose()
   box.removeFromParent()
 }

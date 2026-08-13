@@ -72,7 +72,7 @@ export default function Lobby(props: { identity: Identity }) {
               location.reload()
             }}
           >
-            出る
+            Logout
           </button>
         </div>
       </header>

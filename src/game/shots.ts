@@ -9,10 +9,6 @@ const POOL_SIZE = 24
 /** 着弾痕の半径 (m) */
 const IMPACT_RADIUS = 0.07
 
-/** 爆発の閃光が残る時間 (秒)。実際の爆風より短い — 目に残る印だけ */
-const FLASH_LIFE = 0.55
-/** 閃光が広がりきる半径 (m)。爆風の届く距離 (BLAST_RADIUS) に合わせてある */
-const FLASH_RADIUS = 7
 
 /**
  * 発砲の見た目 (トレーサー + 着弾痕) だけを担当する。
@@ -35,37 +31,10 @@ export class Shots {
   private readonly impactGeometry = new THREE.CircleGeometry(IMPACT_RADIUS, 12)
   private readonly lookTarget = new THREE.Vector3()
 
-  /**
-   * 爆発の閃光。
-   *
-   * 1 つだけ持ち回す。同時に 2 発爆ぜることはまず無いし、あっても
-   * 音と体力の変化で伝わる。見た目のために数を持つ理由が無い。
-   */
-  private readonly flash: THREE.Mesh
-  private readonly flashLight: THREE.PointLight
-  private flashLife = 0
 
   constructor(scene: THREE.Scene) {
     scene.add(this.group)
 
-    this.flash = new THREE.Mesh(
-      new THREE.SphereGeometry(1, 16, 12),
-      new THREE.MeshBasicMaterial({
-        color: 0xffb055,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        // 露出に左右されない。爆発が明るく見えないと何が起きたか分からない
-        toneMapped: false,
-      }),
-    )
-    this.flash.visible = false
-    this.group.add(this.flash)
-
-    // 一瞬だけ周りを照らす。壁の裏に居ても閃光の反射で「近い」が分かる
-    this.flashLight = new THREE.PointLight(0xffa040, 0, FLASH_RADIUS * 2.5)
-    this.flashLight.visible = false
-    this.group.add(this.flashLight)
 
     for (let i = 0; i < POOL_SIZE; i++) {
       // 2 頂点だけの線分。発砲のたびに座標を書き換える
@@ -133,31 +102,7 @@ export class Shots {
     this.impactNext = (this.impactNext + 1) % POOL_SIZE
   }
 
-  /** 爆発の閃光。ダメージはサーバーが決めるので、ここは見せるだけ */
-  explode(at: THREE.Vector3): void {
-    this.flash.position.copy(at)
-    this.flash.scale.setScalar(0.6)
-    this.flash.visible = true
-    this.flashLight.position.copy(at)
-    this.flashLight.visible = true
-    this.flashLife = FLASH_LIFE
-  }
-
-  update(dt: number): void {
-    if (this.flashLife > 0) {
-      this.flashLife -= dt
-      const left = Math.max(0, this.flashLife) / FLASH_LIFE
-      if (left <= 0) {
-        this.flash.visible = false
-        this.flashLight.visible = false
-      } else {
-        // 広がりながら薄れる。最初の一瞬だけ濃く見えるよう二乗で落とす
-        this.flash.scale.setScalar(0.6 + (1 - left) * FLASH_RADIUS)
-        ;(this.flash.material as THREE.MeshBasicMaterial).opacity = left * left * 0.75
-        this.flashLight.intensity = left * left * 60
-      }
-    }
-
+    update(dt: number): void {
     for (let i = 0; i < POOL_SIZE; i++) {
       if (this.tracerLife[i] > 0) {
         this.tracerLife[i] -= dt
@@ -185,8 +130,6 @@ export class Shots {
   }
 
   dispose(): void {
-    this.flash.geometry.dispose()
-    ;(this.flash.material as THREE.Material).dispose()
     for (const line of this.tracers) {
       line.geometry.dispose()
       ;(line.material as THREE.Material).dispose()

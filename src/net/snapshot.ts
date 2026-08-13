@@ -17,6 +17,7 @@
 import type { Locomotion } from '../game/animation'
 import { MOVE_DIRECTIONS } from '../game/animation'
 import type { PlayerSnapshot } from './types'
+import type { WeaponId } from '../sim/weapons'
 
 /** 先頭 1 バイト。将来 2 進の種類が増えたときに見分ける */
 export const PACKET_STATE = 1
@@ -79,8 +80,18 @@ const FLAG_CROUCHING = 2
 const FLAG_BOXED = 4
 const FLAG_CONCENTRATING = 8
 const FLAG_SALUTE = 16
-/** 銃。1 ビットで足りるうちは種類を増やすたびにビットを足す */
-const FLAG_SNIPER = 32
+/**
+ * 持っている銃。2 ビットで 4 種類まで。
+ *
+ * 見た目 (相手が何を構えているか) と、サーバーの威力の計算に要る。
+ * 銃を増やすときはここを広げる — 足りないまま増やすと、
+ * 別の銃として扱われて威力が変わる (狙撃銃で実際に起きた)。
+ */
+const FLAG_WEAPON_LOW = 32
+const FLAG_WEAPON_HIGH = 128
+
+/** 番号の並び。変えると古い版が別の銃として読む */
+const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol']
 /** 手榴弾を振りかぶって持っている。倒されたら足元に落ちる */
 const FLAG_GRENADE = 64
 
@@ -105,7 +116,9 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   if (snapshot.boxed) flags |= FLAG_BOXED
   if (snapshot.concentrating) flags |= FLAG_CONCENTRATING
   if (snapshot.saluteHeld) flags |= FLAG_SALUTE
-  if (snapshot.weapon === 'sniper') flags |= FLAG_SNIPER
+  const weapon = Math.max(0, WEAPON_BITS.indexOf(snapshot.weapon))
+  if (weapon & 1) flags |= FLAG_WEAPON_LOW
+  if (weapon & 2) flags |= FLAG_WEAPON_HIGH
   if (snapshot.holdingGrenade) flags |= FLAG_GRENADE
   view.setUint8(OFF_FLAGS, flags)
 
@@ -132,7 +145,10 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     boxed: (flags & FLAG_BOXED) !== 0,
     concentrating: (flags & FLAG_CONCENTRATING) !== 0,
     saluteHeld: (flags & FLAG_SALUTE) !== 0,
-    weapon: (flags & FLAG_SNIPER) !== 0 ? 'sniper' : 'rifle',
+    weapon:
+      WEAPON_BITS[
+        ((flags & FLAG_WEAPON_LOW) !== 0 ? 1 : 0) | ((flags & FLAG_WEAPON_HIGH) !== 0 ? 2 : 0)
+      ] ?? 'rifle',
     holdingGrenade: (flags & FLAG_GRENADE) !== 0,
     cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,
   }

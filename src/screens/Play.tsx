@@ -4,9 +4,11 @@ import type * as THREE from 'three'
 import { Game, type GameStats } from '../game/Game'
 import type { Identity } from '../auth/session'
 import type { WeaponTarget } from '../game/weapon'
+import type { WeaponId } from '../sim/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
+import Loadout from '../ui/Loadout'
 
 /**
  * 調整パネルを出すか。
@@ -30,12 +32,20 @@ export default function Play(props: { identity: Identity }) {
   const params = useParams<{ room: string }>()
   const navigate = useNavigate()
   const [stats, setStats] = createSignal<GameStats | null>(null)
+  /**
+   * 選んでいる主武器。
+   *
+   * Game 側にも持っているが、あちらは signal ではないので画面が追従しない。
+   * 数字キーでもボタンでも変わるので、押した結果をここへ映して表示に使う。
+   */
+  const [primary, setPrimary] = createSignal<WeaponId>('rifle')
   const [game, setGame] = createSignal<Game | null>(null)
   let container!: HTMLDivElement
 
   onMount(() => {
     const instance = new Game(container, props.identity, params.room)
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
+    instance.onLoadout = setPrimary
     void instance.start(setStats)
     setGame(instance)
   })
@@ -53,6 +63,18 @@ export default function Play(props: { identity: Identity }) {
     <div class="app">
       <div class="viewport" ref={container} />
       <Hud stats={stats()} selfId={game()?.selfId ?? ''} />
+
+      {/*
+        装備。湧くときだけ組める。
+        死んでいる間と、試合が始まる前 (待機・カウントダウン) に出す。
+      */}
+      <Show when={stats()?.loadoutOpen}>
+        <Loadout
+          primary={primary()}
+          onPrimary={(id) => game()?.setLoadout(id)}
+          note={stats()?.dead ? '次に湧くときに持つ' : '試合が始まったら持つ'}
+        />
+      </Show>
 
       {/* 成績表。Tab で開く。部屋を出るのもここから */}
       <Show when={stats()?.menuOpen}>

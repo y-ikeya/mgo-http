@@ -79,6 +79,8 @@ const LOCK_KEYS = new Set([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'Space', 'ShiftLeft', 'ShiftRight',
   'KeyR', 'KeyF', 'KeyC', 'KeyG', 'KeyV', 'KeyQ', 'KeyZ', 'KeyE',
+  // 装備を選ぶ。ポインタを掴んだままなのでボタンは押せない
+  'Digit1', 'Digit2', 'KeyL',
 ])
 
 /**

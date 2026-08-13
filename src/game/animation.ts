@@ -204,6 +204,39 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
 const AIM_KEY = 'aim'
 const CROUCH_AIM_KEY = 'crouch_aim'
 const FIRE_KEY = 'fire'
+/**
+ * 拳銃の型。
+ *
+ * 銃ごとに構えが要る。ライフルの構えで拳銃を持つと両手で握ることになり、
+ * 手の位置も銃の長さも合わない。狙撃銃はまだ専用の構えが無く、
+ * ライフルのものを流用している (左手が合わない、として残っている問題)。
+ */
+const PISTOL_AIM_KEY = 'pistol_aim'
+const PISTOL_CROUCH_AIM_KEY = 'pistol_crouch_aim'
+const PISTOL_FIRE_KEY = 'pistol_fire'
+/**
+ * 拳銃を構えていないときの姿勢。ホルスターに納めた手ぶらの型。
+ *
+ * 移動中も要る。止まっているときだけ差し替えると、走った瞬間に
+ * 長物を提げた型に落ちて、**拳銃を選んだのに突撃銃を構えて見える**。
+ */
+const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
+  idle: 'pistol_relaxed',
+  crouch_idle: 'pistol_relaxed',
+  sneak: 'crouch_unarmed',
+  ...(Object.fromEntries(
+    MOVE_DIRECTIONS.flatMap((d) => [
+      // 手ぶらの走り。拳銃は納めているので、腕を振って走るのが正しい
+      // (pistol_run は拳銃を持ったまま走る型なので、納めている間は合わない)
+      [`run_${d}`, 'run_unarmed'],
+      // しゃがみ移動も手ぶら。拳銃を持ったまま歩く型 (pistol_walk) は
+      // 納めている間は合わない
+      [`crouch_${d}`, 'crouch_unarmed'],
+    ]),
+  ) as Record<string, string>),
+}
+
+const pistolKey = (state: Locomotion) => `pistol_relaxed:${state}`
 const RELOAD_KEY = 'reload'
 const STAB_KEY = 'stab'
 /** ボルト操作。1 発ごとに薬室へ送る動作で、その間は撃てない */
@@ -672,6 +705,22 @@ export class CharacterAnimator {
     const crouchAim = byName.get('crouch_aim')
     if (crouchAim) registerUpper(CROUCH_AIM_KEY, crouchAim)
 
+    // 拳銃の構えと発砲。無ければライフルの型で代用される
+    for (const [key, name] of [
+      [PISTOL_AIM_KEY, 'pistol_aim'],
+      [PISTOL_CROUCH_AIM_KEY, 'pistol_crouch_aim'],
+      [PISTOL_FIRE_KEY, 'pistol_fire'],
+    ] as const) {
+      const clip = byName.get(name)
+      if (clip) registerUpper(key, clip)
+    }
+
+    // 拳銃を提げているときの姿勢。移動状態ごとに引き分ける
+    for (const [state, clipName] of Object.entries(PISTOL_RELAXED) as [Locomotion, string][]) {
+      const clip = byName.get(clipName)
+      if (clip) registerUpper(pistolKey(state), clip)
+    }
+
     // 構えていないときは銃を下ろした姿勢。移動状態ごとに別のクリップを使う。
     for (const [state, clipName] of Object.entries(RELAXED_CLIPS) as [Locomotion, string][]) {
       const clip = byName.get(clipName)
@@ -1069,6 +1118,19 @@ export class CharacterAnimator {
     if (this.lower.has(next)) this.locomotion = next
   }
 
+  /**
+   * 拳銃を持っているか。構えと発砲の型を引き分けるのに使う。
+   *
+   * 銃の種類そのものではなく「片手で構える銃か」を持たせている。
+   * 麻酔銃を足すときも同じ型を使うはずなので、そこで分けたくない。
+   */
+  private pistol = false
+
+  setPistol(holding: boolean): void {
+    this.pistol = holding
+  }
+
+
   /** ダンボールを被っているか。深く丸めて頭を下げる */
   setBoxed(boxed: boolean): void {
     this.boxed = boxed
@@ -1198,7 +1260,17 @@ export class CharacterAnimator {
    * 待機姿勢は「構えているか」と「今どう動いているか」の両方で決まる。
    */
   private resolveUpperKey(): string {
-    if (this.upperState === 'fire' && this.upper.has(FIRE_KEY)) return FIRE_KEY
+    // 発砲の型。**拳銃では使わない。**
+    //
+    // 拳銃は単発なので、速く叩くと 1.20 秒のクリップが頭から流れ直し、
+    // 構えとの間を何度も行き来する。上半身がくねって見えた。
+    // 突撃銃は押しっぱなしで状態が続くので、この問題が出ない。
+    //
+    // 撃ったことは銃口炎・音・カメラの反動・照準の散らばりで既に伝わっている。
+    // 型が無くても分からなくはならない。
+    if (this.upperState === 'fire' && !this.pistol && this.upper.has(FIRE_KEY)) {
+      return FIRE_KEY
+    }
     if (this.upperState === 'reload' && this.upper.has(RELOAD_KEY)) return RELOAD_KEY
     // 倒れている間は他の何よりも優先する
     if (this.upperState === 'death' && this.upper.has(DEATH_KEY)) return DEATH_KEY
@@ -1225,9 +1297,19 @@ export class CharacterAnimator {
 
     if (this.aiming) {
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
+      if (this.pistol) {
+        const key = crouching ? PISTOL_CROUCH_AIM_KEY : PISTOL_AIM_KEY
+        if (this.upper.has(key)) return key
+      }
       if (crouching && this.upper.has(CROUCH_AIM_KEY)) return CROUCH_AIM_KEY
       return AIM_KEY
     }
+    // 拳銃は納めているので手ぶら。移動状態ごとに専用の型がある
+    if (this.pistol) {
+      const key = pistolKey(this.locomotion)
+      if (this.upper.has(key)) return key
+    }
+
     // 該当する非構えクリップが無ければ構えの姿勢で代用する
     const key = relaxedKey(this.locomotion)
     return this.upper.has(key) ? key : AIM_KEY
@@ -1322,6 +1404,11 @@ export class CharacterAnimator {
     this.throwHeld = false
     this.upper.get(THROW_KEY)?.stop()
     this.upperState = 'stance'
+  }
+
+  /** 投擲モーションの再生位置 (秒)。手を離れる時刻を測るのに使う */
+  get throwTime(): number {
+    return this.upperState === 'throw' ? (this.upper.get(THROW_KEY)?.time ?? 0) : 0
   }
 
   /** いま振りかぶった所で止まっているか */

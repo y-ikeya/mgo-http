@@ -12,7 +12,6 @@ import {
   buildStage,
   setAmbientIntensity,
   setCloudCoverage,
-  followShadow,
   TEAM_SPAWNS,
   STAGE_CODE,
   loadStageBoxes,
@@ -25,9 +24,11 @@ import type { Step } from "../sim/footsteps";
 import { SoundRing, type PingKind } from "./soundRing";
 import { ThrownItems } from "./thrown";
 import { Grenades } from "./grenades";
+import { BlastFx } from "./blastfx";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
 import { MAX_HEALTH } from "../sim/damage";
+import { CHOICES, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../sim/damage";
@@ -71,6 +72,8 @@ export interface GameStats {
   shots: number;
   ammo: number;
   magazine: number;
+  /** 弾倉の外に残っている弾 */
+  reserve: number;
   reloading: boolean;
   /** 転んでいて、まだ起き上がれるか */
   downed: boolean;
@@ -86,10 +89,12 @@ export interface GameStats {
   links: string[];
   /** 成績表を開いているか */
   menuOpen: boolean;
+  /** 装備の画面を開いているか */
+  loadoutOpen: boolean;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
   /** いま持っている銃。調整パネルが追従する */
-  equipped: "rifle" | "sniper";
+  equipped: WeaponId;
   /** 覗いている倍率。空なら覗いていない */
   zoom: string;
   /** ホイールで覗ける状態か。案内を出すのに使う */
@@ -252,11 +257,22 @@ const THROWABLES_PER_LIFE = 3;
  */
 const GRENADES_PER_LIFE = 3;
 
-/** 投げ出す速さ (m/s)。server の THROW_SPEED と揃える */
-const GRENADE_SPEED = 15;
+/**
+ * 手を離れる高さ (m)。server の RELEASE_HEIGHT と揃える。
+ *
+ * 投擲モーションで手が振り切る所の実測が 1.74m (1.65 秒の時点)。
+ * そこに合わせてある。低くすると、腕は上にあるのに物が腰から出る。
+ */
+const GRENADE_RELEASE_HEIGHT = 1.7;
 
-/** 手を離れる高さ (m)。server の RELEASE_HEIGHT と揃える */
-const GRENADE_RELEASE_HEIGHT = 1.35;
+/**
+ * 手を離れる位置を、投げる向きへどれだけ前に出すか (m)。
+ * server の RELEASE_FORWARD と揃える。
+ *
+ * 体の中心から出すと、真下へ投げたときに自分の足元をすり抜ける。
+ * 腕を伸ばした先から出るようにする。
+ */
+const GRENADE_RELEASE_FORWARD = 0.45;
 
 /**
  * 手榴弾が手を離れる時刻 (投擲クリップ内の秒)。
@@ -269,13 +285,6 @@ const GRENADE_RELEASE_HEIGHT = 1.35;
  */
 const GRENADE_RELEASE_AT = 1.66;
 
-/**
- * 振りかぶりで止まる時刻 (投擲クリップ内の秒)。animation.ts の THROW_HOLD_AT と揃える。
- *
- * 押している間はここで止まっているので、キーを離してから手を離れるまでは
- * その差 (0.16 秒) しかない。既に引き切っているので、あとは振るだけ。
- */
-const GRENADE_HOLD_AT = 1.5;
 
 /**
  * 空撃ちの音を鳴らす間隔 (秒)。
@@ -324,6 +333,7 @@ export class Game {
   /** 投げた物。落ちた場所で音を出すためだけのもの */
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
+  private readonly blast: BlastFx;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
   private stageBoxes: StageBox[] = [];
   private grenadeCount = GRENADES_PER_LIFE;
@@ -332,6 +342,14 @@ export class Game {
   private grenadeRelease = 0;
   /** 空撃ちの音を次に鳴らせるまで (秒) */
   private emptyCooldown = 0;
+  /**
+   * 引き金を離したか。単発の銃で、押しっぱなしの連射を止めるのに使う。
+   *
+   * 「押した瞬間」を数えるのではなく「離したか」を持つのは、撃てない条件
+   * (弾切れ・リロード中・構えていない) で押し始めたときに、条件が解けた瞬間へ
+   * 1 発ぶん持ち越さないため。
+   */
+  private triggerReleased = true;
   private grenadeReleaseAt = GRENADE_RELEASE_AT;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
@@ -392,9 +410,42 @@ export class Game {
    * 撃ち切ったら持ち替えて、また撃ち切ったら戻して、で永久に撃てる。
    * 銃を置いてくるわけではないので、残りはそのまま残る。
    */
-  private readonly magazines: Record<"rifle" | "sniper", number> = {
+  /**
+   * 湧き地点で組んだ装備。
+   *
+   * 銃を並べて順に持ち替えるのではなく、**枠に何を入れるかを選ぶ**。
+   * 狙撃銃を主に選んだなら、詰められたときに突撃銃は無い — その代わり副武器がある。
+   * 選んだこと自体が手になる。
+   *
+   * 替えられるのは湧くときだけ。試合中に持ち物を組み替えられると、
+   * 状況ごとに最適な物へ乗り換えるだけになって、選ぶ意味が消える。
+   */
+  private loadout: { primary: WeaponId; secondary: WeaponId } = {
+    primary: "rifle",
+    secondary: "pistol",
+  };
+  /** 次に湧いたときの装備。試合中に変えても、いま持っている物は変わらない */
+  private pendingLoadout = { primary: "rifle" as WeaponId, secondary: "pistol" as WeaponId };
+  /** いまどちらの枠を持っているか */
+  private slot: "primary" | "secondary" = "primary";
+
+  private readonly magazines: Record<WeaponId, number> = {
     rifle: WEAPONS.rifle.magazine,
     sniper: WEAPONS.sniper.magazine,
+    pistol: WEAPONS.pistol.magazine,
+  };
+
+  /**
+   * 弾倉の外に持っている弾。武器ごと、1 つの命ぶん。
+   *
+   * 弾倉の数ではなく発数で持つので、半分残った弾倉を替えても損しない。
+   * 尽きたらその銃はもう撃てない — 持ち替えるか、ナイフで行くか、
+   * という判断が最後に残る。
+   */
+  private readonly reserves: Record<WeaponId, number> = {
+    rifle: WEAPONS.rifle.reserve,
+    sniper: WEAPONS.sniper.reserve,
+    pistol: WEAPONS.pistol.reserve,
   };
 
   private get ammo(): number {
@@ -559,6 +610,7 @@ export class Game {
     this.soundRing = new SoundRing(this.scene);
     this.thrown = new ThrownItems(this.scene);
     this.grenades = new Grenades(this.scene);
+    this.blast = new BlastFx(this.scene);
     void loadStageBoxes().then((boxes) => {
       // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
       this.stageBoxes = solidBlockers(boxes);
@@ -759,6 +811,7 @@ export class Game {
     this.soundRing.dispose();
     this.thrown.dispose();
     this.grenades.dispose();
+    this.blast.dispose();
     this.player.dispose();
     this.scene.traverse((obj) => {
       if (isMesh(obj)) {
@@ -810,6 +863,7 @@ export class Game {
     }
     // 銃の持ち替え。構え中 / リロード中 / 転がり中は受け付けない
     if (this.input.consumeAction("swap", "KeyQ")) void this.swapWeapon();
+    this.updateLoadoutKeys();
     this.updateZoom();
     this.applyWeaponView();
 
@@ -832,7 +886,6 @@ export class Game {
     this.follow.update(dt, this.player, this.cameraWorld);
 
     if (this.hitFeedbackTimer > 0) this.hitFeedbackTimer -= dt;
-    followShadow(this.sun, this.player.position);
     this.updateRollContact();
     this.updateStab(dt);
     this.updatePostureSpread(dt);
@@ -860,6 +913,7 @@ export class Game {
       this.listeningLevel(),
     );
     this.shots.update(dt);
+    this.blast.update(dt);
 
     this.renderer.render(this.scene, this.follow.camera);
     this.publishStats(dt);
@@ -950,6 +1004,7 @@ export class Game {
 
       case "respawn":
         if (message.id === this.net.id) this.respawnSelf();
+        else this.remotes.warp(message.id);
         break;
 
       case "roster":
@@ -968,14 +1023,26 @@ export class Game {
         }
         break;
 
-      case "match":
+      case "match": {
+        const changed = this.match?.phase !== message.phase;
         // 試合が切り替わったら飛んでいる手榴弾を捨てる。
         // サーバー側も同じ所で捨てるので、爆発が届かないまま残り続ける
-        if (this.match?.phase !== message.phase && message.phase !== "playing") {
-          this.grenades.clear();
-        }
+        if (changed && message.phase !== "playing") this.grenades.clear();
         this.match = message;
+
+        // 決着したら成績表を開く。
+        //
+        // 誰が何点取ったかは、終わった直後にしか意味を持たない。Tab を
+        // 押した人だけが見られる形だと、押さない人には勝ち負けの結果しか残らない。
+        //
+        // 次の試合が始まったら畳む。開いたままだとポインタが離れていて、
+        // 始まった瞬間に動けない
+        if (changed) {
+          if (message.phase === "over") this.setMenu(true);
+          else if (message.phase === "playing" && this.menuOpen) this.setMenu(false);
+        }
         break;
+      }
 
       case "throw":
         // 初速だけが届く。同じ物理を同じ地形に対して解くので、
@@ -1094,15 +1161,74 @@ export class Game {
       0,
       base.z + Math.sin(spread) * SPAWN_SPREAD,
     );
+    // 跳んだ距離を足音に積ませない。積むと着いた先で連打になる
+    this.player.warpTo(this.player.position.x, this.player.position.z);
+  }
+
+  /**
+   * 数字キーで主武器を選ぶ。
+   *
+   * ポインタを掴んだままなので画面のボタンは押せない。押せるようにするには
+   * ポインタを離す必要があり、そうすると死んでいる間に視点が動かせなくなる。
+   * 選ぶのはキーで済ませる。
+   */
+  private updateLoadoutKeys(): void {
+    if (!this.canChooseLoadout) {
+      // 組める場面から外れたら畳む。次に組めるようになったらまた開く
+      this.loadoutOpen = true;
+      return;
+    }
+    if (this.input.consumeKeyPress("KeyL")) this.loadoutOpen = !this.loadoutOpen;
+    const choices = CHOICES.primary;
+    if (this.input.consumeKeyPress("Digit1") && choices[0]) this.setLoadout(choices[0]);
+    if (this.input.consumeKeyPress("Digit2") && choices[1]) this.setLoadout(choices[1]);
+  }
+
+  /**
+   * 装備の画面を開いているか。
+   *
+   * 組める場面 (死んでいる間 / 開始前) では既定で開く。読み終わったら
+   * 畳めるようにしてあるのは、開始前に周りを見たいため。
+   */
+  private loadoutOpen = true;
+
+  /** 装備を組めるか。湧くときだけ */
+  private get canChooseLoadout(): boolean {
+    const phase = this.match?.phase;
+    return this.player.isDead || phase === "waiting" || phase === "countdown";
+  }
+
+  /**
+   * 次に湧いたときの装備を決める。
+   *
+   * 反映されるのは次に湧いたとき。いま持っている物は変わらない。
+   */
+  setLoadout(primary: WeaponId): void {
+    this.pendingLoadout.primary = primary;
+    this.onLoadout?.(primary);
+  }
+
+  /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
+  onLoadout: ((primary: WeaponId) => void) | null = null;
+
+  /** いま選んでいる装備 (次に湧いたときのもの) */
+  get chosenPrimary(): WeaponId {
+    return this.pendingLoadout.primary;
   }
 
   /** サーバーから復帰の合図が来た */
   private respawnSelf(): void {
     this.placeAtSpawn();
+    // 湧くときに装備が確定する。試合中に組み替えても、ここまで反映されない
+    this.loadout = { ...this.pendingLoadout };
+    this.slot = "primary";
+    void this.player.equip(this.loadout.primary);
     this.player.respawn();
     // 生き返ったら両方満タン。持ち替えの都合で片方だけ空、を持ち越さない
-    this.magazines.rifle = WEAPONS.rifle.magazine;
-    this.magazines.sniper = WEAPONS.sniper.magazine;
+    for (const id of Object.keys(WEAPONS) as WeaponId[]) {
+      this.magazines[id] = WEAPONS[id].magazine;
+      this.reserves[id] = WEAPONS[id].reserve;
+    }
     this.throwables = THROWABLES_PER_LIFE;
     this.grenadeCount = GRENADES_PER_LIFE;
     this.reloadTimer = 0;
@@ -1212,7 +1338,11 @@ export class Game {
       this.reloadTimer -= dt;
       if (this.reloadTimer <= 0) {
         this.reloadTimer = 0;
-        this.ammo = this.weapon.magazine;
+        // 池から足りるぶんだけ移す。弾倉に残っていた分は捨てない
+        const kind = this.player.equipped;
+        const take = Math.min(this.weapon.magazine - this.ammo, this.reserves[kind]);
+        this.ammo += take;
+        this.reserves[kind] -= take;
       }
       // 弾倉に手が掛かる頃に鳴らす。近くの相手には「いま撃てない」が伝わる
       if (this.reloadSoundIn > 0) {
@@ -1246,8 +1376,20 @@ export class Game {
       this.emptyCooldown = EMPTY_INTERVAL;
     }
 
+    // 単発の銃は、押しっぱなしでは 1 発しか出ない。
+    //
+    // 表に auto があるのに誰も見ていなかった。狙撃銃が連射できないのは
+    // ボルト操作の時間で塞がれていたからで、単発だからではなかった。
+    // 拳銃はその時間が無いので、そのままだと押しっぱなしで撃ち続けられる。
+    //
+    // 引き金を離すまで次を撃たせない。離した瞬間に撃てるようにするのではなく、
+    // **離してから押し直す**まで待たせる。
+    if (!this.input.firing) this.triggerReleased = true;
+    const pulled = this.weapon.auto || this.triggerReleased;
+
     // 構えていないと撃てない。空になっても自動でリロードはしない。
     const firing =
+      pulled &&
       this.input.firing &&
       this.player.isAiming &&
       !this.player.isDead &&
@@ -1269,13 +1411,22 @@ export class Game {
     } else {
       this.fireCooldown = this.weapon.fireInterval;
     }
+    // 単発の銃はここで引き金を「使い切る」。次は離して押し直すまで出ない
+    if (!this.weapon.auto) this.triggerReleased = false;
     this.fire();
   }
 
   private startReload(): void {
     if (this.reloadTimer > 0 || this.stabTimer > 0 || this.player.rolling)
       return;
+    // ボルトを送り終えるまでは弾倉に触れない。
+    //
+    // 持ち替え・ダンボール・ローリングで飛ばせないようにしてあるのと同じ規則。
+    // ここが抜けていて、撃った直後に R を押すとコッキングを省略できた。
+    if (this.cocking) return;
     if (this.ammo >= this.weapon.magazine) return;
+    // 予備が尽きていたら替えるものが無い
+    if (this.reserves[this.player.equipped] <= 0) return;
     // モーションの尺をそのまま操作不能時間にして、見た目と挙動を一致させる
     this.reloadTimer = this.player.reloadDuration || this.weapon.reload;
     this.player.playReload();
@@ -1461,17 +1612,15 @@ export class Game {
       if (!this.grenadeAiming) this.player.playThrow();
       this.grenadeAiming = true;
       this.follow.aimDirection(this.aimDir);
+      // 前へ出す量は水平方向だけで測る。見上げているときに近く、
+      // 見下ろしているときに遠く、では手の位置が動いて見える
+      const flat = Math.hypot(this.aimDir.x, this.aimDir.z) || 1;
       this.grenadeOrigin.set(
-        this.player.position.x,
+        this.player.position.x + (this.aimDir.x / flat) * GRENADE_RELEASE_FORWARD,
         this.player.position.y + GRENADE_RELEASE_HEIGHT,
-        this.player.position.z,
+        this.player.position.z + (this.aimDir.z / flat) * GRENADE_RELEASE_FORWARD,
       );
-      this.grenades.showPreview(
-        this.grenadeOrigin,
-        this.aimDir,
-        GRENADE_SPEED,
-        this.stageBoxes,
-      );
+      this.grenades.showPreview(this.grenadeOrigin, this.aimDir, this.stageBoxes);
       // 体を照準の方へ向ける。投げる向きと見た目を一致させる
       this.player.setThrowing(true);
       return;
@@ -1497,7 +1646,12 @@ export class Game {
     this.grenadeCount--;
     // 止めていた続きから振り切る。手を離れるのはその途中
     this.player.releaseThrow();
-    this.grenadeRelease = Math.max(0.01, this.grenadeReleaseAt - GRENADE_HOLD_AT);
+    // 残りは**いまどこまで再生されたか**から測る。
+    //
+    // 振りかぶりで止まっている前提で引くと、軽く叩いただけのときに
+    // まだ腕を引いている途中なのに手を離れる。長押しなら 1.50 秒まで
+    // 進んでいるので差は 0.16 秒、叩いただけならほぼ丸ごと残る。
+    this.grenadeRelease = Math.max(0.01, this.grenadeReleaseAt - this.player.throwTime);
   }
 
   /** 投げる型が振り切る所で手を離す */
@@ -1532,7 +1686,7 @@ export class Game {
       this.grenades.remove(id) ?? new THREE.Vector3(at[0], at[1], at[2]);
     const gain = this.audio.play("explosion", position, 1);
     this.addPing("shot", position, gain);
-    this.shots.explode(position);
+    this.blast.explode(position);
   }
 
   /**
@@ -1616,7 +1770,9 @@ export class Game {
     if (this.player.isAiming) return;
     this.equipping = true;
     try {
-      await this.player.equip(this.player.equipped === "rifle" ? "sniper" : "rifle");
+      // 枠を入れ替える。並べた銃を順に回すのではない
+      this.slot = this.slot === "primary" ? "secondary" : "primary";
+      await this.player.equip(this.loadout[this.slot]);
       // 残弾は武器ごとに残る。持ち替えても補充されない
       this.burstIndex = 0;
       this.zoomStep = 0;
@@ -1872,6 +2028,7 @@ export class Game {
       shots: this.shotCount,
       ammo: this.ammo,
       magazine: this.weapon.magazine,
+      reserve: this.reserves[this.player.equipped],
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
@@ -1880,6 +2037,7 @@ export class Game {
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
       menuOpen: this.menuOpen,
+      loadoutOpen: this.canChooseLoadout && this.loadoutOpen,
       scoped: this.scoped,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",

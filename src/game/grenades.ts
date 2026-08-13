@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 import { loadGrenade } from './assets'
-import { FIXED_STEP, stepProjectile, type Projectile } from '../sim/ballistic'
+import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../sim/ballistic'
 import type { StageBox } from '../sim/vision'
 
 /**
@@ -64,6 +64,7 @@ export class Grenades {
   private readonly marker: THREE.Mesh
   private readonly previewPoints: Float32Array
   private readonly bounce: Bounce = { position: new THREE.Vector3(), strength: 0 }
+  private readonly launch = { x: 0, y: 0, z: 0 }
   private readonly probe: Projectile = {
     x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bounces: 0, resting: false,
   }
@@ -193,14 +194,17 @@ export class Grenades {
    * 落とすのが運になる。手榴弾は「そこへ落とす」判断そのものが手なので、
    * 見せないと成立しない。
    */
-  showPreview(origin: THREE.Vector3, direction: THREE.Vector3, speed: number, boxes: StageBox[]): void {
+  showPreview(origin: THREE.Vector3, direction: THREE.Vector3, boxes: StageBox[]): void {
     const p = this.probe
     p.x = origin.x
     p.y = origin.y
     p.z = origin.z
-    p.vx = direction.x * speed
-    p.vy = direction.y * speed
-    p.vz = direction.z * speed
+    // 初速はサーバーと同じ式で作る。速さも上向きの下駄もあちらが決めるので、
+    // ここで別に持つと見えている軌道と実際に飛ぶ軌道が食い違う
+    throwVelocity(direction.x, direction.y, direction.z, this.launch)
+    p.vx = this.launch.x
+    p.vy = this.launch.y
+    p.vz = this.launch.z
     p.bounces = 0
     p.resting = false
 

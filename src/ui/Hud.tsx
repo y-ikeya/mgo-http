@@ -202,12 +202,15 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       {/* 残弾は視線を大きく動かさずに読めるよう画面右下に置く */}
       <div class="hud-ammo" classList={{ 'hud-ammo-empty': (props.stats?.ammo ?? 1) === 0 }}>
         <span class="hud-ammo-count">{props.stats?.ammo ?? 0}</span>
-        <span class="hud-ammo-magazine">/ {props.stats?.magazine ?? 0}</span>
+        {/* 弾倉 / 予備。予備は「あと何発撃てるか」で、弾倉の数ではない */}
+        <span class="hud-ammo-magazine">/ {props.stats?.reserve ?? 0}</span>
         <Show when={props.stats?.reloading}>
           <div class="hud-ammo-state">RELOADING</div>
         </Show>
         <Show when={!props.stats?.reloading && props.stats?.ammo === 0}>
-          <div class="hud-ammo-state hud-ammo-state-warn">PRESS R</div>
+          <div class="hud-ammo-state hud-ammo-state-warn">
+            {(props.stats?.reserve ?? 0) > 0 ? 'PRESS R' : 'NO AMMO'}
+          </div>
         </Show>
         {/* 転んだら自分で起きる。撃つか起きるかを選ばせたいので、時間では立たない */}
         <Show when={props.stats?.downed}>

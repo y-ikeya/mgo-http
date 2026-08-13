@@ -132,7 +132,7 @@ export class RemotePlayer {
   /** 読み込んだ体。銃を差し替えるときに手ボーンを引き直すのに要る */
   private model: THREE.Object3D | null = null;
   /** いま持っている銃 */
-  private weaponKind: 'rifle' | 'sniper' = 'rifle';
+  private weaponKind: WeaponId = 'rifle';
   /** 差し替えの最中。二重に走らせない */
   private swapping = false;
   /** 取り付けの基準。最初の 1 回で決めて、持ち替えでも使い回す */
@@ -164,6 +164,10 @@ export class RemotePlayer {
   private locomotion: Locomotion = "idle";
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
+  /** 湧き直しで跳んだことを足音に伝える。積算を捨てないと着いた先で連打になる */
+  warp(x: number, z: number): void {
+    this.footsteps.warp(x, z);
+  }
   /** このフレームで踏んだ足音。Game が拾って鳴らす */
   step: Step | null = null;
   /** このフレームで転がり始めたか。同じく Game が拾う */
@@ -254,8 +258,15 @@ export class RemotePlayer {
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている
     void this.equip(state.weapon)
 
-    // 敬礼中は銃を下ろす。自機と同じ規則を、送られてきた姿勢に対して当てる
-    if (this.weapon) this.weapon.visible = !this.boxed && locomotion !== 'salute'
+    // 銃を隠す場面は自機と同じ規則で当てる。片方だけだと、自分では納めているのに
+    // 相手の画面には出たままになる。
+    //   敬礼中 / ダンボール … 手が塞がっている
+    //   拳銃を構えていない  … ホルスターに納まっている
+    const holstered =
+      this.boxed ||
+      locomotion === 'salute' ||
+      (state.weapon === 'pistol' && !state.aiming)
+    if (this.weapon) this.weapon.visible = !holstered
 
     this.object.updateMatrixWorld(true);
 
@@ -531,9 +542,10 @@ export class RemotePlayer {
    *
    * 読み込みは共有のキャッシュに乗るので、2 回目以降は待ち時間が出ない。
    */
-  private async equip(kind: 'rifle' | 'sniper'): Promise<void> {
+  private async equip(kind: WeaponId): Promise<void> {
     if (kind === this.weaponKind || this.swapping) return;
-    this.weaponKind = kind;
+    this.weaponKind = kind
+    this.animator?.setPistol(kind === 'pistol');
     const model = this.model;
     if (!model) return;
 
@@ -550,7 +562,7 @@ export class RemotePlayer {
 
   private async attachWeapon(
     model: THREE.Object3D,
-    kind: 'rifle' | 'sniper' = this.weaponKind,
+    kind: WeaponId = this.weaponKind,
   ): Promise<void> {
     let weapon: Weapon;
     try {
@@ -695,6 +707,17 @@ export class RemotePlayers {
   /** 退出。サーバーが配る leave で消える */
   leave(id: string): void {
     this.remove(id);
+  }
+
+  /**
+   * 湧き直した。跳んだ距離を足音に積ませない。
+   *
+   * 積むと、湧いた相手の足音が着いた先で連打される。update 側でも
+   * 距離で弾いているが、知らせを受けられる場面では受けたほうが確実。
+   */
+  warp(id: string): void {
+    const player = this.players.get(id);
+    if (player) player.warp(player.object.position.x, player.object.position.z);
   }
 
   /**

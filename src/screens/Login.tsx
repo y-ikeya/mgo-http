@@ -24,8 +24,8 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
     setNotice('')
 
     const who = name().trim()
-    if (who.length < 2) return setError('名前は 2 文字以上')
-    if (password().length < 6) return setError('パスワードは 6 文字以上')
+    if (who.length < 2) return setError('名前は 2 文字以上にしてください')
+    if (password().length < 6) return setError('パスワードは 6 文字以上にしてください')
 
     setBusy(true)
     try {
@@ -35,13 +35,13 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
 
       // 登録したがメールの確認が要る設定だと、まだ入れない
       if (!identity) {
-        setNotice('登録した。メールの確認を済ませてから入り直す')
+        setNotice('登録しました。確認メールのリンクを開いてから Login してください')
         setRegistering(false)
         return
       }
       props.onDone(identity)
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : '入れない')
+      setError(failure instanceof Error ? failure.message : 'Login できませんでした')
     } finally {
       setBusy(false)
     }
@@ -51,7 +51,7 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
     <div class="login">
       <form class="login-panel" onSubmit={submit}>
         <div class="login-title">MGOHTTP</div>
-        <div class="login-sub">{registering() ? '新しく登録する' : '入る'}</div>
+        <div class="login-sub">{registering() ? 'Sign up' : 'Login'}</div>
 
         <label class="login-field">
           <span>名前</span>
@@ -83,7 +83,7 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
         </Show>
 
         <button class="login-submit" type="submit" disabled={busy()}>
-          {busy() ? '…' : registering() ? '登録して入る' : '入る'}
+          {busy() ? '…' : registering() ? 'Sign up' : 'Login'}
         </button>
 
         <button
@@ -96,7 +96,7 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
           }}
           disabled={busy()}
         >
-          {registering() ? 'アカウントを持っている' : 'アカウントを作る'}
+          {registering() ? 'アカウントを持っている場合は Login' : 'アカウントを作る (Sign up)'}
         </button>
       </form>
     </div>

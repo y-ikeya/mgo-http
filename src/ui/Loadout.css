@@ -1,0 +1,121 @@
+/*
+ * 装備を組む画面。
+ *
+ * ロビーや成績表と同じ色域に置く。MGO2 の橙をなぞらないのは、
+ * この作りの他の画面と地続きに見せたいため。
+ */
+.loadout {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.loadout-panel {
+  min-width: 380px;
+  background: rgba(12, 16, 10, 0.82);
+  border: 1px solid rgba(160, 190, 140, 0.22);
+  backdrop-filter: blur(3px);
+}
+
+.loadout-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.16);
+}
+
+.loadout-title {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: rgba(190, 206, 176, 0.9);
+}
+
+.loadout-note {
+  font-size: 11px;
+  color: rgba(190, 206, 176, 0.45);
+}
+
+.loadout-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 14px;
+}
+
+.loadout-slot {
+  width: 76px;
+  flex: none;
+  align-self: center;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: rgba(190, 206, 176, 0.4);
+}
+
+.loadout-items {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loadout-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 92px;
+  padding: 8px 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.2);
+  color: rgba(190, 206, 176, 0.7);
+}
+
+.loadout-item:hover:not(:disabled) {
+  border-color: rgba(160, 190, 140, 0.45);
+  color: rgba(210, 226, 196, 0.9);
+}
+
+/* 選択中。角を強めるのではなく、面で示す */
+.loadout-item-on {
+  background: rgba(150, 214, 132, 0.12);
+  border-color: rgba(150, 214, 132, 0.5);
+  color: rgba(206, 232, 190, 0.95);
+}
+
+/* 選択肢が 1 つしか無い枠。押せないことを見た目でも示す */
+.loadout-item-only {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.loadout-name {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.loadout-spec {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(190, 206, 176, 0.45);
+}
+
+/* 押すキー。名前の前に小さく添える */
+.loadout-key {
+  display: inline-block;
+  min-width: 14px;
+  margin-right: 6px;
+  padding: 0 3px;
+  font-size: 10px;
+  text-align: center;
+  border: 1px solid rgba(160, 190, 140, 0.35);
+  color: rgba(190, 206, 176, 0.6);
+}
