@@ -74,8 +74,8 @@ deploy-server:
 # --- 様子を見る -----------------------------------------------------------
 
 status:
-	@printf 'サーバー   '; curl -s -m 10 -o /dev/null -w '%{http_code}\n' https://mgohttp.pepaga.me/health
-	@printf 'クライアント '; curl -s -m 10 -o /dev/null -w '%{http_code}\n' https://pepaga.me/
+	@printf 'サーバー   '; curl -s -m 10 -o /dev/null -w '%{http_code}\n' https://mgohttp-server.pepaga.me/v1/health
+	@printf 'クライアント '; curl -s -m 10 -o /dev/null -w '%{http_code}\n' https://mgohttp.pepaga.me/
 	@printf '常駐       '; $(SSH) 'systemctl is-active mgohttp'
 	@printf 'コミット   '; $(SSH) 'cd $(SERVER_DIR) && git log --oneline -1'
 
