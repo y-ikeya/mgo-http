@@ -174,6 +174,14 @@ interface Player {
    */
   positioned: boolean
   /**
+   * いまこの人へ位置を配っている相手の id。
+   *
+   * 配るのをやめた瞬間に「もう見えない」と知らせるために持つ。知らせないと、
+   * 受け取る側は沈黙から察するしかなく、遅れて届いているだけの相手と
+   * 区別が付かない (見えたり消えたりになる)。
+   */
+  seen: Set<string>
+  /**
    * 集中し始めた時刻 (Date.now)。0 なら集中していない。
    *
    * 回復の条件。姿勢を崩した瞬間も、撃たれた瞬間も 0 に戻すので、
@@ -837,7 +845,18 @@ function relayState(roomName: string, from: Player, payload: Uint8Array): void {
         head,
         stageBoxes,
       )
-      if (!visible) continue
+      if (!visible) {
+        // 配るのをやめる瞬間に 1 通だけ知らせる。
+        //
+        // 黙って止めると、受け取る側は沈黙の長さから察するしかない。
+        // 沈黙は「隠れた」でも「相手の機械が遅れている」でも起きるので、
+        // 区別が付かず、遅れて届く相手が見えたり消えたりする。
+        if (viewer.seen.delete(from.id)) {
+          viewer.socket.send(JSON.stringify({ type: 'hidden', id: from.id } satisfies NetMessage))
+        }
+        continue
+      }
+      viewer.seen.add(from.id)
     }
 
     viewer.socket.send(payload)
@@ -1279,6 +1298,9 @@ const server = Bun.serve<Client, Record<string, never>>({
         seat.health = MAX_HEALTH
         seat.respawnAt = 0
         seat.positioned = false
+        // 繋いだ直後は誰も見えていない。前の接続の分を残すと、隠れたことを
+        // 知らせる 1 通が出ないまま「見えている」ことになる
+        seat.seen.clear()
         // 繋ぎ直しの間は測っていない。前回の値を引き継ぐと巨大な間隔になる
         seat.packetGap = 0
         seat.lastPacketAt = 0
@@ -1323,6 +1345,7 @@ const server = Bun.serve<Client, Record<string, never>>({
           holdingGrenade: false,
           protectedUntil: 0,
           badPacketAt: 0,
+          seen: new Set(),
           packetGap: 0,
           lastPacketAt: 0,
           clockSkew: 0,

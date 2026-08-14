@@ -1166,6 +1166,12 @@ export class Game {
         this.hearNoise(message);
         break;
 
+      // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
+      // 待つと、遅れて届いているだけの相手と区別が付かない
+      case "hidden":
+        this.remotes.hide(message.id);
+        break;
+
       case "leave":
         this.remotes.remove(message.id);
         break;
