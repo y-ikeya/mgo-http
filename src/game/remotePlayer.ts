@@ -63,6 +63,15 @@ import {
  */
 const HIDE_AFTER = 0.35
 
+/**
+ * 送り主の時計との差を、上へ戻す速さ (1 通あたりの割合)。
+ *
+ * 差は最小値で採るので、下へは即座に、上へはこの速さでしか動かない。
+ * 一度でも短く届けばそれが真値に近い、という前提。時計は 1 日で数秒ずれる
+ * 程度なので、上へ戻すのは極端に遅くてよい。
+ */
+const CLOCK_DRIFT = 0.002
+
 const TEAM_TINT: Record<Team, number> = {
   blue: 0x88a8ff,
   red: 0xff9a86,
@@ -118,8 +127,14 @@ export class RemotePlayer {
   health = MAX_HEALTH;
   /** 画面に出す名前。スナップショットで届く */
   name = "";
-  /** 最後に状態が届いた時刻 (Date.now)。退出判定に使う */
+  /** 最後に状態が届いた時刻。**こちらの** Date.now。隠すかどうかの判定に使う */
   lastSeen = 0;
+  /**
+   * 送り主の時計とこちらの時計の差 (ms)。届いた時刻から引いて求める。
+   *
+   * 最初の 1 通が来るまでは分からないので null。
+   */
+  private clockOffset: number | null = null;
   /** 所属。サーバーが決める。届くまでは赤として描く */
   private team: Team = "red";
   /** 色を掛ける対象。所属が変わっても掛け直せるよう控えておく */
@@ -200,13 +215,38 @@ export class RemotePlayer {
     void this.load();
   }
 
-  /** 受信した状態を溜める。順序が入れ替わって届いても時刻順に保つ */
-  push(snapshot: PlayerSnapshot): void {
-    this.lastSeen = snapshot.time;
+  /**
+   * 受信した状態を溜める。順序が入れ替わって届いても時刻順に保つ。
+   *
+   * --- 時刻はこちらの時計に直してから入れる ---
+   * snapshot.time は**送り主の Date.now()**、つまり別の機械の時計であって、
+   * こちらの Date.now() と直に引き算してよいものではない。
+   *
+   * 直に引いていたときに何が起きたか: 相手の時計が 0.35 秒以上遅れていると、
+   * 届いた瞬間から「途切れて久しい」判定になり、その人だけ**一度も画面に
+   * 出てこない**。銃声は届く (音は別の道を通る) ので、姿の無い敵になる。
+   * 逆に相手の時計が進んでいると、遮蔽に入って位置が止まっても消えない。
+   * 同じ機械で 2 つ開いて試している限り時計は同一なので、絶対に出ない。
+   *
+   * 差は「いちばん速く届いた 1 通」がいちばん真値に近いので、観測した
+   * 最小値を採る。時計は少しずつずれていくので、上へはゆっくり戻す。
+   *
+   * @param arrivedAt 届いた時刻 (こちらの Date.now)
+   */
+  push(snapshot: PlayerSnapshot, arrivedAt: number): void {
+    const observed = arrivedAt - snapshot.time;
+    if (this.clockOffset === null || observed < this.clockOffset) {
+      this.clockOffset = observed;
+    } else {
+      this.clockOffset += (observed - this.clockOffset) * CLOCK_DRIFT;
+    }
+
+    this.lastSeen = arrivedAt;
+    const stamped = { ...snapshot, time: snapshot.time + this.clockOffset };
 
     let index = this.buffer.length;
-    while (index > 0 && this.buffer[index - 1].time > snapshot.time) index--;
-    this.buffer.splice(index, 0, snapshot);
+    while (index > 0 && this.buffer[index - 1].time > stamped.time) index--;
+    this.buffer.splice(index, 0, stamped);
     while (this.buffer.length > BUFFER_SIZE) this.buffer.shift();
   }
 
@@ -684,8 +724,12 @@ export class RemotePlayers {
     return this.players.values();
   }
 
-  /** 状態を受け取る。知らない ID なら参加とみなして作る */
-  receive(snapshot: PlayerSnapshot): void {
+  /**
+   * 状態を受け取る。知らない ID なら参加とみなして作る。
+   *
+   * @param arrivedAt 届いた時刻 (こちらの Date.now)。既定は今
+   */
+  receive(snapshot: PlayerSnapshot, arrivedAt = Date.now()): void {
     let player = this.players.get(snapshot.id);
     if (!player) {
       player = new RemotePlayer(snapshot.id, this.scene);
@@ -704,7 +748,7 @@ export class RemotePlayers {
       }
       this.refreshAlly(player);
     }
-    player.push(snapshot);
+    player.push(snapshot, arrivedAt);
   }
 
   /** まだ実体の無い相手の情報を控える。位置が届いて作られたときに反映する */

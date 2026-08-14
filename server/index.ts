@@ -137,6 +137,24 @@ interface Player {
    * 物陰でしゃがんだ相手が一瞬で画面から消える。沈み切るまでは高いほうで見る。
    */
   loweredAt: number
+  /**
+   * 位置が届く間隔 (ms) の均し。20Hz で送っているので 50 前後が正常。
+   *
+   * ここが伸びている人は、こちらから見て「途切れがちな相手」になる。
+   * 相手の画面ではその人が明滅するか、出てこない。
+   */
+  packetGap: number
+  /** 最後に位置が届いた時刻 (Date.now)。間隔を測るのに使う */
+  lastPacketAt: number
+  /**
+   * その人の時計とこちらの時計の差 (ms)。
+   *
+   * 位置には送り主の Date.now() が乗っている。ここが大きくずれている機械が
+   * 混ざると、受け取る側が「送り主の時計 − 自分の時計」で古さを測っていた
+   * 頃は、その人だけ姿が出なかった。今は各クライアントで直しているが、
+   * ずれ自体は見えるようにしておく。
+   */
+  clockSkew: number
   /** 体の向き (rad)。ナイフの背後判定に要る */
   yaw: number
   /**
@@ -354,6 +372,21 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   }
 
   const snapshot = decodeSnapshot(view, player.id)
+
+  // 通信の様子を控える。/health に出す。
+  //
+  // 「見えない敵が居る」の原因は、遮蔽の判定・届く間隔・時計のずれの
+  // どれでも起こる。判定だけ疑って何度も試すことになったので、
+  // 残りの 2 つは常に測っておく
+  const arrived = Date.now()
+  if (player.lastPacketAt > 0) {
+    const gap = arrived - player.lastPacketAt
+    player.packetGap =
+      player.packetGap > 0 ? player.packetGap + (gap - player.packetGap) * 0.1 : gap
+  }
+  player.lastPacketAt = arrived
+  player.clockSkew = snapshot.time - arrived
+
   player.x = snapshot.x
   player.y = snapshot.y
   player.z = snapshot.z
@@ -775,27 +808,6 @@ function isProtected(player: Player, now = Date.now()): boolean {
   return player.protectedUntil > now
 }
 
-/**
- * 見える / 見えないの判断を書き出す。調査用。
- *
- * 位置と、目の位置と、結果。手元で stage.json に対して同じ計算をやり直せる。
- */
-let debugAt = 0
-function debugVision(viewer: Player, from: Player, eye: { x: number; y: number; z: number }): void {
-  const t = Date.now()
-  if (t - debugAt < 3000) return
-  debugAt = t
-  const head = visibleHead(from, t)
-  const ok = hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
-  console.warn(
-    `[可視] ${viewer.name} → ${from.name}: ${ok ? '見える' : '見えない'}` +
-      ` / 見る側 (${viewer.x.toFixed(1)}, ${viewer.y.toFixed(1)}, ${viewer.z.toFixed(1)})` +
-      ` yaw=${viewer.cameraYaw.toFixed(2)} pitch=${viewer.pitch.toFixed(2)} aim=${viewer.aiming}` +
-      ` / 目 (${eye.x.toFixed(1)}, ${eye.y.toFixed(1)}, ${eye.z.toFixed(1)})` +
-      ` / 相手 (${from.x.toFixed(1)}, ${from.y.toFixed(1)}, ${from.z.toFixed(1)}) 頭 ${head.toFixed(2)}`,
-  )
-}
-
 function relayState(roomName: string, from: Player, payload: Uint8Array): void {
   const room = rooms.get(roomName)
   if (!room) return
@@ -815,8 +827,6 @@ function relayState(roomName: string, from: Player, payload: Uint8Array): void {
       // カメラのほうが後ろ上から見下ろすぶん、目より広く見える。そこは許す —
       // 描いている物と送る物がずれているほうが困る
       const eye = viewOf(viewer)
-      // 調査用。原因が分かったら消す
-      debugVision(viewer, from, eye)
       const visible = hasLineOfSight(
         eye.x,
         eye.y,
@@ -1190,6 +1200,12 @@ const server = Bun.serve<Client, Record<string, never>>({
             .map(
               (p) =>
                 `  ${p.team === 'blue' ? '青' : '赤'} ${p.name} (${Math.ceil(p.health)})` +
+                // 通信の様子。姿が出ない相手が居るときはここを先に見る。
+                // 20 通/秒 から落ちていれば途切れがち、時計差が大きければ
+                // 古いクライアントが混ざっている
+                (p.packetGap > 0
+                  ? ` ${(1000 / p.packetGap).toFixed(1)}通/秒 時計差 ${(p.clockSkew / 1000).toFixed(2)}s`
+                  : '') +
                 (p.rejected > 0 ? ` 却下 ${p.rejected}` : '') +
                 (p.droppedAt > 0 ? ' ※離脱中' : ''),
             )
@@ -1263,6 +1279,9 @@ const server = Bun.serve<Client, Record<string, never>>({
         seat.health = MAX_HEALTH
         seat.respawnAt = 0
         seat.positioned = false
+        // 繋ぎ直しの間は測っていない。前回の値を引き継ぐと巨大な間隔になる
+        seat.packetGap = 0
+        seat.lastPacketAt = 0
         // 離脱前の姿は当てにならない。遡って照合すると過去の位置で当たってしまう
         seat.history = []
         seat.lastShotAt = 0
@@ -1304,6 +1323,9 @@ const server = Bun.serve<Client, Record<string, never>>({
           holdingGrenade: false,
           protectedUntil: 0,
           badPacketAt: 0,
+          packetGap: 0,
+          lastPacketAt: 0,
+          clockSkew: 0,
           loweredAt: 0,
           socket,
         })
