@@ -9,7 +9,7 @@ import {
   type HitZone,
 } from '../src/sim/damage'
 import { verifyToken, type Identity } from './auth'
-import { decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/net/snapshot'
+import { decodeSnapshot, isSnapshot, stampProtected, stampSlot, SNAPSHOT_BYTES } from '../src/net/snapshot'
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
@@ -330,11 +330,28 @@ function broadcast(roomName: string, message: NetMessage, except?: string): void
  * 中身は詰め直さず、送り主の席番号だけを書き込んで、そのまま配る。
  * 送り主に名乗らせないので、他人になりすませない。
  */
+const now = () => Date.now()
+
 function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
     raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  if (!isSnapshot(view)) return
+  if (!isSnapshot(view)) {
+    // 形が合わない位置は捨てるしかないが、**黙って捨てると原因が分からない**。
+    //
+    // 位置の大きさは作りを変えるたびに増えている (33 → 35 → 36 バイト)。
+    // 古いクライアントが繋ぐと、その人の位置だけが全部落ちる。落ちた人は
+    // 「まだ位置を知らせていない人」の扱いになるので、誰の位置も配られない —
+    // 銃声だけ聞こえて姿が見えない、という形で表に出る。
+    if (now() - player.badPacketAt > 5000) {
+      player.badPacketAt = now()
+      console.warn(
+        `[位置] ${player.name}: 形が合わない (${bytes.byteLength} バイト、期待は ${SNAPSHOT_BYTES})。` +
+          'クライアントが古い可能性',
+      )
+    }
+    return
+  }
 
   const snapshot = decodeSnapshot(view, player.id)
   player.x = snapshot.x
@@ -1263,6 +1280,7 @@ const server = Bun.serve<Client, Record<string, never>>({
           support: 'grenade',
           holdingGrenade: false,
           protectedUntil: 0,
+          badPacketAt: 0,
           loweredAt: 0,
           socket,
         })
