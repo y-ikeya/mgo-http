@@ -7,6 +7,9 @@ import { isMesh } from './guards'
  * 武器ごとの取り付け設定。モデルは convert_gun.py で正規化済みで、
  * どれも「刃/銃身が -Z、上が +Y、原点は後端付近」の座標系に揃っている。
  */
+/** 排莢口の位置 (銃のローカル座標)。機関部の右少し上 */
+const EJECT_LOCAL = { x: 0.04, y: 0.06, z: -0.12 }
+
 export interface WeaponConfig {
   /** 右手が握る位置。手ボーンは手首にあるので、実機で合わせた値になっている */
   grip: THREE.Vector3
@@ -297,6 +300,17 @@ export class Weapon {
   /** 先端 (銃口 / 刃先) のワールド座標 */
   muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
     return out.copy(this.config.tip).applyMatrix4(this.object.matrixWorld)
+  }
+
+  /**
+   * 排莢口のワールド座標。
+   *
+   * 銃口ではなく機関部の右側から出る。銃ごとに測ってはいない —
+   * 飛んだ薬莢は一瞬で視界から外れるので、位置の細かさより
+   * 「銃のあたりから右へ飛ぶ」が合っていれば足りる。
+   */
+  ejectWorld(out: THREE.Vector3): THREE.Vector3 {
+    return out.set(EJECT_LOCAL.x, EJECT_LOCAL.y, EJECT_LOCAL.z).applyMatrix4(this.object.matrixWorld)
   }
 
   /** 左手を持っていく先のワールド座標。片手武器なら null */

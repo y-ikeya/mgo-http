@@ -4,7 +4,7 @@ import type * as THREE from 'three'
 import { Game, type GameStats } from '../game/Game'
 import type { Identity } from '../auth/session'
 import type { WeaponTarget } from '../game/weapon'
-import type { WeaponId } from '../sim/weapons'
+import type { SupportId, WeaponId } from '../sim/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
@@ -39,13 +39,17 @@ export default function Play(props: { identity: Identity }) {
    * 数字キーでもボタンでも変わるので、押した結果をここへ映して表示に使う。
    */
   const [primary, setPrimary] = createSignal<WeaponId>('rifle')
+  const [support, setSupport] = createSignal<SupportId>('grenade')
   const [game, setGame] = createSignal<Game | null>(null)
   let container!: HTMLDivElement
 
   onMount(() => {
     const instance = new Game(container, props.identity, params.room)
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
-    instance.onLoadout = setPrimary
+    instance.onLoadout = (next) => {
+      setPrimary(next.primary)
+      setSupport(next.support)
+    }
     void instance.start(setStats)
     setGame(instance)
   })
@@ -71,8 +75,12 @@ export default function Play(props: { identity: Identity }) {
       <Show when={stats()?.loadoutOpen}>
         <Loadout
           primary={primary()}
+          support={support()}
           onPrimary={(id) => game()?.setLoadout(id)}
-          note={stats()?.dead ? '次に湧くときに持つ' : '試合が始まったら持つ'}
+          onSupport={(id) => game()?.setSupport(id)}
+          note="装備を選んでください" 
+          left={stats()?.loadoutLeft ?? 0}
+          onClose={() => game()?.closeLoadout()}
         />
       </Show>
 

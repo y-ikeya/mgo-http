@@ -53,6 +53,24 @@ export interface PlayerSnapshot {
   /** ダンボールを被っているか。受け取った側は箱を出す */
   boxed: boolean
   /**
+   * リロード中か。
+   *
+   * **相手に見せる。** 撃ち返せない時間が見えていることが、詰めるか下がるかの
+   * 判断材料になる。隠す情報ではない — 音でも分かるし、姿でも分かるべき。
+   *
+   * 別のメッセージではなく位置に乗せているのは、遮蔽の判定を通すため。
+   * 位置は見えている相手にしか配られないので、隠れている人がリロードしたことは
+   * 伝わらない。別便で送ると、そこだけ遮蔽を素通りする。
+   */
+  reloading: boolean
+  /**
+   * 無敵か。**サーバーが書き込む** ので、送る側は常に false でよい。
+   *
+   * 湧いた直後の数秒。撃たれずに位置を取り直すための時間で、
+   * 見た目は半透明になる。撃てば切れる — 盾にして撃つのを塞ぐ。
+   */
+  protectedNow: boolean
+  /**
    * 手榴弾を振りかぶって持っているか。
    *
    * サーバーが要る。**この状態で倒されると、足元に落ちて爆発する**ので、
@@ -230,6 +248,19 @@ export interface ExplosionEvent {
   at: [number, number, number]
 }
 
+/**
+ * 装備を伝える。
+ *
+ * 手榴弾の数はサーバーが持っている (投げられるかを決めているのがあちら) ので、
+ * 何を選んだかを知らせないと弾倉を選んでも手榴弾が配られる。
+ *
+ * 主武器は送らない。何を構えているかは位置に乗っている。
+ */
+export interface LoadoutEvent {
+  type: 'loadout'
+  support: 'grenade' | 'magazine'
+}
+
 export interface LeaveEvent {
   type: 'leave'
   id: string
@@ -338,6 +369,7 @@ export type NetMessage =
   | NoiseEvent
   | GrenadeEvent
   | KnockDownEvent
+  | LoadoutEvent
   | ExplosionEvent
   | KillEvent
   | RespawnMessage

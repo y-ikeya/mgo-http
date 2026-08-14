@@ -25,10 +25,11 @@ import { SoundRing, type PingKind } from "./soundRing";
 import { ThrownItems } from "./thrown";
 import { Grenades } from "./grenades";
 import { BlastFx } from "./blastfx";
+import { Casings } from "./casings";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
 import { MAX_HEALTH } from "../sim/damage";
-import { CHOICES, type WeaponId } from "../sim/weapons";
+import { CHOICES, SUPPORT_SPECS, SUPPORTS, type SupportId, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../sim/damage";
@@ -91,6 +92,8 @@ export interface GameStats {
   menuOpen: boolean;
   /** 装備の画面を開いているか */
   loadoutOpen: boolean;
+  /** 装備の画面が自動で閉じるまで (秒) */
+  loadoutLeft: number;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
   /** いま持っている銃。調整パネルが追従する */
@@ -107,6 +110,8 @@ export interface GameStats {
   throwables: number
   /** 手榴弾の残り */
   grenades: number
+  /** 投擲の枠に何を入れているか */
+  support: SupportId
   /** 自分の所属 */
   team: Team
   /** 試合の状態。まだ届いていなければ null */
@@ -294,6 +299,23 @@ const GRENADE_RELEASE_AT = 1.66;
  */
 const EMPTY_INTERVAL = 0.45;
 
+/**
+ * 湧いた直後の無敵 (秒)。server の SPAWN_PROTECT_MS と揃える。
+ *
+ * 自分の位置は自分へ返ってこないので、サーバーが書き込んだ値を受け取れない。
+ * 同じ時計をこちらでも回して、見た目 (半透明) に使う。
+ * **判定はサーバーのものが正**で、これは表示のためだけ。
+ */
+const SPAWN_PROTECT = 3;
+
+/**
+ * 装備の画面が自動で閉じるまで (秒)。
+ *
+ * 決めるまで動けない作りなので、放っておくと止まったままになる。
+ * 湧いてから撃ち合いが始まるまでの時間でもあるので、上限を切る。
+ */
+const LOADOUT_TIMEOUT = 30;
+
 /** 集中してから音の輪が出そろうまで (秒) */
 const RING_SETTLE = 1
 
@@ -334,12 +356,15 @@ export class Game {
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
   private readonly blast: BlastFx;
+  private readonly casings: Casings;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
   private stageBoxes: StageBox[] = [];
   private grenadeCount = GRENADES_PER_LIFE;
   private grenadeAiming = false;
   /** 手を離れるまでの残り (秒)。0 なら投げていない */
   private grenadeRelease = 0;
+  /** 直前のフレームの経過時間 (秒)。tick の外で時計を進めるのに使う */
+  private lastDt = 0;
   /** 空撃ちの音を次に鳴らせるまで (秒) */
   private emptyCooldown = 0;
   /**
@@ -381,6 +406,7 @@ export class Game {
   private readonly noisePos = new THREE.Vector3();
   private readonly aimDir = new THREE.Vector3();
   private readonly muzzlePos = new THREE.Vector3();
+  private readonly ejectPos = new THREE.Vector3();
   private readonly hitPoint = new THREE.Vector3();
   private readonly hitNormal = new THREE.Vector3();
   private readonly normalMatrix = new THREE.Matrix3();
@@ -420,12 +446,17 @@ export class Game {
    * 替えられるのは湧くときだけ。試合中に持ち物を組み替えられると、
    * 状況ごとに最適な物へ乗り換えるだけになって、選ぶ意味が消える。
    */
-  private loadout: { primary: WeaponId; secondary: WeaponId } = {
+  private loadout: { primary: WeaponId; secondary: WeaponId; support: SupportId } = {
     primary: "rifle",
     secondary: "pistol",
+    support: "grenade",
   };
   /** 次に湧いたときの装備。試合中に変えても、いま持っている物は変わらない */
-  private pendingLoadout = { primary: "rifle" as WeaponId, secondary: "pistol" as WeaponId };
+  private pendingLoadout = {
+    primary: "rifle" as WeaponId,
+    secondary: "pistol" as WeaponId,
+    support: "grenade" as SupportId,
+  };
   /** いまどちらの枠を持っているか */
   private slot: "primary" | "secondary" = "primary";
 
@@ -611,6 +642,7 @@ export class Game {
     this.thrown = new ThrownItems(this.scene);
     this.grenades = new Grenades(this.scene);
     this.blast = new BlastFx(this.scene);
+    this.casings = new Casings(this.scene);
     void loadStageBoxes().then((boxes) => {
       // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
       this.stageBoxes = solidBlockers(boxes);
@@ -812,6 +844,7 @@ export class Game {
     this.thrown.dispose();
     this.grenades.dispose();
     this.blast.dispose();
+    this.casings.dispose();
     this.player.dispose();
     this.scene.traverse((obj) => {
       if (isMesh(obj)) {
@@ -846,12 +879,32 @@ export class Game {
       .addScaledVector(this.forwardVec, -axis.z)
       .addScaledVector(this.rightVec, axis.x);
 
+    // 装備を組んでいる間は動けない。
+    //
+    // 決めるまで動けない形にしてある。裏で動けると、選ぶのを後回しにして
+    // 走り出せてしまい、「湧くときに決める」という手続きが有名無実になる。
+    if (this.loadoutBlocking) this.moveDir.set(0, 0, 0);
+
+    // 開始前も動けない。
+    //
+    // 湧き地点は決まっているので、始まる前に動けると、始まった瞬間には
+    // もう散らばっている。位置取りは試合が始まってから始まってほしい。
+    //
+    // 視点は動かせるままにする。周りを見て、どこへ向かうか決める時間になる。
+    if (this.match?.phase === "countdown") this.moveDir.set(0, 0, 0);
+
     // ブラウザはユーザー操作があるまで音を出せない。ロック取得やボタン押下がそれにあたる。
     if (this.input.engaged) this.audio.resume();
 
     // 押した事実を渡して、受け付けるかは Player が決める。
     // カメラはその結果に従う (箱の中では寄らない)
-    this.player.setAiming(this.input.aiming && this.input.engaged);
+    // 装備を組んでいる間は操作を受け付けない。
+    //
+    // 決めるまで動けない形にしてある。裏で動けると、選ぶのを後回しにして
+    // 走り出せてしまい、「湧くときに決める」という手続きが有名無実になる。
+    this.player.setAiming(
+      this.input.aiming && this.input.engaged && !this.loadoutBlocking,
+    );
     this.follow.setAiming(this.player.isAiming);
     this.follow.setViewHeight(this.player.viewHeight);
 
@@ -864,6 +917,7 @@ export class Game {
     // 銃の持ち替え。構え中 / リロード中 / 転がり中は受け付けない
     if (this.input.consumeAction("swap", "KeyQ")) void this.swapWeapon();
     this.updateLoadoutKeys();
+    this.syncLoadoutPointer();
     this.updateZoom();
     this.applyWeaponView();
 
@@ -886,6 +940,14 @@ export class Game {
     this.follow.update(dt, this.player, this.cameraWorld);
 
     if (this.hitFeedbackTimer > 0) this.hitFeedbackTimer -= dt;
+    this.lastDt = dt;
+    // 無敵の間は半透明。撃てば切れる (サーバーがそう決めている) ので、
+    // 撃った時点でこちらも消す
+    if (this.protectLeft > 0) {
+      this.protectLeft -= dt;
+      if (this.input.firing && this.player.isAiming) this.protectLeft = 0;
+    }
+    this.player.setGhost(this.protectLeft > 0 || this.loadoutBlocking);
     this.updateRollContact();
     this.updateStab(dt);
     this.updatePostureSpread(dt);
@@ -914,6 +976,11 @@ export class Game {
     );
     this.shots.update(dt);
     this.blast.update(dt);
+    this.casings.update(dt, this.stageBoxes, (at) => {
+      // 落ちた音。輪には出さない — 撃った位置は銃声が既に伝えているので、
+      // ここで二重に印を付ける意味が無い
+      this.audio.play("casingDrop", at);
+    });
 
     this.renderer.render(this.scene, this.follow.camera);
     this.publishStats(dt);
@@ -967,6 +1034,8 @@ export class Game {
     // 視点の向きはカメラが持っている。体の向きとは別 (構えていないと体は進行方向を向く)。
     // サーバーはこれで「どこから見ているか」を出し、可視の判定に使う
     snapshot.cameraYaw = this.follow.aimYaw;
+    // 撃ち返せない時間は相手にも見せる。反撃の機会になる
+    snapshot.reloading = this.reloadTimer > 0;
     this.net.send({ type: "state", snapshot });
   }
 
@@ -987,6 +1056,9 @@ export class Game {
           // 撃った本人にボルト操作を流し、音もその銃のものにする。
           // 全部ライフルの音だと、撃たれた側は相手の武器を読み違える
           const kind = this.remotes.shot(message.id);
+          // 遠くの人の排莢も出す。通信はせず、撃ったことだけを合図に各自で出す
+          const yaw = this.remotes.ejectFrom(message.id, this.ejectPos);
+          if (yaw !== null) this.casings.eject(this.ejectPos, yaw);
           const sound = weaponOf(kind).shotSound;
           // 銃声も輪に出す。最も遠くまで届くので、撃ち合いが始まった方角が分かる。
           this.addPing("shot", this.remoteFrom, this.audio.play(sound, this.remoteFrom));
@@ -1175,13 +1247,24 @@ export class Game {
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) {
       // 組める場面から外れたら畳む。次に組めるようになったらまた開く
-      this.loadoutOpen = true;
+      this.setLoadoutOpen(true);
       return;
     }
-    if (this.input.consumeKeyPress("KeyL")) this.loadoutOpen = !this.loadoutOpen;
+    // 決めたら閉じる。閉じて初めて動けるようになる
+    if (this.input.consumeKeyPress("Enter") || this.input.consumeKeyPress("KeyL")) {
+      this.setLoadoutOpen(!this.loadoutOpen);
+    }
+    // 放っておくと止まったままになるので、時間で閉じる
+    if (this.loadoutOpen) {
+      this.loadoutLeft -= this.lastDt;
+      if (this.loadoutLeft <= 0) this.setLoadoutOpen(false);
+    }
     const choices = CHOICES.primary;
     if (this.input.consumeKeyPress("Digit1") && choices[0]) this.setLoadout(choices[0]);
     if (this.input.consumeKeyPress("Digit2") && choices[1]) this.setLoadout(choices[1]);
+    // 投擲の枠。主武器の続きの番号にする
+    if (this.input.consumeKeyPress("Digit3") && SUPPORTS[0]) this.setSupport(SUPPORTS[0]);
+    if (this.input.consumeKeyPress("Digit4") && SUPPORTS[1]) this.setSupport(SUPPORTS[1]);
   }
 
   /**
@@ -1191,11 +1274,96 @@ export class Game {
    * 畳めるようにしてあるのは、開始前に周りを見たいため。
    */
   private loadoutOpen = true;
+  /** 装備の画面が自動で閉じるまでの残り (秒) */
+  private loadoutLeft = LOADOUT_TIMEOUT;
+  /** 無敵の残り (秒)。見た目に使う。判定はサーバーが持っている */
+  private protectLeft = 0;
+
+  /**
+   * 装備の画面を開く / 閉じる。
+   *
+   * 開いている間はポインタを離す。掴んだままだとボタンを押せないし、
+   * 視点も動き続けて落ち着いて読めない (成績表と同じ扱い)。
+   */
+  private setLoadoutOpen(open: boolean): void {
+    if (this.loadoutOpen === open) return;
+    this.loadoutOpen = open;
+    if (open) this.loadoutLeft = LOADOUT_TIMEOUT;
+  }
+
+  /** ポインタを離しているか。出ている画面が変わったときだけ触る */
+  private loadoutHadPointer = false;
+
+  /**
+   * 装備の画面に合わせてポインタを離す / 掴み直す。
+   *
+   * **毎フレーム、実際に出ているかを見て決める。** 開いたり閉じたりした瞬間だけ
+   * 触っていると、死んで画面が出た瞬間には走らない (開いているかどうかは
+   * 変わっておらず、組める場面になっただけなので)。
+   * 掴んだままだとキーを押すたびに視点が飛び、毎回 Esc を押す羽目になる。
+   */
+  private syncLoadoutPointer(): void {
+    const showing = this.loadoutBlocking;
+    if (showing === this.loadoutHadPointer) return;
+    this.loadoutHadPointer = showing;
+    this.input.wantsLock = !showing && !this.menuOpen;
+    if (showing) document.exitPointerLock();
+    else if (!this.menuOpen) this.input.grab();
+  }
+
+  /** 画面の OK から閉じる */
+  closeLoadout(): void {
+    this.setLoadoutOpen(false);
+  }
+
+  /**
+   * いま装備の画面が出ているか。
+   *
+   * `loadoutOpen` だけを見てはいけない。組めない場面では**次に開くための予約**
+   * として true にしてあるので、そのまま操作の可否に使うと湧いたあとも動けない。
+   * 出ているかどうかは、組める場面かどうかと合わせて決まる。
+   */
+  private get loadoutBlocking(): boolean {
+    return this.canChooseLoadout && this.loadoutOpen;
+  }
 
   /** 装備を組めるか。湧くときだけ */
   private get canChooseLoadout(): boolean {
     const phase = this.match?.phase;
     return this.player.isDead || phase === "waiting" || phase === "countdown";
+  }
+
+  /**
+   * 装備に従って持ち物を配り直す。
+   *
+   * 生き返ったら両方満タン。持ち替えの都合で片方だけ空、を持ち越さない。
+   */
+  private refillFromLoadout(): void {
+    // 投擲の枠で持ち物が変わる。**両方は持てない**
+    const support = SUPPORT_SPECS[this.loadout.support];
+    this.throwables = this.loadout.support === "magazine" ? support.count : 0;
+    this.grenadeCount = this.loadout.support === "grenade" ? support.count : 0;
+
+    for (const id of Object.keys(WEAPONS) as WeaponId[]) {
+      this.magazines[id] = WEAPONS[id].magazine;
+      // 弾倉を選ぶと予備が 1 弾倉ぶん増える。撃ち切るまでの時間がそのぶん延びる
+      this.reserves[id] =
+        WEAPONS[id].reserve + support.spareMagazines * WEAPONS[id].magazine;
+    }
+  }
+
+  /**
+   * 選び直した装備を、待たずに反映してよい場面なら反映する。
+   *
+   * 組めるのは湧くときだけなので、その場面では**すぐ**効かせる。
+   * 次の湧きを待つと、支度の間に選び直した分が 1 試合ぶん遅れて効く。
+   * サーバーも同じ規則で手榴弾を配っているので、ここを揃えないと
+   * 画面には 3 個あるのに投げられない、が起きる。
+   */
+  private applyLoadoutNow(): void {
+    if (!this.canChooseLoadout) return;
+    this.loadout = { ...this.pendingLoadout };
+    this.refillFromLoadout();
   }
 
   /**
@@ -1205,16 +1373,25 @@ export class Game {
    */
   setLoadout(primary: WeaponId): void {
     this.pendingLoadout.primary = primary;
-    this.onLoadout?.(primary);
+    this.applyLoadoutNow();
+    this.onLoadout?.(this.pendingLoadout);
+  }
+
+  /**
+   * 投擲の枠を選ぶ。
+   *
+   * サーバーへ知らせる。手榴弾の数を持っているのがあちらなので、
+   * 伝えないと弾倉を選んでも手榴弾が配られる。
+   */
+  setSupport(support: SupportId): void {
+    this.pendingLoadout.support = support;
+    this.net.send({ type: "loadout", support });
+    this.applyLoadoutNow();
+    this.onLoadout?.(this.pendingLoadout);
   }
 
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
-  onLoadout: ((primary: WeaponId) => void) | null = null;
-
-  /** いま選んでいる装備 (次に湧いたときのもの) */
-  get chosenPrimary(): WeaponId {
-    return this.pendingLoadout.primary;
-  }
+  onLoadout: ((next: { primary: WeaponId; support: SupportId }) => void) | null = null;
 
   /** サーバーから復帰の合図が来た */
   private respawnSelf(): void {
@@ -1224,13 +1401,9 @@ export class Game {
     this.slot = "primary";
     void this.player.equip(this.loadout.primary);
     this.player.respawn();
-    // 生き返ったら両方満タン。持ち替えの都合で片方だけ空、を持ち越さない
-    for (const id of Object.keys(WEAPONS) as WeaponId[]) {
-      this.magazines[id] = WEAPONS[id].magazine;
-      this.reserves[id] = WEAPONS[id].reserve;
-    }
-    this.throwables = THROWABLES_PER_LIFE;
-    this.grenadeCount = GRENADES_PER_LIFE;
+    this.refillFromLoadout();
+    // 湧いた直後は撃たれない。サーバーも同じ時計を持っている
+    this.protectLeft = SPAWN_PROTECT;
     this.reloadTimer = 0;
     this.reloadSoundIn = 0;
     this.boltIn = 0;
@@ -1349,7 +1522,7 @@ export class Game {
         this.reloadSoundIn -= dt;
         if (this.reloadSoundIn <= 0) {
           this.reloadSoundIn = 0;
-          this.audio.play("reload", this.player.position);
+          this.audio.play(this.weapon.reloadSound, this.player.position);
         }
       }
     }
@@ -1471,6 +1644,9 @@ export class Game {
 
     // トレーサーだけは銃口から描く。判定は照準線、見た目は銃口という TPS 共通の割り切り。
     this.player.muzzle(this.muzzlePos);
+    // 排莢。当たり判定も音も無く、撃っている手応えのためだけに出す
+    this.player.ejectPort(this.ejectPos);
+    this.casings.eject(this.ejectPos, this.player.yaw);
     this.audio.play(this.weapon.shotSound, this.muzzlePos);
     // 撃っている間は何も聞こえない
     this.soundRing.suppress(1);
@@ -1557,7 +1733,11 @@ export class Game {
    * 読み合いにならないため。1 回の命につき数発で、外せば手札が減る。
    */
   private updateThrowAim(): void {
-    const canThrow = this.throwables > 0 && !this.player.isDead && !this.player.isBoxed;
+    // ボルトを送り終えるまでは投げられない。持ち替え・ダンボール・ローリング・
+    // リロードと同じ規則。ここが抜けていて、撃った直後に投げるとコッキングを
+    // 省略できた
+    const canThrow =
+      this.throwables > 0 && !this.player.isDead && !this.player.isBoxed && !this.cocking;
     const held = canThrow && this.input.isActionDown("throwItem", "KeyG");
 
     if (held) {
@@ -1728,6 +1908,11 @@ export class Game {
       if (remote.rollStarted) {
         const gain = this.audio.play("roll", remote.object.position);
         this.addPing("roll", remote.object.position, gain);
+      }
+      // リロードの音。姿が見えている相手にだけ届く (位置がそうなので)
+      if (remote.reloadStarted) {
+        const spec = weaponOf(remote.equipped);
+        this.audio.play(spec.reloadSound, remote.object.position);
       }
       // 吹き飛ばされた叫び。倒れたのではなく、まだ生きて転がっている
       if (remote.sweptThisFrame) {
@@ -2037,7 +2222,8 @@ export class Game {
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
       menuOpen: this.menuOpen,
-      loadoutOpen: this.canChooseLoadout && this.loadoutOpen,
+      loadoutOpen: this.loadoutBlocking,
+      loadoutLeft: Math.max(0, Math.ceil(this.loadoutLeft)),
       scoped: this.scoped,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
@@ -2051,6 +2237,7 @@ export class Game {
       ),
       throwables: this.throwables,
       grenades: this.grenadeCount,
+      support: this.loadout.support,
       team: this.team,
       match: this.match,
       players: this.remotes.count,

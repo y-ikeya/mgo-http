@@ -38,12 +38,60 @@ export const CHOICES: Record<Slot, WeaponId[]> = {
   secondary: ['pistol'],
 }
 
+/**
+ * 投擲の枠。
+ *
+ * 手榴弾か、弾倉か。**両方は持てない**。
+ *
+ *   手榴弾 … 削って転ばせる。遮蔽の裏へ回り込める唯一の手
+ *   弾倉   … 予備弾が 1 つ増え、囮として投げられる
+ *
+ * 交換になっているのが肝。手榴弾は「相手を動かす」道具で、弾倉は
+ * 「相手を騙す」道具と「撃ち続けられること」。どちらも接敵の前後に効くが、
+ * 効き方が違う。
+ */
+export type SupportId = 'grenade' | 'magazine'
+
+export const SUPPORTS: SupportId[] = ['grenade', 'magazine']
+
+export interface SupportSpec {
+  id: SupportId
+  label: string
+  /** 1 つの命で持てる数 */
+  count: number
+  /** 予備弾が何弾倉ぶん増えるか */
+  spareMagazines: number
+  hint: string
+}
+
+export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
+  grenade: {
+    id: 'grenade',
+    label: 'M26',
+    count: 3,
+    spareMagazines: 0,
+    hint: '爆風で削って転ばせる',
+  },
+  magazine: {
+    id: 'magazine',
+    label: 'MAG',
+    // 手榴弾より 1 つ多い。囮は当てるものではないので、外しても痛くない代わりに
+    // 数が要る — 1 つでは向きを示すだけで、2 つ以上でないと嘘の筋道が引けない
+    count: 4,
+    // 主武器の弾倉 1 つぶん。撃ち切るまでの時間がそのぶん延びる
+    spareMagazines: 1,
+    hint: '囮として投げる / 予備弾 +1 弾倉',
+  },
+}
+
 export interface WeaponSpec {
   id: WeaponId
   /** 調整パネルなどに出す名前 */
   label: string
   /** キル表示に出す名前。実銃の呼び名 */
   kill: string
+  /** リロードの音 (audio.ts の名前)。銃ごとに違う */
+  reloadSound: 'reload' | 'pistolReload'
   /** 撃ったときの音 (audio.ts の名前) */
   shotSound: 'rifle' | 'snipe' | 'pistol'
   /** モデルのファイル名 (拡張子なし) */
@@ -158,6 +206,7 @@ const RIFLE: WeaponSpec = {
   label: 'ライフル',
   kill: 'AK47',
   shotSound: 'rifle',
+  reloadSound: 'reload',
   model: 'rifle',
 
   // 頭 1 発 / 胴 5 発 / 脚 10 発
@@ -210,6 +259,7 @@ const SNIPER: WeaponSpec = {
   label: 'スナイパー',
   kill: 'XM2010',
   shotSound: 'snipe',
+  reloadSound: 'reload',
   model: 'sniper',
 
   // 頭 1 発 / 胴 2 発 / 脚 4 発。
@@ -278,6 +328,7 @@ const PISTOL: WeaponSpec = {
   label: '拳銃',
   kill: 'M9',
   shotSound: 'pistol',
+  reloadSound: 'pistolReload',
   model: 'pistol',
   // 胴 4 発。突撃銃 (5 発) よりわずかに速いだけで、離れると減衰で届かなくなる
   zone: { HEAD: 100, BODY: 25, LEGS: 12 },

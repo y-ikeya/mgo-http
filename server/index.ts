@@ -9,7 +9,7 @@ import {
   type HitZone,
 } from '../src/sim/damage'
 import { verifyToken, type Identity } from './auth'
-import { decodeSnapshot, isSnapshot, stampSlot } from '../src/net/snapshot'
+import { decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/net/snapshot'
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
@@ -164,8 +164,21 @@ interface Player {
   concentratingSince: number
   /** 残りの手榴弾。倒れて復帰するたびに戻る */
   grenades: number
+  /**
+   * 投擲の枠に何を入れたか。
+   *
+   * 弾倉を選んだ人には手榴弾を配らない。数を持っているのがこちらなので、
+   * 知らせてもらわないと決められない。
+   */
+  support: 'grenade' | 'magazine'
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
+  /**
+   * 無敵が切れる時刻 (Date.now)。0 なら無敵でない。
+   *
+   * サーバーが持つ。クライアントに言わせると、ずっと無敵と言い続けられる。
+   */
+  protectedUntil: number
   socket: Bun.ServerWebSocket<Client>
 }
 
@@ -292,9 +305,10 @@ function resetPlayers(roomName: string, room: Match): void {
     player.respawnAt = 0
     player.health = MAX_HEALTH
     player.concentratingSince = 0
-    player.grenades = GRENADES_PER_LIFE
+    player.grenades = player.support === 'grenade' ? GRENADES_PER_LIFE : 0
     player.holdingGrenade = false
     player.footsteps.warp(player.x, player.z)
+    player.protectedUntil = Date.now() + SPAWN_PROTECT_MS
     broadcast(roomName, { type: 'respawn', id: player.id })
     sendHealth(roomName, player, 0, false)
   }
@@ -354,6 +368,8 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   else if (player.concentratingSince === 0) player.concentratingSince = now
 
   stampSlot(view, player.slot)
+  // 無敵かどうかはこちらが知っている。送り主に名乗らせない
+  stampProtected(view, isProtected(player))
   relayState(roomName, player, bytes)
 }
 
@@ -370,6 +386,17 @@ const SHOT_RANGE = 130
 
 /** 乗り越えられる段差 (m)。collision.ts の STEP_UP と揃える */
 const STEP_UP = 0.25
+
+/**
+ * 湧いた直後の無敵 (ms)。
+ *
+ * 湧き地点は決まっているので、そこを狙って待たれると出た瞬間に倒される。
+ * 位置を取り直すだけの時間を渡す。
+ *
+ * **撃てば切れる。** 盾にしたまま撃てると、無敵の側が一方的に有利になる。
+ * 装備を組んでいる間も守るが、そちらは死んでいるか試合前なので元々当たらない。
+ */
+const SPAWN_PROTECT_MS = 3000
 
 /**
  * しゃがみが体に現れるまで (ms)。
@@ -447,6 +474,8 @@ function throwGrenade(roomName: string, from: Player, event: NetMessage): void {
   const v = throwVelocity(dx / length, dy / length, dz / length)
 
   from.grenades--
+  // 投げた時点で無敵は切れる。守られたまま攻撃はできない
+  from.protectedUntil = 0
   const id = ++grenadeId
   // 前へ出す量は水平方向だけで測る (上下を向いても手の位置が動かないように)
   const flat = Math.hypot(v.x, v.z) || 1
@@ -527,6 +556,8 @@ function detonate(nade: Grenade): void {
 
   for (const victim of connected(room)) {
     if (victim.health <= 0 || !victim.positioned) continue
+    // 湧いた直後は爆風も通らない
+    if (isProtected(victim)) continue
     // 味方は巻き込まない。銃と同じ規則にする (誤爆で試合が壊れるより分かりやすい)。
     // 投げた本人だけは例外 — 足元に落とせば自分が吹き飛ぶ
     if (victim.team === nade.team && victim.id !== nade.owner) continue
@@ -722,6 +753,11 @@ function viewOf(player: Player): { x: number; y: number; z: number } {
   )
 }
 
+/** いま無敵か */
+function isProtected(player: Player, now = Date.now()): boolean {
+  return player.protectedUntil > now
+}
+
 function relayState(roomName: string, from: Player, payload: Uint8Array): void {
   const room = rooms.get(roomName)
   if (!room) return
@@ -834,6 +870,10 @@ function applyDamage(roomName: string, attacker: Player, event: NetMessage): voi
   const room = rooms.get(roomName)
   const victim = room?.players.get(event.target)
   if (!room || !victim || victim.health <= 0) return
+  // 撃った時点で自分の無敵は切れる。盾にしたまま撃たせない
+  attacker.protectedUntil = 0
+  // 湧いた直後の相手には当たらない
+  if (isProtected(victim)) return
   // 味方は撃てない。誤射で試合が壊れるより、当たらないほうが分かりやすい
   if (victim.team === attacker.team) return
   // 試合中以外は削らない。支度の間や結果を読んでいる間に得点が動くと、
@@ -949,6 +989,8 @@ function updateMatch(roomName: string, room: Match, now: number): void {
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION
+    // 始まった瞬間から無敵を数える。支度の間に数えても、そこは元々当たらない
+    for (const player of connected(room)) player.protectedUntil = now + SPAWN_PROTECT_MS
   } else if (room.phase === 'playing' && now >= room.endsAt) {
     room.phase = 'over'
     room.winner = room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
@@ -1003,10 +1045,11 @@ setInterval(() => {
         if (now < player.respawnAt) continue
         player.respawnAt = 0
         player.health = MAX_HEALTH
-        player.grenades = GRENADES_PER_LIFE
+        player.grenades = player.support === 'grenade' ? GRENADES_PER_LIFE : 0
         player.holdingGrenade = false
         // 湧き地点へ跳ぶ。歩いた距離として積むと、着いた先で足音が連打される
         player.footsteps.warp(player.x, player.z)
+        player.protectedUntil = now + SPAWN_PROTECT_MS
         broadcast(roomName, { type: 'respawn', id: player.id })
         sendHealth(roomName, player, 0, false)
         continue
@@ -1184,7 +1227,7 @@ const server = Bun.serve<Client, Record<string, never>>({
         seat.history = []
         seat.lastShotAt = 0
         seat.concentratingSince = 0
-        seat.grenades = GRENADES_PER_LIFE
+        seat.grenades = seat.support === 'grenade' ? GRENADES_PER_LIFE : 0
         seat.holdingGrenade = false
       } else {
         // 名前は発行元が持っていればそれ、無ければ join で名乗るまで仮のもの
@@ -1217,7 +1260,9 @@ const server = Bun.serve<Client, Record<string, never>>({
           positioned: false,
           concentratingSince: 0,
           grenades: GRENADES_PER_LIFE,
+          support: 'grenade',
           holdingGrenade: false,
+          protectedUntil: 0,
           loweredAt: 0,
           socket,
         })
@@ -1286,6 +1331,19 @@ const server = Bun.serve<Client, Record<string, never>>({
         case 'grenade':
           throwGrenade(socket.data.room, player, message)
           break
+
+        case 'loadout': {
+          player.support = message.support === 'magazine' ? 'magazine' : 'grenade'
+          // 組めるのは湧くときだけ (試合前か、倒れている間)。その場面なら
+          // すぐ効かせる — 次の湧きを待つと、支度の間に選び直した分が
+          // 1 試合ぶん遅れて効くことになる
+          const room = rooms.get(socket.data.room)
+          const settled = room?.phase === 'playing' && player.health > 0
+          if (!settled) {
+            player.grenades = player.support === 'grenade' ? GRENADES_PER_LIFE : 0
+          }
+          break
+        }
 
         case 'shot':
           // 銃声だけは扱いが違う。

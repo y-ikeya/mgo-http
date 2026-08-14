@@ -214,6 +214,19 @@ const FIRE_KEY = 'fire'
 const PISTOL_AIM_KEY = 'pistol_aim'
 const PISTOL_CROUCH_AIM_KEY = 'pistol_crouch_aim'
 const PISTOL_FIRE_KEY = 'pistol_fire'
+/** 拳銃のリロード。弾倉を抜いて差し込む片手の型 */
+const PISTOL_RELOAD_KEY = 'pistol_reload'
+
+/**
+ * 拳銃のリロードの再生速度。
+ *
+ * クリップは 3.73 秒。等速だと長物より遅くなって、副武器として持つ意味が薄れる。
+ * 1.7 倍 = 約 2.2 秒。
+ *
+ * 音 (1.18 秒) より長い。音が先に終わるが、そこは合わせない —
+ * 速めると動きが破綻するほうが目立つ。
+ */
+const PISTOL_RELOAD_RATE = 1.7
 /**
  * 拳銃を構えていないときの姿勢。ホルスターに納めた手ぶらの型。
  *
@@ -306,6 +319,7 @@ const relaxedKey = (state: Locomotion) => `relaxed:${state}`
 /** 一度だけ流す上半身。起動時から回さず、始める側で play する */
 const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   RELOAD_KEY,
+  PISTOL_RELOAD_KEY,
   STAB_KEY,
   BOLT_KEY,
   SWEEP_KEY,
@@ -344,6 +358,18 @@ const CROUCH_CLIP_SPEED = 2.02
  * (歩行は両足が離れる瞬間が無いので歩幅が実移動とほぼ一致する)。
  */
 const SNEAK_CLIP_SPEED = 1.3
+
+/**
+ * ダンボールで動くときの足の速さ (倍率)。
+ *
+ * 進む速さは変えず、**足の運びだけ遅くする**。歩幅に合わせて再生すると
+ * 足は滑らないが、箱の中で細かく足踏みしているように見えた。
+ *
+ * 箱は「そこに置いてある物」に見えていてほしいので、動きは鈍いほうがいい。
+ * そのぶん足は少し滑るが、箱に隠れてほとんど見えない — この姿勢に限っては
+ * 足の同期より見え方を取る。
+ */
+const SNEAK_RATE = 0.65
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
   sneak: SNEAK_CLIP_SPEED,
   ...(Object.fromEntries(
@@ -445,6 +471,8 @@ const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
 export class CharacterAnimator {
   /** リロードクリップの尺 (秒)。0 ならクリップが無い */
   readonly reloadDuration: number
+  /** 拳銃のリロードの尺 (秒)。0 ならクリップが無い */
+  pistolReloadDuration = 0
   /** 刺突クリップの尺 (秒)。0 ならクリップが無い */
   readonly stabDuration: number
   /** ボルト操作の尺 (秒)。モデル未着なら 0 */
@@ -591,6 +619,7 @@ export class CharacterAnimator {
     // 倒れたときだけは戻さない。最終ポーズのまま留める。
     if (
       finished === this.upper.get(RELOAD_KEY) ||
+      finished === this.upper.get(PISTOL_RELOAD_KEY) ||
       finished === this.upper.get(STAB_KEY) ||
       finished === this.upper.get(ROLL_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
@@ -714,6 +743,16 @@ export class CharacterAnimator {
       const clip = byName.get(name)
       if (clip) registerUpper(key, clip)
     }
+
+    // 拳銃のリロード。1 回きりで、終わったら構えに戻る
+    const pistolReload = byName.get('pistol_reload')
+    if (pistolReload) {
+      const action = registerUpper(PISTOL_RELOAD_KEY, pistolReload)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+      action.setEffectiveTimeScale(PISTOL_RELOAD_RATE)
+    }
+    this.pistolReloadDuration = (pistolReload?.duration ?? 0) / PISTOL_RELOAD_RATE
 
     // 拳銃を提げているときの姿勢。移動状態ごとに引き分ける
     for (const [state, clipName] of Object.entries(PISTOL_RELAXED) as [Locomotion, string][]) {
@@ -1107,7 +1146,10 @@ export class CharacterAnimator {
   private applyLocomotionTimeScales(): void {
     for (const [state, clipSpeed] of Object.entries(CLIP_SPEED)) {
       if (!clipSpeed) continue
-      this.lower.get(state as Locomotion)?.setEffectiveTimeScale(this.moveSpeed / clipSpeed)
+      const rate = state === 'sneak' ? SNEAK_RATE : 1
+      this.lower
+        .get(state as Locomotion)
+        ?.setEffectiveTimeScale((this.moveSpeed / clipSpeed) * rate)
     }
   }
 
@@ -1203,6 +1245,11 @@ export class CharacterAnimator {
     lower.setEffectiveTimeScale(scale)
   }
 
+  /** リロード中か。銃を抜いたままにするのに使う */
+  get reloading(): boolean {
+    return this.upperState === 'reload'
+  }
+
   /** 怯み中か。被弾リアクションの再生中 */
   get flinching(): boolean {
     return this.upperState === 'hit'
@@ -1271,7 +1318,11 @@ export class CharacterAnimator {
     if (this.upperState === 'fire' && !this.pistol && this.upper.has(FIRE_KEY)) {
       return FIRE_KEY
     }
-    if (this.upperState === 'reload' && this.upper.has(RELOAD_KEY)) return RELOAD_KEY
+    if (this.upperState === 'reload') {
+      // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
+      const key = this.pistol && this.upper.has(PISTOL_RELOAD_KEY) ? PISTOL_RELOAD_KEY : RELOAD_KEY
+      if (this.upper.has(key)) return key
+    }
     // 倒れている間は他の何よりも優先する
     if (this.upperState === 'death' && this.upper.has(DEATH_KEY)) return DEATH_KEY
     if (this.upperState === 'hit' && this.upper.has(HIT_KEY)) return HIT_KEY
@@ -1558,7 +1609,9 @@ export class CharacterAnimator {
   /** リロードモーションを頭から再生する。終わると自動で構えに戻る */
   playReload(): void {
     if (this.dead) return
-    const action = this.upper.get(RELOAD_KEY)
+    // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
+    const key = this.pistol && this.upper.has(PISTOL_RELOAD_KEY) ? PISTOL_RELOAD_KEY : RELOAD_KEY
+    const action = this.upper.get(key)
     if (!action) return
     action.reset().play()
     this.upperState = 'reload'

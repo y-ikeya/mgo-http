@@ -1,5 +1,12 @@
 import { For } from 'solid-js'
-import { CHOICES, WEAPONS, type WeaponId } from '../sim/weapons'
+import {
+  CHOICES,
+  SUPPORTS,
+  SUPPORT_SPECS,
+  WEAPONS,
+  type SupportId,
+  type WeaponId,
+} from '../sim/weapons'
 import './Loadout.css'
 
 /**
@@ -14,10 +21,19 @@ import './Loadout.css'
  */
 export default function Loadout(props: {
   primary: WeaponId
+  support: SupportId
   onPrimary: (id: WeaponId) => void
+  onSupport: (id: SupportId) => void
   /** 反映されるまでの説明。死んでいる間か、開始前かで変わる */
   note: string
+  /** 自動で閉じるまで (秒) */
+  left: number
+  onClose: () => void
 }) {
+  /** その枠を選んだときの予備弾。弾倉を選ぶと 1 弾倉ぶん増える */
+  const reserveOf = (id: WeaponId) =>
+    WEAPONS[id].reserve + SUPPORT_SPECS[props.support].spareMagazines * WEAPONS[id].magazine
+
   const rows = () => [
     { key: 'PRIMARY', ids: CHOICES.primary, current: props.primary, pick: props.onPrimary },
     { key: 'SECONDARY', ids: CHOICES.secondary, current: 'pistol' as WeaponId, pick: () => {} },
@@ -29,7 +45,7 @@ export default function Loadout(props: {
         <header class="loadout-head">
           <span class="loadout-title">LOADOUT</span>
           <span class="loadout-note">
-            {props.note} · 1 / 2 で選ぶ · L で閉じる
+            {props.note} · 残り {props.left} 秒
           </span>
         </header>
 
@@ -55,8 +71,12 @@ export default function Loadout(props: {
                         )}
                         {WEAPONS[id].kill}
                       </span>
+                      {/*
+                        予備弾は投擲の枠で変わる。表の値をそのまま出すと、
+                        MAG を選んでも数字が動かず、増えていないように見える。
+                      */}
                       <span class="loadout-spec">
-                        {WEAPONS[id].magazine} + {WEAPONS[id].reserve}
+                        {WEAPONS[id].magazine} + {reserveOf(id)}
                       </span>
                     </button>
                   )}
@@ -66,16 +86,37 @@ export default function Loadout(props: {
           )}
         </For>
 
-        {/* 投擲は選ばせない。持ち物の全体が見える形にしたいので、表示だけする */}
+        {/* 投擲。**どちらか一方**しか持てない */}
         <div class="loadout-row">
           <div class="loadout-slot">SUPPORT</div>
           <div class="loadout-items">
-            <button class="loadout-item loadout-item-on loadout-item-only" disabled>
-              <span class="loadout-name">M26</span>
-              <span class="loadout-spec">× 3</span>
-            </button>
+            <For each={SUPPORTS}>
+              {(id, i) => (
+                <button
+                  class="loadout-item"
+                  classList={{ 'loadout-item-on': id === props.support }}
+                  onClick={() => props.onSupport(id)}
+                >
+                  <span class="loadout-name">
+                    <span class="loadout-key">{i() + 3}</span>
+                    {SUPPORT_SPECS[id].label}
+                  </span>
+                  <span class="loadout-spec">
+                    × {SUPPORT_SPECS[id].count} · {SUPPORT_SPECS[id].hint}
+                  </span>
+                </button>
+              )}
+            </For>
           </div>
         </div>
+
+        {/*
+          決めるまで動けない。押して初めて操作が戻る、という手続きにしてある。
+          後回しにして走り出せると「湧くときに決める」が有名無実になる。
+        */}
+        <button class="loadout-ok" onClick={props.onClose}>
+          OK<span class="loadout-key loadout-key-wide">Enter</span>
+        </button>
       </div>
     </div>
   )

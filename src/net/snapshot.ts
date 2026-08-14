@@ -73,7 +73,15 @@ const OFF_FLAGS = 32 // u8
  * その精度は要らない。0.005° の誤差は 100m 先で 1cm。
  */
 const OFF_CAMERA_YAW = 33 // u16
-export const SNAPSHOT_BYTES = 35
+/**
+ * 2 枚目のフラグ。1 枚目が 8 ビット埋まったので足した。
+ *
+ * 1 バイト増えるが、位置は 64Hz で流れるので効くのはここだけ。
+ * 別メッセージにしなかったのは遮蔽の判定を通すため — 位置は見えている相手に
+ * しか配られない。
+ */
+const OFF_FLAGS2 = 35 // u8
+export const SNAPSHOT_BYTES = 36
 
 const FLAG_AIMING = 1
 const FLAG_CROUCHING = 2
@@ -94,6 +102,16 @@ const FLAG_WEAPON_HIGH = 128
 const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol']
 /** 手榴弾を振りかぶって持っている。倒されたら足元に落ちる */
 const FLAG_GRENADE = 64
+
+/** 2 枚目のフラグ */
+const FLAG2_RELOADING = 1
+/**
+ * 無敵か。**サーバーが書き込む。**
+ *
+ * 送り主に名乗らせない。自分で立てられるなら、ずっと無敵と言い続けられる。
+ * 席番号と同じで、こちらが知っていることはこちらで書く。
+ */
+const FLAG2_PROTECTED = 2
 
 /** 位置を詰める。slot は送る側では 0 (サーバーが書き込む) */
 export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer {
@@ -125,6 +143,8 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   const turns = snapshot.cameraYaw / (Math.PI * 2)
   view.setUint16(OFF_CAMERA_YAW, Math.round((turns - Math.floor(turns)) * 65536) & 0xffff)
 
+  view.setUint8(OFF_FLAGS2, snapshot.reloading ? FLAG2_RELOADING : 0)
+
   return buffer
 }
 
@@ -151,12 +171,24 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
       ] ?? 'rifle',
     holdingGrenade: (flags & FLAG_GRENADE) !== 0,
     cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,
+    reloading: (view.getUint8(OFF_FLAGS2) & FLAG2_RELOADING) !== 0,
+    protectedNow: (view.getUint8(OFF_FLAGS2) & FLAG2_PROTECTED) !== 0,
   }
 }
 
 /** 中継するときに送り主の番号を書き込む。中身は作り直さない */
 export function stampSlot(view: DataView, slot: number): void {
   view.setUint16(OFF_SLOT, slot)
+}
+
+/**
+ * 無敵かどうかを書き込む。中継するときにサーバーが呼ぶ。
+ *
+ * 中身は作り直さない。1 ビット立てるだけ。
+ */
+export function stampProtected(view: DataView, protectedNow: boolean): void {
+  const flags = view.getUint8(OFF_FLAGS2)
+  view.setUint8(OFF_FLAGS2, protectedNow ? flags | FLAG2_PROTECTED : flags & ~FLAG2_PROTECTED)
 }
 
 export function readSlot(view: DataView): number {

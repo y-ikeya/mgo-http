@@ -80,7 +80,7 @@ const LOCK_KEYS = new Set([
   'Space', 'ShiftLeft', 'ShiftRight',
   'KeyR', 'KeyF', 'KeyC', 'KeyG', 'KeyV', 'KeyQ', 'KeyZ', 'KeyE',
   // 装備を選ぶ。ポインタを掴んだままなのでボタンは押せない
-  'Digit1', 'Digit2', 'KeyL',
+  'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyL', 'Enter',
 ])
 
 /**

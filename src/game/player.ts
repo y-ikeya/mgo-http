@@ -41,6 +41,9 @@ export const PLAYER_RADIUS = CAPSULE_RADIUS
  */
 const MOVE_SPEED = 3.04
 
+/** 無敵の間の濃さ。消さずに薄くする — 居ることは見えていてよい */
+const GHOST_OPACITY = 0.35
+
 /**
  * 構えている間の移動速度の倍率。
  *
@@ -412,8 +415,11 @@ export class Player {
       z: this.object.position.z,
       yaw: this.yaw,
       pitch: this.aimPitch,
-      // 視点の向きはカメラが持っている。呼ぶ側が上書きする
+      // 視点の向きとリロードは呼ぶ側が持っている。あちらで上書きする
       cameraYaw: this.yaw,
+      reloading: false,
+      // 無敵かどうかはサーバーが書き込む。名乗る値ではない
+      protectedNow: false,
       locomotion: this.locomotion,
       aiming: this.aiming,
       weapon: this.weaponKind,
@@ -515,6 +521,27 @@ export class Player {
     this.footsteps.warp(x, z)
   }
 
+  /**
+   * 無敵の間は半透明にする。
+   *
+   * 撃てない相手だと見て分かる必要がある。撃ち込んでから「効かない」と
+   * 気付くのでは、撃った側の弾と時間が無駄になる。
+   *
+   * 自分の体は既に transparent で描いている (味方の発光より後に描くため) ので、
+   * 濃さを触るだけで済む。
+   */
+  setGhost(on: boolean): void {
+    if (this.ghost === on || !this.model) return
+    this.ghost = on
+    this.model.traverse((obj) => {
+      if (!isMesh(obj)) return
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+      for (const material of materials) material.opacity = on ? GHOST_OPACITY : 1
+    })
+  }
+
+  private ghost = false
+
   /** 復帰。位置は呼び出し側が決める */
   respawn(): void {
     this.health = MAX_HEALTH
@@ -550,8 +577,18 @@ export class Player {
   }
 
   /** リロードモーションの尺 (秒)。モデル未着なら 0 */
+  /**
+   * いま持っている銃のリロードの尺 (秒)。
+   *
+   * 銃ごとに型が違うので長さも違う。突撃銃の尺で拳銃を待たせると、
+   * 型が終わったのに撃てない時間が残る。
+   */
   get reloadDuration(): number {
-    return this.animator?.reloadDuration ?? 0
+    if (!this.animator) return 0
+    if (this.weaponKind === 'pistol' && this.animator.pistolReloadDuration > 0) {
+      return this.animator.pistolReloadDuration
+    }
+    return this.animator.reloadDuration
   }
 
   /** ボルトを操作する。上半身だけなので足は動かせる */
@@ -941,6 +978,12 @@ export class Player {
    * 銃口位置 = トレーサーの始点。弾道の判定そのものはカメラ側の照準線で行うので、
    * これは純粋に見た目用。武器モデルを持たせたら右手ボーンのワールド座標に置き換える。
    */
+  /** 排莢口のワールド座標。銃が付いていなければ銃口で代用する */
+  ejectPort(out: THREE.Vector3): THREE.Vector3 {
+    if (this.weapon) return this.weapon.ejectWorld(out)
+    return this.muzzle(out)
+  }
+
   muzzle(out: THREE.Vector3): THREE.Vector3 {
     // 武器がある間はその銃口を使う。以下は武器が付く前のフォールバック。
     if (this.weapon) return this.weapon.muzzleWorld(out)
@@ -1122,8 +1165,13 @@ export class Player {
       //
       // 副武器なので、持っていること自体は見せなくてよい。抜いていないぶん
       // 「今どちらを持っているか」が相手からも読みにくくなる。
+      // 拳銃は構えるまで抜かない。ただしリロード中は抜いている —
+      // 納めたまま弾倉を替えることはできないし、見えない銃をリロードして
+      // いるように見える
       const holstered =
-        this.boxed || saluting || (this.weaponKind === 'pistol' && !this.aiming)
+        this.boxed ||
+        saluting ||
+        (this.weaponKind === 'pistol' && !this.aiming && !this.animator.reloading)
       if (this.knife) this.knife.visible = (stabbing || this.knifePreview) && !holstered
       if (this.weapon) this.weapon.visible = !stabbing && !holstered
     }

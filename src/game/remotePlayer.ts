@@ -164,6 +164,22 @@ export class RemotePlayer {
   private locomotion: Locomotion = "idle";
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
+  /** 直前のリロード状態。始まった瞬間だけ型を流すのに使う */
+  private reloading = false;
+  /** このフレームにリロードを始めたか。音を鳴らすのは呼び出し側の仕事 */
+  reloadStarted = false;
+  /** 無敵の間は半透明にする。撃っても効かない相手だと見て分かるように */
+  private ghost = false;
+  private setGhost(on: boolean): void {
+    if (this.ghost === on) return;
+    this.ghost = on;
+    for (const material of this.tinted) {
+      material.transparent = on || material.userData.wasTransparent === true;
+      material.opacity = on ? 0.35 : 1;
+      material.needsUpdate = true;
+    }
+  }
+
   /** 湧き直しで跳んだことを足音に伝える。積算を捨てないと着いた先で連打になる */
   warp(x: number, z: number): void {
     this.footsteps.warp(x, z);
@@ -219,6 +235,7 @@ export class RemotePlayer {
     // 全身モーションは重みの補間では出せない。状態が切り替わった瞬間に頭から流す。
     this.rollStarted = false;
     this.sweptThisFrame = false;
+    this.reloadStarted = false;
     if (locomotion !== this.locomotion && WHOLE_BODY.has(locomotion)) {
       if (locomotion === "roll") {
         animator.playRoll();
@@ -258,6 +275,17 @@ export class RemotePlayer {
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている
     void this.equip(state.weapon)
 
+    // リロードは始まった瞬間だけ型を流す。状態として届くので、
+    // 途中から見え始めた相手にも「いま撃てない」が伝わる
+    if (state.reloading && !this.reloading) {
+      animator.playReload();
+      this.reloadStarted = true;
+    }
+    this.reloading = state.reloading;
+
+    // 無敵の間は半透明。撃てない相手だと見て分かる必要がある
+    this.setGhost(state.protectedNow)
+
     // 銃を隠す場面は自機と同じ規則で当てる。片方だけだと、自分では納めているのに
     // 相手の画面には出たままになる。
     //   敬礼中 / ダンボール … 手が塞がっている
@@ -265,7 +293,7 @@ export class RemotePlayer {
     const holstered =
       this.boxed ||
       locomotion === 'salute' ||
-      (state.weapon === 'pistol' && !state.aiming)
+      (state.weapon === 'pistol' && !state.aiming && !state.reloading)
     if (this.weapon) this.weapon.visible = !holstered
 
     this.object.updateMatrixWorld(true);
@@ -414,6 +442,11 @@ export class RemotePlayer {
   /** 撃った。ボルト操作のある銃なら動作を流す */
   playShot(): void {
     if (weaponOf(this.weaponKind).bolt) this.animator?.playBolt();
+  }
+
+  /** 排莢口のワールド座標。銃がまだ付いていなければ null */
+  ejectPort(out: THREE.Vector3): THREE.Vector3 | null {
+    return this.weapon ? this.weapon.ejectWorld(out) : null;
   }
 
   /** 持っている銃 */
@@ -852,6 +885,17 @@ export class RemotePlayers {
     const player = this.players.get(id);
     player?.playShot();
     return player?.equipped ?? 'rifle';
+  }
+
+  /**
+   * 排莢口の位置と体の向き。撃った合図を受けて薬莢を出すのに使う。
+   *
+   * まだ銃が付いていない (読み込み中) なら null。
+   */
+  ejectFrom(id: string, out: THREE.Vector3): number | null {
+    const player = this.players.get(id);
+    if (!player || !player.ejectPort(out)) return null;
+    return player.object.rotation.y;
   }
 
   /** 今いる場所。倒れていなくても音を鳴らす先が要るとき用 */

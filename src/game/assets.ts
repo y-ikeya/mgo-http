@@ -13,6 +13,7 @@ const SOLDIER_URL = `${import.meta.env.BASE_URL}models/soldier.glb`
 const RIFLE_URL = `${import.meta.env.BASE_URL}models/rifle.glb`
 const SNIPER_URL = `${import.meta.env.BASE_URL}models/sniper.glb`
 const PISTOL_URL = `${import.meta.env.BASE_URL}models/pistol.glb`
+const CASING_URL = `${import.meta.env.BASE_URL}models/casing_rifle.glb`
 const KNIFE_URL = `${import.meta.env.BASE_URL}models/knife.glb`
 const GRENADE_URL = `${import.meta.env.BASE_URL}models/grenade.glb`
 const STAGE_URL = `${import.meta.env.BASE_URL}models/stage.glb`
@@ -64,6 +65,14 @@ export function loadSniper(): Promise<GLTF> {
 
 export function loadPistol(): Promise<GLTF> {
   return load(PISTOL_URL)
+}
+
+/**
+ * 薬莢。銃ごとに分けていない — 飛んで転がるだけの物なので、
+ * 見分けが付く距離では既に消えている。
+ */
+export function loadCasing(): Promise<GLTF> {
+  return load(CASING_URL)
 }
 
 export function loadKnife(): Promise<GLTF> {

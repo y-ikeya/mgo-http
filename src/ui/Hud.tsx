@@ -216,13 +216,24 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <Show when={props.stats?.downed}>
           <div class="hud-ammo-state hud-ammo-state-warn">移動で起き上がる</div>
         </Show>
-        {/* 投げ物の残り。数が限られていることが見えていないと判断にならない */}
-        <div class="hud-throwables" classList={{ 'hud-throwables-empty': !props.stats?.throwables }}>
-          MAG × {props.stats?.throwables ?? 0}
-        </div>
-        <div class="hud-throwables" classList={{ 'hud-throwables-empty': !props.stats?.grenades }}>
-          GRENADE × {props.stats?.grenades ?? 0}
-        </div>
+        {/*
+          投げ物の残り。数が限られていることが見えていないと判断にならない。
+          持っていない方は出さない — 投擲の枠はどちらか一方しか取れない。
+          0 のまま並べると、取れるのに取っていないように見える。
+        */}
+        <Show when={props.stats?.support === 'magazine'}>
+          <div
+            class="hud-throwables"
+            classList={{ 'hud-throwables-empty': !props.stats?.throwables }}
+          >
+            MAG × {props.stats?.throwables ?? 0}
+          </div>
+        </Show>
+        <Show when={props.stats?.support === 'grenade'}>
+          <div class="hud-throwables" classList={{ 'hud-throwables-empty': !props.stats?.grenades }}>
+            GRENADE × {props.stats?.grenades ?? 0}
+          </div>
+        </Show>
       </div>
 
       <div class="hud-help">
