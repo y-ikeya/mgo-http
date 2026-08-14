@@ -56,12 +56,42 @@ import {
  * 即断できる**ほうが大事。見つけること自体は音と視線が受け持っている。
  */
 /**
- * 位置が途切れてから相手を隠すまで (秒)。
+ * 位置が途切れてから相手を隠すまでの下限 (秒)。
  *
  * 送る間隔 (1/20 秒) と補間の遅れ (0.1 秒) を足しても届かない長さにする。
  * 短すぎると、普通に見えている相手が通信のゆらぎで明滅する。
  */
 const HIDE_AFTER = 0.35
+
+/**
+ * 隠すまでを、その相手から実際に届いている間隔の何倍まで伸ばすか。
+ *
+ * 固定の 0.35 秒だけで決めていたときに何が起きたか: 送るのが遅れがちな機械
+ * (20Hz で送っているつもりでも 3〜4 通/秒しか出ていない) が相手だと、届く間隔が
+ * 0.35 秒に迫って**見えたり消えたりを繰り返す**。こちらの回線が細いときも同じ。
+ *
+ * 「途切れた」は、その相手が普段どれだけの間隔で届いているかに対しての話で、
+ * 絶対の秒数ではない。健全な相手 (50ms 間隔) なら 3 倍しても 150ms なので
+ * 下限の 0.35 秒が効いたまま — 遮蔽に入った敵が消えるまでの速さは変わらない。
+ */
+const HIDE_SLACK = 3
+
+/**
+ * どれだけ間隔が開いていても、ここで隠す (秒)。
+ *
+ * 伸ばしすぎると、遮蔽に入った相手が居ない場所に立って見え続ける。
+ * 撃てる (raycast は見えている相手だけを拾う) ので、そのぶん嘘の的が増える。
+ */
+const HIDE_LIMIT = 1.5
+
+/**
+ * 届く間隔の目安を下げる速さ (1 通あたりの割合)。
+ *
+ * 上へは即座に、下へはゆっくり。回線が詰まって固まって届くと、束の中だけ見れば
+ * 間隔は 1ms になる。そこに合わせて猶予を縮めると、束と束の間で消える。
+ * 直近の**最悪の間隔**を覚えておいて、良くなったらゆっくり忘れる。
+ */
+const GAP_DECAY = 0.05
 
 /**
  * 送り主の時計との差を、上へ戻す速さ (1 通あたりの割合)。
@@ -135,6 +165,10 @@ export class RemotePlayer {
    * 最初の 1 通が来るまでは分からないので null。
    */
   private clockOffset: number | null = null;
+  /** 直近で位置が届いていた間隔 (ms)。最悪の値を覚えて、良くなったら忘れる */
+  private packetGap = 0;
+  /** サーバーが「もう見えない」と言ってきたか。位置が来たら解ける */
+  private hiddenByServer = false;
   /** 所属。サーバーが決める。届くまでは赤として描く */
   private team: Team = "red";
   /** 色を掛ける対象。所属が変わっても掛け直せるよう控えておく */
@@ -195,6 +229,40 @@ export class RemotePlayer {
     }
   }
 
+  /** サーバーから「もう見えない」と届いた。次の位置が来るまで隠す */
+  hide(): void {
+    this.hiddenByServer = true;
+  }
+
+  /**
+   * 途切れたと見なすまでの猶予 (ms)。
+   *
+   * 相手ごとに変わる。20Hz で届いている相手なら下限の 0.35 秒のまま。
+   * 3 通/秒しか出せていない相手には 1 秒近くまで伸びる — その人にとっては
+   * 0.3 秒空くのが普通なので、そこで切ると見えたり消えたりになる。
+   */
+  get hideAfter(): number {
+    return Math.min(
+      HIDE_LIMIT * 1000,
+      Math.max(HIDE_AFTER * 1000, this.packetGap * HIDE_SLACK),
+    );
+  }
+
+  /**
+   * 画面に出すかどうかを決める。
+   *
+   * 判断は 2 つある。**サーバーの知らせ**が本筋で、遮蔽に入った瞬間に消える。
+   * **沈黙の長さ**はその保険で、相手が丸ごと落ちた (タブを閉じた、回線が切れた)
+   * ときに立ち尽くしたまま残るのを防ぐ。
+   *
+   * 沈黙だけで決めていた頃は、この 2 つが混ざっていた。遅れて届いているだけの
+   * 相手と、隠れた相手の区別が付かず、送るのが遅い機械が相手だと明滅した。
+   */
+  private refreshVisibility(now: number): void {
+    const silence = this.lastSeen > 0 ? now - this.lastSeen : 0;
+    this.setVisible(!this.hiddenByServer && silence < this.hideAfter);
+  }
+
   /** 湧き直しで跳んだことを足音に伝える。積算を捨てないと着いた先で連打になる */
   warp(x: number, z: number): void {
     this.footsteps.warp(x, z);
@@ -241,6 +309,21 @@ export class RemotePlayer {
       this.clockOffset += (observed - this.clockOffset) * CLOCK_DRIFT;
     }
 
+    // 届く間隔を覚える。途切れたと見なすまでの猶予をここから決める。
+    //
+    // 隠れていた間の空白は混ぜない。それは遮蔽に入っていた時間であって、
+    // その相手が送る速さではない。HIDE_LIMIT で頭も打っておく —
+    // サーバーが古くて hidden を送ってこない場合の保険
+    if (this.lastSeen > 0 && !this.hiddenByServer) {
+      const gap = arrivedAt - this.lastSeen;
+      if (gap <= HIDE_LIMIT * 1000) {
+        if (gap > this.packetGap) this.packetGap = gap;
+        else this.packetGap += (gap - this.packetGap) * GAP_DECAY;
+      }
+    }
+
+    // 位置が来たということは、また見えている
+    this.hiddenByServer = false;
     this.lastSeen = arrivedAt;
     const stamped = { ...snapshot, time: snapshot.time + this.clockOffset };
 
@@ -254,6 +337,8 @@ export class RemotePlayer {
    * @param now 現在時刻 (Date.now)。描くのはここから INTERPOLATION_DELAY だけ前
    */
   update(dt: number, now: number): void {
+    this.refreshVisibility(now);
+
     const state = this.sampleAt(now - INTERPOLATION_DELAY * 1000);
     if (!state) return;
 
@@ -764,21 +849,22 @@ export class RemotePlayers {
     this.players.delete(id);
   }
 
+  /**
+   * 隠れた相手も**消さずに残す**。
+   *
+   * 消すと所属も名前も失われ、出てきた瞬間に陣営の色が分からない別人として
+   * 現れる。かといって止まった場所に立たせたままにもしない。そこに居ない相手が
+   * 見えていることになる。最後に見えた位置は、こちらの頭の中にだけ残ればよい。
+   *
+   * 出す / 出さないの判断は RemotePlayer が持つ (refreshVisibility)。
+   */
   update(dt: number, now: number): void {
-    for (const player of this.players.values()) {
-      player.update(dt, now);
+    for (const player of this.players.values()) player.update(dt, now);
+  }
 
-      // 位置が途切れるのは、切れたときではなく隠れたときになった。
-      // サーバーが見えている相手にしか位置を配らないので、遮蔽に入れば止まる。
-      //
-      // 消さずに隠すだけにしてある。消すと所属も名前も失われ、出てきた瞬間に
-      // 陣営の色が分からない別人として現れる。
-      //
-      // 止まった場所に立たせたままにもしない。そこに居ない相手が見えていることに
-      // なってしまう。最後に見えた位置は、こちらの頭の中にだけ残ればよい。
-      const silence = player.lastSeen > 0 ? now - player.lastSeen : 0
-      player.setVisible(silence < HIDE_AFTER * 1000);
-    }
+  /** サーバーが「もう見えない」と言ってきた。位置が止まるのを待たずに消す */
+  hide(id: string): void {
+    this.players.get(id)?.hide();
   }
 
   /** 退出。サーバーが配る leave で消える */

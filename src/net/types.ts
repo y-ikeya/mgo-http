@@ -266,6 +266,22 @@ export interface LeaveEvent {
   id: string
 }
 
+/**
+ * この相手はもう見えない、という知らせ。
+ *
+ * 位置は見えている相手にしか配られないので、隠れたことは「位置が来なくなった」
+ * ことからも読める。読めるが、**それだけでは決められない**。位置が来ないのは
+ * 隠れたときだけでなく、相手の機械が遅れているときにも起きる。区別が付かないと、
+ * 送るのが遅い相手が見えたり消えたりを繰り返す (実際に起きた)。
+ *
+ * 見えなくなった理由を知っているのはサーバーなので、そちらに言わせる。
+ * 沈黙から測るほうは、相手ごと丸ごと落ちた場合の保険として残す。
+ */
+export interface HiddenEvent {
+  type: 'hidden'
+  id: string
+}
+
 /** 接続した直後にサーバーから届く、今いる全員 */
 export interface RosterMessage {
   type: 'roster'
@@ -363,6 +379,7 @@ export type NetMessage =
   | ThrowEvent
   | JoinEvent
   | LeaveEvent
+  | HiddenEvent
   | RosterMessage
   | MatchMessage
   | HealthMessage
