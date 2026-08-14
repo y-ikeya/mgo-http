@@ -775,6 +775,27 @@ function isProtected(player: Player, now = Date.now()): boolean {
   return player.protectedUntil > now
 }
 
+/**
+ * 見える / 見えないの判断を書き出す。調査用。
+ *
+ * 位置と、目の位置と、結果。手元で stage.json に対して同じ計算をやり直せる。
+ */
+let debugAt = 0
+function debugVision(viewer: Player, from: Player, eye: { x: number; y: number; z: number }): void {
+  const t = Date.now()
+  if (t - debugAt < 3000) return
+  debugAt = t
+  const head = visibleHead(from, t)
+  const ok = hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
+  console.warn(
+    `[可視] ${viewer.name} → ${from.name}: ${ok ? '見える' : '見えない'}` +
+      ` / 見る側 (${viewer.x.toFixed(1)}, ${viewer.y.toFixed(1)}, ${viewer.z.toFixed(1)})` +
+      ` yaw=${viewer.cameraYaw.toFixed(2)} pitch=${viewer.pitch.toFixed(2)} aim=${viewer.aiming}` +
+      ` / 目 (${eye.x.toFixed(1)}, ${eye.y.toFixed(1)}, ${eye.z.toFixed(1)})` +
+      ` / 相手 (${from.x.toFixed(1)}, ${from.y.toFixed(1)}, ${from.z.toFixed(1)}) 頭 ${head.toFixed(2)}`,
+  )
+}
+
 function relayState(roomName: string, from: Player, payload: Uint8Array): void {
   const room = rooms.get(roomName)
   if (!room) return
@@ -794,6 +815,8 @@ function relayState(roomName: string, from: Player, payload: Uint8Array): void {
       // カメラのほうが後ろ上から見下ろすぶん、目より広く見える。そこは許す —
       // 描いている物と送る物がずれているほうが困る
       const eye = viewOf(viewer)
+      // 調査用。原因が分かったら消す
+      debugVision(viewer, from, eye)
       const visible = hasLineOfSight(
         eye.x,
         eye.y,
