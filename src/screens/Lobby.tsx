@@ -59,6 +59,14 @@ export default function Lobby(props: { identity: Identity }) {
 
   const full = (room: Room) => room.players >= room.capacity
 
+  /**
+   * 部屋へ移るとき、クエリをそのまま持っていく。
+   *
+   * `?server=` や `?panel=open` は部屋に入ってから読まれるので、
+   * ここで落とすと効かない (手元の画面から本番のサーバーへ繋ぐ、ができなくなる)。
+   */
+  const enter = (name: string) => navigate(`/rooms/${name}${location.search}`)
+
   return (
     <div class="lobby">
       <header class="lobby-head">
@@ -88,7 +96,7 @@ export default function Lobby(props: { identity: Identity }) {
               class="room"
               classList={{ 'room-full': full(room), 'room-live': room.phase === 'playing' }}
               disabled={full(room)}
-              onClick={() => navigate(`/rooms/${room.name}`)}
+              onClick={() => enter(room.name)}
             >
               <span class="room-name">{room.name}</span>
 

@@ -43,7 +43,15 @@ export default function App() {
           <Router>
             <Route path="/rooms" component={() => <Lobby identity={who()} />} />
             <Route path="/rooms/:room" component={() => <Play identity={who()} />} />
-            <Route path="*" component={() => <Navigate href="/rooms" />} />
+            {/*
+              クエリを持ったまま飛ばす。`?server=` や `?panel=open` は
+              この先で読まれるので、ここで落とすと効かない
+              (手元の画面から本番のサーバーへ繋ぐ、ができなくなる)。
+            */}
+            <Route
+              path="*"
+              component={() => <Navigate href={`/rooms${location.search}`} />}
+            />
           </Router>
         )}
       </Show>

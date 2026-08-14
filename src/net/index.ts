@@ -21,6 +21,17 @@ import type { Identity } from '../auth/session'
 const DEFAULT_PORT = 8787
 
 /**
+ * 既定の接続先。ビルド時に決まる。
+ *
+ * 本番はここに `wss://mgohttp.pepaga.me` が入る。手元では空のままなので、
+ * 「このページと同じホストの 8787」に落ちる。
+ *
+ * `?server=` を付ければどちらの場合でも上書きできる。手元の画面から
+ * 本番のサーバーへ繋いで試す、ができる。
+ */
+const BUILT_IN_SERVER = import.meta.env.VITE_SERVER_URL ?? ''
+
+/**
  * @param identity ログイン済みの本人。ID も名前もここから取る。
  *   サーバーは token の署名から ID を導くので、名乗った値は使われない。
  */
@@ -30,7 +41,7 @@ export function createTransport(identity: Identity, room: string): NetTransport 
 
   if (params.get('local') === '1') return new NetChannel(id, name, `mgohttp:${room}`)
 
-  const url = resolveServerUrl(params.get('server') ?? '1')
+  const url = resolveServerUrl(params.get('server') ?? BUILT_IN_SERVER ?? '1')
   console.info(`[Net] WebSocket で接続: ${url} (room: ${room}, name: ${name})`)
   return new NetSocket(id, name, url, room, identity.token)
 }
@@ -42,7 +53,10 @@ function resolveServerUrl(server: string): string {
   // ページが https なら ws:// は混在コンテンツとして遮断されるので合わせる
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
   // "1" や "true" は「このページと同じホスト」の意味
-  const host = server === '1' || server === 'true' ? `${location.hostname}:${DEFAULT_PORT}` : server
+  const host =
+    server === '1' || server === 'true' || server === ''
+      ? `${location.hostname}:${DEFAULT_PORT}`
+      : server
   return `${scheme}://${host}`
 }
 
@@ -54,7 +68,7 @@ function resolveServerUrl(server: string): string {
  */
 export function serverHttpUrl(): string {
   const params = new URLSearchParams(location.search)
-  return resolveServerUrl(params.get('server') ?? '1')
+  return resolveServerUrl(params.get('server') ?? BUILT_IN_SERVER ?? '1')
     .replace(/^ws:/, 'http:')
     .replace(/^wss:/, 'https:')
 }
