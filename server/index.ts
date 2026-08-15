@@ -1131,21 +1131,68 @@ function applyDamage(roomName: string, attacker: Player, event: NetMessage): voi
 }
 
 /**
+ * 残っているのが片側だけならその陣営。両方居るか、誰も居なければ null。
+ *
+ * 不戦勝を出すかどうかの判断に使う。
+ */
+function soleTeam(seats: Player[]): Team | null {
+  const blue = seats.some((p) => p.team === 'blue')
+  const red = seats.some((p) => p.team === 'red')
+  if (blue === red) return null
+  return blue ? 'blue' : 'red'
+}
+
+/**
  * 試合の進行。
  *
  * 時間切れで決着、しばらく結果を見せてから次の試合を始める。
  * クライアント側で時計を回すと、タブが裏に回ったぶんだけずれるのでサーバーが持つ。
  */
 function updateMatch(roomName: string, room: Match, now: number): void {
-  const enough = holdingSeats(room, now).length >= MIN_PLAYERS
+  const seats = holdingSeats(room, now)
+  // 続けられるかは頭数ではなく**両陣営に居るか**で決まる。
+  //
+  // 数だけ見ていると、片側に 2 人残って反対側が空でも「2 人居るから続行」に
+  // なる。相手の居ない試合が時間切れまで走ることになる。
+  const enough = seats.some((p) => p.team === 'blue') && seats.some((p) => p.team === 'red')
   const previous = room.phase
 
-  // 人が欠けたら、どの段階からでも待ちへ戻る。
-  // 相手が居ないまま時計だけ進むと、誰も居ない相手に勝ったことになる。
-  if (!enough && room.phase !== 'waiting') {
-    room.phase = 'waiting'
-    room.endsAt = 0
-    room.winner = undefined
+  // 結果を見せている間は人数を見ない。見せ終わってから次を決める。
+  //
+  // ここを人数で割り込ませると、不戦勝を出した次の刻みで待ちへ落ちて、
+  // 勝ったことが画面に出ないまま消える
+  if (room.phase === 'over') {
+    if (now < room.endsAt) {
+      // まだ見せている最中
+    } else if (enough) {
+      room.phase = 'countdown'
+      room.endsAt = now + COUNTDOWN
+      room.blue = 0
+      room.red = 0
+      room.winner = undefined
+      resetPlayers(roomName, room)
+    } else {
+      room.phase = 'waiting'
+      room.endsAt = 0
+      room.winner = undefined
+    }
+  } else if (!enough && room.phase !== 'waiting') {
+    // 相手が居なくなった。
+    //
+    // 試合中なら**残っている側の勝ち**にする。待ちへ戻すだけだと、
+    // 抜けた側は負けを付けられずに済むので、劣勢になったら抜ければよい
+    // ことになる。席を空けて待つ猶予 (30 秒) を過ぎるまでは畳まないので、
+    // 一瞬の離脱で勝ちが転がり込むことはない。
+    const survivor = soleTeam(seats)
+    if (room.phase === 'playing' && survivor) {
+      room.phase = 'over'
+      room.winner = survivor
+      room.endsAt = now + INTERMISSION
+    } else {
+      room.phase = 'waiting'
+      room.endsAt = 0
+      room.winner = undefined
+    }
   } else if (room.phase === 'waiting' && enough) {
     room.phase = 'countdown'
     room.endsAt = now + COUNTDOWN
@@ -1165,13 +1212,6 @@ function updateMatch(roomName: string, room: Match, now: number): void {
     room.phase = 'over'
     room.winner = room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
     room.endsAt = now + INTERMISSION
-  } else if (room.phase === 'over' && now >= room.endsAt) {
-    room.phase = 'countdown'
-    room.endsAt = now + COUNTDOWN
-    room.blue = 0
-    room.red = 0
-    room.winner = undefined
-    resetPlayers(roomName, room)
   }
 
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
