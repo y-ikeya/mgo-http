@@ -1,4 +1,5 @@
 import { For } from 'solid-js'
+import { t } from '../i18n'
 import {
   CHOICES,
   SUPPORTS,
@@ -124,7 +125,7 @@ export default function Loadout(props: {
           しない — 倒された直後に戻ってこられると、勝った側が休めない。
         */}
         <button class="loadout-ok" disabled={props.wait > 0} onClick={props.onSpawn}>
-          {props.wait > 0 ? `出撃まで ${props.wait}` : 'OK'}
+          {props.wait > 0 ? t('loadout.deployIn', { n: props.wait }) : 'OK'}
           <span class="loadout-key loadout-key-wide">Enter</span>
         </button>
       </div>

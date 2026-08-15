@@ -1,4 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { t } from '../i18n'
 import type { GameStats } from '../game/Game'
 import './Scoreboard.css'
 
@@ -70,9 +71,13 @@ export default function Scoreboard(props: {
         </Show>
 
         <header class="score-head">
-          <span class="score-blue">青 {props.stats?.match?.blue ?? 0}</span>
+          <span class="score-blue">
+            {t('score.blue')} {props.stats?.match?.blue ?? 0}
+          </span>
           <span class="score-dash">–</span>
-          <span class="score-red">{props.stats?.match?.red ?? 0} 赤</span>
+          <span class="score-red">
+            {props.stats?.match?.red ?? 0} {t('score.red')}
+          </span>
         </header>
 
         <div class="score-teams">
@@ -80,7 +85,7 @@ export default function Scoreboard(props: {
             {(team) => (
               <div class="score-team">
                 <div class={`score-team-head score-${team}`}>
-                  {team === 'blue' ? '青' : '赤'}
+                  {team === 'blue' ? t('score.blue') : t('score.red')}
                   <span class="score-cols">
                     <span>K</span>
                     <span>D</span>
@@ -100,7 +105,7 @@ export default function Scoreboard(props: {
                     >
                       <span class={`score-name score-${team}`}>
                         {player.name}
-                        {player.away === true && <span class="score-tag">再接続中</span>}
+                        {player.away === true && <span class="score-tag">{t('score.away')}</span>}
                       </span>
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
@@ -109,7 +114,7 @@ export default function Scoreboard(props: {
                 </For>
 
                 <Show when={side(team).length === 0}>
-                  <div class="score-none">まだ誰も居ない</div>
+                  <div class="score-none">{t('score.empty')}</div>
                 </Show>
               </div>
             )}
@@ -129,7 +134,7 @@ export default function Scoreboard(props: {
             <span class="score-next">NEXT MATCH IN {nextIn()}</span>
           </Show>
           <button class="score-close" onClick={props.onClose}>
-            戻る <span class="score-key">Tab</span>
+            {t('score.back')} <span class="score-key">Tab</span>
           </button>
         </footer>
       </div>

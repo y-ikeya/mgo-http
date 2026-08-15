@@ -1,4 +1,5 @@
 import { createSignal, Show } from 'solid-js'
+import { t } from '../i18n'
 import { signIn, signUp, type Identity } from '../auth/session'
 import './Login.css'
 
@@ -24,8 +25,8 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
     setNotice('')
 
     const who = name().trim()
-    if (who.length < 2) return setError('名前は 2 文字以上にしてください')
-    if (password().length < 6) return setError('パスワードは 6 文字以上にしてください')
+    if (who.length < 2) return setError(t('login.nameTooShort'))
+    if (password().length < 6) return setError(t('login.passwordTooShort'))
 
     setBusy(true)
     try {
@@ -35,13 +36,13 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
 
       // 登録したがメールの確認が要る設定だと、まだ入れない
       if (!identity) {
-        setNotice('登録しました。確認メールのリンクを開いてから Login してください')
+        setNotice(t('login.confirmSent'))
         setRegistering(false)
         return
       }
       props.onDone(identity)
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Login できませんでした')
+      setError(failure instanceof Error ? failure.message : t('login.failed'))
     } finally {
       setBusy(false)
     }
@@ -54,7 +55,7 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
         <div class="login-sub">{registering() ? 'Sign up' : 'Login'}</div>
 
         <label class="login-field">
-          <span>名前</span>
+          <span>{t('login.name')}</span>
           <input
             type="text"
             autocomplete="username"
@@ -65,7 +66,7 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
         </label>
 
         <label class="login-field">
-          <span>パスワード</span>
+          <span>{t('login.password')}</span>
           <input
             type="password"
             autocomplete={registering() ? 'new-password' : 'current-password'}
@@ -96,7 +97,7 @@ export default function Login(props: { onDone: (identity: Identity) => void }) {
           }}
           disabled={busy()}
         >
-          {registering() ? 'アカウントを持っている場合は Login' : 'アカウントを作る (Sign up)'}
+          {registering() ? t('login.toSignIn') : t('login.toSignUp')}
         </button>
       </form>
     </div>
