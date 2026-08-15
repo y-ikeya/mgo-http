@@ -1,4 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { t } from '../i18n'
 import { useNavigate } from '@solidjs/router'
 import { serverHttpUrl } from '../net'
 import type { Identity } from '../auth/session'
@@ -28,11 +29,12 @@ interface Room {
   remaining: number
 }
 
-const PHASE_LABEL: Record<Room['phase'], string> = {
-  waiting: '待機中',
-  countdown: 'まもなく開始',
-  playing: '対戦中',
-  over: '結果表示',
+/** 段階の呼び名。引くたびに t() を通す (言語は起動時に決まっているので実質定数) */
+const PHASE_LABEL: Record<Room['phase'], () => string> = {
+  waiting: () => t('lobby.waiting'),
+  countdown: () => t('lobby.countdown'),
+  playing: () => t('lobby.playing'),
+  over: () => t('lobby.over'),
 }
 
 export default function Lobby(props: { identity: Identity }) {
@@ -47,7 +49,7 @@ export default function Lobby(props: { identity: Identity }) {
       setRooms((await response.json()) as Room[])
       setError('')
     } catch {
-      setError('サーバーに繋がらない')
+      setError(t('lobby.unreachable'))
     }
   }
 
@@ -110,7 +112,7 @@ export default function Lobby(props: { identity: Identity }) {
                 <span class="room-bar-fill" style={{ width: `${(room.players / room.capacity) * 100}%` }} />
               </span>
 
-              <span class="room-phase">{PHASE_LABEL[room.phase]}</span>
+              <span class="room-phase">{PHASE_LABEL[room.phase]()}</span>
 
               <Show when={room.phase === 'playing' || room.phase === 'over'}>
                 <span class="room-score">
@@ -132,7 +134,7 @@ export default function Lobby(props: { identity: Identity }) {
       </div>
 
       <Show when={rooms().length === 0 && !error()}>
-        <div class="lobby-empty">読み込み中…</div>
+        <div class="lobby-empty">{t('lobby.loading')}</div>
       </Show>
     </div>
   )

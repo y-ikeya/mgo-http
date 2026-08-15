@@ -1,4 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { t } from '../i18n'
 import { useNavigate, useParams } from '@solidjs/router'
 import type * as THREE from 'three'
 import { Game, type GameStats } from '../game/Game'
@@ -78,7 +79,7 @@ export default function Play(props: { identity: Identity }) {
           support={support()}
           onPrimary={(id) => game()?.setLoadout(id)}
           onSupport={(id) => game()?.setSupport(id)}
-          note="装備を選んでください"
+          note={t('loadout.note')}
           left={stats()?.loadoutLeft ?? 0}
           wait={stats()?.loadoutWait ?? 0}
           onSpawn={() => game()?.closeLoadout()}

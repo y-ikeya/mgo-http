@@ -1,4 +1,5 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
+import { t } from '../i18n'
 import type { GameStats } from '../game/Game'
 import './Hud.css'
 
@@ -68,7 +69,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <div class="hud-standby">
           <div class="hud-standby-title">STANDBY</div>
           <div class="hud-standby-sub">
-            対戦相手を待っています &nbsp; {props.stats?.match?.present ?? 1} /{' '}
+            {t('hud.waitingForOpponent')} &nbsp; {props.stats?.match?.present ?? 1} /{' '}
             {props.stats?.match?.required ?? 2}
           </div>
         </div>
@@ -78,7 +79,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={phase() === 'countdown'}>
         <div class="hud-standby">
           <div class="hud-standby-count">{remaining()}</div>
-          <div class="hud-standby-sub">まもなく開始</div>
+          <div class="hud-standby-sub">{t('hud.startingSoon')}</div>
         </div>
       </Show>
 
@@ -169,7 +170,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
       {/* 覗ける状態のとき、肩越しのまま何もしていない人に操作を伝える */}
       <Show when={props.stats?.canZoom && !props.stats?.scoped}>
-        <div class="scope-hint">Z / ホイールで覗く</div>
+        <div class="scope-hint">{t('hud.scopeHint')}</div>
       </Show>
 
       <Show when={locked() && props.stats?.aiming && !props.stats?.scoped}>
@@ -214,7 +215,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </Show>
         {/* 転んだら自分で起きる。撃つか起きるかを選ばせたいので、時間では立たない */}
         <Show when={props.stats?.downed}>
-          <div class="hud-ammo-state hud-ammo-state-warn">移動で起き上がる</div>
+          <div class="hud-ammo-state hud-ammo-state-warn">{t('hud.standUpHint')}</div>
         </Show>
         {/*
           投げ物の残り。数が限られていることが見えていないと判断にならない。
@@ -236,10 +237,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </Show>
       </div>
 
-      <div class="hud-help">
-        WASD 移動 &nbsp;·&nbsp; Space 短押し しゃがみ / 長押し ローリング &nbsp;·&nbsp; マウス 視点 &nbsp;·&nbsp; 右クリック / Shift 構え
-        &nbsp;·&nbsp; 左クリック 射撃 &nbsp;·&nbsp; R リロード &nbsp;·&nbsp; F ナイフ &nbsp;·&nbsp; C ダンボール &nbsp;·&nbsp; G 長押しで弾倉を投げる &nbsp;·&nbsp; E 長押しで手榴弾 &nbsp;·&nbsp; V 敬礼 (長押しで保つ) &nbsp;·&nbsp; Q 持ち替え &nbsp;·&nbsp; Z 倍率 &nbsp;·&nbsp; Tab 成績表
-      </div>
+      <div class="hud-help">{t('hud.help')}</div>
     </div>
   )
 }
