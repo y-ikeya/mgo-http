@@ -929,7 +929,10 @@ export class Game {
       this.follow.aimPitch,
       this.world,
     );
-    this.follow.update(dt, this.player, this.cameraWorld);
+    // 倒されている間は倒した相手を映す。それ以外は自分を追う
+    const watching = this.killCamTarget;
+    if (watching) this.follow.watch(dt, watching, this.cameraWorld);
+    else this.follow.update(dt, this.player, this.cameraWorld);
 
     if (this.hitFeedbackTimer > 0) this.hitFeedbackTimer -= dt;
     // 無敵の間は半透明。撃てば切れる (サーバーがそう決めている) ので、
@@ -1061,11 +1064,16 @@ export class Game {
       case "kill":
         this.killFeed.unshift({ ...message, at: Date.now() });
         this.killFeed.length = Math.min(this.killFeed.length, KILL_FEED_MAX);
+        // 倒された。この後の 5 秒はこの人を映す。
+        // 自爆なら映すものが無いので空のままにする
+        if (message.victim === this.net.id) {
+          this.killedBy = message.killer === this.net.id ? "" : message.killer;
+        }
         break;
 
+      // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
       case "respawn":
-        if (message.id === this.net.id) this.respawnSelf();
-        else this.remotes.warp(message.id);
+        if (message.id !== this.net.id) this.remotes.warp(message.id);
         break;
 
       case "roster":
@@ -1283,6 +1291,40 @@ export class Game {
     if (this.life === state) return;
     this.life = state;
     this.lifeAt = Date.now();
+
+    // 支度へ移った。倒した相手を映すのをやめて、自分の湧き地点へ戻る。
+    // ここで初めて装備画面が出るので、その背景が自分の湧き地点になる
+    if (state === "choosing") {
+      this.killedBy = "";
+      this.placeAtSpawn();
+      this.player.respawn();
+      this.follow.snapTo(this.player, this.cameraWorld);
+    }
+
+    // 戦場へ出た。装備が確定して、持ち物が配り直される
+    if (state === "spawning") this.respawnSelf();
+  }
+
+  /**
+   * 倒した相手の id。倒れている間だけ入っている。
+   *
+   * その 5 秒はこの人を映す。遮蔽の裏に居てもサーバーが位置を配ってくれる
+   * (倒れている間だけ)。
+   */
+  private killedBy = "";
+  private readonly killCamAt = new THREE.Vector3();
+
+  /**
+   * 倒した相手を映すか。映すなら killCamAt にその足元が入る。
+   *
+   * 相手が見つからない (自爆した、退出した) ときは映さない。
+   * その場合は倒れた自分の体をそのまま映し続ける
+   */
+  private get killCamTarget(): THREE.Vector3 | null {
+    if (this.life !== "downed" || !this.killedBy) return null;
+    const at = this.remotes.positionOf(this.killedBy);
+    if (!at) return null;
+    return this.killCamAt.copy(at);
   }
 
   /** ポインタを離しているか。出ている画面が変わったときだけ触る */
@@ -1404,9 +1446,13 @@ export class Game {
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
   onLoadout: ((next: { primary: WeaponId; support: SupportId }) => void) | null = null;
 
-  /** サーバーから復帰の合図が来た */
+  /**
+   * 戦場へ出た。
+   *
+   * 湧き地点へ置くのは支度に移った時点で済んでいる (装備画面の背景が
+   * 自分の湧き地点になる)。ここでやるのは持ち物の確定だけ。
+   */
   private respawnSelf(): void {
-    this.placeAtSpawn();
     // 湧くときに装備が確定する。試合中に組み替えても、ここまで反映されない
     this.loadout = { ...this.pendingLoadout };
     this.slot = "primary";

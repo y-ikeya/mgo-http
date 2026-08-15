@@ -126,6 +126,13 @@ interface Player {
    */
   life: Life
   /**
+   * 倒した相手の id。倒れている間だけ意味がある。
+   *
+   * 倒された側の画面はこの人を映す。**その間だけ、遮蔽を無視して位置を配る** —
+   * 映すものが無いと画面が成立しないので。湧いたら消す。
+   */
+  killedBy: string
+  /**
    * その状態に入った時刻 (Date.now)。
    *
    * 時間で切り替わる遷移 (倒れる尺、無敵、支度の打ち切り、席を畳むまで) は
@@ -347,6 +354,7 @@ function resetPlayers(roomName: string, room: Match): void {
  * (setLife が通してくれないので、書き間違えても状態が壊れることはない)。
  */
 function spawn(roomName: string, player: Player, now = Date.now()): void {
+  player.killedBy = ''
   player.health = MAX_HEALTH
   player.grenades = player.support === 'grenade' ? GRENADES_PER_LIFE : 0
   player.holdingGrenade = false
@@ -649,10 +657,12 @@ function detonate(nade: Grenade): void {
     }
 
     victim.deaths++
+    const killer = room.players.get(nade.owner)
+    // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる
+    victim.killedBy = killer && killer.id !== victim.id ? killer.id : ''
     setLife(nade.room, victim, 'downed')
     // 握っていたものは足元に落ちる。誘爆する
     dropGrenade(nade.room, victim)
-    const killer = room.players.get(nade.owner)
     // 自爆は得点にしない。倒された数だけが残る
     if (killer && killer.id !== victim.id) {
       killer.kills++
@@ -875,9 +885,20 @@ function relayState(roomName: string, from: Player, payload: Uint8Array): void {
     // 見る側として成立するか。どこから見ているか分からない相手には配らない
     let visible = present && canSee(viewer.life)
 
+    // 倒された側には、倒した相手だけ遮蔽を無視して配る。
+    //
+    // その画面はいまその人を映している (kill cam)。映すものが無いと画面が
+    // 成立しない。倒れている間だけで、支度に移った瞬間に切れる。
+    //
+    // **代償**: 倒された人は撃ってきた相手の居場所を 5 秒間見られる。
+    // 味方に伝えられるので、隠れている側の利は少し削られる。それでも
+    // 「どこから撃たれたのか分からないまま死ぬ」よりは読み合いになる、
+    // という判断で入れてある。
+    const killCam = viewer.life === 'downed' && viewer.killedBy === from.id
+
     // 味方は無条件。TDM で味方の位置が分からないと連携のしようがないし、
     // 隠すべき情報は敵に対するものだけ。判定の回数も半分以下になる
-    if (visible && viewer.team !== from.team && stageBoxes.length > 0) {
+    if (visible && !killCam && viewer.team !== from.team && stageBoxes.length > 0) {
       // **目ではなくカメラから**線を引く。三人称なので、画面に映るものを
       // 決めているのはカメラの位置。目で見ると、遮蔽の裏にしゃがんだ相手が
       // 「カメラからは見えているのに送られてこない」ことになる。
@@ -1048,6 +1069,7 @@ function applyDamage(roomName: string, attacker: Player, event: NetMessage): voi
     return
   }
 
+  victim.killedBy = attacker.id
   setLife(roomName, victim, 'downed')
   victim.deaths++
   // 振りかぶったまま倒されたら、足元に落ちて爆ぜる。
@@ -1375,6 +1397,7 @@ const server = Bun.serve<Client, Record<string, never>>({
           health: MAX_HEALTH,
           life: 'joining',
           lifeAt: Date.now(),
+          killedBy: '',
           x: 0,
           y: 0,
           z: 0,

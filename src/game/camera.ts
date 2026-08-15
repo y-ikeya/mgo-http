@@ -47,6 +47,29 @@ const OCCLUSION_PADDING = 0.28
 const MIN_OCCLUDED_DISTANCE = 0.45
 
 /**
+ * 倒した相手を映すときの構え。
+ *
+ * 近い。誰に倒されたのかが読めないと映す意味が無いので、顔と装備が
+ * 分かる距離まで寄せる。
+ */
+const WATCH_DISTANCE = 3.4
+/** どれだけ壁に押されても、これより寄らない (m)。中に入ると何も映らない */
+const WATCH_MIN_DISTANCE = 1.2
+/** 相手の足元からのカメラの高さ (m)。少し見下ろす */
+const WATCH_HEIGHT = 1.5
+/** 注視点の高さ (m)。胸のあたり */
+const WATCH_LOOK_HEIGHT = 1.2
+/** 回り込む速さ (rad/s)。止まった絵にすると固まったように見える */
+const WATCH_SPIN = 0.3
+/**
+ * 映す位置へ寄る速さ。
+ *
+ * 追従より遅い。倒れた場所から相手のところまで一瞬で飛ぶと、
+ * どこを映しているのか分からなくなる。
+ */
+const WATCH_LAMBDA = 3.5
+
+/**
  * 遮蔽が解けてカメラが戻る速さ。
  *
  * 寄るときは補間しない。壁に入る側を遅らせると、遅れている間そのまま
@@ -133,6 +156,8 @@ export class FollowCamera {
   private readonly centerPivot = new THREE.Vector3()
   /** 遮蔽を考慮した実際の距離。目標の distance 以下になる */
   private occludedDistance = HIP_VIEW.distance
+  /** 倒した相手を映すときの回り込み角 (rad) */
+  private watchAngle = 0
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(HIP_VIEW.fov, aspect, 0.1, 500)
@@ -199,7 +224,53 @@ export class FollowCamera {
   }
 
   /** 初期配置。追従の補間を挟まず目標位置へ即座に置く */
+  /**
+   * 誰かを映す。倒された側の画面が、倒した相手を映すのに使う。
+   *
+   * 追従とは別の口にしてある。追従は「自分の後ろ」を保つ仕掛けで、
+   * 向きも距離も自分の入力から出る。ここは自分がどこを向いていようと
+   * 関係なく相手を中心に置くので、同じ計算では出せない。
+   *
+   * ゆっくり回り込む。止まった絵にすると、映しているのか固まったのかが
+   * 分からない。
+   *
+   * @param target 映す相手の足元
+   */
+  watch(dt: number, target: THREE.Vector3, world?: CameraWorld): void {
+    this.watchAngle += dt * WATCH_SPIN
+
+    // 見るのは胸のあたり。足元を見ると地面ばかりが映る
+    this.pivot.set(target.x, target.y + WATCH_LOOK_HEIGHT, target.z)
+
+    this.back
+      .set(Math.sin(this.watchAngle), 0, Math.cos(this.watchAngle))
+      .normalize()
+
+    // 壁の向こうから見ない。回り込んだ先が壁の中だと、相手が消える
+    let distance = WATCH_DISTANCE
+    if (world) {
+      const blocked = world.distanceToObstruction(this.pivot, this.back, WATCH_DISTANCE)
+      distance = Math.max(WATCH_MIN_DISTANCE, blocked - OCCLUSION_PADDING)
+    }
+
+    this.desired
+      .copy(this.pivot)
+      .addScaledVector(this.back, distance)
+    this.desired.y = Math.max(MIN_CAMERA_Y, this.pivot.y + WATCH_HEIGHT)
+
+    const p = this.camera.position
+    p.set(
+      damp(p.x, this.desired.x, WATCH_LAMBDA, dt),
+      damp(p.y, this.desired.y, WATCH_LAMBDA, dt),
+      damp(p.z, this.desired.z, WATCH_LAMBDA, dt),
+    )
+    this.camera.lookAt(this.pivot)
+  }
+
   snapTo(player: Player, world?: CameraWorld): void {
+    // 映すのをやめたら回り込みも最初から。次に倒されたときに続きから
+    // 回り始めると、角度が毎回変わって落ち着かない
+    this.watchAngle = 0
     this.occludedDistance = this.distance
     this.computeDesired(player, world, 0)
     this.camera.position.copy(this.desired)
