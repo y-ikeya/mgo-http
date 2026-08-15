@@ -293,9 +293,26 @@ function roomOf(name: string): Match {
  */
 const RECONNECT_GRACE = 30_000
 
-/** 今つながっている人だけ。離脱中の席は数にも配信にも入れない */
+/** 今つながっている人だけ。離脱中の席は配信に入れない */
 function connected(room: Match): Player[] {
   return [...room.players.values()].filter((p) => isSeated(p.life))
+}
+
+/**
+ * 席を持っている人。**一瞬の離脱を数に入れる。**
+ *
+ * 試合を続けるかどうかはこちらで数える。繋がっている人だけで数えていた頃は、
+ * 片方がリロードした瞬間に人数が割れて待ちへ戻り、戻ってきたときに
+ * countdown からやり直しになっていた — 得点も試合の時計も最初から。
+ *
+ * 席は RECONNECT_GRACE の間だけ空けて待つ、と決めてある。人数もその間は
+ * 空けて待つのが筋で、そうでないと「席を残す」という仕掛けが試合の側から
+ * 台無しにされる。戻ってこなければ席ごと消えて、そこで初めて人数が割れる。
+ */
+function holdingSeats(room: Match, now: number): Player[] {
+  return [...room.players.values()].filter(
+    (p) => isSeated(p.life) || now - p.lifeAt < RECONNECT_GRACE,
+  )
 }
 
 function assignTeam(room: Match): Team {
@@ -318,13 +335,17 @@ function matchState(room: Match): NetMessage {
     present: connected(room).length,
     required: MIN_PLAYERS,
     winner: room.winner,
-    // 戦績。1 秒ごとに配られるので、成績表はこれを見れば足りる
-    players: connected(room).map((p) => ({
+    // 戦績。1 秒ごとに配られるので、成績表はこれを見れば足りる。
+    //
+    // 離脱中の人も**消さずに残す**。リロードしている 2 秒のあいだ行が消えて
+    // 戻ってくると、点差を見ている側には試合が壊れたように見える
+    players: [...room.players.values()].map((p) => ({
       id: p.id,
       name: p.name,
       team: p.team,
       kills: p.kills,
       deaths: p.deaths,
+      away: !isSeated(p.life),
     })),
   }
 }
@@ -1103,7 +1124,7 @@ function applyDamage(roomName: string, attacker: Player, event: NetMessage): voi
  * クライアント側で時計を回すと、タブが裏に回ったぶんだけずれるのでサーバーが持つ。
  */
 function updateMatch(roomName: string, room: Match, now: number): void {
-  const enough = connected(room).length >= MIN_PLAYERS
+  const enough = holdingSeats(room, now).length >= MIN_PLAYERS
   const previous = room.phase
 
   // 人が欠けたら、どの段階からでも待ちへ戻る。

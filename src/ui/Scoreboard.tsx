@@ -69,8 +69,19 @@ export default function Scoreboard(props: {
 
                 <For each={side(team)}>
                   {(player) => (
-                    <div class="score-row" classList={{ 'score-mine': player.id === props.selfId }}>
-                      <span class={`score-name score-${team}`}>{player.name}</span>
+                    <div
+                      class="score-row"
+                      classList={{
+                        'score-mine': player.id === props.selfId,
+                        // 離脱中。行は残す (消すと試合が壊れたように見える) が、
+                        // 今そこに居ないことは分かるようにする
+                        'score-away': player.away === true,
+                      }}
+                    >
+                      <span class={`score-name score-${team}`}>
+                        {player.name}
+                        {player.away === true && <span class="score-tag">再接続中</span>}
+                      </span>
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
                     </div>
