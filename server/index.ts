@@ -387,6 +387,19 @@ function spawn(roomName: string, player: Player, now = Date.now()): void {
   sendHealth(roomName, player, 0, false)
 }
 
+/**
+ * 席を畳む。切れるのを待たずに消す。
+ *
+ * 名乗った id ではなく接続の player を受ける。他人を追い出せてしまうので。
+ */
+function leaveRoom(roomName: string, player: Player): void {
+  const room = rooms.get(roomName)
+  if (!room) return
+  room.players.delete(player.id)
+  // 本人はもう聞いていない。残った人に消してもらう
+  broadcast(roomName, { type: 'leave', id: player.id })
+}
+
 /** 部屋の全員へ。except を渡すとその 1 人を除く */
 function broadcast(roomName: string, message: NetMessage, except?: string): void {
   const room = rooms.get(roomName)
@@ -1536,6 +1549,15 @@ const server = Bun.serve<Client, Record<string, never>>({
             spawn(socket.data.room, player)
           }
           break
+
+        // 自分から部屋を出た。**戻りを待たない。**
+        //
+        // 席を空けて待つのは「うっかり切れた人が戻ってこられるように」で、
+        // 出ると決めた人には要らない。待つと、残った側は居ない相手を相手に
+        // 最大 30 秒立たされる (試合は続いているのに誰も来ない)。
+        case 'leave':
+          leaveRoom(socket.data.room, player)
+          return
 
         case 'shot':
           // 銃声だけは扱いが違う。

@@ -91,7 +91,12 @@ export default function Play(props: { identity: Identity }) {
           stats={stats()}
           selfId={game()?.selfId ?? ''}
           onClose={() => game()?.setMenu(false)}
-          onLeave={() => navigate('/rooms')}
+          onLeave={() => {
+            // 出ることを伝えてから離れる。伝えないと、残った人は
+            // 席が畳まれるまで居ない相手を待つことになる
+            game()?.leaveRoom()
+            navigate('/rooms')
+          }}
         />
       </Show>
 
