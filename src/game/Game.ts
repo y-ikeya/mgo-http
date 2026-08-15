@@ -29,6 +29,13 @@ import { Casings } from "./casings";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
 import { MAX_HEALTH } from "../sim/damage";
+import {
+  canAct,
+  canChoose,
+  CHOOSE_FLOOR,
+  CHOOSE_TIMEOUT,
+  type Life,
+} from "../sim/lifecycle";
 import { CHOICES, SUPPORT_SPECS, SUPPORTS, type SupportId, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
@@ -94,6 +101,8 @@ export interface GameStats {
   loadoutOpen: boolean;
   /** 装備の画面が自動で閉じるまで (秒) */
   loadoutLeft: number;
+  /** OK が効くようになるまで (秒)。0 なら押せる */
+  loadoutWait: number;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
   /** いま持っている銃。調整パネルが追従する */
@@ -299,22 +308,6 @@ const GRENADE_RELEASE_AT = 1.66;
  */
 const EMPTY_INTERVAL = 0.45;
 
-/**
- * 湧いた直後の無敵 (秒)。server の SPAWN_PROTECT_MS と揃える。
- *
- * 自分の位置は自分へ返ってこないので、サーバーが書き込んだ値を受け取れない。
- * 同じ時計をこちらでも回して、見た目 (半透明) に使う。
- * **判定はサーバーのものが正**で、これは表示のためだけ。
- */
-const SPAWN_PROTECT = 3;
-
-/**
- * 装備の画面が自動で閉じるまで (秒)。
- *
- * 決めるまで動けない作りなので、放っておくと止まったままになる。
- * 湧いてから撃ち合いが始まるまでの時間でもあるので、上限を切る。
- */
-const LOADOUT_TIMEOUT = 30;
 
 /** 集中してから音の輪が出そろうまで (秒) */
 const RING_SETTLE = 1
@@ -364,7 +357,6 @@ export class Game {
   /** 手を離れるまでの残り (秒)。0 なら投げていない */
   private grenadeRelease = 0;
   /** 直前のフレームの経過時間 (秒)。tick の外で時計を進めるのに使う */
-  private lastDt = 0;
   /** 空撃ちの音を次に鳴らせるまで (秒) */
   private emptyCooldown = 0;
   /**
@@ -940,14 +932,11 @@ export class Game {
     this.follow.update(dt, this.player, this.cameraWorld);
 
     if (this.hitFeedbackTimer > 0) this.hitFeedbackTimer -= dt;
-    this.lastDt = dt;
     // 無敵の間は半透明。撃てば切れる (サーバーがそう決めている) ので、
     // 撃った時点でこちらも消す
-    if (this.protectLeft > 0) {
-      this.protectLeft -= dt;
-      if (this.input.firing && this.player.isAiming) this.protectLeft = 0;
-    }
-    this.player.setGhost(this.protectLeft > 0 || this.loadoutBlocking);
+    // 無敵かどうかも支度中かどうかも状態が答える。こちらで時計を回さない —
+    // 回すと、サーバーが解いたのにこちらは半透明のまま、が起きる
+    this.player.setGhost(this.life === "spawning" || this.loadoutBlocking);
     this.updateRollContact();
     this.updateStab(dt);
     this.updatePostureSpread(dt);
@@ -1166,6 +1155,18 @@ export class Game {
         this.hearNoise(message);
         break;
 
+      // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
+      // ここから出る。推し量る側の判断はどこにも残さない
+      case "life":
+        if (message.id === this.net.id) this.setLife(message.state);
+        else {
+          const at = this.remotes.setLife(message.id, message.state);
+          // 倒れた相手の位置で叫ぶ。撃った側には当てた手応えになり、
+          // 離れた場所の誰かには「そこで撃ち合いが終わった」と伝わる
+          if (at) this.addPing("shot", at, this.audio.play("scream", at));
+        }
+        break;
+
       // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
       // 待つと、遅れて届いているだけの相手と区別が付かない
       case "hidden":
@@ -1187,14 +1188,9 @@ export class Game {
    */
   private applyHealth(message: HealthMessage): void {
     if (message.id !== this.net.id) {
-      const position = this.remotes.setHealth(message.id, message.health);
+      this.remotes.setHealth(message.id, message.health);
       if (message.flinch) this.remotes.flinch(message.id);
-      // 倒れた相手の位置で叫ぶ。撃った側には当てた手応えになり、
-      // 離れた場所の誰かには「そこで撃ち合いが終わった」と伝わる。
-      if (position) {
-        this.addPing("shot", position, this.audio.play("scream", position));
-        return;
-      }
+      // 倒れた相手の叫びは life で鳴らす (倒れたと決めるのは体力ではなく状態)。
       // 倒れなかった頭への一発はうめきになる。近くの相手にだけ届く。
       if (message.zone === "HEAD" && message.damage > 0) {
         const at = this.remotes.positionOf(message.id);
@@ -1251,19 +1247,11 @@ export class Game {
    * 選ぶのはキーで済ませる。
    */
   private updateLoadoutKeys(): void {
-    if (!this.canChooseLoadout) {
-      // 組める場面から外れたら畳む。次に組めるようになったらまた開く
-      this.setLoadoutOpen(true);
-      return;
-    }
-    // 決めたら閉じる。閉じて初めて動けるようになる
+    if (!this.canChooseLoadout) return;
+    // 決めたら湧く。閉じるのではなく**戦場へ出る**ので、サーバーに頼む。
+    // 湧かせるかどうかを決めるのはあちら (支度に入って 3 秒経つまでは通らない)
     if (this.input.consumeKeyPress("Enter") || this.input.consumeKeyPress("KeyL")) {
-      this.setLoadoutOpen(!this.loadoutOpen);
-    }
-    // 放っておくと止まったままになるので、時間で閉じる
-    if (this.loadoutOpen) {
-      this.loadoutLeft -= this.lastDt;
-      if (this.loadoutLeft <= 0) this.setLoadoutOpen(false);
+      this.requestSpawn();
     }
     const choices = CHOICES.primary;
     if (this.input.consumeKeyPress("Digit1") && choices[0]) this.setLoadout(choices[0]);
@@ -1274,27 +1262,27 @@ export class Game {
   }
 
   /**
-   * 装備の画面を開いているか。
+   * 自分がどういう状態に居るか。**サーバーが決めたものの写し。**
    *
-   * 組める場面 (死んでいる間 / 開始前) では既定で開く。読み終わったら
-   * 畳めるようにしてあるのは、開始前に周りを見たいため。
+   * 以前はここが無く、「体力が 0 か」「試合の段階は何か」から必要な場所で
+   * 都度組み立てていた。組み立て方が場所ごとにずれて不具合になっていたので、
+   * 権威が言ってきた 1 つの値だけを見る (src/sim/lifecycle.ts)。
    */
-  private loadoutOpen = true;
-  /** 装備の画面が自動で閉じるまでの残り (秒) */
-  private loadoutLeft = LOADOUT_TIMEOUT;
-  /** 無敵の残り (秒)。見た目に使う。判定はサーバーが持っている */
-  private protectLeft = 0;
+  private life: Life = "joining";
+  /** その状態に入った時刻 (Date.now)。残り秒数の表示に使う */
+  private lifeAt = Date.now();
 
   /**
-   * 装備の画面を開く / 閉じる。
+   * サーバーが状態を移した。
    *
-   * 開いている間はポインタを離す。掴んだままだとボタンを押せないし、
-   * 視点も動き続けて落ち着いて読めない (成績表と同じ扱い)。
+   * 装備画面の出し入れも、無敵の見た目も、入力を受けるかも全部ここから出る。
+   * 「開いているか」という別の札は持たない — 持つと、状態と札の 2 つが
+   * 食い違い得る場所が生まれる (実際、札が閉じたまま開き直らない不具合があった)。
    */
-  private setLoadoutOpen(open: boolean): void {
-    if (this.loadoutOpen === open) return;
-    this.loadoutOpen = open;
-    if (open) this.loadoutLeft = LOADOUT_TIMEOUT;
+  private setLife(state: Life): void {
+    if (this.life === state) return;
+    this.life = state;
+    this.lifeAt = Date.now();
   }
 
   /** ポインタを離しているか。出ている画面が変わったときだけ触る */
@@ -1317,26 +1305,43 @@ export class Game {
     else if (!this.menuOpen) this.input.grab();
   }
 
-  /** 画面の OK から閉じる */
+  /**
+   * 画面の OK。**閉じるのではなく戦場へ出る。**
+   *
+   * 湧かせてよいかを決めるのはサーバー (支度に入って CHOOSE_FLOOR 秒
+   * 経つまでは通らない)。こちらで閉じてしまうと、通らなかったときに
+   * 誰も居ない画面の前で動けなくなる。
+   */
   closeLoadout(): void {
-    this.setLoadoutOpen(false);
+    this.requestSpawn();
+  }
+
+  private requestSpawn(): void {
+    if (!this.canChooseLoadout) return;
+    if (this.chooseElapsed < CHOOSE_FLOOR) return;
+    this.net.send({ type: "spawn" });
+  }
+
+  /** いま装備の画面が出ているか。状態がそのまま答えになる */
+  private get loadoutBlocking(): boolean {
+    return this.canChooseLoadout;
   }
 
   /**
-   * いま装備の画面が出ているか。
+   * 装備を組めるか。
    *
-   * `loadoutOpen` だけを見てはいけない。組めない場面では**次に開くための予約**
-   * として true にしてあるので、そのまま操作の可否に使うと湧いたあとも動けない。
-   * 出ているかどうかは、組める場面かどうかと合わせて決まる。
+   * **サーバーの状態をそのまま問う。** 以前はここで
+   * 「倒れている or 試合前」と組み立てていて、試合の段階から人の都合を
+   * 代弁していた。そのせいで、先に部屋へ入って 30 秒待った人は始まる時に
+   * 画面が閉じたままになり、試合中に入ってきた人には最初から出なかった。
    */
-  private get loadoutBlocking(): boolean {
-    return this.canChooseLoadout && this.loadoutOpen;
+  private get canChooseLoadout(): boolean {
+    return canChoose(this.life);
   }
 
-  /** 装備を組めるか。湧くときだけ */
-  private get canChooseLoadout(): boolean {
-    const phase = this.match?.phase;
-    return this.player.isDead || phase === "waiting" || phase === "countdown";
+  /** 支度に入ってから経った時間 (秒) */
+  private get chooseElapsed(): number {
+    return (Date.now() - this.lifeAt) / 1000;
   }
 
   /**
@@ -1408,8 +1413,6 @@ export class Game {
     void this.player.equip(this.loadout.primary);
     this.player.respawn();
     this.refillFromLoadout();
-    // 湧いた直後は撃たれない。サーバーも同じ時計を持っている
-    this.protectLeft = SPAWN_PROTECT;
     this.reloadTimer = 0;
     this.reloadSoundIn = 0;
     this.boltIn = 0;
@@ -1546,7 +1549,7 @@ export class Game {
     if (
       this.input.firing &&
       this.player.isAiming &&
-      !this.player.isDead &&
+      canAct(this.life) &&
       this.reloadTimer <= 0 &&
       this.ammo <= 0 &&
       this.emptyCooldown <= 0
@@ -1571,7 +1574,7 @@ export class Game {
       pulled &&
       this.input.firing &&
       this.player.isAiming &&
-      !this.player.isDead &&
+      canAct(this.life) &&
       this.reloadTimer <= 0 &&
       this.stabTimer <= 0 &&
       !this.player.rolling &&
@@ -1743,7 +1746,7 @@ export class Game {
     // リロードと同じ規則。ここが抜けていて、撃った直後に投げるとコッキングを
     // 省略できた
     const canThrow =
-      this.throwables > 0 && !this.player.isDead && !this.player.isBoxed && !this.cocking;
+      this.throwables > 0 && canAct(this.life) && !this.player.isBoxed && !this.cocking;
     const held = canThrow && this.input.isActionDown("throwItem", "KeyG");
 
     if (held) {
@@ -1786,7 +1789,7 @@ export class Game {
     // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
     const canThrow =
       this.grenadeCount > 0 &&
-      !this.player.isDead &&
+      canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
       !this.cocking;
@@ -2229,7 +2232,9 @@ export class Game {
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
       menuOpen: this.menuOpen,
       loadoutOpen: this.loadoutBlocking,
-      loadoutLeft: Math.max(0, Math.ceil(this.loadoutLeft)),
+      loadoutLeft: Math.max(0, Math.ceil(CHOOSE_TIMEOUT - this.chooseElapsed)),
+      // OK が効くようになるまで。押せないボタンを押させないための表示
+      loadoutWait: Math.max(0, Math.ceil(CHOOSE_FLOOR - this.chooseElapsed)),
       scoped: this.scoped,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",

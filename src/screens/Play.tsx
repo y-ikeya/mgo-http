@@ -69,8 +69,8 @@ export default function Play(props: { identity: Identity }) {
       <Hud stats={stats()} selfId={game()?.selfId ?? ''} />
 
       {/*
-        装備。湧くときだけ組める。
-        死んでいる間と、試合が始まる前 (待機・カウントダウン) に出す。
+        装備。支度をしている間 (sim/lifecycle.ts の choosing) だけ出す。
+        入った直後と、倒れて次に湧くまでがそこにあたる。
       */}
       <Show when={stats()?.loadoutOpen}>
         <Loadout
@@ -78,9 +78,10 @@ export default function Play(props: { identity: Identity }) {
           support={support()}
           onPrimary={(id) => game()?.setLoadout(id)}
           onSupport={(id) => game()?.setSupport(id)}
-          note="装備を選んでください" 
+          note="装備を選んでください"
           left={stats()?.loadoutLeft ?? 0}
-          onClose={() => game()?.closeLoadout()}
+          wait={stats()?.loadoutWait ?? 0}
+          onSpawn={() => game()?.closeLoadout()}
         />
       </Show>
 

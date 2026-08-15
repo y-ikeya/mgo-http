@@ -12,7 +12,11 @@ import './Loadout.css'
 /**
  * 装備を組む画面。
  *
- * 湧くときだけ開く。試合中に持ち物を組み替えられると、状況ごとに最適な物へ
+ * 支度をしている間だけ出る (sim/lifecycle.ts の choosing)。出す / 出さないは
+ * サーバーが持つ状態がそのまま決めていて、こちらに開閉の札は無い。
+ * 札を持っていた頃は、閉じたまま開き直らない場面があった。
+ *
+ * 試合中に持ち物を組み替えられると、状況ごとに最適な物へ
  * 乗り換えるだけになって、選ぶこと自体が手にならない。
  * **戻って組み直すのに時間を払う**というのが元の作りだった。
  *
@@ -26,9 +30,11 @@ export default function Loadout(props: {
   onSupport: (id: SupportId) => void
   /** 反映されるまでの説明。死んでいる間か、開始前かで変わる */
   note: string
-  /** 自動で閉じるまで (秒) */
+  /** 放っておいても湧かされるまで (秒) */
   left: number
-  onClose: () => void
+  /** OK が効くようになるまで (秒)。0 なら押せる */
+  wait: number
+  onSpawn: () => void
 }) {
   /** その枠を選んだときの予備弾。弾倉を選ぶと 1 弾倉ぶん増える */
   const reserveOf = (id: WeaponId) =>
@@ -111,11 +117,15 @@ export default function Loadout(props: {
         </div>
 
         {/*
-          決めるまで動けない。押して初めて操作が戻る、という手続きにしてある。
-          後回しにして走り出せると「湧くときに決める」が有名無実になる。
+          押して初めて戦場へ出る。閉じるボタンではない。
+
+          湧く時刻を本人に握らせている。自動で湧かせていた頃は、選んでいる
+          途中で湧いて画面が消えていた。ただし早く押したぶん早く戻れる、には
+          しない — 倒された直後に戻ってこられると、勝った側が休めない。
         */}
-        <button class="loadout-ok" onClick={props.onClose}>
-          OK<span class="loadout-key loadout-key-wide">Enter</span>
+        <button class="loadout-ok" disabled={props.wait > 0} onClick={props.onSpawn}>
+          {props.wait > 0 ? `出撃まで ${props.wait}` : 'OK'}
+          <span class="loadout-key loadout-key-wide">Enter</span>
         </button>
       </div>
     </div>

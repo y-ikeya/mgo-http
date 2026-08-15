@@ -2,6 +2,7 @@ import type { Locomotion } from '../game/animation'
 import type { HitZone } from '../sim/damage'
 import type { Surface } from '../sim/surface'
 import type { WeaponId } from '../sim/weapons'
+import type { Life } from '../sim/lifecycle'
 
 /**
  * ネットワークで流す型。
@@ -277,6 +278,23 @@ export interface LeaveEvent {
  * 見えなくなった理由を知っているのはサーバーなので、そちらに言わせる。
  * 沈黙から測るほうは、相手ごと丸ごと落ちた場合の保険として残す。
  */
+/**
+ * その人がどういう状態に居るか。サーバーが変わるたびに配る。
+ *
+ * 状態は src/sim/lifecycle.ts が定義している。以前は「体力が 0 になった」
+ * 「位置が来なくなった」から各自が推し量っていて、場所ごとに答えがずれていた。
+ */
+export interface LifeEvent {
+  type: 'life'
+  id: string
+  state: Life
+}
+
+/** 支度ができたので湧かせてほしい。装備画面の OK が送る */
+export interface SpawnRequest {
+  type: 'spawn'
+}
+
 export interface HiddenEvent {
   type: 'hidden'
   id: string
@@ -380,6 +398,8 @@ export type NetMessage =
   | JoinEvent
   | LeaveEvent
   | HiddenEvent
+  | LifeEvent
+  | SpawnRequest
   | RosterMessage
   | MatchMessage
   | HealthMessage

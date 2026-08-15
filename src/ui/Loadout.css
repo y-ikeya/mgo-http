@@ -149,6 +149,13 @@
   color: rgba(206, 232, 190, 0.9);
 }
 
-.loadout-ok:hover {
+.loadout-ok:hover:not(:disabled) {
   background: rgba(150, 214, 132, 0.18);
+}
+
+/* 出撃までの床。押せないことが見て分かるようにする */
+.loadout-ok:disabled {
+  cursor: default;
+  color: rgba(214, 226, 200, 0.45);
+  background: rgba(150, 214, 132, 0.04);
 }
