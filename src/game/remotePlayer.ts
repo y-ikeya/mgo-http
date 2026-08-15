@@ -38,6 +38,7 @@ import {
   type HitZone,
 } from "../sim/damage";
 import { Footsteps, type Step } from "../sim/footsteps";
+import { onBattlefield, type Life } from "../sim/lifecycle";
 import { Hitbox } from "./hitbox";
 import { dampAngle } from "./math";
 import { Weapon } from "./weapon";
@@ -170,6 +171,8 @@ export class RemotePlayer {
   private packetGap = 0;
   /** サーバーが「もう見えない」と言ってきたか。位置が来たら解ける */
   private hiddenByServer = false;
+  /** サーバーが決めた状態。倒れているか / 戦場に居るかはこれで決まる */
+  private life: Life = "joining";
   /** 所属。サーバーが決める。届くまでは赤として描く */
   private team: Team = "red";
   /** 色を掛ける対象。所属が変わっても掛け直せるよう控えておく */
@@ -261,7 +264,9 @@ export class RemotePlayer {
    */
   private refreshVisibility(now: number): void {
     const silence = this.lastSeen > 0 ? now - this.lastSeen : 0;
-    this.setVisible(!this.hiddenByServer && silence < this.hideAfter);
+    this.setVisible(
+      onBattlefield(this.life) && !this.hiddenByServer && silence < this.hideAfter,
+    );
   }
 
   /** 湧き直しで跳んだことを足音に伝える。積算を捨てないと着いた先で連打になる */
@@ -586,21 +591,35 @@ export class RemotePlayer {
   }
 
   /**
-   * サーバーが確定させた体力を反映する。倒れる / 起き上がるもここで決まる。
-   * @returns 倒れた瞬間なら true
+   * サーバーが確定させた体力を反映する。
+   *
+   * 倒れる / 起き上がるは体力ではなく**状態**が決める (setLife)。ここは
+   * 数字を控えるだけ。体力から生死を導いていた頃は、状態と導出結果が
+   * 食い違い得る場所が 2 つあった。
    */
-  applyHealth(health: number): boolean {
+  applyHealth(health: number): void {
     this.health = health;
-    const dead = health <= 0;
-    if (dead === this.serverDead) return false;
+  }
 
-    this.serverDead = dead;
-    if (dead) {
-      this.animator?.playDeath();
-      return true;
+  /**
+   * サーバーが状態を移した。
+   *
+   * 倒れる姿勢も、戦場に居るかどうかも全部ここから出す。
+   * @returns 倒れた瞬間なら true (叫びを鳴らすのは呼び出し側の仕事)
+   */
+  setLife(state: Life): boolean {
+    if (this.life === state) return false;
+    this.life = state;
+
+    const dead = state === "downed";
+    if (dead !== this.serverDead) {
+      this.serverDead = dead;
+      if (dead) this.animator?.playDeath();
+      else this.animator?.revive();
     }
-    this.animator?.revive();
-    return false;
+    // 戦場に居ないなら消す。支度中の相手が倒れた場所に立っていることになる
+    if (!onBattlefield(state)) this.hiddenByServer = true;
+    return dead;
   }
 
   dispose(): void {
@@ -775,6 +794,7 @@ interface Pending {
   name?: string;
   team?: Team;
   health?: number;
+  life?: Life;
 }
 
 export class RemotePlayers {
@@ -830,6 +850,7 @@ export class RemotePlayers {
         if (known.name !== undefined) player.name = known.name;
         if (known.team !== undefined) player.setTeam(known.team);
         if (known.health !== undefined) player.applyHealth(known.health);
+        if (known.life !== undefined) player.setLife(known.life);
         this.pending.delete(snapshot.id);
       }
       this.refreshAlly(player);
@@ -1001,14 +1022,11 @@ export class RemotePlayers {
     this.players.get(id)?.flinch();
   }
 
-  /** サーバーが確定させた体力を反映する。倒れる表示もここから出る */
-  setHealth(id: string, health: number): THREE.Vector3 | null {
+  /** サーバーが確定させた体力を控える。倒れる表示は setLife が持つ */
+  setHealth(id: string, health: number): void {
     const player = this.players.get(id);
-    if (!player) {
-      this.remember(id, { health });
-      return null;
-    }
-    return player.applyHealth(health) ? player.object.position : null;
+    if (!player) this.remember(id, { health });
+    else player.applyHealth(health);
   }
 
   /** 撃った相手にボルト操作を流す。撃った音もその銃のものにする */
@@ -1097,6 +1115,20 @@ export class RemotePlayers {
     const player = this.players.get(id);
     if (player) player.name = name;
     else this.remember(id, { name });
+  }
+
+  /**
+   * サーバーが決めた状態を渡す。
+   *
+   * @returns 倒れた瞬間なら、その位置 (叫ぶのに使う)
+   */
+  setLife(id: string, state: Life): THREE.Vector3 | null {
+    const player = this.players.get(id);
+    if (!player) {
+      this.remember(id, { life: state });
+      return null;
+    }
+    return player.setLife(state) ? player.object.position : null;
   }
 
   dispose(): void {
