@@ -860,7 +860,12 @@ export class Game {
 
     // 視点はマウスが唯一の駆動源。カメラを回してから移動方向を解決する。
     const look = this.input.consumeLook(this.look);
-    this.follow.addLook(look.x, look.y);
+    // 動かせるときだけ視点を回す。
+    //
+    // 支度中 (装備画面) と倒れている間 (倒した相手を映している間) は、
+    // 動かしても意味が無いどころか害になる — 裏で回った向きのまま湧く。
+    // 読み捨てているのは、溜めておくと解けた瞬間に一気に飛ぶため。
+    if (canAct(this.life)) this.follow.addLook(look.x, look.y);
 
     // 移動入力はカメラ基準。W で必ず「画面奥」へ進む。
     const axis = this.input.moveAxis();
@@ -1345,6 +1350,17 @@ export class Game {
     this.input.wantsLock = !showing && !this.menuOpen;
     if (showing) document.exitPointerLock();
     else if (!this.menuOpen) this.input.grab();
+  }
+
+  /**
+   * 自分から部屋を出る。
+   *
+   * 黙って切ると、サーバーは「うっかり切れた人」として席を 30 秒空けて待つ。
+   * 残った側はその間、居ない相手を相手に立たされる (試合は続いているのに
+   * 誰も来ない)。出ると決めたことは伝えてから切る。
+   */
+  leaveRoom(): void {
+    this.net.send({ type: "leave", id: this.net.id });
   }
 
   /**

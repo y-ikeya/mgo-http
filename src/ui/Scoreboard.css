@@ -91,6 +91,19 @@
   background: rgba(180, 214, 150, 0.1);
 }
 
+/* 離脱中。行は残したまま、居ないことだけ分かるように落とす */
+.score-away {
+  opacity: 0.45;
+}
+
+.score-tag {
+  margin-left: 8px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  vertical-align: 1px;
+  opacity: 0.8;
+}
+
 .score-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -144,6 +157,12 @@
 .score-close:hover {
   border-color: rgba(180, 214, 150, 0.7);
   color: rgba(230, 240, 220, 0.98);
+}
+
+/* 滅多に押さないものを左側にまとめる。右端は「戻る」のまま */
+.score-aside {
+  display: flex;
+  gap: 10px;
 }
 
 .score-key {

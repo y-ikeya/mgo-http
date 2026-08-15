@@ -317,8 +317,21 @@ export interface MatchMessage {
   type: 'match'
   blue: number
   red: number
-  /** 部屋に居る全員と、その戦績。成績表はこれだけで描ける */
-  players: { id: string; name: string; team: Team; kills: number; deaths: number }[]
+  /**
+   * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
+   *
+   * 離脱中の人も入っている (away)。リロードのあいだ行が消えると、
+   * 点差を見ている側には試合が壊れたように見える。
+   */
+  players: {
+    id: string
+    name: string
+    team: Team
+    kills: number
+    deaths: number
+    /** 接続が切れて戻りを待っている。数分で席ごと消える */
+    away?: boolean
+  }[]
   /**
    * 今の段階が終わる時刻 (Date.now)。残り時間はここから引いて出す。
    * waiting は人が揃うまで進まないので 0。

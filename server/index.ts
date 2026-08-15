@@ -293,9 +293,26 @@ function roomOf(name: string): Match {
  */
 const RECONNECT_GRACE = 30_000
 
-/** 今つながっている人だけ。離脱中の席は数にも配信にも入れない */
+/** 今つながっている人だけ。離脱中の席は配信に入れない */
 function connected(room: Match): Player[] {
   return [...room.players.values()].filter((p) => isSeated(p.life))
+}
+
+/**
+ * 席を持っている人。**一瞬の離脱を数に入れる。**
+ *
+ * 試合を続けるかどうかはこちらで数える。繋がっている人だけで数えていた頃は、
+ * 片方がリロードした瞬間に人数が割れて待ちへ戻り、戻ってきたときに
+ * countdown からやり直しになっていた — 得点も試合の時計も最初から。
+ *
+ * 席は RECONNECT_GRACE の間だけ空けて待つ、と決めてある。人数もその間は
+ * 空けて待つのが筋で、そうでないと「席を残す」という仕掛けが試合の側から
+ * 台無しにされる。戻ってこなければ席ごと消えて、そこで初めて人数が割れる。
+ */
+function holdingSeats(room: Match, now: number): Player[] {
+  return [...room.players.values()].filter(
+    (p) => isSeated(p.life) || now - p.lifeAt < RECONNECT_GRACE,
+  )
 }
 
 function assignTeam(room: Match): Team {
@@ -318,13 +335,17 @@ function matchState(room: Match): NetMessage {
     present: connected(room).length,
     required: MIN_PLAYERS,
     winner: room.winner,
-    // 戦績。1 秒ごとに配られるので、成績表はこれを見れば足りる
-    players: connected(room).map((p) => ({
+    // 戦績。1 秒ごとに配られるので、成績表はこれを見れば足りる。
+    //
+    // 離脱中の人も**消さずに残す**。リロードしている 2 秒のあいだ行が消えて
+    // 戻ってくると、点差を見ている側には試合が壊れたように見える
+    players: [...room.players.values()].map((p) => ({
       id: p.id,
       name: p.name,
       team: p.team,
       kills: p.kills,
       deaths: p.deaths,
+      away: !isSeated(p.life),
     })),
   }
 }
@@ -364,6 +385,19 @@ function spawn(roomName: string, player: Player, now = Date.now()): void {
   setLife(roomName, player, 'spawning', now)
   broadcast(roomName, { type: 'respawn', id: player.id })
   sendHealth(roomName, player, 0, false)
+}
+
+/**
+ * 席を畳む。切れるのを待たずに消す。
+ *
+ * 名乗った id ではなく接続の player を受ける。他人を追い出せてしまうので。
+ */
+function leaveRoom(roomName: string, player: Player): void {
+  const room = rooms.get(roomName)
+  if (!room) return
+  room.players.delete(player.id)
+  // 本人はもう聞いていない。残った人に消してもらう
+  broadcast(roomName, { type: 'leave', id: player.id })
 }
 
 /** 部屋の全員へ。except を渡すとその 1 人を除く */
@@ -1097,21 +1131,68 @@ function applyDamage(roomName: string, attacker: Player, event: NetMessage): voi
 }
 
 /**
+ * 残っているのが片側だけならその陣営。両方居るか、誰も居なければ null。
+ *
+ * 不戦勝を出すかどうかの判断に使う。
+ */
+function soleTeam(seats: Player[]): Team | null {
+  const blue = seats.some((p) => p.team === 'blue')
+  const red = seats.some((p) => p.team === 'red')
+  if (blue === red) return null
+  return blue ? 'blue' : 'red'
+}
+
+/**
  * 試合の進行。
  *
  * 時間切れで決着、しばらく結果を見せてから次の試合を始める。
  * クライアント側で時計を回すと、タブが裏に回ったぶんだけずれるのでサーバーが持つ。
  */
 function updateMatch(roomName: string, room: Match, now: number): void {
-  const enough = connected(room).length >= MIN_PLAYERS
+  const seats = holdingSeats(room, now)
+  // 続けられるかは頭数ではなく**両陣営に居るか**で決まる。
+  //
+  // 数だけ見ていると、片側に 2 人残って反対側が空でも「2 人居るから続行」に
+  // なる。相手の居ない試合が時間切れまで走ることになる。
+  const enough = seats.some((p) => p.team === 'blue') && seats.some((p) => p.team === 'red')
   const previous = room.phase
 
-  // 人が欠けたら、どの段階からでも待ちへ戻る。
-  // 相手が居ないまま時計だけ進むと、誰も居ない相手に勝ったことになる。
-  if (!enough && room.phase !== 'waiting') {
-    room.phase = 'waiting'
-    room.endsAt = 0
-    room.winner = undefined
+  // 結果を見せている間は人数を見ない。見せ終わってから次を決める。
+  //
+  // ここを人数で割り込ませると、不戦勝を出した次の刻みで待ちへ落ちて、
+  // 勝ったことが画面に出ないまま消える
+  if (room.phase === 'over') {
+    if (now < room.endsAt) {
+      // まだ見せている最中
+    } else if (enough) {
+      room.phase = 'countdown'
+      room.endsAt = now + COUNTDOWN
+      room.blue = 0
+      room.red = 0
+      room.winner = undefined
+      resetPlayers(roomName, room)
+    } else {
+      room.phase = 'waiting'
+      room.endsAt = 0
+      room.winner = undefined
+    }
+  } else if (!enough && room.phase !== 'waiting') {
+    // 相手が居なくなった。
+    //
+    // 試合中なら**残っている側の勝ち**にする。待ちへ戻すだけだと、
+    // 抜けた側は負けを付けられずに済むので、劣勢になったら抜ければよい
+    // ことになる。席を空けて待つ猶予 (30 秒) を過ぎるまでは畳まないので、
+    // 一瞬の離脱で勝ちが転がり込むことはない。
+    const survivor = soleTeam(seats)
+    if (room.phase === 'playing' && survivor) {
+      room.phase = 'over'
+      room.winner = survivor
+      room.endsAt = now + INTERMISSION
+    } else {
+      room.phase = 'waiting'
+      room.endsAt = 0
+      room.winner = undefined
+    }
   } else if (room.phase === 'waiting' && enough) {
     room.phase = 'countdown'
     room.endsAt = now + COUNTDOWN
@@ -1131,13 +1212,6 @@ function updateMatch(roomName: string, room: Match, now: number): void {
     room.phase = 'over'
     room.winner = room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
     room.endsAt = now + INTERMISSION
-  } else if (room.phase === 'over' && now >= room.endsAt) {
-    room.phase = 'countdown'
-    room.endsAt = now + COUNTDOWN
-    room.blue = 0
-    room.red = 0
-    room.winner = undefined
-    resetPlayers(roomName, room)
   }
 
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
@@ -1515,6 +1589,15 @@ const server = Bun.serve<Client, Record<string, never>>({
             spawn(socket.data.room, player)
           }
           break
+
+        // 自分から部屋を出た。**戻りを待たない。**
+        //
+        // 席を空けて待つのは「うっかり切れた人が戻ってこられるように」で、
+        // 出ると決めた人には要らない。待つと、残った側は居ない相手を相手に
+        // 最大 30 秒立たされる (試合は続いているのに誰も来ない)。
+        case 'leave':
+          leaveRoom(socket.data.room, player)
+          return
 
         case 'shot':
           // 銃声だけは扱いが違う。
