@@ -26,7 +26,7 @@ import {
 } from '../src/sim/vision'
 import { cameraPoint } from '../src/sim/eyepoint'
 import type { Locomotion } from '../src/game/animation'
-import type { NetMessage, Team } from '../src/net/types'
+import { SNAPSHOT_INTERVAL, type NetMessage, type Team } from '../src/net/types'
 
 /**
  * 対戦サーバー。
@@ -138,7 +138,7 @@ interface Player {
    */
   loweredAt: number
   /**
-   * 位置が届く間隔 (ms) の均し。20Hz で送っているので 50 前後が正常。
+   * 位置が届く間隔 (ms) の均し。64Hz で送っているので 16 前後が正常。
    *
    * ここが伸びている人は、こちらから見て「途切れがちな相手」になる。
    * 相手の画面ではその人が明滅するか、出てこない。
@@ -771,8 +771,15 @@ function relayShot(roomName: string, from: Player, message: NetMessage): void {
  */
 const LAG_WINDOW = 400
 
-/** 履歴に残す数。20Hz で送ってくるので 12 個で 0.6 秒ぶん */
-const HISTORY_SIZE = 12
+/**
+ * 履歴に残す数。遡れる長さを覆えるだけ持つ。
+ *
+ * **送る間隔から出す。** 20Hz の頃に 12 個 (= 0.6 秒) と決め打ちしていたのを、
+ * 64Hz へ上げたときに直し忘れていた。12 個では 0.19 秒しか遡れず、
+ * LAG_WINDOW が 0.4 秒あっても半分より前は届かない — 回線の遠い人ほど
+ * 「当てたのに通らない」が増える、という形で静かに効いていた。
+ */
+const HISTORY_SIZE = Math.ceil(LAG_WINDOW / (SNAPSHOT_INTERVAL * 1000)) + 2
 
 function recordPose(player: Player): void {
   player.history.push({
@@ -1220,8 +1227,9 @@ const server = Bun.serve<Client, Record<string, never>>({
               (p) =>
                 `  ${p.team === 'blue' ? '青' : '赤'} ${p.name} (${Math.ceil(p.health)})` +
                 // 通信の様子。姿が出ない相手が居るときはここを先に見る。
-                // 20 通/秒 から落ちていれば途切れがち、時計差が大きければ
-                // 古いクライアントが混ざっている
+                // 64 通/秒 から落ちていれば途切れがち (1 通/秒 まで落ちて
+                // いれば、その人のタブが裏に回っている)。時計差が大きければ
+                // 時計の合っていない機械が混ざっている
                 (p.packetGap > 0
                   ? ` ${(1000 / p.packetGap).toFixed(1)}通/秒 時計差 ${(p.clockSkew / 1000).toFixed(2)}s`
                   : '') +
