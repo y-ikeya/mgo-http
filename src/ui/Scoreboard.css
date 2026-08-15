@@ -159,6 +159,12 @@
   color: rgba(230, 240, 220, 0.98);
 }
 
+/* 滅多に押さないものを左側にまとめる。右端は「戻る」のまま */
+.score-aside {
+  display: flex;
+  gap: 10px;
+}
+
 .score-key {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 10px;
