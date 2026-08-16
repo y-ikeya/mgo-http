@@ -1723,6 +1723,10 @@ const server = Bun.serve<Client>({
             health: p.health,
             team: p.team,
             slot: p.slot,
+            // 状態も載せる。life は変わった時にしか配らないので、後から
+            // 繋いだ人はここで受け取らないと既定値 (joining) のままになり、
+            // **その人たちが一度も描かれない**
+            life: p.life,
           })),
         } satisfies ServerMessage),
       )

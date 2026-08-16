@@ -1130,6 +1130,9 @@ export class Game {
           this.remotes.setName(player.id, player.name);
           this.remotes.setTeam(player.id, player.team);
           this.remotes.setHealth(player.id, player.health);
+          // 状態を先に入れる。無いと既定の joining のまま = 戦場に居ない扱いで、
+          // 位置が届いていても一度も描かれない
+          if (player.life) this.remotes.setLife(player.id, player.life);
         }
         break;
 
