@@ -1,7 +1,8 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import { useNavigate } from '@solidjs/router'
-import { serverHttpUrl } from '../net'
+import { fetchRooms } from '../net/rooms'
+import type { MatchPhase, RoomSummary } from '../net/types'
 import type { Identity } from '../auth/session'
 import { signOut } from '../auth/session'
 import './Lobby.css'
@@ -19,18 +20,8 @@ import './Lobby.css'
 /** 一覧を取り直す間隔 (ms)。人の出入りに気づける程度で、叩きすぎない */
 const POLL_MS = 2000
 
-interface Room {
-  name: string
-  players: number
-  capacity: number
-  phase: 'waiting' | 'countdown' | 'playing' | 'over'
-  blue: number
-  red: number
-  remaining: number
-}
-
 /** 段階の呼び名。引くたびに t() を通す (言語は起動時に決まっているので実質定数) */
-const PHASE_LABEL: Record<Room['phase'], () => string> = {
+const PHASE_LABEL: Record<MatchPhase, () => string> = {
   waiting: () => t('lobby.waiting'),
   countdown: () => t('lobby.countdown'),
   playing: () => t('lobby.playing'),
@@ -39,14 +30,12 @@ const PHASE_LABEL: Record<Room['phase'], () => string> = {
 
 export default function Lobby(props: { identity: Identity }) {
   const navigate = useNavigate()
-  const [rooms, setRooms] = createSignal<Room[]>([])
+  const [rooms, setRooms] = createSignal<RoomSummary[]>([])
   const [error, setError] = createSignal('')
 
   const poll = async () => {
     try {
-      const response = await fetch(`${serverHttpUrl()}/rooms`)
-      if (!response.ok) throw new Error(String(response.status))
-      setRooms((await response.json()) as Room[])
+      setRooms(await fetchRooms())
       setError('')
     } catch {
       setError(t('lobby.unreachable'))
@@ -59,7 +48,7 @@ export default function Lobby(props: { identity: Identity }) {
     onCleanup(() => window.clearInterval(timer))
   })
 
-  const full = (room: Room) => room.players >= room.capacity
+  const full = (room: RoomSummary) => room.players >= room.capacity
 
   /**
    * 部屋へ移るとき、クエリをそのまま持っていく。

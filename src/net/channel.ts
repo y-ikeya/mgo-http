@@ -1,4 +1,22 @@
-import type { NetMessage, NetTransport } from './types'
+import type { ClientMessage, NetTransport, ServerMessage } from './types'
+
+/**
+ * サーバーの居ない通信路で通してよい種類。
+ *
+ * 両向きに現れる物 = 権威が要らない物、と一致する。体力も得点も決める人が
+ * 居ないので、相手のタブが「倒した」と言ってきても通す先が無い。
+ *
+ * 型で縛ってある (両方の union に無い名前を書くと落ちる) ので、
+ * メッセージを増やしたときにここだけ古い、が起きない。
+ */
+const RELAYED: ReadonlySet<ClientMessage['type'] & ServerMessage['type']> = new Set([
+  'state',
+  'join',
+  'leave',
+  'shot',
+  'knock',
+  'throw',
+])
 
 /**
  * タブ間の通信路。
@@ -20,15 +38,19 @@ export class NetChannel implements NetTransport {
   readonly id: string
 
   private readonly channel: BroadcastChannel
-  private readonly listeners = new Set<(message: NetMessage) => void>()
+  private readonly listeners = new Set<(message: ServerMessage) => void>()
 
   constructor(id: string, name: string, room = 'mgohttp') {
     this.id = id
     this.channel = new BroadcastChannel(room)
-    this.channel.onmessage = (event: MessageEvent<NetMessage>) => {
+    this.channel.onmessage = (event: MessageEvent<ClientMessage>) => {
       // 自分の送信は戻ってこない仕様だが、念のため弾く
       if ('id' in event.data && event.data.id === this.id) return
-      for (const listener of this.listeners) listener(event.data)
+      // 相手のタブは**クライアント**なので、権威の要る物は名乗れない。
+      // 通すのは両向きに現れる物だけ (RELAYED で型ごと縛ってある)
+      const message = event.data
+      if (!RELAYED.has(message.type as never)) return
+      for (const listener of this.listeners) listener(message as ServerMessage)
     }
 
     this.send({ type: 'join', id: this.id, name })
@@ -36,11 +58,11 @@ export class NetChannel implements NetTransport {
     window.addEventListener('beforeunload', this.sendLeave)
   }
 
-  send(message: NetMessage): void {
+  send(message: ClientMessage): void {
     this.channel.postMessage(message)
   }
 
-  onMessage(listener: (message: NetMessage) => void): void {
+  onMessage(listener: (message: ServerMessage) => void): void {
     this.listeners.add(listener)
   }
 
