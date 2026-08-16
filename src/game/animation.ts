@@ -52,6 +52,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   sneak: 'sneak',
   sit: 'sit',
   salute: 'salute',
+  // 接続が切れた人の姿。全身 1 枚の静止ポーズ
+  away: 'away',
   // 爆風で倒れる / 起き上がる。倒れた姿勢のまま留まるので伏せ撃ちができる。
   // 起き上がりは仰向け用 (STAND_CLIP) を引く — sweep が仰向けで終わるため
   sweep: 'sweep',
@@ -102,6 +104,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   sneak: 'sneak',
   sit: 'sit',
   salute: 'salute',
+  away: 'away',
   jump_up: 'relaxed_run',
   jump_loop: 'relaxed_run',
   jump_down: 'relaxed_run',

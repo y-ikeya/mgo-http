@@ -39,6 +39,8 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<Locomotion>([
   'jump_down',
   'sweep',
   'stand',
+  // 切れた人の姿。上半身だけ別の型を重ねると、銃を構えたまま固まる
+  'away',
 ])
 
 /** そのモーションのときの構え */

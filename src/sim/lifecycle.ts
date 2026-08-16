@@ -68,7 +68,14 @@ export type Life =
    * 接続が切れて、席だけ残っている。
    *
    * うっかりリロードしただけで所属も試合も失われるのが理不尽なので、
-   * しばらく席を空けて待つ。人数にも配信にも入れない。
+   * しばらく席を空けて待つ。**送る先としては数えない** (もう聞いていない)。
+   *
+   * ただし**体はその場に残る。** 消してしまうと、撃ち合いで不利になったら
+   * ブラウザを閉じる、が逃げ道になる (閉じれば消え、戻れば続きから)。
+   * 残しておけば撃たれるし倒される — 閉じることに命 1 つの代価が付く。
+   *
+   * サーバーからは「閉じた」と「回線が切れた」の区別が付かないので、
+   * 一瞬切れただけの人も同じ扱いになる。そこは避けられない。
    */
   | 'dropped'
 
@@ -103,16 +110,24 @@ export const SPAWN_PROTECT = 3
 /**
  * 戦場に居るか。
  *
- * 位置を配る対象かどうかがこれで決まる。選んでいる間の人は、
- * まだそこに居ない — 倒れた場所に体が 30 秒残るのはおかしい。
+ * 位置を配る対象かどうかがこれで決まる。選んでいる間の人は、まだそこに居ない
+ * — 倒れた場所に体が 30 秒残るのはおかしい。
+ *
+ * **切れた人 (dropped) は居る。** 体をその場に残すため。
  */
 export function onBattlefield(life: Life): boolean {
-  return life === 'spawning' || life === 'alive' || life === 'downed'
+  return (
+    life === 'spawning' || life === 'alive' || life === 'downed' || life === 'dropped'
+  )
 }
 
-/** 撃たれるか。爆風も刃も含む */
+/**
+ * 撃たれるか。爆風も刃も含む。
+ *
+ * **切れた人も撃たれる。** そうしないと、閉じれば無敵になる。
+ */
 export function canBeHurt(life: Life): boolean {
-  return life === 'alive'
+  return life === 'alive' || life === 'dropped'
 }
 
 /** 自分で動けるか。撃つ・投げる・走るを受け付けるか */
@@ -135,7 +150,12 @@ export function canChoose(life: Life): boolean {
   return life === 'choosing'
 }
 
-/** 人数に数えるか。離脱中の席は数えない */
+/**
+ * **送れる相手か。**
+ *
+ * 切れた人はもう聞いていないので、送っても意味が無い。戦場に居るか
+ * (onBattlefield) とは別の問い — 切れた人は体が残るので戦場には居る。
+ */
 export function isSeated(life: Life): boolean {
   return life !== 'dropped'
 }
@@ -158,8 +178,8 @@ const ALLOWED: Record<Life, readonly Life[]> = {
   // 倒れる尺が終わったら支度へ
   downed: ['choosing', 'dropped'],
   // 繋ぎ直し。**その命の続きへ戻れる** (alive) — 猶予はそのために空けてある。
-  // 倒れている最中に切れた人だけ支度から (choosing)
-  dropped: ['choosing', 'alive'],
+  // 切れている間に倒されることもある (downed)。その場合は戻ってきても支度から
+  dropped: ['choosing', 'alive', 'downed'],
 }
 
 export function canTransition(from: Life, to: Life): boolean {

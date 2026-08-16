@@ -33,7 +33,8 @@
     "Running Dive Roll.fbx": "roll",
     "Hit Reaction.fbx": "hit",
     "Sneaking Forward.fbx": "sneak",
-    "Male Sitting Pose.fbx": "sit"
+    "Male Sitting Pose.fbx": "sit",
+    "pose.fbx": "away"
   },
   "out": "public/models/soldier.glb",
   "maxTexture": 1024

@@ -8,7 +8,14 @@ import {
   type HitZone,
 } from '../src/sim/damage'
 import { verifyToken, type Identity } from './auth'
-import { decodeSnapshot, isSnapshot, stampProtected, stampSlot, SNAPSHOT_BYTES } from '../src/net/snapshot'
+import {
+  decodeSnapshot,
+  isSnapshot,
+  stampLocomotion,
+  stampProtected,
+  stampSlot,
+  SNAPSHOT_BYTES,
+} from '../src/net/snapshot'
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
@@ -238,6 +245,14 @@ interface Player {
    */
   wasAlive: boolean
   /**
+   * 最後に届いた位置のパケット。**そのまま配り直す**ために取っておく。
+   *
+   * 接続が切れた人の体をその場に残すのに要る。位置は「届いたときに配る」形なので、
+   * 送ってこなくなれば自然に止まり、相手の画面から消える。消えると、撃ち合いで
+   * 不利になったらブラウザを閉じる、が逃げ道になる。
+   */
+  lastPayload: Uint8Array | null
+  /**
    * 席番号。位置の 2 進で誰のものかを表すのに使う。
    *
    * id をそのまま載せると長さが可変になる。抜けた番号は空くまで使い回さない
@@ -316,6 +331,8 @@ interface Match {
   winner?: Team | 'draw'
   /** 最後に状態を配った時刻。1 秒ごとに配る */
   lastBroadcast: number
+  /** 最後に「切れた人の体」を配り直した時刻 */
+  lastLimbo: number
 }
 
 const rooms = new Map<string, Match>()
@@ -348,6 +365,7 @@ function roomOf(name: string): Match {
       endsAt: 0,
       phase: 'waiting',
       lastBroadcast: 0,
+      lastLimbo: 0,
     }
     rooms.set(name, room)
   }
@@ -613,6 +631,9 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   stampSlot(view, player.slot)
   // 無敵かどうかはこちらが知っている。送り主に名乗らせない
   stampProtected(view, isProtected(player))
+  // 切れたときに配り直せるよう、写しを取っておく。
+  // bytes は受信バッファなので、持ち回すなら複製が要る
+  player.lastPayload = new Uint8Array(bytes)
   relayState(roomName, player, bytes)
 }
 
@@ -812,6 +833,8 @@ function detonate(nade: Grenade): void {
     }
 
     victim.deaths++
+    // 切れている間に倒された。戻ってきても続きは無い
+    victim.wasAlive = false
     const killer = room.players.get(nade.owner)
     // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる
     victim.killedBy = killer && killer.id !== victim.id ? killer.id : ''
@@ -1225,6 +1248,8 @@ function applyDamage(roomName: string, attacker: Player, event: ClientMessage): 
   }
 
   victim.killedBy = attacker.id
+  // 切れている間に倒された。戻ってきても続きは無い — 死んだので支度から
+  victim.wasAlive = false
   setLife(roomName, victim, 'downed')
   victim.deaths++
   // 振りかぶったまま倒されたら、足元に落ちて爆ぜる。
@@ -1355,9 +1380,41 @@ function updateMatch(roomName: string, room: Match, now: number): void {
  */
 const TICK_MS = 1000 / 64
 
+/**
+ * 切れた人の体を配り直す間隔 (ms)。
+ *
+ * 動かないので細かく送る意味が無い。受け取る側が「途切れた」と判断しない
+ * 程度で足りる (相手ごとの猶予は届く間隔の 3 倍、下限 0.35 秒)。
+ */
+const LIMBO_MS = 100
+
 setInterval(() => {
   const now = Date.now()
   for (const [roomName, room] of rooms) {
+    // 切れた人の体をその場に残す。
+    //
+    // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
+    // 相手の画面から消える。消えると**ブラウザを閉じるのが逃げ道**になる
+    // (閉じれば消え、戻れば続きから)。最後のパケットを配り直して、
+    // 撃てるし倒せる的として残す。
+    //
+    // 姿勢だけ away に差し替える。そのまま配ると、走っていた人がその場で
+    // 走り続ける絵になる
+    if (now - room.lastLimbo >= LIMBO_MS) {
+      room.lastLimbo = now
+      for (const player of room.players.values()) {
+        if (player.life !== 'dropped' || !player.lastPayload) continue
+        const view = new DataView(
+          player.lastPayload.buffer,
+          player.lastPayload.byteOffset,
+          player.lastPayload.byteLength,
+        )
+        stampLocomotion(view, 'away')
+        stampProtected(view, false)
+        relayState(roomName, player, player.lastPayload)
+      }
+    }
+
     // 待ち切った席を畳む。部屋が空になったらここで初めて部屋も消える
     for (const player of room.players.values()) {
       if (player.life === 'dropped' && lifeElapsed(player, now) >= RECONNECT_GRACE) {
@@ -1643,6 +1700,7 @@ const server = Bun.serve<Client>({
           support: 'grenade',
           holdingGrenade: false,
           wasAlive: false,
+          lastPayload: null,
           badPacketAt: 0,
           badMoveAt: 0,
           seen: new Set(),
