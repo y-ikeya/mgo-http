@@ -21,6 +21,7 @@ SSH := ssh -i $(SERVER_KEY) $(SERVER_USER)@$(SERVER_HOST)
 
 help:
 	@echo '手元で動かす'
+	@echo '  make check          型と組み立て (画面 + サーバー)'
 	@echo '  make dev            画面 (vite)。サーバーは同じホストの 8787 を見る'
 	@echo '  make serve          対戦サーバー。保存すると勝手に読み直す'
 	@echo ''
@@ -47,9 +48,15 @@ serve:
 build:
 	bun run build
 
-# 型と組み立てが通るか。配置の前に必ず通す
+# 型と組み立てが通るか。配置の前に必ず通す。
+#
+# **画面とサーバーを両方見る。** サーバーは長らく検査の外に居て、
+# Player の宣言から 11 個のフィールドが抜けたまま動いていた
+# (bun は型を剥がすだけなので気づけない)。厳しさは tsconfig.base.json に
+# 1 つ置いて、両方がそれを継いでいる。
 check:
 	bunx tsc --noEmit -p tsconfig.app.json
+	bunx tsc --noEmit -p tsconfig.server.json
 	bun run build
 
 # --- 配置 -----------------------------------------------------------------

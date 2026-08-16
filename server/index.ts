@@ -38,7 +38,7 @@ import {
   SPAWN_PROTECT,
   type Life,
 } from '../src/sim/lifecycle'
-import type { Locomotion } from '../src/game/animation'
+import type { Locomotion } from '../src/sim/locomotion'
 import { SNAPSHOT_INTERVAL, type NetMessage, type Team } from '../src/net/types'
 
 /**
@@ -215,6 +215,44 @@ interface Player {
   support: 'grenade' | 'magazine'
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
+  /**
+   * 席番号。位置の 2 進で誰のものかを表すのに使う。
+   *
+   * id をそのまま載せると長さが可変になる。抜けた番号は空くまで使い回さない
+   */
+  slot: number
+  /** 倒した数 / 倒された数。試合ごとに 0 に戻る */
+  kills: number
+  deaths: number
+  /**
+   * 直前に配った体力。同じ値を配り直さないための控え。
+   *
+   * 回復は毎 tick 少しずつ動くので、丸めた値が変わったときだけ配る
+   */
+  healthShown: number
+  /** 却下した申告の数。/health に出す (当たり判定が疑わしい人が分かる) */
+  rejected: number
+  /** 最後に撃った時刻 (Date.now)。連射の速さの上限を見るのに使う */
+  lastShotAt: number
+  /**
+   * 過去の姿勢。当てたという申告を遡って照合するのに使う。
+   *
+   * 長さは送る間隔から出す (HISTORY_SIZE)。決め打ちにすると、送る速さを
+   * 変えたときに遡れる長さが黙って変わる
+   */
+  history: Pose[]
+  /** 歩いた距離の積算。足音を出す間隔を決める */
+  footsteps: Footsteps
+  /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
+  locomotion: Locomotion
+  /** 持っている銃。威力と連射の上限をこれで引く */
+  weapon: WeaponId
+  /**
+   * 形の合わない位置を最後に警告した時刻 (Date.now)。
+   *
+   * 古いクライアントが繋ぐと毎フレーム落ちるので、間引かないとログが埋まる
+   */
+  badPacketAt: number
   socket: Bun.ServerWebSocket<Client>
 }
 
@@ -416,8 +454,6 @@ function broadcast(roomName: string, message: NetMessage, except?: string): void
  * 中身は詰め直さず、送り主の席番号だけを書き込んで、そのまま配る。
  * 送り主に名乗らせないので、他人になりすませない。
  */
-const now = () => Date.now()
-
 function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
     raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
@@ -429,8 +465,12 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
     // 古いクライアントが繋ぐと、その人の位置だけが全部落ちる。落ちた人は
     // 「まだ位置を知らせていない人」の扱いになるので、誰の位置も配られない —
     // 銃声だけ聞こえて姿が見えない、という形で表に出る。
-    if (now() - player.badPacketAt > 5000) {
-      player.badPacketAt = now()
+    // 時刻はここで取る。**下の const now より前なので、そちらは参照できない** —
+    // 参照すると ReferenceError で落ちる (形の合わない位置が届いた瞬間に、
+    // 古いクライアントを知らせるはずの道でサーバーが例外を投げていた)
+    const at = Date.now()
+    if (at - player.badPacketAt > 5000) {
+      player.badPacketAt = at
       console.warn(
         `[位置] ${player.name}: 形が合わない (${bytes.byteLength} バイト、期待は ${SNAPSHOT_BYTES})。` +
           'クライアントが古い可能性',
@@ -1353,7 +1393,7 @@ const CORS = {
   'access-control-allow-headers': 'content-type',
 }
 
-const server = Bun.serve<Client, Record<string, never>>({
+const server = Bun.serve<Client>({
   port: PORT,
 
   async fetch(request, server) {

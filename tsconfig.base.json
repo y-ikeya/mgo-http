@@ -1,0 +1,30 @@
+{
+  /*
+   * 両側に同じ厳しさを掛けるための土台。
+   *
+   * クライアントとサーバーで検査の強さが違うと、共有の層 (src/sim, src/net) が
+   * 「どちらから見るか」で通ったり落ちたりする。同じファイルを両方が読む作りに
+   * している以上、規則も 1 か所に置く。
+   *
+   * ここに置くのは**規則だけ**。lib と types は環境ごとに違う (DOM を持つのは
+   * クライアントだけ、Bun を持つのはサーバーだけ) ので、それぞれの側で足す。
+   */
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    /* 検査 */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}

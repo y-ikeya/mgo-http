@@ -1,11 +1,8 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../sim/weapons'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import {
-  CharacterAnimator,
-  findBoneBySuffix,
-  type Locomotion,
-} from './animation'
+import { CharacterAnimator, findBoneBySuffix } from './animation'
+import type { Locomotion } from '../sim/locomotion'
 import { loadSoldier } from './assets'
 import { isMesh } from './guards'
 import { damp, dampAngle } from './math'

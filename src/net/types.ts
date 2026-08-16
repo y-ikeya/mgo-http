@@ -1,4 +1,4 @@
-import type { Locomotion } from '../game/animation'
+import type { Locomotion } from '../sim/locomotion'
 import type { HitZone } from '../sim/damage'
 import type { Surface } from '../sim/surface'
 import type { WeaponId } from '../sim/weapons'
