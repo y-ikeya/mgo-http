@@ -24,6 +24,7 @@ import {
   type StageBox,
 } from '../src/sim/vision'
 import { cameraPoint } from '../src/sim/eyepoint'
+import { checkMove } from '../src/sim/motioncheck'
 import {
   canAct,
   canBeHurt,
@@ -259,6 +260,8 @@ interface Player {
    * 古いクライアントが繋ぐと毎フレーム落ちるので、間引かないとログが埋まる
    */
   badPacketAt: number
+  /** 成立しない移動を最後に警告した時刻 (Date.now)。同じく間引くため */
+  badMoveAt: number
   socket: Bun.ServerWebSocket<Client>
 }
 
@@ -460,6 +463,14 @@ function broadcast(roomName: string, message: ServerMessage, except?: string): v
  * 中身は詰め直さず、送り主の席番号だけを書き込んで、そのまま配る。
  * 送り主に名乗らせないので、他人になりすませない。
  */
+/**
+ * 状態が変わってから、移動の検査を始めるまで (ms)。
+ *
+ * 湧き直しでは湧き地点へ正当に跳ぶ (倒れた場所から数十 m 動く)。
+ * 繋ぎ直した直後も前の位置とは繋がっていない。その分をここで見逃す。
+ */
+const WARP_GRACE = 1000
+
 function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
     raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
@@ -500,6 +511,28 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   }
   player.lastPacketAt = arrived
   player.clockSkew = snapshot.time - arrived
+
+  // 跳んだ / 抜けたを弾く。
+  //
+  // 通ったものはそのまま信じる (速さは測らない)。ここが緩いままだと、
+  // 座標を書き換えるだけで「そこから見える相手」を配らせられる —
+  // 位置が可視を決めているので、詐称は壁抜けの視界になる。
+  //
+  // **状態が変わった直後は見ない。** 湧き直しでは湧き地点へ正当に跳ぶし、
+  // 繋ぎ直した直後も前の位置とは繋がっていない
+  const settled = onBattlefield(player.life) && lifeElapsed(player, arrived) > WARP_GRACE
+  if (settled) {
+    const verdict = checkMove(player, snapshot, solidBoxes)
+    if (!verdict.ok) {
+      player.rejected++
+      if (arrived - player.badMoveAt > 5000) {
+        player.badMoveAt = arrived
+        console.warn(`[位置] ${player.name}: ${verdict.reason}`)
+      }
+      // 動かさない。姿勢や向きは受けてよいので、位置だけ据え置く
+      return
+    }
+  }
 
   player.x = snapshot.x
   player.y = snapshot.y
@@ -1542,6 +1575,7 @@ const server = Bun.serve<Client>({
           support: 'grenade',
           holdingGrenade: false,
           badPacketAt: 0,
+          badMoveAt: 0,
           seen: new Set(),
           packetGap: 0,
           lastPacketAt: 0,
