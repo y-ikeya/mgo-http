@@ -1,0 +1,35 @@
+# 型と組み立てが通るかを、PR のたびに回す。
+#
+# 手元の `make check` と**同じものを呼ぶ**。CI 専用の手順を書くと、
+# 手元で通ったのに CI で落ちる (逆も) が起きる。増やすときは Makefile を直す。
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同じ枝に続けて push したら、走っている古い方を止める
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # 手元と同じ版で動かす。版が違うと型定義 (bun-types) もずれる
+          bun-version: 1.3.14
+
+      # lockfile を書き換えさせない。CI が勝手に依存を上げたら検査の意味が薄れる
+      - run: bun install --frozen-lockfile
+
+      # 画面 + サーバーの型検査と、組み立て。
+      #
+      # .env は置かない。秘密はビルドに要らない (すべて ?? '' で受けている) し、
+      # 置かない状態で通ることを CI が確かめていることになる
+      - run: make check
