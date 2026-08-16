@@ -1419,6 +1419,10 @@ setInterval(() => {
     for (const player of room.players.values()) {
       if (player.life === 'dropped' && lifeElapsed(player, now) >= RECONNECT_GRACE) {
         room.players.delete(player.id)
+        // ここで初めて消してもらう。切れた時点では配らない —
+        // 配ると受け取った側が実体を捨ててしまい、そのあと届く体を
+        // 新品として作り直して状態を見失う
+        broadcast(roomName, { type: 'leave', id: player.id })
       }
     }
     if (room.players.size === 0) {
@@ -1859,9 +1863,15 @@ const server = Bun.serve<Client>({
       player.wasAlive = player.life === 'alive' || player.life === 'spawning'
       setLife(socket.data.room, player, 'dropped')
 
-      // 本人はもう送れないので代わりに配る。
-      // これが無いと、閉じた側が相手の画面に立ち尽くしたまま残る。
-      broadcast(socket.data.room, { type: 'leave', id: socket.data.id })
+      // **leave は配らない。**
+      //
+      // 以前はここで配っていた (「閉じた側が立ち尽くしたまま残る」のを防ぐため)
+      // が、いまはその立ち尽くしこそが欲しい挙動になった — 閉じても体は残って
+      // 撃たれる。leave を配ると受け取った側は実体ごと捨てるので、そのあと
+      // 体のパケットが届いても**新品として作り直され、状態が既定の joining に
+      // 戻る**。戦場に居ない扱いになって、一度も描かれない。
+      //
+      // 配るのは席を畳むとき (猶予切れ / 自分から出たとき) だけ。
     },
   },
 })
