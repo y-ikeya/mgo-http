@@ -1098,6 +1098,20 @@ export class Game {
         }
         break;
 
+      // 繋ぎ直したときに届く、離脱前の続き。
+      //
+      // 湧き地点へは戻さない。**その命の続き**なので、居た場所に居た体力で戻る。
+      // 弾数もサーバーが写しを持っているので、そちらを正とする
+      case "resume":
+        this.player.resumeAt(message.x, message.y, message.z, message.health);
+        for (const id of Object.keys(this.magazines) as WeaponId[]) {
+          this.magazines[id] = message.magazine[id] ?? this.magazines[id];
+          this.reserves[id] = message.reserve[id] ?? this.reserves[id];
+        }
+        this.grenadeCount = message.grenades;
+        this.follow.snapTo(this.player, this.cameraWorld);
+        break;
+
       // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
       case "respawn":
         if (message.id !== this.net.id) this.remotes.warp(message.id);
@@ -1609,6 +1623,9 @@ export class Game {
         const take = Math.min(this.weapon.magazine - this.ammo, this.reserves[kind]);
         this.ammo += take;
         this.reserves[kind] -= take;
+        // **終わった瞬間**に知らせる。始まりではなく終わりを送ることで、
+        // サーバーは銃ごとの装填の尺を持たなくてよくなる
+        if (take > 0) this.net.send({ type: "reload", weapon: kind });
       }
       // 弾倉に手が掛かる頃に鳴らす。近くの相手には「いま撃てない」が伝わる
       if (this.reloadSoundIn > 0) {

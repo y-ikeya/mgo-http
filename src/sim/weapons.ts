@@ -411,3 +411,44 @@ export function carrySpeedScale(spec: WeaponSpec): number {
 export function bulletDamage(spec: WeaponSpec, zone: HitZone, distance: number): number {
   return spec.zone[zone] * falloff(spec, distance)
 }
+
+/**
+ * 湧いたときに配る持ち物。
+ *
+ * **サーバーとクライアントが同じ式を読む。** 弾数はサーバーが写しを持って
+ * いて、繋ぎ直したときにそれを返す。両側で別々に計算すると、返した値が
+ * 画面と食い違う。
+ *
+ * 弾倉を投げる枠 (magazine) を選ぶと、予備が 1 弾倉ぶん増える。
+ * 撃ち切るまでの時間がそのぶん延びる。
+ */
+export interface Ammo {
+  /** 銃ごとの装填済み */
+  magazine: Record<WeaponId, number>
+  /** 銃ごとの予備 */
+  reserve: Record<WeaponId, number>
+}
+
+export function startingAmmo(support: SupportId): Ammo {
+  const spare = SUPPORT_SPECS[support].spareMagazines
+  const magazine = {} as Record<WeaponId, number>
+  const reserve = {} as Record<WeaponId, number>
+  for (const id of Object.keys(WEAPONS) as WeaponId[]) {
+    magazine[id] = WEAPONS[id].magazine
+    reserve[id] = WEAPONS[id].reserve + spare * WEAPONS[id].magazine
+  }
+  return { magazine, reserve }
+}
+
+/**
+ * 装填。予備から弾倉へ、入るぶんだけ移す。
+ *
+ * 弾倉に残っていた分は捨てない (差分だけ足す)。**その場で書き換える** —
+ * サーバーもクライアントも、自分が持っている表を直に更新したいので。
+ */
+export function reloadInto(ammo: Ammo, id: WeaponId): void {
+  const take = Math.min(WEAPONS[id].magazine - ammo.magazine[id], ammo.reserve[id])
+  if (take <= 0) return
+  ammo.magazine[id] += take
+  ammo.reserve[id] -= take
+}

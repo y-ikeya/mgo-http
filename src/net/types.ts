@@ -307,6 +307,37 @@ export interface LifeEvent {
   state: Life
 }
 
+/**
+ * 装填が終わった (クライアント → サーバー)。
+ *
+ * **終わった瞬間に送る。** 始まりではなく終わりを送ることで、サーバーは
+ * 銃ごとの装填の尺を持たなくてよくなる。受け取ったら予備から弾倉へ移すだけ。
+ */
+export interface ReloadEvent {
+  type: 'reload'
+  weapon: WeaponId
+}
+
+/**
+ * 繋ぎ直した人へ返す、離脱前の続き (サーバー → 本人)。
+ *
+ * 30 秒の猶予は「その命を続けさせる」ためにある。支度からやり直させると、
+ * **瀕死でリロードすれば全快して装備も選び直せる**ことになる。
+ * サーバーが持っている続きをそのまま返す。
+ */
+export interface ResumeMessage {
+  type: 'resume'
+  x: number
+  y: number
+  z: number
+  health: number
+  /** 銃ごとの装填済みと予備 */
+  magazine: Record<WeaponId, number>
+  reserve: Record<WeaponId, number>
+  /** 残りの手榴弾 */
+  grenades: number
+}
+
 /** 支度ができたので湧かせてほしい。装備画面の OK が送る */
 export interface SpawnRequest {
   type: 'spawn'
@@ -481,6 +512,7 @@ export type ClientMessage =
   | GrenadeThrow
   | LoadoutEvent
   | SpawnRequest
+  | ReloadEvent
   // 見た目だけの物。当たったかどうかに関わらないので素通しする
   | ShotEvent
   | KnockEvent
@@ -502,6 +534,7 @@ export type ServerMessage =
   | ExplosionEvent
   | KnockDownEvent
   | GrenadeSpawn
+  | ResumeMessage
   // 素通しされてきた物
   | ShotEvent
   | KnockEvent

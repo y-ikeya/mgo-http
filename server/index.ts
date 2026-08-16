@@ -13,7 +13,14 @@ import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/ballistic'
-import { bulletDamage, weaponOf, type WeaponId } from '../src/sim/weapons'
+import {
+  bulletDamage,
+  reloadInto,
+  startingAmmo,
+  weaponOf,
+  type Ammo,
+  type WeaponId,
+} from '../src/sim/weapons'
 import { verifyHit, type Pose } from '../src/sim/hitcheck'
 import {
   groundUnder,
@@ -224,6 +231,13 @@ interface Player {
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
   /**
+   * 切れたとき戦場に居たか。
+   *
+   * 戻ってきた人を続きへ返すか、支度からやり直させるかの判断。
+   * 倒れている最中に切れたなら、どのみち次は湧くので支度でよい。
+   */
+  wasAlive: boolean
+  /**
    * 席番号。位置の 2 進で誰のものかを表すのに使う。
    *
    * id をそのまま載せると長さが可変になる。抜けた番号は空くまで使い回さない
@@ -255,6 +269,18 @@ interface Player {
   locomotion: Locomotion
   /** 持っている銃。威力と連射の上限をこれで引く */
   weapon: WeaponId
+  /**
+   * 銃ごとの弾数。**写しであって、権威ではない。**
+   *
+   * 空撃ちの判断はクライアントがやる (押した瞬間に音が要るので)。ここが持って
+   * いるのは、繋ぎ直した人へ続きを返すため。持たせないと、30 秒の猶予が
+   * 「瀕死でリロードすれば全快して弾も満タン」という抜け道になる。
+   *
+   * 減らすのは shot が届いたとき。増やすのは reload が届いたとき —
+   * **クライアントは装填が終わった瞬間に送る**ので、こちらは銃ごとの尺を
+   * 知らなくてよい。
+   */
+  ammo: Ammo
   /**
    * 形の合わない位置を最後に警告した時刻 (Date.now)。
    *
@@ -431,6 +457,8 @@ function resetPlayers(roomName: string, room: Match): void {
 function spawn(roomName: string, player: Player, now = Date.now()): void {
   player.killedBy = ''
   player.health = MAX_HEALTH
+  // 装備から詰め直す。式は共有なので、画面に出る数と必ず一致する
+  player.ammo = startingAmmo(player.support)
   player.grenades = player.support === 'grenade' ? GRENADES_PER_LIFE : 0
   player.holdingGrenade = false
   player.concentratingSince = 0
@@ -1536,13 +1564,20 @@ const server = Bun.serve<Client>({
       const seat = room.players.get(socket.data.id)
 
       if (seat && seat.life === 'dropped') {
-        // 席が残っていた。所属と名前を引き継ぐ。
-        // 人数の少ない側へ割り振り直すと、リロードしただけで敵味方が入れ替わる。
+        // 席が残っていた。**その命の続きから始める。**
+        //
+        // 猶予を 30 秒空けているのは「うっかり切れた人が戻ってこられるように」で
+        // あって、湧き直させるためではない。支度からやり直させていた頃は、
+        // **瀕死でリロードすれば全快して、装備も選び直せて、弾も満タン**になった。
+        // 撃ち合いで不利になったらリロードするのが最適解になる。
+        //
+        // 所属と名前も引き継ぐ。少ない側へ割り振り直すと、リロードしただけで
+        // 敵味方が入れ替わる。
         seat.socket = socket
-        seat.health = MAX_HEALTH
-        // 前の命の続きからは始めない。支度からやり直す
+        // 倒れている最中に切れた人だけは支度から。どのみち次は湧く
+        const resuming = seat.wasAlive
         seat.life = 'dropped'
-        setLife(socket.data.room, seat, 'choosing')
+        setLife(socket.data.room, seat, resuming ? 'spawning' : 'choosing')
         // 繋いだ直後は誰も見えていない。前の接続の分を残すと、隠れたことを
         // 知らせる 1 通が出ないまま「見えている」ことになる
         seat.seen.clear()
@@ -1553,8 +1588,23 @@ const server = Bun.serve<Client>({
         seat.history = []
         seat.lastShotAt = 0
         seat.concentratingSince = 0
-        seat.grenades = seat.support === 'grenade' ? GRENADES_PER_LIFE : 0
         seat.holdingGrenade = false
+
+        // 続きを返す。クライアントは湧き地点ではなくここへ戻る
+        if (resuming) {
+          socket.send(
+            JSON.stringify({
+              type: 'resume',
+              x: seat.x,
+              y: seat.y,
+              z: seat.z,
+              health: seat.health,
+              magazine: seat.ammo.magazine,
+              reserve: seat.ammo.reserve,
+              grenades: seat.grenades,
+            } satisfies ServerMessage),
+          )
+        }
       } else {
         // 名前は発行元が持っていればそれ、無ければ join で名乗るまで仮のもの
         room.players.set(socket.data.id, {
@@ -1582,12 +1632,14 @@ const server = Bun.serve<Client>({
           footsteps: new Footsteps(),
           locomotion: 'idle',
           weapon: 'rifle',
+          ammo: startingAmmo('grenade'),
           slot: nextSlot(room),
           rejected: 0,
           concentratingSince: 0,
           grenades: GRENADES_PER_LIFE,
           support: 'grenade',
           holdingGrenade: false,
+          wasAlive: false,
           badPacketAt: 0,
           badMoveAt: 0,
           seen: new Set(),
@@ -1693,7 +1745,12 @@ const server = Bun.serve<Client>({
           leaveRoom(socket.data.room, player)
           return
 
-        case 'shot':
+        case 'shot': {
+          // 弾数の写しを減らす。**空でも拒否しない** — 空撃ちの判断は
+          // クライアントがやっている (押した瞬間に音が要る)。ここで拒めば、
+          // 通信のずれで正当な 1 発が消える
+          const left = player.ammo.magazine[player.weapon]
+          if (left > 0) player.ammo.magazine[player.weapon] = left - 1
           // 銃声だけは扱いが違う。
           //
           // 曳光を描くには銃口の座標が要るが、それは「どこに居るか」そのもの。
@@ -1701,6 +1758,13 @@ const server = Bun.serve<Client>({
           // 銃声は遠くまで届く設計なので位置がおおよそ漏れるのは想定内だが、
           // 座標は耳より精度が高い。
           relayShot(socket.data.room, player, message)
+          break
+        }
+
+        // 装填が**終わった**。尺はクライアントが持っているので、
+        // こちらは移すだけでよい
+        case 'reload':
+          reloadInto(player.ammo, message.weapon)
           break
 
         default:
@@ -1718,6 +1782,8 @@ const server = Bun.serve<Client>({
       if (player.socket !== socket) return
 
       // 席は残す。畳むのは待ち切ってから (tick)
+      // 続きへ戻せる状態だったかを控える。倒れている最中なら、どのみち次は湧く
+      player.wasAlive = player.life === 'alive' || player.life === 'spawning'
       setLife(socket.data.room, player, 'dropped')
 
       // 本人はもう送れないので代わりに配る。

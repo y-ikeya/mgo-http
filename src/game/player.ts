@@ -539,6 +539,27 @@ export class Player {
 
   private ghost = false
 
+  /**
+   * 繋ぎ直しで**その命の続き**へ戻す。
+   *
+   * respawn と違って体力を満タンにしない。切れる前の続きなので、削られていた
+   * ぶんは削られたまま。位置もサーバーが持っていた場所へ置く
+   * (湧き地点ではない)。
+   */
+  resumeAt(x: number, y: number, z: number, health: number): void {
+    this.object.position.set(x, y, z)
+    this.health = health
+    this.down = false
+    this.boxed = false
+    this.velocityY = 0
+    this.downed_ = false
+    this.downElapsed = 0
+    this.standing = false
+    this.standTimer = 0
+    // 跳んだ距離を足音に積ませない
+    this.warpTo(x, z)
+  }
+
   /** 復帰。位置は呼び出し側が決める */
   respawn(): void {
     this.health = MAX_HEALTH
