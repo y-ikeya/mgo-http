@@ -1619,6 +1619,8 @@ const server = Bun.serve<Client>({
     open(socket) {
       const room = roomOf(socket.data.room)
       const seat = room.players.get(socket.data.id)
+      /** 続きへ戻す人。名簿を送ったあとに渡す */
+      let resumed: Player | null = null
 
       if (seat && seat.life === 'dropped') {
         // 席が残っていた。**その命の続きから始める。**
@@ -1638,6 +1640,10 @@ const server = Bun.serve<Client>({
         // クライアント側でも spawning は respawnSelf を呼ぶので、弾が満タンに戻る
         const resuming = seat.wasAlive
         setLife(socket.data.room, seat, resuming ? 'alive' : 'choosing')
+        // 続きを返すのは名簿のあと (下)。**順番が要る** — 名簿を受けた
+        // クライアントは placeAtSpawn で湧き地点へ自分を置くので、先に
+        // 続きを渡すと上書きされて**湧き地点へワープする**
+        resumed = resuming ? seat : null
         // 繋いだ直後は誰も見えていない。前の接続の分を残すと、隠れたことを
         // 知らせる 1 通が出ないまま「見えている」ことになる
         seat.seen.clear()
@@ -1650,21 +1656,6 @@ const server = Bun.serve<Client>({
         seat.concentratingSince = 0
         seat.holdingGrenade = false
 
-        // 続きを返す。クライアントは湧き地点ではなくここへ戻る
-        if (resuming) {
-          socket.send(
-            JSON.stringify({
-              type: 'resume',
-              x: seat.x,
-              y: seat.y,
-              z: seat.z,
-              health: seat.health,
-              magazine: seat.ammo.magazine,
-              reserve: seat.ammo.reserve,
-              grenades: seat.grenades,
-            } satisfies ServerMessage),
-          )
-        }
       } else {
         // 名前は発行元が持っていればそれ、無ければ join で名乗るまで仮のもの
         room.players.set(socket.data.id, {
@@ -1731,6 +1722,23 @@ const server = Bun.serve<Client>({
         } satisfies ServerMessage),
       )
       socket.send(JSON.stringify(matchState(room)))
+
+      // **名簿のあとに渡す。** 名簿を受けたクライアントは placeAtSpawn で
+      // 自分を湧き地点へ置くので、先に渡すと上書きされてワープになる
+      if (resumed) {
+        socket.send(
+          JSON.stringify({
+            type: 'resume',
+            x: resumed.x,
+            y: resumed.y,
+            z: resumed.z,
+            health: resumed.health,
+            magazine: resumed.ammo.magazine,
+            reserve: resumed.ammo.reserve,
+            grenades: resumed.grenades,
+          } satisfies ServerMessage),
+        )
+      }
     },
 
     message(socket, raw) {

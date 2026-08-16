@@ -437,6 +437,8 @@ export class RemotePlayer {
         this.sweptThisFrame = true;
       }
       else if (locomotion === "stand") animator.playStand();
+      // 接続が切れた人。ここを書き忘れると playLanding へ落ちる
+      else if (locomotion === "away") animator.playAway();
       else animator.playLanding();
     }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
