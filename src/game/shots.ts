@@ -6,8 +6,13 @@ const TRACER_LIFE = 0.05
 const IMPACT_LIFE = 2.5
 /** それぞれのプール数。使い切ったら古いものから再利用する */
 const POOL_SIZE = 24
-/** 着弾痕の半径 (m) */
-const IMPACT_RADIUS = 0.07
+/**
+ * 着弾痕の半径 (m)。
+ *
+ * 弾が当たった一点を示すものなので、小さいほうが「そこ」に見える。
+ * 大きいと壁の模様のようになって、どこに当たったのかが読めない。
+ */
+const IMPACT_RADIUS = 0.05
 
 
 /**
