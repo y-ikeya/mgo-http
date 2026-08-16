@@ -348,11 +348,25 @@ export interface HiddenEvent {
   id: string
 }
 
-/** 接続した直後にサーバーから届く、今いる全員 */
+/**
+ * 接続した直後にサーバーから届く、今いる全員。
+ *
+ * **状態 (life) も載せる。** life は「変わった時」にしか配られないので、
+ * 後から繋いだ人は既に居る人の状態を一度も知らされない。既定値のまま
+ * (joining = 戦場に居ない) 扱いになって、**その人たちがずっと描かれない**。
+ */
 export interface RosterMessage {
   type: 'roster'
   /** slot は位置の 2 進で使う席番号。通信層が ID との対応表を持つ */
-  players: { id: string; name: string; health: number; team: Team; slot?: number }[]
+  players: {
+    id: string
+    name: string
+    health: number
+    team: Team
+    slot?: number
+    /** いまどういう状態に居るか。これが無いと描かれない (上記) */
+    life?: Life
+  }[]
 }
 
 /**
