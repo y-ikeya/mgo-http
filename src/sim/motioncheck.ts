@@ -41,13 +41,31 @@ import { segmentHitsBox, type StageBox } from './vision'
 export const MAX_STEP = 15
 
 /**
- * 遊べる範囲の半分 (m)。
+ * 遊べる範囲の半分 (m) を、**ステージそのものから出す**。
  *
- * 地面は 120m 四方あるが、**外周に壁が立っている** (±39.5 が内側の面)。
- * 体の半径 0.35 を引くと、実際に届くのは ±39.15 まで。地面の広さで見ると
- * 壁の外側に 20m の「通ってしまう帯」ができるので、壁のほうを基準にする。
+ * ここは一度 40 と直書きしていた。いまの stage.json は外接が ±40.5 なので
+ * 合っていたが、**ステージを広げた瞬間に、増えた分が全部「場外」になって
+ * 誰も動けなくなる**。しかも広げた端でだけ起きるので気づきにくい。
+ *
+ * 地面の広さ (120m 四方) ではなく箱の外接を採る。地面で見ると、外周の壁の
+ * 外側に 20m の「通ってしまう帯」ができる。
+ *
+ * 箱が 1 つも無ければ範囲を見ない (Infinity)。地形を読めなかった環境で
+ * 全員が場外扱いになるほうが困る。
  */
-export const ARENA_HALF = 40
+export function arenaHalfOf(boxes: StageBox[]): number {
+  let half = 0
+  for (const box of boxes) {
+    half = Math.max(
+      half,
+      Math.abs(box.min[0]),
+      Math.abs(box.max[0]),
+      Math.abs(box.min[2]),
+      Math.abs(box.max[2]),
+    )
+  }
+  return half > 0 ? half : Infinity
+}
 
 /**
  * 壁抜けを見る高さ (m)。**両端のうち高いほうから**この分だけ上。
@@ -94,13 +112,19 @@ export interface MoveVerdict {
  * その移動が成立するか。
  *
  * @param boxes 人を止める箱 (solidBlockers を通したもの)
+ * @param arenaHalf 遊べる範囲の半分 (m)。arenaHalfOf で一度だけ出しておく
  */
-export function checkMove(from: Point, to: Point, boxes: StageBox[]): MoveVerdict {
+export function checkMove(
+  from: Point,
+  to: Point,
+  boxes: StageBox[],
+  arenaHalf: number,
+): MoveVerdict {
   if (!Number.isFinite(to.x) || !Number.isFinite(to.y) || !Number.isFinite(to.z)) {
     return { ok: false, reason: '数でない座標' }
   }
 
-  if (Math.abs(to.x) > ARENA_HALF || Math.abs(to.z) > ARENA_HALF) {
+  if (Math.abs(to.x) > arenaHalf || Math.abs(to.z) > arenaHalf) {
     return { ok: false, reason: `場外 (${to.x.toFixed(0)}, ${to.z.toFixed(0)})` }
   }
 

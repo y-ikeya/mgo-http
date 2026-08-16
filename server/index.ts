@@ -24,7 +24,7 @@ import {
   type StageBox,
 } from '../src/sim/vision'
 import { cameraPoint } from '../src/sim/eyepoint'
-import { checkMove } from '../src/sim/motioncheck'
+import { arenaHalfOf, checkMove } from '../src/sim/motioncheck'
 import {
   canAct,
   canBeHurt,
@@ -109,7 +109,8 @@ const [stageBoxes, solidBoxes]: [StageBox[], StageBox[]] = await (async () => {
     const blockers = sightBlockers(data.boxes)
     const solids = solidBlockers(data.boxes)
     console.info(
-      `ステージ: 箱 ${data.boxes.length} 個 / 視線を止める ${blockers.length} 個 / 物が当たる ${solids.length} 個`,
+      `ステージ: 箱 ${data.boxes.length} 個 / 視線を止める ${blockers.length} 個 / ` +
+        `物が当たる ${solids.length} 個 / 範囲 ±${arenaHalfOf(solids).toFixed(1)}m`,
     )
     return [blockers, solids]
   } catch {
@@ -471,6 +472,13 @@ function broadcast(roomName: string, message: ServerMessage, except?: string): v
  */
 const WARP_GRACE = 1000
 
+/**
+ * 遊べる範囲の半分 (m)。ステージから出す。
+ *
+ * 起動時に 1 回。毎回の位置で 53 個の箱を舐め直す理由が無い
+ */
+const arenaHalf = arenaHalfOf(solidBoxes)
+
 function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
     raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
@@ -522,7 +530,7 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   // 繋ぎ直した直後も前の位置とは繋がっていない
   const settled = onBattlefield(player.life) && lifeElapsed(player, arrived) > WARP_GRACE
   if (settled) {
-    const verdict = checkMove(player, snapshot, solidBoxes)
+    const verdict = checkMove(player, snapshot, solidBoxes, arenaHalf)
     if (!verdict.ok) {
       player.rejected++
       if (arrived - player.badMoveAt > 5000) {
