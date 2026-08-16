@@ -56,7 +56,7 @@ import {
   type HealthMessage,
   type KillEvent,
   type MatchMessage,
-  type NetMessage,
+  type ServerMessage,
   type Team,
 } from "../net/types";
 
@@ -1037,7 +1037,7 @@ export class Game {
   }
 
   /** 他プレイヤーからのメッセージ。自分宛ての被弾はここで受ける */
-  private receive(message: NetMessage): void {
+  private receive(message: ServerMessage): void {
     switch (message.type) {
       case "state":
         this.remotes.receive(message.snapshot);
@@ -1919,10 +1919,7 @@ export class Game {
     // 地図の反対側まで飛ばせないように)
     this.net.send({
       type: "grenade",
-      id: 0,
-      from: [0, 0, 0],
-      velocity: [this.aimDir.x, this.aimDir.y, this.aimDir.z],
-      fuse: 0,
+      dir: [this.aimDir.x, this.aimDir.y, this.aimDir.z],
     });
   }
 

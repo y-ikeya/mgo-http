@@ -1,4 +1,4 @@
-import type { Locomotion } from '../game/animation'
+import type { Locomotion } from '../sim/locomotion'
 import type { HitZone } from '../sim/damage'
 import type { Surface } from '../sim/surface'
 import type { WeaponId } from '../sim/weapons'
@@ -220,7 +220,24 @@ export interface NoiseEvent {
  * 位置は毎フレーム配らない。初速だけ渡せば、受け取った側が同じ物理で
  * 同じ軌道を解ける (src/sim/ballistic.ts)。爆発の判定はサーバーが持つ。
  */
-export interface GrenadeEvent {
+/**
+ * 手榴弾を投げる (クライアント → サーバー)。
+ *
+ * **向きしか送らない。** 位置は控えてあるものを使い、速さは共有の式で作り直す。
+ * 壁の中から投げる / 地図の反対側まで飛ばす、を初速の捏造で作れなくするため。
+ *
+ * 配るときの形 (GrenadeSpawn) とは別にしてある。1 つにまとめていた頃は、
+ * サーバーしか知らないはずの id と from と fuse を、クライアントが
+ * **0 で埋めて送っていた** — 型がその向きで何を送るのかを表していなかった。
+ */
+export interface GrenadeThrow {
+  type: 'grenade'
+  /** 投げる向き (正規化は問わない)。長さは無視される */
+  dir: [number, number, number]
+}
+
+/** 飛び始めた手榴弾 (サーバー → クライアント)。受け取った側が同じ物理を解く */
+export interface GrenadeSpawn {
   type: 'grenade'
   /** サーバーが振る番号。爆発を同じ手榴弾に結びつけるのに使う */
   id: number
@@ -313,6 +330,36 @@ export interface RosterMessage {
  * 得点も残り時間もサーバーが持つ。クライアントが自分で時計を回すと、
  * タブが裏に回ったぶんだけずれて、終わったはずの試合が続く。
  */
+/**
+ * 部屋の段階。
+ *
+ *   waiting   … 人が足りない。時計は止まっている
+ *   countdown … 揃った。全員を湧き地点へ戻して数える
+ *   playing   … 試合中。ダメージが入るのはここだけ
+ *   over      … 決着。結果を見せている
+ */
+export type MatchPhase = 'waiting' | 'countdown' | 'playing' | 'over'
+
+/**
+ * 部屋の一覧 (`GET /rooms`) が返す 1 部屋ぶん。
+ *
+ * **サーバーが返す形とクライアントが読む形を、この 1 つの宣言にする。**
+ * 以前はサーバーが直に組み立てたものを、画面側が手で書き写した interface で
+ * 受けていた。いま一致しているだけで、片方を変えればもう片方は静かに
+ * undefined を読む。サーバーは satisfies で名乗るので、増やしても減らしても落ちる。
+ */
+export interface RoomSummary {
+  name: string
+  /** いま繋がっている人数 */
+  players: number
+  capacity: number
+  phase: MatchPhase
+  blue: number
+  red: number
+  /** 今の段階が終わるまで (秒)。待機中は 0 */
+  remaining: number
+}
+
 export interface MatchMessage {
   type: 'match'
   blue: number
@@ -345,7 +392,7 @@ export interface MatchMessage {
    *   playing   … 試合中。ダメージが入るのはここだけ
    *   over      … 決着。結果を見せている
    */
-  phase: 'waiting' | 'countdown' | 'playing' | 'over'
+  phase: MatchPhase
   /** 今いる人数と、始まるのに要る人数 */
   present: number
   required: number
@@ -402,27 +449,58 @@ export interface RespawnMessage {
   id: string
 }
 
-export type NetMessage =
+/**
+ * 向きで分ける。
+ *
+ * --- なぜ 1 つの union ではいけないか ---
+ * 以前は全部まとめた `NetMessage` を、送る側も受ける側も使っていた。
+ * つまり**クライアントから `health` や `kill` を送るコードが型で通る**。
+ * サーバーの default はそれを中身を見ずに配るので、実際に流れてしまう。
+ * 表 (doc の「メッセージ」) では向きを分けているのに、型は分けていなかった。
+ *
+ * 両方に出てくる物がある。素通しする物 (`shot` `knock` `throw`) は
+ * クライアントが送り、サーバーがそのまま配るので、両向きに現れる。
+ * `state` も同じ (位置は 2 進で往復する)。`join` と `leave` は、
+ * サーバーが所属を足してから配り直す。
+ */
+
+/** クライアント → サーバー。**申告と操作**しか無い */
+export type ClientMessage =
   | StateMessage
-  | ShotEvent
-  | DamageEvent
-  | KnockEvent
-  | ThrowEvent
   | JoinEvent
   | LeaveEvent
-  | HiddenEvent
-  | LifeEvent
+  | DamageEvent
+  | GrenadeThrow
+  | LoadoutEvent
   | SpawnRequest
+  // 見た目だけの物。当たったかどうかに関わらないので素通しする
+  | ShotEvent
+  | KnockEvent
+  | ThrowEvent
+
+/** サーバー → クライアント。**覆せない事実**がここに乗る */
+export type ServerMessage =
+  | StateMessage
+  | JoinEvent
+  | LeaveEvent
   | RosterMessage
   | MatchMessage
   | HealthMessage
-  | NoiseEvent
-  | GrenadeEvent
-  | KnockDownEvent
-  | LoadoutEvent
-  | ExplosionEvent
   | KillEvent
   | RespawnMessage
+  | NoiseEvent
+  | LifeEvent
+  | HiddenEvent
+  | ExplosionEvent
+  | KnockDownEvent
+  | GrenadeSpawn
+  // 素通しされてきた物
+  | ShotEvent
+  | KnockEvent
+  | ThrowEvent
+
+/** 通信路の上を流れうる全部。符号化のように向きを問わない所だけが使う */
+export type NetMessage = ClientMessage | ServerMessage
 
 /**
  * 通信路。
@@ -437,8 +515,9 @@ export type NetMessage =
 export interface NetTransport {
   /** 自分の ID。通信路を変えても変わらない */
   readonly id: string
-  send(message: NetMessage): void
-  onMessage(listener: (message: NetMessage) => void): void
+  /** 送れるのはクライアント側の物だけ。体力や得点を名乗ることはできない */
+  send(message: ClientMessage): void
+  onMessage(listener: (message: ServerMessage) => void): void
   dispose(): void
 }
 

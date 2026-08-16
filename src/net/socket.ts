@@ -1,5 +1,5 @@
 import { decodeSnapshot, encodeSnapshot, isSnapshot, readSlot } from './snapshot'
-import type { NetMessage, NetTransport } from './types'
+import type { ClientMessage, NetTransport, ServerMessage } from './types'
 
 /**
  * WebSocket の通信路。別のマシンにいる相手と繋ぐ。
@@ -16,7 +16,7 @@ export class NetSocket implements NetTransport {
   readonly id: string
 
   private readonly url: string
-  private readonly listeners = new Set<(message: NetMessage) => void>()
+  private readonly listeners = new Set<(message: ServerMessage) => void>()
   private readonly name: string
   private socket: WebSocket | null = null
   /**
@@ -53,7 +53,7 @@ export class NetSocket implements NetTransport {
     this.connect()
   }
 
-  send(message: NetMessage): void {
+  send(message: ClientMessage): void {
     // 繋がっていなければ捨てる。溜めて後から流すと、既に古くなった位置が
     // 現在の状態として届く。状態は送り直されるので、落とすのが正しい。
     if (this.socket?.readyState !== WebSocket.OPEN) return
@@ -67,7 +67,7 @@ export class NetSocket implements NetTransport {
     this.socket.send(JSON.stringify(message))
   }
 
-  onMessage(listener: (message: NetMessage) => void): void {
+  onMessage(listener: (message: ServerMessage) => void): void {
     this.listeners.add(listener)
   }
 
@@ -92,7 +92,7 @@ export class NetSocket implements NetTransport {
     const id = this.slots.get(readSlot(view))
     if (!id) return
 
-    const message: NetMessage = { type: 'state', snapshot: decodeSnapshot(view, id) }
+    const message: ServerMessage = { type: 'state', snapshot: decodeSnapshot(view, id) }
     for (const listener of this.listeners) listener(message)
   }
 
@@ -116,7 +116,7 @@ export class NetSocket implements NetTransport {
         return
       }
 
-      let message: NetMessage
+      let message: ServerMessage
       try {
         message = JSON.parse(event.data)
       } catch {

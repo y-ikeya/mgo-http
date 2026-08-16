@@ -12,11 +12,8 @@ import {
   transformedNormalView,
 } from "three/tsl";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import {
-  CharacterAnimator,
-  findBoneBySuffix,
-  type Locomotion,
-} from "./animation";
+import { CharacterAnimator, findBoneBySuffix } from "./animation";
+import type { Locomotion } from "../sim/locomotion";
 import { loadSoldier } from "./assets";
 import { WHOLE_BODY } from "../sim/stance";
 import { weaponOf, type WeaponId } from "../sim/weapons";

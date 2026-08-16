@@ -1,0 +1,21 @@
+{
+  /*
+   * 対戦サーバー。
+   *
+   * **DOM を持たせない。** 持たせると document や window を書いても型が通り、
+   * 動かして初めて落ちる。共有の層 (src/sim, src/net) が three にも DOM にも
+   * 依存しないのはこの検査で守られる — 依存した瞬間にここが落ちる。
+   *
+   * 起点は server/ と src/sim/ の 2 つだけ。src/net の protocol (types, snapshot) は
+   * server が import するので一緒に検査される。逆に src/net/socket.ts のような
+   * **クライアント専用の物は起点に入れない** — サーバーがうっかり import したら
+   * そこで初めて window が見つからずに落ちる。それが正しい落ち方。
+   */
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo",
+    "lib": ["ES2023"],
+    "types": ["bun-types"]
+  },
+  "include": ["server", "src/sim"]
+}

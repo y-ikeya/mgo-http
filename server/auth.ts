@@ -69,7 +69,7 @@ async function importKey(jwk: Jwk): Promise<CryptoKey | null> {
       ? { name: 'ECDSA', namedCurve: jwk.crv ?? 'P-256' }
       : { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }
   try {
-    return await crypto.subtle.importKey('jwk', jwk as JsonWebKey, algorithm, false, ['verify'])
+    return await crypto.subtle.importKey('jwk', jwk, algorithm, false, ['verify'])
   } catch (error) {
     console.warn(`[認証] 公開鍵を読めない (kid ${jwk.kid})`, error)
     return null

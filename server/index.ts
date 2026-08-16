@@ -38,8 +38,14 @@ import {
   SPAWN_PROTECT,
   type Life,
 } from '../src/sim/lifecycle'
-import type { Locomotion } from '../src/game/animation'
-import { SNAPSHOT_INTERVAL, type NetMessage, type Team } from '../src/net/types'
+import type { Locomotion } from '../src/sim/locomotion'
+import {
+  SNAPSHOT_INTERVAL,
+  type ClientMessage,
+  type RoomSummary,
+  type ServerMessage,
+  type Team,
+} from '../src/net/types'
 
 /**
  * 対戦サーバー。
@@ -215,6 +221,44 @@ interface Player {
   support: 'grenade' | 'magazine'
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
+  /**
+   * 席番号。位置の 2 進で誰のものかを表すのに使う。
+   *
+   * id をそのまま載せると長さが可変になる。抜けた番号は空くまで使い回さない
+   */
+  slot: number
+  /** 倒した数 / 倒された数。試合ごとに 0 に戻る */
+  kills: number
+  deaths: number
+  /**
+   * 直前に配った体力。同じ値を配り直さないための控え。
+   *
+   * 回復は毎 tick 少しずつ動くので、丸めた値が変わったときだけ配る
+   */
+  healthShown: number
+  /** 却下した申告の数。/health に出す (当たり判定が疑わしい人が分かる) */
+  rejected: number
+  /** 最後に撃った時刻 (Date.now)。連射の速さの上限を見るのに使う */
+  lastShotAt: number
+  /**
+   * 過去の姿勢。当てたという申告を遡って照合するのに使う。
+   *
+   * 長さは送る間隔から出す (HISTORY_SIZE)。決め打ちにすると、送る速さを
+   * 変えたときに遡れる長さが黙って変わる
+   */
+  history: Pose[]
+  /** 歩いた距離の積算。足音を出す間隔を決める */
+  footsteps: Footsteps
+  /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
+  locomotion: Locomotion
+  /** 持っている銃。威力と連射の上限をこれで引く */
+  weapon: WeaponId
+  /**
+   * 形の合わない位置を最後に警告した時刻 (Date.now)。
+   *
+   * 古いクライアントが繋ぐと毎フレーム落ちるので、間引かないとログが埋まる
+   */
+  badPacketAt: number
   socket: Bun.ServerWebSocket<Client>
 }
 
@@ -325,7 +369,7 @@ function assignTeam(room: Match): Team {
   return blue <= red ? 'blue' : 'red'
 }
 
-function matchState(room: Match): NetMessage {
+function matchState(room: Match): ServerMessage {
   return {
     type: 'match',
     blue: room.blue,
@@ -401,7 +445,7 @@ function leaveRoom(roomName: string, player: Player): void {
 }
 
 /** 部屋の全員へ。except を渡すとその 1 人を除く */
-function broadcast(roomName: string, message: NetMessage, except?: string): void {
+function broadcast(roomName: string, message: ServerMessage, except?: string): void {
   const room = rooms.get(roomName)
   if (!room) return
   const payload = JSON.stringify(message)
@@ -416,8 +460,6 @@ function broadcast(roomName: string, message: NetMessage, except?: string): void
  * 中身は詰め直さず、送り主の席番号だけを書き込んで、そのまま配る。
  * 送り主に名乗らせないので、他人になりすませない。
  */
-const now = () => Date.now()
-
 function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
     raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
@@ -429,8 +471,12 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
     // 古いクライアントが繋ぐと、その人の位置だけが全部落ちる。落ちた人は
     // 「まだ位置を知らせていない人」の扱いになるので、誰の位置も配られない —
     // 銃声だけ聞こえて姿が見えない、という形で表に出る。
-    if (now() - player.badPacketAt > 5000) {
-      player.badPacketAt = now()
+    // 時刻はここで取る。**下の const now より前なので、そちらは参照できない** —
+    // 参照すると ReferenceError で落ちる (形の合わない位置が届いた瞬間に、
+    // 古いクライアントを知らせるはずの道でサーバーが例外を投げていた)
+    const at = Date.now()
+    if (at - player.badPacketAt > 5000) {
+      player.badPacketAt = at
       console.warn(
         `[位置] ${player.name}: 形が合わない (${bytes.byteLength} バイト、期待は ${SNAPSHOT_BYTES})。` +
           'クライアントが古い可能性',
@@ -569,7 +615,7 @@ const RELEASE_FORWARD = 0.45
 /** 1 つの命で投げられる数 */
 const GRENADES_PER_LIFE = 3
 
-function throwGrenade(roomName: string, from: Player, event: NetMessage): void {
+function throwGrenade(roomName: string, from: Player, event: ClientMessage): void {
   if (event.type !== 'grenade') return
   const room = rooms.get(roomName)
   if (!room) return
@@ -578,7 +624,7 @@ function throwGrenade(roomName: string, from: Player, event: NetMessage): void {
   // 向きは信じる (どこを向いているかは本人にしか分からない) が、
   // 位置と速さは信じない。位置は控えてあるものを使い、初速はこちらで作り直す。
   // 壁の中から投げる / 地図の反対側まで飛ばす、を初速の捏造で作れなくする
-  const [dx, dy, dz] = event.velocity
+  const [dx, dy, dz] = event.dir
   const length = Math.hypot(dx, dy, dz)
   if (!(length > 0.001)) return
   // 速さと上向きの下駄は共有の式で決める。予測線と同じ軌道になる
@@ -781,7 +827,7 @@ function emitNoise(
 /**
  * 発砲を配る。見えている相手には曳光ごと、見えない相手には音だけ。
  */
-function relayShot(roomName: string, from: Player, message: NetMessage): void {
+function relayShot(roomName: string, from: Player, message: ServerMessage): void {
   const room = rooms.get(roomName)
   if (!room) return
   const payload = JSON.stringify(message)
@@ -950,7 +996,7 @@ function relayState(roomName: string, from: Player, payload: Uint8Array): void {
       // 沈黙は「隠れた」でも「相手の機械が遅れている」でも起きるので、
       // 区別が付かず、遅れて届く相手が見えたり消えたりする。
       if (viewer.seen.delete(from.id)) {
-        viewer.socket.send(JSON.stringify({ type: 'hidden', id: from.id } satisfies NetMessage))
+        viewer.socket.send(JSON.stringify({ type: 'hidden', id: from.id } satisfies ServerMessage))
       }
       continue
     }
@@ -1031,7 +1077,7 @@ function reject(attacker: Player, reason: string): void {
   console.warn(`[却下] ${attacker.name}: ${reason}`)
 }
 
-function applyDamage(roomName: string, attacker: Player, event: NetMessage): void {
+function applyDamage(roomName: string, attacker: Player, event: ClientMessage): void {
   if (event.type !== 'damage') return
   const room = rooms.get(roomName)
   const victim = room?.players.get(event.target)
@@ -1353,7 +1399,7 @@ const CORS = {
   'access-control-allow-headers': 'content-type',
 }
 
-const server = Bun.serve<Client, Record<string, never>>({
+const server = Bun.serve<Client>({
   port: PORT,
 
   async fetch(request, server) {
@@ -1389,23 +1435,23 @@ const server = Bun.serve<Client, Record<string, never>>({
 
     // --- 部屋の一覧 ---
     if (url.pathname === '/rooms') {
-      return Response.json(
-        ROOM_NAMES.map((name) => {
-          const room = rooms.get(name)
-          const here = room ? connected(room) : []
-          return {
-            name,
-            players: here.length,
-            capacity: ROOM_CAPACITY,
-            phase: room?.phase ?? 'waiting',
-            blue: room?.blue ?? 0,
-            red: room?.red ?? 0,
-            // 残り時間はこちらで秒に直す。時計を合わせる話を持ち込まない
-            remaining: room?.endsAt ? Math.max(0, Math.round((room.endsAt - Date.now()) / 1000)) : 0,
-          }
-        }),
-        { headers: CORS },
-      )
+      // 返す形は src/net/types.ts の RoomSummary。画面側も同じ宣言を読む。
+      // satisfies なので、増やしても減らしてもここで落ちる
+      const summaries = ROOM_NAMES.map((name) => {
+        const room = rooms.get(name)
+        const here = room ? connected(room) : []
+        return {
+          name,
+          players: here.length,
+          capacity: ROOM_CAPACITY,
+          phase: room?.phase ?? 'waiting',
+          blue: room?.blue ?? 0,
+          red: room?.red ?? 0,
+          // 残り時間はこちらで秒に直す。時計を合わせる話を持ち込まない
+          remaining: room?.endsAt ? Math.max(0, Math.round((room.endsAt - Date.now()) / 1000)) : 0,
+        } satisfies RoomSummary
+      })
+      return Response.json(summaries, { headers: CORS })
     }
 
     // 誰なのかを決める。
@@ -1517,7 +1563,7 @@ const server = Bun.serve<Client, Record<string, never>>({
             team: p.team,
             slot: p.slot,
           })),
-        } satisfies NetMessage),
+        } satisfies ServerMessage),
       )
       socket.send(JSON.stringify(matchState(room)))
     },
@@ -1533,7 +1579,7 @@ const server = Bun.serve<Client, Record<string, never>>({
         return
       }
 
-      let message: NetMessage
+      let message: ClientMessage
       try {
         message = JSON.parse(String(raw))
       } catch {

@@ -14,8 +14,7 @@
  * three.js に依存しない。サーバー (bun) がこのファイルをそのまま読む。
  */
 
-import type { Locomotion } from '../game/animation'
-import { MOVE_DIRECTIONS } from '../game/animation'
+import { MOVE_DIRECTIONS, type Locomotion } from '../sim/locomotion'
 import type { PlayerSnapshot } from './types'
 import type { WeaponId } from '../sim/weapons'
 
