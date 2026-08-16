@@ -10,6 +10,7 @@ import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
 import Loadout from '../ui/Loadout'
+import Stats from '../ui/Stats'
 
 /**
  * 調整パネルを出すか。
@@ -21,6 +22,18 @@ import Loadout from '../ui/Loadout'
  */
 function panelRequested(): boolean {
   return new URLSearchParams(location.search).get('panel') === 'open'
+}
+
+/**
+ * 診断の表示を出すか。
+ *
+ *   /rooms/alpha?stats=on
+ *
+ * 調整パネルと違って**本番でも出す**。値を書き換えないので誰が見ても害が無いし、
+ * 「相手がカクつく」の原因が自分側か相手側かを切り分けるのに要る。
+ */
+function statsRequested(): boolean {
+  return new URLSearchParams(location.search).get('stats') === 'on'
 }
 
 /**
@@ -68,6 +81,11 @@ export default function Play(props: { identity: Identity }) {
     <div class="app">
       <div class="viewport" ref={container} />
       <Hud stats={stats()} selfId={game()?.selfId ?? ''} />
+
+      {/* 診断。?stats=on のときだけ。読むだけなので本番でも出す */}
+      <Show when={statsRequested()}>
+        <Stats stats={stats()} />
+      </Show>
 
       {/*
         装備。支度をしている間 (sim/lifecycle.ts の choosing) だけ出す。

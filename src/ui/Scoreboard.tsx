@@ -89,6 +89,8 @@ export default function Scoreboard(props: {
                   <span class="score-cols">
                     <span>K</span>
                     <span>D</span>
+                    {/* 通信。名目 64 通/秒 */}
+                    <span class="score-col-rate">/s</span>
                   </span>
                 </div>
 
@@ -109,6 +111,17 @@ export default function Scoreboard(props: {
                       </span>
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
+                      {/*
+                        位置が届いている回数。低い人は自分の機械が送れていない。
+                        相手の画面ではその人がカクつくので、**誰のせいかが
+                        全員に見える**ようにしておく。
+                      */}
+                      <span
+                        class="score-num score-rate"
+                        classList={{ 'score-rate-low': (player.rate ?? 0) > 0 && (player.rate ?? 0) < 40 }}
+                      >
+                        {player.away === true ? '—' : (player.rate ?? 0) || '—'}
+                      </span>
                     </div>
                   )}
                 </For>

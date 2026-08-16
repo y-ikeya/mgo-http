@@ -1,0 +1,56 @@
+/*
+ * 診断の表示。読むだけなので、遊びの邪魔をしない大きさに留める。
+ *
+ * 左上に置く。右下は残弾、右上は成績、下は操作説明で埋まっている。
+ */
+.stats {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  color: rgba(200, 212, 192, 0.75);
+  background: rgba(10, 14, 10, 0.45);
+  border: 1px solid rgba(160, 190, 140, 0.18);
+  border-radius: 3px;
+  /* 操作を邪魔しない。下のキャンバスがクリックを受ける */
+  pointer-events: none;
+  user-select: none;
+}
+
+.stats-row {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.stats-key {
+  color: rgba(150, 166, 140, 0.7);
+}
+
+/* 名前は長いことがあるので詰める */
+.stats-peer {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-val {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 目安を下回っている値。原因の切り分けはここを見れば足りる */
+.stats-warn {
+  color: rgba(255, 150, 120, 0.95);
+}
+
+.stats-idle {
+  color: rgba(150, 166, 140, 0.5);
+}

@@ -394,6 +394,12 @@ function matchState(room: Match): ServerMessage {
       kills: p.kills,
       deaths: p.deaths,
       away: !isSeated(p.life),
+      // 位置が届いている回数 (通/秒)。名目は 64。
+      //
+      // **全員に見せる。** 「相手がカクつく / 消える」の原因が誰にあるかは、
+      // これを見れば一目で分かる。調べるのに /health を叩いたり
+      // DevTools を開いてもらったりしていた
+      rate: p.packetGap > 0 ? Math.round(1000 / p.packetGap) : 0,
     })),
   }
 }
