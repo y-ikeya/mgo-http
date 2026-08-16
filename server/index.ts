@@ -1574,10 +1574,13 @@ const server = Bun.serve<Client>({
         // 所属と名前も引き継ぐ。少ない側へ割り振り直すと、リロードしただけで
         // 敵味方が入れ替わる。
         seat.socket = socket
-        // 倒れている最中に切れた人だけは支度から。どのみち次は湧く
+        // 倒れている最中に切れた人だけは支度から。どのみち次は湧く。
+        //
+        // 戻す先は **alive**。spawning にすると 3 秒の無敵がタダで手に入り、
+        // 「不利になったらリロードして無敵を貰う」ができてしまう。
+        // クライアント側でも spawning は respawnSelf を呼ぶので、弾が満タンに戻る
         const resuming = seat.wasAlive
-        seat.life = 'dropped'
-        setLife(socket.data.room, seat, resuming ? 'spawning' : 'choosing')
+        setLife(socket.data.room, seat, resuming ? 'alive' : 'choosing')
         // 繋いだ直後は誰も見えていない。前の接続の分を残すと、隠れたことを
         // 知らせる 1 通が出ないまま「見えている」ことになる
         seat.seen.clear()
