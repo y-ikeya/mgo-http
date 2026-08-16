@@ -1,4 +1,4 @@
-import { Show } from 'solid-js'
+import { onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import type { GpuVerdict } from '../game/gpu'
 import './GpuBlocked.css'
@@ -18,6 +18,44 @@ import './GpuBlocked.css'
  */
 export default function GpuBlocked(props: { verdict: GpuVerdict }) {
   const renderer = () => (props.verdict.ok ? '' : props.verdict.renderer)
+
+  /**
+   * 断りの音。
+   *
+   * **ブラウザは操作なしの自動再生を止める。** この画面は読み込んだ瞬間に
+   * 出るので、素直に鳴らすと大抵は弾かれる。弾かれたら諦めるのではなく、
+   * 最初に触った瞬間に鳴るよう仕掛け直す — 読んでいる人は必ずどこかを
+   * クリックするかキーを押すので、そこで鳴る。
+   *
+   * 鳴らなくても画面は成立するので、失敗は握り潰してよい。
+   */
+  let audio: HTMLAudioElement | null = null
+  const armed: (() => void)[] = []
+
+  onMount(() => {
+    audio = new Audio(`${import.meta.env.BASE_URL}audio/error1.mp3`)
+    audio.volume = 0.7
+
+    void audio.play().catch(() => {
+      // 自動再生を断られた。**最初の操作**で 1 回だけ鳴らす。
+      // 両方に仕掛けるので、片方が発火したらもう片方も外す (二重に鳴らさない)
+      const fire = () => {
+        for (const disarm of armed) disarm()
+        armed.length = 0
+        void audio?.play().catch(() => {})
+      }
+      for (const kind of ['pointerdown', 'keydown'] as const) {
+        window.addEventListener(kind, fire)
+        armed.push(() => window.removeEventListener(kind, fire))
+      }
+    })
+  })
+
+  onCleanup(() => {
+    for (const disarm of armed) disarm()
+    audio?.pause()
+    audio = null
+  })
 
   return (
     <div class="gpublock">
