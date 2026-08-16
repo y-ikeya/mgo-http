@@ -1,0 +1,82 @@
+/* 描けない機械に出す画面。全面を覆う — ここから先は無いので */
+.gpublock {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0b0e0a;
+}
+
+.gpublock-panel {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 30px;
+  color: rgba(214, 226, 200, 0.9);
+  background: rgba(18, 24, 16, 0.9);
+  border: 1px solid rgba(160, 190, 140, 0.24);
+  border-left: 3px solid rgba(255, 150, 120, 0.8);
+  border-radius: 3px;
+}
+
+.gpublock-title {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 170, 140, 0.95);
+}
+
+.gpublock-lede {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.gpublock-steps {
+  margin: 0;
+  padding-left: 1.3em;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: rgba(200, 212, 192, 0.82);
+}
+
+.gpublock-steps li::marker {
+  color: rgba(150, 166, 140, 0.7);
+}
+
+.gpublock-detail {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid rgba(160, 190, 140, 0.16);
+}
+
+.gpublock-key {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: rgba(150, 166, 140, 0.7);
+}
+
+.gpublock-detail code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(200, 212, 192, 0.7);
+  /* 長いので折り返す */
+  overflow-wrap: anywhere;
+}
+
+.gpublock-note {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(150, 166, 140, 0.7);
+}

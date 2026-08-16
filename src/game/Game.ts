@@ -132,6 +132,15 @@ export interface GameStats {
   dead: boolean;
   /** 接続している他プレイヤーの数 */
   players: number;
+  /**
+   * 自分が実際に位置を送れている回数 (通/秒)。
+   *
+   * 名目は 64。**下回っていたら、描画が重くて setInterval が発火できていない。**
+   * 相手の画面ではその分だけ自分がカクつく
+   */
+  sendRate: number;
+  /** 相手ごとに、位置が届いている回数 (通/秒) */
+  peerRates: { name: string; rate: number }[];
 }
 
 /**
@@ -1026,7 +1035,20 @@ export class Game {
    * 補間するので、**間隔が一定でない**と補間の速度が揺れる。描画の速さは
    * 機械ごとに違うが、送る速さは揃えられる。
    */
+  /** 直前に位置を送った時刻と、その間隔の均し (ms)。名目は 1/64 秒 */
+  private sentAt = 0;
+  private sendGap = 0;
+
   private broadcast(): void {
+    // 実際に送れている間隔を測る。名目 (SNAPSHOT_INTERVAL) ではなく実測。
+    // 描画が重いとタイマーが発火できず、ここが伸びる
+    const at = Date.now();
+    if (this.sentAt > 0) {
+      const gap = at - this.sentAt;
+      this.sendGap = this.sendGap > 0 ? this.sendGap + (gap - this.sendGap) * 0.1 : gap;
+    }
+    this.sentAt = at;
+
     const snapshot = this.player.snapshot(this.net.id, Date.now());
     // 視点の向きはカメラが持っている。体の向きとは別 (構えていないと体は進行方向を向く)。
     // サーバーはこれで「どこから見ているか」を出し、可視の判定に使う
@@ -2311,6 +2333,8 @@ export class Game {
       team: this.team,
       match: this.match,
       players: this.remotes.count,
+      sendRate: this.sendGap > 0 ? 1000 / this.sendGap : 0,
+      peerRates: this.remotes.rates(),
     });
   }
 

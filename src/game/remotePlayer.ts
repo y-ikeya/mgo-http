@@ -84,6 +84,27 @@ const HIDE_SLACK = 3
 const HIDE_LIMIT = 1.5
 
 /**
+ * 何秒過去を描くかを、届く間隔の何倍にするか。
+ *
+ * `INTERPOLATION_DELAY` は「相手が 64Hz で送ってくる」前提の値 (0.05 秒 = 3 通ぶん)。
+ * 遅れている相手にはまったく足りない。**3 通/秒 の相手は間隔が 333ms あるので、
+ * 50ms しか遡らないと狙った時刻が常に最新の位置より後ろになり、補間が一切効かない**
+ * — 届いた位置にカクッと飛んで次が来るまで止まる。実際にそう見えた。
+ *
+ * 前後に 1 つずつ材料がある状態を保つには、間隔より長く遡る必要がある。
+ */
+const DELAY_SLACK = 1.5
+
+/**
+ * どれだけ遅れている相手でも、これ以上は過去を描かない (秒)。
+ *
+ * **サーバーが遡れる長さ (LAG_WINDOW = 0.4 秒) の内側に収める。** 描いている場所が
+ * それより古いと、当てたと申告しても照合の窓から外れて却下される —
+ * 「当てたのに何も起きない」になる。滑らかさより、当たることを採る。
+ */
+const DELAY_LIMIT = 0.25
+
+/**
  * 届く間隔の目安を下げる速さ (1 通あたりの割合)。
  *
  * 上へは即座に、下へはゆっくり。回線が詰まって固まって届くと、束の中だけ見れば
@@ -230,9 +251,39 @@ export class RemotePlayer {
     }
   }
 
+  /**
+   * 位置が届いている回数 (通/秒)。診断の表示に使う。
+   *
+   * **packetGap から割り出してはいけない。** あちらは「隠すまでの猶予」を
+   * 決めるための推定器で、直近の**最悪の間隔**を覚えるようにしてある
+   * (平均で切ると、たまの遅れで相手が消える)。悲観側に張り付くので、
+   * 57 通/秒 届いていても 37 と出た。数えるなら素直に数える。
+   */
+  get packetRate(): number {
+    const span = this.rateWindowFrom > 0 ? this.lastSeen - this.rateWindowFrom : 0;
+    return span > 0 ? (this.rateCount * 1000) / span : 0;
+  }
+
+  /** 数えている窓の始まり (Date.now) と、その間に届いた数 */
+  private rateWindowFrom = 0;
+  private rateCount = 0;
+
   /** サーバーから「もう見えない」と届いた。次の位置が来るまで隠す */
   hide(): void {
     this.hiddenByServer = true;
+  }
+
+  /**
+   * この相手を何秒過去で描くか (ms)。
+   *
+   * 64Hz で届いている相手は既定の 50ms のまま。遅れている相手ほど深く遡って、
+   * 補間の材料が前後に揃うようにする。
+   */
+  get renderDelay(): number {
+    return Math.min(
+      DELAY_LIMIT * 1000,
+      Math.max(INTERPOLATION_DELAY * 1000, this.packetGap * DELAY_SLACK),
+    );
   }
 
   /**
@@ -325,6 +376,13 @@ export class RemotePlayer {
       }
     }
 
+    // 届いた数を数える。1 秒ごとに窓を切り直す
+    if (this.rateWindowFrom === 0 || arrivedAt - this.rateWindowFrom >= 1000) {
+      this.rateWindowFrom = this.lastSeen > 0 ? this.lastSeen : arrivedAt;
+      this.rateCount = 0;
+    }
+    this.rateCount++;
+
     // 位置が来たということは、また見えている
     this.hiddenByServer = false;
     this.lastSeen = arrivedAt;
@@ -342,7 +400,7 @@ export class RemotePlayer {
   update(dt: number, now: number): void {
     this.refreshVisibility(now);
 
-    const state = this.sampleAt(now - INTERPOLATION_DELAY * 1000);
+    const state = this.sampleAt(now - this.renderDelay);
     if (!state) return;
 
     this.setBoxed(state.boxed);
@@ -879,6 +937,21 @@ export class RemotePlayers {
    */
   update(dt: number, now: number): void {
     for (const player of this.players.values()) player.update(dt, now);
+  }
+
+  /**
+   * 相手ごとに、位置が届いている回数 (通/秒)。診断の表示に使う。
+   *
+   * ここが 64 を大きく下回っている相手は、**その人の機械が送れていない**。
+   * こちらの画面ではその人がカクつくが、直せるのは相手側だけ。
+   */
+  rates(): { name: string; rate: number }[] {
+    const out: { name: string; rate: number }[] = [];
+    for (const player of this.players.values()) {
+      if (player.packetRate <= 0) continue;
+      out.push({ name: player.name, rate: player.packetRate });
+    }
+    return out.sort((a, b) => a.rate - b.rate);
   }
 
   /** サーバーが「もう見えない」と言ってきた。位置が止まるのを待たずに消す */

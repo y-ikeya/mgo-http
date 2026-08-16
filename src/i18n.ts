@@ -65,6 +65,21 @@ const JA = {
   'loadout.note': '装備を選んでください',
   'loadout.deployIn': '出撃まで {n}',
 
+  // --- 描けない機械 ---
+  'gpu.title': 'GPU が使われていません',
+  'gpu.lede':
+    'この機械はいま、画面をすべて CPU で描いています。この状態では数 FPS しか出ず、' +
+    '遊べないうえに、相手の画面でもあなたがカクついて見えます。' +
+    '下のどれかで直ります。',
+  'gpu.remote': 'リモートデスクトップ越しに開いていませんか。その PC の前で直接開いてください。',
+  'gpu.accel':
+    'Chrome の 設定 → システム →「ハードウェア アクセラレーションが使用可能な場合は使用する」' +
+    'をオンにして、ブラウザを再起動してください。',
+  'gpu.driver':
+    'デバイスマネージャーの「ディスプレイ アダプター」が「Microsoft 基本ディスプレイ アダプター」' +
+    'になっていたら、GPU のドライバを入れてください。',
+  'gpu.recheck': '直したらこのページを開き直してください。',
+
   // --- 成績表 ---
   'score.blue': '青',
   'score.red': '赤',
@@ -103,6 +118,20 @@ const EN: Record<Key, string> = {
 
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',
+
+  'gpu.title': 'GPU IS NOT BEING USED',
+  'gpu.lede':
+    'This machine is currently drawing everything on the CPU. That gives only a few frames ' +
+    'per second — the game is unplayable, and you also stutter on everyone else\'s screen. ' +
+    'One of the steps below will fix it.',
+  'gpu.remote': 'Are you connected over Remote Desktop? Open the page on the machine itself.',
+  'gpu.accel':
+    'In Chrome, go to Settings → System and turn on "Use graphics acceleration when available", ' +
+    'then restart the browser.',
+  'gpu.driver':
+    'If Device Manager shows "Microsoft Basic Display Adapter" under Display adapters, ' +
+    'install your GPU driver.',
+  'gpu.recheck': 'Reload this page once it is fixed.',
 
   'score.blue': 'BLUE',
   'score.red': 'RED',
