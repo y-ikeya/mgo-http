@@ -92,6 +92,8 @@ type UpperState =
   | 'bolt'
   | 'sweep'
   | 'stand'
+  // 接続が切れた人の姿
+  | 'away'
 
 /**
  * 構えていないときの上半身。移動状態ごとに使うクリップを変える。
@@ -170,6 +172,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'jump_down',
   'death',
   'salute',
+  // 切れた人の姿。1 枚の静止ポーズなので、流したところで留める
+  'away',
 ])
 
 /** 上半身レイヤーの action を引くキー。移動状態ごとに別 action を持つため文字列にする */
@@ -277,6 +281,13 @@ const THROW_KEY = 'throw'
 const THROW_HOLD_AT = 1.5
 const ROLL_KEY = 'roll'
 const DEATH_KEY = 'death'
+
+/**
+ * 接続が切れた人の姿。
+ *
+ * 1 枚の静止ポーズなので、流したところで留める (死体と同じ扱い)。
+ */
+const AWAY_KEY = 'away'
 const HIT_KEY = 'hit'
 const SALUTE_KEY = 'salute'
 /**
@@ -803,6 +814,13 @@ export class CharacterAnimator {
       // 倒れた姿勢のまま留める。ここを緩めると死体が立ち上がる。
       action.clampWhenFinished = true
     }
+
+    const away = byName.get('away')
+    if (away) {
+      const action = registerUpper(AWAY_KEY, away)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
     this.deathDuration = death?.duration ?? 0
 
     const salute = byName.get('salute')
@@ -1239,6 +1257,22 @@ export class CharacterAnimator {
     lower.reset().play()
     this.upperState = 'death'
     this.locomotion = 'death'
+  }
+
+  /**
+   * 接続が切れた人の姿。
+   *
+   * 体はその場に残って撃たれるので、**倒れる型とは別**にしてある。
+   * 死んでいるわけではないことが見て分かる必要がある。
+   */
+  playAway(): void {
+    const upper = this.upper.get(AWAY_KEY)
+    const lower = this.lower.get('away')
+    if (!upper || !lower) return
+    upper.reset().play()
+    lower.reset().play()
+    this.upperState = 'away'
+    this.locomotion = 'away'
   }
 
   /**
