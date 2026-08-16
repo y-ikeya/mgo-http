@@ -45,6 +45,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   // 爆風で倒れている / 起き上がる。末尾に足す (並びを変えると古い版が別の姿勢を再生する)
   'sweep',
   'stand',
+  // 接続が切れた人の姿。本人は送ってこない — サーバーが書き込む
+  'away',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -188,6 +190,17 @@ export function stampSlot(view: DataView, slot: number): void {
 export function stampProtected(view: DataView, protectedNow: boolean): void {
   const flags = view.getUint8(OFF_FLAGS2)
   view.setUint8(OFF_FLAGS2, protectedNow ? flags | FLAG2_PROTECTED : flags & ~FLAG2_PROTECTED)
+}
+
+/**
+ * モーションを書き込む。中継するときにサーバーが呼ぶ。
+ *
+ * 接続が切れた人の体をその場に残すのに要る。最後に届いたパケットをそのまま
+ * 配り直すと、走っていた人がその場で走り続ける絵になるので、姿勢だけ
+ * 差し替える。中身は作り直さない (1 バイト書くだけ)。
+ */
+export function stampLocomotion(view: DataView, locomotion: Locomotion): void {
+  view.setUint8(OFF_LOCOMOTION, LOCOMOTION_INDEX.get(locomotion) ?? 0)
 }
 
 export function readSlot(view: DataView): number {
