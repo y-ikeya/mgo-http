@@ -64,7 +64,20 @@
   letter-spacing: 0.1em;
 }
 
-/* K / D の見出し。数字の列と同じ幅にして真上に来るようにする */
+/*
+ * 列の幅。**見出しと行が同じ数を読む。**
+ *
+ * em で書いていたら揃わなかった。見出しは 10px、行は 13px なので、
+ * 同じ 2.4em が 24px と 31.2px になる。基準が違うものに同じ倍率を掛けても
+ * 同じ長さにはならない。px で 1 か所に置く。
+ */
+.score {
+  --score-col: 34px;
+  /* 通信は 2 桁 + 単位ぶん広い */
+  --score-col-rate: 42px;
+}
+
+/* K / D / 通信 の見出し。数字の列の真上に来る */
 .score-cols {
   display: flex;
   gap: 0;
@@ -74,14 +87,12 @@
 }
 
 .score-cols span {
-  width: 2.4em;
+  width: var(--score-col);
   text-align: right;
 }
 
-/* 通信の列は数字が 2 桁なので少し広く取る */
-.score-col-rate,
-.score-rate {
-  width: 3.2em !important;
+.score-col-rate {
+  width: var(--score-col-rate);
 }
 
 .score-row {
@@ -110,7 +121,18 @@
   opacity: 0.8;
 }
 
+/*
+ * 名前が余りを全部取る。
+ *
+ * 行は space-between なので、名前が伸びないと**数字どうしの間にも隙間が
+ * 配られて**列がばらける。余りを名前に吸わせれば、数字は右端に固まる。
+ *
+ * min-width: 0 が要る。flex の子は既定で中身より縮まないので、
+ * 長い名前のとき ellipsis が効かずに行がはみ出す。
+ */
 .score-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -119,7 +141,7 @@
 .score-num {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-variant-numeric: tabular-nums;
-  width: 2.4em;
+  width: var(--score-col);
   text-align: right;
   color: rgba(214, 226, 200, 0.9);
 }
@@ -130,6 +152,14 @@
  * 数字そのものより「誰が下回っているか」が読めることが大事なので、
  * 色で先に目に入るようにする。
  */
+/*
+ * 幅は .score-num より優先させる必要があるので、両方を並べて指定する。
+ * 片方だけだと同じ強さになり、**どちらが勝つかが書いた順に依存する**。
+ */
+.score-num.score-rate {
+  width: var(--score-col-rate);
+}
+
 .score-rate {
   color: rgba(150, 166, 140, 0.65);
 }
