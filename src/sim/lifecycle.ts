@@ -157,8 +157,9 @@ const ALLOWED: Record<Life, readonly Life[]> = {
   alive: ['downed', 'choosing', 'dropped'],
   // 倒れる尺が終わったら支度へ
   downed: ['choosing', 'dropped'],
-  // 繋ぎ直したら支度から。前の命の続きからは始めない
-  dropped: ['choosing'],
+  // 繋ぎ直し。**その命の続きへ戻れる** (alive) — 猶予はそのために空けてある。
+  // 倒れている最中に切れた人だけ支度から (choosing)
+  dropped: ['choosing', 'alive'],
 }
 
 export function canTransition(from: Life, to: Life): boolean {
