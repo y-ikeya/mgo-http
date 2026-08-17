@@ -30,6 +30,7 @@ import {
   type WeaponId,
 } from '../src/sim/weapons'
 import { verifyHit, type Pose } from '../src/sim/hitcheck'
+import { stanceOf } from '../src/sim/stance'
 import {
   groundUnder,
   hasLineOfSight,
@@ -1098,6 +1099,10 @@ function recordPose(player: Player): void {
     yaw: player.yaw,
     crouching: player.crouching,
     boxed: player.boxed,
+    // ナイフが刺さる姿勢かの判定に要る。**遡って照合するので履歴に持つ** —
+    // 「いまの姿勢」で見ると、刺した瞬間は立っていた相手が
+    // 爆風で転んだ直後に届いた申告を弾いてしまう
+    stance: stanceOf(player.locomotion),
   })
   if (player.history.length > HISTORY_SIZE) player.history.shift()
 }

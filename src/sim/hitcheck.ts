@@ -13,6 +13,7 @@
 
 import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from './damage'
 import { headHeight, isPathClear, type StageBox } from './vision'
+import type { Stance } from './stance'
 
 /** 判定に使う、ある時刻の姿 */
 export interface Pose {
@@ -25,7 +26,27 @@ export interface Pose {
   yaw: number
   crouching: boolean
   boxed: boolean
+  /**
+   * そのときの構え。**ナイフが刺さる姿勢かどうか**に使う。
+   *
+   * crouching / boxed とは別に持つ。あれは「しゃがんでいるか / 箱を被っているか」
+   * という操作の状態で、**吹っ飛んで倒れているかは表せない** (本人は何も
+   * 押していない)。倒れているかを知っているのはモーションのほう。
+   */
+  stance: Stance
 }
+
+/**
+ * ナイフが刺さる構え。
+ *
+ * **立ちと中腰だけ。** 吹っ飛んで倒れている相手には刺さらない — 立っている人が
+ * 地面の的に向かって同じ型で刺す絵にならないし、爆風で転ばせてから刺す、が
+ * 安すぎる。倒れている間は撃って仕留める。
+ *
+ * 箱は含める。中に居るのは立っているか中腰の人なので、被っただけで刃が
+ * 通らなくなるのはおかしい (被れば無敵、という抜け道になる)。
+ */
+const STABBABLE: ReadonlySet<Stance> = new Set<Stance>(['stand', 'crouch', 'box'])
 
 /** 申告の中身 */
 export interface HitClaim {
@@ -126,6 +147,11 @@ function verifyPose(
   const actual = Math.hypot(tx - attacker.x, ty - eyeY, tz - attacker.z)
 
   if (claim.kind === 'melee') {
+    // 倒れている相手には刺さらない
+    if (!STABBABLE.has(target.stance)) {
+      return { ok: false, reason: `刺さる姿勢ではない (${target.stance})` }
+    }
+
     // 間合い。撃つのと違って、届かない位置からは絶対に当たらない
     const flat = Math.hypot(target.x - attacker.x, target.z - attacker.z)
     if (flat > MELEE_RANGE + MELEE_SLACK) {
