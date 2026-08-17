@@ -19,6 +19,7 @@ import {
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
+import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from '../src/sim/scoring'
 import { closeMatch, flush, recordPlayer } from './stats'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/ballistic'
 import {
@@ -444,6 +445,17 @@ function assignTeam(room: Match): Team {
   return blue <= red ? 'blue' : 'red'
 }
 
+/**
+ * 陣営の点を動かす。**点が動く道はここ 1 本だけ**にする。
+ *
+ * 以前は撃った側の分を 2 箇所 (銃と手榴弾) で別々に足していた。倒された側から
+ * 引くぶんが増えると、片方に足し忘れても試合はそれらしく進むので気づけない。
+ */
+function addPoints(room: Match, team: Team, points: number): void {
+  if (team === 'blue') room.blue += points
+  else room.red += points
+}
+
 function matchState(room: Match): ServerMessage {
   return {
     type: 'match',
@@ -464,6 +476,7 @@ function matchState(room: Match): ServerMessage {
       team: p.team,
       kills: p.kills,
       deaths: p.deaths,
+      suicides: p.suicides,
       away: !isSeated(p.life),
       // 位置が届いている回数 (通/秒)。名目は 64。
       //
@@ -917,16 +930,23 @@ function detonate(nade: Grenade): void {
     setLife(nade.room, victim, 'downed')
     // 握っていたものは足元に落ちる。誘爆する
     dropGrenade(nade.room, victim)
-    // 自爆は得点にしない。倒された数だけが残る
     if (killer && killer.id !== victim.id) {
       killer.kills++
       killer.killsByWeapon.grenade = (killer.killsByWeapon.grenade ?? 0) + 1
-      if (killer.team === 'blue') room.blue++
-      else room.red++
+      addPoints(room, killer.team, KILL_POINTS)
+      addPoints(room, victim.team, DEATH_POINTS)
     } else {
-      // 自分の手榴弾で死んだ。投げた本人が既に居ない場合も、残った物で
-      // 死んだのは自分の落ち度ではないので数えない
-      if (killer) victim.suicides++
+      // 自分の手榴弾で死んだ。**手柄は誰にも付かないが、点は引く。**
+      // 引かないと、倒されそうなときに自分で死ぬのが点を渋る手になる
+      //
+      // 投げた本人が既に居ない場合は数えない。残っていた物で死んだのは
+      // 自分の落ち度ではない
+      if (killer) {
+        victim.suicides++
+        addPoints(room, victim.team, SUICIDE_POINTS)
+      } else {
+        addPoints(room, victim.team, DEATH_POINTS)
+      }
     }
     sendHealth(nade.room, victim, result.damage, false, bearing)
     broadcast(nade.room, matchState(room))
@@ -1346,8 +1366,9 @@ function applyDamage(roomName: string, attacker: Player, event: ClientMessage): 
   // 撃った側にとっては「今撃つと道連れになる」という読みになる
   dropGrenade(roomName, victim)
   attacker.kills++
-  if (attacker.team === 'blue') room.blue++
-  else room.red++
+  // 倒した側に入れて、**倒された側から引く**。引かないと死ぬ側にコストが無い
+  addPoints(room, attacker.team, KILL_POINTS)
+  addPoints(room, victim.team, DEATH_POINTS)
   sendHealth(roomName, victim, amount, false, bearingTo(victim, attacker))
   broadcast(roomName, matchState(room))
   broadcast(roomName, {

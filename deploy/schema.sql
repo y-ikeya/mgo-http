@@ -94,6 +94,9 @@ select
   coalesce(sum(mp.headshots), 0)                       as headshots,
   coalesce(sum(mp.head_deaths), 0)                     as head_deaths,
   coalesce(sum(mp.suicides), 0)                        as suicides
+-- 点 (kill +3 / death -2) はここで出さない。**式は src/sim/scoring.ts が持つ。**
+-- SQL にも書くと 2 箇所になり、片方を直し忘れたときに成績表とプロフィールで
+-- 違う点が出る。生の数だけ配って、出すのは読む側でやる
 from players p
 left join match_players mp on mp.player_id = p.id
 group by p.id, p.name, p.created_at;

@@ -1,5 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
+import { pointsOf } from '../sim/scoring'
 import type { GameStats } from '../game/Game'
 import './Scoreboard.css'
 
@@ -49,11 +50,16 @@ export default function Scoreboard(props: {
   const nextIn = () =>
     Math.max(0, Math.ceil(((props.stats?.match?.endsAt ?? 0) - Date.now()) / 1000))
 
-  // 陣営ごとに分けて、キルの多い順。同数ならデスの少ない順
+  /**
+   * 陣営ごとに分けて、**点の多い順**。同点ならデスの少ない順。
+   *
+   * キルの多い順にすると、並びと勝敗の決まり方が食い違う。突っ込んで
+   * 相打ちを重ねる人が上に来るのに、その人が居るせいで負けている、が起きる。
+   */
   const side = (team: 'blue' | 'red') =>
     (props.stats?.scores ?? [])
       .filter((p) => p.team === team)
-      .sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)
+      .sort((a, b) => pointsOf(b) - pointsOf(a) || a.deaths - b.deaths)
 
   return (
     <div class="score">
@@ -87,6 +93,8 @@ export default function Scoreboard(props: {
                 <div class={`score-team-head score-${team}`}>
                   {team === 'blue' ? t('score.blue') : t('score.red')}
                   <span class="score-cols">
+                    {/* 点。kill +3 / death -2 の合算 */}
+                    <span class="score-col-points">P</span>
                     <span>K</span>
                     <span>D</span>
                     {/* 通信。名目 64 通/秒 */}
@@ -109,6 +117,11 @@ export default function Scoreboard(props: {
                         {player.name}
                         {player.away === true && <span class="score-tag">{t('score.away')}</span>}
                       </span>
+                      {/*
+                        点。勝敗を決めているのはこれなので、K/D より先に置く。
+                        **負にもなる。**
+                      */}
+                      <span class="score-num score-points">{pointsOf(player)}</span>
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
                       {/*

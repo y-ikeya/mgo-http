@@ -73,6 +73,8 @@
  */
 .score {
   --score-col: 34px;
+  /* 点は負にもなる。符号のぶん広く取る */
+  --score-col-points: 42px;
   /* 通信は 2 桁 + 単位ぶん広い */
   --score-col-rate: 42px;
 }
@@ -89,6 +91,10 @@
 .score-cols span {
   width: var(--score-col);
   text-align: right;
+}
+
+.score-cols span.score-col-points {
+  width: var(--score-col-points);
 }
 
 .score-col-rate {
@@ -166,6 +172,15 @@
 
 .score-rate-low {
   color: rgba(255, 150, 120, 0.95);
+}
+
+/*
+ * 点。勝敗を決めているのはこれなので、K/D より前に出す。
+ * 負の符号が入るぶん 1 桁ぶん広い
+ */
+.score-num.score-points {
+  width: var(--score-col-points);
+  color: rgba(214, 226, 200, 1);
 }
 
 .score-deaths {
