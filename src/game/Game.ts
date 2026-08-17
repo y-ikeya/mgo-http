@@ -51,6 +51,7 @@ import {
 import { createTransport } from "../net";
 import type { NetTransport } from "../net/types";
 import type { Identity } from "../auth/session";
+import { selfSkin } from "./skin";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -617,6 +618,9 @@ export class Game {
     this.container = container;
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room);
+    // 自機のモデルはここで読み始める。**構築時ではない** —
+    // どのモデルを着るかは名前で決まり、名前を知っているのはこちら (skin.ts)
+    this.player.start(selfSkin(identity.displayName));
 
     // WebGPU が無い環境では three が自動で WebGL2 に落ちる。
     // 「対応ブラウザだけ」にはならないので、片道の選択ではない。
