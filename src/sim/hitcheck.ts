@@ -48,6 +48,18 @@ export interface Pose {
  */
 const STABBABLE: ReadonlySet<Stance> = new Set<Stance>(['stand', 'crouch', 'box'])
 
+/**
+ * その構えに刃が通るか。
+ *
+ * **クライアントも同じものを読む。** サーバーが弾くだけにしていたら、
+ * 空振りなのに手元では「当たった」と出た (倒れている相手を刺すと
+ * BACKSTAB の文字が出る)。当たり判定はサーバーが権威だが、
+ * **当たらないと分かっている物は手元でも当てない。**
+ */
+export function canBeStabbed(stance: Stance): boolean {
+  return STABBABLE.has(stance)
+}
+
 /** 申告の中身 */
 export interface HitClaim {
   kind: 'bullet' | 'melee'
@@ -148,7 +160,7 @@ function verifyPose(
 
   if (claim.kind === 'melee') {
     // 倒れている相手には刺さらない
-    if (!STABBABLE.has(target.stance)) {
+    if (!canBeStabbed(target.stance)) {
       return { ok: false, reason: `刺さる姿勢ではない (${target.stance})` }
     }
 
