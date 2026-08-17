@@ -170,4 +170,20 @@ describe('戦績', () => {
     a.close()
     b.close()
   }, 40_000)
+
+  test('鍵を渡さずに立てたサーバーは、何処へも書かない', async () => {
+    // **手元の .env を継がないことの試験。** bun は .env を勝手に読むので、
+    // startServer が既定で鍵を空にしていないと、試験を回すだけで本番の表に
+    // alice / bob の戦績が積まれる (実際に 33 試合ぶん積まれた)。
+    //
+    // 行き先だけ箱に向けて、鍵は渡さない。既定が壊れたらここに通信が来る
+    stub = recorder()
+    server = await startServer({ SUPABASE_URL: `http://localhost:${stub.port}` })
+    const { a, b } = await twoPlayers(server)
+    b.send({ type: 'leave', id: b.id })
+    await Bun.sleep(3000)
+
+    expect(stub.calls).toHaveLength(0)
+    a.close()
+  }, 40_000)
 })
