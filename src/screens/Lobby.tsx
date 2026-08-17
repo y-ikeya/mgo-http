@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Profile from '../ui/Profile'
 import { profilesAvailable } from '../net/profile'
+import { useLevels } from '../net/levels'
 import { t } from '../i18n'
 import { useNavigate } from '@solidjs/router'
 import { fetchRooms } from '../net/rooms'
@@ -36,6 +37,11 @@ export default function Lobby(props: { identity: Identity }) {
   const [error, setError] = createSignal('')
   /** 戦績を開いている相手。null なら閉じている */
   const [opened, setOpened] = createSignal<{ id: string; name: string } | null>(null)
+  // 札に出す Lv。入る前に「この部屋は強いのばかり」が読めるように
+  const levelFor = useLevels(
+    () => rooms().flatMap((room) => room.roster.map((who) => who.id)),
+    props.identity,
+  )
 
   const poll = async () => {
     try {
@@ -136,6 +142,7 @@ export default function Lobby(props: { identity: Identity }) {
                         disabled={!profilesAvailable}
                         onClick={() => setOpened({ id: who.id, name: who.name })}
                       >
+                        <span class="room-player-lv">{levelFor(who.id)}</span>
                         {who.name}
                       </button>
                     )}

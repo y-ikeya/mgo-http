@@ -1,6 +1,8 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import { pointsOf } from '../sim/scoring'
+import { useLevels } from '../net/levels'
+import type { Identity } from '../auth/session'
 import type { GameStats } from '../game/Game'
 import './Scoreboard.css'
 
@@ -18,11 +20,17 @@ import './Scoreboard.css'
  */
 export default function Scoreboard(props: {
   stats: GameStats | null
+  identity: Identity
   selfId: string
   onClose: () => void
   onLeave: () => void
 }) {
   /** 決着したあとか。そのときは成績表がそのままリザルト画面になる */
+  // 名前の横に出す Lv。通算から出るのでサーバーは知らない
+  const levelFor = useLevels(
+    () => (props.stats?.scores ?? []).map((p) => p.id),
+    props.identity,
+  )
   const over = () => props.stats?.match?.phase === 'over'
   const winner = () => props.stats?.match?.winner
   /** 自分の陣営。勝ったかどうかの言い方を変えるのに使う */
@@ -76,6 +84,7 @@ export default function Scoreboard(props: {
           </div>
         </Show>
 
+        {/* 上の数字は**残機**。0 にされた側が負け */}
         <header class="score-head">
           <span class="score-blue">
             {t('score.blue')} {props.stats?.match?.blue ?? 0}
@@ -114,6 +123,7 @@ export default function Scoreboard(props: {
                       }}
                     >
                       <span class={`score-name score-${team}`}>
+                        <span class="score-lv">{levelFor(player.id)}</span>
                         {player.name}
                         {player.away === true && <span class="score-tag">{t('score.away')}</span>}
                       </span>

@@ -419,9 +419,10 @@ export interface RoomSummary {
 export interface MatchMessage {
   type: 'match'
   /**
-   * 陣営の点。**キル数ではない** (kill +3 / death -2)。
+   * 陣営の**残機**。得点ではない。
    *
-   * 引かれるぶんがあるので**負にもなる**。桁を詰めるときに符号を落とさないこと
+   * 死因を問わず 1 ずつ減り、0 になった側が負け。時間切れなら多いほうが勝ち。
+   * 増えることは無いので、**減っていく数として読む**
    */
   blue: number
   red: number

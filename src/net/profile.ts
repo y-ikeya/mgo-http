@@ -25,6 +25,13 @@ const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 /** 設定が無ければ戦績の機能ごと出さない。遊ぶのに外部サービスが要る状態にはしない */
 export const profilesAvailable = URL_ !== '' && ANON !== ''
 
+/** 生の数から点を出すのに要る分。scoring.ts の pointsOf に渡す形 */
+export interface Record_ {
+  kills: number
+  deaths: number
+  suicides: number
+}
+
 /** 通算。player_totals の 1 行 */
 export interface Totals {
   name: string
@@ -88,4 +95,46 @@ export async function fetchTotals(
     headDeaths: num('head_deaths'),
     suicides: num('suicides'),
   }
+}
+
+
+/**
+ * 何人ぶんかの通算をまとめて引く。
+ *
+ * 成績表 (最大 8 人) と部屋一覧 (5 部屋 × 8 人) で Lv を出すのに要る。
+ * **1 人ずつ叩かない** — 部屋一覧は 2 秒ごとに引き直すので、40 本の往復が
+ * 秒間 20 本になる。
+ *
+ * 返らなかった人は入っていない (まだ 1 試合も終えていない = Lv 1)。
+ */
+export async function fetchRecords(
+  subjects: string[],
+  identity: Identity,
+): Promise<Map<string, Record_>> {
+  const out = new Map<string, Record_>()
+  if (!profilesAvailable || subjects.length === 0) return out
+
+  const list = subjects.map((s) => `"${s.replace(/"/g, '')}"`).join(',')
+  const players = (await read(
+    `players?auth_subject=in.(${encodeURIComponent(list)})&select=id,auth_subject`,
+    identity,
+  )) as { id: string; auth_subject: string }[]
+  if (players.length === 0) return out
+
+  const subjectById = new Map(players.map((p) => [p.id, p.auth_subject]))
+  const rows = (await read(
+    `player_totals?player_id=in.(${players.map((p) => p.id).join(',')})&select=player_id,kills,deaths,suicides`,
+    identity,
+  )) as Record<string, unknown>[]
+
+  for (const row of rows) {
+    const subject = subjectById.get(String(row.player_id))
+    if (!subject) continue
+    out.set(subject, {
+      kills: Number(row.kills ?? 0),
+      deaths: Number(row.deaths ?? 0),
+      suicides: Number(row.suicides ?? 0),
+    })
+  }
+  return out
 }
