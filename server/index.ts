@@ -1498,20 +1498,23 @@ setInterval(() => {
  * 誰でも入れる状態で立ち上がる。落ちるほうが安全。
  */
 const AUTH_URL = process.env.SUPABASE_URL ?? ''
-if (!AUTH_URL) {
-  console.error('SUPABASE_URL が無い。.env を読ませて起動する:\n  bun run serve')
-  process.exit(1)
-}
-
 /**
- * 署名を確かめずに ID を名乗らせる抜け道。
+ * 署名を確かめずに ID を名乗れる入口。**明示的に立てたときだけ**開く。
  *
- * 検証の自動テスト用。アカウントを人数分作らずに、遮蔽や当たり判定を
- * 確かめられるようにするためだけのもの。**明示的に立てたときだけ**開く。
+ * 試験用。アカウントを人数分作らずに、遮蔽や当たり判定を確かめられるようにする。
  */
 const TEST_AUTH = process.env.MGO2_TEST_AUTH === '1'
 if (TEST_AUTH) {
   console.warn('⚠ MGO2_TEST_AUTH=1 — 署名を確かめずに ID を名乗れる。試験用')
+}
+// 署名を確かめるのに要る。**試験用の入口を開けているときは要らない** —
+// そちらは token を見ないので、公開鍵を取りに行く先も要らない。
+//
+// ここで落ちると、.env の無い環境 (CI) では起動すらできない。手元では bun が
+// cwd の .env を勝手に読むので気づけず、CI でだけ「サーバーが起きない」になった。
+if (!AUTH_URL && !TEST_AUTH) {
+  console.error('SUPABASE_URL が無い。.env を読ませて起動する:\n  bun run serve')
+  process.exit(1)
 }
 
 async function resolveIdentity(url: URL): Promise<Identity | null> {

@@ -25,9 +25,10 @@ import { Client, startServer, twoPlayers, type Server } from './server'
 
 let server: Server
 
+// 起動を待つので、既定の 5 秒では足りないことがある (CI の機械は遅い)
 beforeEach(async () => {
   server = await startServer()
-})
+}, 30_000)
 
 afterEach(() => {
   server.stop()
