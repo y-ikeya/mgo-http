@@ -1,0 +1,15 @@
+{
+  /*
+   * 試験。サーバー (bun) と同じ環境で回るので、DOM は持たせない。
+   *
+   * src/sim の単体試験 (presence.test.ts) は src の側に置いてあるが、
+   * あれも three にも DOM にも触らないので、ここで検査できる。
+   */
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "lib": ["ES2023"],
+    "types": ["bun-types"]
+  },
+  "include": ["test", "src/sim"]
+}

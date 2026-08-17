@@ -17,5 +17,7 @@
     "lib": ["ES2023"],
     "types": ["bun-types"]
   },
-  "include": ["server", "src/sim"]
+  "include": ["server", "src/sim"],
+  /* 試験は tsconfig.test.json が見る */
+  "exclude": ["src/**/*.test.ts"]
 }
