@@ -80,6 +80,7 @@ UV も箱の大きさに合わせてゲーム側で作り直している (Blende
 | `convert_character.py` | FBX 群 → 1 つの glb。設定ファイルを引数に取る |
 | `soldier.json` | **どの FBX がどのクリップになったか**の対応表。32 本ぶん |
 | `merge_clip.js` | 既存の glb にクリップだけ追加する。全体を作り直さずに済む |
+| `split_clip.js` | **クリップを 2 本に割る。** 境目の姿勢は補間して両方に入れる |
 
 ```
 # 全部作り直す (元の FBX が全部要る)
@@ -89,6 +90,23 @@ $BLENDER -b --factory-startup --python tools/convert_character.py -- tools/soldi
 $BLENDER -b --factory-startup --python tools/convert_character.py -- one.json
 bun tools/merge_clip.js public/models/soldier.glb new.glb sneak out.glb
 ```
+
+### 作り直したら投擲を割り直すこと
+
+`convert_character.py` で全部作り直すと `throw` が 1 本に戻る。**割り直さないと
+手榴弾が投げられない** (コードは `throw_windup` / `throw_release` を探す)。
+
+```
+bun tools/split_clip.js public/models/soldier.glb throw 1.5 throw_windup throw_release
+```
+
+1.5 秒は手が一番後ろ (腰から -0.48m) かつ高い (1.57m) 位置の実測値。ここで割ると
+腕を引き切った形が前半の最後になり、`clampWhenFinished` がそのまま保持になる。
+
+**割る理由**は「止める位置をコードが絶対秒で持たなくて済む」こと。以前は
+`THROW_HOLD_AT = 1.5` を持っていて、尺の違うモデルに差し替えると別の場所を指した
+(移植したモデルが 25% 速く、振り切ったあとを指して「押しっぱなしなのに手を
+振り下ろす」になった)。
 
 `merge_clip.js` はチャンネルの対象を**ノード名で対応付ける**。索引で合わせると、書き出しのたびにノード順が変わった場合に静かに壊れる。
 

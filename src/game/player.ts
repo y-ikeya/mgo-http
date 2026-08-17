@@ -659,9 +659,14 @@ export class Player {
     this.animator?.cancelThrow()
   }
 
-  /** 投擲モーションの再生位置 (秒) */
-  get throwTime(): number {
-    return this.animator?.throwTime ?? 0
+  /** 振りかぶりが終わるまであと何秒か。軽く叩いただけなら残っている */
+  get throwWindupLeft(): number {
+    return this.animator?.throwWindupLeft ?? 0
+  }
+
+  /** 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る */
+  get throwReleaseDuration(): number {
+    return this.animator?.throwReleaseDuration ?? 0
   }
 
   /** 振りかぶり切ったか。投げられる状態になったかの判定に使う */

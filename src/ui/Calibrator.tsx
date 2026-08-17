@@ -105,8 +105,8 @@ const INITIAL_TORSO_YAW = 12
 /** Game.ts の BOLT_DELAY と揃えること */
 const INITIAL_BOLT_DELAY = 0.54
 
-/** Game.ts の GRENADE_RELEASE_AT と揃えること */
-const INITIAL_GRENADE_RELEASE = 1.66
+/** Game.ts の GRENADE_RELEASE_RATIO と揃えること。投げクリップに対する割合 */
+const INITIAL_GRENADE_RELEASE = 0.19
 
 /** animation.ts の SWEEP_RATE / STAND_RATE と揃えること */
 const INITIAL_SWEEP_RATE = 1
@@ -370,7 +370,7 @@ export default function Calibrator(props: {
       `// 非構えの上半身の向き補正: ${twistFix().toFixed(2)}`,
       `// しゃがみ時の上半身の旋回: ${torsoYaw().toFixed(0)}度`,
       `// ボルトに手を掛けるまで: ${boltDelay().toFixed(2)}秒`,
-      `// 手榴弾が手を離れる時刻: ${grenadeRelease().toFixed(2)}秒 (振りかぶりは 1.50秒)`,
+      `// 手榴弾が手を離れる位置: 投げクリップの ${(grenadeRelease() * 100).toFixed(0)}%`,
       `// 吹き飛び ${sweepRate().toFixed(2)}倍 (着地まで ${(0.92 / sweepRate()).toFixed(2)}秒)`,
       `// 起き上がり ${standRate().toFixed(2)}倍 (${(2.4 / standRate()).toFixed(2)}秒)`,
       `// リロード音の開始: ${reloadSound().toFixed(2)}`,
@@ -580,9 +580,9 @@ export default function Calibrator(props: {
           <span class="calib-label">手榴弾</span>
           <input
             type="range"
-            min="1.5"
-            max="2.33"
-            step="0.02"
+            min="0"
+            max="1"
+            step="0.01"
             value={grenadeRelease()}
             onInput={(e) => {
               const value = Number(e.currentTarget.value)
@@ -590,10 +590,10 @@ export default function Calibrator(props: {
               props.onGrenadeRelease(value)
             }}
           />
-          <span class="calib-value">{grenadeRelease().toFixed(2)}s</span>
+          <span class="calib-value">{(grenadeRelease() * 100).toFixed(0)}%</span>
           <span class="calib-hint">
-            投擲モーション内で手を離れる時刻。1.50s で振りかぶって止まるので、
-            離してから飛ぶまではその差になる
+            **投げクリップ**のどこで手を離れるか。振りかぶりは別クリップなので
+            0% が「放した瞬間」。秒ではなく割合なので、尺の違うモデルでもずれない
           </span>
         </label>
         <label class="calib-row">

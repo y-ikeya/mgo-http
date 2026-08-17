@@ -7,7 +7,7 @@ Mixamo のキャラから頭だけ取って、いまの兵士の体に移植す�
 --- なぜ Blender が要るか ---
 soldier.glb (Ch35) はメッシュが 1 枚に焼かれていて、頭が胴と地続きになっている。
 部位ごとの差し替えができないので、頂点グループ (mixamorig:Head の重み) を見て
-切り出すしかない。提供側 (Ch23) も同じ。
+切り出すしかない。提供側 (Mixamo のキャラ) も同じ。
 
 --- 詰まった所 ---
 1. 親を付け替えるだけでは頭が乗らなかった。提供側は 90 度回った骨にぶら下がって
@@ -22,16 +22,39 @@ import bpy, bmesh, math
 from mathutils import Vector
 
 SOLDIER='/Users/yuma/workspace/mgo2http/public/models/soldier.glb'
-DONOR='/Users/yuma/Downloads/Idle.fbx'
+DONOR='/Users/yuma/Downloads/Dying.fbx'
 OUT='/Users/yuma/workspace/mgo2http/public/models/soldier_pepa.glb'
-HEAD='mixamorig:Head'
+# 骨の名前は接頭辞が揃わない。Mixamo は書き出しのたびに番号を振るので、
+# 宿主が mixamorig: で提供側が mixamorig7: ということが起きる。**決め打ちにしない**
+BONE='Head'
+def prefix_of(arm):
+    for b in arm.data.bones:
+        if b.name.endswith(':Hips'): return b.name.split(':')[0]
+    raise SystemExit('Hips が見つからない')
 THRESH=0.5
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
+# --- 何よりも先に fps を合わせる ---
+#
+# **Blender の既定は 24fps。**読み込むときの fps でクリップがフレームに刻まれ、
+# 書き出すときの fps で秒に戻る。**その 2 つが違うと尺が変わる。**
+#
+# 最初は書き出しの直前に立てていて、まるで効かなかった —
+# 24fps で読み込んだ時点で throw は 56 フレームになっていて、それを 30 で割ると
+# 1.87 秒 (元は 2.33 秒)。48 本すべてが 0.8 倍 = 全モーションが 25% 速い。
+#
+# 尺が変わると、クリップ内の絶対時刻で決め打ちしている所が全部ずれる。実際
+# THROW_HOLD_AT (1.5 秒で振りかぶりを止める) が振り切ったあとを指すようになり、
+# 「押しっぱなしなのに手を振り下ろす」になった。
+bpy.context.scene.render.fps = 30
+bpy.context.scene.render.fps_base = 1
+
 bpy.ops.import_scene.gltf(filepath=SOLDIER)
 host_arm=next(o for o in bpy.data.objects if o.type=='ARMATURE')
 host_arm.name='Host'
 host_mesh=next(o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith('Ch35'))
+HOSTP=prefix_of(host_arm); HEAD=f'{HOSTP}:{BONE}'
+print(f'宿主の骨は {HOSTP}:')
 clips_before=len(bpy.data.actions)
 # 提供側の画像を見分けるための控え。FBX の画像は 'file1' のような名前で来るので、
 # 名前では判別できない。**あとから増えた物が提供側**、という数え方にする
@@ -67,19 +90,27 @@ print('落としたあと', len(host_mesh.data.vertices))
 # --- 2. 提供側を読む ---
 bpy.ops.import_scene.fbx(filepath=DONOR)
 donor_arm=next(o for o in bpy.data.objects if o.type=='ARMATURE' and o is not host_arm)
-body=bpy.data.objects['Ch23_Body']; hair=bpy.data.objects['Ch23_Hair']
-lash=bpy.data.objects.get('Ch23_Eyelashes')
+# **キャラ番号は決め打ちにしない。** Mixamo は Ch23 / Ch33 … と番号で来るので、
+# 別のキャラに乗り換えるたびに名前を書き換えることになる。入ってきた物から拾う
+donor_names=[o.name for o in bpy.data.objects
+             if o.type=='MESH' and o.name.startswith('Ch') and o is not host_mesh]
+P=sorted({n.split('_')[0] for n in donor_names})[0]
+print(f'提供側は {P} ({len(donor_names)} メッシュ: {", ".join(sorted(donor_names))})')
+DONORP=prefix_of(donor_arm); DHEAD=f'{DONORP}:{BONE}'
+print(f'提供側の骨は {DONORP}:')
+body=bpy.data.objects[f'{P}_Body']; hair=bpy.data.objects[f'{P}_Hair']
+lash=bpy.data.objects.get(f'{P}_Eyelashes')
 
 # 体から頭だけ切り出す
 bpy.ops.object.select_all(action='DESELECT')
 bpy.context.view_layer.objects.active=body
-d_head=verts_of(body,HEAD,THRESH)
-print(f'Ch23 の頭 {len(d_head)} 頂点 / 全 {len(body.data.vertices)}')
+d_head=verts_of(body,DHEAD,THRESH)
+print(f'{P} の頭 {len(d_head)} 頂点 / 全 {len(body.data.vertices)}')
 select(body,d_head)
 bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_mode(type='VERT')
 bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
-new_head=[o for o in bpy.data.objects if o.name.startswith('Ch23_Body.')][0]
-new_head.name='Ch23_HeadOnly'
+new_head=[o for o in bpy.data.objects if o.name.startswith(f'{P}_Body.')][0]
+new_head.name=f'{P}_HeadOnly'
 bpy.data.objects.remove(body,do_unlink=True)
 for o in list(bpy.data.objects):
     if o.type=='MESH' and o not in (host_mesh,new_head,hair,lash):
@@ -97,7 +128,7 @@ for o in list(bpy.data.objects):
 #
 # 位置だけ合わせても駄目で、**同じ骨のレスト行列どうしで橋を架ける**必要がある。
 H = host_arm.matrix_world  @ host_arm.data.bones[HEAD].matrix_local
-D = donor_arm.matrix_world @ donor_arm.data.bones[HEAD].matrix_local
+D = donor_arm.matrix_world @ donor_arm.data.bones[DHEAD].matrix_local
 M = H @ D.inverted()
 print('橋渡しの行列 (移動 mm):', tuple(round(v*1000,1) for v in M.translation))
 print('  回転 (度):', tuple(round(math.degrees(v),1) for v in M.to_euler()))
@@ -130,6 +161,16 @@ if donor_action: bpy.data.actions.remove(donor_action)
 # TEXCOORD_0 を見るため、移植側はテクスチャの 1 点だけを引くことになる —
 # 髪はそこが透明で全部抜け (つるっぱげ)、顔は 1 色に潰れる (のっぺらぼう)。
 # 中身は全部正しいのに描かれない、という形で出るので気づきにくい。
+# **頂点グループの名前も宿主に揃える。** join は名前で繋ぐので、
+# mixamorig7: のままだと宿主の骨に一本も繋がらず、頭が原点へ潰れる
+if DONORP != HOSTP:
+    for o in grafts:
+        renamed=0
+        for g in o.vertex_groups:
+            if g.name.startswith(f'{DONORP}:'):
+                g.name = f'{HOSTP}:' + g.name.split(':', 1)[1]; renamed+=1
+        print(f'  骨の名前 {o.name}: {renamed} 個を {DONORP}: -> {HOSTP}: へ')
+
 uv_name=host_mesh.data.uv_layers[0].name
 for o in grafts:
     for layer in o.data.uv_layers:
@@ -150,13 +191,13 @@ print('動き', clips_before, '->', len(bpy.data.actions))
 # --- 4. テクスチャを削る ---
 #
 # Mixamo の FBX は 4K の PNG を抱えてくる。そのままだと 59MB で、
-# 元の soldier.glb 7.1MB の 8 倍 (Ch23 の 4 枚だけで 53.7MB)。
+# 元の soldier.glb 7.1MB の 8 倍 (提供側の 4 枚だけで 53.7MB)。
 # 顔と髪しか使っていないので、この解像度は要らない。
 #
 # 髪は PNG のまま — 透過が要る (alphaMode BLEND)。残りは JPEG にする。
 SIDE=1024
 hair_images=set()
-hair_mat=bpy.data.materials.get('Ch23_hair')
+hair_mat=bpy.data.materials.get(f'{P}_hair')
 if hair_mat and hair_mat.use_nodes:
     for n in hair_mat.node_tree.nodes:
         if n.type=='TEX_IMAGE' and n.image: hair_images.add(n.image.name)
@@ -209,4 +250,4 @@ def mask_alpha(path, material, cutoff=0.25):
     open(path,'wb').write(out)
     print(f'  {material} を alphaMode=MASK (cutoff {cutoff}) にした')
 
-mask_alpha(OUT,'Ch23_hair')
+mask_alpha(OUT, f'{P}_hair')
