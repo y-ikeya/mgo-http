@@ -1,5 +1,6 @@
 import { createResource, Show } from 'solid-js'
 import { fetchTotals } from '../net/profile'
+import { levelOf, levelProgress, pointsForLevel, pointsOf } from '../sim/scoring'
 import type { Identity } from '../auth/session'
 import './Profile.css'
 
@@ -57,46 +58,66 @@ export default function Profile(props: {
         </Show>
 
         <Show when={totals()} keyed>
-          {(t) => (
-            <dl class="profile-grid">
-              <div class="profile-cell">
-                <dt>試合</dt>
-                <dd>{t.matches}</dd>
-              </div>
-              <div class="profile-cell">
-                <dt>キル</dt>
-                <dd>{t.kills}</dd>
-              </div>
-              <div class="profile-cell">
-                <dt>デス</dt>
-                <dd>{t.deaths}</dd>
-              </div>
-              <div class="profile-cell">
-                <dt>K/D</dt>
-                <dd>{ratio(t)}</dd>
-              </div>
-              {/* 与えたヘッドショットと、受けたヘッドショット。
-                  MGO2 はやられた側も記録していた — 上手さだけでなく
-                  「どうやられたか」を見せるため */}
-              <div class="profile-cell">
-                <dt>ヘッドショット</dt>
-                <dd>{t.headshots}</dd>
-              </div>
-              <div class="profile-cell">
-                <dt>被ヘッドショット</dt>
-                <dd class="profile-bad">{t.headDeaths}</dd>
-              </div>
-              <div class="profile-cell">
-                <dt>自死</dt>
-                <dd class="profile-bad">{t.suicides}</dd>
-              </div>
-              {/* 途中で抜けた回数。リロードは数えない */}
-              <div class="profile-cell">
-                <dt>離脱</dt>
-                <dd class="profile-bad">{t.abandons}</dd>
-              </div>
-            </dl>
-          )}
+          {(t) => {
+            const points = pointsOf(t)
+            const level = levelOf(points)
+            return (
+              <>
+                <div class="profile-level">
+                  <div class="profile-level-value">
+                    <span class="profile-level-label">Lv</span>
+                    {level}
+                  </div>
+                  {/* 次の Lv までの帯。数字だけだと「あとどれくらい」が読めない */}
+                  <div class="profile-level-bar">
+                    <span style={{ width: `${levelProgress(points) * 100}%` }} />
+                  </div>
+                  <div class="profile-level-note">
+                    {points} pt / 次まで {Math.max(0, pointsForLevel(level + 1) - points)}
+                  </div>
+                </div>
+
+                <dl class="profile-grid">
+                  <div class="profile-cell">
+                    <dt>試合</dt>
+                    <dd>{t.matches}</dd>
+                  </div>
+                  <div class="profile-cell">
+                    <dt>キル</dt>
+                    <dd>{t.kills}</dd>
+                  </div>
+                  <div class="profile-cell">
+                    <dt>デス</dt>
+                    <dd>{t.deaths}</dd>
+                  </div>
+                  <div class="profile-cell">
+                    <dt>K/D</dt>
+                    <dd>{ratio(t)}</dd>
+                  </div>
+                  {/* 与えたヘッドショットと、受けたヘッドショット。
+                      MGO2 はやられた側も記録していた — 上手さだけでなく
+                      「どうやられたか」を見せるため */}
+                  <div class="profile-cell">
+                    <dt>ヘッドショット</dt>
+                    <dd>{t.headshots}</dd>
+                  </div>
+                  <div class="profile-cell">
+                    <dt>被ヘッドショット</dt>
+                    <dd class="profile-bad">{t.headDeaths}</dd>
+                  </div>
+                  <div class="profile-cell">
+                    <dt>自死</dt>
+                    <dd class="profile-bad">{t.suicides}</dd>
+                  </div>
+                  {/* 途中で抜けた回数。リロードは数えない */}
+                  <div class="profile-cell">
+                    <dt>離脱</dt>
+                    <dd class="profile-bad">{t.abandons}</dd>
+                  </div>
+                </dl>
+              </>
+            )
+          }}
         </Show>
       </div>
     </div>

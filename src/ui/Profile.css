@@ -67,6 +67,56 @@
   color: rgba(150, 166, 140, 0.7);
 }
 
+/*
+ * Lv。点の置き場所はここ — 陣営の勝敗には関わらない個人の積み上げなので、
+ * 試合の数字 (下の格子) より上に、大きく置く。
+ */
+.profile-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 20px 16px 16px;
+}
+
+.profile-level-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 40px;
+  line-height: 1;
+  color: rgba(180, 214, 150, 1);
+}
+
+.profile-level-label {
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: rgba(150, 166, 140, 0.7);
+}
+
+/* 次の Lv までの帯。数字だけだと「あとどれくらい」が読めない */
+.profile-level-bar {
+  width: min(220px, 70%);
+  height: 3px;
+  background: rgba(160, 190, 140, 0.18);
+  overflow: hidden;
+}
+
+.profile-level-bar span {
+  display: block;
+  height: 100%;
+  background: rgba(180, 214, 150, 0.85);
+}
+
+.profile-level-note {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: rgba(150, 166, 140, 0.65);
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -136,6 +136,23 @@
  * min-width: 0 が要る。flex の子は既定で中身より縮まないので、
  * 長い名前のとき ellipsis が効かずに行がはみ出す。
  */
+/*
+ * 名前の前の Lv。通算から出る (その試合の成績ではない)。
+ * 名前より小さく、色を落として置く — 読みたいのは名前が先で、Lv は添え物
+ */
+.score-lv {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-right: 6px;
+  padding: 0 4px;
+  border: 1px solid rgba(160, 190, 140, 0.28);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  text-align: center;
+  color: rgba(180, 200, 165, 0.85);
+}
+
 .score-name {
   flex: 1;
   min-width: 0;

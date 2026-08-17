@@ -42,12 +42,17 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   return (
     <div class="hud">
       {/*
-        得点と残り時間。画面上部の中央。
+        残機と残り時間。画面上部の中央。
         自分の陣営を左に置かない。どちらが青でどちらが赤かが固定されているほうが、
         相手の画面と話が通じる。
+
+        **数字は残機**で、減っていく。0 にした側が勝ち。
+        種目名を上に置くのは、これから他の種目 (SNE / RES …) を足すため —
+        入った部屋が何なのかが画面から読めるようにしておく。
       */}
       <Show when={phase() === 'playing' || phase() === 'over'}>
         <div class="hud-match">
+          <span class="hud-mode">TDM</span>
           <span
             class="hud-score hud-score-blue"
             classList={{ 'hud-score-own': props.stats?.team === 'blue' }}

@@ -19,7 +19,6 @@ import {
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
-import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from '../src/sim/scoring'
 import { closeMatch, flush, recordPlayer } from './stats'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/ballistic'
 import {
@@ -85,6 +84,19 @@ import {
 const PORT = Number(process.env.PORT ?? 8787)
 /** 1 試合の長さ (ms) */
 const MATCH_DURATION = 5 * 60 * 1000
+
+/**
+ * 陣営ごとの残機。TDM の勝敗はこれの削り合いで決まる。
+ *
+ * 死因を問わず 1 ずつ減り、**0 になった側が負け**。時間切れなら多く残っている
+ * ほうが勝ち。倒した数ではなく「相手をどれだけ削れたか」で決まるので、
+ * 相打ちを重ねても差が付かない。
+ *
+ * 20 は 4 対 4 で 5 分の試合を想定した数。1 人あたり 5 回死ねる勘定で、
+ * 削り切って終わることも時間切れになることも両方ある辺り。**実際に回して詰める**
+ * ものなので、環境変数で変えられるようにしてある (箱の上で試すのに再配置が要らない)。
+ */
+const TICKETS = Math.max(1, Number(process.env.MGO2_TICKETS) || 20)
 /** 決着してから次の支度が始まるまで (ms)。結果を読む時間 */
 const INTERMISSION = 10 * 1000
 /**
@@ -446,14 +458,18 @@ function assignTeam(room: Match): Team {
 }
 
 /**
- * 陣営の点を動かす。**点が動く道はここ 1 本だけ**にする。
+ * 残機を 1 減らす。**残機が動く道はここ 1 本だけ**にする。
  *
- * 以前は撃った側の分を 2 箇所 (銃と手榴弾) で別々に足していた。倒された側から
- * 引くぶんが増えると、片方に足し忘れても試合はそれらしく進むので気づけない。
+ * 以前は点を 2 箇所 (銃と手榴弾) で別々に動かしていた。片方に足し忘れても
+ * 試合はそれらしく進むので気づけない。
+ *
+ * **死因を問わない。** 撃たれても自爆しても自陣の残機が 1 減り、倒した側には
+ * 何も入らない。これで「殺されるくらいなら自死する」が成り立たなくなる —
+ * どちらで死んでも自陣の損は同じで、敵の得も同じ (ゼロ)。
  */
-function addPoints(room: Match, team: Team, points: number): void {
-  if (team === 'blue') room.blue += points
-  else room.red += points
+function loseTicket(room: Match, team: Team): void {
+  if (team === 'blue') room.blue = Math.max(0, room.blue - 1)
+  else room.red = Math.max(0, room.red - 1)
 }
 
 function matchState(room: Match): ServerMessage {
@@ -933,21 +949,14 @@ function detonate(nade: Grenade): void {
     if (killer && killer.id !== victim.id) {
       killer.kills++
       killer.killsByWeapon.grenade = (killer.killsByWeapon.grenade ?? 0) + 1
-      addPoints(room, killer.team, KILL_POINTS)
-      addPoints(room, victim.team, DEATH_POINTS)
-    } else {
-      // 自分の手榴弾で死んだ。**手柄は誰にも付かないが、点は引く。**
-      // 引かないと、倒されそうなときに自分で死ぬのが点を渋る手になる
-      //
-      // 投げた本人が既に居ない場合は数えない。残っていた物で死んだのは
+    } else if (killer) {
+      // 自分の手榴弾で死んだ。手柄は誰にも付かない。
+      // 投げた本人が既に居ない場合は自死に数えない — 残っていた物で死んだのは
       // 自分の落ち度ではない
-      if (killer) {
-        victim.suicides++
-        addPoints(room, victim.team, SUICIDE_POINTS)
-      } else {
-        addPoints(room, victim.team, DEATH_POINTS)
-      }
+      victim.suicides++
     }
+    // 死因を問わず、倒された側の残機が 1 減る
+    loseTicket(room, victim.team)
     sendHealth(nade.room, victim, result.damage, false, bearing)
     broadcast(nade.room, matchState(room))
     broadcast(nade.room, {
@@ -1366,9 +1375,8 @@ function applyDamage(roomName: string, attacker: Player, event: ClientMessage): 
   // 撃った側にとっては「今撃つと道連れになる」という読みになる
   dropGrenade(roomName, victim)
   attacker.kills++
-  // 倒した側に入れて、**倒された側から引く**。引かないと死ぬ側にコストが無い
-  addPoints(room, attacker.team, KILL_POINTS)
-  addPoints(room, victim.team, DEATH_POINTS)
+  // 減るのは倒された側の残機だけ。倒した側には何も入らない
+  loseTicket(room, victim.team)
   sendHealth(roomName, victim, amount, false, bearingTo(victim, attacker))
   broadcast(roomName, matchState(room))
   broadcast(roomName, {
@@ -1424,8 +1432,8 @@ function updateMatch(roomName: string, room: Match, now: number): void {
     } else if (enough) {
       room.phase = 'countdown'
       room.endsAt = now + COUNTDOWN
-      room.blue = 0
-      room.red = 0
+      room.blue = TICKETS
+      room.red = TICKETS
       room.winner = undefined
       resetPlayers(roomName, room)
     } else {
@@ -1454,8 +1462,8 @@ function updateMatch(roomName: string, room: Match, now: number): void {
   } else if (room.phase === 'waiting' && enough) {
     room.phase = 'countdown'
     room.endsAt = now + COUNTDOWN
-    room.blue = 0
-    room.red = 0
+    room.blue = TICKETS
+    room.red = TICKETS
     room.winner = undefined
     resetPlayers(roomName, room)
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
@@ -1469,7 +1477,14 @@ function updateMatch(roomName: string, room: Match, now: number): void {
     for (const player of connected(room)) {
       if (player.life === 'choosing') spawn(roomName, player, now)
     }
+  } else if (room.phase === 'playing' && (room.blue <= 0 || room.red <= 0)) {
+    // **削り切った。** 残機が 0 になった側の負け。時間を待たずにその場で終わる
+    room.phase = 'over'
+    room.winner = room.blue <= 0 && room.red <= 0 ? 'draw' : room.blue <= 0 ? 'red' : 'blue'
+    room.endsAt = now + INTERMISSION
+    finishMatch(roomName, room)
   } else if (room.phase === 'playing' && now >= room.endsAt) {
+    // 時間切れ。**多く残っているほうが勝ち**
     room.phase = 'over'
     room.winner = room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
     room.endsAt = now + INTERMISSION

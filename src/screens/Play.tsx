@@ -108,6 +108,7 @@ export default function Play(props: { identity: Identity }) {
       <Show when={stats()?.menuOpen}>
         <Scoreboard
           stats={stats()}
+          identity={props.identity}
           selfId={game()?.selfId ?? ''}
           onClose={() => game()?.setMenu(false)}
           onLeave={() => {

@@ -311,18 +311,33 @@
 
 /* --- 試合 --- */
 
+/*
+ * 残機と時計。種目名を真ん中の上に載せるので、格子で組む。
+ * 上段は種目名だけ (中央の列)、下段が [残機 時計 残機]。
+ */
 .hud-match {
   position: absolute;
-  top: 14px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto auto;
   align-items: baseline;
-  gap: 18px;
-  padding: 5px 16px;
+  justify-items: center;
+  column-gap: 18px;
+  padding: 3px 16px 5px;
   background: rgba(10, 14, 18, 0.5);
   border: 1px solid rgba(160, 190, 140, 0.2);
   font-variant-numeric: tabular-nums;
+}
+
+/* 種目名。時計の真上に置く */
+.hud-mode {
+  grid-column: 2;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: rgba(150, 166, 140, 0.75);
 }
 
 .hud-score {
