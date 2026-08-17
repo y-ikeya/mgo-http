@@ -407,6 +407,11 @@ export interface RoomSummary {
 
 export interface MatchMessage {
   type: 'match'
+  /**
+   * 陣営の点。**キル数ではない** (kill +3 / death -2)。
+   *
+   * 引かれるぶんがあるので**負にもなる**。桁を詰めるときに符号を落とさないこと
+   */
   blue: number
   red: number
   /**
@@ -421,6 +426,13 @@ export interface MatchMessage {
     team: Team
     kills: number
     deaths: number
+    /**
+     * 自分で死んだ数 (deaths に含まれる)。
+     *
+     * 個人の点を手元で出すのに要る。自死の引き方を倒された時と変えたときに、
+     * これが無いと個人の点と陣営の点が黙って食い違う
+     */
+    suicides: number
     /** 接続が切れて戻りを待っている。数分で席ごと消える */
     away?: boolean
     /**
