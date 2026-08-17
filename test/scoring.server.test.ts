@@ -92,6 +92,19 @@ describe('点', () => {
     // 手柄は誰にも付かない
     expect(after[theirs]).toBe(before[theirs])
 
+    // **自死が混ざった状態でも個人の点が陣営の点に合う。**
+    // SUICIDE_POINTS を DEATH_POINTS と別の値にした以上、自死の数が配られて
+    // いないと、ここで初めて食い違う (下の試験は自死が無いので気づけない)
+    const match = a.last.get('match')
+    if (match?.type !== 'match') throw new Error('match が来ていない')
+    expect(match.players.some((p) => p.suicides > 0)).toBe(true)
+    for (const team of ['blue', 'red'] as const) {
+      const sum = match.players
+        .filter((p) => p.team === team)
+        .reduce((total, p) => total + pointsOf(p), 0)
+      expect(sum).toBe(match[team])
+    }
+
     a.close()
     b.close()
   }, 60_000)
