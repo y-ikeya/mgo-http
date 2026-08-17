@@ -15,6 +15,7 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../sim/locomotion";
 import { loadSoldier } from "./assets";
+import { DEFAULT_SKIN, skinFor } from "./skin";
 import { WHOLE_BODY } from "../sim/stance";
 import { weaponOf, type WeaponId } from "../sim/weapons";
 import {
@@ -206,8 +207,12 @@ export class RemotePlayer {
   private yawInitialized = false;
   private disposed = false;
 
-  constructor(id: string, scene: THREE.Scene) {
+  /** どのモデルを着るか (見た目の試作。skin.ts) */
+  private readonly skin: string;
+
+  constructor(id: string, scene: THREE.Scene, skin: string = DEFAULT_SKIN) {
     this.id = id;
+    this.skin = skin;
     this.box = createCardboardBox();
     this.object.add(this.box);
     scene.add(this.object);
@@ -567,7 +572,7 @@ export class RemotePlayer {
   private async load(): Promise<void> {
     let gltf;
     try {
-      gltf = await loadSoldier();
+      gltf = await loadSoldier(this.skin);
     } catch (error) {
       console.error("[RemotePlayer] 兵士モデルの読み込みに失敗", error);
       return;
@@ -731,14 +736,16 @@ export class RemotePlayers {
   receive(snapshot: PlayerSnapshot, arrivedAt = Date.now()): void {
     let player = this.players.get(snapshot.id);
     if (!player) {
-      player = new RemotePlayer(snapshot.id, this.scene);
+      // **控えを先に引く。** どのモデルを着るかは名前で決まり、モデルの
+      // 読み込みは構築と同時に始まる。作ってから名前を入れたのでは間に合わない
+      const known = this.pending.get(snapshot.id);
+      player = new RemotePlayer(snapshot.id, this.scene, skinFor(known?.name));
       this.players.set(snapshot.id, player);
 
       // 名簿で先に届いていた情報を反映する。
       // 入室直後に届く名簿の時点では、まだ相手の実体が無い (位置が届いて
       // 初めて作られる) ので、そのまま捨てると所属も名前も既定のままになる。
       // 所属が既定のままだと、敵を撃っても味方判定になる。
-      const known = this.pending.get(snapshot.id);
       if (known) {
         if (known.name !== undefined) player.name = known.name;
         if (known.team !== undefined) player.setTeam(known.team);

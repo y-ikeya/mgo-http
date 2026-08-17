@@ -356,7 +356,16 @@ export class Player {
     this.object.add(this.placeholder)
     this.box = createCardboardBox()
     this.object.add(this.box)
-    void this.load()
+  }
+
+  /**
+   * モデルを読み始める。**構築とは分けてある。**
+   *
+   * どのモデルを着るかは名前で決まるが (skin.ts)、名前を知っているのは
+   * Game のほう。構築時に読み始めると、まだ名前が入っていない
+   */
+  start(skin: string): void {
+    void this.load(skin)
   }
 
   get position(): THREE.Vector3 {
@@ -1209,10 +1218,10 @@ export class Player {
     this.box = null
   }
 
-  private async load(): Promise<void> {
+  private async load(skin: string): Promise<void> {
     let gltf
     try {
-      gltf = await loadSoldier()
+      gltf = await loadSoldier(skin)
     } catch (error) {
       // 読み込みに失敗してもプレースホルダーのまま操作は続けられる
       console.error('[Player] 兵士モデルの読み込みに失敗', error)

@@ -1,5 +1,6 @@
 import type * as THREE from 'three'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DEFAULT_SKIN } from './skin'
 
 /**
  * モデルの読み込みを 1 回に集約する。
@@ -9,7 +10,6 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
  * 実体は 1 つで、使う側が SkeletonUtils.clone で複製する。
  */
 
-const SOLDIER_URL = `${import.meta.env.BASE_URL}models/soldier.glb`
 const RIFLE_URL = `${import.meta.env.BASE_URL}models/rifle.glb`
 const SNIPER_URL = `${import.meta.env.BASE_URL}models/sniper.glb`
 const PISTOL_URL = `${import.meta.env.BASE_URL}models/pistol.glb`
@@ -51,8 +51,13 @@ function load(url: string): Promise<GLTF> {
   return pending
 }
 
-export function loadSoldier(): Promise<GLTF> {
-  return load(SOLDIER_URL)
+/**
+ * 兵士のモデル。skin で差し替えられる (見た目の試作。src/game/skin.ts)。
+ *
+ * 種類ごとに Promise を分けて持つので、同じ物を 2 回解析しない。
+ */
+export function loadSoldier(skin: string = DEFAULT_SKIN): Promise<GLTF> {
+  return load(`${import.meta.env.BASE_URL}models/${skin}.glb`)
 }
 
 export function loadRifle(): Promise<GLTF> {
