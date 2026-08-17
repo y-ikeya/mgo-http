@@ -36,7 +36,20 @@ let nextPort = 9100
 export async function startServer(env: Record<string, string> = {}): Promise<Server> {
   const port = nextPort++
   const proc = Bun.spawn(['bun', 'server/index.ts'], {
-    env: { ...process.env, PORT: String(port), MGO2_TEST_AUTH: '1', ...env },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      MGO2_TEST_AUTH: '1',
+      // **試験は本番の表に書かない。**
+      //
+      // bun は .env を勝手に読むので、何もしないと手元の秘密鍵をそのまま継いで
+      // 本物の Supabase に書き込む。実際に alice / bob / late の戦績が
+      // 33 試合ぶん積まれた。手元で試験を回しただけで本番が汚れる。
+      //
+      // 戦績を見る試験だけが、下の ...env で行き先を差し替える
+      SUPABASE_SERVICE_ROLE_KEY: '',
+      ...env,
+    },
     stdout: 'pipe',
     stderr: 'pipe',
   })
