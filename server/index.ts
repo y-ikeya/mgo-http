@@ -19,6 +19,7 @@ import {
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
+import { closeMatch, flush, recordPlayer } from './stats'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/ballistic'
 import {
   bulletDamage,
@@ -262,6 +263,22 @@ interface Player {
   kills: number
   deaths: number
   /**
+   * 与えたヘッドショットと、**受けた**ヘッドショット。
+   *
+   * MGO2 はやられた側も記録していた。上手さだけでなく「どうやられたか」を
+   * 見せるため。こちらは zone を持っているのでタダで取れる。
+   */
+  headshots: number
+  headDeaths: number
+  /** 自爆。倒された数には入るが、誰かの手柄にはならない */
+  suicides: number
+  /**
+   * 武器ごとのキル。**表示名ではなく安定した id で数える**
+   * ('rifle' | 'sniper' | 'pistol' | 'knife' | 'grenade')。
+   * 銃の表示名を変えたときに過去の記録が壊れないように
+   */
+  killsByWeapon: Record<string, number>
+  /**
    * 直前に配った体力。同じ値を配り直さないための控え。
    *
    * 回復は毎 tick 少しずつ動くので、丸めた値が変わったときだけ配る
@@ -333,6 +350,14 @@ interface Match {
   lastBroadcast: number
   /** 最後に「切れた人の体」を配り直した時刻 */
   lastLimbo: number
+  /**
+   * いま走っている試合の身元。記録に要る。
+   *
+   * 始まった時に発番して、終わるまで変えない。**離脱した人はその場で書く**ので、
+   * 試合が終わってから採番したのでは間に合わない。
+   */
+  matchId: string | null
+  startedAt: number
 }
 
 const rooms = new Map<string, Match>()
@@ -366,6 +391,8 @@ function roomOf(name: string): Match {
       phase: 'waiting',
       lastBroadcast: 0,
       lastLimbo: 0,
+      matchId: null,
+      startedAt: 0,
     }
     rooms.set(name, room)
   }
@@ -457,6 +484,12 @@ function resetPlayers(roomName: string, room: Match): void {
   for (const player of connected(room)) {
     player.kills = 0
     player.deaths = 0
+    // 記録に残す分もここで戻す。**足したら必ずここにも足す** —
+    // 戻し忘れると前の試合の数が次に混ざる
+    player.headshots = 0
+    player.headDeaths = 0
+    player.suicides = 0
+    player.killsByWeapon = {}
     // 仕切り直しは支度から。いきなり湧かせない —
     // 前の試合の装備のまま次が始まるのは、選ぶ場面を 1 回飛ばすのと同じ
     setLife(roomName, player, 'choosing')
@@ -495,9 +528,52 @@ function spawn(roomName: string, player: Player, now = Date.now()): void {
 function leaveRoom(roomName: string, player: Player): void {
   const room = rooms.get(roomName)
   if (!room) return
+  // 走っている試合を捨てて出た。抜けたことごと残す
+  if (room.phase === 'playing') recordSeat(roomName, room, player, true)
   room.players.delete(player.id)
   // 本人はもう聞いていない。残った人に消してもらう
   broadcast(roomName, { type: 'leave', id: player.id })
+}
+
+/**
+ * その人の一戦分を残す。
+ *
+ * **試合の終わりにまとめて、ではない。** 抜けた人は終わる頃にはもう部屋に
+ * 居ないので、席を畳む側からもここを呼ぶ。関数は冪等なので、同じ人を
+ * 二度書いても増えない。
+ */
+function recordSeat(roomName: string, room: Match, player: Player, leftEarly: boolean): void {
+  if (!room.matchId) return
+  recordPlayer({
+    matchId: room.matchId,
+    room: roomName,
+    startedAt: room.startedAt,
+    // 発行元での識別子。認証を通しているので player.id がそれになっている
+    subject: player.id,
+    name: player.name,
+    team: player.team,
+    kills: player.kills,
+    deaths: player.deaths,
+    headshots: player.headshots,
+    headDeaths: player.headDeaths,
+    suicides: player.suicides,
+    killsByWeapon: player.killsByWeapon,
+    leftEarly,
+  })
+}
+
+/**
+ * 決着した。残っている全員を書いて、試合を締める。
+ *
+ * 途中で抜けた人は既に書かれている (recordSeat) ので、ここには出てこない。
+ */
+function finishMatch(roomName: string, room: Match): void {
+  if (!room.matchId) return
+  for (const player of room.players.values()) {
+    // 接続が切れているだけの人も含める。席は残っているので、まだ抜けてはいない
+    recordSeat(roomName, room, player, false)
+  }
+  closeMatch(room.matchId, roomName, room.startedAt, room.winner ?? 'draw')
 }
 
 /** 部屋の全員へ。except を渡すとその 1 人を除く */
@@ -844,8 +920,13 @@ function detonate(nade: Grenade): void {
     // 自爆は得点にしない。倒された数だけが残る
     if (killer && killer.id !== victim.id) {
       killer.kills++
+      killer.killsByWeapon.grenade = (killer.killsByWeapon.grenade ?? 0) + 1
       if (killer.team === 'blue') room.blue++
       else room.red++
+    } else {
+      // 自分の手榴弾で死んだ。投げた本人が既に居ない場合も、残った物で
+      // 死んだのは自分の落ち度ではないので数えない
+      if (killer) victim.suicides++
     }
     sendHealth(nade.room, victim, result.damage, false, bearing)
     broadcast(nade.room, matchState(room))
@@ -1252,6 +1333,15 @@ function applyDamage(roomName: string, attacker: Player, event: ClientMessage): 
   victim.wasAlive = false
   setLife(roomName, victim, 'downed')
   victim.deaths++
+
+  // 記録に残す分。**表示名ではなく安定した id で数える**
+  const headshot = event.kind === 'bullet' && event.zone === 'HEAD'
+  if (headshot) {
+    attacker.headshots++
+    victim.headDeaths++
+  }
+  const by = event.kind === 'melee' ? 'knife' : attacker.weapon
+  attacker.killsByWeapon[by] = (attacker.killsByWeapon[by] ?? 0) + 1
   // 振りかぶったまま倒されたら、足元に落ちて爆ぜる。
   // 撃った側にとっては「今撃つと道連れになる」という読みになる
   dropGrenade(roomName, victim)
@@ -1334,6 +1424,7 @@ function updateMatch(roomName: string, room: Match, now: number): void {
       room.phase = 'over'
       room.winner = survivor
       room.endsAt = now + INTERMISSION
+      finishMatch(roomName, room)
     } else {
       room.phase = 'waiting'
       room.endsAt = 0
@@ -1349,6 +1440,9 @@ function updateMatch(roomName: string, room: Match, now: number): void {
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION
+    // ここで身元が決まる。以後この試合の記録は全部これに紐づく
+    room.matchId = crypto.randomUUID()
+    room.startedAt = now
     // 支度がまだ済んでいない人はここで押し出す。始まっているのに
     // 装備画面の裏で立ち尽くす人が出ないように
     for (const player of connected(room)) {
@@ -1358,6 +1452,7 @@ function updateMatch(roomName: string, room: Match, now: number): void {
     room.phase = 'over'
     room.winner = room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
     room.endsAt = now + INTERMISSION
+    finishMatch(roomName, room)
   }
 
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
@@ -1418,6 +1513,8 @@ setInterval(() => {
     // 待ち切った席を畳む。部屋が空になったらここで初めて部屋も消える
     for (const player of room.players.values()) {
       if (player.life === 'dropped' && lifeElapsed(player, now) >= RECONNECT_GRACE) {
+        // 待ち切っても戻らなかった。走っている試合を置いて消えたのと同じ
+        if (room.phase === 'playing') recordSeat(roomName, room, player, true)
         room.players.delete(player.id)
         // ここで初めて消してもらう。切れた時点では配らない —
         // 配ると受け取った側が実体を捨ててしまい、そのあと届く体を
@@ -1562,6 +1659,16 @@ const server = Bun.serve<Client>({
                 (p.packetGap > 0
                   ? ` ${(1000 / p.packetGap).toFixed(1)}通/秒 時計差 ${(p.clockSkew / 1000).toFixed(2)}s`
                   : '') +
+                // 記録に残る分。数えられているかをここで見られる
+                ` ${p.kills}/${p.deaths}` +
+                (p.headshots > 0 ? ` HS${p.headshots}` : '') +
+                (p.headDeaths > 0 ? ` 被HS${p.headDeaths}` : '') +
+                (p.suicides > 0 ? ` 自爆${p.suicides}` : '') +
+                (Object.keys(p.killsByWeapon).length > 0
+                  ? ` [${Object.entries(p.killsByWeapon)
+                      .map(([id, n]) => `${id}:${n}`)
+                      .join(' ')}]`
+                  : '') +
                 (p.rejected > 0 ? ` 却下 ${p.rejected}` : '') +
                 ` [${p.life}]`,
             )
@@ -1687,6 +1794,10 @@ const server = Bun.serve<Client>({
           healthShown: MAX_HEALTH,
           kills: 0,
           deaths: 0,
+          headshots: 0,
+          headDeaths: 0,
+          suicides: 0,
+          killsByWeapon: {},
           footsteps: new Footsteps(),
           locomotion: 'idle',
           weapon: 'rifle',
@@ -1880,3 +1991,26 @@ const server = Bun.serve<Client>({
 })
 
 console.info(`対戦サーバー: ws://localhost:${server.port}  (確認: http://localhost:${server.port}/health)`)
+
+/**
+ * 止める合図。**配置のたびにここを通る。**
+ *
+ * 部屋はメモリにしか無いので、そのまま落ちると走っていた試合の戦績が丸ごと
+ * 消える。ここで書き出せば、決着は付かない (ended_at は null のまま) が
+ * 数字は残る。
+ *
+ * **離脱にはしない。** 抜けさせたのはこちらの都合であって、本人ではない。
+ * 配置のたびに全員へ離脱が付くようだと、その数字は誰も信用しなくなる。
+ */
+function shutdown(signal: string): void {
+  console.info(`[終了] ${signal}。走っている試合を書き出す`)
+  for (const [roomName, room] of rooms) {
+    if (room.phase !== 'playing') continue
+    for (const player of room.players.values()) recordSeat(roomName, room, player, false)
+  }
+  // 送り終わるのを待ってから落ちる。待たないと書いた意味が無い
+  void flush().then(() => process.exit(0))
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))

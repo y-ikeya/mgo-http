@@ -22,15 +22,21 @@ export interface Server {
   /** 部屋の様子 (/health の本文) */
   health(): Promise<string>
   stop(): void
+  /** 配置と同じ止め方 (SIGTERM)。落ち切るまで待つ */
+  terminate(): Promise<void>
 }
 
 let nextPort = 9100
 
-/** 試験用のサーバーを 1 つ立てる。ポートは自動で選ぶ */
-export async function startServer(): Promise<Server> {
+/**
+ * 試験用のサーバーを 1 つ立てる。ポートは自動で選ぶ。
+ *
+ * env を渡すと環境変数を足せる (戦績の書き込み先を差し替えるのに使う)
+ */
+export async function startServer(env: Record<string, string> = {}): Promise<Server> {
   const port = nextPort++
   const proc = Bun.spawn(['bun', 'server/index.ts'], {
-    env: { ...process.env, PORT: String(port), MGO2_TEST_AUTH: '1' },
+    env: { ...process.env, PORT: String(port), MGO2_TEST_AUTH: '1', ...env },
     stdout: 'pipe',
     stderr: 'pipe',
   })
@@ -51,6 +57,11 @@ export async function startServer(): Promise<Server> {
     port,
     health: async () => (await fetch(`http://localhost:${port}/health`)).text(),
     stop: () => proc.kill(),
+    // 配置で止めるときと同じ合図。書き出してから落ちるかを見るのに使う
+    terminate: async () => {
+      proc.kill('SIGTERM')
+      await proc.exited
+    },
   }
 }
 
