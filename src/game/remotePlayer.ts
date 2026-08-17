@@ -14,6 +14,8 @@ import {
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../sim/locomotion";
+import { canBeStabbed } from "../sim/hitcheck";
+import { stanceOf } from "../sim/stance";
 import { loadSoldier } from "./assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { WHOLE_BODY } from "../sim/stance";
@@ -157,6 +159,16 @@ export class RemotePlayer {
   private lift = 0;
   private readonly buffer: PlayerSnapshot[] = [];
   private locomotion: Locomotion = "idle";
+
+  /**
+   * いま刃が通る構えか。
+   *
+   * locomotion をそのまま公開せず、**問いの形で出す**。外から構えを見て
+   * 各所で判定を組み立てると、サーバー側の規則とだんだんずれる。
+   */
+  get stabbable(): boolean {
+    return canBeStabbed(stanceOf(this.locomotion));
+  }
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
   /** 直前のリロード状態。始まった瞬間だけ型を流すのに使う */
@@ -866,6 +878,10 @@ export class RemotePlayers {
 
     for (const player of this.players.values()) {
       if (player.health <= 0) continue;
+      // 倒れている相手には刺さらない。**サーバーと同じ式を読む** —
+      // 手元で外しておかないと、サーバーが弾いた空振りに対して
+      // 「当たった」表示だけが出る
+      if (!player.stabbable) continue;
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;
       const distance = this.scratch.length();
