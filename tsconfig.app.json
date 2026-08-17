@@ -8,5 +8,7 @@
     "jsx": "preserve",
     "jsxImportSource": "solid-js"
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* 試験は tsconfig.test.json が見る (bun の型が要る) */
+  "exclude": ["src/**/*.test.ts"]
 }

@@ -21,7 +21,8 @@ SSH := ssh -i $(SERVER_KEY) $(SERVER_USER)@$(SERVER_HOST)
 
 help:
 	@echo '手元で動かす'
-	@echo '  make check          型と組み立て (画面 + サーバー)'
+	@echo '  make check          型と試験と組み立て。CI もこれを呼ぶ'
+	@echo '  make test           試験だけ (50 秒ほどかかる)'
 	@echo '  make dev            画面 (vite)。サーバーは同じホストの 8787 を見る'
 	@echo '  make serve          対戦サーバー。保存すると勝手に読み直す'
 	@echo ''
@@ -57,7 +58,16 @@ build:
 check:
 	bunx tsc --noEmit -p tsconfig.app.json
 	bunx tsc --noEmit -p tsconfig.server.json
+	bunx tsc --noEmit -p tsconfig.test.json
+	bun test
 	bun run build
+
+# 試験だけ。check の一部でもあるので、普段は check を叩けばよい。
+#
+# 単体 (src/sim/*.test.ts) は一瞬。統合 (test/) は 1 本ごとにサーバーを
+# 立てて実時間を待つので 50 秒ほどかかる。
+test:
+	bun test
 
 # --- 配置 -----------------------------------------------------------------
 
