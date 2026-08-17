@@ -265,20 +265,24 @@ const STAND_CLIP = 'stand_front'
  * 等速だと撃たれるのを待つだけの間が長すぎる。速めて 1.5 秒ほどにする。
  */
 const STAND_RATE = 1.2
-/** 手榴弾を投げる。上半身だけで済むので走りながらでも投げられる */
-const THROW_KEY = 'throw'
-
 /**
- * 振りかぶりで止める位置 (クリップ内の時刻、秒)。
+ * 手榴弾を投げる。上半身だけで済むので走りながらでも投げられる。
  *
- * 実測: 2.33 秒のクリップで、手が一番後ろ (腰から -0.48m) かつ高い (1.57m) のが
- * 1.46〜1.56 秒。その中間で止めると、腕を引き切って構えた形で固まる。
+ * **2 本に割ってある** (tools/split_clip.js)。以前は 1 本のクリップを
+ * 「1.5 秒の所で再生速度を 0 にして止める」形で扱っていたが、その 1.5 秒は
+ * 2.33 秒のクリップを実測した値なので、**尺の違うモデルでは別の場所を指す**。
+ * 移植したモデルが 25% 速かったとき、振り切ったあとを指して
+ * 「押しっぱなしなのに手を振り下ろす」になった。
+ *
+ * 割れば止める位置は「前半クリップの終わり」になる。数字がコードから消えて
+ * 資産に移り、clampWhenFinished がそのまま保持になる。
  *
  * ピンを抜いて振りかぶるまでを押している間に済ませ、離すと振り切って投げる。
  * 押している間は信管が進まない — 現実には抜いた時点で燃え始めるが、
  * 溜められると「持ったまま間合いを計る」が最善手になって読み合いが消える。
  */
-const THROW_HOLD_AT = 1.5
+const THROW_WINDUP_KEY = 'throw_windup'
+const THROW_RELEASE_KEY = 'throw_release'
 const ROLL_KEY = 'roll'
 const DEATH_KEY = 'death'
 
@@ -307,7 +311,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   BOLT_KEY,
   SWEEP_KEY,
   STAND_KEY,
-  THROW_KEY,
+  THROW_WINDUP_KEY,
+  THROW_RELEASE_KEY,
   ROLL_KEY,
   DEATH_KEY,
   HIT_KEY,
@@ -464,8 +469,10 @@ export class CharacterAnimator {
   sweepDuration = 0
   /** 起き上がる尺 (秒)。再生速度を掛けたあとの実際の長さ */
   standDuration = 0
-  /** 投擲の尺 (秒) */
+  /** 投擲の尺 (秒)。振りかぶり + 投げ */
   throwDuration = 0
+  /** 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る */
+  throwReleaseDuration = 0
   /** 振りかぶりで止めているか */
   private throwHeld = false
 
@@ -610,7 +617,7 @@ export class CharacterAnimator {
       finished === this.upper.get(BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
-      finished === this.upper.get(THROW_KEY)
+      finished === this.upper.get(THROW_RELEASE_KEY)
     ) {
       this.upperState = 'stance'
     }
@@ -775,13 +782,21 @@ export class CharacterAnimator {
     this.standClipDuration = byName.get(STAND_CLIP)?.duration ?? 0
     this.refreshKnockdownRates()
 
-    const grenade = byName.get('throw')
-    if (grenade) {
-      const action = registerUpper(THROW_KEY, grenade)
+    // 振りかぶりは**終わった所で止まる**。それが保持の姿勢になる
+    const windup = byName.get(THROW_WINDUP_KEY)
+    if (windup) {
+      const action = registerUpper(THROW_WINDUP_KEY, windup)
       action.setLoop(THREE.LoopOnce, 1)
       action.clampWhenFinished = true
     }
-    this.throwDuration = grenade?.duration ?? 0
+    const release = byName.get(THROW_RELEASE_KEY)
+    if (release) {
+      const action = registerUpper(THROW_RELEASE_KEY, release)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+    this.throwDuration = (windup?.duration ?? 0) + (release?.duration ?? 0)
+    this.throwReleaseDuration = release?.duration ?? 0
 
     const bolt = byName.get('bolt')
     if (bolt) {
@@ -1338,7 +1353,10 @@ export class CharacterAnimator {
     // 途中で切れると「撃ったのに動作していない」が頻繁に見える
     if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) return BOLT_KEY
     if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
-    if (this.upperState === 'throw' && this.upper.has(THROW_KEY)) return THROW_KEY
+    if (this.upperState === 'throw') {
+      const key = this.throwHeld ? THROW_WINDUP_KEY : THROW_RELEASE_KEY
+      if (this.upper.has(key)) return key
+    }
     // 起き上がりは中断できない。撃つ操作より優先する
     if (this.upperState === 'stand' && this.upper.has(STAND_KEY)) return STAND_KEY
     if (this.upperState === 'roll' && this.upper.has(ROLL_KEY)) return ROLL_KEY
@@ -1437,20 +1455,28 @@ export class CharacterAnimator {
    * 落とすのが使い方の一つなので、投げるために止まらせない。
    */
   /**
-   * 投げ始める。振りかぶった所で止まる。
+   * 投げ始める。振りかぶりを流す。
    *
-   * 放すまでその姿勢を保つ。投げ切るには releaseThrow を呼ぶ。
+   * クリップは振りかぶりで終わっていて clampWhenFinished なので、**最後の姿勢で
+   * 勝手に止まる**。以前のように再生速度を 0 にして押さえ込む必要がない。
    */
   playThrow(): void {
     if (this.dead) return
-    const upper = this.upper.get(THROW_KEY)
-    if (!upper) return
-    upper.reset().setEffectiveTimeScale(1).play()
+    const windup = this.upper.get(THROW_WINDUP_KEY)
+    if (!windup) return
+    windup.reset().play()
+    this.upper.get(THROW_RELEASE_KEY)?.stop()
     this.upperState = 'throw'
     this.throwHeld = true
   }
 
-  /** 振り切って投げる。止めていた続きから流す */
+  /**
+   * 振り切って投げる。
+   *
+   * **振りかぶりが終わるのを待ってから**後半へ移る (updateThrow)。軽く叩いた
+   * だけのときに途中で切り替えると、腕を引いている最中から投げの型へ飛んで
+   * 見た目が繋がらない。
+   */
   releaseThrow(): void {
     this.throwHeld = false
   }
@@ -1459,27 +1485,34 @@ export class CharacterAnimator {
   cancelThrow(): void {
     if (this.upperState !== 'throw') return
     this.throwHeld = false
-    this.upper.get(THROW_KEY)?.stop()
+    this.upper.get(THROW_WINDUP_KEY)?.stop()
+    this.upper.get(THROW_RELEASE_KEY)?.stop()
     this.upperState = 'stance'
   }
 
-  /** 投擲モーションの再生位置 (秒)。手を離れる時刻を測るのに使う */
-  get throwTime(): number {
-    return this.upperState === 'throw' ? (this.upper.get(THROW_KEY)?.time ?? 0) : 0
+  /** 振りかぶりが終わるまであと何秒か。放した瞬間に残っていれば投げは待たされる */
+  get throwWindupLeft(): number {
+    const windup = this.upper.get(THROW_WINDUP_KEY)
+    if (!windup || this.upperState !== 'throw') return 0
+    return Math.max(0, windup.getClip().duration - windup.time)
   }
 
   /** いま振りかぶった所で止まっているか */
   get throwWoundUp(): boolean {
-    const upper = this.upper.get(THROW_KEY)
-    return this.throwHeld && !!upper && upper.time >= THROW_HOLD_AT
+    return this.throwHeld && this.throwWindupLeft <= 0
   }
 
-  /** 振りかぶりを保つ。敬礼と同じで、再生速度を 0 にして止める */
+  /**
+   * 振りかぶりが終わっていたら後半へ移す。
+   *
+   * 保持そのものは clampWhenFinished がやる。ここがやるのは繋ぎだけ。
+   */
   private updateThrow(): void {
-    if (this.upperState !== 'throw') return
-    const upper = this.upper.get(THROW_KEY)
-    if (!upper) return
-    upper.setEffectiveTimeScale(this.throwHeld && upper.time >= THROW_HOLD_AT ? 0 : 1)
+    if (this.upperState !== 'throw' || this.throwHeld) return
+    const release = this.upper.get(THROW_RELEASE_KEY)
+    if (!release || release.isRunning() || release.time > 0) return
+    if (this.throwWindupLeft > 0) return
+    release.reset().play()
   }
 
   playBolt(): void {

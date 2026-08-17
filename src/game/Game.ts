@@ -306,8 +306,11 @@ const GRENADE_RELEASE_FORWARD = 0.45;
  *
  * 向きはこの瞬間に取り直す。キーを離した時点の向きを使うと、振っている間に
  * 視点を動かしても軌道が変わらず、手だけが別の方を向く。
+ *
+ * **秒ではなく投げクリップに対する割合で持つ。** 秒で持つと、尺の違うモデルに
+ * 差し替えたときに別の場所を指す (実測 0.83 秒のクリップの 0.16 秒あたり)。
  */
-const GRENADE_RELEASE_AT = 1.66;
+const GRENADE_RELEASE_RATIO = 0.19;
 
 
 /**
@@ -377,7 +380,7 @@ export class Game {
    * 1 発ぶん持ち越さないため。
    */
   private triggerReleased = true;
-  private grenadeReleaseAt = GRENADE_RELEASE_AT;
+  private grenadeReleaseRatio = GRENADE_RELEASE_RATIO;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
   private throwables = THROWABLES_PER_LIFE;
@@ -703,9 +706,9 @@ export class Game {
     this.player.setKnockdownRates(sweep, stand);
   }
 
-  /** 投げてから手を離れるまで (秒)。調整用 */
-  setGrenadeRelease(seconds: number): void {
-    this.grenadeReleaseAt = seconds;
+  /** 手を離れる位置。投げクリップに対する割合 (0..1)。調整用 */
+  setGrenadeRelease(ratio: number): void {
+    this.grenadeReleaseRatio = ratio;
   }
 
   setBoltDelay(seconds: number): void {
@@ -1948,7 +1951,12 @@ export class Game {
     // 振りかぶりで止まっている前提で引くと、軽く叩いただけのときに
     // まだ腕を引いている途中なのに手を離れる。長押しなら 1.50 秒まで
     // 進んでいるので差は 0.16 秒、叩いただけならほぼ丸ごと残る。
-    this.grenadeRelease = Math.max(0.01, this.grenadeReleaseAt - this.player.throwTime);
+    // **振りかぶりの残りを待ってから**、投げの型の途中で手を離れる。
+    // 軽く叩いただけなら振りかぶりが残っているぶん遅れて出る
+    this.grenadeRelease = Math.max(
+      0.01,
+      this.player.throwWindupLeft + this.grenadeReleaseRatio * this.player.throwReleaseDuration,
+    );
   }
 
   /** 投げる型が振り切る所で手を離す */
