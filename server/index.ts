@@ -1712,6 +1712,8 @@ const server = Bun.serve<Client>({
           players: here.length,
           capacity: ROOM_CAPACITY,
           phase: room?.phase ?? 'waiting',
+          // 誰が居るか。入る前に見せる
+          roster: here.map((p) => ({ id: p.id, name: p.name, team: p.team })),
           blue: room?.blue ?? 0,
           red: room?.red ?? 0,
           // 残り時間はこちらで秒に直す。時計を合わせる話を持ち込まない

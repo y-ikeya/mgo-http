@@ -1,4 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import Profile from '../ui/Profile'
+import { profilesAvailable } from '../net/profile'
 import { t } from '../i18n'
 import { useNavigate } from '@solidjs/router'
 import { fetchRooms } from '../net/rooms'
@@ -32,6 +34,8 @@ export default function Lobby(props: { identity: Identity }) {
   const navigate = useNavigate()
   const [rooms, setRooms] = createSignal<RoomSummary[]>([])
   const [error, setError] = createSignal('')
+  /** 戦績を開いている相手。null なら閉じている */
+  const [opened, setOpened] = createSignal<{ id: string; name: string } | null>(null)
 
   const poll = async () => {
     try {
@@ -83,12 +87,12 @@ export default function Lobby(props: { identity: Identity }) {
       <div class="lobby-rooms">
         <For each={rooms()}>
           {(room) => (
-            <button
-              class="room"
-              classList={{ 'room-full': full(room), 'room-live': room.phase === 'playing' }}
-              disabled={full(room)}
-              onClick={() => enter(room.name)}
-            >
+            <div class="room" classList={{ 'room-full': full(room), 'room-live': room.phase === 'playing' }}>
+              {/*
+                入るのはこのボタン。**名前の札は別のボタン**なので、行ごと
+                1 つのボタンにはできない (button の中に button は置けない)。
+              */}
+              <button class="room-enter" disabled={full(room)} onClick={() => enter(room.name)}>
               <span class="room-name">{room.name}</span>
 
               <span class="room-count">
@@ -117,13 +121,45 @@ export default function Lobby(props: { identity: Identity }) {
                   {String(room.remaining % 60).padStart(2, '0')}
                 </span>
               </Show>
-            </button>
+              </button>
+
+              {/*
+                誰が居るか。**部屋は人数ではなく人で選ぶ。**
+                押すとその人の通算が開く (戦績の設定が無い環境では押せない)
+              */}
+              <Show when={room.roster.length > 0}>
+                <div class="room-players">
+                  <For each={room.roster}>
+                    {(who) => (
+                      <button
+                        class={`room-player room-player-${who.team}`}
+                        disabled={!profilesAvailable}
+                        onClick={() => setOpened({ id: who.id, name: who.name })}
+                      >
+                        {who.name}
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </div>
           )}
         </For>
       </div>
 
       <Show when={rooms().length === 0 && !error()}>
         <div class="lobby-empty">{t('lobby.loading')}</div>
+      </Show>
+
+      <Show when={opened()} keyed>
+        {(who) => (
+          <Profile
+            subject={who.id}
+            fallbackName={who.name}
+            identity={props.identity}
+            onClose={() => setOpened(null)}
+          />
+        )}
       </Show>
     </div>
   )

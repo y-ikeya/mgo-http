@@ -397,6 +397,17 @@ export interface RoomSummary {
   name: string
   /** いま繋がっている人数 */
   players: number
+  /**
+   * いま居る人。
+   *
+   * **部屋は人数ではなく「誰が居るか」で選ぶ。**「この部屋は強いのばかり」
+   * 「知り合いが居る」が入る前に分かるほうが、空き数を見るより効く。
+   * 名前から戦績も開けるようにするので id も渡す。
+   *
+   * 位置は入っていない。ここで漏れるのは**部屋に居るという事実だけ**で、
+   * 試合中の居場所ではない (それは state が遮蔽を見て配る)。
+   */
+  roster: { id: string; name: string; team: Team }[]
   capacity: number
   phase: MatchPhase
   blue: number
