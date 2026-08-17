@@ -1,0 +1,20 @@
+[Unit]
+# 対戦サーバー。位置と判定を持っていて、部屋の状態はメモリにある。
+# 落ちたら試合が消えるので、必ず起動し直す。
+Description=mgohttp game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/mgohttp
+# --env-file で .env を読む。鍵はリポジトリに入っていない
+ExecStart=/home/ubuntu/.bun/bin/bun --env-file=.env server/index.ts
+Restart=always
+RestartSec=2
+# 部屋の状態は復元できないので、落ちた回数を数えて止めることはしない
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

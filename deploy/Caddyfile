@@ -1,0 +1,12 @@
+# 対戦サーバーの入口。証明書は Let's Encrypt から自動で取り、自動で更新する。
+#
+# /v1 はここで剥がす。サーバー側のコードは自分がどの経路で呼ばれたかを
+# 知らないままでよく、後から作りを変えたときに /v2 を並べて古い
+# クライアントを動かし続けられる。
+#
+# WebSocket は素通しする (Caddy が Upgrade を勝手に扱う)。
+mgohttp-server.pepaga.me {
+	handle_path /v1* {
+		reverse_proxy localhost:8787
+	}
+}

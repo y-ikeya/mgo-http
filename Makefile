@@ -17,7 +17,7 @@ PAGES_PROJECT := mgohttp
 
 SSH := ssh -i $(SERVER_KEY) $(SERVER_USER)@$(SERVER_HOST)
 
-.PHONY: help dev serve build deploy deploy-web deploy-server logs status ssh restart check
+.PHONY: help dev serve build test check deploy deploy-web deploy-server setup-server push-env logs status ssh restart
 
 help:
 	@echo '手元で動かす'
@@ -30,6 +30,10 @@ help:
 	@echo '  make deploy         クライアントとサーバーを両方'
 	@echo '  make deploy-web     クライアントだけ (Cloudflare Pages)'
 	@echo '  make deploy-server  サーバーだけ (Lightsail)'
+	@echo ''
+	@echo '箱を仕立てる (作り直したときだけ)'
+	@echo '  make push-env       手元の .env を箱へ送る'
+	@echo '  make setup-server   systemd と Caddy の設定を配って有効化'
 	@echo ''
 	@echo '様子を見る'
 	@echo '  make status         本番が生きているか'
@@ -85,6 +89,35 @@ deploy-web: check
 deploy-server:
 	$(SSH) 'cd $(SERVER_DIR) && git fetch -q origin && git reset -q --hard origin/main && ~/.bun/bin/bun install --frozen-lockfile'
 	$(SSH) 'sudo systemctl restart mgohttp'
+	@sleep 2
+	@$(MAKE) --no-print-directory status
+
+# --- 箱を仕立てる ---------------------------------------------------------
+# 普段は使わない。インスタンスを作り直したときだけ。
+#
+# **ここに無いものは箱の上にしか無い。** 手で置いたまま記録が無いと、
+# 作り直すときに思い出しながら書くことになる (実際そうなっていた)。
+# 手順の詳細は deploy/README.md。
+
+# 鍵を送る。**repo には入れない** (.gitignore)。何が要るかは .env.example。
+#
+# 送る前に中身を見せる。取り違えた .env を本番へ送るのがいちばん怖い。
+push-env:
+	@test -f .env || { echo '.env が無い。.env.example を写して埋める'; exit 1; }
+	@echo '--- 送る中身 (値は伏せる) ---'
+	@sed -E 's/=.*/=<値>/' .env
+	@printf '送るか [y/N] '; read yes; test "$$yes" = y
+	scp -i $(SERVER_KEY) .env $(SERVER_USER)@$(SERVER_HOST):$(SERVER_DIR)/.env
+	$(SSH) 'chmod 600 $(SERVER_DIR)/.env'
+
+# systemd と Caddy の設定を配る。中身は deploy/ にある (秘密は入っていない)
+setup-server:
+	scp -i $(SERVER_KEY) deploy/mgohttp.service $(SERVER_USER)@$(SERVER_HOST):/tmp/
+	scp -i $(SERVER_KEY) deploy/Caddyfile $(SERVER_USER)@$(SERVER_HOST):/tmp/
+	$(SSH) 'sudo install -m 644 /tmp/mgohttp.service /etc/systemd/system/mgohttp.service'
+	$(SSH) 'sudo install -m 644 /tmp/Caddyfile /etc/caddy/Caddyfile'
+	$(SSH) 'sudo systemctl daemon-reload && sudo systemctl enable --now mgohttp'
+	$(SSH) 'sudo systemctl reload caddy || sudo systemctl restart caddy'
 	@sleep 2
 	@$(MAKE) --no-print-directory status
 
