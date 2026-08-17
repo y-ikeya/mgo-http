@@ -82,14 +82,24 @@
  * 1 部屋 1 行。左から 名前 / 人数 / 空き具合 / 段階 / 得点 / 残り時間。
  * 縦に並べたとき、同じ情報が同じ列に来るよう幅を決め打ちする。
  */
+/*
+ * 部屋の行。**行そのものはボタンではない** — 中に名前の札 (ボタン) を
+ * 置くので、button の入れ子にできない。押して入るのは .room-enter のほう。
+ */
 .room {
+  background: rgba(12, 18, 10, 0.72);
+  border: 1px solid rgba(160, 190, 140, 0.2);
+}
+
+.room-enter {
   display: grid;
   grid-template-columns: 5.5em 3.6em 1fr 6em 4.5em 3.4em;
   align-items: center;
   gap: 14px;
+  width: 100%;
   padding: 14px 18px;
-  background: rgba(12, 18, 10, 0.72);
-  border: 1px solid rgba(160, 190, 140, 0.2);
+  background: none;
+  border: none;
   color: inherit;
   font-family: inherit;
   font-size: 13px;
@@ -97,15 +107,59 @@
   cursor: pointer;
 }
 
-.room:hover:not(:disabled) {
+.room:has(.room-enter:hover:not(:disabled)),
+.room:has(.room-enter:focus-visible) {
   border-color: rgba(180, 214, 150, 0.55);
   background: rgba(20, 30, 16, 0.85);
 }
 
-.room:disabled {
+.room-enter:disabled {
   cursor: default;
   opacity: 0.45;
 }
+
+/* 誰が居るか。名前を押すとその人の戦績が開く */
+.room-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 18px 13px;
+}
+
+.room-player {
+  background: rgba(160, 190, 140, 0.08);
+  border: 1px solid rgba(160, 190, 140, 0.22);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-family: inherit;
+  font-size: 12px;
+  color: rgba(200, 216, 186, 0.9);
+  cursor: pointer;
+  /* 長い名前で行が崩れないように */
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-player:hover:not(:disabled),
+.room-player:focus-visible {
+  border-color: rgba(180, 214, 150, 0.6);
+  color: rgba(224, 236, 212, 1);
+}
+
+/* 戦績の設定が無い環境。押せないことが見て分かるようにする */
+.room-player:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/*
+ * 所属は札の縁だけで示す。**体には色を掛けない**と決めたので
+ * (remotePlayer.ts)、ここも塗り潰しではなく縁に留める
+ */
+.room-player-blue { border-color: rgba(126, 166, 255, 0.5); }
+.room-player-red { border-color: rgba(255, 138, 114, 0.5); }
 
 .room-live {
   border-left: 3px solid rgba(180, 214, 150, 0.7);
@@ -173,7 +227,7 @@
 }
 
 @media (max-width: 560px) {
-  .room {
+  .room-enter {
     grid-template-columns: 4.5em 3.4em 1fr;
     row-gap: 6px;
   }

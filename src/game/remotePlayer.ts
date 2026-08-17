@@ -45,17 +45,19 @@ import {
   type Team,
 } from "../net/types";
 
-/**
- * 所属を表す色。テクスチャに掛ける。
+/*
+ * --- 所属の色をテクスチャに掛けるのをやめた (翻意) ---
  *
- * 迷彩の上から色を乗せるので、遠くからでも所属が読める。ステルスの game で
- * 目立つ色を着せるのは矛盾しているようだが、**見つけた後に撃つかどうかを
- * 即断できる**ほうが大事。見つけること自体は音と視線が受け持っている。
+ * 以前はここに TEAM_TINT があって、迷彩の上から青/赤を乗せていた。理由は
+ * 「見つけた後に撃つかどうかを即断できるほうが大事」。
+ *
+ * やめたのは、**着せ替えを入れる以上、着せた物がその色に染まってしまう**から。
+ * 何を着ても青か赤に転ぶなら、見た目を選ぶ意味が薄い。
+ *
+ * 所属は link の光 (ALLY_GLOW_TINT) が受け持つ。こちらは敬礼で繋いだ相手にしか
+ * 出ないので、**繋いでいない味方は敵と同じに見える** — その代わりに
+ * 「誰と繋ぐか」が意味を持つ。
  */
-const TEAM_TINT: Record<Team, number> = {
-  blue: 0x88a8ff,
-  red: 0xff9a86,
-};
 
 /**
  * 味方を壁越しに光らせる。
@@ -455,25 +457,10 @@ export class RemotePlayer {
     }
   }
 
-  /** 所属を反映する。色を掛け直す */
+  /** 所属を反映する。光の色を掛け直す (体そのものには色を掛けない) */
   setTeam(team: Team): void {
     this.team = team
-    this.applyTint()
     this.applyGlowTint()
-  }
-
-  /**
-   * 所属の色を掛ける。
-   *
-   * 元の色を控えておいて毎回そこから掛け直す。掛かった色にさらに掛けると、
-   * 所属が変わるたびに濁っていく。
-   */
-  private applyTint(): void {
-    const tint = new THREE.Color(TEAM_TINT[this.team])
-    for (const material of this.tinted) {
-      const base = material.userData.baseColor as THREE.Color | undefined
-      if (base) material.color.copy(base).multiply(tint)
-    }
   }
 
   /** 撃った。ボルト操作のある銃なら動作を流す */
@@ -590,16 +577,16 @@ export class RemotePlayer {
     const model = cloneSkinned(gltf.scene);
     model.rotation.y = MODEL_YAW_OFFSET;
 
-    // 元のマテリアルは自機と共有しているので、複製してから色を掛ける
-    const tinted = new Map<THREE.Material, THREE.Material>();
+    // 元のマテリアルは自機と共有しているので複製する。
+    // 複製が要るのは色のためではなく、無敵の半透明を人ごとに掛けるため
+    const cloned = new Map<THREE.Material, THREE.Material>();
     model.traverse((obj) => {
       if (!isMesh(obj)) return;
       obj.castShadow = true;
       // スキニング後の姿勢はバウンディングボックスに出ないので視錐台カリングを切る
       obj.frustumCulled = false;
-      obj.material = tintMaterial(obj.material, tinted, this.tinted);
+      obj.material = cloneMaterial(obj.material, cloned, this.tinted);
     });
-    this.applyTint();
     this.buildGlow(model);
 
     this.object.add(model);
@@ -1059,16 +1046,18 @@ export class RemotePlayers {
 }
 
 /**
- * 元のマテリアルを壊さないよう複製する。色そのものは applyTint が掛ける。
- * 掛ける前の色を userData に控えて、所属が変わっても掛け直せるようにしておく。
+ * 元のマテリアルを壊さないよう複製する。
+ *
+ * 実体は全員で 1 つを共有しているので、直接いじると他人にも効く。
+ * 人ごとに変えたいのは**無敵の間の半透明** (setGhost) だけ。
  */
-function tintMaterial(
+function cloneMaterial(
   material: THREE.Material | THREE.Material[],
   cache: Map<THREE.Material, THREE.Material>,
   out: THREE.MeshStandardMaterial[],
 ): THREE.Material | THREE.Material[] {
   if (Array.isArray(material)) {
-    return material.map((m) => tintMaterial(m, cache, out) as THREE.Material);
+    return material.map((m) => cloneMaterial(m, cache, out) as THREE.Material);
   }
 
   const existing = cache.get(material);
@@ -1076,7 +1065,6 @@ function tintMaterial(
 
   const copy = material.clone() as THREE.MeshStandardMaterial;
   if (copy.color instanceof THREE.Color) {
-    copy.userData.baseColor = copy.color.clone();
     out.push(copy);
   }
   cache.set(material, copy);

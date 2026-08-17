@@ -1,0 +1,105 @@
+/*
+ * 戦績。部屋一覧の上に重ねる。
+ *
+ * 色と字面は成績表 (Scoreboard.css) に揃えてある。同じ数字を見る場所なので、
+ * 別の見た目にすると「別の集計」に見える。
+ */
+.profile-veil {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 9, 5, 0.72);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+}
+
+.profile {
+  width: min(420px, calc(100vw - 40px));
+  background: rgba(10, 15, 9, 0.94);
+  border: 1px solid rgba(160, 190, 140, 0.24);
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.16);
+}
+
+.profile-name {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 17px;
+  color: rgba(214, 226, 200, 0.95);
+  /* 長い名前で × を押し出さない */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-close {
+  flex: none;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.28);
+  color: rgba(180, 200, 165, 0.8);
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.profile-close:hover,
+.profile-close:focus-visible {
+  color: rgba(220, 235, 205, 1);
+  border-color: rgba(180, 214, 150, 0.6);
+}
+
+.profile-note {
+  padding: 26px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(150, 166, 140, 0.7);
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  background: rgba(160, 190, 140, 0.14);
+  border-top: 1px solid rgba(160, 190, 140, 0.14);
+}
+
+.profile-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 16px;
+  background: rgba(10, 15, 9, 0.94);
+}
+
+.profile-cell dt {
+  font-size: 12px;
+  color: rgba(150, 166, 140, 0.75);
+}
+
+.profile-cell dd {
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: rgba(214, 226, 200, 0.95);
+}
+
+/* 誇るものではない数字。読めるが目は引かない */
+.profile-cell dd.profile-bad {
+  color: rgba(150, 166, 140, 0.65);
+}
