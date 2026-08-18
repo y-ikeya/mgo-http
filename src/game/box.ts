@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { asset } from './assets'
 import { damp } from './math'
 import { createHandleAlpha } from './cardboard'
 
@@ -170,7 +171,7 @@ function template(): THREE.Object3D {
   // 画像が届いたら中身だけ入れ替わる。あとから material.map を代入して
   // needsUpdate を立てると、WebGPU では描画物が作り直しになる。
   const photo = new THREE.TextureLoader().load(
-    `${import.meta.env.BASE_URL}textures/cardboard.jpg`,
+    asset.texture('cardboard.jpg'),
     undefined,
     undefined,
     (error) => console.warn('[Box] cardboard.jpg が読めない', error),
