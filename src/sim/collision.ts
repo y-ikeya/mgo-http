@@ -1,10 +1,17 @@
 
 /**
- * 移動判定用の障害物。XZ 平面の AABB に上面の高さを添えたもの。
+ * 移動判定用の障害物。XZ 平面の AABB に、上面と下面の高さを添えたもの。
  *
  * 側面は「足元より高ければ壁、低ければ乗り越えられる床」として働く。
- * 下面を持たないのは意図的で、橋の下をくぐるような地形はまだ想定していない。
- * それが要るようになったら AABB を上下方向にも持たせることになる。
+ *
+ * --- 下面を持つようになった ---
+ * 以前は下面が無く、どの箱も地面から上面までの**柱**だった。橋の下も、
+ * アーチの下も、2 階の床の下も塞がっていて、**階のあるステージが作れない**。
+ * 見た目だけ作り込んでも、通れない場所が増えるだけだった。
+ *
+ * 下面を持たせると、体より上に浮いている箱は壁として数えない = くぐれる。
+ * 屋根も架けられる。視線判定 (vision.ts) は元から上下を見ていたので、
+ * 遮蔽の側は最初から階に対応していた — 通れなかったのは移動だけ。
  */
 export type { Surface } from './surface'
 import type { Surface } from './surface'
@@ -41,6 +48,12 @@ export interface Obstacle {
   slopeZ: number
   /** 傾きの基準点 (minX, minZ) における上面の高さ */
   baseTop: number
+  /**
+   * 下面の高さ (m)。地面に置かれた箱は 0。
+   *
+   * これより下は空いている。頭より上に下面がある箱は壁にならない (くぐれる)。
+   */
+  bottom: number
   /** 上に乗ったときの足音 */
   surface: Surface
   /** 元になったオブジェクト名。書き出しの結果と突き合わせるのに使う */
@@ -81,12 +94,16 @@ const ITERATIONS = 3
  * すり抜けは起きない。移動速度か MAX_DT を大きく変える場合はここを見直すこと。
  *
  * @param feetY 足元の高さ。これより低い障害物は床として扱い、壁とは見なさない
+ * @param bodyHeight 体の高さ (m)。**しゃがんだ高さは渡さない** — 低い隙間へ
+ *   もぐり込めるようになる代わりに、そこで立ち上がると天井にめり込む。
+ *   押し戻す先が横だけなので、まだ受けきれない
  */
 export function resolveCircle(
   position: Vec3,
   radius: number,
   obstacles: readonly Obstacle[],
   feetY: number,
+  bodyHeight: number,
 ): void {
   const radiusSq = radius * radius
 
@@ -96,6 +113,8 @@ export function resolveCircle(
     for (const o of obstacles) {
       // 最高点でも足元より低ければ、触れる前から壁になりようがない
       if (o.top <= feetY + STEP_UP) continue
+      // 下面が頭より上にある = くぐれる。橋の下、アーチ、2 階の床
+      if (o.bottom >= feetY + bodyHeight) continue
 
       // AABB 上で円の中心に最も近い点
       const nearX = clamp(position.x, o.minX, o.maxX)
@@ -200,6 +219,40 @@ export function groundHeight(
   }
 
   return ground
+}
+
+/**
+ * その XZ 位置で頭がぶつかる高さを返す。何も無ければ Infinity。
+ *
+ * 跳ねて上がったときに、橋や 2 階の床を突き抜けないようにするためのもの。
+ * 下面を持たせた以上、**上にも止まる面がある**。
+ *
+ * 足元より下にある箱は見ない。乗っている床そのものを天井として拾ってしまう。
+ */
+export function ceilingHeight(
+  position: Vec3,
+  radius: number,
+  obstacles: readonly Obstacle[],
+  feetY: number,
+): number {
+  const radiusSq = radius * radius
+  let ceiling = Infinity
+
+  for (const o of obstacles) {
+    // 足元と同じか下にある物は天井ではない。乗っている床がこれ
+    if (o.bottom <= feetY + EPSILON) continue
+    if (o.bottom >= ceiling) continue
+
+    const nearX = clamp(position.x, o.minX, o.maxX)
+    const nearZ = clamp(position.z, o.minZ, o.maxZ)
+    const dx = position.x - nearX
+    const dz = position.z - nearZ
+    if (dx * dx + dz * dz >= radiusSq) continue
+
+    ceiling = o.bottom
+  }
+
+  return ceiling
 }
 
 /** ステージ外周から出ないように閉じ込める */

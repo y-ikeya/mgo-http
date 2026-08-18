@@ -642,6 +642,8 @@ export function buildStage(scene: THREE.Scene): Stage {
       slopeX: 0,
       slopeZ: 0,
       baseTop: h,
+      // コード側のブロックアウトは地面に置く箱しかない
+      bottom: 0,
       surface: DEFAULT_SURFACE,
     })
   }
@@ -732,6 +734,9 @@ async function replaceWithModel(
       slopeX: 0,
       slopeZ: 0,
       baseTop: bounds.max.y,
+      // **浮いている物はここで初めて浮く。** 以前は下面を捨てて地面からの柱に
+      // していたので、橋を架けても下が塞がっていた
+      bottom: bounds.min.y,
       surface: surfaceOf(name),
       name,
     })
