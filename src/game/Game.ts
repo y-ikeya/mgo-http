@@ -36,7 +36,7 @@ import { BlastFx } from "./blastfx";
 import { Casings } from "./casings";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
-import { MAX_HEALTH } from "../sim/damage";
+import { fallDamage, MAX_HEALTH } from "../sim/damage";
 import {
   canAct,
   canChoose,
@@ -979,6 +979,7 @@ export class Game {
       this.follow.aimPitch,
       this.world,
     );
+    this.reportFall();
     // 倒されている間は倒した相手を映す。それ以外は自分を追う
     const watching = this.killCamTarget;
     if (watching) this.follow.watch(dt, watching, this.cameraWorld);
@@ -2138,6 +2139,22 @@ export class Game {
     this.setupRelease = 0;
     this.player.setThrowing(false);
     this.net.send({ type: "claymore" });
+  }
+
+  /**
+   * 落ちたことをサーバーへ知らせる。
+   *
+   * **速さだけ送る。** 受ける量を決めるのはサーバー — 式は共有 (damage.ts) なので、
+   * 同じ速さから同じ量が出る。ここで量を送ると好きな値を申告できてしまう。
+   *
+   * 無傷の速さなら送らない。1 層 (3.2m) 降りるたびに 1 通飛ぶのは無駄で、
+   * 飛び降りて回り込むのは普通の動き方なので回数も多い。
+   */
+  private reportFall(): void {
+    const speed = this.player.landedSpeed;
+    if (speed <= 0 || !canAct(this.life)) return;
+    if (fallDamage(speed) <= 0) return;
+    this.net.send({ type: "fall", speed });
   }
 
   /** 投げる型が振り切る所で手を離す */

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { Client, startServer, twoPlayers, type Server } from './server'
+import { Client, startServer, twoPlayers, type Server, openSpot } from './server'
 
 /**
  * 戦績が残るかの試験。
@@ -119,7 +119,7 @@ describe('戦績', () => {
 
     b.close()
     await Bun.sleep(2000)
-    const back = await new Client(server, b.id, [0, 0, 6]).ready()
+    const back = await new Client(server, b.id, openSpot(0, 6)).ready()
     back.live()
     await Bun.sleep(1000)
 
