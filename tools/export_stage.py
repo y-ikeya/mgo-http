@@ -3,7 +3,7 @@
 #   /Applications/Blender.app/Contents/MacOS/Blender -b tools/stage.blend --python tools/export_stage.py
 #
 # Blender の GUI から File → Export を辿るのと同じことを、コマンド 1 本でやる。
-# 書き出しの設定 (選択物だけ / マテリアルなし) を毎回手で合わせずに済むので、
+# 書き出しの設定 (選択物だけ / 材質も載せる) を毎回手で合わせずに済むので、
 # 「書き出したつもりで設定が違っていた」という取り違えが起きない。
 #
 # ref_ で始まるオブジェクトは寸法の物差しなので除外する。
@@ -257,12 +257,23 @@ json_path = os.path.join(root, 'public', 'models', 'stage.json')
 with open(json_path, 'w') as f:
     json.dump({'boxes': boxes}, f, ensure_ascii=False, indent=0)
 
+# 材質は載せる。
+#
+# 以前は 'NONE' にして「見た目はゲーム側で付ける」ことにしていた。箱しか無かった
+# 頃はそれでよかった — 名前 (metal_ / concrete_) から材質を引けば済む。
+#
+# **アートの入った物を置くと落ちる。** 停めてある車はテクスチャを持っていて、
+# それを落とすと灰色の塊になる。クライアントは「テクスチャを持たないメッシュだけ
+# 差し替える」形になっている (stage.ts) ので、載せておけば箱は今までどおり
+# 名前から塗られ、車は自分の絵のまま出る。
 bpy.ops.export_scene.gltf(
     filepath=glb_path,
     export_format='GLB',
     use_selection=True,
     export_apply=True,      # モディファイアを確定させてから出す
-    export_materials='NONE',  # 見た目はゲーム側で付ける
+    export_materials='EXPORT',
+    export_image_format='AUTO',
+    export_jpeg_quality=85,
 )
 
 # 材質の内訳も出す。札の付け忘れは数を見ると気づける

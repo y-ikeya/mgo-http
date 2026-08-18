@@ -23,6 +23,8 @@
 # 座標は Blender 基準 (X 右 / Y 奥 / Z 上、単位はメートル)。
 
 import bpy
+import math
+import mathutils
 import os
 
 # --- 寸法の語彙 -------------------------------------------------------------
@@ -41,7 +43,18 @@ H_WALL = 3.2       # 外壁。越えられない
 # 実際の駐車場より高いが、駐車場らしさより**見上げられること**を取る。
 # 階をまたいで撃ち合わせたい地形なので、上を向けないと成立しない。
 LEVEL = 4.0
-SLAB = 0.35        # 床の厚み
+# 床の厚み。
+#
+# **薄いほうが軽く見える。** 厚いと要塞のように見えて、駐車場の「柱と板だけ」という
+# 感じが出ない。判定の上では厚みに意味が無い (上面と下面しか見ない) ので、
+# 見た目だけで決めてよい。
+#
+# 階高から引いた残りが内法になるので、薄くするとその分だけ頭上が広がる
+# (4.0 - 0.10 = 3.90m)。落ちる高さは床の上面どうしの差なので、ここでは変わらない。
+#
+# 紙のように見えないのは、縁に腰壁 (1.0m) が乗っていて、外から見える厚みが
+# 1.1m になるため。**床そのものは薄くてよい。**
+SLAB = 0.10
 LEVELS = (0.0, LEVEL, LEVEL * 2)   # 各階の床の上面
 
 STEP_RISE = 0.25   # collision.ts の STEP_UP と揃える
@@ -169,6 +182,94 @@ def parapet(name, rects, top, open_edges=()):
                 box(f'concrete_{name}_{i:02d}n', x0, x1, y1 - t, y1, top, top + H_LOW)
 
 
+def load_car(path, key):
+    """
+    車のモデルを 1 台読み込んで、複製の元にする。
+
+    tools/convert_car.py が実寸・接地・前後を Y に揃えた glb を作る。ここでやるのは
+    **glTF の読み込みが付ける親を外して姿勢を焼く**ことだけ — 焼いておかないと、
+    複製して回したときにローカルとワールドで軸が入れ替わる。
+    """
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=path)
+    added = [o for o in bpy.data.objects if o not in before and o.type == 'MESH']
+    if not added:
+        raise SystemExit(f'{path} にメッシュが無い')
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in added:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = added[0]
+    if len(added) > 1:
+        bpy.ops.object.join()
+    car = bpy.context.view_layer.objects.active
+    bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    # **ref_ を付けて書き出しから外す** (export_stage.py の約束)。
+    # 元は複製の型紙で、ゲームの中に転がっていても邪魔なだけ
+    car.name = f'ref_car_{key}'
+    for empty in [o for o in bpy.data.objects if o not in before and o.type == 'EMPTY']:
+        bpy.data.objects.remove(empty, do_unlink=True)
+    return car
+
+
+def footprint(obj, matrix=None):
+    """
+    その物が占める軸に沿った箱。
+
+    **行列を自分で渡せる。** 置いた直後の obj.matrix_world は depsgraph が
+    更新されるまで古いままで、回したはずの向きが footprint に出ない
+    (90 度回した車が回っていない箱として検査を通った)。呼ぶ側が組んだ行列を
+    使えば、更新の順番に左右されない。
+    """
+    m = matrix if matrix is not None else obj.matrix_world
+    lo = [1e9] * 3
+    hi = [-1e9] * 3
+    for corner in obj.bound_box:
+        w = m @ mathutils.Vector(corner)
+        for i in range(3):
+            lo[i] = min(lo[i], w[i])
+            hi[i] = max(hi[i], w[i])
+    return lo, hi
+
+
+def car(key, x, y, base, spin=0):
+    """
+    車を 1 台置く。spin は 90 度単位 (判定が軸に沿った箱しか持てないため)。
+
+    **置いた先が空いているかを調べる。** 柱や腰壁に食い込んだ車は、Blender の中では
+    それらしく見えるのに、遊ぶと通れない壁になる。歩いて気づく類なので、
+    書き出す前ではなく**組み立てる時点**で落とす。
+    """
+    if spin % 90 != 0:
+        raise SystemExit(f'車の向きは 90 度単位: {spin}')
+    template = CARS[key]
+    dup = template.copy()
+    dup.data = template.data
+    dup.name = f'metal_car_{key}_{len(objects):02d}'
+    matrix = (mathutils.Matrix.Translation((x, y, base))
+              @ mathutils.Matrix.Rotation(math.radians(spin), 4, 'Z'))
+    dup.matrix_world = matrix
+    bpy.context.collection.objects.link(dup)
+
+    lo, hi = footprint(dup, matrix)
+    for other in objects:
+        olo, ohi = footprint(other)
+        # 乗っている床は除く。上面が車の足元と同じ高さなら、それは床
+        if ohi[2] <= base + 1e-3:
+            continue
+        if olo[2] >= hi[2] - 1e-3:
+            continue
+        if ohi[0] <= lo[0] or olo[0] >= hi[0]:
+            continue
+        if ohi[1] <= lo[1] or olo[1] >= hi[1]:
+            continue
+        raise SystemExit(
+            f'{dup.name} が {other.name} と重なっている '
+            f'(車 x {lo[0]:.1f}..{hi[0]:.1f} y {lo[1]:.1f}..{hi[1]:.1f})')
+    objects.append(dup)
+    return dup
+
+
 def stairs(name, x0, x1, y_from, base, height, facing):
     """
     階段。1 段ずつ別の箱にする (判定は上面の高さしか見ないため)。
@@ -287,6 +388,35 @@ parapet('rail3', deck3_rects, LEVELS[2], open_edges=('e',))
 for top in (LEVELS[1], LEVELS[2]):
     box(f'metal_well_s_{top:.0f}', WELL[0], WELL[1], WELL[2] - 0.3, WELL[2], top, top + H_LOW)
     box(f'metal_well_n_{top:.0f}', WELL[0], WELL[1], WELL[3], WELL[3] + 0.3, top, top + H_LOW)
+
+# --- 停めてある車 -----------------------------------------------------------
+# **駐車場なのだから車が要る。** それだけではなく、遮蔽としても効く —
+# 高さ 1.2m ほどなので、しゃがめば隠れて立つと上半身が出る。柱 (完全に隠れる) と
+# 腰壁 (縁にしか無い) の間を埋める。
+#
+# 向きは 90 度単位。判定が軸に沿った箱しか持てないので、斜め driving はできない。
+# 置いた先が空いているかは car() が調べる。
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CARS = {
+    'rusty': load_car(os.path.join(root_dir, 'tools', 'props', 'car_rusty.glb'), 'rusty'),
+    'small': load_car(os.path.join(root_dir, 'tools', 'props', 'car_small.glb'), 'small'),
+}
+
+# 地上。柱の間の通路に沿って停める
+car('rusty', -11.5, -12.0, LEVELS[0])
+car('small', -11.5, 11.5, LEVELS[0])
+car('small', 11.5, -12.0, LEVELS[0], spin=180)
+car('rusty', 19.0, 11.0, LEVELS[0])
+
+# 2F。吹き抜けの脇に寄せて、縁に貼り付いた相手の後ろを取れる形にする
+car('small', -11.5, -12.0, LEVELS[1])
+car('rusty', -11.5, 11.5, LEVELS[1], spin=180)
+car('small', 12.5, 11.5, LEVELS[1])
+car('rusty', 0.0, -8.5, LEVELS[1], spin=90)
+
+# 3F (屋上)。数を減らす。見晴らしを潰すと上へ行く意味が消える
+car('small', -11.5, 11.5, LEVELS[2])
+car('rusty', -18.5, -11.0, LEVELS[2], spin=180)
 
 # --- 地上の遮蔽 -------------------------------------------------------------
 # 柱だけだと地上が広すぎる。駐車場らしく、低い塊を散らす

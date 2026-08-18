@@ -104,7 +104,7 @@
 "name": "concrete_deck2_00",
 "min": [
 -14.0,
-3.65,
+3.9,
 4.5
 ],
 "max": [
@@ -129,7 +129,7 @@
 "name": "concrete_deck2_01",
 "min": [
 -14.0,
-3.65,
+3.9,
 -8.2
 ],
 "max": [
@@ -154,7 +154,7 @@
 "name": "concrete_deck2_02",
 "min": [
 -14.0,
-3.65,
+3.9,
 -15.0
 ],
 "max": [
@@ -179,7 +179,7 @@
 "name": "concrete_deck2_03",
 "min": [
 9.0,
-3.65,
+3.9,
 -15.0
 ],
 "max": [
@@ -204,7 +204,7 @@
 "name": "concrete_deck2_04",
 "min": [
 -14.0,
-3.65,
+3.9,
 -4.5
 ],
 "max": [
@@ -229,7 +229,7 @@
 "name": "concrete_deck2_05",
 "min": [
 3.5,
-3.65,
+3.9,
 -4.5
 ],
 "max": [
@@ -254,7 +254,7 @@
 "name": "concrete_deck2_06",
 "min": [
 -21.0,
-3.65,
+3.9,
 -15.0
 ],
 "max": [
@@ -279,7 +279,7 @@
 "name": "concrete_deck3_00",
 "min": [
 -21.0,
-7.65,
+7.9,
 4.5
 ],
 "max": [
@@ -304,7 +304,7 @@
 "name": "concrete_deck3_01",
 "min": [
 -21.0,
-7.65,
+7.9,
 8.2
 ],
 "max": [
@@ -329,7 +329,7 @@
 "name": "concrete_deck3_02",
 "min": [
 9.0,
-7.65,
+7.9,
 8.2
 ],
 "max": [
@@ -354,7 +354,7 @@
 "name": "concrete_deck3_03",
 "min": [
 -21.0,
-7.65,
+7.9,
 -15.0
 ],
 "max": [
@@ -379,7 +379,7 @@
 "name": "concrete_deck3_04",
 "min": [
 -21.0,
-7.65,
+7.9,
 -4.5
 ],
 "max": [
@@ -404,7 +404,7 @@
 "name": "concrete_deck3_05",
 "min": [
 3.5,
-7.65,
+7.9,
 -4.5
 ],
 "max": [
@@ -429,7 +429,7 @@
 "name": "concrete_deck3_06",
 "min": [
 14.0,
-7.65,
+7.9,
 7.0
 ],
 "max": [
@@ -2289,6 +2289,256 @@
 ],
 "top": {
 "h": 9.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_rusty_92",
+"min": [
+-12.327,
+0.0,
+9.519
+],
+"max": [
+-10.674,
+1.169,
+14.119
+],
+"top": {
+"h": 1.1692,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_small_93",
+"min": [
+-12.43,
+0.0,
+-13.254
+],
+"max": [
+-10.57,
+1.267,
+-9.054
+],
+"top": {
+"h": 1.2672,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_small_94",
+"min": [
+10.57,
+0.0,
+9.554
+],
+"max": [
+12.43,
+1.267,
+13.754
+],
+"top": {
+"h": 1.2672,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_rusty_95",
+"min": [
+18.173,
+0.0,
+-13.481
+],
+"max": [
+19.826,
+1.169,
+-8.881
+],
+"top": {
+"h": 1.1692,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_small_96",
+"min": [
+-12.43,
+4.0,
+10.246
+],
+"max": [
+-10.57,
+5.267,
+14.446
+],
+"top": {
+"h": 5.2672,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_rusty_97",
+"min": [
+-12.326,
+4.0,
+-13.619
+],
+"max": [
+-10.673,
+5.169,
+-9.019
+],
+"top": {
+"h": 5.1692,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_small_98",
+"min": [
+11.57,
+4.0,
+-13.254
+],
+"max": [
+13.43,
+5.267,
+-9.054
+],
+"top": {
+"h": 5.2672,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_rusty_99",
+"min": [
+-2.481,
+4.0,
+7.674
+],
+"max": [
+2.119,
+5.169,
+9.327
+],
+"top": {
+"h": 5.1692,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_small_100",
+"min": [
+-12.43,
+8.0,
+-13.254
+],
+"max": [
+-10.57,
+9.267,
+-9.054
+],
+"top": {
+"h": 9.2672,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_car_rusty_101",
+"min": [
+-19.326,
+8.0,
+8.881
+],
+"max": [
+-17.673,
+9.169,
+13.481
+],
+"top": {
+"h": 9.1692,
 "dx": 0.0,
 "dz": 0.0
 },
