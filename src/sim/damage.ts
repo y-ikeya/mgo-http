@@ -85,3 +85,36 @@ export const RECOVER_RATE = 8
 export function meleeDamage(fromBehind: boolean): number {
   return fromBehind ? MELEE_BACK_DAMAGE : MELEE_FRONT_DAMAGE
 }
+
+/**
+ * 落ちても平気な着地速度 (m/s)。
+ *
+ * **1 層は無傷で降りられる。** 重力 9.8 に下降の倍率 1.8 が掛かるので、階高 4.0m を
+ * 落ちると 11.9 m/s で着く。そこに余裕を足した値。
+ *
+ * **ステージの階高に紐付いている。** 階を高くするならここも上げないと、
+ * 1 層降りるだけで削れるようになる (逆も同じ)。数字の出どころは
+ * tools/make_garage.py の LEVEL。
+ *
+ * 降りるのがタダでないと、立体的なステージで**下りだけスロープを回らされる**。
+ * 飛び降りて逃げる・回り込むのは階のある地形の一番面白い所なので、そこは残す。
+ */
+export const FALL_SAFE_SPEED = 12
+
+/**
+ * 超えた分の 1 m/s あたりに受ける量。
+ *
+ * 2 層 (8.0m = 16.8 m/s) で 53。**痛いが死なない。** 落ちた先で撃たれれば死ぬので、
+ * 「近道をした代償を、そのあとの撃ち合いで払う」形になる。
+ *
+ * 上限は置かない。爆風と違って**自分でやったこと**なので、高い所から飛び降りて
+ * 死ぬのは筋が通る (12.6m で致死)。手榴弾が単体で殺さないのは、相手の一手で
+ * 一方的に決まらないためであって、自傷には当てはまらない。
+ */
+export const FALL_DAMAGE_PER_SPEED = 11
+
+/** その着地速度で受ける量。無傷なら 0 */
+export function fallDamage(impactSpeed: number): number {
+  if (impactSpeed <= FALL_SAFE_SPEED) return 0
+  return Math.round((impactSpeed - FALL_SAFE_SPEED) * FALL_DAMAGE_PER_SPEED)
+}

@@ -209,11 +209,29 @@ function snapshotOf(
  * 位置は開けた場所に向かい合わせで置く。**遮蔽の裏かどうかを問わない試験**は
  * これで足りる (問う試験はステージから座標を探す必要があるので、別に書く)。
  */
+/**
+ * ステージの中で**必ず開けている場所**。試験はここを基準に人を置く。
+ *
+ * 原点あたりに置いていたが、ステージを立体駐車場にしたときに中央へ柱が立って、
+ * 2 人の間が塞がった (視線が通らないので当たりの申告が全部弾かれた)。
+ * 試験が見たいのは点数の増え方であって地形ではないので、**地形の都合を 1 か所に
+ * 集める**。ステージを作り直すときは、ここが開いていることだけ守ればよい。
+ *
+ * いまの立体駐車場は建物が x ∈ [-21, 21] なので、その東の外側を取ってある。
+ */
+const OPEN_X = 30
+const OPEN_Z = 0
+
+/** 開けている場所からの相対で座標を作る */
+export function openSpot(dx: number, dz: number): [number, number, number] {
+  return [OPEN_X + dx, 0, OPEN_Z + dz]
+}
+
 export async function twoPlayers(
   server: Server,
 ): Promise<{ a: Client; b: Client }> {
-  const a = await new Client(server, 'alice', [0, 0, -6]).ready()
-  const b = await new Client(server, 'bob', [0, 0, 6]).ready()
+  const a = await new Client(server, 'alice', openSpot(0, -6)).ready()
+  const b = await new Client(server, 'bob', openSpot(0, 6)).ready()
   a.live()
   b.live()
   // 支度が済むまで待って、二人とも出撃する (床は 3 秒)

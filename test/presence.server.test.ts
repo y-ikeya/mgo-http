@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { Client, startServer, twoPlayers, type Server } from './server'
+import { Client, startServer, twoPlayers, type Server, openSpot } from './server'
 
 /**
  * 「クライアントが期待するものが、期待する順で届くか」の試験。
@@ -40,7 +40,7 @@ describe('名簿', () => {
     // 受け取らないと相手の状態を一度も知らないまま = 描かれない
     const { a } = await twoPlayers(server)
 
-    const late = await new Client(server, 'late', [5, 0, 0]).ready()
+    const late = await new Client(server, 'late', openSpot(5, 0)).ready()
     late.live()
     await Bun.sleep(500)
 
@@ -90,7 +90,7 @@ describe('繋ぎ直し', () => {
     b.close()
     await Bun.sleep(600)
 
-    const back = await new Client(server, 'bob', [3, 0, 8]).ready()
+    const back = await new Client(server, 'bob', openSpot(3, 8)).ready()
     back.live()
     await Bun.sleep(800)
 
@@ -127,7 +127,7 @@ describe('繋ぎ直し', () => {
 
     b.close()
     await Bun.sleep(800)
-    const back = await new Client(server, 'bob', [0, 0, 6]).ready()
+    const back = await new Client(server, 'bob', openSpot(0, 6)).ready()
     back.live()
     await Bun.sleep(1200)
 
@@ -150,7 +150,7 @@ describe('繋ぎ直し', () => {
     for (let round = 0; round < 3; round++) {
       bob.close()
       await Bun.sleep(700)
-      bob = await new Client(server, 'bob', [0, 0, 6]).ready()
+      bob = await new Client(server, 'bob', openSpot(0, 6)).ready()
       bob.live()
       await Bun.sleep(1000)
       expect(bob.life).toBe('alive')

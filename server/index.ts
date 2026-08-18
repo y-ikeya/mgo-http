@@ -19,6 +19,7 @@ import {
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
+import { fallDamage } from '../src/sim/damage'
 import {
   blastFrom,
   canPlaceAt,
@@ -1126,6 +1127,18 @@ function detonate(nade: Grenade): void {
  * @param amount 与える量。届くかどうかと、どれだけ届くかは呼ぶ側が決める
  * @param knock 転ばせるか。クレイモアは転ばせない (踏んだら死ぬか掠るかなので)
  */
+/**
+ * 落下速度の上限 (m/s)。
+ *
+ * これ以上は同じ扱い。**申告に頼っているので、青天井にしない** — 移動を持って
+ * いるのがクライアントなので、あり得ない速さを送られても分からない。
+ * ステージの一番高い所 (7.5m) から落ちて 16.3 m/s なので、そこに余裕を足した値。
+ */
+const MAX_FALL_SPEED = 25
+
+/** 死因の表示。表にしておかないと、増やしたときに三項演算子が伸びる */
+const KILL_LABEL = { grenade: 'grenade', claymore: 'CLAYMORE', fall: '落下' } as const
+
 function applyBlastDamage(
   roomName: string,
   room: Match,
@@ -1134,7 +1147,7 @@ function applyBlastDamage(
   fromX: number,
   fromZ: number,
   ownerId: string,
-  weapon: 'grenade' | 'claymore',
+  weapon: 'grenade' | 'claymore' | 'fall',
   knock: boolean,
 ): void {
   victim.health = Math.max(0, victim.health - amount)
@@ -1182,7 +1195,7 @@ function applyBlastDamage(
     victim: victim.id,
     victimName: victim.name,
     victimTeam: victim.team,
-    weapon: weapon === 'claymore' ? 'CLAYMORE' : 'grenade',
+    weapon: KILL_LABEL[weapon],
     headshot: false,
   })
 }
@@ -2219,6 +2232,28 @@ const server = Bun.serve<Client>({
         case 'claymore':
           placeClaymore(socket.data.room, player)
           break
+
+        /*
+         * 落ちた。**量はこちらで決める** — 速さだけ受け取って共有の式に通す。
+         * 量を送らせると好きな値を申告できる。
+         *
+         * 手柄は誰にも付かない。自分でやったことなので自死に数える
+         * (爆風で自分の手榴弾に巻き込まれたときと同じ扱い)。
+         */
+        case 'fall': {
+          const room = rooms.get(socket.data.room)
+          if (!room || room.phase !== 'playing') break
+          if (!canBeHurt(player.life)) break
+          // 速さそのものも信じ切らない。落ちきる前に着地を申告しても
+          // 上限を超えた分は効かない
+          const amount = fallDamage(Math.min(message.speed, MAX_FALL_SPEED))
+          if (amount <= 0) break
+          applyBlastDamage(
+            socket.data.room, room, player, amount,
+            player.x, player.z, player.id, 'fall', false,
+          )
+          break
+        }
         case 'leave':
           leaveRoom(socket.data.room, player)
           return

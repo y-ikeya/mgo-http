@@ -15,7 +15,15 @@ tools/raw/
 
 # --- 変換の中間物 ---
 # public/ に入った glb と jpg は成果物なので追跡する (数 MB)。
-# ステージの .blend は編集の元なので追跡する (100KB 程度)。
+# 手で編集する .blend は元データなので追跡する (stage.blend、100KB 程度)。
+#
+# **生成される .blend は追跡しない。** garage.blend は make_garage.py が毎回
+# 白紙から起こすもので、手では触らない。車のテクスチャを抱えて 5MB あり、
+# 中身は make_garage.py と tools/props/ から作り直せる。
+tools/garage.blend
+# 配布モデルを変換した中間物。ステージに焼き込まれた分が public/ にあるので、
+# これ自体は成果物ではない。作り直す手順は tools/convert_car.py と CREDITS.md。
+tools/props/
 
 # --- 秘密 ---
 # Supabase の URL と鍵。anon key は公開前提のものだが、

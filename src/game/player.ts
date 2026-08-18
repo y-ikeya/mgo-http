@@ -331,6 +331,14 @@ export class Player {
    */
   private gravity = GRAVITY
   private fallGravityScale = FALL_GRAVITY_SCALE
+  /**
+   * このフレームで着地したときの落下速度 (m/s)。着地していなければ 0。
+   *
+   * 呼ぶ側 (Game) が拾ってサーバーへ送る。Player は体力を持たないので、
+   * ここで削らない。
+   */
+  landedSpeed = 0
+
   /** 落下ループの再生速度を出すための想定落下高さ */
   private fallReferenceHeight = FALL_REFERENCE_HEIGHT
   /** ローリング中に進む向き。踏み切った時点で固定する */
@@ -1149,6 +1157,9 @@ export class Player {
       this.landingTimer = LANDING_TIME
       this.animator?.playLanding()
     }
+    // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
+    // サーバーなので、速さを申告して同じ式 (damage.ts) を向こうで通してもらう
+    this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.landingTimer > 0) this.landingTimer -= dt
     this.actualSpeed = moved.actualSpeed
 

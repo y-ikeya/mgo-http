@@ -315,6 +315,22 @@ export interface ClaymoreGone {
   blast: boolean
 }
 
+/**
+ * 落ちた。
+ *
+ * **速さだけ送る。** 受ける量を送らせると、好きな値を申告できる。式は共有 (damage.ts)
+ * なので、サーバーが同じ速さから同じ量を出す。
+ *
+ * 落ちたことを知っているのは本人だけ (移動を持っているのがクライアント) なので、
+ * ここは申告に頼る。撃たれた申告と違って**自分が損をする**方向なので、嘘をつく
+ * 動機があるとすれば「送らない」ほう。そこは移動そのものをサーバーが持つまで残る穴。
+ */
+export interface FallEvent {
+  type: 'fall'
+  /** 着地したときの落下速度 (m/s) */
+  speed: number
+}
+
 export interface LeaveEvent {
   type: 'leave'
   id: string
@@ -596,6 +612,7 @@ export type ClientMessage =
   | GrenadeThrow
   | LoadoutEvent
   | PlaceClaymoreEvent
+  | FallEvent
   | SpawnRequest
   | ReloadEvent
   // 見た目だけの物。当たったかどうかに関わらないので素通しする
