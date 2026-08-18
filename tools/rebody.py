@@ -4,9 +4,14 @@
     $BLENDER -b --factory-startup --python tools/rebody.py -- \
         <体.fbx> <出力.glb> [宿主の腰の高さ] [材質の元.gltf]
 
-そのあとクリップを移す:
+そのあとクリップを移して、背丈を合わせる:
 
-    bun tools/merge_all_clips.js public/models/soldier.glb <出力.glb>
+    bun tools/merge_all_clips.js public/models/soldier.glb <出力.glb> <完成.glb>
+    bun tools/fit_height.js public/models/soldier.glb <完成.glb>
+
+**背丈合わせは別の道具に分けてある。** ここで合わせるのは腰の高さだが、体つきが
+違えば腰から上の比率も違うので、腰を揃えても頭はずれる (Raiden で 3.3cm 低かった)。
+ゲームが見ているのは頭のほうなので、最後に頭で合わせ直す。
 
 --- なぜ骨を貼り替えないか ---
 メッシュを宿主の骨に貼り直すと、**レストポーズの差がそのまま歪みになる**。
