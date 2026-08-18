@@ -3,7 +3,7 @@ import { WebGPURenderer } from "three/webgpu";
 import { FollowCamera, type CameraWorld } from "./camera";
 import { isMesh } from "./guards";
 import { Input, type InputDevice } from "./input";
-import { Player, PLAYER_RADIUS, type PlayerWorld } from "./player";
+import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./player";
 import { Shots } from "./shots";
 import type { WeaponTarget } from "./weapon";
 import {
@@ -19,7 +19,13 @@ import {
   type Stage,
 } from "./stage";
 import { solidBlockers, type StageBox } from "../sim/vision";
-import { clampToArena, groundHeight, resolveCircle, surfaceAt } from "../sim/collision";
+import {
+  ceilingHeight,
+  clampToArena,
+  groundHeight,
+  resolveCircle,
+  surfaceAt,
+} from "../sim/collision";
 import { GameAudio } from "./audio";
 import type { Step } from "../sim/footsteps";
 import { SoundRing, type PingKind } from "./soundRing";
@@ -1046,11 +1052,13 @@ export class Game {
   /** Player から見た世界。地形の表現を Player 側に漏らさないための薄い層 */
   private readonly world: PlayerWorld = {
     resolveHorizontal: (position, radius, feetY) => {
-      resolveCircle(position, radius, this.stage.obstacles, feetY);
+      resolveCircle(position, radius, this.stage.obstacles, feetY, PLAYER_HEIGHT);
       clampToArena(position, radius, ARENA_HALF_SIZE);
     },
     groundHeight: (position, radius, feetY) =>
       groundHeight(position, radius, this.stage.obstacles, feetY),
+    ceilingHeight: (position, radius, feetY) =>
+      ceilingHeight(position, radius, this.stage.obstacles, feetY),
   };
 
   /**
@@ -1140,6 +1148,14 @@ export class Game {
           this.reserves[id] = message.reserve[id] ?? this.reserves[id];
         }
         this.grenadeCount = message.grenades;
+        // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
+        // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
+        this.loadout.support = message.support;
+        this.loadout.primary = message.primary;
+        this.pendingLoadout.support = message.support;
+        this.pendingLoadout.primary = message.primary;
+        this.onLoadout?.(this.pendingLoadout);
+        if (this.slot === "primary") void this.player.equip(message.primary);
         this.follow.snapTo(this.player, this.cameraWorld);
         break;
 
@@ -1571,8 +1587,24 @@ export class Game {
    */
   setLoadout(primary: WeaponId): void {
     this.pendingLoadout.primary = primary;
+    this.sendLoadout();
     this.applyLoadoutNow();
     this.onLoadout?.(this.pendingLoadout);
+  }
+
+  /**
+   * 選んだ物をサーバーへ知らせる。
+   *
+   * 数を持っているのがあちらなので、伝えないと選んだ物と配られる物が食い違う。
+   * **主武器も送る。** 遊びの上では要らないが、繋ぎ直したときに返してもらうため
+   * (読み直すとこちらは既定値へ戻る)。
+   */
+  private sendLoadout(): void {
+    this.net.send({
+      type: "loadout",
+      support: this.pendingLoadout.support,
+      primary: this.pendingLoadout.primary,
+    });
   }
 
   /**
@@ -1583,7 +1615,7 @@ export class Game {
    */
   setSupport(support: SupportId): void {
     this.pendingLoadout.support = support;
-    this.net.send({ type: "loadout", support });
+    this.sendLoadout();
     this.applyLoadoutNow();
     this.onLoadout?.(this.pendingLoadout);
   }

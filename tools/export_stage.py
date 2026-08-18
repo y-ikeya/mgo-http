@@ -44,6 +44,14 @@ def flags_of(name):
     return flags
 
 
+# 体の高さ (m)。src/game/player.ts の PLAYER_HEIGHT と揃える。
+# くぐれる隙間かどうかの判断に使う
+PLAYER_HEIGHT = 1.8
+
+# 足を乗せられる段差 (m)。src/sim/collision.ts の STEP_UP
+STEP_UP = 0.25
+
+
 def check(objects):
     """
     当たり判定の前提を満たしているか調べる。
@@ -54,6 +62,18 @@ def check(objects):
     """
     problems = []
     for obj in objects:
+        # 浮いているが、下をくぐれない高さ。
+        #
+        # **見た目と通れるかが食い違う。** 下が空いて見えるのに体が入らないので、
+        # 「なぜかここだけ通れない」という形で出る。乗るための台なら段差
+        # (STEP_UP) 以下に、くぐらせるなら体の高さ以上に離す。
+        bottom = min((obj.matrix_world @ v.co).z for v in obj.data.vertices) if obj.data.vertices else 0
+        if STEP_UP < bottom < PLAYER_HEIGHT:
+            problems.append(
+                f'{obj.name}: 下面が {bottom:.2f}m に浮いている '
+                f'(隙間が体の高さ {PLAYER_HEIGHT}m に足りず、くぐれない)'
+            )
+
         # 回転。90 度の倍数なら AABB として破綻しない
         for axis, angle in zip('XYZ', obj.rotation_euler):
             degrees = math.degrees(angle) % 90
