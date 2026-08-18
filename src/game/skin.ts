@@ -20,9 +20,18 @@
 export const DEFAULT_SKIN = 'soldier'
 
 const SKINS: Record<string, string> = {
-  // Ch23 (Mixamo) の頭と髪を Ch35 の体に移植したもの。
-  // tools/graft-head.py が作る
-  pepa1404: 'soldier_pepa',
+  /*
+   * Raiden。体ごと差し替えてある。
+   *
+   * 骨は貼り替えず、**クリップだけを移した** (tools/rebody.py +
+   * tools/merge_all_clips.js)。メッシュを別の骨に貼り直すとレストポーズの差が
+   * そのまま歪みになるが、回転は体つきに依存しないので同じ角度で曲がる。
+   *
+   * 腰の高さを宿主に合わせて縮めてある。**見た目の理由だけではない** —
+   * HEAD_HEIGHT = 1.47 は 1 体を実測した値なので、背の高い体を入れると
+   * その人だけ遮蔽越しに見つかりやすくなる。
+   */
+  pepa1404: 'soldier_raiden',
 }
 
 export function skinFor(name: string | undefined): string {
@@ -30,7 +39,7 @@ export function skinFor(name: string | undefined): string {
 }
 
 /**
- * `?skin=soldier_pepa` で自分の見た目を上書きする。試作を見るためだけの物。
+ * `?skin=soldier_raiden` で自分の見た目を上書きする。試作を見るためだけの物。
  *
  * **自分にしか効かない。** 他人の見た目はその人の名前から決まるので、
  * ここで何を指定しても相手の画面には出ない。見せかけて有利になる類の物でもない
