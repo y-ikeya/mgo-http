@@ -31,7 +31,19 @@ export type Stance = 'stand' | 'crouch' | 'box' | 'prone' | 'down'
  * 受け取る側はこの集合を見て「切り替わった瞬間に再生し直す」を決める。
  * 移動モーションと同じ扱いにすると、ループして永久に繰り返す。
  */
-export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<Locomotion>([
+export type WholeBodyLocomotion =
+  | 'roll'
+  | 'stab'
+  | 'death'
+  | 'salute'
+  | 'jump_down'
+  | 'sweep'
+  | 'stand'
+  | 'away'
+  | 'claymore_windup'
+  | 'claymore_place'
+
+export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>([
   'roll',
   'stab',
   'death',
@@ -45,6 +57,15 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<Locomotion>([
   'claymore_windup',
   'claymore_place',
 ])
+
+/**
+ * 全身の型か。**型を絞る形で返す** — 受け取る側が「どれを流すか」の表を
+ * `Record<WholeBodyLocomotion, ...>` で持てるようにするため。分岐で書いていた頃、
+ * クレイモアを足したときに書き忘れて、置いている人が他人の画面で T ポーズになった。
+ */
+export function isWholeBody(locomotion: Locomotion): locomotion is WholeBodyLocomotion {
+  return WHOLE_BODY.has(locomotion)
+}
 
 /** そのモーションのときの構え */
 export function stanceOf(locomotion: Locomotion): Stance {
