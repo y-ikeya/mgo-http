@@ -1413,7 +1413,15 @@ export class CharacterAnimator {
     if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) return BOLT_KEY
     if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
     if (this.upperState === 'throw' && this.pair) {
-      const key = this.pair.held ? this.pair.windup : this.pair.release
+      // **振りかぶりが残っている間は前半のまま。** 放した瞬間に後半へ渡すと、
+      // 後半はまだ流れていない (updateThrow が振りかぶりの終わりを待つ) ので
+      // 重みの行き先が止まったアクションになり、合計が 1 を下回って
+      // バインドポーズ = T ポーズが埋まる (blend のコメント)。
+      //
+      // 軽く叩いたときだけ出る。押し続けて投げるぶんには振りかぶりが
+      // 終わっているので、放した時点で後半がすぐ流れる。
+      const waiting = this.pair.held || this.throwWindupLeft > 0
+      const key = waiting ? this.pair.windup : this.pair.release
       if (this.upper.has(key)) return key
     }
     // 起き上がりは中断できない。撃つ操作より優先する
@@ -1525,6 +1533,12 @@ export class CharacterAnimator {
     if (this.dead) return
     const first = this.upper.get(windup)
     if (!first) return
+    // 前の型の下半身を畳む。全身の型 (クレイモア) は clampWhenFinished で
+    // 最後の姿勢に留まるので、止めずに次へ移ると足だけかがんだまま残る
+    if (this.pair?.whole) {
+      this.lower.get(this.pair.windup as Locomotion)?.stop()
+      this.lower.get(this.pair.release as Locomotion)?.stop()
+    }
     first.reset().play()
     this.upper.get(release)?.stop()
     if (whole) {
