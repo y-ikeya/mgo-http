@@ -10,22 +10,22 @@ import { fallDamage, FALL_SAFE_SPEED, MAX_HEALTH } from './damage'
  */
 const speedFrom = (height: number) => Math.sqrt(2 * 9.8 * 1.8 * height)
 
-/** 立体駐車場の階の高さ */
-const LEVEL = 3.2
+/** 立体駐車場の階の高さ (tools/make_garage.py の LEVEL) */
+const LEVEL = 4.0
 
 describe('階の高さと受ける量', () => {
-  test('1 層 (3.2m) は無傷。降りるのがタダでないと下りもスロープを回らされる', () => {
+  test('1 層は無傷。降りるのがタダでないと下りもスロープを回らされる', () => {
     expect(fallDamage(speedFrom(LEVEL))).toBe(0)
   })
 
-  test('2 層 (6.4m) は痛いが死なない', () => {
+  test('2 層は痛いが死なない', () => {
     const amount = fallDamage(speedFrom(LEVEL * 2))
     expect(amount).toBeGreaterThan(30)
     expect(amount).toBeLessThan(MAX_HEALTH)
   })
 
   test('高い所からは死ぬ。自分でやったことなので上限を置かない', () => {
-    expect(fallDamage(speedFrom(12))).toBeGreaterThanOrEqual(MAX_HEALTH)
+    expect(fallDamage(speedFrom(14))).toBeGreaterThanOrEqual(MAX_HEALTH)
   })
 })
 
