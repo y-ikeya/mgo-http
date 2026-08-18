@@ -276,6 +276,13 @@ interface Player {
    * 枠を使って選ぶ装備ではない。数えているのはクライアント (囮は各自が解く)。
    */
   support: SupportId
+  /**
+   * 主武器の選択。
+   *
+   * `weapon` (いま構えている物) とは別。繋ぎ直したときに返すためだけに持つ —
+   * 読み直した瞬間は拳銃を持っているかもしれないので、構えている物からは復元できない。
+   */
+  primary: WeaponId
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
   /**
@@ -2079,6 +2086,7 @@ const server = Bun.serve<Client>({
           concentratingSince: 0,
           grenades: SUPPORT_SPECS.grenade.count,
           support: 'grenade',
+          primary: 'rifle',
           holdingGrenade: false,
           wasAlive: false,
           lastPayload: null,
@@ -2127,6 +2135,8 @@ const server = Bun.serve<Client>({
             magazine: resumed.ammo.magazine,
             reserve: resumed.ammo.reserve,
             grenades: resumed.grenades,
+            support: resumed.support,
+            primary: resumed.primary,
           } satisfies ServerMessage),
         )
       }
@@ -2181,6 +2191,7 @@ const server = Bun.serve<Client>({
 
         case 'loadout': {
           player.support = message.support
+          player.primary = message.primary
           // 支度中なら**すぐ**効かせる。次の湧きを待つと、選び直した分が
           // 1 つ遅れて効くことになる
           if (canChoose(player.life)) {

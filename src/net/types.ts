@@ -278,6 +278,13 @@ export interface LoadoutEvent {
   type: 'loadout'
   /** support の枠に何を入れたか。弾倉はここに入らない (撃った弾から勝手に増える) */
   support: SupportId
+  /**
+   * 主武器。
+   *
+   * 遊びの上では要らない (何を構えているかは位置に乗っている) が、**繋ぎ直したときに
+   * 返すために持たせる**。持っていないと、読み直した人だけが突撃銃へ戻る。
+   */
+  primary: WeaponId
 }
 
 /**
@@ -363,8 +370,18 @@ export interface ResumeMessage {
   /** 銃ごとの装填済みと予備 */
   magazine: Record<WeaponId, number>
   reserve: Record<WeaponId, number>
-  /** 残りの手榴弾 */
+  /** 残りの投げ物 / 置き物 */
   grenades: number
+  /**
+   * 選んである装備。
+   *
+   * **画面を読み直しても席は残る** (30 秒は繋ぎ直しを待つ) ので、選んだ物も
+   * サーバー側に残っている。返さないと、クライアントだけが既定値へ戻って
+   * 食い違う — クレイモアを選んで読み直すと、手元は手榴弾のつもりで投げの型を
+   * 出すのに、数を持っているサーバーはクレイモアのまま、という形で出た。
+   */
+  support: SupportId
+  primary: WeaponId
 }
 
 /** 支度ができたので湧かせてほしい。装備画面の OK が送る */
