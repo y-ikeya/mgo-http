@@ -3,7 +3,7 @@ import { WebGPURenderer } from "three/webgpu";
 import { FollowCamera, type CameraWorld } from "./camera";
 import { isMesh } from "./guards";
 import { Input, type InputDevice } from "./input";
-import { Player, PLAYER_RADIUS, type PlayerWorld } from "./player";
+import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./player";
 import { Shots } from "./shots";
 import type { WeaponTarget } from "./weapon";
 import {
@@ -19,7 +19,13 @@ import {
   type Stage,
 } from "./stage";
 import { solidBlockers, type StageBox } from "../sim/vision";
-import { clampToArena, groundHeight, resolveCircle, surfaceAt } from "../sim/collision";
+import {
+  ceilingHeight,
+  clampToArena,
+  groundHeight,
+  resolveCircle,
+  surfaceAt,
+} from "../sim/collision";
 import { GameAudio } from "./audio";
 import type { Step } from "../sim/footsteps";
 import { SoundRing, type PingKind } from "./soundRing";
@@ -1046,11 +1052,13 @@ export class Game {
   /** Player から見た世界。地形の表現を Player 側に漏らさないための薄い層 */
   private readonly world: PlayerWorld = {
     resolveHorizontal: (position, radius, feetY) => {
-      resolveCircle(position, radius, this.stage.obstacles, feetY);
+      resolveCircle(position, radius, this.stage.obstacles, feetY, PLAYER_HEIGHT);
       clampToArena(position, radius, ARENA_HALF_SIZE);
     },
     groundHeight: (position, radius, feetY) =>
       groundHeight(position, radius, this.stage.obstacles, feetY),
+    ceilingHeight: (position, radius, feetY) =>
+      ceilingHeight(position, radius, this.stage.obstacles, feetY),
   };
 
   /**

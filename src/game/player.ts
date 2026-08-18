@@ -207,6 +207,8 @@ export interface PlayerWorld {
   resolveHorizontal(position: THREE.Vector3, radius: number, feetY: number): void
   /** その位置で足が着く高さ */
   groundHeight(position: THREE.Vector3, radius: number, feetY: number): number
+  /** その位置で頭がぶつかる高さ。何も無ければ Infinity */
+  ceilingHeight(position: THREE.Vector3, radius: number, feetY: number): number
 }
 
 /**
@@ -1134,6 +1136,7 @@ export class Player {
       world,
       {
         radius: PLAYER_RADIUS,
+        height: PLAYER_HEIGHT,
         gravity: this.gravity,
         fallGravityScale: this.fallGravityScale,
         airControl: AIR_CONTROL,

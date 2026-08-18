@@ -26,6 +26,13 @@ export interface MoveWorld {
   resolveHorizontal(position: Vec3, radius: number, feetY: number): void
   /** その位置で足が着く高さ */
   groundHeight(position: Vec3, radius: number, feetY: number): number
+  /**
+   * その位置で頭がぶつかる高さ。何も無ければ Infinity。
+   *
+   * 障害物が下面を持つようになって、**上にも止まる面ができた**。跳ねて上がった
+   * ときに橋や 2 階の床を突き抜けないために要る。
+   */
+  ceilingHeight(position: Vec3, radius: number, feetY: number): number
 }
 
 /** 移動する体。呼ぶ側が持ち、この関数が書き換える */
@@ -59,6 +66,8 @@ export interface MoveCommand {
 
 export interface MoveTuning {
   radius: number
+  /** 体の高さ (m)。天井にぶつかる位置を決める */
+  height: number
   gravity: number
   /** 下降中に重力へ掛ける倍率。上りは素、落ちるのは速く */
   fallGravityScale: number
@@ -122,6 +131,17 @@ export function stepMovement(
   mover.velocityY -=
     tuning.gravity * (mover.velocityY <= 0 ? tuning.fallGravityScale : 1) * dt
   position.y += mover.velocityY * dt
+
+  // 天井。上がる途中でだけ見る — 落ちている最中に見ると、乗ろうとしている
+  // 床の下面を拾って弾かれる
+  if (mover.velocityY > 0) {
+    const ceiling = world.ceilingHeight(position, tuning.radius, feetY)
+    if (position.y + tuning.height > ceiling) {
+      position.y = ceiling - tuning.height
+      // 勢いを消す。残すと天井に貼り付いたまま上を向き続ける
+      mover.velocityY = 0
+    }
+  }
 
   const ground = world.groundHeight(position, tuning.radius, feetY)
   const wasAirborne = !mover.onGround
