@@ -9,6 +9,7 @@ import type { WeaponTarget } from "./weapon";
 import {
   ARENA_HALF_SIZE,
   buildLights,
+  buildBases,
   buildStage,
   setAmbientIntensity,
   setCloudCoverage,
@@ -651,6 +652,8 @@ export class Game {
     container.appendChild(this.renderer.domElement);
 
     this.stage = buildStage(this.scene);
+    // 陣営の基地。地面を見れば自分の湧く場所が分かる
+    this.scene.add(buildBases());
     this.sun = buildLights(this.scene);
     this.placeAtSpawn();
     this.scene.add(this.player.object);
@@ -1333,6 +1336,31 @@ export class Game {
     );
     // 跳んだ距離を足音に積ませない。積むと着いた先で連打になる
     this.player.warpTo(this.player.position.x, this.player.position.z);
+
+    this.faceCentre();
+  }
+
+  /**
+   * ステージの中央を向く。
+   *
+   * 向きを触らないと、倒された時のカメラ (倒した相手を映していた) の向きが
+   * そのまま残る。湧いた瞬間にステージの外を眺めていることが多かった。
+   *
+   * yaw = θ のとき前方は (-sinθ, -cosθ)。中央 (0,0) へ向けるなら
+   * (-sinθ, -cosθ) ∝ (-x, -z) なので sinθ = x/d, cosθ = z/d。
+   * **符号を 1 つ間違えると外を向く** — 直そうとしていた不具合そのものになる。
+   *
+   * **カメラがまだ無いことがある。** 最初の 1 回は構築の途中から呼ばれていて、
+   * this.follow はもっと後で作られる。構築順に依存する書き方をしたせいで
+   * 「undefined の yaw に代入した」で落ちた。
+   *
+   * 無ければ何もしなくてよい。構築時の湧きは**所属が分かる前の仮置き**で、
+   * 名簿で所属を受け取った時 (roster) と湧くたび (spawning) に置き直される。
+   * 向きが要るのはそちらで、そこでは既にカメラがある。
+   */
+  private faceCentre(): void {
+    if (!this.follow) return;
+    this.follow.yaw = Math.atan2(this.player.position.x, this.player.position.z);
   }
 
   /**

@@ -163,6 +163,59 @@ export const TEAM_SPAWNS = {
   red: { x: 0, z: -35 },
 } as const
 
+/**
+ * 基地の枠の大きさ (m)。中心から端まで。
+ *
+ * **これ以上は小さくできない。** 湧く位置は基地の中心から半径 4m
+ * (Game.ts の SPAWN_SPREAD) の円周上に散るので、4 を下回ると
+ * **自分の基地の外に立つ**ことになる。0.5m だけ余裕を持たせてある。
+ *
+ * もっと小さくしたいなら、先に SPAWN_SPREAD を縮める。ただしあれは
+ * 湧いた人どうしが重ならないための距離なので、詰めると出会い頭が増える。
+ */
+const BASE_HALF = 4.5
+
+/** 枠を描く高さ (m)。地面と z 争いしない程度に浮かせる */
+const BASE_Y = 0.03
+
+/** 陣営の色。HUD の得点と揃える — 同じ物を指す色は同じにする */
+const BASE_COLOR = { blue: 0x7ea6ff, red: 0xff8a72 } as const
+
+/**
+ * 陣営の基地を示す枠。
+ *
+ * **ここが自分の湧く場所だと、地面を見て分かるようにする。** 湧いた直後に
+ * 「どちらへ進めばよいか」を向きだけで判断させると、倒された回数が増えるほど
+ * 方向感覚が失われる。地面に描いてあれば、振り向いた先で常に分かる。
+ *
+ * 塗り潰さず枠線にするのは、床の材質 (足音が変わる) を隠さないため。
+ */
+export function buildBases(): THREE.Object3D {
+  const group = new THREE.Group()
+  for (const [team, base] of Object.entries(TEAM_SPAWNS)) {
+    const points = [
+      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z - BASE_HALF),
+      new THREE.Vector3(base.x + BASE_HALF, BASE_Y, base.z - BASE_HALF),
+      new THREE.Vector3(base.x + BASE_HALF, BASE_Y, base.z + BASE_HALF),
+      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z + BASE_HALF),
+      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z - BASE_HALF),
+    ]
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(points),
+      // 露出に左右されない。位置を示すための線なので、明るさが変わっても読めてほしい
+      new THREE.LineBasicMaterial({
+        color: BASE_COLOR[team as keyof typeof BASE_COLOR],
+        transparent: true,
+        opacity: 0.55,
+        toneMapped: false,
+      }),
+    )
+    line.frustumCulled = false
+    group.add(line)
+  }
+  return group
+}
+
 export interface Stage {
   /** 弾が当たる物。撃った先を決めるのに使う */
   readonly collidables: THREE.Object3D[]
