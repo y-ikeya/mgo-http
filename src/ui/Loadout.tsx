@@ -37,9 +37,8 @@ export default function Loadout(props: {
   wait: number
   onSpawn: () => void
 }) {
-  /** その枠を選んだときの予備弾。弾倉を選ぶと 1 弾倉ぶん増える */
-  const reserveOf = (id: WeaponId) =>
-    WEAPONS[id].reserve + SUPPORT_SPECS[props.support].spareMagazines * WEAPONS[id].magazine
+  /** その銃の予備弾 */
+  const reserveOf = (id: WeaponId) => WEAPONS[id].reserve
 
   const rows = () => [
     { key: 'PRIMARY', ids: CHOICES.primary, current: props.primary, pick: props.onPrimary },

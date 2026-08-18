@@ -1,7 +1,7 @@
 import type { Locomotion } from '../sim/locomotion'
 import type { HitZone } from '../sim/damage'
 import type { Surface } from '../sim/surface'
-import type { WeaponId } from '../sim/weapons'
+import type { SupportId, WeaponId } from '../sim/weapons'
 import type { Life } from '../sim/lifecycle'
 
 /**
@@ -269,14 +269,43 @@ export interface ExplosionEvent {
 /**
  * 装備を伝える。
  *
- * 手榴弾の数はサーバーが持っている (投げられるかを決めているのがあちら) ので、
- * 何を選んだかを知らせないと弾倉を選んでも手榴弾が配られる。
+ * 投げる物の数はサーバーが持っている (投げられるかを決めているのがあちら) ので、
+ * 何を選んだかを知らせる必要がある。
  *
  * 主武器は送らない。何を構えているかは位置に乗っている。
  */
 export interface LoadoutEvent {
   type: 'loadout'
-  support: 'grenade' | 'magazine'
+  /** support の枠に何を入れたか。弾倉はここに入らない (撃った弾から勝手に増える) */
+  support: SupportId
+}
+
+/**
+ * クレイモアを置く。
+ *
+ * **位置も向きも送らない。** サーバーが持っている位置と向きから決める —
+ * 送らせると、壁の中や相手の足元へ置ける。置くのは「自分の前」だけでよい。
+ */
+export interface PlaceClaymoreEvent {
+  type: 'claymore'
+}
+
+/** 置かれたクレイモア。見えている人にだけ配る */
+export interface ClaymorePlaced {
+  type: 'claymorePlaced'
+  id: number
+  at: [number, number, number]
+  /** 正面の向き (rad) */
+  yaw: number
+  team: Team
+}
+
+/** 起爆した / 消えた */
+export interface ClaymoreGone {
+  type: 'claymoreGone'
+  id: number
+  /** 起爆したなら爆発を見せる。試合の仕切り直しで消えただけなら false */
+  blast: boolean
 }
 
 export interface LeaveEvent {
@@ -549,6 +578,7 @@ export type ClientMessage =
   | DamageEvent
   | GrenadeThrow
   | LoadoutEvent
+  | PlaceClaymoreEvent
   | SpawnRequest
   | ReloadEvent
   // 見た目だけの物。当たったかどうかに関わらないので素通しする
@@ -577,6 +607,8 @@ export type ServerMessage =
   | ShotEvent
   | KnockEvent
   | ThrowEvent
+  | ClaymorePlaced
+  | ClaymoreGone
 
 /** 通信路の上を流れうる全部。符号化のように向きを問わない所だけが使う */
 export type NetMessage = ClientMessage | ServerMessage

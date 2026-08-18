@@ -24,6 +24,7 @@ import type { Step } from "../sim/footsteps";
 import { SoundRing, type PingKind } from "./soundRing";
 import { ThrownItems } from "./thrown";
 import { Grenades } from "./grenades";
+import { Claymores } from "./claymores";
 import { BlastFx } from "./blastfx";
 import { Casings } from "./casings";
 import { damp } from "./math";
@@ -36,7 +37,7 @@ import {
   CHOOSE_TIMEOUT,
   type Life,
 } from "../sim/lifecycle";
-import { CHOICES, SUPPORT_SPECS, SUPPORTS, type SupportId, type WeaponId } from "../sim/weapons";
+import { CHOICES, SUPPORT_SPECS, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../sim/damage";
@@ -312,6 +313,13 @@ const GRENADE_RELEASE_FORWARD = 0.45;
  */
 const GRENADE_RELEASE_RATIO = 0.19;
 
+/**
+ * クレイモアが地面に着く位置。置く型に対する割合。
+ *
+ * 型は 3.6 秒あるが、手を離れるのはかがんで置いた辺り。残りは立ち上がる動き。
+ */
+const CLAYMORE_PLACE_RATIO = 0.55;
+
 
 /**
  * 空撃ちの音を鳴らす間隔 (秒)。
@@ -361,6 +369,7 @@ export class Game {
   /** 投げた物。落ちた場所で音を出すためだけのもの */
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
+  private readonly claymores: Claymores;
   private readonly blast: BlastFx;
   private readonly casings: Casings;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
@@ -649,6 +658,7 @@ export class Game {
     this.soundRing = new SoundRing(this.scene);
     this.thrown = new ThrownItems(this.scene);
     this.grenades = new Grenades(this.scene);
+    this.claymores = new Claymores(this.scene);
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
     void loadStageBoxes().then((boxes) => {
@@ -906,6 +916,13 @@ export class Game {
     // 視点は動かせるままにする。周りを見て、どこへ向かうか決める時間になる。
     if (this.match?.phase === "countdown") this.moveDir.set(0, 0, 0);
 
+    // クレイモアを構えている間は動けない。
+    //
+    // かがんで置く動作なので、そのまま走られると型と足が食い違う。**向きだけは
+    // 変えられる** — 置く向きは自分の向きで決まるので、狙えないと通り道を塞げない
+    // (体をカメラへ向ける処理は updateClaymoreSetup が setThrowing で入れている)。
+    if (this.setupAiming) this.moveDir.set(0, 0, 0);
+
     // ブラウザはユーザー操作があるまで音を出せない。ロック取得やボタン押下がそれにあたる。
     if (this.input.engaged) this.audio.resume();
 
@@ -974,6 +991,7 @@ export class Game {
       this.addPing("shot", bounce.position, gain);
     });
     this.updateGrenadeAim();
+    this.updateClaymoreRelease(dt);
     this.updateGrenadeRelease(dt);
     this.thrown.update(dt, this.stage.collidables, (impact) => {
       // 跳ねるたびに鳴る。自分が投げたものは輪に出さない
@@ -1147,7 +1165,10 @@ export class Game {
         const changed = this.match?.phase !== message.phase;
         // 試合が切り替わったら飛んでいる手榴弾を捨てる。
         // サーバー側も同じ所で捨てるので、爆発が届かないまま残り続ける
-        if (changed && message.phase !== "playing") this.grenades.clear();
+        if (changed && message.phase !== "playing") {
+          this.grenades.clear();
+          this.claymores.clear();
+        }
         this.match = message;
 
         // 決着したら成績表を開く。
@@ -1195,6 +1216,22 @@ export class Game {
 
       case "explosion": {
         this.explode(message.id, message.at);
+        break;
+      }
+
+      case "claymorePlaced":
+        this.claymores.place(message.id, message.at, message.yaw);
+        break;
+
+      case "claymoreGone": {
+        // 位置を先に取る。消してから爆発を出すと出す場所が分からない
+        const mesh = this.claymores.at(message.id);
+        this.claymores.remove(message.id);
+        if (message.blast && mesh) {
+          const gain = this.audio.play("claymore", mesh, 1);
+          this.addPing("shot", mesh, gain);
+          this.blast.explode(mesh);
+        }
         break;
       }
 
@@ -1317,7 +1354,6 @@ export class Game {
     if (this.input.consumeKeyPress("Digit2") && choices[1]) this.setLoadout(choices[1]);
     // 投擲の枠。主武器の続きの番号にする
     if (this.input.consumeKeyPress("Digit3") && SUPPORTS[0]) this.setSupport(SUPPORTS[0]);
-    if (this.input.consumeKeyPress("Digit4") && SUPPORTS[1]) this.setSupport(SUPPORTS[1]);
   }
 
   /**
@@ -1454,16 +1490,32 @@ export class Game {
    * 生き返ったら両方満タン。持ち替えの都合で片方だけ空、を持ち越さない。
    */
   private refillFromLoadout(): void {
-    // 投擲の枠で持ち物が変わる。**両方は持てない**
-    const support = SUPPORT_SPECS[this.loadout.support];
-    this.throwables = this.loadout.support === "magazine" ? support.count : 0;
-    this.grenadeCount = this.loadout.support === "grenade" ? support.count : 0;
+    this.grenadeCount = SUPPORT_SPECS[this.loadout.support].count;
+    // **投げられる弾倉は 0 から。** 撃った弾が 1 弾倉ぶん溜まるごとに増える
+    this.throwables = 0;
+    this.roundsFired = 0;
 
     for (const id of Object.keys(WEAPONS) as WeaponId[]) {
       this.magazines[id] = WEAPONS[id].magazine;
-      // 弾倉を選ぶと予備が 1 弾倉ぶん増える。撃ち切るまでの時間がそのぶん延びる
-      this.reserves[id] =
-        WEAPONS[id].reserve + support.spareMagazines * WEAPONS[id].magazine;
+      this.reserves[id] = WEAPONS[id].reserve;
+    }
+  }
+
+  /**
+   * この命で撃った発数。投げられる弾倉の出どころ。
+   *
+   * **リロードの回数では数えない。** 回数だと半分残ったまま替えても増えるので、
+   * 篭って替え続けるのが最適になる。撃った弾で数えれば実弾を使わないと増えない。
+   */
+  private roundsFired = 0;
+
+  /** 1 発撃った。1 弾倉ぶん溜まったら投げられる弾倉が 1 個増える */
+  private countRoundForDecoy(): void {
+    this.roundsFired++;
+    const per = roundsPerDecoy(this.player.equipped);
+    if (this.roundsFired >= per) {
+      this.roundsFired -= per;
+      this.throwables++;
     }
   }
 
@@ -1778,6 +1830,7 @@ export class Game {
     );
     this.shotCount++;
     this.ammo--;
+    this.countRoundForDecoy();
 
     // 弾道と発砲音のためだけの通知。当たったかどうかは damage で別に送っている。
     this.net.send({
@@ -1897,6 +1950,11 @@ export class Game {
    * 「落下点を見る」ためのこの画面と役目がぶつかる。
    */
   private updateGrenadeAim(): void {
+    // support がクレイモアなら、同じキーは「置く」になる
+    if (this.loadout.support === "claymore") {
+      this.updateClaymoreSetup();
+      return;
+    }
     // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
     const canThrow =
       this.grenadeCount > 0 &&
@@ -1957,6 +2015,66 @@ export class Game {
       0.01,
       this.player.throwWindupLeft + this.grenadeReleaseRatio * this.player.throwReleaseDuration,
     );
+  }
+
+  /** クレイモアを構えているか */
+  private setupAiming = false;
+  /** 置き切るまでの残り (秒)。0 になった瞬間にサーバーへ知らせる */
+  private setupRelease = 0;
+
+  /**
+   * クレイモアを置く。
+   *
+   * 手榴弾と同じで、押している間は構えたまま止まり、離すと置く型が流れる。
+   * **落下点は見せない** — 投げる物ではないので、置くのは自分の足元の前と決まっている。
+   *
+   * 置く型は 3.6 秒あって、その間ずっと無防備。置いて離れる道具の代償がここ。
+   */
+  private updateClaymoreSetup(): void {
+    const canPlace =
+      this.grenadeCount > 0 &&
+      canAct(this.life) &&
+      !this.player.isBoxed &&
+      !this.player.downed &&
+      !this.cocking;
+    const held = canPlace && this.input.isActionDown("grenade", "KeyE");
+
+    if (held) {
+      if (!this.setupAiming) this.player.playSetup();
+      this.setupAiming = true;
+      // 体をカメラの方へ向ける。置く向き = 自分の向きなので、これが照準になる
+      this.player.setThrowing(true);
+      return;
+    }
+
+    if (!this.setupAiming) return;
+    this.setupAiming = false;
+    // 構えを解かされただけ (倒された・箱に入った) なら置かない
+    if (!canPlace) {
+      this.player.cancelThrow();
+      this.player.setThrowing(false);
+      return;
+    }
+
+    this.grenadeCount--;
+    this.player.releaseSetup();
+    // 置き切るまでは向きを保つ。放した瞬間に向き直ると、置く先がずれる
+    this.player.setThrowing(true);
+    // 置く型の途中で手を離れる。振りかぶりが残っていればそのぶん待つ
+    this.setupRelease = Math.max(
+      0.01,
+      this.player.throwWindupLeft + CLAYMORE_PLACE_RATIO * this.player.setupReleaseDuration,
+    );
+  }
+
+  /** 置き切ったらサーバーへ知らせる。位置も向きもあちらが決める */
+  private updateClaymoreRelease(dt: number): void {
+    if (this.setupRelease <= 0) return;
+    this.setupRelease -= dt;
+    if (this.setupRelease > 0) return;
+    this.setupRelease = 0;
+    this.player.setThrowing(false);
+    this.net.send({ type: "claymore" });
   }
 
   /** 投げる型が振り切る所で手を離す */
