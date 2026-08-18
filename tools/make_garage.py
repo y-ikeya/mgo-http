@@ -206,8 +206,15 @@ RAMP_Y = 7.0
 # 階段の吹き抜け。**スロープとは反対側の端に置く** — 上がる手が 1 つしかないと、
 # その口を抑えるだけで階が閉じる。狭いので撃ち合いには向かないが、速い。
 STAIR_X = (4.0, 9.0)
-STAIR2 = (STAIR_X[0], STAIR_X[1], BY1 - stair_run(LEVEL) - 0.6, BY1)   # 地上 → 2F
-STAIR3 = (STAIR_X[0], STAIR_X[1], BY0, BY0 + stair_run(LEVEL) + 0.6)   # 2F → 3F
+
+# 踏み板の手前に立つ場所 (m)。
+#
+# **腰壁のぶんを空ける。** 段を建物の縁ちょうどから始めると、そこに立っている
+# 腰壁に食い込んで、下り口に立てない = 上れない。体の直径 (0.7m) より広く取る。
+STAIR_LANDING = 1.2
+
+STAIR2 = (STAIR_X[0], STAIR_X[1], BY1 - stair_run(LEVEL) - STAIR_LANDING, BY1)   # 地上 → 2F
+STAIR3 = (STAIR_X[0], STAIR_X[1], BY0, BY0 + stair_run(LEVEL) + STAIR_LANDING)   # 2F → 3F
 
 deck2_rects = deck('deck2', [
     (DECK2[0], DECK2[1], BY0, BY1),
@@ -244,8 +251,8 @@ box('concrete_ramp_up3_side', BX1 - RAMP_W, BX1 - RAMP_W + 0.35, -1.0, 7.0,
 # **建物の内側へ向かって上る。** 外へ向けて上ると、上り切った所が建物の縁で、
 # その先に床が無い (走り抜けてそのまま落ちる)。内向きなら、上り切った所が
 # 穴の内側の縁 = 床の始まりになる。
-stairs('metal_stair_up2', STAIR_X[0], STAIR_X[1], BY1 - 0.3, 0.0, LEVEL, '-y')
-stairs('metal_stair_up3', STAIR_X[0], STAIR_X[1], BY0 + 0.3, LEVELS[1], LEVEL, '+y')
+stairs('metal_stair_up2', STAIR_X[0], STAIR_X[1], BY1 - STAIR_LANDING, 0.0, LEVEL, '-y')
+stairs('metal_stair_up3', STAIR_X[0], STAIR_X[1], BY0 + STAIR_LANDING, LEVELS[1], LEVEL, '+y')
 
 # --- 柱 ---------------------------------------------------------------------
 # **遮蔽はこれだけ。** 細いので、止まっていれば隠れるが動けば見える。
