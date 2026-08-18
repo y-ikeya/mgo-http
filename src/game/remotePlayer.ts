@@ -15,10 +15,9 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../sim/locomotion";
 import { canBeStabbed } from "../sim/hitcheck";
-import { stanceOf } from "../sim/stance";
 import { loadSoldier } from "./assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { WHOLE_BODY } from "../sim/stance";
+import { isWholeBody, stanceOf, type WholeBodyLocomotion } from "../sim/stance";
 import { weaponOf, type WeaponId } from "../sim/weapons";
 import {
   advanceBoxLift,
@@ -90,7 +89,37 @@ const YAW_LAMBDA = 16;
 /** モデルの正面 (+Z) を Player の基準 (-Z) に合わせる回転 */
 const MODEL_YAW_OFFSET = Math.PI;
 
-/** 頭から流し直す必要がある全身モーション。状態の遷移で検出する */
+/**
+ * 頭から流し直す必要がある全身モーションと、その流し方。
+ *
+ * **分岐ではなく表にしてある。** 以前は if の連なりで、最後が
+ * `else animator.playLanding()` だった。当てはまらない型が黙って着地モーションに
+ * 落ちて、上半身がどこにも割り当たらず**素の姿勢 (T ポーズ) が出る**。
+ * クレイモアを足したときに実際にそうなった (置いている人が他人の画面で棒立ち)。
+ *
+ * `Record<WholeBodyLocomotion, ...>` なので、WHOLE_BODY に足してここに足さないと
+ * **組み立てが通らない**。落とし穴をコメントで警告する代わりに、型で塞ぐ。
+ */
+const PLAY_WHOLE_BODY: Record<
+  WholeBodyLocomotion,
+  (animator: CharacterAnimator) => void
+> = {
+  roll: (a) => a.playRoll(),
+  stab: (a) => a.playStab(),
+  death: (a) => a.playDeath(),
+  salute: (a) => a.playSalute(),
+  // 爆風で倒れる / 起き上がる
+  sweep: (a) => a.playSweep(),
+  stand: (a) => a.playStand(),
+  // 接続が切れた人。1 枚の静止ポーズ
+  away: (a) => a.playAway(),
+  // 着地。ここだけは「全身だが専用の入口がある」ではなく元からこれ
+  jump_down: (a) => a.playLanding(),
+  // クレイモア。構え始めと、置き切る所。**置く型から見え始めることがある**ので、
+  // releaseSetup は振りかぶりを飛ばして始められるようになっている
+  claymore_windup: (a) => a.playSetup(),
+  claymore_place: (a) => a.releaseSetup(),
+};
 
 /**
  * 他のプレイヤー。受信した状態だけで動く。
@@ -290,24 +319,11 @@ export class RemotePlayer {
     this.rollStarted = false;
     this.sweptThisFrame = false;
     this.reloadStarted = false;
-    if (locomotion !== this.locomotion && WHOLE_BODY.has(locomotion)) {
-      if (locomotion === "roll") {
-        animator.playRoll();
-        this.rollStarted = true;
-      } else if (locomotion === "stab") animator.playStab();
-      else if (locomotion === "death") animator.playDeath();
-      else if (locomotion === "salute") animator.playSalute();
-      // 爆風で倒れる / 起き上がる。ここを書き忘れると着地モーションに落ちて、
-      // 上半身がどこにも割り当たらず素の姿勢 (T ポーズ) が出る
-      else if (locomotion === "sweep") {
-        animator.playSweep();
-        // 叫んだことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
-        this.sweptThisFrame = true;
-      }
-      else if (locomotion === "stand") animator.playStand();
-      // 接続が切れた人。ここを書き忘れると playLanding へ落ちる
-      else if (locomotion === "away") animator.playAway();
-      else animator.playLanding();
+    if (locomotion !== this.locomotion && isWholeBody(locomotion)) {
+      PLAY_WHOLE_BODY[locomotion](animator);
+      // 叫んだこと・回り始めたことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
+      this.rollStarted = locomotion === "roll";
+      this.sweptThisFrame = locomotion === "sweep";
     }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
     if (this.locomotion === "salute" && locomotion !== "salute") {

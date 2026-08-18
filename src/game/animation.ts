@@ -301,6 +301,18 @@ const THROW_RELEASE_KEY = 'throw_release'
  */
 const SETUP_WINDUP_KEY = 'claymore_windup'
 const SETUP_RELEASE_KEY = 'claymore_place'
+
+/**
+ * 置き切る型の再生速度。
+ *
+ * 素の 3.60 秒は**長すぎた**。かがんで置いて立ち上がるまでが 1 つのクリップに
+ * 入っていて、後半はほぼ立ち上がるだけ。代償として払わせたいのは「その場に
+ * 留まる時間」だが、置き終わってからも足が止まっているのは、代償ではなく
+ * ただ操作が返ってこない時間になる。
+ *
+ * 振りかぶり (1.77 秒) はそのまま。押している間の話なので、長くて困らない。
+ */
+const SETUP_RELEASE_RATE = 2.2
 const ROLL_KEY = 'roll'
 const DEATH_KEY = 'death'
 
@@ -835,8 +847,15 @@ export class CharacterAnimator {
       const action = registerUpper(key, clip)
       action.setLoop(THREE.LoopOnce, 1)
       action.clampWhenFinished = true
+      // 上下を同じ速さで流す。片方だけ速めると腰から上と下が離れる
+      if (key === SETUP_RELEASE_KEY) {
+        action.setEffectiveTimeScale(SETUP_RELEASE_RATE)
+        this.lower.get(key as Locomotion)?.setEffectiveTimeScale(SETUP_RELEASE_RATE)
+      }
     }
-    this.setupReleaseDuration = byName.get(SETUP_RELEASE_KEY)?.duration ?? 0
+    // **実際に流れる秒数**を持つ。クリップの尺をそのまま出すと、速めたぶん
+    // 手を離れる時刻が後ろにずれて、置き終わってから物が出る
+    this.setupReleaseDuration = (byName.get(SETUP_RELEASE_KEY)?.duration ?? 0) / SETUP_RELEASE_RATE
 
     const bolt = byName.get('bolt')
     if (bolt) {
@@ -1538,8 +1557,23 @@ export class CharacterAnimator {
     if (this.pair) this.pair.held = false
   }
 
-  /** 置くのを解く。releaseThrow と同じ物 — 呼ぶ側が読みやすいよう名前だけ分ける */
+  /**
+   * 置くのを解く。
+   *
+   * **構えていないのに置く型が来ることがある。** 途中から見えるようになった人が
+   * それで、こちらには振りかぶりが流れていない。振りかぶりから流し直すと、
+   * 実際にはもう置いている相手が構え直して見える。振りかぶりを終わった所から
+   * 始める。
+   */
   releaseSetup(): void {
+    if (!this.pair) {
+      this.playPair(SETUP_WINDUP_KEY, SETUP_RELEASE_KEY, true)
+      // 振りかぶりを終わらせておく。updateThrow は残っている間は後半へ移らない
+      const windup = this.upper.get(SETUP_WINDUP_KEY)
+      if (windup) windup.time = windup.getClip().duration
+      const lower = this.lower.get(SETUP_WINDUP_KEY as Locomotion)
+      if (lower) lower.time = lower.getClip().duration
+    }
     this.releaseThrow()
   }
 

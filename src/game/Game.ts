@@ -919,12 +919,15 @@ export class Game {
     // 視点は動かせるままにする。周りを見て、どこへ向かうか決める時間になる。
     if (this.match?.phase === "countdown") this.moveDir.set(0, 0, 0);
 
-    // クレイモアを構えている間は動けない。
+    // クレイモアを構えている / 置いている間は動けない。
     //
     // かがんで置く動作なので、そのまま走られると型と足が食い違う。**向きだけは
     // 変えられる** — 置く向きは自分の向きで決まるので、狙えないと通り道を塞げない
     // (体をカメラへ向ける処理は updateClaymoreSetup が setThrowing で入れている)。
-    if (this.setupAiming) this.moveDir.set(0, 0, 0);
+    //
+    // **手を離したあとも塞ぐ。** 押している間だけ止めていたら、離した瞬間から
+    // 動けるのに足はかがんだままで、置く型が流れきるまで滑って見えた。
+    if (this.setupAiming || this.player.placing) this.moveDir.set(0, 0, 0);
 
     // ブラウザはユーザー操作があるまで音を出せない。ロック取得やボタン押下がそれにあたる。
     if (this.input.engaged) this.audio.resume();

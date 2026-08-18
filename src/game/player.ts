@@ -649,6 +649,16 @@ export class Player {
     this.animator?.playSetup()
   }
 
+  /**
+   * クレイモアを構えている / 置いている最中か。
+   *
+   * **押している間だけでは足りない。** 手を離しても置く型が流れきるまでは
+   * かがんだままで、そこで走らせると足が動かないまま滑る。
+   */
+  get placing(): boolean {
+    return this.animator?.setupLocomotion != null
+  }
+
   get setupReleaseDuration(): number {
     return this.animator?.setupReleaseDuration ?? 0
   }
