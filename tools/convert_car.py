@@ -83,9 +83,18 @@ scale = LENGTH / max(size[0], size[1])
 car.data.transform(
     mathutils.Matrix.Rotation(spin, 4, 'Z') @ mathutils.Matrix.Scale(scale, 4))
 
-# 車輪を地面に。Z=0 が接地面でないと沈むか浮く
-lowest = min(v.co.z for v in car.data.vertices)
-car.data.transform(mathutils.Matrix.Translation((0, 0, -lowest)))
+# 車輪を地面に、車体の中心を原点に。
+#
+# **Z だけ揃えていては足りない。** 配布モデルの原点は車体の中心にあるとは限らず、
+# X/Y がずれたままだと「(x, y) に置く」が車体の中心を指さない。ステージ側は
+# 中心で位置を決めているので、寄せ幅が読めずに腰壁へ食い込む (実際そうなった)。
+lo, hi = [1e9] * 3, [-1e9] * 3
+for v in car.data.vertices:
+    for i in range(3):
+        lo[i] = min(lo[i], v.co[i])
+        hi[i] = max(hi[i], v.co[i])
+car.data.transform(mathutils.Matrix.Translation(
+    (-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2])))
 car.location = (0, 0, 0)
 car.rotation_euler = (0, 0, 0)
 car.scale = (1, 1, 1)
