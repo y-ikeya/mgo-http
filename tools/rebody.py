@@ -9,9 +9,10 @@
     bun tools/merge_all_clips.js public/models/soldier.glb <出力.glb> <完成.glb>
     bun tools/fit_height.js public/models/soldier.glb <完成.glb>
 
-**背丈合わせは別の道具に分けてある。** ここで合わせるのは腰の高さだが、体つきが
-違えば腰から上の比率も違うので、腰を揃えても頭はずれる (Raiden で 3.3cm 低かった)。
-ゲームが見ているのは頭のほうなので、最後に頭で合わせ直す。
+**背丈合わせは最後にやり直す。** ここで腰の高さから決める scale は FBX 側の実測値
+なので、Mixamo が正規化して返す単位系とずれる。ずれたまま宿主のクリップを流すと、
+腰の移動が宿主の単位のままなので体が沈む (Raiden で頭が 10.3cm 低かった)。
+fit_height.js が Armature の scale を宿主と揃えて直す。
 
 --- なぜ骨を貼り替えないか ---
 メッシュを宿主の骨に貼り直すと、**レストポーズの差がそのまま歪みになる**。
