@@ -47,6 +47,9 @@ export const LOCOMOTIONS: Locomotion[] = [
   'stand',
   // 接続が切れた人の姿。本人は送ってこない — サーバーが書き込む
   'away',
+  // クレイモアを置く型。**末尾に足す** (並びを変えると古い版が別の姿勢を再生する)
+  'claymore_windup',
+  'claymore_place',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

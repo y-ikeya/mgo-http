@@ -54,6 +54,9 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   salute: 'salute',
   // 接続が切れた人の姿。全身 1 枚の静止ポーズ
   away: 'away',
+  // クレイモア。かがむ全身の型なので、上半身も同じクリップから取る
+  claymore_windup: 'claymore_windup',
+  claymore_place: 'claymore_place',
   // 爆風で倒れる / 起き上がる。倒れた姿勢のまま留まるので伏せ撃ちができる。
   // 起き上がりは仰向け用 (STAND_CLIP) を引く — sweep が仰向けで終わるため
   sweep: 'sweep',
@@ -107,6 +110,8 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   sit: 'sit',
   salute: 'salute',
   away: 'away',
+  claymore_windup: 'claymore_windup',
+  claymore_place: 'claymore_place',
   jump_up: 'relaxed_run',
   jump_loop: 'relaxed_run',
   jump_down: 'relaxed_run',
@@ -172,6 +177,10 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'jump_down',
   'death',
   'salute',
+  // クレイモアを置く型。**構えは最後のフレームで止める** —
+  // 一度だけにしないと 1.77 秒で頭から流れ直して、かがむ動作を繰り返す
+  'claymore_windup',
+  'claymore_place',
   // 切れた人の姿。1 枚の静止ポーズなので、流したところで留める
   'away',
 ])
@@ -283,6 +292,15 @@ const STAND_RATE = 1.2
  */
 const THROW_WINDUP_KEY = 'throw_windup'
 const THROW_RELEASE_KEY = 'throw_release'
+
+/**
+ * クレイモアを置く型。投擲と**同じ 2 段**で、押している間は構えたまま止まる。
+ *
+ * 尺は 1.77 秒 + 3.60 秒。投擲 (1.50 + 0.83) よりずっと長い — 置いて離れる道具は
+ * 「その場に留まる時間」そのものが代償になっている。
+ */
+const SETUP_WINDUP_KEY = 'claymore_windup'
+const SETUP_RELEASE_KEY = 'claymore_place'
 const ROLL_KEY = 'roll'
 const DEATH_KEY = 'death'
 
@@ -313,6 +331,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   STAND_KEY,
   THROW_WINDUP_KEY,
   THROW_RELEASE_KEY,
+  SETUP_WINDUP_KEY,
+  SETUP_RELEASE_KEY,
   ROLL_KEY,
   DEATH_KEY,
   HIT_KEY,
@@ -474,7 +494,15 @@ export class CharacterAnimator {
   /** 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る */
   throwReleaseDuration = 0
   /** 振りかぶりで止めているか */
-  private throwHeld = false
+  /**
+   * いま流している 2 段の型。振りかぶって止まり、放すと振り切る物。
+   *
+   * 手榴弾とクレイモアが同じ仕組みを通る。**別々に書くと片方だけ直してずれる** —
+   * 実際、刺さる姿勢の規則をサーバーにだけ入れて同じ形の穴を開けた。
+   */
+  private pair: { windup: string; release: string; held: boolean; whole: boolean } | null = null
+  /** 置く型の後半の尺 (秒) */
+  setupReleaseDuration = 0
 
   /** 吹き飛ばされる型の再生速度 (調整用)。着地の時刻もこれで割る */
   sweepRate = SWEEP_RATE
@@ -617,7 +645,8 @@ export class CharacterAnimator {
       finished === this.upper.get(BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
-      finished === this.upper.get(THROW_RELEASE_KEY)
+      finished === this.upper.get(THROW_RELEASE_KEY) ||
+      finished === this.upper.get(SETUP_RELEASE_KEY)
     ) {
       this.upperState = 'stance'
     }
@@ -797,6 +826,17 @@ export class CharacterAnimator {
     }
     this.throwDuration = (windup?.duration ?? 0) + (release?.duration ?? 0)
     this.throwReleaseDuration = release?.duration ?? 0
+
+    // クレイモアも同じ 2 段。**同じ仕組みを通す** — 別々に書くと、
+    // 片方だけ直したときに静かにずれる
+    for (const key of [SETUP_WINDUP_KEY, SETUP_RELEASE_KEY]) {
+      const clip = byName.get(key)
+      if (!clip) continue
+      const action = registerUpper(key, clip)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+    this.setupReleaseDuration = byName.get(SETUP_RELEASE_KEY)?.duration ?? 0
 
     const bolt = byName.get('bolt')
     if (bolt) {
@@ -1353,8 +1393,8 @@ export class CharacterAnimator {
     // 途中で切れると「撃ったのに動作していない」が頻繁に見える
     if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) return BOLT_KEY
     if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
-    if (this.upperState === 'throw') {
-      const key = this.throwHeld ? THROW_WINDUP_KEY : THROW_RELEASE_KEY
+    if (this.upperState === 'throw' && this.pair) {
+      const key = this.pair.held ? this.pair.windup : this.pair.release
       if (this.upper.has(key)) return key
     }
     // 起き上がりは中断できない。撃つ操作より優先する
@@ -1455,51 +1495,78 @@ export class CharacterAnimator {
    * 落とすのが使い方の一つなので、投げるために止まらせない。
    */
   /**
-   * 投げ始める。振りかぶりを流す。
+   * 2 段の型を始める。振りかぶりを流し、**その終わりで勝手に止まる**
+   * (clampWhenFinished)。以前のように再生速度を 0 にして押さえ込む必要がない。
    *
-   * クリップは振りかぶりで終わっていて clampWhenFinished なので、**最後の姿勢で
-   * 勝手に止まる**。以前のように再生速度を 0 にして押さえ込む必要がない。
+   * @param whole 全身の型か。**かがむ動作は上半身だけ切り出せない** —
+   *   腰の向きが下半身と食い違って、腕だけがバインドポーズ (T ポーズ) に
+   *   見えることがある。クレイモアの設置がそれだった。刺突と同じ扱いにする
    */
-  playThrow(): void {
+  private playPair(windup: string, release: string, whole = false): void {
     if (this.dead) return
-    const windup = this.upper.get(THROW_WINDUP_KEY)
-    if (!windup) return
-    windup.reset().play()
-    this.upper.get(THROW_RELEASE_KEY)?.stop()
+    const first = this.upper.get(windup)
+    if (!first) return
+    first.reset().play()
+    this.upper.get(release)?.stop()
+    if (whole) {
+      // 上下を同時に頭から流す。同じクリップなので腰の向きが食い違わない
+      this.lower.get(windup as Locomotion)?.reset().play()
+      this.lower.get(release as Locomotion)?.stop()
+    }
     this.upperState = 'throw'
-    this.throwHeld = true
+    this.pair = { windup, release, held: true, whole }
+  }
+
+  /** 投げ始める */
+  playThrow(): void {
+    this.playPair(THROW_WINDUP_KEY, THROW_RELEASE_KEY)
+  }
+
+  /** クレイモアを構え始める。**かがむので全身** */
+  playSetup(): void {
+    this.playPair(SETUP_WINDUP_KEY, SETUP_RELEASE_KEY, true)
   }
 
   /**
-   * 振り切って投げる。
+   * 振り切る / 置き切る。
    *
-   * **振りかぶりが終わるのを待ってから**後半へ移る (updateThrow)。軽く叩いた
-   * だけのときに途中で切り替えると、腕を引いている最中から投げの型へ飛んで
+   * **振りかぶりが終わるのを待ってから**後半へ移る (updatePair)。軽く叩いた
+   * だけのときに途中で切り替えると、腕を引いている最中から次の型へ飛んで
    * 見た目が繋がらない。
    */
   releaseThrow(): void {
-    this.throwHeld = false
+    if (this.pair) this.pair.held = false
   }
 
-  /** 投げるのをやめる。腕を下ろして構えに戻す (倒された・箱に入った) */
+  /** 置くのを解く。releaseThrow と同じ物 — 呼ぶ側が読みやすいよう名前だけ分ける */
+  releaseSetup(): void {
+    this.releaseThrow()
+  }
+
+  /** やめる。腕を下ろして構えに戻す (倒された・箱に入った) */
   cancelThrow(): void {
-    if (this.upperState !== 'throw') return
-    this.throwHeld = false
-    this.upper.get(THROW_WINDUP_KEY)?.stop()
-    this.upper.get(THROW_RELEASE_KEY)?.stop()
+    if (this.upperState !== 'throw' || !this.pair) return
+    this.upper.get(this.pair.windup)?.stop()
+    this.upper.get(this.pair.release)?.stop()
+    if (this.pair.whole) {
+      this.lower.get(this.pair.windup as Locomotion)?.stop()
+      this.lower.get(this.pair.release as Locomotion)?.stop()
+    }
+    this.pair = null
     this.upperState = 'stance'
   }
 
-  /** 振りかぶりが終わるまであと何秒か。放した瞬間に残っていれば投げは待たされる */
+  /** 振りかぶりが終わるまであと何秒か。軽く叩いただけなら残っている */
   get throwWindupLeft(): number {
-    const windup = this.upper.get(THROW_WINDUP_KEY)
-    if (!windup || this.upperState !== 'throw') return 0
+    if (!this.pair || this.upperState !== 'throw') return 0
+    const windup = this.upper.get(this.pair.windup)
+    if (!windup) return 0
     return Math.max(0, windup.getClip().duration - windup.time)
   }
 
   /** いま振りかぶった所で止まっているか */
   get throwWoundUp(): boolean {
-    return this.throwHeld && this.throwWindupLeft <= 0
+    return !!this.pair?.held && this.throwWindupLeft <= 0
   }
 
   /**
@@ -1508,11 +1575,15 @@ export class CharacterAnimator {
    * 保持そのものは clampWhenFinished がやる。ここがやるのは繋ぎだけ。
    */
   private updateThrow(): void {
-    if (this.upperState !== 'throw' || this.throwHeld) return
-    const release = this.upper.get(THROW_RELEASE_KEY)
+    if (this.upperState !== 'throw' || !this.pair || this.pair.held) return
+    const release = this.upper.get(this.pair.release)
     if (!release || release.isRunning() || release.time > 0) return
     if (this.throwWindupLeft > 0) return
     release.reset().play()
+    if (this.pair.whole) {
+      this.lower.get(this.pair.windup as Locomotion)?.stop()
+      this.lower.get(this.pair.release as Locomotion)?.reset().play()
+    }
   }
 
   playBolt(): void {
@@ -1643,6 +1714,17 @@ export class CharacterAnimator {
   /** ナイフを振っている間か。武器の持ち替えに使う */
   get stabbing(): boolean {
     return this.upperState === 'stab'
+  }
+
+  /**
+   * クレイモアを置いている最中の姿勢。置いていなければ null。
+   *
+   * **全身の型なので、位置に載せる姿勢もこれになる。** 他人の画面でも
+   * かがんで見えないと、置いていることが誰にも分からない
+   */
+  get setupLocomotion(): 'claymore_windup' | 'claymore_place' | null {
+    if (this.upperState !== 'throw' || !this.pair?.whole) return null
+    return this.pair.held ? 'claymore_windup' : 'claymore_place'
   }
 
   /** リロードモーションを頭から再生する。終わると自動で構えに戻る */

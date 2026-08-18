@@ -645,11 +645,23 @@ export class Player {
    * 上半身だけなので走りながらでも出る。退きながら足元へ落とすのが
    * 使い方の一つなので、投げるために止まらせない。
    */
+  playSetup(): void {
+    this.animator?.playSetup()
+  }
+
+  get setupReleaseDuration(): number {
+    return this.animator?.setupReleaseDuration ?? 0
+  }
+
   playThrow(): void {
     this.animator?.playThrow()
   }
 
   /** 振り切って投げる */
+  releaseSetup(): void {
+    this.animator?.releaseSetup()
+  }
+
   releaseThrow(): void {
     this.animator?.releaseThrow()
   }
@@ -1409,6 +1421,7 @@ export class Player {
       downed: this.downed,
       standingUp: this.standing,
       stabbing: this.stabbing,
+      setting: this.animator?.setupLocomotion ?? null,
       rolling: this.rolling,
       onGround: this.onGround,
       landing: this.landingTimer,

@@ -224,22 +224,27 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </Show>
         {/*
           投げ物の残り。数が限られていることが見えていないと判断にならない。
-          持っていない方は出さない — 投擲の枠はどちらか一方しか取れない。
-          0 のまま並べると、取れるのに取っていないように見える。
+
+          **弾倉は 0 でも出す。** 撃てば増える物なので、0 と出ていること自体が
+          「まだ 1 弾倉ぶん撃っていない」という情報になる。手榴弾は枠で選ぶ物なので
+          持っていなければ出さない (取れるのに取っていないように見える)。
         */}
-        <Show when={props.stats?.support === 'magazine'}>
-          <div
-            class="hud-throwables"
-            classList={{ 'hud-throwables-empty': !props.stats?.throwables }}
-          >
-            MAG × {props.stats?.throwables ?? 0}
-          </div>
-        </Show>
         <Show when={props.stats?.support === 'grenade'}>
           <div class="hud-throwables" classList={{ 'hud-throwables-empty': !props.stats?.grenades }}>
             GRENADE × {props.stats?.grenades ?? 0}
           </div>
         </Show>
+        <Show when={props.stats?.support === 'claymore'}>
+          <div class="hud-throwables" classList={{ 'hud-throwables-empty': !props.stats?.grenades }}>
+            CLAYMORE × {props.stats?.grenades ?? 0}
+          </div>
+        </Show>
+        <div
+          class="hud-throwables"
+          classList={{ 'hud-throwables-empty': !props.stats?.throwables }}
+        >
+          MAG × {props.stats?.throwables ?? 0}
+        </div>
       </div>
 
       <div class="hud-help">{t('hud.help')}</div>

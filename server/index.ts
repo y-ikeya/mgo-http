@@ -19,6 +19,15 @@ import {
 import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
+import {
+  blastFrom,
+  canPlaceAt,
+  triggeredBy,
+  PLACE_FORWARD,
+  SHOT_HALF,
+  SHOT_TOP,
+  type Placed,
+} from '../src/sim/claymore'
 import { closeMatch, flush, recordPlayer } from './stats'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/ballistic'
 import {
@@ -26,7 +35,9 @@ import {
   reloadInto,
   startingAmmo,
   weaponOf,
+  SUPPORT_SPECS,
   type Ammo,
+  type SupportId,
   type WeaponId,
 } from '../src/sim/weapons'
 import { verifyHit, type Pose } from '../src/sim/hitcheck'
@@ -37,6 +48,7 @@ import {
   headHeight,
   sightBlockers,
   solidBlockers,
+  segmentHitsBox,
   type StageBox,
 } from '../src/sim/vision'
 import { cameraPoint } from '../src/sim/eyepoint'
@@ -235,6 +247,14 @@ interface Player {
    */
   seen: Set<string>
   /**
+   * その人に見えていると伝えてあるクレイモアの id。
+   *
+   * 位置の seen と同じ形。**置いた瞬間に全員へ配ると、壁の裏に置いた物が
+   * 透けて見える** — 隠して置くことに意味がある道具なので、そこを漏らすと
+   * 使う理由が消える。
+   */
+  seenClaymores: Set<number>
+  /**
    * 集中し始めた時刻 (Date.now)。0 なら集中していない。
    *
    * 回復の条件。姿勢を崩した瞬間も、撃たれた瞬間も 0 に戻すので、
@@ -249,7 +269,13 @@ interface Player {
    * 弾倉を選んだ人には手榴弾を配らない。数を持っているのがこちらなので、
    * 知らせてもらわないと決められない。
    */
-  support: 'grenade' | 'magazine'
+  /**
+   * support の枠に何を入れたか。
+   *
+   * 弾倉はここに入らない — 撃った弾が 1 弾倉ぶん溜まるごとに勝手に増える物で、
+   * 枠を使って選ぶ装備ではない。数えているのはクライアント (囮は各自が解く)。
+   */
+  support: SupportId
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
   /**
@@ -539,8 +565,8 @@ function spawn(roomName: string, player: Player, now = Date.now()): void {
   player.killedBy = ''
   player.health = MAX_HEALTH
   // 装備から詰め直す。式は共有なので、画面に出る数と必ず一致する
-  player.ammo = startingAmmo(player.support)
-  player.grenades = player.support === 'grenade' ? GRENADES_PER_LIFE : 0
+  player.ammo = startingAmmo()
+  player.grenades = SUPPORT_SPECS[player.support].count
   player.holdingGrenade = false
   player.concentratingSince = 0
   // 湧き地点へ跳ぶ。歩いた距離として積むと、着いた先で足音が連打される
@@ -792,6 +818,157 @@ interface Grenade {
 }
 
 const grenades: Grenade[] = []
+
+/**
+ * 置かれたクレイモア。
+ *
+ * 手榴弾と違って**飛ばない**ので軌道は持たない。置いた瞬間に位置と向きが決まり、
+ * 起爆するまでそこに在り続ける。置いた本人が死んでも残る — 置いて離れる道具なので、
+ * 本人が生きているかは関係ない。
+ */
+interface Claymore extends Placed {
+  id: number
+  room: string
+  owner: string
+  team: Team
+}
+
+const claymores: Claymore[] = []
+let nextClaymoreId = 1
+
+/**
+ * 置く。**位置も向きもサーバーが決める** — 送らせると壁の中に置ける。
+ *
+ * 置けるのは自分の前 0.9m。そこが壁の中や段差の外なら**置かせない**
+ * (sim/claymore.ts の canPlaceAt)。高さは地面に乗せる — 足元の y をそのまま
+ * 使うと、段差の上に置いたときに床へ沈む。
+ */
+function placeClaymore(roomName: string, from: Player): void {
+  if (!canAct(from.life) || from.support !== 'claymore' || from.grenades <= 0) return
+
+  const forward = [-Math.sin(from.yaw), -Math.cos(from.yaw)]
+  const x = from.x + forward[0] * PLACE_FORWARD
+  const z = from.z + forward[1] * PLACE_FORWARD
+
+  // 壁の中や縁の外へは置けない。**弾いても数は減らさない** —
+  // 置けなかったのに手札が減ると、押し間違いが取り返しの付かない損になる
+  const ground = groundUnder(x, z, from.y, solidBoxes, STEP_UP).top
+  if (!canPlaceAt(x, z, from.y, ground, solidBoxes)) return
+
+  from.grenades--
+  const claymore: Claymore = {
+    id: nextClaymoreId++,
+    room: roomName,
+    owner: from.id,
+    team: from.team,
+    x,
+    // 地面に乗せる。足元をそのまま使うと、段差の上に置いたときに沈む
+    y: ground,
+    z,
+    // 置いた本人と同じ向き。自分が来た方を向く形になる
+    yaw: from.yaw,
+  }
+  claymores.push(claymore)
+
+  // ここでは配らない。**見えている人にだけ**、tick が配る (relayClaymores)
+}
+
+/**
+ * 置かれたクレイモアを、見えている人にだけ配る。
+ *
+ * 位置の配り方 (relayState) と同じ規則。味方には無条件、敵にはカメラから線が
+ * 通ったときだけ。**見えなくなったら消す** — 一度見せたまま置きっぱなしにすると、
+ * 物陰へ回った相手の画面に残り続けて「そこに在る」ことが漏れ続ける。
+ *
+ * 本体は 26cm しかないので、体のように 3 点で見ずに 1 点で見る。
+ */
+function relayClaymores(roomName: string, room: Match): void {
+  for (const viewer of connected(room)) {
+    for (const claymore of claymores) {
+      if (claymore.room !== roomName) continue
+
+      // 味方の物は無条件。どこに置いたか分からないと自分が引っ掛かる
+      let visible = viewer.team === claymore.team
+      if (!visible && stageBoxes.length > 0) {
+        const eye = viewOf(viewer)
+        visible = hasLineOfSight(
+          eye.x, eye.y, eye.z,
+          claymore.x, claymore.y, claymore.z,
+          // 本体の高さ。頭の高さと同じ引数の意味 (足元からどれだけ上か)
+          0.2,
+          stageBoxes,
+        )
+      } else if (!visible) {
+        visible = true
+      }
+
+      const known = viewer.seenClaymores.has(claymore.id)
+      if (visible && !known) {
+        viewer.seenClaymores.add(claymore.id)
+        viewer.socket.send(
+          JSON.stringify({
+            type: 'claymorePlaced',
+            id: claymore.id,
+            at: [claymore.x, claymore.y, claymore.z],
+            yaw: claymore.yaw,
+            team: claymore.team,
+          } satisfies ServerMessage),
+        )
+      } else if (!visible && known) {
+        viewer.seenClaymores.delete(claymore.id)
+        viewer.socket.send(
+          JSON.stringify({ type: 'claymoreGone', id: claymore.id, blast: false } satisfies ServerMessage),
+        )
+      }
+    }
+  }
+}
+
+/**
+ * 撃たれたクレイモアを起爆させる。
+ *
+ * **申告を増やさない。** shot は銃口と着弾点を既に送ってきているので、その線分と
+ * 当たりを見れば済む。「クレイモアを撃った」と言わせると、見えていない物を
+ * 撃ったことにできる。
+ *
+ * 見つけて壊せることが、置く側への答えになる — 通り道を塞がれたら、
+ * 迂回するか壊すかを選べる。
+ */
+function shotHitsClaymore(roomName: string, from: readonly number[], to: readonly number[]): void {
+  for (let i = claymores.length - 1; i >= 0; i--) {
+    const claymore = claymores[i]
+    if (claymore.room !== roomName) continue
+    const box: StageBox = {
+      name: 'claymore',
+      min: [claymore.x - SHOT_HALF, claymore.y, claymore.z - SHOT_HALF],
+      max: [claymore.x + SHOT_HALF, claymore.y + SHOT_TOP, claymore.z + SHOT_HALF],
+    }
+    if (!segmentHitsBox(from[0], from[1], from[2], to[0], to[1], to[2], box)) continue
+    detonateClaymore(claymore)
+    claymores.splice(i, 1)
+  }
+}
+
+/** 起爆。前に居た敵だけを巻き込む */
+function detonateClaymore(claymore: Claymore): void {
+  const room = rooms.get(claymore.room)
+  // 起爆は隠さない。音も光も壁を回り込んで届く (手榴弾と同じ規則)
+  broadcast(claymore.room, { type: 'claymoreGone', id: claymore.id, blast: true })
+  const here = rooms.get(claymore.room)
+  if (here) for (const viewer of connected(here)) viewer.seenClaymores.delete(claymore.id)
+  if (!room || room.phase !== 'playing') return
+
+  for (const victim of connected(room)) {
+    if (!canBeHurt(victim.life)) continue
+    // 味方は巻き込まない。**置いた本人だけは例外** — 手榴弾を足元に落としたときと
+    // 同じ規則で、自分の物で死ぬことがある
+    if (victim.team === claymore.team && victim.id !== claymore.owner) continue
+
+    const amount = blastFrom(claymore, victim)
+    if (amount <= 0) continue
+    applyBlastDamage(claymore.room, room, victim, amount, claymore.x, claymore.z, claymore.owner, 'claymore', false)
+  }
+}
 let grenadeId = 0
 
 /** 信管 (秒)。投げてから爆発するまで */
@@ -814,8 +991,13 @@ const RELEASE_HEIGHT = 1.7
  */
 const RELEASE_FORWARD = 0.45
 
-/** 1 つの命で投げられる数 */
-const GRENADES_PER_LIFE = 3
+/**
+ * 1 つの命で持てる数は support の表 (sim/weapons.ts) が決める。
+ *
+ * **数を持っているのはこちら。** 投げられるか置けるかを決めているのがこちらなので、
+ * 表を読む側もこちらでないと、画面の数だけ減って実際には投げられる、が起きる。
+ * 手榴弾 3 / クレイモア 2 という差もそこに書いてある。
+ */
 
 function throwGrenade(roomName: string, from: Player, event: ClientMessage): void {
   if (event.type !== 'grenade') return
@@ -923,55 +1105,79 @@ function detonate(nade: Grenade): void {
     const result = blastAt(x, y, z, victim, stageBoxes)
     if (!result) continue
 
-    victim.health = Math.max(0, victim.health - result.damage)
-    // 爆風でも集中は途切れる
-    victim.concentratingSince = 0
-
-    // 爆心の方向。撃たれたときと同じで、どこから来たかだけ渡す
-    const bearing = Math.atan2(x - victim.x, -(z - victim.z))
-
-    if (victim.health > 0) {
-      sendHealth(nade.room, victim, result.damage, false, bearing)
-      if (result.knock && isSeated(victim.life)) {
-        victim.socket.send(JSON.stringify({ type: 'knockdown' }))
-      }
-      continue
-    }
-
-    victim.deaths++
-    // 切れている間に倒された。戻ってきても続きは無い
-    victim.wasAlive = false
-    const killer = room.players.get(nade.owner)
-    // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる
-    victim.killedBy = killer && killer.id !== victim.id ? killer.id : ''
-    setLife(nade.room, victim, 'downed')
-    // 握っていたものは足元に落ちる。誘爆する
-    dropGrenade(nade.room, victim)
-    if (killer && killer.id !== victim.id) {
-      killer.kills++
-      killer.killsByWeapon.grenade = (killer.killsByWeapon.grenade ?? 0) + 1
-    } else if (killer) {
-      // 自分の手榴弾で死んだ。手柄は誰にも付かない。
-      // 投げた本人が既に居ない場合は自死に数えない — 残っていた物で死んだのは
-      // 自分の落ち度ではない
-      victim.suicides++
-    }
-    // 死因を問わず、倒された側の残機が 1 減る
-    loseTicket(room, victim.team)
-    sendHealth(nade.room, victim, result.damage, false, bearing)
-    broadcast(nade.room, matchState(room))
-    broadcast(nade.room, {
-      type: 'kill',
-      killer: killer?.id ?? victim.id,
-      killerName: killer?.name ?? victim.name,
-      killerTeam: killer?.team ?? victim.team,
-      victim: victim.id,
-      victimName: victim.name,
-      victimTeam: victim.team,
-      weapon: 'grenade',
-      headshot: false,
-    })
+    applyBlastDamage(nade.room, room, victim, result.damage, x, z, nade.owner, 'grenade', result.knock)
   }
+}
+
+/**
+ * 爆風のダメージを 1 人に入れる。
+ *
+ * **手榴弾とクレイモアが同じ道を通る。** 倒したときに動くものが多い
+ * (体力・残機・戦績・キル表示・握っていた物・倒した相手を映す先) ので、
+ * 2 つ目の爆発物を足すときにここを写すと、必ずどれかを写し忘れる。
+ *
+ * @param amount 与える量。届くかどうかと、どれだけ届くかは呼ぶ側が決める
+ * @param knock 転ばせるか。クレイモアは転ばせない (踏んだら死ぬか掠るかなので)
+ */
+function applyBlastDamage(
+  roomName: string,
+  room: Match,
+  victim: Player,
+  amount: number,
+  fromX: number,
+  fromZ: number,
+  ownerId: string,
+  weapon: 'grenade' | 'claymore',
+  knock: boolean,
+): void {
+  victim.health = Math.max(0, victim.health - amount)
+  // 爆風でも集中は途切れる
+  victim.concentratingSince = 0
+
+  // 爆心の方向。撃たれたときと同じで、どこから来たかだけ渡す
+  const bearing = Math.atan2(fromX - victim.x, -(fromZ - victim.z))
+
+  if (victim.health > 0) {
+    sendHealth(roomName, victim, amount, false, bearing)
+    if (knock && isSeated(victim.life)) {
+      victim.socket.send(JSON.stringify({ type: 'knockdown' }))
+    }
+    return
+  }
+
+  victim.deaths++
+  // 切れている間に倒された。戻ってきても続きは無い
+  victim.wasAlive = false
+  const killer = room.players.get(ownerId)
+  // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる
+  victim.killedBy = killer && killer.id !== victim.id ? killer.id : ''
+  setLife(roomName, victim, 'downed')
+  // 握っていたものは足元に落ちる。誘爆する
+  dropGrenade(roomName, victim)
+  if (killer && killer.id !== victim.id) {
+    killer.kills++
+    killer.killsByWeapon[weapon] = (killer.killsByWeapon[weapon] ?? 0) + 1
+  } else if (killer) {
+    // 自分の物で死んだ。手柄は誰にも付かない。
+    // 置いた/投げた本人が既に居ない場合は自死に数えない — 残っていた物で
+    // 死んだのは自分の落ち度ではない
+    victim.suicides++
+  }
+  // 死因を問わず、倒された側の残機が 1 減る
+  loseTicket(room, victim.team)
+  sendHealth(roomName, victim, amount, false, bearing)
+  broadcast(roomName, matchState(room))
+  broadcast(roomName, {
+    type: 'kill',
+    killer: killer?.id ?? victim.id,
+    killerName: killer?.name ?? victim.name,
+    killerTeam: killer?.team ?? victim.team,
+    victim: victim.id,
+    victimName: victim.name,
+    victimTeam: victim.team,
+    weapon: weapon === 'claymore' ? 'CLAYMORE' : 'grenade',
+    headshot: false,
+  })
 }
 
 /**
@@ -1569,6 +1775,7 @@ setInterval(() => {
     }
 
     updateMatch(roomName, room, now)
+    relayClaymores(roomName, room)
     for (const player of connected(room)) {
       // --- 時間で進む遷移 ---
       //
@@ -1626,6 +1833,27 @@ setInterval(() => {
       detonate(nade)
       grenades.splice(i, 1)
     }
+  }
+
+  // クレイモア。前を敵が通ったら起爆する
+  for (let i = claymores.length - 1; i >= 0; i--) {
+    const claymore = claymores[i]
+    const room = rooms.get(claymore.room)
+    if (!room) {
+      claymores.splice(i, 1)
+      continue
+    }
+    if (room.phase !== 'playing') continue
+    // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する**
+    const hit = connected(room).some(
+      (p) =>
+        canBeHurt(p.life) &&
+        (p.id === claymore.owner || p.team !== claymore.team) &&
+        triggeredBy(claymore, p),
+    )
+    if (!hit) continue
+    detonateClaymore(claymore)
+    claymores.splice(i, 1)
   }
 }, TICK_MS)
 
@@ -1804,6 +2032,7 @@ const server = Bun.serve<Client>({
         // 繋いだ直後は誰も見えていない。前の接続の分を残すと、隠れたことを
         // 知らせる 1 通が出ないまま「見えている」ことになる
         seat.seen.clear()
+        seat.seenClaymores.clear()
         // 繋ぎ直しの間は測っていない。前回の値を引き継ぐと巨大な間隔になる
         seat.packetGap = 0
         seat.lastPacketAt = 0
@@ -1844,11 +2073,11 @@ const server = Bun.serve<Client>({
           footsteps: new Footsteps(),
           locomotion: 'idle',
           weapon: 'rifle',
-          ammo: startingAmmo('grenade'),
+          ammo: startingAmmo(),
           slot: nextSlot(room),
           rejected: 0,
           concentratingSince: 0,
-          grenades: GRENADES_PER_LIFE,
+          grenades: SUPPORT_SPECS.grenade.count,
           support: 'grenade',
           holdingGrenade: false,
           wasAlive: false,
@@ -1856,6 +2085,7 @@ const server = Bun.serve<Client>({
           badPacketAt: 0,
           badMoveAt: 0,
           seen: new Set(),
+          seenClaymores: new Set(),
           packetGap: 0,
           lastPacketAt: 0,
           clockSkew: 0,
@@ -1950,11 +2180,11 @@ const server = Bun.serve<Client>({
           break
 
         case 'loadout': {
-          player.support = message.support === 'magazine' ? 'magazine' : 'grenade'
+          player.support = message.support
           // 支度中なら**すぐ**効かせる。次の湧きを待つと、選び直した分が
           // 1 つ遅れて効くことになる
           if (canChoose(player.life)) {
-            player.grenades = player.support === 'grenade' ? GRENADES_PER_LIFE : 0
+            player.grenades = SUPPORT_SPECS[player.support].count
           }
           break
         }
@@ -1975,6 +2205,9 @@ const server = Bun.serve<Client>({
         // 席を空けて待つのは「うっかり切れた人が戻ってこられるように」で、
         // 出ると決めた人には要らない。待つと、残った側は居ない相手を相手に
         // 最大 30 秒立たされる (試合は続いているのに誰も来ない)。
+        case 'claymore':
+          placeClaymore(socket.data.room, player)
+          break
         case 'leave':
           leaveRoom(socket.data.room, player)
           return
@@ -1985,6 +2218,8 @@ const server = Bun.serve<Client>({
           // 通信のずれで正当な 1 発が消える
           const left = player.ammo.magazine[player.weapon]
           if (left > 0) player.ammo.magazine[player.weapon] = left - 1
+          // 弾道の上にクレイモアがあれば起爆する
+          shotHitsClaymore(socket.data.room, message.from, message.to)
           // 銃声だけは扱いが違う。
           //
           // 曳光を描くには銃口の座標が要るが、それは「どこに居るか」そのもの。

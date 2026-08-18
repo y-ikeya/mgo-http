@@ -24,63 +24,65 @@ import type { HitZone } from './damage'
 export type WeaponId = 'rifle' | 'sniper' | 'pistol'
 
 /**
- * 武器の枠。
+ * 装備の枠。
  *
- * 持ち物は「主 1 丁 + 副 1 丁 + 投擲」で、枠に何を入れるかを湧き地点で選ぶ。
- * 銃を並べて順に持ち替える形にしないのは、選ぶこと自体を手にしたいため —
- * 狙撃銃を選んだなら、詰められたときに突撃銃は無い。
+ * 湧き地点で**それぞれ 1 つずつ**選ぶ。銃を並べて順に持ち替える形にしないのは、
+ * 選ぶこと自体を手にしたいため — 狙撃銃を選んだなら、詰められたときに突撃銃は無い。
+ *
+ * **2 本目以降は戦場で手に入れる。** 味方が外した銃を拾う、CQC で落とさせる。
+ * 持てる数に上限は置かない — 上限で縛る代わりに「奪ってこないと増えない」で縛る。
  */
-export type Slot = 'primary' | 'secondary'
+export type Slot = 'primary' | 'secondary' | 'support'
 
 /** その枠に入れられる銃 */
-export const CHOICES: Record<Slot, WeaponId[]> = {
+export const CHOICES: Record<'primary' | 'secondary', WeaponId[]> = {
   primary: ['rifle', 'sniper'],
   secondary: ['pistol'],
 }
 
 /**
- * 投擲の枠。
+ * support の枠に入る物。
  *
- * 手榴弾か、弾倉か。**両方は持てない**。
+ * 投げる物と置く物。**弾倉はここに入らない** — 撃った弾が 1 弾倉ぶん溜まるごとに
+ * 勝手に増える副産物であって、枠を使って選ぶ装備ではない。
  *
- *   手榴弾 … 削って転ばせる。遮蔽の裏へ回り込める唯一の手
- *   弾倉   … 予備弾が 1 つ増え、囮として投げられる
- *
- * 交換になっているのが肝。手榴弾は「相手を動かす」道具で、弾倉は
- * 「相手を騙す」道具と「撃ち続けられること」。どちらも接敵の前後に効くが、
- * 効き方が違う。
+ * 以前は `grenade | magazine` の二択にして「手榴弾は相手を動かす道具、弾倉は
+ * 相手を騙す道具。交換になっているのが肝」と理屈まで書いていたが、**作り話だった**。
+ * 本家では弾倉は選ぶものではない。
  */
-export type SupportId = 'grenade' | 'magazine'
+export type SupportId = 'grenade' | 'claymore'
 
-export const SUPPORTS: SupportId[] = ['grenade', 'magazine']
+export const SUPPORTS: SupportId[] = ['grenade', 'claymore']
 
 export interface SupportSpec {
   id: SupportId
+  /**
+   * 装備画面に出す名前。
+   *
+   * **実銃の型番ではなく「それが何か」を書く。** 銃は AK47 と書けば何か分かるが、
+   * M26 / M18 は覚えている人にしか通じない。選ぶ画面で要るのは
+   * 「投げる物か、置く物か」であって、正式名称ではない。
+   */
   label: string
   /** 1 つの命で持てる数 */
   count: number
-  /** 予備弾が何弾倉ぶん増えるか */
-  spareMagazines: number
   hint: string
 }
 
 export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
   grenade: {
     id: 'grenade',
-    label: 'M26',
+    label: 'GRENADE',
     count: 3,
-    spareMagazines: 0,
     hint: '爆風で削って転ばせる',
   },
-  magazine: {
-    id: 'magazine',
-    label: 'MAG',
-    // 手榴弾より 1 つ多い。囮は当てるものではないので、外しても痛くない代わりに
-    // 数が要る — 1 つでは向きを示すだけで、2 つ以上でないと嘘の筋道が引けない
-    count: 4,
-    // 主武器の弾倉 1 つぶん。撃ち切るまでの時間がそのぶん延びる
-    spareMagazines: 1,
-    hint: '囮として投げる / 予備弾 +1 弾倉',
+  claymore: {
+    id: 'claymore',
+    label: 'CLAYMORE',
+    // 手榴弾より少ない。置きっぱなしで効き続けるので、数を配ると
+    // 「通り道を全部塞ぐ」ができてしまう
+    count: 2,
+    hint: '置いて離れる。前を通った敵で起爆',
   },
 }
 
@@ -427,8 +429,8 @@ export function bulletDamage(spec: WeaponSpec, zone: HitZone, distance: number):
  * いて、繋ぎ直したときにそれを返す。両側で別々に計算すると、返した値が
  * 画面と食い違う。
  *
- * 弾倉を投げる枠 (magazine) を選ぶと、予備が 1 弾倉ぶん増える。
- * 撃ち切るまでの時間がそのぶん延びる。
+ * 銃ごとの池として持つので、**持っていない銃の弾も席に載っている**。
+ * 戦場で拾った銃をそのまま撃てるようにするための形。
  */
 export interface Ammo {
   /** 銃ごとの装填済み */
@@ -437,15 +439,25 @@ export interface Ammo {
   reserve: Record<WeaponId, number>
 }
 
-export function startingAmmo(support: SupportId): Ammo {
-  const spare = SUPPORT_SPECS[support].spareMagazines
+export function startingAmmo(): Ammo {
   const magazine = {} as Record<WeaponId, number>
   const reserve = {} as Record<WeaponId, number>
   for (const id of Object.keys(WEAPONS) as WeaponId[]) {
     magazine[id] = WEAPONS[id].magazine
-    reserve[id] = WEAPONS[id].reserve + spare * WEAPONS[id].magazine
+    reserve[id] = WEAPONS[id].reserve
   }
   return { magazine, reserve }
+}
+
+/**
+ * 投げられる弾倉が 1 個増えるまでに撃つ発数。
+ *
+ * **その銃の弾倉 1 つぶん。** リロードの回数ではなく撃った発数で数える —
+ * 回数で数えると、半分残ったまま替えても増えてしまい、篭って替え続けるのが
+ * 最適になる。撃った弾で数えれば、実弾を使わないと囮は増えない。
+ */
+export function roundsPerDecoy(id: WeaponId): number {
+  return WEAPONS[id].magazine
 }
 
 /**

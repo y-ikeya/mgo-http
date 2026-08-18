@@ -41,6 +41,9 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<Locomotion>([
   'stand',
   // 切れた人の姿。上半身だけ別の型を重ねると、銃を構えたまま固まる
   'away',
+  // クレイモアを置く。かがむので上下を分けられない
+  'claymore_windup',
+  'claymore_place',
 ])
 
 /** そのモーションのときの構え */
@@ -49,6 +52,8 @@ export function stanceOf(locomotion: Locomotion): Stance {
   // 爆風で倒れている間。起き上がりの途中も含めて低い姿勢として扱う
   if (locomotion === 'sweep' || locomotion === 'stand') return 'prone'
   if (locomotion === 'sneak' || locomotion === 'sit') return 'box'
+  // クレイモアはかがんで置く。頭が下がるので、見つかりにくさもしゃがみと同じ
+  if (locomotion === 'claymore_windup' || locomotion === 'claymore_place') return 'crouch'
   if (locomotion === 'crouch_idle' || locomotion.startsWith('crouch_')) return 'crouch'
   return 'stand'
 }
@@ -94,6 +99,8 @@ export interface StanceInput {
   aiming: boolean
   saluting: boolean
   stabbing: boolean
+  /** クレイモアを置いている最中の姿勢。置いていなければ null */
+  setting: 'claymore_windup' | 'claymore_place' | null
   /** 爆風で倒れているか */
   downed: boolean
   /**
@@ -144,7 +151,8 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // 敬礼。動けば解ける (解く操作は呼ぶ側が行う)
   if (input.saluting && !hasDirection(input)) return 'salute'
 
-  // 刺突とローリングは全身動作。終わるまで移動モーションに戻さない
+  // 刺突・設置・ローリングは全身動作。終わるまで移動モーションに戻さない
+  if (input.setting) return input.setting
   if (input.stabbing) return 'stab'
   if (input.rolling) return 'roll'
 

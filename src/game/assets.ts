@@ -15,6 +15,7 @@ const SNIPER_URL = `${import.meta.env.BASE_URL}models/sniper.glb`
 const PISTOL_URL = `${import.meta.env.BASE_URL}models/pistol.glb`
 const CASING_URL = `${import.meta.env.BASE_URL}models/casing_rifle.glb`
 const KNIFE_URL = `${import.meta.env.BASE_URL}models/knife.glb`
+const CLAYMORE_URL = `${import.meta.env.BASE_URL}models/claymore.glb`
 const GRENADE_URL = `${import.meta.env.BASE_URL}models/grenade.glb`
 const STAGE_URL = `${import.meta.env.BASE_URL}models/stage.glb`
 
@@ -82,6 +83,10 @@ export function loadCasing(): Promise<GLTF> {
 
 export function loadKnife(): Promise<GLTF> {
   return load(KNIFE_URL)
+}
+
+export function loadClaymore(): Promise<GLTF> {
+  return load(CLAYMORE_URL)
 }
 
 export function loadGrenade(): Promise<GLTF> {
