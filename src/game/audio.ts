@@ -1,5 +1,7 @@
 import * as THREE from "three";
 
+import { asset } from "./assets";
+
 /**
  * 効果音。位置情報を持たせて鳴らす。
  *
@@ -287,7 +289,7 @@ export class GameAudio {
         async ([name, profile]) => {
           try {
             const buffer = await loader.loadAsync(
-              `${import.meta.env.BASE_URL}audio/${profile.file}`,
+              asset.audio(profile.file),
             );
             if (!this.disposed) this.buffers.set(name, buffer);
           } catch (error) {

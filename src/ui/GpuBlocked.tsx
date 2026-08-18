@@ -1,5 +1,6 @@
 import { onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
+import { asset } from '../game/assets'
 import type { GpuVerdict } from '../game/gpu'
 import './GpuBlocked.css'
 
@@ -33,7 +34,7 @@ export default function GpuBlocked(props: { verdict: GpuVerdict }) {
   const armed: (() => void)[] = []
 
   onMount(() => {
-    audio = new Audio(`${import.meta.env.BASE_URL}audio/error1.mp3`)
+    audio = new Audio(asset.audio('error1.mp3'))
     audio.volume = 0.7
 
     void audio.play().catch(() => {

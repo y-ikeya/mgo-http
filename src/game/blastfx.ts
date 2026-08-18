@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 
+import { asset } from './assets'
+
 /**
  * 爆発の見た目。
  *
@@ -88,7 +90,7 @@ export class BlastFx {
     for (const kind of RECIPE) {
       for (let i = 0; i < kind.count; i++) {
         const texture = loader.load(
-          `${import.meta.env.BASE_URL}textures/particles.png`,
+          asset.texture('particles.png'),
           undefined,
           undefined,
           (error) => console.warn('[爆発] particles.png が読めない', error),

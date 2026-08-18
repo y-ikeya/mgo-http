@@ -23,7 +23,7 @@ import {
 } from 'three/tsl'
 import type { Obstacle } from '../sim/collision'
 import type { StageBox } from '../sim/vision'
-import { loadStage } from './assets'
+import { asset, loadStage } from './assets'
 import { isMesh } from './guards'
 
 /**
@@ -252,7 +252,6 @@ async function applyStructureTexture(
   surface: Surface,
 ): Promise<void> {
   const loader = new THREE.TextureLoader()
-  const base = `${import.meta.env.BASE_URL}textures/`
   const prefix = SURFACE_TEXTURES[surface]
 
   const setup = (texture: THREE.Texture, srgb: boolean) => {
@@ -265,9 +264,9 @@ async function applyStructureTexture(
 
   try {
     const [diffuse, normal, roughness] = await Promise.all([
-      loader.loadAsync(`${base}${prefix}_diff.jpg`),
-      loader.loadAsync(`${base}${prefix}_nor.jpg`),
-      loader.loadAsync(`${base}${prefix}_rough.jpg`),
+      loader.loadAsync(asset.texture(`${prefix}_diff.jpg`)),
+      loader.loadAsync(asset.texture(`${prefix}_nor.jpg`)),
+      loader.loadAsync(asset.texture(`${prefix}_rough.jpg`)),
     ])
     material.map = setup(diffuse, true)
     material.normalMap = setup(normal, false)
@@ -277,7 +276,7 @@ async function applyStructureTexture(
     material.roughness = 1
     // 金属だけ metalness のマップを持つ。コンクリートは非金属
     if (surface === 'metal') {
-      material.metalnessMap = setup(await loader.loadAsync(`${base}${prefix}_metal.jpg`), false)
+      material.metalnessMap = setup(await loader.loadAsync(asset.texture(`${prefix}_metal.jpg`)), false)
       material.metalness = 1
     } else {
       material.metalness = 0
@@ -471,7 +470,7 @@ let stageBoxes: Promise<StageBox[]> | null = null
 
 export function loadStageBoxes(): Promise<StageBox[]> {
   if (!stageBoxes) {
-    const url = `${import.meta.env.BASE_URL}models/stage.json`
+    const url = asset.model('stage.json')
     stageBoxes = fetch(url)
       .then((res) => res.json() as Promise<{ boxes: StageBox[] }>)
       .then((data) => data.boxes)
@@ -521,7 +520,6 @@ async function applySlopes(obstacles: Obstacle[]): Promise<void> {
  */
 async function applyGroundTexture(material: THREE.MeshStandardMaterial): Promise<void> {
   const loader = new THREE.TextureLoader()
-  const base = `${import.meta.env.BASE_URL}textures/`
   const repeat = GROUND_SIZE / GROUND_TILE_SIZE
 
   const setup = (texture: THREE.Texture, srgb: boolean) => {
@@ -536,9 +534,9 @@ async function applyGroundTexture(material: THREE.MeshStandardMaterial): Promise
 
   try {
     const [diffuse, normal, roughness] = await Promise.all([
-      loader.loadAsync(`${base}ground_diff.jpg`),
-      loader.loadAsync(`${base}ground_nor.jpg`),
-      loader.loadAsync(`${base}ground_rough.jpg`),
+      loader.loadAsync(asset.texture(`ground_diff.jpg`)),
+      loader.loadAsync(asset.texture(`ground_nor.jpg`)),
+      loader.loadAsync(asset.texture(`ground_rough.jpg`)),
     ])
     material.map = setup(diffuse, true)
     material.normalMap = setup(normal, false)

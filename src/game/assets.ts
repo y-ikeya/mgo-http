@@ -10,14 +10,30 @@ import { DEFAULT_SKIN } from './skin'
  * 実体は 1 つで、使う側が SkeletonUtils.clone で複製する。
  */
 
-const RIFLE_URL = `${import.meta.env.BASE_URL}models/rifle.glb`
-const SNIPER_URL = `${import.meta.env.BASE_URL}models/sniper.glb`
-const PISTOL_URL = `${import.meta.env.BASE_URL}models/pistol.glb`
-const CASING_URL = `${import.meta.env.BASE_URL}models/casing_rifle.glb`
-const KNIFE_URL = `${import.meta.env.BASE_URL}models/knife.glb`
-const CLAYMORE_URL = `${import.meta.env.BASE_URL}models/claymore.glb`
-const GRENADE_URL = `${import.meta.env.BASE_URL}models/grenade.glb`
-const STAGE_URL = `${import.meta.env.BASE_URL}models/stage.glb`
+/**
+ * public/ の下のどこに何が置いてあるか。
+ *
+ * **ここだけが知っている。** 以前は `${import.meta.env.BASE_URL}audio/...` のような
+ * 組み立てが 7 か所に散っていて、置き場所を動かすときに全部を見つけて回る必要があった
+ * (見つけ損ねても組み立ては通る — 404 になって初めて分かる)。
+ *
+ * BASE_URL は配置先で変わる (Pages のプレビューはサブパスに出る) ので、
+ * 直書きの絶対パスにはできない。
+ */
+export const asset = {
+  model: (file: string) => `${import.meta.env.BASE_URL}models/${file}`,
+  audio: (file: string) => `${import.meta.env.BASE_URL}audio/${file}`,
+  texture: (file: string) => `${import.meta.env.BASE_URL}textures/${file}`,
+} as const
+
+const RIFLE_URL = asset.model('rifle.glb')
+const SNIPER_URL = asset.model('sniper.glb')
+const PISTOL_URL = asset.model('pistol.glb')
+const CASING_URL = asset.model('casing_rifle.glb')
+const KNIFE_URL = asset.model('knife.glb')
+const CLAYMORE_URL = asset.model('claymore.glb')
+const GRENADE_URL = asset.model('grenade.glb')
+const STAGE_URL = asset.model('stage.glb')
 
 const cache = new Map<string, Promise<GLTF>>()
 
@@ -58,7 +74,7 @@ function load(url: string): Promise<GLTF> {
  * 種類ごとに Promise を分けて持つので、同じ物を 2 回解析しない。
  */
 export function loadSoldier(skin: string = DEFAULT_SKIN): Promise<GLTF> {
-  return load(`${import.meta.env.BASE_URL}models/${skin}.glb`)
+  return load(asset.model(`${skin}.glb`))
 }
 
 export function loadRifle(): Promise<GLTF> {
