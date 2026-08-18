@@ -1295,19 +1295,34 @@ export class Player {
    *
    * マテリアルは複製してから触る。glTF の実体は他プレイヤーの複製元でもあるので、
    * ここで書き換えると相手の見た目まで変わる。
+   *
+   * --- 深度の書き方は元のまま残す ---
+   *
+   * 以前はここで全部に `depthWrite = true` を焼いていた。**髪で破綻する。**
+   *
+   * 髪は重なった板の集まりで、glTF の alphaMode BLEND (three では
+   * `depthWrite: false`) で描くことを前提に作られている。深度を書かせると、
+   * 板の**透明な所まで深度を書く**。半透明の列の並べ替えは物体の中心までの距離で
+   * 決まり、頭も髪も中心がほぼ同じなので順番が回によって入れ替わる。髪が先に出た
+   * 回は、その裏の頭とうなじが深度で落ちて**背景の壁が抜けて見える**。
+   *
+   * 元が半透明だった物には書かせない。そのうえで実体より後ろの順番に回して、
+   * 並べ替えの当たり外れに任せない。
    */
   private drawLast(root: THREE.Object3D): void {
     const cloned = new Map<THREE.Material, THREE.Material>()
     root.traverse((obj) => {
       if (!isMesh(obj)) return
-      obj.renderOrder = SELF_RENDER_ORDER
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+      // 元から半透明だった物 (髪のような重なる板) は実体を全部描いたあとに回す
+      const wasTransparent = materials.some((material) => material.transparent)
+      obj.renderOrder = SELF_RENDER_ORDER + (wasTransparent ? 1 : 0)
       const replaced = materials.map((material) => {
         let copy = cloned.get(material)
         if (!copy) {
           copy = material.clone()
+          copy.depthWrite = material.transparent ? material.depthWrite : true
           copy.transparent = true
-          copy.depthWrite = true
           cloned.set(material, copy)
         }
         return copy
