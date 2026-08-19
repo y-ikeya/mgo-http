@@ -132,7 +132,7 @@ export const WEIGHT_EFFECT = 0.06
  * 実際に触って決める所。**押した入力は捨てずに溜める**ので、連打しても反応が
  * 無いようには感じないはず (Inventory.switchTo)。
  */
-export const SWITCH_TIME = 0.6
+export const SWITCH_TIME = 0.3
 
 /**
  * 持ち物を並べる。系統ごとに、枠の順で。

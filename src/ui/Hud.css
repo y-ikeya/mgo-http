@@ -596,3 +596,51 @@
   letter-spacing: 0.08em;
   color: rgba(170, 186, 156, 0.55);
 }
+
+/*
+ * 持ち替えの一覧。
+ *
+ * **L 字。** 現在の位置が角に来て、前半が上へ、後半が右へ伸びる。縦一列に
+ * 並べると画面の真ん中を塞ぐので、隅へ逃がしてある。
+ */
+.hud-browse {
+  position: absolute;
+  left: 22px;
+  bottom: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
+}
+
+.hud-browse-up {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.hud-browse-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-browse-item {
+  padding: 3px 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(198, 214, 232, 0.72);
+  background: rgba(10, 14, 20, 0.55);
+  border: 1px solid rgba(126, 166, 255, 0.18);
+  white-space: nowrap;
+}
+
+/* 選んでいる物。角に来る */
+.hud-browse-at {
+  color: #f2f6fb;
+  background: rgba(126, 166, 255, 0.22);
+  border-color: rgba(126, 166, 255, 0.7);
+}

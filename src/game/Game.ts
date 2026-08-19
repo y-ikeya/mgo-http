@@ -47,7 +47,7 @@ import {
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { Inventory } from "../sim/inventory";
-import { HELD } from "../sim/held";
+import { HELD, type Family, type HeldId } from "../sim/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../sim/damage";
 import type { NoiseEvent } from "../net/types";
@@ -132,6 +132,12 @@ export interface GameStats {
   grenades: number
   /** 投擲の枠に何を入れているか */
   support: SupportId
+  /** 開いている持ち替えの一覧。閉じていれば null */
+  browsing: { items: HeldId[]; at: number } | null
+  /** いま手にある物 */
+  held: HeldId
+  /** 持ち替えの最中か。HUD を薄くするのに使う */
+  switching: boolean
   /** 自分の所属 */
   team: Team
   /** 試合の状態。まだ届いていなければ null */
@@ -315,6 +321,20 @@ const GRENADE_RELEASE_RATIO = 0.19;
  */
 const CLAYMORE_PLACE_RATIO = 0.55;
 
+/**
+ * 一覧が開くまでの長押し (秒)。
+ *
+ * これより短ければトグル。**押すだけで往復できることを壊さない**ための境目で、
+ * 長すぎると一覧に辿り着けず、短すぎるとトグルのつもりで一覧が出る。
+ */
+const BROWSE_HOLD = 0.18;
+
+/** 長押しで一覧が出るキー。系統ごとに 1 つ */
+const SWITCH_KEYS: readonly (readonly [Family, "swap" | "box", string])[] = [
+  ["weapon", "swap", "KeyQ"],
+  ["tool", "box", "KeyC"],
+];
+
 
 /**
  * 空撃ちの音を鳴らす間隔 (秒)。
@@ -369,6 +389,14 @@ export class Game {
   private readonly casings: Casings;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
   private stageBoxes: StageBox[] = [];
+  /**
+   * 一覧を開いている最中。
+   *
+   * **開いている間は持ち替えていない。** 選ぶことと抜くことを分けてあるので、
+   * ここを動かしても代償は発生しない (docs/design.md の 5)。
+   */
+  private browsing: { family: Family; at: number; since: number } | null = null;
+
   private grenadeAiming = false;
   /** 投げる引き金のラッチ。押しっぱなしで連投しない */
   private throwReleased = true;
@@ -2198,17 +2226,65 @@ export class Game {
    * それが投げること・刺すことの代償になっている (docs/design.md の 5)。
    */
   private updateSwitchKeys(): void {
-    if (!canAct(this.life) || this.loadoutBlocking) return;
+    if (!canAct(this.life) || this.loadoutBlocking) {
+      this.browsing = null;
+      return;
+    }
     // ボルトを送り終えるまでは持ち替えない。撃って即座に隠れる、を塞ぐ
     if (this.cocking) return;
     // 構えたままは持ち替えられない。銃を下ろす一手間があって初めて、
     // どちらで待つかの選択になる
-    if (this.player.isAiming) return;
+    if (this.player.isAiming) {
+      this.browsing = null;
+      return;
+    }
 
-    if (this.input.consumeAction("swap", "KeyQ")) this.inv.toggle("weapon");
-    if (this.input.consumeAction("grenade", "KeyE")) this.inv.switchTo(this.loadout.support);
+    // --- 長押しで一覧、離すと持ち替え ---
+    //
+    // **一覧の中を動くのはタダ。** 時間がかかるのは決めた後の持ち替えだけ。
+    // 押すだけのトグルは即持ち替えなので、連打すると全部が実際の持ち替えになる。
+    // 選ぶことと抜くことを分けると、迷っている時間に代償が要らなくなる。
+    for (const [family, action, code] of SWITCH_KEYS) {
+      const down = this.input.isActionDown(action, code);
+      if (down) {
+        if (!this.browsing) {
+          this.browsing = { family, at: this.browseStart(family), since: Date.now() };
+        } else if (this.browsing.family === family) {
+          const steps = this.input.consumeWheel();
+          if (steps !== 0) this.browsing.at = this.browseMove(this.browsing, -steps);
+        }
+      } else if (this.browsing?.family === family) {
+        const list = this.inv.list(family);
+        const pick = list[this.browsing.at]?.id;
+        const opened = Date.now() - this.browsing.since >= BROWSE_HOLD * 1000;
+        this.browsing = null;
+        // 短く押しただけならトグル。長押しなら一覧で選んだ物へ
+        if (opened && pick) this.inv.switchTo(pick);
+        else if (family === "weapon") this.inv.toggle("weapon");
+        else this.inv.toggle("tool");
+      }
+    }
+
+    // 名指しの持ち替え。一覧を開かずに行き先が決まっているとき
+    if (this.input.consumeAction("grenade", "KeyE")) {
+      const support = this.inv.supportId;
+      if (support) this.inv.switchTo(support);
+    }
     if (this.input.consumeAction("knife", "KeyF")) this.inv.switchTo("knife");
-    if (this.input.consumeAction("box", "KeyC")) this.inv.toggle("tool");
+  }
+
+  /** 一覧を開いた時点の位置。いま手にある物に合わせる */
+  private browseStart(family: Family): number {
+    const list = this.inv.list(family);
+    const at = list.findIndex((item) => item.id === this.inv.held);
+    return at < 0 ? 0 : at;
+  }
+
+  /** 一覧の中を送る。端で止めず回す — 短い並びなので行き止まりが煩わしい */
+  private browseMove(state: { family: Family; at: number }, step: number): number {
+    const list = this.inv.list(state.family);
+    if (list.length === 0) return 0;
+    return (state.at + step + list.length) % list.length;
   }
 
   /**
@@ -2602,6 +2678,20 @@ export class Game {
       ),
       throwables: this.inv.countOf('magazine'),
       grenades: this.inv.supportCount,
+      /**
+       * 開いている一覧。閉じていれば null。
+       *
+       * 並びと、いま指している位置を渡す。**L 字に折って描く**のは画面側の仕事
+       * (真ん中を塞がないため)。
+       */
+      browsing: this.browsing
+        ? {
+            items: this.inv.list(this.browsing.family).map((c) => c.id),
+            at: this.browsing.at,
+          }
+        : null,
+      held: this.inv.held,
+      switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物
       support: (this.inv.supportId as SupportId | null) ?? this.loadout.support,
       team: this.team,

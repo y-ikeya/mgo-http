@@ -1,5 +1,6 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
+import { HELD } from '../sim/held'
 import type { GameStats } from '../game/Game'
 import './Hud.css'
 
@@ -246,6 +247,32 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           MAG × {props.stats?.throwables ?? 0}
         </div>
       </div>
+
+      {/*
+        持ち替えの一覧。
+        **1 本のリストを L 字に折る。** 縦一列だと画面の真ん中を塞ぐ。現在の位置を
+        角に置いて、前半を上へ、後半を右へ伸ばす。見えていることが勝敗を決める
+        ゲームなので、UI が視界を奪わない (MGO2 がそうしていた)。
+      */}
+      <Show when={props.stats?.browsing}>
+        {(browsing) => (
+          <div class="hud-browse">
+            <div class="hud-browse-up">
+              <For each={browsing().items.slice(0, browsing().at).reverse()}>
+                {(id) => <div class="hud-browse-item">{HELD[id].label}</div>}
+              </For>
+            </div>
+            <div class="hud-browse-row">
+              <div class="hud-browse-item hud-browse-at">
+                {HELD[browsing().items[browsing().at]]?.label ?? ''}
+              </div>
+              <For each={browsing().items.slice(browsing().at + 1)}>
+                {(id) => <div class="hud-browse-item">{HELD[id].label}</div>}
+              </For>
+            </div>
+          </div>
+        )}
+      </Show>
 
       <div class="hud-help">{t('hud.help')}</div>
     </div>
