@@ -1,4 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../sim/weapons'
+import type { HeldId } from '../sim/held'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
@@ -255,6 +256,15 @@ export class Player {
   private model: THREE.Object3D | null = null
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle'
+
+  /**
+   * いま手にある物。
+   *
+   * **見た目の唯一の在り処。** どのモデルを出すか、銃を納めるかが全部ここから
+   * 決まる。以前は boxed / stabbing / weaponKind から場合分けしていて、
+   * 手に持てる物を増やすたびに条件が増えた (docs/design.md の 5)。
+   */
+  private held: HeldId = 'rifle'
   /**
    * 爆風で倒れているか。起き上がる操作をするまで続く。
    *
@@ -444,7 +454,7 @@ export class Player {
       // いま手にある物。**ここが唯一の在り処になる。** いまは既存の状態から
       // 組み立てているが、持ち物 (Carried[]) を Player が持つようになったら
       // そちらを直接返す
-      held: this.boxed ? 'box' : this.throwing ? 'grenade' : this.weaponKind,
+      held: this.held,
       concentrating: this.isConcentrating,
       saluteHeld: this.saluteHeld,
       // 振りかぶって持っている間だけ。倒されたら足元に落ちる
@@ -468,10 +478,23 @@ export class Player {
    * 空中では切り替えない。落下中に被ると、着地までの間だけ箱が宙に浮く。
    */
   toggleBox(): void {
-    if (this.down || !this.onGround || this.rolling || this.stabbing) return
-    if (this.downed || this.standing) return
-    if (this.saluting) return
-    this.boxed = !this.boxed
+    this.setBoxed(!this.boxed)
+  }
+
+  /**
+   * 箱を被る / 下ろす。
+   *
+   * **持ち替えから呼ばれる。** 箱は道具系の 1 つなので、手にした瞬間に被る。
+   * 立てない場面 (転がり中・倒れている・敬礼中) では被れない。
+   */
+  setBoxed(on: boolean): void {
+    if (on === this.boxed) return
+    if (on) {
+      if (this.down || !this.onGround || this.rolling || this.stabbing) return
+      if (this.downed || this.standing) return
+      if (this.saluting) return
+    }
+    this.boxed = on
     this.animator?.setBoxed(this.boxed)
     // 被る = 屈む。箱の高さはしゃがみ姿勢に合わせてある。
     if (this.boxed) {
@@ -659,6 +682,20 @@ export class Player {
    * 上半身だけなので走りながらでも出る。退きながら足元へ落とすのが
    * 使い方の一つなので、投げるために止まらせない。
    */
+  /**
+   * 手にある物を差し替える。
+   *
+   * モデルの読み込みは持たない — 銃は equip()、ナイフと箱は最初から付いている。
+   * ここがやるのは**どれを見せるか**の切り替えだけ。
+   */
+  setHeld(id: HeldId): void {
+    this.held = id
+  }
+
+  get heldItem(): HeldId {
+    return this.held
+  }
+
   playSetup(): void {
     this.animator?.playSetup()
   }
@@ -1227,25 +1264,26 @@ export class Player {
       // 見えているものと当たるものが食い違わない。
       if (this.box) this.box.visible = this.boxed
 
-      // 刺突中だけナイフを出す。同じ右手ソケットなので入れ替えるだけ。
-      const stabbing = this.animator.stabbing
-      // 武器を隠す場面が 2 つある。
-      //   箱の中  … 持ったまま屈むと箱からはみ出るし、構えられないので意味がない
-      //   敬礼中  … 銃を握った手で敬礼はできない。手が空いている前提の型
-      const saluting = this.animator.saluting
-      // 拳銃は構えるまで抜かない。**ホルスターに納まっている**という扱い。
+      // 手に何を出すかは held が決める。
       //
-      // 副武器なので、持っていること自体は見せなくてよい。抜いていないぶん
-      // 「今どちらを持っているか」が相手からも読みにくくなる。
-      // 拳銃は構えるまで抜かない。ただしリロード中は抜いている —
-      // 納めたまま弾倉を替えることはできないし、見えない銃をリロードして
-      // いるように見える
+      // 銃を隠す場面:
+      //   銃以外を手にしている … 持ち替えたので背中・腰に納まっている
+      //   敬礼中               … 銃を握った手で敬礼はできない。手が空いている型
+      //   拳銃を構えていない   … ホルスターに納まっている扱い。副武器なので
+      //                          持っていること自体を見せなくてよく、相手からも
+      //                          「今どちらを持っているか」が読みにくくなる。
+      //                          ただしリロード中は抜いている (納めたまま弾倉は
+      //                          替えられないし、見えない銃をリロードして見える)
+      const saluting = this.animator.saluting
+      const gun = this.held === 'rifle' || this.held === 'sniper' || this.held === 'pistol'
       const holstered =
-        this.boxed ||
+        !gun ||
         saluting ||
         (this.weaponKind === 'pistol' && !this.aiming && !this.animator.reloading)
-      if (this.knife) this.knife.visible = (stabbing || this.knifePreview) && !holstered
-      if (this.weapon) this.weapon.visible = !stabbing && !holstered
+      // ナイフは持ち替えて出す。刺突中の一瞬だけではなくなった
+      const knifeOut = (this.held === 'knife' || this.knifePreview) && !saluting && !this.boxed
+      if (this.knife) this.knife.visible = knifeOut
+      if (this.weapon) this.weapon.visible = !holstered
     }
   }
 

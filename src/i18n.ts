@@ -57,9 +57,10 @@ const JA = {
   'hud.scopeHint': 'Z / ホイールで覗く',
   'hud.standUpHint': '移動で起き上がる',
   'hud.help':
-    'WASD 移動 · Space 短押し しゃがみ / 長押し ローリング · マウス 視点 · 右クリック / Shift 構え' +
-    ' · 左クリック 射撃 · R リロード · F ナイフ · C ダンボール · G 長押しで弾倉を投げる' +
-    ' · E 長押しで手榴弾 · V 敬礼 (長押しで保つ) · Q 持ち替え · Z 倍率 · Tab 成績表',
+    'WASD 移動 · Space 短押し しゃがみ / 長押し ローリング · マウス 視点' +
+    ' · 右クリック / Shift 構え · 左クリック 使う (撃つ / 投げる / 刺す)' +
+    ' · Q 持ち替え · E 投げ物 · F ナイフ · C ダンボール' +
+    ' · R リロード · V 敬礼 (長押しで保つ) · Z 倍率 · Tab 成績表',
 
   // --- 装備 ---
   'loadout.note': '装備を選んでください',
@@ -112,9 +113,10 @@ const EN: Record<Key, string> = {
   'hud.scopeHint': 'Z / wheel to scope',
   'hud.standUpHint': 'MOVE TO GET UP',
   'hud.help':
-    'WASD move · Space tap to crouch / hold to roll · Mouse look · Right click / Shift aim' +
-    ' · Left click fire · R reload · F knife · C cardboard box · G hold to throw a magazine' +
-    ' · E hold for a grenade · V salute (hold to keep) · Q swap weapon · Z zoom · Tab scoreboard',
+    'WASD move · Space tap to crouch / hold to roll · Mouse look' +
+    ' · Right click / Shift aim · Left click use (shoot / throw / stab)' +
+    ' · Q switch · E throwable · F knife · C cardboard box' +
+    ' · R reload · V salute (hold to keep) · Z zoom · Tab scoreboard',
 
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',
