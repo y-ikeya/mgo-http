@@ -586,10 +586,19 @@
   gap: 6px;
 }
 
+/*
+ * 一覧の 1 つ。
+ *
+ * **幅を揃える。** 中身に合わせると M9 は狭く CLAYMORE は広くなり、縦に並べた
+ * ときに端が揃わない。選んでいる物が動くたびに列の形が変わって、目が落ち着かない。
+ */
 .hud-browse-item {
+  box-sizing: border-box;
+  min-width: 104px;
   padding: 3px 10px;
   font-size: 12px;
   letter-spacing: 0.08em;
+  text-align: center;
   color: rgba(198, 214, 232, 0.72);
   background: rgba(10, 14, 20, 0.55);
   border: 1px solid rgba(126, 166, 255, 0.18);
