@@ -50,11 +50,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * 操作の説明。
+ *
+ * **右下には掛からない。** 幅を切らないと、折り返した行が武器のカードの上を
+ * 通る。窓を小さくするほど行が増えるので、右側を空けておく必要がある
+ * (実際に描いて気づいた — 手書きの見本には説明を入れていなかった)。
+ */
 .hud-help {
   position: absolute;
   bottom: 16px;
   left: 16px;
+  max-width: calc(100% - 260px);
   font-size: 11px;
+  line-height: 1.5;
   letter-spacing: 0.08em;
   color: rgba(200, 212, 192, 0.45);
 }
