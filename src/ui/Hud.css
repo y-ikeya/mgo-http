@@ -684,6 +684,7 @@
   background: rgba(24, 38, 64, 0.72);
 }
 
+/* 持っている弾の総数 (装填分 + 予備)。内訳は下の目盛り */
 .hud-weapon-spare {
   font-size: 22px;
   line-height: 1;

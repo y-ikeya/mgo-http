@@ -28,6 +28,19 @@ const cases: Record<string, Partial<GameStats>> = {
   boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'pistol', ammo: 10, magazine: 12, reserve: 48 },
   noneSelected: { tool: 'none', toolInHand: false },
   empty: { ammo: 0 },
+  reloading: { ammo: 0, reloading: true },
+  browsing: {
+    browsingFamily: 'weapon',
+    browsing: {
+      items: [
+        { id: 'rifle', n: 84, loaded: 24, mag: 30 },
+        { id: 'pistol', n: 58, loaded: 10, mag: 12 },
+        { id: 'grenade', n: 3, loaded: null, mag: null },
+        { id: 'knife', n: null, loaded: null, mag: null },
+      ],
+      at: 1,
+    },
+  },
 }
 const which = new URLSearchParams(location.search).get('case') ?? 'normal'
 const stats = { ...base, ...cases[which] } as GameStats

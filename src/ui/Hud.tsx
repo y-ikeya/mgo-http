@@ -56,8 +56,25 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     }
     return props.stats?.weaponHeld ?? 'rifle'
   }
+  /** 武器の一覧を送っている間、いま指している物。それ以外は null */
+  const browsedItem = () => {
+    const browsing = props.stats?.browsing
+    if (!browsing || props.stats?.browsingFamily !== 'weapon') return null
+    return browsing.items[browsing.at] ?? null
+  }
+
   const heldLabel = () => HELD[held()].label
   const heldIsGun = () => HELD[held()].shoots
+
+  /**
+   * カードの大きい数字。**持っている弾の総数** (装填分 + 予備)。
+   *
+   * 予備だけを出すと、弾倉に 30 発あるのに 0 と出る瞬間がある。数字は
+   * 「あと何発撃てるか」の答えでいてほしい。装填の内訳は下の目盛りが持つ。
+   *
+   * 一覧を送っている間は、指している銃の総数 (サーバーが総数で載せている)。
+   */
+  const heldTotal = () => browsedItem()?.n ?? (props.stats?.ammo ?? 0) + (props.stats?.reserve ?? 0)
 
   /** 投げ物の残り。銃なら null */
   const heldCount = () => {
@@ -75,8 +92,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * **数字を読まずに残りが分かる**ことのほうが要る。
    */
   const ticks = () => {
-    const size = props.stats?.magazine ?? 0
-    const left = props.stats?.ammo ?? 0
+    const browsed = browsedItem()
+    const size = browsed?.mag ?? props.stats?.magazine ?? 0
+    const left = browsed?.loaded ?? props.stats?.ammo ?? 0
     return Array.from({ length: size }, (_, i) => i < left)
   }
 
@@ -300,8 +318,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         持ち替えて使う形にした以上、持っていない物の数を並べても判断に使えない。
         MGO2 も手にしている物だけを出していた (docs/design.md の 5)。
 
-        装填弾は**目盛り**、予備弾は**数字**。撃っている最中に数字を読ませない —
-        減っていくのが目に入るだけで足りるし、視線を画面の隅へ動かす回数が減る。
+        装填弾は**目盛り**、持っている総数は**数字**。撃っている最中に数字を
+        読ませない — 減っていくのが目に入るだけで足りるし、視線を画面の隅へ
+        動かす回数が減る。
       */}
       <div
         class="hud-weapon"
@@ -311,11 +330,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           // 道具を手にしている間。**弾数は正しいまま薄くする** — 0 と出すと
           // 「弾が無い」に見えるが、実際は手が塞がっているだけ
           'hud-weapon-idle': props.stats?.toolInHand,
-          'hud-weapon-empty': heldIsGun() && (props.stats?.ammo ?? 0) === 0,
+          // 送っている間は指している銃の装填で見る。空の銃が赤いまま並ぶ
+          'hud-weapon-empty':
+            heldIsGun() && (browsedItem()?.loaded ?? props.stats?.ammo ?? 0) === 0,
         }}
       >
         <Show when={heldIsGun()}>
-          <div class="hud-weapon-spare">{props.stats?.reserve ?? 0}</div>
+          <div class="hud-weapon-spare">{heldTotal()}</div>
         </Show>
         <div class="hud-weapon-name">{heldLabel()}</div>
         <Show when={heldIsGun()}>

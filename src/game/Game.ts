@@ -133,7 +133,11 @@ export interface GameStats {
   /** 投擲の枠に何を入れているか */
   support: SupportId
   /** 開いている持ち替えの一覧。閉じていれば null */
-  browsing: { items: { id: HeldId; n: number | null }[]; at: number } | null
+  browsing: {
+    /** n = 持っている総数 (銃は装填 + 予備)。loaded/mag は銃だけ */
+    items: { id: HeldId; n: number | null; loaded: number | null; mag: number | null }[]
+    at: number
+  } | null
   /** いま手にある物 */
   held: HeldId
   /** 武器系で選んでいる物。道具を手にしていても変わらない */
@@ -2720,10 +2724,15 @@ export class Game {
       browsing: this.browsing
         ? {
             // **数も載せる。** 選ぶときに「あと何発か」が要る — 弾切れの銃と
-            // 満タンの銃が同じ見た目だと、一覧が選ぶ材料にならない
+            // 満タンの銃が同じ見た目だと、一覧が選ぶ材料にならない。
+            // 銃は装填分も足した**総数**。カードの数字と揃える
             items: this.inv.list(this.browsing.family).map((c) => ({
               id: c.id,
-              n: 'ammo' in c ? c.ammo : 'count' in c ? c.count : null,
+              n: 'ammo' in c ? c.ammo + c.reserve : 'count' in c ? c.count : null,
+              // **装填の内訳も銃ごとに。** 送っている間、角のカードは指している銃を
+              // 映すので、目盛りだけ手元の銃のままだと弾倉の長さが名前と合わない
+              loaded: 'ammo' in c ? c.ammo : null,
+              mag: 'ammo' in c ? weaponOf(c.id).magazine : null,
             })),
             at: this.browsing.at,
           }
