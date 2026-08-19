@@ -220,7 +220,15 @@ export function toggle(
   held: HeldId,
   previous: HeldId | null,
 ): HeldId {
-  if (previous && previous !== held && find(carried, previous)) return previous
+  // **同じ系統の中だけ。** 直前に持っていた物が別の系統だと、武器のトグルで
+  // 箱に戻ってしまう (箱 → Q で銃 → Q でまた箱、になった)。
+  // 系統をまたぐのは専用のキー (C など) の仕事。
+  const sameFamily =
+    previous !== null &&
+    previous !== held &&
+    HELD[previous].family === HELD[held].family &&
+    find(carried, previous) !== undefined
+  if (sameFamily) return previous as HeldId
   return cycle(carried, held, 1)
 }
 

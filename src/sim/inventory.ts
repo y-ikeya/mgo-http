@@ -121,6 +121,26 @@ export class Inventory {
     if (item.count === 0 && item.id !== this.current) dropEmpty(this.items, item.id)
   }
 
+  /**
+   * 持っている投げ物 (弾倉を除く) の残り。
+   *
+   * **選択ではなく持ち物を見る。** 「選んだ support の数」を数えると、選択と
+   * 実際の持ち物が食い違ったときに 0 に見える。実際に持っている物を数えれば
+   * 食い違いようがない。
+   */
+  get supportCount(): number {
+    const item = this.items.find(
+      (c) => 'count' in c && c.id !== 'magazine',
+    ) as { count: number } | undefined
+    return item?.count ?? 0
+  }
+
+  /** 持っている投げ物の種類。持っていなければ null */
+  get supportId(): HeldId | null {
+    const item = this.items.find((c) => 'count' in c && c.id !== 'magazine')
+    return item?.id ?? null
+  }
+
   /** その系統の並び。一覧に出す順 */
   list(family: Family): Carried[] {
     return listOf(this.items, family)
@@ -238,6 +258,12 @@ export class Inventory {
         item.ammo = magazine[item.id] ?? item.ammo
         item.reserve = reserve[item.id] ?? item.reserve
       } else if ('count' in item && item.id !== 'magazine') {
+        if (support === 0 && item.count > 0) {
+          console.warn(
+            `[持ち物] ${item.id} を ${item.count} から 0 に戻した。` +
+              'サーバーが 0 を返している — 前の命の残りを引き継いでいる可能性',
+          )
+        }
         item.count = support
       }
     }

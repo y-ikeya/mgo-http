@@ -2601,8 +2601,9 @@ export class Game {
         (entry) => now - entry.at < KILL_FEED_DURATION * 1000,
       ),
       throwables: this.inv.countOf('magazine'),
-      grenades: this.inv.countOf(this.loadout.support),
-      support: this.loadout.support,
+      grenades: this.inv.supportCount,
+      // **持ち物を見る。** 選択ではなく実際に持っている物
+      support: (this.inv.supportId as SupportId | null) ?? this.loadout.support,
       team: this.team,
       match: this.match,
       players: this.remotes.count,

@@ -196,3 +196,21 @@ describe('投げ切る', () => {
     expect(carried).toHaveLength(1)
   })
 })
+
+describe('トグルは系統をまたがない', () => {
+  const carried: Carried[] = [
+    { id: 'rifle', ammo: 30, reserve: 90 },
+    { id: 'pistol', ammo: 12, reserve: 48 },
+    { id: 'box' },
+  ]
+
+  test('直前に持っていた物が別の系統なら、そちらへは戻らない', () => {
+    // 箱から銃へ移った直後。previous は 'box'
+    expect(toggle(carried, 'rifle', 'box')).not.toBe('box')
+    expect(toggle(carried, 'rifle', 'box')).toBe('pistol')
+  })
+
+  test('同じ系統なら往復する', () => {
+    expect(toggle(carried, 'rifle', 'pistol')).toBe('pistol')
+  })
+})
