@@ -299,17 +299,17 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={props.stats?.browsing}>
         {(browsing) => (
           <div class="hud-browse">
-            {/* 縦の列と角。角を基準に左揃えで積む */}
+            {/* 角より前。角の真上へ積む (角に近いほど下) */}
             <div class="hud-browse-column">
-              <For each={browsing().items.slice(0, browsing().at).reverse()}>
+              <For each={browsing().items.slice(0, browsing().at)}>
                 {(id) => <div class="hud-browse-item">{HELD[id].label}</div>}
               </For>
+            </div>
+            {/* 角と、その後ろ。**角は動かない** */}
+            <div class="hud-browse-row">
               <div class="hud-browse-item hud-browse-at">
                 {HELD[browsing().items[browsing().at]]?.label ?? ''}
               </div>
-            </div>
-            {/* 角より後ろ。右へ伸びる */}
-            <div class="hud-browse-after">
               <For each={browsing().items.slice(browsing().at + 1)}>
                 {(id) => <div class="hud-browse-item">{HELD[id].label}</div>}
               </For>

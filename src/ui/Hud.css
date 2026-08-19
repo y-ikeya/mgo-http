@@ -553,45 +553,52 @@
  * 並べると画面の真ん中を塞ぐので、隅へ逃がしてある。
  */
 /*
- * 武器の表示と同じ右下。持ち物の話は 1 か所にまとめる。
+ * 持ち替えの一覧。
  *
- * 全体を右へ寄せつつ、**角から右へ伸びる**形は保つ。右端に来るのは並びの
- * 最後の物で、角はその左に立つ。
+ * **角は動かない。動くのはカードのほう。** 選んでいる物が常に同じ場所 (角) に来て、
+ * 他の選択肢がその上と右に並ぶ。送ると札が流れて、角に来た物が選ばれる。
+ * 強調が列の中を動く形だと、目で追う先が毎回変わる。
+ *
+ * 1 本のリストを L 字に折ってあるのは、縦一列だと画面の真ん中を塞ぐため。
+ * **見えていることが勝敗を決めるゲームなので、UI が視界を奪わない** (MGO2 が
+ * そうしていた。docs/design.md の 5)。
+ *
+ * **右下。角は弾のカードの真上に来る。** 持ち物の話が画面の左右に分かれていると
+ * 目が往復する。角が動かないので、弾のカードと角がいつも同じ縦線上に並ぶ。
  */
 .hud-browse {
   position: absolute;
   right: 22px;
   bottom: 128px;
-  display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  gap: 6px;
   pointer-events: none;
   font-family: var(--hud-font, ui-monospace, monospace);
 }
 
-/* 縦の列と角。角を基準に左揃えで積む */
+/* 角より前。角の真上へ積む (角に近いほど下) */
 .hud-browse-column {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 6px;
+  margin-bottom: 6px;
 }
 
-/* 角より後ろ。右へ伸びる */
-.hud-browse-after {
+/*
+ * 角と、その後ろ。
+ *
+ * **角が右端に固定**で、後ろの物が左へ伸びる。右へ伸ばすと画面の外に出るため。
+ * 角が動かないので、送っても目で追う先が変わらない。
+ */
+.hud-browse-row {
   display: flex;
-  flex-direction: row;
+  flex-direction: row-reverse;
   align-items: center;
   gap: 6px;
 }
 
-/*
- * 一覧の 1 つ。
- *
- * **幅を揃える。** 中身に合わせると M9 は狭く CLAYMORE は広くなり、縦に並べた
- * ときに端が揃わない。選んでいる物が動くたびに列の形が変わって、目が落ち着かない。
- */
 .hud-browse-item {
   box-sizing: border-box;
   min-width: 104px;
