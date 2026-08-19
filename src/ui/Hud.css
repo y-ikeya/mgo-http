@@ -558,74 +558,86 @@
 /*
  * 持ち替えの一覧。
  *
- * **L 字。** 現在の位置が角に来て、前半が上へ、後半が右へ伸びる。縦一列に
- * 並べると画面の真ん中を塞ぐので、隅へ逃がしてある。
- */
-/*
- * 持ち替えの一覧。
+ * **角は武器のカードそのもの** (hud-weapon)。選んでいる物の弾数まで出ている
+ * カードが、そのまま選択の印になる。ここに出すのは**選んでいない物だけ**。
  *
- * **角は動かない。動くのはカードのほう。** 選んでいる物が常に同じ場所 (角) に来て、
- * 他の選択肢がその上と右に並ぶ。送ると札が流れて、角に来た物が選ばれる。
+ * 角は動かない。動くのはカードのほう。送ると札が流れて、角に来た物が選ばれる。
  * 強調が列の中を動く形だと、目で追う先が毎回変わる。
  *
  * 1 本のリストを L 字に折ってあるのは、縦一列だと画面の真ん中を塞ぐため。
  * **見えていることが勝敗を決めるゲームなので、UI が視界を奪わない** (MGO2 が
  * そうしていた。docs/design.md の 5)。
  *
- * **右下。角は弾のカードの真上に来る。** 持ち物の話が画面の左右に分かれていると
- * 目が往復する。角が動かないので、弾のカードと角がいつも同じ縦線上に並ぶ。
+ * --- 列と行を別々に置く ---
+ * まとめて 1 つの箱に入れると、後ろの物が**カードの上の行**に出てしまう。
+ * 角より前は「カードの真上」、後ろは「カードの左隣」で、基準が違う。
  */
 .hud-browse {
-  position: absolute;
-  right: 22px;
-  bottom: 128px;
   pointer-events: none;
   font-family: var(--hud-font, ui-monospace, monospace);
 }
 
-/* 角より前。角の真上へ積む (角に近いほど下) */
+/* 角より前。武器カードの真上へ積む (角に近いほど下) */
 .hud-browse-column {
   position: absolute;
-  right: 0;
-  bottom: 100%;
+  right: 22px;
+  bottom: 108px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 5px;
 }
 
 /*
- * 角と、その後ろ。
+ * 角より後ろ。武器カードの**左隣**へ並べる。
  *
- * **角が右端に固定**で、後ろの物が左へ伸びる。右へ伸ばすと画面の外に出るため。
- * 角が動かないので、送っても目で追う先が変わらない。
+ * 右へ伸ばすと画面の外に出るので左。カードと同じ高さに揃えるため、下端を
+ * カードと合わせる。
  */
 .hud-browse-row {
+  position: absolute;
+  right: 198px;
+  bottom: 20px;
   display: flex;
   flex-direction: row-reverse;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-end;
+  gap: 5px;
 }
 
+/*
+ * 一覧の 1 つ。
+ *
+ * **選んでいない物。** 選んでいる物は角の武器カードそのものなので、ここには
+ * 出てこない。名前と残りの数だけを出す — 選ぶときに要るのは「何があるか」と
+ * 「あと何発か」で、弾切れの銃と満タンの銃が同じ見た目だと材料にならない。
+ *
+ * 幅を揃える。中身に合わせると M9 は狭く CLAYMORE は広くなり、縦に並べたときに
+ * 端が揃わない。
+ */
 .hud-browse-item {
   box-sizing: border-box;
-  min-width: 104px;
-  padding: 3px 10px;
+  /* 武器カードと同じ幅。角と列が同じ縦線に乗る */
+  min-width: 168px;
+  padding: 3px 12px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 12px;
   letter-spacing: 0.08em;
-  text-align: center;
   color: rgba(198, 214, 232, 0.72);
-  background: rgba(10, 14, 20, 0.55);
-  border: 1px solid rgba(126, 166, 255, 0.18);
+  background: rgba(10, 14, 20, 0.42);
+  border: 1px solid rgba(126, 166, 255, 0.14);
   white-space: nowrap;
 }
 
-/* 選んでいる物。角に来る */
-.hud-browse-at {
-  color: #f2f6fb;
-  background: rgba(126, 166, 255, 0.22);
-  border-color: rgba(126, 166, 255, 0.7);
+.hud-browse-name {
+  letter-spacing: 0.12em;
+}
+
+.hud-browse-n {
+  font-variant-numeric: tabular-nums;
+  color: rgba(198, 214, 232, 0.55);
 }
 
 /*
@@ -653,7 +665,8 @@
    * 飛び、暗い屋内では枠が無いと数字が浮いて見える。立体駐車場は明るい屋上と
    * 暗い 1 階が同じ試合の中にあるので、どちらでも読めないと困る。
    */
-  min-width: 168px;
+  box-sizing: border-box;
+  width: 168px;
   padding: 8px 12px 10px;
   background: rgba(10, 14, 20, 0.55);
   border: 1px solid rgba(126, 166, 255, 0.28);
@@ -662,6 +675,12 @@
 /* 持ち替えの最中は薄く。使えないことが見て分かる */
 .hud-weapon-switching {
   opacity: 0.45;
+}
+
+/* 一覧を開いている間。カードが選択の印を兼ねるので、枠を立てる */
+.hud-weapon-picking {
+  border-color: rgba(126, 166, 255, 0.75);
+  background: rgba(24, 38, 64, 0.72);
 }
 
 .hud-weapon-spare {

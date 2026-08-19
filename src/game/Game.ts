@@ -133,7 +133,7 @@ export interface GameStats {
   /** 投擲の枠に何を入れているか */
   support: SupportId
   /** 開いている持ち替えの一覧。閉じていれば null */
-  browsing: { items: HeldId[]; at: number } | null
+  browsing: { items: { id: HeldId; n: number | null }[]; at: number } | null
   /** いま手にある物 */
   held: HeldId
   /** 持ち替えの最中か。HUD を薄くするのに使う */
@@ -2698,7 +2698,12 @@ export class Game {
        */
       browsing: this.browsing
         ? {
-            items: this.inv.list(this.browsing.family).map((c) => c.id),
+            // **数も載せる。** 選ぶときに「あと何発か」が要る — 弾切れの銃と
+            // 満タンの銃が同じ見た目だと、一覧が選ぶ材料にならない
+            items: this.inv.list(this.browsing.family).map((c) => ({
+              id: c.id,
+              n: 'ammo' in c ? c.ammo : 'count' in c ? c.count : null,
+            })),
             at: this.browsing.at,
           }
         : null,

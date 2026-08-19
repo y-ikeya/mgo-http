@@ -25,8 +25,17 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner !== props.stats?.team
   }
-  /** いま手にある物。届いていなければ主武器を仮に出す */
-  const held = () => props.stats?.held ?? 'rifle'
+  /**
+   * カードに出す物。
+   *
+   * **一覧を開いている間は、選んでいる物を映す。** カードが選択の印を兼ねるので、
+   * 送るたびに中身が入れ替わって「これを選んだらこうなる」が見える。
+   */
+  const held = () => {
+    const browsing = props.stats?.browsing
+    if (browsing) return browsing.items[browsing.at]?.id ?? props.stats?.held ?? 'rifle'
+    return props.stats?.held ?? 'rifle'
+  }
   const heldLabel = () => HELD[held()].label
   const heldIsGun = () => HELD[held()].shoots
 
@@ -244,6 +253,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <div
         class="hud-weapon"
         classList={{
+          'hud-weapon-picking': !!props.stats?.browsing,
           'hud-weapon-switching': props.stats?.switching,
           'hud-weapon-empty': heldIsGun() && (props.stats?.ammo ?? 0) === 0,
         }}
@@ -299,26 +309,46 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={props.stats?.browsing}>
         {(browsing) => (
           <div class="hud-browse">
-            {/* 角より前。角の真上へ積む (角に近いほど下) */}
+            {/*
+              角は出さない。**角にあるのは武器のカードそのもの** (下の hud-weapon)。
+              選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。
+              別に札を出すと同じ名前が 2 つ並ぶ。
+            */}
             <div class="hud-browse-column">
               <For each={browsing().items.slice(0, browsing().at)}>
-                {(id) => <div class="hud-browse-item">{HELD[id].label}</div>}
+                {(item) => (
+                  <div class="hud-browse-item">
+                    <span class="hud-browse-name">{HELD[item.id].label}</span>
+                    <Show when={item.n !== null}>
+                      <span class="hud-browse-n">{item.n}</span>
+                    </Show>
+                  </div>
+                )}
               </For>
             </div>
-            {/* 角と、その後ろ。**角は動かない** */}
             <div class="hud-browse-row">
-              <div class="hud-browse-item hud-browse-at">
-                {HELD[browsing().items[browsing().at]]?.label ?? ''}
-              </div>
               <For each={browsing().items.slice(browsing().at + 1)}>
-                {(id) => <div class="hud-browse-item">{HELD[id].label}</div>}
+                {(item) => (
+                  <div class="hud-browse-item">
+                    <span class="hud-browse-name">{HELD[item.id].label}</span>
+                    <Show when={item.n !== null}>
+                      <span class="hud-browse-n">{item.n}</span>
+                    </Show>
+                  </div>
+                )}
               </For>
             </div>
           </div>
         )}
       </Show>
 
-      <div class="hud-help">{t('hud.help')}</div>
+      {/*
+        操作の説明。**一覧を開いている間は隠す。** 左から伸びてくる選択肢と
+        重なるし、持ち替えを選んでいる最中に読むものでもない。
+      */}
+      <Show when={!props.stats?.browsing}>
+        <div class="hud-help">{t('hud.help')}</div>
+      </Show>
     </div>
   )
 }
