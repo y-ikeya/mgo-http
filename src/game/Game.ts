@@ -2681,9 +2681,11 @@ export class Game {
       speed: this.player.speed,
       locked: this.input.engaged,
       shots: this.shotCount,
-      ammo: this.ammo,
+      // **武器のカードに出す数。** 手にある物ではなく、カードが名指している武器の
+      // 弾。ダンボールを被っている間も銃の残弾はそのまま出す
+      ammo: this.inv.ammoOf(this.inv.weapon),
       magazine: this.weapon.magazine,
-      reserve: this.inv.reserve,
+      reserve: this.inv.reserveOf(this.inv.weapon),
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,

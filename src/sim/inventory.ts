@@ -114,6 +114,28 @@ export class Inventory {
     return find(this.items, this.held)
   }
 
+  /**
+   * 持ち物を 1 つ引く。持っていなければ undefined。
+   *
+   * **手にある物とは限らない。** ダンボールを被っていても銃の残弾は表示に要る
+   * (被った瞬間に弾数が 0 に見えると、抜いたときに撃てるのか分からない)
+   */
+  of(id: HeldId): Carried | undefined {
+    return find(this.items, id)
+  }
+
+  /** 指定した銃の装填弾。銃でなければ 0 */
+  ammoOf(id: HeldId): number {
+    const item = this.of(id)
+    return item && 'ammo' in item ? item.ammo : 0
+  }
+
+  /** 指定した銃の予備弾。銃でなければ 0 */
+  reserveOf(id: HeldId): number {
+    const item = this.of(id)
+    return item && 'reserve' in item ? item.reserve : 0
+  }
+
   /** 装填されている弾。銃でなければ 0 */
   get ammo(): number {
     const item = this.item

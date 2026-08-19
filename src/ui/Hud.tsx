@@ -308,6 +308,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         classList={{
           'hud-weapon-picking': !!props.stats?.browsing,
           'hud-weapon-switching': props.stats?.switching,
+          // 道具を手にしている間。**弾数は正しいまま薄くする** — 0 と出すと
+          // 「弾が無い」に見えるが、実際は手が塞がっているだけ
+          'hud-weapon-idle': props.stats?.toolInHand,
           'hud-weapon-empty': heldIsGun() && (props.stats?.ammo ?? 0) === 0,
         }}
       >
@@ -339,6 +342,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           when={
             !props.stats?.switching &&
             !props.stats?.reloading &&
+            // 道具を手にしている間は R を押しても入れ替わらない。促さない
+            !props.stats?.toolInHand &&
             heldIsGun() &&
             props.stats?.ammo === 0
           }
