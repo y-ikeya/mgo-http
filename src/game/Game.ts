@@ -47,7 +47,7 @@ import {
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { Inventory } from "../sim/inventory";
-import { HELD, type Family, type HeldId } from "../sim/held";
+import { type Family, type HeldId } from "../sim/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../sim/damage";
 import type { NoiseEvent } from "../net/types";
@@ -952,13 +952,22 @@ export class Game {
     //
     // 決めるまで動けない形にしてある。裏で動けると、選ぶのを後回しにして
     // 走り出せてしまい、「湧くときに決める」という手続きが有名無実になる。
-    // **構えの型は銃のときだけ。** 手榴弾を持って Shift を押すのは振りかぶりで
-    // あって、銃を構える型ではない
+    /*
+     * 構える。
+     *
+     * **投げ物のときだけ別。** あれは Shift が振りかぶりなので、銃を構える型に
+     * すると腕が二重に動く。
+     *
+     * **ナイフは構える。** 下を狙えることに意味がある — 倒れている相手には
+     * 立ったまま前を刺しても届かず、しゃがんで見下ろして初めて刃が通る
+     * (sim/hitcheck.ts の STAB_DOWN_PITCH)。
+     */
+    const throwing =
+      this.inv.held === "grenade" ||
+      this.inv.held === "claymore" ||
+      this.inv.held === "magazine";
     this.player.setAiming(
-      this.input.aiming &&
-        this.input.engaged &&
-        !this.loadoutBlocking &&
-        HELD[this.inv.held].shoots,
+      this.input.aiming && this.input.engaged && !this.loadoutBlocking && !throwing,
     );
     this.follow.setAiming(this.player.isAiming);
     this.follow.setViewHeight(this.player.viewHeight);
@@ -1704,6 +1713,8 @@ export class Game {
       this.player.position,
       this.meleeForward,
       this.team,
+      // 見下ろしていれば倒れている相手にも届く。構えていなければ水平とみなす
+      this.player.isAiming ? this.follow.aimPitch : 0,
     );
     if (!result) return;
 

@@ -1333,6 +1333,8 @@ function recordPose(player: Player): void {
     y: player.y,
     z: player.z,
     yaw: player.yaw,
+    // 見下ろしていれば倒れている相手にも刃が通る。刺した瞬間の向きが要るので履歴に持つ
+    pitch: player.pitch,
     crouching: player.crouching,
     boxed: player.boxed,
     // ナイフが刺さる姿勢かの判定に要る。**遡って照合するので履歴に持つ** —
