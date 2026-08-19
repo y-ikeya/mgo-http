@@ -49,8 +49,12 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    */
   const held = () => {
     const browsing = props.stats?.browsing
-    if (browsing) return browsing.items[browsing.at]?.id ?? props.stats?.held ?? 'rifle'
-    return props.stats?.held ?? 'rifle'
+    // 武器の一覧を送っている間だけ、カードが選んでいる物を映す。
+    // 道具の一覧を送っても武器のカードは変わらない
+    if (browsing && props.stats?.browsingFamily === 'weapon') {
+      return browsing.items[browsing.at]?.id ?? props.stats.weaponHeld
+    }
+    return props.stats?.weaponHeld ?? 'rifle'
   }
   const heldLabel = () => HELD[held()].label
   const heldIsGun = () => HELD[held()].shoots
@@ -356,7 +360,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         ゲームなので、UI が視界を奪わない (MGO2 がそうしていた)。
       */}
       <Show when={props.stats?.browsing}>
-        <div class="hud-browse">
+        <div
+          class="hud-browse"
+          classList={{ 'hud-browse-tool': props.stats?.browsingFamily === 'tool' }}
+        >
             {/*
               角は出さない。**角にあるのは武器のカードそのもの** (下の hud-weapon)。
               選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。
@@ -372,12 +379,22 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
-        操作の説明。**一覧を開いている間は隠す。** 左から伸びてくる選択肢と
-        重なるし、持ち替えを選んでいる最中に読むものでもない。
+        持っている道具。**左下。** 右下は武器のカードが使っている。
+
+        ダンボールを被っていても武器のカードは銃のまま出る。手にある物をそのまま
+        出すと、被った瞬間にカードが C.BOX になって「抜けば構える銃」が分からなく
+        なる (MGO2 も道具は左下で、武器のカードは別に出ていた)。
       */}
-      <Show when={!props.stats?.browsing}>
-        <div class="hud-help">{t('hud.help')}</div>
+      <Show when={props.stats?.tool}>
+        {(tool) => (
+          <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand }}>
+            <div class="hud-tool-key">C</div>
+            <div class="hud-tool-name">{HELD[tool()].label}</div>
+          </div>
+        )}
       </Show>
+
+
     </div>
   )
 }

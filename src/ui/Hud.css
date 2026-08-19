@@ -50,24 +50,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/*
- * 操作の説明。
- *
- * **右下には掛からない。** 幅を切らないと、折り返した行が武器のカードの上を
- * 通る。窓を小さくするほど行が増えるので、右側を空けておく必要がある
- * (実際に描いて気づいた — 手書きの見本には説明を入れていなかった)。
- */
-.hud-help {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  max-width: calc(100% - 260px);
-  font-size: 11px;
-  line-height: 1.5;
-  letter-spacing: 0.08em;
-  color: rgba(200, 212, 192, 0.45);
-}
-
 /* --- クロスヘア --- */
 
 .crosshair {
@@ -749,4 +731,75 @@
 
 .hud-weapon-state-warn {
   color: rgba(255, 138, 114, 0.95);
+}
+
+/*
+ * 道具の一覧は左下。**右下は武器のカードが使っている。**
+ *
+ * 系統ごとに場所を分けるのは MGO2 と同じ。どちらを送っているかが位置で分かる。
+ */
+/* 角 = 道具の表示 (hud-tool)。その真上へ積む */
+.hud-browse-tool .hud-browse-column {
+  right: auto;
+  left: 22px;
+  bottom: 108px;
+  align-items: flex-start;
+}
+
+/* 角の右隣。左下が起点なので右へ伸ばす */
+.hud-browse-tool .hud-browse-row {
+  right: auto;
+  left: 198px;
+  bottom: 20px;
+  flex-direction: row;
+}
+
+/*
+ * いま選んでいる道具。
+ *
+ * **武器のカードと同じ大きさ。** 左下と右下で対になるので、大きさが違うと
+ * 片方だけ浮いて見える。中身は左揃え — 画面の左端に付くので、右揃えだと
+ * 文字が枠の中で遠くなる。
+ *
+ * **被っているときだけ立てる。** 持っていることと使っていることを見分けられないと、
+ * C を押したかどうかが分からない。
+ */
+.hud-tool {
+  position: absolute;
+  left: 22px;
+  bottom: 20px;
+  box-sizing: border-box;
+  width: 168px;
+  min-height: 68px;
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 4px;
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
+  color: rgba(198, 214, 232, 0.6);
+  background: rgba(10, 14, 20, 0.55);
+  border: 1px solid rgba(126, 166, 255, 0.28);
+}
+
+.hud-tool-name {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+}
+
+.hud-tool-key {
+  align-self: flex-start;
+  font-size: 10px;
+  padding: 0 5px;
+  color: rgba(198, 214, 232, 0.5);
+  border: 1px solid rgba(126, 166, 255, 0.25);
+}
+
+/* 手にしている (被っている) */
+.hud-tool-on {
+  color: #f2f6fb;
+  background: rgba(24, 38, 64, 0.72);
+  border-color: rgba(126, 166, 255, 0.7);
 }

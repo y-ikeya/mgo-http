@@ -42,6 +42,8 @@ export class Inventory {
     this.items = buildCarried(loadout, fullAmmo)
     this.current = loadout.primary
     this.last = loadout.secondary
+    this.lastWeapon = loadout.primary
+    this.lastTool = null
     this.switchLeft = 0
     this.queued = null
   }
@@ -50,6 +52,26 @@ export class Inventory {
   get held(): HeldId {
     return this.current
   }
+
+  /**
+   * 武器系でいま選んでいる物。
+   *
+   * **道具を手にしていても変わらない。** ダンボールを被っている間も「抜けば
+   * 構える銃」は決まっているので、武器のカードにはそれが出続ける。手にある物を
+   * そのまま出すと、箱を被った瞬間にカードが C.BOX になってしまう。
+   */
+  get weapon(): HeldId {
+    return HELD[this.current].family === 'weapon' ? this.current : this.lastWeapon
+  }
+
+  /** 道具系でいま選んでいる物。持っていなければ null */
+  get tool(): HeldId | null {
+    if (HELD[this.current].family === 'tool') return this.current
+    return this.lastTool ?? firstOf(this.items, 'tool')
+  }
+
+  private lastWeapon: HeldId = 'rifle'
+  private lastTool: HeldId | null = null
 
   /** 持ち替えの最中か。**この間は撃てないし投げられない** */
   get switching(): boolean {
@@ -192,7 +214,13 @@ export class Inventory {
     }
     if (id === this.current) return false
     this.last = this.current
+    // 系統ごとに「最後に選んだ物」を覚える。武器のカードと道具の表示が
+    // 手にある物に引きずられないようにするため
+    if (HELD[this.current].family === 'weapon') this.lastWeapon = this.current
+    else this.lastTool = this.current
     this.current = id
+    if (HELD[id].family === 'weapon') this.lastWeapon = id
+    else this.lastTool = id
     this.switchLeft = SWITCH_TIME
     return true
   }

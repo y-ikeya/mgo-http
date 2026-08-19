@@ -136,6 +136,14 @@ export interface GameStats {
   browsing: { items: { id: HeldId; n: number | null }[]; at: number } | null
   /** いま手にある物 */
   held: HeldId
+  /** 武器系で選んでいる物。道具を手にしていても変わらない */
+  weaponHeld: HeldId
+  /** 道具系で選んでいる物。持っていなければ null */
+  tool: HeldId | null
+  /** その道具をいま手にしているか */
+  toolInHand: boolean
+  /** どちらの系統の一覧を開いているか。閉じていれば null */
+  browsingFamily: 'weapon' | 'tool' | null
   /** 持ち替えの最中か。HUD を薄くするのに使う */
   switching: boolean
   /** 自分の所属 */
@@ -2719,6 +2727,11 @@ export class Game {
           }
         : null,
       held: this.inv.held,
+      // **武器のカードに出す物。** 道具を手にしていても変わらない
+      weaponHeld: this.inv.weapon,
+      tool: this.inv.tool,
+      toolInHand: this.inv.held === this.inv.tool,
+      browsingFamily: this.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物
       support: (this.inv.supportId as SupportId | null) ?? this.loadout.support,
