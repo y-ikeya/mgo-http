@@ -77,22 +77,35 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   }
 
   /**
+   * 角の次に来る物の位置。
+   *
+   * **並びは輪になっている** (送ると端で回る) ので、最後を選んだら次は先頭。
+   * 端で「次が無い」にすると、そこだけ左が空いて形が変わる。
+   */
+  const nextAt = () => {
+    const browsing = props.stats?.browsing
+    if (!browsing || browsing.items.length === 0) return -1
+    return (browsing.at + 1) % browsing.items.length
+  }
+
+  /**
    * 角の左に出す物。**1 つだけ。**
    *
-   * 並びの次に来る物。何枚も左へ伸ばすと画面を横切るので、左は 1 枚に決めて
-   * 残りは上へ積む (weapons.png がそうなっていた)。
+   * 何枚も左へ伸ばすと画面を横切るので、左は 1 枚に決めて残りは上へ積む
+   * (weapons.png がそうなっていた)。
    */
   const beside = () => {
     const browsing = props.stats?.browsing
-    if (!browsing) return null
-    return browsing.items[browsing.at + 1] ?? null
+    const at = nextAt()
+    if (!browsing || at < 0 || at === browsing.at) return null
+    return browsing.items[at]
   }
 
   /** 角の上に積む物。選んでいる物と、左に出した物を除いた残り */
   const above = () => {
     const browsing = props.stats?.browsing
     if (!browsing) return []
-    const skip = new Set([browsing.at, browsing.at + 1])
+    const skip = new Set([browsing.at, nextAt()])
     return browsing.items.filter((_, i) => !skip.has(i))
   }
 
