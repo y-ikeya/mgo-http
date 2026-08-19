@@ -25,6 +25,32 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner !== props.stats?.team
   }
+  /** いま手にある物。届いていなければ主武器を仮に出す */
+  const held = () => props.stats?.held ?? 'rifle'
+  const heldLabel = () => HELD[held()].label
+  const heldIsGun = () => HELD[held()].shoots
+
+  /** 投げ物の残り。銃なら null */
+  const heldCount = () => {
+    const stats = props.stats
+    if (!stats || heldIsGun()) return null
+    if (held() === 'magazine') return stats.throwables
+    if (held() === 'grenade' || held() === 'claymore') return stats.grenades
+    return null
+  }
+
+  /**
+   * 装填弾の目盛り。撃った分から消えていく。
+   *
+   * 弾倉の大きさぶん並べる。P90 のように 50 発ある銃だと細かくなるが、
+   * **数字を読まずに残りが分かる**ことのほうが要る。
+   */
+  const ticks = () => {
+    const size = props.stats?.magazine ?? 0
+    const left = props.stats?.ammo ?? 0
+    return Array.from({ length: size }, (_, i) => i < left)
+  }
+
   const health = () => {
     const max = props.stats?.maxHealth ?? 100
     return max > 0 ? ((props.stats?.health ?? max) / max) * 100 : 0
@@ -206,46 +232,62 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </div>
       </Show>
 
-      {/* 残弾は視線を大きく動かさずに読めるよう画面右下に置く */}
-      <div class="hud-ammo" classList={{ 'hud-ammo-empty': (props.stats?.ammo ?? 1) === 0 }}>
-        <span class="hud-ammo-count">{props.stats?.ammo ?? 0}</span>
-        {/* 弾倉 / 予備。予備は「あと何発撃てるか」で、弾倉の数ではない */}
-        <span class="hud-ammo-magazine">/ {props.stats?.reserve ?? 0}</span>
-        <Show when={props.stats?.reloading}>
-          <div class="hud-ammo-state">RELOADING</div>
+      {/*
+        いま手にある物。**1 つだけ出す。**
+
+        持ち替えて使う形にした以上、持っていない物の数を並べても判断に使えない。
+        MGO2 も手にしている物だけを出していた (docs/design.md の 5)。
+
+        装填弾は**目盛り**、予備弾は**数字**。撃っている最中に数字を読ませない —
+        減っていくのが目に入るだけで足りるし、視線を画面の隅へ動かす回数が減る。
+      */}
+      <div
+        class="hud-weapon"
+        classList={{
+          'hud-weapon-switching': props.stats?.switching,
+          'hud-weapon-empty': heldIsGun() && (props.stats?.ammo ?? 0) === 0,
+        }}
+      >
+        <Show when={heldIsGun()}>
+          <div class="hud-weapon-spare">{props.stats?.reserve ?? 0}</div>
         </Show>
-        <Show when={!props.stats?.reloading && props.stats?.ammo === 0}>
-          <div class="hud-ammo-state hud-ammo-state-warn">
+        <div class="hud-weapon-name">{heldLabel()}</div>
+        <Show when={heldIsGun()}>
+          <div class="hud-weapon-mag">
+            <For each={ticks()}>
+              {(filled) => (
+                <span class="hud-weapon-tick" classList={{ 'hud-weapon-tick-on': filled }} />
+              )}
+            </For>
+          </div>
+        </Show>
+        {/* 投げ物は装填が無い。残りの数だけ */}
+        <Show when={!heldIsGun() && heldCount() !== null}>
+          <div class="hud-weapon-count">× {heldCount()}</div>
+        </Show>
+
+        <Show when={props.stats?.switching}>
+          <div class="hud-weapon-state">SWITCHING</div>
+        </Show>
+        <Show when={!props.stats?.switching && props.stats?.reloading}>
+          <div class="hud-weapon-state">RELOADING</div>
+        </Show>
+        <Show
+          when={
+            !props.stats?.switching &&
+            !props.stats?.reloading &&
+            heldIsGun() &&
+            props.stats?.ammo === 0
+          }
+        >
+          <div class="hud-weapon-state hud-weapon-state-warn">
             {(props.stats?.reserve ?? 0) > 0 ? 'PRESS R' : 'NO AMMO'}
           </div>
         </Show>
         {/* 転んだら自分で起きる。撃つか起きるかを選ばせたいので、時間では立たない */}
         <Show when={props.stats?.downed}>
-          <div class="hud-ammo-state hud-ammo-state-warn">{t('hud.standUpHint')}</div>
+          <div class="hud-weapon-state hud-weapon-state-warn">{t('hud.standUpHint')}</div>
         </Show>
-        {/*
-          投げ物の残り。数が限られていることが見えていないと判断にならない。
-
-          **弾倉は 0 でも出す。** 撃てば増える物なので、0 と出ていること自体が
-          「まだ 1 弾倉ぶん撃っていない」という情報になる。手榴弾は枠で選ぶ物なので
-          持っていなければ出さない (取れるのに取っていないように見える)。
-        */}
-        <Show when={props.stats?.support === 'grenade'}>
-          <div class="hud-throwables" classList={{ 'hud-throwables-empty': !props.stats?.grenades }}>
-            GRENADE × {props.stats?.grenades ?? 0}
-          </div>
-        </Show>
-        <Show when={props.stats?.support === 'claymore'}>
-          <div class="hud-throwables" classList={{ 'hud-throwables-empty': !props.stats?.grenades }}>
-            CLAYMORE × {props.stats?.grenades ?? 0}
-          </div>
-        </Show>
-        <div
-          class="hud-throwables"
-          classList={{ 'hud-throwables-empty': !props.stats?.throwables }}
-        >
-          MAG × {props.stats?.throwables ?? 0}
-        </div>
       </div>
 
       {/*

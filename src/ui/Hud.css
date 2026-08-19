@@ -123,45 +123,6 @@
   color: #ff8a72;
 }
 
-/* --- 残弾 --- */
-
-.hud-ammo {
-  position: absolute;
-  right: 22px;
-  bottom: 20px;
-  text-align: right;
-  line-height: 1;
-}
-
-.hud-ammo-count {
-  font-size: 34px;
-  letter-spacing: 0.04em;
-  color: #d8e6cc;
-  font-variant-numeric: tabular-nums;
-}
-
-.hud-ammo-magazine {
-  margin-left: 6px;
-  font-size: 14px;
-  color: rgba(160, 190, 140, 0.55);
-  font-variant-numeric: tabular-nums;
-}
-
-.hud-ammo-empty .hud-ammo-count {
-  color: #e07a5f;
-}
-
-.hud-ammo-state {
-  margin-top: 8px;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: rgba(200, 212, 192, 0.6);
-}
-
-.hud-ammo-state-warn {
-  color: #e07a5f;
-}
-
 /* --- ポインタロック待ち --- */
 
 /* 接続人数。1 人以上いるときだけ色を変えて、対戦中だと分かるようにする */
@@ -254,18 +215,6 @@
 .hud-kill-weapon {
   font-size: 11px;
   color: rgba(160, 190, 140, 0.55);
-}
-
-/* 投げ物の残り。残弾の下に小さく添える */
-.hud-throwables {
-  margin-top: 4px;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: rgba(160, 190, 140, 0.65);
-}
-
-.hud-throwables-empty {
-  color: rgba(160, 190, 140, 0.25);
 }
 
 /*
@@ -652,4 +601,86 @@
   color: #f2f6fb;
   background: rgba(126, 166, 255, 0.22);
   border-color: rgba(126, 166, 255, 0.7);
+}
+
+/*
+ * いま手にある物。
+ *
+ * **装填弾は目盛り、予備は数字。** 撃っている最中に数字を読ませない — 減って
+ * いくのが目に入るだけで足りる。MGO2 がそうしていた (docs/design.md の 5)。
+ */
+.hud-weapon {
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
+  color: #dbe6f2;
+}
+
+/* 持ち替えの最中は薄く。使えないことが見て分かる */
+.hud-weapon-switching {
+  opacity: 0.45;
+}
+
+.hud-weapon-spare {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: rgba(219, 230, 242, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-weapon-name {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  color: #f2f6fb;
+}
+
+.hud-weapon-count {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 装填弾。1 発 1 目盛り */
+.hud-weapon-mag {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  height: 10px;
+  align-items: stretch;
+}
+
+.hud-weapon-tick {
+  width: 3px;
+  background: rgba(219, 230, 242, 0.16);
+}
+
+.hud-weapon-tick-on {
+  background: rgba(240, 246, 252, 0.9);
+}
+
+/* 空。目盛りごと赤く落として、数字を読まなくても分かる */
+.hud-weapon-empty .hud-weapon-tick-on {
+  background: rgba(255, 138, 114, 0.9);
+}
+
+.hud-weapon-empty .hud-weapon-spare {
+  color: rgba(255, 138, 114, 0.9);
+}
+
+.hud-weapon-state {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: rgba(198, 214, 232, 0.7);
+}
+
+.hud-weapon-state-warn {
+  color: rgba(255, 138, 114, 0.95);
 }
