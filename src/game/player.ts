@@ -441,6 +441,10 @@ export class Player {
       weapon: this.weaponKind,
       crouching: this.crouching,
       boxed: this.boxed,
+      // いま手にある物。**ここが唯一の在り処になる。** いまは既存の状態から
+      // 組み立てているが、持ち物 (Carried[]) を Player が持つようになったら
+      // そちらを直接返す
+      held: this.boxed ? 'box' : this.throwing ? 'grenade' : this.weaponKind,
       concentrating: this.isConcentrating,
       saluteHeld: this.saluteHeld,
       // 振りかぶって持っている間だけ。倒されたら足元に落ちる

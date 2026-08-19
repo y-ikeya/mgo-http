@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { HELD, carrySpeed, listOf, pickUp, type Carried, type HeldId } from './held'
+import {
+  HELD, buildCarried, carrySpeed, cycle, dropEmpty, firstOf, listOf, pickUp, toggle,
+  type Carried, type HeldId,
+} from './held'
 
 /**
  * 持ち物。
@@ -104,5 +107,92 @@ describe('拾う', () => {
     const carried: Carried[] = [{ id: 'grenade', count: 1 }]
     pickUp(carried, { id: 'grenade', count: 2 })
     expect(carried[0]).toEqual({ id: 'grenade', count: 3 })
+  })
+})
+
+
+describe('湧いたときの持ち物', () => {
+  const ammo = () => ({ ammo: 30, reserve: 90 })
+  const carried = buildCarried({ primary: 'rifle', secondary: 'pistol', support: 'grenade' }, ammo)
+
+  test('ナイフとダンボールは選ばない。最初から持っている', () => {
+    expect(carried.map((c) => c.id)).toContain('knife')
+    expect(carried.map((c) => c.id)).toContain('box')
+  })
+
+  test('弾倉 (囮) は持っていない。撃って初めて増える', () => {
+    expect(carried.map((c) => c.id)).not.toContain('magazine')
+  })
+
+  test('投げ物の数は選んだ物で決まる。クレイモアは手榴弾より少ない', () => {
+    const withClaymore = buildCarried(
+      { primary: 'rifle', secondary: 'pistol', support: 'claymore' }, ammo)
+    const g = carried.find((c) => c.id === 'grenade') as { count: number }
+    const c = withClaymore.find((c) => c.id === 'claymore') as { count: number }
+    expect(g.count).toBeGreaterThan(c.count)
+  })
+})
+
+describe('持ち替え', () => {
+  const carried: Carried[] = [
+    { id: 'rifle', ammo: 30, reserve: 90 },
+    { id: 'pistol', ammo: 12, reserve: 48 },
+    { id: 'grenade', count: 3 },
+    { id: 'knife' },
+    { id: 'box' },
+  ]
+
+  test('押すだけなら直前に持っていた物へ戻る', () => {
+    expect(toggle(carried, 'grenade', 'rifle')).toBe('rifle')
+    expect(toggle(carried, 'rifle', 'grenade')).toBe('grenade')
+  })
+
+  test('直前の物を持っていなければ並びの次へ', () => {
+    // 手榴弾を投げ切って持っていない
+    const empty = carried.filter((c) => c.id !== 'grenade')
+    expect(toggle(empty, 'rifle', 'grenade')).toBe('pistol')
+  })
+
+  test('一覧は同じ系統の中だけを回る。武器を送って箱は出ない', () => {
+    let at: HeldId = 'rifle'
+    const seen: HeldId[] = []
+    for (let i = 0; i < 4; i++) {
+      at = cycle(carried, at, 1)
+      seen.push(at)
+    }
+    expect(seen).toEqual(['pistol', 'grenade', 'knife', 'rifle'])
+    expect(seen).not.toContain('box')
+  })
+
+  test('逆にも送れる', () => {
+    expect(cycle(carried, 'rifle', -1)).toBe('knife')
+  })
+
+  test('系統を切り替えると、その先頭へ行く', () => {
+    expect(firstOf(carried, 'tool')).toBe('box')
+    expect(firstOf(carried, 'weapon')).toBe('rifle')
+  })
+
+  test('道具を持っていなければ null', () => {
+    expect(firstOf([{ id: 'knife' }], 'tool')).toBeNull()
+  })
+})
+
+describe('投げ切る', () => {
+  test('投げ物は 0 になったら持ち物から消える', () => {
+    const carried: Carried[] = [{ id: 'grenade', count: 0 }, { id: 'knife' }]
+    expect(dropEmpty(carried, 'grenade')).toBe(true)
+    expect(carried.map((c) => c.id)).toEqual(['knife'])
+  })
+
+  test('まだ残っていれば消えない', () => {
+    const carried: Carried[] = [{ id: 'grenade', count: 1 }]
+    expect(dropEmpty(carried, 'grenade')).toBe(false)
+  })
+
+  test('銃は弾が尽きても手元に残る。拾って補充できるため', () => {
+    const carried: Carried[] = [{ id: 'rifle', ammo: 0, reserve: 0 }]
+    expect(dropEmpty(carried, 'rifle')).toBe(false)
+    expect(carried).toHaveLength(1)
   })
 })

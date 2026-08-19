@@ -20,6 +20,7 @@ import { Footsteps } from '../src/sim/footsteps'
 import { surfaceOf } from '../src/sim/surface'
 import { blastAt } from '../src/sim/blast'
 import { fallDamage } from '../src/sim/damage'
+import { HELD, type HeldId } from '../src/sim/held'
 import {
   blastFrom,
   canPlaceAt,
@@ -284,6 +285,13 @@ interface Player {
    * 読み直した瞬間は拳銃を持っているかもしれないので、構えている物からは復元できない。
    */
   primary: WeaponId
+  /**
+   * いま手にある物。位置と一緒に届く。
+   *
+   * 撃てない物 (手榴弾・ナイフ・箱) を持っている間の射撃を弾くのに使う。
+   * **申告を信じるのではなく、届いた状態と突き合わせる。**
+   */
+  held: HeldId
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
   /**
@@ -751,6 +759,8 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   player.locomotion = snapshot.locomotion
   // 持っている銃。威力と連射の上限をこれで引く
   player.weapon = snapshot.weapon
+  // いま手にある物。撃てるかどうかの判断に使う
+  player.held = snapshot.held
   // 振りかぶって持っているか。倒された瞬間に足元へ落とすのに要る
   player.holdingGrenade = snapshot.holdingGrenade
   // 位置が届いた。どこに居るか分かったので支度に進める
@@ -2100,6 +2110,7 @@ const server = Bun.serve<Client>({
           grenades: SUPPORT_SPECS.grenade.count,
           support: 'grenade',
           primary: 'rifle',
+          held: 'rifle',
           holdingGrenade: false,
           wasAlive: false,
           lastPayload: null,
@@ -2259,6 +2270,17 @@ const server = Bun.serve<Client>({
           return
 
         case 'shot': {
+          /*
+           * **撃てない物を持っている間の射撃は弾く。**
+           *
+           * 手榴弾やナイフに持ち替えている間は引き金が効かない、というのが
+           * 持ち替えの代償 (docs/design.md の 5)。手元でそう作っても、申告は
+           * 別に送れるので、こちらでも見る。
+           *
+           * 空の弾倉と違って**通信のずれで正当な 1 発が消える心配が無い**。
+           * 持ち替えは位置と同じ流れで届くので、撃った瞬間の状態と揃っている。
+           */
+          if (!HELD[player.held]?.shoots) break
           // 弾数の写しを減らす。**空でも拒否しない** — 空撃ちの判断は
           // クライアントがやっている (押した瞬間に音が要る)。ここで拒めば、
           // 通信のずれで正当な 1 発が消える

@@ -164,3 +164,102 @@ export function pickUp(carried: Carried[], found: Carried): boolean {
   }
   return false
 }
+
+/**
+ * 湧くときの選択。
+ *
+ * **これは「枠」の概念。** 使うときの並び (Carried[]) とは別物で、湧く瞬間にしか
+ * 出てこない。混ぜたのが以前の失敗。
+ */
+export interface Loadout {
+  primary: GunId
+  secondary: GunId
+  support: 'grenade' | 'claymore'
+}
+
+/** 1 つの命で持てる投げ物の数 */
+export const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
+  grenade: 3,
+  // 置きっぱなしで効き続けるので、手榴弾と同じ数を配ると通り道を全部塞げる
+  claymore: 2,
+}
+
+/**
+ * 選択から持ち物を組む。湧くたびに呼ぶ。
+ *
+ * ナイフとダンボールは選ばない。**最初から持っている**。
+ *
+ * 弾倉 (囮) は入れない。撃った弾が 1 弾倉ぶん溜まって初めて増える物なので、
+ * 湧いた時点では持っていない。
+ */
+export function buildCarried(loadout: Loadout, ammoOf: (id: GunId) => { ammo: number; reserve: number }): Carried[] {
+  return [
+    { id: loadout.primary, ...ammoOf(loadout.primary) },
+    { id: loadout.secondary, ...ammoOf(loadout.secondary) },
+    { id: loadout.support, count: SUPPORT_COUNT[loadout.support] },
+    { id: 'knife' },
+    { id: 'box' },
+  ]
+}
+
+/** その物を持っているか */
+export function find(carried: readonly Carried[], id: HeldId): Carried | undefined {
+  return carried.find((item) => item.id === id)
+}
+
+/**
+ * 押すだけの持ち替え。**直前に持っていた物との往復**。
+ *
+ * 一覧を開かずに 2 つを行き来できることが、1 枠でも操作が成立する理由。
+ * 大抵は主武器と投擲、あるいは主武器と副武器を往復する。
+ *
+ * 直前の物を持っていない (投げ切った・拾う前) なら、並びの次へ送る。
+ */
+export function toggle(
+  carried: readonly Carried[],
+  held: HeldId,
+  previous: HeldId | null,
+): HeldId {
+  if (previous && previous !== held && find(carried, previous)) return previous
+  return cycle(carried, held, 1)
+}
+
+/**
+ * 一覧を送る。長押し中の上下がこれ。
+ *
+ * **同じ系統の中だけ**を回る。武器を送っているときに箱が出てきたりしない。
+ *
+ * @param step 1 で次、-1 で前
+ */
+export function cycle(carried: readonly Carried[], held: HeldId, step: number): HeldId {
+  const family = HELD[held].family
+  const list = listOf(carried, family)
+  if (list.length === 0) return held
+  const at = list.findIndex((item) => item.id === held)
+  const next = (at + step + list.length) % list.length
+  return list[next].id
+}
+
+/**
+ * その系統の先頭。系統を切り替えるとき (武器 ⇄ 道具) の行き先。
+ *
+ * 何も持っていなければ null。道具を 1 つも持っていない場面がありうる。
+ */
+export function firstOf(carried: readonly Carried[], family: Family): HeldId | null {
+  return listOf(carried, family)[0]?.id ?? null
+}
+
+/**
+ * 投げ切った物を持ち物から外す。
+ *
+ * **銃は外さない。** 弾が尽きても銃は手元に残る (拾って補充できる)。
+ * 投げ物は無くなれば持っていることにならない。
+ */
+export function dropEmpty(carried: Carried[], id: HeldId): boolean {
+  const at = carried.findIndex((item) => item.id === id)
+  if (at < 0) return false
+  const item = carried[at]
+  if (!('count' in item) || item.count > 0) return false
+  carried.splice(at, 1)
+  return true
+}
