@@ -605,39 +605,43 @@
 }
 
 /*
- * 一覧の 1 つ。
+ * 一覧の 1 枚。
  *
- * **選んでいない物。** 選んでいる物は角の武器カードそのものなので、ここには
- * 出てこない。名前と残りの数だけを出す — 選ぶときに要るのは「何があるか」と
- * 「あと何発か」で、弾切れの銃と満タンの銃が同じ見た目だと材料にならない。
+ * **武器カードと同じ大きさ・同じ並び。** 選んでいる物 (角のカード) と大きさが
+ * 違うと、送るたびに列の形が変わって目が落ち着かない。数を上、名前を下に置くのも
+ * カードと同じ。
  *
- * 幅を揃える。中身に合わせると M9 は狭く CLAYMORE は広くなり、縦に並べたときに
- * 端が揃わない。
+ * 選んでいる物はここに出てこない。角にあるのが武器カードそのもの。
  */
 .hud-browse-item {
   box-sizing: border-box;
-  /* 武器カードと同じ幅。角と列が同じ縦線に乗る */
-  min-width: 168px;
-  padding: 3px 12px;
+  width: 168px;
+  min-height: 68px;
+  padding: 8px 12px 10px;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: rgba(198, 214, 232, 0.72);
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 4px;
+  color: rgba(198, 214, 232, 0.62);
   background: rgba(10, 14, 20, 0.42);
   border: 1px solid rgba(126, 166, 255, 0.14);
   white-space: nowrap;
 }
 
 .hud-browse-name {
-  letter-spacing: 0.12em;
+  font-size: 15px;
+  letter-spacing: 0.14em;
 }
 
+/* 武器カードの予備弾と同じ位置・同じ大きさ */
 .hud-browse-n {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
-  color: rgba(198, 214, 232, 0.55);
+  color: rgba(198, 214, 232, 0.5);
+  min-height: 22px;
 }
 
 /*
@@ -667,6 +671,8 @@
    */
   box-sizing: border-box;
   width: 168px;
+  /* 一覧の 1 枚と同じ大きさ。並べたときに揃う */
+  min-height: 68px;
   padding: 8px 12px 10px;
   background: rgba(10, 14, 20, 0.55);
   border: 1px solid rgba(126, 166, 255, 0.28);

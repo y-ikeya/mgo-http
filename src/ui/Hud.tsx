@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
-import { HELD } from '../sim/held'
+import { HELD, type HeldId } from '../sim/held'
 import type { GameStats } from '../game/Game'
 import './Hud.css'
 
@@ -8,6 +8,22 @@ import './Hud.css'
  * HUD オーバーレイ。Solid が担当するのはこの層だけで、3D シーンには一切触れない。
  * 現時点では動作確認用の数値表示とクロスヘアのみ。警戒度メーターやミニマップはここに足していく。
  */
+/**
+ * 一覧の 1 枚。
+ *
+ * **武器カードと同じ大きさ・同じ並び。** 選んでいる物 (角のカード) と大きさが
+ * 違うと、送るたびに列の形が変わって目が落ち着かない。数を上、名前を下にするのも
+ * カードと同じ。
+ */
+function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
+  return (
+    <div class="hud-browse-item">
+      <div class="hud-browse-n">{props.item.n ?? ''}</div>
+      <div class="hud-browse-name">{HELD[props.item.id].label}</div>
+    </div>
+  )
+}
+
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
   // 残り時間の表示だけは秒ごとに動かす。stats は 0.1 秒ごとに来るが、
@@ -58,6 +74,26 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     const size = props.stats?.magazine ?? 0
     const left = props.stats?.ammo ?? 0
     return Array.from({ length: size }, (_, i) => i < left)
+  }
+
+  /**
+   * 角の左に出す物。**1 つだけ。**
+   *
+   * 並びの次に来る物。何枚も左へ伸ばすと画面を横切るので、左は 1 枚に決めて
+   * 残りは上へ積む (weapons.png がそうなっていた)。
+   */
+  const beside = () => {
+    const browsing = props.stats?.browsing
+    if (!browsing) return null
+    return browsing.items[browsing.at + 1] ?? null
+  }
+
+  /** 角の上に積む物。選んでいる物と、左に出した物を除いた残り */
+  const above = () => {
+    const browsing = props.stats?.browsing
+    if (!browsing) return []
+    const skip = new Set([browsing.at, browsing.at + 1])
+    return browsing.items.filter((_, i) => !skip.has(i))
   }
 
   const health = () => {
@@ -307,39 +343,19 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         ゲームなので、UI が視界を奪わない (MGO2 がそうしていた)。
       */}
       <Show when={props.stats?.browsing}>
-        {(browsing) => (
-          <div class="hud-browse">
+        <div class="hud-browse">
             {/*
               角は出さない。**角にあるのは武器のカードそのもの** (下の hud-weapon)。
               選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。
               別に札を出すと同じ名前が 2 つ並ぶ。
             */}
-            <div class="hud-browse-column">
-              <For each={browsing().items.slice(0, browsing().at)}>
-                {(item) => (
-                  <div class="hud-browse-item">
-                    <span class="hud-browse-name">{HELD[item.id].label}</span>
-                    <Show when={item.n !== null}>
-                      <span class="hud-browse-n">{item.n}</span>
-                    </Show>
-                  </div>
-                )}
-              </For>
-            </div>
-            <div class="hud-browse-row">
-              <For each={browsing().items.slice(browsing().at + 1)}>
-                {(item) => (
-                  <div class="hud-browse-item">
-                    <span class="hud-browse-name">{HELD[item.id].label}</span>
-                    <Show when={item.n !== null}>
-                      <span class="hud-browse-n">{item.n}</span>
-                    </Show>
-                  </div>
-                )}
-              </For>
-            </div>
+          <div class="hud-browse-column">
+            <For each={above()}>{(item) => <BrowseItem item={item} />}</For>
           </div>
-        )}
+          <div class="hud-browse-row">
+            <Show when={beside()}>{(item) => <BrowseItem item={item()} />}</Show>
+          </div>
+        </div>
       </Show>
 
       {/*
