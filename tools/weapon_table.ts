@@ -6,6 +6,12 @@
 // 数字の出どころは src/sim/weapons.ts で、そこはゲームが実際に読む所。手で表を
 // 書くと**必ずずれる**。しかも気づけない — 表が古いことは、表を見ても分からない。
 //
+// --- 手で書く所と生成する所を分ける ---
+// docs/weapons.md の**印より上は手で書く**。各武器の役どころや、なぜその数字なのか
+// といった理由はそちらへ。印より下だけを毎回書き直す。
+//
+// 全部を生成すると理由が書けず、全部を手で書くと数字がずれる。
+//
 // --- なぜ生の値をそのまま出さないか ---
 // 「HEAD 100 / minScale 0.5」を見ても強さが分からない。知りたいのは**何発で
 // 死ぬか**で、それは減衰と体力を通して初めて出る。実際、拳銃が遠距離でも頭 2 発
@@ -36,10 +42,12 @@ const DISTANCES = [5, 10, 15, 20, 25, 30, 40, 60, 80]
 const out: string[] = []
 const w = (line = '') => out.push(line)
 
-w('# 武器の表')
+/** この印より下だけを書き直す。上は手で書いた説明が乗っている */
+const MARKER = '<!-- ここから下は生成。bun tools/weapon_table.ts が書き直す -->'
+
+w(MARKER)
 w()
-w('**この表は生成されたもの。** `bun tools/weapon_table.ts` が')
-w('`src/sim/weapons.ts` から書き出す。手で直さない — 直す先はコードのほう。')
+w('# 表')
 w()
 w(`体力は ${MAX_HEALTH}。「発」は倒すのに要る命中数、「時間」は撃ち終わるまで。`)
 w()
@@ -109,5 +117,25 @@ w('では、下限が 0.5 なら遠距離でも 50 = 2 発で倒せてしまう�
 w('「頭 2 発」が変わらないなら、それは減衰が効いていない。')
 
 const path = new URL('../docs/weapons.md', import.meta.url).pathname
-await Bun.write(path, out.join('\n') + '\n')
-console.log(`書いた ${path} (${out.length} 行)`)
+
+// 印より上を残す。
+//
+// **印が無いファイルには書き込まない。** 「印が無ければ全部生成物」にしていたら、
+// 手で書いた説明を丸ごと消した。生成は上書きなので、判断を間違えたときの被害が
+// 戻らない。無い物 (初回) だけ作る。
+let head = ''
+const file = Bun.file(path)
+if (await file.exists()) {
+  const existing = await file.text()
+  const at = existing.indexOf(MARKER)
+  if (at < 0) {
+    console.error(`${path} に印が無い。手で書いた物を消しかねないので書き込まない。`)
+    console.error(`書き直したいなら、残したい説明の末尾に次の行を置くこと:`)
+    console.error(`  ${MARKER}`)
+    process.exit(1)
+  }
+  head = existing.slice(0, at)
+}
+
+await Bun.write(path, head + out.join('\n') + '\n')
+console.log(`書いた ${path} (生成部 ${out.length} 行 / 手書き ${head.split('\n').length - 1} 行)`)
