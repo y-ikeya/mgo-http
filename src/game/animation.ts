@@ -956,9 +956,18 @@ export class CharacterAnimator {
     this.blend(this.lower, this.lowerWeights, this.locomotion, lowerLambda, dt)
     this.previousLocomotion = this.locomotion
     this.blend(this.upper, this.upperWeights, this.resolveUpperKey(), UPPER_BLEND_LAMBDA, dt)
-    // 全身の型が決まっている動作では、照準由来の補正を掛けると崩れる
+    /*
+     * 全身の型が決まっている動作では、照準由来の補正を掛けると崩れる。
+     *
+     * **しゃがんだ刺突だけは別。** あれは上半身だけの型で、下半身はしゃがみのまま
+     * なので、背骨を曲げても壊れない。むしろ曲がらないと**下を向いて刺せない** —
+     * 倒れている相手に刃が通るのは見下ろしたときだけ (hitcheck の
+     * STAB_DOWN_PITCH) なのに、見た目が真っ直ぐ前を刺したままになる。
+     *
+     * 腕は Spine2 の子なので、背骨が下を向けば刃も下を向く。
+     */
     const committed =
-      this.upperState === 'stab' ||
+      (this.upperState === 'stab' && this.locomotion !== 'crouch_stab') ||
       this.upperState === 'salute' ||
       this.upperState === 'roll' ||
       this.upperState === 'death' ||
