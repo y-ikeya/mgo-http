@@ -603,30 +603,36 @@
  * **L 字。** 現在の位置が角に来て、前半が上へ、後半が右へ伸びる。縦一列に
  * 並べると画面の真ん中を塞ぐので、隅へ逃がしてある。
  */
+/*
+ * 武器の表示と同じ右下。持ち物の話は 1 か所にまとめる。
+ *
+ * 全体を右へ寄せつつ、**角から右へ伸びる**形は保つ。右端に来るのは並びの
+ * 最後の物で、角はその左に立つ。
+ */
 .hud-browse {
   position: absolute;
-  /* 武器の表示と同じ右下。持ち物の話は 1 か所にまとめる */
   right: 22px;
   bottom: 128px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
   gap: 6px;
   pointer-events: none;
   font-family: var(--hud-font, ui-monospace, monospace);
 }
 
-.hud-browse-up {
+/* 縦の列と角。角を基準に左揃えで積む */
+.hud-browse-column {
   display: flex;
-  flex-direction: column-reverse;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
 }
 
-/* 角から**左へ**伸ばす。右端が起点なので、右へ伸ばすと画面から出る */
-.hud-browse-row {
+/* 角より後ろ。右へ伸びる */
+.hud-browse-after {
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
 }
