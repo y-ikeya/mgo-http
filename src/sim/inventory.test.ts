@@ -190,3 +190,43 @@ describe('連打', () => {
     expect(inv.held).toBe('grenade')
   })
 })
+
+describe('道具の枠と NONE', () => {
+  test('C で被り、もう一度 C で NONE に戻る', () => {
+    const inv = make()
+    inv.toggle('tool'); settle(inv)
+    expect(inv.selected).toBe('box')
+    expect(inv.usingTool).toBe(true)
+    inv.toggle('tool'); settle(inv)
+    expect(inv.selected).toBe('none')
+    expect(inv.usingTool).toBe(false)
+  })
+
+  test('**NONE を選んでいる間も手には武器がある。** 撃てなくなってはいけない', () => {
+    const inv = make()
+    inv.toggle('tool'); settle(inv)   // box
+    inv.toggle('tool'); settle(inv)   // none
+    expect(inv.held).toBe('rifle')
+    expect(inv.canShoot).toBe(true)
+  })
+
+  test('NONE から戻るのは持っていた武器。主武器ではない', () => {
+    const inv = make()
+    inv.switchTo('pistol'); settle(inv)
+    inv.toggle('tool'); settle(inv)   // box
+    inv.toggle('tool'); settle(inv)   // none
+    expect(inv.held).toBe('pistol')
+  })
+
+  test('箱を被っている間も武器の選択は覚えている', () => {
+    const inv = make()
+    inv.switchTo('grenade'); settle(inv)
+    inv.toggle('tool'); settle(inv)
+    expect(inv.weapon).toBe('grenade')
+    expect(inv.canShoot).toBe(false)
+  })
+
+  test('道具の一覧は 箱 → NONE の順', () => {
+    expect(make().list('tool').map((c) => c.id)).toEqual(['box', 'none'])
+  })
+})

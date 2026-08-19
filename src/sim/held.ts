@@ -28,8 +28,13 @@ export type GunId = 'rifle' | 'sniper' | 'pistol'
 /** 投げる物・置く物。support の枠に入る */
 export type ThrowId = 'grenade' | 'claymore' | 'magazine'
 
-/** 手に持てる物すべて */
-export type HeldId = GunId | ThrowId | 'knife' | 'box'
+/**
+ * 手に持てる物すべて。
+ *
+ * `none` は**道具を何も使っていない**という選択。手ぶらという意味ではない —
+ * 道具の枠が空なだけで、手には武器がある (Inventory.held を参照)。
+ */
+export type HeldId = GunId | ThrowId | 'knife' | 'box' | 'none'
 
 /**
  * 系統。持ち替えの操作が別々に割り当たる (MGO2 の十字左右)。
@@ -65,6 +70,8 @@ export interface HeldSpec {
  * クレイモアのどちらかだが、弾倉 (囮) は撃った弾が溜まって増えるので、持って
  * いれば並びに現れる。だから武器系は 4 つのときも 5 つのときもある。
  */
+const TOOL_ORDER: Partial<Record<HeldId, number>> = { box: 0, none: 1 }
+
 const SLOT_ORDER: Record<Slot, number> = {
   primary: 0,
   secondary: 1,
@@ -88,6 +95,17 @@ export const HELD: Record<HeldId, HeldSpec> = {
 
   // 被っている間は動けるが撃てない。速さは別の倍率で決めている (player.ts)
   box: { id: 'box', label: 'C.BOX', family: 'tool', slot: 'tool', weight: 2.0, shoots: false },
+
+  /*
+   * 道具を使っていない状態。
+   *
+   * **一覧に並ぶ選択肢として置く。** 「箱を降ろす」を別の操作にすると、道具が
+   * 増えたときに降ろし方が分からなくなる。一覧の中に「何も使わない」があれば、
+   * 送るだけで戻れる (MGO2 の道具一覧にも NONE が並んでいた)。
+   *
+   * 重さは 0 だが、これを手にしている間も**武器を持っている**ので速さには効かない。
+   */
+  none: { id: 'none', label: 'NONE', family: 'tool', slot: 'tool', weight: 0, shoots: false },
 }
 
 /**
@@ -101,6 +119,7 @@ export type Carried =
   | { id: ThrowId; count: number }
   | { id: 'knife' }
   | { id: 'box' }
+  | { id: 'none' }
 
 export function specOf(id: HeldId): HeldSpec {
   return HELD[id]
@@ -142,7 +161,11 @@ export const SWITCH_TIME = 0.3
 export function listOf(carried: readonly Carried[], family: Family): Carried[] {
   return carried
     .filter((item) => HELD[item.id].family === family)
-    .sort((a, b) => SLOT_ORDER[HELD[a.id].slot] - SLOT_ORDER[HELD[b.id].slot])
+    .sort((a, b) =>
+      family === 'tool'
+        ? (TOOL_ORDER[a.id] ?? 9) - (TOOL_ORDER[b.id] ?? 9)
+        : SLOT_ORDER[HELD[a.id].slot] - SLOT_ORDER[HELD[b.id].slot],
+    )
 }
 
 /**
@@ -203,6 +226,8 @@ export function buildCarried(loadout: Loadout, ammoOf: (id: GunId) => { ammo: nu
     { id: loadout.support, count: SUPPORT_COUNT[loadout.support] },
     { id: 'knife' },
     { id: 'box' },
+    // 道具を使っていない状態。一覧に並べて、送るだけで戻れるようにする
+    { id: 'none' },
   ]
 }
 

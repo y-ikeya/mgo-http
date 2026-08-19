@@ -123,6 +123,8 @@ const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol']
  */
 const HELD_BITS: HeldId[] = [
   'rifle', 'sniper', 'pistol', 'grenade', 'claymore', 'magazine', 'knife', 'box',
+  // 道具を使っていない状態。**末尾に足す**
+  'none',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 

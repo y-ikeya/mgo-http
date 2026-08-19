@@ -138,8 +138,8 @@ export interface GameStats {
   held: HeldId
   /** 武器系で選んでいる物。道具を手にしていても変わらない */
   weaponHeld: HeldId
-  /** 道具系で選んでいる物。持っていなければ null */
-  tool: HeldId | null
+  /** 道具系で選んでいる物。使っていなければ 'none' */
+  tool: HeldId
   /** その道具をいま手にしているか */
   toolInHand: boolean
   /** どちらの系統の一覧を開いているか。閉じていれば null */
@@ -2328,7 +2328,7 @@ export class Game {
     if (held === this.player.heldItem) return;
     this.player.setHeld(held);
     // ダンボールは被る状態が別にある。持ち替えに合わせる
-    this.player.setBoxed(held === "box");
+    this.player.setBoxed(this.inv.usingTool && held === "box");
     if (held === "rifle" || held === "sniper" || held === "pistol") {
       void this.player.equip(held);
     }
@@ -2730,7 +2730,7 @@ export class Game {
       // **武器のカードに出す物。** 道具を手にしていても変わらない
       weaponHeld: this.inv.weapon,
       tool: this.inv.tool,
-      toolInHand: this.inv.held === this.inv.tool,
+      toolInHand: this.inv.usingTool,
       browsingFamily: this.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物

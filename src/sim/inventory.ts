@@ -43,13 +43,24 @@ export class Inventory {
     this.current = loadout.primary
     this.last = loadout.secondary
     this.lastWeapon = loadout.primary
-    this.lastTool = null
+    this.lastTool = 'none'
     this.switchLeft = 0
     this.queued = null
   }
 
-  /** いま手にある物 */
+  /**
+   * いま手にある物。
+   *
+   * **`none` を選んでいるときは武器を返す。** あれは「道具を使っていない」という
+   * 選択で、手ぶらという意味ではない。そのまま返すと、道具を降ろした瞬間に
+   * 撃てなくなる。
+   */
   get held(): HeldId {
+    return this.current === 'none' ? this.lastWeapon : this.current
+  }
+
+  /** 一覧で指している物。`none` もそのまま返る */
+  get selected(): HeldId {
     return this.current
   }
 
@@ -64,14 +75,19 @@ export class Inventory {
     return HELD[this.current].family === 'weapon' ? this.current : this.lastWeapon
   }
 
+  /** 道具を手にしているか。`none` を選んでいれば false */
+  get usingTool(): boolean {
+    return HELD[this.current].family === 'tool' && this.current !== 'none'
+  }
+
   /** 道具系でいま選んでいる物。持っていなければ null */
-  get tool(): HeldId | null {
+  get tool(): HeldId {
     if (HELD[this.current].family === 'tool') return this.current
-    return this.lastTool ?? firstOf(this.items, 'tool')
+    return this.lastTool ?? 'none'
   }
 
   private lastWeapon: HeldId = 'rifle'
-  private lastTool: HeldId | null = null
+  private lastTool: HeldId = 'none'
 
   /** 持ち替えの最中か。**この間は撃てないし投げられない** */
   get switching(): boolean {
@@ -90,12 +106,12 @@ export class Inventory {
    * 瞬間に撃つ手段を手放す**、が持ち替えの代償なので、ここが要になる。
    */
   get canShoot(): boolean {
-    return HELD[this.current].shoots && !this.switching
+    return HELD[this.held].shoots && !this.switching
   }
 
   /** いま手にある物の中身 (弾数など)。持っていなければ undefined */
   get item(): Carried | undefined {
-    return find(this.items, this.current)
+    return find(this.items, this.held)
   }
 
   /** 装填されている弾。銃でなければ 0 */
@@ -228,12 +244,26 @@ export class Inventory {
   /** 持ち替え中に押された行き先。1 つだけ溜める */
   private queued: HeldId | null = null
 
-  /** 押すだけの持ち替え。直前に持っていた物との往復 */
+  /**
+   * 押すだけの持ち替え。
+   *
+   * **系統に入る / 出る**が先で、同じ系統の中に居るときだけ往復になる。
+   *
+   *   別の系統に居る … その系統で**最後に選んでいた物**へ移る。先頭ではない —
+   *                    拳銃を持っていた人が箱を脱いだら拳銃に戻ってほしい
+   *   道具に居る     … 武器へ戻る。道具は「被る / 降ろす」の 2 択で、送るものが
+   *                    無い (いま持っているのはダンボールだけ)
+   *   武器に居る     … 直前に持っていた武器と往復
+   */
   toggle(family: Family): boolean {
     if (HELD[this.current].family !== family) {
-      const first = firstOf(this.items, family)
-      return first !== null && this.switchTo(first)
+      const target = family === 'weapon' ? this.weapon : this.tool
+      // 道具の枠が none のまま入っても意味が無いので、そのときは箱へ
+      const enter = family === 'tool' && target === 'none' ? 'box' : target
+      return this.switchTo(enter)
     }
+    // 道具は一覧を送る。箱 → none → 箱 …。「降ろす」を別の操作にしない
+    if (family === 'tool') return this.switchTo(cycleId(this.items, this.current, 1))
     return this.switchTo(toggleId(this.items, this.current, this.last))
   }
 
