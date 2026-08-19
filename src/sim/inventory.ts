@@ -43,6 +43,7 @@ export class Inventory {
     this.current = loadout.primary
     this.last = loadout.secondary
     this.switchLeft = 0
+    this.queued = null
   }
 
   /** いま手にある物 */
@@ -163,25 +164,41 @@ export class Inventory {
     return this.items
   }
 
-  /** 時計を進める */
+  /** 時計を進める。持ち替えが終わったら、溜めていた行き先へ続けて移る */
   update(dt: number): void {
-    if (this.switchLeft > 0) this.switchLeft = Math.max(0, this.switchLeft - dt)
+    if (this.switchLeft <= 0) return
+    this.switchLeft = Math.max(0, this.switchLeft - dt)
+    if (this.switchLeft > 0) return
+    const next = this.queued
+    this.queued = null
+    if (next) this.switchTo(next)
   }
 
   /**
    * 指した物へ持ち替える。
    *
-   * 持っていない物、いま持っている物、持ち替えの最中は何もしない。
-   * **持ち替え中に更に持ち替えられると、代償を払わずに済んでしまう。**
+   * **持ち替え中の入力は捨てずに溜める。** 代償 (時間) は残したいが、押した
+   * ことが無かったことになるのは操作として良くない — 連打しても反応が無いと、
+   * 効いていないのか間に合っていないのか分からない。
+   *
+   * 溜めるのは 1 つだけ。連打したぶんだけ順に持ち替わると、指を離した後も
+   * 勝手に動き続ける。
    */
   switchTo(id: HeldId): boolean {
-    if (this.switching || id === this.current) return false
     if (!find(this.items, id)) return false
+    if (this.switching) {
+      this.queued = id === this.current ? null : id
+      return false
+    }
+    if (id === this.current) return false
     this.last = this.current
     this.current = id
     this.switchLeft = SWITCH_TIME
     return true
   }
+
+  /** 持ち替え中に押された行き先。1 つだけ溜める */
+  private queued: HeldId | null = null
 
   /** 押すだけの持ち替え。直前に持っていた物との往復 */
   toggle(family: Family): boolean {

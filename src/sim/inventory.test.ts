@@ -150,3 +150,43 @@ describe('拾う', () => {
     expect(inv.list('weapon').map((c) => c.id)).toContain('magazine')
   })
 })
+
+describe('連打', () => {
+  test('持ち替え中の入力は捨てずに溜める。終わったら続けて移る', () => {
+    const inv = make()
+    inv.switchTo('grenade')
+    // まだ切り替え中。ここで押した分が消えない
+    inv.switchTo('knife')
+    expect(inv.held).toBe('grenade')
+    settle(inv)
+    expect(inv.held).toBe('knife')
+  })
+
+  test('溜めるのは 1 つだけ。指を離した後も動き続けない', () => {
+    const inv = make()
+    inv.switchTo('grenade')
+    inv.switchTo('knife')
+    inv.switchTo('pistol')
+    settle(inv)
+    expect(inv.held).toBe('pistol')
+    settle(inv)
+    expect(inv.held).toBe('pistol')
+  })
+
+  test('いま持っている物を指し直したら溜めない', () => {
+    const inv = make()
+    inv.switchTo('grenade')
+    inv.switchTo('grenade')
+    settle(inv)
+    expect(inv.held).toBe('grenade')
+  })
+
+  test('代償は残る。連打しても 1 回ぶんの時間は必ずかかる', () => {
+    const inv = make()
+    inv.switchTo('grenade')
+    inv.switchTo('knife')
+    inv.update(SWITCH_TIME / 2)
+    expect(inv.switching).toBe(true)
+    expect(inv.held).toBe('grenade')
+  })
+})
