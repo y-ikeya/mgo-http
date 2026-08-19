@@ -325,6 +325,15 @@ export class RemotePlayer {
       this.rollStarted = locomotion === "roll";
       this.sweptThisFrame = locomotion === "sweep";
     }
+    /*
+     * しゃがんだまま刺す。
+     *
+     * **全身の型ではない**ので上の表には載らない — 下半身はしゃがみのままで、
+     * 上半身だけが刺す型になる。切り替わった瞬間に上半身を頭から流す。
+     */
+    if (locomotion === "crouch_stab" && this.locomotion !== "crouch_stab") {
+      animator.playStab();
+    }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
     if (this.locomotion === "salute" && locomotion !== "salute") {
       animator.cancelSalute();

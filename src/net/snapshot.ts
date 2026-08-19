@@ -51,6 +51,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   // クレイモアを置く型。**末尾に足す** (並びを変えると古い版が別の姿勢を再生する)
   'claymore_windup',
   'claymore_place',
+  // しゃがんだまま刺す。**末尾に足す**
+  'crouch_stab',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

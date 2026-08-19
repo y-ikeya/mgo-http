@@ -174,7 +174,8 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
 
   // 刺突・設置・ローリングは全身動作。終わるまで移動モーションに戻さない
   if (input.setting) return input.setting
-  if (input.stabbing) return 'stab'
+  // しゃがんだままなら上半身だけ。立ちの刺突は全身の型なので立ち上がってしまう
+  if (input.stabbing) return input.crouching ? 'crouch_stab' : 'stab'
   if (input.rolling) return 'roll'
 
   // 空中では上昇と下降でモーションを分ける。クリップの終了ではなく速度で

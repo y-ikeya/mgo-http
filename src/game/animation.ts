@@ -63,6 +63,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   stand: 'stand_front',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
+  // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
+  crouch_stab: 'crouch_idle',
   roll: 'roll',
   death: 'death',
   jump_up: 'jump_up',
@@ -88,6 +90,7 @@ type UpperState =
   | 'throw'
   | 'reload'
   | 'stab'
+  | 'crouch_stab'
   | 'roll'
   | 'death'
   | 'hit'
