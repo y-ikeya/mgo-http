@@ -59,7 +59,7 @@ const JA = {
   'hud.help':
     'WASD 移動 · Space 短押し しゃがみ / 長押し ローリング · マウス 視点' +
     ' · 右クリック / Shift 構え · 左クリック 使う (撃つ / 投げる / 刺す)' +
-    ' · Q 持ち替え (長押しで一覧、ホイールで選ぶ) · E 投げ物 · F ナイフ · C ダンボール' +
+    ' · Q 持ち替え (1 秒押すと一覧、ホイールで選ぶ) · E 投げ物 · F ナイフ · C ダンボール' +
     ' · R リロード · V 敬礼 (長押しで保つ) · Z 倍率 · Tab 成績表',
 
   // --- 装備 ---
@@ -115,7 +115,7 @@ const EN: Record<Key, string> = {
   'hud.help':
     'WASD move · Space tap to crouch / hold to roll · Mouse look' +
     ' · Right click / Shift aim · Left click use (shoot / throw / stab)' +
-    ' · Q switch (hold for the list, wheel to choose) · E throwable · F knife · C cardboard box' +
+    ' · Q switch (hold 1s for the list, wheel to choose) · E throwable · F knife · C cardboard box' +
     ' · R reload · V salute (hold to keep) · Z zoom · Tab scoreboard',
 
   'loadout.note': 'Choose your loadout',

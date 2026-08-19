@@ -324,10 +324,13 @@ const CLAYMORE_PLACE_RATIO = 0.55;
 /**
  * 一覧が開くまでの長押し (秒)。
  *
- * これより短ければトグル。**押すだけで往復できることを壊さない**ための境目で、
- * 長すぎると一覧に辿り着けず、短すぎるとトグルのつもりで一覧が出る。
+ * **短く押したときは一覧を出さない。** 往復するたびに画面が騒がしくなるし、
+ * 一覧が出ること自体が「いま選んでいる」という状態なので、意図せず入るのは困る。
+ *
+ * 1 秒は長めだが、一覧は**行き先が決まっていないとき**に使うもの。急いでいる
+ * ときはトグルか名指し (E / F) を使う。
  */
-const BROWSE_HOLD = 0.18;
+const BROWSE_HOLD = 1.0;
 
 /** 長押しで一覧が出るキー。系統ごとに 1 つ */
 const SWITCH_KEYS: readonly (readonly [Family, "swap" | "box", string])[] = [
@@ -395,7 +398,9 @@ export class Game {
    * **開いている間は持ち替えていない。** 選ぶことと抜くことを分けてあるので、
    * ここを動かしても代償は発生しない (docs/design.md の 5)。
    */
-  private browsing: { family: Family; at: number; since: number } | null = null;
+  private browsing: { family: Family; at: number } | null = null;
+  /** 系統ごとの押し始めた時刻。0 なら押していない */
+  private readonly pressedAt: Record<Family, number> = { weapon: 0, tool: 0 };
 
   private grenadeAiming = false;
   /** 投げる引き金のラッチ。押しっぱなしで連投しない */
@@ -2228,6 +2233,8 @@ export class Game {
   private updateSwitchKeys(): void {
     if (!canAct(this.life) || this.loadoutBlocking) {
       this.browsing = null;
+      this.pressedAt.weapon = 0;
+      this.pressedAt.tool = 0;
       return;
     }
     // ボルトを送り終えるまでは持ち替えない。撃って即座に隠れる、を塞ぐ
@@ -2247,19 +2254,24 @@ export class Game {
     for (const [family, action, code] of SWITCH_KEYS) {
       const down = this.input.isActionDown(action, code);
       if (down) {
-        if (!this.browsing) {
-          this.browsing = { family, at: this.browseStart(family), since: Date.now() };
-        } else if (this.browsing.family === family) {
+        // 押し始めを控える。**一覧はすぐには出さない** — 単押しのつもりで
+        // 出ると、往復するたびに画面が騒がしくなる
+        if (this.pressedAt[family] === 0) this.pressedAt[family] = Date.now();
+        const holding = Date.now() - this.pressedAt[family] >= BROWSE_HOLD * 1000;
+        if (holding && !this.browsing) {
+          this.browsing = { family, at: this.browseStart(family) };
+        }
+        if (this.browsing?.family === family) {
           const steps = this.input.consumeWheel();
           if (steps !== 0) this.browsing.at = this.browseMove(this.browsing, -steps);
         }
-      } else if (this.browsing?.family === family) {
-        const list = this.inv.list(family);
-        const pick = list[this.browsing.at]?.id;
-        const opened = Date.now() - this.browsing.since >= BROWSE_HOLD * 1000;
-        this.browsing = null;
-        // 短く押しただけならトグル。長押しなら一覧で選んだ物へ
-        if (opened && pick) this.inv.switchTo(pick);
+      } else if (this.pressedAt[family] !== 0) {
+        const opened = this.browsing?.family === family;
+        const pick = opened ? this.inv.list(family)[this.browsing!.at]?.id : undefined;
+        this.pressedAt[family] = 0;
+        if (opened) this.browsing = null;
+        // 一覧を開いていたなら選んだ物へ。開いていなければトグル
+        if (pick) this.inv.switchTo(pick);
         else if (family === "weapon") this.inv.toggle("weapon");
         else this.inv.toggle("tool");
       }

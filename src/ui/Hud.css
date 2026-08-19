@@ -605,11 +605,12 @@
  */
 .hud-browse {
   position: absolute;
-  left: 22px;
-  bottom: 96px;
+  /* 武器の表示と同じ右下。持ち物の話は 1 か所にまとめる */
+  right: 22px;
+  bottom: 128px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 6px;
   pointer-events: none;
   font-family: var(--hud-font, ui-monospace, monospace);
@@ -618,12 +619,14 @@
 .hud-browse-up {
   display: flex;
   flex-direction: column-reverse;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 6px;
 }
 
+/* 角から**左へ**伸ばす。右端が起点なので、右へ伸ばすと画面から出る */
 .hud-browse-row {
   display: flex;
+  flex-direction: row-reverse;
   align-items: center;
   gap: 6px;
 }
