@@ -44,12 +44,14 @@ import {
   CHOOSE_TIMEOUT,
   type Life,
 } from "../sim/lifecycle";
-import { CHOICES, SUPPORT_SPECS, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
+import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
+import { Inventory } from "../sim/inventory";
+import { type Family, type HeldId } from "../sim/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../sim/damage";
 import type { NoiseEvent } from "../net/types";
-import { WEAPONS, weaponOf } from "../sim/weapons";
+import { weaponOf } from "../sim/weapons";
 import {
   BULLET_GRAVITY,
   flightTime,
@@ -130,6 +132,24 @@ export interface GameStats {
   grenades: number
   /** 投擲の枠に何を入れているか */
   support: SupportId
+  /** 開いている持ち替えの一覧。閉じていれば null */
+  browsing: {
+    /** n = 持っている総数 (銃は装填 + 予備)。loaded/mag は銃だけ */
+    items: { id: HeldId; n: number | null; loaded: number | null; mag: number | null }[]
+    at: number
+  } | null
+  /** いま手にある物 */
+  held: HeldId
+  /** 武器系で選んでいる物。道具を手にしていても変わらない */
+  weaponHeld: HeldId
+  /** 道具系で選んでいる物。使っていなければ 'none' */
+  tool: HeldId
+  /** その道具をいま手にしているか */
+  toolInHand: boolean
+  /** どちらの系統の一覧を開いているか。閉じていれば null */
+  browsingFamily: 'weapon' | 'tool' | null
+  /** 持ち替えの最中か。HUD を薄くするのに使う */
+  switching: boolean
   /** 自分の所属 */
   team: Team
   /** 試合の状態。まだ届いていなければ null */
@@ -273,21 +293,7 @@ const DEFAULT_EXPOSURE = 3.0;
  */
 const ROLL_HOLD_TIME = 0.17;
 
-/**
- * 1 回の命で投げられる数。
- *
- * 無制限だと「とりあえず投げ続ける」が最適になって読み合いが消える。
- * 限られていれば、どこへ投げるか・いつ投げるかが判断になる。
- */
-const THROWABLES_PER_LIFE = 3;
 
-/**
- * 1 つの命で投げられる手榴弾の数。server の GRENADES_PER_LIFE と揃える。
- *
- * ここは表示のためだけの控え。実際に減らすのはサーバーで、投げられるかどうかも
- * サーバーが決める。多く見えていても投げられないだけで、破綻はしない。
- */
-const GRENADES_PER_LIFE = 3;
 
 /**
  * 手を離れる高さ (m)。server の RELEASE_HEIGHT と揃える。
@@ -326,6 +332,23 @@ const GRENADE_RELEASE_RATIO = 0.19;
  * 型は 3.6 秒あるが、手を離れるのはかがんで置いた辺り。残りは立ち上がる動き。
  */
 const CLAYMORE_PLACE_RATIO = 0.55;
+
+/**
+ * 一覧が開くまでの長押し (秒)。
+ *
+ * **短く押したときは一覧を出さない。** 往復するたびに画面が騒がしくなるし、
+ * 一覧が出ること自体が「いま選んでいる」という状態なので、意図せず入るのは困る。
+ *
+ * 1 秒にしていたら遅かった。押してから出るまで待たされると、一覧を使うこと自体が
+ * 億劫になる。叩く (0.1 秒前後) と押さえる (0.3 秒以上) の間を取る。
+ */
+const BROWSE_HOLD = 0.35;
+
+/** 長押しで一覧が出るキー。系統ごとに 1 つ */
+const SWITCH_KEYS: readonly (readonly [Family, "swap" | "box", string])[] = [
+  ["weapon", "swap", "KeyQ"],
+  ["tool", "box", "KeyC"],
+];
 
 
 /**
@@ -381,8 +404,19 @@ export class Game {
   private readonly casings: Casings;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
   private stageBoxes: StageBox[] = [];
-  private grenadeCount = GRENADES_PER_LIFE;
+  /**
+   * 一覧を開いている最中。
+   *
+   * **開いている間は持ち替えていない。** 選ぶことと抜くことを分けてあるので、
+   * ここを動かしても代償は発生しない (docs/design.md の 5)。
+   */
+  private browsing: { family: Family; at: number } | null = null;
+  /** 系統ごとの押し始めた時刻。0 なら押していない */
+  private readonly pressedAt: Record<Family, number> = { weapon: 0, tool: 0 };
+
   private grenadeAiming = false;
+  /** 投げる引き金のラッチ。押しっぱなしで連投しない */
+  private throwReleased = true;
   /** 手を離れるまでの残り (秒)。0 なら投げていない */
   private grenadeRelease = 0;
   /** 直前のフレームの経過時間 (秒)。tick の外で時計を進めるのに使う */
@@ -399,7 +433,6 @@ export class Game {
   private grenadeReleaseRatio = GRENADE_RELEASE_RATIO;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
-  private throwables = THROWABLES_PER_LIFE;
   /** 投げる構えを取っているか。離した瞬間に投げる */
   private throwAiming = false;
   /** しゃがみ / 回避のキーを押している時間 (秒) */
@@ -479,33 +512,22 @@ export class Game {
     support: "grenade" as SupportId,
   };
   /** いまどちらの枠を持っているか */
-  private slot: "primary" | "secondary" = "primary";
-
-  private readonly magazines: Record<WeaponId, number> = {
-    rifle: WEAPONS.rifle.magazine,
-    sniper: WEAPONS.sniper.magazine,
-    pistol: WEAPONS.pistol.magazine,
-  };
 
   /**
-   * 弾倉の外に持っている弾。武器ごと、1 つの命ぶん。
+   * 持ち物と、いま手にある物。
    *
-   * 弾倉の数ではなく発数で持つので、半分残った弾倉を替えても損しない。
-   * 尽きたらその銃はもう撃てない — 持ち替えるか、ナイフで行くか、
-   * という判断が最後に残る。
+   * **弾はここにある。** 以前は銃ごとの装填と予備、手榴弾の残り、投げられる弾倉が
+   * 別々のフィールドに散っていて、読み書きが各所にあった。持ち物の考え方を変える
+   * たびに全部を追いかけることになる (docs/design.md の 5)。
    */
-  private readonly reserves: Record<WeaponId, number> = {
-    rifle: WEAPONS.rifle.reserve,
-    sniper: WEAPONS.sniper.reserve,
-    pistol: WEAPONS.pistol.reserve,
-  };
+  private inv = new Inventory({
+    primary: "rifle",
+    secondary: "pistol",
+    support: "grenade",
+  });
 
   private get ammo(): number {
-    return this.magazines[this.player.equipped];
-  }
-
-  private set ammo(value: number) {
-    this.magazines[this.player.equipped] = value;
+    return this.inv.ammo;
   }
   /** 0 より大きい間はリロード中で、発砲できない */
   private reloadTimer = 0;
@@ -541,9 +563,7 @@ export class Game {
   private readonly links: { name: string; at: number }[] = []
   /** 成績表を開いているか */
   private menuOpen = false
-  /** 持ち替えの最中。二重に走らせない */
-  private equipping = false
-
+  
   /**
    * いま持っている武器の性能。
    *
@@ -944,22 +964,33 @@ export class Game {
     //
     // 決めるまで動けない形にしてある。裏で動けると、選ぶのを後回しにして
     // 走り出せてしまい、「湧くときに決める」という手続きが有名無実になる。
+    /*
+     * 構える。
+     *
+     * **投げ物のときだけ別。** あれは Shift が振りかぶりなので、銃を構える型に
+     * すると腕が二重に動く。
+     *
+     * **ナイフは構える。** 下を狙えることに意味がある — 倒れている相手には
+     * 立ったまま前を刺しても届かず、しゃがんで見下ろして初めて刃が通る
+     * (sim/hitcheck.ts の STAB_DOWN_PITCH)。
+     */
+    const throwing =
+      this.inv.held === "grenade" ||
+      this.inv.held === "claymore" ||
+      this.inv.held === "magazine";
     this.player.setAiming(
-      this.input.aiming && this.input.engaged && !this.loadoutBlocking,
+      this.input.aiming && this.input.engaged && !this.loadoutBlocking && !throwing,
     );
     this.follow.setAiming(this.player.isAiming);
     this.follow.setViewHeight(this.player.viewHeight);
 
-    if (this.input.consumeAction("knife", "KeyF")) this.startStab();
+    this.updateSwitchKeys();
     this.updateStanceInput(dt);
-    // ボルトを送り終えるまでは箱に入れない。撃って即座に隠れる、を塞ぐ
-    if (this.input.consumeAction("box", "KeyC") && !this.cocking) {
-      this.player.toggleBox();
-    }
-    // 銃の持ち替え。構え中 / リロード中 / 転がり中は受け付けない
-    if (this.input.consumeAction("swap", "KeyQ")) void this.swapWeapon();
     this.updateLoadoutKeys();
     this.syncLoadoutPointer();
+    this.syncHeld();
+    this.inv.update(dt);
+    this.updateTrigger();
     this.updateZoom();
     this.applyWeaponView();
 
@@ -1144,11 +1175,9 @@ export class Game {
       // 弾数もサーバーが写しを持っているので、そちらを正とする
       case "resume":
         this.player.resumeAt(message.x, message.y, message.z, message.health);
-        for (const id of Object.keys(this.magazines) as WeaponId[]) {
-          this.magazines[id] = message.magazine[id] ?? this.magazines[id];
-          this.reserves[id] = message.reserve[id] ?? this.reserves[id];
-        }
-        this.grenadeCount = message.grenades;
+        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
+        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
+        this.inv.restore(message.magazine, message.reserve, message.grenades);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
@@ -1156,7 +1185,7 @@ export class Game {
         this.pendingLoadout.support = message.support;
         this.pendingLoadout.primary = message.primary;
         this.onLoadout?.(this.pendingLoadout);
-        if (this.slot === "primary") void this.player.equip(message.primary);
+        void this.player.equip(message.primary);
         this.follow.snapTo(this.player, this.cameraWorld);
         break;
 
@@ -1538,15 +1567,8 @@ export class Game {
    * 生き返ったら両方満タン。持ち替えの都合で片方だけ空、を持ち越さない。
    */
   private refillFromLoadout(): void {
-    this.grenadeCount = SUPPORT_SPECS[this.loadout.support].count;
-    // **投げられる弾倉は 0 から。** 撃った弾が 1 弾倉ぶん溜まるごとに増える
-    this.throwables = 0;
+    this.inv.refill(this.loadout);
     this.roundsFired = 0;
-
-    for (const id of Object.keys(WEAPONS) as WeaponId[]) {
-      this.magazines[id] = WEAPONS[id].magazine;
-      this.reserves[id] = WEAPONS[id].reserve;
-    }
   }
 
   /**
@@ -1563,7 +1585,7 @@ export class Game {
     const per = roundsPerDecoy(this.player.equipped);
     if (this.roundsFired >= per) {
       this.roundsFired -= per;
-      this.throwables++;
+      this.inv.gainMagazine();
     }
   }
 
@@ -1633,7 +1655,7 @@ export class Game {
   private respawnSelf(): void {
     // 湧くときに装備が確定する。試合中に組み替えても、ここまで反映されない
     this.loadout = { ...this.pendingLoadout };
-    this.slot = "primary";
+
     void this.player.equip(this.loadout.primary);
     this.player.respawn();
     this.refillFromLoadout();
@@ -1703,6 +1725,8 @@ export class Game {
       this.player.position,
       this.meleeForward,
       this.team,
+      // 見下ろしていれば倒れている相手にも届く。構えていなければ水平とみなす
+      this.player.isAiming ? this.follow.aimPitch : 0,
     );
     if (!result) return;
 
@@ -1726,6 +1750,25 @@ export class Game {
   }
 
   /** リロードの進行と、押しっぱなしの間 FIRE_INTERVAL ごとの発砲 */
+  /**
+   * 引き金は 1 本。手にある物が何をするかを決める。
+   *
+   * **撃つ・投げる・刺すが同じボタンになる。** 持ち替えて使う形にした以上、
+   * 物ごとに別のキーを割り当てると「持ち替えたのに別のキーを押す」ことになって、
+   * 持ち替えたこと自体が意味を失う。
+   */
+  private updateTrigger(): void {
+    if (!canAct(this.life) || this.loadoutBlocking) return;
+    if (this.inv.switching) return;
+    if (this.inv.held !== "knife") return;
+    // ナイフは押した瞬間に振る。押しっぱなしで連打しない
+    if (this.input.firing && this.triggerReleased) {
+      this.triggerReleased = false;
+      this.startStab();
+    }
+    if (!this.input.firing) this.triggerReleased = true;
+  }
+
   private updateWeapon(dt: number): void {
     // 撃つ手を止めたらパターンを頭に戻す。バースト射撃が意味を持つのはこのため。
     this.timeSinceShot += dt;
@@ -1744,14 +1787,11 @@ export class Game {
       this.reloadTimer -= dt;
       if (this.reloadTimer <= 0) {
         this.reloadTimer = 0;
-        // 池から足りるぶんだけ移す。弾倉に残っていた分は捨てない
+        // 予備から足りるぶんだけ移す。弾倉に残っていた分は捨てない
         const kind = this.player.equipped;
-        const take = Math.min(this.weapon.magazine - this.ammo, this.reserves[kind]);
-        this.ammo += take;
-        this.reserves[kind] -= take;
         // **終わった瞬間**に知らせる。始まりではなく終わりを送ることで、
         // サーバーは銃ごとの装填の尺を持たなくてよくなる
-        if (take > 0) this.net.send({ type: "reload", weapon: kind });
+        if (this.inv.reload()) this.net.send({ type: "reload", weapon: kind });
       }
       // 弾倉に手が掛かる頃に鳴らす。近くの相手には「いま撃てない」が伝わる
       if (this.reloadSoundIn > 0) {
@@ -1805,6 +1845,10 @@ export class Game {
       this.reloadTimer <= 0 &&
       this.stabTimer <= 0 &&
       !this.player.rolling &&
+      // **撃てる物を手にしていて、持ち替えが終わっていること。**
+      // 手榴弾やナイフに持ち替えている間は引き金が効かない。これが
+      // 投げること・刺すことの代償になる (docs/design.md の 5)
+      this.inv.canShoot &&
       this.ammo > 0;
     this.player.setFiring(firing);
 
@@ -1835,7 +1879,7 @@ export class Game {
     if (this.cocking) return;
     if (this.ammo >= this.weapon.magazine) return;
     // 予備が尽きていたら替えるものが無い
-    if (this.reserves[this.player.equipped] <= 0) return;
+    if (this.inv.reserve <= 0) return;
     // モーションの尺をそのまま操作不能時間にして、見た目と挙動を一致させる
     this.reloadTimer = this.player.reloadDuration || this.weapon.reload;
     this.player.playReload();
@@ -1893,7 +1937,7 @@ export class Game {
       player ? IMPACT_HIT : IMPACT_WORLD,
     );
     this.shotCount++;
-    this.ammo--;
+    this.inv.spend();
     this.countRoundForDecoy();
 
     // 弾道と発砲音のためだけの通知。当たったかどうかは damage で別に送っている。
@@ -1974,10 +2018,13 @@ export class Game {
     // リロードと同じ規則。ここが抜けていて、撃った直後に投げるとコッキングを
     // 省略できた
     const canThrow =
-      this.throwables > 0 && canAct(this.life) && !this.player.isBoxed && !this.cocking;
-    const held = canThrow && this.input.isActionDown("throwItem", "KeyG");
+      this.inv.held === "magazine" && canAct(this.life) && !this.cocking;
+    const held = canThrow && this.input.aiming;
+    const release = held && this.throwAiming && this.input.firing && this.throwReleased;
+    if (this.input.firing) this.throwReleased = false;
+    else this.throwReleased = true;
 
-    if (held) {
+    if (held && !release) {
       this.follow.aimOrigin(this.aimOrigin);
       this.follow.aimDirection(this.aimDir);
       this.thrown.showPreview(this.aimOrigin, this.aimDir, this.stage.collidables);
@@ -1988,10 +2035,10 @@ export class Game {
     if (!this.throwAiming) return;
     this.throwAiming = false;
     this.thrown.hidePreview();
-    // 構えを解いただけ (死んだ・箱に入った) なら投げない
-    if (!canThrow) return;
+    // 構えをやめただけ / 解かされただけ (死んだ・箱に入った) なら投げない
+    if (!release || !canThrow) return;
 
-    this.throwables--;
+    this.inv.spend();
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
     this.thrown.throwFrom(this.aimOrigin, this.aimDir);
@@ -2013,24 +2060,47 @@ export class Game {
    * 溜められると、構えている間ずっと残り時間を見せる必要が出てきて、
    * 「落下点を見る」ためのこの画面と役目がぶつかる。
    */
+  /**
+   * 手にある物で分ける。
+   *
+   * **投げるのは引き金。** 持ち替えて手にした物を、引き金で使う。物ごとに別の
+   * キーを割り当てると「持ち替えたのに別のキーを押す」ことになって、持ち替えた
+   * こと自体が意味を失う。
+   *
+   * **銃と同じ二段。** 構える (Shift / 右クリック) と振りかぶり、引き金 (左
+   * クリック) で放す。銃は構えて撃つので、投げ物だけ別の操作にすると持ち替えた
+   * ときに指が迷う。落下点は構えている間ずっと見えるので、狙ってから放せる。
+   */
   private updateGrenadeAim(): void {
-    // support がクレイモアなら、同じキーは「置く」になる
-    if (this.loadout.support === "claymore") {
+    if (this.inv.held === "claymore") {
       this.updateClaymoreSetup();
+      return;
+    }
+    if (this.inv.held !== "grenade") {
+      // 手にしていないなら構えを畳む。持ち替えた瞬間に振りかぶりが残らない
+      if (this.grenadeAiming) {
+        this.grenadeAiming = false;
+        this.player.cancelThrow();
+        this.player.setThrowing(false);
+      }
       return;
     }
     // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
     const canThrow =
-      this.grenadeCount > 0 &&
+      this.inv.countOf(this.inv.held) > 0 &&
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
       !this.cocking;
-    const held = canThrow && this.input.isActionDown("grenade", "KeyE");
+    const held = canThrow && this.input.aiming;
+    // 構えている間に引き金を引いたら放す。押しっぱなしで連投しない
+    const release = held && this.grenadeAiming && this.input.firing && this.throwReleased;
+    if (this.input.firing) this.throwReleased = false;
+    else this.throwReleased = true;
 
-    if (held) {
-      // 押した瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
-      // 落下点はその間ずっと見える — どこへ落とすかを見てから離せるように
+    if (held && !release) {
+      // 構えた瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
+      // 落下点はその間ずっと見える — どこへ落とすかを見てから放せるように
       if (!this.grenadeAiming) this.player.playThrow();
       this.grenadeAiming = true;
       this.follow.aimDirection(this.aimDir);
@@ -2056,6 +2126,14 @@ export class Game {
     this.grenadeAiming = false;
     this.grenades.hidePreview();
 
+    // **構えをやめただけなら投げない。** 引き金を引いていないのに投げると、
+    // 覗いて確かめる、が使えなくなる
+    if (!release) {
+      this.player.cancelThrow();
+      this.player.setThrowing(false);
+      return;
+    }
+
     // 構えを解かされただけ (倒された・箱に入った・死んだ) なら投げない。
     // 腕を下ろして構えに戻す。抜いたピンは無かったことになるが、
     // ここで爆発させると理不尽な死に方が増えるだけで読み合いにならない
@@ -2065,7 +2143,7 @@ export class Game {
       return;
     }
 
-    this.grenadeCount--;
+    this.inv.spend();
     // 止めていた続きから振り切る。手を離れるのはその途中
     this.player.releaseThrow();
     // 残りは**いまどこまで再生されたか**から測る。
@@ -2096,14 +2174,17 @@ export class Game {
    */
   private updateClaymoreSetup(): void {
     const canPlace =
-      this.grenadeCount > 0 &&
+      this.inv.countOf(this.inv.held) > 0 &&
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
       !this.cocking;
-    const held = canPlace && this.input.isActionDown("grenade", "KeyE");
+    const held = canPlace && this.input.aiming;
+    const release = held && this.setupAiming && this.input.firing && this.throwReleased;
+    if (this.input.firing) this.throwReleased = false;
+    else this.throwReleased = true;
 
-    if (held) {
+    if (held && !release) {
       if (!this.setupAiming) this.player.playSetup();
       this.setupAiming = true;
       // 体をカメラの方へ向ける。置く向き = 自分の向きなので、これが照準になる
@@ -2113,14 +2194,14 @@ export class Game {
 
     if (!this.setupAiming) return;
     this.setupAiming = false;
-    // 構えを解かされただけ (倒された・箱に入った) なら置かない
-    if (!canPlace) {
+    // 構えをやめただけなら置かない。覗いて場所を確かめる、が使える
+    if (!release || !canPlace) {
       this.player.cancelThrow();
       this.player.setThrowing(false);
       return;
     }
 
-    this.grenadeCount--;
+    this.inv.spend();
     this.player.releaseSetup();
     // 置き切るまでは向きを保つ。放した瞬間に向き直ると、置く先がずれる
     this.player.setThrowing(true);
@@ -2155,6 +2236,106 @@ export class Game {
     if (speed <= 0 || !canAct(this.life)) return;
     if (fallDamage(speed) <= 0) return;
     this.net.send({ type: "fall", speed });
+  }
+
+  /**
+   * 持ち替えの操作。
+   *
+   * **押すだけで 2 つを往復し、行き先を決めたいときは名指しする。** MGO2 は
+   * 十字の長押しで一覧を出していたが、キーボードなら名指しのほうが速い。
+   * 一覧 (L 字) は後で足す。
+   *
+   *   Q   武器系のトグル。直前に持っていた物と往復する
+   *   E   support (手榴弾 / クレイモア) へ
+   *   F   ナイフへ
+   *   C   ダンボールへ (道具系のトグル)
+   *
+   * **持ち替えには時間がかかり、その間は何もできない** (Inventory.canShoot)。
+   * それが投げること・刺すことの代償になっている (docs/design.md の 5)。
+   */
+  private updateSwitchKeys(): void {
+    if (!canAct(this.life) || this.loadoutBlocking) {
+      this.browsing = null;
+      this.pressedAt.weapon = 0;
+      this.pressedAt.tool = 0;
+      return;
+    }
+    // ボルトを送り終えるまでは持ち替えない。撃って即座に隠れる、を塞ぐ
+    if (this.cocking) return;
+    // 構えたままは持ち替えられない。銃を下ろす一手間があって初めて、
+    // どちらで待つかの選択になる
+    if (this.player.isAiming) {
+      this.browsing = null;
+      return;
+    }
+
+    // --- 長押しで一覧、離すと持ち替え ---
+    //
+    // **一覧の中を動くのはタダ。** 時間がかかるのは決めた後の持ち替えだけ。
+    // 押すだけのトグルは即持ち替えなので、連打すると全部が実際の持ち替えになる。
+    // 選ぶことと抜くことを分けると、迷っている時間に代償が要らなくなる。
+    for (const [family, action, code] of SWITCH_KEYS) {
+      const down = this.input.isActionDown(action, code);
+      if (down) {
+        // 押し始めを控える。**一覧はすぐには出さない** — 単押しのつもりで
+        // 出ると、往復するたびに画面が騒がしくなる
+        if (this.pressedAt[family] === 0) this.pressedAt[family] = Date.now();
+        const holding = Date.now() - this.pressedAt[family] >= BROWSE_HOLD * 1000;
+        if (holding && !this.browsing) {
+          this.browsing = { family, at: this.browseStart(family) };
+        }
+        if (this.browsing?.family === family) {
+          const steps = this.input.consumeWheel();
+          if (steps !== 0) this.browsing.at = this.browseMove(this.browsing, -steps);
+        }
+      } else if (this.pressedAt[family] !== 0) {
+        const opened = this.browsing?.family === family;
+        const pick = opened ? this.inv.list(family)[this.browsing!.at]?.id : undefined;
+        this.pressedAt[family] = 0;
+        if (opened) this.browsing = null;
+        // 一覧を開いていたなら選んだ物へ。開いていなければトグル
+        if (pick) this.inv.switchTo(pick);
+        else if (family === "weapon") this.inv.toggle("weapon");
+        else this.inv.toggle("tool");
+      }
+    }
+
+    // 名指しの持ち替え。一覧を開かずに行き先が決まっているとき
+    if (this.input.consumeAction("grenade", "KeyE")) {
+      const support = this.inv.supportId;
+      if (support) this.inv.switchTo(support);
+    }
+    if (this.input.consumeAction("knife", "KeyF")) this.inv.switchTo("knife");
+  }
+
+  /** 一覧を開いた時点の位置。いま手にある物に合わせる */
+  private browseStart(family: Family): number {
+    const list = this.inv.list(family);
+    const at = list.findIndex((item) => item.id === this.inv.held);
+    return at < 0 ? 0 : at;
+  }
+
+  /** 一覧の中を送る。端で止めず回す — 短い並びなので行き止まりが煩わしい */
+  private browseMove(state: { family: Family; at: number }, step: number): number {
+    const list = this.inv.list(state.family);
+    if (list.length === 0) return 0;
+    return (state.at + step + list.length) % list.length;
+  }
+
+  /**
+   * 手にある物を Player と Inventory で揃える。
+   *
+   * 銃はモデルの読み込みが要る (equip) ので、変わった瞬間だけ呼ぶ。
+   */
+  private syncHeld(): void {
+    const held = this.inv.held;
+    if (held === this.player.heldItem) return;
+    this.player.setHeld(held);
+    // ダンボールは被る状態が別にある。持ち替えに合わせる
+    this.player.setBoxed(this.inv.usingTool && held === "box");
+    if (held === "rifle" || held === "sniper" || held === "pistol") {
+      void this.player.equip(held);
+    }
   }
 
   /** 投げる型が振り切る所で手を離す */
@@ -2258,33 +2439,6 @@ export class Game {
     if (ping) this.addPing("step", position, gain);
   }
 
-  /**
-   * 銃を持ち替える。
-   *
-   * 弾倉は満タンで持ち替える。ここで残弾を引き継ぐと、持ち替えを挟むだけで
-   * リロードの隙を消せてしまう。
-   */
-  private async swapWeapon(): Promise<void> {
-    if (this.equipping || this.reloadTimer > 0 || this.player.rolling) return;
-    // ボルトを送り終えるまでは持ち替えられない。撃って即座に別の銃、を塞ぐ
-    if (this.cocking) return;
-    // 構えたままは持ち替えられない。銃を下ろす動作が要る。
-    //
-    // 覗いたまま持ち替えられると、遠距離で狙撃銃、詰められたら即座に突撃銃、が
-    // 隙なしで通る。構えを解く一手間があって初めて、どちらで待つかの選択になる。
-    if (this.player.isAiming) return;
-    this.equipping = true;
-    try {
-      // 枠を入れ替える。並べた銃を順に回すのではない
-      this.slot = this.slot === "primary" ? "secondary" : "primary";
-      await this.player.equip(this.loadout[this.slot]);
-      // 残弾は武器ごとに残る。持ち替えても補充されない
-      this.burstIndex = 0;
-      this.zoomStep = 0;
-    } finally {
-      this.equipping = false;
-    }
-  }
 
   /**
    * 成績表を開く / 閉じる。
@@ -2531,9 +2685,11 @@ export class Game {
       speed: this.player.speed,
       locked: this.input.engaged,
       shots: this.shotCount,
-      ammo: this.ammo,
+      // **武器のカードに出す数。** 手にある物ではなく、カードが名指している武器の
+      // 弾。ダンボールを被っている間も銃の残弾はそのまま出す
+      ammo: this.inv.ammoOf(this.inv.weapon),
       magazine: this.weapon.magazine,
-      reserve: this.reserves[this.player.equipped],
+      reserve: this.inv.reserveOf(this.inv.weapon),
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
@@ -2557,9 +2713,39 @@ export class Game {
       kills: this.killFeed.filter(
         (entry) => now - entry.at < KILL_FEED_DURATION * 1000,
       ),
-      throwables: this.throwables,
-      grenades: this.grenadeCount,
-      support: this.loadout.support,
+      throwables: this.inv.countOf('magazine'),
+      grenades: this.inv.supportCount,
+      /**
+       * 開いている一覧。閉じていれば null。
+       *
+       * 並びと、いま指している位置を渡す。**L 字に折って描く**のは画面側の仕事
+       * (真ん中を塞がないため)。
+       */
+      browsing: this.browsing
+        ? {
+            // **数も載せる。** 選ぶときに「あと何発か」が要る — 弾切れの銃と
+            // 満タンの銃が同じ見た目だと、一覧が選ぶ材料にならない。
+            // 銃は装填分も足した**総数**。カードの数字と揃える
+            items: this.inv.list(this.browsing.family).map((c) => ({
+              id: c.id,
+              n: 'ammo' in c ? c.ammo + c.reserve : 'count' in c ? c.count : null,
+              // **装填の内訳も銃ごとに。** 送っている間、角のカードは指している銃を
+              // 映すので、目盛りだけ手元の銃のままだと弾倉の長さが名前と合わない
+              loaded: 'ammo' in c ? c.ammo : null,
+              mag: 'ammo' in c ? weaponOf(c.id).magazine : null,
+            })),
+            at: this.browsing.at,
+          }
+        : null,
+      held: this.inv.held,
+      // **武器のカードに出す物。** 道具を手にしていても変わらない
+      weaponHeld: this.inv.weapon,
+      tool: this.inv.tool,
+      toolInHand: this.inv.usingTool,
+      browsingFamily: this.browsing?.family ?? null,
+      switching: this.inv.switching,
+      // **持ち物を見る。** 選択ではなく実際に持っている物
+      support: (this.inv.supportId as SupportId | null) ?? this.loadout.support,
       team: this.team,
       match: this.match,
       players: this.remotes.count,

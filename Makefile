@@ -17,11 +17,12 @@ PAGES_PROJECT := mgohttp
 
 SSH := ssh -i $(SERVER_KEY) $(SERVER_USER)@$(SERVER_HOST)
 
-.PHONY: help dev serve build test check deploy deploy-web deploy-server setup-server push-env logs status ssh restart
+.PHONY: help dev serve build test check docs deploy deploy-web deploy-server setup-server push-env logs status ssh restart
 
 help:
 	@echo '手元で動かす'
-	@echo '  make check          型と試験と組み立て。CI もこれを呼ぶ'
+	@echo '  make check          型と試験と組み立てと武器の表。CI もこれを呼ぶ'
+	@echo '  make docs           武器の表を書き出し直す (docs/weapons.md)'
 	@echo '  make test           試験だけ (50 秒ほどかかる)'
 	@echo '  make dev            画面 (vite)。サーバーは同じホストの 8787 を見る'
 	@echo '  make serve          対戦サーバー。保存すると勝手に読み直す'
@@ -59,12 +60,32 @@ build:
 # Player の宣言から 11 個のフィールドが抜けたまま動いていた
 # (bun は型を剥がすだけなので気づけない)。厳しさは tsconfig.base.json に
 # 1 つ置いて、両方がそれを継いでいる。
-check:
+check: docs
 	bunx tsc --noEmit -p tsconfig.app.json
 	bunx tsc --noEmit -p tsconfig.server.json
 	bunx tsc --noEmit -p tsconfig.test.json
 	bun test
 	bun run build
+
+# 武器の表を書き出し直す。
+#
+# **古いことに気づけないのが怖い。** 表を見ても、それが古いかどうかは分からない。
+# だから check で毎回書き直して、差が出たら止める。数字を変えたら表も一緒に
+# コミットする、という形になる。
+#
+# 見るのは git の状態ではなく**中身が変わったかどうか**。git で見ると、まだ
+# コミットしていないだけの表でも止まる — 「いじる → check → コミット」の順で
+# 作業できなくなる。
+docs:
+	@prev=$$(mktemp); cp docs/weapons.md $$prev 2>/dev/null || true; \
+	bun tools/weapon_table.ts; \
+	if cmp -s $$prev docs/weapons.md; then rm -f $$prev; else \
+		rm -f $$prev; \
+		echo ''; \
+		echo '武器の表が古かったので書き直した。docs/weapons.md も一緒にコミットする'; \
+		echo ''; \
+		exit 1; \
+	fi
 
 # 試験だけ。check の一部でもあるので、普段は check を叩けばよい。
 #

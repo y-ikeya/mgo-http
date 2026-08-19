@@ -50,15 +50,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.hud-help {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: rgba(200, 212, 192, 0.45);
-}
-
 /* --- クロスヘア --- */
 
 .crosshair {
@@ -121,45 +112,6 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   color: #ff8a72;
-}
-
-/* --- 残弾 --- */
-
-.hud-ammo {
-  position: absolute;
-  right: 22px;
-  bottom: 20px;
-  text-align: right;
-  line-height: 1;
-}
-
-.hud-ammo-count {
-  font-size: 34px;
-  letter-spacing: 0.04em;
-  color: #d8e6cc;
-  font-variant-numeric: tabular-nums;
-}
-
-.hud-ammo-magazine {
-  margin-left: 6px;
-  font-size: 14px;
-  color: rgba(160, 190, 140, 0.55);
-  font-variant-numeric: tabular-nums;
-}
-
-.hud-ammo-empty .hud-ammo-count {
-  color: #e07a5f;
-}
-
-.hud-ammo-state {
-  margin-top: 8px;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: rgba(200, 212, 192, 0.6);
-}
-
-.hud-ammo-state-warn {
-  color: #e07a5f;
 }
 
 /* --- ポインタロック待ち --- */
@@ -254,18 +206,6 @@
 .hud-kill-weapon {
   font-size: 11px;
   color: rgba(160, 190, 140, 0.55);
-}
-
-/* 投げ物の残り。残弾の下に小さく添える */
-.hud-throwables {
-  margin-top: 4px;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: rgba(160, 190, 140, 0.65);
-}
-
-.hud-throwables-empty {
-  color: rgba(160, 190, 140, 0.25);
 }
 
 /*
@@ -595,4 +535,285 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   color: rgba(170, 186, 156, 0.55);
+}
+
+/*
+ * 持ち替えの一覧。
+ *
+ * **角は武器のカードそのもの** (hud-weapon)。選んでいる物の弾数まで出ている
+ * カードが、そのまま選択の印になる。ここに出すのは**選んでいない物だけ**。
+ *
+ * 角は動かない。動くのはカードのほう。送ると札が流れて、角に来た物が選ばれる。
+ * 強調が列の中を動く形だと、目で追う先が毎回変わる。
+ *
+ * 1 本のリストを L 字に折ってあるのは、縦一列だと画面の真ん中を塞ぐため。
+ * **見えていることが勝敗を決めるゲームなので、UI が視界を奪わない** (MGO2 が
+ * そうしていた。docs/design.md の 5)。
+ *
+ * --- 列と行を別々に置く ---
+ * まとめて 1 つの箱に入れると、後ろの物が**カードの上の行**に出てしまう。
+ * 角より前は「カードの真上」、後ろは「カードの左隣」で、基準が違う。
+ */
+.hud-browse {
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
+}
+
+/* 角より前。武器カードの真上へ積む (角に近いほど下) */
+.hud-browse-column {
+  position: absolute;
+  right: 22px;
+  bottom: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+/*
+ * 角より後ろ。武器カードの**左隣**へ並べる。
+ *
+ * 右へ伸ばすと画面の外に出るので左。カードと同じ高さに揃えるため、下端を
+ * カードと合わせる。
+ */
+.hud-browse-row {
+  position: absolute;
+  right: 198px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+/*
+ * 一覧の 1 枚。
+ *
+ * **武器カードと同じ大きさ・同じ並び。** 選んでいる物 (角のカード) と大きさが
+ * 違うと、送るたびに列の形が変わって目が落ち着かない。数を上、名前を下に置くのも
+ * カードと同じ。
+ *
+ * 選んでいる物はここに出てこない。角にあるのが武器カードそのもの。
+ */
+.hud-browse-item {
+  box-sizing: border-box;
+  width: 168px;
+  min-height: 68px;
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 4px;
+  color: rgba(198, 214, 232, 0.62);
+  background: rgba(10, 14, 20, 0.42);
+  border: 1px solid rgba(126, 166, 255, 0.14);
+  white-space: nowrap;
+}
+
+.hud-browse-name {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+}
+
+/* 武器カードの予備弾と同じ位置・同じ大きさ */
+.hud-browse-n {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(198, 214, 232, 0.5);
+  min-height: 22px;
+}
+
+/*
+ * いま手にある物。
+ *
+ * **装填弾は目盛り、予備は数字。** 撃っている最中に数字を読ませない — 減って
+ * いくのが目に入るだけで足りる。MGO2 がそうしていた (docs/design.md の 5)。
+ */
+.hud-weapon {
+  position: absolute;
+  right: 22px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
+  color: #dbe6f2;
+
+  /*
+   * 枠で囲う。
+   *
+   * **背景の明暗に左右されずに読めるようにする。** 空を背に立つと白い文字が
+   * 飛び、暗い屋内では枠が無いと数字が浮いて見える。立体駐車場は明るい屋上と
+   * 暗い 1 階が同じ試合の中にあるので、どちらでも読めないと困る。
+   */
+  box-sizing: border-box;
+  width: 168px;
+  /* 一覧の 1 枚と同じ大きさ。並べたときに揃う */
+  min-height: 68px;
+  padding: 8px 12px 10px;
+  background: rgba(10, 14, 20, 0.55);
+  border: 1px solid rgba(126, 166, 255, 0.28);
+}
+
+/* 持ち替えの最中は薄く。使えないことが見て分かる */
+.hud-weapon-switching {
+  opacity: 0.45;
+}
+
+/*
+ * 道具を手にしている間 (ダンボールを被っているなど)。
+ *
+ * **数字は消さない。薄くするだけ。** 手が塞がっているだけで弾はそのままある。
+ * 0 と出すと弾切れと区別が付かず、抜いてから撃てるかどうかが分からない。
+ * 持ち替えの最中より少しだけ濃いのは、こちらは自分で選んで入った状態で、
+ * すぐ抜けられるため。
+ */
+.hud-weapon-idle {
+  opacity: 0.5;
+  border-color: rgba(126, 166, 255, 0.14);
+}
+
+/* 一覧を開いている間。カードが選択の印を兼ねるので、枠を立てる */
+.hud-weapon-picking {
+  border-color: rgba(126, 166, 255, 0.75);
+  background: rgba(24, 38, 64, 0.72);
+}
+
+/* 持っている弾の総数 (装填分 + 予備)。内訳は下の目盛り */
+.hud-weapon-spare {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: rgba(219, 230, 242, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-weapon-name {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  color: #f2f6fb;
+}
+
+.hud-weapon-count {
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 装填弾。1 発 1 目盛り */
+/* 枠の幅いっぱいに敷く。弾倉の大きさが違っても同じ長さのバーに見える */
+.hud-weapon-mag {
+  display: flex;
+  flex-direction: row;
+  gap: 1px;
+  height: 8px;
+  width: 100%;
+  align-items: stretch;
+  margin-top: 2px;
+}
+
+.hud-weapon-tick {
+  flex: 1 1 0;
+  min-width: 1px;
+  background: rgba(219, 230, 242, 0.16);
+}
+
+.hud-weapon-tick-on {
+  background: rgba(240, 246, 252, 0.9);
+}
+
+/* 空。目盛りごと赤く落として、数字を読まなくても分かる */
+.hud-weapon-empty .hud-weapon-tick-on {
+  background: rgba(255, 138, 114, 0.9);
+}
+
+.hud-weapon-empty .hud-weapon-spare {
+  color: rgba(255, 138, 114, 0.9);
+}
+
+.hud-weapon-state {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: rgba(198, 214, 232, 0.7);
+}
+
+.hud-weapon-state-warn {
+  color: rgba(255, 138, 114, 0.95);
+}
+
+/*
+ * 道具の一覧は左下。**右下は武器のカードが使っている。**
+ *
+ * 系統ごとに場所を分けるのは MGO2 と同じ。どちらを送っているかが位置で分かる。
+ */
+/* 角 = 道具の表示 (hud-tool)。その真上へ積む */
+.hud-browse-tool .hud-browse-column {
+  right: auto;
+  left: 22px;
+  bottom: 108px;
+  align-items: flex-start;
+}
+
+/* 角の右隣。左下が起点なので右へ伸ばす */
+.hud-browse-tool .hud-browse-row {
+  right: auto;
+  left: 198px;
+  bottom: 20px;
+  flex-direction: row;
+}
+
+/*
+ * いま選んでいる道具。
+ *
+ * **武器のカードと同じ大きさ。** 左下と右下で対になるので、大きさが違うと
+ * 片方だけ浮いて見える。中身は左揃え — 画面の左端に付くので、右揃えだと
+ * 文字が枠の中で遠くなる。
+ *
+ * **被っているときだけ立てる。** 持っていることと使っていることを見分けられないと、
+ * C を押したかどうかが分からない。
+ */
+.hud-tool {
+  position: absolute;
+  left: 22px;
+  bottom: 20px;
+  box-sizing: border-box;
+  width: 168px;
+  min-height: 68px;
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 4px;
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
+  color: rgba(198, 214, 232, 0.6);
+  background: rgba(10, 14, 20, 0.55);
+  border: 1px solid rgba(126, 166, 255, 0.28);
+}
+
+.hud-tool-name {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+}
+
+.hud-tool-key {
+  align-self: flex-start;
+  font-size: 10px;
+  padding: 0 5px;
+  color: rgba(198, 214, 232, 0.5);
+  border: 1px solid rgba(126, 166, 255, 0.25);
+}
+
+/* 手にしている (被っている) */
+.hud-tool-on {
+  color: #f2f6fb;
+  background: rgba(24, 38, 64, 0.72);
+  border-color: rgba(126, 166, 255, 0.7);
 }

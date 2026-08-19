@@ -2,6 +2,7 @@ import type { Locomotion } from '../sim/locomotion'
 import type { HitZone } from '../sim/damage'
 import type { Surface } from '../sim/surface'
 import type { SupportId, WeaponId } from '../sim/weapons'
+import type { HeldId } from '../sim/held'
 import type { Life } from '../sim/lifecycle'
 
 /**
@@ -78,7 +79,20 @@ export interface PlayerSnapshot {
    * 倒した瞬間に持っていたかどうかを知らないと決められない。
    * 見た目には既にモーションで出ているので、隠す情報ではない。
    */
+  /**
+   * 手榴弾を振りかぶって持っているか。
+   *
+   * **held から導く。** 通信に載っているのは held のほうで、これは読みやすさの
+   * ための別名。持ち物の在り処を 1 つにするため (docs/design.md の 5)。
+   */
   holdingGrenade: boolean
+  /**
+   * いま手にある物。銃・投げ物・ナイフ・ダンボールが同じ 1 つの場所に載る。
+   *
+   * 銃 (weapon) は別に持つ。手にあるのが手榴弾でも、**背中に提げている銃**は
+   * 描かないといけないし、サーバーは威力の計算にそれを使う。
+   */
+  held: HeldId
   /**
    * 集中しているか (しゃがんで動いていない)。
    *

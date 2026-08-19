@@ -195,8 +195,8 @@ export class RemotePlayer {
    * locomotion をそのまま公開せず、**問いの形で出す**。外から構えを見て
    * 各所で判定を組み立てると、サーバー側の規則とだんだんずれる。
    */
-  get stabbable(): boolean {
-    return canBeStabbed(stanceOf(this.locomotion));
+  stabbableFrom(aimPitch: number): boolean {
+    return canBeStabbed(stanceOf(this.locomotion), aimPitch);
   }
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
@@ -324,6 +324,15 @@ export class RemotePlayer {
       // 叫んだこと・回り始めたことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
       this.rollStarted = locomotion === "roll";
       this.sweptThisFrame = locomotion === "sweep";
+    }
+    /*
+     * しゃがんだまま刺す。
+     *
+     * **全身の型ではない**ので上の表には載らない — 下半身はしゃがみのままで、
+     * 上半身だけが刺す型になる。切り替わった瞬間に上半身を頭から流す。
+     */
+    if (locomotion === "crouch_stab" && this.locomotion !== "crouch_stab") {
+      animator.playStab();
     }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
     if (this.locomotion === "salute" && locomotion !== "salute") {
@@ -889,6 +898,13 @@ export class RemotePlayers {
     origin: THREE.Vector3,
     forward: THREE.Vector3,
     team: Team,
+    /**
+     * 刺す側が見ている上下 (rad)。**下が負。**
+     *
+     * 倒れている相手は、見下ろしているときだけ刃が通る。サーバーと同じ式を
+     * 読むので、手元で外しておかないと空振りに「当たった」表示だけが出る。
+     */
+    aimPitch: number,
   ): { id: string; fromBehind: boolean; distance: number; friendly: boolean } | null {
     let closest: { player: RemotePlayer; distance: number } | null = null;
 
@@ -897,7 +913,7 @@ export class RemotePlayers {
       // 倒れている相手には刺さらない。**サーバーと同じ式を読む** —
       // 手元で外しておかないと、サーバーが弾いた空振りに対して
       // 「当たった」表示だけが出る
-      if (!player.stabbable) continue;
+      if (!player.stabbableFrom(aimPitch)) continue;
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;
       const distance = this.scratch.length();

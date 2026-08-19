@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { verifyHit, type Pose } from './hitcheck'
+import { STAB_DOWN_PITCH, verifyHit, type Pose } from './hitcheck'
 import type { Stance } from './stance'
 
 /**
@@ -12,7 +12,7 @@ import type { Stance } from './stance'
 const WINDOW = 400
 
 /** 同じ場所に立っている 1 人ぶんの履歴。姿勢だけ差し替えられる */
-function history(at: [number, number], stance: Stance, yaw = 0): Pose[] {
+function history(at: [number, number], stance: Stance, yaw = 0, pitch = 0): Pose[] {
   const [x, z] = at
   return [0, 1, 2].map((i) => ({
     time: 100_000 + i * 16,
@@ -20,6 +20,7 @@ function history(at: [number, number], stance: Stance, yaw = 0): Pose[] {
     y: 0,
     z,
     yaw,
+    pitch,
     crouching: stance === 'crouch',
     boxed: stance === 'box',
     stance,
@@ -72,5 +73,34 @@ describe('ナイフの刺さる姿勢', () => {
     const verdict = verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW)
     expect(verdict.ok).toBe(false)
     if (!verdict.ok) expect(verdict.reason).toContain('姿勢')
+  })
+})
+
+describe('倒れている相手を刺す', () => {
+  /** 刺せる間合いに並べて、見下ろす角度を変える */
+  const stab = (targetStance: Stance, pitch: number) =>
+    verifyHit(
+      history([0, 0], 'stand', 0, pitch),
+      history([0, 1], targetStance),
+      { kind: 'melee' },
+      [],
+      WINDOW,
+    )
+
+  test('真っ直ぐ前を刺しても、倒れている相手には届かない', () => {
+    expect(stab('prone', 0).ok).toBe(false)
+  })
+
+  test('見下ろせば通る。しゃがんで下を狙う手間が要る', () => {
+    expect(stab('prone', STAB_DOWN_PITCH).ok).toBe(true)
+    expect(stab('prone', -0.8).ok).toBe(true)
+  })
+
+  test('少し下を向いた程度では通らない', () => {
+    expect(stab('prone', -0.1).ok).toBe(false)
+  })
+
+  test('立っている相手は見下ろさなくても刺さる', () => {
+    expect(stab('stand', 0).ok).toBe(true)
   })
 })

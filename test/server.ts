@@ -192,6 +192,7 @@ function snapshotOf(
     aiming: false,
     crouching: false,
     boxed: false,
+    held: 'rifle' as const,
     locomotion,
     concentrating: false,
     saluteHeld: false,

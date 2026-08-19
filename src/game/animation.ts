@@ -63,6 +63,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   stand: 'stand_front',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
+  // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
+  crouch_stab: 'crouch_idle',
   roll: 'roll',
   death: 'death',
   jump_up: 'jump_up',
@@ -88,6 +90,7 @@ type UpperState =
   | 'throw'
   | 'reload'
   | 'stab'
+  | 'crouch_stab'
   | 'roll'
   | 'death'
   | 'hit'
@@ -953,9 +956,18 @@ export class CharacterAnimator {
     this.blend(this.lower, this.lowerWeights, this.locomotion, lowerLambda, dt)
     this.previousLocomotion = this.locomotion
     this.blend(this.upper, this.upperWeights, this.resolveUpperKey(), UPPER_BLEND_LAMBDA, dt)
-    // 全身の型が決まっている動作では、照準由来の補正を掛けると崩れる
+    /*
+     * 全身の型が決まっている動作では、照準由来の補正を掛けると崩れる。
+     *
+     * **しゃがんだ刺突だけは別。** あれは上半身だけの型で、下半身はしゃがみのまま
+     * なので、背骨を曲げても壊れない。むしろ曲がらないと**下を向いて刺せない** —
+     * 倒れている相手に刃が通るのは見下ろしたときだけ (hitcheck の
+     * STAB_DOWN_PITCH) なのに、見た目が真っ直ぐ前を刺したままになる。
+     *
+     * 腕は Spine2 の子なので、背骨が下を向けば刃も下を向く。
+     */
     const committed =
-      this.upperState === 'stab' ||
+      (this.upperState === 'stab' && this.locomotion !== 'crouch_stab') ||
       this.upperState === 'salute' ||
       this.upperState === 'roll' ||
       this.upperState === 'death' ||

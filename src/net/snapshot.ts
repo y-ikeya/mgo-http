@@ -17,6 +17,7 @@
 import { MOVE_DIRECTIONS, type Locomotion } from '../sim/locomotion'
 import type { PlayerSnapshot } from './types'
 import type { WeaponId } from '../sim/weapons'
+import type { HeldId } from '../sim/held'
 
 /** 先頭 1 バイト。将来 2 進の種類が増えたときに見分ける */
 export const PACKET_STATE = 1
@@ -50,6 +51,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   // クレイモアを置く型。**末尾に足す** (並びを変えると古い版が別の姿勢を再生する)
   'claymore_windup',
   'claymore_place',
+  // しゃがんだまま刺す。**末尾に足す**
+  'crouch_stab',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -85,11 +88,21 @@ const OFF_CAMERA_YAW = 33 // u16
  * しか配られない。
  */
 const OFF_FLAGS2 = 35 // u8
-export const SNAPSHOT_BYTES = 36
+/**
+ * いま手にある物。
+ *
+ * **これが「手に何があるか」の唯一の在り処。** 以前はフラグ 2 つ (boxed /
+ * holdingGrenade) と武器の 2 ビットに分かれていて、同じ 1 つの事実が 3 か所に
+ * 載っていた。持ち物の考え方を変えるたびに 3 か所を書き直すことになる。
+ *
+ * 銃 (weapon) は別に送り続ける。手にあるのが手榴弾でも、**背中に提げている銃**は
+ * 描かないといけないし、サーバーは威力の計算にそれを使う。
+ */
+const OFF_HELD = 36 // u8
+export const SNAPSHOT_BYTES = 37
 
 const FLAG_AIMING = 1
 const FLAG_CROUCHING = 2
-const FLAG_BOXED = 4
 const FLAG_CONCENTRATING = 8
 const FLAG_SALUTE = 16
 /**
@@ -104,8 +117,16 @@ const FLAG_WEAPON_HIGH = 128
 
 /** 番号の並び。変えると古い版が別の銃として読む */
 const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol']
-/** 手榴弾を振りかぶって持っている。倒されたら足元に落ちる */
-const FLAG_GRENADE = 64
+
+/**
+ * 手にある物の番号。**末尾に足す** — 並びを変えると古い版が別の物を持って見える。
+ */
+const HELD_BITS: HeldId[] = [
+  'rifle', 'sniper', 'pistol', 'grenade', 'claymore', 'magazine', 'knife', 'box',
+  // 道具を使っていない状態。**末尾に足す**
+  'none',
+]
+const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 
 /** 2 枚目のフラグ */
 const FLAG2_RELOADING = 1
@@ -135,19 +156,18 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   let flags = 0
   if (snapshot.aiming) flags |= FLAG_AIMING
   if (snapshot.crouching) flags |= FLAG_CROUCHING
-  if (snapshot.boxed) flags |= FLAG_BOXED
   if (snapshot.concentrating) flags |= FLAG_CONCENTRATING
   if (snapshot.saluteHeld) flags |= FLAG_SALUTE
   const weapon = Math.max(0, WEAPON_BITS.indexOf(snapshot.weapon))
   if (weapon & 1) flags |= FLAG_WEAPON_LOW
   if (weapon & 2) flags |= FLAG_WEAPON_HIGH
-  if (snapshot.holdingGrenade) flags |= FLAG_GRENADE
   view.setUint8(OFF_FLAGS, flags)
 
   const turns = snapshot.cameraYaw / (Math.PI * 2)
   view.setUint16(OFF_CAMERA_YAW, Math.round((turns - Math.floor(turns)) * 65536) & 0xffff)
 
   view.setUint8(OFF_FLAGS2, snapshot.reloading ? FLAG2_RELOADING : 0)
+  view.setUint8(OFF_HELD, HELD_INDEX.get(snapshot.held) ?? 0)
 
   return buffer
 }
@@ -155,6 +175,7 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
 /** 誰のものかは呼ぶ側が決める (サーバーは接続から、クライアントは slot から) */
 export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
   const flags = view.getUint8(OFF_FLAGS)
+  const held = HELD_BITS[view.getUint8(OFF_HELD)] ?? 'rifle'
   return {
     id,
     time: view.getFloat64(OFF_TIME),
@@ -164,16 +185,18 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     yaw: view.getFloat32(OFF_YAW),
     pitch: view.getFloat32(OFF_PITCH),
     locomotion: LOCOMOTIONS[view.getUint8(OFF_LOCOMOTION)] ?? 'idle',
+    held,
     aiming: (flags & FLAG_AIMING) !== 0,
     crouching: (flags & FLAG_CROUCHING) !== 0,
-    boxed: (flags & FLAG_BOXED) !== 0,
+    // 手に何があるかから導く。別々に持つと食い違う
+    boxed: held === 'box',
     concentrating: (flags & FLAG_CONCENTRATING) !== 0,
     saluteHeld: (flags & FLAG_SALUTE) !== 0,
     weapon:
       WEAPON_BITS[
         ((flags & FLAG_WEAPON_LOW) !== 0 ? 1 : 0) | ((flags & FLAG_WEAPON_HIGH) !== 0 ? 2 : 0)
       ] ?? 'rifle',
-    holdingGrenade: (flags & FLAG_GRENADE) !== 0,
+    holdingGrenade: held === 'grenade',
     cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,
     reloading: (view.getUint8(OFF_FLAGS2) & FLAG2_RELOADING) !== 0,
     protectedNow: (view.getUint8(OFF_FLAGS2) & FLAG2_PROTECTED) !== 0,
