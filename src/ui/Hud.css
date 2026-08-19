@@ -620,6 +620,18 @@
   pointer-events: none;
   font-family: var(--hud-font, ui-monospace, monospace);
   color: #dbe6f2;
+
+  /*
+   * 枠で囲う。
+   *
+   * **背景の明暗に左右されずに読めるようにする。** 空を背に立つと白い文字が
+   * 飛び、暗い屋内では枠が無いと数字が浮いて見える。立体駐車場は明るい屋上と
+   * 暗い 1 階が同じ試合の中にあるので、どちらでも読めないと困る。
+   */
+  min-width: 168px;
+  padding: 8px 12px 10px;
+  background: rgba(10, 14, 20, 0.55);
+  border: 1px solid rgba(126, 166, 255, 0.28);
 }
 
 /* 持ち替えの最中は薄く。使えないことが見て分かる */
@@ -649,16 +661,20 @@
 }
 
 /* 装填弾。1 発 1 目盛り */
+/* 枠の幅いっぱいに敷く。弾倉の大きさが違っても同じ長さのバーに見える */
 .hud-weapon-mag {
   display: flex;
   flex-direction: row;
-  gap: 2px;
-  height: 10px;
+  gap: 1px;
+  height: 8px;
+  width: 100%;
   align-items: stretch;
+  margin-top: 2px;
 }
 
 .hud-weapon-tick {
-  width: 3px;
+  flex: 1 1 0;
+  min-width: 1px;
   background: rgba(219, 230, 242, 0.16);
 }
 
