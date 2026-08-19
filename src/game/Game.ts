@@ -44,12 +44,13 @@ import {
   CHOOSE_TIMEOUT,
   type Life,
 } from "../sim/lifecycle";
-import { CHOICES, SUPPORT_SPECS, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
+import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
+import { Inventory } from "../sim/inventory";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../sim/damage";
 import type { NoiseEvent } from "../net/types";
-import { WEAPONS, weaponOf } from "../sim/weapons";
+import { weaponOf } from "../sim/weapons";
 import {
   BULLET_GRAVITY,
   flightTime,
@@ -273,21 +274,7 @@ const DEFAULT_EXPOSURE = 3.0;
  */
 const ROLL_HOLD_TIME = 0.17;
 
-/**
- * 1 回の命で投げられる数。
- *
- * 無制限だと「とりあえず投げ続ける」が最適になって読み合いが消える。
- * 限られていれば、どこへ投げるか・いつ投げるかが判断になる。
- */
-const THROWABLES_PER_LIFE = 3;
 
-/**
- * 1 つの命で投げられる手榴弾の数。server の GRENADES_PER_LIFE と揃える。
- *
- * ここは表示のためだけの控え。実際に減らすのはサーバーで、投げられるかどうかも
- * サーバーが決める。多く見えていても投げられないだけで、破綻はしない。
- */
-const GRENADES_PER_LIFE = 3;
 
 /**
  * 手を離れる高さ (m)。server の RELEASE_HEIGHT と揃える。
@@ -381,7 +368,6 @@ export class Game {
   private readonly casings: Casings;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
   private stageBoxes: StageBox[] = [];
-  private grenadeCount = GRENADES_PER_LIFE;
   private grenadeAiming = false;
   /** 手を離れるまでの残り (秒)。0 なら投げていない */
   private grenadeRelease = 0;
@@ -399,7 +385,6 @@ export class Game {
   private grenadeReleaseRatio = GRENADE_RELEASE_RATIO;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
-  private throwables = THROWABLES_PER_LIFE;
   /** 投げる構えを取っているか。離した瞬間に投げる */
   private throwAiming = false;
   /** しゃがみ / 回避のキーを押している時間 (秒) */
@@ -479,33 +464,22 @@ export class Game {
     support: "grenade" as SupportId,
   };
   /** いまどちらの枠を持っているか */
-  private slot: "primary" | "secondary" = "primary";
-
-  private readonly magazines: Record<WeaponId, number> = {
-    rifle: WEAPONS.rifle.magazine,
-    sniper: WEAPONS.sniper.magazine,
-    pistol: WEAPONS.pistol.magazine,
-  };
 
   /**
-   * 弾倉の外に持っている弾。武器ごと、1 つの命ぶん。
+   * 持ち物と、いま手にある物。
    *
-   * 弾倉の数ではなく発数で持つので、半分残った弾倉を替えても損しない。
-   * 尽きたらその銃はもう撃てない — 持ち替えるか、ナイフで行くか、
-   * という判断が最後に残る。
+   * **弾はここにある。** 以前は銃ごとの装填と予備、手榴弾の残り、投げられる弾倉が
+   * 別々のフィールドに散っていて、読み書きが各所にあった。持ち物の考え方を変える
+   * たびに全部を追いかけることになる (docs/design.md の 5)。
    */
-  private readonly reserves: Record<WeaponId, number> = {
-    rifle: WEAPONS.rifle.reserve,
-    sniper: WEAPONS.sniper.reserve,
-    pistol: WEAPONS.pistol.reserve,
-  };
+  private inv = new Inventory({
+    primary: "rifle",
+    secondary: "pistol",
+    support: "grenade",
+  });
 
   private get ammo(): number {
-    return this.magazines[this.player.equipped];
-  }
-
-  private set ammo(value: number) {
-    this.magazines[this.player.equipped] = value;
+    return this.inv.ammo;
   }
   /** 0 より大きい間はリロード中で、発砲できない */
   private reloadTimer = 0;
@@ -1144,11 +1118,9 @@ export class Game {
       // 弾数もサーバーが写しを持っているので、そちらを正とする
       case "resume":
         this.player.resumeAt(message.x, message.y, message.z, message.health);
-        for (const id of Object.keys(this.magazines) as WeaponId[]) {
-          this.magazines[id] = message.magazine[id] ?? this.magazines[id];
-          this.reserves[id] = message.reserve[id] ?? this.reserves[id];
-        }
-        this.grenadeCount = message.grenades;
+        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
+        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
+        this.inv.restore(message.magazine, message.reserve, message.grenades);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
@@ -1156,7 +1128,7 @@ export class Game {
         this.pendingLoadout.support = message.support;
         this.pendingLoadout.primary = message.primary;
         this.onLoadout?.(this.pendingLoadout);
-        if (this.slot === "primary") void this.player.equip(message.primary);
+        void this.player.equip(message.primary);
         this.follow.snapTo(this.player, this.cameraWorld);
         break;
 
@@ -1538,15 +1510,8 @@ export class Game {
    * 生き返ったら両方満タン。持ち替えの都合で片方だけ空、を持ち越さない。
    */
   private refillFromLoadout(): void {
-    this.grenadeCount = SUPPORT_SPECS[this.loadout.support].count;
-    // **投げられる弾倉は 0 から。** 撃った弾が 1 弾倉ぶん溜まるごとに増える
-    this.throwables = 0;
+    this.inv.refill(this.loadout);
     this.roundsFired = 0;
-
-    for (const id of Object.keys(WEAPONS) as WeaponId[]) {
-      this.magazines[id] = WEAPONS[id].magazine;
-      this.reserves[id] = WEAPONS[id].reserve;
-    }
   }
 
   /**
@@ -1563,7 +1528,7 @@ export class Game {
     const per = roundsPerDecoy(this.player.equipped);
     if (this.roundsFired >= per) {
       this.roundsFired -= per;
-      this.throwables++;
+      this.inv.gainMagazine();
     }
   }
 
@@ -1633,7 +1598,7 @@ export class Game {
   private respawnSelf(): void {
     // 湧くときに装備が確定する。試合中に組み替えても、ここまで反映されない
     this.loadout = { ...this.pendingLoadout };
-    this.slot = "primary";
+
     void this.player.equip(this.loadout.primary);
     this.player.respawn();
     this.refillFromLoadout();
@@ -1744,14 +1709,11 @@ export class Game {
       this.reloadTimer -= dt;
       if (this.reloadTimer <= 0) {
         this.reloadTimer = 0;
-        // 池から足りるぶんだけ移す。弾倉に残っていた分は捨てない
+        // 予備から足りるぶんだけ移す。弾倉に残っていた分は捨てない
         const kind = this.player.equipped;
-        const take = Math.min(this.weapon.magazine - this.ammo, this.reserves[kind]);
-        this.ammo += take;
-        this.reserves[kind] -= take;
         // **終わった瞬間**に知らせる。始まりではなく終わりを送ることで、
         // サーバーは銃ごとの装填の尺を持たなくてよくなる
-        if (take > 0) this.net.send({ type: "reload", weapon: kind });
+        if (this.inv.reload()) this.net.send({ type: "reload", weapon: kind });
       }
       // 弾倉に手が掛かる頃に鳴らす。近くの相手には「いま撃てない」が伝わる
       if (this.reloadSoundIn > 0) {
@@ -1835,7 +1797,7 @@ export class Game {
     if (this.cocking) return;
     if (this.ammo >= this.weapon.magazine) return;
     // 予備が尽きていたら替えるものが無い
-    if (this.reserves[this.player.equipped] <= 0) return;
+    if (this.inv.reserve <= 0) return;
     // モーションの尺をそのまま操作不能時間にして、見た目と挙動を一致させる
     this.reloadTimer = this.player.reloadDuration || this.weapon.reload;
     this.player.playReload();
@@ -1893,7 +1855,7 @@ export class Game {
       player ? IMPACT_HIT : IMPACT_WORLD,
     );
     this.shotCount++;
-    this.ammo--;
+    this.inv.spend();
     this.countRoundForDecoy();
 
     // 弾道と発砲音のためだけの通知。当たったかどうかは damage で別に送っている。
@@ -1974,7 +1936,7 @@ export class Game {
     // リロードと同じ規則。ここが抜けていて、撃った直後に投げるとコッキングを
     // 省略できた
     const canThrow =
-      this.throwables > 0 && canAct(this.life) && !this.player.isBoxed && !this.cocking;
+      this.inv.has('magazine') && canAct(this.life) && !this.player.isBoxed && !this.cocking;
     const held = canThrow && this.input.isActionDown("throwItem", "KeyG");
 
     if (held) {
@@ -1991,7 +1953,7 @@ export class Game {
     // 構えを解いただけ (死んだ・箱に入った) なら投げない
     if (!canThrow) return;
 
-    this.throwables--;
+    this.inv.spendOf('magazine');
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
     this.thrown.throwFrom(this.aimOrigin, this.aimDir);
@@ -2021,7 +1983,7 @@ export class Game {
     }
     // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
     const canThrow =
-      this.grenadeCount > 0 &&
+      this.inv.countOf(this.loadout.support) > 0 &&
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
@@ -2065,7 +2027,7 @@ export class Game {
       return;
     }
 
-    this.grenadeCount--;
+    this.inv.spendOf(this.loadout.support);
     // 止めていた続きから振り切る。手を離れるのはその途中
     this.player.releaseThrow();
     // 残りは**いまどこまで再生されたか**から測る。
@@ -2096,7 +2058,7 @@ export class Game {
    */
   private updateClaymoreSetup(): void {
     const canPlace =
-      this.grenadeCount > 0 &&
+      this.inv.countOf(this.loadout.support) > 0 &&
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
@@ -2120,7 +2082,7 @@ export class Game {
       return;
     }
 
-    this.grenadeCount--;
+    this.inv.spendOf(this.loadout.support);
     this.player.releaseSetup();
     // 置き切るまでは向きを保つ。放した瞬間に向き直ると、置く先がずれる
     this.player.setThrowing(true);
@@ -2275,9 +2237,15 @@ export class Game {
     if (this.player.isAiming) return;
     this.equipping = true;
     try {
-      // 枠を入れ替える。並べた銃を順に回すのではない
-      this.slot = this.slot === "primary" ? "secondary" : "primary";
-      await this.player.equip(this.loadout[this.slot]);
+      // 持っている銃を順に回す。
+      //
+      // **いまは銃だけ。** 手榴弾やナイフに移るのは、モーションと HUD が揃って
+      // からにする (docs/design.md の 5)。Inventory.guns() がその繋ぎ
+      const guns = this.inv.guns();
+      const at = guns.indexOf(this.player.equipped);
+      const next = guns[(at + 1) % guns.length] ?? this.player.equipped;
+      this.inv.switchTo(next);
+      await this.player.equip(next);
       // 残弾は武器ごとに残る。持ち替えても補充されない
       this.burstIndex = 0;
       this.zoomStep = 0;
@@ -2533,7 +2501,7 @@ export class Game {
       shots: this.shotCount,
       ammo: this.ammo,
       magazine: this.weapon.magazine,
-      reserve: this.reserves[this.player.equipped],
+      reserve: this.inv.reserve,
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
@@ -2557,8 +2525,8 @@ export class Game {
       kills: this.killFeed.filter(
         (entry) => now - entry.at < KILL_FEED_DURATION * 1000,
       ),
-      throwables: this.throwables,
-      grenades: this.grenadeCount,
+      throwables: this.inv.countOf('magazine'),
+      grenades: this.inv.countOf(this.loadout.support),
       support: this.loadout.support,
       team: this.team,
       match: this.match,

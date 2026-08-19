@@ -93,9 +93,49 @@ export class Inventory {
     return item && 'count' in item ? item.count : 0
   }
 
+  /** その物を持っているか */
+  has(id: HeldId): boolean {
+    return find(this.items, id) !== undefined
+  }
+
+  /** その物の残り。持っていなければ 0 */
+  countOf(id: HeldId): number {
+    const item = find(this.items, id)
+    if (!item) return 0
+    if ('count' in item) return item.count
+    if ('ammo' in item) return item.ammo
+    return 1
+  }
+
+  /**
+   * 手にしていない物を 1 つ使う。
+   *
+   * 投げた瞬間はまだ手に持っているので普通は spend() を使う。これが要るのは、
+   * 手に持たずに数だけ減らす場面 (いまの実装が持ち替えを経ずに投げているため)。
+   * 持ち替えを入れ切ったら消える。
+   */
+  spendOf(id: HeldId): void {
+    const item = find(this.items, id)
+    if (!item || !('count' in item)) return
+    item.count = Math.max(0, item.count - 1)
+    if (item.count === 0 && item.id !== this.current) dropEmpty(this.items, item.id)
+  }
+
   /** その系統の並び。一覧に出す順 */
   list(family: Family): Carried[] {
     return listOf(this.items, family)
+  }
+
+  /**
+   * 持っている銃だけ。
+   *
+   * **持ち替えを入れ切るまでの繋ぎ。** いまの操作は銃どうしの往復しかできないので、
+   * 手榴弾やナイフに移らないようここで絞る。一覧 (長押し) を入れたら消える。
+   */
+  guns(): GunId[] {
+    return this.items
+      .filter((item): item is { id: GunId; ammo: number; reserve: number } => 'ammo' in item)
+      .map((item) => item.id)
   }
 
   /** 持っている物すべて。画面に出すときだけ使う */
@@ -180,6 +220,27 @@ export class Inventory {
     item.ammo += moved
     item.reserve -= moved
     return true
+  }
+
+  /**
+   * 繋ぎ直したときに、サーバーが持っていた数を書き戻す。
+   *
+   * **持っている物にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
+   * こちらは持っている物しか持たない。持っていない銃の弾は捨てる。
+   */
+  restore(
+    magazine: Partial<Record<GunId, number>>,
+    reserve: Partial<Record<GunId, number>>,
+    support: number,
+  ): void {
+    for (const item of this.items) {
+      if ('ammo' in item) {
+        item.ammo = magazine[item.id] ?? item.ammo
+        item.reserve = reserve[item.id] ?? item.reserve
+      } else if ('count' in item && item.id !== 'magazine') {
+        item.count = support
+      }
+    }
   }
 
   /** 投げられる弾倉が 1 個増える。撃った弾が 1 弾倉ぶん溜まったとき */
