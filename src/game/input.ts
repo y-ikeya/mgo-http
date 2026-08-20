@@ -15,6 +15,11 @@ const STICK_DEADZONE = 0.12
  * 1 (線形) だと、細かく狙う領域と素早く振り向く領域を 1 本のスティックで
  * 両立できない。2 乗にすると倒し始めがゆっくりで、大きく倒したときだけ速くなる。
  */
+/** 一覧を 1 段送ったとみなすスティックの倒し具合 */
+const LIST_THRESHOLD = 0.55
+/** 倒しっぱなしのときに次の段へ送るまで (ms) */
+const LIST_REPEAT = 180
+
 const LOOK_CURVE = 2
 
 /**
@@ -32,10 +37,10 @@ const LOOK_SPEED = 1400
  * 添字で書ける。× □ ○ の位置は Xbox 系とも一致する。
  */
 const PAD_BUTTONS = {
-  /** R2 / RT */
-  fire: [7, 5],
+  /** R2 / RT。**R1 は持ち替えに使う**ので、撃つのは引き金だけ */
+  fire: [7],
   /** L2 / LT */
-  aim: [6, 4],
+  aim: [6],
   /** × / A */
   roll: [0],
   /** □ / X */
@@ -44,8 +49,13 @@ const PAD_BUTTONS = {
   knife: [1],
   /** L3 / 左スティック押し込み */
   crouch: [10],
-  /** △ / Y */
-  box: [3],
+  /**
+   * L1。**単押しでダンボール、長押しで道具の一覧。**
+   *
+   * 鍵盤の C と同じ役。武器 (R1) と左右で対になっていて、どちらの系統を
+   * 送っているかが指で分かる。
+   */
+  box: [4],
   /** 十字キー上 */
   throwItem: [12],
   /** R3 / 右スティック押し込み。手榴弾 (押している間に落下点、離して投げる) */
@@ -54,17 +64,16 @@ const PAD_BUTTONS = {
   salute: [13],
   /** OPTIONS / START */
   menu: [9],
-  /** 十字キー左。銃の持ち替え (L1 は構えが使っている) */
-  swap: [14],
+  /**
+   * R1。**単押しで持ち替え、長押しで一覧。**
+   *
+   * 鍵盤の Q と同じ役。撃つ指 (R2) の隣に置いて、構えたまま持ち替えられる。
+   */
+  swap: [5],
   /** 十字キー右。倍率を 1 段上げる (一番上まで行ったら戻る) */
   zoom: [15],
-  /**
-   * 拾う / 置く。**パッドの割り当ては保留。**
-   *
-   * 押せる所が残っていない (L1 は構え、十字は 4 方向とも埋まっている)。
-   * 長押しとの組み合わせで空ける必要があるので、まずは鍵盤だけで通す。
-   */
-  drop: [],
+  /** △ / Y。置く / 拾う */
+  drop: [3],
 } as const
 
 type PadAction = keyof typeof PAD_BUTTONS
@@ -382,6 +391,15 @@ export class Input {
     this.padMoveX = move.x
     this.padMoveZ = move.y
 
+    // 一覧を開いている間は、右スティックは一覧を送るためのもの。視点は止める
+    this.listAxis = this.listMode ? (pad.axes[3] ?? 0) : 0
+    if (this.listMode) {
+      this.padLookX = 0
+      this.padLookY = 0
+      if (this.padActive()) this.lastUsed = 'gamepad'
+      return
+    }
+
     // 視点: 右スティック。マウスの移動量と同じ単位 (px) に換算して渡す。
     const look = applyDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0)
     const magnitude = Math.hypot(look.x, look.y)
@@ -497,6 +515,41 @@ export class Input {
     const steps = this.wheelSteps
     this.wheelSteps = 0
     return steps
+  }
+
+  /**
+   * 一覧を送っている間か。**右スティックを視点から取り上げる。**
+   *
+   * 一覧の中を動かすのに右スティックを使うので、そのまま視点にも渡すと
+   * 選びながら画面が回る。開いている間は視点を止めて、段送りだけに使う。
+   */
+  setListMode(open: boolean): void {
+    this.listMode = open
+    if (!open) {
+      this.listAxis = 0
+      this.listAt = 0
+    }
+  }
+
+  private listMode = false
+  /** 右スティックの上下。一覧を開いている間だけ拾う */
+  private listAxis = 0
+  /** 直近に 1 段送った時刻。倒しっぱなしで飛ばないように間隔を空ける */
+  private listAt = 0
+
+  /**
+   * 右スティックで何段動かしたか。読むと 0 に戻る (上が +)。
+   *
+   * 倒し切ってから戻すまでを 1 段とはしない — 押しっぱなしで送れるほうが速い。
+   * 代わりに間隔 (LIST_REPEAT) を空けて、勢いで飛びすぎないようにする。
+   */
+  consumeListStep(): number {
+    if (!this.listMode || Math.abs(this.listAxis) < LIST_THRESHOLD) return 0
+    const now = performance.now()
+    if (now - this.listAt < LIST_REPEAT) return 0
+    this.listAt = now
+    // 画面の上が -1 (スティックの上倒しが負) なので、符号を返す前に反転する
+    return this.listAxis < 0 ? 1 : -1
   }
 
   /** 視点を掴む。ユーザーの操作の最中から呼ぶこと */
