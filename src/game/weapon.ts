@@ -57,11 +57,13 @@ const RIFLE: WeaponConfig = {
  * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
  */
 const SMG: WeaponConfig = {
-  // 引き金の輪 (後ろ側の大きいほう) の中。前の輪は左手が入る
-  grip: new THREE.Vector3(-0.06, 0.105, -0.6),
-  rotation: new THREE.Euler(degrees(-10), degrees(-16), degrees(80)),
-  crouchGrip: new THREE.Vector3(-0.07, 0.1, -0.635),
-  crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
+  // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
+  grip: new THREE.Vector3(0, 0.1, -0.435),
+  rotation: new THREE.Euler(degrees(-7), degrees(-9), degrees(7)),
+  // **しゃがみはまだ立ちと同じ** (crouchGrip を置いていない)。上半身の角度が
+  // 変わるぶん銃が体から浮くはずなので、詰め直す余地がある —
+  // 突撃銃は立ちとしゃがみで別の値を持っている
+  //
   // 銃口。断面の実測 (最も -Z の点)
   tip: new THREE.Vector3(0, 0.16, -0.845),
 }
