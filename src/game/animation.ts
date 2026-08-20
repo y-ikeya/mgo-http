@@ -94,6 +94,7 @@ type UpperState =
   | 'stab'
   | 'crouch_stab'
   | 'roll'
+  | 'fall_roll'
   | 'death'
   | 'hit'
   | 'salute'
@@ -319,6 +320,13 @@ const SETUP_RELEASE_KEY = 'claymore_place'
  */
 const SETUP_RELEASE_RATE = 2.2
 const ROLL_KEY = 'roll'
+/**
+ * 落下の受け身。**上半身にも同じクリップを流す。**
+ *
+ * 下だけに流したら、銃を構えたまま脚だけが転がった。全身の型は上下ともに
+ * 差し替えないと、腰から上が構えの姿勢のまま残る。
+ */
+const FALL_ROLL_KEY = 'fall_roll'
 const DEATH_KEY = 'death'
 
 /**
@@ -351,6 +359,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   SETUP_WINDUP_KEY,
   SETUP_RELEASE_KEY,
   ROLL_KEY,
+  FALL_ROLL_KEY,
   DEATH_KEY,
   HIT_KEY,
   SALUTE_KEY,
@@ -657,6 +666,7 @@ export class CharacterAnimator {
       finished === this.upper.get(PISTOL_RELOAD_KEY) ||
       finished === this.upper.get(STAB_KEY) ||
       finished === this.upper.get(ROLL_KEY) ||
+      finished === this.upper.get(FALL_ROLL_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
@@ -886,6 +896,13 @@ export class CharacterAnimator {
     }
     this.rollDuration = roll?.duration ?? 0
 
+    const fallRoll = byName.get('fall_roll')
+    if (fallRoll) {
+      const action = registerUpper(FALL_ROLL_KEY, fallRoll)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+
     const death = byName.get('death')
     if (death) {
       const action = registerUpper(DEATH_KEY, death)
@@ -972,6 +989,7 @@ export class CharacterAnimator {
       (this.upperState === 'stab' && this.locomotion !== 'crouch_stab') ||
       this.upperState === 'salute' ||
       this.upperState === 'roll' ||
+      this.upperState === 'fall_roll' ||
       this.upperState === 'death' ||
       this.upperState === 'hit'
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
@@ -1441,6 +1459,8 @@ export class CharacterAnimator {
     // 起き上がりは中断できない。撃つ操作より優先する
     if (this.upperState === 'stand' && this.upper.has(STAND_KEY)) return STAND_KEY
     if (this.upperState === 'roll' && this.upper.has(ROLL_KEY)) return ROLL_KEY
+    // 落下の受け身も中断させない。**上半身だけ構えに戻ると、脚だけ転がる**
+    if (this.upperState === 'fall_roll' && this.upper.has(FALL_ROLL_KEY)) return FALL_ROLL_KEY
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
     //
@@ -1495,9 +1515,13 @@ export class CharacterAnimator {
    */
   playFallRoll(): void {
     if (this.dead) return
-    const action = this.lower.get('fall_roll')
-    if (!action) return
-    action.reset().play()
+    const upper = this.upper.get(FALL_ROLL_KEY)
+    const lower = this.lower.get('fall_roll')
+    if (!upper || !lower) return
+    // **上下そろえて流す。** 下だけだと銃を構えたまま脚が転がる
+    upper.reset().play()
+    lower.reset().play()
+    this.upperState = 'fall_roll'
     this.locomotion = 'fall_roll'
     this.rootSampleValid = false
   }
