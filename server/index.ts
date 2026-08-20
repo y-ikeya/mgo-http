@@ -290,7 +290,17 @@ function newSession(player: Player, socket: Bun.ServerWebSocket<Client>): Sessio
   }
 }
 
-/** その人の接続。席に着いている人には必ず在る */
+/**
+ * その人の接続。**無ければ null** — 的 (bot) は接続を持たない。
+ *
+ * 「人にも的にも起こりうる」場所ではこちらを使う。sessionOf は投げるので、
+ * **的が混ざった瞬間にサーバーが落ちる** (実際、爆風の転倒を送る所で落ちた)。
+ */
+function sessionFor(player: Player): Session | null {
+  return sessions.get(player.id) ?? null
+}
+
+/** その人の接続。席に着いている**人**には必ず在る (的には無い) */
 function sessionOf(player: Player): Session {
   const found = sessions.get(player.id)
   if (!found) throw new Error(`接続が無い: ${player.id}`)
@@ -1141,8 +1151,9 @@ function applyBlastDamage(
 
   if (victim.health > 0) {
     sendHealth(roomName, victim, amount, false, bearing)
+    // **的にも爆風は当たる。** 送り先が無いなら送らないだけ
     if (knock && isSeated(victim.life)) {
-      sessionOf(victim).socket.send(JSON.stringify({ type: 'knockdown' }))
+      sessionFor(victim)?.socket.send(JSON.stringify({ type: 'knockdown' }))
     }
     return
   }
@@ -1737,131 +1748,144 @@ const TICK_MS = 1000 / 64
  */
 const LIMBO_MS = 100
 
+/**
+ * 時計を進める。
+ *
+ * **例外でサーバーごと落とさない。** 的 (接続を持たない Player) に向かって
+ * 送ろうとした所で例外が出て、**プロセスが落ちて全部屋が消えた**ことがある。
+ * 1 回の刻みを捨てるだけなら、次の刻みで何事もなく続く。
+ *
+ * 握り潰さずに大きく出す。落ちなくなったぶん、気づけるのはログだけになる。
+ */
 setInterval(() => {
-  const now = Date.now()
-  for (const [roomName, room] of rooms) {
-    // 切れた人の体をその場に残す。
-    //
-    // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
-    // 相手の画面から消える。消えると**ブラウザを閉じるのが逃げ道**になる
-    // (閉じれば消え、戻れば続きから)。最後のパケットを配り直して、
-    // 撃てるし倒せる的として残す。
-    //
-    // 姿勢だけ away に差し替える。そのまま配ると、走っていた人がその場で
-    // 走り続ける絵になる
-    if (now - room.lastLimbo >= LIMBO_MS) {
-      room.lastLimbo = now
-      for (const player of room.players.values()) {
-        // 的は切れない (接続を持たない)。ここは人の話
-        if (player.bot || player.life !== 'dropped') continue
-        const last = sessionOf(player).lastPayload
-        if (!last) continue
-        const view = new DataView(last.buffer, last.byteOffset, last.byteLength)
-        stampLocomotion(view, 'away')
-        stampProtected(view, false)
-        relayState(roomName, player, last)
-      }
-    }
-
-    // 待ち切った席を畳む。部屋が空になったらここで初めて部屋も消える
-    for (const player of room.players.values()) {
-      if (player.life === 'dropped' && lifeElapsed(player, now) >= RECONNECT_GRACE) {
-        // 待ち切っても戻らなかった。走っている試合を置いて消えたのと同じ
-        if (room.phase === 'playing') recordSeat(roomName, room, player, true)
-        room.players.delete(player.id)
-        sessions.delete(player.id)
-        // ここで初めて消してもらう。切れた時点では配らない —
-        // 配ると受け取った側が実体を捨ててしまい、そのあと届く体を
-        // 新品として作り直して状態を見失う
-        broadcast(roomName, { type: 'leave', id: player.id })
-      }
-    }
-    if (room.players.size === 0) {
-      rooms.delete(roomName)
-      continue
-    }
-
-    updateMatch(roomName, room, now)
-    if (room.mode.id === 'PRACTICE') updateTargets(roomName, room, now)
-    relayClaymores(roomName, room)
-    for (const player of connected(room)) {
-      // --- 時間で進む遷移 ---
+  try {
+    const now = Date.now()
+    for (const [roomName, room] of rooms) {
+      // 切れた人の体をその場に残す。
       //
-      // 状態ごとに別の時計を持たない。「その状態に入ってから何秒経ったか」
-      // だけを見る。以前は respawnAt と protectedUntil が別々にあり、
-      // 置き忘れた場所 (途中参加) だけ無敵が付かなかった。
-      switch (player.life) {
-        case 'downed':
-          // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る
-          if (lifeElapsed(player, now) >= DOWN_DURATION * 1000) {
-            setLife(roomName, player, 'choosing', now)
-          }
-          continue
-        case 'choosing':
-          // 決めないまま放っておかれた。相手の試合を止めないために打ち切る
-          if (lifeElapsed(player, now) >= CHOOSE_TIMEOUT * 1000) spawn(roomName, player, now)
-          continue
-        case 'spawning':
-          if (lifeElapsed(player, now) >= SPAWN_PROTECT * 1000) {
-            setLife(roomName, player, 'alive', now)
-          }
-          break
-        case 'joining':
-          continue
+      // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
+      // 相手の画面から消える。消えると**ブラウザを閉じるのが逃げ道**になる
+      // (閉じれば消え、戻れば続きから)。最後のパケットを配り直して、
+      // 撃てるし倒せる的として残す。
+      //
+      // 姿勢だけ away に差し替える。そのまま配ると、走っていた人がその場で
+      // 走り続ける絵になる
+      if (now - room.lastLimbo >= LIMBO_MS) {
+        room.lastLimbo = now
+        for (const player of room.players.values()) {
+          // 的は切れない (接続を持たない)。ここは人の話
+          if (player.bot || player.life !== 'dropped') continue
+          const last = sessionOf(player).lastPayload
+          if (!last) continue
+          const view = new DataView(last.buffer, last.byteOffset, last.byteLength)
+          stampLocomotion(view, 'away')
+          stampProtected(view, false)
+          relayState(roomName, player, last)
+        }
       }
 
-      // --- 回復 ---
-      // 集中し続けた時間で買う。全快はせず、瀕死を脱するところまで。
-      // 撃ち合いに負けた傷は残り、次の撃ち合いは不利なまま始まる。
-      if (player.health <= 0 || player.health >= RECOVER_CAP) continue
-      if (player.concentratingSince === 0) continue
-      if (now - player.concentratingSince < RECOVER_DELAY * 1000) continue
+      // 待ち切った席を畳む。部屋が空になったらここで初めて部屋も消える
+      for (const player of room.players.values()) {
+        if (player.life === 'dropped' && lifeElapsed(player, now) >= RECONNECT_GRACE) {
+          // 待ち切っても戻らなかった。走っている試合を置いて消えたのと同じ
+          if (room.phase === 'playing') recordSeat(roomName, room, player, true)
+          room.players.delete(player.id)
+          sessions.delete(player.id)
+          // ここで初めて消してもらう。切れた時点では配らない —
+          // 配ると受け取った側が実体を捨ててしまい、そのあと届く体を
+          // 新品として作り直して状態を見失う
+          broadcast(roomName, { type: 'leave', id: player.id })
+        }
+      }
+      if (room.players.size === 0) {
+        rooms.delete(roomName)
+        continue
+      }
 
-      const healed = Math.min(RECOVER_CAP, player.health + (RECOVER_RATE * TICK_MS) / 1000)
-      if (healed === player.health) continue
-      player.health = healed
+      updateMatch(roomName, room, now)
+      if (room.mode.id === 'PRACTICE') updateTargets(roomName, room, now)
+      relayClaymores(roomName, room)
+      for (const player of connected(room)) {
+        // --- 時間で進む遷移 ---
+        //
+        // 状態ごとに別の時計を持たない。「その状態に入ってから何秒経ったか」
+        // だけを見る。以前は respawnAt と protectedUntil が別々にあり、
+        // 置き忘れた場所 (途中参加) だけ無敵が付かなかった。
+        switch (player.life) {
+          case 'downed':
+            // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る
+            if (lifeElapsed(player, now) >= DOWN_DURATION * 1000) {
+              setLife(roomName, player, 'choosing', now)
+            }
+            continue
+          case 'choosing':
+            // 決めないまま放っておかれた。相手の試合を止めないために打ち切る
+            if (lifeElapsed(player, now) >= CHOOSE_TIMEOUT * 1000) spawn(roomName, player, now)
+            continue
+          case 'spawning':
+            if (lifeElapsed(player, now) >= SPAWN_PROTECT * 1000) {
+              setLife(roomName, player, 'alive', now)
+            }
+            break
+          case 'joining':
+            continue
+        }
 
-      // 回復そのものは毎刻み進めるが、配るのは表示が変わるときだけ。
-      // 刻みを 64Hz に上げたぶんをそのまま流すと、回復中だけ通信が跳ね上がる。
-      // 受け取る側は整数に丸めて出しているので、変わらない値を送る意味が無い。
-      const shown = Math.ceil(player.health)
-      if (shown === sessionOf(player).healthShown && player.health < RECOVER_CAP) continue
-      sessionOf(player).healthShown = shown
-      sendHealth(roomName, player, 0, false)
+        // --- 回復 ---
+        // 集中し続けた時間で買う。全快はせず、瀕死を脱するところまで。
+        // 撃ち合いに負けた傷は残り、次の撃ち合いは不利なまま始まる。
+        if (player.health <= 0 || player.health >= RECOVER_CAP) continue
+        if (player.concentratingSince === 0) continue
+        if (now - player.concentratingSince < RECOVER_DELAY * 1000) continue
+
+        const healed = Math.min(RECOVER_CAP, player.health + (RECOVER_RATE * TICK_MS) / 1000)
+        if (healed === player.health) continue
+        player.health = healed
+
+        // 回復そのものは毎刻み進めるが、配るのは表示が変わるときだけ。
+        // 刻みを 64Hz に上げたぶんをそのまま流すと、回復中だけ通信が跳ね上がる。
+        // 受け取る側は整数に丸めて出しているので、変わらない値を送る意味が無い。
+        const shown = Math.ceil(player.health)
+        if (shown === sessionOf(player).healthShown && player.health < RECOVER_CAP) continue
+        sessionOf(player).healthShown = shown
+        sendHealth(roomName, player, 0, false)
+      }
     }
-  }
-  // --- 手榴弾 ---
-  // 固定の刻みで解く。クライアントも同じ刻みで解くので軌道が一致する
-  for (let i = grenades.length - 1; i >= 0; i--) {
-    const nade = grenades[i]
-    const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
-    for (let k = 0; k < steps; k++) stepProjectile(nade.body, solidBoxes)
-    nade.fuse -= TICK_MS / 1000
-    if (nade.fuse <= 0) {
-      detonate(nade)
-      grenades.splice(i, 1)
+    // --- 手榴弾 ---
+    // 固定の刻みで解く。クライアントも同じ刻みで解くので軌道が一致する
+    for (let i = grenades.length - 1; i >= 0; i--) {
+      const nade = grenades[i]
+      const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
+      for (let k = 0; k < steps; k++) stepProjectile(nade.body, solidBoxes)
+      nade.fuse -= TICK_MS / 1000
+      if (nade.fuse <= 0) {
+        detonate(nade)
+        grenades.splice(i, 1)
+      }
     }
-  }
 
-  // クレイモア。前を敵が通ったら起爆する
-  for (let i = claymores.length - 1; i >= 0; i--) {
-    const claymore = claymores[i]
-    const room = rooms.get(claymore.room)
-    if (!room) {
+    // クレイモア。前を敵が通ったら起爆する
+    for (let i = claymores.length - 1; i >= 0; i--) {
+      const claymore = claymores[i]
+      const room = rooms.get(claymore.room)
+      if (!room) {
+        claymores.splice(i, 1)
+        continue
+      }
+      if (room.phase !== 'playing') continue
+      // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する**
+      const hit = present(room).some(
+        (p) =>
+          canBeHurt(p.life) &&
+          (p.id === claymore.owner || p.team !== claymore.team) &&
+          triggeredBy(claymore, p),
+      )
+      if (!hit) continue
+      detonateClaymore(claymore)
       claymores.splice(i, 1)
-      continue
     }
-    if (room.phase !== 'playing') continue
-    // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する**
-    const hit = present(room).some(
-      (p) =>
-        canBeHurt(p.life) &&
-        (p.id === claymore.owner || p.team !== claymore.team) &&
-        triggeredBy(claymore, p),
-    )
-    if (!hit) continue
-    detonateClaymore(claymore)
-    claymores.splice(i, 1)
+  } catch (error) {
+    console.error('[刻み] 例外。この刻みは捨てる', error)
   }
 }, TICK_MS)
 
@@ -1912,6 +1936,232 @@ const CORS = {
   'access-control-allow-headers': 'content-type',
 }
 
+
+/**
+ * 届いた 1 通を捌く。
+ *
+ * **本体を関数に出してある。** 呼ぶ側 (websocket.message) が try で包むため —
+ * 1 通の例外でプロセスが落ちると、その部屋どころか**全部屋の全員が切れる**。
+ */
+function handleMessage(
+  socket: Bun.ServerWebSocket<Client>,
+  raw: string | Buffer | Uint8Array | ArrayBuffer,
+): void {
+  const room = rooms.get(socket.data.room)
+  const player = room?.players.get(socket.data.id)
+  if (!player) return
+
+
+  // 位置だけ 2 進。数が桁違いに多いので、ここだけ詰めてある
+  if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) {
+    receiveSnapshot(socket.data.room, player, raw)
+    return
+  }
+
+  let message: ClientMessage
+  try {
+    message = JSON.parse(String(raw))
+  } catch {
+    // 壊れた 1 通で対戦が止まる理由はない
+    return
+  }
+
+  switch (message.type) {
+    case 'join':
+      player.name = message.name
+      // 所属と席番号を足してから配る。本人が名乗った内容をそのまま流さない
+      broadcast(
+        socket.data.room,
+        { ...message, team: player.team, slot: player.slot },
+        player.id,
+      )
+      break
+
+    case 'damage':
+      // 送り主を信じない。名乗った ID ではなく接続の ID を使う。
+      applyDamage(socket.data.room, player, { ...message, id: player.id })
+      break
+
+    case 'state':
+      // 位置は 2 進でしか受け取らない。
+      //
+      // JSON で来たものをここで捨てないと、下の default に落ちて
+      // **遮蔽の判定を通さずに全員へ配られる**。見えない相手の位置を
+      // 配らない、という仕掛けが丸ごと迂回できてしまう。
+      return
+
+    case 'grenade':
+      throwGrenade(socket.data.room, player, message)
+      break
+
+    case 'loadout': {
+      player.support = message.support
+      player.primary = message.primary
+      // 支度中なら**すぐ**効かせる。次の湧きを待つと、選び直した分が
+      // 1 つ遅れて効くことになる
+      if (canChoose(player.life)) {
+        player.grenades = SUPPORT_SPECS[player.support].count
+      }
+      break
+    }
+
+    // 支度ができた。ここで初めて戦場へ出す。
+    //
+    // 湧く時刻を本人に握らせる。自動で湧かせていた頃は、選んでいる途中で
+    // 湧いて装備画面が消えていた。ただし早く選んだぶん早く戻れる、には
+    // しない (CHOOSE_FLOOR)。選ぶのが速いことは腕前ではない
+    case 'spawn':
+      if (canChoose(player.life) && lifeElapsed(player, Date.now()) >= CHOOSE_FLOOR * 1000) {
+        spawn(socket.data.room, player)
+      }
+      break
+
+    // 自分から部屋を出た。**戻りを待たない。**
+    //
+    // 席を空けて待つのは「うっかり切れた人が戻ってこられるように」で、
+    // 出ると決めた人には要らない。待つと、残った側は居ない相手を相手に
+    // 最大 30 秒立たされる (試合は続いているのに誰も来ない)。
+    case 'claymore':
+      placeClaymore(socket.data.room, player)
+      break
+
+    /*
+     * 落ちた。**量はこちらで決める** — 速さだけ受け取って共有の式に通す。
+     * 量を送らせると好きな値を申告できる。
+     *
+     * 手柄は誰にも付かない。自分でやったことなので自死に数える
+     * (爆風で自分の手榴弾に巻き込まれたときと同じ扱い)。
+     */
+    /*
+     * 武器を地面へ置く。
+     *
+     * **持ち物を持っているのはクライアント側**なので、何を置いたかは
+     * 申告してもらう。こちらは「その銃の写しを捨てる」だけ — 繋ぎ直した
+     * ときに、置いたはずの銃が戻ってきては困る。
+     */
+    case 'drop': {
+      if (!canDrop(message.weapon)) break
+      if (!canAct(player.life)) break
+      const item: Dropped = {
+        id: ++droppedId,
+        room: socket.data.room,
+        weapon: message.weapon,
+        ammo: message.ammo ?? 0,
+        reserve: message.reserve ?? 0,
+        count: message.count ?? 0,
+        x: player.x,
+        y: player.y,
+        z: player.z,
+        // 置いた向き。転がっている絵にするために、体の向きから 90 度倒す
+        yaw: player.yaw + Math.PI / 2,
+      }
+      dropped.push(item)
+      const put = message.weapon
+      if (isGun(put)) {
+        player.ammo.magazine[put] = 0
+        player.ammo.reserve[put] = 0
+      }
+      broadcast(socket.data.room, droppedMessage(item))
+      break
+    }
+
+    /**
+     * 拾う。**どれを拾うかはこちらが決める** (一番近い物)。
+     *
+     * 位置を持っているのはサーバーなので、離れた所の物を指して
+     * 「拾った」と言われても通らない。
+     */
+    case 'pickup': {
+      if (!canAct(player.life)) break
+      let best: Dropped | null = null
+      let nearest = PICKUP_RANGE
+      for (const item of dropped) {
+        if (item.room !== socket.data.room) continue
+        const distance = Math.hypot(item.x - player.x, item.z - player.z)
+        if (distance > nearest) continue
+        best = item
+        nearest = distance
+      }
+      if (!best) break
+      dropped.splice(dropped.indexOf(best), 1)
+      const got = best.weapon
+      if (isGun(got)) {
+        player.ammo.magazine[got] = best.ammo
+        player.ammo.reserve[got] = best.reserve
+      }
+      sessionOf(player).socket.send(
+        JSON.stringify({
+          type: 'picked',
+          id: best.id,
+          weapon: best.weapon,
+          ammo: best.ammo,
+          reserve: best.reserve,
+          count: best.count,
+        } satisfies ServerMessage),
+      )
+      broadcast(socket.data.room, { type: 'droppedGone', id: best.id })
+      break
+    }
+
+    case 'fall': {
+      const room = rooms.get(socket.data.room)
+      if (!room || room.phase !== 'playing') break
+      if (!canBeHurt(player.life)) break
+      // 速さそのものも信じ切らない。落ちきる前に着地を申告しても
+      // 上限を超えた分は効かない
+      const amount = fallDamage(Math.min(message.speed, MAX_FALL_SPEED))
+      if (amount <= 0) break
+      applyBlastDamage(
+        socket.data.room, room, player, amount,
+        player.x, player.z, player.id, 'fall', false,
+      )
+      break
+    }
+    case 'leave':
+      leaveRoom(socket.data.room, player)
+      return
+
+    case 'shot': {
+      /*
+       * **撃てない物を持っている間の射撃は弾く。**
+       *
+       * 手榴弾やナイフに持ち替えている間は引き金が効かない、というのが
+       * 持ち替えの代償 (docs/design.md の 5)。手元でそう作っても、申告は
+       * 別に送れるので、こちらでも見る。
+       *
+       * 空の弾倉と違って**通信のずれで正当な 1 発が消える心配が無い**。
+       * 持ち替えは位置と同じ流れで届くので、撃った瞬間の状態と揃っている。
+       */
+      if (!HELD[player.held]?.shoots) break
+      // 弾数の写しを減らす。**空でも拒否しない** — 空撃ちの判断は
+      // クライアントがやっている (押した瞬間に音が要る)。ここで拒めば、
+      // 通信のずれで正当な 1 発が消える
+      const left = player.ammo.magazine[player.weapon]
+      if (left > 0) player.ammo.magazine[player.weapon] = left - 1
+      // 弾道の上にクレイモアがあれば起爆する
+      shotHitsClaymore(socket.data.room, message.from, message.to)
+      // 銃声だけは扱いが違う。
+      //
+      // 曳光を描くには銃口の座標が要るが、それは「どこに居るか」そのもの。
+      // 姿が見えている相手にだけ座標を渡し、見えない相手には音として配る。
+      // 銃声は遠くまで届く設計なので位置がおおよそ漏れるのは想定内だが、
+      // 座標は耳より精度が高い。
+      relayShot(socket.data.room, player, message)
+      break
+    }
+
+    // 装填が**終わった**。尺はクライアントが持っているので、
+    // こちらは移すだけでよい
+    case 'reload':
+      reloadInto(player.ammo, message.weapon)
+      break
+
+    default:
+      // 見た目のもの (knock) は中身を見ずに流す
+      broadcast(socket.data.room, message, player.id)
+  }
+}
+
 const server = Bun.serve<Client>({
   port: PORT,
 
@@ -1933,8 +2183,8 @@ const server = Bun.serve<Client>({
                 // 64 通/秒 から落ちていれば途切れがち (1 通/秒 まで落ちて
                 // いれば、その人のタブが裏に回っている)。時計差が大きければ
                 // 時計の合っていない機械が混ざっている
-                (sessionOf(p).packetGap > 0
-                  ? ` ${(1000 / sessionOf(p).packetGap).toFixed(1)}通/秒 時計差 ${(sessionOf(p).clockSkew / 1000).toFixed(2)}s`
+                ((sessionFor(p)?.packetGap ?? 0) > 0
+                  ? ` ${(1000 / (sessionFor(p)?.packetGap ?? 1)).toFixed(1)}通/秒 時計差 ${((sessionFor(p)?.clockSkew ?? 0) / 1000).toFixed(2)}s`
                   : '') +
                 // 記録に残る分。数えられているかをここで見られる
                 ` ${p.kills}/${p.deaths}` +
@@ -1946,7 +2196,7 @@ const server = Bun.serve<Client>({
                       .map(([id, n]) => `${id}:${n}`)
                       .join(' ')}]`
                   : '') +
-                (sessionOf(p).rejected > 0 ? ` 却下 ${sessionOf(p).rejected}` : '') +
+                ((sessionFor(p)?.rejected ?? 0) > 0 ? ` 却下 ${sessionFor(p)?.rejected}` : '') +
                 ` [${p.life}]`,
             )
             .join('\n'),
@@ -2104,217 +2354,11 @@ const server = Bun.serve<Client>({
     },
 
     message(socket, raw) {
-      const room = rooms.get(socket.data.room)
-      const player = room?.players.get(socket.data.id)
-      if (!player) return
-
-      // 位置だけ 2 進。数が桁違いに多いので、ここだけ詰めてある
-      if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) {
-        receiveSnapshot(socket.data.room, player, raw)
-        return
-      }
-
-      let message: ClientMessage
       try {
-        message = JSON.parse(String(raw))
-      } catch {
-        // 壊れた 1 通で対戦が止まる理由はない
-        return
-      }
-
-      switch (message.type) {
-        case 'join':
-          player.name = message.name
-          // 所属と席番号を足してから配る。本人が名乗った内容をそのまま流さない
-          broadcast(
-            socket.data.room,
-            { ...message, team: player.team, slot: player.slot },
-            player.id,
-          )
-          break
-
-        case 'damage':
-          // 送り主を信じない。名乗った ID ではなく接続の ID を使う。
-          applyDamage(socket.data.room, player, { ...message, id: player.id })
-          break
-
-        case 'state':
-          // 位置は 2 進でしか受け取らない。
-          //
-          // JSON で来たものをここで捨てないと、下の default に落ちて
-          // **遮蔽の判定を通さずに全員へ配られる**。見えない相手の位置を
-          // 配らない、という仕掛けが丸ごと迂回できてしまう。
-          return
-
-        case 'grenade':
-          throwGrenade(socket.data.room, player, message)
-          break
-
-        case 'loadout': {
-          player.support = message.support
-          player.primary = message.primary
-          // 支度中なら**すぐ**効かせる。次の湧きを待つと、選び直した分が
-          // 1 つ遅れて効くことになる
-          if (canChoose(player.life)) {
-            player.grenades = SUPPORT_SPECS[player.support].count
-          }
-          break
-        }
-
-        // 支度ができた。ここで初めて戦場へ出す。
-        //
-        // 湧く時刻を本人に握らせる。自動で湧かせていた頃は、選んでいる途中で
-        // 湧いて装備画面が消えていた。ただし早く選んだぶん早く戻れる、には
-        // しない (CHOOSE_FLOOR)。選ぶのが速いことは腕前ではない
-        case 'spawn':
-          if (canChoose(player.life) && lifeElapsed(player, Date.now()) >= CHOOSE_FLOOR * 1000) {
-            spawn(socket.data.room, player)
-          }
-          break
-
-        // 自分から部屋を出た。**戻りを待たない。**
-        //
-        // 席を空けて待つのは「うっかり切れた人が戻ってこられるように」で、
-        // 出ると決めた人には要らない。待つと、残った側は居ない相手を相手に
-        // 最大 30 秒立たされる (試合は続いているのに誰も来ない)。
-        case 'claymore':
-          placeClaymore(socket.data.room, player)
-          break
-
-        /*
-         * 落ちた。**量はこちらで決める** — 速さだけ受け取って共有の式に通す。
-         * 量を送らせると好きな値を申告できる。
-         *
-         * 手柄は誰にも付かない。自分でやったことなので自死に数える
-         * (爆風で自分の手榴弾に巻き込まれたときと同じ扱い)。
-         */
-        /*
-         * 武器を地面へ置く。
-         *
-         * **持ち物を持っているのはクライアント側**なので、何を置いたかは
-         * 申告してもらう。こちらは「その銃の写しを捨てる」だけ — 繋ぎ直した
-         * ときに、置いたはずの銃が戻ってきては困る。
-         */
-        case 'drop': {
-          if (!canDrop(message.weapon)) break
-          if (!canAct(player.life)) break
-          const item: Dropped = {
-            id: ++droppedId,
-            room: socket.data.room,
-            weapon: message.weapon,
-            ammo: message.ammo ?? 0,
-            reserve: message.reserve ?? 0,
-            count: message.count ?? 0,
-            x: player.x,
-            y: player.y,
-            z: player.z,
-            // 置いた向き。転がっている絵にするために、体の向きから 90 度倒す
-            yaw: player.yaw + Math.PI / 2,
-          }
-          dropped.push(item)
-          const put = message.weapon
-          if (isGun(put)) {
-            player.ammo.magazine[put] = 0
-            player.ammo.reserve[put] = 0
-          }
-          broadcast(socket.data.room, droppedMessage(item))
-          break
-        }
-
-        /**
-         * 拾う。**どれを拾うかはこちらが決める** (一番近い物)。
-         *
-         * 位置を持っているのはサーバーなので、離れた所の物を指して
-         * 「拾った」と言われても通らない。
-         */
-        case 'pickup': {
-          if (!canAct(player.life)) break
-          let best: Dropped | null = null
-          let nearest = PICKUP_RANGE
-          for (const item of dropped) {
-            if (item.room !== socket.data.room) continue
-            const distance = Math.hypot(item.x - player.x, item.z - player.z)
-            if (distance > nearest) continue
-            best = item
-            nearest = distance
-          }
-          if (!best) break
-          dropped.splice(dropped.indexOf(best), 1)
-          const got = best.weapon
-          if (isGun(got)) {
-            player.ammo.magazine[got] = best.ammo
-            player.ammo.reserve[got] = best.reserve
-          }
-          sessionOf(player).socket.send(
-            JSON.stringify({
-              type: 'picked',
-              id: best.id,
-              weapon: best.weapon,
-              ammo: best.ammo,
-              reserve: best.reserve,
-              count: best.count,
-            } satisfies ServerMessage),
-          )
-          broadcast(socket.data.room, { type: 'droppedGone', id: best.id })
-          break
-        }
-
-        case 'fall': {
-          const room = rooms.get(socket.data.room)
-          if (!room || room.phase !== 'playing') break
-          if (!canBeHurt(player.life)) break
-          // 速さそのものも信じ切らない。落ちきる前に着地を申告しても
-          // 上限を超えた分は効かない
-          const amount = fallDamage(Math.min(message.speed, MAX_FALL_SPEED))
-          if (amount <= 0) break
-          applyBlastDamage(
-            socket.data.room, room, player, amount,
-            player.x, player.z, player.id, 'fall', false,
-          )
-          break
-        }
-        case 'leave':
-          leaveRoom(socket.data.room, player)
-          return
-
-        case 'shot': {
-          /*
-           * **撃てない物を持っている間の射撃は弾く。**
-           *
-           * 手榴弾やナイフに持ち替えている間は引き金が効かない、というのが
-           * 持ち替えの代償 (docs/design.md の 5)。手元でそう作っても、申告は
-           * 別に送れるので、こちらでも見る。
-           *
-           * 空の弾倉と違って**通信のずれで正当な 1 発が消える心配が無い**。
-           * 持ち替えは位置と同じ流れで届くので、撃った瞬間の状態と揃っている。
-           */
-          if (!HELD[player.held]?.shoots) break
-          // 弾数の写しを減らす。**空でも拒否しない** — 空撃ちの判断は
-          // クライアントがやっている (押した瞬間に音が要る)。ここで拒めば、
-          // 通信のずれで正当な 1 発が消える
-          const left = player.ammo.magazine[player.weapon]
-          if (left > 0) player.ammo.magazine[player.weapon] = left - 1
-          // 弾道の上にクレイモアがあれば起爆する
-          shotHitsClaymore(socket.data.room, message.from, message.to)
-          // 銃声だけは扱いが違う。
-          //
-          // 曳光を描くには銃口の座標が要るが、それは「どこに居るか」そのもの。
-          // 姿が見えている相手にだけ座標を渡し、見えない相手には音として配る。
-          // 銃声は遠くまで届く設計なので位置がおおよそ漏れるのは想定内だが、
-          // 座標は耳より精度が高い。
-          relayShot(socket.data.room, player, message)
-          break
-        }
-
-        // 装填が**終わった**。尺はクライアントが持っているので、
-        // こちらは移すだけでよい
-        case 'reload':
-          reloadInto(player.ammo, message.weapon)
-          break
-
-        default:
-          // 見た目のもの (knock) は中身を見ずに流す
-          broadcast(socket.data.room, message, player.id)
+        handleMessage(socket, raw)
+      } catch (error) {
+        // **1 通の躓きでサーバーを落とさない。** 落ちると全部屋の全員が切れる
+        console.error(`[通] ${socket.data.id} の 1 通で例外`, error)
       }
     },
 

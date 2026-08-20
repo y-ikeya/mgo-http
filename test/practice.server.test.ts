@@ -83,3 +83,50 @@ describe('練習部屋', () => {
     shooter.close()
   }, 20000)
 })
+
+describe('練習部屋で爆風', () => {
+  test('手榴弾で倒しても的は戻ってくる', async () => {
+    const shooter = await enterPractice('bomber')
+    await Bun.sleep(3400)
+    shooter.send({ type: 'spawn' })
+    await Bun.sleep(400)
+    shooter.reset()
+
+    // 的の足元へ投げる。**すぐ下へ**投げれば爆風が両方に入る
+    shooter.send({ type: 'grenade', dir: [0, -1, 0] })
+    // 信管 (3 秒) + 余白
+    await Bun.sleep(4000)
+
+    const hurt = shooter.messages.filter(
+      (m) => m.type === 'health' && m.id === 'target-0',
+    )
+    expect(hurt.length).toBeGreaterThan(0)
+
+    /*
+     * **サーバーが生きていること。**
+     *
+     * 爆風で的を転ばせる所で、的の接続を引こうとして例外が出ていた。プロセスが
+     * 落ちるので**全部屋の全員が切れる** — 画面からは「敵が消えた」に見える。
+     * 位置が流れ続けているかで生死を見る。
+     */
+    shooter.reset()
+    await Bun.sleep(500)
+    expect(shooter.states).toBeGreaterThan(0)
+    // **握り潰した例外も見る。** 落ちなくなったぶん、静かに壊れる余地が増えた
+    expect(server.errors()).not.toContain('接続が無い')
+    expect(server.errors()).not.toContain('例外')
+
+    // 倒れたなら、3 秒で戻る
+    const downed = shooter.messages.some(
+      (m) => m.type === 'life' && m.id === 'target-0' && m.state === 'downed',
+    )
+    if (downed) {
+      await Bun.sleep(3600)
+      const back = shooter.messages.some(
+        (m) => m.type === 'life' && m.id === 'target-0' && m.state === 'alive',
+      )
+      expect(back).toBe(true)
+    }
+    shooter.close()
+  }, 30000)
+})

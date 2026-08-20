@@ -21,6 +21,13 @@ export interface Server {
   port: number
   /** 部屋の様子 (/health の本文) */
   health(): Promise<string>
+  /**
+   * サーバーが吐いた例外。**握り潰した分も含む。**
+   *
+   * 刻みと 1 通ごとの処理は try で包んであるので、例外が出てもサーバーは
+   * 落ちない。落ちないぶん**試験からは正常に見える**ので、ログを見に行く。
+   */
+  errors(): string
   stop(): void
   /** 配置と同じ止め方 (SIGTERM)。落ち切るまで待つ */
   terminate(): Promise<void>
@@ -66,9 +73,18 @@ export async function startServer(env: Record<string, string> = {}): Promise<Ser
     await Bun.sleep(50)
   }
 
+  /** 立ち上げてからの stderr。例外はここに出る */
+  let stderr = ''
+  void (async () => {
+    for await (const chunk of proc.stderr as ReadableStream<Uint8Array>) {
+      stderr += new TextDecoder().decode(chunk)
+    }
+  })()
+
   return {
     port,
     health: async () => (await fetch(`http://localhost:${port}/health`)).text(),
+    errors: () => stderr,
     stop: () => proc.kill(),
     // 配置で止めるときと同じ合図。書き出してから落ちるかを見るのに使う
     terminate: async () => {
