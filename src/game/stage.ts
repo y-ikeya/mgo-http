@@ -164,16 +164,21 @@ export const TEAM_SPAWNS = {
 } as const
 
 /**
- * 基地の枠の大きさ (m)。中心から端まで。
+ * 基地の枠の大きさ (m)。中心から端まで。**3m 角。**
  *
- * **これ以上は小さくできない。** 湧く位置は基地の中心から半径 4m
- * (Game.ts の SPAWN_SPREAD) の円周上に散るので、4 を下回ると
- * **自分の基地の外に立つ**ことになる。0.5m だけ余裕を持たせてある。
- *
- * もっと小さくしたいなら、先に SPAWN_SPREAD を縮める。ただしあれは
- * 湧いた人どうしが重ならないための距離なので、詰めると出会い頭が増える。
+ * 湧く位置は基地の中心から半径 SPAWN_SPREAD (Game.ts) の円周上に散るので、
+ * **ここを縮めたら向こうも縮める**。外に立つと枠が「自分の場所」に見えない。
  */
-const BASE_HALF = 4.5
+const BASE_HALF = 1.5
+
+/**
+ * 枠線の太さ (m)。
+ *
+ * **線ではなく板で描く。** THREE.Line の linewidth は WebGL / WebGPU では
+ * 効かない (常に 1px) ので、太さが欲しければ面を張るしかない。1px の線は
+ * 離れると消えるし、真上から見ないと読めなかった。
+ */
+const BASE_LINE = 0.3
 
 /** 枠を描く高さ (m)。地面と z 争いしない程度に浮かせる */
 const BASE_Y = 0.03
@@ -193,27 +198,51 @@ const BASE_COLOR = { blue: 0x7ea6ff, red: 0xff8a72 } as const
 export function buildBases(): THREE.Object3D {
   const group = new THREE.Group()
   for (const [team, base] of Object.entries(TEAM_SPAWNS)) {
-    const points = [
-      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z - BASE_HALF),
-      new THREE.Vector3(base.x + BASE_HALF, BASE_Y, base.z - BASE_HALF),
-      new THREE.Vector3(base.x + BASE_HALF, BASE_Y, base.z + BASE_HALF),
-      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z + BASE_HALF),
-      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z - BASE_HALF),
-    ]
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      // 露出に左右されない。位置を示すための線なので、明るさが変わっても読めてほしい
-      new THREE.LineBasicMaterial({
+    const frame = new THREE.Mesh(
+      frameGeometry(BASE_HALF, BASE_LINE),
+      // 露出に左右されない。位置を示すための印なので、明るさが変わっても読めてほしい
+      new THREE.MeshBasicMaterial({
         color: BASE_COLOR[team as keyof typeof BASE_COLOR],
         transparent: true,
         opacity: 0.55,
         toneMapped: false,
+        side: THREE.DoubleSide,
       }),
     )
-    line.frustumCulled = false
-    group.add(line)
+    frame.position.set(base.x, BASE_Y, base.z)
+    frame.frustumCulled = false
+    group.add(frame)
   }
   return group
+}
+
+/**
+ * 地面に寝かせる「額縁」。中を空けた四角。
+ *
+ * 4 枚の板を重ねて置くと、角が二重になって半透明のそこだけ濃くなる。
+ * 外周と内周の 8 点から帯を張れば、重なりが出ない。
+ */
+function frameGeometry(half: number, width: number): THREE.BufferGeometry {
+  const inner = Math.max(0.01, half - width)
+  const ring = (h: number) => [
+    [-h, -h],
+    [h, -h],
+    [h, h],
+    [-h, h],
+  ]
+  const outer = ring(half)
+  const hole = ring(inner)
+  const points: number[] = []
+  const push = (p: number[]) => points.push(p[0], 0, p[1])
+  for (let k = 0; k < 4; k++) {
+    const n = (k + 1) % 4
+    push(outer[k]); push(outer[n]); push(hole[n])
+    push(outer[k]); push(hole[n]); push(hole[k])
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
+  geometry.computeVertexNormals()
+  return geometry
 }
 
 export interface Stage {

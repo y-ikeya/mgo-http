@@ -370,8 +370,13 @@ const PING_THRESHOLD = 0.04
 const KILL_FEED_DURATION = 6;
 const KILL_FEED_MAX = 5;
 
-/** スポーン地点をどれだけ散らすか (m) */
-const SPAWN_SPREAD = 4;
+/**
+ * スポーン地点をどれだけ散らすか (m)。
+ *
+ * **基地の枠 (stage.ts の BASE_HALF = 1.5m) の内側に収める。** 外に出ると、
+ * 地面に描いた枠が「自分の湧く場所」に見えなくなる。
+ */
+const SPAWN_SPREAD = 1.1;
 
 /** ID から湧く方向を決める。同じタブなら再読み込みしても同じ場所 */
 function spawnAngle(id: string): number {
