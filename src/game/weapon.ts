@@ -60,10 +60,9 @@ const SMG: WeaponConfig = {
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
   grip: new THREE.Vector3(0, 0.1, -0.435),
   rotation: new THREE.Euler(degrees(-7), degrees(-9), degrees(7)),
-  // **しゃがみはまだ立ちと同じ** (crouchGrip を置いていない)。上半身の角度が
-  // 変わるぶん銃が体から浮くはずなので、詰め直す余地がある —
-  // 突撃銃は立ちとしゃがみで別の値を持っている
-  //
+  // しゃがむと上半身が前に倒れるので、銃も倒して抱え込む (pitch -7 → -44)
+  crouchGrip: new THREE.Vector3(-0.05, 0.035, -0.455),
+  crouchRotation: new THREE.Euler(degrees(-44), degrees(15), degrees(14)),
   // 銃口。断面の実測 (最も -Z の点)
   tip: new THREE.Vector3(0, 0.16, -0.845),
 }

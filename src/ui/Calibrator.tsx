@@ -16,10 +16,9 @@ const INITIAL_WEAPONS = {
     grip: { x: 0, y: 0.1, z: -0.435 },
     rotation: { x: -7, y: -9, z: 7 },
   },
-  // しゃがみは未調整。立ちと同じ値から始める
   smgCrouch: {
-    grip: { x: 0, y: 0.1, z: -0.435 },
-    rotation: { x: -7, y: -9, z: 7 },
+    grip: { x: -0.05, y: 0.035, z: -0.455 },
+    rotation: { x: -44, y: 15, z: 14 },
   },
   rifle: {
     grip: { x: -0.095, y: 0.145, z: -0.165 },
