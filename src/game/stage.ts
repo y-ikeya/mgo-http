@@ -164,12 +164,12 @@ export const TEAM_SPAWNS = {
 } as const
 
 /**
- * 基地の枠の大きさ (m)。中心から端まで。**3m 角。**
+ * 基地の枠の大きさ (m)。中心から端まで。**4m 角。**
  *
  * 湧く位置は基地の中心から半径 SPAWN_SPREAD (Game.ts) の円周上に散るので、
  * **ここを縮めたら向こうも縮める**。外に立つと枠が「自分の場所」に見えない。
  */
-const BASE_HALF = 1.5
+const BASE_HALF = 2
 
 /**
  * 枠線の太さ (m)。
@@ -178,7 +178,7 @@ const BASE_HALF = 1.5
  * 効かない (常に 1px) ので、太さが欲しければ面を張るしかない。1px の線は
  * 離れると消えるし、真上から見ないと読めなかった。
  */
-const BASE_LINE = 0.3
+const BASE_LINE = 0.2
 
 /** 枠を描く高さ (m)。地面と z 争いしない程度に浮かせる */
 const BASE_Y = 0.03
