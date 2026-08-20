@@ -27,7 +27,7 @@ import {
   surfaceAt,
 } from "../sim/collision";
 import { GameAudio } from "./audio";
-import type { Step } from "../domain/footsteps";
+import type { Step } from "../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./soundRing";
 import { ThrownItems } from "./thrown";
 import { Grenades } from "./grenades";
@@ -36,7 +36,7 @@ import { BlastFx } from "./blastfx";
 import { Casings } from "./casings";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
-import { fallDamage, MAX_HEALTH } from "../domain/damage";
+import { fallDamage, MAX_HEALTH } from "../domain/rule/damage";
 import {
   canAct,
   canChoose,
@@ -44,14 +44,14 @@ import {
   CHOOSE_TIMEOUT,
   type Life,
 } from "../domain/lifecycle";
-import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/weapons";
+import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/item/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
-import { Inventory } from "../domain/inventory";
-import { type Family, type HeldId } from "../domain/held";
+import { Inventory } from "../domain/item/inventory";
+import { type Family, type HeldId } from "../domain/item/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
-import type { HitZone } from "../domain/damage";
+import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
-import { weaponOf } from "../domain/weapons";
+import { weaponOf } from "../domain/item/weapons";
 import {
   BULLET_GRAVITY,
   flightTime,

@@ -3,7 +3,7 @@
 //   bun tools/weapon_table.ts
 //
 // --- なぜ生成するか ---
-// 数字の出どころは src/domain/weapons.ts で、そこはゲームが実際に読む所。手で表を
+// 数字の出どころは src/domain/item/weapons.ts で、そこはゲームが実際に読む所。手で表を
 // 書くと**必ずずれる**。しかも気づけない — 表が古いことは、表を見ても分からない。
 //
 // --- 手で書く所と生成する所を分ける ---
@@ -20,8 +20,8 @@
 import {
   SUPPORT_SPECS, SUPPORTS, WEAPONS, bulletDamage, carrySpeedScale, weaponOf,
   type WeaponId,
-} from '../src/domain/weapons'
-import { MAX_HEALTH, MELEE_BACK_DAMAGE, MELEE_FRONT_DAMAGE, MELEE_RANGE } from '../src/domain/damage'
+} from '../src/domain/item/weapons'
+import { MAX_HEALTH, MELEE_BACK_DAMAGE, MELEE_FRONT_DAMAGE, MELEE_RANGE } from '../src/domain/rule/damage'
 import { BLAST_DAMAGE, BLAST_RADIUS } from '../src/sim/blast'
 import { BLAST_MAX, BLAST_MIN, BLAST_RANGE, TRIGGER_RANGE } from '../src/sim/claymore'
 

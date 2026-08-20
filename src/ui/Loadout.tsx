@@ -7,7 +7,7 @@ import {
   WEAPONS,
   type SupportId,
   type WeaponId,
-} from '../domain/weapons'
+} from '../domain/item/weapons'
 import './Loadout.css'
 
 /**

@@ -17,8 +17,8 @@ import type { Locomotion } from "../domain/locomotion";
 import { canBeStabbed } from "../sim/hitcheck";
 import { loadSoldier } from "./assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { isWholeBody, stanceOf, type WholeBodyLocomotion } from "../domain/stance";
-import { weaponOf, type WeaponId } from "../domain/weapons";
+import { isWholeBody, stanceOf, type WholeBodyLocomotion } from "../domain/rule/stance";
+import { weaponOf, type WeaponId } from "../domain/item/weapons";
 import {
   advanceBoxLift,
   boxLift,
@@ -35,8 +35,8 @@ import {
   ROLL_HIT_RANGE,
   ROLL_KNOCKBACK,
   type HitZone,
-} from "../domain/damage";
-import { Footsteps, type Step } from "../domain/footsteps";
+} from "../domain/rule/damage";
+import { Footsteps, type Step } from "../domain/rule/footsteps";
 import type { Life } from "../domain/lifecycle";
 import { BUFFER_SIZE, Presence } from "../sim/presence";
 import { Hitbox } from "./hitbox";

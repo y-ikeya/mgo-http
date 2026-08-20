@@ -19,7 +19,7 @@
  * src/game/weapon.ts が持つ。**遊びに効く数字だけ**をここに置く。
  */
 
-import type { HitZone } from './damage'
+import type { HitZone } from '../rule/damage'
 
 export type WeaponId = 'rifle' | 'sniper' | 'pistol'
 

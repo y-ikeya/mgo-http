@@ -1,4 +1,4 @@
-import type { Locomotion } from "./locomotion";
+import type { Locomotion } from "../locomotion";
 import { stanceOf } from "./stance";
 
 /**

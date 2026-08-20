@@ -6,8 +6,29 @@ import {
   RECOVER_DELAY,
   RECOVER_RATE,
   type HitZone,
-} from '../src/domain/damage'
+} from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
+import {
+  enterLife,
+  isProtected,
+  lifeElapsed,
+  newPlayer,
+  refill,
+  type Player,
+  type Team,
+} from '../src/domain/player'
+import {
+  MIN_PLAYERS,
+  RECONNECT_GRACE,
+  assignTeam,
+  connected,
+  holdingSeats,
+  loseTicket,
+  newMatch,
+  nextSlot,
+  soleTeam,
+  type Match,
+} from '../src/domain/match'
 import {
   decodeSnapshot,
   isSnapshot,
@@ -16,11 +37,10 @@ import {
   stampSlot,
   SNAPSHOT_BYTES,
 } from '../src/net/snapshot'
-import { Footsteps } from '../src/domain/footsteps'
 import { surfaceOf } from '../src/domain/surface'
 import { blastAt } from '../src/sim/blast'
-import { fallDamage } from '../src/domain/damage'
-import { HELD, type HeldId } from '../src/domain/held'
+import { fallDamage } from '../src/domain/rule/damage'
+import { HELD } from '../src/domain/item/held'
 import {
   blastFrom,
   canPlaceAt,
@@ -35,15 +55,11 @@ import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../s
 import {
   bulletDamage,
   reloadInto,
-  startingAmmo,
   weaponOf,
   SUPPORT_SPECS,
-  type Ammo,
-  type SupportId,
-  type WeaponId,
-} from '../src/domain/weapons'
+} from '../src/domain/item/weapons'
 import { verifyHit, type Pose } from '../src/sim/hitcheck'
-import { stanceOf } from '../src/domain/stance'
+import { stanceOf } from '../src/domain/rule/stance'
 import {
   groundUnder,
   hasLineOfSight,
@@ -60,7 +76,6 @@ import {
   canBeHurt,
   canChoose,
   canSee,
-  canTransition,
   CHOOSE_FLOOR,
   CHOOSE_TIMEOUT,
   DOWN_DURATION,
@@ -69,13 +84,11 @@ import {
   SPAWN_PROTECT,
   type Life,
 } from '../src/domain/lifecycle'
-import type { Locomotion } from '../src/domain/locomotion'
 import {
   SNAPSHOT_INTERVAL,
   type ClientMessage,
   type RoomSummary,
   type ServerMessage,
-  type Team,
 } from '../src/net/types'
 
 /**
@@ -85,7 +98,7 @@ import {
  *
  * 体力・生死・復帰・キルを持つ。位置や見た目は持たず、そのまま中継する。
  *
- * ダメージの計算は src/domain/damage.ts を**そのまま読み込んでいる**。Bun は
+ * ダメージの計算は src/domain/rule/damage.ts を**そのまま読み込んでいる**。Bun は
  * TypeScript を直接動かせるので、クライアントと文字どおり同じコードが走る。
  * 移植しないので値がずれようがなく、片方だけ直して忘れる、が起きない。
  *
@@ -121,13 +134,6 @@ const INTERMISSION = 10 * 1000
  * 画面が切り替わった側が一方的に不利になる。
  */
 const COUNTDOWN = 5 * 1000
-/**
- * 試合を始めるのに要る人数。
- *
- * 各陣営に 1 人。片方しか居ない状態で時計を回すと、誰も居ない相手に対して
- * 勝ったことになる。
- */
-const MIN_PLAYERS = 2
 /** 試合の状態を配る間隔 (ms)。残り時間の表示に要る */
 const MATCH_BROADCAST = 1000
 
@@ -163,54 +169,17 @@ const [stageBoxes, solidBoxes]: [StageBox[], StageBox[]] = await (async () => {
   }
 })()
 
-interface Player {
-  id: string
-  name: string
-  team: Team
-  health: number
-  /**
-   * いまどういう状態に居るか。src/domain/lifecycle.ts に定義がある。
-   *
-   * **ここが唯一の出どころ。** 以前は respawnAt / droppedAt / protectedUntil /
-   * positioned の 4 つの数から、必要な場所で必要な条件をその都度組み立てていた。
-   * 同じ問いへの答えが場所ごとにずれて、そのまま不具合になっていた。
-   */
-  life: Life
-  /**
-   * 倒した相手の id。倒れている間だけ意味がある。
-   *
-   * 倒された側の画面はこの人を映す。**その間だけ、遮蔽を無視して位置を配る** —
-   * 映すものが無いと画面が成立しないので。湧いたら消す。
-   */
-  killedBy: string
-  /**
-   * その状態に入った時刻 (Date.now)。
-   *
-   * 時間で切り替わる遷移 (倒れる尺、無敵、支度の打ち切り、席を畳むまで) は
-   * 全部ここから出す。状態ごとに別の時計を持たない。
-   */
-  lifeAt: number
-  /**
-   * 直近の位置。state をそのまま流すついでに控えている。
-   *
-   * サーバーが位置を持つのはこれが初めて。今は「撃たれた方向」を出すためだけだが、
-   * 選択的可視化 (見えている相手だけを配る) に要るのも同じ情報なので、
-   * ここが将来その足場になる。
-   */
-  x: number
-  y: number
-  z: number
-  /** 姿勢。頭の高さが変わるので、遮蔽の判定に要る */
-  crouching: boolean
-  boxed: boolean
-  /**
-   * 姿勢が低くなった時刻 (Date.now)。0 なら低くない。
-   *
-   * しゃがむ操作は押した瞬間に届くが、体が実際に沈むのは補間で 0.3 秒ほどかかる。
-   * 届いた瞬間から低い頭で線を引くと、**まだ立っている相手を先に消す**ことになり、
-   * 物陰でしゃがんだ相手が一瞬で画面から消える。沈み切るまでは高いほうで見る。
-   */
-  loweredAt: number
+/**
+ * 接続 1 本ぶんの帳簿。**人 (Player) とは別。**
+ *
+ * socket も「届く間隔」も「誰に何を配ったか」も、人ではなく**接続**の持ち物。
+ * 同じ人が繋ぎ直せば新しい Session になるが、Player は席に残ったままになる —
+ * その違いが型に出ていなかったので、30 秒の猶予まわりの規則が読み取れなかった。
+ *
+ * 人の側は src/domain/player.ts。
+ */
+interface Session {
+  player: Player
   /**
    * 位置が届く間隔 (ms) の均し。64Hz で送っているので 16 前後が正常。
    *
@@ -229,17 +198,6 @@ interface Player {
    * ずれ自体は見えるようにしておく。
    */
   clockSkew: number
-  /** 体の向き (rad)。ナイフの背後判定に要る */
-  yaw: number
-  /**
-   * 視点の向きと上下 (rad)、構えているか。
-   *
-   * どこから見ているかを出すのに要る。三人称なので、画面に映るものを
-   * 決めているのはカメラの位置であって目の位置ではない (src/sim/eyepoint.ts)。
-   */
-  cameraYaw: number
-  pitch: number
-  aiming: boolean
   /**
    * いまこの人へ位置を配っている相手の id。
    *
@@ -257,51 +215,6 @@ interface Player {
    */
   seenClaymores: Set<number>
   /**
-   * 集中し始めた時刻 (Date.now)。0 なら集中していない。
-   *
-   * 回復の条件。姿勢を崩した瞬間も、撃たれた瞬間も 0 に戻すので、
-   * 待ち直しになる。
-   */
-  concentratingSince: number
-  /** 残りの手榴弾。倒れて復帰するたびに戻る */
-  grenades: number
-  /**
-   * 投擲の枠に何を入れたか。
-   *
-   * 弾倉を選んだ人には手榴弾を配らない。数を持っているのがこちらなので、
-   * 知らせてもらわないと決められない。
-   */
-  /**
-   * support の枠に何を入れたか。
-   *
-   * 弾倉はここに入らない — 撃った弾が 1 弾倉ぶん溜まるごとに勝手に増える物で、
-   * 枠を使って選ぶ装備ではない。数えているのはクライアント (囮は各自が解く)。
-   */
-  support: SupportId
-  /**
-   * 主武器の選択。
-   *
-   * `weapon` (いま構えている物) とは別。繋ぎ直したときに返すためだけに持つ —
-   * 読み直した瞬間は拳銃を持っているかもしれないので、構えている物からは復元できない。
-   */
-  primary: WeaponId
-  /**
-   * いま手にある物。位置と一緒に届く。
-   *
-   * 撃てない物 (手榴弾・ナイフ・箱) を持っている間の射撃を弾くのに使う。
-   * **申告を信じるのではなく、届いた状態と突き合わせる。**
-   */
-  held: HeldId
-  /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
-  holdingGrenade: boolean
-  /**
-   * 切れたとき戦場に居たか。
-   *
-   * 戻ってきた人を続きへ返すか、支度からやり直させるかの判断。
-   * 倒れている最中に切れたなら、どのみち次は湧くので支度でよい。
-   */
-  wasAlive: boolean
-  /**
    * 最後に届いた位置のパケット。**そのまま配り直す**ために取っておく。
    *
    * 接続が切れた人の体をその場に残すのに要る。位置は「届いたときに配る」形なので、
@@ -309,31 +222,6 @@ interface Player {
    * 不利になったらブラウザを閉じる、が逃げ道になる。
    */
   lastPayload: Uint8Array | null
-  /**
-   * 席番号。位置の 2 進で誰のものかを表すのに使う。
-   *
-   * id をそのまま載せると長さが可変になる。抜けた番号は空くまで使い回さない
-   */
-  slot: number
-  /** 倒した数 / 倒された数。試合ごとに 0 に戻る */
-  kills: number
-  deaths: number
-  /**
-   * 与えたヘッドショットと、**受けた**ヘッドショット。
-   *
-   * MGO2 はやられた側も記録していた。上手さだけでなく「どうやられたか」を
-   * 見せるため。こちらは zone を持っているのでタダで取れる。
-   */
-  headshots: number
-  headDeaths: number
-  /** 自爆。倒された数には入るが、誰かの手柄にはならない */
-  suicides: number
-  /**
-   * 武器ごとのキル。**表示名ではなく安定した id で数える**
-   * ('rifle' | 'sniper' | 'pistol' | 'knife' | 'grenade')。
-   * 銃の表示名を変えたときに過去の記録が壊れないように
-   */
-  killsByWeapon: Record<string, number>
   /**
    * 直前に配った体力。同じ値を配り直さないための控え。
    *
@@ -351,24 +239,6 @@ interface Player {
    * 変えたときに遡れる長さが黙って変わる
    */
   history: Pose[]
-  /** 歩いた距離の積算。足音を出す間隔を決める */
-  footsteps: Footsteps
-  /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
-  locomotion: Locomotion
-  /** 持っている銃。威力と連射の上限をこれで引く */
-  weapon: WeaponId
-  /**
-   * 銃ごとの弾数。**写しであって、権威ではない。**
-   *
-   * 空撃ちの判断はクライアントがやる (押した瞬間に音が要るので)。ここが持って
-   * いるのは、繋ぎ直した人へ続きを返すため。持たせないと、30 秒の猶予が
-   * 「瀕死でリロードすれば全快して弾も満タン」という抜け道になる。
-   *
-   * 減らすのは shot が届いたとき。増やすのは reload が届いたとき —
-   * **クライアントは装填が終わった瞬間に送る**ので、こちらは銃ごとの尺を
-   * 知らなくてよい。
-   */
-  ammo: Ammo
   /**
    * 形の合わない位置を最後に警告した時刻 (Date.now)。
    *
@@ -380,6 +250,47 @@ interface Player {
   socket: Bun.ServerWebSocket<Client>
 }
 
+/**
+ * 接続の帳簿。人の id で引く。
+ *
+ * Player に socket を持たせない代わりに、こちら側から人を指す。**人は
+ * 部屋 (Match) が持ち、接続はここが持つ。**
+ */
+const sessions = new Map<string, Session>()
+
+/**
+ * 繋がった時の帳簿。**繋ぎ直すたびに作り直す。**
+ *
+ * 前の接続の値を引き継がない。誰に何を配ったかを残すと「隠れた」の 1 通が
+ * 出ないまま見えていることになり、届く間隔を引き継ぐと巨大な間隔になり、
+ * 過去の姿を引き継ぐと**離脱前の位置で当たってしまう**。
+ */
+function newSession(player: Player, socket: Bun.ServerWebSocket<Client>): Session {
+  return {
+    player,
+    socket,
+    seen: new Set(),
+    seenClaymores: new Set(),
+    lastPayload: null,
+    packetGap: 0,
+    lastPacketAt: 0,
+    clockSkew: 0,
+    healthShown: player.health,
+    rejected: 0,
+    badPacketAt: 0,
+    badMoveAt: 0,
+    lastShotAt: 0,
+    history: [],
+  }
+}
+
+/** その人の接続。席に着いている人には必ず在る */
+function sessionOf(player: Player): Session {
+  const found = sessions.get(player.id)
+  if (!found) throw new Error(`接続が無い: ${player.id}`)
+  return found
+}
+
 interface Client {
   /** 発行元が保証した ID。名乗った値ではない (認証が有効なとき) */
   id: string
@@ -388,33 +299,7 @@ interface Client {
   room: string
 }
 
-/** 席番号を配る。抜けた番号は空くまで使い回さない (取り違えを避ける) */
-function nextSlot(room: Match): number {
-  const used = new Set([...room.players.values()].map((p) => p.slot))
-  for (let i = 0; i < 0xffff; i++) if (!used.has(i)) return i
-  return 0
-}
 
-interface Match {
-  players: Map<string, Player>
-  blue: number
-  red: number
-  endsAt: number
-  phase: 'waiting' | 'countdown' | 'playing' | 'over'
-  winner?: Team | 'draw'
-  /** 最後に状態を配った時刻。1 秒ごとに配る */
-  lastBroadcast: number
-  /** 最後に「切れた人の体」を配り直した時刻 */
-  lastLimbo: number
-  /**
-   * いま走っている試合の身元。記録に要る。
-   *
-   * 始まった時に発番して、終わるまで変えない。**離脱した人はその場で書く**ので、
-   * 試合が終わってから採番したのでは間に合わない。
-   */
-  matchId: string | null
-  startedAt: number
-}
 
 const rooms = new Map<string, Match>()
 
@@ -439,17 +324,7 @@ function isRoomName(name: string): name is RoomName {
 function roomOf(name: string): Match {
   let room = rooms.get(name)
   if (!room) {
-    room = {
-      players: new Map(),
-      blue: 0,
-      red: 0,
-      endsAt: 0,
-      phase: 'waiting',
-      lastBroadcast: 0,
-      lastLimbo: 0,
-      matchId: null,
-      startedAt: 0,
-    }
+    room = newMatch()
     rooms.set(name, room)
   }
   return room
@@ -460,60 +335,10 @@ function roomOf(name: string): Match {
  *
  * 本人に選ばせない。人数が偏ったまま始まると、腕前より頭数で決まってしまう。
  */
-/**
- * 席を空けて待つ時間 (ms)。
- *
- * リロードや一瞬の電波切れで戻ってこられる長さ。長くすると、抜けた相手を
- * 待って試合が始まらない時間も伸びるので、ほどほどに。
- */
-const RECONNECT_GRACE = 30_000
 
-/** 今つながっている人だけ。離脱中の席は配信に入れない */
-function connected(room: Match): Player[] {
-  return [...room.players.values()].filter((p) => isSeated(p.life))
-}
 
-/**
- * 席を持っている人。**一瞬の離脱を数に入れる。**
- *
- * 試合を続けるかどうかはこちらで数える。繋がっている人だけで数えていた頃は、
- * 片方がリロードした瞬間に人数が割れて待ちへ戻り、戻ってきたときに
- * countdown からやり直しになっていた — 得点も試合の時計も最初から。
- *
- * 席は RECONNECT_GRACE の間だけ空けて待つ、と決めてある。人数もその間は
- * 空けて待つのが筋で、そうでないと「席を残す」という仕掛けが試合の側から
- * 台無しにされる。戻ってこなければ席ごと消えて、そこで初めて人数が割れる。
- */
-function holdingSeats(room: Match, now: number): Player[] {
-  return [...room.players.values()].filter(
-    (p) => isSeated(p.life) || now - p.lifeAt < RECONNECT_GRACE,
-  )
-}
 
-function assignTeam(room: Match): Team {
-  let blue = 0
-  let red = 0
-  for (const player of connected(room)) {
-    if (player.team === 'blue') blue++
-    else red++
-  }
-  return blue <= red ? 'blue' : 'red'
-}
 
-/**
- * 残機を 1 減らす。**残機が動く道はここ 1 本だけ**にする。
- *
- * 以前は点を 2 箇所 (銃と手榴弾) で別々に動かしていた。片方に足し忘れても
- * 試合はそれらしく進むので気づけない。
- *
- * **死因を問わない。** 撃たれても自爆しても自陣の残機が 1 減り、倒した側には
- * 何も入らない。これで「殺されるくらいなら自死する」が成り立たなくなる —
- * どちらで死んでも自陣の損は同じで、敵の得も同じ (ゼロ)。
- */
-function loseTicket(room: Match, team: Team): void {
-  if (team === 'blue') room.blue = Math.max(0, room.blue - 1)
-  else room.red = Math.max(0, room.red - 1)
-}
 
 function matchState(room: Match): ServerMessage {
   return {
@@ -542,7 +367,7 @@ function matchState(room: Match): ServerMessage {
       // **全員に見せる。** 「相手がカクつく / 消える」の原因が誰にあるかは、
       // これを見れば一目で分かる。調べるのに /health を叩いたり
       // DevTools を開いてもらったりしていた
-      rate: p.packetGap > 0 ? Math.round(1000 / p.packetGap) : 0,
+      rate: sessionOf(p).packetGap > 0 ? Math.round(1000 / sessionOf(p).packetGap) : 0,
     })),
   }
 }
@@ -578,15 +403,7 @@ function resetPlayers(roomName: string, room: Match): void {
  * (setLife が通してくれないので、書き間違えても状態が壊れることはない)。
  */
 function spawn(roomName: string, player: Player, now = Date.now()): void {
-  player.killedBy = ''
-  player.health = MAX_HEALTH
-  // 装備から詰め直す。式は共有なので、画面に出る数と必ず一致する
-  player.ammo = startingAmmo()
-  player.grenades = SUPPORT_SPECS[player.support].count
-  player.holdingGrenade = false
-  player.concentratingSince = 0
-  // 湧き地点へ跳ぶ。歩いた距離として積むと、着いた先で足音が連打される
-  player.footsteps.warp(player.x, player.z)
+  refill(player)
   setLife(roomName, player, 'spawning', now)
   broadcast(roomName, { type: 'respawn', id: player.id })
   sendHealth(roomName, player, 0, false)
@@ -603,6 +420,7 @@ function leaveRoom(roomName: string, player: Player): void {
   // 走っている試合を捨てて出た。抜けたことごと残す
   if (room.phase === 'playing') recordSeat(roomName, room, player, true)
   room.players.delete(player.id)
+  sessions.delete(player.id)
   // 本人はもう聞いていない。残った人に消してもらう
   broadcast(roomName, { type: 'leave', id: player.id })
 }
@@ -654,7 +472,7 @@ function broadcast(roomName: string, message: ServerMessage, except?: string): v
   if (!room) return
   const payload = JSON.stringify(message)
   for (const player of connected(room)) {
-    if (player.id !== except) player.socket.send(payload)
+    if (player.id !== except) sessionOf(player).socket.send(payload)
   }
 }
 
@@ -694,8 +512,8 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
     // 参照すると ReferenceError で落ちる (形の合わない位置が届いた瞬間に、
     // 古いクライアントを知らせるはずの道でサーバーが例外を投げていた)
     const at = Date.now()
-    if (at - player.badPacketAt > 5000) {
-      player.badPacketAt = at
+    if (at - sessionOf(player).badPacketAt > 5000) {
+      sessionOf(player).badPacketAt = at
       console.warn(
         `[位置] ${player.name}: 形が合わない (${bytes.byteLength} バイト、期待は ${SNAPSHOT_BYTES})。` +
           'クライアントが古い可能性',
@@ -712,13 +530,13 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   // どれでも起こる。判定だけ疑って何度も試すことになったので、
   // 残りの 2 つは常に測っておく
   const arrived = Date.now()
-  if (player.lastPacketAt > 0) {
-    const gap = arrived - player.lastPacketAt
-    player.packetGap =
-      player.packetGap > 0 ? player.packetGap + (gap - player.packetGap) * 0.1 : gap
+  if (sessionOf(player).lastPacketAt > 0) {
+    const gap = arrived - sessionOf(player).lastPacketAt
+    sessionOf(player).packetGap =
+      sessionOf(player).packetGap > 0 ? sessionOf(player).packetGap + (gap - sessionOf(player).packetGap) * 0.1 : gap
   }
-  player.lastPacketAt = arrived
-  player.clockSkew = snapshot.time - arrived
+  sessionOf(player).lastPacketAt = arrived
+  sessionOf(player).clockSkew = snapshot.time - arrived
 
   // 跳んだ / 抜けたを弾く。
   //
@@ -732,9 +550,9 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   if (settled) {
     const verdict = checkMove(player, snapshot, solidBoxes, arenaHalf)
     if (!verdict.ok) {
-      player.rejected++
-      if (arrived - player.badMoveAt > 5000) {
-        player.badMoveAt = arrived
+      sessionOf(player).rejected++
+      if (arrived - sessionOf(player).badMoveAt > 5000) {
+        sessionOf(player).badMoveAt = arrived
         console.warn(`[位置] ${player.name}: ${verdict.reason}`)
       }
       // 動かさない。姿勢や向きは受けてよいので、位置だけ据え置く
@@ -783,7 +601,7 @@ function receiveSnapshot(roomName: string, player: Player, raw: ArrayBuffer | Ar
   stampProtected(view, isProtected(player))
   // 切れたときに配り直せるよう、写しを取っておく。
   // bytes は受信バッファなので、持ち回すなら複製が要る
-  player.lastPayload = new Uint8Array(bytes)
+  sessionOf(player).lastPayload = new Uint8Array(bytes)
   relayState(roomName, player, bytes)
 }
 
@@ -920,10 +738,10 @@ function relayClaymores(roomName: string, room: Match): void {
         visible = true
       }
 
-      const known = viewer.seenClaymores.has(claymore.id)
+      const known = sessionOf(viewer).seenClaymores.has(claymore.id)
       if (visible && !known) {
-        viewer.seenClaymores.add(claymore.id)
-        viewer.socket.send(
+        sessionOf(viewer).seenClaymores.add(claymore.id)
+        sessionOf(viewer).socket.send(
           JSON.stringify({
             type: 'claymorePlaced',
             id: claymore.id,
@@ -933,8 +751,8 @@ function relayClaymores(roomName: string, room: Match): void {
           } satisfies ServerMessage),
         )
       } else if (!visible && known) {
-        viewer.seenClaymores.delete(claymore.id)
-        viewer.socket.send(
+        sessionOf(viewer).seenClaymores.delete(claymore.id)
+        sessionOf(viewer).socket.send(
           JSON.stringify({ type: 'claymoreGone', id: claymore.id, blast: false } satisfies ServerMessage),
         )
       }
@@ -973,7 +791,7 @@ function detonateClaymore(claymore: Claymore): void {
   // 起爆は隠さない。音も光も壁を回り込んで届く (手榴弾と同じ規則)
   broadcast(claymore.room, { type: 'claymoreGone', id: claymore.id, blast: true })
   const here = rooms.get(claymore.room)
-  if (here) for (const viewer of connected(here)) viewer.seenClaymores.delete(claymore.id)
+  if (here) for (const viewer of connected(here)) sessionOf(viewer).seenClaymores.delete(claymore.id)
   if (!room || room.phase !== 'playing') return
 
   for (const victim of connected(room)) {
@@ -1010,7 +828,7 @@ const RELEASE_HEIGHT = 1.7
 const RELEASE_FORWARD = 0.45
 
 /**
- * 1 つの命で持てる数は support の表 (domain/weapons.ts) が決める。
+ * 1 つの命で持てる数は support の表 (domain/item/weapons.ts) が決める。
  *
  * **数を持っているのはこちら。** 投げられるか置けるかを決めているのがこちらなので、
  * 表を読む側もこちらでないと、画面の数だけ減って実際には投げられる、が起きる。
@@ -1170,7 +988,7 @@ function applyBlastDamage(
   if (victim.health > 0) {
     sendHealth(roomName, victim, amount, false, bearing)
     if (knock && isSeated(victim.life)) {
-      victim.socket.send(JSON.stringify({ type: 'knockdown' }))
+      sessionOf(victim).socket.send(JSON.stringify({ type: 'knockdown' }))
     }
     return
   }
@@ -1254,7 +1072,7 @@ function emitNoise(
       hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
     if (visible) continue
 
-    listener.socket.send(
+    sessionOf(listener).socket.send(
       JSON.stringify({
         type: 'noise',
         kind: noise.kind,
@@ -1288,7 +1106,7 @@ function relayShot(roomName: string, from: Player, message: ServerMessage): void
       !canSee(listener.life) ||
       hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
 
-    if (visible) listener.socket.send(payload)
+    if (visible) sessionOf(listener).socket.send(payload)
   }
 
   // 見えない相手には音として届ける
@@ -1327,7 +1145,7 @@ const LAG_WINDOW = 400
 const HISTORY_SIZE = Math.ceil(LAG_WINDOW / (SNAPSHOT_INTERVAL * 1000)) + 2
 
 function recordPose(player: Player): void {
-  player.history.push({
+  sessionOf(player).history.push({
     time: Date.now(),
     x: player.x,
     y: player.y,
@@ -1342,7 +1160,7 @@ function recordPose(player: Player): void {
     // 爆風で転んだ直後に届いた申告を弾いてしまう
     stance: stanceOf(player.locomotion),
   })
-  if (player.history.length > HISTORY_SIZE) player.history.shift()
+  if (sessionOf(player).history.length > HISTORY_SIZE) sessionOf(player).history.shift()
 }
 
 /** カメラ位置の置き場。毎フレーム作らないよう使い回す */
@@ -1380,25 +1198,15 @@ function viewOf(player: Player): { x: number; y: number; z: number } {
  * 「位置が来ないから倒れたのだろう」と推し量ることになる。
  */
 function setLife(roomName: string, player: Player, next: Life, now = Date.now()): void {
-  if (player.life === next) return
-  if (!canTransition(player.life, next)) {
-    console.warn(`[状態] ${player.name}: ${player.life} → ${next} は通れない`)
+  const before = player.life
+  if (!enterLife(player, next, now)) {
+    if (before !== next) console.warn(`[状態] ${player.name}: ${before} → ${next} は通れない`)
     return
   }
-  player.life = next
-  player.lifeAt = now
   broadcast(roomName, { type: 'life', id: player.id, state: next })
 }
 
-/** その状態に入ってから経った時間 (ms) */
-function lifeElapsed(player: Player, now = Date.now()): number {
-  return now - player.lifeAt
-}
 
-/** いま無敵か */
-function isProtected(player: Player): boolean {
-  return player.life === 'spawning'
-}
 
 function relayState(roomName: string, from: Player, payload: Uint8Array): void {
   const room = rooms.get(roomName)
@@ -1446,14 +1254,14 @@ function relayState(roomName: string, from: Player, payload: Uint8Array): void {
       // 黙って止めると、受け取る側は沈黙の長さから察するしかない。
       // 沈黙は「隠れた」でも「相手の機械が遅れている」でも起きるので、
       // 区別が付かず、遅れて届く相手が見えたり消えたりする。
-      if (viewer.seen.delete(from.id)) {
-        viewer.socket.send(JSON.stringify({ type: 'hidden', id: from.id } satisfies ServerMessage))
+      if (sessionOf(viewer).seen.delete(from.id)) {
+        sessionOf(viewer).socket.send(JSON.stringify({ type: 'hidden', id: from.id } satisfies ServerMessage))
       }
       continue
     }
 
-    viewer.seen.add(from.id)
-    viewer.socket.send(payload)
+    sessionOf(viewer).seen.add(from.id)
+    sessionOf(viewer).socket.send(payload)
   }
 }
 
@@ -1471,7 +1279,7 @@ function sendHealth(
   // 状態として配られているので、そこから方向へ線を引けば射手の居場所が出る。
   // 「誰に撃たれたかは渡さない」と決めた意味が無くなる。
   if (isSeated(player.life)) {
-    player.socket.send(
+    sessionOf(player).socket.send(
       JSON.stringify({
         type: 'health',
         id: player.id,
@@ -1524,7 +1332,7 @@ const FIRE_INTERVAL_SLACK = 0.85
  * 何が通って何が通らないかを試して回れてしまう。
  */
 function reject(attacker: Player, reason: string): void {
-  attacker.rejected++
+  sessionOf(attacker).rejected++
   console.warn(`[却下] ${attacker.name}: ${reason}`)
 }
 
@@ -1553,16 +1361,16 @@ function applyDamage(roomName: string, attacker: Player, event: ClientMessage): 
   if (event.kind === 'bullet') {
     const now = Date.now()
     const limit = weaponOf(attacker.weapon).fireInterval * 1000 * FIRE_INTERVAL_SLACK
-    if (now - attacker.lastShotAt < limit) {
-      reject(attacker, `連射が速すぎる (${now - attacker.lastShotAt}ms)`)
+    if (now - sessionOf(attacker).lastShotAt < limit) {
+      reject(attacker, `連射が速すぎる (${now - sessionOf(attacker).lastShotAt}ms)`)
       return
     }
-    attacker.lastShotAt = now
+    sessionOf(attacker).lastShotAt = now
   }
 
   const verdict = verifyHit(
-    attacker.history,
-    victim.history,
+    sessionOf(attacker).history,
+    sessionOf(victim).history,
     {
       kind: event.kind,
       zone: event.zone,
@@ -1638,17 +1446,6 @@ function applyDamage(roomName: string, attacker: Player, event: ClientMessage): 
   })
 }
 
-/**
- * 残っているのが片側だけならその陣営。両方居るか、誰も居なければ null。
- *
- * 不戦勝を出すかどうかの判断に使う。
- */
-function soleTeam(seats: Player[]): Team | null {
-  const blue = seats.some((p) => p.team === 'blue')
-  const red = seats.some((p) => p.team === 'red')
-  if (blue === red) return null
-  return blue ? 'blue' : 'red'
-}
 
 /**
  * 試合の進行。
@@ -1777,15 +1574,12 @@ setInterval(() => {
     if (now - room.lastLimbo >= LIMBO_MS) {
       room.lastLimbo = now
       for (const player of room.players.values()) {
-        if (player.life !== 'dropped' || !player.lastPayload) continue
-        const view = new DataView(
-          player.lastPayload.buffer,
-          player.lastPayload.byteOffset,
-          player.lastPayload.byteLength,
-        )
+        const last = sessionOf(player).lastPayload
+        if (player.life !== 'dropped' || !last) continue
+        const view = new DataView(last.buffer, last.byteOffset, last.byteLength)
         stampLocomotion(view, 'away')
         stampProtected(view, false)
-        relayState(roomName, player, player.lastPayload)
+        relayState(roomName, player, last)
       }
     }
 
@@ -1795,6 +1589,7 @@ setInterval(() => {
         // 待ち切っても戻らなかった。走っている試合を置いて消えたのと同じ
         if (room.phase === 'playing') recordSeat(roomName, room, player, true)
         room.players.delete(player.id)
+        sessions.delete(player.id)
         // ここで初めて消してもらう。切れた時点では配らない —
         // 配ると受け取った側が実体を捨ててしまい、そのあと届く体を
         // 新品として作り直して状態を見失う
@@ -1849,8 +1644,8 @@ setInterval(() => {
       // 刻みを 64Hz に上げたぶんをそのまま流すと、回復中だけ通信が跳ね上がる。
       // 受け取る側は整数に丸めて出しているので、変わらない値を送る意味が無い。
       const shown = Math.ceil(player.health)
-      if (shown === player.healthShown && player.health < RECOVER_CAP) continue
-      player.healthShown = shown
+      if (shown === sessionOf(player).healthShown && player.health < RECOVER_CAP) continue
+      sessionOf(player).healthShown = shown
       sendHealth(roomName, player, 0, false)
     }
   }
@@ -1957,8 +1752,8 @@ const server = Bun.serve<Client>({
                 // 64 通/秒 から落ちていれば途切れがち (1 通/秒 まで落ちて
                 // いれば、その人のタブが裏に回っている)。時計差が大きければ
                 // 時計の合っていない機械が混ざっている
-                (p.packetGap > 0
-                  ? ` ${(1000 / p.packetGap).toFixed(1)}通/秒 時計差 ${(p.clockSkew / 1000).toFixed(2)}s`
+                (sessionOf(p).packetGap > 0
+                  ? ` ${(1000 / sessionOf(p).packetGap).toFixed(1)}通/秒 時計差 ${(sessionOf(p).clockSkew / 1000).toFixed(2)}s`
                   : '') +
                 // 記録に残る分。数えられているかをここで見られる
                 ` ${p.kills}/${p.deaths}` +
@@ -1970,7 +1765,7 @@ const server = Bun.serve<Client>({
                       .map(([id, n]) => `${id}:${n}`)
                       .join(' ')}]`
                   : '') +
-                (p.rejected > 0 ? ` 却下 ${p.rejected}` : '') +
+                (sessionOf(p).rejected > 0 ? ` 却下 ${sessionOf(p).rejected}` : '') +
                 ` [${p.life}]`,
             )
             .join('\n'),
@@ -2049,7 +1844,8 @@ const server = Bun.serve<Client>({
         //
         // 所属と名前も引き継ぐ。少ない側へ割り振り直すと、リロードしただけで
         // 敵味方が入れ替わる。
-        seat.socket = socket
+        // 帳簿は作り直す (newSession の註釈にある通り、引き継ぐと壊れる)
+        sessions.set(seat.id, newSession(seat, socket))
         // 倒れている最中に切れた人だけは支度から。どのみち次は湧く。
         //
         // 戻す先は **alive**。spawning にすると 3 秒の無敵がタダで手に入り、
@@ -2061,71 +1857,19 @@ const server = Bun.serve<Client>({
         // クライアントは placeAtSpawn で湧き地点へ自分を置くので、先に
         // 続きを渡すと上書きされて**湧き地点へワープする**
         resumed = resuming ? seat : null
-        // 繋いだ直後は誰も見えていない。前の接続の分を残すと、隠れたことを
-        // 知らせる 1 通が出ないまま「見えている」ことになる
-        seat.seen.clear()
-        seat.seenClaymores.clear()
-        // 繋ぎ直しの間は測っていない。前回の値を引き継ぐと巨大な間隔になる
-        seat.packetGap = 0
-        seat.lastPacketAt = 0
-        // 離脱前の姿は当てにならない。遡って照合すると過去の位置で当たってしまう
-        seat.history = []
-        seat.lastShotAt = 0
         seat.concentratingSince = 0
         seat.holdingGrenade = false
-
       } else {
         // 名前は発行元が持っていればそれ、無ければ join で名乗るまで仮のもの
-        room.players.set(socket.data.id, {
+        const joined = newPlayer({
           id: socket.data.id,
           name: socket.data.name ?? socket.data.id.slice(0, 4).toUpperCase(),
           team: assignTeam(room),
-          health: MAX_HEALTH,
-          life: 'joining',
-          lifeAt: Date.now(),
-          killedBy: '',
-          x: 0,
-          y: 0,
-          z: 0,
-          yaw: 0,
-          cameraYaw: 0,
-          pitch: 0,
-          aiming: false,
-          crouching: false,
-          boxed: false,
-          history: [],
-          lastShotAt: 0,
-          healthShown: MAX_HEALTH,
-          kills: 0,
-          deaths: 0,
-          headshots: 0,
-          headDeaths: 0,
-          suicides: 0,
-          killsByWeapon: {},
-          footsteps: new Footsteps(),
-          locomotion: 'idle',
-          weapon: 'rifle',
-          ammo: startingAmmo(),
           slot: nextSlot(room),
-          rejected: 0,
-          concentratingSince: 0,
-          grenades: SUPPORT_SPECS.grenade.count,
-          support: 'grenade',
-          primary: 'rifle',
-          held: 'rifle',
-          holdingGrenade: false,
-          wasAlive: false,
-          lastPayload: null,
-          badPacketAt: 0,
-          badMoveAt: 0,
-          seen: new Set(),
-          seenClaymores: new Set(),
-          packetGap: 0,
-          lastPacketAt: 0,
-          clockSkew: 0,
-          loweredAt: 0,
-          socket,
+          now: Date.now(),
         })
+        room.players.set(joined.id, joined)
+        sessions.set(joined.id, newSession(joined, socket))
       }
 
       // 今いる全員と試合の状態を渡す。
@@ -2232,7 +1976,7 @@ const server = Bun.serve<Client>({
         // 湧いて装備画面が消えていた。ただし早く選んだぶん早く戻れる、には
         // しない (CHOOSE_FLOOR)。選ぶのが速いことは腕前ではない
         case 'spawn':
-          if (canChoose(player.life) && lifeElapsed(player) >= CHOOSE_FLOOR * 1000) {
+          if (canChoose(player.life) && lifeElapsed(player, Date.now()) >= CHOOSE_FLOOR * 1000) {
             spawn(socket.data.room, player)
           }
           break
@@ -2318,7 +2062,7 @@ const server = Bun.serve<Client>({
       if (!player) return
       // 同じ ID で繋ぎ直したあとに、古い接続の後始末が届くことがある。
       // それで新しいほうを離脱扱いにしないよう、送り主を確かめる。
-      if (player.socket !== socket) return
+      if (sessions.get(player.id)?.socket !== socket) return
 
       // 席は残す。畳むのは待ち切ってから (tick)
       // 続きへ戻せる状態だったかを控える。倒れている最中なら、どのみち次は湧く

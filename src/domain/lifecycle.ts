@@ -1,4 +1,4 @@
-import { RESPAWN_DELAY } from './damage'
+import { RESPAWN_DELAY } from './rule/damage'
 
 /**
  * プレイヤーが今どういう状態に居るか。
@@ -29,7 +29,7 @@ import { RESPAWN_DELAY } from './damage'
  *
  * --- 読む場所 ---
  * サーバーとクライアントが同じこのファイルを読む。移植しないので、
- * 片方だけ直して忘れる、が起きない (domain/damage.ts と同じ扱い)。
+ * 片方だけ直して忘れる、が起きない (domain/rule/damage.ts と同じ扱い)。
  *
  * 権威はサーバーにある。クライアントが持つのは写しで、遷移は知らせで届く。
  */

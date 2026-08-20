@@ -436,9 +436,10 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
 同じ棚に並んでいた。どちらも「three を import しない」という**技術的な**理由で
 1 か所に居ただけで、意味では別の物。
 
-    src/domain/   語彙と規則。ルールブックに書けること
-                  held weapons inventory damage stance locomotion
-                  lifecycle scoring footsteps surface flags
+    src/domain/   ゲームの語彙。**entity の名前で並べる**
+                  player match lifecycle locomotion surface flags
+                  item/  held weapons inventory
+                  rule/  damage stance scoring footsteps
 
     src/sim/      世界を進める手続き。幾何・物理・審判
                   collision movement ballistic blast claymore
@@ -450,8 +451,27 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
 
 **依存は一方通行。** `sim → domain` は良い。`domain → sim` は書かない。規則が
 幾何を知っていると、「弾がどう飛ぶか」を変えるたびに「何発で死ぬか」が動く。
-分けた時点で domain の 11 ファイルは互いだけを import していて、外を見ていな
-かった — 線は元から在って、名前が付いていなかっただけ。
+通信 (`src/net`) も同じで、**protocol がゲームの言葉を借りて話す**側。だから
+陣営 (`Team`) の定義は net から domain へ移した。
+
+### 人と接続を分ける
+
+`Player` と `Match` は server/index.ts (2364 行) の中に居た。設計が「誰が何を
+持って、どういう状態に居るか」の話をしているのに、コードではその言葉が
+**通信の帳簿と同じ構造体**に混ざっていた。48 個のフィールドを分けると:
+
+    Player   (domain)   体力 状態 位置 持ち物 成績        35 個
+    Session  (server)   socket 届く間隔 時計のずれ        13 個
+                        誰に何を配ったか 遡る用の姿勢
+
+**同じ人が繋ぎ直せば Session は新しくなるが、Player は席に残る。** 30 秒だけ
+席を空けて待つ規則がここに出る。前は「繋ぎ直したら seen を消す、間隔を 0 に
+戻す、姿勢を捨てる」と 6 行かけて書いていたものが、`newSession()` を作り直す
+1 行になった。
+
+こうしておくと**クライアントも同じ Player を読める**。いまは片方が three を
+抱えた src/game/player.ts で、同じ人物のことを別々の言葉で書いている。そこを
+寄せていく足場になる (まだやっていない)。
 
 境界に迷ったときの問い: **これは MGO2 の説明書に書いてあることか。** 「拳銃は
 12 発」は書いてある (domain)。「弾が地形に当たったら跳ねる」は書いていない (sim)。

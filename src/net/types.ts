@@ -1,8 +1,8 @@
 import type { Locomotion } from '../domain/locomotion'
-import type { HitZone } from '../domain/damage'
+import type { HitZone } from '../domain/rule/damage'
 import type { Surface } from '../domain/surface'
-import type { SupportId, WeaponId } from '../domain/weapons'
-import type { HeldId } from '../domain/held'
+import type { SupportId, WeaponId } from '../domain/item/weapons'
+import type { HeldId } from '../domain/item/held'
 import type { Life } from '../domain/lifecycle'
 
 /**
@@ -18,8 +18,14 @@ import type { Life } from '../domain/lifecycle'
  * 権威を強めていくとき、変える場所がサーバーの中だけで済む。
  */
 
-/** 所属。サーバーが割り当てる */
-export type Team = 'blue' | 'red'
+/**
+ * 所属。**定義は src/domain/player.ts に在る。**
+ *
+ * 通信の型が陣営を宣言していたのは順番が逆で、protocol はゲームの言葉を
+ * 借りて話す側。ここから出しているのは、読む側の import を変えないため。
+ */
+import type { Team } from '../domain/player'
+export type { Team }
 
 /** 1 人分の見た目の状態。体力はここに含めない (サーバーが持つ) */
 export interface PlayerSnapshot {

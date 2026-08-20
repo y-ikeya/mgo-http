@@ -11,9 +11,9 @@
  * three.js に依存しない。サーバー (bun) がこのファイルをそのまま読む。
  */
 
-import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from '../domain/damage'
+import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from '../domain/rule/damage'
 import { headHeight, isPathClear, type StageBox } from './vision'
-import type { Stance } from '../domain/stance'
+import type { Stance } from '../domain/rule/stance'
 
 /** 判定に使う、ある時刻の姿 */
 export interface Pose {

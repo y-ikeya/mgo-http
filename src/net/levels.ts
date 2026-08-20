@@ -10,7 +10,7 @@
  */
 import { createResource, type Accessor } from 'solid-js'
 import { fetchRecords } from './profile'
-import { levelOf, pointsOf } from '../domain/scoring'
+import { levelOf, pointsOf } from '../domain/rule/scoring'
 import type { Identity } from '../auth/session'
 
 /**

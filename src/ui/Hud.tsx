@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
-import { HELD, type HeldId } from '../domain/held'
+import { HELD, type HeldId } from '../domain/item/held'
 import type { GameStats } from '../game/Game'
 import './Hud.css'
 

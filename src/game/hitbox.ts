@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { findBoneBySuffix } from './animation'
-import type { HitZone } from '../domain/damage'
+import type { HitZone } from '../domain/rule/damage'
 
 /**
  * 当たり判定。ボーンに追従する球で表す。

@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
-import { pointsOf } from '../domain/scoring'
+import { pointsOf } from '../domain/rule/scoring'
 import { useLevels } from '../net/levels'
 import type { Identity } from '../auth/session'
 import type { GameStats } from '../game/Game'

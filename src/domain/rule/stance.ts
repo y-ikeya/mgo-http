@@ -16,7 +16,7 @@
  * クリップから実測した値なのに、モーションを差し替えても黙って古いままになる。
  */
 
-import { locomotionFor, MOVE_DIRECTIONS, type Locomotion } from './locomotion'
+import { locomotionFor, MOVE_DIRECTIONS, type Locomotion } from '../locomotion'
 
 /**
  * 体の構え。頭の高さと足音の届く距離がこれで決まる。

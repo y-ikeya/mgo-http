@@ -16,8 +16,8 @@
 
 import { MOVE_DIRECTIONS, type Locomotion } from '../domain/locomotion'
 import type { PlayerSnapshot } from './types'
-import type { WeaponId } from '../domain/weapons'
-import type { HeldId } from '../domain/held'
+import type { WeaponId } from '../domain/item/weapons'
+import type { HeldId } from '../domain/item/held'
 
 /** 先頭 1 バイト。将来 2 進の種類が増えたときに見分ける */
 export const PACKET_STATE = 1
