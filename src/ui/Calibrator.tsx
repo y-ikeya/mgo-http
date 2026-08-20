@@ -160,12 +160,23 @@ interface Axis {
   key: 'x' | 'y' | 'z'
   label: string
   hint: string
+  /** つまみの可動域。回転は共通なので省略できる */
+  min?: number
+  max?: number
 }
 
+/**
+ * 握り位置の可動域 (m)。**軸ごとに違う。**
+ *
+ * 前後 (Z) だけ広い。握りは銃のローカル座標にある点で、原点は後端付近・
+ * 銃口が -Z なので、**長い銃ほど深い値になる**。P90 は握りが真ん中にあって
+ * -0.6 で、±0.3 では端に張り付いて動かせなかった。端で止まらないよう、
+ * 要ると言われた -1.2 より更に先まで開けてある。
+ */
 const POSITION_AXES: Axis[] = [
-  { key: 'x', label: 'X', hint: '手の中で左右' },
-  { key: 'y', label: 'Y', hint: '大きいほど銃が下がる' },
-  { key: 'z', label: 'Z', hint: '大きいほど銃が手前' },
+  { key: 'x', label: 'X', hint: '手の中で左右', min: -0.3, max: 0.3 },
+  { key: 'y', label: 'Y', hint: '大きいほど銃が下がる', min: -0.3, max: 0.3 },
+  { key: 'z', label: 'Z', hint: '大きいほど銃が手前', min: -1.5, max: 0.3 },
 ]
 
 const ROTATION_AXES: Axis[] = [
@@ -505,13 +516,23 @@ export default function Calibrator(props: {
               <span class="calib-label">{axis.label}</span>
               <input
                 type="range"
-                min="-0.3"
-                max="0.3"
+                min={axis.min}
+                max={axis.max}
                 step="0.005"
                 value={grip()[axis.key]}
                 onInput={(e) => updateGrip(axis.key, Number(e.currentTarget.value))}
               />
-              <span class="calib-value">{grip()[axis.key].toFixed(3)}</span>
+              {/*
+                **数字も打てる。** つまみの端に用があるとき (銃が長い / 想定外の
+                握り) に、範囲を広げ直さないと進めないのは詰まる
+              */}
+              <input
+                class="calib-value calib-number"
+                type="number"
+                step="0.005"
+                value={grip()[axis.key].toFixed(3)}
+                onChange={(e) => updateGrip(axis.key, Number(e.currentTarget.value))}
+              />
               <span class="calib-hint">{axis.hint}</span>
             </label>
           )}
