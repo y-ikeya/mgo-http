@@ -22,6 +22,7 @@ import {
   vec3,
 } from 'three/tsl'
 import type { Obstacle } from '../sim/collision'
+import { isPathClear, sightBlockers } from '../sim/vision'
 import type { StageBox } from '../sim/vision'
 import { asset, loadStage } from './assets'
 import { isMesh } from './guards'
@@ -40,6 +41,15 @@ export const STAGE_CODE = 'AA'
 
 /** 地面の一辺 (m) */
 const GROUND_SIZE = 120
+
+/** 地面を割る数。明暗を頂点で持つので、粗いと段になる */
+const GROUND_CELLS = 40
+/** 地面から浮かせて光線を撃つ高さ (m)。自分自身に当たらないように */
+const GROUND_SKY_EPS = 0.05
+/** 光線を飛ばす距離 (m) */
+const GROUND_SKY_REACH = 60
+/** 一番暗い所の明るさ。0 にすると建物の奥が真っ黒になる (tools/bake_stage.py と同じ) */
+const GROUND_SKY_FLOOR = 0.3
 
 /**
  * 天空光の強さ。日陰の明るさはこれで決まる。
@@ -269,7 +279,68 @@ export interface Stage {
  * テクスチャが届いたら applyStructureTexture が上書きする。
  */
 function createBlockoutMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color: 0x6b7684, roughness: 0.85, metalness: 0.05 })
+  return new THREE.MeshStandardMaterial({
+    color: 0x6b7684,
+    roughness: 0.85,
+    metalness: 0.05,
+    /*
+     * **焼いた「空の見え方」を掛ける。**
+     *
+     * 環境光 (HemisphereLight) はどこでも同じ明るさで当たるので、そのままだと
+     * 建物の奥も外の縁も同じ灰色になる。実際の光は開口から入って奥ほど届かない。
+     *
+     * 頂点色に「その点から空がどれだけ見えるか」が入っている
+     * (tools/bake_stage.py)。屋上 0.97 / 1 階の奥 0.39 くらい。
+     */
+    vertexColors: true,
+  })
+}
+
+/**
+ * 地面に「空がどれだけ見えるか」を塗る。
+ *
+ * 建物の中の床は**この地面そのもの** (1 階の床は敷いていない) なので、ここを
+ * 塗らないと歩いている足元だけ平らな明るさのまま残る。
+ *
+ * 焼き方は tools/bake_stage.py と同じ考え方 — 上半球へ光線を飛ばして、遮られ
+ * なかった割合を色にする。あちらは書き出しのときに 1 度、こちらは地面が
+ * コードで作られているので読み込みのたびに。1600 点 × 9 本なので一瞬で終わる。
+ */
+async function bakeGroundSky(geometry: THREE.BufferGeometry): Promise<void> {
+  const boxes = sightBlockers(await loadStageBoxes())
+  if (boxes.length === 0) return
+
+  const position = geometry.getAttribute('position')
+  const colors = new Float32Array(position.count * 3)
+  // 上半球へ。真上と、斜め 45 度を 8 方向
+  const rays: [number, number, number][] = [[0, 1, 0]]
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2
+    rays.push([Math.cos(angle) * 0.7, 0.7, Math.sin(angle) * 0.7])
+  }
+
+  for (let i = 0; i < position.count; i++) {
+    // PlaneGeometry は XY 平面で作られていて、あとで寝かせている。
+    // ここではまだ回っていないので x, y がワールドの x, z にあたる
+    const x = position.getX(i)
+    const z = -position.getY(i)
+    let open = 0
+    for (const [dx, dy, dz] of rays) {
+      const clear = isPathClear(
+        x, GROUND_SKY_EPS, z,
+        x + dx * GROUND_SKY_REACH, dy * GROUND_SKY_REACH, z + dz * GROUND_SKY_REACH,
+        boxes,
+      )
+      // 真上を厚く見る。空は上に広い
+      if (clear) open += dy
+    }
+    const weight = rays.reduce((sum, r) => sum + r[1], 0)
+    const sky = GROUND_SKY_FLOOR + (1 - GROUND_SKY_FLOOR) * (open / weight)
+    colors[i * 3] = sky
+    colors[i * 3 + 1] = sky
+    colors[i * 3 + 2] = sky
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 }
 
 /**
@@ -638,9 +709,12 @@ export function buildStage(scene: THREE.Scene): Stage {
     color: 0x424b57,
     roughness: 0.95,
     metalness: 0,
+    // 地面にも空の見え方を掛ける (下の bakeGroundSky)。建物の中は暗くなる
+    vertexColors: true,
   })
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
+    // **細かく割る。** 明暗は頂点で持つので、1 枚の四角では中が塗れない
+    new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE, GROUND_CELLS, GROUND_CELLS),
     groundMaterial,
   )
   ground.rotation.x = -Math.PI / 2
@@ -649,6 +723,8 @@ export function buildStage(scene: THREE.Scene): Stage {
   collidables.push(ground)
   // テクスチャは非同期。届くまでは単色のまま出しておく。
   void applyGroundTexture(groundMaterial)
+  // 明暗は箱が届いてから。**歩く床がここ**なので、ここが平らだと効果が出ない
+  void bakeGroundSky(ground.geometry)
 
   // stage.glb が届いたら丸ごと外せるよう 1 つにまとめておく
   const blockout = new THREE.Group()
