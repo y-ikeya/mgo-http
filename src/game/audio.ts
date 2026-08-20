@@ -210,6 +210,12 @@ const jitter = () => 1 + (Math.random() * 2 - 1) * PITCH_JITTER;
  * 足音が埋もれる。
  */
 const AMBIENCE_FILE = 'city_loop1.mp3';
+/*
+ * 音源は 96kbps に落としてある (256kbps から 5.1MB → 1.8MB)。
+ *
+ * **小さく流し続ける音**なので、音質の差は聞き取れない。読み込みの重さのほうが
+ * 効く — 部屋に入った直後に落ちてくるものなので。
+ */
 const AMBIENCE_VOLUME = 0.12;
 
 export class GameAudio {
