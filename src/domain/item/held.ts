@@ -23,7 +23,7 @@
  */
 
 /** 撃てる物 */
-export type GunId = 'rifle' | 'sniper' | 'pistol'
+export type GunId = 'smg' | 'rifle' | 'sniper' | 'pistol'
 
 /** 投げる物・置く物。support の枠に入る */
 export type ThrowId = 'grenade' | 'claymore' | 'magazine'
@@ -42,6 +42,16 @@ export type HeldId = GunId | ThrowId | 'knife' | 'box' | 'none'
  * 分かれていないと、箱を出したいだけなのに武器を何度も送ることになる。
  */
 export type Family = 'weapon' | 'tool'
+
+/**
+ * それが銃か。**id を並べて書かないための述語。**
+ *
+ * 「rifle か sniper か pistol なら」と書いた所が 3 箇所あって、P90 を足した
+ * ときに 3 つとも直す必要があった。表に聞けば足し忘れが起きない。
+ */
+export function isGun(id: HeldId): id is GunId {
+  return HELD[id].shoots
+}
 
 /** 湧くときに選ぶ枠。並びの順もこれで決まる */
 export type Slot = 'primary' | 'secondary' | 'support' | 'knife' | 'tool'
@@ -81,6 +91,7 @@ const SLOT_ORDER: Record<Slot, number> = {
 }
 
 export const HELD: Record<HeldId, HeldSpec> = {
+  smg: { id: 'smg', label: 'P90', family: 'weapon', slot: 'primary', weight: 2.6, shoots: true },
   rifle: { id: 'rifle', label: 'AK47', family: 'weapon', slot: 'primary', weight: 3.5, shoots: true },
   sniper: { id: 'sniper', label: 'XM2010', family: 'weapon', slot: 'primary', weight: 5.5, shoots: true },
   pistol: { id: 'pistol', label: 'M9', family: 'weapon', slot: 'secondary', weight: 0.95, shoots: true },

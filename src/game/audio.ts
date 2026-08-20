@@ -48,6 +48,9 @@ const SOUNDS = {
   snipe: { file: "xm2010_shot1.mp3", reference: 8, max: 170 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
+  // P90。突撃銃より軽い音で、間隔が詰まるぶん 1 発を短く聞かせたい
+  smg: { file: "p90_shot1.mp3", reference: 5, max: 110 },
+  smgReload: { file: "p90_reload1.mp3", reference: 2, max: 24 },
   /**
    * 足音。20m で消える。
    *

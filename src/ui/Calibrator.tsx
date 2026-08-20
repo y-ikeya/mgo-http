@@ -12,6 +12,14 @@ import './Calibrator.css'
  * 補正値も別に持つ必要がある。
  */
 const INITIAL_WEAPONS = {
+  smg: {
+    grip: { x: -0.06, y: 0.115, z: -0.62 },
+    rotation: { x: -10, y: -16, z: 80 },
+  },
+  smgCrouch: {
+    grip: { x: -0.07, y: 0.11, z: -0.655 },
+    rotation: { x: -34, y: -3, z: 80 },
+  },
   rifle: {
     grip: { x: -0.095, y: 0.145, z: -0.165 },
     rotation: { x: -10, y: -16, z: 80 },
@@ -446,6 +454,15 @@ export default function Calibrator(props: {
           </Show>
         </div>
         <div class="calib-tabs">
+          <button
+            classList={{
+              'calib-tab': true,
+              'calib-tab-on': target() === 'smg' || target() === 'smgCrouch',
+            }}
+            onClick={() => selectTarget(props.stats?.crouching ? 'smgCrouch' : 'smg')}
+          >
+            P90
+          </button>
           <button
             classList={{
               'calib-tab': true,

@@ -1,5 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../domain/item/weapons'
-import type { HeldId } from '../domain/item/held'
+import { isGun, type HeldId } from '../domain/item/held'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
@@ -978,7 +978,9 @@ export class Player {
       ? 'sniper'
       : target.startsWith('pistol')
         ? 'pistol'
-        : 'rifle'
+        : target.startsWith('smg')
+          ? 'smg'
+          : 'rifle'
     if (kind !== this.weaponKind) return
     this.weapon?.setStanceValues(target.endsWith('Crouch'), grip, rotation)
   }
@@ -1275,7 +1277,8 @@ export class Player {
       //                          ただしリロード中は抜いている (納めたまま弾倉は
       //                          替えられないし、見えない銃をリロードして見える)
       const saluting = this.animator.saluting
-      const gun = this.held === 'rifle' || this.held === 'sniper' || this.held === 'pistol'
+      // **表に聞く。** id を並べると、銃が増えたときにここだけ古くなる
+      const gun = isGun(this.held)
       const holstered =
         !gun ||
         saluting ||

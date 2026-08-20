@@ -21,7 +21,7 @@
 
 import type { HitZone } from '../rule/damage'
 
-export type WeaponId = 'rifle' | 'sniper' | 'pistol'
+export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'pistol'
 
 /**
  * 装備の枠。
@@ -36,7 +36,7 @@ export type Slot = 'primary' | 'secondary' | 'support'
 
 /** その枠に入れられる銃 */
 export const CHOICES: Record<'primary' | 'secondary', WeaponId[]> = {
-  primary: ['rifle', 'sniper'],
+  primary: ['smg', 'rifle', 'sniper'],
   secondary: ['pistol'],
 }
 
@@ -93,9 +93,9 @@ export interface WeaponSpec {
   /** キル表示に出す名前。実銃の呼び名 */
   kill: string
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
-  reloadSound: 'reload' | 'pistolReload'
+  reloadSound: 'reload' | 'pistolReload' | 'smgReload'
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe' | 'pistol'
+  shotSound: 'rifle' | 'snipe' | 'pistol' | 'smg'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
 
@@ -195,6 +195,77 @@ export interface WeaponSpec {
    * 各段は { 画角 (度), 表示する倍率 }。
    */
   scope: { fov: number; label: string }[]
+}
+
+
+/**
+ * サブマシンガン (FN P90)。**近距離を受け持つ。**
+ *
+ * --- 何で勝ち、何で負けるか ---
+ * 装弾 50 発・900 発/分・反動が小さい。近づいてしまえば当て続けられる。
+ * 軽い (2.6kg) ので足も速い。**代わりに頭 1 発の間合いが 12m しかない** —
+ * 突撃銃の半分以下で、20m 離れれば頭 2 発、30m から先は 4 発になる。
+ *
+ * **胴で削り合えばほぼ互角**にしてある。SMG は 7 発 0.39 秒、突撃銃は 5 発
+ * 0.36 秒で、**近くでも突撃銃がわずかに速い**。勝っているのは弾倉の大きさと
+ * 足の速さで、殴り合いの強さではない。ここを上げると「近くても遠くても SMG」
+ * になり、選ぶ意味が消える。
+ *
+ * 棲み分けの表は src/domain/README.md。
+ */
+const SMG: WeaponSpec = {
+  id: 'smg',
+  label: 'サブマシンガン',
+  kill: 'P90',
+  shotSound: 'smg',
+  reloadSound: 'smgReload',
+  model: 'smg',
+
+  // 頭 1 発 / 胴 7 発 (0.39 秒) / 脚 15 発
+  slot: 'primary',
+  cost: 0,
+  // P90 の実重量 (空)。3.5kg を等倍として 105%
+  weight: 2.6,
+  zone: { HEAD: 100, BODY: 15, LEGS: 7 },
+  /*
+   *      12m まで  HEAD 100  1 発       同じ部屋・角の向こう
+   *      20m       HEAD  67  2 発
+   *      25m       HEAD  46  3 発
+   *      30m 以降  HEAD  25  4 発       胴なら 7 発 → 27 発。弾倉は足りるが遅い
+   *
+   * **突撃銃と重ならない**ように 12m で切ってある。25m まで頭 1 発の銃が
+   * 2 挺あると、軽くて弾倉の大きいほうだけが選ばれる。
+   */
+  fullRange: 12,
+  minRange: 30,
+  minScale: 0.25,
+
+  fireInterval: 0.065, // 約 900 RPM。実銃と同じ
+  auto: true,
+  bolt: false,
+  magazine: 50,
+  // 弾倉 2 つぶん。1 発が軽いので、撃ち切るのは突撃銃より速い
+  reserve: 100,
+  reload: 2.2,
+
+  bulletSpeed: 715, // 5.7x28mm の初速
+  bulletGravity: 9.8,
+
+  // **反動が小さい。** 押しっぱなしでも散らばりにくいのがこの銃の取り柄
+  spreadPerShot: 0.08,
+  spreadMax: 1.1,
+  spreadPerSpeed: 0.2,
+  spreadCrouchScale: 0.5,
+  spreadAirborne: 1.5,
+  spreadPerStance: 0.07,
+
+  // 突撃銃より寄らない。近距離で振り回す銃なので、視野を狭めない
+  aimFov: 42,
+  aimDistance: 1.3,
+  aimShoulder: 0.4,
+  // 軽いぶん構えたままでも動ける
+  aimSpeedScale: 0.62,
+  scope: [],
 }
 
 /**
@@ -400,6 +471,7 @@ const PISTOL: WeaponSpec = {
 }
 
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
+  smg: SMG,
   rifle: RIFLE,
   sniper: SNIPER,
   pistol: PISTOL,

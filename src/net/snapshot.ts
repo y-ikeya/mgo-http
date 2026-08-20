@@ -106,17 +106,21 @@ const FLAG_CROUCHING = 2
 const FLAG_CONCENTRATING = 8
 const FLAG_SALUTE = 16
 /**
- * 持っている銃。2 ビットで 4 種類まで。
+ * 持っている銃。2 ビットで 4 種類まで。**P90 で埋まった。**
  *
  * 見た目 (相手が何を構えているか) と、サーバーの威力の計算に要る。
- * 銃を増やすときはここを広げる — 足りないまま増やすと、
- * 別の銃として扱われて威力が変わる (狙撃銃で実際に起きた)。
+ * 銃を増やすときはここを広げる — 足りないまま増やすと、別の銃として扱われて
+ * 威力が変わる (狙撃銃で実際に起きた)。
+ *
+ * 次の 1 挺 (SG) を足すときは、ここを広げるのではなく **held (u8) に寄せる**。
+ * 「いま手にある物」は既にあちらが 1 バイトで持っていて、この 2 ビットは
+ * 同じことを別の場所で言っている。
  */
 const FLAG_WEAPON_LOW = 32
 const FLAG_WEAPON_HIGH = 128
 
 /** 番号の並び。変えると古い版が別の銃として読む */
-const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol']
+const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol', 'smg']
 
 /**
  * 手にある物の番号。**末尾に足す** — 並びを変えると古い版が別の物を持って見える。
@@ -125,6 +129,7 @@ const HELD_BITS: HeldId[] = [
   'rifle', 'sniper', 'pistol', 'grenade', 'claymore', 'magazine', 'knife', 'box',
   // 道具を使っていない状態。**末尾に足す**
   'none',
+  'smg',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 

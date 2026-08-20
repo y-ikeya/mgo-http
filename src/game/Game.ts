@@ -47,7 +47,7 @@ import {
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/item/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { Inventory } from "../domain/item/inventory";
-import { type Family, type HeldId } from "../domain/item/held";
+import { isGun, type Family, type HeldId } from "../domain/item/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
@@ -1426,11 +1426,15 @@ export class Game {
     if (this.input.consumeKeyPress("Enter") || this.input.consumeKeyPress("KeyL")) {
       this.requestSpawn();
     }
+    // **番号は並び順から出す。** 主武器が 1 から、投擲はその続き。
+    // 直に書くと、銃が 1 挺増えたときに番号が重なる (P90 を足して実際に重なった)
     const choices = CHOICES.primary;
-    if (this.input.consumeKeyPress("Digit1") && choices[0]) this.setLoadout(choices[0]);
-    if (this.input.consumeKeyPress("Digit2") && choices[1]) this.setLoadout(choices[1]);
-    // 投擲の枠。主武器の続きの番号にする
-    if (this.input.consumeKeyPress("Digit3") && SUPPORTS[0]) this.setSupport(SUPPORTS[0]);
+    choices.forEach((id, i) => {
+      if (this.input.consumeKeyPress(`Digit${i + 1}`)) this.setLoadout(id);
+    });
+    SUPPORTS.forEach((id, i) => {
+      if (this.input.consumeKeyPress(`Digit${choices.length + 1 + i}`)) this.setSupport(id);
+    });
   }
 
   /**
@@ -2333,7 +2337,7 @@ export class Game {
     this.player.setHeld(held);
     // ダンボールは被る状態が別にある。持ち替えに合わせる
     this.player.setBoxed(this.inv.usingTool && held === "box");
-    if (held === "rifle" || held === "sniper" || held === "pistol") {
+    if (isGun(held)) {
       void this.player.equip(held);
     }
   }

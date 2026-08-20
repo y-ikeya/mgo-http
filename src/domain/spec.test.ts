@@ -84,6 +84,27 @@ describe('README が数字の出どころ', () => {
     }
   })
 
+  test('頭 1 発の間合い (棲み分けの土台)', () => {
+    for (const [id, full, min, scale] of tableOf('射程')) {
+      const spec = WEAPONS[id as WeaponId]
+      expect(spec, `README に無い武器: ${id}`).toBeDefined()
+      expect([id, spec.fullRange, spec.minRange, spec.minScale]).toEqual([
+        id,
+        Number(full),
+        Number(min),
+        Number(scale),
+      ])
+    }
+    // **主武器が README に全部並んでいること。** 1 挺増やしたときに棲み分けの
+    // 表を書き足し忘れると、同じ距離で 2 挺が競合していても気づけない
+    const primaries = Object.values(WEAPONS)
+      .filter((w) => w.slot === 'primary')
+      .map((w) => w.id)
+      .sort()
+    const listed = tableOf('射程').map((cells) => cells[0])
+    expect(primaries.filter((id) => !listed.includes(id))).toEqual([])
+  })
+
   test('1 つの命で持てる数', () => {
     for (const [id, label, count] of tableOf('支援')) {
       const spec = SUPPORT_SPECS[id as SupportId]

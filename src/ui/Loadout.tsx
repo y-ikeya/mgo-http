@@ -104,7 +104,8 @@ export default function Loadout(props: {
                   onClick={() => props.onSupport(id)}
                 >
                   <span class="loadout-name">
-                    <span class="loadout-key">{i() + 3}</span>
+                    {/* 主武器の続きの番号。挺数から出す (直に書くと重なる) */}
+                    <span class="loadout-key">{CHOICES.primary.length + 1 + i()}</span>
                     {SUPPORT_SPECS[id].label}
                   </span>
                   <span class="loadout-spec">
