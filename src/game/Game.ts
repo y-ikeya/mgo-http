@@ -449,8 +449,19 @@ export class Game {
   private readonly pressedAt: Record<Family, number> = { weapon: 0, tool: 0 };
 
   private grenadeAiming = false;
-  /** 投げる引き金のラッチ。押しっぱなしで連投しない */
-  private throwReleased = true;
+  /**
+   * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
+   *
+   * --- なぜ 1 か所で数えるか ---
+   * 以前は「引いていたか」を控える札を 3 つの投げ物 (弾倉・手榴弾・クレイモア)
+   * が**共有して、それぞれが自分の番で倒していた**。順番が先の弾倉が先に倒すので、
+   * 後から見る手榴弾には「もう引かれている」としか見えず、**手榴弾が投げられ
+   * なかった**。
+   *
+   * 立ち上がりはフレームに 1 つしかないので、フレームの頭で 1 回だけ数える。
+   */
+  private triggerEdge = false;
+  private wasFiring = false;
   /** 手を離れるまでの残り (秒)。0 なら投げていない */
   private grenadeRelease = 0;
   /** 直前のフレームの経過時間 (秒)。tick の外で時計を進めるのに使う */
@@ -1037,6 +1048,10 @@ export class Game {
     this.updateLinks();
     // 押している間は手を挙げたまま。離すと下ろす
     this.player.setSaluteHeld(this.input.isActionDown("salute", "KeyV"));
+    // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
+    // 先に見た物が倒した札を後の物が読むことになる
+    this.triggerEdge = this.input.firing && !this.wasFiring;
+    this.wasFiring = this.input.firing;
     this.updateThrowAim();
     // 反動込みの照準を渡す。銃口が跳ね上がる動きが体にも出る。
     this.player.update(
@@ -2098,9 +2113,7 @@ export class Game {
     const canThrow =
       this.inv.held === "magazine" && canAct(this.life) && !this.cocking;
     const held = canThrow && this.input.aiming;
-    const release = held && this.throwAiming && this.input.firing && this.throwReleased;
-    if (this.input.firing) this.throwReleased = false;
-    else this.throwReleased = true;
+    const release = held && this.throwAiming && this.triggerEdge;
 
     if (held && !release) {
       this.follow.aimOrigin(this.aimOrigin);
@@ -2150,19 +2163,27 @@ export class Game {
    * ときに指が迷う。落下点は構えている間ずっと見えるので、狙ってから放せる。
    */
   private updateGrenadeAim(): void {
+    // 手榴弾から離れたなら、構えも**落下点も**畳む。
+    //
+    // 消すのを忘れていて、構えたままダンボールを被ると放物線が出っぱなしに
+    // なっていた。持ち替え・箱・死亡のどれでもここを通る
+    if (this.inv.held !== "grenade" && this.grenadeAiming) {
+      this.grenadeAiming = false;
+      this.grenades.hidePreview();
+      this.player.cancelThrow();
+      this.player.setThrowing(false);
+    }
+    // クレイモアから離れたときも同じ。**構えっぱなしで腕が上がったまま**になる
+    if (this.inv.held !== "claymore" && this.setupAiming) {
+      this.setupAiming = false;
+      this.player.cancelThrow();
+      this.player.setThrowing(false);
+    }
     if (this.inv.held === "claymore") {
       this.updateClaymoreSetup();
       return;
     }
-    if (this.inv.held !== "grenade") {
-      // 手にしていないなら構えを畳む。持ち替えた瞬間に振りかぶりが残らない
-      if (this.grenadeAiming) {
-        this.grenadeAiming = false;
-        this.player.cancelThrow();
-        this.player.setThrowing(false);
-      }
-      return;
-    }
+    if (this.inv.held !== "grenade") return;
     // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
     const canThrow =
       this.inv.countOf(this.inv.held) > 0 &&
@@ -2172,9 +2193,7 @@ export class Game {
       !this.cocking;
     const held = canThrow && this.input.aiming;
     // 構えている間に引き金を引いたら放す。押しっぱなしで連投しない
-    const release = held && this.grenadeAiming && this.input.firing && this.throwReleased;
-    if (this.input.firing) this.throwReleased = false;
-    else this.throwReleased = true;
+    const release = held && this.grenadeAiming && this.triggerEdge;
 
     if (held && !release) {
       // 構えた瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
@@ -2258,9 +2277,7 @@ export class Game {
       !this.player.downed &&
       !this.cocking;
     const held = canPlace && this.input.aiming;
-    const release = held && this.setupAiming && this.input.firing && this.throwReleased;
-    if (this.input.firing) this.throwReleased = false;
-    else this.throwReleased = true;
+    const release = held && this.setupAiming && this.triggerEdge;
 
     if (held && !release) {
       if (!this.setupAiming) this.player.playSetup();
