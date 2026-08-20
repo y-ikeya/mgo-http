@@ -12,6 +12,7 @@
 4. できること (動詞)
 5. 持ち物 (entity)
 6. 時間                    湧き・ラウンド・試合
+7. コードの置き場所        ← 上が決まってから
 ```
 
 順番を守る理由は、今日それを破って失敗したから。「手榴弾を持ち替えるべきか」を
@@ -425,6 +426,35 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
 ## 6. 時間
 
 未着手。
+
+---
+
+## 7. コードの置き場所
+
+**設計の言葉と、それを動かす手続きを別のディレクトリにする。** 設計 (この文書) が
+「持ち物」「姿勢」「ダメージ」の話をしているのに、コードでは当たり判定の幾何と
+同じ棚に並んでいた。どちらも「three を import しない」という**技術的な**理由で
+1 か所に居ただけで、意味では別の物。
+
+    src/domain/   語彙と規則。ルールブックに書けること
+                  held weapons inventory damage stance locomotion
+                  lifecycle scoring footsteps surface flags
+
+    src/sim/      世界を進める手続き。幾何・物理・審判
+                  collision movement ballistic blast claymore
+                  hitcheck motioncheck vision eyepoint presence
+
+    src/net/      通信の形 (protocol)
+    src/game/     描画と入力 (three を持つのはここだけ)
+    src/ui/       HUD と画面 (Solid)
+
+**依存は一方通行。** `sim → domain` は良い。`domain → sim` は書かない。規則が
+幾何を知っていると、「弾がどう飛ぶか」を変えるたびに「何発で死ぬか」が動く。
+分けた時点で domain の 11 ファイルは互いだけを import していて、外を見ていな
+かった — 線は元から在って、名前が付いていなかっただけ。
+
+境界に迷ったときの問い: **これは MGO2 の説明書に書いてあることか。** 「拳銃は
+12 発」は書いてある (domain)。「弾が地形に当たったら跳ねる」は書いていない (sim)。
 
 ---
 

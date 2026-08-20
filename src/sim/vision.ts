@@ -9,8 +9,8 @@
  * 同じ判定を 2 か所に書くと、必ずどちらかがずれる。
  */
 
-import type { SurfaceFlags } from './flags'
-import { HEAD_HEIGHT } from './stance'
+import type { SurfaceFlags } from '../domain/flags'
+import { HEAD_HEIGHT } from '../domain/stance'
 
 /** 遮蔽になる箱。ステージの書き出しが作る stage.json の中身 */
 export interface StageBox {

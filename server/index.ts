@@ -6,7 +6,7 @@ import {
   RECOVER_DELAY,
   RECOVER_RATE,
   type HitZone,
-} from '../src/sim/damage'
+} from '../src/domain/damage'
 import { verifyToken, type Identity } from './auth'
 import {
   decodeSnapshot,
@@ -16,11 +16,11 @@ import {
   stampSlot,
   SNAPSHOT_BYTES,
 } from '../src/net/snapshot'
-import { Footsteps } from '../src/sim/footsteps'
-import { surfaceOf } from '../src/sim/surface'
+import { Footsteps } from '../src/domain/footsteps'
+import { surfaceOf } from '../src/domain/surface'
 import { blastAt } from '../src/sim/blast'
-import { fallDamage } from '../src/sim/damage'
-import { HELD, type HeldId } from '../src/sim/held'
+import { fallDamage } from '../src/domain/damage'
+import { HELD, type HeldId } from '../src/domain/held'
 import {
   blastFrom,
   canPlaceAt,
@@ -41,9 +41,9 @@ import {
   type Ammo,
   type SupportId,
   type WeaponId,
-} from '../src/sim/weapons'
+} from '../src/domain/weapons'
 import { verifyHit, type Pose } from '../src/sim/hitcheck'
-import { stanceOf } from '../src/sim/stance'
+import { stanceOf } from '../src/domain/stance'
 import {
   groundUnder,
   hasLineOfSight,
@@ -68,8 +68,8 @@ import {
   onBattlefield,
   SPAWN_PROTECT,
   type Life,
-} from '../src/sim/lifecycle'
-import type { Locomotion } from '../src/sim/locomotion'
+} from '../src/domain/lifecycle'
+import type { Locomotion } from '../src/domain/locomotion'
 import {
   SNAPSHOT_INTERVAL,
   type ClientMessage,
@@ -85,7 +85,7 @@ import {
  *
  * 体力・生死・復帰・キルを持つ。位置や見た目は持たず、そのまま中継する。
  *
- * ダメージの計算は src/sim/damage.ts を**そのまま読み込んでいる**。Bun は
+ * ダメージの計算は src/domain/damage.ts を**そのまま読み込んでいる**。Bun は
  * TypeScript を直接動かせるので、クライアントと文字どおり同じコードが走る。
  * 移植しないので値がずれようがなく、片方だけ直して忘れる、が起きない。
  *
@@ -169,7 +169,7 @@ interface Player {
   team: Team
   health: number
   /**
-   * いまどういう状態に居るか。src/sim/lifecycle.ts に定義がある。
+   * いまどういう状態に居るか。src/domain/lifecycle.ts に定義がある。
    *
    * **ここが唯一の出どころ。** 以前は respawnAt / droppedAt / protectedUntil /
    * positioned の 4 つの数から、必要な場所で必要な条件をその都度組み立てていた。
@@ -1010,7 +1010,7 @@ const RELEASE_HEIGHT = 1.7
 const RELEASE_FORWARD = 0.45
 
 /**
- * 1 つの命で持てる数は support の表 (sim/weapons.ts) が決める。
+ * 1 つの命で持てる数は support の表 (domain/weapons.ts) が決める。
  *
  * **数を持っているのはこちら。** 投げられるか置けるかを決めているのがこちらなので、
  * 表を読む側もこちらでないと、画面の数だけ減って実際には投げられる、が起きる。

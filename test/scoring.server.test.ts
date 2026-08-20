@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { startServer, twoPlayers, type Client, type Server } from './server'
-import { pointsOf } from '../src/sim/scoring'
+import { pointsOf } from '../src/domain/scoring'
 
 /**
  * TDM の勝敗 (残機) と、個人の点の試験。

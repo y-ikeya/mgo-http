@@ -13,8 +13,8 @@
  * 屋根も架けられる。視線判定 (vision.ts) は元から上下を見ていたので、
  * 遮蔽の側は最初から階に対応していた — 通れなかったのは移動だけ。
  */
-export type { Surface } from './surface'
-import type { Surface } from './surface'
+export type { Surface } from '../domain/surface'
+import type { Surface } from '../domain/surface'
 
 /**
  * 位置。three の Vector3 はこの形を満たすので、呼ぶ側は今までどおり渡せる。

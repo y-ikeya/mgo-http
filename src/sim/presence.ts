@@ -1,5 +1,5 @@
 import { INTERPOLATION_DELAY } from '../net/types'
-import { onBattlefield, type Life } from './lifecycle'
+import { onBattlefield, type Life } from '../domain/lifecycle'
 
 /**
  * 相手が「いま、どこに、見えているか」。

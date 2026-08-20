@@ -1,9 +1,9 @@
-import type { Locomotion } from '../sim/locomotion'
-import type { HitZone } from '../sim/damage'
-import type { Surface } from '../sim/surface'
-import type { SupportId, WeaponId } from '../sim/weapons'
-import type { HeldId } from '../sim/held'
-import type { Life } from '../sim/lifecycle'
+import type { Locomotion } from '../domain/locomotion'
+import type { HitZone } from '../domain/damage'
+import type { Surface } from '../domain/surface'
+import type { SupportId, WeaponId } from '../domain/weapons'
+import type { HeldId } from '../domain/held'
+import type { Life } from '../domain/lifecycle'
 
 /**
  * ネットワークで流す型。
@@ -364,7 +364,7 @@ export interface LeaveEvent {
 /**
  * その人がどういう状態に居るか。サーバーが変わるたびに配る。
  *
- * 状態は src/sim/lifecycle.ts が定義している。以前は「体力が 0 になった」
+ * 状態は src/domain/lifecycle.ts が定義している。以前は「体力が 0 になった」
  * 「位置が来なくなった」から各自が推し量っていて、場所ごとに答えがずれていた。
  */
 export interface LifeEvent {

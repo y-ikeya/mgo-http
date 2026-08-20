@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../sim/surface'
-import { flagsOf } from '../sim/flags'
+import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../domain/surface'
+import { flagsOf } from '../domain/flags'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
   clamp,
@@ -552,7 +552,7 @@ async function applyGroundTexture(material: THREE.MeshStandardMaterial): Promise
 /**
  * オブジェクト名の規約。
  *
- * 何を止めるかは名前に書く (src/sim/flags.ts)。描画と判定を別のメッシュに
+ * 何を止めるかは名前に書く (src/domain/flags.ts)。描画と判定を別のメッシュに
  * 分けるのも、金網のように「人は止めるが弾は通す」物を作るのも、同じ仕組みで表せる。
  */
 

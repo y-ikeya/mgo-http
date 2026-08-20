@@ -5,7 +5,7 @@ import type * as THREE from 'three'
 import { Game, type GameStats } from '../game/Game'
 import type { Identity } from '../auth/session'
 import type { WeaponTarget } from '../game/weapon'
-import type { SupportId, WeaponId } from '../sim/weapons'
+import type { SupportId, WeaponId } from '../domain/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
@@ -88,7 +88,7 @@ export default function Play(props: { identity: Identity }) {
       </Show>
 
       {/*
-        装備。支度をしている間 (sim/lifecycle.ts の choosing) だけ出す。
+        装備。支度をしている間 (domain/lifecycle.ts の choosing) だけ出す。
         入った直後と、倒れて次に湧くまでがそこにあたる。
       */}
       <Show when={stats()?.loadoutOpen}>

@@ -27,7 +27,7 @@ import {
   surfaceAt,
 } from "../sim/collision";
 import { GameAudio } from "./audio";
-import type { Step } from "../sim/footsteps";
+import type { Step } from "../domain/footsteps";
 import { SoundRing, type PingKind } from "./soundRing";
 import { ThrownItems } from "./thrown";
 import { Grenades } from "./grenades";
@@ -36,22 +36,22 @@ import { BlastFx } from "./blastfx";
 import { Casings } from "./casings";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
-import { fallDamage, MAX_HEALTH } from "../sim/damage";
+import { fallDamage, MAX_HEALTH } from "../domain/damage";
 import {
   canAct,
   canChoose,
   CHOOSE_FLOOR,
   CHOOSE_TIMEOUT,
   type Life,
-} from "../sim/lifecycle";
-import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
+} from "../domain/lifecycle";
+import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
-import { Inventory } from "../sim/inventory";
-import { type Family, type HeldId } from "../sim/held";
+import { Inventory } from "../domain/inventory";
+import { type Family, type HeldId } from "../domain/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
-import type { HitZone } from "../sim/damage";
+import type { HitZone } from "../domain/damage";
 import type { NoiseEvent } from "../net/types";
-import { weaponOf } from "../sim/weapons";
+import { weaponOf } from "../domain/weapons";
 import {
   BULLET_GRAVITY,
   flightTime,
@@ -1438,7 +1438,7 @@ export class Game {
    *
    * 以前はここが無く、「体力が 0 か」「試合の段階は何か」から必要な場所で
    * 都度組み立てていた。組み立て方が場所ごとにずれて不具合になっていたので、
-   * 権威が言ってきた 1 つの値だけを見る (src/sim/lifecycle.ts)。
+   * 権威が言ってきた 1 つの値だけを見る (src/domain/lifecycle.ts)。
    */
   private life: Life = "joining";
   /** その状態に入った時刻 (Date.now)。残り秒数の表示に使う */

@@ -13,12 +13,12 @@ import {
 } from "three/tsl";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
-import type { Locomotion } from "../sim/locomotion";
+import type { Locomotion } from "../domain/locomotion";
 import { canBeStabbed } from "../sim/hitcheck";
 import { loadSoldier } from "./assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { isWholeBody, stanceOf, type WholeBodyLocomotion } from "../sim/stance";
-import { weaponOf, type WeaponId } from "../sim/weapons";
+import { isWholeBody, stanceOf, type WholeBodyLocomotion } from "../domain/stance";
+import { weaponOf, type WeaponId } from "../domain/weapons";
 import {
   advanceBoxLift,
   boxLift,
@@ -35,9 +35,9 @@ import {
   ROLL_HIT_RANGE,
   ROLL_KNOCKBACK,
   type HitZone,
-} from "../sim/damage";
-import { Footsteps, type Step } from "../sim/footsteps";
-import type { Life } from "../sim/lifecycle";
+} from "../domain/damage";
+import { Footsteps, type Step } from "../domain/footsteps";
+import type { Life } from "../domain/lifecycle";
 import { BUFFER_SIZE, Presence } from "../sim/presence";
 import { Hitbox } from "./hitbox";
 import { dampAngle } from "./math";

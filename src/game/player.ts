@@ -1,17 +1,17 @@
-import { carrySpeedScale, weaponOf, type WeaponId } from '../sim/weapons'
-import type { HeldId } from '../sim/held'
+import { carrySpeedScale, weaponOf, type WeaponId } from '../domain/weapons'
+import type { HeldId } from '../domain/held'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
-import type { Locomotion } from '../sim/locomotion'
+import type { Locomotion } from '../domain/locomotion'
 import { loadSoldier } from './assets'
 import { isMesh } from './guards'
 import { damp, dampAngle } from './math'
 import { stepMovement, type Mover } from '../sim/movement'
-import { resolveLocomotion } from '../sim/stance'
+import { resolveLocomotion } from '../domain/stance'
 import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
-import { Footsteps, type Step } from '../sim/footsteps'
-import { MAX_HEALTH } from '../sim/damage'
+import { Footsteps, type Step } from '../domain/footsteps'
+import { MAX_HEALTH } from '../domain/damage'
 import { Weapon } from './weapon'
 import type { PlayerSnapshot } from '../net/types'
 import type { WeaponTarget } from './weapon'
@@ -1486,7 +1486,7 @@ export class Player {
   /**
    * 再生すべきクリップを選ぶ。
    *
-   * 規則そのものは src/sim/stance.ts にある。ここでやるのは、その規則が要る値を
+   * 規則そのものは src/domain/stance.ts にある。ここでやるのは、その規則が要る値を
    * 集めることと、決まった結果に応じて**こちら側の状態を畳む**ことだけ。
    * (敬礼をやめる、落下ループの尺を渡す、といった副作用は共有側に置けない)
    */
