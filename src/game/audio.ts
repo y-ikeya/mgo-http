@@ -199,8 +199,23 @@ const PITCH_JITTER = 0.06;
  */
 const jitter = () => 1 + (Math.random() * 2 - 1) * PITCH_JITTER;
 
+/**
+ * 街の音。**部屋に入ったら小さく流し続ける。**
+ *
+ * 位置を持たない (THREE.Audio)。どこに立っていても同じ大きさで、方向も無い —
+ * **これは聞き分けるための音ではない**ので、定位させると足音や銃声と混ざって
+ * 邪魔になる。
+ *
+ * 小さくするのは索敵のため。この遊びは音で相手を探すので、環境音が大きいと
+ * 足音が埋もれる。
+ */
+const AMBIENCE_FILE = 'city_loop1.mp3';
+const AMBIENCE_VOLUME = 0.12;
+
 export class GameAudio {
   readonly listener = new THREE.AudioListener();
+  /** 街の音。読み込めたら鳴り続ける */
+  private ambience: THREE.Audio | null = null;
 
   private readonly buffers = new Map<SoundName, AudioBuffer>();
   private readonly pool: THREE.PositionalAudio[] = [];
@@ -236,6 +251,17 @@ export class GameAudio {
   resume(): void {
     const context = this.listener.context;
     if (context.state === "suspended") void context.resume();
+    // 止まっている間に読み込みが終わっていることがある。**ここで鳴らし始める** —
+    // ブラウザは操作があるまで音を出せないので、読み込み直後には始められない
+    this.startAmbience();
+  }
+
+  /** 街の音を流し始める。既に鳴っていれば何もしない */
+  private startAmbience(): void {
+    const sound = this.ambience;
+    if (!sound || sound.isPlaying || this.disposed) return;
+    if (this.listener.context.state === "suspended") return;
+    sound.play();
   }
 
   /**
@@ -285,6 +311,8 @@ export class GameAudio {
 
   dispose(): void {
     this.disposed = true;
+    if (this.ambience?.isPlaying) this.ambience.stop();
+    this.ambience?.removeFromParent();
     for (const sound of this.pool) {
       if (sound.isPlaying) sound.stop();
       sound.removeFromParent();
@@ -293,7 +321,30 @@ export class GameAudio {
     this.listener.removeFromParent();
   }
 
+  /**
+   * 街の音を用意する。**失敗しても遊べる。**
+   *
+   * 3 分近い 5MB の音源なので、他の音とは別に読む。届く前に部屋へ入っても
+   * 困らないよう、届いた時点で鳴らし始める。
+   */
+  private async loadAmbience(): Promise<void> {
+    const loader = new THREE.AudioLoader();
+    try {
+      const buffer = await loader.loadAsync(asset.audio(AMBIENCE_FILE));
+      if (this.disposed) return;
+      const sound = new THREE.Audio(this.listener);
+      sound.setBuffer(buffer);
+      sound.setLoop(true);
+      sound.setVolume(AMBIENCE_VOLUME);
+      this.ambience = sound;
+      this.startAmbience();
+    } catch (error) {
+      console.error(`[Audio] 街の音を読めなかった: ${AMBIENCE_FILE}`, error);
+    }
+  }
+
   private async load(): Promise<void> {
+    void this.loadAmbience();
     const loader = new THREE.AudioLoader();
     await Promise.all(
       (Object.entries(SOUNDS) as [SoundName, (typeof SOUNDS)[SoundName]][]).map(
