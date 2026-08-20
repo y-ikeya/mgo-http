@@ -12,6 +12,14 @@ import './Calibrator.css'
  * 補正値も別に持つ必要がある。
  */
 const INITIAL_WEAPONS = {
+  smg: {
+    grip: { x: 0, y: 0.1, z: -0.435 },
+    rotation: { x: -7, y: -9, z: 7 },
+  },
+  smgCrouch: {
+    grip: { x: -0.05, y: 0.035, z: -0.455 },
+    rotation: { x: -44, y: 15, z: 14 },
+  },
   rifle: {
     grip: { x: -0.095, y: 0.145, z: -0.165 },
     rotation: { x: -10, y: -16, z: 80 },
@@ -152,12 +160,23 @@ interface Axis {
   key: 'x' | 'y' | 'z'
   label: string
   hint: string
+  /** つまみの可動域。回転は共通なので省略できる */
+  min?: number
+  max?: number
 }
 
+/**
+ * 握り位置の可動域 (m)。**軸ごとに違う。**
+ *
+ * 前後 (Z) だけ広い。握りは銃のローカル座標にある点で、原点は後端付近・
+ * 銃口が -Z なので、**長い銃ほど深い値になる**。P90 は握りが真ん中にあって
+ * -0.6 で、±0.3 では端に張り付いて動かせなかった。端で止まらないよう、
+ * 要ると言われた -1.2 より更に先まで開けてある。
+ */
 const POSITION_AXES: Axis[] = [
-  { key: 'x', label: 'X', hint: '手の中で左右' },
-  { key: 'y', label: 'Y', hint: '大きいほど銃が下がる' },
-  { key: 'z', label: 'Z', hint: '大きいほど銃が手前' },
+  { key: 'x', label: 'X', hint: '手の中で左右', min: -0.3, max: 0.3 },
+  { key: 'y', label: 'Y', hint: '大きいほど銃が下がる', min: -0.3, max: 0.3 },
+  { key: 'z', label: 'Z', hint: '大きいほど銃が手前', min: -1.5, max: 0.3 },
 ]
 
 const ROTATION_AXES: Axis[] = [
@@ -449,6 +468,15 @@ export default function Calibrator(props: {
           <button
             classList={{
               'calib-tab': true,
+              'calib-tab-on': target() === 'smg' || target() === 'smgCrouch',
+            }}
+            onClick={() => selectTarget(props.stats?.crouching ? 'smgCrouch' : 'smg')}
+          >
+            P90
+          </button>
+          <button
+            classList={{
+              'calib-tab': true,
               'calib-tab-on': target() === 'rifle' || target() === 'rifleCrouch',
             }}
             onClick={() => selectTarget(props.stats?.crouching ? 'rifleCrouch' : 'rifle')}
@@ -488,13 +516,23 @@ export default function Calibrator(props: {
               <span class="calib-label">{axis.label}</span>
               <input
                 type="range"
-                min="-0.3"
-                max="0.3"
+                min={axis.min}
+                max={axis.max}
                 step="0.005"
                 value={grip()[axis.key]}
                 onInput={(e) => updateGrip(axis.key, Number(e.currentTarget.value))}
               />
-              <span class="calib-value">{grip()[axis.key].toFixed(3)}</span>
+              {/*
+                **数字も打てる。** つまみの端に用があるとき (銃が長い / 想定外の
+                握り) に、範囲を広げ直さないと進めないのは詰まる
+              */}
+              <input
+                class="calib-value calib-number"
+                type="number"
+                step="0.005"
+                value={grip()[axis.key].toFixed(3)}
+                onChange={(e) => updateGrip(axis.key, Number(e.currentTarget.value))}
+              />
               <span class="calib-hint">{axis.hint}</span>
             </label>
           )}

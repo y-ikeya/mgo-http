@@ -1,17 +1,18 @@
-import { carrySpeedScale, weaponOf, type WeaponId } from '../sim/weapons'
-import type { HeldId } from '../sim/held'
+import { carrySpeedScale, weaponOf, type WeaponId } from '../domain/item/weapons'
+import { isGun, isTwoHanded, type HeldId } from '../domain/item/held'
+import { fallDamage } from '../domain/rule/damage'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
-import type { Locomotion } from '../sim/locomotion'
+import type { Locomotion } from '../domain/locomotion'
 import { loadSoldier } from './assets'
 import { isMesh } from './guards'
 import { damp, dampAngle } from './math'
 import { stepMovement, type Mover } from '../sim/movement'
-import { resolveLocomotion } from '../sim/stance'
+import { resolveLocomotion } from '../domain/rule/stance'
 import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
-import { Footsteps, type Step } from '../sim/footsteps'
-import { MAX_HEALTH } from '../sim/damage'
+import { Footsteps, type Step } from '../domain/rule/footsteps'
+import { MAX_HEALTH } from '../domain/rule/damage'
 import { Weapon } from './weapon'
 import type { PlayerSnapshot } from '../net/types'
 import type { WeaponTarget } from './weapon'
@@ -179,6 +180,29 @@ const FALL_REFERENCE_HEIGHT = 0.6
  * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
  */
 const LANDING_TIME = 0.16
+
+/**
+ * 段差とみなす 1 フレームの上がり幅 (m)。
+ *
+ * 越えられる段差は 0.25m (collision.ts の STEP_UP)。坂は連続して上がるので
+ * 1 フレームでは 0.02m ほどしか動かない — その間に線を引く。
+ */
+const STAIR_RISE_MIN = 0.08
+/**
+ * 階段の型を持たせる時間 (秒)。
+ *
+ * 段を上がった瞬間だけだと、段の上を歩いている間に走りの型へ戻って点滅する。
+ * 次の段までを繋ぐ長さにする。
+ */
+const STAIR_HOLD = 0.45
+
+/**
+ * 受け身の尺 (秒)。**クリップの長さ (1.67s) に合わせる。**
+ *
+ * 途中で移動の型に戻すと、転がっている最中に立ち上がって滑る。削られた高さから
+ * 落ちたことを見せる動きなので、最後まで流す。
+ */
+const FALL_ROLL_TIME = 1.67
 /**
  * 着地モーションを出す落下速度の下限 (m/s)。
  *
@@ -333,8 +357,35 @@ export class Player {
   private set velocityY(value: number) {
     this.mover.velocityY = value
   }
+  /**
+   * いま落ちている速さ (m/s)。落ちていなければ 0。
+   *
+   * **着地する前に、これから食らう量が読める。** 悲鳴を上げるのに使う —
+   * 落ち切ってから叫んだのでは間に合わない。
+   */
+  get fallingSpeed(): number {
+    return this.onGround ? 0 : Math.max(0, -this.velocityY)
+  }
+
   /** 着地モーションの残り時間 */
   private landingTimer = 0
+  /**
+   * 空中に居る時間 (秒)。接地したら 0 に戻す。
+   *
+   * **短い浮きを空中扱いしない**ために測る (stance.ts の AIR_MOTION_DELAY)。
+   */
+  private airborneFor = 0
+  /**
+   * 階段を上っている残り時間 (秒)。
+   *
+   * 1 段上がるたびに足元が飛ぶので、その瞬間に立て直して**段の間も持たせる**。
+   * 持たせないと、段の上を歩いている一瞬だけ走りの型に戻って点滅する。
+   */
+  private stairFor = 0
+  /** 前のフレームの足元の高さ。段差を上がったかを見るのに使う */
+  private lastFeetY = 0
+  /** 受け身の残り時間。ただの着地より長い */
+  private fallRollTimer = 0
   /**
    * 跳躍の設定。高さを固定したまま重力を変えられるよう、初速は毎回 sqrt(2gh) で出す。
    * 重力だけ上げれば「同じ高さまで跳ぶが滞空が短い」になる。
@@ -457,8 +508,14 @@ export class Player {
       held: this.held,
       concentrating: this.isConcentrating,
       saluteHeld: this.saluteHeld,
-      // 振りかぶって持っている間だけ。倒されたら足元に落ちる
-      holdingGrenade: this.throwing,
+      /*
+       * **手榴弾を振りかぶっている間だけ。**
+       *
+       * 選んで手にしているだけでは立たない (抜いていないピンは戻せる)。
+       * throwing はクレイモアを置くときにも立つので、手にある物も見る —
+       * 見ないと、クレイモアを構えて撃たれた人の足元に**手榴弾が湧く**。
+       */
+      holdingGrenade: this.throwing && this.held === 'grenade',
     }
   }
 
@@ -647,6 +704,12 @@ export class Player {
    * 銃ごとに型が違うので長さも違う。突撃銃の尺で拳銃を待たせると、
    * 型が終わったのに撃てない時間が残る。
    */
+  /**
+   * 弾倉を替える型の素の長さ (秒)。**時間そのものではない。**
+   *
+   * 掛かる時間を決めるのは武器の表 (domain/item/weapons.ts) で、型はそこへ
+   * 合わせて伸び縮みする (playReload)。ここは調整の目安として残してある。
+   */
   get reloadDuration(): number {
     if (!this.animator) return 0
     if (this.weaponKind === 'pistol' && this.animator.pistolReloadDuration > 0) {
@@ -690,6 +753,15 @@ export class Player {
    */
   setHeld(id: HeldId): void {
     this.held = id
+    /*
+     * **走り方は手にある物で決まる。**
+     *
+     * 両手の物 (突撃銃・狙撃銃・P90) は抱えて走り、片手の物 (拳銃・手榴弾・
+     * ナイフ…) は身軽に走る。以前は「拳銃を持っているか」だけで見ていたので、
+     * 手榴弾に持ち替えても突撃銃の走り方のままだった。軽い物に持ち替えて速く
+     * 動くのがこの遊びの手なのに、それが見た目に出ていなかった。
+     */
+    this.animator?.setPistol(!isTwoHanded(id))
   }
 
   get heldItem(): HeldId {
@@ -961,9 +1033,9 @@ export class Player {
   }
 
   /** リロードモーションを頭から再生する */
-  playReload(): void {
+  playReload(seconds = 0): void {
     if (this.down) return
-    this.animator?.playReload()
+    this.animator?.playReload(seconds)
   }
 
   /** 武器の握り位置と角度を作り直す (調整用。確定したら weapon.ts の定数へ焼き込む) */
@@ -978,7 +1050,9 @@ export class Player {
       ? 'sniper'
       : target.startsWith('pistol')
         ? 'pistol'
-        : 'rifle'
+        : target.startsWith('smg')
+          ? 'smg'
+          : 'rifle'
     if (kind !== this.weaponKind) return
     this.weapon?.setStanceValues(target.endsWith('Crouch'), grip, rotation)
   }
@@ -1193,15 +1267,33 @@ export class Player {
       dt,
     )
 
-    // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す
+    // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す。
+    // **削られる速さなら受け身。** 体力が減ったことが動きにも出る
     if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED) {
       this.landingTimer = LANDING_TIME
-      this.animator?.playLanding()
+      if (fallDamage(moved.impactSpeed) > 0) {
+        this.fallRollTimer = FALL_ROLL_TIME
+        this.animator?.playFallRoll()
+      } else {
+        this.animator?.playLanding()
+      }
     }
     // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
     // サーバーなので、速さを申告して同じ式 (damage.ts) を向こうで通してもらう
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.landingTimer > 0) this.landingTimer -= dt
+    if (this.fallRollTimer > 0) this.fallRollTimer -= dt
+    this.airborneFor = this.grounded ? 0 : this.airborneFor + dt
+    /*
+     * 階段を上ったか。**1 フレームで足元が跳ね上がったら段差。**
+     *
+     * 坂も上がるが、そちらは連続なので 1 フレームの上がり幅が小さい
+     * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
+     */
+    const rise = this.position.y - this.lastFeetY
+    if (this.grounded && rise >= STAIR_RISE_MIN) this.stairFor = STAIR_HOLD
+    else if (this.stairFor > 0) this.stairFor -= dt
+    this.lastFeetY = this.position.y
     this.actualSpeed = moved.actualSpeed
 
     // 倒れている間の時計。起き上がるのは操作されたときだけ (standUp)
@@ -1275,7 +1367,8 @@ export class Player {
       //                          ただしリロード中は抜いている (納めたまま弾倉は
       //                          替えられないし、見えない銃をリロードして見える)
       const saluting = this.animator.saluting
-      const gun = this.held === 'rifle' || this.held === 'sniper' || this.held === 'pistol'
+      // **表に聞く。** id を並べると、銃が増えたときにここだけ古くなる
+      const gun = isGun(this.held)
       const holstered =
         !gun ||
         saluting ||
@@ -1329,7 +1422,8 @@ export class Player {
     this.animator = new CharacterAnimator(model, gltf.animations, this.moveSpeed)
     // モデルは非同期で読むので、ここより前に受けた設定を流し込み直す。
     // 呼ばれた時点では animator がまだ無く、素通りしている
-    this.animator.setPistol(this.weaponKind === 'pistol')
+    // 読み込み前に持ち替えている場合があるので、いま手にある物から決める
+    this.animator.setPistol(!isTwoHanded(this.held))
 
     disposeTree(this.placeholder)
     this.placeholder = null
@@ -1398,7 +1492,7 @@ export class Player {
   async equip(kind: WeaponId): Promise<void> {
     if (kind === this.weaponKind) return
     this.weaponKind = kind
-    this.animator?.setPistol(kind === 'pistol')
+    // 走り方は「いま手にある物」で決まる (setHeld)。ここでは触らない
     const model = this.model
     if (!model) return
 
@@ -1486,7 +1580,7 @@ export class Player {
   /**
    * 再生すべきクリップを選ぶ。
    *
-   * 規則そのものは src/sim/stance.ts にある。ここでやるのは、その規則が要る値を
+   * 規則そのものは src/domain/rule/stance.ts にある。ここでやるのは、その規則が要る値を
    * 集めることと、決まった結果に応じて**こちら側の状態を畳む**ことだけ。
    * (敬礼をやめる、落下ループの尺を渡す、といった副作用は共有側に置けない)
    */
@@ -1506,6 +1600,9 @@ export class Player {
       rolling: this.rolling,
       onGround: this.onGround,
       landing: this.landingTimer,
+      fallRoll: this.fallRollTimer,
+      airborneFor: this.airborneFor,
+      stairFor: this.stairFor,
       velocityY: this.velocityY,
       dirX: moveDir.x,
       dirZ: moveDir.z,

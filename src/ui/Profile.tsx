@@ -1,6 +1,6 @@
 import { createResource, Show } from 'solid-js'
 import { fetchTotals } from '../net/profile'
-import { levelOf, levelProgress, pointsForLevel, pointsOf } from '../sim/scoring'
+import { levelOf, levelProgress, pointsForLevel, pointsOf } from '../domain/rule/scoring'
 import type { Identity } from '../auth/session'
 import './Profile.css'
 

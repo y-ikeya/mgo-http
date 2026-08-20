@@ -11,37 +11,13 @@
  * three.js に依存しない。サーバー (bun) がこのファイルをそのまま読む。
  */
 
-import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from './damage'
+import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from '../domain/rule/damage'
 import { headHeight, isPathClear, type StageBox } from './vision'
-import type { Stance } from './stance'
+import type { Stance } from '../domain/rule/stance'
+import type { Pose } from '../domain/player'
 
-/** 判定に使う、ある時刻の姿 */
-export interface Pose {
-  /** 記録した時刻 (Date.now) */
-  time: number
-  x: number
-  y: number
-  z: number
-  /** 体の向き (rad)。ローカル -Z が前 */
-  yaw: number
-  /**
-   * 見ている上下 (rad)。**下が負。**
-   *
-   * 倒れている相手にナイフが通るかの判断に使う。刺した瞬間にどこを向いていたかは
-   * 遡って照合しないと分からないので、履歴に載せる。
-   */
-  pitch: number
-  crouching: boolean
-  boxed: boolean
-  /**
-   * そのときの構え。**ナイフが刺さる姿勢かどうか**に使う。
-   *
-   * crouching / boxed とは別に持つ。あれは「しゃがんでいるか / 箱を被っているか」
-   * という操作の状態で、**吹っ飛んで倒れているかは表せない** (本人は何も
-   * 押していない)。倒れているかを知っているのはモーションのほう。
-   */
-  stance: Stance
-}
+// 姿の形は domain (Player の過去の姿そのものなので)。ここからも出す
+export type { Pose }
 
 /**
  * 何もしなくてもナイフが刺さる構え。

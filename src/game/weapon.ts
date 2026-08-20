@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadRifle, loadSniper, loadPistol } from './assets'
+import { loadKnife, loadRifle, loadSmg, loadSniper, loadPistol } from './assets'
 import { isMesh } from './guards'
 
 /**
@@ -44,6 +44,27 @@ const RIFLE: WeaponConfig = {
   crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
   crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
   tip: new THREE.Vector3(0, 0.171, -0.845),
+}
+
+/**
+ * P90。全長 500mm のブルパップ。
+ *
+ * 握りが**銃の真ん中**にある (弾倉と機関部が後ろ半分を占める) ので、
+ * 突撃銃の値をそのまま使うと銃口が体に食い込む。銃口 (-0.845) から
+ * 0.22m 後ろ、引き金の輪の高さに合わせてある。
+ *
+ * **実機で詰め直すこと。** ここは断面から出した初期値で、目で合わせていない。
+ * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
+ */
+const SMG: WeaponConfig = {
+  // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
+  grip: new THREE.Vector3(0, 0.1, -0.435),
+  rotation: new THREE.Euler(degrees(-7), degrees(-9), degrees(7)),
+  // しゃがむと上半身が前に倒れるので、銃も倒して抱え込む (pitch -7 → -44)
+  crouchGrip: new THREE.Vector3(-0.05, 0.035, -0.455),
+  crouchRotation: new THREE.Euler(degrees(-44), degrees(15), degrees(14)),
+  // 銃口。断面の実測 (最も -Z の点)
+  tip: new THREE.Vector3(0, 0.16, -0.845),
 }
 
 /**
@@ -99,7 +120,7 @@ const PISTOL: WeaponConfig = {
   tip: new THREE.Vector3(0, 0.067, -0.172),
 }
 
-export const WEAPON_CONFIGS = { rifle: RIFLE, sniper: SNIPER, pistol: PISTOL, knife: KNIFE } as const
+export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, sniper: SNIPER, pistol: PISTOL, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
 
 /**
@@ -108,6 +129,8 @@ export type WeaponKind = keyof typeof WEAPON_CONFIGS
  * 立ちとしゃがみで上半身の角度が変わるので、同じ握り方では銃が体から浮く。
  */
 export type WeaponTarget =
+  | 'smg'
+  | 'smgCrouch'
   | 'rifle'
   | 'rifleCrouch'
   | 'sniper'
@@ -174,7 +197,9 @@ export class Weapon {
           ? await loadSniper()
           : kind === 'pistol'
             ? await loadPistol()
-            : await loadRifle()
+            : kind === 'smg'
+              ? await loadSmg()
+              : await loadRifle()
     return new Weapon(cloneSkinned(gltf.scene), WEAPON_CONFIGS[kind])
   }
 

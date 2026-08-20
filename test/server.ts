@@ -21,6 +21,13 @@ export interface Server {
   port: number
   /** 部屋の様子 (/health の本文) */
   health(): Promise<string>
+  /**
+   * サーバーが吐いた例外。**握り潰した分も含む。**
+   *
+   * 刻みと 1 通ごとの処理は try で包んであるので、例外が出てもサーバーは
+   * 落ちない。落ちないぶん**試験からは正常に見える**ので、ログを見に行く。
+   */
+  errors(): string
   stop(): void
   /** 配置と同じ止め方 (SIGTERM)。落ち切るまで待つ */
   terminate(): Promise<void>
@@ -66,9 +73,18 @@ export async function startServer(env: Record<string, string> = {}): Promise<Ser
     await Bun.sleep(50)
   }
 
+  /** 立ち上げてからの stderr。例外はここに出る */
+  let stderr = ''
+  void (async () => {
+    for await (const chunk of proc.stderr as ReadableStream<Uint8Array>) {
+      stderr += new TextDecoder().decode(chunk)
+    }
+  })()
+
   return {
     port,
     health: async () => (await fetch(`http://localhost:${port}/health`)).text(),
+    errors: () => stderr,
     stop: () => proc.kill(),
     // 配置で止めるときと同じ合図。書き出してから落ちるかを見るのに使う
     terminate: async () => {
@@ -97,15 +113,29 @@ export class Client {
   locomotion = ''
   /** 自分の状態 (life で届いたもの) */
   life = ''
+  /**
+   * 届いた通をそのまま控える。
+   *
+   * **種類だけでは足りない場面がある。** 「的が戻ってきたか」を respawn の数で
+   * 見ていたら、撃った本人の respawn を数えていて的が戻らないのを見逃した。
+   * id まで見られるようにする。
+   */
+  readonly messages: ServerMessage[] = []
 
   private readonly socket: WebSocket
   private timer: ReturnType<typeof setInterval> | null = null
   private position: [number, number, number]
 
-  constructor(server: Server, id: string, at: [number, number, number] = [0, 0, 0]) {
+  constructor(
+    server: Server,
+    id: string,
+    at: [number, number, number] = [0, 0, 0],
+    /** 入る部屋。既定はチーム戦 (bravo) — 陣営の規則を見る試験が多いので */
+    room = 'bravo',
+  ) {
     this.id = id
     this.position = at
-    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=alpha&id=${id}`)
+    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=${room}&id=${id}`)
     this.socket.binaryType = 'arraybuffer'
     this.socket.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (event.data instanceof ArrayBuffer) {
@@ -116,6 +146,7 @@ export class Client {
         return
       }
       const message = JSON.parse(event.data) as ServerMessage
+      this.messages.push(message)
       this.order.push(message.type)
       this.last.set(message.type, message)
       this.count.set(message.type, (this.count.get(message.type) ?? 0) + 1)
@@ -147,7 +178,24 @@ export class Client {
   sendState(locomotion = 'idle'): void {
     if (this.socket.readyState !== WebSocket.OPEN) return
     const [x, y, z] = this.position
-    this.socket.send(encodeSnapshot(snapshotOf(this.id, x, y, z, locomotion)))
+    this.socket.send(
+      encodeSnapshot(
+        snapshotOf(this.id, x, y, z, locomotion, this.holdingGrenade, this.holdingClaymore),
+      ),
+    )
+  }
+
+  /** 振りかぶって持っているか。位置に乗せて送る */
+  private holdingGrenade = false
+  /** クレイモアを手にしているか */
+  private holdingClaymore = false
+
+  holdGrenade(holding: boolean): void {
+    this.holdingGrenade = holding
+  }
+
+  holdClaymore(holding: boolean): void {
+    this.holdingClaymore = holding
   }
 
   send(message: ClientMessage): void {
@@ -157,6 +205,7 @@ export class Client {
   /** 数えているものを 0 に戻す。「この区間で何通来たか」を測るのに使う */
   reset(): void {
     this.states = 0
+    this.messages.length = 0
     this.order.length = 0
     this.count.clear()
   }
@@ -179,6 +228,8 @@ function snapshotOf(
   y: number,
   z: number,
   locomotion: string,
+  holdingGrenade = false,
+  holdingClaymore = false,
 ): PlayerSnapshot {
   return {
     id,
@@ -192,13 +243,19 @@ function snapshotOf(
     aiming: false,
     crouching: false,
     boxed: false,
-    held: 'rifle' as const,
+    // 振りかぶっているなら手にあるのも手榴弾。**両方そろって初めて落ちる**
+    held: holdingGrenade
+      ? ('grenade' as const)
+      : holdingClaymore
+        ? ('claymore' as const)
+        : ('rifle' as const),
     locomotion,
     concentrating: false,
     saluteHeld: false,
     reloading: false,
     weapon: 'rifle',
-    holdingGrenade: false,
+    // 振りかぶっている間だけ立つ (FLAG2_WINDUP)
+    holdingGrenade,
     protectedNow: false,
     slot: 0,
   } as PlayerSnapshot

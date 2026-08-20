@@ -274,6 +274,10 @@ bpy.ops.export_scene.gltf(
     export_materials='EXPORT',
     export_image_format='AUTO',
     export_jpeg_quality=85,
+    # **頂点色も出す。** bake_stage.py が焼いた「空の見え方」がここに乗る。
+    # 既定 (MATERIAL) だと材質が使っていない色は落とされるので、明示する
+    export_vertex_color='ACTIVE',
+    export_all_vertex_colors=False,
 )
 
 # 材質の内訳も出す。札の付け忘れは数を見ると気づける

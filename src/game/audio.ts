@@ -48,6 +48,9 @@ const SOUNDS = {
   snipe: { file: "xm2010_shot1.mp3", reference: 8, max: 170 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
+  // P90。突撃銃より軽い音で、間隔が詰まるぶん 1 発を短く聞かせたい
+  smg: { file: "p90_shot1.mp3", reference: 5, max: 110 },
+  smgReload: { file: "p90_reload1.mp3", reference: 2, max: 24 },
   /**
    * 足音。20m で消える。
    *
@@ -80,6 +83,14 @@ const SOUNDS = {
    * 足音と取り違えないようにしてある。
    */
   clink: { file: "step_metal1.mp3", reference: 3, max: 30, rate: 1.15 },
+  /**
+   * 武器を地面へ置く / 拾う。
+   *
+   * **足音より少し遠くまで届く (20m)。** 近くで誰かが銃を捨てた・拾ったことは
+   * 手がかりになる — 弾が尽きたか、良い銃を手に入れたかが読める。
+   */
+  drop: { file: "weapon_drop1.mp3", reference: 4, max: 20 },
+  pick: { file: "weapon_pick1.mp3", reference: 4, max: 20 },
   /**
    * 倒れたときの叫び。
    *
@@ -188,8 +199,29 @@ const PITCH_JITTER = 0.06;
  */
 const jitter = () => 1 + (Math.random() * 2 - 1) * PITCH_JITTER;
 
+/**
+ * 街の音。**部屋に入ったら小さく流し続ける。**
+ *
+ * 位置を持たない (THREE.Audio)。どこに立っていても同じ大きさで、方向も無い —
+ * **これは聞き分けるための音ではない**ので、定位させると足音や銃声と混ざって
+ * 邪魔になる。
+ *
+ * 小さくするのは索敵のため。この遊びは音で相手を探すので、環境音が大きいと
+ * 足音が埋もれる。
+ */
+const AMBIENCE_FILE = 'city_loop1.mp3';
+/*
+ * 音源は 96kbps に落としてある (256kbps から 5.1MB → 1.8MB)。
+ *
+ * **小さく流し続ける音**なので、音質の差は聞き取れない。読み込みの重さのほうが
+ * 効く — 部屋に入った直後に落ちてくるものなので。
+ */
+const AMBIENCE_VOLUME = 0.12;
+
 export class GameAudio {
   readonly listener = new THREE.AudioListener();
+  /** 街の音。読み込めたら鳴り続ける */
+  private ambience: THREE.Audio | null = null;
 
   private readonly buffers = new Map<SoundName, AudioBuffer>();
   private readonly pool: THREE.PositionalAudio[] = [];
@@ -225,6 +257,17 @@ export class GameAudio {
   resume(): void {
     const context = this.listener.context;
     if (context.state === "suspended") void context.resume();
+    // 止まっている間に読み込みが終わっていることがある。**ここで鳴らし始める** —
+    // ブラウザは操作があるまで音を出せないので、読み込み直後には始められない
+    this.startAmbience();
+  }
+
+  /** 街の音を流し始める。既に鳴っていれば何もしない */
+  private startAmbience(): void {
+    const sound = this.ambience;
+    if (!sound || sound.isPlaying || this.disposed) return;
+    if (this.listener.context.state === "suspended") return;
+    sound.play();
   }
 
   /**
@@ -274,6 +317,8 @@ export class GameAudio {
 
   dispose(): void {
     this.disposed = true;
+    if (this.ambience?.isPlaying) this.ambience.stop();
+    this.ambience?.removeFromParent();
     for (const sound of this.pool) {
       if (sound.isPlaying) sound.stop();
       sound.removeFromParent();
@@ -282,7 +327,30 @@ export class GameAudio {
     this.listener.removeFromParent();
   }
 
+  /**
+   * 街の音を用意する。**失敗しても遊べる。**
+   *
+   * 3 分近い 5MB の音源なので、他の音とは別に読む。届く前に部屋へ入っても
+   * 困らないよう、届いた時点で鳴らし始める。
+   */
+  private async loadAmbience(): Promise<void> {
+    const loader = new THREE.AudioLoader();
+    try {
+      const buffer = await loader.loadAsync(asset.audio(AMBIENCE_FILE));
+      if (this.disposed) return;
+      const sound = new THREE.Audio(this.listener);
+      sound.setBuffer(buffer);
+      sound.setLoop(true);
+      sound.setVolume(AMBIENCE_VOLUME);
+      this.ambience = sound;
+      this.startAmbience();
+    } catch (error) {
+      console.error(`[Audio] 街の音を読めなかった: ${AMBIENCE_FILE}`, error);
+    }
+  }
+
   private async load(): Promise<void> {
+    void this.loadAmbience();
     const loader = new THREE.AudioLoader();
     await Promise.all(
       (Object.entries(SOUNDS) as [SoundName, (typeof SOUNDS)[SoundName]][]).map(

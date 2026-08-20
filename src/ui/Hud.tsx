@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
-import { HELD, type HeldId } from '../sim/held'
+import { HELD, type HeldId } from '../domain/item/held'
 import type { GameStats } from '../game/Game'
 import './Hud.css'
 
@@ -353,6 +353,36 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           <div class="hud-weapon-count">× {heldCount()}</div>
         </Show>
 
+      </div>
+
+      {/*
+        点の増減。**倒した / 倒された瞬間だけ、右下に短く出す。**
+
+        誰が誰を倒したかの一覧 (hud-kills) は別に出ている。あれは記録として
+        読むもので、こちらは**自分に何が起きたか**の手応え。武器のカードの
+        真上に積んで、2.5 秒で消える。
+      */}
+      <div class="hud-points">
+        <For each={props.stats?.points ?? []}>
+          {(entry) => (
+            <div class="hud-point" classList={{ 'hud-point-minus': entry.delta < 0 }}>
+              <span class="hud-point-label">{entry.label}</span>
+              <span class="hud-point-delta">
+                {entry.delta > 0 ? '+' : ''}
+                {entry.delta}
+              </span>
+            </div>
+          )}
+        </For>
+      </div>
+
+      {/*
+        状態の行。**カードの外、真下に置く。**
+
+        中に積むとカードの高さが変わり、撃っている最中に枠が伸び縮みする。
+        目盛りを見ている目がそのたびに引っ張られるので、位置は動かさない。
+      */}
+      <div class="hud-weapon-states">
         <Show when={props.stats?.switching}>
           <div class="hud-weapon-state">SWITCHING</div>
         </Show>
@@ -372,6 +402,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           <div class="hud-weapon-state hud-weapon-state-warn">
             {(props.stats?.reserve ?? 0) > 0 ? 'PRESS R' : 'NO AMMO'}
           </div>
+        </Show>
+        {/* 近くに落ちている武器。**押せば拾える**とだけ出す */}
+        <Show when={props.stats?.canPickUp}>
+          <div class="hud-weapon-state hud-weapon-state-pick">G で拾う</div>
         </Show>
         {/* 転んだら自分で起きる。撃つか起きるかを選ばせたいので、時間では立たない */}
         <Show when={props.stats?.downed}>

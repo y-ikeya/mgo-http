@@ -79,6 +79,7 @@ UV も箱の大きさに合わせてゲーム側で作り直している (Blende
 |---|---|
 | `convert_character.py` | FBX 群 → 1 つの glb。設定ファイルを引数に取る |
 | `soldier.json` | **どの FBX がどのクリップになったか**の対応表。32 本ぶん |
+| `bake_stage.py` | ステージに**空の見え方**を焼く (頂点色)。書き出す前に 1 度 |
 | `merge_clip.js` | 既存の glb にクリップだけ追加する。全体を作り直さずに済む |
 | `split_clip.js` | **クリップを 2 本に割る。** 境目の姿勢は補間して両方に入れる |
 
@@ -176,7 +177,8 @@ soldier.glb には焼き込まれているので今は動く。作り直すと�
 Mixamo から取り直す必要がある。1 本足りないまま書き出すと、そのモーションが
 静かに消えて素の姿勢 (T ポーズ) が出る。
 
-後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`) は
+後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
+`fall_roll` `up_stair`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 

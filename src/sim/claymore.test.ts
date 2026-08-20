@@ -56,22 +56,36 @@ describe('爆風', () => {
   const mine = at(0)
 
   test('近いほど削れる。至近でも単体では死なない', () => {
-    const near = blastFrom(mine, { x: 0, y: 0, z: -0.5 })
-    const far = blastFrom(mine, { x: 0, y: 0, z: -(BLAST_RANGE - 0.2) })
+    const near = blastFrom(mine, { x: 0, y: 0, z: -0.5 }).damage
+    const far = blastFrom(mine, { x: 0, y: 0, z: -(BLAST_RANGE - 0.2) }).damage
     expect(near).toBeGreaterThan(far)
     expect(near).toBeLessThanOrEqual(BLAST_MAX)
     expect(BLAST_MAX).toBeLessThan(100)
     expect(far).toBeGreaterThanOrEqual(BLAST_MIN - 1)
   })
 
-  test('背後には入らない。起爆したあとでも向きは効いている', () => {
-    expect(blastFrom(mine, { x: 0, y: 0, z: 2 })).toBe(0)
+  test('**爆風は全方位。** 背後に居ても同じだけ削れる', () => {
+    const front = blastFrom(mine, { x: 0, y: 0, z: -2 }).damage
+    const back = blastFrom(mine, { x: 0, y: 0, z: 2 }).damage
+    const side = blastFrom(mine, { x: 2, y: 0, z: 0 }).damage
+    expect(back).toBeCloseTo(front, 5)
+    expect(side).toBeCloseTo(front, 5)
+  })
+
+  test('向きが効くのは起爆まで。背後を通っても反応はしない', () => {
+    expect(triggeredBy(mine, { x: 0, y: 0, z: 2 })).toBe(false)
+    expect(blastFrom(mine, { x: 0, y: 0, z: 2 }).damage).toBeGreaterThan(0)
+  })
+
+  test('近ければ転ぶ。端で掠っただけなら立っていられる', () => {
+    expect(blastFrom(mine, { x: 0, y: 0, z: -1 }).knock).toBe(true)
+    expect(blastFrom(mine, { x: 0, y: 0, z: -(BLAST_RANGE - 0.2) }).knock).toBe(false)
   })
 
   test('届く距離は反応する距離より広い。反応した時点で逃げ切れない', () => {
     expect(BLAST_RANGE).toBeGreaterThan(TRIGGER_RANGE)
     // 反応する縁に立った人には必ず入る
-    expect(blastFrom(mine, { x: 0, y: 0, z: -TRIGGER_RANGE })).toBeGreaterThan(0)
+    expect(blastFrom(mine, { x: 0, y: 0, z: -TRIGGER_RANGE }).damage).toBeGreaterThan(0)
   })
 })
 

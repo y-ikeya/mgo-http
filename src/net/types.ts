@@ -1,9 +1,9 @@
-import type { Locomotion } from '../sim/locomotion'
-import type { HitZone } from '../sim/damage'
-import type { Surface } from '../sim/surface'
-import type { SupportId, WeaponId } from '../sim/weapons'
-import type { HeldId } from '../sim/held'
-import type { Life } from '../sim/lifecycle'
+import type { Locomotion } from '../domain/locomotion'
+import type { HitZone } from '../domain/rule/damage'
+import type { Surface } from '../domain/surface'
+import type { SupportId, WeaponId } from '../domain/item/weapons'
+import type { HeldId } from '../domain/item/held'
+import type { Life } from '../domain/lifecycle'
 
 /**
  * ネットワークで流す型。
@@ -18,8 +18,15 @@ import type { Life } from '../sim/lifecycle'
  * 権威を強めていくとき、変える場所がサーバーの中だけで済む。
  */
 
-/** 所属。サーバーが割り当てる */
-export type Team = 'blue' | 'red'
+/**
+ * 所属。**定義は src/domain/player.ts に在る。**
+ *
+ * 通信の型が陣営を宣言していたのは順番が逆で、protocol はゲームの言葉を
+ * 借りて話す側。ここから出しているのは、読む側の import を変えないため。
+ */
+import type { Team } from '../domain/player'
+import type { Mode } from '../domain/room'
+export type { Team }
 
 /** 1 人分の見た目の状態。体力はここに含めない (サーバーが持つ) */
 export interface PlayerSnapshot {
@@ -315,6 +322,14 @@ export interface PlaceClaymoreEvent {
 export interface ClaymorePlaced {
   type: 'claymorePlaced'
   id: number
+  /**
+   * 置いた人。
+   *
+   * **本人が「置けた」ことを知るのに要る。** 置けるかどうかを決めているのは
+   * サーバー (壁の中や縁の外へは置けない) で、断られたことが分からないと
+   * 手元の残り数だけが減る。
+   */
+  owner: string
   at: [number, number, number]
   /** 正面の向き (rad) */
   yaw: number
@@ -364,7 +379,7 @@ export interface LeaveEvent {
 /**
  * その人がどういう状態に居るか。サーバーが変わるたびに配る。
  *
- * 状態は src/sim/lifecycle.ts が定義している。以前は「体力が 0 になった」
+ * 状態は src/domain/lifecycle.ts が定義している。以前は「体力が 0 になった」
  * 「位置が来なくなった」から各自が推し量っていて、場所ごとに答えがずれていた。
  */
 export interface LifeEvent {
@@ -471,6 +486,12 @@ export type MatchPhase = 'waiting' | 'countdown' | 'playing' | 'over'
  */
 export interface RoomSummary {
   name: string
+  /** その部屋のルール。部屋ごとに固定 (src/domain/room.ts) */
+  mode: Mode
+  /** ルールの表示名 */
+  label: string
+  /** 入れるか。false なら一覧に出るが繋げない */
+  active: boolean
   /** いま繋がっている人数 */
   players: number
   /**
@@ -618,6 +639,62 @@ export interface RespawnMessage {
  */
 
 /** クライアント → サーバー。**申告と操作**しか無い */
+/**
+ * 武器を地面へ置く。
+ *
+ * **中身も一緒に送る。** 持ち物を持っているのはクライアント側で、サーバーは
+ * 銃ごとの弾の写ししか持っていない (繋ぎ直し用)。置いた物の残弾は本人しか
+ * 知らないので、申告してもらう。
+ *
+ * 撃ち合いの結果に効くのは「拾った人がその銃を使えるか」までで、残弾を多めに
+ * 申告しても**弾は結局サーバーが数える** (shot が届くたびに減らす)。
+ */
+export interface DropWeaponEvent {
+  type: 'drop'
+  weapon: HeldId
+  /** 装填 / 予備。投げ物なら count に入れる */
+  ammo?: number
+  reserve?: number
+  count?: number
+}
+
+/** 落ちている物を拾う。どれを拾うかはサーバーが決める (一番近い物) */
+export interface PickUpEvent {
+  type: 'pickup'
+}
+
+/** 地面に落ちている武器。**見えている / 見えていないは問わない** */
+export interface DroppedMessage {
+  type: 'dropped'
+  id: number
+  weapon: HeldId
+  ammo?: number
+  reserve?: number
+  count?: number
+  at: [number, number, number]
+  yaw: number
+}
+
+/** 拾われた / 消えた */
+export interface DroppedGoneMessage {
+  type: 'droppedGone'
+  id: number
+}
+
+/**
+ * 拾えた。**中身は拾った本人にだけ返す。**
+ *
+ * 他の人に要るのは「そこから消えた」ことだけで、何発入っていたかは要らない。
+ */
+export interface PickedMessage {
+  type: 'picked'
+  id: number
+  weapon: HeldId
+  ammo?: number
+  reserve?: number
+  count?: number
+}
+
 export type ClientMessage =
   | StateMessage
   | JoinEvent
@@ -626,6 +703,8 @@ export type ClientMessage =
   | GrenadeThrow
   | LoadoutEvent
   | PlaceClaymoreEvent
+  | DropWeaponEvent
+  | PickUpEvent
   | FallEvent
   | SpawnRequest
   | ReloadEvent
@@ -644,6 +723,9 @@ export type ServerMessage =
   | HealthMessage
   | KillEvent
   | RespawnMessage
+  | DroppedMessage
+  | DroppedGoneMessage
+  | PickedMessage
   | NoiseEvent
   | LifeEvent
   | HiddenEvent

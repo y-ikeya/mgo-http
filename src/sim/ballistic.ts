@@ -60,10 +60,24 @@ export interface ThrowTuning {
   contactSpeed: number
 }
 
+/**
+ * 投げた物の跳ね方。
+ *
+ * **跳ねるより転がる。** 手榴弾は「そこへ置きに行く」道具なので、着いた先から
+ * 大きく跳ねると狙って落とす意味が薄くなる。落下点の印を見て放しているのに、
+ * そこから 0.4m 跳ねて 2 秒転がっていた。
+ *
+ *     restitution 0.36 → 0.18   1 回目の跳ねが 0.39m → 0.11m
+ *     friction    0.72 → 0.55   接地で横の勢いも削る
+ *     rollFriction   7 → 11     止まるまで 2.18s → 1.05s
+ *
+ * 転がりを完全に殺さないのは、**階段や坂から落ちてくる**動きを残したいため。
+ * 上の階へ投げ上げたつもりが縁で止まらずに戻ってくる、が起きるくらいが良い。
+ */
 export const DEFAULT_THROW: ThrowTuning = {
-  restitution: 0.36,
-  friction: 0.72,
-  rollFriction: 7,
+  restitution: 0.18,
+  friction: 0.55,
+  rollFriction: 11,
   restSpeed: 0.35,
   contactSpeed: 0.9,
 }

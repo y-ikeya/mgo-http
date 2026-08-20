@@ -3,7 +3,7 @@
 //   bun tools/weapon_table.ts
 //
 // --- なぜ生成するか ---
-// 数字の出どころは src/sim/weapons.ts で、そこはゲームが実際に読む所。手で表を
+// 数字の出どころは src/domain/item/weapons.ts で、そこはゲームが実際に読む所。手で表を
 // 書くと**必ずずれる**。しかも気づけない — 表が古いことは、表を見ても分からない。
 //
 // --- 手で書く所と生成する所を分ける ---
@@ -20,8 +20,8 @@
 import {
   SUPPORT_SPECS, SUPPORTS, WEAPONS, bulletDamage, carrySpeedScale, weaponOf,
   type WeaponId,
-} from '../src/sim/weapons'
-import { MAX_HEALTH, MELEE_BACK_DAMAGE, MELEE_FRONT_DAMAGE, MELEE_RANGE } from '../src/sim/damage'
+} from '../src/domain/item/weapons'
+import { MAX_HEALTH, MELEE_BACK_DAMAGE, MELEE_FRONT_DAMAGE, MELEE_RANGE } from '../src/domain/rule/damage'
 import { BLAST_DAMAGE, BLAST_RADIUS } from '../src/sim/blast'
 import { BLAST_MAX, BLAST_MIN, BLAST_RANGE, TRIGGER_RANGE } from '../src/sim/claymore'
 
@@ -92,15 +92,19 @@ w(`体力 ${MAX_HEALTH} なので**単体では死なない**。`)
 w()
 w('### クレイモアの爆風')
 w()
-w(`正面 **${TRIGGER_RANGE}m** で反応し、**${BLAST_RANGE}m** まで届く。`)
-w(`至近 **${BLAST_MAX}** / 端 **${BLAST_MIN}**。こちらも単体では死なない。`)
+w(`**反応は正面 ${TRIGGER_RANGE}m の扇**。背後や真横を通っても起爆しない。`)
+w(`**爆風は全方位 ${BLAST_RANGE}m**。至近 ${BLAST_MAX} / 端 ${BLAST_MIN}、` +
+  `近ければ転ぶ。こちらも単体では死なない。`)
 w()
 w('## 近接')
 w()
 w('| | ダメージ | |')
 w('|---|---|---|')
-w(`| 背後から | ${MELEE_BACK_DAMAGE} | 即死 |`)
-w(`| 正面から | ${MELEE_FRONT_DAMAGE} | 2 回 |`)
+// **要る発数から書く。** 「2 回」と直に書いてあったので、正面を即死にしても
+// 表だけ古いままだった
+const stabs = (damage: number) => (damage >= MAX_HEALTH ? '即死' : `${Math.ceil(MAX_HEALTH / damage)} 回`)
+w(`| 背後から | ${MELEE_BACK_DAMAGE} | ${stabs(MELEE_BACK_DAMAGE)} |`)
+w(`| 正面から | ${MELEE_FRONT_DAMAGE} | ${stabs(MELEE_FRONT_DAMAGE)} |`)
 w()
 w(`間合いは ${MELEE_RANGE}m。`)
 w()

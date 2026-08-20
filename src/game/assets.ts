@@ -26,6 +26,7 @@ export const asset = {
   texture: (file: string) => `${import.meta.env.BASE_URL}textures/${file}`,
 } as const
 
+const SMG_URL = asset.model('smg.glb')
 const RIFLE_URL = asset.model('rifle.glb')
 const SNIPER_URL = asset.model('sniper.glb')
 const PISTOL_URL = asset.model('pistol.glb')
@@ -75,6 +76,10 @@ function load(url: string): Promise<GLTF> {
  */
 export function loadSoldier(skin: string = DEFAULT_SKIN): Promise<GLTF> {
   return load(asset.model(`${skin}.glb`))
+}
+
+export function loadSmg(): Promise<GLTF> {
+  return load(SMG_URL)
 }
 
 export function loadRifle(): Promise<GLTF> {

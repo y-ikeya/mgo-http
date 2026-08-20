@@ -93,7 +93,7 @@
 
 .room-enter {
   display: grid;
-  grid-template-columns: 5.5em 3.6em 1fr 6em 4.5em 3.4em;
+  grid-template-columns: 5.5em 6.8em 3.6em 1fr 6em 4.5em 3.4em;
   align-items: center;
   gap: 14px;
   width: 100%;
@@ -237,10 +237,25 @@
 
 @media (max-width: 560px) {
   .room-enter {
-    grid-template-columns: 4.5em 3.4em 1fr;
+    grid-template-columns: 4.5em 6.8em 3.4em 1fr;
     row-gap: 6px;
   }
   .room-phase, .room-score, .room-time {
     grid-column: span 1;
   }
+}
+
+/* ルールの略称。名前の隣に小さく */
+.room-mode {
+  justify-self: start;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 1px 6px;
+  color: #cfe0ff;
+  border: 1px solid rgba(126, 166, 255, 0.35);
+}
+
+/* まだ開けていない部屋。**一覧には出す** — 何を作れば開くかが見える */
+.room-shut {
+  opacity: 0.45;
 }

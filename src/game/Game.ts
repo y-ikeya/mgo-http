@@ -27,31 +27,32 @@ import {
   surfaceAt,
 } from "../sim/collision";
 import { GameAudio } from "./audio";
-import type { Step } from "../sim/footsteps";
+import type { Step } from "../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./soundRing";
 import { ThrownItems } from "./thrown";
 import { Grenades } from "./grenades";
 import { Claymores } from "./claymores";
 import { BlastFx } from "./blastfx";
 import { Casings } from "./casings";
+import { Drops } from "./drops";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
-import { fallDamage, MAX_HEALTH } from "../sim/damage";
+import { fallDamage, MAX_HEALTH } from "../domain/rule/damage";
 import {
   canAct,
   canChoose,
   CHOOSE_FLOOR,
   CHOOSE_TIMEOUT,
   type Life,
-} from "../sim/lifecycle";
-import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../sim/weapons";
+} from "../domain/lifecycle";
+import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/item/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
-import { Inventory } from "../sim/inventory";
-import { type Family, type HeldId } from "../sim/held";
+import { Inventory } from "../domain/item/inventory";
+import { canDrop, isGun, type Family, type HeldId } from "../domain/item/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
-import type { HitZone } from "../sim/damage";
+import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
-import { weaponOf } from "../sim/weapons";
+import { weaponOf } from "../domain/item/weapons";
 import {
   BULLET_GRAVITY,
   flightTime,
@@ -62,6 +63,7 @@ import { createTransport } from "../net";
 import type { NetTransport } from "../net/types";
 import type { Identity } from "../auth/session";
 import { selfSkin } from "./skin";
+import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../domain/rule/scoring";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -124,6 +126,15 @@ export interface GameStats {
   canZoom: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
+  /**
+   * 直近の点の増減。**自分の分だけ。**
+   *
+   * 倒した / 倒された瞬間に右下へ出す。誰が誰を倒したかの一覧 (kills) とは別で、
+   * こちらは自分に何が起きたかだけを短く見せる。
+   */
+  points: { label: string; delta: number; at: number }[]
+  /** 近くに落ちている武器がある。**押せば拾える**という案内を出す */
+  canPickUp: boolean
   /** 直近のキル表示。新しいものが先頭 */
   kills: KillEvent[]
   /** 残っている投げ物 */
@@ -366,12 +377,33 @@ const RING_SETTLE = 1
 /** これ以下の強さなら聞こえていないものとして扱う */
 const PING_THRESHOLD = 0.04
 
+/**
+ * 拾える距離 (m)。**サーバーと同じ値** (server/index.ts の PICKUP_RANGE)。
+ *
+ * こちらは案内を出すためだけに使う。実際に拾えるかを決めるのはあちら。
+ */
+const PICKUP_RANGE = 1.0;
+
 /** キル表示を残す時間 (秒) と、同時に出す行数 */
 const KILL_FEED_DURATION = 6;
 const KILL_FEED_MAX = 5;
 
-/** スポーン地点をどれだけ散らすか (m) */
-const SPAWN_SPREAD = 4;
+/**
+ * 点の増減を残す時間 (秒) と行数。
+ *
+ * キル表示より**短く**する。あれは「誰が誰を」の記録で読むもの、こちらは
+ * 「いま入った」という手応えなので、残り続けると邪魔になる。
+ */
+const POINT_FEED_DURATION = 2.5;
+const POINT_FEED_MAX = 4;
+
+/**
+ * スポーン地点をどれだけ散らすか (m)。
+ *
+ * **基地の枠 (stage.ts の BASE_HALF = 2m) の内側に収める。** 外に出ると、
+ * 地面に描いた枠が「自分の湧く場所」に見えなくなる。
+ */
+const SPAWN_SPREAD = 1.5;
 
 /** ID から湧く方向を決める。同じタブなら再読み込みしても同じ場所 */
 function spawnAngle(id: string): number {
@@ -402,6 +434,8 @@ export class Game {
   private readonly claymores: Claymores;
   private readonly blast: BlastFx;
   private readonly casings: Casings;
+  /** 地面に落ちている武器。浮かせて回している */
+  private readonly drops: Drops;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
   private stageBoxes: StageBox[] = [];
   /**
@@ -415,8 +449,25 @@ export class Game {
   private readonly pressedAt: Record<Family, number> = { weapon: 0, tool: 0 };
 
   private grenadeAiming = false;
-  /** 投げる引き金のラッチ。押しっぱなしで連投しない */
-  private throwReleased = true;
+  /** 構え始めと同じフレームに引かれた引き金。次のフレームで放す */
+  private pendingThrow = false;
+  /** クレイモア側の同じもの */
+  private pendingSetup = false;
+  /** 弾倉 (囮) 側の同じもの */
+  private pendingDecoy = false;
+  /**
+   * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
+   *
+   * --- なぜ 1 か所で数えるか ---
+   * 以前は「引いていたか」を控える札を 3 つの投げ物 (弾倉・手榴弾・クレイモア)
+   * が**共有して、それぞれが自分の番で倒していた**。順番が先の弾倉が先に倒すので、
+   * 後から見る手榴弾には「もう引かれている」としか見えず、**手榴弾が投げられ
+   * なかった**。
+   *
+   * 立ち上がりはフレームに 1 つしかないので、フレームの頭で 1 回だけ数える。
+   */
+  private triggerEdge = false;
+  private wasFiring = false;
   /** 手を離れるまでの残り (秒)。0 なら投げていない */
   private grenadeRelease = 0;
   /** 直前のフレームの経過時間 (秒)。tick の外で時計を進めるのに使う */
@@ -690,6 +741,7 @@ export class Game {
     this.claymores = new Claymores(this.scene);
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
+    this.drops = new Drops(this.scene);
     void loadStageBoxes().then((boxes) => {
       // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
       this.stageBoxes = solidBlockers(boxes);
@@ -892,6 +944,7 @@ export class Game {
     this.grenades.dispose();
     this.blast.dispose();
     this.casings.dispose();
+    this.drops.clear();
     this.player.dispose();
     this.scene.traverse((obj) => {
       if (isMesh(obj)) {
@@ -1001,6 +1054,10 @@ export class Game {
     this.updateLinks();
     // 押している間は手を挙げたまま。離すと下ろす
     this.player.setSaluteHeld(this.input.isActionDown("salute", "KeyV"));
+    // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
+    // 先に見た物が倒した札を後の物が読むことになる
+    this.triggerEdge = this.input.firing && !this.wasFiring;
+    this.wasFiring = this.input.firing;
     this.updateThrowAim();
     // 反動込みの照準を渡す。銃口が跳ね上がる動きが体にも出る。
     this.player.update(
@@ -1011,6 +1068,7 @@ export class Game {
       this.world,
     );
     this.reportFall();
+    this.updateFallScream();
     // 倒されている間は倒した相手を映す。それ以外は自分を追う
     const watching = this.killCamTarget;
     if (watching) this.follow.watch(dt, watching, this.cameraWorld);
@@ -1027,6 +1085,7 @@ export class Game {
     this.updatePostureSpread(dt);
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
+    this.drops.update(dt);
     this.updateFootsteps();
     this.grenades.update(dt, this.stageBoxes, (bounce) => {
       // 跳ねた音は全員の輪に出す。自分が投げたものも例外にしない。
@@ -1162,6 +1221,7 @@ export class Game {
       case "kill":
         this.killFeed.unshift({ ...message, at: Date.now() });
         this.killFeed.length = Math.min(this.killFeed.length, KILL_FEED_MAX);
+        this.recordPoints(message);
         // 倒された。この後の 5 秒はこの人を映す。
         // 自爆なら映すものが無いので空のままにする
         if (message.victim === this.net.id) {
@@ -1175,13 +1235,21 @@ export class Game {
       // 弾数もサーバーが写しを持っているので、そちらを正とする
       case "resume":
         this.player.resumeAt(message.x, message.y, message.z, message.health);
-        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
-        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
-        this.inv.restore(message.magazine, message.reserve, message.grenades);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
         this.loadout.primary = message.primary;
+        /*
+         * **持ち物を組み直す。**
+         *
+         * 画面を読み直すと Inventory は既定 (AK47) で作られる。装備を戻すだけ
+         * では手の中は既定のままで、**P90 を選んでいたのに AK を持って戻る**。
+         * 戻した装備から組み直してから、残弾を当てる (順番が要る)。
+         */
+        this.inv.refill(this.loadout);
+        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
+        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
+        this.inv.restore(message.magazine, message.reserve, message.grenades);
         this.pendingLoadout.support = message.support;
         this.pendingLoadout.primary = message.primary;
         this.onLoadout?.(this.pendingLoadout);
@@ -1271,9 +1339,55 @@ export class Game {
         break;
       }
 
-      case "claymorePlaced":
-        this.claymores.place(message.id, message.at, message.yaw);
+      // **置いたのが自分でも他人でも鳴らす。** 落ちた場所で鳴るので、
+      // 見えていなくても「そこで誰かが捨てた」ことが耳に入る
+      case "dropped": {
+        this.drops.place(message.id, message.weapon, message.at, message.yaw);
+        const at = this.drops.positionOf(message.id);
+        if (at) this.audio.play("drop", at);
         break;
+      }
+
+      /*
+       * 拾われた / 消えた。**音と後片付けはここ 1 か所。**
+       *
+       * 拾った本人には picked も届くが、あちらでは消さない。消してしまうと
+       * この通が来たときに置き場所が分からず、**拾った本人にだけ音が鳴らない**。
+       * (実際そうなっていた。他の人には聞こえていたので気づきにくい)
+       */
+      case "droppedGone": {
+        const at = this.drops.positionOf(message.id);
+        if (at) this.audio.play("pick", at);
+        this.drops.remove(message.id);
+        break;
+      }
+
+      // 拾えた。**中身はここで初めて分かる** (見ただけでは残弾は読めない)
+      case "picked": {
+        const found =
+          message.count !== undefined && message.count > 0
+            ? { id: message.weapon as never, count: message.count }
+            : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
+        this.inv.pick(found);
+        // **消すのは droppedGone の側。** ここで消すと、あちらが鳴らす音の
+        // 置き場所が無くなる (自分にだけ聞こえない、になる)
+        break;
+      }
+
+      /*
+       * 置かれたクレイモア。**自分の物なら、ここで初めて残り数を減らす。**
+       *
+       * 置けるかを決めているのはサーバー (壁の中や縁の外へは置けない)。送った
+       * 時点で減らしていたので、断られると**置けていないのに減る**ことがあった。
+       *
+       * 同じ物が二度来る (見え隠れするたびに配られる) ので、初めて見た物だけ数える。
+       */
+      case "claymorePlaced": {
+        const mine = message.owner === this.net.id && !this.claymores.has(message.id);
+        this.claymores.place(message.id, message.at, message.yaw);
+        if (mine) this.inv.spendOf("claymore");
+        break;
+      }
 
       case "claymoreGone": {
         // 位置を先に取る。消してから爆発を出すと出す場所が分からない
@@ -1289,6 +1403,8 @@ export class Game {
 
       case "knockdown":
         this.player.knockDown();
+        // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
+        this.loseHeldGrenade();
         this.audio.play("blastScream", this.player.position);
         break;
 
@@ -1347,6 +1463,8 @@ export class Game {
       return;
     }
 
+    // **仰け反れば手が緩む。** 振りかぶったまま頭を撃たれたら足元に落ちる
+    if (message.flinch) this.loseHeldGrenade();
     const died = this.player.setHealth(message.health, message.flinch);
     if (message.damage > 0) {
       this.lastHitZone = "HIT";
@@ -1426,11 +1544,15 @@ export class Game {
     if (this.input.consumeKeyPress("Enter") || this.input.consumeKeyPress("KeyL")) {
       this.requestSpawn();
     }
+    // **番号は並び順から出す。** 主武器が 1 から、投擲はその続き。
+    // 直に書くと、銃が 1 挺増えたときに番号が重なる (P90 を足して実際に重なった)
     const choices = CHOICES.primary;
-    if (this.input.consumeKeyPress("Digit1") && choices[0]) this.setLoadout(choices[0]);
-    if (this.input.consumeKeyPress("Digit2") && choices[1]) this.setLoadout(choices[1]);
-    // 投擲の枠。主武器の続きの番号にする
-    if (this.input.consumeKeyPress("Digit3") && SUPPORTS[0]) this.setSupport(SUPPORTS[0]);
+    choices.forEach((id, i) => {
+      if (this.input.consumeKeyPress(`Digit${i + 1}`)) this.setLoadout(id);
+    });
+    SUPPORTS.forEach((id, i) => {
+      if (this.input.consumeKeyPress(`Digit${choices.length + 1 + i}`)) this.setSupport(id);
+    });
   }
 
   /**
@@ -1438,7 +1560,7 @@ export class Game {
    *
    * 以前はここが無く、「体力が 0 か」「試合の段階は何か」から必要な場所で
    * 都度組み立てていた。組み立て方が場所ごとにずれて不具合になっていたので、
-   * 権威が言ってきた 1 つの値だけを見る (src/sim/lifecycle.ts)。
+   * 権威が言ってきた 1 つの値だけを見る (src/domain/lifecycle.ts)。
    */
   private life: Life = "joining";
   /** その状態に入った時刻 (Date.now)。残り秒数の表示に使う */
@@ -1880,9 +2002,15 @@ export class Game {
     if (this.ammo >= this.weapon.magazine) return;
     // 予備が尽きていたら替えるものが無い
     if (this.inv.reserve <= 0) return;
-    // モーションの尺をそのまま操作不能時間にして、見た目と挙動を一致させる
-    this.reloadTimer = this.player.reloadDuration || this.weapon.reload;
-    this.player.playReload();
+    /*
+     * **時間を決めるのは武器の表。** 型はそこへ合わせて伸び縮みする。
+     *
+     * 以前はクリップの尺 (3.33 秒) をそのまま使っていたので、**どの銃も同じ
+     * 時間**だった。表には P90 3.0 / AK47 2.5 / XM2010 3.2 と書いてあるのに
+     * 手応えが同じで、選んだ銃が入っていないように感じる。
+     */
+    this.reloadTimer = this.weapon.reload;
+    this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
     this.reloadSoundIn = this.reloadTimer * this.reloadSoundAt;
     // 覗いたままだと入れ替えの間ずっと視界が狭い。肩越しへ戻す
@@ -2020,20 +2148,22 @@ export class Game {
     const canThrow =
       this.inv.held === "magazine" && canAct(this.life) && !this.cocking;
     const held = canThrow && this.input.aiming;
-    const release = held && this.throwAiming && this.input.firing && this.throwReleased;
-    if (this.input.firing) this.throwReleased = false;
-    else this.throwReleased = true;
+    // 手榴弾・クレイモアと同じ規則。構え始めと同じフレームの分も覚えておく
+    const pulled = this.triggerEdge || this.pendingDecoy;
+    const release = held && this.throwAiming && pulled;
 
     if (held && !release) {
       this.follow.aimOrigin(this.aimOrigin);
       this.follow.aimDirection(this.aimDir);
       this.thrown.showPreview(this.aimOrigin, this.aimDir, this.stage.collidables);
+      if (!this.throwAiming) this.pendingDecoy = this.triggerEdge;
       this.throwAiming = true;
       return;
     }
 
     if (!this.throwAiming) return;
     this.throwAiming = false;
+    this.pendingDecoy = false;
     this.thrown.hidePreview();
     // 構えをやめただけ / 解かされただけ (死んだ・箱に入った) なら投げない
     if (!release || !canThrow) return;
@@ -2071,20 +2201,51 @@ export class Game {
    * クリック) で放す。銃は構えて撃つので、投げ物だけ別の操作にすると持ち替えた
    * ときに指が迷う。落下点は構えている間ずっと見えるので、狙ってから放せる。
    */
+  /**
+   * 握っていた手榴弾を手放す。
+   *
+   * **落としたのはサーバー** (転倒と仰け反りの所で足元に置いている)。こちらは
+   * その分を持ち物から引いて、構えを畳むだけ。引かないと、画面の残り数だけが
+   * 1 個多いまま残る。
+   *
+   * 振りかぶっていなければ何もしない — サーバーも同じ条件で見ている
+   * (holdingGrenade)。
+   */
+  private loseHeldGrenade(): void {
+    if (!this.grenadeAiming && this.grenadeRelease <= 0) return;
+    if (this.inv.held === "grenade") this.inv.spend();
+    this.grenadeAiming = false;
+    this.grenadeRelease = 0;
+    this.grenades.hidePreview();
+    this.player.cancelThrow();
+    this.player.setThrowing(false);
+  }
+
   private updateGrenadeAim(): void {
+    // 手榴弾から離れたなら、構えも**落下点も**畳む。
+    //
+    // 消すのを忘れていて、構えたままダンボールを被ると放物線が出っぱなしに
+    // なっていた。持ち替え・箱・死亡のどれでもここを通る
+    //
+    // **振り切っている最中は畳まない** (grenadeRelease > 0)。最後の 1 個を投げると
+    // 持ち物から消えて次の武器へ移るので、投げの型がそこで中断されていた
+    if (this.inv.held !== "grenade" && this.grenadeAiming && this.grenadeRelease <= 0) {
+      this.grenadeAiming = false;
+      this.grenades.hidePreview();
+      this.player.cancelThrow();
+      this.player.setThrowing(false);
+    }
+    // クレイモアから離れたときも同じ。**構えっぱなしで腕が上がったまま**になる
+    if (this.inv.held !== "claymore" && this.setupAiming && this.setupRelease <= 0) {
+      this.setupAiming = false;
+      this.player.cancelThrow();
+      this.player.setThrowing(false);
+    }
     if (this.inv.held === "claymore") {
       this.updateClaymoreSetup();
       return;
     }
-    if (this.inv.held !== "grenade") {
-      // 手にしていないなら構えを畳む。持ち替えた瞬間に振りかぶりが残らない
-      if (this.grenadeAiming) {
-        this.grenadeAiming = false;
-        this.player.cancelThrow();
-        this.player.setThrowing(false);
-      }
-      return;
-    }
+    if (this.inv.held !== "grenade") return;
     // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
     const canThrow =
       this.inv.countOf(this.inv.held) > 0 &&
@@ -2093,15 +2254,25 @@ export class Game {
       !this.player.downed &&
       !this.cocking;
     const held = canThrow && this.input.aiming;
-    // 構えている間に引き金を引いたら放す。押しっぱなしで連投しない
-    const release = held && this.grenadeAiming && this.input.firing && this.throwReleased;
-    if (this.input.firing) this.throwReleased = false;
-    else this.throwReleased = true;
+    /*
+     * 構えている間に引き金を引いたら放す。押しっぱなしで連投しない。
+     *
+     * **同じフレームで構えて引いた分も覚えておく** (pendingThrow)。Shift と
+     * クリックがほぼ同時だと、その回は「構え始め」で消えて、引いたことが
+     * 無かったことになっていた。押した意思は消さずに、振りかぶりが始まった
+     * 次のフレームで放す。
+     */
+    const pulled = this.triggerEdge || this.pendingThrow;
+    const release = held && this.grenadeAiming && pulled;
 
     if (held && !release) {
       // 構えた瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
       // 落下点はその間ずっと見える — どこへ落とすかを見てから放せるように
-      if (!this.grenadeAiming) this.player.playThrow();
+      if (!this.grenadeAiming) {
+        this.player.playThrow();
+        // 構え始めと同じフレームに引かれた分を覚えておく
+        this.pendingThrow = this.triggerEdge;
+      }
       this.grenadeAiming = true;
       this.follow.aimDirection(this.aimDir);
       // 前へ出す量は水平方向だけで測る。見上げているときに近く、
@@ -2119,11 +2290,29 @@ export class Game {
     }
 
     if (!this.grenadeAiming) {
+      /*
+       * 振り切っている最中に構えをやめた。**投げない。**
+       *
+       * 手榴弾が手を離れるのは引き金を引いた 1.5 秒後まで遅れることがある
+       * (振りかぶりが残っているぶん待つ)。その間に構えを解けば、腕は下りて
+       * 型も畳まれる。**画面では投げていないのに手榴弾だけ飛んでいく**のは
+       * 嘘になるので、離す前なら無かったことにする。
+       *
+       * ピンを戻したことになるが、そこを咎めるより「見た通りに起きる」ほうを
+       * 取る。代わりに、投げ切りたければ手を離れるまで構えていることになる。
+       */
+      if (this.grenadeRelease > 0 && !held) {
+        this.grenadeRelease = 0;
+        this.player.cancelThrow();
+        this.player.setThrowing(false);
+        return;
+      }
       // 構えても投げてもいない間だけ解く。放すまでは向きを保つ
       if (this.grenadeRelease <= 0) this.player.setThrowing(false);
       return;
     }
     this.grenadeAiming = false;
+    this.pendingThrow = false;
     this.grenades.hidePreview();
 
     // **構えをやめただけなら投げない。** 引き金を引いていないのに投げると、
@@ -2143,7 +2332,10 @@ export class Game {
       return;
     }
 
-    this.inv.spend();
+    // **数を減らすのは手を離れたとき** (updateGrenadeRelease)。
+    //
+    // 引き金を引いた時点で減らしていたので、軽く叩いたとき (振りかぶりが
+    // 残っている) に「まだ投げていないのに残り数が減る」が 1.5 秒続いていた。
     // 止めていた続きから振り切る。手を離れるのはその途中
     this.player.releaseThrow();
     // 残りは**いまどこまで再生されたか**から測る。
@@ -2180,20 +2372,37 @@ export class Game {
       !this.player.downed &&
       !this.cocking;
     const held = canPlace && this.input.aiming;
-    const release = held && this.setupAiming && this.input.firing && this.throwReleased;
-    if (this.input.firing) this.throwReleased = false;
-    else this.throwReleased = true;
+    // 手榴弾と同じ規則。**構え始めと同じフレームに引かれた分も覚えておく**
+    const pulled = this.triggerEdge || this.pendingSetup;
+    const release = held && this.setupAiming && pulled;
 
     if (held && !release) {
-      if (!this.setupAiming) this.player.playSetup();
+      if (!this.setupAiming) {
+        this.player.playSetup();
+        this.pendingSetup = this.triggerEdge;
+      }
       this.setupAiming = true;
       // 体をカメラの方へ向ける。置く向き = 自分の向きなので、これが照準になる
       this.player.setThrowing(true);
       return;
     }
 
-    if (!this.setupAiming) return;
+    if (!this.setupAiming) {
+      /*
+       * 置き切る前に構えをやめた。**置かない** (手榴弾と同じ規則)。
+       *
+       * 手を離れるのは引き金を引いたあと。その間に構えを解けば腕は下りるので、
+       * 画面では置いていない。**見た通りに起きる**ほうを取る。
+       */
+      if (this.setupRelease > 0 && !held) {
+        this.setupRelease = 0;
+        this.player.cancelThrow();
+        this.player.setThrowing(false);
+      }
+      return;
+    }
     this.setupAiming = false;
+    this.pendingSetup = false;
     // 構えをやめただけなら置かない。覗いて場所を確かめる、が使える
     if (!release || !canPlace) {
       this.player.cancelThrow();
@@ -2201,7 +2410,7 @@ export class Game {
       return;
     }
 
-    this.inv.spend();
+    // **数を減らすのは置いた瞬間** (updateClaymoreRelease)
     this.player.releaseSetup();
     // 置き切るまでは向きを保つ。放した瞬間に向き直ると、置く先がずれる
     this.player.setThrowing(true);
@@ -2219,6 +2428,8 @@ export class Game {
     if (this.setupRelease > 0) return;
     this.setupRelease = 0;
     this.player.setThrowing(false);
+    // **数を減らすのはサーバーが置けたと言ってから** (claymorePlaced)。
+    // 壁の中や縁の外は断られるので、送った時点で減らすと置けずに減る
     this.net.send({ type: "claymore" });
   }
 
@@ -2231,6 +2442,31 @@ export class Game {
    * 無傷の速さなら送らない。1 層 (3.2m) 降りるたびに 1 通飛ぶのは無駄で、
    * 飛び降りて回り込むのは普通の動き方なので回数も多い。
    */
+  /**
+   * 落ちながら叫ぶ。
+   *
+   * **落ち切ってからでは間に合わない。** 死ぬのは着地した瞬間で、そこから
+   * 叫び始めると絵と音がずれる。落下中の速さから「このまま着くと何点削られるか」
+   * を出して、**今の体力で死ぬなら**その場で叫ぶ。
+   *
+   * 式はサーバーと同じ (domain/rule/damage.ts)。こちらは音を鳴らすだけで、
+   * 削るのはあちら。
+   */
+  private updateFallScream(): void {
+    if (this.player.fallingSpeed <= 0) {
+      this.fallScreamed = false;
+      return;
+    }
+    if (this.fallScreamed || !canAct(this.life)) return;
+    if (fallDamage(this.player.fallingSpeed) < this.player.health) return;
+    this.fallScreamed = true;
+    // 長いほう (3.3 秒)。落ちている間ずっと聞こえていてほしい
+    this.audio.play("blastScream", this.player.position);
+  }
+
+  /** この落下でもう叫んだか。着地するか、落ちるのをやめたら戻す */
+  private fallScreamed = false;
+
   private reportFall(): void {
     const speed = this.player.landedSpeed;
     if (speed <= 0 || !canAct(this.life)) return;
@@ -2267,6 +2503,18 @@ export class Game {
     if (this.player.isAiming) {
       this.browsing = null;
       return;
+    }
+
+    /*
+     * G。**一覧を開いていれば置く、開いていなければ拾う。**
+     *
+     * 同じ 1 つのキーにしてあるのは、どちらも「地面と手の間で物を動かす」
+     * 操作だから。押し分ける必要が出るのは、置きたい物の上に立っているときだけで、
+     * そのときは一覧を開いているかどうかで意図がはっきりしている。
+     */
+    if (this.input.consumeAction("drop", "KeyG")) {
+      if (this.browsing) this.dropSelected();
+      else this.net.send({ type: "pickup" });
     }
 
     // --- 長押しで一覧、離すと持ち替え ---
@@ -2327,13 +2575,42 @@ export class Game {
    *
    * 銃はモデルの読み込みが要る (equip) ので、変わった瞬間だけ呼ぶ。
    */
+  /**
+   * 一覧で選んでいる物を地面へ置く。
+   *
+   * **持ち物から外すのはこちら、地面に置くのはあちら。** 位置を持っているのが
+   * サーバーなので、置き場所はあちらが決める (足元)。残弾は本人しか知らないので
+   * 一緒に送る。
+   */
+  private dropSelected(): void {
+    if (!this.browsing) return;
+    const id = this.inv.list(this.browsing.family)[this.browsing.at]?.id;
+    if (!id || !canDrop(id)) return;
+    const gone = this.inv.drop(id);
+    if (!gone) return;
+    this.net.send({
+      type: "drop",
+      weapon: gone.id,
+      ammo: "ammo" in gone ? gone.ammo : undefined,
+      reserve: "reserve" in gone ? gone.reserve : undefined,
+      count: "count" in gone ? gone.count : undefined,
+    });
+    // 一覧は閉じる。置いた物を指したまま残ると、次に離した瞬間に
+    // 「持っていない物へ持ち替える」になる
+    this.browsing = null;
+    this.pressedAt.weapon = 0;
+    this.pressedAt.tool = 0;
+    // 音は dropped が返ってきたときに鳴らす。**置いた場所で鳴らしたい**し、
+    // ここでも鳴らすと自分だけ 2 回聞こえる
+  }
+
   private syncHeld(): void {
     const held = this.inv.held;
     if (held === this.player.heldItem) return;
     this.player.setHeld(held);
     // ダンボールは被る状態が別にある。持ち替えに合わせる
     this.player.setBoxed(this.inv.usingTool && held === "box");
-    if (held === "rifle" || held === "sniper" || held === "pistol") {
+    if (isGun(held)) {
       void this.player.equip(held);
     }
   }
@@ -2345,6 +2622,8 @@ export class Game {
     if (this.grenadeRelease > 0) return;
     this.grenadeRelease = 0;
     this.player.setThrowing(false);
+    // ここで初めて手を離れる。残り数が減るのもここ
+    this.inv.spend();
 
     // 向きはこの瞬間のもの。放す所まで狙いを追えるようにする
     this.follow.aimDirection(this.aimDir);
@@ -2476,6 +2755,31 @@ export class Game {
       this.audio.play("clink", this.player.position);
     }
   }
+
+  /**
+   * 自分の点が動いたことを控える。
+   *
+   * **数字はルールから引く** (domain/rule/scoring.ts)。ここで 3 や -2 を直に
+   * 書くと、点の付け方を変えたときに画面だけ古い数を出し続ける。
+   *
+   * 練習部屋のように点が記録されない部屋でも出る。**手応えとしての表示**なので、
+   * 記録に残るかどうかとは別で構わない。
+   */
+  private recordPoints(message: KillEvent): void {
+    const me = this.net.id;
+    const mine = message.killer === me;
+    const died = message.victim === me;
+    if (!mine && !died) return;
+
+    const suicide = mine && died;
+    const label = suicide ? "SUICIDE" : mine ? "KILL" : "DEATH";
+    const delta = suicide ? SUICIDE_POINTS : mine ? KILL_POINTS : DEATH_POINTS;
+    this.pointFeed.unshift({ label, delta, at: Date.now() });
+    this.pointFeed.length = Math.min(this.pointFeed.length, POINT_FEED_MAX);
+  }
+
+  /** 直近の点の増減。画面の右下に流す */
+  private readonly pointFeed: { label: string; delta: number; at: number }[] = [];
 
   /**
    * 姿の見えない相手が立てた音。
@@ -2676,6 +2980,19 @@ export class Game {
     if (this.statsTimer < STATS_INTERVAL || !this.onStats) return;
     this.statsTimer = 0;
     const now = Date.now();
+    /*
+     * 支度の間、カードは**これから湧く銃**を映す。
+     *
+     * 手には何も無い (戦場に居ない) ので、前の命の銃を出すと「P90 を選んだのに
+     * AK47 と出る」になる。装備画面で選んでいる物と食い違うのはここだけで、
+     * 直前まで持っていた物に用は無い。
+     */
+    const choosing = this.canChooseLoadout;
+    const shownWeapon: HeldId = choosing ? this.pendingLoadout.primary : this.inv.weapon;
+    const chosen = weaponOf(this.pendingLoadout.primary);
+    const shownAmmo = choosing
+      ? { magazine: chosen.magazine, reserve: chosen.reserve }
+      : { magazine: this.inv.ammoOf(shownWeapon), reserve: this.inv.reserveOf(shownWeapon) };
     this.onStats({
       stage: STAGE_CODE,
       backend: this.backend,
@@ -2687,9 +3004,9 @@ export class Game {
       shots: this.shotCount,
       // **武器のカードに出す数。** 手にある物ではなく、カードが名指している武器の
       // 弾。ダンボールを被っている間も銃の残弾はそのまま出す
-      ammo: this.inv.ammoOf(this.inv.weapon),
-      magazine: this.weapon.magazine,
-      reserve: this.inv.reserveOf(this.inv.weapon),
+      ammo: shownAmmo.magazine,
+      magazine: choosing ? chosen.magazine : this.weapon.magazine,
+      reserve: shownAmmo.reserve,
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
@@ -2710,6 +3027,16 @@ export class Game {
       health: this.player.health,
       maxHealth: MAX_HEALTH,
       dead: this.player.isDead,
+      /**
+       * 拾える物が近くにあるか。
+       *
+       * **距離はこちらで測る。** サーバーも拾うときに測っている (そちらが正) が、
+       * 「押せば拾える」を出すのに毎フレーム往復させるわけにいかない。
+       */
+      canPickUp: this.drops.nearest(this.player.position) <= PICKUP_RANGE,
+      points: this.pointFeed.filter(
+        (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
+      ),
       kills: this.killFeed.filter(
         (entry) => now - entry.at < KILL_FEED_DURATION * 1000,
       ),
@@ -2739,7 +3066,7 @@ export class Game {
         : null,
       held: this.inv.held,
       // **武器のカードに出す物。** 道具を手にしていても変わらない
-      weaponHeld: this.inv.weapon,
+      weaponHeld: shownWeapon,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
       browsingFamily: this.browsing?.family ?? null,

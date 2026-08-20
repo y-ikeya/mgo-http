@@ -89,7 +89,7 @@ docs:
 
 # 試験だけ。check の一部でもあるので、普段は check を叩けばよい。
 #
-# 単体 (src/sim/*.test.ts) は一瞬。統合 (test/) は 1 本ごとにサーバーを
+# 単体 (src/domain, src/sim の *.test.ts) は一瞬。統合 (test/) は 1 本ごとにサーバーを
 # 立てて実時間を待つので 50 秒ほどかかる。
 test:
 	bun test

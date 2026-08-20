@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../sim/surface'
-import { flagsOf } from '../sim/flags'
+import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../domain/surface'
+import { flagsOf } from '../domain/flags'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
   clamp,
@@ -22,6 +22,7 @@ import {
   vec3,
 } from 'three/tsl'
 import type { Obstacle } from '../sim/collision'
+import { isPathClear, sightBlockers } from '../sim/vision'
 import type { StageBox } from '../sim/vision'
 import { asset, loadStage } from './assets'
 import { isMesh } from './guards'
@@ -40,6 +41,15 @@ export const STAGE_CODE = 'AA'
 
 /** 地面の一辺 (m) */
 const GROUND_SIZE = 120
+
+/** 地面を割る数。明暗を頂点で持つので、粗いと段になる */
+const GROUND_CELLS = 40
+/** 地面から浮かせて光線を撃つ高さ (m)。自分自身に当たらないように */
+const GROUND_SKY_EPS = 0.05
+/** 光線を飛ばす距離 (m) */
+const GROUND_SKY_REACH = 60
+/** 一番暗い所の明るさ。0 にすると建物の奥が真っ黒になる (tools/bake_stage.py と同じ) */
+const GROUND_SKY_FLOOR = 0.3
 
 /**
  * 天空光の強さ。日陰の明るさはこれで決まる。
@@ -152,28 +162,37 @@ export const ARENA_HALF_SIZE = GROUND_SIZE / 2
  * (原点のままだと生成直後にコリジョンで建物の外へ弾き出される)
  */
 /**
- * チームごとの湧き位置。
+ * チームごとの湧き位置。**対角の角。**
  *
- * 南北の端に分けてある。ステージは y=0 を挟んで左右対称に作ってあるので、
- * どちらの陣営も同じ形の地形から始まる。目の前には 1.9m の遮蔽があり、
- * 出た瞬間に撃たれることはない。
+ * 辺の中央どうしに置いていた頃は、どちらから出ても同じ 1 本の通りを進むことに
+ * なっていた。角どうしにすると**建物を斜めに横切る**ので、西のスロープから
+ * 上がるか、東の階段まで回るか、地上を突っ切るかが分かれる。
+ *
+ * 原点を挟んで点対称なので、どちらの陣営も同じ形の地形から始まる。
+ * 湧き地点の脇には L 字の遮蔽があり、出た瞬間に 2 方向から抜かれることはない
+ * (tools/make_garage.py の「湧き地点の遮蔽」)。
  */
 export const TEAM_SPAWNS = {
-  blue: { x: 0, z: 35 },
-  red: { x: 0, z: -35 },
+  blue: { x: -30, z: 30 },
+  red: { x: 30, z: -30 },
 } as const
 
 /**
- * 基地の枠の大きさ (m)。中心から端まで。
+ * 基地の枠の大きさ (m)。中心から端まで。**4m 角。**
  *
- * **これ以上は小さくできない。** 湧く位置は基地の中心から半径 4m
- * (Game.ts の SPAWN_SPREAD) の円周上に散るので、4 を下回ると
- * **自分の基地の外に立つ**ことになる。0.5m だけ余裕を持たせてある。
- *
- * もっと小さくしたいなら、先に SPAWN_SPREAD を縮める。ただしあれは
- * 湧いた人どうしが重ならないための距離なので、詰めると出会い頭が増える。
+ * 湧く位置は基地の中心から半径 SPAWN_SPREAD (Game.ts) の円周上に散るので、
+ * **ここを縮めたら向こうも縮める**。外に立つと枠が「自分の場所」に見えない。
  */
-const BASE_HALF = 4.5
+const BASE_HALF = 2
+
+/**
+ * 枠線の太さ (m)。
+ *
+ * **線ではなく板で描く。** THREE.Line の linewidth は WebGL / WebGPU では
+ * 効かない (常に 1px) ので、太さが欲しければ面を張るしかない。1px の線は
+ * 離れると消えるし、真上から見ないと読めなかった。
+ */
+const BASE_LINE = 0.2
 
 /** 枠を描く高さ (m)。地面と z 争いしない程度に浮かせる */
 const BASE_Y = 0.03
@@ -193,27 +212,51 @@ const BASE_COLOR = { blue: 0x7ea6ff, red: 0xff8a72 } as const
 export function buildBases(): THREE.Object3D {
   const group = new THREE.Group()
   for (const [team, base] of Object.entries(TEAM_SPAWNS)) {
-    const points = [
-      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z - BASE_HALF),
-      new THREE.Vector3(base.x + BASE_HALF, BASE_Y, base.z - BASE_HALF),
-      new THREE.Vector3(base.x + BASE_HALF, BASE_Y, base.z + BASE_HALF),
-      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z + BASE_HALF),
-      new THREE.Vector3(base.x - BASE_HALF, BASE_Y, base.z - BASE_HALF),
-    ]
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      // 露出に左右されない。位置を示すための線なので、明るさが変わっても読めてほしい
-      new THREE.LineBasicMaterial({
+    const frame = new THREE.Mesh(
+      frameGeometry(BASE_HALF, BASE_LINE),
+      // 露出に左右されない。位置を示すための印なので、明るさが変わっても読めてほしい
+      new THREE.MeshBasicMaterial({
         color: BASE_COLOR[team as keyof typeof BASE_COLOR],
         transparent: true,
         opacity: 0.55,
         toneMapped: false,
+        side: THREE.DoubleSide,
       }),
     )
-    line.frustumCulled = false
-    group.add(line)
+    frame.position.set(base.x, BASE_Y, base.z)
+    frame.frustumCulled = false
+    group.add(frame)
   }
   return group
+}
+
+/**
+ * 地面に寝かせる「額縁」。中を空けた四角。
+ *
+ * 4 枚の板を重ねて置くと、角が二重になって半透明のそこだけ濃くなる。
+ * 外周と内周の 8 点から帯を張れば、重なりが出ない。
+ */
+function frameGeometry(half: number, width: number): THREE.BufferGeometry {
+  const inner = Math.max(0.01, half - width)
+  const ring = (h: number) => [
+    [-h, -h],
+    [h, -h],
+    [h, h],
+    [-h, h],
+  ]
+  const outer = ring(half)
+  const hole = ring(inner)
+  const points: number[] = []
+  const push = (p: number[]) => points.push(p[0], 0, p[1])
+  for (let k = 0; k < 4; k++) {
+    const n = (k + 1) % 4
+    push(outer[k]); push(outer[n]); push(hole[n])
+    push(outer[k]); push(hole[n]); push(hole[k])
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3))
+  geometry.computeVertexNormals()
+  return geometry
 }
 
 export interface Stage {
@@ -236,7 +279,68 @@ export interface Stage {
  * テクスチャが届いたら applyStructureTexture が上書きする。
  */
 function createBlockoutMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color: 0x6b7684, roughness: 0.85, metalness: 0.05 })
+  return new THREE.MeshStandardMaterial({
+    color: 0x6b7684,
+    roughness: 0.85,
+    metalness: 0.05,
+    /*
+     * **焼いた「空の見え方」を掛ける。**
+     *
+     * 環境光 (HemisphereLight) はどこでも同じ明るさで当たるので、そのままだと
+     * 建物の奥も外の縁も同じ灰色になる。実際の光は開口から入って奥ほど届かない。
+     *
+     * 頂点色に「その点から空がどれだけ見えるか」が入っている
+     * (tools/bake_stage.py)。屋上 0.97 / 1 階の奥 0.39 くらい。
+     */
+    vertexColors: true,
+  })
+}
+
+/**
+ * 地面に「空がどれだけ見えるか」を塗る。
+ *
+ * 建物の中の床は**この地面そのもの** (1 階の床は敷いていない) なので、ここを
+ * 塗らないと歩いている足元だけ平らな明るさのまま残る。
+ *
+ * 焼き方は tools/bake_stage.py と同じ考え方 — 上半球へ光線を飛ばして、遮られ
+ * なかった割合を色にする。あちらは書き出しのときに 1 度、こちらは地面が
+ * コードで作られているので読み込みのたびに。1600 点 × 9 本なので一瞬で終わる。
+ */
+async function bakeGroundSky(geometry: THREE.BufferGeometry): Promise<void> {
+  const boxes = sightBlockers(await loadStageBoxes())
+  if (boxes.length === 0) return
+
+  const position = geometry.getAttribute('position')
+  const colors = new Float32Array(position.count * 3)
+  // 上半球へ。真上と、斜め 45 度を 8 方向
+  const rays: [number, number, number][] = [[0, 1, 0]]
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2
+    rays.push([Math.cos(angle) * 0.7, 0.7, Math.sin(angle) * 0.7])
+  }
+
+  for (let i = 0; i < position.count; i++) {
+    // PlaneGeometry は XY 平面で作られていて、あとで寝かせている。
+    // ここではまだ回っていないので x, y がワールドの x, z にあたる
+    const x = position.getX(i)
+    const z = -position.getY(i)
+    let open = 0
+    for (const [dx, dy, dz] of rays) {
+      const clear = isPathClear(
+        x, GROUND_SKY_EPS, z,
+        x + dx * GROUND_SKY_REACH, dy * GROUND_SKY_REACH, z + dz * GROUND_SKY_REACH,
+        boxes,
+      )
+      // 真上を厚く見る。空は上に広い
+      if (clear) open += dy
+    }
+    const weight = rays.reduce((sum, r) => sum + r[1], 0)
+    const sky = GROUND_SKY_FLOOR + (1 - GROUND_SKY_FLOOR) * (open / weight)
+    colors[i * 3] = sky
+    colors[i * 3 + 1] = sky
+    colors[i * 3 + 2] = sky
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 }
 
 /**
@@ -552,7 +656,7 @@ async function applyGroundTexture(material: THREE.MeshStandardMaterial): Promise
 /**
  * オブジェクト名の規約。
  *
- * 何を止めるかは名前に書く (src/sim/flags.ts)。描画と判定を別のメッシュに
+ * 何を止めるかは名前に書く (src/domain/flags.ts)。描画と判定を別のメッシュに
  * 分けるのも、金網のように「人は止めるが弾は通す」物を作るのも、同じ仕組みで表せる。
  */
 
@@ -605,9 +709,12 @@ export function buildStage(scene: THREE.Scene): Stage {
     color: 0x424b57,
     roughness: 0.95,
     metalness: 0,
+    // 地面にも空の見え方を掛ける (下の bakeGroundSky)。建物の中は暗くなる
+    vertexColors: true,
   })
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
+    // **細かく割る。** 明暗は頂点で持つので、1 枚の四角では中が塗れない
+    new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE, GROUND_CELLS, GROUND_CELLS),
     groundMaterial,
   )
   ground.rotation.x = -Math.PI / 2
@@ -616,6 +723,8 @@ export function buildStage(scene: THREE.Scene): Stage {
   collidables.push(ground)
   // テクスチャは非同期。届くまでは単色のまま出しておく。
   void applyGroundTexture(groundMaterial)
+  // 明暗は箱が届いてから。**歩く床がここ**なので、ここが平らだと効果が出ない
+  void bakeGroundSky(ground.geometry)
 
   // stage.glb が届いたら丸ごと外せるよう 1 つにまとめておく
   const blockout = new THREE.Group()

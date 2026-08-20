@@ -13,6 +13,7 @@
 |---|---|---|---|
 | [Old Rusty Car](https://sketchfab.com/3d-models/old-rusty-car-95baa20ebc5d4d2e869f0b549be838fe) | 立体駐車場に停めてある車 | [Renafox](https://sketchfab.com/kryik1023) | CC-BY-**NC** 4.0 |
 | [Small price car](https://sketchfab.com/3d-models/small-price-car-67c84e4d30ae42fda22c0a0c7526df26) | 同上 | [Oliv1e](https://sketchfab.com/Oliv1e) | CC-BY 4.0 |
+| [P90 Final](https://sketchfab.com/3d-models/p90-final-cd59e752d0a34623a0e61a5623ee2762) | サブマシンガン (`public/models/smg.glb`) | [charles.cla](https://sketchfab.com/charles.cla) | CC-BY-**NC** 4.0 |
 
 そのまま貼る文言:
 
@@ -20,12 +21,21 @@
 
 > This work is based on "Small price car" (https://sketchfab.com/3d-models/small-price-car-67c84e4d30ae42fda22c0a0c7526df26) by Oliv1e (https://sketchfab.com/Oliv1e) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
-### NC (非営利) が 1 つ混ざっている
+> This work is based on "P90 Final" (https://sketchfab.com/3d-models/p90-final-cd59e752d0a34623a0e61a5623ee2762) by charles.cla (https://sketchfab.com/charles.cla) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
 
-Old Rusty Car は **商用利用ができない**。いま遊びで作っている分には問題ないが、
-広告を置く・課金する・仕事の実績として売る、といった話が出たらこのモデルは
-差し替えることになる。差し替えるのは `tools/props/car_rusty.glb` の 1 つで、
-`tools/convert_car.py` に同じ全長を渡せば同じ場所に収まる。
+### NC (非営利) が 2 つ混ざっている
+
+Old Rusty Car と P90 は **商用利用ができない**。いま遊びで作っている分には
+問題ないが、広告を置く・課金する・仕事の実績として売る、といった話が出たら
+どちらも差し替えることになる。
+
+- 車 … `tools/props/car_rusty.glb`。`tools/convert_car.py` に同じ全長を渡す
+- P90 … `public/models/smg.glb`。別の glTF を拾って
+
+      $BLENDER -b --factory-startup --python tools/convert_gltf_gun.py -- \
+          <scene.gltf> public/models/smg.glb 0.5 max
+
+  で同じ規約に揃う (銃口が -Z、全長 0.5m)。握りの位置は Calibrator で詰め直す。
 
 ## 表示が要らないもの
 

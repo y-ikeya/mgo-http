@@ -7,13 +7,13 @@ import {
   WEAPONS,
   type SupportId,
   type WeaponId,
-} from '../sim/weapons'
+} from '../domain/item/weapons'
 import './Loadout.css'
 
 /**
  * 装備を組む画面。
  *
- * 支度をしている間だけ出る (sim/lifecycle.ts の choosing)。出す / 出さないは
+ * 支度をしている間だけ出る (domain/lifecycle.ts の choosing)。出す / 出さないは
  * サーバーが持つ状態がそのまま決めていて、こちらに開閉の札は無い。
  * 札を持っていた頃は、閉じたまま開き直らない場面があった。
  *
@@ -104,7 +104,8 @@ export default function Loadout(props: {
                   onClick={() => props.onSupport(id)}
                 >
                   <span class="loadout-name">
-                    <span class="loadout-key">{i() + 3}</span>
+                    {/* 主武器の続きの番号。挺数から出す (直に書くと重なる) */}
+                    <span class="loadout-key">{CHOICES.primary.length + 1 + i()}</span>
                     {SUPPORT_SPECS[id].label}
                   </span>
                   <span class="loadout-spec">

@@ -14,10 +14,10 @@
  * three.js に依存しない。サーバー (bun) がこのファイルをそのまま読む。
  */
 
-import { MOVE_DIRECTIONS, type Locomotion } from '../sim/locomotion'
+import { MOVE_DIRECTIONS, type Locomotion } from '../domain/locomotion'
 import type { PlayerSnapshot } from './types'
-import type { WeaponId } from '../sim/weapons'
-import type { HeldId } from '../sim/held'
+import type { WeaponId } from '../domain/item/weapons'
+import type { HeldId } from '../domain/item/held'
 
 /** 先頭 1 バイト。将来 2 進の種類が増えたときに見分ける */
 export const PACKET_STATE = 1
@@ -53,6 +53,10 @@ export const LOCOMOTIONS: Locomotion[] = [
   'claymore_place',
   // しゃがんだまま刺す。**末尾に足す**
   'crouch_stab',
+  // 落下の受け身。**末尾に足す**
+  'fall_roll',
+  // 階段を上る。**末尾に足す**
+  'up_stair',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -106,17 +110,21 @@ const FLAG_CROUCHING = 2
 const FLAG_CONCENTRATING = 8
 const FLAG_SALUTE = 16
 /**
- * 持っている銃。2 ビットで 4 種類まで。
+ * 持っている銃。2 ビットで 4 種類まで。**P90 で埋まった。**
  *
  * 見た目 (相手が何を構えているか) と、サーバーの威力の計算に要る。
- * 銃を増やすときはここを広げる — 足りないまま増やすと、
- * 別の銃として扱われて威力が変わる (狙撃銃で実際に起きた)。
+ * 銃を増やすときはここを広げる — 足りないまま増やすと、別の銃として扱われて
+ * 威力が変わる (狙撃銃で実際に起きた)。
+ *
+ * 次の 1 挺 (SG) を足すときは、ここを広げるのではなく **held (u8) に寄せる**。
+ * 「いま手にある物」は既にあちらが 1 バイトで持っていて、この 2 ビットは
+ * 同じことを別の場所で言っている。
  */
 const FLAG_WEAPON_LOW = 32
 const FLAG_WEAPON_HIGH = 128
 
 /** 番号の並び。変えると古い版が別の銃として読む */
-const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol']
+const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol', 'smg']
 
 /**
  * 手にある物の番号。**末尾に足す** — 並びを変えると古い版が別の物を持って見える。
@@ -125,6 +133,7 @@ const HELD_BITS: HeldId[] = [
   'rifle', 'sniper', 'pistol', 'grenade', 'claymore', 'magazine', 'knife', 'box',
   // 道具を使っていない状態。**末尾に足す**
   'none',
+  'smg',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 
@@ -137,6 +146,13 @@ const FLAG2_RELOADING = 1
  * 席番号と同じで、こちらが知っていることはこちらで書く。
  */
 const FLAG2_PROTECTED = 2
+/**
+ * **ピンを抜いて振りかぶっている。**
+ *
+ * 「手榴弾を手にしている」(held) とは別。抜いてしまえば、撃たれて手を離しても
+ * 足元で爆ぜる — サーバーはその判断にこれを使う。手にしているだけなら落ちない。
+ */
+const FLAG2_WINDUP = 4
 
 /** 位置を詰める。slot は送る側では 0 (サーバーが書き込む) */
 export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer {
@@ -166,7 +182,10 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   const turns = snapshot.cameraYaw / (Math.PI * 2)
   view.setUint16(OFF_CAMERA_YAW, Math.round((turns - Math.floor(turns)) * 65536) & 0xffff)
 
-  view.setUint8(OFF_FLAGS2, snapshot.reloading ? FLAG2_RELOADING : 0)
+  view.setUint8(
+    OFF_FLAGS2,
+    (snapshot.reloading ? FLAG2_RELOADING : 0) | (snapshot.holdingGrenade ? FLAG2_WINDUP : 0),
+  )
   view.setUint8(OFF_HELD, HELD_INDEX.get(snapshot.held) ?? 0)
 
   return buffer
@@ -196,7 +215,8 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
       WEAPON_BITS[
         ((flags & FLAG_WEAPON_LOW) !== 0 ? 1 : 0) | ((flags & FLAG_WEAPON_HIGH) !== 0 ? 2 : 0)
       ] ?? 'rifle',
-    holdingGrenade: held === 'grenade',
+    // **振りかぶっているか。** 手にしているだけでは立たない
+    holdingGrenade: (view.getUint8(OFF_FLAGS2) & FLAG2_WINDUP) !== 0,
     cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,
     reloading: (view.getUint8(OFF_FLAGS2) & FLAG2_RELOADING) !== 0,
     protectedNow: (view.getUint8(OFF_FLAGS2) & FLAG2_PROTECTED) !== 0,

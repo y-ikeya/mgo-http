@@ -4,6 +4,7 @@ import { profilesAvailable } from '../net/profile'
 import { useLevels } from '../net/levels'
 import { t } from '../i18n'
 import { useNavigate } from '@solidjs/router'
+import { MODES } from '../domain/room'
 import { fetchRooms } from '../net/rooms'
 import type { MatchPhase, RoomSummary } from '../net/types'
 import type { Identity } from '../auth/session'
@@ -59,6 +60,8 @@ export default function Lobby(props: { identity: Identity }) {
   })
 
   const full = (room: RoomSummary) => room.players >= room.capacity
+  /** 入れない部屋。まだ開けていないルール (TSNE は非殺傷武器が要る) */
+  const shut = (room: RoomSummary) => !room.active
 
   /**
    * 部屋へ移るとき、クエリをそのまま持っていく。
@@ -93,13 +96,26 @@ export default function Lobby(props: { identity: Identity }) {
       <div class="lobby-rooms">
         <For each={rooms()}>
           {(room) => (
-            <div class="room" classList={{ 'room-full': full(room), 'room-live': room.phase === 'playing' }}>
+            <div
+              class="room"
+              classList={{
+                'room-full': full(room),
+                'room-live': room.phase === 'playing',
+                'room-shut': shut(room),
+              }}
+            >
               {/*
                 入るのはこのボタン。**名前の札は別のボタン**なので、行ごと
                 1 つのボタンにはできない (button の中に button は置けない)。
               */}
-              <button class="room-enter" disabled={full(room)} onClick={() => enter(room.name)}>
+              <button
+                class="room-enter"
+                disabled={full(room) || shut(room)}
+                onClick={() => enter(room.name)}
+              >
               <span class="room-name">{room.name}</span>
+              {/* **どのルールの部屋かを一覧で見せる。** 入ってから分かるのでは遅い */}
+              <span class="room-mode">{room.mode}</span>
 
               <span class="room-count">
                 <span class="room-count-now">{room.players}</span>
@@ -111,9 +127,10 @@ export default function Lobby(props: { identity: Identity }) {
                 <span class="room-bar-fill" style={{ width: `${(room.players / room.capacity) * 100}%` }} />
               </span>
 
-              <span class="room-phase">{PHASE_LABEL[room.phase]()}</span>
+              <span class="room-phase">{shut(room) ? '準備中' : PHASE_LABEL[room.phase]()}</span>
 
-              <Show when={room.phase === 'playing' || room.phase === 'over'}>
+              {/* 残機は削り合う部屋だけ。休憩と練習に 0–0 が出ても意味が無い */}
+              <Show when={MODES[room.mode].tickets && (room.phase === 'playing' || room.phase === 'over')}>
                 <span class="room-score">
                   <span class="room-blue">{room.blue}</span>
                   <span class="room-dash">–</span>

@@ -3,7 +3,7 @@ import { isBone } from './guards'
 import { damp } from './math'
 import { rootMotionStore, type RootMotionTrack } from './assets'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
-import { MOVE_DIRECTIONS, type Locomotion, type MoveDirection } from '../sim/locomotion'
+import { MOVE_DIRECTIONS, type Locomotion, type MoveDirection } from '../domain/locomotion'
 
 
 /**
@@ -48,6 +48,10 @@ const AIM_HIP_LAMBDA = 10
  */
 const LOWER_CLIPS: Record<Locomotion, string> = {
   idle: 'idle',
+  // 落下の受け身。着地 (jump_down) とは別のクリップ
+  fall_roll: 'fall_roll',
+  // 階段を上る。**下半身だけ** — 上は構えたまま上れる
+  up_stair: 'up_stair',
   crouch_idle: 'crouch_idle',
   sneak: 'sneak',
   sit: 'sit',
@@ -92,6 +96,7 @@ type UpperState =
   | 'stab'
   | 'crouch_stab'
   | 'roll'
+  | 'fall_roll'
   | 'death'
   | 'hit'
   | 'salute'
@@ -317,6 +322,13 @@ const SETUP_RELEASE_KEY = 'claymore_place'
  */
 const SETUP_RELEASE_RATE = 2.2
 const ROLL_KEY = 'roll'
+/**
+ * 落下の受け身。**上半身にも同じクリップを流す。**
+ *
+ * 下だけに流したら、銃を構えたまま脚だけが転がった。全身の型は上下ともに
+ * 差し替えないと、腰から上が構えの姿勢のまま残る。
+ */
+const FALL_ROLL_KEY = 'fall_roll'
 const DEATH_KEY = 'death'
 
 /**
@@ -349,6 +361,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   SETUP_WINDUP_KEY,
   SETUP_RELEASE_KEY,
   ROLL_KEY,
+  FALL_ROLL_KEY,
   DEATH_KEY,
   HIT_KEY,
   SALUTE_KEY,
@@ -649,12 +662,22 @@ export class CharacterAnimator {
   private readonly onFinished = (event: { action: THREE.AnimationAction }) => {
     // ワンショット (リロード) が終わったら構えに戻す
     const finished = event.action
+    /*
+     * **倒れていたら戻さない。**
+     *
+     * 死ぬ直前に流していた型 (受け身・転がり・刺突…) は、死んだあとも尺の
+     * 分だけ動き続けて終わる。その「終わった」で構えへ戻すと、**死体の
+     * 上半身だけが銃を構え直す**。落下の受け身 (1.67 秒) は死んでから終わる
+     * ことが多いので、そこで必ず出ていた。
+     */
+    if (this.upperState === 'death') return
     // 倒れたときだけは戻さない。最終ポーズのまま留める。
     if (
       finished === this.upper.get(RELOAD_KEY) ||
       finished === this.upper.get(PISTOL_RELOAD_KEY) ||
       finished === this.upper.get(STAB_KEY) ||
       finished === this.upper.get(ROLL_KEY) ||
+      finished === this.upper.get(FALL_ROLL_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
@@ -884,6 +907,13 @@ export class CharacterAnimator {
     }
     this.rollDuration = roll?.duration ?? 0
 
+    const fallRoll = byName.get('fall_roll')
+    if (fallRoll) {
+      const action = registerUpper(FALL_ROLL_KEY, fallRoll)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+
     const death = byName.get('death')
     if (death) {
       const action = registerUpper(DEATH_KEY, death)
@@ -970,6 +1000,7 @@ export class CharacterAnimator {
       (this.upperState === 'stab' && this.locomotion !== 'crouch_stab') ||
       this.upperState === 'salute' ||
       this.upperState === 'roll' ||
+      this.upperState === 'fall_roll' ||
       this.upperState === 'death' ||
       this.upperState === 'hit'
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
@@ -1244,8 +1275,14 @@ export class CharacterAnimator {
    */
   private pistol = false
 
-  setPistol(holding: boolean): void {
-    this.pistol = holding
+  /**
+   * 片手で持っているか。**走り方と構えの型が変わる。**
+   *
+   * 名前は拳銃から来ているが、決めているのは「片手か両手か」。手榴弾や
+   * ナイフを持っているときも片手で、身軽に走る (domain の twoHanded)。
+   */
+  setPistol(oneHanded: boolean): void {
+    this.pistol = oneHanded
   }
 
 
@@ -1439,6 +1476,8 @@ export class CharacterAnimator {
     // 起き上がりは中断できない。撃つ操作より優先する
     if (this.upperState === 'stand' && this.upper.has(STAND_KEY)) return STAND_KEY
     if (this.upperState === 'roll' && this.upper.has(ROLL_KEY)) return ROLL_KEY
+    // 落下の受け身も中断させない。**上半身だけ構えに戻ると、脚だけ転がる**
+    if (this.upperState === 'fall_roll' && this.upper.has(FALL_ROLL_KEY)) return FALL_ROLL_KEY
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
     //
@@ -1483,6 +1522,25 @@ export class CharacterAnimator {
     }
     action.reset().play()
     this.locomotion = 'jump_up'
+  }
+
+  /**
+   * 落下の受け身。**削られる高さから落ちたときだけ。**
+   *
+   * ただの着地 (playLanding) と分ける。体力が減ったことが体の動きにも出る
+   * ようにしたいので、転がる型を最後まで流す。
+   */
+  playFallRoll(): void {
+    if (this.dead) return
+    const upper = this.upper.get(FALL_ROLL_KEY)
+    const lower = this.lower.get('fall_roll')
+    if (!upper || !lower) return
+    // **上下そろえて流す。** 下だけだと銃を構えたまま脚が転がる
+    upper.reset().play()
+    lower.reset().play()
+    this.upperState = 'fall_roll'
+    this.locomotion = 'fall_roll'
+    this.rootSampleValid = false
   }
 
   /** 着地のモーション。頭から流す */
@@ -1606,12 +1664,16 @@ export class CharacterAnimator {
   /** やめる。腕を下ろして構えに戻す (倒された・箱に入った) */
   cancelThrow(): void {
     if (this.upperState !== 'throw' || !this.pair) return
-    this.upper.get(this.pair.windup)?.stop()
-    this.upper.get(this.pair.release)?.stop()
-    if (this.pair.whole) {
-      this.lower.get(this.pair.windup as Locomotion)?.stop()
-      this.lower.get(this.pair.release as Locomotion)?.stop()
-    }
+    /*
+     * **止めない。重みを構えへ移すだけ。**
+     *
+     * stop() すると、その型はもう再生されていないのに重みの行き先としては
+     * 残る。合計が 1 に届かず、足りない分に**バインドポーズ (T ポーズ)** が
+     * 混ざる — 構えを解いた瞬間に一瞬だけ棒立ちになっていたのはこれ。
+     *
+     * 一度きりの型なので、放っておいても終わりで止まる。重みは blend が
+     * 0 まで落とすので、それまでの数フレームは腕を下ろす動きとして見える。
+     */
     this.pair = null
     this.upperState = 'stance'
   }
@@ -1788,12 +1850,25 @@ export class CharacterAnimator {
   }
 
   /** リロードモーションを頭から再生する。終わると自動で構えに戻る */
-  playReload(): void {
+  /**
+   * 弾倉を替える。
+   *
+   * @param seconds 掛ける時間。**銃ごとに違う** (domain/item/weapons.ts) ので、
+   *   クリップの尺をそこへ合わせて伸び縮みさせる。
+   *
+   * --- なぜ尺を合わせるか ---
+   * 型は 1 本しかない (拳銃だけ別)。**時間をクリップ任せにすると、どの銃も
+   * 同じ 3.33 秒になる。** 表には P90 3.0 / AK47 2.5 / XM2010 3.2 と書いてあるのに
+   * 全部同じ手応えで、「P90 を選んでいるのに AK が入っている」ように感じていた。
+   */
+  playReload(seconds = 0): void {
     if (this.dead) return
     // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
     const key = this.pistol && this.upper.has(PISTOL_RELOAD_KEY) ? PISTOL_RELOAD_KEY : RELOAD_KEY
     const action = this.upper.get(key)
     if (!action) return
+    const clip = action.getClip().duration
+    action.setEffectiveTimeScale(seconds > 0 && clip > 0 ? clip / seconds : 1)
     action.reset().play()
     this.upperState = 'reload'
   }
