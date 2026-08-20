@@ -451,6 +451,10 @@ export class Game {
   private grenadeAiming = false;
   /** 構え始めと同じフレームに引かれた引き金。次のフレームで放す */
   private pendingThrow = false;
+  /** クレイモア側の同じもの */
+  private pendingSetup = false;
+  /** 弾倉 (囮) 側の同じもの */
+  private pendingDecoy = false;
   /**
    * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
    *
@@ -2119,18 +2123,22 @@ export class Game {
     const canThrow =
       this.inv.held === "magazine" && canAct(this.life) && !this.cocking;
     const held = canThrow && this.input.aiming;
-    const release = held && this.throwAiming && this.triggerEdge;
+    // 手榴弾・クレイモアと同じ規則。構え始めと同じフレームの分も覚えておく
+    const pulled = this.triggerEdge || this.pendingDecoy;
+    const release = held && this.throwAiming && pulled;
 
     if (held && !release) {
       this.follow.aimOrigin(this.aimOrigin);
       this.follow.aimDirection(this.aimDir);
       this.thrown.showPreview(this.aimOrigin, this.aimDir, this.stage.collidables);
+      if (!this.throwAiming) this.pendingDecoy = this.triggerEdge;
       this.throwAiming = true;
       return;
     }
 
     if (!this.throwAiming) return;
     this.throwAiming = false;
+    this.pendingDecoy = false;
     this.thrown.hidePreview();
     // 構えをやめただけ / 解かされただけ (死んだ・箱に入った) なら投げない
     if (!release || !canThrow) return;
@@ -2203,7 +2211,7 @@ export class Game {
       this.player.setThrowing(false);
     }
     // クレイモアから離れたときも同じ。**構えっぱなしで腕が上がったまま**になる
-    if (this.inv.held !== "claymore" && this.setupAiming) {
+    if (this.inv.held !== "claymore" && this.setupAiming && this.setupRelease <= 0) {
       this.setupAiming = false;
       this.player.cancelThrow();
       this.player.setThrowing(false);
@@ -2339,18 +2347,37 @@ export class Game {
       !this.player.downed &&
       !this.cocking;
     const held = canPlace && this.input.aiming;
-    const release = held && this.setupAiming && this.triggerEdge;
+    // 手榴弾と同じ規則。**構え始めと同じフレームに引かれた分も覚えておく**
+    const pulled = this.triggerEdge || this.pendingSetup;
+    const release = held && this.setupAiming && pulled;
 
     if (held && !release) {
-      if (!this.setupAiming) this.player.playSetup();
+      if (!this.setupAiming) {
+        this.player.playSetup();
+        this.pendingSetup = this.triggerEdge;
+      }
       this.setupAiming = true;
       // 体をカメラの方へ向ける。置く向き = 自分の向きなので、これが照準になる
       this.player.setThrowing(true);
       return;
     }
 
-    if (!this.setupAiming) return;
+    if (!this.setupAiming) {
+      /*
+       * 置き切る前に構えをやめた。**置かない** (手榴弾と同じ規則)。
+       *
+       * 手を離れるのは引き金を引いたあと。その間に構えを解けば腕は下りるので、
+       * 画面では置いていない。**見た通りに起きる**ほうを取る。
+       */
+      if (this.setupRelease > 0 && !held) {
+        this.setupRelease = 0;
+        this.player.cancelThrow();
+        this.player.setThrowing(false);
+      }
+      return;
+    }
     this.setupAiming = false;
+    this.pendingSetup = false;
     // 構えをやめただけなら置かない。覗いて場所を確かめる、が使える
     if (!release || !canPlace) {
       this.player.cancelThrow();
@@ -2358,7 +2385,7 @@ export class Game {
       return;
     }
 
-    this.inv.spend();
+    // **数を減らすのは置いた瞬間** (updateClaymoreRelease)
     this.player.releaseSetup();
     // 置き切るまでは向きを保つ。放した瞬間に向き直ると、置く先がずれる
     this.player.setThrowing(true);
@@ -2376,6 +2403,8 @@ export class Game {
     if (this.setupRelease > 0) return;
     this.setupRelease = 0;
     this.player.setThrowing(false);
+    // ここで初めて手を離れる。残り数が減るのもここ
+    this.inv.spend();
     this.net.send({ type: "claymore" });
   }
 
