@@ -67,3 +67,32 @@ describe('落下の受け身', () => {
     expect(playing(anim, 'lower')).toEqual(['death'])
   })
 })
+
+describe('構えを解く', () => {
+  /** 動いている型の重みの合計。**1 に届かない分は T ポーズが埋める** */
+  function total(anim: CharacterAnimator, layer: 'upper' | 'lower'): number {
+    const actions = (anim as unknown as Record<string, Map<string, THREE.AnimationAction>>)[layer]
+    let sum = 0
+    for (const [, action] of actions) {
+      if (action.isRunning()) sum += action.getEffectiveWeight()
+    }
+    return sum
+  }
+
+  test('**振りかぶりを解いても T ポーズを挟まない**', () => {
+    const anim = animator()
+    run(anim, 0.5, 'idle', true)
+    anim.playThrow()
+    run(anim, 0.3, 'idle', true)
+    expect(total(anim, 'upper')).toBeGreaterThan(0.99)
+
+    // Shift を離してやめる。**ここで一瞬 T ポーズになっていた**
+    anim.cancelThrow()
+    for (let i = 0; i < 30; i++) {
+      anim.setLocomotion('idle')
+      anim.setAiming(true)
+      anim.update(1 / 60)
+      expect(total(anim, 'upper')).toBeGreaterThan(0.99)
+    }
+  })
+})

@@ -1656,12 +1656,16 @@ export class CharacterAnimator {
   /** やめる。腕を下ろして構えに戻す (倒された・箱に入った) */
   cancelThrow(): void {
     if (this.upperState !== 'throw' || !this.pair) return
-    this.upper.get(this.pair.windup)?.stop()
-    this.upper.get(this.pair.release)?.stop()
-    if (this.pair.whole) {
-      this.lower.get(this.pair.windup as Locomotion)?.stop()
-      this.lower.get(this.pair.release as Locomotion)?.stop()
-    }
+    /*
+     * **止めない。重みを構えへ移すだけ。**
+     *
+     * stop() すると、その型はもう再生されていないのに重みの行き先としては
+     * 残る。合計が 1 に届かず、足りない分に**バインドポーズ (T ポーズ)** が
+     * 混ざる — 構えを解いた瞬間に一瞬だけ棒立ちになっていたのはこれ。
+     *
+     * 一度きりの型なので、放っておいても終わりで止まる。重みは blend が
+     * 0 まで落とすので、それまでの数フレームは腕を下ろす動きとして見える。
+     */
     this.pair = null
     this.upperState = 'stance'
   }
