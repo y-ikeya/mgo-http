@@ -598,7 +598,8 @@
 .hud-browse-item {
   box-sizing: border-box;
   width: 168px;
-  min-height: 68px;
+  /* 角のカード (hud-weapon) と同じ高さ */
+  min-height: 74px;
   padding: 8px 12px 10px;
   display: flex;
   flex-direction: column;
@@ -635,7 +636,8 @@
 .hud-weapon {
   position: absolute;
   right: 22px;
-  bottom: 20px;
+  /* 状態の行 (hud-weapon-states) がこの下に入る */
+  bottom: 38px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -653,8 +655,17 @@
    */
   box-sizing: border-box;
   width: 168px;
-  /* 一覧の 1 枚と同じ大きさ。並べたときに揃う */
-  min-height: 68px;
+  /*
+   * **高さを固定する。** 一覧の 1 枚と同じ大きさで、並べたときに揃う。
+   *
+   * min-height にしていた頃は、RELOADING や PRESS R が出るたびにカードが
+   * 伸びていた。**弾を撃っている最中に枠が動く**ので、目盛りを見ている目が
+   * そのたびに引っ張られる。状態の行はカードの外 (下) へ出した。
+   *
+   * 74px は中身が収まる高さ (数字 22 + 名前 15 + 目盛り 8 + 隙間と余白)。
+   * 一覧の札 (hud-browse-item) も同じ値にしてある — **並べたときに揃う**。
+   */
+  height: 74px;
   padding: 8px 12px 10px;
   background: rgba(10, 14, 20, 0.55);
   border: 1px solid rgba(126, 166, 255, 0.28);
@@ -712,7 +723,8 @@
   display: flex;
   flex-direction: row;
   gap: 1px;
-  height: 8px;
+  /* **縮ませない。** 高さの決まった箱の中では、既定だとここが 0 まで潰れる */
+  flex: 0 0 8px;
   width: 100%;
   align-items: stretch;
   margin-top: 2px;
@@ -735,6 +747,25 @@
 
 .hud-weapon-empty .hud-weapon-spare {
   color: rgba(255, 138, 114, 0.9);
+}
+
+/*
+ * 状態の行。**カードの外、真下に置く。**
+ *
+ * カードの中に積むと高さが変わる (上の height: 68px を参照)。絶対配置に
+ * すれば、出ても消えてもカードは動かない。
+ */
+.hud-weapon-states {
+  position: absolute;
+  right: 22px;
+  bottom: 0;
+  width: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
 }
 
 .hud-weapon-state {
@@ -784,7 +815,7 @@
   bottom: 20px;
   box-sizing: border-box;
   width: 168px;
-  min-height: 68px;
+  min-height: 74px;
   padding: 8px 12px 10px;
   display: flex;
   flex-direction: column;
@@ -816,4 +847,65 @@
   color: #f2f6fb;
   background: rgba(24, 38, 64, 0.72);
   border-color: rgba(126, 166, 255, 0.7);
+}
+
+/*
+ * 点の増減。武器のカードの真上に積む。
+ *
+ * **数字を右端で揃える。** カードの数字と同じ列に来るので、目を動かさずに
+ * 読める。新しいものが下 (カードに近いほう) に来るように column-reverse。
+ */
+.hud-points {
+  position: absolute;
+  right: 22px;
+  bottom: 124px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+  font-family: var(--hud-font, ui-monospace, monospace);
+}
+
+.hud-point {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 10px;
+  background: rgba(10, 14, 20, 0.55);
+  border-right: 2px solid rgba(126, 166, 255, 0.75);
+  color: #eaf1fb;
+  animation: hud-point-in 2.5s ease-out forwards;
+}
+
+/* 引かれたときは色を変える。数字を読まなくても損得が分かる */
+.hud-point-minus {
+  border-right-color: rgba(255, 138, 114, 0.8);
+  color: rgba(255, 200, 190, 0.95);
+}
+
+.hud-point-label {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  opacity: 0.75;
+}
+
+.hud-point-delta {
+  font-size: 18px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 出て、少し上がりながら消える */
+@keyframes hud-point-in {
+  0% { opacity: 0; transform: translateY(6px); }
+  12% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-point {
+    animation: none;
+  }
 }

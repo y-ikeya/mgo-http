@@ -20,6 +20,7 @@ const base = {
   throwables: 2, grenades: 3, browsing: null, held: 'rifle', weaponHeld: 'rifle',
   tool: 'none', toolInHand: false, browsingFamily: null, switching: false,
   support: 'grenade', team: 0, match: null, players: 1, sendRate: 64, peerRates: [],
+  points: [],
 } as unknown as GameStats
 
 const cases: Record<string, Partial<GameStats>> = {
@@ -29,6 +30,16 @@ const cases: Record<string, Partial<GameStats>> = {
   noneSelected: { tool: 'none', toolInHand: false },
   empty: { ammo: 0 },
   reloading: { ammo: 0, reloading: true },
+  // 状態の行が出てもカードの大きさが変わらないこと
+  pressR: { ammo: 0 },
+  downed: { ammo: 12, downed: true },
+  // 点の増減
+  points: {
+    points: [
+      { label: 'KILL', delta: 3, at: Date.now() },
+      { label: 'DEATH', delta: -2, at: Date.now() },
+    ],
+  },
   browsing: {
     browsingFamily: 'weapon',
     browsing: {

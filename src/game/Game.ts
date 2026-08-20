@@ -62,6 +62,7 @@ import { createTransport } from "../net";
 import type { NetTransport } from "../net/types";
 import type { Identity } from "../auth/session";
 import { selfSkin } from "./skin";
+import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../domain/rule/scoring";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -124,6 +125,13 @@ export interface GameStats {
   canZoom: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
+  /**
+   * 直近の点の増減。**自分の分だけ。**
+   *
+   * 倒した / 倒された瞬間に右下へ出す。誰が誰を倒したかの一覧 (kills) とは別で、
+   * こちらは自分に何が起きたかだけを短く見せる。
+   */
+  points: { label: string; delta: number; at: number }[]
   /** 直近のキル表示。新しいものが先頭 */
   kills: KillEvent[]
   /** 残っている投げ物 */
@@ -369,6 +377,15 @@ const PING_THRESHOLD = 0.04
 /** キル表示を残す時間 (秒) と、同時に出す行数 */
 const KILL_FEED_DURATION = 6;
 const KILL_FEED_MAX = 5;
+
+/**
+ * 点の増減を残す時間 (秒) と行数。
+ *
+ * キル表示より**短く**する。あれは「誰が誰を」の記録で読むもの、こちらは
+ * 「いま入った」という手応えなので、残り続けると邪魔になる。
+ */
+const POINT_FEED_DURATION = 2.5;
+const POINT_FEED_MAX = 4;
 
 /**
  * スポーン地点をどれだけ散らすか (m)。
@@ -1167,6 +1184,7 @@ export class Game {
       case "kill":
         this.killFeed.unshift({ ...message, at: Date.now() });
         this.killFeed.length = Math.min(this.killFeed.length, KILL_FEED_MAX);
+        this.recordPoints(message);
         // 倒された。この後の 5 秒はこの人を映す。
         // 自爆なら映すものが無いので空のままにする
         if (message.victim === this.net.id) {
@@ -2487,6 +2505,31 @@ export class Game {
   }
 
   /**
+   * 自分の点が動いたことを控える。
+   *
+   * **数字はルールから引く** (domain/rule/scoring.ts)。ここで 3 や -2 を直に
+   * 書くと、点の付け方を変えたときに画面だけ古い数を出し続ける。
+   *
+   * 練習部屋のように点が記録されない部屋でも出る。**手応えとしての表示**なので、
+   * 記録に残るかどうかとは別で構わない。
+   */
+  private recordPoints(message: KillEvent): void {
+    const me = this.net.id;
+    const mine = message.killer === me;
+    const died = message.victim === me;
+    if (!mine && !died) return;
+
+    const suicide = mine && died;
+    const label = suicide ? "SUICIDE" : mine ? "KILL" : "DEATH";
+    const delta = suicide ? SUICIDE_POINTS : mine ? KILL_POINTS : DEATH_POINTS;
+    this.pointFeed.unshift({ label, delta, at: Date.now() });
+    this.pointFeed.length = Math.min(this.pointFeed.length, POINT_FEED_MAX);
+  }
+
+  /** 直近の点の増減。画面の右下に流す */
+  private readonly pointFeed: { label: string; delta: number; at: number }[] = [];
+
+  /**
    * 姿の見えない相手が立てた音。
    *
    * 位置は届かない。届くのは方向と距離だけ — 耳で分かるのがそこまでだから。
@@ -2732,6 +2775,9 @@ export class Game {
       health: this.player.health,
       maxHealth: MAX_HEALTH,
       dead: this.player.isDead,
+      points: this.pointFeed.filter(
+        (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
+      ),
       kills: this.killFeed.filter(
         (entry) => now - entry.at < KILL_FEED_DURATION * 1000,
       ),
