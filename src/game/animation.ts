@@ -1842,12 +1842,25 @@ export class CharacterAnimator {
   }
 
   /** リロードモーションを頭から再生する。終わると自動で構えに戻る */
-  playReload(): void {
+  /**
+   * 弾倉を替える。
+   *
+   * @param seconds 掛ける時間。**銃ごとに違う** (domain/item/weapons.ts) ので、
+   *   クリップの尺をそこへ合わせて伸び縮みさせる。
+   *
+   * --- なぜ尺を合わせるか ---
+   * 型は 1 本しかない (拳銃だけ別)。**時間をクリップ任せにすると、どの銃も
+   * 同じ 3.33 秒になる。** 表には P90 3.0 / AK47 2.5 / XM2010 3.2 と書いてあるのに
+   * 全部同じ手応えで、「P90 を選んでいるのに AK が入っている」ように感じていた。
+   */
+  playReload(seconds = 0): void {
     if (this.dead) return
     // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
     const key = this.pistol && this.upper.has(PISTOL_RELOAD_KEY) ? PISTOL_RELOAD_KEY : RELOAD_KEY
     const action = this.upper.get(key)
     if (!action) return
+    const clip = action.getClip().duration
+    action.setEffectiveTimeScale(seconds > 0 && clip > 0 ? clip / seconds : 1)
     action.reset().play()
     this.upperState = 'reload'
   }

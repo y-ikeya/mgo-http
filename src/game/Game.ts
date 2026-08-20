@@ -1994,9 +1994,15 @@ export class Game {
     if (this.ammo >= this.weapon.magazine) return;
     // 予備が尽きていたら替えるものが無い
     if (this.inv.reserve <= 0) return;
-    // モーションの尺をそのまま操作不能時間にして、見た目と挙動を一致させる
-    this.reloadTimer = this.player.reloadDuration || this.weapon.reload;
-    this.player.playReload();
+    /*
+     * **時間を決めるのは武器の表。** 型はそこへ合わせて伸び縮みする。
+     *
+     * 以前はクリップの尺 (3.33 秒) をそのまま使っていたので、**どの銃も同じ
+     * 時間**だった。表には P90 3.0 / AK47 2.5 / XM2010 3.2 と書いてあるのに
+     * 手応えが同じで、選んだ銃が入っていないように感じる。
+     */
+    this.reloadTimer = this.weapon.reload;
+    this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
     this.reloadSoundIn = this.reloadTimer * this.reloadSoundAt;
     // 覗いたままだと入れ替えの間ずっと視界が狭い。肩越しへ戻す

@@ -674,6 +674,12 @@ export class Player {
    * 銃ごとに型が違うので長さも違う。突撃銃の尺で拳銃を待たせると、
    * 型が終わったのに撃てない時間が残る。
    */
+  /**
+   * 弾倉を替える型の素の長さ (秒)。**時間そのものではない。**
+   *
+   * 掛かる時間を決めるのは武器の表 (domain/item/weapons.ts) で、型はそこへ
+   * 合わせて伸び縮みする (playReload)。ここは調整の目安として残してある。
+   */
   get reloadDuration(): number {
     if (!this.animator) return 0
     if (this.weaponKind === 'pistol' && this.animator.pistolReloadDuration > 0) {
@@ -988,9 +994,9 @@ export class Player {
   }
 
   /** リロードモーションを頭から再生する */
-  playReload(): void {
+  playReload(seconds = 0): void {
     if (this.down) return
-    this.animator?.playReload()
+    this.animator?.playReload(seconds)
   }
 
   /** 武器の握り位置と角度を作り直す (調整用。確定したら weapon.ts の定数へ焼き込む) */

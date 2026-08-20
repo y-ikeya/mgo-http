@@ -96,3 +96,25 @@ describe('構えを解く', () => {
     }
   })
 })
+
+describe('弾倉を替える', () => {
+  /** その型の再生速度 */
+  function scaleOf(anim: CharacterAnimator, key: string): number {
+    const actions = (anim as unknown as Record<string, Map<string, THREE.AnimationAction>>).upper
+    return actions.get(key)?.getEffectiveTimeScale() ?? 0
+  }
+
+  test('**銃ごとの時間に型を合わせる。** どの銃も同じ尺にしない', () => {
+    const anim = animator()
+    const clip = (anim as unknown as { reloadDuration: number }).reloadDuration
+    expect(clip).toBeGreaterThan(0)
+
+    // P90 は 3.0 秒 (domain/item/weapons.ts)
+    anim.playReload(3)
+    expect(scaleOf(anim, 'reload')).toBeCloseTo(clip / 3, 3)
+
+    // AK47 は 2.5 秒。**同じ型が速く回る**
+    anim.playReload(2.5)
+    expect(scaleOf(anim, 'reload')).toBeCloseTo(clip / 2.5, 3)
+  })
+})
