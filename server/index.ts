@@ -1055,7 +1055,9 @@ function throwGrenade(roomName: RoomName, from: Player, event: ClientMessage): v
  * 投げるときと同じ経路に乗せるので、見た目も音も爆風も全部そのまま働く。
  */
 function dropGrenade(roomName: RoomName, from: Player): void {
-  if (!from.holdingGrenade || from.grenades <= 0) return
+  // **振りかぶっている手榴弾だけ。** 手にしているだけなら落ちないし、
+  // クレイモアを構えていた人の足元に手榴弾が湧いても困る
+  if (!from.holdingGrenade || from.held !== 'grenade' || from.grenades <= 0) return
   from.holdingGrenade = false
   from.grenades--
 

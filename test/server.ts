@@ -234,7 +234,8 @@ function snapshotOf(
     aiming: false,
     crouching: false,
     boxed: false,
-    held: 'rifle' as const,
+    // 振りかぶっているなら手にあるのも手榴弾。**両方そろって初めて落ちる**
+    held: holdingGrenade ? ('grenade' as const) : ('rifle' as const),
     locomotion,
     concentrating: false,
     saluteHeld: false,

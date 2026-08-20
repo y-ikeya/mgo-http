@@ -478,8 +478,14 @@ export class Player {
       held: this.held,
       concentrating: this.isConcentrating,
       saluteHeld: this.saluteHeld,
-      // 振りかぶって持っている間だけ。倒されたら足元に落ちる
-      holdingGrenade: this.throwing,
+      /*
+       * **手榴弾を振りかぶっている間だけ。**
+       *
+       * 選んで手にしているだけでは立たない (抜いていないピンは戻せる)。
+       * throwing はクレイモアを置くときにも立つので、手にある物も見る —
+       * 見ないと、クレイモアを構えて撃たれた人の足元に**手榴弾が湧く**。
+       */
+      holdingGrenade: this.throwing && this.held === 'grenade',
     }
   }
 
