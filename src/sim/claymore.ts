@@ -135,6 +135,21 @@ function forwardOf(yaw: number): [number, number] {
  * 足元を通ったときで、上の階に居る人で反応されると理不尽になる…
  * のだが、階の概念がまだ無いので今は平面で見る。
  */
+/** 爆風の結果。damage 0 なら届いていない */
+export interface BlastHit {
+  damage: number
+  knock: boolean
+}
+
+/**
+ * 転ぶ距離。届く距離に対する割合。
+ *
+ * 手榴弾は 7m のうち 5m で転ぶ (blast.ts の near > 0.28) ので、それに揃える。
+ * 道具ごとに別の勘で決めると、受けた側が「どこまで下がれば立っていられるか」を
+ * 覚え直すことになる。
+ */
+const KNOCK_RATIO = 0.72
+
 export function triggeredBy(mine: Placed, target: Target): boolean {
   const dx = target.x - mine.x
   const dz = target.z - mine.z
@@ -146,25 +161,31 @@ export function triggeredBy(mine: Placed, target: Target): boolean {
 }
 
 /**
- * その相手に与える量。届かなければ 0。
+ * その相手に与える量と、転ぶかどうか。届かなければ damage 0。
  *
- * **前だけに飛ぶ。** 起爆したあとでも、背後に居た人には入らない —
- * 置いた向きが最後まで意味を持つ。
+ * **全方位に飛ぶ。** 向きが意味を持つのは「いつ起爆するか」(triggeredBy) まで。
+ * 爆ぜてしまえば火薬は前も後ろも無い — 真後ろに立っていた人だけ無傷、は
+ * 物として嘘になる。置く側から見ても、**背後を通られたら起爆しない**という
+ * 時点で向きの代償は払っている。
  *
- * **置いた本人も例外にしない。** 前を通れば自分の物で削れる (手榴弾を足元に
- * 落としたときと同じ規則)。置いた場所を覚えていないと自分が損をする、が
- * 置いて離れる道具の代償になる。
+ * **置いた本人も例外にしない。** 自分の物で削れる (手榴弾を足元に落としたときと
+ * 同じ規則)。置いた場所を覚えていないと自分が損をする、が置いて離れる道具の
+ * 代償になる。
+ *
+ * 転倒は手榴弾と同じ扱い。**当たれば動きが止まる**のがこの手の道具の効き目で、
+ * 削るだけなら置いて離れる意味が薄い。
  */
-export function blastFrom(mine: Placed, target: Target): number {
+export function blastFrom(mine: Placed, target: Target): BlastHit {
   const dx = target.x - mine.x
   const dz = target.z - mine.z
   const distance = Math.hypot(dx, dz)
-  if (distance > BLAST_RANGE) return 0
-  if (distance < 1e-4) return BLAST_MAX
-
-  const [fx, fz] = forwardOf(mine.yaw)
-  if ((dx / distance) * fx + (dz / distance) * fz < TRIGGER_COS) return 0
+  if (distance > BLAST_RANGE) return { damage: 0, knock: false }
+  if (distance < 1e-4) return { damage: BLAST_MAX, knock: true }
 
   const t = distance / BLAST_RANGE
-  return BLAST_MAX - t * (BLAST_MAX - BLAST_MIN)
+  return {
+    damage: BLAST_MAX - t * (BLAST_MAX - BLAST_MIN),
+    // 手榴弾と同じ割合 (届く距離の 7 割) で転ぶ。端で掠っただけの相手は立っている
+    knock: t < KNOCK_RATIO,
+  }
 }

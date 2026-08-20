@@ -905,9 +905,12 @@ function detonateClaymore(claymore: Claymore): void {
     // 同じ規則で、自分の物で死ぬことがある。誰が味方かはルールが決める
     if (victim.id !== claymore.owner && !hostileToOwner(room, claymore.team, victim)) continue
 
-    const amount = blastFrom(claymore, victim)
-    if (amount <= 0) continue
-    applyBlastDamage(claymore.room, room, victim, amount, claymore.x, claymore.z, claymore.owner, 'claymore', false)
+    const hit = blastFrom(claymore, victim)
+    if (hit.damage <= 0) continue
+    applyBlastDamage(
+      claymore.room, room, victim, hit.damage,
+      claymore.x, claymore.z, claymore.owner, 'claymore', hit.knock,
+    )
   }
 }
 let grenadeId = 0
@@ -1058,7 +1061,7 @@ function detonate(nade: Grenade): void {
  * 2 つ目の爆発物を足すときにここを写すと、必ずどれかを写し忘れる。
  *
  * @param amount 与える量。届くかどうかと、どれだけ届くかは呼ぶ側が決める
- * @param knock 転ばせるか。クレイモアは転ばせない (踏んだら死ぬか掠るかなので)
+ * @param knock 転ばせるか。手榴弾もクレイモアも、近ければ転ぶ
  */
 /**
  * 落下速度の上限 (m/s)。
