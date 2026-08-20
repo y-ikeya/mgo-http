@@ -289,3 +289,51 @@
   letter-spacing: 0.12em;
   color: rgba(190, 206, 176, 0.55);
 }
+
+/*
+ * 個人戦の順位表。**陣営で分けない。**
+ *
+ * 2 列に分けると「味方が居る」に読める。1 本にして、順位を左に振る。
+ */
+.score-solo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/*
+ * 名前と見出しの色。
+ *
+ * 陣営戦は青と赤で塗り分けているが、**個人戦は塗る色が無い** (陣営が無いので)。
+ * 色を当てないと下地に沈んで読めなかったので、明示しておく。
+ */
+.score-solo .score-name {
+  color: #d8e6f2;
+}
+
+.score-solo .score-team-head {
+  color: rgba(198, 214, 232, 0.7);
+}
+
+/* 順位。名前の前に小さく */
+.score-rank {
+  display: inline-block;
+  min-width: 1.4em;
+  margin-right: 8px;
+  text-align: right;
+  color: rgba(198, 214, 232, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 上の見出し。個人戦は残機が 1 つなので、種目名と並べる */
+.score-solo-head {
+  letter-spacing: 0.18em;
+  color: rgba(198, 214, 232, 0.7);
+}
+
+.score-solo-left {
+  margin-left: 10px;
+  font-size: 1.3em;
+  color: #eaf1fb;
+  font-variant-numeric: tabular-nums;
+}

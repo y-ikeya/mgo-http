@@ -1,5 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
+import { MODES } from '../domain/room'
 import { pointsOf } from '../domain/rule/scoring'
 import { useLevels } from '../net/levels'
 import type { Identity } from '../auth/session'
@@ -69,6 +70,21 @@ export default function Scoreboard(props: {
       .filter((p) => p.team === team)
       .sort((a, b) => pointsOf(b) - pointsOf(a) || a.deaths - b.deaths)
 
+  /** その部屋のルール。陣営で分けるかどうかがこれで決まる */
+  const mode = () => props.stats?.match?.mode ?? 'TDM'
+  const teams = () => MODES[mode()].teams
+
+  /**
+   * 個人戦の並び。**陣営で分けず、1 本の順位表にする。**
+   *
+   * 分けて出すと「味方が居る」に読める。全員が敵なので、上から順に強い、が
+   * そのまま読めるほうがいい。
+   */
+  const ranking = () =>
+    [...(props.stats?.scores ?? [])].sort(
+      (a, b) => pointsOf(b) - pointsOf(a) || a.deaths - b.deaths,
+    )
+
   return (
     <div class="score">
       <div class="score-panel">
@@ -84,17 +100,75 @@ export default function Scoreboard(props: {
           </div>
         </Show>
 
-        {/* 上の数字は**残機**。0 にされた側が負け */}
+        {/* 上の数字は**残機**。0 にされた側が負け (個人戦は部屋で 1 つ) */}
         <header class="score-head">
-          <span class="score-blue">
-            {t('score.blue')} {props.stats?.match?.blue ?? 0}
-          </span>
-          <span class="score-dash">–</span>
-          <span class="score-red">
-            {props.stats?.match?.red ?? 0} {t('score.red')}
-          </span>
+          <Show
+            when={teams()}
+            fallback={
+              <span class="score-solo-head">
+                {mode()} <span class="score-solo-left">{props.stats?.match?.blue ?? 0}</span>
+              </span>
+            }
+          >
+            <span class="score-blue">
+              {t('score.blue')} {props.stats?.match?.blue ?? 0}
+            </span>
+            <span class="score-dash">–</span>
+            <span class="score-red">
+              {props.stats?.match?.red ?? 0} {t('score.red')}
+            </span>
+          </Show>
         </header>
 
+        {/*
+          個人戦。**1 本の順位表。** 陣営で分けると「味方が居る」に読める。
+          順位を左に振って、上から強い順であることを見せる。
+        */}
+        <Show when={!teams()}>
+          <div class="score-solo">
+            <div class="score-team-head">
+              順位
+              <span class="score-cols">
+                <span class="score-col-points">P</span>
+                <span>K</span>
+                <span>D</span>
+                <span class="score-col-rate">/s</span>
+              </span>
+            </div>
+            <For each={ranking()}>
+              {(player, index) => (
+                <div
+                  class="score-row"
+                  classList={{
+                    'score-mine': player.id === props.selfId,
+                    'score-away': player.away === true,
+                  }}
+                >
+                  <span class="score-name">
+                    <span class="score-rank">{index() + 1}</span>
+                    <span class="score-lv">{levelFor(player.id)}</span>
+                    {player.name}
+                    {player.away === true && <span class="score-tag">{t('score.away')}</span>}
+                  </span>
+                  <span class="score-num score-points">{pointsOf(player)}</span>
+                  <span class="score-num">{player.kills}</span>
+                  <span class="score-num score-deaths">{player.deaths}</span>
+                  <span
+                    class="score-num score-rate"
+                    classList={{ 'score-rate-low': (player.rate ?? 0) > 0 && (player.rate ?? 0) < 40 }}
+                  >
+                    {player.away === true ? '—' : (player.rate ?? 0) || '—'}
+                  </span>
+                </div>
+              )}
+            </For>
+            <Show when={ranking().length === 0}>
+              <div class="score-none">{t('score.empty')}</div>
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={teams()}>
         <div class="score-teams">
           <For each={['blue', 'red'] as const}>
             {(team) => (
@@ -156,6 +230,7 @@ export default function Scoreboard(props: {
             )}
           </For>
         </div>
+        </Show>
 
         <footer class="score-foot">
           <div class="score-aside">

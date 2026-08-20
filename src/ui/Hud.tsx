@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
 import { HELD, type HeldId } from '../domain/item/held'
 import { MODES } from '../domain/room'
@@ -24,6 +24,9 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
     </div>
   )
 }
+
+/** 1 段送ったときに滑る距離 (px)。札 1 枚より小さくして「動いた」だけを見せる */
+const BROWSE_SLIDE = 26
 
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
@@ -126,6 +129,45 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     if (!browsing || at < 0 || at === browsing.at) return null
     return browsing.items[at]
   }
+
+  /*
+   * 送った向きに滑らせる。
+   *
+   * **どちらへ動いたかが分からない**という指摘。札の中身だけが入れ替わるので、
+   * 上へ送ったのか下へ送ったのかが読めなかった。1 段ごとに、来た方向から
+   * 滑り込ませる。
+   *
+   * Solid は中身が変わっても要素を作り直さないので、CSS の入場アニメーションは
+   * 流れない。**送るたびに自分で 1 回流す** (Web Animations)。
+   */
+  let browseEl: HTMLDivElement | undefined
+  let browsedAt = -1
+  createEffect(() => {
+    const at = props.stats?.browsing?.at
+    const el = browseEl
+    if (at === undefined || !el) {
+      browsedAt = -1
+      return
+    }
+    const from = browsedAt
+    browsedAt = at
+    if (from < 0 || from === at) return
+    // 一覧は輪になっているので、端で回った分は近いほうの向きとして扱う
+    const count = props.stats?.browsing?.items.length ?? 1
+    const raw = at - from
+    const step = Math.abs(raw) > count / 2 ? -Math.sign(raw) : Math.sign(raw)
+    const shift = step * BROWSE_SLIDE
+    // 武器は上下 (列)、道具は左右 (行) に伸びるので、滑る向きも合わせる
+    const tool = props.stats?.browsingFamily === 'tool'
+    const offset = tool ? `translateX(${-shift}px)` : `translateY(${shift}px)`
+    el.animate(
+      [
+        { transform: offset, opacity: 0.35 },
+        { transform: 'translate(0, 0)', opacity: 1 },
+      ],
+      { duration: 130, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
+    )
+  })
 
   /** 角の上に積む物。選んでいる物と、左に出した物を除いた残り */
   const above = () => {
@@ -446,6 +488,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       */}
       <Show when={props.stats?.browsing}>
         <div
+          ref={browseEl}
           class="hud-browse"
           classList={{ 'hud-browse-tool': props.stats?.browsingFamily === 'tool' }}
         >
