@@ -270,3 +270,27 @@ describe('地面へ置く', () => {
     expect(inv.list('weapon').map((c) => c.id)).toContain('rifle')
   })
 })
+
+describe('画面を読み直したとき', () => {
+  test('**選んでいた主武器のまま戻る。** 既定の AK47 に戻らない', () => {
+    // 画面を読み直すと持ち物は既定 (AK47) で作られる
+    const inv = new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' })
+    // サーバーが「選んでいたのは P90」と返してくる
+    inv.refill({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    inv.restore({ smg: 20 }, { smg: 60 }, 2)
+
+    expect(inv.held).toBe('smg')
+    expect(inv.ammo).toBe(20)
+    expect(inv.reserve).toBe(60)
+    expect(inv.list('weapon').map((c) => c.id)).toContain('smg')
+    expect(inv.list('weapon').map((c) => c.id)).not.toContain('rifle')
+  })
+
+  test('組み直す前に弾を当てると、当てる先が無い', () => {
+    const inv = new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' })
+    // 順番を逆にした場合。**P90 を持っていないので弾は捨てられる**
+    inv.restore({ smg: 20 }, { smg: 60 }, 2)
+    inv.refill({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    expect(inv.ammo).toBe(50)
+  })
+})

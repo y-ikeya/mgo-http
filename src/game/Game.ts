@@ -1235,13 +1235,21 @@ export class Game {
       // 弾数もサーバーが写しを持っているので、そちらを正とする
       case "resume":
         this.player.resumeAt(message.x, message.y, message.z, message.health);
-        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
-        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
-        this.inv.restore(message.magazine, message.reserve, message.grenades);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
         this.loadout.primary = message.primary;
+        /*
+         * **持ち物を組み直す。**
+         *
+         * 画面を読み直すと Inventory は既定 (AK47) で作られる。装備を戻すだけ
+         * では手の中は既定のままで、**P90 を選んでいたのに AK を持って戻る**。
+         * 戻した装備から組み直してから、残弾を当てる (順番が要る)。
+         */
+        this.inv.refill(this.loadout);
+        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
+        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
+        this.inv.restore(message.magazine, message.reserve, message.grenades);
         this.pendingLoadout.support = message.support;
         this.pendingLoadout.primary = message.primary;
         this.onLoadout?.(this.pendingLoadout);
