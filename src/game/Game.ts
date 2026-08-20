@@ -382,7 +382,7 @@ const PING_THRESHOLD = 0.04
  *
  * こちらは案内を出すためだけに使う。実際に拾えるかを決めるのはあちら。
  */
-const PICKUP_RANGE = 1.8;
+const PICKUP_RANGE = 1.0;
 
 /** キル表示を残す時間 (秒) と、同時に出す行数 */
 const KILL_FEED_DURATION = 6;
@@ -1310,13 +1310,21 @@ export class Game {
         break;
       }
 
-      case "dropped":
+      // **置いたのが自分でも他人でも鳴らす。** 落ちた場所で鳴るので、
+      // 見えていなくても「そこで誰かが捨てた」ことが耳に入る
+      case "dropped": {
         this.drops.place(message.id, message.weapon, message.at, message.yaw);
+        const at = this.drops.positionOf(message.id);
+        if (at) this.audio.play("drop", at);
         break;
+      }
 
-      case "droppedGone":
+      case "droppedGone": {
+        const at = this.drops.positionOf(message.id);
+        if (at) this.audio.play("pick", at);
         this.drops.remove(message.id);
         break;
+      }
 
       // 拾えた。**中身はここで初めて分かる** (見ただけでは残弾は読めない)
       case "picked": {
@@ -1325,8 +1333,8 @@ export class Game {
             ? { id: message.weapon as never, count: message.count }
             : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
         this.inv.pick(found);
+        // 音は droppedGone の側で鳴らす (全員に届く通なので、そこで 1 回だけ)
         this.drops.remove(message.id);
-        this.audio.play("clink", this.player.position);
         break;
       }
 
@@ -2452,7 +2460,8 @@ export class Game {
     this.browsing = null;
     this.pressedAt.weapon = 0;
     this.pressedAt.tool = 0;
-    this.audio.play("clink", this.player.position);
+    // 音は dropped が返ってきたときに鳴らす。**置いた場所で鳴らしたい**し、
+    // ここでも鳴らすと自分だけ 2 回聞こえる
   }
 
   private syncHeld(): void {

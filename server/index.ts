@@ -938,12 +938,12 @@ const dropped: Dropped[] = []
 let droppedId = 0
 
 /**
- * 拾える距離 (m)。
+ * 拾える距離 (m)。**落ちている物を中心とした半径 1m の円。**
  *
  * 近づいて押す、という手間を残す。広くすると「通りかかったら勝手に拾える」に
  * なって、置いてある物を避けて通ることができなくなる。
  */
-const PICKUP_RANGE = 1.8
+const PICKUP_RANGE = 1.0
 
 /** 落ちている物を 1 つぶん配る形にする */
 function droppedMessage(item: Dropped): ServerMessage {

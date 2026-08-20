@@ -84,6 +84,14 @@ const SOUNDS = {
    */
   clink: { file: "step_metal1.mp3", reference: 3, max: 30, rate: 1.15 },
   /**
+   * 武器を地面へ置く / 拾う。
+   *
+   * **足音より少し遠くまで届く (20m)。** 近くで誰かが銃を捨てた・拾ったことは
+   * 手がかりになる — 弾が尽きたか、良い銃を手に入れたかが読める。
+   */
+  drop: { file: "weapon_drop1.mp3", reference: 4, max: 20 },
+  pick: { file: "weapon_pick1.mp3", reference: 4, max: 20 },
+  /**
    * 倒れたときの叫び。
    *
    * 銃声と同じくらい遠くまで届く。誰かが倒れたことは戦況そのもので、

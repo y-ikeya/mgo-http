@@ -85,6 +85,16 @@ export class Drops {
       model.traverse((obj) => {
         if (obj instanceof THREE.Mesh) obj.castShadow = true
       })
+      /*
+       * **形の中心を軸に回す。**
+       *
+       * 銃のモデルは原点が後端にある (convert_gltf_gun.py の規約)。そのまま
+       * 回すと銃口が大きく振り回されて、プロペラのように見えた。頂点から中心を
+       * measure して、その分だけモデルをずらす。
+       */
+      model.updateMatrixWorld(true)
+      const centre = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3())
+      model.position.sub(centre)
       holder.add(model)
     })
   }

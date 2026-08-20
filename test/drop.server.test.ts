@@ -37,8 +37,8 @@ describe('置いて拾う', () => {
     await Bun.sleep(300)
     expect(b.messages.some((m) => m.type === 'picked')).toBe(false)
 
-    // 近づけば拾える。**中身は拾った人にだけ返る**
-    b.moveTo(...openSpot(0, -6))
+    // 近づけば拾える (半径 1m)。**中身は拾った人にだけ返る**
+    b.moveTo(...openSpot(0, -5.5))
     await Bun.sleep(400)
     b.send({ type: 'pickup' })
     await Bun.sleep(300)
