@@ -43,25 +43,39 @@ export interface ModeSpec {
   active: boolean
   /** 1 人でも遊べるか。練習と休憩は相手を待たない */
   solo: boolean
+  /**
+   * 陣営で分かれるか。
+   *
+   * false なら**全員が同じ色**で、味方の発光もリンクも無い。個人戦で色が
+   * 分かれていると「味方が居る」と読めてしまう。
+   */
+  teams: boolean
+  /**
+   * 1 位が光るか (位置が公になる)。
+   *
+   * **追われる側になることが、勝っていることの代償。** 情報の設計と同じ語彙で、
+   * 遮蔽を無視して配る + 体を光らせる、を同じ道で通す。
+   */
+  leaderGlows: boolean
 }
 
 export const MODES: Record<Mode, ModeSpec> = {
-  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false },
-  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false },
+  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true },
+  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false },
   /**
    * 潜入側はナイフ以外の殺傷武器を持てず、防御側は非殺傷武器を持てない。
    * **その縛りがルールの核**なので、麻酔銃とスタングレネードが無いと成立しない。
    * 枠は残す — 何を作れば開くかが分かる形にしておきたい。
    */
-  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: false, solo: false },
-  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true },
+  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: false, solo: false, teams: true, leaderGlows: false },
+  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false },
   /**
    * 練習。**入る人は全員青**で、赤には棒立ちの的が並ぶ。
    *
    * 戦績に残さないのは、動かない相手を撃った数が記録に混ざると記録の意味が
    * 消えるため。ここで武器の距離感と当て方を確かめる。
    */
-  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true },
+  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false },
 }
 
 /** 部屋の割り当て。**変えるならここ 1 か所** */

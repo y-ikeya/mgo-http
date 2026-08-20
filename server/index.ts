@@ -34,6 +34,7 @@ import {
   RECONNECT_GRACE,
   assignTeam,
   connected,
+  leaderOf,
   present,
   holdingSeats,
   loseTicket,
@@ -453,9 +454,31 @@ function targetPayload(bot: Player, now: number): Uint8Array {
 
 
 
+/** 残機を削り切ったか。個人戦は部屋で 1 つの池を見る */
+function ticketsGone(room: Match): boolean {
+  return room.mode.teams ? room.blue <= 0 || room.red <= 0 : room.blue <= 0
+}
+
+/**
+ * 勝敗。
+ *
+ * 陣営戦は残機の多いほう。**個人戦は勝った「陣営」が無い**ので、色としては
+ * draw を返す — 誰が勝ったかは倒した数 (成績表) が答える。
+ */
+function decideWinner(room: Match): Team | 'draw' {
+  if (!room.mode.teams) return 'draw'
+  if (room.blue <= 0 || room.red <= 0) {
+    return room.blue <= 0 && room.red <= 0 ? 'draw' : room.blue <= 0 ? 'red' : 'blue'
+  }
+  return room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
+}
+
 function matchState(room: Match): ServerMessage {
+  const leader = room.mode.leaderGlows ? leaderOf(room) : null
   return {
     type: 'match',
+    mode: room.mode.id,
+    leader: leader?.id,
     blue: room.blue,
     red: room.red,
     endsAt: room.endsAt,
@@ -1407,9 +1430,17 @@ function relayState(roomName: RoomName, from: Player, payload: Uint8Array): void
     // という判断で入れてある。
     const killCam = viewer.life === 'downed' && viewer.killedBy === from.id
 
+    /*
+     * **光っている人は遮蔽を無視して配る。**
+     *
+     * 個人戦の 1 位がこれ (docs/design.md の 2)。光る = 位置が公になっている、
+     * という語彙で、リンクを抜かれた相手も同じ道を通る予定。
+     */
+    const glowing = room.mode.leaderGlows && leaderOf(room)?.id === from.id
+
     // 味方は無条件。TDM で味方の位置が分からないと連携のしようがないし、
     // 隠すべき情報は敵に対するものだけ。判定の回数も半分以下になる
-    if (visible && !killCam && !isFriendly(room.mode, viewer, from) && stageBoxes.length > 0) {
+    if (visible && !killCam && !glowing && !isFriendly(room.mode, viewer, from) && stageBoxes.length > 0) {
       // **目ではなくカメラから**線を引く。三人称なので、画面に映るものを
       // 決めているのはカメラの位置。目で見ると、遮蔽の裏にしゃがんだ相手が
       // 「カメラからは見えているのに送られてこない」ことになる。
@@ -1659,7 +1690,10 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
   //
   // 数だけ見ていると、片側に 2 人残って反対側が空でも「2 人居るから続行」に
   // なる。相手の居ない試合が時間切れまで走ることになる。
-  const enough = seats.some((p) => p.team === 'blue') && seats.some((p) => p.team === 'red')
+  // 続けられるか。**陣営戦は両陣営に、個人戦は 2 人以上**
+  const enough = room.mode.teams
+    ? seats.some((p) => p.team === 'blue') && seats.some((p) => p.team === 'red')
+    : seats.length >= MIN_PLAYERS
   const previous = room.phase
 
   // 結果を見せている間は人数を見ない。見せ終わってから次を決める。
@@ -1717,16 +1751,16 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
     for (const player of connected(room)) {
       if (player.life === 'choosing') spawn(roomName, player, now)
     }
-  } else if (room.phase === 'playing' && (room.blue <= 0 || room.red <= 0)) {
-    // **削り切った。** 残機が 0 になった側の負け。時間を待たずにその場で終わる
+  } else if (room.phase === 'playing' && ticketsGone(room)) {
+    // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     room.phase = 'over'
-    room.winner = room.blue <= 0 && room.red <= 0 ? 'draw' : room.blue <= 0 ? 'red' : 'blue'
+    room.winner = decideWinner(room)
     room.endsAt = now + INTERMISSION
     finishMatch(roomName, room)
   } else if (room.phase === 'playing' && now >= room.endsAt) {
-    // 時間切れ。**多く残っているほうが勝ち**
+    // 時間切れ。陣営戦は多く残っているほう、個人戦は倒した数が一番多い人
     room.phase = 'over'
-    room.winner = room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
+    room.winner = decideWinner(room)
     room.endsAt = now + INTERMISSION
     finishMatch(roomName, room)
   }

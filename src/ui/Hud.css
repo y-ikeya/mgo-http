@@ -934,3 +934,39 @@
     animation: none;
   }
 }
+
+/*
+ * 位置が漏れている (個人戦の 1 位)。
+ *
+ * **画面の上、時計の下。** 隠さずに出す — 気づかないまま追われるのは理不尽で、
+ * 知っていれば動き方を変えられる。追われている側の色 (琥珀) は、体に出る光と
+ * 同じ色にしてある。
+ */
+.hud-leak {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 12px;
+  font-family: var(--hud-font, ui-monospace, monospace);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: #ffd45c;
+  background: rgba(10, 14, 20, 0.55);
+  border: 1px solid rgba(255, 212, 92, 0.5);
+  pointer-events: none;
+}
+
+/*
+ * 個人戦。**残機が 1 つ**なので左右に分けない。
+ *
+ * 種目名を 1 列目の上へ、残機と時計を横に並べる。陣営戦の格子 (3 列) を
+ * そのまま使うと、真ん中が空いて左に寄って見える。
+ */
+.hud-match-solo {
+  grid-template-columns: auto auto;
+}
+
+.hud-match-solo .hud-mode {
+  grid-column: 1 / -1;
+}
