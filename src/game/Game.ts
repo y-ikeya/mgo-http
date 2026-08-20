@@ -2522,6 +2522,9 @@ export class Game {
     // **一覧の中を動くのはタダ。** 時間がかかるのは決めた後の持ち替えだけ。
     // 押すだけのトグルは即持ち替えなので、連打すると全部が実際の持ち替えになる。
     // 選ぶことと抜くことを分けると、迷っている時間に代償が要らなくなる。
+    // 一覧を開いている間は、右スティックを視点ではなく一覧に使う
+    this.input.setListMode(this.browsing !== null);
+
     for (const [family, action, code] of SWITCH_KEYS) {
       const down = this.input.isActionDown(action, code);
       if (down) {
@@ -2533,7 +2536,8 @@ export class Game {
           this.browsing = { family, at: this.browseStart(family) };
         }
         if (this.browsing?.family === family) {
-          const steps = this.input.consumeWheel();
+          // ホイール (鍵盤) と右スティック (パッド)。**どちらでも同じだけ送る**
+          const steps = this.input.consumeWheel() + this.input.consumeListStep();
           if (steps !== 0) this.browsing.at = this.browseMove(this.browsing, -steps);
         }
       } else if (this.pressedAt[family] !== 0) {
