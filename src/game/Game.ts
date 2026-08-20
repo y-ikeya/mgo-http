@@ -2257,6 +2257,23 @@ export class Game {
     }
 
     if (!this.grenadeAiming) {
+      /*
+       * 振り切っている最中に構えをやめた。**投げない。**
+       *
+       * 手榴弾が手を離れるのは引き金を引いた 1.5 秒後まで遅れることがある
+       * (振りかぶりが残っているぶん待つ)。その間に構えを解けば、腕は下りて
+       * 型も畳まれる。**画面では投げていないのに手榴弾だけ飛んでいく**のは
+       * 嘘になるので、離す前なら無かったことにする。
+       *
+       * ピンを戻したことになるが、そこを咎めるより「見た通りに起きる」ほうを
+       * 取る。代わりに、投げ切りたければ手を離れるまで構えていることになる。
+       */
+      if (this.grenadeRelease > 0 && !held) {
+        this.grenadeRelease = 0;
+        this.player.cancelThrow();
+        this.player.setThrowing(false);
+        return;
+      }
       // 構えても投げてもいない間だけ解く。放すまでは向きを保つ
       if (this.grenadeRelease <= 0) this.player.setThrowing(false);
       return;
