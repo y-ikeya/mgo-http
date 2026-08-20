@@ -1319,6 +1319,13 @@ export class Game {
         break;
       }
 
+      /*
+       * 拾われた / 消えた。**音と後片付けはここ 1 か所。**
+       *
+       * 拾った本人には picked も届くが、あちらでは消さない。消してしまうと
+       * この通が来たときに置き場所が分からず、**拾った本人にだけ音が鳴らない**。
+       * (実際そうなっていた。他の人には聞こえていたので気づきにくい)
+       */
       case "droppedGone": {
         const at = this.drops.positionOf(message.id);
         if (at) this.audio.play("pick", at);
@@ -1333,8 +1340,8 @@ export class Game {
             ? { id: message.weapon as never, count: message.count }
             : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
         this.inv.pick(found);
-        // 音は droppedGone の側で鳴らす (全員に届く通なので、そこで 1 回だけ)
-        this.drops.remove(message.id);
+        // **消すのは droppedGone の側。** ここで消すと、あちらが鳴らす音の
+        // 置き場所が無くなる (自分にだけ聞こえない、になる)
         break;
       }
 
