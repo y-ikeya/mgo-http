@@ -40,6 +40,18 @@ const cases: Record<string, Partial<GameStats>> = {
       { label: 'DEATH', delta: -2, at: Date.now() },
     ],
   },
+  browsingTool: {
+    browsingFamily: 'tool',
+    tool: 'box',
+    toolInHand: true,
+    browsing: {
+      items: [
+        { id: 'box', n: null, loaded: null, mag: null },
+        { id: 'none', n: null, loaded: null, mag: null },
+      ],
+      at: 0,
+    },
+  },
   browsing: {
     browsingFamily: 'weapon',
     browsing: {
