@@ -449,6 +449,8 @@ export class Game {
   private readonly pressedAt: Record<Family, number> = { weapon: 0, tool: 0 };
 
   private grenadeAiming = false;
+  /** 構え始めと同じフレームに引かれた引き金。次のフレームで放す */
+  private pendingThrow = false;
   /**
    * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
    *
@@ -2191,7 +2193,10 @@ export class Game {
     //
     // 消すのを忘れていて、構えたままダンボールを被ると放物線が出っぱなしに
     // なっていた。持ち替え・箱・死亡のどれでもここを通る
-    if (this.inv.held !== "grenade" && this.grenadeAiming) {
+    //
+    // **振り切っている最中は畳まない** (grenadeRelease > 0)。最後の 1 個を投げると
+    // 持ち物から消えて次の武器へ移るので、投げの型がそこで中断されていた
+    if (this.inv.held !== "grenade" && this.grenadeAiming && this.grenadeRelease <= 0) {
       this.grenadeAiming = false;
       this.grenades.hidePreview();
       this.player.cancelThrow();
@@ -2216,13 +2221,25 @@ export class Game {
       !this.player.downed &&
       !this.cocking;
     const held = canThrow && this.input.aiming;
-    // 構えている間に引き金を引いたら放す。押しっぱなしで連投しない
-    const release = held && this.grenadeAiming && this.triggerEdge;
+    /*
+     * 構えている間に引き金を引いたら放す。押しっぱなしで連投しない。
+     *
+     * **同じフレームで構えて引いた分も覚えておく** (pendingThrow)。Shift と
+     * クリックがほぼ同時だと、その回は「構え始め」で消えて、引いたことが
+     * 無かったことになっていた。押した意思は消さずに、振りかぶりが始まった
+     * 次のフレームで放す。
+     */
+    const pulled = this.triggerEdge || this.pendingThrow;
+    const release = held && this.grenadeAiming && pulled;
 
     if (held && !release) {
       // 構えた瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
       // 落下点はその間ずっと見える — どこへ落とすかを見てから放せるように
-      if (!this.grenadeAiming) this.player.playThrow();
+      if (!this.grenadeAiming) {
+        this.player.playThrow();
+        // 構え始めと同じフレームに引かれた分を覚えておく
+        this.pendingThrow = this.triggerEdge;
+      }
       this.grenadeAiming = true;
       this.follow.aimDirection(this.aimDir);
       // 前へ出す量は水平方向だけで測る。見上げているときに近く、
@@ -2245,6 +2262,7 @@ export class Game {
       return;
     }
     this.grenadeAiming = false;
+    this.pendingThrow = false;
     this.grenades.hidePreview();
 
     // **構えをやめただけなら投げない。** 引き金を引いていないのに投げると、
@@ -2264,7 +2282,10 @@ export class Game {
       return;
     }
 
-    this.inv.spend();
+    // **数を減らすのは手を離れたとき** (updateGrenadeRelease)。
+    //
+    // 引き金を引いた時点で減らしていたので、軽く叩いたとき (振りかぶりが
+    // 残っている) に「まだ投げていないのに残り数が減る」が 1.5 秒続いていた。
     // 止めていた続きから振り切る。手を離れるのはその途中
     this.player.releaseThrow();
     // 残りは**いまどこまで再生されたか**から測る。
@@ -2530,6 +2551,8 @@ export class Game {
     if (this.grenadeRelease > 0) return;
     this.grenadeRelease = 0;
     this.player.setThrowing(false);
+    // ここで初めて手を離れる。残り数が減るのもここ
+    this.inv.spend();
 
     // 向きはこの瞬間のもの。放す所まで狙いを追えるようにする
     this.follow.aimDirection(this.aimDir);
