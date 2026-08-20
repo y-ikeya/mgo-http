@@ -1033,6 +1033,7 @@ export class Game {
       this.world,
     );
     this.reportFall();
+    this.updateFallScream();
     // 倒されている間は倒した相手を映す。それ以外は自分を追う
     const watching = this.killCamTarget;
     if (watching) this.follow.watch(dt, watching, this.cameraWorld);
@@ -2258,6 +2259,31 @@ export class Game {
    * 無傷の速さなら送らない。1 層 (3.2m) 降りるたびに 1 通飛ぶのは無駄で、
    * 飛び降りて回り込むのは普通の動き方なので回数も多い。
    */
+  /**
+   * 落ちながら叫ぶ。
+   *
+   * **落ち切ってからでは間に合わない。** 死ぬのは着地した瞬間で、そこから
+   * 叫び始めると絵と音がずれる。落下中の速さから「このまま着くと何点削られるか」
+   * を出して、**今の体力で死ぬなら**その場で叫ぶ。
+   *
+   * 式はサーバーと同じ (domain/rule/damage.ts)。こちらは音を鳴らすだけで、
+   * 削るのはあちら。
+   */
+  private updateFallScream(): void {
+    if (this.player.fallingSpeed <= 0) {
+      this.fallScreamed = false;
+      return;
+    }
+    if (this.fallScreamed || !canAct(this.life)) return;
+    if (fallDamage(this.player.fallingSpeed) < this.player.health) return;
+    this.fallScreamed = true;
+    // 長いほう (3.3 秒)。落ちている間ずっと聞こえていてほしい
+    this.audio.play("blastScream", this.player.position);
+  }
+
+  /** この落下でもう叫んだか。着地するか、落ちるのをやめたら戻す */
+  private fallScreamed = false;
+
   private reportFall(): void {
     const speed = this.player.landedSpeed;
     if (speed <= 0 || !canAct(this.life)) return;

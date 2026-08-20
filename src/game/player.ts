@@ -1,5 +1,6 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../domain/item/weapons'
 import { isGun, type HeldId } from '../domain/item/held'
+import { fallDamage } from '../domain/rule/damage'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
@@ -179,6 +180,14 @@ const FALL_REFERENCE_HEIGHT = 0.6
  * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
  */
 const LANDING_TIME = 0.16
+
+/**
+ * 受け身の尺 (秒)。**クリップの長さ (1.67s) に合わせる。**
+ *
+ * 途中で移動の型に戻すと、転がっている最中に立ち上がって滑る。削られた高さから
+ * 落ちたことを見せる動きなので、最後まで流す。
+ */
+const FALL_ROLL_TIME = 1.67
 /**
  * 着地モーションを出す落下速度の下限 (m/s)。
  *
@@ -333,8 +342,20 @@ export class Player {
   private set velocityY(value: number) {
     this.mover.velocityY = value
   }
+  /**
+   * いま落ちている速さ (m/s)。落ちていなければ 0。
+   *
+   * **着地する前に、これから食らう量が読める。** 悲鳴を上げるのに使う —
+   * 落ち切ってから叫んだのでは間に合わない。
+   */
+  get fallingSpeed(): number {
+    return this.onGround ? 0 : Math.max(0, -this.velocityY)
+  }
+
   /** 着地モーションの残り時間 */
   private landingTimer = 0
+  /** 受け身の残り時間。ただの着地より長い */
+  private fallRollTimer = 0
   /**
    * 跳躍の設定。高さを固定したまま重力を変えられるよう、初速は毎回 sqrt(2gh) で出す。
    * 重力だけ上げれば「同じ高さまで跳ぶが滞空が短い」になる。
@@ -1195,15 +1216,22 @@ export class Player {
       dt,
     )
 
-    // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す
+    // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す。
+    // **削られる速さなら受け身。** 体力が減ったことが動きにも出る
     if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED) {
       this.landingTimer = LANDING_TIME
-      this.animator?.playLanding()
+      if (fallDamage(moved.impactSpeed) > 0) {
+        this.fallRollTimer = FALL_ROLL_TIME
+        this.animator?.playFallRoll()
+      } else {
+        this.animator?.playLanding()
+      }
     }
     // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
     // サーバーなので、速さを申告して同じ式 (damage.ts) を向こうで通してもらう
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.landingTimer > 0) this.landingTimer -= dt
+    if (this.fallRollTimer > 0) this.fallRollTimer -= dt
     this.actualSpeed = moved.actualSpeed
 
     // 倒れている間の時計。起き上がるのは操作されたときだけ (standUp)
@@ -1509,6 +1537,7 @@ export class Player {
       rolling: this.rolling,
       onGround: this.onGround,
       landing: this.landingTimer,
+      fallRoll: this.fallRollTimer,
       velocityY: this.velocityY,
       dirX: moveDir.x,
       dirZ: moveDir.z,

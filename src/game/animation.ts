@@ -48,6 +48,8 @@ const AIM_HIP_LAMBDA = 10
  */
 const LOWER_CLIPS: Record<Locomotion, string> = {
   idle: 'idle',
+  // 落下の受け身。着地 (jump_down) とは別のクリップ
+  fall_roll: 'fall_roll',
   crouch_idle: 'crouch_idle',
   sneak: 'sneak',
   sit: 'sit',
@@ -1483,6 +1485,21 @@ export class CharacterAnimator {
     }
     action.reset().play()
     this.locomotion = 'jump_up'
+  }
+
+  /**
+   * 落下の受け身。**削られる高さから落ちたときだけ。**
+   *
+   * ただの着地 (playLanding) と分ける。体力が減ったことが体の動きにも出る
+   * ようにしたいので、転がる型を最後まで流す。
+   */
+  playFallRoll(): void {
+    if (this.dead) return
+    const action = this.lower.get('fall_roll')
+    if (!action) return
+    action.reset().play()
+    this.locomotion = 'fall_roll'
+    this.rootSampleValid = false
   }
 
   /** 着地のモーション。頭から流す */

@@ -23,6 +23,7 @@ const base: StanceInput = {
   rolling: false,
   onGround: true,
   landing: 0,
+  fallRoll: 0,
   forward: 0,
   strafe: 0,
   speed: 0,
@@ -45,5 +46,24 @@ describe('刺す姿勢', () => {
   test('全身の型ではない。下半身はしゃがみ、上半身だけが刺す', () => {
     expect(WHOLE_BODY.has('stab')).toBe(true)
     expect(WHOLE_BODY.has('crouch_stab')).toBe(false)
+  })
+})
+
+describe('落下の受け身', () => {
+  test('削られる高さから落ちたら受け身。ただの着地とは別', () => {
+    expect(resolveLocomotion({ ...base, fallRoll: 1.6 })).toBe('fall_roll')
+    expect(resolveLocomotion({ ...base, landing: 0.1 })).toBe('jump_down')
+  })
+
+  test('受け身の間は移動の型に戻らない。**転がり切るまで続く**', () => {
+    expect(
+      resolveLocomotion({ ...base, fallRoll: 0.4, actualSpeed: 5, dirZ: -1 } as StanceInput),
+    ).toBe('fall_roll')
+  })
+
+  test('空中にいる間は受け身にならない (着いてから転がる)', () => {
+    expect(
+      resolveLocomotion({ ...base, onGround: false, velocityY: -18, fallRoll: 1.6 } as StanceInput),
+    ).toBe('jump_loop')
   })
 })

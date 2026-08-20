@@ -33,6 +33,7 @@ export type Stance = 'stand' | 'crouch' | 'box' | 'prone' | 'down'
  */
 export type WholeBodyLocomotion =
   | 'roll'
+  | 'fall_roll'
   | 'stab'
   | 'death'
   | 'salute'
@@ -45,6 +46,8 @@ export type WholeBodyLocomotion =
 
 export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>([
   'roll',
+  // 受け身。転がるので上半身だけ別の型は重ねられない
+  'fall_roll',
   'stab',
   'death',
   'salute',
@@ -136,6 +139,13 @@ export interface StanceInput {
   onGround: boolean
   /** 着地モーションの残り時間 (秒) */
   landing: number
+  /**
+   * 受け身の残り時間 (秒)。0 なら受け身ではない。
+   *
+   * ただの着地 (landing) と別に持つ。落下ダメージが入る速さで落ちたときだけで、
+   * 尺もクリップに合わせて長い。
+   */
+  fallRoll: number
   /** 上下の速度 (m/s)。空中で上昇と下降を分ける */
   velocityY: number
   /** 入力された移動方向 (ワールド、正規化済み)。停止なら 0 */
@@ -181,6 +191,8 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // 空中では上昇と下降でモーションを分ける。クリップの終了ではなく速度で
   // 切り替えるので、滞空時間が変わっても破綻しない
   if (!input.onGround) return input.velocityY > 0 ? 'jump_up' : 'jump_loop'
+  // 削られる高さから落ちた着地は受け身。ただの着地より長く、転がり切るまで続く
+  if (input.fallRoll > 0) return 'fall_roll'
   if (input.landing > 0) return 'jump_down'
 
   const stopping =

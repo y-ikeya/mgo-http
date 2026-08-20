@@ -34,7 +34,8 @@
     "Hit Reaction.fbx": "hit",
     "Sneaking Forward.fbx": "sneak",
     "Male Sitting Pose.fbx": "sit",
-    "pose.fbx": "away"
+    "pose.fbx": "away",
+    "fallRoll.fbx": "fall_roll"
   },
   "out": "public/models/soldier.glb",
   "maxTexture": 1024

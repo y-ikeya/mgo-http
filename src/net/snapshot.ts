@@ -53,6 +53,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   'claymore_place',
   // しゃがんだまま刺す。**末尾に足す**
   'crouch_stab',
+  // 落下の受け身。**末尾に足す**
+  'fall_roll',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

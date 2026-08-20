@@ -105,6 +105,8 @@ const PLAY_WHOLE_BODY: Record<
   (animator: CharacterAnimator) => void
 > = {
   roll: (a) => a.playRoll(),
+  // 落下の受け身。削られる高さから落ちた着地
+  fall_roll: (a) => a.playFallRoll(),
   stab: (a) => a.playStab(),
   death: (a) => a.playDeath(),
   salute: (a) => a.playSalute(),
