@@ -2680,6 +2680,19 @@ export class Game {
     if (this.statsTimer < STATS_INTERVAL || !this.onStats) return;
     this.statsTimer = 0;
     const now = Date.now();
+    /*
+     * 支度の間、カードは**これから湧く銃**を映す。
+     *
+     * 手には何も無い (戦場に居ない) ので、前の命の銃を出すと「P90 を選んだのに
+     * AK47 と出る」になる。装備画面で選んでいる物と食い違うのはここだけで、
+     * 直前まで持っていた物に用は無い。
+     */
+    const choosing = this.canChooseLoadout;
+    const shownWeapon: HeldId = choosing ? this.pendingLoadout.primary : this.inv.weapon;
+    const chosen = weaponOf(this.pendingLoadout.primary);
+    const shownAmmo = choosing
+      ? { magazine: chosen.magazine, reserve: chosen.reserve }
+      : { magazine: this.inv.ammoOf(shownWeapon), reserve: this.inv.reserveOf(shownWeapon) };
     this.onStats({
       stage: STAGE_CODE,
       backend: this.backend,
@@ -2691,9 +2704,9 @@ export class Game {
       shots: this.shotCount,
       // **武器のカードに出す数。** 手にある物ではなく、カードが名指している武器の
       // 弾。ダンボールを被っている間も銃の残弾はそのまま出す
-      ammo: this.inv.ammoOf(this.inv.weapon),
-      magazine: this.weapon.magazine,
-      reserve: this.inv.reserveOf(this.inv.weapon),
+      ammo: shownAmmo.magazine,
+      magazine: choosing ? chosen.magazine : this.weapon.magazine,
+      reserve: shownAmmo.reserve,
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
@@ -2743,7 +2756,7 @@ export class Game {
         : null,
       held: this.inv.held,
       // **武器のカードに出す物。** 道具を手にしていても変わらない
-      weaponHeld: this.inv.weapon,
+      weaponHeld: shownWeapon,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
       browsingFamily: this.browsing?.family ?? null,
