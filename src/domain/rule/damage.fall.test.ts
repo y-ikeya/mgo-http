@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { fallDamage, FALL_SAFE_SPEED, MAX_HEALTH } from './damage'
+import { FALL_SAFE_SPEED, MAX_HEALTH, fallDamage, meleeDamage } from './damage'
 
 /**
  * 落下ダメージ。
@@ -40,5 +40,12 @@ describe('境目', () => {
 
   test('速いほど痛い', () => {
     expect(fallDamage(18)).toBeGreaterThan(fallDamage(16))
+  })
+})
+
+describe('ナイフ', () => {
+  test('**どこを刺しても即死。** 背後と正面で分けない', () => {
+    expect(meleeDamage(true)).toBe(MAX_HEALTH)
+    expect(meleeDamage(false)).toBe(MAX_HEALTH)
   })
 })

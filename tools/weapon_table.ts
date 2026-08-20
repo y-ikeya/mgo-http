@@ -100,8 +100,11 @@ w('## 近接')
 w()
 w('| | ダメージ | |')
 w('|---|---|---|')
-w(`| 背後から | ${MELEE_BACK_DAMAGE} | 即死 |`)
-w(`| 正面から | ${MELEE_FRONT_DAMAGE} | 2 回 |`)
+// **要る発数から書く。** 「2 回」と直に書いてあったので、正面を即死にしても
+// 表だけ古いままだった
+const stabs = (damage: number) => (damage >= MAX_HEALTH ? '即死' : `${Math.ceil(MAX_HEALTH / damage)} 回`)
+w(`| 背後から | ${MELEE_BACK_DAMAGE} | ${stabs(MELEE_BACK_DAMAGE)} |`)
+w(`| 正面から | ${MELEE_FRONT_DAMAGE} | ${stabs(MELEE_FRONT_DAMAGE)} |`)
 w()
 w(`間合いは ${MELEE_RANGE}m。`)
 w()

@@ -22,10 +22,19 @@ export const MAX_HEALTH = 100
 export const MELEE_RANGE = 2.0
 /** ナイフの有効範囲 (正面からの半角の cos)。60° 以内 */
 export const MELEE_CONE_COS = Math.cos((60 * Math.PI) / 180)
-/** 背後から刺したときのダメージ。即死 */
+/**
+ * 刺したときのダメージ。**どこを刺しても即死。**
+ *
+ * 背後と正面で分けていない。代償は**先に払われている** — ナイフは持ち替えの
+ * 枠なので、刺しに行く人は銃をしまってから近づいている。撃つ手段を手放し、
+ * 間合い (2m) に入るまで無防備でいる。そこまでやって届いたなら絶対、という
+ * 釣り合いにしてある (docs/weapons.md)。
+ *
+ * 持ち替えが入るまでは正面 50 (2 回) にしてあった。銃を持ったまま一瞬で
+ * 刺せる状態で即死にすると、代償が無いまま報酬だけが残る。
+ */
 export const MELEE_BACK_DAMAGE = MAX_HEALTH
-/** 正面から刺したときのダメージ。2 回要る */
-export const MELEE_FRONT_DAMAGE = MAX_HEALTH / 2
+export const MELEE_FRONT_DAMAGE = MAX_HEALTH
 /**
  * 「背後から」と判定する内積の閾値。
  * 攻撃者と被害者が同じ向きを向いていれば背後を取っている。
