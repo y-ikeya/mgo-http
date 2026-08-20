@@ -9,6 +9,7 @@
  */
 import { isSeated } from './lifecycle'
 import type { Player, Team } from './player'
+import { MODES, type Mode, type ModeSpec } from './room'
 
 /**
  * 試合の段階。
@@ -37,6 +38,8 @@ export const MIN_PLAYERS = 2
 export const RECONNECT_GRACE = 30_000
 
 export interface Match {
+  /** この部屋のルール。部屋ごとに固定 (src/domain/room.ts) */
+  mode: ModeSpec
   players: Map<string, Player>
   /** 残機。0 にされた側が負け */
   blue: number
@@ -58,8 +61,9 @@ export interface Match {
   startedAt: number
 }
 
-export function newMatch(): Match {
+export function newMatch(mode: Mode): Match {
   return {
+    mode: MODES[mode],
     players: new Map(),
     blue: 0,
     red: 0,
@@ -107,6 +111,8 @@ export function holdingSeats(room: Match, now: number): Player[] {
  * 本人に選ばせない。人数が偏ったまま始まると、腕前より頭数で決まってしまう。
  */
 export function assignTeam(room: Match): Team {
+  // **練習部屋は全員青。** 赤は棒立ちの的の側で、そこへ人を入れる意味が無い
+  if (room.mode.id === 'PRACTICE') return 'blue'
   let blue = 0
   let red = 0
   for (const player of connected(room)) {

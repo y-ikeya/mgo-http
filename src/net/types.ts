@@ -25,6 +25,7 @@ import type { Life } from '../domain/lifecycle'
  * 借りて話す側。ここから出しているのは、読む側の import を変えないため。
  */
 import type { Team } from '../domain/player'
+import type { Mode } from '../domain/room'
 export type { Team }
 
 /** 1 人分の見た目の状態。体力はここに含めない (サーバーが持つ) */
@@ -477,6 +478,12 @@ export type MatchPhase = 'waiting' | 'countdown' | 'playing' | 'over'
  */
 export interface RoomSummary {
   name: string
+  /** その部屋のルール。部屋ごとに固定 (src/domain/room.ts) */
+  mode: Mode
+  /** ルールの表示名 */
+  label: string
+  /** 入れるか。false なら一覧に出るが繋げない */
+  active: boolean
   /** いま繋がっている人数 */
   players: number
   /**

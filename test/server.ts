@@ -105,7 +105,7 @@ export class Client {
   constructor(server: Server, id: string, at: [number, number, number] = [0, 0, 0]) {
     this.id = id
     this.position = at
-    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=alpha&id=${id}`)
+    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=bravo&id=${id}`)
     this.socket.binaryType = 'arraybuffer'
     this.socket.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (event.data instanceof ArrayBuffer) {
