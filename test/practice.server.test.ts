@@ -17,7 +17,7 @@ beforeAll(async () => {
 afterAll(() => server.stop())
 
 /** 的の位置。server/index.ts の TARGET_SPOTS と揃えてある */
-const NEAR = { x: -3, z: 20 }
+const NEAR = { x: -30, z: 12 }
 
 async function enterPractice(id: string): Promise<Client> {
   const client = new Client(server, id, [NEAR.x, 0, NEAR.z + 3], 'echo')
@@ -64,13 +64,22 @@ describe('練習部屋', () => {
     })
     await Bun.sleep(300)
 
-    const down = shooter.order.filter((t) => t === 'life').length
-    expect(down).toBeGreaterThan(0)
+    // **的の id で見る。** 種類だけで数えると、撃った本人の湧きを数えてしまう
+    const downed = shooter.messages.some(
+      (m) => m.type === 'life' && m.id === 'target-0' && m.state === 'downed',
+    )
+    expect(downed).toBe(true)
 
     // 戻るまで待つ (3 秒 + 余白)
     await Bun.sleep(3600)
-    const revived = shooter.count.get('respawn') ?? 0
-    expect(revived).toBeGreaterThan(0)
+    const revived = shooter.messages.some(
+      (m) => m.type === 'life' && m.id === 'target-0' && m.state === 'alive',
+    )
+    expect(revived).toBe(true)
+    const healed = shooter.messages.some(
+      (m) => m.type === 'health' && m.id === 'target-0' && m.health === 100,
+    )
+    expect(healed).toBe(true)
     shooter.close()
   }, 20000)
 })

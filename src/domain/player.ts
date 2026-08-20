@@ -317,6 +317,23 @@ export function newBot(seed: {
 }
 
 /**
+ * 的を戻す。**人の遷移表を通さない。**
+ *
+ * 表には `downed → alive` が無い。人は倒れたら支度 (choosing) を挟んで湧く
+ * ので要らない遷移で、そこを塞いでいるのは正しい。**的は装備を選ばない**ので、
+ * 同じ道を通れない。
+ *
+ * これに気づかず enterLife(bot, 'alive') を呼んでいて、的が倒れたきり戻って
+ * こなかった。試験は通っていた — 撃った本人の respawn を数えていたため。
+ */
+export function reviveBot(bot: Player, now: number): void {
+  refill(bot)
+  bot.life = 'alive'
+  bot.lifeAt = now
+  bot.killedBy = ''
+}
+
+/**
  * 状態を移す。**通れない遷移は移さずに false を返す。**
  *
  * 知らせる (broadcast) のは呼ぶ側の仕事。ここは人の側の話だけで、

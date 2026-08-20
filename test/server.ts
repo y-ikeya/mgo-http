@@ -97,6 +97,14 @@ export class Client {
   locomotion = ''
   /** 自分の状態 (life で届いたもの) */
   life = ''
+  /**
+   * 届いた通をそのまま控える。
+   *
+   * **種類だけでは足りない場面がある。** 「的が戻ってきたか」を respawn の数で
+   * 見ていたら、撃った本人の respawn を数えていて的が戻らないのを見逃した。
+   * id まで見られるようにする。
+   */
+  readonly messages: ServerMessage[] = []
 
   private readonly socket: WebSocket
   private timer: ReturnType<typeof setInterval> | null = null
@@ -122,6 +130,7 @@ export class Client {
         return
       }
       const message = JSON.parse(event.data) as ServerMessage
+      this.messages.push(message)
       this.order.push(message.type)
       this.last.set(message.type, message)
       this.count.set(message.type, (this.count.get(message.type) ?? 0) + 1)
@@ -163,6 +172,7 @@ export class Client {
   /** 数えているものを 0 に戻す。「この区間で何通来たか」を測るのに使う */
   reset(): void {
     this.states = 0
+    this.messages.length = 0
     this.order.length = 0
     this.count.clear()
   }

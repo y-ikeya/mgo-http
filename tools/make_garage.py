@@ -64,9 +64,13 @@ STAIR_DEPTH = 0.35   # 床に開けた穴に収めるための浅い段
 ARENA = 40.0
 WALL_THICK = 1.0
 
-# 建物の外形。2F と 3F でずらしてあり、はみ出した側がスロープの吹き抜けになる
-BX0, BX1 = -21.0, 21.0
-BY0, BY1 = -15.0, 15.0
+# 建物の外形。2F と 3F でずらしてあり、はみ出した側がスロープの吹き抜けになる。
+#
+# **広くしてある** (42x30 → 48x40)。湧き地点を対角の角へ移したので、端から端まで
+# 建物の中を斜めに横切ることになる。前の大きさだと通路が 1 本きりで、どこを
+# 通っても同じ道になっていた。
+BX0, BX1 = -24.0, 24.0
+BY0, BY1 = -20.0, 20.0
 RAMP_W = 7.0                       # スロープの幅 (吹き抜けの幅でもある)
 DECK2 = (BX0 + RAMP_W, BX1)        # 2F の床の x 範囲。西がスロープで抜けている
 DECK3 = (BX0, BX1 - RAMP_W)        # 3F の床の x 範囲。東が抜けている
@@ -370,8 +374,8 @@ stairs('metal_stair_up3', STAIR_X[0], STAIR_X[1], BY0 + STAIR_LANDING, LEVELS[1]
 # **遮蔽はこれだけ。** 細いので、止まっていれば隠れるが動けば見える。
 # 3F の上へ 1.1m 突き出して、屋上でも身を隠せるようにする。
 PILLAR = 0.9
-for px in (-16.0, -8.0, 0.0, 8.0, 16.0):
-    for py in (-12.0, -6.0, 6.0, 12.0):
+for px in (-19.0, -11.0, -3.0, 5.0, 13.0, 21.0):
+    for py in (-16.0, -9.0, 9.0, 16.0):
         # 吹き抜けや階段室の中には立てない
         if any(hx0 < px < hx1 and hy0 < py < hy1
                for hx0, hx1, hy0, hy1 in (WELL, STAIR2, STAIR3)):
@@ -402,21 +406,22 @@ CARS = {
     'small': load_car(os.path.join(root_dir, 'tools', 'props', 'car_small.glb'), 'small'),
 }
 
-# 地上。柱の間の通路に沿って停める
-car('rusty', -11.5, -12.0, LEVELS[0])
-car('small', -11.5, 11.5, LEVELS[0])
-car('small', 11.5, -12.0, LEVELS[0], spin=180)
-car('rusty', 19.0, 11.0, LEVELS[0])
+# 地上。**柱の間の車路に沿って停める。** 柱は 8m 間隔なので、その中間の
+# 通り (x = -15 / -7 / 1 / 9 / 17) が車路になる。y は柱の列 (±9, ±16) の間
+car('rusty', -15.0, -12.5, LEVELS[0])
+car('small', -15.0, 12.5, LEVELS[0])
+car('small', 1.0, -12.5, LEVELS[0], spin=180)
+car('rusty', 17.0, 12.5, LEVELS[0])
 
 # 2F。吹き抜けの脇に寄せて、縁に貼り付いた相手の後ろを取れる形にする
-car('small', -11.5, -12.0, LEVELS[1])
-car('rusty', -11.5, 11.5, LEVELS[1], spin=180)
-car('small', 12.5, 11.5, LEVELS[1])
-car('rusty', 0.0, -8.5, LEVELS[1], spin=90)
+car('small', -7.0, -12.5, LEVELS[1])
+car('rusty', -7.0, 12.5, LEVELS[1], spin=180)
+car('small', 17.0, -12.5, LEVELS[1])
+car('rusty', 1.0, 12.5, LEVELS[1])
 
 # 3F (屋上)。数を減らす。見晴らしを潰すと上へ行く意味が消える
-car('small', -11.5, 11.5, LEVELS[2])
-car('rusty', -18.5, -11.0, LEVELS[2], spin=180)
+car('small', -15.0, 12.5, LEVELS[2])
+car('rusty', -7.0, -12.5, LEVELS[2], spin=180)
 
 # --- 地上の遮蔽 -------------------------------------------------------------
 # 柱だけだと地上が広すぎる。駐車場らしく、低い塊を散らす
@@ -430,11 +435,29 @@ for i, (cx, cy, w, d, h) in enumerate([
     box(f'metal_ground_cover_{i}', cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2, 0, h)
 
 # --- 湧き地点の遮蔽 ---------------------------------------------------------
-# 出た直後に建物から抜かれないように、正面を切る
-for tag, sy in (('n', 1), ('s', -1)):
-    box(f'concrete_spawn_{tag}', -6.0, 6.0, sy * 27.0 - 1.0, sy * 27.0 + 1.0, 0, 1.9)
-    box(f'wood_spawn_{tag}_a', 12.0, 17.0, sy * 24.0 - 1.2, sy * 24.0 + 1.2, 0, H_LOW)
-    box(f'wood_spawn_{tag}_b', -17.0, -12.0, sy * 24.0 - 1.2, sy * 24.0 + 1.2, 0, 1.4)
+# 湧き地点は**対角の角**。建物の中を斜めに横切る形にしてある。
+#
+# 遮蔽は L 字に 2 枚。角に湧くと 2 方向から抜かれるので、正面を 1 枚切るだけでは
+# 足りない (辺の中央に湧いていた頃は 1 枚で済んでいた)。
+#
+# 中心から 6m。基地の枠 (stage.ts の BASE_HALF = 2m) より外で、出るときに
+# 回り込む距離が残る位置。
+SPAWN_C = 30.0      # 湧き地点の中心 (角から 10m 内側)
+SPAWN_OFF = 6.0     # 遮蔽までの距離
+for tag, sx, sy in (('sw', -1, -1), ('ne', 1, 1)):
+    cx, cy = sx * SPAWN_C, sy * SPAWN_C
+    wall_x = cx - sx * SPAWN_OFF
+    wall_y = cy - sy * SPAWN_OFF
+    ax = sorted((wall_x - 0.5, wall_x + 0.5))
+    ay = sorted((cy + sy * 6.0, cy - sy * 8.0))
+    box(f'concrete_spawn_{tag}_a', ax[0], ax[1], ay[0], ay[1], 0, 1.9)
+    bx = sorted((cx + sx * 6.0, cx - sx * 8.0))
+    by = sorted((wall_y - 0.5, wall_y + 0.5))
+    box(f'concrete_spawn_{tag}_b', bx[0], bx[1], by[0], by[1], 0, 1.9)
+    # 低い遮蔽。出た先で伏せる場所を 1 つ置く
+    cover_x = sorted((cx - sx * 11.0, cx - sx * 15.0))
+    cover_y = sorted((cy - sy * 3.0, cy - sy * 5.2))
+    box(f'wood_spawn_{tag}_c', cover_x[0], cover_x[1], cover_y[0], cover_y[1], 0, H_LOW)
 
 # --- 寸法の物差し -----------------------------------------------------------
 for name, height, x in (('ref_stand', 1.80, 34.0), ('ref_crouch', 0.94, 35.5)):

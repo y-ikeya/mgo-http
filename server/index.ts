@@ -15,6 +15,7 @@ import {
   newBot,
   newPlayer,
   refill,
+  reviveBot,
   type Player,
   type Team,
 } from '../src/domain/player'
@@ -341,25 +342,25 @@ function roomOf(name: RoomName): Match {
 }
 
 /**
- * 練習部屋の的。**10m 間隔で 1 列**に並べる。
+ * 練習部屋の的。**建物の西、外壁沿いの一直線に 10m 間隔**で並べる。
  *
  * 用は**距離の練習**。P90 の頭 1 発は 12m まで、AK47 は 25m まで
  * (src/domain/README.md) — その境目は説明を読むより撃ったほうが早い。
- * 間隔を 10m で揃えてあるので、隣に立って次を撃てば「10m 先」がそのまま出る。
  *
- * 青の湧き地点は (0, 35) で、その手前に高さ 1.9m の壁 (concrete_spawn_s) が
- * ある。**壁を出た所 (z≒24) が撃ち始めの位置**で、そこから 5 / 13 / 24 / 34 /
- * 44m に並ぶ。
+ * 青の湧き地点 (-30, 30) から南へ真っ直ぐ伸びる車路で、**湧き地点の遮蔽を
+ * 出た所 (z≒22) から 10 / 20 / 30 / 40 / 50m**。建物の外なので柱にも階にも
+ * 邪魔されない。5 点とも床が 0m で、押し戻しも視線の遮りも無いことを
+ * ステージの箱に当てて確かめてある。
  *
- * 横へずらしてあるのは、一直線だと手前の的が奥を隠すため。z=11 だけ 1m ずれて
- * いるのは、そこに柱があって的が壁の中に埋まるから (実測して避けた)。
+ * 一直線に並べても手前が奥を隠さないのは、**外した弾がそのまま次の的へ飛ぶ**
+ * のがむしろ都合がよいため (縦に並んだ的は距離が読みやすい)。
  */
 const TARGET_SPOTS = [
-  { x: -3, z: 20 },
-  { x: 3, z: 11 },
-  { x: -3, z: 0 },
-  { x: 3, z: -10 },
-  { x: -3, z: -20 },
+  { x: -30, z: 12 },
+  { x: -30, z: 2 },
+  { x: -30, z: -8 },
+  { x: -30, z: -18 },
+  { x: -30, z: -28 },
 ]
 
 /** 倒してから戻るまで (ms) */
@@ -392,12 +393,10 @@ function updateTargets(roomName: RoomName, room: Match, now: number): void {
   for (const bot of room.players.values()) {
     if (!bot.bot) continue
     if (bot.life === 'downed' && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
-      refill(bot)
-      if (enterLife(bot, 'alive', now)) {
-        broadcast(roomName, { type: 'life', id: bot.id, state: 'alive' })
-        broadcast(roomName, { type: 'respawn', id: bot.id })
-        broadcast(roomName, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
-      }
+      reviveBot(bot, now)
+      broadcast(roomName, { type: 'life', id: bot.id, state: 'alive' })
+      broadcast(roomName, { type: 'respawn', id: bot.id })
+      broadcast(roomName, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
     }
     recordPose(bot)
     relayState(roomName, bot, targetPayload(bot, now))
