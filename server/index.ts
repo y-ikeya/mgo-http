@@ -794,7 +794,9 @@ let nextClaymoreId = 1
  * 使うと、段差の上に置いたときに床へ沈む。
  */
 function placeClaymore(roomName: RoomName, from: Player): void {
-  if (!canAct(from.life) || from.support !== 'claymore' || from.grenades <= 0) return
+  // **手にある物で決める。** 装備の選択 (support) で見ていたので、落ちている
+  // クレイモアを拾って持ち替えた人が置けなかった
+  if (!canAct(from.life) || from.held !== 'claymore' || from.grenades <= 0) return
 
   const forward = [-Math.sin(from.yaw), -Math.cos(from.yaw)]
   const x = from.x + forward[0] * PLACE_FORWARD
@@ -859,6 +861,7 @@ function relayClaymores(roomName: RoomName, room: Match): void {
           JSON.stringify({
             type: 'claymorePlaced',
             id: claymore.id,
+            owner: claymore.owner,
             at: [claymore.x, claymore.y, claymore.z],
             yaw: claymore.yaw,
             team: claymore.team,

@@ -179,15 +179,23 @@ export class Client {
     if (this.socket.readyState !== WebSocket.OPEN) return
     const [x, y, z] = this.position
     this.socket.send(
-      encodeSnapshot(snapshotOf(this.id, x, y, z, locomotion, this.holdingGrenade)),
+      encodeSnapshot(
+        snapshotOf(this.id, x, y, z, locomotion, this.holdingGrenade, this.holdingClaymore),
+      ),
     )
   }
 
   /** 振りかぶって持っているか。位置に乗せて送る */
   private holdingGrenade = false
+  /** クレイモアを手にしているか */
+  private holdingClaymore = false
 
   holdGrenade(holding: boolean): void {
     this.holdingGrenade = holding
+  }
+
+  holdClaymore(holding: boolean): void {
+    this.holdingClaymore = holding
   }
 
   send(message: ClientMessage): void {
@@ -221,6 +229,7 @@ function snapshotOf(
   z: number,
   locomotion: string,
   holdingGrenade = false,
+  holdingClaymore = false,
 ): PlayerSnapshot {
   return {
     id,
@@ -235,7 +244,11 @@ function snapshotOf(
     crouching: false,
     boxed: false,
     // 振りかぶっているなら手にあるのも手榴弾。**両方そろって初めて落ちる**
-    held: holdingGrenade ? ('grenade' as const) : ('rifle' as const),
+    held: holdingGrenade
+      ? ('grenade' as const)
+      : holdingClaymore
+        ? ('claymore' as const)
+        : ('rifle' as const),
     locomotion,
     concentrating: false,
     saluteHeld: false,

@@ -123,3 +123,38 @@ describe('握ったまま撃たれる', () => {
     b.close()
   }, 30000)
 })
+
+/**
+ * クレイモアは**置けたときだけ**数が減る。
+ *
+ * 置ける場所かを決めているのはサーバー (壁の中や縁の外へは置けない)。断られた
+ * ことが画面に伝わらないと、置けていないのに手元の残り数だけが減る。
+ */
+describe('クレイモアを置く', () => {
+  test('置けたら owner 付きで配られる', async () => {
+    const { a, b } = await twoPlayers(server)
+    a.holdClaymore(true)
+    await Bun.sleep(300)
+    a.reset()
+
+    a.send({ type: 'claymore' })
+    await Bun.sleep(400)
+
+    const placed = a.messages.find((m) => m.type === 'claymorePlaced')
+    expect(placed?.type === 'claymorePlaced' && placed.owner).toBe('alice')
+
+    a.holdClaymore(false)
+    a.close()
+    b.close()
+  }, 30000)
+
+  test('**手にしていなければ置けない。** 何も配られない', async () => {
+    const { a, b } = await twoPlayers(server)
+    a.reset()
+    a.send({ type: 'claymore' })
+    await Bun.sleep(400)
+    expect(a.messages.some((m) => m.type === 'claymorePlaced')).toBe(false)
+    a.close()
+    b.close()
+  }, 30000)
+})

@@ -322,6 +322,14 @@ export interface PlaceClaymoreEvent {
 export interface ClaymorePlaced {
   type: 'claymorePlaced'
   id: number
+  /**
+   * 置いた人。
+   *
+   * **本人が「置けた」ことを知るのに要る。** 置けるかどうかを決めているのは
+   * サーバー (壁の中や縁の外へは置けない) で、断られたことが分からないと
+   * 手元の残り数だけが減る。
+   */
+  owner: string
   at: [number, number, number]
   /** 正面の向き (rad) */
   yaw: number

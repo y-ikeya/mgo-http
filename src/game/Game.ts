@@ -1366,9 +1366,20 @@ export class Game {
         break;
       }
 
-      case "claymorePlaced":
+      /*
+       * 置かれたクレイモア。**自分の物なら、ここで初めて残り数を減らす。**
+       *
+       * 置けるかを決めているのはサーバー (壁の中や縁の外へは置けない)。送った
+       * 時点で減らしていたので、断られると**置けていないのに減る**ことがあった。
+       *
+       * 同じ物が二度来る (見え隠れするたびに配られる) ので、初めて見た物だけ数える。
+       */
+      case "claymorePlaced": {
+        const mine = message.owner === this.net.id && !this.claymores.has(message.id);
         this.claymores.place(message.id, message.at, message.yaw);
+        if (mine) this.inv.spendOf("claymore");
         break;
+      }
 
       case "claymoreGone": {
         // 位置を先に取る。消してから爆発を出すと出す場所が分からない
@@ -2403,8 +2414,8 @@ export class Game {
     if (this.setupRelease > 0) return;
     this.setupRelease = 0;
     this.player.setThrowing(false);
-    // ここで初めて手を離れる。残り数が減るのもここ
-    this.inv.spend();
+    // **数を減らすのはサーバーが置けたと言ってから** (claymorePlaced)。
+    // 壁の中や縁の外は断られるので、送った時点で減らすと置けずに減る
     this.net.send({ type: "claymore" });
   }
 

@@ -73,6 +73,11 @@ export class Claymores {
   }
 
   /** その id の置き場所。爆発を出す位置に使う */
+  /** もう置いてある物か。**同じ物が二度配られる** (見え隠れするたびに来る) */
+  has(id: number): boolean {
+    return this.live.has(id)
+  }
+
   at(id: number): THREE.Vector3 | null {
     return this.live.get(id)?.mesh.position.clone() ?? null
   }
