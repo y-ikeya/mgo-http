@@ -42,6 +42,7 @@ export class Inventory {
     this.items = buildCarried(loadout, fullAmmo)
     this.current = loadout.primary
     this.last = loadout.secondary
+    this.previousWeapon = loadout.secondary
     this.lastWeapon = loadout.primary
     this.lastTool = 'none'
     this.switchLeft = 0
@@ -88,6 +89,8 @@ export class Inventory {
 
   private lastWeapon: HeldId = 'rifle'
   private lastTool: HeldId = 'none'
+  /** 直前に持っていた**武器**。道具を挟んでも変わらない (トグルの行き先) */
+  private previousWeapon: HeldId | null = null
 
   /** 持ち替えの最中か。**この間は撃てないし投げられない** */
   get switching(): boolean {
@@ -251,11 +254,22 @@ export class Inventory {
       return false
     }
     if (id === this.current) return false
-    this.last = this.current
+    const from = this.current
+    this.last = from
+    /*
+     * **「直前の武器」は武器から武器へ移ったときだけ覚える。**
+     *
+     * ダンボールを被って戻ってくると、直前が箱になる。そのまま武器のトグルに
+     * 使うと**同じ系統に居ないので往復にならず、一覧を送ってしまう** —
+     * P90 → M9 → 箱 → M9 → Q で、P90 ではなくナイフが出ていた。
+     */
+    if (HELD[from].family === 'weapon' && HELD[id].family === 'weapon') {
+      this.previousWeapon = from
+    }
     // 系統ごとに「最後に選んだ物」を覚える。武器のカードと道具の表示が
     // 手にある物に引きずられないようにするため
-    if (HELD[this.current].family === 'weapon') this.lastWeapon = this.current
-    else this.lastTool = this.current
+    if (HELD[from].family === 'weapon') this.lastWeapon = from
+    else this.lastTool = from
     this.current = id
     if (HELD[id].family === 'weapon') this.lastWeapon = id
     else this.lastTool = id
@@ -286,7 +300,8 @@ export class Inventory {
     }
     // 道具は一覧を送る。箱 → none → 箱 …。「降ろす」を別の操作にしない
     if (family === 'tool') return this.switchTo(cycleId(this.items, this.current, 1))
-    return this.switchTo(toggleId(this.items, this.current, this.last))
+    // 武器は「直前の武器」と往復する。箱を挟んでも P90 ⇄ M9 が続く
+    return this.switchTo(toggleId(this.items, this.current, this.previousWeapon))
   }
 
   /** 一覧を送る。長押し中の上下 */
@@ -392,6 +407,7 @@ export class Inventory {
     const gone = dropFrom(this.items, id)
     if (!gone) return null
     if (this.lastWeapon === id) this.lastWeapon = firstOf(this.items, 'weapon') ?? 'knife'
+    if (this.previousWeapon === id) this.previousWeapon = firstOf(this.items, 'weapon')
     if (this.last === id) this.last = this.lastWeapon
     if (this.current === id) {
       this.current = this.lastWeapon

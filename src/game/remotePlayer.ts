@@ -927,7 +927,6 @@ export class RemotePlayers {
   hitMelee(
     origin: THREE.Vector3,
     forward: THREE.Vector3,
-    team: Team,
     /**
      * 刺す側が見ている上下 (rad)。**下が負。**
      *
@@ -935,7 +934,7 @@ export class RemotePlayers {
      * 読むので、手元で外しておかないと空振りに「当たった」表示だけが出る。
      */
     aimPitch: number,
-  ): { id: string; fromBehind: boolean; distance: number; friendly: boolean } | null {
+  ): { id: string; fromBehind: boolean; distance: number; side: Team } | null {
     let closest: { player: RemotePlayer; distance: number } | null = null;
 
     for (const player of this.players.values()) {
@@ -970,7 +969,9 @@ export class RemotePlayers {
       id: closest.player.id,
       fromBehind: this.victimForward.dot(forward) > BACKSTAB_DOT,
       distance: closest.distance,
-      friendly: closest.player.isAlly(team),
+      // **敵かどうかはここでは決めない。** 個人戦では同じ色でも敵なので、
+      // ルールを知っている側 (Game) が判断する
+      side: closest.player.side,
     };
   }
 

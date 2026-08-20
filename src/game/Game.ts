@@ -1864,7 +1864,6 @@ export class Game {
     const result = this.remotes.hitMelee(
       this.player.position,
       this.meleeForward,
-      this.team,
       // 見下ろしていれば倒れている相手にも届く。構えていなければ水平とみなす
       this.player.isAiming ? this.follow.aimPitch : 0,
     );
@@ -1872,7 +1871,10 @@ export class Game {
 
     // 味方に当てた。申告は送らない (サーバーが捨てるが、送る意味も無い)。
     // 表示だけは出す。当たったこと自体が分からないと、撃ち続けてしまう。
-    if (result.friendly) {
+    //
+    // **敵かどうかはルールに聞く。** 個人戦では同じ色でも敵で、陣営で見ていると
+    // 刺しても何も起きない
+    if (!this.hostileTo(result.id, result.side)) {
       this.lastHitZone = "FF";
       this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
       return;
@@ -2053,11 +2055,7 @@ export class Game {
        * 個人戦では同じ色でも敵なので、陣営で見ていると自分の弾が当たらない
        * (申告を送らないので、当てても削れない)。
        */
-      const friendly = !isHostile(
-        MODES[this.mode],
-        { id: this.net.id, team: this.team ?? "blue" } as never,
-        { id: player.player.id, team: player.player.side } as never,
-      );
+      const friendly = !this.hostileTo(player.player.id, player.player.side);
       if (!friendly) {
         // 当てたことをサーバーへ申告する。ダメージの数値は決めない。
         this.net.send({
@@ -2634,6 +2632,20 @@ export class Game {
     this.pressedAt.tool = 0;
     // 音は dropped が返ってきたときに鳴らす。**置いた場所で鳴らしたい**し、
     // ここでも鳴らすと自分だけ 2 回聞こえる
+  }
+
+  /**
+   * その相手を撃てるか。**陣営ではなくルールに聞く。**
+   *
+   * 個人戦では同じ色でも敵。陣営で見ていると、当てても申告を送らないので
+   * 削れない (弾も刺突も同じ穴があった)。
+   */
+  private hostileTo(id: string, side: Team): boolean {
+    return isHostile(
+      MODES[this.mode],
+      { id: this.net.id, team: this.team ?? "blue" } as never,
+      { id, team: side } as never,
+    );
   }
 
   private syncHeld(): void {

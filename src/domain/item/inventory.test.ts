@@ -294,3 +294,30 @@ describe('画面を読み直したとき', () => {
     expect(inv.ammo).toBe(50)
   })
 })
+
+describe('箱を挟んだ持ち替え', () => {
+  test('**箱を被って戻っても、武器の往復は続く。** ナイフが出てこない', () => {
+    const inv = new Inventory({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    // P90 → M9
+    inv.toggle('weapon'); settle(inv)
+    expect(inv.held).toBe('pistol')
+
+    // ダンボールを被って、また武器へ戻る
+    inv.toggle('tool'); settle(inv)
+    expect(inv.held).toBe('box')
+    inv.toggle('weapon'); settle(inv)
+    expect(inv.held).toBe('pistol')
+
+    // **ここが P90 に戻ってほしい所** (直前の武器)
+    inv.toggle('weapon'); settle(inv)
+    expect(inv.held).toBe('smg')
+  })
+
+  test('投げ物を挟んでも往復の相手は変わらない', () => {
+    const inv = new Inventory({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    inv.switchTo('grenade'); settle(inv)
+    inv.toggle('weapon'); settle(inv)
+    // 手榴弾 → 直前の武器 (P90)
+    expect(inv.held).toBe('smg')
+  })
+})
