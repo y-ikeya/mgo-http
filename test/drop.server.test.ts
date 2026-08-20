@@ -73,3 +73,53 @@ describe('置いて拾う', () => {
     b.close()
   }, 30000)
 })
+
+/**
+ * 振りかぶったまま撃たれる / 転ばされる。
+ *
+ * **ピンは抜けている。** そのまま何事もなく投げ切れるなら、手榴弾を構えている
+ * 相手を撃つ意味が薄くなる。足元に落ちて爆ぜるからこそ、「今撃つと道連れになる」
+ * という読みが生まれる。
+ */
+describe('握ったまま撃たれる', () => {
+  test('頭に当たって仰け反ると、手榴弾が足元に落ちる', async () => {
+    const { a, b } = await twoPlayers(server)
+    // **倒れない距離まで離れる。** 25m まで頭 1 発なので、それより遠くから
+    a.moveTo(...openSpot(0, -15))
+    b.moveTo(...openSpot(0, 15))
+    // b が振りかぶる (位置に holdingGrenade を立てて送り続ける)
+    b.holdGrenade(true)
+    await Bun.sleep(400)
+    a.reset()
+    b.reset()
+
+    a.send({
+      type: 'damage',
+      id: 'alice',
+      target: 'bob',
+      kind: 'bullet',
+      zone: 'HEAD',
+      distance: 30,
+    })
+    await Bun.sleep(400)
+
+    // 手を離れた手榴弾が全員に配られる
+    expect(a.messages.some((m) => m.type === 'grenade')).toBe(true)
+    expect(b.messages.some((m) => m.type === 'grenade')).toBe(true)
+
+    // **手にしているだけなら落ちない。** ピンを抜いていなければ手は緩まない
+    b.holdGrenade(false)
+    await Bun.sleep(300)
+    a.reset()
+    b.reset()
+    a.send({
+      type: 'damage', id: 'alice', target: 'bob',
+      kind: 'bullet', zone: 'HEAD', distance: 30,
+    })
+    await Bun.sleep(400)
+    expect(a.messages.some((m) => m.type === 'grenade')).toBe(false)
+    b.holdGrenade(false)
+    a.close()
+    b.close()
+  }, 30000)
+})

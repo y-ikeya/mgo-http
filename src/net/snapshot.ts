@@ -144,6 +144,13 @@ const FLAG2_RELOADING = 1
  * 席番号と同じで、こちらが知っていることはこちらで書く。
  */
 const FLAG2_PROTECTED = 2
+/**
+ * **ピンを抜いて振りかぶっている。**
+ *
+ * 「手榴弾を手にしている」(held) とは別。抜いてしまえば、撃たれて手を離しても
+ * 足元で爆ぜる — サーバーはその判断にこれを使う。手にしているだけなら落ちない。
+ */
+const FLAG2_WINDUP = 4
 
 /** 位置を詰める。slot は送る側では 0 (サーバーが書き込む) */
 export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer {
@@ -173,7 +180,10 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   const turns = snapshot.cameraYaw / (Math.PI * 2)
   view.setUint16(OFF_CAMERA_YAW, Math.round((turns - Math.floor(turns)) * 65536) & 0xffff)
 
-  view.setUint8(OFF_FLAGS2, snapshot.reloading ? FLAG2_RELOADING : 0)
+  view.setUint8(
+    OFF_FLAGS2,
+    (snapshot.reloading ? FLAG2_RELOADING : 0) | (snapshot.holdingGrenade ? FLAG2_WINDUP : 0),
+  )
   view.setUint8(OFF_HELD, HELD_INDEX.get(snapshot.held) ?? 0)
 
   return buffer
@@ -203,7 +213,8 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
       WEAPON_BITS[
         ((flags & FLAG_WEAPON_LOW) !== 0 ? 1 : 0) | ((flags & FLAG_WEAPON_HIGH) !== 0 ? 2 : 0)
       ] ?? 'rifle',
-    holdingGrenade: held === 'grenade',
+    // **振りかぶっているか。** 手にしているだけでは立たない
+    holdingGrenade: (view.getUint8(OFF_FLAGS2) & FLAG2_WINDUP) !== 0,
     cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,
     reloading: (view.getUint8(OFF_FLAGS2) & FLAG2_RELOADING) !== 0,
     protectedNow: (view.getUint8(OFF_FLAGS2) & FLAG2_PROTECTED) !== 0,

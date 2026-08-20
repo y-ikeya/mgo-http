@@ -1378,6 +1378,8 @@ export class Game {
 
       case "knockdown":
         this.player.knockDown();
+        // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
+        this.loseHeldGrenade();
         this.audio.play("blastScream", this.player.position);
         break;
 
@@ -1436,6 +1438,8 @@ export class Game {
       return;
     }
 
+    // **仰け反れば手が緩む。** 振りかぶったまま頭を撃たれたら足元に落ちる
+    if (message.flinch) this.loseHeldGrenade();
     const died = this.player.setHealth(message.health, message.flinch);
     if (message.damage > 0) {
       this.lastHitZone = "HIT";
@@ -2162,6 +2166,26 @@ export class Game {
    * クリック) で放す。銃は構えて撃つので、投げ物だけ別の操作にすると持ち替えた
    * ときに指が迷う。落下点は構えている間ずっと見えるので、狙ってから放せる。
    */
+  /**
+   * 握っていた手榴弾を手放す。
+   *
+   * **落としたのはサーバー** (転倒と仰け反りの所で足元に置いている)。こちらは
+   * その分を持ち物から引いて、構えを畳むだけ。引かないと、画面の残り数だけが
+   * 1 個多いまま残る。
+   *
+   * 振りかぶっていなければ何もしない — サーバーも同じ条件で見ている
+   * (holdingGrenade)。
+   */
+  private loseHeldGrenade(): void {
+    if (!this.grenadeAiming && this.grenadeRelease <= 0) return;
+    if (this.inv.held === "grenade") this.inv.spend();
+    this.grenadeAiming = false;
+    this.grenadeRelease = 0;
+    this.grenades.hidePreview();
+    this.player.cancelThrow();
+    this.player.setThrowing(false);
+  }
+
   private updateGrenadeAim(): void {
     // 手榴弾から離れたなら、構えも**落下点も**畳む。
     //

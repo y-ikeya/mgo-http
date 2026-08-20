@@ -1154,6 +1154,8 @@ function applyBlastDamage(
     // **的にも爆風は当たる。** 送り先が無いなら送らないだけ
     if (knock && isSeated(victim.life)) {
       sessionFor(victim)?.socket.send(JSON.stringify({ type: 'knockdown' }))
+      // 振りかぶったまま転んだら手を離す。**ピンは抜けている**ので、そのまま爆ぜる
+      dropGrenade(roomName, victim)
     }
     return
   }
@@ -1564,11 +1566,15 @@ function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage)
   if (victim.health > 0) {
     // 頭に当たったのに倒れなかったときだけ怯ませる。
     // 胴でも出すと、連射している間ずっと怯み続けて棒立ちになる。
+    const flinch = event.kind === 'bullet' && event.zone === 'HEAD'
+    // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。
+    // 遠くから頭を撃たれた人が、そのまま何事もなく投げ切るのはおかしい
+    if (flinch) dropGrenade(roomName, victim)
     sendHealth(
       roomName,
       victim,
       amount,
-      event.kind === 'bullet' && event.zone === 'HEAD',
+      flinch,
       bearingTo(victim, attacker),
       event.zone,
     )
