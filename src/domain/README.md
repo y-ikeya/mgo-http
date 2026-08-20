@@ -208,7 +208,9 @@ AR は 20 で 5 発 (0.36 秒)。**近くでは AR がわずかに速い。** SM
 |---|---|
 | **Player** | 人。体力・状態・位置・持ち物・成績 |
 | **Session** | 接続。`server/index.ts` に居る。socket・届く間隔・誰に何を配ったか |
-| **Match** | 試合 = 部屋 1 つ |
+| **Match** | 試合 = 部屋 1 つ。ルール (Mode) を持つ |
+| **Mode** | 部屋のルール (`DM` `TDM` `TSNE` `INT` `PRACTICE`)。誰が敵かはこれが決める |
+| **的 (bot)** | 接続を持たない Player。練習部屋に並ぶ棒立ち |
 | **席 (seat)** | 部屋の中の 1 人分の枠。切れても 30 秒は空けて待つ |
 | **残機 (ticket)** | 陣営の持ち点 |
 | **Life** | 上の 6 状態 |
@@ -243,8 +245,9 @@ Session  (server 側)    socket 届く間隔 時計のずれ
 ## 棚
 
 ```
-player.ts       人
+player.ts       人 (と、練習部屋の的)
 match.ts        試合
+room.ts         部屋とルール。誰が敵か
 lifecycle.ts    Life の遷移表
 locomotion.ts   体の動きの種類
 surface.ts      面の材質 (足音が変わる)

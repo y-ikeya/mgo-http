@@ -21,6 +21,7 @@
  */
 import { canTransition, type Life } from './lifecycle'
 import type { Locomotion } from './locomotion'
+import type { Stance } from './rule/stance'
 import type { HeldId } from './item/held'
 import {
   SUPPORT_SPECS,
@@ -31,6 +32,39 @@ import {
 } from './item/weapons'
 import { MAX_HEALTH } from './rule/damage'
 import { Footsteps } from './rule/footsteps'
+
+/**
+ * ある時刻の姿。**当てたという申告を遡って照合する**のに使う。
+ *
+ * 判定に使うのは sim/hitcheck だが、形はここに置く — これは人の過去の姿で
+ * あって、幾何の道具ではない。的 (練習部屋の棒立ち) も同じものを持つ。
+ */
+export interface Pose {
+  /** 記録した時刻 (Date.now) */
+  time: number
+  x: number
+  y: number
+  z: number
+  /** 体の向き (rad)。ローカル -Z が前 */
+  yaw: number
+  /**
+   * 見ている上下 (rad)。**下が負。**
+   *
+   * 倒れている相手にナイフが通るかの判断に使う。刺した瞬間にどこを向いていたかは
+   * 遡って照合しないと分からないので、履歴に載せる。
+   */
+  pitch: number
+  crouching: boolean
+  boxed: boolean
+  /**
+   * そのときの構え。**ナイフが刺さる姿勢かどうか**に使う。
+   *
+   * crouching / boxed とは別に持つ。あれは「しゃがんでいるか / 箱を被っているか」
+   * という操作の状態で、**吹っ飛んで倒れているかは表せない** (本人は何も
+   * 押していない)。倒れているかを知っているのはモーションのほう。
+   */
+  stance: Stance
+}
 
 /**
  * 所属。サーバーが割り当てる。
@@ -149,6 +183,20 @@ export interface Player {
    * id をそのまま載せると長さが可変になる。抜けた番号は空くまで使い回さない
    */
   slot: number
+  /**
+   * 過去の姿。当てたという申告を遡って照合するのに使う。
+   *
+   * **接続ではなく人が持つ。** 練習部屋の的は接続を持たないが、撃たれる以上
+   * 照合の相手にはなる。長さは呼ぶ側が決める (送る間隔から出す)。
+   */
+  history: Pose[]
+  /**
+   * 人ではなく的か。
+   *
+   * **接続を持たない Player。** 練習部屋に並ぶ棒立ちがこれで、倒すと数秒後に
+   * 同じ場所へ戻る。戦績には残さない。
+   */
+  bot: boolean
   /** 倒した数 / 倒された数。試合ごとに 0 に戻る */
   kills: number
   deaths: number
@@ -231,6 +279,8 @@ export function newPlayer(seed: {
     grenades: SUPPORT_SPECS.grenade.count,
     holdingGrenade: false,
     wasAlive: false,
+    history: [],
+    bot: false,
     kills: 0,
     deaths: 0,
     headshots: 0,
@@ -238,6 +288,32 @@ export function newPlayer(seed: {
     suicides: 0,
     killsByWeapon: {},
   }
+}
+
+/**
+ * 練習部屋の的。**接続を持たない Player。**
+ *
+ * 動かない・撃たない・戦績に残らない。撃たれて倒れ、数秒後に同じ場所へ戻る。
+ * 位置を固定で持つのは、**距離の練習**がこの部屋の用だから — 何 m の的かが
+ * 変わってしまうと確かめようが無い。
+ */
+export function newBot(seed: {
+  id: string
+  name: string
+  slot: number
+  team: Team
+  x: number
+  z: number
+  now: number
+}): Player {
+  const bot = newPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
+  bot.bot = true
+  bot.x = seed.x
+  bot.z = seed.z
+  bot.life = 'alive'
+  // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
+  bot.yaw = Math.PI
+  return bot
 }
 
 /**

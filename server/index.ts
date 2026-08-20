@@ -12,6 +12,7 @@ import {
   enterLife,
   isProtected,
   lifeElapsed,
+  newBot,
   newPlayer,
   refill,
   type Player,
@@ -32,6 +33,7 @@ import {
   RECONNECT_GRACE,
   assignTeam,
   connected,
+  present,
   holdingSeats,
   loseTicket,
   newMatch,
@@ -41,6 +43,7 @@ import {
 } from '../src/domain/match'
 import {
   decodeSnapshot,
+  encodeSnapshot,
   isSnapshot,
   stampLocomotion,
   stampProtected,
@@ -68,7 +71,7 @@ import {
   weaponOf,
   SUPPORT_SPECS,
 } from '../src/domain/item/weapons'
-import { verifyHit, type Pose } from '../src/sim/hitcheck'
+import { verifyHit } from '../src/sim/hitcheck'
 import { stanceOf } from '../src/domain/rule/stance'
 import {
   groundUnder,
@@ -243,13 +246,6 @@ interface Session {
   /** 最後に撃った時刻 (Date.now)。連射の速さの上限を見るのに使う */
   lastShotAt: number
   /**
-   * 過去の姿勢。当てたという申告を遡って照合するのに使う。
-   *
-   * 長さは送る間隔から出す (HISTORY_SIZE)。決め打ちにすると、送る速さを
-   * 変えたときに遡れる長さが黙って変わる
-   */
-  history: Pose[]
-  /**
    * 形の合わない位置を最後に警告した時刻 (Date.now)。
    *
    * 古いクライアントが繋ぐと毎フレーム落ちるので、間引かないとログが埋まる
@@ -290,7 +286,6 @@ function newSession(player: Player, socket: Bun.ServerWebSocket<Client>): Sessio
     badPacketAt: 0,
     badMoveAt: 0,
     lastShotAt: 0,
-    history: [],
   }
 }
 
@@ -339,9 +334,104 @@ function roomOf(name: RoomName): Match {
   let room = rooms.get(name)
   if (!room) {
     room = newMatch(ROOM_MODE[name])
+    if (room.mode.id === 'PRACTICE') placeTargets(room)
     rooms.set(name, room)
   }
   return room
+}
+
+/**
+ * 練習部屋の的。**10m 間隔で 1 列**に並べる。
+ *
+ * 用は**距離の練習**。P90 の頭 1 発は 12m まで、AK47 は 25m まで
+ * (src/domain/README.md) — その境目は説明を読むより撃ったほうが早い。
+ * 間隔を 10m で揃えてあるので、隣に立って次を撃てば「10m 先」がそのまま出る。
+ *
+ * 青の湧き地点は (0, 35) で、その手前に高さ 1.9m の壁 (concrete_spawn_s) が
+ * ある。**壁を出た所 (z≒24) が撃ち始めの位置**で、そこから 5 / 13 / 24 / 34 /
+ * 44m に並ぶ。
+ *
+ * 横へずらしてあるのは、一直線だと手前の的が奥を隠すため。z=11 だけ 1m ずれて
+ * いるのは、そこに柱があって的が壁の中に埋まるから (実測して避けた)。
+ */
+const TARGET_SPOTS = [
+  { x: -3, z: 20 },
+  { x: 3, z: 11 },
+  { x: -3, z: 0 },
+  { x: 3, z: -10 },
+  { x: -3, z: -20 },
+]
+
+/** 倒してから戻るまで (ms) */
+const TARGET_RESPAWN = 3000
+
+function placeTargets(room: Match): void {
+  const now = Date.now()
+  TARGET_SPOTS.forEach((at, i) => {
+    const bot = newBot({
+      id: `target-${i}`,
+      name: `TARGET ${i + 1}`,
+      slot: nextSlot(room),
+      team: 'red',
+      x: at.x,
+      z: at.z,
+      now,
+    })
+    room.players.set(bot.id, bot)
+  })
+}
+
+/**
+ * 的を動かす (動かないが、生き死にと配信はする)。
+ *
+ * 位置はサーバーが作る。人のように**送ってくる相手が居ない**ので、姿を組み立てて
+ * 自分で配る。遮蔽の判定は人と同じ道 (relayState) を通すので、壁の裏の的は
+ * 見えない。
+ */
+function updateTargets(roomName: RoomName, room: Match, now: number): void {
+  for (const bot of room.players.values()) {
+    if (!bot.bot) continue
+    if (bot.life === 'downed' && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
+      refill(bot)
+      if (enterLife(bot, 'alive', now)) {
+        broadcast(roomName, { type: 'life', id: bot.id, state: 'alive' })
+        broadcast(roomName, { type: 'respawn', id: bot.id })
+        broadcast(roomName, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
+      }
+    }
+    recordPose(bot)
+    relayState(roomName, bot, targetPayload(bot, now))
+  }
+}
+
+/** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
+function targetPayload(bot: Player, now: number): Uint8Array {
+  return new Uint8Array(
+    encodeSnapshot(
+      {
+        id: bot.id,
+        time: now,
+        x: bot.x,
+        y: bot.y,
+        z: bot.z,
+        yaw: bot.yaw,
+        pitch: 0,
+        cameraYaw: bot.yaw,
+        locomotion: bot.life === 'downed' ? 'death' : 'idle',
+        aiming: false,
+        weapon: 'rifle',
+        crouching: false,
+        boxed: false,
+        reloading: false,
+        protectedNow: false,
+        holdingGrenade: false,
+        held: 'rifle',
+        concentrating: false,
+        saluteHeld: false,
+      },
+      bot.slot,
+    ),
+  )
 }
 
 /**
@@ -368,7 +458,8 @@ function matchState(room: Match): ServerMessage {
     //
     // 離脱中の人も**消さずに残す**。リロードしている 2 秒のあいだ行が消えて
     // 戻ってくると、点差を見ている側には試合が壊れたように見える
-    players: [...room.players.values()].map((p) => ({
+    // **的 (bot) は出さない。** 成績表に「動かない相手」の行が並んでも読めない
+    players: [...room.players.values()].filter((p) => !p.bot).map((p) => ({
       id: p.id,
       name: p.name,
       team: p.team,
@@ -808,7 +899,7 @@ function detonateClaymore(claymore: Claymore): void {
   if (here) for (const viewer of connected(here)) sessionOf(viewer).seenClaymores.delete(claymore.id)
   if (!room || room.phase !== 'playing') return
 
-  for (const victim of connected(room)) {
+  for (const victim of present(room)) {
     if (!canBeHurt(victim.life)) continue
     // 味方は巻き込まない。**置いた本人だけは例外** — 手榴弾を足元に落としたときと
     // 同じ規則で、自分の物で死ぬことがある。誰が味方かはルールが決める
@@ -945,7 +1036,7 @@ function detonate(nade: Grenade): void {
   // 飛ぶことと爆ぜることは止めない — 一人で立ち上げて試せなくなる
   if (room.phase !== 'playing') return
 
-  for (const victim of connected(room)) {
+  for (const victim of present(room)) {
     // 撃たれる状態に居る人だけ。まだ湧いていない・無敵・倒れている最中は通らない
     if (!canBeHurt(victim.life)) continue
     // 味方は巻き込まない。銃と同じ規則にする (誤爆で試合が壊れるより分かりやすい)。
@@ -1159,7 +1250,7 @@ const LAG_WINDOW = 400
 const HISTORY_SIZE = Math.ceil(LAG_WINDOW / (SNAPSHOT_INTERVAL * 1000)) + 2
 
 function recordPose(player: Player): void {
-  sessionOf(player).history.push({
+  player.history.push({
     time: Date.now(),
     x: player.x,
     y: player.y,
@@ -1174,7 +1265,7 @@ function recordPose(player: Player): void {
     // 爆風で転んだ直後に届いた申告を弾いてしまう
     stance: stanceOf(player.locomotion),
   })
-  if (sessionOf(player).history.length > HISTORY_SIZE) sessionOf(player).history.shift()
+  if (player.history.length > HISTORY_SIZE) player.history.shift()
 }
 
 /** カメラ位置の置き場。毎フレーム作らないよう使い回す */
@@ -1292,7 +1383,8 @@ function sendHealth(
   // 全員へ流すと、位置と合わせて撃った側を逆算できてしまう。被害者の座標は
   // 状態として配られているので、そこから方向へ線を引けば射手の居場所が出る。
   // 「誰に撃たれたかは渡さない」と決めた意味が無くなる。
-  if (isSeated(player.life)) {
+  // 的には送り先が無い (接続を持たない)
+  if (isSeated(player.life) && !player.bot) {
     sessionOf(player).socket.send(
       JSON.stringify({
         type: 'health',
@@ -1384,8 +1476,8 @@ function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage)
   }
 
   const verdict = verifyHit(
-    sessionOf(attacker).history,
-    sessionOf(victim).history,
+    attacker.history,
+    victim.history,
     {
       kind: event.kind,
       zone: event.zone,
@@ -1484,11 +1576,8 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
       // matchId は発番しない。**記録に残さない**のはこれで足りる
       // (recordSeat は matchId が無ければ何も書かない)
     }
-    for (const player of connected(room)) {
-      if (player.life === 'choosing' && lifeElapsed(player, now) >= CHOOSE_TIMEOUT * 1000) {
-        spawn(roomName, player, now)
-      }
-    }
+    // 支度の打ち切りも湧きも、人の側の刻み (下の switch) が面倒を見る。
+    // ここでやることは「終わらせないこと」だけ
     if (now - room.lastBroadcast >= MATCH_BROADCAST) {
       room.lastBroadcast = now
       broadcast(roomName, matchState(room))
@@ -1614,8 +1703,10 @@ setInterval(() => {
     if (now - room.lastLimbo >= LIMBO_MS) {
       room.lastLimbo = now
       for (const player of room.players.values()) {
+        // 的は切れない (接続を持たない)。ここは人の話
+        if (player.bot || player.life !== 'dropped') continue
         const last = sessionOf(player).lastPayload
-        if (player.life !== 'dropped' || !last) continue
+        if (!last) continue
         const view = new DataView(last.buffer, last.byteOffset, last.byteLength)
         stampLocomotion(view, 'away')
         stampProtected(view, false)
@@ -1642,6 +1733,7 @@ setInterval(() => {
     }
 
     updateMatch(roomName, room, now)
+    if (room.mode.id === 'PRACTICE') updateTargets(roomName, room, now)
     relayClaymores(roomName, room)
     for (const player of connected(room)) {
       // --- 時間で進む遷移 ---
@@ -1712,7 +1804,7 @@ setInterval(() => {
     }
     if (room.phase !== 'playing') continue
     // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する**
-    const hit = connected(room).some(
+    const hit = present(room).some(
       (p) =>
         canBeHurt(p.life) &&
         (p.id === claymore.owner || p.team !== claymore.team) &&
@@ -1927,7 +2019,7 @@ const server = Bun.serve<Client>({
       socket.send(
         JSON.stringify({
           type: 'roster',
-          players: connected(room).map((p) => ({
+          players: present(room).map((p) => ({
             id: p.id,
             name: p.name,
             health: p.health,

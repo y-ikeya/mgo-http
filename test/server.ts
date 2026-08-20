@@ -102,10 +102,16 @@ export class Client {
   private timer: ReturnType<typeof setInterval> | null = null
   private position: [number, number, number]
 
-  constructor(server: Server, id: string, at: [number, number, number] = [0, 0, 0]) {
+  constructor(
+    server: Server,
+    id: string,
+    at: [number, number, number] = [0, 0, 0],
+    /** 入る部屋。既定はチーム戦 (bravo) — 陣営の規則を見る試験が多いので */
+    room = 'bravo',
+  ) {
     this.id = id
     this.position = at
-    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=bravo&id=${id}`)
+    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=${room}&id=${id}`)
     this.socket.binaryType = 'arraybuffer'
     this.socket.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (event.data instanceof ArrayBuffer) {

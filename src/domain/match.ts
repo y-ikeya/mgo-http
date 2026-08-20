@@ -83,8 +83,23 @@ export function nextSlot(room: Match): number {
   return 0
 }
 
-/** 今つながっている人だけ。離脱中の席は配信に入れない */
+/**
+ * 今つながっている**人**だけ。離脱中の席は配信に入れない。
+ *
+ * **的 (bot) は入らない。** 接続を持たないので、送る相手にも数にもならない。
+ */
 export function connected(room: Match): Player[] {
+  return [...room.players.values()].filter((p) => isSeated(p.life) && !p.bot)
+}
+
+/**
+ * 席に着いている者。**的 (bot) を含む。**
+ *
+ * 撃たれる相手・爆風に巻き込まれる相手・名簿に出る相手はこちら。
+ * 「送る相手」(connected) と「居る者」を分けておかないと、的に向かって
+ * 配信しようとして落ちる。
+ */
+export function present(room: Match): Player[] {
   return [...room.players.values()].filter((p) => isSeated(p.life))
 }
 
