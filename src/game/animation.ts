@@ -660,6 +660,15 @@ export class CharacterAnimator {
   private readonly onFinished = (event: { action: THREE.AnimationAction }) => {
     // ワンショット (リロード) が終わったら構えに戻す
     const finished = event.action
+    /*
+     * **倒れていたら戻さない。**
+     *
+     * 死ぬ直前に流していた型 (受け身・転がり・刺突…) は、死んだあとも尺の
+     * 分だけ動き続けて終わる。その「終わった」で構えへ戻すと、**死体の
+     * 上半身だけが銃を構え直す**。落下の受け身 (1.67 秒) は死んでから終わる
+     * ことが多いので、そこで必ず出ていた。
+     */
+    if (this.upperState === 'death') return
     // 倒れたときだけは戻さない。最終ポーズのまま留める。
     if (
       finished === this.upper.get(RELOAD_KEY) ||
