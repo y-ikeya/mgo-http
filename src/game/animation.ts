@@ -1275,8 +1275,14 @@ export class CharacterAnimator {
    */
   private pistol = false
 
-  setPistol(holding: boolean): void {
-    this.pistol = holding
+  /**
+   * 片手で持っているか。**走り方と構えの型が変わる。**
+   *
+   * 名前は拳銃から来ているが、決めているのは「片手か両手か」。手榴弾や
+   * ナイフを持っているときも片手で、身軽に走る (domain の twoHanded)。
+   */
+  setPistol(oneHanded: boolean): void {
+    this.pistol = oneHanded
   }
 
 

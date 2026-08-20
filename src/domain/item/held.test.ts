@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  HELD, buildCarried, carrySpeed, cycle, dropEmpty, firstOf, listOf, pickUp, toggle,
+  HELD, buildCarried, carrySpeed, cycle, dropEmpty, firstOf, isTwoHanded, listOf, pickUp, toggle,
   type Carried, type HeldId,
 } from './held'
 
@@ -212,5 +212,27 @@ describe('トグルは系統をまたがない', () => {
 
   test('同じ系統なら往復する', () => {
     expect(toggle(carried, 'rifle', 'pistol')).toBe('pistol')
+  })
+})
+
+describe('両手か片手か', () => {
+  test('主武器は両手、副武器と投げ物は片手', () => {
+    expect(isTwoHanded('rifle')).toBe(true)
+    expect(isTwoHanded('sniper')).toBe(true)
+    expect(isTwoHanded('smg')).toBe(true)
+    expect(isTwoHanded('pistol')).toBe(false)
+  })
+
+  test('**手榴弾は片手。** 身軽に走れる', () => {
+    expect(isTwoHanded('grenade')).toBe(false)
+    expect(isTwoHanded('claymore')).toBe(false)
+    expect(isTwoHanded('magazine')).toBe(false)
+    expect(isTwoHanded('knife')).toBe(false)
+  })
+
+  test('重い物ほど両手。**重さと矛盾しない**', () => {
+    for (const [id, spec] of Object.entries(HELD)) {
+      if (spec.twoHanded) expect(spec.weight, id).toBeGreaterThan(2)
+    }
   })
 })

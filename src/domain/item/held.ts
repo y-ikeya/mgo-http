@@ -49,6 +49,15 @@ export type Family = 'weapon' | 'tool'
  * 「rifle か sniper か pistol なら」と書いた所が 3 箇所あって、P90 を足した
  * ときに 3 つとも直す必要があった。表に聞けば足し忘れが起きない。
  */
+/**
+ * 両手で構える物か。走り方 (と構えの型) がこれで変わる。
+ *
+ * 銃でも拳銃は片手。手榴弾・弾倉・ナイフ・クレイモアも片手で、**身軽に走る**。
+ */
+export function isTwoHanded(id: HeldId): boolean {
+  return HELD[id].twoHanded
+}
+
 export function isGun(id: HeldId): id is GunId {
   return HELD[id].shoots
 }
@@ -71,6 +80,14 @@ export interface HeldSpec {
   weight: number
   /** 撃てるか。false の物を持っている間は引き金が効かない */
   shoots: boolean
+  /**
+   * 両手で構えるか。
+   *
+   * **走り方が変わる。** 両手の物は銃を抱えて走り、片手の物は身軽に走る
+   * (副武器と同じ型)。手榴弾を抱えて突撃銃の走り方をしていると、軽い物に
+   * 持ち替えて速く動く、という選択が見た目に出ない。
+   */
+  twoHanded: boolean
 }
 
 /**
@@ -91,21 +108,21 @@ const SLOT_ORDER: Record<Slot, number> = {
 }
 
 export const HELD: Record<HeldId, HeldSpec> = {
-  smg: { id: 'smg', label: 'P90', family: 'weapon', slot: 'primary', weight: 2.6, shoots: true },
-  rifle: { id: 'rifle', label: 'AK47', family: 'weapon', slot: 'primary', weight: 3.5, shoots: true },
-  sniper: { id: 'sniper', label: 'XM2010', family: 'weapon', slot: 'primary', weight: 5.5, shoots: true },
-  pistol: { id: 'pistol', label: 'M9', family: 'weapon', slot: 'secondary', weight: 0.95, shoots: true },
+  smg: { id: 'smg', label: 'P90', family: 'weapon', slot: 'primary', weight: 2.6, shoots: true, twoHanded: true },
+  rifle: { id: 'rifle', label: 'AK47', family: 'weapon', slot: 'primary', weight: 3.5, shoots: true, twoHanded: true },
+  sniper: { id: 'sniper', label: 'XM2010', family: 'weapon', slot: 'primary', weight: 5.5, shoots: true, twoHanded: true },
+  pistol: { id: 'pistol', label: 'M9', family: 'weapon', slot: 'secondary', weight: 0.95, shoots: true, twoHanded: false },
 
   // 投げる物は軽い。**持ち替えると速くなる**のがそのまま戦い方になる
-  grenade: { id: 'grenade', label: 'GRENADE', family: 'weapon', slot: 'support', weight: 0.4, shoots: false },
-  claymore: { id: 'claymore', label: 'CLAYMORE', family: 'weapon', slot: 'support', weight: 1.6, shoots: false },
-  magazine: { id: 'magazine', label: 'MAG', family: 'weapon', slot: 'support', weight: 0.3, shoots: false },
+  grenade: { id: 'grenade', label: 'GRENADE', family: 'weapon', slot: 'support', weight: 0.4, shoots: false, twoHanded: false },
+  claymore: { id: 'claymore', label: 'CLAYMORE', family: 'weapon', slot: 'support', weight: 1.6, shoots: false, twoHanded: false },
+  magazine: { id: 'magazine', label: 'MAG', family: 'weapon', slot: 'support', weight: 0.3, shoots: false, twoHanded: false },
 
   // 刺されば即死。代償は**銃をしまってから近づく**こと (docs/weapons.md)
-  knife: { id: 'knife', label: 'KNIFE', family: 'weapon', slot: 'knife', weight: 0.3, shoots: false },
+  knife: { id: 'knife', label: 'KNIFE', family: 'weapon', slot: 'knife', weight: 0.3, shoots: false, twoHanded: false },
 
   // 被っている間は動けるが撃てない。速さは別の倍率で決めている (player.ts)
-  box: { id: 'box', label: 'C.BOX', family: 'tool', slot: 'tool', weight: 2.0, shoots: false },
+  box: { id: 'box', label: 'C.BOX', family: 'tool', slot: 'tool', weight: 2.0, shoots: false, twoHanded: false },
 
   /*
    * 道具を使っていない状態。
@@ -116,7 +133,7 @@ export const HELD: Record<HeldId, HeldSpec> = {
    *
    * 重さは 0 だが、これを手にしている間も**武器を持っている**ので速さには効かない。
    */
-  none: { id: 'none', label: 'NONE', family: 'tool', slot: 'tool', weight: 0, shoots: false },
+  none: { id: 'none', label: 'NONE', family: 'tool', slot: 'tool', weight: 0, shoots: false, twoHanded: false },
 }
 
 /**

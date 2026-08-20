@@ -1,5 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../domain/item/weapons'
-import { isGun, type HeldId } from '../domain/item/held'
+import { isGun, isTwoHanded, type HeldId } from '../domain/item/held'
 import { fallDamage } from '../domain/rule/damage'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
@@ -753,6 +753,15 @@ export class Player {
    */
   setHeld(id: HeldId): void {
     this.held = id
+    /*
+     * **走り方は手にある物で決まる。**
+     *
+     * 両手の物 (突撃銃・狙撃銃・P90) は抱えて走り、片手の物 (拳銃・手榴弾・
+     * ナイフ…) は身軽に走る。以前は「拳銃を持っているか」だけで見ていたので、
+     * 手榴弾に持ち替えても突撃銃の走り方のままだった。軽い物に持ち替えて速く
+     * 動くのがこの遊びの手なのに、それが見た目に出ていなかった。
+     */
+    this.animator?.setPistol(!isTwoHanded(id))
   }
 
   get heldItem(): HeldId {
@@ -1413,7 +1422,8 @@ export class Player {
     this.animator = new CharacterAnimator(model, gltf.animations, this.moveSpeed)
     // モデルは非同期で読むので、ここより前に受けた設定を流し込み直す。
     // 呼ばれた時点では animator がまだ無く、素通りしている
-    this.animator.setPistol(this.weaponKind === 'pistol')
+    // 読み込み前に持ち替えている場合があるので、いま手にある物から決める
+    this.animator.setPistol(!isTwoHanded(this.held))
 
     disposeTree(this.placeholder)
     this.placeholder = null
@@ -1482,7 +1492,7 @@ export class Player {
   async equip(kind: WeaponId): Promise<void> {
     if (kind === this.weaponKind) return
     this.weaponKind = kind
-    this.animator?.setPistol(kind === 'pistol')
+    // 走り方は「いま手にある物」で決まる (setHeld)。ここでは触らない
     const model = this.model
     if (!model) return
 
