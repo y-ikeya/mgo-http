@@ -33,7 +33,7 @@ Old Rusty Car と P90 は **商用利用ができない**。いま遊びで作�
 - P90 … `public/models/smg.glb`。別の glTF を拾って
 
       $BLENDER -b --factory-startup --python tools/convert_gltf_gun.py -- \
-          <scene.gltf> public/models/smg.glb 0.5
+          <scene.gltf> public/models/smg.glb 0.5 max
 
   で同じ規約に揃う (銃口が -Z、全長 0.5m)。握りの位置は Calibrator で詰め直す。
 

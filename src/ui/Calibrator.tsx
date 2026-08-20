@@ -13,11 +13,11 @@ import './Calibrator.css'
  */
 const INITIAL_WEAPONS = {
   smg: {
-    grip: { x: -0.06, y: 0.115, z: -0.62 },
+    grip: { x: -0.06, y: 0.105, z: -0.6 },
     rotation: { x: -10, y: -16, z: 80 },
   },
   smgCrouch: {
-    grip: { x: -0.07, y: 0.11, z: -0.655 },
+    grip: { x: -0.07, y: 0.1, z: -0.635 },
     rotation: { x: -34, y: -3, z: 80 },
   },
   rifle: {
