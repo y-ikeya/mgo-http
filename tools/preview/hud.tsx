@@ -22,6 +22,7 @@ const base = {
   support: 'grenade', team: 0, match: null, players: 1, sendRate: 64, peerRates: [],
   points: [],
   canPickUp: false,
+  leaking: false,
 } as unknown as GameStats
 
 const cases: Record<string, Partial<GameStats>> = {
@@ -36,6 +37,21 @@ const cases: Record<string, Partial<GameStats>> = {
   downed: { ammo: 12, downed: true },
   // 拾える物が近くにある
   pickup: { canPickUp: true },
+  // 個人戦。残機は 1 つ、上に DM
+  dm: {
+    match: { phase: 'playing', mode: 'DM', blue: 14, red: 0, endsAt: Date.now() + 212000, present: 5, required: 2, players: [] },
+    team: 'blue',
+  },
+  // 個人戦の 1 位。位置が漏れている
+  dmLeader: {
+    match: { phase: 'playing', mode: 'DM', blue: 9, red: 0, endsAt: Date.now() + 90000, present: 5, required: 2, players: [] },
+    team: 'blue',
+    leaking: true,
+  },
+  tdm: {
+    match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 6, required: 2, players: [] },
+    team: 'blue',
+  },
   // 点の増減
   points: {
     points: [

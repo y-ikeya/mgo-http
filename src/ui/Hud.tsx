@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
 import { HELD, type HeldId } from '../domain/item/held'
+import { MODES } from '../domain/room'
 import type { GameStats } from '../game/Game'
 import './Hud.css'
 
@@ -33,6 +34,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   onCleanup(() => clearInterval(timer))
 
   const phase = () => props.stats?.match?.phase
+  /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
+  const mode = () => props.stats?.match?.mode ?? 'TDM'
+  const teams = () => MODES[mode()].teams
   const won = () => {
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner === props.stats?.team
@@ -158,22 +162,43 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         入った部屋が何なのかが画面から読めるようにしておく。
       */}
       <Show when={phase() === 'playing' || phase() === 'over'}>
-        <div class="hud-match">
-          <span class="hud-mode">TDM</span>
-          <span
-            class="hud-score hud-score-blue"
-            classList={{ 'hud-score-own': props.stats?.team === 'blue' }}
+        <div class="hud-match" classList={{ 'hud-match-solo': !teams() }}>
+          <span class="hud-mode">{mode()}</span>
+          {/*
+            陣営で分かれない部屋 (個人戦) は残機が 1 つ。左右に分けて出すと
+            **味方が居るように読める**ので、真ん中に 1 つだけ出す。
+          */}
+          <Show
+            when={teams()}
+            fallback={<span class="hud-score hud-score-own">{props.stats?.match?.blue ?? 0}</span>}
           >
-            {props.stats?.match?.blue ?? 0}
-          </span>
+            <span
+              class="hud-score hud-score-blue"
+              classList={{ 'hud-score-own': props.stats?.team === 'blue' }}
+            >
+              {props.stats?.match?.blue ?? 0}
+            </span>
+          </Show>
           <span class="hud-clock">{clock()}</span>
-          <span
-            class="hud-score hud-score-red"
-            classList={{ 'hud-score-own': props.stats?.team === 'red' }}
-          >
-            {props.stats?.match?.red ?? 0}
-          </span>
+          <Show when={teams()}>
+            <span
+              class="hud-score hud-score-red"
+              classList={{ 'hud-score-own': props.stats?.team === 'red' }}
+            >
+              {props.stats?.match?.red ?? 0}
+            </span>
+          </Show>
         </div>
+      </Show>
+
+      {/*
+        自分が光っている (個人戦の 1 位)。**位置が全員に漏れている。**
+
+        勝っていることの代償なので、隠さずに出す — 気づかないまま追われるのは
+        理不尽で、知っていれば動き方を変えられる。
+      */}
+      <Show when={props.stats?.leaking && phase() === 'playing'}>
+        <div class="hud-leak">位置が漏れている</div>
       </Show>
 
       {/* 人待ち。時計は動かない */}

@@ -84,6 +84,14 @@ const ALLY_GLOW_TINT: Record<Team, number> = {
   blue: 0x5c8cff,
   red: 0xff6a4a,
 };
+
+/**
+ * 位置が漏れている人の色 (個人戦の 1 位)。
+ *
+ * **陣営の色を使わない。** 味方の光と同じ色だと「味方が居る」に読める。
+ * 追う目印なので、地形にも制服にも無い色にしてある。
+ */
+const LEAK_GLOW_TINT = 0xffd45c;
 /** 向きが追いつく速さ。角度は補間より追従のほうが素直に見える */
 const YAW_LAMBDA = 16;
 /** モデルの正面 (+Z) を Player の基準 (-Z) に合わせる回転 */
@@ -421,6 +429,11 @@ export class RemotePlayer {
   }
 
   /** 同じ陣営か。撃つ前ではなく、当ててしまった後の表示に使う */
+  /** 所属。**個人戦では色が同じでも敵**なので、判断は呼ぶ側がルールで行う */
+  get side(): Team {
+    return this.team
+  }
+
   isAlly(team: Team): boolean {
     return this.team === team;
   }
@@ -442,17 +455,32 @@ export class RemotePlayer {
     this.applyGlow();
   }
 
+  /**
+   * 位置が漏れている (個人戦の 1 位)。**壁越しに光る。**
+   *
+   * 味方の光とは別の色。同じ色だと「味方が居る」に読めてしまう。
+   */
+  setLeaking(leaking: boolean): void {
+    if (this.leaking === leaking) return;
+    this.leaking = leaking;
+    this.applyGlow();
+    this.applyGlowTint();
+  }
+
+  private leaking = false;
+
   get isLinked(): boolean {
     return this.linked;
   }
 
   private applyGlow(): void {
-    const on = this.ally && this.linked;
+    // 漏れている人は敵でも光る。味方は敬礼で繋いだときだけ
+    const on = this.leaking || (this.ally && this.linked);
     for (const mesh of this.glow) mesh.visible = on;
   }
 
   private applyGlowTint(): void {
-    const color = new THREE.Color(ALLY_GLOW_TINT[this.team]);
+    const color = new THREE.Color(this.leaking ? LEAK_GLOW_TINT : ALLY_GLOW_TINT[this.team]);
     for (const mesh of this.glow) {
       (mesh.material as MeshBasicNodeMaterial).color.copy(color);
     }
@@ -1024,6 +1052,16 @@ export class RemotePlayers {
       player.setTeam(team);
       this.refreshAlly(player);
     } else this.remember(id, { team });
+  }
+
+  /**
+   * 位置が漏れている人を 1 人だけ立てる (個人戦の 1 位)。
+   *
+   * **毎回全員に配り直す。** 誰かが 1 位を奪ったときに、前の 1 位を消す通が
+   * 要らない — 1 秒ごとに来る match がそのまま最新の答えになる。
+   */
+  setLeaking(id: string | null): void {
+    for (const [key, player] of this.players) player.setLeaking(key === id);
   }
 
   /**

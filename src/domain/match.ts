@@ -128,6 +128,9 @@ export function holdingSeats(room: Match, now: number): Player[] {
 export function assignTeam(room: Match): Team {
   // **練習部屋は全員青。** 赤は棒立ちの的の側で、そこへ人を入れる意味が無い
   if (room.mode.id === 'PRACTICE') return 'blue'
+  // 陣営で分かれない部屋 (個人戦・休憩) は全員同じ色。色が分かれていると
+  // 「味方が居る」と読めてしまう
+  if (!room.mode.teams) return 'blue'
   let blue = 0
   let red = 0
   for (const player of connected(room)) {
@@ -148,8 +151,45 @@ export function assignTeam(room: Match): Team {
  * どちらで死んでも自陣の損は同じで、敵の得も同じ (ゼロ)。
  */
 export function loseTicket(room: Match, team: Team): void {
+  /*
+   * **個人戦は部屋で 1 つの残機を削る。**
+   *
+   * 陣営ごとに持つと「どちらが 0 になったか」で決まるが、個人戦では割り振る先が
+   * 無い。全員で 1 つの砂時計を削る形にすると、**誰が死んでも試合が終わりに
+   * 近づく** — 生き延びること自体に意味が出る。
+   *
+   * 数は blue に入れておく (赤は使わない)。通信の形を分けるより、読む側が
+   * 「陣営で分かれる部屋か」を見るほうが増やしやすい。
+   */
+  if (!room.mode.teams) {
+    room.blue = Math.max(0, room.blue - 1)
+    return
+  }
   if (team === 'blue') room.blue = Math.max(0, room.blue - 1)
   else room.red = Math.max(0, room.red - 1)
+}
+
+/**
+ * いま 1 位の人。**倒した数が一番多い人。同数なら居ない。**
+ *
+ * 同数で誰も選ばないのは、序盤に全員 0 の状態で「最初に 1 人倒した人」だけが
+ * 延々と狙われるのを避けるため。0 キルの人は 1 位にならない。
+ *
+ * 個人戦ではこの人が光って位置が漏れる (docs/design.md の 2)。
+ */
+export function leaderOf(room: Match): Player | null {
+  let best: Player | null = null
+  let tied = false
+  for (const player of room.players.values()) {
+    if (player.bot || player.kills <= 0) continue
+    if (!best || player.kills > best.kills) {
+      best = player
+      tied = false
+    } else if (player.kills === best.kills) {
+      tied = true
+    }
+  }
+  return tied ? null : best
 }
 
 /**

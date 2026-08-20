@@ -515,6 +515,14 @@ export interface RoomSummary {
 
 export interface MatchMessage {
   type: 'match'
+  /** その部屋のルール。陣営で分かれるか、何を表示するかがこれで決まる */
+  mode: Mode
+  /**
+   * いま 1 位の人 (個人戦だけ)。**この人は光って位置が漏れる。**
+   *
+   * 同数なら誰も居ない。0 キルの人は 1 位にならない。
+   */
+  leader?: string
   /**
    * 陣営の**残機**。得点ではない。
    *

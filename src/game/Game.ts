@@ -13,6 +13,7 @@ import {
   buildStage,
   setAmbientIntensity,
   setCloudCoverage,
+  SOLO_SPAWNS,
   TEAM_SPAWNS,
   STAGE_CODE,
   loadStageBoxes,
@@ -49,6 +50,7 @@ import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from
 import { setBoxTuning, type BoxTuning } from "./box";
 import { Inventory } from "../domain/item/inventory";
 import { canDrop, isGun, type Family, type HeldId } from "../domain/item/held";
+import { MODES, isHostile, type Mode } from "../domain/room";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
@@ -135,6 +137,8 @@ export interface GameStats {
   points: { label: string; delta: number; at: number }[]
   /** 近くに落ちている武器がある。**押せば拾える**という案内を出す */
   canPickUp: boolean
+  /** 自分が光っている (個人戦の 1 位)。位置が全員に漏れている */
+  leaking: boolean
   /** 直近のキル表示。新しいものが先頭 */
   kills: KillEvent[]
   /** 残っている投げ物 */
@@ -1282,6 +1286,12 @@ export class Game {
         break;
 
       case "match": {
+        // ルールは 1 秒ごとに届く。**部屋に入った時点では分からない**ので、
+        // ここで初めて「陣営で分かれる部屋か」が決まる
+        this.mode = message.mode;
+        // 光っている人 (個人戦の 1 位)。自分なら HUD に出す
+        this.remotes.setLeaking(message.leader ?? null);
+        this.leaking = message.leader === this.net.id;
         const changed = this.match?.phase !== message.phase;
         // 試合が切り替わったら飛んでいる手榴弾を捨てる。
         // サーバー側も同じ所で捨てるので、爆発が届かないまま残り続ける
@@ -1493,7 +1503,15 @@ export class Game {
    * サーバーは「復帰してよい」とだけ言う。
    */
   private placeAtSpawn(): void {
-    const base = TEAM_SPAWNS[this.team];
+    /*
+     * 湧く場所。**陣営で分かれない部屋は散らす。**
+     *
+     * 個人戦で角の 2 つに全員が湧くと、出た所で撃ち合いになって「湧き待ち」が
+     * 成立する。8 点から選んで、死ぬたびに変える (同じ所へ戻ると待たれる)。
+     */
+    const base = MODES[this.mode].teams
+      ? TEAM_SPAWNS[this.team]
+      : SOLO_SPAWNS[Math.floor(Math.random() * SOLO_SPAWNS.length)];
     // 同じ点に重なると互いが見えないので、ID から決まる向きへ散らす
     const spread = spawnAngle(this.net.id + this.shotCount);
     this.player.position.set(
@@ -2029,7 +2047,17 @@ export class Game {
     const distance = shot.distance;
     const hit = player || terrain;
     if (player) {
-      const friendly = player.player.isAlly(this.team);
+      /*
+       * 撃てる相手か。**陣営ではなくルールに聞く。**
+       *
+       * 個人戦では同じ色でも敵なので、陣営で見ていると自分の弾が当たらない
+       * (申告を送らないので、当てても削れない)。
+       */
+      const friendly = !isHostile(
+        MODES[this.mode],
+        { id: this.net.id, team: this.team ?? "blue" } as never,
+        { id: player.player.id, team: player.player.side } as never,
+      );
       if (!friendly) {
         // 当てたことをサーバーへ申告する。ダメージの数値は決めない。
         this.net.send({
@@ -2782,6 +2810,10 @@ export class Game {
     this.pointFeed.length = Math.min(this.pointFeed.length, POINT_FEED_MAX);
   }
 
+  /** その部屋のルール。1 秒ごとに届く match で分かる */
+  private mode: Mode = "TDM";
+  /** 自分が光っているか (個人戦の 1 位)。位置が全員に漏れている */
+  private leaking = false;
   /** 直近の点の増減。画面の右下に流す */
   private readonly pointFeed: { label: string; delta: number; at: number }[] = [];
 
@@ -3038,6 +3070,8 @@ export class Game {
        * 「押せば拾える」を出すのに毎フレーム往復させるわけにいかない。
        */
       canPickUp: this.drops.nearest(this.player.position) <= PICKUP_RANGE,
+      /** いま自分が光っているか。個人戦の 1 位は位置が漏れる */
+      leaking: this.leaking,
       points: this.pointFeed.filter(
         (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
       ),
