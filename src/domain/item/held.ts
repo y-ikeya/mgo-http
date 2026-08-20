@@ -204,6 +204,29 @@ export function pickUp(carried: Carried[], found: Carried): boolean {
 }
 
 /**
+ * 置いていけるか。
+ *
+ * **ナイフと道具は置けない。** ナイフは最後の手段として必ず残す (全部置いた人が
+ * 素手になると、そこから何もできない)。道具 (ダンボール・NONE) は持ち物の枠が
+ * 別なので、落として拾う話に乗らない。
+ */
+export function canDrop(id: HeldId): boolean {
+  return HELD[id].family === 'weapon' && id !== 'knife'
+}
+
+/**
+ * 持ち物から外す。**外した物をそのまま返す** (弾の残りごと地面に置くため)。
+ *
+ * 置けない物や持っていない物なら null。
+ */
+export function dropFrom(carried: Carried[], id: HeldId): Carried | null {
+  if (!canDrop(id)) return null
+  const at = carried.findIndex((item) => item.id === id)
+  if (at < 0) return null
+  return carried.splice(at, 1)[0] ?? null
+}
+
+/**
  * 湧くときの選択。
  *
  * **これは「枠」の概念。** 使うときの並び (Carried[]) とは別物で、湧く瞬間にしか

@@ -403,6 +403,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             {(props.stats?.reserve ?? 0) > 0 ? 'PRESS R' : 'NO AMMO'}
           </div>
         </Show>
+        {/* 近くに落ちている武器。**押せば拾える**とだけ出す */}
+        <Show when={props.stats?.canPickUp}>
+          <div class="hud-weapon-state hud-weapon-state-pick">G で拾う</div>
+        </Show>
         {/* 転んだら自分で起きる。撃つか起きるかを選ばせたいので、時間では立たない */}
         <Show when={props.stats?.downed}>
           <div class="hud-weapon-state hud-weapon-state-warn">{t('hud.standUpHint')}</div>

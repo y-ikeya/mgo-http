@@ -793,6 +793,11 @@
   color: rgba(198, 214, 232, 0.7);
 }
 
+/* 拾える物が近くにある。警告ではないので色を分ける */
+.hud-weapon-state-pick {
+  color: rgba(174, 230, 160, 0.95);
+}
+
 .hud-weapon-state-warn {
   color: rgba(255, 138, 114, 0.95);
 }

@@ -631,6 +631,62 @@ export interface RespawnMessage {
  */
 
 /** クライアント → サーバー。**申告と操作**しか無い */
+/**
+ * 武器を地面へ置く。
+ *
+ * **中身も一緒に送る。** 持ち物を持っているのはクライアント側で、サーバーは
+ * 銃ごとの弾の写ししか持っていない (繋ぎ直し用)。置いた物の残弾は本人しか
+ * 知らないので、申告してもらう。
+ *
+ * 撃ち合いの結果に効くのは「拾った人がその銃を使えるか」までで、残弾を多めに
+ * 申告しても**弾は結局サーバーが数える** (shot が届くたびに減らす)。
+ */
+export interface DropWeaponEvent {
+  type: 'drop'
+  weapon: HeldId
+  /** 装填 / 予備。投げ物なら count に入れる */
+  ammo?: number
+  reserve?: number
+  count?: number
+}
+
+/** 落ちている物を拾う。どれを拾うかはサーバーが決める (一番近い物) */
+export interface PickUpEvent {
+  type: 'pickup'
+}
+
+/** 地面に落ちている武器。**見えている / 見えていないは問わない** */
+export interface DroppedMessage {
+  type: 'dropped'
+  id: number
+  weapon: HeldId
+  ammo?: number
+  reserve?: number
+  count?: number
+  at: [number, number, number]
+  yaw: number
+}
+
+/** 拾われた / 消えた */
+export interface DroppedGoneMessage {
+  type: 'droppedGone'
+  id: number
+}
+
+/**
+ * 拾えた。**中身は拾った本人にだけ返す。**
+ *
+ * 他の人に要るのは「そこから消えた」ことだけで、何発入っていたかは要らない。
+ */
+export interface PickedMessage {
+  type: 'picked'
+  id: number
+  weapon: HeldId
+  ammo?: number
+  reserve?: number
+  count?: number
+}
+
 export type ClientMessage =
   | StateMessage
   | JoinEvent
@@ -639,6 +695,8 @@ export type ClientMessage =
   | GrenadeThrow
   | LoadoutEvent
   | PlaceClaymoreEvent
+  | DropWeaponEvent
+  | PickUpEvent
   | FallEvent
   | SpawnRequest
   | ReloadEvent
@@ -657,6 +715,9 @@ export type ServerMessage =
   | HealthMessage
   | KillEvent
   | RespawnMessage
+  | DroppedMessage
+  | DroppedGoneMessage
+  | PickedMessage
   | NoiseEvent
   | LifeEvent
   | HiddenEvent

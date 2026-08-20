@@ -54,7 +54,7 @@ import {
 import { surfaceOf } from '../src/domain/surface'
 import { blastAt } from '../src/sim/blast'
 import { fallDamage } from '../src/domain/rule/damage'
-import { HELD } from '../src/domain/item/held'
+import { HELD, canDrop, isGun, type HeldId } from '../src/domain/item/held'
 import {
   blastFrom,
   canPlaceAt,
@@ -912,6 +912,53 @@ function detonateClaymore(claymore: Claymore): void {
     )
   }
 }
+/**
+ * 地面に落ちている武器。
+ *
+ * **置いた本人の物ではなくなる。** 誰でも拾える — 敵の銃を奪って使うのが
+ * この仕掛けの面白い所で、味方だけが拾えるなら「捨てる」に意味が無い。
+ *
+ * 位置はサーバーが持つ。置いた瞬間の足元で、以後は動かない (蹴って転がる、
+ * のような話は無い)。
+ */
+interface Dropped {
+  id: number
+  room: RoomName
+  weapon: HeldId
+  ammo: number
+  reserve: number
+  count: number
+  x: number
+  y: number
+  z: number
+  yaw: number
+}
+
+const dropped: Dropped[] = []
+let droppedId = 0
+
+/**
+ * 拾える距離 (m)。
+ *
+ * 近づいて押す、という手間を残す。広くすると「通りかかったら勝手に拾える」に
+ * なって、置いてある物を避けて通ることができなくなる。
+ */
+const PICKUP_RANGE = 1.8
+
+/** 落ちている物を 1 つぶん配る形にする */
+function droppedMessage(item: Dropped): ServerMessage {
+  return {
+    type: 'dropped',
+    id: item.id,
+    weapon: item.weapon,
+    ammo: item.ammo,
+    reserve: item.reserve,
+    count: item.count,
+    at: [item.x, item.y, item.z],
+    yaw: item.yaw,
+  }
+}
+
 let grenadeId = 0
 
 /** 信管 (秒)。投げてから爆発するまで */
@@ -2141,6 +2188,77 @@ const server = Bun.serve<Client>({
          * 手柄は誰にも付かない。自分でやったことなので自死に数える
          * (爆風で自分の手榴弾に巻き込まれたときと同じ扱い)。
          */
+        /*
+         * 武器を地面へ置く。
+         *
+         * **持ち物を持っているのはクライアント側**なので、何を置いたかは
+         * 申告してもらう。こちらは「その銃の写しを捨てる」だけ — 繋ぎ直した
+         * ときに、置いたはずの銃が戻ってきては困る。
+         */
+        case 'drop': {
+          if (!canDrop(message.weapon)) break
+          if (!canAct(player.life)) break
+          const item: Dropped = {
+            id: ++droppedId,
+            room: socket.data.room,
+            weapon: message.weapon,
+            ammo: message.ammo ?? 0,
+            reserve: message.reserve ?? 0,
+            count: message.count ?? 0,
+            x: player.x,
+            y: player.y,
+            z: player.z,
+            // 置いた向き。転がっている絵にするために、体の向きから 90 度倒す
+            yaw: player.yaw + Math.PI / 2,
+          }
+          dropped.push(item)
+          const put = message.weapon
+          if (isGun(put)) {
+            player.ammo.magazine[put] = 0
+            player.ammo.reserve[put] = 0
+          }
+          broadcast(socket.data.room, droppedMessage(item))
+          break
+        }
+
+        /**
+         * 拾う。**どれを拾うかはこちらが決める** (一番近い物)。
+         *
+         * 位置を持っているのはサーバーなので、離れた所の物を指して
+         * 「拾った」と言われても通らない。
+         */
+        case 'pickup': {
+          if (!canAct(player.life)) break
+          let best: Dropped | null = null
+          let nearest = PICKUP_RANGE
+          for (const item of dropped) {
+            if (item.room !== socket.data.room) continue
+            const distance = Math.hypot(item.x - player.x, item.z - player.z)
+            if (distance > nearest) continue
+            best = item
+            nearest = distance
+          }
+          if (!best) break
+          dropped.splice(dropped.indexOf(best), 1)
+          const got = best.weapon
+          if (isGun(got)) {
+            player.ammo.magazine[got] = best.ammo
+            player.ammo.reserve[got] = best.reserve
+          }
+          sessionOf(player).socket.send(
+            JSON.stringify({
+              type: 'picked',
+              id: best.id,
+              weapon: best.weapon,
+              ammo: best.ammo,
+              reserve: best.reserve,
+              count: best.count,
+            } satisfies ServerMessage),
+          )
+          broadcast(socket.data.room, { type: 'droppedGone', id: best.id })
+          break
+        }
+
         case 'fall': {
           const room = rooms.get(socket.data.room)
           if (!room || room.phase !== 'playing') break

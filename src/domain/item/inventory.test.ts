@@ -230,3 +230,43 @@ describe('道具の枠と NONE', () => {
     expect(make().list('tool').map((c) => c.id)).toEqual(['box', 'none'])
   })
 })
+
+describe('地面へ置く', () => {
+  test('外した物が弾ごと返る。持ち物からは消える', () => {
+    const inv = make()
+    inv.switchTo('rifle'); settle(inv)
+    const gone = inv.drop('rifle')
+    expect(gone).toEqual({ id: 'rifle', ammo: 30, reserve: 90 })
+    expect(inv.list('weapon').map((c) => c.id)).not.toContain('rifle')
+  })
+
+  test('手にしていた物を外したら、次の武器へ持ち替える', () => {
+    const inv = make()
+    inv.switchTo('rifle'); settle(inv)
+    inv.drop('rifle'); settle(inv)
+    expect(inv.held).not.toBe('rifle')
+    expect(inv.canShoot || inv.held === 'knife').toBe(true)
+  })
+
+  test('**ナイフは置けない。** 全部置いても手ぶらにはならない', () => {
+    const inv = make()
+    expect(inv.drop('knife')).toBe(null)
+    for (const id of ['rifle', 'pistol', 'grenade'] as const) inv.drop(id)
+    settle(inv)
+    expect(inv.held).toBe('knife')
+  })
+
+  test('持っていない物は置けない', () => {
+    const inv = make()
+    inv.drop('rifle')
+    expect(inv.drop('rifle')).toBe(null)
+  })
+
+  test('置いた物は拾い直せる', () => {
+    const inv = make()
+    const gone = inv.drop('rifle')
+    expect(gone).not.toBe(null)
+    expect(inv.pick(gone!)).toBe(true)
+    expect(inv.list('weapon').map((c) => c.id)).toContain('rifle')
+  })
+})

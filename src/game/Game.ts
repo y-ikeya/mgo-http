@@ -34,6 +34,7 @@ import { Grenades } from "./grenades";
 import { Claymores } from "./claymores";
 import { BlastFx } from "./blastfx";
 import { Casings } from "./casings";
+import { Drops } from "./drops";
 import { damp } from "./math";
 import { randomSigned, randomUnit, RandomStream } from "./random";
 import { fallDamage, MAX_HEALTH } from "../domain/rule/damage";
@@ -47,7 +48,7 @@ import {
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/item/weapons";
 import { setBoxTuning, type BoxTuning } from "./box";
 import { Inventory } from "../domain/item/inventory";
-import { isGun, type Family, type HeldId } from "../domain/item/held";
+import { canDrop, isGun, type Family, type HeldId } from "../domain/item/held";
 import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
 import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
@@ -132,6 +133,8 @@ export interface GameStats {
    * こちらは自分に何が起きたかだけを短く見せる。
    */
   points: { label: string; delta: number; at: number }[]
+  /** 近くに落ちている武器がある。**押せば拾える**という案内を出す */
+  canPickUp: boolean
   /** 直近のキル表示。新しいものが先頭 */
   kills: KillEvent[]
   /** 残っている投げ物 */
@@ -374,6 +377,13 @@ const RING_SETTLE = 1
 /** これ以下の強さなら聞こえていないものとして扱う */
 const PING_THRESHOLD = 0.04
 
+/**
+ * 拾える距離 (m)。**サーバーと同じ値** (server/index.ts の PICKUP_RANGE)。
+ *
+ * こちらは案内を出すためだけに使う。実際に拾えるかを決めるのはあちら。
+ */
+const PICKUP_RANGE = 1.8;
+
 /** キル表示を残す時間 (秒) と、同時に出す行数 */
 const KILL_FEED_DURATION = 6;
 const KILL_FEED_MAX = 5;
@@ -424,6 +434,8 @@ export class Game {
   private readonly claymores: Claymores;
   private readonly blast: BlastFx;
   private readonly casings: Casings;
+  /** 地面に落ちている武器。浮かせて回している */
+  private readonly drops: Drops;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
   private stageBoxes: StageBox[] = [];
   /**
@@ -712,6 +724,7 @@ export class Game {
     this.claymores = new Claymores(this.scene);
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
+    this.drops = new Drops(this.scene);
     void loadStageBoxes().then((boxes) => {
       // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
       this.stageBoxes = solidBlockers(boxes);
@@ -914,6 +927,7 @@ export class Game {
     this.grenades.dispose();
     this.blast.dispose();
     this.casings.dispose();
+    this.drops.clear();
     this.player.dispose();
     this.scene.traverse((obj) => {
       if (isMesh(obj)) {
@@ -1050,6 +1064,7 @@ export class Game {
     this.updatePostureSpread(dt);
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
+    this.drops.update(dt);
     this.updateFootsteps();
     this.grenades.update(dt, this.stageBoxes, (bounce) => {
       // 跳ねた音は全員の輪に出す。自分が投げたものも例外にしない。
@@ -1292,6 +1307,26 @@ export class Game {
 
       case "explosion": {
         this.explode(message.id, message.at);
+        break;
+      }
+
+      case "dropped":
+        this.drops.place(message.id, message.weapon, message.at, message.yaw);
+        break;
+
+      case "droppedGone":
+        this.drops.remove(message.id);
+        break;
+
+      // 拾えた。**中身はここで初めて分かる** (見ただけでは残弾は読めない)
+      case "picked": {
+        const found =
+          message.count !== undefined && message.count > 0
+            ? { id: message.weapon as never, count: message.count }
+            : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
+        this.inv.pick(found);
+        this.drops.remove(message.id);
+        this.audio.play("clink", this.player.position);
         break;
       }
 
@@ -2322,6 +2357,18 @@ export class Game {
       return;
     }
 
+    /*
+     * G。**一覧を開いていれば置く、開いていなければ拾う。**
+     *
+     * 同じ 1 つのキーにしてあるのは、どちらも「地面と手の間で物を動かす」
+     * 操作だから。押し分ける必要が出るのは、置きたい物の上に立っているときだけで、
+     * そのときは一覧を開いているかどうかで意図がはっきりしている。
+     */
+    if (this.input.consumeAction("drop", "KeyG")) {
+      if (this.browsing) this.dropSelected();
+      else this.net.send({ type: "pickup" });
+    }
+
     // --- 長押しで一覧、離すと持ち替え ---
     //
     // **一覧の中を動くのはタダ。** 時間がかかるのは決めた後の持ち替えだけ。
@@ -2380,6 +2427,34 @@ export class Game {
    *
    * 銃はモデルの読み込みが要る (equip) ので、変わった瞬間だけ呼ぶ。
    */
+  /**
+   * 一覧で選んでいる物を地面へ置く。
+   *
+   * **持ち物から外すのはこちら、地面に置くのはあちら。** 位置を持っているのが
+   * サーバーなので、置き場所はあちらが決める (足元)。残弾は本人しか知らないので
+   * 一緒に送る。
+   */
+  private dropSelected(): void {
+    if (!this.browsing) return;
+    const id = this.inv.list(this.browsing.family)[this.browsing.at]?.id;
+    if (!id || !canDrop(id)) return;
+    const gone = this.inv.drop(id);
+    if (!gone) return;
+    this.net.send({
+      type: "drop",
+      weapon: gone.id,
+      ammo: "ammo" in gone ? gone.ammo : undefined,
+      reserve: "reserve" in gone ? gone.reserve : undefined,
+      count: "count" in gone ? gone.count : undefined,
+    });
+    // 一覧は閉じる。置いた物を指したまま残ると、次に離した瞬間に
+    // 「持っていない物へ持ち替える」になる
+    this.browsing = null;
+    this.pressedAt.weapon = 0;
+    this.pressedAt.tool = 0;
+    this.audio.play("clink", this.player.position);
+  }
+
   private syncHeld(): void {
     const held = this.inv.held;
     if (held === this.player.heldItem) return;
@@ -2801,6 +2876,13 @@ export class Game {
       health: this.player.health,
       maxHealth: MAX_HEALTH,
       dead: this.player.isDead,
+      /**
+       * 拾える物が近くにあるか。
+       *
+       * **距離はこちらで測る。** サーバーも拾うときに測っている (そちらが正) が、
+       * 「押せば拾える」を出すのに毎フレーム往復させるわけにいかない。
+       */
+      canPickUp: this.drops.nearest(this.player.position) <= PICKUP_RANGE,
       points: this.pointFeed.filter(
         (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
       ),

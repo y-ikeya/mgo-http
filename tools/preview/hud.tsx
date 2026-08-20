@@ -21,6 +21,7 @@ const base = {
   tool: 'none', toolInHand: false, browsingFamily: null, switching: false,
   support: 'grenade', team: 0, match: null, players: 1, sendRate: 64, peerRates: [],
   points: [],
+  canPickUp: false,
 } as unknown as GameStats
 
 const cases: Record<string, Partial<GameStats>> = {
@@ -33,6 +34,8 @@ const cases: Record<string, Partial<GameStats>> = {
   // 状態の行が出てもカードの大きさが変わらないこと
   pressR: { ammo: 0 },
   downed: { ammo: 12, downed: true },
+  // 拾える物が近くにある
+  pickup: { canPickUp: true },
   // 点の増減
   points: {
     points: [

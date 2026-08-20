@@ -14,7 +14,7 @@
  */
 
 import {
-  HELD, SWITCH_TIME, buildCarried, cycle as cycleId, dropEmpty, find, firstOf,
+  HELD, SWITCH_TIME, buildCarried, cycle as cycleId, dropEmpty, dropFrom, find, firstOf,
   listOf, pickUp, toggle as toggleId,
   type Carried, type Family, type GunId, type HeldId, type Loadout,
 } from './held'
@@ -380,5 +380,24 @@ export class Inventory {
    */
   pick(found: Carried): boolean {
     return pickUp(this.items, found)
+  }
+
+  /**
+   * 持ち物から外して地面へ。**外した物を返す** (弾の残りごと置くため)。
+   *
+   * 手にしていた物を外したら、次の武器へ持ち替える。**ナイフは必ず残る**ので
+   * 行き先が無くなることはない (canDrop)。
+   */
+  drop(id: HeldId): Carried | null {
+    const gone = dropFrom(this.items, id)
+    if (!gone) return null
+    if (this.lastWeapon === id) this.lastWeapon = firstOf(this.items, 'weapon') ?? 'knife'
+    if (this.last === id) this.last = this.lastWeapon
+    if (this.current === id) {
+      this.current = this.lastWeapon
+      this.switchLeft = SWITCH_TIME
+      this.queued = null
+    }
+    return gone
   }
 }
