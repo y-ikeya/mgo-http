@@ -35,7 +35,8 @@
     "Sneaking Forward.fbx": "sneak",
     "Male Sitting Pose.fbx": "sit",
     "pose.fbx": "away",
-    "fallRoll.fbx": "fall_roll"
+    "fallRoll.fbx": "fall_roll",
+    "upStair.fbx": "up_stair"
   },
   "out": "public/models/soldier.glb",
   "maxTexture": 1024

@@ -26,6 +26,21 @@ const STANCE_LAMBDA = 8
 
 /** カメラ位置が目標位置に追従する速さ。向きは補間しない (エイムが鈍るため) */
 const POSITION_LAMBDA = 16
+
+/**
+ * 段差で上がった足元に視点が追いつく速さ。
+ *
+ * 0.25m の段を 0.2 秒ほどで吸収する。速すぎると跳ねが残り、遅すぎると
+ * 階段を上っている間ずっと視点が沈んで見える。
+ */
+const STEP_LAMBDA = 14
+/**
+ * これ以上動いたら均さずに合わせる (m)。
+ *
+ * 落下・跳躍・湧き直しまで均すと、落ちている間ずっと視点が遅れて付いてくる。
+ * 段差 (最大 0.25m) より大きく、跳躍 (0.6m) より小さい所に置く。
+ */
+const STEP_SNAP = 0.45
 /** カメラが地面に潜らないための下限 (m) */
 const MIN_CAMERA_Y = 0.4
 
@@ -143,6 +158,8 @@ export class FollowCamera {
   private readonly aimView = { ...AIM_VIEW }
   /** 注視点の高さ (m)。Player が実測した頭の位置から決める */
   private viewHeight = PLAYER_HEIGHT * 0.85
+  /** 均した足元の高さ。段差で視点が跳ねないようにするためのもの */
+  private footY = 0
   private currentViewHeight = PLAYER_HEIGHT * 0.85
 
   private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ')
@@ -324,10 +341,20 @@ export class FollowCamera {
     const rightX = Math.cos(yaw)
     const rightZ = -Math.sin(yaw)
     const base = player.position
-    this.centerPivot.set(base.x, base.y + this.currentViewHeight, base.z)
+    /*
+     * 足元の高さは**均してから使う**。
+     *
+     * 階段を上がると足元が 1 段ぶん (0.25m) 一気に飛ぶ。そのまま視点にすると、
+     * 段のたびに画面が跳ねて狙えない。**大きく動いたときは追いつかせる** —
+     * 落下や湧き直しまで均すと、落ちている間ずっと視点が遅れる。
+     */
+    if (Math.abs(base.y - this.footY) > STEP_SNAP) this.footY = base.y
+    else this.footY = damp(this.footY, base.y, STEP_LAMBDA, dt)
+    const footY = this.footY
+    this.centerPivot.set(base.x, footY + this.currentViewHeight, base.z)
     this.pivot.set(
       base.x + rightX * this.shoulder,
-      base.y + this.currentViewHeight,
+      footY + this.currentViewHeight,
       base.z + rightZ * this.shoulder,
     )
 

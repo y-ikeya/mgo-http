@@ -24,6 +24,8 @@ const base: StanceInput = {
   onGround: true,
   landing: 0,
   fallRoll: 0,
+  airborneFor: 0,
+  stairFor: 0,
   forward: 0,
   strafe: 0,
   speed: 0,
@@ -63,7 +65,30 @@ describe('落下の受け身', () => {
 
   test('空中にいる間は受け身にならない (着いてから転がる)', () => {
     expect(
-      resolveLocomotion({ ...base, onGround: false, velocityY: -18, fallRoll: 1.6 } as StanceInput),
+      resolveLocomotion({
+        ...base, onGround: false, velocityY: -18, airborneFor: 0.5, fallRoll: 1.6,
+      } as StanceInput),
     ).toBe('jump_loop')
+  })
+})
+
+describe('階段', () => {
+  test('段差を上がっている間は専用の型', () => {
+    expect(resolveLocomotion({ ...base, stairFor: 0.3 } as StanceInput)).toBe('up_stair')
+  })
+
+  test('**短い浮きは空中扱いしない。** 階段を下りるたびに膝を曲げない', () => {
+    const hop = { ...base, onGround: false, velocityY: -2, airborneFor: 0.05 } as StanceInput
+    expect(resolveLocomotion(hop)).not.toBe('jump_loop')
+    // 0.12 秒を超えたら空中の型へ
+    expect(resolveLocomotion({ ...hop, airborneFor: 0.2 })).toBe('jump_loop')
+  })
+
+  test('空中のほうが先。**階段を上って跳んだら跳躍の型**', () => {
+    expect(
+      resolveLocomotion({
+        ...base, onGround: false, velocityY: 4, airborneFor: 0.3, stairFor: 0.3,
+      } as StanceInput),
+    ).toBe('jump_up')
   })
 })

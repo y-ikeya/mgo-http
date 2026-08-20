@@ -182,6 +182,21 @@ const FALL_REFERENCE_HEIGHT = 0.6
 const LANDING_TIME = 0.16
 
 /**
+ * 段差とみなす 1 フレームの上がり幅 (m)。
+ *
+ * 越えられる段差は 0.25m (collision.ts の STEP_UP)。坂は連続して上がるので
+ * 1 フレームでは 0.02m ほどしか動かない — その間に線を引く。
+ */
+const STAIR_RISE_MIN = 0.08
+/**
+ * 階段の型を持たせる時間 (秒)。
+ *
+ * 段を上がった瞬間だけだと、段の上を歩いている間に走りの型へ戻って点滅する。
+ * 次の段までを繋ぐ長さにする。
+ */
+const STAIR_HOLD = 0.45
+
+/**
  * 受け身の尺 (秒)。**クリップの長さ (1.67s) に合わせる。**
  *
  * 途中で移動の型に戻すと、転がっている最中に立ち上がって滑る。削られた高さから
@@ -354,6 +369,21 @@ export class Player {
 
   /** 着地モーションの残り時間 */
   private landingTimer = 0
+  /**
+   * 空中に居る時間 (秒)。接地したら 0 に戻す。
+   *
+   * **短い浮きを空中扱いしない**ために測る (stance.ts の AIR_MOTION_DELAY)。
+   */
+  private airborneFor = 0
+  /**
+   * 階段を上っている残り時間 (秒)。
+   *
+   * 1 段上がるたびに足元が飛ぶので、その瞬間に立て直して**段の間も持たせる**。
+   * 持たせないと、段の上を歩いている一瞬だけ走りの型に戻って点滅する。
+   */
+  private stairFor = 0
+  /** 前のフレームの足元の高さ。段差を上がったかを見るのに使う */
+  private lastFeetY = 0
   /** 受け身の残り時間。ただの着地より長い */
   private fallRollTimer = 0
   /**
@@ -1244,6 +1274,17 @@ export class Player {
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.fallRollTimer > 0) this.fallRollTimer -= dt
+    this.airborneFor = this.grounded ? 0 : this.airborneFor + dt
+    /*
+     * 階段を上ったか。**1 フレームで足元が跳ね上がったら段差。**
+     *
+     * 坂も上がるが、そちらは連続なので 1 フレームの上がり幅が小さい
+     * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
+     */
+    const rise = this.position.y - this.lastFeetY
+    if (this.grounded && rise >= STAIR_RISE_MIN) this.stairFor = STAIR_HOLD
+    else if (this.stairFor > 0) this.stairFor -= dt
+    this.lastFeetY = this.position.y
     this.actualSpeed = moved.actualSpeed
 
     // 倒れている間の時計。起き上がるのは操作されたときだけ (standUp)
@@ -1550,6 +1591,8 @@ export class Player {
       onGround: this.onGround,
       landing: this.landingTimer,
       fallRoll: this.fallRollTimer,
+      airborneFor: this.airborneFor,
+      stairFor: this.stairFor,
       velocityY: this.velocityY,
       dirX: moveDir.x,
       dirZ: moveDir.z,

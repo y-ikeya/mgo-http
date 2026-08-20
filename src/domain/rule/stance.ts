@@ -31,6 +31,15 @@ export type Stance = 'stand' | 'crouch' | 'box' | 'prone' | 'down'
  * 受け取る側はこの集合を見て「切り替わった瞬間に再生し直す」を決める。
  * 移動モーションと同じ扱いにすると、ループして永久に繰り返す。
  */
+/**
+ * 空中の型へ移るまでの猶予 (秒)。
+ *
+ * 階段の 1 段 (0.25m) を下りる浮きは 0.22 秒ほど。**それより短くする**と
+ * 段ごとに点滅するので、そこそこ長く取る。ジャンプは 0.6m 上がるので
+ * 十分に超える。
+ */
+export const AIR_MOTION_DELAY = 0.12
+
 export type WholeBodyLocomotion =
   | 'roll'
   | 'fall_roll'
@@ -140,6 +149,15 @@ export interface StanceInput {
   /** 着地モーションの残り時間 (秒) */
   landing: number
   /**
+   * 空中に居る時間 (秒)。0 なら接地している。
+   *
+   * **短い浮きを空中扱いしない**ために持つ。階段を下りると 1 段ごとに離れて
+   * 着くので、そのたびに空中の型へ移ると膝を曲げる姿勢が点滅する。
+   */
+  airborneFor: number
+  /** 階段を上り始めてからの残り時間 (秒)。0 なら上っていない */
+  stairFor: number
+  /**
    * 受け身の残り時間 (秒)。0 なら受け身ではない。
    *
    * ただの着地 (landing) と別に持つ。落下ダメージが入る速さで落ちたときだけで、
@@ -190,7 +208,18 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
 
   // 空中では上昇と下降でモーションを分ける。クリップの終了ではなく速度で
   // 切り替えるので、滞空時間が変わっても破綻しない
-  if (!input.onGround) return input.velocityY > 0 ? 'jump_up' : 'jump_loop'
+  /*
+   * 空中の型は**すぐには出さない** (airborneFor)。
+   *
+   * 階段や坂を下りると、1 段ごとに離地と接地を繰り返す。そのたびに空中の型へ
+   * 移ると、**膝を大きく曲げる姿勢が点滅する**。0.12 秒より短い浮きは
+   * 歩いているものとして扱う。
+   */
+  if (!input.onGround && input.airborneFor >= AIR_MOTION_DELAY) {
+    return input.velocityY > 0 ? 'jump_up' : 'jump_loop'
+  }
+  // 階段を上っている間は専用の型。**坂は含まない** (段差が無いので走りで足りる)
+  if (input.stairFor > 0) return 'up_stair'
   // 削られる高さから落ちた着地は受け身。ただの着地より長く、転がり切るまで続く
   if (input.fallRoll > 0) return 'fall_roll'
   if (input.landing > 0) return 'jump_down'
