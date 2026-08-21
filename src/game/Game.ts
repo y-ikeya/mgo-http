@@ -734,7 +734,15 @@ export class Game {
 
     this.stage = buildStage(this.scene);
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
-    this.scene.add(buildBases());
+    /*
+     * 陣営の基地。**個人戦では出さない。**
+     *
+     * ルールは 1 秒ごとに届く match で分かるので、置いてから隠す。地面に色の
+     * 付いた枠があると「そこが自分の陣地」に読めるが、個人戦にはそんな場所は
+     * 無い (湧く所も毎回変わる)。
+     */
+    this.bases = buildBases();
+    this.scene.add(this.bases);
     this.sun = buildLights(this.scene);
     this.placeAtSpawn();
     this.scene.add(this.player.object);
@@ -1289,6 +1297,8 @@ export class Game {
         // ルールは 1 秒ごとに届く。**部屋に入った時点では分からない**ので、
         // ここで初めて「陣営で分かれる部屋か」が決まる
         this.mode = message.mode;
+        // 陣営が無い部屋には基地も無い
+        if (this.bases) this.bases.visible = MODES[this.mode].teams;
         // 光っている人 (個人戦の 1 位)。自分なら HUD に出す
         this.remotes.setLeaking(message.leader ?? null);
         this.leaking = message.leader === this.net.id;
@@ -2824,6 +2834,8 @@ export class Game {
 
   /** その部屋のルール。1 秒ごとに届く match で分かる */
   private mode: Mode = "TDM";
+  /** 陣営の基地を示す枠。陣営が無い部屋では隠す */
+  private bases: THREE.Object3D | null = null;
   /** 自分が光っているか (個人戦の 1 位)。位置が全員に漏れている */
   private leaking = false;
   /** 直近の点の増減。画面の右下に流す */
