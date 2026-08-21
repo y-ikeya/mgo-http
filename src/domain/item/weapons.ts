@@ -381,7 +381,7 @@ const SNIPER: WeaponSpec = {
   reserve: 15,
   reload: 3.2,
 
-  bulletSpeed: 820,
+  bulletSpeed: 880, // .300 Win Mag の初速
   bulletGravity: 9.8,
 
   // 連射で広がる分は大きいが、そもそも連射できない
