@@ -18,10 +18,9 @@ import { SNAPSHOT_INTERVAL, type ServerMessage } from '../src/net/types'
 import { checkMove } from '../src/sim/judge/motioncheck'
 import { cameraPoint } from '../src/sim/space/eyepoint'
 import { groundUnder, hasLineOfSight, headHeight } from '../src/sim/space/vision'
-import { setLife } from './match'
 import { sessionOf } from './session'
 import { arenaHalf, solidBoxes, stageBoxes } from './stage'
-import { type RoomWorld } from './world'
+import { type RoomWorld, setLife } from './world'
 
 /**
  * 位置が届いたとき。

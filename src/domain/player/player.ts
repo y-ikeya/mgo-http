@@ -22,6 +22,7 @@
 import { canTransition, type Life } from './lifecycle'
 import type { Locomotion } from './locomotion'
 import type { Stance } from './stance'
+import { creditOf, takeDamage, type Credit, type Wound } from '../rule/damage'
 import type { HeldId } from '../item/held'
 import {
   SUPPORT_SPECS,
@@ -372,4 +373,51 @@ export function refill(player: Player): void {
   player.concentratingSince = 0
   // 湧き地点へ跳ぶ。歩いた距離として積むと、着いた先で足音が連打される
   player.footsteps.warp(player.x, player.z)
+}
+
+/**
+ * 削られる。**倒れたかどうかまでを返す。**
+ *
+ * 体力を引くのは審判 (server) の仕事に見えるが、「0 になったら倒れる」も
+ * 「削られたら集中が切れる」も遊びの決めごとで、**同じ判断をクライアントも
+ * 先に回している**。2 か所に書くと、片方だけ規則が変わる。
+ */
+export function hurt(player: Player, amount: number): Wound {
+  const wound = takeDamage(player.health, amount)
+  player.health = wound.health
+  // 撃たれても爆風でも集中は途切れる。回復は最初からやり直し
+  player.concentratingSince = 0
+  return wound
+}
+
+/**
+ * 倒された。**数える所を 1 か所にする。**
+ *
+ * 弾でもナイフでも爆風でも落下でも、ここを通る。倒した人が居なければ
+ * (置いた本人がもう部屋に居ない) 誰の手柄にもならず、自死にも数えない —
+ * 残っていた物で死んだのは落ち度ではない。
+ *
+ * 残機を減らすのは試合の側 (match.loseTicket)。人が持つのは自分の戦績だけ。
+ */
+export function downedBy(
+  victim: Player,
+  killer: Player | null,
+  weapon: string,
+  headshot = false,
+): Credit {
+  const credit = creditOf(victim.id, killer ? killer.id : null)
+  victim.deaths++
+  // 切れている間に倒された。戻ってきても続きは無い — 死んだので支度から
+  victim.wasAlive = false
+  // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる
+  victim.killedBy = credit === 'kill' && killer ? killer.id : ''
+  if (headshot) victim.headDeaths++
+  if (credit === 'kill' && killer) {
+    killer.kills++
+    killer.killsByWeapon[weapon] = (killer.killsByWeapon[weapon] ?? 0) + 1
+    if (headshot) killer.headshots++
+  } else if (credit === 'suicide') {
+    victim.suicides++
+  }
+  return credit
 }

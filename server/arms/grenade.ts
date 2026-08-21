@@ -10,11 +10,11 @@ import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
 import { type Player, type Team } from '../../src/domain/player/player'
 import { type ClientMessage } from '../../src/net/types'
 import { type Projectile, throwVelocity } from '../../src/sim/judge/ballistic'
-import { blastAt } from '../../src/sim/judge/blast'
+import { blastExposure } from '../../src/sim/judge/blast'
+import { blastEffect } from '../../src/domain/item/grenade'
 import { applyBlastDamage } from '../damage'
-import { setLife } from '../match'
 import { stageBoxes } from '../stage'
-import { type RoomWorld, broadcast, hostileToOwner } from '../world'
+import { type RoomWorld, broadcast, hostileToOwner, setLife } from '../world'
 
 /**
  * 飛んでいる手榴弾。
@@ -165,8 +165,12 @@ export function detonate(room: RoomWorld, nade: Grenade): void {
     // 投げた本人だけは例外 — 足元に落とせば自分が吹き飛ぶ
     if (victim.id !== nade.owner && !hostileToOwner(room, nade.team, victim)) continue
 
-    const result = blastAt(x, y, z, victim, stageBoxes)
-    if (!result) continue
+    // sim が測るのは**どこに誰がどれだけ晒されていたか**まで。
+    // 何ダメージかを決めるのは規則の側 (domain/item/grenade.ts)
+    const seen = blastExposure(x, y, z, victim, stageBoxes)
+    if (!seen) continue
+    const result = blastEffect(seen.distance, seen.cover)
+    if (result.damage <= 0) continue
 
     applyBlastDamage(room, victim, result.damage, x, z, nade.owner, 'grenade', result.knock)
   }

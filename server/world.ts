@@ -6,7 +6,8 @@
 
 import { type Match, connected, newMatch } from '../src/domain/match/match'
 import { ROOM_MODE, type RoomName } from '../src/domain/match/room'
-import { type Player, type Team } from '../src/domain/player/player'
+import { type Life } from '../src/domain/player/lifecycle'
+import { type Player, type Team, enterLife } from '../src/domain/player/player'
 import { type ServerMessage } from '../src/net/types'
 import { type Claymore } from './arms/claymore'
 import { type Dropped } from './arms/drops'
@@ -87,4 +88,23 @@ export function broadcast(room: RoomWorld, message: ServerMessage, except?: stri
   for (const player of connected(room)) {
     if (player.id !== except) sessionOf(player).socket.send(payload)
   }
+}
+
+/**
+ * 状態を移す。**書き換えるのはここだけ。**
+ *
+ * 直に代入させないのは、遷移が飛ぶと辻褄が合わなくなるため。倒れた人を
+ * 支度を経ずに湧かせると装備が配り直されないし、離脱中の席を生き返らせると
+ * 誰も居ない場所に人が立つ。通ってよい道は lifecycle.ts の表が持っている。
+ *
+ * 変わったことは全員へ知らせる。知らせないと、受け取る側がまた
+ * 「位置が来ないから倒れたのだろう」と推し量ることになる。
+ */
+export function setLife(room: RoomWorld, player: Player, next: Life, now = Date.now()): void {
+  const before = player.life
+  if (!enterLife(player, next, now)) {
+    if (before !== next) console.warn(`[状態] ${player.name}: ${before} → ${next} は通れない`)
+    return
+  }
+  broadcast(room, { type: 'life', id: player.id, state: next })
 }

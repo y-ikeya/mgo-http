@@ -62,3 +62,30 @@ export const THROW_SPEED = 12
  * 狙う側は落下点の印を見て決めるので、向きと着地点がずれても困らない。
  */
 export const THROW_LOFT = (28 * Math.PI) / 180
+
+/** 爆風を受けた結果 */
+export interface BlastEffect {
+  /** 削る量 */
+  damage: number
+  /** 吹き飛ぶか */
+  knock: boolean
+}
+
+/**
+ * その距離と遮蔽で、どれだけ削れて転ぶか。
+ *
+ * **近いほど強い。** 中心付近だけ極端にせず、素直に線形で落とす。遮蔽は
+ * 体の何割が爆心から見えていたか (cover) をそのまま掛ける — 半分だけ壁から
+ * 出ていれば、半分だけ食らう。
+ *
+ * 転ぶのは**遮蔽の外に居る相手だけ**。壁の裏で削られただけの相手まで
+ * 転ばせると理不尽になる。
+ *
+ * 距離と遮蔽を測るのは sim (judge/blast.ts の blastExposure)。
+ */
+export function blastEffect(distance: number, cover: number): BlastEffect {
+  const near = 1 - distance / BLAST_RADIUS
+  if (near <= 0) return { damage: 0, knock: false }
+  const shade = BLAST_SHADOWED + (1 - BLAST_SHADOWED) * cover
+  return { damage: BLAST_DAMAGE * near * shade, knock: cover > 0 && near > KNOCK_NEAR }
+}

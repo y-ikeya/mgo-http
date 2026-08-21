@@ -6,8 +6,8 @@
  */
 
 import { MIN_PLAYERS, type Match, connected, holdingSeats, leaderOf, nextSlot, soleTeam } from '../src/domain/match/match'
-import { type Life, isSeated } from '../src/domain/player/lifecycle'
-import { type Player, type Team, enterLife, lifeElapsed, newBot, refill, reviveBot } from '../src/domain/player/player'
+import { isSeated } from '../src/domain/player/lifecycle'
+import { type Player, type Team, lifeElapsed, newBot, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { encodeSnapshot } from '../src/net/snapshot'
 import { type ServerMessage } from '../src/net/types'
@@ -15,7 +15,7 @@ import { sendHealth } from './damage'
 import { recordPose, relayState } from './relay'
 import { sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
-import { type RoomWorld, broadcast } from './world'
+import { type RoomWorld, broadcast, setLife } from './world'
 
 /** 1 試合の長さ (ms) */
 export const MATCH_DURATION = 5 * 60 * 1000
@@ -295,25 +295,6 @@ export function finishMatch(room: RoomWorld): void {
     recordSeat(room, player, false)
   }
   closeMatch(room.matchId, room.name, room.startedAt, room.winner ?? 'draw')
-}
-
-/**
- * 状態を移す。**書き換えるのはここだけ。**
- *
- * 直に代入させないのは、遷移が飛ぶと辻褄が合わなくなるため。倒れた人を
- * 支度を経ずに湧かせると装備が配り直されないし、離脱中の席を生き返らせると
- * 誰も居ない場所に人が立つ。通ってよい道は lifecycle.ts の表が持っている。
- *
- * 変わったことは全員へ知らせる。知らせないと、受け取る側がまた
- * 「位置が来ないから倒れたのだろう」と推し量ることになる。
- */
-export function setLife(room: RoomWorld, player: Player, next: Life, now = Date.now()): void {
-  const before = player.life
-  if (!enterLife(player, next, now)) {
-    if (before !== next) console.warn(`[状態] ${player.name}: ${before} → ${next} は通れない`)
-    return
-  }
-  broadcast(room, { type: 'life', id: player.id, state: next })
 }
 
 /**

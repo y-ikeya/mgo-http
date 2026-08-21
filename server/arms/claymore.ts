@@ -7,7 +7,8 @@ import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
 import { type Player, type Team } from '../../src/domain/player/player'
 import { type ServerMessage } from '../../src/net/types'
-import { PLACE_FORWARD, type Placed, SHOT_HALF, SHOT_TOP, blastFrom, canPlaceAt } from '../../src/sim/judge/claymore'
+import { PLACE_FORWARD, type Placed, SHOT_HALF, SHOT_TOP, blastReach, canPlaceAt } from '../../src/sim/judge/claymore'
+import { blastEffect } from '../../src/domain/item/claymore'
 import { type StageBox, groundUnder, hasLineOfSight, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
 import { viewOf } from '../relay'
@@ -155,7 +156,8 @@ export function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
     // 同じ規則で、自分の物で死ぬことがある。誰が味方かはルールが決める
     if (victim.id !== claymore.owner && !hostileToOwner(room, claymore.team, victim)) continue
 
-    const hit = blastFrom(claymore, victim)
+    // 距離を測るのは sim、何ダメージかは規則 (domain/item/claymore.ts)
+    const hit = blastEffect(blastReach(claymore, victim))
     if (hit.damage <= 0) continue
     applyBlastDamage(
       room, victim, hit.damage,

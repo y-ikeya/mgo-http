@@ -12,56 +12,44 @@
  */
 
 import { headHeight, isPathClear, SAMPLE_RATIOS, type StageBox } from '../space/vision'
-import {
-  BLAST_DAMAGE,
-  BLAST_RADIUS,
-  BLAST_SHADOWED,
-  KNOCK_NEAR,
-} from '../../domain/item/grenade'
+import { BLAST_RADIUS } from '../../domain/item/grenade'
 
-export interface BlastResult {
-  /** 与えるダメージ */
-  damage: number
-  /** 吹き飛ばすか。遮蔽の外で、近くで受けたときだけ倒れる */
-  knock: boolean
+/** 爆心から見た相手の姿。**量はここで決めない** (domain/item/grenade.ts) */
+export interface Exposure {
+  /** 爆心からの距離 (m)。体の中ほどまでで測る */
+  distance: number
+  /** 体のどれだけが爆心から見えていたか (0..1) */
+  cover: number
 }
 
 /**
- * 爆心からの距離と遮蔽で威力を決める。
+ * 爆心から相手がどう見えていたか。
  *
- * 体の何点が爆心から見えているかを数え、その割合をそのまま威力に掛ける。
- * 1 点だけで見ると「頭が壁から出ているのに無傷」が起きるし、
- * **体の半分だけ壁から出ている**が表せない。
+ * **返すのは事実だけ。** 何ダメージかを決めるのは規則の側 (domain)。以前は
+ * ここで `BLAST_DAMAGE * near * shade` まで計算していたが、**遠くでどれだけ
+ * 削れるか**は遊びの調整そのもので、レイと三角関数の隣に置くものではない。
+ *
+ * 体の何点が爆心から見えているかを数える。1 点だけで見ると「頭が壁から出て
+ * いるのに無傷」が起きるし、**体の半分だけ壁から出ている**が表せない。
  *
  * @param feetY 相手の足元の高さ
  * @returns 届かなければ null
  */
-export function blastAt(
+export function blastExposure(
   cx: number,
   cy: number,
   cz: number,
   target: { x: number; y: number; z: number; crouching: boolean; boxed: boolean },
   boxes: StageBox[],
-): BlastResult | null {
+): Exposure | null {
   const head = headHeight(target.crouching, target.boxed)
   // 体の中ほどまでの距離で測る。足元で測ると、真上で爆ぜたときに遠く見える
   const distance = Math.hypot(target.x - cx, target.y + head / 2 - cy, target.z - cz)
   if (distance >= BLAST_RADIUS) return null
 
-  // 近いほど強い。中心付近だけ極端にせず、素直に線形で落とす
-  const near = 1 - distance / BLAST_RADIUS
-
   let exposed = 0
   for (const ratio of SAMPLE_RATIOS) {
     if (isPathClear(cx, cy, cz, target.x, target.y + head * ratio, target.z, boxes)) exposed++
   }
-  const cover = exposed / SAMPLE_RATIOS.length
-  const shade = BLAST_SHADOWED + (1 - BLAST_SHADOWED) * cover
-
-  return {
-    damage: BLAST_DAMAGE * near * shade,
-    // 転ぶ近さは domain (KNOCK_NEAR)。ここで足すのは**遮蔽の外に居ること** —
-    // 壁の裏で削られただけの相手まで転ばせると理不尽になる
-    knock: cover > 0 && near > KNOCK_NEAR,
-  }
+  return { distance, cover: exposed / SAMPLE_RATIOS.length }
 }

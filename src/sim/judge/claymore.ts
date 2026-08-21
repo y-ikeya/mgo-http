@@ -8,14 +8,7 @@
  * three にも DOM にも依存しない。サーバーが起爆を決める。
  */
 
-import {
-  BLAST_MAX,
-  BLAST_MIN,
-  BLAST_RANGE,
-  KNOCK_RATIO,
-  TRIGGER_COS,
-  TRIGGER_RANGE,
-} from '../../domain/item/claymore'
+import { TRIGGER_COS, TRIGGER_RANGE } from '../../domain/item/claymore'
 
 /** 置く位置。本人の足元から前へ何 m か */
 export const PLACE_FORWARD = 0.9
@@ -108,13 +101,6 @@ function forwardOf(yaw: number): [number, number] {
  * 足元を通ったときで、上の階に居る人で反応されると理不尽になる…
  * のだが、階の概念がまだ無いので今は平面で見る。
  */
-/** 爆風の結果。damage 0 なら届いていない */
-export interface BlastHit {
-  damage: number
-  knock: boolean
-}
-
-
 export function triggeredBy(mine: Placed, target: Target): boolean {
   const dx = target.x - mine.x
   const dz = target.z - mine.z
@@ -126,31 +112,16 @@ export function triggeredBy(mine: Placed, target: Target): boolean {
 }
 
 /**
- * その相手に与える量と、転ぶかどうか。届かなければ damage 0。
+ * 爆心から相手までの距離 (m)。**量はここで決めない** (domain/item/claymore.ts)。
  *
- * **全方位に飛ぶ。** 向きが意味を持つのは「いつ起爆するか」(triggeredBy) まで。
+ * **全方位に測る。** 向きが意味を持つのは「いつ起爆するか」(triggeredBy) まで。
  * 爆ぜてしまえば火薬は前も後ろも無い — 真後ろに立っていた人だけ無傷、は
  * 物として嘘になる。置く側から見ても、**背後を通られたら起爆しない**という
  * 時点で向きの代償は払っている。
  *
- * **置いた本人も例外にしない。** 自分の物で削れる (手榴弾を足元に落としたときと
- * 同じ規則)。置いた場所を覚えていないと自分が損をする、が置いて離れる道具の
- * 代償になる。
- *
- * 転倒は手榴弾と同じ扱い。**当たれば動きが止まる**のがこの手の道具の効き目で、
- * 削るだけなら置いて離れる意味が薄い。
+ * 高さは見ない (足元の平面で測る)。上の階に居る人を巻き込む問題は、階の概念が
+ * 入ってから。
  */
-export function blastFrom(mine: Placed, target: Target): BlastHit {
-  const dx = target.x - mine.x
-  const dz = target.z - mine.z
-  const distance = Math.hypot(dx, dz)
-  if (distance > BLAST_RANGE) return { damage: 0, knock: false }
-  if (distance < 1e-4) return { damage: BLAST_MAX, knock: true }
-
-  const t = distance / BLAST_RANGE
-  return {
-    damage: BLAST_MAX - t * (BLAST_MAX - BLAST_MIN),
-    // 手榴弾と同じ割合 (届く距離の 7 割) で転ぶ。端で掠っただけの相手は立っている
-    knock: t < KNOCK_RATIO,
-  }
+export function blastReach(mine: Placed, target: Target): number {
+  return Math.hypot(target.x - mine.x, target.z - mine.z)
 }

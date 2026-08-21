@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { blastFrom, canPlaceAt, triggeredBy, type Placed } from './claymore'
-import {
-  BLAST_MAX,
-  BLAST_MIN,
-  BLAST_RANGE,
-  TRIGGER_RANGE,
-} from '../../domain/item/claymore'
+import { blastReach, canPlaceAt, triggeredBy, type Placed } from './claymore'
+import { BLAST_RANGE, TRIGGER_RANGE } from '../../domain/item/claymore'
 
 /**
  * クレイモアの向き。
@@ -49,40 +44,20 @@ describe('前を通ったときだけ起爆する', () => {
   })
 })
 
-describe('爆風', () => {
+describe('爆風の届き方 (量は domain の試験)', () => {
   const mine = at(0)
 
-  test('近いほど削れる。至近でも単体では死なない', () => {
-    const near = blastFrom(mine, { x: 0, y: 0, z: -0.5 }).damage
-    const far = blastFrom(mine, { x: 0, y: 0, z: -(BLAST_RANGE - 0.2) }).damage
-    expect(near).toBeGreaterThan(far)
-    expect(near).toBeLessThanOrEqual(BLAST_MAX)
-    expect(BLAST_MAX).toBeLessThan(100)
-    expect(far).toBeGreaterThanOrEqual(BLAST_MIN - 1)
-  })
-
-  test('**爆風は全方位。** 背後に居ても同じだけ削れる', () => {
-    const front = blastFrom(mine, { x: 0, y: 0, z: -2 }).damage
-    const back = blastFrom(mine, { x: 0, y: 0, z: 2 }).damage
-    const side = blastFrom(mine, { x: 2, y: 0, z: 0 }).damage
+  test('**測るのは距離だけ。全方位。** 背後でも横でも同じ', () => {
+    const front = blastReach(mine, { x: 0, y: 0, z: -2 })
+    const back = blastReach(mine, { x: 0, y: 0, z: 2 })
+    const side = blastReach(mine, { x: 2, y: 0, z: 0 })
     expect(back).toBeCloseTo(front, 5)
     expect(side).toBeCloseTo(front, 5)
   })
 
   test('向きが効くのは起爆まで。背後を通っても反応はしない', () => {
     expect(triggeredBy(mine, { x: 0, y: 0, z: 2 })).toBe(false)
-    expect(blastFrom(mine, { x: 0, y: 0, z: 2 }).damage).toBeGreaterThan(0)
-  })
-
-  test('近ければ転ぶ。端で掠っただけなら立っていられる', () => {
-    expect(blastFrom(mine, { x: 0, y: 0, z: -1 }).knock).toBe(true)
-    expect(blastFrom(mine, { x: 0, y: 0, z: -(BLAST_RANGE - 0.2) }).knock).toBe(false)
-  })
-
-  test('届く距離は反応する距離より広い。反応した時点で逃げ切れない', () => {
-    expect(BLAST_RANGE).toBeGreaterThan(TRIGGER_RANGE)
-    // 反応する縁に立った人には必ず入る
-    expect(blastFrom(mine, { x: 0, y: 0, z: -TRIGGER_RANGE }).damage).toBeGreaterThan(0)
+    expect(blastReach(mine, { x: 0, y: 0, z: 2 })).toBeLessThan(BLAST_RANGE)
   })
 })
 

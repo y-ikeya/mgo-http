@@ -9,17 +9,17 @@ import { bulletDamage, weaponOf } from '../src/domain/item/weapons'
 import { loseTicket } from '../src/domain/match/match'
 import { isHostile } from '../src/domain/match/room'
 import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
-import { type Player, isProtected } from '../src/domain/player/player'
+import { downedBy, hurt, type Player, isProtected } from '../src/domain/player/player'
 import { type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
 import { type ClientMessage } from '../src/net/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
 import { dropGrenade } from './arms/grenade'
-import { matchState, setLife } from './match'
+import { matchState } from './match'
 import { bearingTo } from './relay'
 import { sessionFor, sessionOf } from './session'
 import { stageBoxes } from './stage'
-import { type RoomWorld, broadcast } from './world'
+import { type RoomWorld, broadcast, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -53,14 +53,13 @@ export function applyBlastDamage(
   weapon: 'grenade' | 'claymore' | 'fall',
   knock: boolean,
 ): void {
-  victim.health = Math.max(0, victim.health - amount)
-  // 爆風でも集中は途切れる
-  victim.concentratingSince = 0
+  // 削るのも、倒れるかも人の側の振る舞い (domain/player/player.ts)
+  const wound = hurt(victim, amount)
 
   // 爆心の方向。撃たれたときと同じで、どこから来たかだけ渡す
   const bearing = Math.atan2(fromX - victim.x, -(fromZ - victim.z))
 
-  if (victim.health > 0) {
+  if (!wound.downed) {
     sendHealth(room, victim, amount, false, bearing)
     // **的にも爆風は当たる。** 送り先が無いなら送らないだけ
     if (knock && isSeated(victim.life)) {
@@ -71,24 +70,12 @@ export function applyBlastDamage(
     return
   }
 
-  victim.deaths++
-  // 切れている間に倒された。戻ってきても続きは無い
-  victim.wasAlive = false
-  const killer = room.players.get(ownerId)
-  // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる
-  victim.killedBy = killer && killer.id !== victim.id ? killer.id : ''
+  // 誰の手柄か、戦績にどう残るかは人の側が決める
+  const killer = room.players.get(ownerId) ?? null
+  downedBy(victim, killer, weapon)
   setLife(room, victim, 'downed')
   // 握っていたものは足元に落ちる。誘爆する
   dropGrenade(room, victim)
-  if (killer && killer.id !== victim.id) {
-    killer.kills++
-    killer.killsByWeapon[weapon] = (killer.killsByWeapon[weapon] ?? 0) + 1
-  } else if (killer) {
-    // 自分の物で死んだ。手柄は誰にも付かない。
-    // 置いた/投げた本人が既に居ない場合は自死に数えない — 残っていた物で
-    // 死んだのは自分の落ち度ではない
-    victim.suicides++
-  }
   // 死因を問わず、倒された側の残機が 1 減る。**削り合わない部屋では動かさない**
   if (room.mode.tickets) loseTicket(room, victim.team)
   sendHealth(room, victim, amount, false, bearing)
@@ -222,11 +209,11 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
       ? meleeDamage(event.fromBehind ?? false)
       : bulletDamage(weaponOf(attacker.weapon), (event.zone ?? 'BODY') as HitZone, event.distance ?? 0)
 
-  victim.health = Math.max(0, victim.health - amount)
+  const wound = hurt(victim, amount)
   // 撃たれたら集中は途切れる。回復は最初から待ち直し。
   victim.concentratingSince = 0
 
-  if (victim.health > 0) {
+  if (!wound.downed) {
     // 頭に当たったのに倒れなかったときだけ怯ませる。
     // 胴でも出すと、連射している間ずっと怯み続けて棒立ちになる。
     const flinch = event.kind === 'bullet' && event.zone === 'HEAD'
@@ -244,24 +231,14 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     return
   }
 
-  victim.killedBy = attacker.id
-  // 切れている間に倒された。戻ってきても続きは無い — 死んだので支度から
-  victim.wasAlive = false
-  setLife(room, victim, 'downed')
-  victim.deaths++
-
   // 記録に残す分。**表示名ではなく安定した id で数える**
   const headshot = event.kind === 'bullet' && event.zone === 'HEAD'
-  if (headshot) {
-    attacker.headshots++
-    victim.headDeaths++
-  }
   const by = event.kind === 'melee' ? 'knife' : attacker.weapon
-  attacker.killsByWeapon[by] = (attacker.killsByWeapon[by] ?? 0) + 1
+  downedBy(victim, attacker, by, headshot)
+  setLife(room, victim, 'downed')
   // 振りかぶったまま倒されたら、足元に落ちて爆ぜる。
   // 撃った側にとっては「今撃つと道連れになる」という読みになる
   dropGrenade(room, victim)
-  attacker.kills++
   // 減るのは倒された側の残機だけ。倒した側には何も入らない
   if (room.mode.tickets) loseTicket(room, victim.team)
   sendHealth(room, victim, amount, false, bearingTo(victim, attacker))

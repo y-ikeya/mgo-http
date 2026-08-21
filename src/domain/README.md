@@ -284,7 +284,7 @@ Session  (server 側)    socket 届く間隔 時計のずれ
 
 ```
 player/         人
-  player.ts       人 (と、練習部屋の的)
+  player.ts       人 (と、練習部屋の的)。削られる / 倒される も人の振る舞い
   lifecycle.ts    Life の遷移表
   locomotion.ts   体の動きの種類
   stance.ts       構えと頭の高さ (屈めば隠れられる)
@@ -299,24 +299,29 @@ item/           持ち物
   held.ts         手に持てる物の表
   weapons.ts      武器の性能
   inventory.ts    持ち物と持ち替えの状態
-  grenade.ts      爆風の届く距離と量、投げる強さ
-  claymore.ts     見張る距離と角度、爆風の量
+  grenade.ts      爆風の届く距離と量 (blastEffect)、投げる強さ
+  claymore.ts     見張る距離と角度、爆風の量 (blastEffect)
 
 stage/          面
   surface.ts      面の材質 (足音が変わる)
   flags.ts        面が何を止めるか (人 / 弾 / 視線 / カメラ / 描画)
 
 rule/           規則。**どの entity のものでもない判断**だけを置く
-  damage.ts       部位・距離・落下・近接 (誰を刺せるか)
+  damage.ts       部位・距離・落下・近接 / 削って倒れるか (takeDamage)・手柄は誰か
   footsteps.ts    どれだけ歩いたら音が鳴るか
   lag.ts          遅れをどちらに味方させるか (当てた側に寄せる)
 ```
 
 直下に置くのは README と試験だけ。[layout.test.ts](layout.test.ts) が留めている。
 
-**幾何は連れてこない。** 「爆風は 7m で 75」はここだが、体の何点が爆心から
-見えているかを数えるのは sim。「見張るのは前方 60 度」はここだが、扇の中に
-居るかを内積で見るのは sim。**数字だけがこちらに来る。**
+**幾何は連れてこない。** sim が返すのは**事実**で、それを量に直すのがここ。
+
+    sim     どこに落ちて、誰が何 m 先に、体のどれだけが晒されていたか
+    domain  その距離と遮蔽なら何ダメージか、転ぶか、削られて倒れるか
+    server  それを実際に引いて、記録して、配る
+
+体の何点が爆心から見えているかを数えるのも、扇の中に居るかを内積で見るのも sim。
+**数字と式がこちらに来る。**
 
 逆に、ここから出ていったものもある。どのモーションを流すかを決める規則
 (`resolveLocomotion` と階段まわりの調律値) は game/actor/motion.ts へ移した —

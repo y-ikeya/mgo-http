@@ -167,3 +167,39 @@ export function canBeStabbed(stance: Stance, aimPitch = 0): boolean {
   return aimPitch <= STAB_DOWN_PITCH
 }
 
+
+/** 削られた結果 */
+export interface Wound {
+  /** 削ったあとの体力 */
+  health: number
+  /** 倒れたか */
+  downed: boolean
+}
+
+/**
+ * 削る。**倒れたかどうかまでが規則。**
+ *
+ * 引き算そのものは審判 (server) がやればいい話に見えるが、「0 になったら
+ * 倒れる」は遊びの決めごとで、**同じ判断をクライアントも先に回している**。
+ * 2 か所に書くと、片方だけ「0 でも立っている」に変わる。
+ */
+export function takeDamage(health: number, amount: number): Wound {
+  const left = Math.max(0, health - amount)
+  return { health: left, downed: left <= 0 }
+}
+
+/**
+ * 手柄は誰に付くか。
+ *
+ *     kill     倒した人が居る
+ *     suicide  自分の物で死んだ (足元に落とした手榴弾、自分で踏んだクレイモア)
+ *     none     置いた本人がもう居ない。**残っていた物で死んだのは落ち度ではない**
+ *
+ * 落下も自死に数える。自分でやったことなので (量を送らせない、の裏返し)。
+ */
+export type Credit = 'kill' | 'suicide' | 'none'
+
+export function creditOf(victimId: string, killerId: string | null): Credit {
+  if (killerId === null) return 'none'
+  return killerId === victimId ? 'suicide' : 'kill'
+}

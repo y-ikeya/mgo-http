@@ -57,3 +57,27 @@ export const BLAST_MIN = 25
  * 立っていられるか」を覚え直すことになる。
  */
 export const KNOCK_RATIO = 0.72
+
+/** 爆風を受けた結果。手榴弾と同じ形 (item/grenade.ts) */
+export interface BlastEffect {
+  damage: number
+  knock: boolean
+}
+
+/**
+ * その距離で、どれだけ削れて転ぶか。
+ *
+ * 至近で 75、端で 25 まで線形に落ちる。**置いた本人も例外にしない** — 誰に
+ * 当たったかを見ないのは、自分の物で削れることを規則として認めているため。
+ *
+ * 距離を測るのは sim (judge/claymore.ts の blastReach)。
+ */
+export function blastEffect(distance: number): BlastEffect {
+  if (distance > BLAST_RANGE) return { damage: 0, knock: false }
+  const t = distance / BLAST_RANGE
+  return {
+    damage: BLAST_MAX - t * (BLAST_MAX - BLAST_MIN),
+    // 手榴弾と同じ割合 (届く距離の 7 割) で転ぶ。端で掠っただけの相手は立っている
+    knock: t < KNOCK_RATIO,
+  }
+}
