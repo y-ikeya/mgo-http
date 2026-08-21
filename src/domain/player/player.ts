@@ -127,7 +127,7 @@ export interface Player {
    * 視点の向きと上下 (rad)、構えているか。
    *
    * どこから見ているかを出すのに要る。三人称なので、画面に映るものを
-   * 決めているのはカメラの位置であって目の位置ではない (src/sim/eyepoint.ts)。
+   * 決めているのはカメラの位置であって目の位置ではない (src/sim/space/eyepoint.ts)。
    */
   cameraYaw: number
   pitch: number

@@ -23,7 +23,7 @@ REF_PREFIX = 'ref_'
 KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'ref_')
 
 # 面が何を止めるか。既定は全部止めて、名前で個別に外す。
-# (src/sim/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
+# (src/domain/stage/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
 FLAG_WORDS = ('nodraw', 'noplayer', 'nobullet', 'noeye', 'nocamera')
 
 
@@ -48,7 +48,7 @@ def flags_of(name):
 # くぐれる隙間かどうかの判断に使う
 PLAYER_HEIGHT = 1.8
 
-# 足を乗せられる段差 (m)。src/sim/collision.ts の STEP_UP
+# 足を乗せられる段差 (m)。src/sim/space/collision.ts の STEP_UP
 STEP_UP = 0.25
 
 

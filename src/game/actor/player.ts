@@ -8,7 +8,7 @@ import type { Locomotion } from '../../domain/player/locomotion'
 import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
-import { stepMovement, type Mover } from '../../sim/movement'
+import { stepMovement, type Mover } from '../../sim/space/movement'
 import {
   resolveLocomotion,
   STAIR_DROP_MAX,

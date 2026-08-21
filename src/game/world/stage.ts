@@ -21,9 +21,9 @@ import {
   vec2,
   vec3,
 } from 'three/tsl'
-import type { Obstacle } from '../../sim/collision'
-import { isPathClear, sightBlockers } from '../../sim/vision'
-import type { StageBox } from '../../sim/vision'
+import type { Obstacle } from '../../sim/space/collision'
+import { isPathClear, sightBlockers } from '../../sim/space/vision'
+import type { StageBox } from '../../sim/space/vision'
 import { asset, loadStage } from '../assets'
 import { isMesh } from '../util/guards'
 

@@ -53,7 +53,7 @@ import {
   SNAPSHOT_BYTES,
 } from '../src/net/snapshot'
 import { surfaceOf } from '../src/domain/stage/surface'
-import { blastAt } from '../src/sim/blast'
+import { blastAt } from '../src/sim/judge/blast'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD, canDrop, isGun, type HeldId } from '../src/domain/item/held'
 import {
@@ -64,16 +64,16 @@ import {
   SHOT_HALF,
   SHOT_TOP,
   type Placed,
-} from '../src/sim/claymore'
+} from '../src/sim/judge/claymore'
 import { closeMatch, flush, recordPlayer } from './stats'
-import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/ballistic'
+import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../src/sim/judge/ballistic'
 import {
   bulletDamage,
   reloadInto,
   weaponOf,
   SUPPORT_SPECS,
 } from '../src/domain/item/weapons'
-import { verifyHit } from '../src/sim/hitcheck'
+import { verifyHit } from '../src/sim/judge/hitcheck'
 import { stanceOf } from '../src/domain/rule/stance'
 import {
   groundUnder,
@@ -83,9 +83,9 @@ import {
   solidBlockers,
   segmentHitsBox,
   type StageBox,
-} from '../src/sim/vision'
-import { cameraPoint } from '../src/sim/eyepoint'
-import { arenaHalfOf, checkMove } from '../src/sim/motioncheck'
+} from '../src/sim/space/vision'
+import { cameraPoint } from '../src/sim/space/eyepoint'
+import { arenaHalfOf, checkMove } from '../src/sim/judge/motioncheck'
 import {
   canAct,
   canBeHurt,
@@ -775,7 +775,7 @@ function visibleHead(player: Player, now: number): number {
  * 飛んでいる手榴弾。
  *
  * **サーバーが自分で飛ばす。** クライアントは初速だけ受け取って同じ物理を解くので、
- * 位置を毎フレーム配らなくてよい (src/sim/ballistic.ts が両側で同じ結果を出す)。
+ * 位置を毎フレーム配らなくてよい (src/sim/judge/ballistic.ts が両側で同じ結果を出す)。
  *
  * 弾と違って遡らない。投げた瞬間からこちらが飛ばしているので、爆発した時点の
  * 位置がそのまま正しい。

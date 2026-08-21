@@ -1,4 +1,4 @@
-import { segmentHitsBox, type StageBox } from './vision'
+import { segmentHitsBox, type StageBox } from '../space/vision'
 
 /**
  * 「そこへ動いた」という申告を確かめる。

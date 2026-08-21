@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { stepMovement, type MoveWorld, type Mover } from './movement'
-import { STAIR_DROP_MAX, STAIR_DROP_MIN, STAIR_RISE_MIN } from '../domain/rule/stance'
+import { STAIR_DROP_MAX, STAIR_DROP_MIN, STAIR_RISE_MIN } from '../../domain/rule/stance'
 
 /**
  * **坂と階段を落差で見分けられるか。**

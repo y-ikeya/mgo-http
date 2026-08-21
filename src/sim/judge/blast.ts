@@ -11,7 +11,7 @@
  * three.js に依存しない。
  */
 
-import { headHeight, isPathClear, SAMPLE_RATIOS, type StageBox } from './vision'
+import { headHeight, isPathClear, SAMPLE_RATIOS, type StageBox } from '../space/vision'
 
 /** 爆風が届く距離 (m) */
 export const BLAST_RADIUS = 7

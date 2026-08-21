@@ -17,8 +17,8 @@
  * 跳ねるたびに差が開いて別の場所へ落ちる。
  */
 
-import type { StageBox } from './vision'
-import { segmentHitsBox } from './vision'
+import type { StageBox } from '../space/vision'
+import { segmentHitsBox } from '../space/vision'
 
 /** 物理を進める刻み (秒)。誰が解いても同じ道を通るよう固定する */
 export const FIXED_STEP = 1 / 60

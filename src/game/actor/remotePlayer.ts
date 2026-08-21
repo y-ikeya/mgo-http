@@ -14,7 +14,7 @@ import {
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../../domain/player/locomotion";
-import { canBeStabbed } from "../../sim/hitcheck";
+import { canBeStabbed } from "../../sim/judge/hitcheck";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { isWholeBody, stanceOf, type WholeBodyLocomotion } from "../../domain/rule/stance";
@@ -38,7 +38,7 @@ import {
 } from "../../domain/rule/damage";
 import { Footsteps, type Step } from "../../domain/rule/footsteps";
 import type { Life } from "../../domain/player/lifecycle";
-import { BUFFER_SIZE, Presence } from "../../sim/presence";
+import { BUFFER_SIZE, Presence } from "../../sim/space/presence";
 import { Hitbox } from "./hitbox";
 import { dampAngle } from "../util/math";
 import { Weapon } from "../arms/weapon";
@@ -151,7 +151,7 @@ export class RemotePlayer {
   name = "";
   /**
    * 「いま、どこに、見えているか」の判断。**three を持たない側に置いてある**
-   * (src/sim/presence.ts)。ここはその答えを絵にするだけ。
+   * (src/sim/space/presence.ts)。ここはその答えを絵にするだけ。
    */
   private readonly presence = new Presence();
   /** サーバーが決めた状態。倒れている姿勢を出すかの判断に使う */

@@ -19,14 +19,14 @@ import {
   loadStageBoxes,
   type Stage,
 } from "./world/stage";
-import { solidBlockers, type StageBox } from "../sim/vision";
+import { solidBlockers, type StageBox } from "../sim/space/vision";
 import {
   ceilingHeight,
   clampToArena,
   groundHeight,
   resolveCircle,
   surfaceAt,
-} from "../sim/collision";
+} from "../sim/space/collision";
 import { GameAudio } from "./sense/audio";
 import type { Step } from "../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./sense/soundRing";

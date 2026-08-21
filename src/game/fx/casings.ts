@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 
 import { loadCasing } from '../assets'
-import { FIXED_STEP, stepProjectile, type Projectile } from '../../sim/ballistic'
-import type { StageBox } from '../../sim/vision'
+import { FIXED_STEP, stepProjectile, type Projectile } from '../../sim/judge/ballistic'
+import type { StageBox } from '../../sim/space/vision'
 
 /**
  * 排莢。
