@@ -1,6 +1,6 @@
 import type * as THREE from 'three'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { DEFAULT_SKIN } from './skin'
+import { DEFAULT_SKIN } from './actor/skin'
 
 /**
  * モデルの読み込みを 1 回に集約する。
@@ -70,7 +70,7 @@ function load(url: string): Promise<GLTF> {
 }
 
 /**
- * 兵士のモデル。skin で差し替えられる (見た目の試作。src/game/skin.ts)。
+ * 兵士のモデル。skin で差し替えられる (見た目の試作。src/game/actor/skin.ts)。
  *
  * 種類ごとに Promise を分けて持つので、同じ物を 2 回解析しない。
  */

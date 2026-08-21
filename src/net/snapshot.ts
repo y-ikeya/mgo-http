@@ -14,7 +14,7 @@
  * three.js に依存しない。サーバー (bun) がこのファイルをそのまま読む。
  */
 
-import { MOVE_DIRECTIONS, type Locomotion } from '../domain/locomotion'
+import { MOVE_DIRECTIONS, type Locomotion } from '../domain/player/locomotion'
 import type { PlayerSnapshot } from './types'
 import type { WeaponId } from '../domain/item/weapons'
 import type { HeldId } from '../domain/item/held'

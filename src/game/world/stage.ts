@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../domain/surface'
-import { flagsOf } from '../domain/flags'
+import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../domain/stage/surface'
+import { flagsOf } from '../../domain/stage/flags'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
   clamp,
@@ -21,11 +21,11 @@ import {
   vec2,
   vec3,
 } from 'three/tsl'
-import type { Obstacle } from '../sim/collision'
-import { isPathClear, sightBlockers } from '../sim/vision'
-import type { StageBox } from '../sim/vision'
-import { asset, loadStage } from './assets'
-import { isMesh } from './guards'
+import type { Obstacle } from '../../sim/collision'
+import { isPathClear, sightBlockers } from '../../sim/vision'
+import type { StageBox } from '../../sim/vision'
+import { asset, loadStage } from '../assets'
+import { isMesh } from '../util/guards'
 
 /**
  * ステージ "AA" — BoxGeometry だけのブロックアウト。
@@ -674,7 +674,7 @@ async function applyGroundTexture(material: THREE.MeshStandardMaterial): Promise
 /**
  * オブジェクト名の規約。
  *
- * 何を止めるかは名前に書く (src/domain/flags.ts)。描画と判定を別のメッシュに
+ * 何を止めるかは名前に書く (src/domain/stage/flags.ts)。描画と判定を別のメッシュに
  * 分けるのも、金網のように「人は止めるが弾は通す」物を作るのも、同じ仕組みで表せる。
  */
 

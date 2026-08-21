@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { asset } from './assets'
-import { damp } from './math'
+import { asset } from '../assets'
+import { damp } from '../util/math'
 import { createHandleAlpha } from './cardboard'
 
 /**

@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
-import { FollowCamera, type CameraWorld } from "./camera";
-import { isMesh } from "./guards";
+import { FollowCamera, type CameraWorld } from "./sense/camera";
+import { isMesh } from "./util/guards";
 import { Input, type InputDevice } from "./input";
-import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./player";
-import { Shots } from "./shots";
-import type { WeaponTarget } from "./weapon";
+import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
+import { Shots } from "./fx/shots";
+import type { WeaponTarget } from "./arms/weapon";
 import {
   ARENA_HALF_SIZE,
   buildLights,
@@ -18,7 +18,7 @@ import {
   STAGE_CODE,
   loadStageBoxes,
   type Stage,
-} from "./stage";
+} from "./world/stage";
 import { solidBlockers, type StageBox } from "../sim/vision";
 import {
   ceilingHeight,
@@ -27,17 +27,17 @@ import {
   resolveCircle,
   surfaceAt,
 } from "../sim/collision";
-import { GameAudio } from "./audio";
+import { GameAudio } from "./sense/audio";
 import type { Step } from "../domain/rule/footsteps";
-import { SoundRing, type PingKind } from "./soundRing";
-import { ThrownItems } from "./thrown";
-import { Grenades } from "./grenades";
-import { Claymores } from "./claymores";
-import { BlastFx } from "./blastfx";
-import { Casings } from "./casings";
-import { Drops } from "./drops";
-import { damp } from "./math";
-import { randomSigned, randomUnit, RandomStream } from "./random";
+import { SoundRing, type PingKind } from "./sense/soundRing";
+import { ThrownItems } from "./arms/thrown";
+import { Grenades } from "./arms/grenades";
+import { Claymores } from "./arms/claymores";
+import { BlastFx } from "./fx/blastfx";
+import { Casings } from "./fx/casings";
+import { Drops } from "./arms/drops";
+import { damp } from "./util/math";
+import { randomSigned, randomUnit, RandomStream } from "./util/random";
 import { fallDamage, MAX_HEALTH } from "../domain/rule/damage";
 import {
   canAct,
@@ -45,13 +45,13 @@ import {
   CHOOSE_FLOOR,
   CHOOSE_TIMEOUT,
   type Life,
-} from "../domain/lifecycle";
+} from "../domain/player/lifecycle";
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/item/weapons";
-import { setBoxTuning, type BoxTuning } from "./box";
+import { setBoxTuning, type BoxTuning } from "./actor/box";
 import { Inventory } from "../domain/item/inventory";
 import { canDrop, isGun, type Family, type HeldId } from "../domain/item/held";
-import { MODES, isHostile, type Mode } from "../domain/room";
-import { RemotePlayers, type RemotePlayer } from "./remotePlayer";
+import { MODES, isHostile, type Mode } from "../domain/match/room";
+import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
 import { weaponOf } from "../domain/item/weapons";
@@ -60,12 +60,12 @@ import {
   flightTime,
   trajectoryOffset,
   TRAJECTORY_STEPS,
-} from "./ballistics";
+} from "./arms/ballistics";
 import { createTransport } from "../net";
 import type { NetTransport } from "../net/types";
 import type { Identity } from "../auth/session";
-import { selfSkin } from "./skin";
-import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../domain/rule/scoring";
+import { selfSkin } from "./actor/skin";
+import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../domain/match/scoring";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -1588,7 +1588,7 @@ export class Game {
    *
    * 以前はここが無く、「体力が 0 か」「試合の段階は何か」から必要な場所で
    * 都度組み立てていた。組み立て方が場所ごとにずれて不具合になっていたので、
-   * 権威が言ってきた 1 つの値だけを見る (src/domain/lifecycle.ts)。
+   * 権威が言ってきた 1 つの値だけを見る (src/domain/player/lifecycle.ts)。
    */
   private life: Life = "joining";
   /** その状態に入った時刻 (Date.now)。残り秒数の表示に使う */
@@ -2813,7 +2813,7 @@ export class Game {
   /**
    * 自分の点が動いたことを控える。
    *
-   * **数字はルールから引く** (domain/rule/scoring.ts)。ここで 3 や -2 を直に
+   * **数字はルールから引く** (domain/match/scoring.ts)。ここで 3 や -2 を直に
    * 書くと、点の付け方を変えたときに画面だけ古い数を出し続ける。
    *
    * 練習部屋のように点が記録されない部屋でも出る。**手応えとしての表示**なので、

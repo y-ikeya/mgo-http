@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { HELD, SWITCH_TIME, type HeldId } from './item/held'
 import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from './item/weapons'
 import { MAX_HEALTH } from './rule/damage'
-import { CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from './lifecycle'
-import { MIN_PLAYERS, RECONNECT_GRACE } from './match'
+import { CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from './player/lifecycle'
+import { MIN_PLAYERS, RECONNECT_GRACE } from './match/match'
 
 /**
  * **README が数字の出どころ。** そこに書いた表と実装が合っているかを見る。

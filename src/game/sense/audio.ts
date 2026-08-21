@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { asset } from "./assets";
+import { asset } from "../assets";
 
 /**
  * 効果音。位置情報を持たせて鳴らす。

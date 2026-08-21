@@ -259,26 +259,37 @@ Session  (server 側)    socket 届く間隔 時計のずれ
 
 ## 棚
 
+**入れ物の名前は entity。** 「model と logic」のように、何であるかではなく
+どう扱うかで分けると、置き場所を決めるたびに迷う。人の話は player/ にある、で
+済ませたい。
+
 ```
-player.ts       人 (と、練習部屋の的)
-match.ts        試合
-room.ts         部屋とルール。誰が敵か
-lifecycle.ts    Life の遷移表
-locomotion.ts   体の動きの種類
-surface.ts      面の材質 (足音が変わる)
-flags.ts        面が何を止めるか (人 / 弾 / 視線 / カメラ / 描画)
+player/         人
+  player.ts       人 (と、練習部屋の的)
+  lifecycle.ts    Life の遷移表
+  locomotion.ts   体の動きの種類
+
+match/          試合
+  match.ts        試合と残機
+  room.ts         部屋とルール。誰が敵か
+  scoring.ts      点と Lv
 
 item/           持ち物
   held.ts         手に持てる物の表
   weapons.ts      武器の性能
   inventory.ts    持ち物と持ち替えの状態
 
-rule/           規則
+stage/          面
+  surface.ts      面の材質 (足音が変わる)
+  flags.ts        面が何を止めるか (人 / 弾 / 視線 / カメラ / 描画)
+
+rule/           規則。**どの entity のものでもない判断**だけを置く
   damage.ts       部位・距離・落下
   stance.ts       いまどの姿勢であるべきか
-  scoring.ts      点と Lv
   footsteps.ts    どれだけ歩いたら音が鳴るか
 ```
+
+直下に置くのは README と試験だけ。[layout.test.ts](layout.test.ts) が留めている。
 
 ## まだ言葉になっていないもの
 

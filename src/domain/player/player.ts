@@ -13,7 +13,7 @@
  *     Session  (server 側)    socket・届く間隔・時計のずれ・配った控え
  *
  * こうしておくと、**クライアントも同じ Player を読める**。いまは片方が
- * three を抱えた src/game/player.ts で、同じ人物のことを別々の言葉で
+ * three を抱えた src/game/actor/player.ts で、同じ人物のことを別々の言葉で
  * 書いている。そこを寄せていく足場になる。
  *
  * 置き場所の規則は docs/design.md の 7。ここは domain なので幾何 (src/sim) を
@@ -21,17 +21,17 @@
  */
 import { canTransition, type Life } from './lifecycle'
 import type { Locomotion } from './locomotion'
-import type { Stance } from './rule/stance'
-import type { HeldId } from './item/held'
+import type { Stance } from '../rule/stance'
+import type { HeldId } from '../item/held'
 import {
   SUPPORT_SPECS,
   startingAmmo,
   type Ammo,
   type SupportId,
   type WeaponId,
-} from './item/weapons'
-import { MAX_HEALTH } from './rule/damage'
-import { Footsteps } from './rule/footsteps'
+} from '../item/weapons'
+import { MAX_HEALTH } from '../rule/damage'
+import { Footsteps } from '../rule/footsteps'
 
 /**
  * ある時刻の姿。**当てたという申告を遡って照合する**のに使う。
@@ -79,7 +79,7 @@ export interface Player {
   team: Team
   health: number
   /**
-   * いまどういう状態に居るか。src/domain/lifecycle.ts に定義がある。
+   * いまどういう状態に居るか。src/domain/player/lifecycle.ts に定義がある。
    *
    * **ここが唯一の出どころ。** 以前は respawnAt / droppedAt / protectedUntil /
    * positioned の 4 つの数から、必要な場所で必要な条件をその都度組み立てていた。

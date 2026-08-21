@@ -1,7 +1,7 @@
 import * as THREE from 'three'
-import { damp } from './math'
-import type { Player } from './player'
-import { PLAYER_HEIGHT } from './player'
+import { damp } from '../util/math'
+import type { Player } from '../actor/player'
+import { PLAYER_HEIGHT } from '../actor/player'
 
 /**
  * 構えていないとき / 構えているときのカメラ。

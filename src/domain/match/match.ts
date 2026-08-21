@@ -7,8 +7,8 @@
  *
  * 置き場所の規則は docs/design.md の 7。
  */
-import { isSeated } from './lifecycle'
-import type { Player, Team } from './player'
+import { isSeated } from '../player/lifecycle'
+import type { Player, Team } from '../player/player'
 import { MODES, type Mode, type ModeSpec } from './room'
 
 /**
@@ -38,7 +38,7 @@ export const MIN_PLAYERS = 2
 export const RECONNECT_GRACE = 30_000
 
 export interface Match {
-  /** この部屋のルール。部屋ごとに固定 (src/domain/room.ts) */
+  /** この部屋のルール。部屋ごとに固定 (src/domain/match/room.ts) */
   mode: ModeSpec
   players: Map<string, Player>
   /** 残機。0 にされた側が負け */

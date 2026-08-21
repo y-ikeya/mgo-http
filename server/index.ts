@@ -18,7 +18,7 @@ import {
   reviveBot,
   type Player,
   type Team,
-} from '../src/domain/player'
+} from '../src/domain/player/player'
 import {
   MODES,
   ROOM_MODE,
@@ -28,7 +28,7 @@ import {
   isRoomName,
   modeOf,
   type RoomName,
-} from '../src/domain/room'
+} from '../src/domain/match/room'
 import {
   MIN_PLAYERS,
   RECONNECT_GRACE,
@@ -42,7 +42,7 @@ import {
   nextSlot,
   soleTeam,
   type Match,
-} from '../src/domain/match'
+} from '../src/domain/match/match'
 import {
   decodeSnapshot,
   encodeSnapshot,
@@ -52,7 +52,7 @@ import {
   stampSlot,
   SNAPSHOT_BYTES,
 } from '../src/net/snapshot'
-import { surfaceOf } from '../src/domain/surface'
+import { surfaceOf } from '../src/domain/stage/surface'
 import { blastAt } from '../src/sim/blast'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD, canDrop, isGun, type HeldId } from '../src/domain/item/held'
@@ -98,7 +98,7 @@ import {
   onBattlefield,
   SPAWN_PROTECT,
   type Life,
-} from '../src/domain/lifecycle'
+} from '../src/domain/player/lifecycle'
 import {
   SNAPSHOT_INTERVAL,
   type ClientMessage,
@@ -191,7 +191,7 @@ const [stageBoxes, solidBoxes]: [StageBox[], StageBox[]] = await (async () => {
  * 同じ人が繋ぎ直せば新しい Session になるが、Player は席に残ったままになる —
  * その違いが型に出ていなかったので、30 秒の猶予まわりの規則が読み取れなかった。
  *
- * 人の側は src/domain/player.ts。
+ * 人の側は src/domain/player/player.ts。
  */
 interface Session {
   player: Player
@@ -1550,7 +1550,7 @@ function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage)
   // 湧いた直後の相手には当たらない
   if (isProtected(victim)) return
   // 撃てる相手か。**陣営ではなくルールに聞く** — DM では同じ色でも敵で、
-  // 休憩部屋では誰も敵ではない (src/domain/room.ts)
+  // 休憩部屋では誰も敵ではない (src/domain/match/room.ts)
   if (!isHostile(room.mode, attacker, victim)) return
   // 試合中以外は削らない。支度の間や結果を読んでいる間に得点が動くと、
   // 何が起きたのか分からなくなる

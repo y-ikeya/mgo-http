@@ -3,7 +3,7 @@
  *
  * --- なぜ src/game から出したか ---
  * ここは**共有の層**。サーバーも、位置の符号化も、足音も、姿勢の規則も
- * この型を読む。にもかかわらず src/game/animation.ts (three を読み込む)
+ * この型を読む。にもかかわらず src/game/actor/animation.ts (three を読み込む)
  * に置いてあったので、three に依存しないはずの src/sim と src/net が
  * **型の上では three へ繋がっていた**。
  *

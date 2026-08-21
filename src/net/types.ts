@@ -1,9 +1,9 @@
-import type { Locomotion } from '../domain/locomotion'
+import type { Locomotion } from '../domain/player/locomotion'
 import type { HitZone } from '../domain/rule/damage'
-import type { Surface } from '../domain/surface'
+import type { Surface } from '../domain/stage/surface'
 import type { SupportId, WeaponId } from '../domain/item/weapons'
 import type { HeldId } from '../domain/item/held'
-import type { Life } from '../domain/lifecycle'
+import type { Life } from '../domain/player/lifecycle'
 
 /**
  * ネットワークで流す型。
@@ -19,13 +19,13 @@ import type { Life } from '../domain/lifecycle'
  */
 
 /**
- * 所属。**定義は src/domain/player.ts に在る。**
+ * 所属。**定義は src/domain/player/player.ts に在る。**
  *
  * 通信の型が陣営を宣言していたのは順番が逆で、protocol はゲームの言葉を
  * 借りて話す側。ここから出しているのは、読む側の import を変えないため。
  */
-import type { Team } from '../domain/player'
-import type { Mode } from '../domain/room'
+import type { Team } from '../domain/player/player'
+import type { Mode } from '../domain/match/room'
 export type { Team }
 
 /** 1 人分の見た目の状態。体力はここに含めない (サーバーが持つ) */
@@ -379,7 +379,7 @@ export interface LeaveEvent {
 /**
  * その人がどういう状態に居るか。サーバーが変わるたびに配る。
  *
- * 状態は src/domain/lifecycle.ts が定義している。以前は「体力が 0 になった」
+ * 状態は src/domain/player/lifecycle.ts が定義している。以前は「体力が 0 になった」
  * 「位置が来なくなった」から各自が推し量っていて、場所ごとに答えがずれていた。
  */
 export interface LifeEvent {
@@ -486,7 +486,7 @@ export type MatchPhase = 'waiting' | 'countdown' | 'playing' | 'over'
  */
 export interface RoomSummary {
   name: string
-  /** その部屋のルール。部屋ごとに固定 (src/domain/room.ts) */
+  /** その部屋のルール。部屋ごとに固定 (src/domain/match/room.ts) */
   mode: Mode
   /** ルールの表示名 */
   label: string

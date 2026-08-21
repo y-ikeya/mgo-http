@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import type { HeldId } from '../domain/item/held'
-import { loadGrenade, loadPistol, loadRifle, loadSmg, loadSniper, loadClaymore } from './assets'
+import type { HeldId } from '../../domain/item/held'
+import { loadGrenade, loadPistol, loadRifle, loadSmg, loadSniper, loadClaymore } from '../assets'
 
 /**
  * 地面に落ちている武器。

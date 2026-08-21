@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadRifle, loadSmg, loadSniper, loadPistol } from './assets'
-import { isMesh } from './guards'
+import { loadKnife, loadRifle, loadSmg, loadSniper, loadPistol } from '../assets'
+import { isMesh } from '../util/guards'
 
 /**
  * 武器ごとの取り付け設定。モデルは convert_gun.py で正規化済みで、

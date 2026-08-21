@@ -13,7 +13,7 @@ import './Loadout.css'
 /**
  * 装備を組む画面。
  *
- * 支度をしている間だけ出る (domain/lifecycle.ts の choosing)。出す / 出さないは
+ * 支度をしている間だけ出る (domain/player/lifecycle.ts の choosing)。出す / 出さないは
  * サーバーが持つ状態がそのまま決めていて、こちらに開閉の札は無い。
  * 札を持っていた頃は、閉じたまま開き直らない場面があった。
  *

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import { asset } from './assets'
+import { asset } from '../assets'
 
 /**
  * 爆発の見た目。

@@ -1,4 +1,4 @@
-import type { Player } from './player'
+import type { Player } from '../player/player'
 
 /**
  * 部屋とルール。

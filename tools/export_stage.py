@@ -44,7 +44,7 @@ def flags_of(name):
     return flags
 
 
-# 体の高さ (m)。src/game/player.ts の PLAYER_HEIGHT と揃える。
+# 体の高さ (m)。src/game/actor/player.ts の PLAYER_HEIGHT と揃える。
 # くぐれる隙間かどうかの判断に使う
 PLAYER_HEIGHT = 1.8
 

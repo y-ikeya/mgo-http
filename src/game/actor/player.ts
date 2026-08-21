@@ -1,27 +1,27 @@
-import { carrySpeedScale, weaponOf, type WeaponId } from '../domain/item/weapons'
-import { isGun, isTwoHanded, type HeldId } from '../domain/item/held'
-import { fallDamage } from '../domain/rule/damage'
+import { carrySpeedScale, weaponOf, type WeaponId } from '../../domain/item/weapons'
+import { isGun, isTwoHanded, type HeldId } from '../../domain/item/held'
+import { fallDamage } from '../../domain/rule/damage'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
-import type { Locomotion } from '../domain/locomotion'
-import { loadSoldier } from './assets'
-import { isMesh } from './guards'
-import { damp, dampAngle } from './math'
-import { stepMovement, type Mover } from '../sim/movement'
+import type { Locomotion } from '../../domain/player/locomotion'
+import { loadSoldier } from '../assets'
+import { isMesh } from '../util/guards'
+import { damp, dampAngle } from '../util/math'
+import { stepMovement, type Mover } from '../../sim/movement'
 import {
   resolveLocomotion,
   STAIR_DROP_MAX,
   STAIR_DROP_MIN,
   STAIR_HOLD,
   STAIR_RISE_MIN,
-} from '../domain/rule/stance'
+} from '../../domain/rule/stance'
 import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
-import { Footsteps, type Step } from '../domain/rule/footsteps'
-import { MAX_HEALTH } from '../domain/rule/damage'
-import { Weapon } from './weapon'
-import type { PlayerSnapshot } from '../net/types'
-import type { WeaponTarget } from './weapon'
+import { Footsteps, type Step } from '../../domain/rule/footsteps'
+import { MAX_HEALTH } from '../../domain/rule/damage'
+import { Weapon } from '../arms/weapon'
+import type { PlayerSnapshot } from '../../net/types'
+import type { WeaponTarget } from '../arms/weapon'
 
 /** カプセルの円柱部分の長さ (m)。全高 = LENGTH + RADIUS * 2 */
 const CAPSULE_LENGTH = 1.1

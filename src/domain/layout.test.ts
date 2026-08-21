@@ -23,6 +23,18 @@ function sourcesOf(dir: string): string[] {
 }
 
 describe('置き場所', () => {
+  /**
+   * **直下に .ts を置かない。** 語彙は entity ごとの棚 (player/ match/ item/
+   * stage/ rule/) に入れる。直下に積むと、20 個並んだところで「これは人の話か
+   * 試合の話か」を名前から読むしかなくなる。試験だけは例外 (棚をまたいで見る)。
+   */
+  test('語彙は棚に入っている', () => {
+    const loose = readdirSync(DOMAIN).filter(
+      (n) => n.endsWith('.ts') && !n.endsWith('.test.ts'),
+    )
+    expect(loose).toEqual([])
+  })
+
   test('domain は sim を知らない', () => {
     const guilty = sourcesOf(DOMAIN).filter((n) =>
       /from\s+['"][^'"]*\/sim\//.test(readFileSync(n, 'utf8')),

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { MODES, ROOM_MODE, isFriendly, isHostile, modeOf } from './room'
-import { newPlayer, type Player } from './player'
+import { newPlayer, type Player } from '../player/player'
 
 /** 試験用の人。id と陣営だけあればよい */
 const who = (id: string, team: 'blue' | 'red'): Player =>

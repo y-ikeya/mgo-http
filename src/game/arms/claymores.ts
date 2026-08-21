@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { loadClaymore } from './assets'
+import { loadClaymore } from '../assets'
 
 /**
  * 置かれたクレイモア。

@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 
-import { loadGrenade } from './assets'
-import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../sim/ballistic'
-import type { StageBox } from '../sim/vision'
+import { loadGrenade } from '../assets'
+import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../../sim/ballistic'
+import type { StageBox } from '../../sim/vision'
 
 /**
  * 手榴弾。

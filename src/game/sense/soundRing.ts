@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { damp } from './math'
+import { damp } from '../util/math'
 import { Line2 } from 'three/examples/jsm/lines/webgpu/Line2.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import { Line2NodeMaterial } from 'three/webgpu'

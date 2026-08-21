@@ -1,7 +1,7 @@
 import { onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../i18n'
 import { asset } from '../game/assets'
-import type { GpuVerdict } from '../game/gpu'
+import type { GpuVerdict } from '../game/util/gpu'
 import './GpuBlocked.css'
 
 /**

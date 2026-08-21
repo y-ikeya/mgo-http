@@ -1,4 +1,4 @@
-import { serverHttpUrl } from './index'
+import { serverHttpUrl } from '.'
 import type { RoomSummary } from './types'
 
 /**

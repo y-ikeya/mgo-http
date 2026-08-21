@@ -1,4 +1,4 @@
-import { RESPAWN_DELAY } from './rule/damage'
+import { RESPAWN_DELAY } from '../rule/damage'
 
 /**
  * プレイヤーが今どういう状態に居るか。

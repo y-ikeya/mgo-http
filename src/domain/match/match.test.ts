@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { assignTeam, leaderOf, loseTicket, newMatch, type Match } from './match'
-import { newPlayer } from './player'
+import { newPlayer } from '../player/player'
 
 function room(mode: 'DM' | 'TDM'): Match {
   const match = newMatch(mode)

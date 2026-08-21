@@ -114,7 +114,7 @@ UI は**読めれば通す**。読めないもの (弾数が 0 に見える、�
 部屋は最初から 5 つ置いてある (alpha〜echo、定員 8 = 4 対 4)。**部屋ごとにルールを
 固定する**。部屋を立てるときに選ぶ形にはしない。
 
-割り当ては [src/domain/room.ts](../src/domain/room.ts) の 1 か所。
+割り当ては [src/domain/match/room.ts](../src/domain/match/room.ts) の 1 か所。
 
 | 部屋 | ルール | 状態 |
 |---|---|---|
@@ -516,6 +516,23 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
     src/net/      通信の形 (protocol)
     src/game/     描画と入力 (three を持つのはここだけ)
     src/ui/       HUD と画面 (Solid)
+
+**それぞれの中も、平らに積まない。** src/game は 1 ファイル 1 機能で 28 個並んで
+いて、名前を全部覚えていないと目的の物に辿り着けなかった。**画面に映る物の名前**
+で棚に分ける。
+
+    src/game/Game.ts    まとめ役。毎フレームここから降りていく
+    src/game/input.ts   パッドとキーボード
+    src/game/assets.ts  モデルの読み込み (棚をまたいで共有する)
+      actor/    人 — 自機・他人・モーション・当たり判定・ダンボール
+      arms/     武器と投げた物 — 銃・弾道・手榴弾・クレイモア・落ちている銃
+      fx/       見た目だけの物 — 爆発・排莢・着弾痕
+      sense/    知覚 — カメラ・音・音の輪
+      world/    ステージ
+      util/     three と数の小物
+
+domain 側の棚 (player / match / item / stage / rule) は
+[src/domain/README.md](../src/domain/README.md) にある。
 
 境界に迷ったときの問い: **これは MGO2 の説明書に書いてあることか。** 「拳銃は
 12 発」は書いてある (domain)。「弾が地形に当たったら跳ねる」は書いていない (sim)。

@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import * as THREE from 'three'
-import type { BoxTuning } from '../game/box'
+import type { BoxTuning } from '../game/actor/box'
 import type { GameStats } from '../game/Game'
 import type { InputDevice } from '../game/input'
 import './Calibrator.css'

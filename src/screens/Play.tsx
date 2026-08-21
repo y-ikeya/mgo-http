@@ -4,7 +4,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import type * as THREE from 'three'
 import { Game, type GameStats } from '../game/Game'
 import type { Identity } from '../auth/session'
-import type { WeaponTarget } from '../game/weapon'
+import type { WeaponTarget } from '../game/arms/weapon'
 import type { SupportId, WeaponId } from '../domain/item/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
@@ -88,7 +88,7 @@ export default function Play(props: { identity: Identity }) {
       </Show>
 
       {/*
-        装備。支度をしている間 (domain/lifecycle.ts の choosing) だけ出す。
+        装備。支度をしている間 (domain/player/lifecycle.ts の choosing) だけ出す。
         入った直後と、倒れて次に湧くまでがそこにあたる。
       */}
       <Show when={stats()?.loadoutOpen}>
