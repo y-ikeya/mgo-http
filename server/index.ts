@@ -320,8 +320,32 @@ interface Client {
 }
 
 
+/**
+ * 部屋の世界。**試合 (Match) と、そこに在る物。**
+ *
+ * 語彙では「Match = 試合 = 部屋 1 つ」なのに、実装では手榴弾もクレイモアも
+ * 落ちている武器も**モジュール全域の配列**に置いてあり、要素が
+ * `room: RoomName` を持って自分がどの部屋の物かを申告していた。そのせいで
+ *
+ *   - 部屋の名前を 21 本の関数に引き回すことになり
+ *   - 物を触るたびに「この部屋の物か」を確かめる行が要り
+ *   - 部屋を畳んでも中身が残った (落ちた武器は拾われる以外に消える道が無い)
+ *
+ * 部屋が持てば全部消える。**Match に足せないのは domain が sim を知らない
+ * ため** (手榴弾は Projectile を持つ)。だからサーバー側で包む。
+ */
+interface RoomWorld extends Match {
+  /** 部屋の名前。配る相手を引くのに要る */
+  name: RoomName
+  /** 飛んでいる手榴弾 */
+  grenades: Grenade[]
+  /** 置かれたクレイモア */
+  claymores: Claymore[]
+  /** 落ちている武器 */
+  dropped: Dropped[]
+}
 
-const rooms = new Map<RoomName, Match>()
+const rooms = new Map<RoomName, RoomWorld>()
 
 /**
  * 投げた物・置いた物の持ち主から見て敵か。
@@ -344,10 +368,10 @@ function friendlyTeam(room: Match, viewer: Player, owner: Team): boolean {
 /** 1 部屋の上限。4 対 4 */
 const ROOM_CAPACITY = 8
 
-function roomOf(name: RoomName): Match {
+function roomOf(name: RoomName): RoomWorld {
   let room = rooms.get(name)
   if (!room) {
-    room = newMatch(ROOM_MODE[name])
+    room = { ...newMatch(ROOM_MODE[name]), name, grenades: [], claymores: [], dropped: [] }
     if (room.mode.id === 'PRACTICE') placeTargets(room)
     rooms.set(name, room)
   }
@@ -402,17 +426,17 @@ function placeTargets(room: Match): void {
  * 自分で配る。遮蔽の判定は人と同じ道 (relayState) を通すので、壁の裏の的は
  * 見えない。
  */
-function updateTargets(roomName: RoomName, room: Match, now: number): void {
+function updateTargets(room: RoomWorld, now: number): void {
   for (const bot of room.players.values()) {
     if (!bot.bot) continue
     if (bot.life === 'downed' && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
       reviveBot(bot, now)
-      broadcast(roomName, { type: 'life', id: bot.id, state: 'alive' })
-      broadcast(roomName, { type: 'respawn', id: bot.id })
-      broadcast(roomName, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
+      broadcast(room, { type: 'life', id: bot.id, state: 'alive' })
+      broadcast(room, { type: 'respawn', id: bot.id })
+      broadcast(room, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
     }
     recordPose(bot)
-    relayState(roomName, bot, targetPayload(bot, now))
+    relayState(room, bot, targetPayload(bot, now))
   }
 }
 
@@ -512,11 +536,9 @@ function matchState(room: Match): ServerMessage {
 }
 
 /** 全員を湧き地点へ戻して立たせる。段階が変わるたびに呼ぶ */
-function resetPlayers(roomName: RoomName, room: Match): void {
+function resetPlayers(room: RoomWorld): void {
   // 前の試合の手榴弾が残っていると、始まった直後に爆発する
-  for (let i = grenades.length - 1; i >= 0; i--) {
-    if (grenades[i].room === roomName) grenades.splice(i, 1)
-  }
+  room.grenades.length = 0
   for (const player of connected(room)) {
     player.kills = 0
     player.deaths = 0
@@ -528,10 +550,10 @@ function resetPlayers(roomName: RoomName, room: Match): void {
     player.killsByWeapon = {}
     // 仕切り直しは支度から。いきなり湧かせない —
     // 前の試合の装備のまま次が始まるのは、選ぶ場面を 1 回飛ばすのと同じ
-    setLife(roomName, player, 'choosing')
+    setLife(room, player, 'choosing')
     player.health = MAX_HEALTH
     player.concentratingSince = 0
-    sendHealth(roomName, player, 0, false)
+    sendHealth(room, player, 0, false)
   }
 }
 
@@ -541,11 +563,11 @@ function resetPlayers(roomName: RoomName, room: Match): void {
  * 支度からしか呼ばない。倒れた直後にここへ跳ぶと装備が配り直されない
  * (setLife が通してくれないので、書き間違えても状態が壊れることはない)。
  */
-function spawn(roomName: RoomName, player: Player, now = Date.now()): void {
+function spawn(room: RoomWorld, player: Player, now = Date.now()): void {
   refill(player)
-  setLife(roomName, player, 'spawning', now)
-  broadcast(roomName, { type: 'respawn', id: player.id })
-  sendHealth(roomName, player, 0, false)
+  setLife(room, player, 'spawning', now)
+  broadcast(room, { type: 'respawn', id: player.id })
+  sendHealth(room, player, 0, false)
 }
 
 /**
@@ -553,15 +575,13 @@ function spawn(roomName: RoomName, player: Player, now = Date.now()): void {
  *
  * 名乗った id ではなく接続の player を受ける。他人を追い出せてしまうので。
  */
-function leaveRoom(roomName: RoomName, player: Player): void {
-  const room = rooms.get(roomName)
-  if (!room) return
+function leaveRoom(room: RoomWorld, player: Player): void {
   // 走っている試合を捨てて出た。抜けたことごと残す
-  if (room.phase === 'playing') recordSeat(roomName, room, player, true)
+  if (room.phase === 'playing') recordSeat(room, player, true)
   room.players.delete(player.id)
   sessions.delete(player.id)
   // 本人はもう聞いていない。残った人に消してもらう
-  broadcast(roomName, { type: 'leave', id: player.id })
+  broadcast(room, { type: 'leave', id: player.id })
 }
 
 /**
@@ -571,11 +591,11 @@ function leaveRoom(roomName: RoomName, player: Player): void {
  * 居ないので、席を畳む側からもここを呼ぶ。関数は冪等なので、同じ人を
  * 二度書いても増えない。
  */
-function recordSeat(roomName: RoomName, room: Match, player: Player, leftEarly: boolean): void {
+function recordSeat(room: RoomWorld, player: Player, leftEarly: boolean): void {
   if (!room.matchId) return
   recordPlayer({
     matchId: room.matchId,
-    room: roomName,
+    room: room.name,
     startedAt: room.startedAt,
     // 発行元での識別子。認証を通しているので player.id がそれになっている
     subject: player.id,
@@ -596,19 +616,17 @@ function recordSeat(roomName: RoomName, room: Match, player: Player, leftEarly: 
  *
  * 途中で抜けた人は既に書かれている (recordSeat) ので、ここには出てこない。
  */
-function finishMatch(roomName: RoomName, room: Match): void {
+function finishMatch(room: RoomWorld): void {
   if (!room.matchId) return
   for (const player of room.players.values()) {
     // 接続が切れているだけの人も含める。席は残っているので、まだ抜けてはいない
-    recordSeat(roomName, room, player, false)
+    recordSeat(room, player, false)
   }
-  closeMatch(room.matchId, roomName, room.startedAt, room.winner ?? 'draw')
+  closeMatch(room.matchId, room.name, room.startedAt, room.winner ?? 'draw')
 }
 
 /** 部屋の全員へ。except を渡すとその 1 人を除く */
-function broadcast(roomName: RoomName, message: ServerMessage, except?: string): void {
-  const room = rooms.get(roomName)
-  if (!room) return
+function broadcast(room: RoomWorld, message: ServerMessage, except?: string): void {
   const payload = JSON.stringify(message)
   for (const player of connected(room)) {
     if (player.id !== except) sessionOf(player).socket.send(payload)
@@ -636,7 +654,7 @@ const WARP_GRACE = 1000
  */
 const arenaHalf = arenaHalfOf(solidBoxes)
 
-function receiveSnapshot(roomName: RoomName, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
+function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
     raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -721,14 +739,14 @@ function receiveSnapshot(roomName: RoomName, player: Player, raw: ArrayBuffer | 
   // 振りかぶって持っているか。倒された瞬間に足元へ落とすのに要る
   player.holdingGrenade = snapshot.holdingGrenade
   // 位置が届いた。どこに居るか分かったので支度に進める
-  if (player.life === 'joining') setLife(roomName, player, 'choosing')
+  if (player.life === 'joining') setLife(room, player, 'choosing')
   recordPose(player)
 
   // 足音は位置が動いた分から出す。見えない相手にも音だけは届ける。
   // 戦場に居ないうち (支度中) は鳴らさない — 湧き地点で選んでいるだけなので
   if (onBattlefield(player.life)) {
     const step = player.footsteps.update(player.x, player.z, player.locomotion, true)
-    if (step) emitNoise(roomName, player, { kind: 'step', ...step })
+    if (step) emitNoise(room, player, { kind: 'step', ...step })
   }
 
   const now = Date.now()
@@ -741,7 +759,7 @@ function receiveSnapshot(roomName: RoomName, player: Player, raw: ArrayBuffer | 
   // 切れたときに配り直せるよう、写しを取っておく。
   // bytes は受信バッファなので、持ち回すなら複製が要る
   sessionOf(player).lastPayload = new Uint8Array(bytes)
-  relayState(roomName, player, bytes)
+  relayState(room, player, bytes)
 }
 
 /**
@@ -782,7 +800,6 @@ function visibleHead(player: Player, now: number): number {
  */
 interface Grenade {
   id: number
-  room: RoomName
   owner: string
   team: Team
   body: Projectile
@@ -790,7 +807,6 @@ interface Grenade {
   fuse: number
 }
 
-const grenades: Grenade[] = []
 
 /**
  * 置かれたクレイモア。
@@ -801,12 +817,10 @@ const grenades: Grenade[] = []
  */
 interface Claymore extends Placed {
   id: number
-  room: RoomName
   owner: string
   team: Team
 }
 
-const claymores: Claymore[] = []
 let nextClaymoreId = 1
 
 /**
@@ -816,7 +830,7 @@ let nextClaymoreId = 1
  * (sim/claymore.ts の canPlaceAt)。高さは地面に乗せる — 足元の y をそのまま
  * 使うと、段差の上に置いたときに床へ沈む。
  */
-function placeClaymore(roomName: RoomName, from: Player): void {
+function placeClaymore(room: RoomWorld, from: Player): void {
   // **手にある物で決める。** 装備の選択 (support) で見ていたので、落ちている
   // クレイモアを拾って持ち替えた人が置けなかった
   if (!canAct(from.life) || from.held !== 'claymore' || from.grenades <= 0) return
@@ -833,7 +847,6 @@ function placeClaymore(roomName: RoomName, from: Player): void {
   from.grenades--
   const claymore: Claymore = {
     id: nextClaymoreId++,
-    room: roomName,
     owner: from.id,
     team: from.team,
     x,
@@ -843,7 +856,7 @@ function placeClaymore(roomName: RoomName, from: Player): void {
     // 置いた本人と同じ向き。自分が来た方を向く形になる
     yaw: from.yaw,
   }
-  claymores.push(claymore)
+  room.claymores.push(claymore)
 
   // ここでは配らない。**見えている人にだけ**、tick が配る (relayClaymores)
 }
@@ -857,11 +870,9 @@ function placeClaymore(roomName: RoomName, from: Player): void {
  *
  * 本体は 26cm しかないので、体のように 3 点で見ずに 1 点で見る。
  */
-function relayClaymores(roomName: RoomName, room: Match): void {
+function relayClaymores(room: RoomWorld): void {
   for (const viewer of connected(room)) {
-    for (const claymore of claymores) {
-      if (claymore.room !== roomName) continue
-
+    for (const claymore of room.claymores) {
       // 味方の物は無条件。どこに置いたか分からないと自分が引っ掛かる
       let visible = friendlyTeam(room, viewer, claymore.team)
       if (!visible && stageBoxes.length > 0) {
@@ -910,29 +921,26 @@ function relayClaymores(roomName: RoomName, room: Match): void {
  * 見つけて壊せることが、置く側への答えになる — 通り道を塞がれたら、
  * 迂回するか壊すかを選べる。
  */
-function shotHitsClaymore(roomName: RoomName, from: readonly number[], to: readonly number[]): void {
-  for (let i = claymores.length - 1; i >= 0; i--) {
-    const claymore = claymores[i]
-    if (claymore.room !== roomName) continue
+function shotHitsClaymore(room: RoomWorld, from: readonly number[], to: readonly number[]): void {
+  for (let i = room.claymores.length - 1; i >= 0; i--) {
+    const claymore = room.claymores[i]
     const box: StageBox = {
       name: 'claymore',
       min: [claymore.x - SHOT_HALF, claymore.y, claymore.z - SHOT_HALF],
       max: [claymore.x + SHOT_HALF, claymore.y + SHOT_TOP, claymore.z + SHOT_HALF],
     }
     if (!segmentHitsBox(from[0], from[1], from[2], to[0], to[1], to[2], box)) continue
-    detonateClaymore(claymore)
-    claymores.splice(i, 1)
+    detonateClaymore(room, claymore)
+    room.claymores.splice(i, 1)
   }
 }
 
 /** 起爆。前に居た敵だけを巻き込む */
-function detonateClaymore(claymore: Claymore): void {
-  const room = rooms.get(claymore.room)
+function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
   // 起爆は隠さない。音も光も壁を回り込んで届く (手榴弾と同じ規則)
-  broadcast(claymore.room, { type: 'claymoreGone', id: claymore.id, blast: true })
-  const here = rooms.get(claymore.room)
-  if (here) for (const viewer of connected(here)) sessionOf(viewer).seenClaymores.delete(claymore.id)
-  if (!room || room.phase !== 'playing') return
+  broadcast(room, { type: 'claymoreGone', id: claymore.id, blast: true })
+  for (const viewer of connected(room)) sessionOf(viewer).seenClaymores.delete(claymore.id)
+  if (room.phase !== 'playing') return
 
   for (const victim of present(room)) {
     if (!canBeHurt(victim.life)) continue
@@ -943,7 +951,7 @@ function detonateClaymore(claymore: Claymore): void {
     const hit = blastFrom(claymore, victim)
     if (hit.damage <= 0) continue
     applyBlastDamage(
-      claymore.room, room, victim, hit.damage,
+      room, victim, hit.damage,
       claymore.x, claymore.z, claymore.owner, 'claymore', hit.knock,
     )
   }
@@ -959,7 +967,6 @@ function detonateClaymore(claymore: Claymore): void {
  */
 interface Dropped {
   id: number
-  room: RoomName
   weapon: HeldId
   ammo: number
   reserve: number
@@ -970,7 +977,6 @@ interface Dropped {
   yaw: number
 }
 
-const dropped: Dropped[] = []
 let droppedId = 0
 
 /**
@@ -1025,10 +1031,8 @@ const RELEASE_FORWARD = 0.45
  * 手榴弾 3 / クレイモア 2 という差もそこに書いてある。
  */
 
-function throwGrenade(roomName: RoomName, from: Player, event: ClientMessage): void {
+function throwGrenade(room: RoomWorld, from: Player, event: ClientMessage): void {
   if (event.type !== 'grenade') return
-  const room = rooms.get(roomName)
-  if (!room) return
   if (!canAct(from.life) || from.grenades <= 0) return
 
   // 向きは信じる (どこを向いているかは本人にしか分からない) が、
@@ -1042,7 +1046,7 @@ function throwGrenade(roomName: RoomName, from: Player, event: ClientMessage): v
 
   from.grenades--
   // 投げた時点で無敵は切れる。守られたまま攻撃はできない
-  if (from.life === 'spawning') setLife(roomName, from, 'alive')
+  if (from.life === 'spawning') setLife(room, from, 'alive')
   const id = ++grenadeId
   // 前へ出す量は水平方向だけで測る (上下を向いても手の位置が動かないように)
   const flat = Math.hypot(v.x, v.z) || 1
@@ -1056,13 +1060,13 @@ function throwGrenade(roomName: RoomName, from: Player, event: ClientMessage): v
     bounces: 0,
     resting: false,
   }
-  grenades.push({ id, room: roomName, owner: from.id, team: from.team, body, fuse: FUSE })
+  room.grenades.push({ id, owner: from.id, team: from.team, body, fuse: FUSE })
 
   // 初速だけ配る。受け取った側が同じ物理を解いて同じ軌道を描く。
   //
   // 弾倉の囮と違って、**全員に見せる**。落ちてきたのに気付けないと、
   // 逃げるという手が最初から無い。避けられるからこそ投げる場所に意味が出る。
-  broadcast(roomName, {
+  broadcast(room, {
     type: 'grenade',
     id,
     from: [body.x, body.y, body.z],
@@ -1080,7 +1084,7 @@ function throwGrenade(roomName: RoomName, from: Player, event: ClientMessage): v
  *
  * 投げるときと同じ経路に乗せるので、見た目も音も爆風も全部そのまま働く。
  */
-function dropGrenade(roomName: RoomName, from: Player): void {
+function dropGrenade(room: RoomWorld, from: Player): void {
   // **振りかぶっている手榴弾だけ。** 手にしているだけなら落ちないし、
   // クレイモアを構えていた人の足元に手榴弾が湧いても困る
   if (!from.holdingGrenade || from.held !== 'grenade' || from.grenades <= 0) return
@@ -1099,8 +1103,8 @@ function dropGrenade(roomName: RoomName, from: Player): void {
     bounces: 0,
     resting: false,
   }
-  grenades.push({ id, room: roomName, owner: from.id, team: from.team, body, fuse: FUSE })
-  broadcast(roomName, {
+  room.grenades.push({ id, owner: from.id, team: from.team, body, fuse: FUSE })
+  broadcast(room, {
     type: 'grenade',
     id,
     from: [body.x, body.y, body.z],
@@ -1110,13 +1114,11 @@ function dropGrenade(roomName: RoomName, from: Player): void {
 }
 
 /** 爆発させる。届いた相手を削って、近ければ吹き飛ばす */
-function detonate(nade: Grenade): void {
-  const room = rooms.get(nade.room)
-  if (!room) return
+function detonate(room: RoomWorld, nade: Grenade): void {
   const { x, y, z } = nade.body
 
   // 爆発の位置は隠さない。音も光も壁を回り込んで届くので、伏せる意味が無い
-  broadcast(nade.room, { type: 'explosion', id: nade.id, at: [x, y, z] })
+  broadcast(room, { type: 'explosion', id: nade.id, at: [x, y, z] })
 
   // 削るのは試合中だけ。支度の間や結果を読んでいる間に得点が動くと、
   // 何が起きたのか分からなくなる (銃と同じ規則)。
@@ -1133,7 +1135,7 @@ function detonate(nade: Grenade): void {
     const result = blastAt(x, y, z, victim, stageBoxes)
     if (!result) continue
 
-    applyBlastDamage(nade.room, room, victim, result.damage, x, z, nade.owner, 'grenade', result.knock)
+    applyBlastDamage(room, victim, result.damage, x, z, nade.owner, 'grenade', result.knock)
   }
 }
 
@@ -1160,8 +1162,7 @@ const MAX_FALL_SPEED = 25
 const KILL_LABEL = { grenade: 'grenade', claymore: 'CLAYMORE', fall: '落下' } as const
 
 function applyBlastDamage(
-  roomName: RoomName,
-  room: Match,
+  room: RoomWorld,
   victim: Player,
   amount: number,
   fromX: number,
@@ -1178,12 +1179,12 @@ function applyBlastDamage(
   const bearing = Math.atan2(fromX - victim.x, -(fromZ - victim.z))
 
   if (victim.health > 0) {
-    sendHealth(roomName, victim, amount, false, bearing)
+    sendHealth(room, victim, amount, false, bearing)
     // **的にも爆風は当たる。** 送り先が無いなら送らないだけ
     if (knock && isSeated(victim.life)) {
       sessionFor(victim)?.socket.send(JSON.stringify({ type: 'knockdown' }))
       // 振りかぶったまま転んだら手を離す。**ピンは抜けている**ので、そのまま爆ぜる
-      dropGrenade(roomName, victim)
+      dropGrenade(room, victim)
     }
     return
   }
@@ -1194,9 +1195,9 @@ function applyBlastDamage(
   const killer = room.players.get(ownerId)
   // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる
   victim.killedBy = killer && killer.id !== victim.id ? killer.id : ''
-  setLife(roomName, victim, 'downed')
+  setLife(room, victim, 'downed')
   // 握っていたものは足元に落ちる。誘爆する
-  dropGrenade(roomName, victim)
+  dropGrenade(room, victim)
   if (killer && killer.id !== victim.id) {
     killer.kills++
     killer.killsByWeapon[weapon] = (killer.killsByWeapon[weapon] ?? 0) + 1
@@ -1208,9 +1209,9 @@ function applyBlastDamage(
   }
   // 死因を問わず、倒された側の残機が 1 減る。**削り合わない部屋では動かさない**
   if (room.mode.tickets) loseTicket(room, victim.team)
-  sendHealth(roomName, victim, amount, false, bearing)
-  broadcast(roomName, matchState(room))
-  broadcast(roomName, {
+  sendHealth(room, victim, amount, false, bearing)
+  broadcast(room, matchState(room))
+  broadcast(room, {
     type: 'kill',
     killer: killer?.id ?? victim.id,
     killerName: killer?.name ?? victim.name,
@@ -1232,12 +1233,10 @@ function applyBlastDamage(
  * 位置は入れない。方向と距離だけ渡す — それが耳で分かることの全部だから。
  */
 function emitNoise(
-  roomName: RoomName,
+  room: RoomWorld,
   from: Player,
   noise: { kind: 'step' | 'shot'; volume?: number; range?: number },
 ): void {
-  const room = rooms.get(roomName)
-  if (!room) return
 
   const reach =
     noise.kind === 'shot' ? SHOT_RANGE : STEP_RANGE * (noise.range ?? 1)
@@ -1285,9 +1284,7 @@ function emitNoise(
 /**
  * 発砲を配る。見えている相手には曳光ごと、見えない相手には音だけ。
  */
-function relayShot(roomName: RoomName, from: Player, message: ServerMessage): void {
-  const room = rooms.get(roomName)
-  if (!room) return
+function relayShot(room: RoomWorld, from: Player, message: ServerMessage): void {
   const payload = JSON.stringify(message)
   const head = headHeight(from.crouching, from.boxed)
 
@@ -1305,7 +1302,7 @@ function relayShot(roomName: RoomName, from: Player, message: ServerMessage): vo
   }
 
   // 見えない相手には音として届ける
-  emitNoise(roomName, from, { kind: 'shot' })
+  emitNoise(room, from, { kind: 'shot' })
 }
 
 /**
@@ -1384,20 +1381,18 @@ function viewOf(player: Player): { x: number; y: number; z: number } {
  * 変わったことは全員へ知らせる。知らせないと、受け取る側がまた
  * 「位置が来ないから倒れたのだろう」と推し量ることになる。
  */
-function setLife(roomName: RoomName, player: Player, next: Life, now = Date.now()): void {
+function setLife(room: RoomWorld, player: Player, next: Life, now = Date.now()): void {
   const before = player.life
   if (!enterLife(player, next, now)) {
     if (before !== next) console.warn(`[状態] ${player.name}: ${before} → ${next} は通れない`)
     return
   }
-  broadcast(roomName, { type: 'life', id: player.id, state: next })
+  broadcast(room, { type: 'life', id: player.id, state: next })
 }
 
 
 
-function relayState(roomName: RoomName, from: Player, payload: Uint8Array): void {
-  const room = rooms.get(roomName)
-  if (!room) return
+function relayState(room: RoomWorld, from: Player, payload: Uint8Array): void {
 
   const now = Date.now()
   const head = visibleHead(from, now)
@@ -1461,7 +1456,7 @@ function relayState(roomName: RoomName, from: Player, payload: Uint8Array): void
 }
 
 function sendHealth(
-  roomName: RoomName,
+  room: RoomWorld,
   player: Player,
   damage: number,
   flinch: boolean,
@@ -1490,7 +1485,7 @@ function sendHealth(
 
   // 他の人に要るのは、誰がどれだけ削られたかまで。倒れた表現に使う
   broadcast(
-    roomName,
+    room,
     { type: 'health', id: player.id, health: player.health, damage, flinch },
     player.id,
   )
@@ -1532,13 +1527,12 @@ function reject(attacker: Player, reason: string): void {
   console.warn(`[却下] ${attacker.name}: ${reason}`)
 }
 
-function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage): void {
+function applyDamage(room: RoomWorld, attacker: Player, event: ClientMessage): void {
   if (event.type !== 'damage') return
-  const room = rooms.get(roomName)
-  const victim = room?.players.get(event.target)
-  if (!room || !victim || !canBeHurt(victim.life)) return
+  const victim = room.players.get(event.target)
+  if (!victim || !canBeHurt(victim.life)) return
   // 撃った時点で自分の無敵は切れる。盾にしたまま撃たせない
-  if (attacker.life === 'spawning') setLife(roomName, attacker, 'alive')
+  if (attacker.life === 'spawning') setLife(room, attacker, 'alive')
   // 湧いた直後の相手には当たらない
   if (isProtected(victim)) return
   // 撃てる相手か。**陣営ではなくルールに聞く** — DM では同じ色でも敵で、
@@ -1597,9 +1591,9 @@ function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage)
     const flinch = event.kind === 'bullet' && event.zone === 'HEAD'
     // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。
     // 遠くから頭を撃たれた人が、そのまま何事もなく投げ切るのはおかしい
-    if (flinch) dropGrenade(roomName, victim)
+    if (flinch) dropGrenade(room, victim)
     sendHealth(
-      roomName,
+      room,
       victim,
       amount,
       flinch,
@@ -1612,7 +1606,7 @@ function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage)
   victim.killedBy = attacker.id
   // 切れている間に倒された。戻ってきても続きは無い — 死んだので支度から
   victim.wasAlive = false
-  setLife(roomName, victim, 'downed')
+  setLife(room, victim, 'downed')
   victim.deaths++
 
   // 記録に残す分。**表示名ではなく安定した id で数える**
@@ -1625,13 +1619,13 @@ function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage)
   attacker.killsByWeapon[by] = (attacker.killsByWeapon[by] ?? 0) + 1
   // 振りかぶったまま倒されたら、足元に落ちて爆ぜる。
   // 撃った側にとっては「今撃つと道連れになる」という読みになる
-  dropGrenade(roomName, victim)
+  dropGrenade(room, victim)
   attacker.kills++
   // 減るのは倒された側の残機だけ。倒した側には何も入らない
   if (room.mode.tickets) loseTicket(room, victim.team)
-  sendHealth(roomName, victim, amount, false, bearingTo(victim, attacker))
-  broadcast(roomName, matchState(room))
-  broadcast(roomName, {
+  sendHealth(room, victim, amount, false, bearingTo(victim, attacker))
+  broadcast(room, matchState(room))
+  broadcast(room, {
     type: 'kill',
     killer: attacker.id,
     killerName: attacker.name,
@@ -1654,7 +1648,7 @@ function applyDamage(roomName: RoomName, attacker: Player, event: ClientMessage)
  * 時間切れで決着、しばらく結果を見せてから次の試合を始める。
  * クライアント側で時計を回すと、タブが裏に回ったぶんだけずれるのでサーバーが持つ。
  */
-function updateMatch(roomName: RoomName, room: Match, now: number): void {
+function updateMatch(room: RoomWorld, now: number): void {
   const seats = holdingSeats(room, now)
   /*
    * 勝敗の無い部屋 (休憩・練習)。**相手を待たないし、終わらない。**
@@ -1674,7 +1668,7 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
     // ここでやることは「終わらせないこと」だけ
     if (now - room.lastBroadcast >= MATCH_BROADCAST) {
       room.lastBroadcast = now
-      broadcast(roomName, matchState(room))
+      broadcast(room, matchState(room))
     }
     return
   }
@@ -1701,7 +1695,7 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
       room.blue = TICKETS
       room.red = TICKETS
       room.winner = undefined
-      resetPlayers(roomName, room)
+      resetPlayers(room)
     } else {
       room.phase = 'waiting'
       room.endsAt = 0
@@ -1719,7 +1713,7 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
       room.phase = 'over'
       room.winner = survivor
       room.endsAt = now + INTERMISSION
-      finishMatch(roomName, room)
+      finishMatch(room)
     } else {
       room.phase = 'waiting'
       room.endsAt = 0
@@ -1731,7 +1725,7 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
     room.blue = TICKETS
     room.red = TICKETS
     room.winner = undefined
-    resetPlayers(roomName, room)
+    resetPlayers(room)
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION
@@ -1741,26 +1735,26 @@ function updateMatch(roomName: RoomName, room: Match, now: number): void {
     // 支度がまだ済んでいない人はここで押し出す。始まっているのに
     // 装備画面の裏で立ち尽くす人が出ないように
     for (const player of connected(room)) {
-      if (player.life === 'choosing') spawn(roomName, player, now)
+      if (player.life === 'choosing') spawn(room, player, now)
     }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     room.phase = 'over'
     room.winner = decideWinner(room)
     room.endsAt = now + INTERMISSION
-    finishMatch(roomName, room)
+    finishMatch(room)
   } else if (room.phase === 'playing' && now >= room.endsAt) {
     // 時間切れ。陣営戦は多く残っているほう、個人戦は倒した数が一番多い人
     room.phase = 'over'
     room.winner = decideWinner(room)
     room.endsAt = now + INTERMISSION
-    finishMatch(roomName, room)
+    finishMatch(room)
   }
 
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
   if (previous !== room.phase || now - room.lastBroadcast >= MATCH_BROADCAST) {
     room.lastBroadcast = now
-    broadcast(roomName, matchState(room))
+    broadcast(room, matchState(room))
   }
 }
 
@@ -1797,7 +1791,7 @@ const LIMBO_MS = 100
 setInterval(() => {
   try {
     const now = Date.now()
-    for (const [roomName, room] of rooms) {
+    for (const room of rooms.values()) {
       // 切れた人の体をその場に残す。
       //
       // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
@@ -1817,7 +1811,7 @@ setInterval(() => {
           const view = new DataView(last.buffer, last.byteOffset, last.byteLength)
           stampLocomotion(view, 'away')
           stampProtected(view, false)
-          relayState(roomName, player, last)
+          relayState(room, player, last)
         }
       }
 
@@ -1825,23 +1819,25 @@ setInterval(() => {
       for (const player of room.players.values()) {
         if (player.life === 'dropped' && lifeElapsed(player, now) >= RECONNECT_GRACE) {
           // 待ち切っても戻らなかった。走っている試合を置いて消えたのと同じ
-          if (room.phase === 'playing') recordSeat(roomName, room, player, true)
+          if (room.phase === 'playing') recordSeat(room, player, true)
           room.players.delete(player.id)
           sessions.delete(player.id)
           // ここで初めて消してもらう。切れた時点では配らない —
           // 配ると受け取った側が実体を捨ててしまい、そのあと届く体を
           // 新品として作り直して状態を見失う
-          broadcast(roomName, { type: 'leave', id: player.id })
+          broadcast(room, { type: 'leave', id: player.id })
         }
       }
       if (room.players.size === 0) {
-        rooms.delete(roomName)
+        // **部屋ごと畳む。** 中に在った物 (手榴弾・クレイモア・落ちている武器) も
+        // 一緒に消える。持ち主が部屋なので、掃除を書き忘れようがない
+        rooms.delete(room.name)
         continue
       }
 
-      updateMatch(roomName, room, now)
-      if (room.mode.id === 'PRACTICE') updateTargets(roomName, room, now)
-      relayClaymores(roomName, room)
+      updateMatch(room, now)
+      if (room.mode.id === 'PRACTICE') updateTargets(room, now)
+      relayClaymores(room)
       for (const player of connected(room)) {
         // --- 時間で進む遷移 ---
         //
@@ -1852,16 +1848,16 @@ setInterval(() => {
           case 'downed':
             // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る
             if (lifeElapsed(player, now) >= DOWN_DURATION * 1000) {
-              setLife(roomName, player, 'choosing', now)
+              setLife(room, player, 'choosing', now)
             }
             continue
           case 'choosing':
             // 決めないまま放っておかれた。相手の試合を止めないために打ち切る
-            if (lifeElapsed(player, now) >= CHOOSE_TIMEOUT * 1000) spawn(roomName, player, now)
+            if (lifeElapsed(player, now) >= CHOOSE_TIMEOUT * 1000) spawn(room, player, now)
             continue
           case 'spawning':
             if (lifeElapsed(player, now) >= SPAWN_PROTECT * 1000) {
-              setLife(roomName, player, 'alive', now)
+              setLife(room, player, 'alive', now)
             }
             break
           case 'joining':
@@ -1885,41 +1881,38 @@ setInterval(() => {
         const shown = Math.ceil(player.health)
         if (shown === sessionOf(player).healthShown && player.health < RECOVER_CAP) continue
         sessionOf(player).healthShown = shown
-        sendHealth(roomName, player, 0, false)
+        sendHealth(room, player, 0, false)
       }
-    }
-    // --- 手榴弾 ---
-    // 固定の刻みで解く。クライアントも同じ刻みで解くので軌道が一致する
-    for (let i = grenades.length - 1; i >= 0; i--) {
-      const nade = grenades[i]
-      const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
-      for (let k = 0; k < steps; k++) stepProjectile(nade.body, solidBoxes)
-      nade.fuse -= TICK_MS / 1000
-      if (nade.fuse <= 0) {
-        detonate(nade)
-        grenades.splice(i, 1)
-      }
-    }
 
-    // クレイモア。前を敵が通ったら起爆する
-    for (let i = claymores.length - 1; i >= 0; i--) {
-      const claymore = claymores[i]
-      const room = rooms.get(claymore.room)
-      if (!room) {
-        claymores.splice(i, 1)
-        continue
+      // --- 手榴弾 ---
+      // 固定の刻みで解く。クライアントも同じ刻みで解くので軌道が一致する
+      for (let i = room.grenades.length - 1; i >= 0; i--) {
+        const nade = room.grenades[i]
+        const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
+        for (let k = 0; k < steps; k++) stepProjectile(nade.body, solidBoxes)
+        nade.fuse -= TICK_MS / 1000
+        if (nade.fuse <= 0) {
+          detonate(room, nade)
+          room.grenades.splice(i, 1)
+        }
       }
-      if (room.phase !== 'playing') continue
-      // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する**
-      const hit = present(room).some(
-        (p) =>
-          canBeHurt(p.life) &&
-          (p.id === claymore.owner || p.team !== claymore.team) &&
-          triggeredBy(claymore, p),
-      )
-      if (!hit) continue
-      detonateClaymore(claymore)
-      claymores.splice(i, 1)
+
+      // クレイモア。前を敵が通ったら起爆する
+      if (room.phase === 'playing') {
+        for (let i = room.claymores.length - 1; i >= 0; i--) {
+          const claymore = room.claymores[i]
+          // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する**
+          const hit = present(room).some(
+            (p) =>
+              canBeHurt(p.life) &&
+              (p.id === claymore.owner || p.team !== claymore.team) &&
+              triggeredBy(claymore, p),
+          )
+          if (!hit) continue
+          detonateClaymore(room, claymore)
+          room.claymores.splice(i, 1)
+        }
+      }
     }
   } catch (error) {
     console.error('[刻み] 例外。この刻みは捨てる', error)
@@ -1986,12 +1979,12 @@ function handleMessage(
 ): void {
   const room = rooms.get(socket.data.room)
   const player = room?.players.get(socket.data.id)
-  if (!player) return
+  if (!room || !player) return
 
 
   // 位置だけ 2 進。数が桁違いに多いので、ここだけ詰めてある
   if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) {
-    receiveSnapshot(socket.data.room, player, raw)
+    receiveSnapshot(room, player, raw)
     return
   }
 
@@ -2008,7 +2001,7 @@ function handleMessage(
       player.name = message.name
       // 所属と席番号を足してから配る。本人が名乗った内容をそのまま流さない
       broadcast(
-        socket.data.room,
+        room,
         { ...message, team: player.team, slot: player.slot },
         player.id,
       )
@@ -2016,7 +2009,7 @@ function handleMessage(
 
     case 'damage':
       // 送り主を信じない。名乗った ID ではなく接続の ID を使う。
-      applyDamage(socket.data.room, player, { ...message, id: player.id })
+      applyDamage(room, player, { ...message, id: player.id })
       break
 
     case 'state':
@@ -2028,7 +2021,7 @@ function handleMessage(
       return
 
     case 'grenade':
-      throwGrenade(socket.data.room, player, message)
+      throwGrenade(room, player, message)
       break
 
     case 'loadout': {
@@ -2049,7 +2042,7 @@ function handleMessage(
     // しない (CHOOSE_FLOOR)。選ぶのが速いことは腕前ではない
     case 'spawn':
       if (canChoose(player.life) && lifeElapsed(player, Date.now()) >= CHOOSE_FLOOR * 1000) {
-        spawn(socket.data.room, player)
+        spawn(room, player)
       }
       break
 
@@ -2059,7 +2052,7 @@ function handleMessage(
     // 出ると決めた人には要らない。待つと、残った側は居ない相手を相手に
     // 最大 30 秒立たされる (試合は続いているのに誰も来ない)。
     case 'claymore':
-      placeClaymore(socket.data.room, player)
+      placeClaymore(room, player)
       break
 
     /*
@@ -2081,7 +2074,6 @@ function handleMessage(
       if (!canAct(player.life)) break
       const item: Dropped = {
         id: ++droppedId,
-        room: socket.data.room,
         weapon: message.weapon,
         ammo: message.ammo ?? 0,
         reserve: message.reserve ?? 0,
@@ -2092,13 +2084,13 @@ function handleMessage(
         // 置いた向き。転がっている絵にするために、体の向きから 90 度倒す
         yaw: player.yaw + Math.PI / 2,
       }
-      dropped.push(item)
+      room.dropped.push(item)
       const put = message.weapon
       if (isGun(put)) {
         player.ammo.magazine[put] = 0
         player.ammo.reserve[put] = 0
       }
-      broadcast(socket.data.room, droppedMessage(item))
+      broadcast(room, droppedMessage(item))
       break
     }
 
@@ -2112,15 +2104,14 @@ function handleMessage(
       if (!canAct(player.life)) break
       let best: Dropped | null = null
       let nearest = PICKUP_RANGE
-      for (const item of dropped) {
-        if (item.room !== socket.data.room) continue
+      for (const item of room.dropped) {
         const distance = Math.hypot(item.x - player.x, item.z - player.z)
         if (distance > nearest) continue
         best = item
         nearest = distance
       }
       if (!best) break
-      dropped.splice(dropped.indexOf(best), 1)
+      room.dropped.splice(room.dropped.indexOf(best), 1)
       const got = best.weapon
       if (isGun(got)) {
         player.ammo.magazine[got] = best.ammo
@@ -2136,26 +2127,25 @@ function handleMessage(
           count: best.count,
         } satisfies ServerMessage),
       )
-      broadcast(socket.data.room, { type: 'droppedGone', id: best.id })
+      broadcast(room, { type: 'droppedGone', id: best.id })
       break
     }
 
     case 'fall': {
-      const room = rooms.get(socket.data.room)
-      if (!room || room.phase !== 'playing') break
+      if (room.phase !== 'playing') break
       if (!canBeHurt(player.life)) break
       // 速さそのものも信じ切らない。落ちきる前に着地を申告しても
       // 上限を超えた分は効かない
       const amount = fallDamage(Math.min(message.speed, MAX_FALL_SPEED))
       if (amount <= 0) break
       applyBlastDamage(
-        socket.data.room, room, player, amount,
+        room, player, amount,
         player.x, player.z, player.id, 'fall', false,
       )
       break
     }
     case 'leave':
-      leaveRoom(socket.data.room, player)
+      leaveRoom(room, player)
       return
 
     case 'shot': {
@@ -2176,14 +2166,14 @@ function handleMessage(
       const left = player.ammo.magazine[player.weapon]
       if (left > 0) player.ammo.magazine[player.weapon] = left - 1
       // 弾道の上にクレイモアがあれば起爆する
-      shotHitsClaymore(socket.data.room, message.from, message.to)
+      shotHitsClaymore(room, message.from, message.to)
       // 銃声だけは扱いが違う。
       //
       // 曳光を描くには銃口の座標が要るが、それは「どこに居るか」そのもの。
       // 姿が見えている相手にだけ座標を渡し、見えない相手には音として配る。
       // 銃声は遠くまで届く設計なので位置がおおよそ漏れるのは想定内だが、
       // 座標は耳より精度が高い。
-      relayShot(socket.data.room, player, message)
+      relayShot(room, player, message)
       break
     }
 
@@ -2195,7 +2185,7 @@ function handleMessage(
 
     default:
       // 見た目のもの (knock) は中身を見ずに流す
-      broadcast(socket.data.room, message, player.id)
+      broadcast(room, message, player.id)
   }
 }
 
@@ -2279,17 +2269,17 @@ const server = Bun.serve<Client>({
     if (!identity) return new Response('誰なのか分からない', { status: 401 })
 
     // 部屋は決まったものだけ。知らない名前で新しく作らせない
-    const roomName = url.searchParams.get('room') ?? ROOM_NAMES[0]
-    if (!isRoomName(roomName)) return new Response('そんな部屋は無い', { status: 404 })
+    const name = url.searchParams.get('room') ?? ROOM_NAMES[0]
+    if (!isRoomName(name)) return new Response('そんな部屋は無い', { status: 404 })
 
     // まだ開けていないルール。**一覧には出すが繋がせない** —
     // 何を作れば開くかが見える形にしておきたい (TSNE は非殺傷武器が要る)
-    if (!modeOf(roomName).active) {
+    if (!modeOf(name).active) {
       return new Response('この部屋はまだ開いていない', { status: 503 })
     }
 
     // 満員。ただし席を持っている本人 (繋ぎ直し) は通す
-    const existing = rooms.get(roomName)
+    const existing = rooms.get(name)
     const seated = existing?.players.has(identity.subject) ?? false
     if (!seated && existing && connected(existing).length >= ROOM_CAPACITY) {
       return new Response('満員', { status: 503 })
@@ -2299,7 +2289,7 @@ const server = Bun.serve<Client>({
       data: {
         id: identity.subject,
         name: identity.name,
-        room: roomName,
+        room: name,
       },
     })
     return upgraded ? undefined : new Response('WebSocket でつないでほしい', { status: 426 })
@@ -2330,7 +2320,7 @@ const server = Bun.serve<Client>({
         // 「不利になったらリロードして無敵を貰う」ができてしまう。
         // クライアント側でも spawning は respawnSelf を呼ぶので、弾が満タンに戻る
         const resuming = seat.wasAlive
-        setLife(socket.data.room, seat, resuming ? 'alive' : 'choosing')
+        setLife(room, seat, resuming ? 'alive' : 'choosing')
         // 続きを返すのは名簿のあと (下)。**順番が要る** — 名簿を受けた
         // クライアントは placeAtSpawn で湧き地点へ自分を置くので、先に
         // 続きを渡すと上書きされて**湧き地点へワープする**
@@ -2402,7 +2392,7 @@ const server = Bun.serve<Client>({
     close(socket) {
       const room = rooms.get(socket.data.room)
       const player = room?.players.get(socket.data.id)
-      if (!player) return
+      if (!room || !player) return
       // 同じ ID で繋ぎ直したあとに、古い接続の後始末が届くことがある。
       // それで新しいほうを離脱扱いにしないよう、送り主を確かめる。
       if (sessions.get(player.id)?.socket !== socket) return
@@ -2410,7 +2400,7 @@ const server = Bun.serve<Client>({
       // 席は残す。畳むのは待ち切ってから (tick)
       // 続きへ戻せる状態だったかを控える。倒れている最中なら、どのみち次は湧く
       player.wasAlive = player.life === 'alive' || player.life === 'spawning'
-      setLife(socket.data.room, player, 'dropped')
+      setLife(room, player, 'dropped')
 
       // **leave は配らない。**
       //
@@ -2439,9 +2429,9 @@ console.info(`対戦サーバー: ws://localhost:${server.port}  (確認: http:/
  */
 function shutdown(signal: string): void {
   console.info(`[終了] ${signal}。走っている試合を書き出す`)
-  for (const [roomName, room] of rooms) {
+  for (const room of rooms.values()) {
     if (room.phase !== 'playing') continue
-    for (const player of room.players.values()) recordSeat(roomName, room, player, false)
+    for (const player of room.players.values()) recordSeat(room, player, false)
   }
   // 送り終わるのを待ってから落ちる。待たないと書いた意味が無い
   void flush().then(() => process.exit(0))
