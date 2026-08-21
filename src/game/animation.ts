@@ -52,6 +52,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   fall_roll: 'fall_roll',
   // 階段を上る。**下半身だけ** — 上は構えたまま上れる
   up_stair: 'up_stair',
+  // 階段を下りる。上りとは別のクリップ
+  down_stair: 'down_stair',
   crouch_idle: 'crouch_idle',
   sneak: 'sneak',
   sit: 'sit',

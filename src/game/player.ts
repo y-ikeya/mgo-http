@@ -384,6 +384,8 @@ export class Player {
   private stairFor = 0
   /** 前のフレームの足元の高さ。段差を上がったかを見るのに使う */
   private lastFeetY = 0
+  /** その階段は下りか。上りと下りで型が違う */
+  private stairDown = false
   /** 受け身の残り時間。ただの着地より長い */
   private fallRollTimer = 0
   /**
@@ -1291,8 +1293,24 @@ export class Player {
      * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
      */
     const rise = this.position.y - this.lastFeetY
-    if (this.grounded && rise >= STAIR_RISE_MIN) this.stairFor = STAIR_HOLD
-    else if (this.stairFor > 0) this.stairFor -= dt
+    if (this.grounded && rise >= STAIR_RISE_MIN) {
+      this.stairFor = STAIR_HOLD
+      this.stairDown = false
+    } else if (moved.landed && moved.impactSpeed < LANDING_MIN_SPEED && this.currentSpeed > 0.5) {
+      /*
+       * **下りは「軽く着地した」で見る。**
+       *
+       * 下りる側は 1 段ごとに宙に浮くので、足元の高さは連続して落ちる (上りの
+       * ように 1 フレームで飛ばない)。代わりに、段の高さから落ちた着地は
+       * **着地の型が出ないほど弱い**ので、そこを拾う。
+       *
+       * 坂は浮かないので着地そのものが起きない — 上りと同じく坂は含まれない。
+       */
+      this.stairFor = STAIR_HOLD
+      this.stairDown = true
+    } else if (this.stairFor > 0) {
+      this.stairFor -= dt
+    }
     this.lastFeetY = this.position.y
     this.actualSpeed = moved.actualSpeed
 
@@ -1603,6 +1621,7 @@ export class Player {
       fallRoll: this.fallRollTimer,
       airborneFor: this.airborneFor,
       stairFor: this.stairFor,
+      stairDown: this.stairDown,
       velocityY: this.velocityY,
       dirX: moveDir.x,
       dirZ: moveDir.z,

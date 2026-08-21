@@ -155,8 +155,10 @@ export interface StanceInput {
    * 着くので、そのたびに空中の型へ移ると膝を曲げる姿勢が点滅する。
    */
   airborneFor: number
-  /** 階段を上り始めてからの残り時間 (秒)。0 なら上っていない */
+  /** 階段を上り下りしてからの残り時間 (秒)。0 なら階段に居ない */
   stairFor: number
+  /** その階段は下りか。上りと下りで型が違う */
+  stairDown: boolean
   /**
    * 受け身の残り時間 (秒)。0 なら受け身ではない。
    *
@@ -218,8 +220,8 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (!input.onGround && input.airborneFor >= AIR_MOTION_DELAY) {
     return input.velocityY > 0 ? 'jump_up' : 'jump_loop'
   }
-  // 階段を上っている間は専用の型。**坂は含まない** (段差が無いので走りで足りる)
-  if (input.stairFor > 0) return 'up_stair'
+  // 階段の間は専用の型。**坂は含まない** (段差が無いので走りで足りる)
+  if (input.stairFor > 0) return input.stairDown ? 'down_stair' : 'up_stair'
   // 削られる高さから落ちた着地は受け身。ただの着地より長く、転がり切るまで続く
   if (input.fallRoll > 0) return 'fall_roll'
   if (input.landing > 0) return 'jump_down'

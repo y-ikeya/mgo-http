@@ -26,6 +26,7 @@ const base: StanceInput = {
   fallRoll: 0,
   airborneFor: 0,
   stairFor: 0,
+  stairDown: false,
   forward: 0,
   strafe: 0,
   speed: 0,
@@ -75,6 +76,12 @@ describe('落下の受け身', () => {
 describe('階段', () => {
   test('段差を上がっている間は専用の型', () => {
     expect(resolveLocomotion({ ...base, stairFor: 0.3 } as StanceInput)).toBe('up_stair')
+  })
+
+  test('**下りは別の型。** 同じ型の逆再生では下りに見えない', () => {
+    expect(resolveLocomotion({ ...base, stairFor: 0.3, stairDown: true } as StanceInput)).toBe(
+      'down_stair',
+    )
   })
 
   test('**短い浮きは空中扱いしない。** 階段を下りるたびに膝を曲げない', () => {
