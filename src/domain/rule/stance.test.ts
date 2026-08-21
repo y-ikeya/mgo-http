@@ -30,6 +30,10 @@ const base: StanceInput = {
   forward: 0,
   strafe: 0,
   speed: 0,
+  dirX: 0,
+  dirZ: 0,
+  actualSpeed: 0,
+  yaw: 0,
   sprinting: false,
 } as unknown as StanceInput
 
@@ -64,12 +68,9 @@ describe('落下の受け身', () => {
     ).toBe('fall_roll')
   })
 
-  test('空中にいる間は受け身にならない (着いてから転がる)', () => {
-    expect(
-      resolveLocomotion({
-        ...base, onGround: false, velocityY: -18, airborneFor: 0.5, fallRoll: 1.6,
-      } as StanceInput),
-    ).toBe('jump_loop')
+  test('受け身は着いてから。**空中では立たない札**なので、そもそも来ない', () => {
+    // fallRoll は着地した瞬間に立てる (player.ts)。空中で立っていることは無い
+    expect(resolveLocomotion({ ...base, fallRoll: 0 } as StanceInput)).not.toBe('fall_roll')
   })
 })
 
@@ -84,14 +85,22 @@ describe('階段', () => {
     )
   })
 
-  test('**段を下りる浮き (0.17 秒) は空中扱いしない。** 跳躍は空中', () => {
-    const hop = { ...base, onGround: false, velocityY: -2, airborneFor: 0.17 } as StanceInput
-    expect(resolveLocomotion(hop)).not.toBe('jump_loop')
-    // 跳躍 (0.6m) は 0.26 秒より長く浮く
-    expect(resolveLocomotion({ ...hop, airborneFor: 0.3 })).toBe('jump_loop')
+  test('**落ちている間は移動の型のまま。** 滞空のループは出さない', () => {
+    const falling = { ...base, onGround: false, velocityY: -6, airborneFor: 0.5 } as StanceInput
+    expect(resolveLocomotion(falling)).not.toBe('jump_loop')
+    // 走って落ちれば走ったまま (前へ倒していれば前進の型)
+    expect(
+      resolveLocomotion({ ...falling, actualSpeed: 5, dirZ: -1, yaw: 0 } as StanceInput),
+    ).toBe('run_f')
   })
 
-  test('空中のほうが先。**階段を上って跳んだら跳躍の型**', () => {
+  test('上がっている間だけ跳躍の型', () => {
+    expect(
+      resolveLocomotion({ ...base, onGround: false, velocityY: 4, airborneFor: 0.3 } as StanceInput),
+    ).toBe('jump_up')
+  })
+
+  test('跳ぶほうが先。**階段を上って跳んだら跳躍の型**', () => {
     expect(
       resolveLocomotion({
         ...base, onGround: false, velocityY: 4, airborneFor: 0.3, stairFor: 0.3,

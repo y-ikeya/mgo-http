@@ -219,8 +219,17 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
    * 移ると、**膝を大きく曲げる姿勢が点滅する**。0.12 秒より短い浮きは
    * 歩いているものとして扱う。
    */
-  if (!input.onGround && input.airborneFor >= AIR_MOTION_DELAY) {
-    return input.velocityY > 0 ? 'jump_up' : 'jump_loop'
+  /*
+   * 上がっている間だけ跳躍の型。**落ちている間は移動の型のまま。**
+   *
+   * 滞空のループ (jump_loop) は、走って段から落ちる場面に合っていなかった —
+   * 走っている脚が止まって空中で構え直す絵になる。落ちるのは一瞬なので、
+   * 走ったまま落ちて、着地で受け止める (jump_down / fall_roll) ほうが素直。
+   *
+   * 型としては残してある。**通信の並びから外すと、古い版が別の姿勢を再生する。**
+   */
+  if (!input.onGround && input.airborneFor >= AIR_MOTION_DELAY && input.velocityY > 0) {
+    return 'jump_up'
   }
   // 階段の間は専用の型。**坂は含まない** (段差が無いので走りで足りる)
   if (input.stairFor > 0) return input.stairDown ? 'down_stair' : 'up_stair'
