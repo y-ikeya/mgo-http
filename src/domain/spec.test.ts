@@ -105,6 +105,18 @@ describe('README が数字の出どころ', () => {
     expect(primaries.filter((id) => !listed.includes(id))).toEqual([])
   })
 
+  test('弾道 (速さと落ち方)', () => {
+    for (const [id, speed, gravity] of tableOf('弾道')) {
+      const spec = WEAPONS[id as WeaponId]
+      expect(spec, `README に無い武器: ${id}`).toBeDefined()
+      expect([id, spec.bulletSpeed, spec.bulletGravity]).toEqual([
+        id,
+        Number(speed),
+        Number(gravity),
+      ])
+    }
+  })
+
   test('1 つの命で持てる数', () => {
     for (const [id, label, count] of tableOf('支援')) {
       const spec = SUPPORT_SPECS[id as SupportId]

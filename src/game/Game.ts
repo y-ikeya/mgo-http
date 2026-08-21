@@ -56,11 +56,10 @@ import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
 import { weaponOf } from "../domain/item/weapons";
 import {
-  BULLET_GRAVITY,
+  bulletOffset,
   flightTime,
-  trajectoryOffset,
   TRAJECTORY_STEPS,
-} from "./arms/ballistics";
+} from "../sim/judge/bullet";
 import { createTransport } from "../net";
 import type { NetTransport } from "../net/types";
 import type { Identity } from "../auth/session";
@@ -527,8 +526,13 @@ export class Game {
   private readonly segmentFrom = new THREE.Vector3();
   private readonly segmentTo = new THREE.Vector3();
   private readonly segmentDir = new THREE.Vector3();
-  /** 弾に掛かる重力。調整パネルから変えられる */
-  private bulletGravity = BULLET_GRAVITY;
+  /**
+   * 弾に掛かる重力の上書き。**調整パネル用**で、既定は null。
+   *
+   * 素の値は武器ごとに domain が持っている (weapons.ts の bulletGravity)。
+   * ここに写しを置くと、銃を足したときに片方だけ古くなる。
+   */
+  private bulletGravityOverride: number | null = null;
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -825,7 +829,7 @@ export class Game {
 
   /** 弾の落下の調整用。0 でまっすぐ飛ぶ */
   setBulletGravity(gravity: number): void {
-    this.bulletGravity = gravity;
+    this.bulletGravityOverride = gravity;
   }
 
   /** ダンボールの寸法と位置の調整用 */
@@ -2905,7 +2909,11 @@ export class Game {
     terrain: THREE.Intersection | null;
     distance: number;
   } {
-    const total = flightTime(MAX_RANGE);
+    // 速さも落ち方も**武器の性能** (domain)。ここは道を引くだけ。
+    // 銃ごとに違うので、狙撃銃の弾は同じ距離でも落ちない
+    const speed = this.weapon.bulletSpeed;
+    const gravity = this.bulletGravityOverride ?? this.weapon.bulletGravity;
+    const total = flightTime(MAX_RANGE, speed);
     const step = total / TRAJECTORY_STEPS;
 
     // 区間の始点。最初は銃口 (= 照準の起点)
@@ -2913,12 +2921,7 @@ export class Game {
     let travelled = 0;
 
     for (let i = 1; i <= TRAJECTORY_STEPS; i++) {
-      trajectoryOffset(
-        this.aimDir,
-        step * i,
-        this.bulletGravity,
-        this.segmentTo,
-      );
+      bulletOffset(this.aimDir, step * i, speed, gravity, this.segmentTo);
       this.segmentTo.add(this.aimOrigin);
 
       this.segmentDir.subVectors(this.segmentTo, this.segmentFrom);
