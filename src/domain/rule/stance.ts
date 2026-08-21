@@ -42,6 +42,37 @@ export type Stance = 'stand' | 'crouch' | 'box' | 'prone' | 'down'
  */
 export const AIR_MOTION_DELAY = 0.22
 
+/**
+ * 段差とみなす 1 フレームの上がり幅 (m)。
+ *
+ * 越えられる段差は 0.25m (sim/collision.ts の STEP_UP)。坂は連続して上がるので
+ * 1 フレームでは 0.02m ほどしか動かない — その間に線を引く。
+ */
+export const STAIR_RISE_MIN = 0.08
+/**
+ * 階段の型を持たせる時間 (秒)。
+ *
+ * 段を上がった瞬間だけだと、段の上を歩いている間に走りの型へ戻って点滅する。
+ * 次の段までを繋ぐ長さにする。
+ */
+export const STAIR_HOLD = 0.45
+/**
+ * 段を下りたとみなす落差 (m)。
+ *
+ * **坂と分けるための下限。** 坂を下ると、地面が逃げるぶんだけ体が遅れて
+ * 浮く。追いつくまでの落差は 2·v²/g で決まる — 傾き 0.275 を 3.04 m/s で
+ * 下れば沈む速さは 0.84 m/s、落差は **8cm** (重力 17.6 m/s²)。
+ * 段 1 つは 25cm。その間に引く。
+ */
+export const STAIR_DROP_MIN = 0.15
+/**
+ * 段を下りたとみなす落差の上限 (m)。
+ *
+ * 走って下りると 1 段飛ばしになるので 2 段ぶん (0.5m) は見る。それより深い
+ * 落差は階段ではなく**床から落ちた**ので、着地 (受け身) に譲る。
+ */
+export const STAIR_DROP_MAX = 0.8
+
 export type WholeBodyLocomotion =
   | 'roll'
   | 'fall_roll'
@@ -216,8 +247,8 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
    * 空中の型は**すぐには出さない** (airborneFor)。
    *
    * 階段や坂を下りると、1 段ごとに離地と接地を繰り返す。そのたびに空中の型へ
-   * 移ると、**膝を大きく曲げる姿勢が点滅する**。0.12 秒より短い浮きは
-   * 歩いているものとして扱う。
+   * 移ると、**膝を大きく曲げる姿勢が点滅する**。AIR_MOTION_DELAY より短い
+   * 浮きは歩いているものとして扱う。
    */
   /*
    * 上がっている間だけ跳躍の型。**落ちている間は移動の型のまま。**

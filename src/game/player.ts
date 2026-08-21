@@ -9,7 +9,13 @@ import { loadSoldier } from './assets'
 import { isMesh } from './guards'
 import { damp, dampAngle } from './math'
 import { stepMovement, type Mover } from '../sim/movement'
-import { resolveLocomotion } from '../domain/rule/stance'
+import {
+  resolveLocomotion,
+  STAIR_DROP_MAX,
+  STAIR_DROP_MIN,
+  STAIR_HOLD,
+  STAIR_RISE_MIN,
+} from '../domain/rule/stance'
 import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../domain/rule/footsteps'
 import { MAX_HEALTH } from '../domain/rule/damage'
@@ -181,27 +187,6 @@ const FALL_REFERENCE_HEIGHT = 0.6
  */
 const LANDING_TIME = 0.16
 
-/**
- * 段差とみなす 1 フレームの上がり幅 (m)。
- *
- * 越えられる段差は 0.25m (collision.ts の STEP_UP)。坂は連続して上がるので
- * 1 フレームでは 0.02m ほどしか動かない — その間に線を引く。
- */
-const STAIR_RISE_MIN = 0.08
-/**
- * 階段の型を持たせる時間 (秒)。
- *
- * 段を上がった瞬間だけだと、段の上を歩いている間に走りの型へ戻って点滅する。
- * 次の段までを繋ぐ長さにする。
- */
-const STAIR_HOLD = 0.45
-/**
- * 段を下りたとみなす着地の速さ (m/s)。
- *
- * **坂と分けるための下限。** 坂を下りると毎フレーム軽く接地するが、そちらは
- * 0.3 m/s も出ない。段 1 つ (0.25m) は 2.97 m/s。
- */
-const STAIR_DROP_MIN = 1.2
 
 /**
  * 受け身の尺 (秒)。**クリップの長さ (1.67s) に合わせる。**
@@ -393,6 +378,8 @@ export class Player {
   private lastFeetY = 0
   /** その階段は下りか。上りと下りで型が違う */
   private stairDown = false
+  /** 地面を離れたときの高さ。**どれだけ落ちたか**を測るのに使う */
+  private airFromY = 0
   /** 受け身の残り時間。ただの着地より長い */
   private fallRollTimer = 0
   /**
@@ -1276,9 +1263,59 @@ export class Player {
       dt,
     )
 
+    /*
+     * **段を上り下りしているか。落下の型より先に決める。**
+     *
+     * 走って階段を下りると 1 段飛ばしになり、着地の速さは 4.1 m/s に届く。
+     * 速さだけで見ると 1 段ごとに「落ちてきた」と読まれて着地の型が挟まり、
+     * 階段が下りられない床のように見えていた。**先にここで段だと分かれば**、
+     * 下の落下の型は出さなくていい。
+     */
+    // 前に地面に触れていた高さとの差。**控えるのは使ったあと** (下)
+    const dropped = this.airFromY - this.position.y
+    this.airborneFor = this.grounded ? 0 : this.airborneFor + dt
+    let stepDown = false
+    /*
+     * 階段を上ったか。**1 フレームで足元が跳ね上がったら段差。**
+     *
+     * 坂も上がるが、そちらは連続なので 1 フレームの上がり幅が小さい
+     * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
+     */
+    const rise = this.position.y - this.lastFeetY
+    if (this.grounded && rise >= STAIR_RISE_MIN) {
+      this.stairFor = STAIR_HOLD
+      this.stairDown = false
+    } else if (
+      moved.landed &&
+      dropped >= STAIR_DROP_MIN &&
+      dropped <= STAIR_DROP_MAX &&
+      this.currentSpeed > 0.5
+    ) {
+      /*
+       * **下りは「どれだけ落ちたか」で見る。速さではなく高さ。**
+       *
+       * 一度**速さで分けようとして失敗した。** 坂を下りると数フレーム宙に浮く
+       * ことがあり、そのぶん加速して 1.2 m/s くらいは出る (17.6 m/s² で
+       * 4 フレーム落ちれば届く)。段と同じ速さになるので分けられない。
+       *
+       * 落ちた**高さ**なら混ざらない:
+       *
+       *     坂        7cm       地面が逃げるぶんだけ浮く
+       *     段 1〜2 つ 25〜50cm  下りの型
+       *     床から     1m 以上   落下 (受け身に譲る)
+       *
+       * 最後に地面へ触れていた高さを覚えておいて、着いた高さとの差を見る。
+       */
+      this.stairFor = STAIR_HOLD
+      this.stairDown = true
+      stepDown = true
+    } else if (this.stairFor > 0) {
+      this.stairFor -= dt
+    }
+
     // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す。
     // **削られる速さなら受け身。** 体力が減ったことが動きにも出る
-    if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED) {
+    if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED && !stepDown) {
       this.landingTimer = LANDING_TIME
       if (fallDamage(moved.impactSpeed) > 0) {
         this.fallRollTimer = FALL_ROLL_TIME
@@ -1292,41 +1329,14 @@ export class Player {
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.fallRollTimer > 0) this.fallRollTimer -= dt
-    this.airborneFor = this.grounded ? 0 : this.airborneFor + dt
     /*
-     * 階段を上ったか。**1 フレームで足元が跳ね上がったら段差。**
+     * 最後に地面へ触れていた高さ。**判定を通したあとで控える。**
      *
-     * 坂も上がるが、そちらは連続なので 1 フレームの上がり幅が小さい
-     * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
+     * 坂を下りる間はほぼ毎フレーム宙に浮いているので、「浮いた瞬間」を捕まえ
+     * ようとすると更新の機会が来ない (最初に離れた高さのまま固まり、坂を下りた
+     * 総量が落差として出る)。着地したフレームも含めて、触れていたら控える。
      */
-    const rise = this.position.y - this.lastFeetY
-    if (this.grounded && rise >= STAIR_RISE_MIN) {
-      this.stairFor = STAIR_HOLD
-      this.stairDown = false
-    } else if (
-      moved.landed &&
-      moved.impactSpeed >= STAIR_DROP_MIN &&
-      moved.impactSpeed < LANDING_MIN_SPEED &&
-      this.currentSpeed > 0.5
-    ) {
-      /*
-       * **下りは「段 1 つぶん落ちて着地した」で見る。**
-       *
-       * 下りる側は 1 段ごとに宙に浮くので、足元の高さは連続して落ちる (上りの
-       * ように 1 フレームで飛ばない)。代わりに着地の速さで見る:
-       *
-       *     坂          0.1〜0.3 m/s  ほとんど落ちない (毎フレーム軽く接地する)
-       *     段 0.25m    2.97 m/s      下りの型
-       *     跳躍 0.6m   4.60 m/s      着地の型 (LANDING_MIN_SPEED から上)
-       *
-       * **坂を弾くのがこの下限。** 入れる前は坂を下りる間ずっと下りの型が
-       * 流れ続けて、屈伸しているように見えていた。
-       */
-      this.stairFor = STAIR_HOLD
-      this.stairDown = true
-    } else if (this.stairFor > 0) {
-      this.stairFor -= dt
-    }
+    if (this.grounded) this.airFromY = this.position.y
     this.lastFeetY = this.position.y
     this.actualSpeed = moved.actualSpeed
 

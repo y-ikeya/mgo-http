@@ -75,6 +75,14 @@ export interface MoveTuning {
   airControl: number
 }
 
+/**
+ * 地面に吸い付ける幅 (m)。
+ *
+ * **段差 (0.25m) より浅く、坂で浮く量 (数 cm) より深い。** ここで線を引くと、
+ * 坂は接地したまま、段は落ちる。
+ */
+const GROUND_SNAP = 0.12
+
 export interface MoveResult {
   /** このフレームで着地したか */
   landed: boolean
@@ -155,6 +163,24 @@ export function stepMovement(
     mover.velocityY = 0
     mover.onGround = true
     landed = wasAirborne
+  } else if (wasGrounded && mover.velocityY <= 0 && position.y - ground <= GROUND_SNAP) {
+    /*
+     * **坂では地面に吸い付ける。**
+     *
+     * 坂を下ると、逃げる地面のほうが落ちる体より速い。傾き 0.275 を 3.04 m/s で
+     * 下れば地面は 1 フレームに 14mm 下がるが、重力で落ちるのは 5mm — 差のぶんだけ
+     * 体が浮き、追いつくまで 0.1 秒ほど宙に居ることになる。**坂を下りる間ずっと、
+     * 浮いては着地するのを繰り返していた。**
+     *
+     * これが色々なところを壊していた: 着地のたびに下りの型が出て屈伸して見え、
+     * 接地を見ている跳躍・ローリング・足音が坂の上では効かなかった。
+     *
+     * 落ちる向きで、地面がすぐ下にあるなら、離れずに付いていく。段差 (0.25m) は
+     * この幅より深いので、段から落ちるのはこれまで通り落下として扱われる。
+     */
+    position.y = ground
+    mover.velocityY = 0
+    mover.onGround = true
   } else {
     mover.onGround = false
     // 地面を離れたフレームの速度を空中の勢いとして持ち込む。
