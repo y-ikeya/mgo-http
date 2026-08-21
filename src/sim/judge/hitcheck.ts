@@ -14,6 +14,11 @@
 import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from '../../domain/rule/damage'
 import { headHeight, isPathClear, type StageBox } from '../space/vision'
 import { canBeStabbed } from '../../domain/rule/damage'
+import {
+  DISTANCE_SLACK,
+  DISTANCE_SLACK_RATE,
+  MELEE_SLACK,
+} from '../../domain/rule/lag'
 import type { Pose } from '../../domain/player/player'
 
 // 姿の形は domain (Player の過去の姿そのものなので)。ここからも出す
@@ -38,15 +43,6 @@ export type Verdict = { ok: true } | { ok: false; reason: string }
 const ZONE_RATIO: Record<HitZone, number> = { HEAD: 1, BODY: 0.72, LEGS: 0.28 }
 
 /**
- * 距離の申告に許す誤差。
- *
- * 撃った瞬間と、サーバーが知っている位置には時間差がある。相手が走っていれば
- * その間に動く。固定値だけだと遠射で足りず、比率だけだと至近で足りない。
- */
-const DISTANCE_SLACK = 3
-const DISTANCE_SLACK_RATE = 0.06
-
-/**
  * 遮蔽の判定を、肩の幅だけ横にずらしても試す。
  *
  * TPS の照準は肩越しのカメラから引くので、キャラの頭からは見えない角も撃てる。
@@ -54,8 +50,6 @@ const DISTANCE_SLACK_RATE = 0.06
  */
 const SHOULDER_OFFSET = 0.55
 
-/** ナイフの間合いに許す余裕 (m)。踏み込みと時間差のぶん */
-const MELEE_SLACK = 1.2
 
 /** その姿勢での部位の位置 */
 export function zonePoint(pose: Pose, zone: HitZone): [number, number, number] {

@@ -76,6 +76,7 @@ import {
 import { verifyHit } from '../src/sim/judge/hitcheck'
 import { stanceOf } from '../src/domain/player/stance'
 import { STEP_UP } from '../src/domain/player/moving'
+import { LAG_WINDOW } from '../src/domain/rule/lag'
 import {
   groundUnder,
   hasLineOfSight,
@@ -1320,14 +1321,6 @@ function relayShot(roomName: RoomName, from: Player, message: ServerMessage): vo
  * それ自体が「さっきまで見ていた」という情報になる。受け取る側は最後に
  * 届いた位置のまま置いておく。
  */
-/**
- * 遡れる長さ (ms)。
- *
- * 通信の往復 + 補間の遅れ (0.1 秒) を覆える幅にする。広く取るほど当てた側の
- * 体感は正しくなり、避けた側は「隠れたのに撃たれた」が増える。
- */
-const LAG_WINDOW = 400
-
 /**
  * 履歴に残す数。遡れる長さを覆えるだけ持つ。
  *
