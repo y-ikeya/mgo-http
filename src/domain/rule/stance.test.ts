@@ -84,11 +84,11 @@ describe('階段', () => {
     )
   })
 
-  test('**短い浮きは空中扱いしない。** 階段を下りるたびに膝を曲げない', () => {
-    const hop = { ...base, onGround: false, velocityY: -2, airborneFor: 0.05 } as StanceInput
+  test('**段を下りる浮き (0.17 秒) は空中扱いしない。** 跳躍は空中', () => {
+    const hop = { ...base, onGround: false, velocityY: -2, airborneFor: 0.17 } as StanceInput
     expect(resolveLocomotion(hop)).not.toBe('jump_loop')
-    // 0.12 秒を超えたら空中の型へ
-    expect(resolveLocomotion({ ...hop, airborneFor: 0.2 })).toBe('jump_loop')
+    // 跳躍 (0.6m) は 0.26 秒より長く浮く
+    expect(resolveLocomotion({ ...hop, airborneFor: 0.3 })).toBe('jump_loop')
   })
 
   test('空中のほうが先。**階段を上って跳んだら跳躍の型**', () => {

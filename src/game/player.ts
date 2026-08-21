@@ -195,6 +195,13 @@ const STAIR_RISE_MIN = 0.08
  * 次の段までを繋ぐ長さにする。
  */
 const STAIR_HOLD = 0.45
+/**
+ * 段を下りたとみなす着地の速さ (m/s)。
+ *
+ * **坂と分けるための下限。** 坂を下りると毎フレーム軽く接地するが、そちらは
+ * 0.3 m/s も出ない。段 1 つ (0.25m) は 2.97 m/s。
+ */
+const STAIR_DROP_MIN = 1.2
 
 /**
  * 受け身の尺 (秒)。**クリップの長さ (1.67s) に合わせる。**
@@ -1296,15 +1303,24 @@ export class Player {
     if (this.grounded && rise >= STAIR_RISE_MIN) {
       this.stairFor = STAIR_HOLD
       this.stairDown = false
-    } else if (moved.landed && moved.impactSpeed < LANDING_MIN_SPEED && this.currentSpeed > 0.5) {
+    } else if (
+      moved.landed &&
+      moved.impactSpeed >= STAIR_DROP_MIN &&
+      moved.impactSpeed < LANDING_MIN_SPEED &&
+      this.currentSpeed > 0.5
+    ) {
       /*
-       * **下りは「軽く着地した」で見る。**
+       * **下りは「段 1 つぶん落ちて着地した」で見る。**
        *
        * 下りる側は 1 段ごとに宙に浮くので、足元の高さは連続して落ちる (上りの
-       * ように 1 フレームで飛ばない)。代わりに、段の高さから落ちた着地は
-       * **着地の型が出ないほど弱い**ので、そこを拾う。
+       * ように 1 フレームで飛ばない)。代わりに着地の速さで見る:
        *
-       * 坂は浮かないので着地そのものが起きない — 上りと同じく坂は含まれない。
+       *     坂          0.1〜0.3 m/s  ほとんど落ちない (毎フレーム軽く接地する)
+       *     段 0.25m    2.97 m/s      下りの型
+       *     跳躍 0.6m   4.60 m/s      着地の型 (LANDING_MIN_SPEED から上)
+       *
+       * **坂を弾くのがこの下限。** 入れる前は坂を下りる間ずっと下りの型が
+       * 流れ続けて、屈伸しているように見えていた。
        */
       this.stairFor = STAIR_HOLD
       this.stairDown = true
