@@ -140,12 +140,12 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * Solid は中身が変わっても要素を作り直さないので、CSS の入場アニメーションは
    * 流れない。**送るたびに自分で 1 回流す** (Web Animations)。
    */
-  let browseEl: HTMLDivElement | undefined
+  let columnEl: HTMLDivElement | undefined
+  let rowEl: HTMLDivElement | undefined
   let browsedAt = -1
   createEffect(() => {
     const at = props.stats?.browsing?.at
-    const el = browseEl
-    if (at === undefined || !el) {
+    if (at === undefined || (!columnEl && !rowEl)) {
       browsedAt = -1
       return
     }
@@ -160,13 +160,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     // 武器は上下 (列)、道具は左右 (行) に伸びるので、滑る向きも合わせる
     const tool = props.stats?.browsingFamily === 'tool'
     const offset = tool ? `translateX(${-shift}px)` : `translateY(${shift}px)`
-    el.animate(
-      [
-        { transform: offset, opacity: 0.35 },
-        { transform: 'translate(0, 0)', opacity: 1 },
-      ],
-      { duration: 130, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
-    )
+    /*
+     * **入れ物ではなく、中の 2 つを動かす。**
+     *
+     * L 字の列と行はそれぞれ画面に絶対配置してある。入れ物に transform を掛けると
+     * **そこが配置の基準になってしまい**、札が画面の隅へ飛んで L 字が消えた。
+     */
+    for (const part of [columnEl, rowEl]) {
+      part?.animate(
+        [
+          { transform: offset, opacity: 0.35 },
+          { transform: 'translate(0, 0)', opacity: 1 },
+        ],
+        { duration: 130, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
+      )
+    }
   })
 
   /** 角の上に積む物。選んでいる物と、左に出した物を除いた残り */
@@ -488,7 +496,6 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       */}
       <Show when={props.stats?.browsing}>
         <div
-          ref={browseEl}
           class="hud-browse"
           classList={{ 'hud-browse-tool': props.stats?.browsingFamily === 'tool' }}
         >
@@ -497,10 +504,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
               選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。
               別に札を出すと同じ名前が 2 つ並ぶ。
             */}
-          <div class="hud-browse-column">
+          <div class="hud-browse-column" ref={columnEl}>
             <For each={above()}>{(item) => <BrowseItem item={item} />}</For>
           </div>
-          <div class="hud-browse-row">
+          <div class="hud-browse-row" ref={rowEl}>
             <Show when={beside()}>{(item) => <BrowseItem item={item()} />}</Show>
           </div>
         </div>
