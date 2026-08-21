@@ -70,6 +70,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     return browsing.items[browsing.at] ?? null
   }
 
+  /**
+   * 左下のカードに出す道具。
+   *
+   * **一覧を送っている間は、指している物を映す。** 武器のカード (held) と同じ
+   * 規則 — 角のカードが選択の印を兼ねているので、送っても変わらないと
+   * 「これを選んだらこうなる」が読めない (ずっと NONE のままに見えていた)。
+   */
+  const shownTool = (): HeldId => {
+    const browsing = props.stats?.browsing
+    if (browsing && props.stats?.browsingFamily === 'tool') {
+      return browsing.items[browsing.at]?.id ?? props.stats.tool
+    }
+    return props.stats?.tool ?? 'none'
+  }
+
   const heldLabel = () => HELD[held()].label
   const heldIsGun = () => HELD[held()].shoots
 
@@ -521,12 +536,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         なる (MGO2 も道具は左下で、武器のカードは別に出ていた)。
       */}
       <Show when={props.stats?.tool}>
-        {(tool) => (
-          <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand }}>
-            <div class="hud-tool-key">C</div>
-            <div class="hud-tool-name">{HELD[tool()].label}</div>
-          </div>
-        )}
+        <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand }}>
+          <div class="hud-tool-key">C</div>
+          <div class="hud-tool-name">{HELD[shownTool()].label}</div>
+        </div>
       </Show>
 
 

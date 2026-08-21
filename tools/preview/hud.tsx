@@ -61,13 +61,15 @@ const cases: Record<string, Partial<GameStats>> = {
   },
   browsingTool: {
     browsingFamily: 'tool',
-    tool: 'box',
-    toolInHand: true,
+    tool: 'none',
+    toolInHand: false,
     browsing: {
       items: [
         { id: 'box', n: null, loaded: null, mag: null },
         { id: 'none', n: null, loaded: null, mag: null },
       ],
+      // **NONE を選んでいる状態から C.BOX を指している所**。角が C.BOX に
+      // なっていないと、送っても何も変わらないように見える
       at: 0,
     },
   },
