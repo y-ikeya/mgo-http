@@ -74,7 +74,8 @@ import {
   SUPPORT_SPECS,
 } from '../src/domain/item/weapons'
 import { verifyHit } from '../src/sim/judge/hitcheck'
-import { stanceOf } from '../src/domain/rule/stance'
+import { stanceOf } from '../src/domain/player/stance'
+import { STEP_UP } from '../src/domain/player/moving'
 import {
   groundUnder,
   hasLineOfSight,
@@ -753,8 +754,6 @@ const STEP_RANGE = 20
 /** 銃声が届く距離 (m)。rifle: max 130 と揃える */
 const SHOT_RANGE = 130
 
-/** 乗り越えられる段差 (m)。collision.ts の STEP_UP と揃える */
-const STEP_UP = 0.25
 
 /**
  * しゃがみが体に現れるまで (ms)。

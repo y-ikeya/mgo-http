@@ -21,7 +21,7 @@
  */
 import { canTransition, type Life } from './lifecycle'
 import type { Locomotion } from './locomotion'
-import type { Stance } from '../rule/stance'
+import type { Stance } from './stance'
 import type { HeldId } from '../item/held'
 import {
   SUPPORT_SPECS,

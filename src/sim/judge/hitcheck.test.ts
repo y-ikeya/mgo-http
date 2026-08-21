@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { STAB_DOWN_PITCH, verifyHit, type Pose } from './hitcheck'
-import type { Stance } from '../../domain/rule/stance'
+import { verifyHit, type Pose } from './hitcheck'
+import { STAB_DOWN_PITCH } from '../../domain/rule/damage'
+import type { Stance } from '../../domain/player/stance'
 
 /**
  * 申告の検証。ここでは**ナイフが刺さる姿勢**だけを見る。

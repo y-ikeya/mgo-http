@@ -10,7 +10,7 @@
  */
 
 import type { SurfaceFlags } from '../../domain/stage/flags'
-import { HEAD_HEIGHT } from '../../domain/rule/stance'
+import { HEAD_HEIGHT } from '../../domain/player/stance'
 
 /** 遮蔽になる箱。ステージの書き出しが作る stage.json の中身 */
 export interface StageBox {

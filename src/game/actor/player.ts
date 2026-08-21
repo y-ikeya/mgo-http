@@ -15,7 +15,7 @@ import {
   STAIR_DROP_MIN,
   STAIR_HOLD,
   STAIR_RISE_MIN,
-} from '../../domain/rule/stance'
+} from './motion'
 import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../domain/rule/damage'
@@ -1624,7 +1624,7 @@ export class Player {
   /**
    * 再生すべきクリップを選ぶ。
    *
-   * 規則そのものは src/domain/rule/stance.ts にある。ここでやるのは、その規則が要る値を
+   * 規則そのものは game/actor/motion.ts にある。ここでやるのは、その規則が要る値を
    * 集めることと、決まった結果に応じて**こちら側の状態を畳む**ことだけ。
    * (敬礼をやめる、落下ループの尺を渡す、といった副作用は共有側に置けない)
    */

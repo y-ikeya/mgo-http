@@ -282,6 +282,8 @@ player/         人
   player.ts       人 (と、練習部屋の的)
   lifecycle.ts    Life の遷移表
   locomotion.ts   体の動きの種類
+  stance.ts       構えと頭の高さ (屈めば隠れられる)
+  moving.ts       乗り越えられる段差
 
 match/          試合
   match.ts        試合と残機
@@ -292,18 +294,27 @@ item/           持ち物
   held.ts         手に持てる物の表
   weapons.ts      武器の性能
   inventory.ts    持ち物と持ち替えの状態
+  grenade.ts      爆風の届く距離と量、投げる強さ
+  claymore.ts     見張る距離と角度、爆風の量
 
 stage/          面
   surface.ts      面の材質 (足音が変わる)
   flags.ts        面が何を止めるか (人 / 弾 / 視線 / カメラ / 描画)
 
 rule/           規則。**どの entity のものでもない判断**だけを置く
-  damage.ts       部位・距離・落下
-  stance.ts       いまどの姿勢であるべきか
+  damage.ts       部位・距離・落下・近接 (誰を刺せるか)
   footsteps.ts    どれだけ歩いたら音が鳴るか
 ```
 
 直下に置くのは README と試験だけ。[layout.test.ts](layout.test.ts) が留めている。
+
+**幾何は連れてこない。** 「爆風は 7m で 75」はここだが、体の何点が爆心から
+見えているかを数えるのは sim。「見張るのは前方 60 度」はここだが、扇の中に
+居るかを内積で見るのは sim。**数字だけがこちらに来る。**
+
+逆に、ここから出ていったものもある。どのモーションを流すかを決める規則
+(`resolveLocomotion` と階段まわりの調律値) は game/actor/motion.ts へ移した —
+触る理由が「動きが変に見える」であって、遊びは変わらないため。
 
 ## まだ言葉になっていないもの
 

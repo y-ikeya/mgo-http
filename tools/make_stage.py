@@ -44,7 +44,7 @@ H_CHEST = 1.4    # 立ったまま撃てるが胸から上が出る
 H_FULL = 1.9     # 立っても完全に隠れる。視線が切れる
 H_WALL = 3.2     # 壁。越えられず、向こう側が一切見えない
 
-STEP_RISE = 0.25   # collision.ts の STEP_UP と揃えること
+STEP_RISE = 0.25   # domain/player/moving.ts の STEP_UP と揃えること
 STEP_DEPTH = 0.7
 
 ARENA = 40.0       # 中心から外壁までの距離 (m)。全体で 80m 四方

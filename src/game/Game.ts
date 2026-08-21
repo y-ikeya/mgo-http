@@ -1037,7 +1037,7 @@ export class Game {
      *
      * **ナイフは構える。** 下を狙えることに意味がある — 倒れている相手には
      * 立ったまま前を刺しても届かず、しゃがんで見下ろして初めて刃が通る
-     * (sim/hitcheck.ts の STAB_DOWN_PITCH)。
+     * (domain/rule/damage.ts の STAB_DOWN_PITCH)。
      */
     const throwing =
       this.inv.held === "grenade" ||

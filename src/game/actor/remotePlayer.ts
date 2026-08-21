@@ -14,10 +14,11 @@ import {
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../../domain/player/locomotion";
-import { canBeStabbed } from "../../sim/judge/hitcheck";
+import { canBeStabbed } from "../../domain/rule/damage";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { isWholeBody, stanceOf, type WholeBodyLocomotion } from "../../domain/rule/stance";
+import { stanceOf } from "../../domain/player/stance";
+import { isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { weaponOf, type WeaponId } from "../../domain/item/weapons";
 import {
   advanceBoxLift,

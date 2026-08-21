@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'bun:test'
-import { stepMovement, type MoveWorld, type Mover } from './movement'
-import { STAIR_DROP_MAX, STAIR_DROP_MIN, STAIR_RISE_MIN } from '../../domain/rule/stance'
+import { stepMovement, type MoveWorld, type Mover } from '../../sim/space/movement'
+import { STAIR_DROP_MAX, STAIR_DROP_MIN, STAIR_RISE_MIN } from './motion'
 
 /**
  * **坂と階段を落差で見分けられるか。**
  *
  * 下りの型 (down_stair) を出すかどうかは、着地したときに「どれだけ落ちたか」で
- * 決めている (src/game/actor/player.ts)。その閾値が実際の物理と合っているかを、
+ * 決めている (player.ts)。その閾値が実際の物理と合っているかを、
  * 本物の stepMovement を通して測る。
  *
- * そもそも**坂では浮かない** (movement.ts の GROUND_SNAP)。浮いていた頃は、
+ * そもそも**坂では浮かない** (sim/space/movement.ts の GROUND_SNAP)。浮いていた頃は、
  * 着地のたびに下りの型が流れて屈伸しているように見えていた。ここでは
  * 「坂では離れない」「段では落差が出る」の両方を押さえる。
  */

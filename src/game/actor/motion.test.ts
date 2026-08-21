@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { WHOLE_BODY, resolveLocomotion, stanceOf, type StanceInput } from './stance'
+import { WHOLE_BODY, resolveLocomotion, type StanceInput } from './motion'
+import { stanceOf } from '../../domain/player/stance'
 
 /**
  * しゃがんだまま刺す。
  *
  * 立ちの刺突は**全身の型**なので、しゃがんでいても流すと立ち上がる。倒れている
- * 相手を刺すには見下ろす必要がある (hitcheck の STAB_DOWN_PITCH) のに、
+ * 相手を刺すには見下ろす必要がある (damage.ts の STAB_DOWN_PITCH) のに、
  * 立ち上がってしまうと見下ろせない。
  */
 

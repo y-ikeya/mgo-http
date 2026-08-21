@@ -28,7 +28,7 @@ const ROW_DUST = 1
 const ROW_FIRE = 2
 const ROW_FLASH = 3
 
-/** 爆風の届く距離 (m)。sim/blast.ts の BLAST_RADIUS と揃える */
+/** 爆風の届く距離 (m)。domain/item/grenade.ts の BLAST_RADIUS と揃える */
 const RADIUS = 7
 
 interface Puff {

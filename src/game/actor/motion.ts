@@ -1,29 +1,26 @@
 /**
- * 姿勢の規則。
+ * どのモーションを流すか。
  *
- * 「いまどのモーションであるべきか」と「そのモーションが何を意味するか」を
- * ここにまとめる。three.js に依存しないので、サーバー (bun) がそのまま読める。
+ * --- なぜ domain に置かないか ---
+ * 置き場所の基準は**触る理由** (docs/design.md の 7)。ここを触るのは
+ * 「動きが変に見える」ときで、**遊びは変わらない**。段差を段と読む落差を
+ * 0.15m から 0.2m にしても、誰の判断も変わらない。
  *
- * --- なぜ 1 本にするか ---
- * 姿勢は 3 か所で解釈されている。動かす側 (player)、映す側 (remotePlayer)、
- * 判定する側 (server)。同じ名前の状態を別の意味で読むと、片方だけ壊れる。
+ * 構え (立ち / しゃがみ / 箱) は別で、あちらは頭の高さを決めるので遊びが
+ * 変わる。domain/player/stance.ts に置いてある。
  *
- * 実際に起きた: 敬礼は送る側では「途中で止めて挙げ続ける」全身動作だったのに、
+ * --- なぜ描画から切り離してあるか ---
+ * three を読まない。**姿勢を決める規則を 1 本にする**ため — 動かす側と映す側で
+ * 別々に書いた頃、敬礼が送る側では「途中で止めて挙げ続ける」全身動作なのに、
  * 受け取る側では移動モーションとして扱われ、挙げて下ろしてを繰り返した。
- * 同じ規則を 2 か所に書いたことが原因で、名前は合っているのに意味が違った。
- *
- * 頭の高さも同じ形の穴だった。遮蔽の判定に使う 1.47 / 0.94 は
- * クリップから実測した値なのに、モーションを差し替えても黙って古いままになる。
+ * 名前は合っているのに意味が違う、という壊れ方をする。
  */
 
-import { locomotionFor, MOVE_DIRECTIONS, type Locomotion } from '../player/locomotion'
-
-/**
- * 体の構え。頭の高さと足音の届く距離がこれで決まる。
- *
- * 8 方向の区別は含めない。向きは「どちらへ歩いているか」であって構えではない。
- */
-export type Stance = 'stand' | 'crouch' | 'box' | 'prone' | 'down'
+import {
+  locomotionFor,
+  MOVE_DIRECTIONS,
+  type Locomotion,
+} from '../../domain/player/locomotion'
 
 /**
  * 全身の型。上下のレイヤーを分けず、頭から流して終わるまで戻さない動作。
@@ -45,7 +42,7 @@ export const AIR_MOTION_DELAY = 0.22
 /**
  * 段差とみなす 1 フレームの上がり幅 (m)。
  *
- * 越えられる段差は 0.25m (sim/collision.ts の STEP_UP)。坂は連続して上がるので
+ * 越えられる段差は 0.25m (domain/player/moving.ts の STEP_UP)。坂は連続して上がるので
  * 1 フレームでは 0.02m ほどしか動かない — その間に線を引く。
  */
 export const STAIR_RISE_MIN = 0.08
@@ -110,41 +107,6 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
  */
 export function isWholeBody(locomotion: Locomotion): locomotion is WholeBodyLocomotion {
   return WHOLE_BODY.has(locomotion)
-}
-
-/** そのモーションのときの構え */
-export function stanceOf(locomotion: Locomotion): Stance {
-  if (locomotion === 'death') return 'down'
-  // 爆風で倒れている間。起き上がりの途中も含めて低い姿勢として扱う
-  if (locomotion === 'sweep' || locomotion === 'stand') return 'prone'
-  if (locomotion === 'sneak' || locomotion === 'sit') return 'box'
-  // クレイモアはかがんで置く。頭が下がるので、見つかりにくさもしゃがみと同じ
-  if (locomotion === 'claymore_windup' || locomotion === 'claymore_place') return 'crouch'
-  if (locomotion === 'crouch_idle' || locomotion.startsWith('crouch_')) return 'crouch'
-  return 'stand'
-}
-
-/**
- * 構えごとの頭の高さ (m)。tools/measure/crouch_size.js の実測値。
- *
- * ダンボールで静止すると 0.59m まで下がるが、遮蔽の判定では採らない。
- * 見えるはずの相手を送り忘れると「居るのに映らない」になるのに対し、
- * 見えない相手を送ってしまうのは覗き見の余地が少し残るだけで済む。
- * 迷ったら送る側に倒す。
- */
-export const HEAD_HEIGHT: Record<Stance, number> = {
-  stand: 1.47,
-  crouch: 0.94,
-  box: 0.94,
-  // 伏せている間。実測で頭が 0.11m まで下がるが、起き上がりの途中は上がるので
-  // その中間を採る。低く採りすぎると「見えているのに映らない」が起きる
-  prone: 0.5,
-  down: 0.3,
-}
-
-/** そのモーションのときの頭の高さ */
-export function headHeightOf(locomotion: Locomotion): number {
-  return HEAD_HEIGHT[stanceOf(locomotion)]
 }
 
 /**

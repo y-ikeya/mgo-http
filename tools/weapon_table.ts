@@ -22,8 +22,8 @@ import {
   type WeaponId,
 } from '../src/domain/item/weapons'
 import { MAX_HEALTH, MELEE_BACK_DAMAGE, MELEE_FRONT_DAMAGE, MELEE_RANGE } from '../src/domain/rule/damage'
-import { BLAST_DAMAGE, BLAST_RADIUS } from '../src/sim/judge/blast'
-import { BLAST_MAX, BLAST_MIN, BLAST_RANGE, TRIGGER_RANGE } from '../src/sim/judge/claymore'
+import { BLAST_DAMAGE, BLAST_RADIUS } from '../src/domain/item/grenade'
+import { BLAST_MAX, BLAST_MIN, BLAST_RANGE, TRIGGER_RANGE } from '../src/domain/item/claymore'
 
 /** 何発当てれば倒せるか。0 なら何発でも倒せない */
 function shots(damage: number): string {

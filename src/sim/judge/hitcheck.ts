@@ -13,45 +13,11 @@
 
 import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from '../../domain/rule/damage'
 import { headHeight, isPathClear, type StageBox } from '../space/vision'
-import type { Stance } from '../../domain/rule/stance'
+import { canBeStabbed } from '../../domain/rule/damage'
 import type { Pose } from '../../domain/player/player'
 
 // 姿の形は domain (Player の過去の姿そのものなので)。ここからも出す
 export type { Pose }
-
-/**
- * 何もしなくてもナイフが刺さる構え。
- *
- * **立ちと中腰。** 箱も含める — 中に居るのは立っているか中腰の人なので、
- * 被っただけで刃が通らなくなるのはおかしい (被れば無敵、という抜け道になる)。
- */
-const STABBABLE: ReadonlySet<Stance> = new Set<Stance>(['stand', 'crouch', 'box'])
-
-/**
- * 倒れている相手に刃が通る、見下ろしの角度 (rad)。**下が負。**
- *
- * 立ったまま真っ直ぐ前を刺しても、地面の相手には届かない。しゃがんで下を狙う、
- * という**手間を掛けたときだけ**通る。
- *
- * 爆風で転ばせてから刺す、が安すぎるという理由で以前は一切通らなくしていたが、
- * それだと倒れている相手が銃でしか処理できない。狙う動作を挟ませれば、
- * 「転ばせて即座に刺す」にはならない。
- */
-export const STAB_DOWN_PITCH = -0.35
-
-/**
- * その構えに刃が通るか。
- *
- * **クライアントも同じものを読む。** サーバーが弾くだけにしていたら、
- * 空振りなのに手元では「当たった」と出た (倒れている相手を刺すと
- * BACKSTAB の文字が出る)。当たり判定はサーバーが権威だが、
- * **当たらないと分かっている物は手元でも当てない。**
- */
-export function canBeStabbed(stance: Stance, aimPitch = 0): boolean {
-  if (STABBABLE.has(stance)) return true
-  // 倒れている相手。**下を狙っているときだけ**通る
-  return aimPitch <= STAB_DOWN_PITCH
-}
 
 /** 申告の中身 */
 export interface HitClaim {

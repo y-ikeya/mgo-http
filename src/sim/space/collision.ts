@@ -15,6 +15,7 @@
  */
 export type { Surface } from '../../domain/stage/surface'
 import type { Surface } from '../../domain/stage/surface'
+import { STEP_UP } from '../../domain/player/moving'
 
 /**
  * 位置。three の Vector3 はこの形を満たすので、呼ぶ側は今までどおり渡せる。
@@ -73,13 +74,6 @@ export function topAt(o: Obstacle, x: number, z: number): number {
   return o.baseTop + o.slopeX * (cx - o.minX) + o.slopeZ * (cz - o.minZ)
 }
 
-/**
- * 歩いたまま乗り越えられる段差 (m)。
- *
- * これを超える段差はジャンプしないと登れない。階段の一段をこの値より高く作れば
- * 「ジャンプで登る階段」になり、低く作れば「歩いて登れるスロープ」になる。
- */
-const STEP_UP = 0.25
 
 /** ゼロ除算と、押し出し後に再び接触判定が立つのを避けるための余裕 */
 const EPSILON = 1e-4

@@ -57,7 +57,7 @@ LEVEL = 4.0
 SLAB = 0.10
 LEVELS = (0.0, LEVEL, LEVEL * 2)   # 各階の床の上面
 
-STEP_RISE = 0.25   # collision.ts の STEP_UP と揃える
+STEP_RISE = 0.25   # domain/player/moving.ts の STEP_UP と揃える
 STEP_DEPTH = 0.7
 STAIR_DEPTH = 0.35   # 床に開けた穴に収めるための浅い段
 

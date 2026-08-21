@@ -1,14 +1,11 @@
 import { describe, expect, test } from 'bun:test'
+import { blastFrom, canPlaceAt, triggeredBy, type Placed } from './claymore'
 import {
-  blastFrom,
-  canPlaceAt,
-  triggeredBy,
   BLAST_MAX,
   BLAST_MIN,
   BLAST_RANGE,
   TRIGGER_RANGE,
-  type Placed,
-} from './claymore'
+} from '../../domain/item/claymore'
 
 /**
  * クレイモアの向き。
