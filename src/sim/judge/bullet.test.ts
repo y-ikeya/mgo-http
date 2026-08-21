@@ -6,8 +6,8 @@ import { WEAPONS } from '../../domain/item/weapons'
  * **武器ごとに弾の落ち方が違うことを押さえる。**
  *
  * 速さと重力を持っているのは domain (武器の性能)、放物線を引くのがここ。
- * 長らく**クライアントが全部の銃を 420 m/s で撃っていた** — 狙撃銃の弾が
- * 速いという設計が、画面には一度も出ていなかった。
+ * 長らく**クライアントが全部の銃を 420 m/s で撃っていた** — 武器ごとに初速を
+ * 決めてあるのに、画面には一度も出ていなかった。
  */
 describe('弾の落ち', () => {
   test('近距離では読み取れない。撃ち合いの大半は今までどおり', () => {
@@ -15,20 +15,24 @@ describe('弾の落ち', () => {
     expect(bulletDrop(25, ak.bulletSpeed, ak.bulletGravity)).toBeLessThan(0.05)
   })
 
-  test('遠距離では狙点より下に当たる。ステージの端で 20cm ほど', () => {
+  test('小銃は遠くでもほとんど落ちない。実銃の初速を採っている', () => {
     const ak = WEAPONS.rifle
     const drop = bulletDrop(80, ak.bulletSpeed, ak.bulletGravity)
-    expect(drop).toBeGreaterThan(0.1)
-    expect(drop).toBeLessThan(0.4)
+    expect(drop).toBeGreaterThan(0.02)
+    expect(drop).toBeLessThan(0.1)
   })
 
-  test('**速い弾ほど落ちない。** 狙撃銃は同じ距離で AK の 1/3 以下', () => {
-    const ak = WEAPONS.rifle
-    const sniper = WEAPONS.sniper
-    const akDrop = bulletDrop(80, ak.bulletSpeed, ak.bulletGravity)
-    const sniperDrop = bulletDrop(80, sniper.bulletSpeed, sniper.bulletGravity)
-    // 落差は速さの 2 乗で効く。820 と 420 なら (420/820)² = 0.26 倍
-    expect(sniperDrop).toBeLessThan(akDrop / 3)
+  test('**拳銃だけは目に見えて落ちる。** 遠くを撃つ道具ではない', () => {
+    const m9 = WEAPONS.pistol
+    // 80m で 20cm 以上 — 頭 1 つぶん下に着く
+    expect(bulletDrop(80, m9.bulletSpeed, m9.bulletGravity)).toBeGreaterThan(0.2)
+  })
+
+  test('**速い弾ほど落ちない。** 速さの順と落差の順は必ず逆になる', () => {
+    const bySpeed = Object.values(WEAPONS).sort((a, b) => a.bulletSpeed - b.bulletSpeed)
+    const drops = bySpeed.map((w) => bulletDrop(80, w.bulletSpeed, w.bulletGravity))
+    // 遅い順に並べたら、落差は多い順に並ぶ
+    for (let i = 1; i < drops.length; i++) expect(drops[i]).toBeLessThanOrEqual(drops[i - 1])
   })
 
   test('拳銃は一番落ちる。遠くを撃つ物ではない', () => {

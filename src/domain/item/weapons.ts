@@ -324,7 +324,7 @@ const RIFLE: WeaponSpec = {
   reserve: 90,
   reload: 2.5,
 
-  bulletSpeed: 420,
+  bulletSpeed: 715, // 7.62x39mm の初速
   bulletGravity: 9.8,
 
   spreadPerShot: 0.13,
