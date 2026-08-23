@@ -14,10 +14,11 @@
  */
 
 import {
-  HELD, SWITCH_TIME, buildCarried, cycle as cycleId, dropEmpty, dropFrom, find, firstOf,
-  listOf, pickUp, toggle as toggleId,
+  BROWSE_HOLD, HELD, SWITCH_TIME, buildCarried, canDrop, cycle as cycleId, dropEmpty, dropFrom,
+  find, firstOf, listOf, pickUp, toggle as toggleId,
   type Carried, type Family, type GunId, type HeldId, type Loadout,
 } from './held'
+import type { Intent } from '../player/intent'
 import { WEAPONS } from './weapons'
 
 /** 銃の初期弾数。表から引く */
@@ -25,8 +26,55 @@ function fullAmmo(id: GunId): { ammo: number; reserve: number } {
   return { ammo: WEAPONS[id].magazine, reserve: WEAPONS[id].reserve }
 }
 
+/** 系統は 2 つ。並びを 1 か所に置いて、増えたときに数え漏らさないようにする */
+const FAMILIES: readonly Family[] = ['weapon', 'tool']
+
+/** 開いている一覧。どの系統の、何番目を指しているか */
+export interface Browsing {
+  family: Family
+  at: number
+}
+
+/**
+ * 持ち替えを許すかどうかを決める、外から来る事実。
+ *
+ * **意思 (Intent) ではない。** どれも「押しているか」ではなく「いまどうなって
+ * いるか」で、構えは特にそう — 箱を被っていたり敬礼中は押しても構わないので、
+ * 押していることと構えていることは別物。
+ */
+export interface HandContext {
+  /** 動ける状態か (Life から) */
+  canAct: boolean
+  /** 支度の画面を開いているか。戦場に居ない */
+  choosing: boolean
+  /** **実際に**構えているか。押しているかではない */
+  aiming: boolean
+  /** ボルトを送っている最中か */
+  cocking: boolean
+  /**
+   * いま箱を被れる体勢か。
+   *
+   * **転がり中・空中・刺突中・倒れている間は被れない。** 体の側で弾いていた
+   * だけだと、持ち物は箱に切り替わったのに体は被らない — **HUD が「被って
+   * いる」と言っているのに、画面の中では被っていない**という食い違いになる。
+   * 手にする所で断れば、両方が同じことを言う。
+   */
+  canWearBox: boolean
+}
+
+/** 手にある物が動いた結果、呼ぶ側にやってもらうこと */
+export type HandEvent =
+  /** 足元の物を拾いたい。誰の何を拾うかはサーバーが決める */
+  | { kind: 'pickup' }
+  /** 手放した。地面に置くのはサーバーなので、残弾ごと知らせる */
+  | { kind: 'dropped'; item: Carried }
+  /** 一覧の中で選び直した。音を鳴らすのに使う */
+  | { kind: 'selected' }
+
 export class Inventory {
   private items: Carried[] = []
+  /** 箱を被れる体勢か。hand() が毎フレーム書き込む (既定は被れる) */
+  private wearable = true
   private current: HeldId = 'rifle'
   /** 直前に持っていた物。押すだけのトグルはこの 2 つを往復する */
   private last: HeldId | null = null
@@ -227,6 +275,136 @@ export class Inventory {
     return this.items
   }
 
+  // --- 一覧を開いて選ぶ ---
+
+  /** 開いている一覧。閉じていれば null。画面に出すのに読む */
+  get browsing(): Browsing | null {
+    return this.browse
+  }
+
+  private browse: Browsing | null = null
+  /** 系統ごとに、送りのキーを押し続けている長さ (秒)。0 なら押していない */
+  private heldFor: Record<Family, number> = { weapon: 0, tool: 0 }
+
+  /**
+   * 手にある物を、押されている物から決める。
+   *
+   * --- ここが規則である理由 ---
+   * 「構えたままでは持ち替えられない」「ボルトを送り終えるまで持ち替えない」は
+   * どちらも**代償の置き方**であって、見た目の都合ではない。銃を下ろす一手間が
+   * あって初めて「どちらで待つか」が選択になるし、撃って即座に隠れる、を塞ぐ。
+   *
+   * Game.ts に置いていた頃は、この判断がキーコードと three の間に挟まっていた。
+   * ここに来たので**サーバーも同じ規則を読める** — いまサーバーは「持ち替えの
+   * 最中か」を知らないので、持ち替え中に撃つが通っている。
+   *
+   * @param dt 前のフレームからの秒。**時計は持ち込まない** (Date.now を使うと
+   *           試験が実時間に縛られるし、サーバーが読むときに噛み合わない)
+   * @returns 呼ぶ側にやってもらうこと。通信と音は presentation の仕事
+   */
+  hand(intent: Intent, ctx: HandContext, dt: number): HandEvent[] {
+    // 体勢は毎フレーム変わる。持ち替えの入口 (switchTo) が見るので控えておく
+    this.wearable = ctx.canWearBox
+    // 行動できない / 支度中は、押していたことごと忘れる。
+    // 覚えていると、湧いた瞬間に一覧が開いていたり持ち替えが走ったりする
+    if (!ctx.canAct || ctx.choosing) {
+      this.browse = null
+      this.heldFor.weapon = 0
+      this.heldFor.tool = 0
+      return []
+    }
+    // ボルトを送り終えるまでは持ち替えない。**押していた長さは消さない** —
+    // 送り終えた瞬間に、押しっぱなしだったぶんが効く
+    if (ctx.cocking) return []
+    // 構えたままは持ち替えられない。銃を下ろす一手間があって初めて、
+    // どちらで待つかの選択になる
+    if (ctx.aiming) {
+      this.browse = null
+      return []
+    }
+
+    const events: HandEvent[] = []
+
+    /*
+     * 置く / 拾う。**一覧を開いていれば置く、開いていなければ拾う。**
+     *
+     * 同じ 1 つの動詞にしてあるのは、どちらも「地面と手の間で物を動かす」から。
+     * 押し分けが要るのは置きたい物の上に立っているときだけで、そのときは
+     * 一覧を開いているかどうかで意図がはっきりしている。
+     */
+    if (intent.drop) {
+      const gone = this.browse ? this.dropSelected() : null
+      if (gone) events.push({ kind: 'dropped', item: gone })
+      else if (!this.browse) events.push({ kind: 'pickup' })
+    }
+
+    for (const family of FAMILIES) {
+      if (intent.browse[family]) {
+        this.heldFor[family] += dt
+        // 一覧はすぐには出さない。単押しのつもりで出ると、往復するたびに
+        // 画面が騒がしくなる
+        if (this.heldFor[family] >= BROWSE_HOLD && !this.browse) {
+          this.browse = { family, at: this.startOf(family) }
+        }
+        if (this.browse?.family === family && intent.select !== 0) {
+          this.browse.at = this.moveBy(this.browse, -intent.select)
+          events.push({ kind: 'selected' })
+        }
+        continue
+      }
+      if (this.heldFor[family] === 0) continue
+      // 離した。開いていたなら選んだ物へ、開いていなければトグル
+      const opened = this.browse?.family === family
+      const pick = opened ? this.list(family)[this.browse!.at]?.id : undefined
+      this.heldFor[family] = 0
+      if (opened) this.browse = null
+      if (pick) this.switchTo(pick)
+      else this.toggle(family)
+    }
+
+    // 名指しの持ち替え。一覧を開かずに行き先が決まっているとき
+    if (intent.toSupport) {
+      const support = this.supportId
+      if (support) this.switchTo(support)
+    }
+    if (intent.toKnife) this.switchTo('knife')
+
+    return events
+  }
+
+  /** 一覧を開いた時点の位置。いま手にある物に合わせる */
+  private startOf(family: Family): number {
+    const at = this.list(family).findIndex((item) => item.id === this.held)
+    return at < 0 ? 0 : at
+  }
+
+  /** 一覧の中を送る。端で止めず回す — 短い並びなので行き止まりが煩わしい */
+  private moveBy(state: Browsing, step: number): number {
+    const list = this.list(state.family)
+    if (list.length === 0) return 0
+    return (state.at + step + list.length) % list.length
+  }
+
+  /**
+   * 一覧で選んでいる物を手放す。
+   *
+   * **持ち物から外すのはここ、地面に置くのはサーバー。** 位置を持っているのが
+   * あちらなので、置き場所はあちらが決める (足元)。
+   */
+  private dropSelected(): Carried | null {
+    if (!this.browse) return null
+    const id = this.list(this.browse.family)[this.browse.at]?.id
+    if (!id || !canDrop(id)) return null
+    const gone = this.drop(id)
+    if (!gone) return null
+    // 一覧は閉じる。置いた物を指したまま残ると、次に離した瞬間に
+    // 「持っていない物へ持ち替える」になる
+    this.browse = null
+    this.heldFor.weapon = 0
+    this.heldFor.tool = 0
+    return gone
+  }
+
   /** 時計を進める。持ち替えが終わったら、溜めていた行き先へ続けて移る */
   update(dt: number): void {
     if (this.switchLeft <= 0) return
@@ -249,6 +427,8 @@ export class Inventory {
    */
   switchTo(id: HeldId): boolean {
     if (!find(this.items, id)) return false
+    // 被れない体勢なら箱には持ち替えない。**手にした形だけ作らない**
+    if (id === 'box' && !this.wearable) return false
     if (this.switching) {
       this.queued = id === this.current ? null : id
       return false

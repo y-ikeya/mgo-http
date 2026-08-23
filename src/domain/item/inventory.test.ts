@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { Inventory } from './inventory'
-import { SWITCH_TIME } from './held'
+import { Inventory, type HandContext } from './inventory'
+import { BROWSE_HOLD, SWITCH_TIME, type Family } from './held'
+import { NO_INTENT, type Intent } from '../player/intent'
 
 /**
  * 持ち物の状態と遷移。
@@ -319,5 +320,185 @@ describe('箱を挟んだ持ち替え', () => {
     inv.toggle('weapon'); settle(inv)
     // 手榴弾 → 直前の武器 (P90)
     expect(inv.held).toBe('smg')
+  })
+})
+
+/**
+ * 押されている物から、手にある物を決める。
+ *
+ * Game.ts (2900 行) の中でキーコードと three に挟まれていた判断。**代償の
+ * 置き方がここにある** — 構えたままでは持ち替えられないし、選ぶのはタダだが
+ * 抜くのには時間がかかる。掘り出したので、three 無しで確かめられる。
+ */
+const FREE: HandContext = {
+  canAct: true,
+  choosing: false,
+  aiming: false,
+  cocking: false,
+  canWearBox: true,
+}
+
+/** 何も押していない Intent に、渡した分だけ足す */
+function press(over: Partial<Intent> = {}): Intent {
+  return { ...NO_INTENT, ...over, browse: { ...NO_INTENT.browse, ...over.browse } }
+}
+
+/** 系統のキーを押し続ける。返るのは最後の呼びで出た出来事 */
+function hold(inv: Inventory, family: Family, seconds: number, over: Partial<Intent> = {}) {
+  return inv.hand(press({ ...over, browse: { [family]: true } as never }), FREE, seconds)
+}
+
+describe('一覧を開く', () => {
+  test('短く押して離すとトグル。一覧は出ない', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD / 2)
+    expect(inv.browsing).toBeNull()
+    inv.hand(press(), FREE, 0.016)
+    // 主武器 ⇄ 副武器の往復
+    expect(inv.held).toBe('pistol')
+  })
+
+  test('押さえ続けると一覧が出る', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    expect(inv.browsing?.family).toBe('weapon')
+    // **開いただけでは持ち替えていない。** 選ぶのはタダ
+    expect(inv.held).toBe('rifle')
+    expect(inv.switching).toBe(false)
+  })
+
+  test('一覧は手にある物を指して開く', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    const at = inv.browsing!.at
+    expect(inv.list('weapon')[at]?.id).toBe('rifle')
+  })
+
+  test('送って離すと、選んだ物へ移る', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    const before = inv.browsing!.at
+    hold(inv, 'weapon', 0.016, { select: 1 })
+    expect(inv.browsing!.at).not.toBe(before)
+    const picked = inv.list('weapon')[inv.browsing!.at]!.id
+    inv.hand(press(), FREE, 0.016)
+    expect(inv.browsing).toBeNull()
+    expect(inv.held).toBe(picked)
+  })
+
+  test('端で止めず回る', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    const n = inv.list('weapon').length
+    const start = inv.browsing!.at
+    for (let i = 0; i < n; i++) hold(inv, 'weapon', 0.016, { select: 1 })
+    expect(inv.browsing!.at).toBe(start)
+  })
+})
+
+describe('持ち替えられない場面', () => {
+  test('構えたままでは持ち替えられない。一覧も閉じる', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    expect(inv.browsing).not.toBeNull()
+
+    inv.hand(press({ browse: { weapon: true, tool: false } }), { ...FREE, aiming: true }, 0.016)
+    expect(inv.browsing).toBeNull()
+    // 離しても持ち替わらない
+    inv.hand(press(), { ...FREE, aiming: true }, 0.016)
+    expect(inv.held).toBe('rifle')
+  })
+
+  test('ボルトを送っている間は何も起きない。**押していた長さは消えない**', () => {
+    const inv = make()
+    // 送っている間に押さえ込む
+    inv.hand(press({ browse: { weapon: true, tool: false } }), { ...FREE, cocking: true }, BROWSE_HOLD)
+    expect(inv.browsing).toBeNull()
+    // 送り終えたら、押しっぱなしのぶんが効く
+    hold(inv, 'weapon', BROWSE_HOLD)
+    expect(inv.browsing?.family).toBe('weapon')
+  })
+
+  test('支度中は押していたことごと忘れる', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    inv.hand(press(), { ...FREE, choosing: true }, 0.016)
+    expect(inv.browsing).toBeNull()
+    // 離した扱いにならない = トグルも走らない
+    expect(inv.held).toBe('rifle')
+  })
+})
+
+describe('地面との出し入れ', () => {
+  test('一覧を開いていなければ拾う', () => {
+    const inv = make()
+    expect(inv.hand(press({ drop: true }), FREE, 0.016)).toEqual([{ kind: 'pickup' }])
+  })
+
+  test('一覧を開いていれば、指している物を置く', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    const events = hold(inv, 'weapon', 0.016, { drop: true })
+    const dropped = events.find((e) => e.kind === 'dropped')
+    expect(dropped).toBeDefined()
+    expect(inv.has('rifle')).toBe(false)
+    // 置いた物を指したまま残すと、離した瞬間に「持っていない物へ持ち替える」になる
+    expect(inv.browsing).toBeNull()
+  })
+
+  test('置けない物 (ナイフ) は置けない。拾いにも行かない', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD)
+    const knife = inv.list('weapon').findIndex((c) => c.id === 'knife')
+    inv.browsing!.at = knife
+    expect(hold(inv, 'weapon', 0.016, { drop: true })).toEqual([])
+    expect(inv.has('knife')).toBe(true)
+  })
+})
+
+describe('名指しの持ち替え', () => {
+  test('支援装備へ直接移る', () => {
+    const inv = make()
+    inv.hand(press({ toSupport: true }), FREE, 0.016)
+    expect(inv.held).toBe('grenade')
+  })
+
+  test('ナイフへ直接移る', () => {
+    const inv = make()
+    inv.hand(press({ toKnife: true }), FREE, 0.016)
+    expect(inv.held).toBe('knife')
+  })
+})
+
+/**
+ * **転がりながらは被れない。**
+ *
+ * 体の側 (scene/actor/player.ts) だけで弾いていたので、持ち物は箱に切り替わる
+ * のに体は被らなかった — 左下の HUD が「被っている」と言っているのに、画面の
+ * 中では被っていない。手にする所で断れば、両方が同じことを言う。
+ */
+describe('被れない体勢', () => {
+  const rolling: HandContext = { ...FREE, canWearBox: false }
+
+  test('転がり中に道具へ持ち替えても、箱にはならない', () => {
+    const inv = make()
+    inv.hand(press({ browse: { weapon: false, tool: true } }), rolling, 0.016)
+    inv.hand(press(), rolling, 0.016)
+    expect(inv.held).not.toBe('box')
+    expect(inv.usingTool).toBe(false)
+  })
+
+  test('体勢が戻れば被れる', () => {
+    const inv = make()
+    inv.hand(press({ browse: { weapon: false, tool: true } }), FREE, 0.016)
+    inv.hand(press(), FREE, 0.016)
+    expect(inv.held).toBe('box')
+  })
+
+  test('**名指しの持ち替えも同じ。** 抜け道を作らない', () => {
+    const inv = make()
+    inv.hand(press(), rolling, 0.016)
+    expect(inv.switchTo('box')).toBe(false)
+    expect(inv.held).not.toBe('box')
   })
 })

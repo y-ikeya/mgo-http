@@ -44,7 +44,8 @@ import {
 } from "../../domain/player/lifecycle";
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
 import { Inventory } from "../../domain/item/inventory";
-import { canDrop, isGun, type Family, type HeldId } from "../../domain/item/held";
+import type { Intent } from "../../domain/player/intent";
+import { isGun, type HeldId } from "../../domain/item/held";
 import { MODES, isHostile, type Mode } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
@@ -255,23 +256,6 @@ const GRENADE_RELEASE_FORWARD = 0.45;
  */
 const CLAYMORE_PLACE_RATIO = 0.55;
 
-/**
- * 一覧が開くまでの長押し (秒)。
- *
- * **短く押したときは一覧を出さない。** 往復するたびに画面が騒がしくなるし、
- * 一覧が出ること自体が「いま選んでいる」という状態なので、意図せず入るのは困る。
- *
- * 1 秒にしていたら遅かった。押してから出るまで待たされると、一覧を使うこと自体が
- * 億劫になる。叩く (0.1 秒前後) と押さえる (0.3 秒以上) の間を取る。
- */
-const BROWSE_HOLD = 0.35;
-
-/** 長押しで一覧が出るキー。系統ごとに 1 つ */
-const SWITCH_KEYS: readonly (readonly [Family, "swap" | "box", string])[] = [
-  ["weapon", "swap", "KeyQ"],
-  ["tool", "box", "KeyC"],
-];
-
 
 /**
  * 空撃ちの音を鳴らす間隔 (秒)。
@@ -355,9 +339,13 @@ export class Game {
    * **開いている間は持ち替えていない。** 選ぶことと抜くことを分けてあるので、
    * ここを動かしても代償は発生しない (docs/design.md の 5)。
    */
-  private browsing: { family: Family; at: number } | null = null;
-  /** 系統ごとの押し始めた時刻。0 なら押していない */
-  private readonly pressedAt: Record<Family, number> = { weapon: 0, tool: 0 };
+  /**
+   * 一覧が食い残したホイール。倍率 (updateZoom) が続けて読む。
+   *
+   * ホイールは読んだ時点で 0 になるので、**取り合いになる 2 か所で 2 回読めない**。
+   * 先に読む側 (一覧) が残りをここへ置く。
+   */
+  private wheelLeft = 0;
 
   private grenadeAiming = false;
   /** 構え始めと同じフレームに引かれた引き金。次のフレームで放す */
@@ -582,7 +570,9 @@ export class Game {
    * 覗いたまま構えを解いて、次に構えたら突然 16 倍、では扱えない。
    */
   private updateZoom(): void {
-    const steps = this.input.consumeWheel();
+    // 一覧が食い残したぶんだけ。同じホイールを一覧が先に見ている
+    const steps = this.wheelLeft;
+    this.wheelLeft = 0;
     // Z は 1 段ずつ上げて、一番上まで行ったら肩越しへ戻る。
     // トラックパッドではホイールが扱いにくいので、キーでも回せるようにしてある
     const cycled = this.input.consumeAction("zoom", "KeyZ");
@@ -864,7 +854,7 @@ export class Game {
     this.follow.setAiming(this.player.isAiming);
     this.follow.setViewHeight(this.player.viewHeight);
 
-    this.updateSwitchKeys();
+    this.updateSwitchKeys(dt);
     this.updateStanceInput(dt);
     this.updateLoadoutKeys();
     this.syncLoadoutPointer();
@@ -2328,123 +2318,69 @@ export class Game {
    * **持ち替えには時間がかかり、その間は何もできない** (Inventory.canShoot)。
    * それが投げること・刺すことの代償になっている (docs/design.md の 5)。
    */
-  private updateSwitchKeys(): void {
-    if (!canAct(this.life) || this.loadoutBlocking) {
-      this.browsing = null;
-      this.pressedAt.weapon = 0;
-      this.pressedAt.tool = 0;
-      return;
-    }
-    // ボルトを送り終えるまでは持ち替えない。撃って即座に隠れる、を塞ぐ
-    if (this.cocking) return;
-    // 構えたままは持ち替えられない。銃を下ろす一手間があって初めて、
-    // どちらで待つかの選択になる
-    if (this.player.isAiming) {
-      this.browsing = null;
-      return;
-    }
-
+  /**
+   * 手にある物。**押されている物を Intent に訳して、規則へ渡すだけ。**
+   *
+   * 判断そのものは domain (item/inventory.ts の hand)。ここに残るのは
+   * キーコードと、返ってきた結果を通信・音・右スティックの用途に配ること。
+   */
+  private updateSwitchKeys(dt: number): void {
     /*
-     * G。**一覧を開いていれば置く、開いていなければ拾う。**
+     * ホイールは**一覧とスコープの取り合い**になる。
      *
-     * 同じ 1 つのキーにしてあるのは、どちらも「地面と手の間で物を動かす」
-     * 操作だから。押し分ける必要が出るのは、置きたい物の上に立っているときだけで、
-     * そのときは一覧を開いているかどうかで意図がはっきりしている。
+     * 一覧を開いていれば一覧が食い、開いていなければ倍率へ回す。読んだ時点で
+     * 0 になるので、ここで両方に配る (updateZoom はこの残りを見る)。
+     * 右スティックのぶん (consumeListStep) は一覧専用なので倍率へは回さない。
      */
-    if (this.input.consumeAction("drop", "KeyG")) {
-      if (this.browsing) this.dropSelected();
-      else this.net.send({ type: "pickup" });
-    }
+    const wheel = this.input.consumeWheel();
+    const intent: Intent = {
+      browse: {
+        weapon: this.input.isActionDown("swap", "KeyQ"),
+        tool: this.input.isActionDown("box", "KeyC"),
+      },
+      select: wheel + this.input.consumeListStep(),
+      drop: this.input.consumeAction("drop", "KeyG"),
+      toSupport: this.input.consumeAction("grenade", "KeyE"),
+      toKnife: this.input.consumeAction("knife", "KeyF"),
+    };
 
-    // --- 長押しで一覧、離すと持ち替え ---
-    //
-    // **一覧の中を動くのはタダ。** 時間がかかるのは決めた後の持ち替えだけ。
-    // 押すだけのトグルは即持ち替えなので、連打すると全部が実際の持ち替えになる。
-    // 選ぶことと抜くことを分けると、迷っている時間に代償が要らなくなる。
+    const events = this.inv.hand(intent, {
+      canAct: canAct(this.life),
+      choosing: this.loadoutBlocking,
+      aiming: this.player.isAiming,
+      cocking: this.cocking,
+      canWearBox: this.player.canWearBox,
+    }, dt);
+
+    // 一覧が受け取らなかったぶんは倍率へ回す
+    this.wheelLeft = this.inv.browsing ? 0 : wheel;
     // 一覧を開いている間は、右スティックを視点ではなく一覧に使う
-    this.input.setListMode(this.browsing !== null);
+    this.input.setListMode(this.inv.browsing !== null);
 
-    for (const [family, action, code] of SWITCH_KEYS) {
-      const down = this.input.isActionDown(action, code);
-      if (down) {
-        // 押し始めを控える。**一覧はすぐには出さない** — 単押しのつもりで
-        // 出ると、往復するたびに画面が騒がしくなる
-        if (this.pressedAt[family] === 0) this.pressedAt[family] = Date.now();
-        const holding = Date.now() - this.pressedAt[family] >= BROWSE_HOLD * 1000;
-        if (holding && !this.browsing) {
-          this.browsing = { family, at: this.browseStart(family) };
+    for (const event of events) {
+      switch (event.kind) {
+        case "pickup":
+          this.net.send({ type: "pickup" });
+          break;
+        case "dropped": {
+          // **持ち物から外したのはあちら、地面に置くのはサーバー。**
+          // 残弾は本人しか知らないので一緒に送る
+          const gone = event.item;
+          this.net.send({
+            type: "drop",
+            weapon: gone.id,
+            ammo: "ammo" in gone ? gone.ammo : undefined,
+            reserve: "reserve" in gone ? gone.reserve : undefined,
+            count: "count" in gone ? gone.count : undefined,
+          });
+          // 音は dropped が返ってきたときに鳴らす。**置いた場所で鳴らしたい**し、
+          // ここでも鳴らすと自分だけ 2 回聞こえる
+          break;
         }
-        if (this.browsing?.family === family) {
-          // ホイール (鍵盤) と右スティック (パッド)。**どちらでも同じだけ送る**
-          const steps = this.input.consumeWheel() + this.input.consumeListStep();
-          if (steps !== 0) this.browsing.at = this.browseMove(this.browsing, -steps);
-        }
-      } else if (this.pressedAt[family] !== 0) {
-        const opened = this.browsing?.family === family;
-        const pick = opened ? this.inv.list(family)[this.browsing!.at]?.id : undefined;
-        this.pressedAt[family] = 0;
-        if (opened) this.browsing = null;
-        // 一覧を開いていたなら選んだ物へ。開いていなければトグル
-        if (pick) this.inv.switchTo(pick);
-        else if (family === "weapon") this.inv.toggle("weapon");
-        else this.inv.toggle("tool");
+        case "selected":
+          break;
       }
     }
-
-    // 名指しの持ち替え。一覧を開かずに行き先が決まっているとき
-    if (this.input.consumeAction("grenade", "KeyE")) {
-      const support = this.inv.supportId;
-      if (support) this.inv.switchTo(support);
-    }
-    if (this.input.consumeAction("knife", "KeyF")) this.inv.switchTo("knife");
-  }
-
-  /** 一覧を開いた時点の位置。いま手にある物に合わせる */
-  private browseStart(family: Family): number {
-    const list = this.inv.list(family);
-    const at = list.findIndex((item) => item.id === this.inv.held);
-    return at < 0 ? 0 : at;
-  }
-
-  /** 一覧の中を送る。端で止めず回す — 短い並びなので行き止まりが煩わしい */
-  private browseMove(state: { family: Family; at: number }, step: number): number {
-    const list = this.inv.list(state.family);
-    if (list.length === 0) return 0;
-    return (state.at + step + list.length) % list.length;
-  }
-
-  /**
-   * 手にある物を Player と Inventory で揃える。
-   *
-   * 銃はモデルの読み込みが要る (equip) ので、変わった瞬間だけ呼ぶ。
-   */
-  /**
-   * 一覧で選んでいる物を地面へ置く。
-   *
-   * **持ち物から外すのはこちら、地面に置くのはあちら。** 位置を持っているのが
-   * サーバーなので、置き場所はあちらが決める (足元)。残弾は本人しか知らないので
-   * 一緒に送る。
-   */
-  private dropSelected(): void {
-    if (!this.browsing) return;
-    const id = this.inv.list(this.browsing.family)[this.browsing.at]?.id;
-    if (!id || !canDrop(id)) return;
-    const gone = this.inv.drop(id);
-    if (!gone) return;
-    this.net.send({
-      type: "drop",
-      weapon: gone.id,
-      ammo: "ammo" in gone ? gone.ammo : undefined,
-      reserve: "reserve" in gone ? gone.reserve : undefined,
-      count: "count" in gone ? gone.count : undefined,
-    });
-    // 一覧は閉じる。置いた物を指したまま残ると、次に離した瞬間に
-    // 「持っていない物へ持ち替える」になる
-    this.browsing = null;
-    this.pressedAt.weapon = 0;
-    this.pressedAt.tool = 0;
-    // 音は dropped が返ってきたときに鳴らす。**置いた場所で鳴らしたい**し、
-    // ここでも鳴らすと自分だけ 2 回聞こえる
   }
 
   /**
@@ -2860,12 +2796,12 @@ export class Game {
        * 並びと、いま指している位置を渡す。**L 字に折って描く**のは画面側の仕事
        * (真ん中を塞がないため)。
        */
-      browsing: this.browsing
+      browsing: this.inv.browsing
         ? {
             // **数も載せる。** 選ぶときに「あと何発か」が要る — 弾切れの銃と
             // 満タンの銃が同じ見た目だと、一覧が選ぶ材料にならない。
             // 銃は装填分も足した**総数**。カードの数字と揃える
-            items: this.inv.list(this.browsing.family).map((c) => ({
+            items: this.inv.list(this.inv.browsing.family).map((c) => ({
               id: c.id,
               n: 'ammo' in c ? c.ammo + c.reserve : 'count' in c ? c.count : null,
               // **装填の内訳も銃ごとに。** 送っている間、角のカードは指している銃を
@@ -2873,7 +2809,7 @@ export class Game {
               loaded: 'ammo' in c ? c.ammo : null,
               mag: 'ammo' in c ? weaponOf(c.id).magazine : null,
             })),
-            at: this.browsing.at,
+            at: this.inv.browsing.at,
           }
         : null,
       held: this.inv.held,
@@ -2881,7 +2817,7 @@ export class Game {
       weaponHeld: shownWeapon,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
-      browsingFamily: this.browsing?.family ?? null,
+      browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物
       support: (this.inv.supportId as SupportId | null) ?? this.loadout.support,

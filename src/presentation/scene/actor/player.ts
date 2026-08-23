@@ -542,11 +542,7 @@ export class Player {
    */
   setBoxed(on: boolean): void {
     if (on === this.boxed) return
-    if (on) {
-      if (this.down || !this.onGround || this.rolling || this.stabbing) return
-      if (this.downed || this.standing) return
-      if (this.saluting) return
-    }
+    if (on && !this.canWearBox) return
     this.boxed = on
     this.animator?.setBoxed(this.boxed)
     // 被る = 屈む。箱の高さはしゃがみ姿勢に合わせてある。
@@ -554,6 +550,19 @@ export class Player {
       this.crouching = true
       this.aiming = false
     }
+  }
+
+  /**
+   * いま箱を被れる体勢か。
+   *
+   * **持ち替えの側も同じ答えを見る** (domain/item/inventory.ts の canWearBox)。
+   * ここだけで弾いていた頃は、転がり中に C を押すと**持ち物は箱に替わったのに
+   * 体は被らない** — HUD だけが被っていると言う状態になっていた。
+   */
+  get canWearBox(): boolean {
+    if (this.down || !this.onGround || this.rolling || this.stabbing) return false
+    if (this.downed || this.standing) return false
+    return !this.saluting
   }
 
   /** 箱を脱ぐ。構える・撃つ・転がるなど、隠れるのをやめる操作から呼ぶ */

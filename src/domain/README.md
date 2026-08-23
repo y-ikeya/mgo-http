@@ -321,6 +321,7 @@ AR は 20 で 5 発 (0.36 秒)。**近くでは AR がわずかに速い。** SM
 | **HeldId** | いま手にある物。1 つだけ |
 | **持ち物 (kit)** | その命で手にできる物の全部。選んだ装備 + 拾った物。**置けば外れる** |
 | **Family** | 持ち物の系統 (`weapon` / `tool`) |
+| **Intent** | **その人が何をしようとしているか。** 押されている動詞だけで、受け付けた結果は入らない |
 | **発光** | 位置が公になっている状態。リンクした味方 / 抜かれた相手 / DM の 1 位 |
 
 ### 人 (Player) と接続 (Session) は別
@@ -374,6 +375,7 @@ Session  (server 側)    socket 届く間隔 時計のずれ
 player/         人
   player.ts       人 (と、練習部屋の的)。削られる / 倒される も人の振る舞い
   equip.ts        何を持てるか / 装備を選べるか (**申告を鵜呑みにしない**)
+  intent.ts       動詞。**何をしようとしているか** (押されているかだけ)
   lifecycle.ts    Life の遷移表
   locomotion.ts   体の動きの種類
   stance.ts       構えと頭の高さ (屈めば隠れられる)
@@ -387,7 +389,7 @@ match/          試合
 item/           持ち物
   held.ts         手に持てる物の表
   weapons.ts      武器の性能 (威力・装弾・射程・弾道)
-  inventory.ts    持ち物と持ち替えの状態
+  inventory.ts    持ち物と持ち替えの状態。**一覧を開いて選ぶ**のもここ (hand)
   grenade.ts      爆風の届く距離と量 (blastEffect)、投げる強さ
   claymore.ts     見張る距離と角度、爆風の量 (blastEffect)
 
