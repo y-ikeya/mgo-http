@@ -9,7 +9,8 @@
  * 外部への依存を持たせない (これが sim/ の唯一の規則)。
  */
 
-import type { Stance } from '../player/stance'
+import { headHeightWhen, type Stance } from '../player/stance'
+import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
 export type HitZone = 'HEAD' | 'BODY' | 'LEGS'
@@ -202,4 +203,24 @@ export type Credit = 'kill' | 'suicide' | 'none'
 export function creditOf(victimId: string, killerId: string | null): Credit {
   if (killerId === null) return 'none'
   return killerId === victimId ? 'suicide' : 'kill'
+}
+
+/**
+ * 当たり判定の検算に渡す規則、ひとまとめ。
+ *
+ * **判定の幾何 (sim) はこれを import しない。受け取る。** 幾何の層が遊びの
+ * 数字を直に読むと、間合いを 0.1m 変えただけで幾何の試験が動く。渡す形なら、
+ * あちらは「その形の物を受け取ったらこう判定する」だけを見ていられる。
+ *
+ * **束ねてここに置くのは、写しを作らせないため。** サーバーとクライアントが
+ * 別々に組み立てると、片方だけ古い数字を渡す余地が残る。
+ */
+export const HIT_RULES = {
+  headHeight: headHeightWhen,
+  canBeStabbed,
+  meleeRange: MELEE_RANGE,
+  meleeSlack: MELEE_SLACK,
+  backstabDot: BACKSTAB_DOT,
+  distanceSlack: DISTANCE_SLACK,
+  distanceSlackRate: DISTANCE_SLACK_RATE,
 }

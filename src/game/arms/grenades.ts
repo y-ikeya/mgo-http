@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { loadGrenade } from '../assets'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../../sim/judge/ballistic'
 import type { StageBox } from '../../sim/space/vision'
+import { THROW_LOFT, THROW_SPEED } from '../../domain/item/grenade'
 
 /**
  * 手榴弾。
@@ -199,9 +200,16 @@ export class Grenades {
     p.x = origin.x
     p.y = origin.y
     p.z = origin.z
-    // 初速はサーバーと同じ式で作る。速さも上向きの下駄もあちらが決めるので、
-    // ここで別に持つと見えている軌道と実際に飛ぶ軌道が食い違う
-    throwVelocity(direction.x, direction.y, direction.z, this.launch)
+    // 初速はサーバーと同じ式で、同じ数字で作る。**どちらも domain から引く** —
+    // ここで別に持つと、見えている軌道と実際に飛ぶ軌道が食い違う
+    throwVelocity(
+      direction.x,
+      direction.y,
+      direction.z,
+      THROW_SPEED,
+      THROW_LOFT,
+      this.launch,
+    )
     p.vx = this.launch.x
     p.vy = this.launch.y
     p.vz = this.launch.z

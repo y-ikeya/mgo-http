@@ -10,7 +10,6 @@
  */
 
 import type { SurfaceFlags } from '../../domain/stage/flags'
-import { HEAD_HEIGHT } from '../../domain/player/stance'
 
 /** 遮蔽になる箱。ステージの書き出しが作る stage.json の中身 */
 export interface StageBox {
@@ -27,16 +26,6 @@ export interface StageBox {
    * 誰からも見えなくなる。
    */
   top?: { h: number; dx: number; dz: number }
-}
-
-/**
- * その姿勢での頭の高さ (m)。
- *
- * 値そのものは stance.ts が持つ。遮蔽の判定に使う数字とモーションの表が
- * 別々にあると、クリップを差し替えたときに判定だけ黙って古くなる。
- */
-export function headHeight(crouching: boolean, boxed: boolean): number {
-  return HEAD_HEIGHT[boxed ? 'box' : crouching ? 'crouch' : 'stand']
 }
 
 /**

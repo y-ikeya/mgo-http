@@ -1,5 +1,3 @@
-import { INTERPOLATION_DELAY } from '../../net/types'
-import { onBattlefield, type Life } from '../../domain/player/lifecycle'
 
 /**
  * 相手が「いま、どこに、見えているか」。
@@ -53,7 +51,7 @@ const HIDE_LIMIT = 1.5
 /**
  * 何秒過去を描くかを、届く間隔の何倍にするか。
  *
- * `INTERPOLATION_DELAY` は「相手が 64Hz で送ってくる」前提の値 (0.05 秒 = 3 通ぶん)。
+ * 下限 (minDelay) は「相手が 64Hz で送ってくる」前提の値 (0.05 秒 = 3 通ぶん)。
  * 遅れている相手にはまったく足りない。**3 通/秒 の相手は間隔が 333ms あるので、
  * 50ms しか遡らないと狙った時刻が常に最新の位置より後ろになり、補間が一切効かない**
  * — 届いた位置にカクッと飛んで次が来るまで止まる。実際にそう見えた。
@@ -96,6 +94,18 @@ export const BUFFER_SIZE = 20
  * 1 人ぶんの「見え方」。RemotePlayer が 1 つ持って、判断を委ねる。
  */
 export class Presence {
+  /**
+   * 何秒過去で描くかの下限 (秒)。**回線の都合なので受け取る。**
+   *
+   * 「送る間隔の 3 倍あれば 1 通落ちても間が空かない」という値で、決めているのは
+   * 通信の側 (net/types.ts の INTERPOLATION_DELAY)。
+   */
+  private readonly minDelay: number
+
+  constructor(minDelay: number) {
+    this.minDelay = minDelay
+  }
+
   /** 最後に届いた時刻。**こちらの** Date.now */
   lastSeen = 0
 
@@ -112,8 +122,13 @@ export class Presence {
   /** サーバーが「もう見えない」と言ってきたか。位置が来たら解ける */
   private hiddenByServer = false
 
-  /** サーバーが決めた状態 */
-  private life: Life = 'joining'
+  /**
+   * 戦場に居るか。**状態 (Life) そのものは持たない。**
+   *
+   * 「どの状態なら戦場に居るか」は遊びの規則 (domain) で、こちらは幾何と時計の
+   * 層。判断済みの真偽を渡してもらう。
+   */
+  private onField = false
 
   /** 数えている窓の始まり (Date.now) と、その間に届いた数 */
   private rateWindowFrom = 0
@@ -169,11 +184,11 @@ export class Presence {
   }
 
   /** サーバーが状態を移した */
-  setLife(life: Life): void {
-    if (this.life === life) return
-    this.life = life
+  setOnField(onField: boolean): void {
+    if (this.onField === onField) return
+    this.onField = onField
     // 戦場に居ないなら消す。支度中の相手が倒れた場所に立っていることになる
-    if (!onBattlefield(life)) this.hiddenByServer = true
+    if (!onField) this.hiddenByServer = true
   }
 
   /** サーバーから「もう見えない」と届いた。次の位置が来るまで隠す */
@@ -193,7 +208,7 @@ export class Presence {
    */
   visibleAt(now: number): boolean {
     const silence = this.lastSeen > 0 ? now - this.lastSeen : 0
-    return onBattlefield(this.life) && !this.hiddenByServer && silence < this.hideAfter
+    return this.onField && !this.hiddenByServer && silence < this.hideAfter
   }
 
   /**
@@ -205,7 +220,7 @@ export class Presence {
   get renderDelay(): number {
     return Math.min(
       DELAY_LIMIT * 1000,
-      Math.max(INTERPOLATION_DELAY * 1000, this.packetGap * DELAY_SLACK),
+      Math.max(this.minDelay * 1000, this.packetGap * DELAY_SLACK),
     )
   }
 

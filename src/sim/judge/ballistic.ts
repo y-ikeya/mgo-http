@@ -19,7 +19,6 @@
 
 import type { StageBox } from '../space/vision'
 import { segmentHitsBox } from '../space/vision'
-import { THROW_LOFT, THROW_SPEED } from '../../domain/item/grenade'
 
 /** 物理を進める刻み (秒)。誰が解いても同じ道を通るよう固定する */
 export const FIXED_STEP = 1 / 60
@@ -95,23 +94,25 @@ export function throwVelocity(
   dx: number,
   dy: number,
   dz: number,
+  speed: number,
+  loft: number,
   out: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 },
 ): { x: number; y: number; z: number } {
   const flat = Math.hypot(dx, dz)
   // 真上か真下を向いている。下駄の履かせようが無いのでそのまま
   if (flat < 1e-6) {
     out.x = 0
-    out.y = Math.sign(dy) * THROW_SPEED
+    out.y = Math.sign(dy) * speed
     out.z = 0
     return out
   }
 
   // 真上を越えて後ろへ回らないよう頭打ちにする
-  const pitch = Math.min(Math.atan2(dy, flat) + THROW_LOFT, (80 * Math.PI) / 180)
+  const pitch = Math.min(Math.atan2(dy, flat) + loft, (80 * Math.PI) / 180)
   const cos = Math.cos(pitch)
-  out.x = (dx / flat) * cos * THROW_SPEED
-  out.y = Math.sin(pitch) * THROW_SPEED
-  out.z = (dz / flat) * cos * THROW_SPEED
+  out.x = (dx / flat) * cos * speed
+  out.y = Math.sin(pitch) * speed
+  out.z = (dz / flat) * cos * speed
   return out
 }
 

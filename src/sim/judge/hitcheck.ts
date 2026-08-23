@@ -11,18 +11,37 @@
  * three.js に依存しない。サーバー (bun) がこのファイルをそのまま読む。
  */
 
-import { BACKSTAB_DOT, MELEE_RANGE, type HitZone } from '../../domain/rule/damage'
-import { headHeight, isPathClear, type StageBox } from '../space/vision'
-import { canBeStabbed } from '../../domain/rule/damage'
-import {
-  DISTANCE_SLACK,
-  DISTANCE_SLACK_RATE,
-  MELEE_SLACK,
-} from '../../domain/rule/lag'
+import type { HitZone } from '../../domain/rule/damage'
+import { isPathClear, type StageBox } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
 
 // 姿の形は domain (Player の過去の姿そのものなので)。ここからも出す
 export type { Pose }
+
+/**
+ * 検算に要る規則。**import せずに受け取る。**
+ *
+ * 間合いも許容も「その構えに刃が通るか」も遊びの決めごとで、持っているのは
+ * domain。ここが直接 import すると、**幾何の層が遊びの数字に縛られる** —
+ * 試験のたびに本物の数字を持ち出すことになるし、規則を変えるとこちらの試験が
+ * 動く。渡してもらえば、判定の形だけを見ていられる。
+ *
+ * 渡す物は domain がひとまとめにして持っている (rule/damage.ts の HIT_RULES)。
+ */
+export interface HitRules {
+  /** 姿勢から頭の高さ (m) */
+  headHeight(crouching: boolean, boxed: boolean): number
+  /** その構えに刃が通るか */
+  canBeStabbed(stance: string, aimPitch: number): boolean
+  /** ナイフの間合い (m) と、そこに許す余裕 */
+  meleeRange: number
+  meleeSlack: number
+  /** 背後と認める内積の上限 */
+  backstabDot: number
+  /** 距離の申告に許す誤差 (固定ぶんと、距離に比例するぶん) */
+  distanceSlack: number
+  distanceSlackRate: number
+}
 
 /** 申告の中身 */
 export interface HitClaim {
@@ -57,8 +76,7 @@ const SHOULDER_OFFSET = 0.55
 
 
 /** その姿勢での部位の位置 */
-export function zonePoint(pose: Pose, zone: HitZone): [number, number, number] {
-  const head = headHeight(pose.crouching, pose.boxed)
+export function zonePoint(pose: Pose, zone: HitZone, head: number): [number, number, number] {
   return [pose.x, pose.y + head * ZONE_RATIO[zone], pose.z]
 }
 
@@ -78,11 +96,12 @@ function zoneExposed(
   target: Pose,
   zone: HitZone,
   boxes: StageBox[],
+  rules: HitRules,
 ): boolean {
   if (boxes.length === 0) return true
 
-  const eyeY = attacker.y + headHeight(attacker.crouching, attacker.boxed)
-  const [tx, ty, tz] = zonePoint(target, zone)
+  const eyeY = attacker.y + rules.headHeight(attacker.crouching, attacker.boxed)
+  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.crouching, target.boxed))
 
   // 攻撃者から相手へ向かう線に直交する向き。ここへ肩の幅だけずらす
   const dx = tx - attacker.x
@@ -110,21 +129,22 @@ function verifyPose(
   target: Pose,
   claim: HitClaim,
   boxes: StageBox[],
+  rules: HitRules,
 ): Verdict {
   const zone: HitZone = claim.zone ?? 'BODY'
-  const [tx, ty, tz] = zonePoint(target, zone)
-  const eyeY = attacker.y + headHeight(attacker.crouching, attacker.boxed)
+  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.crouching, target.boxed))
+  const eyeY = attacker.y + rules.headHeight(attacker.crouching, attacker.boxed)
   const actual = Math.hypot(tx - attacker.x, ty - eyeY, tz - attacker.z)
 
   if (claim.kind === 'melee') {
     // 倒れている相手には刺さらない
-    if (!canBeStabbed(target.stance, attacker.pitch)) {
+    if (!rules.canBeStabbed(target.stance, attacker.pitch)) {
       return { ok: false, reason: `刺さる姿勢ではない (${target.stance})` }
     }
 
     // 間合い。撃つのと違って、届かない位置からは絶対に当たらない
     const flat = Math.hypot(target.x - attacker.x, target.z - attacker.z)
-    if (flat > MELEE_RANGE + MELEE_SLACK) {
+    if (flat > rules.meleeRange + rules.meleeSlack) {
       return { ok: false, reason: `ナイフの間合いの外 (${flat.toFixed(1)}m)` }
     }
 
@@ -132,7 +152,7 @@ function verifyPose(
     if (claim.fromBehind) {
       const [vfx, vfz] = forwardOf(target.yaw)
       const [afx, afz] = forwardOf(attacker.yaw)
-      if (vfx * afx + vfz * afz <= BACKSTAB_DOT) {
+      if (vfx * afx + vfz * afz <= rules.backstabDot) {
         return { ok: false, reason: '背後ではない' }
       }
     }
@@ -141,7 +161,7 @@ function verifyPose(
 
   // 弾。申告された距離が実際と合っているか
   const claimed = claim.distance ?? 0
-  const slack = DISTANCE_SLACK + actual * DISTANCE_SLACK_RATE
+  const slack = rules.distanceSlack + actual * rules.distanceSlackRate
   if (Math.abs(claimed - actual) > slack) {
     return {
       ok: false,
@@ -150,7 +170,7 @@ function verifyPose(
   }
 
   // その部位が見えていたか。頭を隠して脚だけ出している相手の頭は撃てない
-  if (!zoneExposed(attacker, target, zone, boxes)) {
+  if (!zoneExposed(attacker, target, zone, boxes, rules)) {
     return { ok: false, reason: `${zone} は遮蔽の裏` }
   }
 
@@ -176,6 +196,7 @@ export function verifyHit(
   claim: HitClaim,
   boxes: StageBox[],
   window: number,
+  rules: HitRules,
 ): Verdict {
   if (attackerHistory.length === 0 || targetHistory.length === 0) {
     return { ok: false, reason: '位置を知らない' }
@@ -198,7 +219,7 @@ export function verifyHit(
       best = gap
     }
 
-    last = verifyPose(attacker, target, claim, boxes)
+    last = verifyPose(attacker, target, claim, boxes, rules)
     if (last.ok) return last
   }
 

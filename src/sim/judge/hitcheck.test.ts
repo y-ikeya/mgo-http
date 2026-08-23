@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 import { verifyHit, type Pose } from './hitcheck'
-import { STAB_DOWN_PITCH } from '../../domain/rule/damage'
 import type { Stance } from '../../domain/player/stance'
 
 /**
@@ -28,9 +27,29 @@ function history(at: [number, number], stance: Stance, yaw = 0, pitch = 0): Pose
   }))
 }
 
+/**
+ * **検算に渡す規則は、この試験が決める。** 遊びの側 (domain) の値を持ち出さない
+ * — 間合いを 0.1m 動かしただけで幾何の試験が動くのはおかしい。ここで見たいのは
+ * 「渡された規則どおりに弾くか」だけ。
+ */
+/** 倒れている相手に刃が通る見下ろしの角度 (rad) */
+const DOWN_PITCH = -0.35
+
+const RULES = {
+  headHeight: (crouching: boolean, boxed: boolean) => (crouching || boxed ? 0.94 : 1.47),
+  // 立ち・しゃがみ・箱は刺さる。倒れている相手は見下ろしたときだけ
+  canBeStabbed: (stance: string, aimPitch: number) =>
+    stance === 'stand' || stance === 'crouch' || stance === 'box' || aimPitch <= DOWN_PITCH,
+  meleeRange: 2,
+  meleeSlack: 1.2,
+  backstabDot: 0.34,
+  distanceSlack: 3,
+  distanceSlackRate: 0.06,
+}
+
 /** 刺せる間合いに並べて刺す */
 function stab(targetStance: Stance) {
-  return verifyHit(history([0, 0], 'stand'), history([0, 1], targetStance), { kind: 'melee' }, [], WINDOW)
+  return verifyHit(history([0, 0], 'stand'), history([0, 1], targetStance), { kind: 'melee' }, [], WINDOW, RULES)
 }
 
 describe('ナイフの刺さる姿勢', () => {
@@ -54,8 +73,7 @@ describe('ナイフの刺さる姿勢', () => {
       history([0, 1], 'prone'),
       { kind: 'bullet', zone: 'BODY', distance: 1 },
       [],
-      WINDOW,
-    )
+      WINDOW, RULES)
     expect(verdict.ok).toBe(true)
   })
 
@@ -66,12 +84,12 @@ describe('ナイフの刺さる姿勢', () => {
       ...history([0, 1], 'stand').slice(0, 2),
       { ...history([0, 1], 'prone')[2], time: 100_032 },
     ]
-    expect(verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW).ok).toBe(true)
+    expect(verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW, RULES).ok).toBe(true)
   })
 
   test('ずっと倒れていれば、遡っても通らない', () => {
     const target = history([0, 1], 'prone')
-    const verdict = verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW)
+    const verdict = verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW, RULES)
     expect(verdict.ok).toBe(false)
     if (!verdict.ok) expect(verdict.reason).toContain('姿勢')
   })
@@ -85,15 +103,14 @@ describe('倒れている相手を刺す', () => {
       history([0, 1], targetStance),
       { kind: 'melee' },
       [],
-      WINDOW,
-    )
+      WINDOW, RULES)
 
   test('真っ直ぐ前を刺しても、倒れている相手には届かない', () => {
     expect(stab('prone', 0).ok).toBe(false)
   })
 
   test('見下ろせば通る。しゃがんで下を狙う手間が要る', () => {
-    expect(stab('prone', STAB_DOWN_PITCH).ok).toBe(true)
+    expect(stab('prone', DOWN_PITCH).ok).toBe(true)
     expect(stab('prone', -0.8).ok).toBe(true)
   })
 

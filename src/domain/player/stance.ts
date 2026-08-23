@@ -61,3 +61,16 @@ export function headHeightOf(locomotion: Locomotion): number {
   return HEAD_HEIGHT[stanceOf(locomotion)]
 }
 
+
+/**
+ * しゃがみ / 箱の別から頭の高さ (m)。
+ *
+ * 遮蔽の判定も足音も、**モーションではなく操作の状態**から引きたい場面がある
+ * (過去の姿を遡って照合するとき、姿勢の札しか残っていない)。
+ *
+ * 元は sim/space/vision.ts に置いてあったが、これは幾何ではなく規則 —
+ * **屈めば隠れられる**の数字そのものなので、こちらに引き上げた。
+ */
+export function headHeightWhen(crouching: boolean, boxed: boolean): number {
+  return HEAD_HEIGHT[boxed ? 'box' : crouching ? 'crouch' : 'stand']
+}

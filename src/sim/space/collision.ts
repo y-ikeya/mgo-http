@@ -15,7 +15,6 @@
  */
 export type { Surface } from '../../domain/stage/surface'
 import type { Surface } from '../../domain/stage/surface'
-import { STEP_UP } from '../../domain/player/moving'
 
 /**
  * 位置。three の Vector3 はこの形を満たすので、呼ぶ側は今までどおり渡せる。
@@ -98,6 +97,7 @@ export function resolveCircle(
   obstacles: readonly Obstacle[],
   feetY: number,
   bodyHeight: number,
+  stepUp: number,
 ): void {
   const radiusSq = radius * radius
 
@@ -106,7 +106,7 @@ export function resolveCircle(
 
     for (const o of obstacles) {
       // 最高点でも足元より低ければ、触れる前から壁になりようがない
-      if (o.top <= feetY + STEP_UP) continue
+      if (o.top <= feetY + stepUp) continue
       // 下面が頭より上にある = くぐれる。橋の下、アーチ、2 階の床
       if (o.bottom >= feetY + bodyHeight) continue
 
@@ -116,7 +116,7 @@ export function resolveCircle(
 
       // 壁かどうかは「触れている場所の高さ」で決める。坂の上を歩いているとき、
       // 遠くの高い側を見て壁と判断すると、坂に乗った瞬間に押し戻される。
-      if (topAt(o, nearX, nearZ) <= feetY + STEP_UP) continue
+      if (topAt(o, nearX, nearZ) <= feetY + stepUp) continue
 
       const dx = position.x - nearX
       const dz = position.z - nearZ
@@ -169,6 +169,7 @@ export function surfaceAt(
   radius: number,
   obstacles: readonly Obstacle[],
   feetY: number,
+  stepUp: number,
 ): Surface {
   let best = 0
   let surface: Surface = 'concrete'
@@ -177,7 +178,7 @@ export function surfaceAt(
     if (position.x + radius < obstacle.minX || position.x - radius > obstacle.maxX) continue
     if (position.z + radius < obstacle.minZ || position.z - radius > obstacle.maxZ) continue
     const height = topAt(obstacle, position.x, position.z)
-    if (height > feetY + STEP_UP) continue
+    if (height > feetY + stepUp) continue
     if (height < best) continue
     best = height
     surface = obstacle.surface
@@ -190,6 +191,7 @@ export function groundHeight(
   radius: number,
   obstacles: readonly Obstacle[],
   feetY: number,
+  stepUp: number,
 ): number {
   const radiusSq = radius * radius
   let ground = 0
@@ -207,7 +209,7 @@ export function groundHeight(
     // 高さは足の真下で測る。坂では一歩ごとに変わる
     const height = topAt(o, position.x, position.z)
     if (height <= ground) continue
-    if (height > feetY + STEP_UP) continue
+    if (height > feetY + stepUp) continue
 
     ground = height
   }
@@ -227,8 +229,7 @@ export function ceilingHeight(
   position: Vec3,
   radius: number,
   obstacles: readonly Obstacle[],
-  feetY: number,
-): number {
+  feetY: number,): number {
   const radiusSq = radius * radius
   let ceiling = Infinity
 

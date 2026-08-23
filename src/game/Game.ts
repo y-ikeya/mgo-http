@@ -55,6 +55,7 @@ import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../domain/rule/damage";
 import type { NoiseEvent } from "../net/types";
 import { weaponOf } from "../domain/item/weapons";
+import { STEP_UP } from "../domain/player/moving";
 import {
   bulletOffset,
   flightTime,
@@ -1159,11 +1160,11 @@ export class Game {
   /** Player から見た世界。地形の表現を Player 側に漏らさないための薄い層 */
   private readonly world: PlayerWorld = {
     resolveHorizontal: (position, radius, feetY) => {
-      resolveCircle(position, radius, this.stage.obstacles, feetY, PLAYER_HEIGHT);
+      resolveCircle(position, radius, this.stage.obstacles, feetY, PLAYER_HEIGHT, STEP_UP);
       clampToArena(position, radius, ARENA_HALF_SIZE);
     },
     groundHeight: (position, radius, feetY) =>
-      groundHeight(position, radius, this.stage.obstacles, feetY),
+      groundHeight(position, radius, this.stage.obstacles, feetY, STEP_UP),
     ceilingHeight: (position, radius, feetY) =>
       ceilingHeight(position, radius, this.stage.obstacles, feetY),
   };
@@ -2769,7 +2770,7 @@ export class Game {
    * 高い位置にコンクリートを置いた瞬間に破綻する。
    */
   private playStep(step: Step, position: THREE.Vector3, ping: boolean): void {
-    const surface = surfaceAt(position, PLAYER_RADIUS, this.stage.obstacles, position.y);
+    const surface = surfaceAt(position, PLAYER_RADIUS, this.stage.obstacles, position.y, STEP_UP);
     const sound =
       surface === "metal" ? "metalStep" : surface === "wood" ? "woodStep" : "step";
     const gain = this.audio.play(sound, position, step.volume, step.range);

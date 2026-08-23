@@ -11,8 +11,7 @@
  * three.js に依存しない。
  */
 
-import { headHeight, isPathClear, SAMPLE_RATIOS, type StageBox } from '../space/vision'
-import { BLAST_RADIUS } from '../../domain/item/grenade'
+import { isPathClear, SAMPLE_RATIOS, type StageBox } from '../space/vision'
 
 /** 爆心から見た相手の姿。**量はここで決めない** (domain/item/grenade.ts) */
 export interface Exposure {
@@ -32,20 +31,25 @@ export interface Exposure {
  * 体の何点が爆心から見えているかを数える。1 点だけで見ると「頭が壁から出て
  * いるのに無傷」が起きるし、**体の半分だけ壁から出ている**が表せない。
  *
- * @param feetY 相手の足元の高さ
+ * **半径も頭の高さも受け取る。** どちらも遊びの数字 (domain) で、こちらが
+ * import すると幾何の層が規則に縛られる。
+ *
+ * @param head 相手の頭の高さ (m)。足元からの高さ
+ * @param radius 届く距離 (m)
  * @returns 届かなければ null
  */
 export function blastExposure(
   cx: number,
   cy: number,
   cz: number,
-  target: { x: number; y: number; z: number; crouching: boolean; boxed: boolean },
+  target: { x: number; y: number; z: number },
+  head: number,
+  radius: number,
   boxes: StageBox[],
 ): Exposure | null {
-  const head = headHeight(target.crouching, target.boxed)
   // 体の中ほどまでの距離で測る。足元で測ると、真上で爆ぜたときに遠く見える
   const distance = Math.hypot(target.x - cx, target.y + head / 2 - cy, target.z - cz)
-  if (distance >= BLAST_RADIUS) return null
+  if (distance >= radius) return null
 
   let exposed = 0
   for (const ratio of SAMPLE_RATIOS) {

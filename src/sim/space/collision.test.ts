@@ -42,10 +42,13 @@ function walkInto(obstacles: Obstacle[], feetY: number): number {
   // 1 歩ずつ詰める。押し戻しは貫入深度の解決なので、少しずつ入れる
   for (let i = 0; i < 100; i++) {
     position.z -= 0.05
-    resolveCircle(position, RADIUS, obstacles, feetY, HEIGHT)
+    resolveCircle(position, RADIUS, obstacles, feetY, HEIGHT, STEP)
   }
   return position.z
 }
+
+/** 足を乗せられる段差 (m)。**試験の数字はここで決める** */
+const STEP = 0.25
 
 describe('下をくぐる', () => {
   test('頭より上に浮いた板はくぐれる', () => {
@@ -72,11 +75,11 @@ describe('床の選び方', () => {
   const bridge = slab(2.0, 2.4)
 
   test('地面に居るとき、橋は床にならない', () => {
-    expect(groundHeight({ x: 0, y: 0, z: 0 }, RADIUS, [bridge], 0)).toBe(0)
+    expect(groundHeight({ x: 0, y: 0, z: 0 }, RADIUS, [bridge], 0, STEP)).toBe(0)
   })
 
   test('橋の高さまで上がれば橋が床になる', () => {
-    expect(groundHeight({ x: 0, y: 2.4, z: 0 }, RADIUS, [bridge], 2.4)).toBe(2.4)
+    expect(groundHeight({ x: 0, y: 2.4, z: 0 }, RADIUS, [bridge], 2.4, STEP)).toBe(2.4)
   })
 })
 

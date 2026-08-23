@@ -8,7 +8,6 @@
  * three にも DOM にも依存しない。サーバーが起爆を決める。
  */
 
-import { TRIGGER_COS, TRIGGER_RANGE } from '../../domain/item/claymore'
 
 /** 置く位置。本人の足元から前へ何 m か */
 export const PLACE_FORWARD = 0.9
@@ -101,14 +100,19 @@ function forwardOf(yaw: number): [number, number] {
  * 足元を通ったときで、上の階に居る人で反応されると理不尽になる…
  * のだが、階の概念がまだ無いので今は平面で見る。
  */
-export function triggeredBy(mine: Placed, target: Target): boolean {
+export function triggeredBy(
+  mine: Placed,
+  target: Target,
+  range: number,
+  cos: number,
+): boolean {
   const dx = target.x - mine.x
   const dz = target.z - mine.z
   const distance = Math.hypot(dx, dz)
-  if (distance > TRIGGER_RANGE || distance < 1e-4) return false
+  if (distance > range || distance < 1e-4) return false
 
   const [fx, fz] = forwardOf(mine.yaw)
-  return (dx / distance) * fx + (dz / distance) * fz >= TRIGGER_COS
+  return (dx / distance) * fx + (dz / distance) * fz >= cos
 }
 
 /**

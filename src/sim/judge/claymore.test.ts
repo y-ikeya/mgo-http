@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import { blastReach, canPlaceAt, triggeredBy, type Placed } from './claymore'
-import { BLAST_RANGE, TRIGGER_RANGE } from '../../domain/item/claymore'
+
+/**
+ * **試験の数字はここで決める。** 遊びの側 (domain) の値を持ち出さない —
+ * 間合いを 4m から 5m に変えただけで幾何の試験が動くのはおかしい。
+ * ここで見たいのは「扇の形が正しいか」だけ。
+ */
+const RANGE = 4
+const COS = Math.cos((60 * Math.PI) / 180)
 
 /**
  * クレイモアの向き。
@@ -29,18 +36,18 @@ describe('前を通ったときだけ起爆する', () => {
     ['斜め前 45 度', -1.4, -1.4, true],
     ['斜め後ろ 45 度', -1.4, 1.4, false],
   ])('%s', (_, x, z, expected) => {
-    expect(triggeredBy(mine, { x, y: 0, z })).toBe(expected)
+    expect(triggeredBy(mine, { x, y: 0, z }, RANGE, COS)).toBe(expected)
   })
 
   test('間合いの外は通す', () => {
-    expect(triggeredBy(mine, { x: 0, y: 0, z: -(TRIGGER_RANGE + 0.5) })).toBe(false)
+    expect(triggeredBy(mine, { x: 0, y: 0, z: -(RANGE + 0.5) }, RANGE, COS)).toBe(false)
   })
 
   test('向けた先が変わればひっくり返る', () => {
     const behind = { x: 0, y: 0, z: 2 }
-    expect(triggeredBy(at(0), behind)).toBe(false)
+    expect(triggeredBy(at(0), behind, RANGE, COS)).toBe(false)
     // 半回転させれば同じ場所が正面になる
-    expect(triggeredBy(at(Math.PI), behind)).toBe(true)
+    expect(triggeredBy(at(Math.PI), behind, RANGE, COS)).toBe(true)
   })
 })
 
@@ -56,8 +63,9 @@ describe('爆風の届き方 (量は domain の試験)', () => {
   })
 
   test('向きが効くのは起爆まで。背後を通っても反応はしない', () => {
-    expect(triggeredBy(mine, { x: 0, y: 0, z: 2 })).toBe(false)
-    expect(blastReach(mine, { x: 0, y: 0, z: 2 })).toBeLessThan(BLAST_RANGE)
+    expect(triggeredBy(mine, { x: 0, y: 0, z: 2 }, RANGE, COS)).toBe(false)
+    // 届く距離のほうが広いので、反応しなくても爆風には入る
+    expect(blastReach(mine, { x: 0, y: 0, z: 2 })).toBeLessThan(6)
   })
 })
 

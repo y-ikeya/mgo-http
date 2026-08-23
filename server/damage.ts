@@ -10,7 +10,7 @@ import { loseTicket } from '../src/domain/match/match'
 import { isHostile } from '../src/domain/match/room'
 import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
 import { downedBy, hurt, type Player, isProtected } from '../src/domain/player/player'
-import { type HitZone, meleeDamage } from '../src/domain/rule/damage'
+import { HIT_RULES, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
 import { type ClientMessage } from '../src/net/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
@@ -198,6 +198,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     },
     stageBoxes,
     LAG_WINDOW,
+    HIT_RULES,
   )
   if (!verdict.ok) {
     reject(attacker, verdict.reason)

@@ -43,7 +43,9 @@ import { BUFFER_SIZE, Presence } from "../../sim/space/presence";
 import { Hitbox } from "./hitbox";
 import { dampAngle } from "../util/math";
 import { Weapon } from "../arms/weapon";
+import { onBattlefield } from "../../domain/player/lifecycle";
 import {
+  INTERPOLATION_DELAY,
   type PlayerSnapshot,
   type Team,
 } from "../../net/types";
@@ -154,7 +156,7 @@ export class RemotePlayer {
    * 「いま、どこに、見えているか」の判断。**three を持たない側に置いてある**
    * (src/sim/space/presence.ts)。ここはその答えを絵にするだけ。
    */
-  private readonly presence = new Presence();
+  private readonly presence = new Presence(INTERPOLATION_DELAY);
   /** サーバーが決めた状態。倒れている姿勢を出すかの判断に使う */
   private life: Life = "joining";
   /** 所属。サーバーが決める。届くまでは赤として描く */
@@ -584,7 +586,8 @@ export class RemotePlayer {
       else this.animator?.revive();
     }
     // 出す / 出さないの判断は Presence が持つ
-    this.presence.setLife(state);
+    // 「戦場に居るか」を決めるのは規則 (domain)。presence には答えだけ渡す
+    this.presence.setOnField(onBattlefield(state));
     return dead;
   }
 

@@ -35,6 +35,7 @@ import { stampLocomotion, stampProtected } from '../src/net/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD } from '../src/domain/item/held'
 import { triggeredBy } from '../src/sim/judge/claymore'
+import { TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { reloadInto, SUPPORT_SPECS } from '../src/domain/item/weapons'
@@ -192,7 +193,7 @@ setInterval(() => {
             (p) =>
               canBeHurt(p.life) &&
               (p.id === claymore.owner || p.team !== claymore.team) &&
-              triggeredBy(claymore, p),
+              triggeredBy(claymore, p, TRIGGER_RANGE, TRIGGER_COS),
           )
           if (!hit) continue
           detonateClaymore(room, claymore)

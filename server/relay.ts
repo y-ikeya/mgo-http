@@ -17,12 +17,13 @@ import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot }
 import { SNAPSHOT_INTERVAL, type ServerMessage } from '../src/net/types'
 import { checkMove } from '../src/sim/judge/motioncheck'
 import { cameraPoint } from '../src/sim/space/eyepoint'
-import { groundUnder, hasLineOfSight, headHeight } from '../src/sim/space/vision'
+import { groundUnder, hasLineOfSight } from '../src/sim/space/vision'
 import { sessionOf } from './session'
 import { arenaHalf, solidBoxes, stageBoxes } from './stage'
 import { type RoomWorld, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
+import { headHeightWhen } from '../src/domain/player/stance'
 
 /**
  * 位置が届いたとき。
@@ -159,7 +160,7 @@ export const LOWER_SETTLE_MS = 300
 /** 遮蔽の判定に使う頭の高さ。沈み切るまでは立った高さで見る */
 export function visibleHead(player: Player, now: number): number {
   const settled = player.loweredAt > 0 && now - player.loweredAt >= LOWER_SETTLE_MS
-  return settled ? headHeight(player.crouching, player.boxed) : headHeight(false, false)
+  return settled ? headHeightWhen(player.crouching, player.boxed) : headHeightWhen(false, false)
 }
 
 /**
@@ -179,7 +180,7 @@ export function emitNoise(
   // どこまで届くかは規則 (domain/rule/noise.ts)。銃声は武器ごとに違う
   const reach =
     noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
-  const head = headHeight(from.crouching, from.boxed)
+  const head = headHeightWhen(from.crouching, from.boxed)
 
   // 何の上を踏んだかは地形から出す。申告させるものではない
   const surface =
@@ -220,7 +221,7 @@ export function emitNoise(
  */
 export function relayShot(room: RoomWorld, from: Player, message: ServerMessage): void {
   const payload = JSON.stringify(message)
-  const head = headHeight(from.crouching, from.boxed)
+  const head = headHeightWhen(from.crouching, from.boxed)
 
   for (const listener of connected(room)) {
     if (listener.id === from.id) continue

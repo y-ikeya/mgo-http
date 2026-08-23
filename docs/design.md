@@ -524,6 +524,23 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
 同じ手続きを先に回して予測している**からで、共有は結果であって定義ではない。
 「共有だから sim」と言うと domain も同じ条件を満たしてしまい、線が引けない。
 
+**sim は domain を import しない。** 向きが一方通行なだけでは足りなかった。
+幾何の層が遊びの数字を直に読んでいると、間合いを 0.1m 変えただけで幾何の試験が
+動くし、「その数字で答えが変わる」ことが呼ぶ側から見えない。**数字も関数も
+引数で渡す。**
+
+    triggeredBy(mine, target, range, cos)          扇の中に居るか
+    blastExposure(cx, cy, cz, target, head, radius, boxes)
+    verifyHit(attacker, target, claim, boxes, window, rules)
+
+渡す物は domain がひとまとめにして持っている (rule/damage.ts の HIT_RULES)。
+**束ねて 1 か所に置くのは写しを作らせないため** — サーバーとクライアントが
+別々に組み立てると、片方だけ古い数字を渡す余地が残る。
+
+型だけは共有する (Pose / Stance / Surface)。実行時に消えるし、どれもこのゲーム
+の語彙であって、別の言い方を sim 側に用意しても混乱するだけ。
+[src/sim/layout.test.ts](../src/sim/layout.test.ts) が留めている。
+
 sim に置くのは **主語が「世界」であるもの** — 世界に訊けば答えが決まる問い。
 
     「頭に当たったら 100」                domain
