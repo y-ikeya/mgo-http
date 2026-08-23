@@ -8,7 +8,7 @@
  */
 import { render } from 'solid-js/web'
 import Hud from '../../src/ui/Hud'
-import type { GameStats } from '../../src/game/Game'
+import type { GameStats } from '../../src/scene/Game'
 
 const base = {
   stage: 'GARAGE', backend: 'webgpu', fps: 120, x: 0, z: 0, speed: 0,

@@ -4,7 +4,7 @@ import { MODES } from '../domain/match/room'
 import { pointsOf } from '../domain/match/scoring'
 import { useLevels } from '../net/levels'
 import type { Identity } from '../auth/session'
-import type { GameStats } from '../game/Game'
+import type { GameStats } from '../scene/Game'
 import './Scoreboard.css'
 
 /**

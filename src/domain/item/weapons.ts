@@ -16,7 +16,7 @@
  * 「その人が持っている武器」で検証しないと意味が無い。
  *
  * 見た目 (握りの位置・銃口の座標) はここに入れない。あれは three の座標なので
- * src/game/arms/weapon.ts が持つ。**遊びに効く数字だけ**をここに置く。
+ * src/scene/arms/weapon.ts が持つ。**遊びに効く数字だけ**をここに置く。
  */
 
 import type { HitZone } from '../rule/damage'

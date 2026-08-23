@@ -6,7 +6,7 @@ import { stanceOf, HEAD_HEIGHT } from './stance'
  * 屈んだ相手が壁の陰に隠れられるかが変わる。
  *
  * どのモーションを流すかは見た目の話で、こちらには無い
- * (game/actor/motion.test.ts)。
+ * (scene/actor/motion.test.ts)。
  */
 describe('構え', () => {
   test('しゃがんだまま刺しても、構えはしゃがみのまま', () => {

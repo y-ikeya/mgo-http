@@ -55,9 +55,9 @@ describe('置き場所 (sim)', () => {
    * 読んでいた (層の図に無い向き)。domain しか見張っていなかったので、
    * 誰も気づかないまま入っていた。
    */
-  test('net / game / ui / server を知らない', () => {
+  test('net / scene / ui / server を知らない', () => {
     const guilty = sourcesOf(SIM).filter((file) =>
-      /from\s+['"][^'"]*\/(net|game|ui|screens)\//.test(readFileSync(file, 'utf8')),
+      /from\s+['"][^'"]*\/(net|scene|game|ui|screens|input)\b/.test(readFileSync(file, 'utf8')),
     )
     expect(guilty).toEqual([])
   })

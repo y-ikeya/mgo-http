@@ -1,7 +1,7 @@
 import { createSignal, onMount, Show } from 'solid-js'
 import { Route, Router, Navigate } from '@solidjs/router'
 import { AUTH_READY, restore, type Identity } from './auth/session'
-import { checkGpu } from './game/util/gpu'
+import { checkGpu } from './scene/util/gpu'
 import GpuBlocked from './ui/GpuBlocked'
 import Login from './screens/Login'
 import Lobby from './screens/Lobby'

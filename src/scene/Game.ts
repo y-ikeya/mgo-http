@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
-import { Input, type InputDevice } from "./input";
+import { Input, type InputDevice } from "../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import type { WeaponTarget } from "./arms/weapon";

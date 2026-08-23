@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../i18n'
 import { HELD, type HeldId } from '../domain/item/held'
 import { MODES } from '../domain/match/room'
-import type { GameStats } from '../game/Game'
+import type { GameStats } from '../scene/Game'
 import './Hud.css'
 
 /**

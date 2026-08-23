@@ -7,7 +7,7 @@
  * 許すか) は世界の側なので sim/space/collision.ts。
  *
  * 走る速さや跳ぶ高さも本来はここに来る数字だが、いまは
- * game/actor/player.ts に置いたままになっている。
+ * scene/actor/player.ts に置いたままになっている。
  */
 
 /**

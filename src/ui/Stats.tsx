@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import type { GameStats } from '../game/Game'
+import type { GameStats } from '../scene/Game'
 import './Stats.css'
 
 /**

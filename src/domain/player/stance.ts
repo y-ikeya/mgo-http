@@ -6,15 +6,15 @@
  * ここ (domain) に置く。
  *
  * --- なぜ 1 本にするか ---
- * 構えは 3 か所で解釈されている。動かす側 (game/actor/player)、映す側
- * (game/actor/remotePlayer)、判定する側 (server)。同じ名前の状態を別の意味で
+ * 構えは 3 か所で解釈されている。動かす側 (scene/actor/player)、映す側
+ * (scene/actor/remotePlayer)、判定する側 (server)。同じ名前の状態を別の意味で
  * 読むと、片方だけ壊れる。
  *
  * 頭の高さがまさにその穴だった。遮蔽の判定に使う 1.47 / 0.94 はクリップから
  * 実測した値なのに、モーションを差し替えても黙って古いままになる。
  *
  * **どのモーションを流すか**は見た目の話なので、ここには無い
- * (game/actor/motion.ts)。
+ * (scene/actor/motion.ts)。
  */
 
 import type { Locomotion } from './locomotion'

@@ -70,7 +70,7 @@ function load(url: string): Promise<GLTF> {
 }
 
 /**
- * 兵士のモデル。skin で差し替えられる (見た目の試作。src/game/actor/skin.ts)。
+ * 兵士のモデル。skin で差し替えられる (見た目の試作。src/scene/actor/skin.ts)。
  *
  * 種類ごとに Promise を分けて持つので、同じ物を 2 回解析しない。
  */

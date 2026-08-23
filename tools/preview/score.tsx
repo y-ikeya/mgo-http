@@ -5,7 +5,7 @@
  */
 import { render } from 'solid-js/web'
 import Scoreboard from '../../src/ui/Scoreboard'
-import type { GameStats } from '../../src/game/Game'
+import type { GameStats } from '../../src/scene/Game'
 
 const players = [
   { id: 'me', name: 'pepa1404', team: 'blue', kills: 7, deaths: 3, suicides: 0, away: false, rate: 64 },

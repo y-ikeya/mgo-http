@@ -61,12 +61,12 @@ describe('置き場所', () => {
   })
 
   /**
-   * 描画と入力 (src/game) を知らないのも同じ理由。こちらは通信 (src/net) より
+   * 描画と入力 (src/scene, src/input.ts) を知らないのも同じ理由。こちらは通信 (src/net) より
    * 強い規則で、**共有の層はサーバーがそのまま読む**ので import した時点で落ちる。
    */
   test('domain は描画を知らない', () => {
     const guilty = sourcesOf(DOMAIN).filter((n) =>
-      /from\s+['"][^'"]*\/(game|ui|screens)\//.test(readFileSync(n, 'utf8')),
+      /from\s+['"][^'"]*\/(scene|game|ui|screens|input)\b/.test(readFileSync(n, 'utf8')),
     )
     expect(guilty).toEqual([])
   })
