@@ -413,7 +413,7 @@ rule/           規則。**どの entity のものでもない判断**だけを�
 **数字と式がこちらに来る。**
 
 逆に、ここから出ていったものもある。どのモーションを流すかを決める規則
-(`resolveLocomotion` と階段まわりの調律値) は scene/actor/motion.ts へ移した —
+(`resolveLocomotion` と階段まわりの調律値) は presentation/scene/actor/motion.ts へ移した —
 触る理由が「動きが変に見える」であって、遊びは変わらないため。
 
 ## まだ言葉になっていないもの

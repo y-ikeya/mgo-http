@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { WHOLE_BODY, resolveLocomotion, type StanceInput } from './motion'
-import { stanceOf } from '../../domain/player/stance'
+import { stanceOf } from '../../../domain/player/stance'
 
 /**
  * しゃがんだまま刺す。

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { stepMovement, type MoveWorld, type Mover } from '../../sim/space/movement'
+import { stepMovement, type MoveWorld, type Mover } from '../../../sim/space/movement'
 import { STAIR_DROP_MAX, STAIR_DROP_MIN, STAIR_RISE_MIN } from './motion'
 
 /**

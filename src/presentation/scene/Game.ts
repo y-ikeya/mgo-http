@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
-import { Input, type InputDevice } from "../input";
+import { Input, type InputDevice } from "../../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import type { WeaponTarget } from "./arms/weapon";
@@ -19,16 +19,16 @@ import {
   loadStageBoxes,
   type Stage,
 } from "./world/stage";
-import { solidBlockers, type StageBox } from "../sim/space/vision";
+import { solidBlockers, type StageBox } from "../../sim/space/vision";
 import {
   ceilingHeight,
   clampToArena,
   groundHeight,
   resolveCircle,
   surfaceAt,
-} from "../sim/space/collision";
+} from "../../sim/space/collision";
 import { GameAudio } from "./sense/audio";
-import type { Step } from "../domain/rule/footsteps";
+import type { Step } from "../../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./sense/soundRing";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
@@ -38,34 +38,34 @@ import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
 import { damp } from "./util/math";
 import { randomSigned, randomUnit, RandomStream } from "./util/random";
-import { fallDamage, MAX_HEALTH } from "../domain/rule/damage";
+import { fallDamage, MAX_HEALTH } from "../../domain/rule/damage";
 import {
   canAct,
   canChoose,
   CHOOSE_FLOOR,
   CHOOSE_TIMEOUT,
   type Life,
-} from "../domain/player/lifecycle";
-import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../domain/item/weapons";
+} from "../../domain/player/lifecycle";
+import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
 import { setBoxTuning, type BoxTuning } from "./actor/box";
-import { Inventory } from "../domain/item/inventory";
-import { canDrop, isGun, type Family, type HeldId } from "../domain/item/held";
-import { MODES, isHostile, type Mode } from "../domain/match/room";
+import { Inventory } from "../../domain/item/inventory";
+import { canDrop, isGun, type Family, type HeldId } from "../../domain/item/held";
+import { MODES, isHostile, type Mode } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
-import type { HitZone } from "../domain/rule/damage";
-import type { NoiseEvent } from "../net/types";
-import { weaponOf } from "../domain/item/weapons";
-import { STEP_UP } from "../domain/player/moving";
+import type { HitZone } from "../../domain/rule/damage";
+import type { NoiseEvent } from "../../net/types";
+import { weaponOf } from "../../domain/item/weapons";
+import { STEP_UP } from "../../domain/player/moving";
 import {
   bulletOffset,
   flightTime,
   TRAJECTORY_STEPS,
-} from "../sim/judge/bullet";
-import { createTransport } from "../net";
-import type { NetTransport } from "../net/types";
-import type { Identity } from "../auth/session";
+} from "../../sim/judge/bullet";
+import { createTransport } from "../../net";
+import type { NetTransport } from "../../net/types";
+import type { Identity } from "../../auth/session";
 import { selfSkin } from "./actor/skin";
-import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../domain/match/scoring";
+import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../../domain/match/scoring";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -73,7 +73,7 @@ import {
   type MatchMessage,
   type ServerMessage,
   type Team,
-} from "../net/types";
+} from "../../net/types";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 export interface GameStats {

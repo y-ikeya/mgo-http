@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../domain/stage/surface'
-import { flagsOf } from '../../domain/stage/flags'
+import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../../domain/stage/surface'
+import { flagsOf } from '../../../domain/stage/flags'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
   clamp,
@@ -21,9 +21,9 @@ import {
   vec2,
   vec3,
 } from 'three/tsl'
-import type { Obstacle } from '../../sim/space/collision'
-import { isPathClear, sightBlockers } from '../../sim/space/vision'
-import type { StageBox } from '../../sim/space/vision'
+import type { Obstacle } from '../../../sim/space/collision'
+import { isPathClear, sightBlockers } from '../../../sim/space/vision'
+import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
 import { isMesh } from '../util/guards'
 

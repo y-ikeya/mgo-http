@@ -1,14 +1,14 @@
-import { carrySpeedScale, weaponOf, type WeaponId } from '../../domain/item/weapons'
-import { isGun, isTwoHanded, type HeldId } from '../../domain/item/held'
-import { fallDamage } from '../../domain/rule/damage'
+import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
+import { isGun, isTwoHanded, type HeldId } from '../../../domain/item/held'
+import { fallDamage } from '../../../domain/rule/damage'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
-import type { Locomotion } from '../../domain/player/locomotion'
+import type { Locomotion } from '../../../domain/player/locomotion'
 import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
-import { stepMovement, type Mover } from '../../sim/space/movement'
+import { stepMovement, type Mover } from '../../../sim/space/movement'
 import {
   resolveLocomotion,
   STAIR_DROP_MAX,
@@ -17,10 +17,10 @@ import {
   STAIR_RISE_MIN,
 } from './motion'
 import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
-import { Footsteps, type Step } from '../../domain/rule/footsteps'
-import { MAX_HEALTH } from '../../domain/rule/damage'
+import { Footsteps, type Step } from '../../../domain/rule/footsteps'
+import { MAX_HEALTH } from '../../../domain/rule/damage'
 import { Weapon } from '../arms/weapon'
-import type { PlayerSnapshot } from '../../net/types'
+import type { PlayerSnapshot } from '../../../net/types'
 import type { WeaponTarget } from '../arms/weapon'
 
 /** カプセルの円柱部分の長さ (m)。全高 = LENGTH + RADIUS * 2 */
@@ -1624,7 +1624,7 @@ export class Player {
   /**
    * 再生すべきクリップを選ぶ。
    *
-   * 規則そのものは scene/actor/motion.ts にある。ここでやるのは、その規則が要る値を
+   * 規則そのものは presentation/scene/actor/motion.ts にある。ここでやるのは、その規則が要る値を
    * 集めることと、決まった結果に応じて**こちら側の状態を畳む**ことだけ。
    * (敬礼をやめる、落下ループの尺を渡す、といった副作用は共有側に置けない)
    */

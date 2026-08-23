@@ -13,7 +13,7 @@
  *     Session  (server 側)    socket・届く間隔・時計のずれ・配った控え
  *
  * こうしておくと、**クライアントも同じ Player を読める**。いまは片方が
- * three を抱えた src/scene/actor/player.ts で、同じ人物のことを別々の言葉で
+ * three を抱えた src/presentation/scene/actor/player.ts で、同じ人物のことを別々の言葉で
  * 書いている。そこを寄せていく足場になる。
  *
  * 置き場所の規則は docs/design.md の 7。ここは domain なので幾何 (src/sim) を

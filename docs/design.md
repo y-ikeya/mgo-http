@@ -515,10 +515,10 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
     src/sim/      世界に訊く手続き      触る理由 = 世界の振る舞いが変
     src/net/      線の上での形          触る理由 = 送る物が変わった
     server/       審判の運営            誰が居る / いつ配る / 誰を信じる
-    src/scene/    見せる・聞かせる      three を持つのはここだけ
+    src/presentation/scene/    見せる・聞かせる      three を持つのはここだけ
     src/input.ts  パッドとキーボード    何にも依存しない
-    src/ui/       画面 (Solid)
-    src/screens/  画面の遷移
+    src/presentation/ui/       画面 (Solid)
+    src/presentation/screens/  画面の遷移
 
 **sim は「共有ライブラリ」ではない。** 10 個のうち 6 個は server か client の
 片側しか読んでいない (押し戻しはクライアントだけ、クレイモアの起爆はサーバー
@@ -559,9 +559,9 @@ sim に置くのは **主語が「世界」であるもの** — 世界に訊け
 いて、名前を全部覚えていないと目的の物に辿り着けなかった。**画面に映る物の名前**
 で棚に分ける。
 
-    src/scene/Game.ts    まとめ役。毎フレームここから降りていく
+    src/presentation/scene/Game.ts    まとめ役。毎フレームここから降りていく
     src/input.ts   パッドとキーボード
-    src/scene/assets.ts  モデルの読み込み (棚をまたいで共有する)
+    src/presentation/scene/assets.ts  モデルの読み込み (棚をまたいで共有する)
       actor/    人 — 自機・他人・モーション (どれを流すか)・当たり判定・ダンボール
       arms/     武器と投げた物 — 銃・弾道・手榴弾・クレイモア・落ちている銃
       fx/       見た目だけの物 — 爆発・排莢・着弾痕

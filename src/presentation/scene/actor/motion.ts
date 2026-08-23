@@ -20,7 +20,7 @@ import {
   locomotionFor,
   MOVE_DIRECTIONS,
   type Locomotion,
-} from '../../domain/player/locomotion'
+} from '../../../domain/player/locomotion'
 
 /**
  * 全身の型。上下のレイヤーを分けず、頭から流して終わるまで戻さない動作。

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import type { HeldId } from '../../domain/item/held'
+import type { HeldId } from '../../../domain/item/held'
 import { loadGrenade, loadPistol, loadRifle, loadSmg, loadSniper, loadClaymore } from '../assets'
 
 /**

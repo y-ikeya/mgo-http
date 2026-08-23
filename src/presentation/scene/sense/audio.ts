@@ -1,8 +1,8 @@
 import * as THREE from "three";
 
 import { asset } from "../assets";
-import { weaponOf } from "../../domain/item/weapons"
-import { STEP_RANGE } from "../../domain/rule/noise"
+import { weaponOf } from "../../../domain/item/weapons"
+import { STEP_RANGE } from "../../../domain/rule/noise"
 
 /**
  * 効果音。位置情報を持たせて鳴らす。

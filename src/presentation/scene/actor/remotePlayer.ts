@@ -13,13 +13,13 @@ import {
 } from "three/tsl";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
-import type { Locomotion } from "../../domain/player/locomotion";
-import { canBeStabbed } from "../../domain/rule/damage";
+import type { Locomotion } from "../../../domain/player/locomotion";
+import { canBeStabbed } from "../../../domain/rule/damage";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { stanceOf } from "../../domain/player/stance";
+import { stanceOf } from "../../../domain/player/stance";
 import { isWholeBody, type WholeBodyLocomotion } from "./motion";
-import { weaponOf, type WeaponId } from "../../domain/item/weapons";
+import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import {
   advanceBoxLift,
   boxLift,
@@ -36,19 +36,19 @@ import {
   ROLL_HIT_RANGE,
   ROLL_KNOCKBACK,
   type HitZone,
-} from "../../domain/rule/damage";
-import { Footsteps, type Step } from "../../domain/rule/footsteps";
-import type { Life } from "../../domain/player/lifecycle";
-import { BUFFER_SIZE, Presence } from "../../sim/space/presence";
+} from "../../../domain/rule/damage";
+import { Footsteps, type Step } from "../../../domain/rule/footsteps";
+import type { Life } from "../../../domain/player/lifecycle";
+import { BUFFER_SIZE, Presence } from "../../../sim/space/presence";
 import { Hitbox } from "./hitbox";
 import { dampAngle } from "../util/math";
 import { Weapon } from "../arms/weapon";
-import { onBattlefield } from "../../domain/player/lifecycle";
+import { onBattlefield } from "../../../domain/player/lifecycle";
 import {
   INTERPOLATION_DELAY,
   type PlayerSnapshot,
   type Team,
-} from "../../net/types";
+} from "../../../net/types";
 
 /*
  * --- 所属の色をテクスチャに掛けるのをやめた (翻意) ---

@@ -4,7 +4,7 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "lib": ["ES2023", "DOM"],
-    /* 画面の試験 (src/scene/*.test.ts) が bun の型を使う */
+    /* 画面の試験 (src/presentation/scene/*.test.ts) が bun の型を使う */
     "types": ["vite/client", "bun-types"],
     "jsx": "preserve",
     "jsxImportSource": "solid-js"

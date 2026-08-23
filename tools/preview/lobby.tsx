@@ -5,7 +5,7 @@
  */
 import { render } from 'solid-js/web'
 import { Router, Route } from '@solidjs/router'
-import Lobby from '../../src/screens/Lobby'
+import Lobby from '../../src/presentation/screens/Lobby'
 import type { RoomSummary } from '../../src/net/types'
 
 const ROOMS: RoomSummary[] = [

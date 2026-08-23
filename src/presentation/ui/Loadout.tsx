@@ -1,5 +1,5 @@
 import { For } from 'solid-js'
-import { t } from '../i18n'
+import { t } from '../../i18n'
 import {
   CHOICES,
   SUPPORTS,
@@ -7,7 +7,7 @@ import {
   WEAPONS,
   type SupportId,
   type WeaponId,
-} from '../domain/item/weapons'
+} from '../../domain/item/weapons'
 import './Loadout.css'
 
 /**

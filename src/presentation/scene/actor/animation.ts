@@ -3,7 +3,7 @@ import { isBone } from '../util/guards'
 import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
-import { MOVE_DIRECTIONS, type Locomotion, type MoveDirection } from '../../domain/player/locomotion'
+import { MOVE_DIRECTIONS, type Locomotion, type MoveDirection } from '../../../domain/player/locomotion'
 
 
 /**

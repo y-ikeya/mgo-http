@@ -4,8 +4,8 @@
  *     bunx vite → http://localhost:5173/tools/preview/score.html?case=dm
  */
 import { render } from 'solid-js/web'
-import Scoreboard from '../../src/ui/Scoreboard'
-import type { GameStats } from '../../src/scene/Game'
+import Scoreboard from '../../src/presentation/ui/Scoreboard'
+import type { GameStats } from '../../src/presentation/scene/Game'
 
 const players = [
   { id: 'me', name: 'pepa1404', team: 'blue', kills: 7, deaths: 3, suicides: 0, away: false, rate: 64 },
