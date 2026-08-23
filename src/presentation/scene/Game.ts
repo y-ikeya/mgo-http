@@ -2,17 +2,15 @@ import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
-import { Input, type InputDevice } from "../../input";
+import { Input } from "../../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
-import type { WeaponTarget } from "./arms/weapon";
+import { Spread } from "./arms/spread";
 import {
   ARENA_HALF_SIZE,
   buildLights,
   buildBases,
   buildStage,
-  setAmbientIntensity,
-  setCloudCoverage,
   SOLO_SPAWNS,
   TEAM_SPAWNS,
   STAGE_CODE,
@@ -36,8 +34,6 @@ import { Claymores } from "./arms/claymores";
 import { BlastFx } from "./fx/blastfx";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { damp } from "./util/math";
-import { randomSigned, randomUnit, RandomStream } from "./util/random";
 import { fallDamage, MAX_HEALTH } from "../../domain/rule/damage";
 import {
   canAct,
@@ -47,7 +43,6 @@ import {
   type Life,
 } from "../../domain/player/lifecycle";
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
-import { setBoxTuning, type BoxTuning } from "./actor/box";
 import { Inventory } from "../../domain/item/inventory";
 import { canDrop, isGun, type Family, type HeldId } from "../../domain/item/held";
 import { MODES, isHostile, type Mode } from "../../domain/match/room";
@@ -62,6 +57,12 @@ import {
   TRAJECTORY_STEPS,
 } from "../../sim/judge/bullet";
 import { createTransport } from "../../net";
+import {
+  createCalibration,
+  defaultKnobs,
+  type Calibration,
+  type Knobs,
+} from "./calibration";
 import type { NetTransport } from "../../net/types";
 import type { Identity } from "../../auth/session";
 import { selfSkin } from "./actor/skin";
@@ -187,34 +188,6 @@ export interface GameStats {
   peerRates: { name: string; rate: number }[];
 }
 
-/**
- * 敬礼が届く距離 (m)。
- *
- * 短い。向かい合って初めて繋がる距離にしてある。
- *
- * 遠くから繋がれると、敬礼が「安全な所から押すボタン」になる。この動作は
- * 銃を下ろして無防備になることに意味があるので、**相手の前に立つ**ところまで
- * 込みで手続きにする。合流するには実際に合流しないといけない。
- */
-/**
- * リロードの音を鳴らし始める位置 (動作全体に対する割合)。
- *
- * 頭で鳴らすと早すぎる。音の中身は 0.10〜1.35 秒に 3 つの塊 (弾倉を外す /
- * 差す / 叩き込む) があり、動作は 3.33 秒。頭から鳴らすと残り 2 秒が無音になる。
- *
- * 割合で持つのは、武器やクリップが変わっても位置がずれないようにするため。
- * 0.28 なら 3.33 秒の動作で 0.93 秒後 — 弾倉に手が掛かるあたり。
- */
-const RELOAD_SOUND_AT = 0.28;
-
-/**
- * 撃ってからボルトに手を掛けるまで (秒)。
- *
- * 撃った瞬間から動かすと、反動を受ける間もなく手が動いて忙しなく見える。
- * この分だけ次の 1 発までも延びる。
- */
-const BOLT_DELAY = 0.54;
-
 const LINK_RANGE = 5;
 
 /** 繋がったことを何秒出すか */
@@ -227,55 +200,7 @@ const STATS_INTERVAL = 0.1;
 const MAX_DT = 1 / 20;
 /** 弾が届く距離 (m)。何にも当たらなければここまで飛んで消える */
 const MAX_RANGE = 200;
-/**
- * リロード時間 (秒) のフォールバック。
- * 通常はリロードモーションの尺をそのまま使い、モーションと操作不能時間を一致させる。
- * これが使われるのはモデル未読み込みか、クリップが無いときだけ。
- */
 
-/**
- * 反動のパターン (度)。[上方向, 右方向] を 1 発ごとに並べたもの。
- *
- * 乱数を使わないのは意図的で、理由が 2 つある。
- *  - 覚えれば押さえ戻せるので、技量が結果に反映される
- *  - 決定的なのでサーバー権威に移しても計算が一致する。乱数だと
- *    「クライアントが思っている弾道」と「サーバーの判定」がずれる
- *
- * 最初の 1 発が最も強く、以降は落ち着く。左右は交互に振れて一直線に登らせない。
- * 弾数がこの表を超えたら最後の値を使い続ける。
- */
-const RECOIL_PATTERN: readonly (readonly [number, number])[] = [
-  [0.95, 0.0],
-  [0.85, -0.12],
-  [0.75, 0.2],
-  [0.68, -0.26],
-  [0.6, 0.32],
-  [0.55, 0.24],
-  [0.5, -0.3],
-  [0.48, -0.38],
-  [0.45, 0.28],
-  [0.44, 0.34],
-  [0.42, -0.32],
-  [0.4, -0.24],
-];
-/** これだけ撃たない時間が続いたらパターンを頭に戻す (秒) */
-const BURST_RESET_TIME = 0.35;
-
-/**
- * 反動に乗せる乱れ。完全に固定だとマウスマクロで打ち消せてしまうため、
- * 大枠は覚えられるが完全な再現はできない程度に散らす。
- */
-const RECOIL_PITCH_JITTER = 0.15;
-/** 左右の乱れ (度)。パターン値が 0 の弾もあるので倍率ではなく加算 */
-const RECOIL_YAW_JITTER = 0.08;
-
-
-/**
- * 姿勢由来の散布が落ち着く速さ。
- * 即座に 0 に戻ると「止まった瞬間に撃つ」だけで精度が得られてしまう。
- * 一拍置く必要があることで、遮蔽に入って落ち着ける動作に意味が出る。
- */
-const SPREAD_SETTLE_LAMBDA = 5;
 
 /**
  * 刺突の判定を出すタイミング (クリップ尺に対する割合)。
@@ -292,10 +217,6 @@ const IMPACT_WORLD = 0xffd9a0;
 const IMPACT_HIT = 0xff5c47;
 /** 命中表示を HUD に出しておく時間 (秒) */
 const HIT_FEEDBACK_DURATION = 0.6;
-
-/** 散布の基準軸。照準がほぼ真上を向いたときだけ前方を基準に切り替える */
-const WORLD_UP = new THREE.Vector3(0, 1, 0);
-const WORLD_FORWARD = new THREE.Vector3(0, 0, -1);
 
 /** トーンマッピングの露出。全体の明るさはまずここで調整する */
 const DEFAULT_EXPOSURE = 3.0;
@@ -326,20 +247,6 @@ const GRENADE_RELEASE_HEIGHT = 1.7;
  * 腕を伸ばした先から出るようにする。
  */
 const GRENADE_RELEASE_FORWARD = 0.45;
-
-/**
- * 手榴弾が手を離れる時刻 (投擲クリップ内の秒)。
- *
- * 投げる型は腕を後ろへ引いてから前へ振る。その振り切る所で放さないと、
- * 構えたまま物だけ飛んでいくように見える。
- *
- * 向きはこの瞬間に取り直す。キーを離した時点の向きを使うと、振っている間に
- * 視点を動かしても軌道が変わらず、手だけが別の方を向く。
- *
- * **秒ではなく投げクリップに対する割合で持つ。** 秒で持つと、尺の違うモデルに
- * 差し替えたときに別の場所を指す (実測 0.83 秒のクリップの 0.16 秒あたり)。
- */
-const GRENADE_RELEASE_RATIO = 0.19;
 
 /**
  * クレイモアが地面に着く位置。置く型に対する割合。
@@ -485,7 +392,6 @@ export class Game {
    * 1 発ぶん持ち越さないため。
    */
   private triggerReleased = true;
-  private grenadeReleaseRatio = GRENADE_RELEASE_RATIO;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
   /** 投げる構えを取っているか。離した瞬間に投げる */
@@ -519,21 +425,31 @@ export class Game {
   private readonly hitPoint = new THREE.Vector3();
   private readonly hitNormal = new THREE.Vector3();
   private readonly normalMatrix = new THREE.Matrix3();
-  private readonly spreadRight = new THREE.Vector3();
-  private readonly spreadUp = new THREE.Vector3();
   /** カメラの遮蔽判定用。弾道とは別に持つ (far が毎回変わるため) */
   private readonly cameraRay = new THREE.Raycaster();
   /** 弾道を折れ線で辿るための作業ベクトル */
   private readonly segmentFrom = new THREE.Vector3();
   private readonly segmentTo = new THREE.Vector3();
   private readonly segmentDir = new THREE.Vector3();
+
   /**
-   * 弾に掛かる重力の上書き。**調整パネル用**で、既定は null。
+   * 手触りの仮置き。**調整パネルだけが動かす** (calibration.ts)。
    *
-   * 素の値は武器ごとに domain が持っている (weapons.ts の bulletGravity)。
-   * ここに写しを置くと、銃を足したときに片方だけ古くなる。
+   * 既定は knobs.ts。パネルは開発時にしか出ないので通常は動かないが、
+   * Game が読むのはここ 1 つで、写しは持たない。
    */
-  private bulletGravityOverride: number | null = null;
+  private readonly knobs: Knobs = defaultKnobs();
+  /**
+   * 調整パネルの受け口。**本体の顔から外してある。**
+   *
+   * 以前は Game に setBoltDelay / setCrouchTorsoYaw … と 20 本以上生えていて、
+   * 外から見ると「この値はいつでも変わりうる」ように読めた。実際に触るのは
+   * 手元で ?panel=open を付けたときだけ。
+   */
+  readonly calibration: Calibration;
+
+  /** 散布と反動。撃つたびに広がり、撃たなければ戻る (arms/spread.ts) */
+  private readonly spread = new Spread();
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -596,13 +512,9 @@ export class Game {
   /** ボルト操作を始めるまでの残り時間 (秒) */
   private boltIn = 0;
   /** 撃ってからボルトに手を掛けるまで (秒、調整用) */
-  private boltDelay = BOLT_DELAY;
   /** リロードの音を鳴らし始める位置 (割合、調整用) */
-  private reloadSoundAt = RELOAD_SOUND_AT;
   /** 連射中の何発目か。反動パターンを引く添字 */
-  private burstIndex = 0;
   /** 姿勢由来の散布 (度)。移動と滞空で増え、落ち着くと戻る */
-  private postureSpread = 0;
   /** 刺突の残り時間。0 より大きい間は発砲できない */
   private stabTimer = 0;
   /** 判定を出したか。1 回の振りで 1 回だけ */
@@ -614,7 +526,6 @@ export class Game {
   /** 直近に当てた部位と、その表示を消すまでの残り時間 */
   private lastHitZone = "";
   private hitFeedbackTimer = 0;
-  private timeSinceShot = BURST_RESET_TIME;
   /** 状態を送るタイマーの ID。描画ループとは独立して回る */
   private snapshotHandle = 0;
   /** 直近のキル表示。新しいものが先頭 */
@@ -772,6 +683,15 @@ export class Game {
     this.follow.snapTo(this.player, this.cameraWorld);
     this.audio = new GameAudio(this.follow.camera, this.scene);
 
+    this.calibration = createCalibration({
+      knobs: this.knobs,
+      player: this.player,
+      follow: this.follow,
+      input: this.input,
+      sun: this.sun,
+      renderer: this.renderer,
+    });
+
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
@@ -800,121 +720,11 @@ export class Game {
   }
 
   /** 武器の取り付け位置の調整用。開発時の Calibrator からのみ呼ばれる */
-  calibrateWeapon(
-    target: WeaponTarget,
-    grip: THREE.Vector3,
-    rotation: THREE.Euler,
-  ): void {
-    this.player.calibrateWeapon(target, grip, rotation);
-  }
-
-  /** 撃ってからボルトに手を掛けるまでの調整用 (秒) */
-  /** 吹き飛ばされる / 起き上がる型の再生速度。調整用 */
-  setKnockdownRates(sweep: number, stand: number): void {
-    this.player.setKnockdownRates(sweep, stand);
-  }
-
-  /** 手を離れる位置。投げクリップに対する割合 (0..1)。調整用 */
-  setGrenadeRelease(ratio: number): void {
-    this.grenadeReleaseRatio = ratio;
-  }
-
-  setBoltDelay(seconds: number): void {
-    this.boltDelay = seconds;
-  }
-
-  /** リロードの音を鳴らし始める位置の調整用 (0..1) */
-  setReloadSoundAt(ratio: number): void {
-    this.reloadSoundAt = ratio;
-  }
-
-  /** 弾の落下の調整用。0 でまっすぐ飛ぶ */
-  setBulletGravity(gravity: number): void {
-    this.bulletGravityOverride = gravity;
-  }
-
-  /** ダンボールの寸法と位置の調整用 */
-  setBoxTuning(tuning: Partial<BoxTuning>): void {
-    setBoxTuning(tuning);
-  }
-
-  /** ナイフを出しっぱなしにする (調整用) */
-  setKnifePreview(visible: boolean): void {
-    this.player.setKnifePreview(visible);
-  }
-
-  /** 照準の上下が上半身に効く強度の調整用 */
-  setAimPitchGain(gain: number): void {
-    this.player.setAimPitchGain(gain);
-  }
-
-  /** しゃがみ時に上半身を右へ旋回させる角度の調整用 (度で受ける) */
-  setCrouchTorsoYaw(degrees: number): void {
-    this.player.setCrouchTorsoYaw(degrees);
-  }
-
-  /** 非構え時の上半身の向き補正の調整用 */
-  setUpperTwistFix(amount: number): void {
-    this.player.setUpperTwistFix(amount);
-  }
-
-  /** 構えていないときの前傾の調整用 (度で受ける) */
-  setRelaxedLean(degrees: number): void {
-    this.player.setRelaxedLean(THREE.MathUtils.degToRad(degrees));
-  }
-
-  /** 雲の量の調整用。小さいほど広く覆う */
-  setCloudCoverage(coverage: number): void {
-    setCloudCoverage(coverage);
-  }
-
-  /** 日陰の明るさ (天空光) の調整用 */
-  setAmbientIntensity(intensity: number): void {
-    setAmbientIntensity(intensity);
-  }
-
-  /** 影の濃さの調整用 (0..1) */
-  setShadowIntensity(intensity: number): void {
-    this.sun.shadow.intensity = intensity;
-  }
-
-  /** 画面全体の明るさ (トーンマッピングの露出) の調整用 */
-  setExposure(exposure: number): void {
-    this.renderer.toneMappingExposure = exposure;
-  }
-
-  /** 構え時のカメラの寄り具合の調整用 */
-  setAimView(view: { distance: number; shoulder: number; fov: number }): void {
-    this.follow.setAimView(view);
-  }
-
-  /** 跳躍の調整用 */
-  setJumpTuning(gravity: number, height: number, fallScale: number): void {
-    this.player.setJumpTuning(gravity, height, fallScale);
-  }
-
-  /** 移動速度の調整用 */
-  setMoveSpeed(speed: number, aimScale: number): void {
-    this.player.setMoveSpeed(speed, aimScale);
-  }
-
-  /** 操作方法の切り替え */
-  setInputDevice(device: InputDevice): void {
-    this.input.setDevice(device);
-  }
-
   /** 自分の ID。HUD がキル表示で自他を分けるのに使う */
   get selfId(): string {
     return this.net.id;
   }
 
-  /** 今どちらが効いているか。パネルの表示用 */
-  inputStatus(): { active: "keyboard" | "gamepad"; connected: boolean } {
-    return {
-      active: this.input.activeDevice,
-      connected: this.input.gamepadConnected,
-    };
-  }
 
   /**
    * WebGPU に乗れなかった理由を出す。
@@ -1099,7 +909,12 @@ export class Game {
     this.player.setGhost(this.life === "spawning" || this.loadoutBlocking);
     this.updateRollContact();
     this.updateStab(dt);
-    this.updatePostureSpread(dt);
+    this.spread.update(dt, this.weapon, {
+      speed: this.player.speed,
+      stanceRate: this.player.stanceRate,
+      crouching: this.player.isCrouching,
+      grounded: this.player.grounded,
+    });
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
     this.drops.update(dt);
@@ -1818,7 +1633,7 @@ export class Game {
     this.reloadSoundIn = 0;
     this.boltIn = 0;
     this.stabTimer = 0;
-    this.burstIndex = 0;
+    this.spread.reset();
     this.follow.snapTo(this.player, this.cameraWorld);
   }
 
@@ -1928,8 +1743,6 @@ export class Game {
 
   private updateWeapon(dt: number): void {
     // 撃つ手を止めたらパターンを頭に戻す。バースト射撃が意味を持つのはこのため。
-    this.timeSinceShot += dt;
-    if (this.timeSinceShot >= BURST_RESET_TIME) this.burstIndex = 0;
 
     // ボルト操作の開始待ち
     if (this.boltIn > 0) {
@@ -2016,8 +1829,8 @@ export class Game {
     // 動作は撃った瞬間ではなく少し置いてから始める。撃った反動を受けてから
     // 手を掛ける、という順になる。
     if (this.weapon.bolt && this.player.boltDuration > 0) {
-      this.boltIn = this.boltDelay;
-      this.fireCooldown = this.boltDelay + this.player.boltDuration;
+      this.boltIn = this.knobs.boltDelay;
+      this.fireCooldown = this.knobs.boltDelay + this.player.boltDuration;
     } else {
       this.fireCooldown = this.weapon.fireInterval;
     }
@@ -2047,7 +1860,7 @@ export class Game {
     this.reloadTimer = this.weapon.reload;
     this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
-    this.reloadSoundIn = this.reloadTimer * this.reloadSoundAt;
+    this.reloadSoundIn = this.reloadTimer * this.knobs.reloadSoundAt;
     // 覗いたままだと入れ替えの間ずっと視界が狭い。肩越しへ戻す
     this.zoomStep = 0;
   }
@@ -2055,7 +1868,7 @@ export class Game {
   private fire(): void {
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
-    this.applySpread(this.aimDir);
+    this.spread.apply(this.aimDir, this.weapon, { seed: this.shotCount });
 
     const shot = this.traceBullet();
     const player = shot.player;
@@ -2117,24 +1930,9 @@ export class Game {
       to: [this.hitPoint.x, this.hitPoint.y, this.hitPoint.z],
     });
 
-    // 反動は撃った「後」に加える。この一発はまだ狙った向きへ飛ぶ。
-    const [pitch, yaw] =
-      RECOIL_PATTERN[Math.min(this.burstIndex, RECOIL_PATTERN.length - 1)];
-    const kickPitch =
-      pitch *
-      (1 +
-        RECOIL_PITCH_JITTER *
-          randomSigned(this.shotCount, RandomStream.recoilPitch));
-    const kickYaw =
-      yaw +
-      RECOIL_YAW_JITTER * randomSigned(this.shotCount, RandomStream.recoilYaw);
-    this.follow.addRecoil(
-      THREE.MathUtils.degToRad(kickPitch),
-      THREE.MathUtils.degToRad(kickYaw),
-    );
-
-    this.burstIndex++;
-    this.timeSinceShot = 0;
+    // 跳ね上がりは散布の側が持っている (arms/spread.ts)
+    const [kickPitch, kickYaw] = this.spread.fired({ seed: this.shotCount });
+    this.follow.addRecoil(kickPitch, kickYaw);
   }
 
   /**
@@ -2388,7 +2186,7 @@ export class Game {
     // 軽く叩いただけなら振りかぶりが残っているぶん遅れて出る
     this.grenadeRelease = Math.max(
       0.01,
-      this.player.throwWindupLeft + this.grenadeReleaseRatio * this.player.throwReleaseDuration,
+      this.player.throwWindupLeft + this.knobs.grenadeRelease * this.player.throwReleaseDuration,
     );
   }
 
@@ -2913,7 +2711,7 @@ export class Game {
     // 速さも落ち方も**武器の性能** (domain)。ここは道を引くだけ。
     // 銃ごとに違うので、狙撃銃の弾は同じ距離でも落ちない
     const speed = this.weapon.bulletSpeed;
-    const gravity = this.bulletGravityOverride ?? this.weapon.bulletGravity;
+    const gravity = this.knobs.bulletGravity ?? this.weapon.bulletGravity;
     const total = flightTime(MAX_RANGE, speed);
     const step = total / TRAJECTORY_STEPS;
 
@@ -2983,60 +2781,8 @@ export class Game {
     return { player: null, terrain: null, distance: travelled };
   }
 
-  /**
-   * 姿勢由来の散布を更新する。
-   *
-   * **上がるのは即座、戻るのは遅い。** 狙いが乱れるのは動いた瞬間であって、
-   * 一拍置いてからではない。両方を均すと、立ち座りのような一瞬の乱れが
-   * 平らに均されて何も起きなくなる (実測で 0.83 度が 0.23 度まで潰れていた)。
-   *
-   * 遅いのは戻りのほうだけ。止まってから精度が返るまでに間がある。
-   */
-  private updatePostureSpread(dt: number): void {
-    const moving = this.player.speed * this.weapon.spreadPerSpeed;
-    // 姿勢を変えている間も散る。頭の高さが変わることは、このゲームでは
-    // 移動と同じ重みを持つ (遮蔽を越えるかがそれで決まる)。ここが只だと、
-    // 止まったまましゃがみ連打で頭だけ上下させるのが一番安い覗き方になる。
-    const changing = this.player.stanceRate * this.weapon.spreadPerStance;
-    const target = this.player.grounded
-      ? moving * (this.player.isCrouching ? this.weapon.spreadCrouchScale : 1) + changing
-      : this.weapon.spreadAirborne;
-    this.postureSpread = Math.max(
-      target,
-      damp(this.postureSpread, target, SPREAD_SETTLE_LAMBDA, dt),
-    );
-  }
 
-  /** 現在の散布界 (度)。連射で広がる分と、姿勢で広がる分の合計 */
-  private get spreadDegrees(): number {
-    return Math.min(
-      this.burstIndex * this.weapon.spreadPerShot + this.postureSpread,
-      this.weapon.spreadMax,
-    );
-  }
 
-  /** 照準方向を散布界の円錐内へずらす。dir は正規化済みで、破壊的に書き換える */
-  private applySpread(dir: THREE.Vector3): void {
-    const spread = this.spreadDegrees;
-    if (spread <= 0) return;
-
-    // 円内に一様分布させる。半径に sqrt を掛けないと中心に偏る
-    const angle =
-      randomUnit(this.shotCount, RandomStream.spreadAngle) * Math.PI * 2;
-    const radius =
-      Math.sqrt(randomUnit(this.shotCount, RandomStream.spreadRadius)) *
-      Math.tan(THREE.MathUtils.degToRad(spread));
-
-    // 照準方向に直交する 2 軸を作る。真上を向いているときは基準を切り替える
-    const up = Math.abs(dir.y) > 0.99 ? WORLD_FORWARD : WORLD_UP;
-    this.spreadRight.crossVectors(dir, up).normalize();
-    this.spreadUp.crossVectors(this.spreadRight, dir);
-
-    dir
-      .addScaledVector(this.spreadRight, Math.cos(angle) * radius)
-      .addScaledVector(this.spreadUp, Math.sin(angle) * radius)
-      .normalize();
-  }
 
   private publishStats(dt: number): void {
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.1;
@@ -3074,7 +2820,7 @@ export class Game {
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
-      spread: this.spreadDegrees,
+      spread: this.spread.degrees(this.weapon),
       crouching: this.player.isCrouching,
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),

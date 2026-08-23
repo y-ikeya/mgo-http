@@ -74,7 +74,7 @@ export default function Play(props: { identity: Identity }) {
   })
 
   const calibrate = (target: WeaponTarget, grip: THREE.Vector3, rotation: THREE.Euler) => {
-    game()?.calibrateWeapon(target, grip, rotation)
+    game()?.calibration.calibrateWeapon(target, grip, rotation)
   }
 
   return (
@@ -125,26 +125,26 @@ export default function Play(props: { identity: Identity }) {
         <Calibrator
           stats={stats()}
           onChange={calibrate}
-          onBox={(tuning) => game()?.setBoxTuning(tuning)}
-          onBulletGravity={(gravity) => game()?.setBulletGravity(gravity)}
-          onBoltDelay={(seconds) => game()?.setBoltDelay(seconds)}
-          onGrenadeRelease={(seconds) => game()?.setGrenadeRelease(seconds)}
-          onKnockdownRates={(sweep, stand) => game()?.setKnockdownRates(sweep, stand)}
-          onReloadSoundAt={(ratio) => game()?.setReloadSoundAt(ratio)}
-          onKnifePreview={(visible) => game()?.setKnifePreview(visible)}
-          onAimPitchGain={(gain) => game()?.setAimPitchGain(gain)}
-          onUpperTwistFix={(amount) => game()?.setUpperTwistFix(amount)}
-          onCrouchTorsoYaw={(degrees) => game()?.setCrouchTorsoYaw(degrees)}
-          onRelaxedLean={(degrees) => game()?.setRelaxedLean(degrees)}
-          onExposure={(exposure) => game()?.setExposure(exposure)}
-          onCloud={(coverage) => game()?.setCloudCoverage(coverage)}
-          onAmbient={(intensity) => game()?.setAmbientIntensity(intensity)}
-          onShadow={(intensity) => game()?.setShadowIntensity(intensity)}
-          onAimView={(view) => game()?.setAimView(view)}
-          onJump={(gravity, height, fall) => game()?.setJumpTuning(gravity, height, fall)}
-          onMoveSpeed={(speed, aimScale) => game()?.setMoveSpeed(speed, aimScale)}
-          onInputDevice={(device) => game()?.setInputDevice(device)}
-          inputStatus={() => game()?.inputStatus() ?? { active: 'keyboard', connected: false }}
+          onBox={(tuning) => game()?.calibration.setBoxTuning(tuning)}
+          onBulletGravity={(gravity) => game()?.calibration.setBulletGravity(gravity)}
+          onBoltDelay={(seconds) => game()?.calibration.setBoltDelay(seconds)}
+          onGrenadeRelease={(seconds) => game()?.calibration.setGrenadeRelease(seconds)}
+          onKnockdownRates={(sweep, stand) => game()?.calibration.setKnockdownRates(sweep, stand)}
+          onReloadSoundAt={(ratio) => game()?.calibration.setReloadSoundAt(ratio)}
+          onKnifePreview={(visible) => game()?.calibration.setKnifePreview(visible)}
+          onAimPitchGain={(gain) => game()?.calibration.setAimPitchGain(gain)}
+          onUpperTwistFix={(amount) => game()?.calibration.setUpperTwistFix(amount)}
+          onCrouchTorsoYaw={(degrees) => game()?.calibration.setCrouchTorsoYaw(degrees)}
+          onRelaxedLean={(degrees) => game()?.calibration.setRelaxedLean(degrees)}
+          onExposure={(exposure) => game()?.calibration.setExposure(exposure)}
+          onCloud={(coverage) => game()?.calibration.setCloudCoverage(coverage)}
+          onAmbient={(intensity) => game()?.calibration.setAmbientIntensity(intensity)}
+          onShadow={(intensity) => game()?.calibration.setShadowIntensity(intensity)}
+          onAimView={(view) => game()?.calibration.setAimView(view)}
+          onJump={(gravity, height, fall) => game()?.calibration.setJumpTuning(gravity, height, fall)}
+          onMoveSpeed={(speed, aimScale) => game()?.calibration.setMoveSpeed(speed, aimScale)}
+          onInputDevice={(device) => game()?.calibration.setInputDevice(device)}
+          inputStatus={() => game()?.calibration.inputStatus() ?? { active: 'keyboard', connected: false }}
         />
       </Show>
     </div>
