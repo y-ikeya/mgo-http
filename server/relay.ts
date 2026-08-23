@@ -24,6 +24,7 @@ import { type RoomWorld, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
 import { headHeightWhen } from '../src/domain/player/stance'
+import { canHold } from '../src/domain/player/equip'
 
 /**
  * 位置が届いたとき。
@@ -118,9 +119,19 @@ export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffe
   player.aiming = snapshot.aiming
   player.locomotion = snapshot.locomotion
   // 持っている銃。威力と連射の上限をこれで引く
-  player.weapon = snapshot.weapon
+  /*
+   * **手にある物は申告だが、持てない物は受け取らない。**
+   *
+   * 位置と一緒に流れてくるので素通ししていたが、これは状態ではなく意思。
+   * 選んでいない銃を名乗って撃つ、が形の上では通っていた (撃つ側で 1 か所
+   * 見ていただけ)。持てるかどうかは規則が決める (domain/player/equip.ts)。
+   *
+   * **弾いたら前の値のまま。** 送り返して直させるより、こちらが知っている
+   * 姿を配り続けるほうが素直 — 他人の画面には正しい物が映る。
+   */
+  if (canHold(player, snapshot.weapon)) player.weapon = snapshot.weapon
   // いま手にある物。撃てるかどうかの判断に使う
-  player.held = snapshot.held
+  if (canHold(player, snapshot.held)) player.held = snapshot.held
   // 振りかぶって持っているか。倒された瞬間に足元へ落とすのに要る
   player.holdingGrenade = snapshot.holdingGrenade
   // 位置が届いた。どこに居るか分かったので支度に進める

@@ -185,6 +185,14 @@ export interface Player {
    */
   slot: number
   /**
+   * 拾って手に入れた物。**選んだ物とは別**。
+   *
+   * 落ちている銃は誰でも拾えるので、選んでいない銃を持っていることがある。
+   * 「持てるか」を確かめる (player/equip.ts の canHold) のに、拾った記録が
+   * サーバー側にも要る。湧き直すと消える。
+   */
+  carried: HeldId[]
+  /**
    * 過去の姿。当てたという申告を遡って照合するのに使う。
    *
    * **接続ではなく人が持つ。** 練習部屋の的は接続を持たないが、撃たれる以上
@@ -272,6 +280,7 @@ export function newPlayer(seed: {
     locomotion: 'idle',
     footsteps: new Footsteps(),
     concentratingSince: 0,
+    carried: [],
     weapon: 'rifle',
     primary: 'rifle',
     held: 'rifle',
@@ -366,6 +375,8 @@ export function isProtected(player: Player): boolean {
  */
 export function refill(player: Player): void {
   player.killedBy = ''
+  // 拾った物は持ち越さない。**次の命は選んだ装備から始まる**
+  player.carried = []
   player.health = MAX_HEALTH
   player.ammo = startingAmmo()
   player.grenades = SUPPORT_SPECS[player.support].count

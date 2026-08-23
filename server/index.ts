@@ -20,7 +20,7 @@ import { dropWeapon, pickUp } from './arms/drops'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { detonate, throwGrenade } from './arms/grenade'
-import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, sendHealth } from './damage'
+import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject, sendHealth } from './damage'
 import { leaveRoom, matchState, recordSeat, spawn, updateMatch, updateTargets } from './match'
 import { receiveSnapshot, relayShot, relayState } from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
@@ -38,9 +38,10 @@ import { triggeredBy } from '../src/sim/judge/claymore'
 import { TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
-import { reloadInto, SUPPORT_SPECS } from '../src/domain/item/weapons'
+import { reloadInto } from '../src/domain/item/weapons'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
 import { type ClientMessage, type RoomSummary, type ServerMessage } from '../src/net/types'
+import { chooseLoadout } from '../src/domain/player/equip'
 
 
 const PORT = Number(process.env.PORT ?? 8787)
@@ -311,16 +312,13 @@ function handleMessage(
       throwGrenade(room, player, message)
       break
 
-    case 'loadout': {
-      player.support = message.support
-      player.primary = message.primary
-      // 支度中なら**すぐ**効かせる。次の湧きを待つと、選び直した分が
-      // 1 つ遅れて効くことになる
-      if (canChoose(player.life)) {
-        player.grenades = SUPPORT_SPECS[player.support].count
+    case 'loadout':
+      // **選んだ物をそのまま書き込まない。** 表に無い名前を名乗られたら弾く
+      // (弾いた先で weaponOf が undefined を返し、判定ごと壊れる)
+      if (!chooseLoadout(player, message.primary, message.support, canChoose(player.life))) {
+        reject(player, `選べない装備 (${message.primary} / ${message.support})`)
       }
       break
-    }
 
     // 支度ができた。ここで初めて戦場へ出す。
     //

@@ -80,3 +80,36 @@ describe('個人戦', () => {
     b.close()
   }, 30000)
 })
+
+/**
+ * **申告した装備を鵜呑みにしない。**
+ *
+ * 手にある物は位置と一緒に流れてくる (37 バイトの中) ので、長らく素通りで
+ * 書き込んでいた。狙撃銃を選んでいないのに「狙撃銃を持っている」と名乗れば、
+ * サーバーはその威力で計算してしまう — 頭 1 発が 100 か 130 かが変わる。
+ */
+describe('持てない物は名乗れない', () => {
+  test('選んでいない銃を名乗っても、削れるのは選んだ銃のぶん', async () => {
+    const { a, b } = await twoInDM()
+    // alice は既定のまま (rifle)。位置パケットだけ狙撃銃と名乗る
+    a.claimedWeapon = 'sniper'
+    await Bun.sleep(300)
+    b.reset()
+
+    a.send({
+      type: 'damage', id: 'alice', target: 'bob',
+      kind: 'bullet', zone: 'HEAD', distance: 12,
+    })
+    await Bun.sleep(400)
+
+    const health = b.messages.find((m) => m.type === 'health' && m.id === 'bob')
+    const damage = health?.type === 'health' ? health.damage : 0
+    // XM2010 の頭は 130、AK47 は 100。**通ってしまえば 130 になる**
+    expect(damage).toBeGreaterThan(0)
+    expect(damage).toBeLessThanOrEqual(100)
+
+    a.claimedWeapon = 'rifle'
+    a.close()
+    b.close()
+  }, 30000)
+})

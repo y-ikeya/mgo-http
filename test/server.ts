@@ -180,12 +180,23 @@ export class Client {
     const [x, y, z] = this.position
     this.socket.send(
       encodeSnapshot(
-        snapshotOf(this.id, x, y, z, locomotion, this.holdingGrenade, this.holdingClaymore),
+        snapshotOf(
+          this.id,
+          x,
+          y,
+          z,
+          locomotion,
+          this.holdingGrenade,
+          this.holdingClaymore,
+          this.claimedWeapon,
+        ),
       ),
     )
   }
 
   /** 振りかぶって持っているか。位置に乗せて送る */
+  /** 位置と一緒に名乗る銃。**選んでいない物を名乗れるか**を試すのに使う */
+  claimedWeapon: 'rifle' | 'sniper' | 'smg' | 'pistol' = 'rifle'
   private holdingGrenade = false
   /** クレイモアを手にしているか */
   private holdingClaymore = false
@@ -194,7 +205,15 @@ export class Client {
     this.holdingGrenade = holding
   }
 
+  /**
+   * クレイモアを手にする。
+   *
+   * **選んでもいない物は持てない** (domain/player/equip.ts の canHold) ので、
+   * 支援の枠をクレイモアに変えてから手にする。本物のクライアントも同じ順で
+   * 通る — 支度で選んで、湧いて、持ち替える。
+   */
   holdClaymore(holding: boolean): void {
+    if (holding) this.send({ type: 'loadout', primary: 'rifle', support: 'claymore' })
     this.holdingClaymore = holding
   }
 
@@ -230,6 +249,8 @@ function snapshotOf(
   locomotion: string,
   holdingGrenade = false,
   holdingClaymore = false,
+  /** 名乗る銃。**選んでいない物を名乗る試験**に使う */
+  claimed: 'rifle' | 'sniper' | 'smg' | 'pistol' = 'rifle',
 ): PlayerSnapshot {
   return {
     id,
@@ -253,7 +274,7 @@ function snapshotOf(
     concentrating: false,
     saluteHeld: false,
     reloading: false,
-    weapon: 'rifle',
+    weapon: claimed,
     // 振りかぶっている間だけ立つ (FLAG2_WINDUP)
     holdingGrenade,
     protectedNow: false,

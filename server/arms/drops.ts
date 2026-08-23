@@ -82,6 +82,8 @@ export function dropWeapon(room: RoomWorld, player: Player, message: ClientMessa
     yaw: player.yaw + Math.PI / 2,
   }
   room.dropped.push(item)
+  // 手放したら「持っている」から外す。拾い直すまで名乗れない
+  player.carried = player.carried.filter((id) => id !== message.weapon)
   const put = message.weapon
   if (isGun(put)) {
     player.ammo.magazine[put] = 0
@@ -109,6 +111,8 @@ export function pickUp(room: RoomWorld, player: Player): void {
   if (!best) return
   room.dropped.splice(room.dropped.indexOf(best), 1)
   const got = best.weapon
+  // **拾ったことを覚える。** 選んでいない銃を持てるのはこれがあるから
+  if (!player.carried.includes(got)) player.carried.push(got)
   if (isGun(got)) {
     player.ammo.magazine[got] = best.ammo
     player.ammo.reserve[got] = best.reserve
