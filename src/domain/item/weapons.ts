@@ -162,6 +162,14 @@ export interface WeaponSpec {
   bulletSpeed: number
   bulletGravity: number
 
+  /**
+   * 銃声が届く距離 (m)。**撃てば居場所が漏れる、その漏れ方。**
+   *
+   * 遠くまで届くほど、撃ったこと自体が相手への情報になる。狙撃銃が一番広いのは
+   * 「遠くから安全に撃てる代わりに、音は遠くまで行く」という交換のため。
+   */
+  noiseRange: number
+
   // --- 散布 (度) ---
   /** 1 発ごとに広がる量 */
   spreadPerShot: number
@@ -257,6 +265,7 @@ const SMG: WeaponSpec = {
 
   bulletSpeed: 715, // 5.7x28mm の初速
   bulletGravity: 9.8,
+  noiseRange: 110,
 
   // **反動が小さい。** 押しっぱなしでも散らばりにくいのがこの銃の取り柄
   spreadPerShot: 0.08,
@@ -326,6 +335,7 @@ const RIFLE: WeaponSpec = {
 
   bulletSpeed: 715, // 7.62x39mm の初速
   bulletGravity: 9.8,
+  noiseRange: 130,
 
   spreadPerShot: 0.13,
   spreadMax: 1.6,
@@ -383,6 +393,7 @@ const SNIPER: WeaponSpec = {
 
   bulletSpeed: 880, // .300 Win Mag の初速
   bulletGravity: 9.8,
+  noiseRange: 170,
 
   // 連射で広がる分は大きいが、そもそも連射できない
   spreadPerShot: 0.9,
@@ -462,6 +473,7 @@ const PISTOL: WeaponSpec = {
   reload: 2.1,
   bulletSpeed: 380,
   bulletGravity: 9.8,
+  noiseRange: 85,
   // 片手で構えるので跳ねる。連射するほど散る
   spreadPerShot: 0.28,
   spreadMax: 2.2,

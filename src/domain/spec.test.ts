@@ -117,6 +117,14 @@ describe('README が数字の出どころ', () => {
     }
   })
 
+  test('銃声の届く距離', () => {
+    for (const [id, range] of tableOf('銃声')) {
+      const spec = WEAPONS[id as WeaponId]
+      expect(spec, `README に無い武器: ${id}`).toBeDefined()
+      expect([id, spec.noiseRange]).toEqual([id, Number(range)])
+    }
+  })
+
   test('1 つの命で持てる数', () => {
     for (const [id, label, count] of tableOf('支援')) {
       const spec = SUPPORT_SPECS[id as SupportId]

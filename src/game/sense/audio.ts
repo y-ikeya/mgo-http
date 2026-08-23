@@ -1,6 +1,8 @@
 import * as THREE from "three";
 
 import { asset } from "../assets";
+import { weaponOf } from "../../domain/item/weapons"
+import { STEP_RANGE } from "../../domain/rule/noise"
 
 /**
  * 効果音。位置情報を持たせて鳴らす。
@@ -38,35 +40,35 @@ import { asset } from "../assets";
  *   max       … ここで完全に無音になる (linear モデル)
  */
 const SOUNDS = {
-  rifle: { file: "ak47_shot1.mp3", reference: 6, max: 130 },
+  rifle: { file: "ak47_shot1.mp3", reference: 6, max: weaponOf("rifle").noiseRange },
   /**
    * 狙撃銃。1 発が 1.57 秒あり、後半にボルト操作の音が入っている。
    *
-   * 届く距離を突撃銃より伸ばしてある。遠くから撃つ武器なので、
-   * 撃った本人には安全でも**音は遠くまで届く**、という交換にする。
+   * **届く距離は武器の性能** (domain/item/weapons.ts の noiseRange)。ここで
+   * 別に決めると、サーバーが「聞こえる」と判断した音が手元では無音になる。
    */
-  snipe: { file: "xm2010_shot1.mp3", reference: 8, max: 170 },
+  snipe: { file: "xm2010_shot1.mp3", reference: 8, max: weaponOf("sniper").noiseRange },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
   // P90。突撃銃より軽い音で、間隔が詰まるぶん 1 発を短く聞かせたい
-  smg: { file: "p90_shot1.mp3", reference: 5, max: 110 },
+  smg: { file: "p90_shot1.mp3", reference: 5, max: weaponOf("smg").noiseRange },
   smgReload: { file: "p90_reload1.mp3", reference: 2, max: 24 },
   /**
-   * 足音。20m で消える。
+   * 足音。**届く距離は規則から引く** (domain/rule/noise.ts の STEP_RANGE)。
    *
    * 走り (音量 1.0) が 20m、しゃがみ (0.3) は実質 8m ほどで聞こえなくなる。
    * 姿勢ごとに max を変えなくても、音量の違いが届く距離の違いになる。
    */
-  step: { file: "step_concrete1.mp3", reference: 2, max: 20 },
+  step: { file: "step_concrete1.mp3", reference: 2, max: STEP_RANGE },
   /** 金属の上を歩いたとき。届く距離はコンクリートと同じにして、材質の差だけ出す */
-  metalStep: { file: "step_metal1.mp3", reference: 2, max: 20 },
+  metalStep: { file: "step_metal1.mp3", reference: 2, max: STEP_RANGE },
   /**
    * 木の上を歩いたとき。
    *
    * 専用の音源がまだ無いので、コンクリートの足音を低く落として代用している。
    * wood_step.mp3 を用意したら file を差し替えるだけでよい。
    */
-  woodStep: { file: "step_concrete1.mp3", reference: 2, max: 20, rate: 0.78 },
+  woodStep: { file: "step_concrete1.mp3", reference: 2, max: STEP_RANGE, rate: 0.78 },
   /**
    * 転がり。体が地面に接する 1 回の音。
    *
@@ -150,7 +152,7 @@ const SOUNDS = {
    * 「近くで撃っている」と伝わってほしい音でもある。副武器で撃つのは
    * 詰められたときか、主武器を撃ち切ったときなので、そこは近い戦いになる。
    */
-  pistol: { file: "pistol_shot1.mp3", reference: 5, max: 85 },
+  pistol: { file: "pistol_shot1.mp3", reference: 5, max: weaponOf("pistol").noiseRange },
   /**
    * 拳銃のリロード。
    *

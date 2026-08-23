@@ -21,6 +21,8 @@ import { groundUnder, hasLineOfSight, headHeight } from '../src/sim/space/vision
 import { sessionOf } from './session'
 import { arenaHalf, solidBoxes, stageBoxes } from './stage'
 import { type RoomWorld, setLife } from './world'
+import { weaponOf } from '../src/domain/item/weapons'
+import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
 
 /**
  * 位置が届いたとき。
@@ -144,16 +146,6 @@ export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffe
   relayState(room, player, bytes)
 }
 
-/**
- * 足音が届く距離 (m)。
- *
- * クライアントの音の設定 (audio.ts の step: max 20) と揃える。
- * 姿勢ごとの倍率を掛けたものが実際に届く距離になる。
- */
-export const STEP_RANGE = 20
-
-/** 銃声が届く距離 (m)。rifle: max 130 と揃える */
-export const SHOT_RANGE = 130
 
 /**
  * しゃがみが体に現れるまで (ms)。
@@ -184,8 +176,9 @@ export function emitNoise(
   noise: { kind: 'step' | 'shot'; volume?: number; range?: number },
 ): void {
 
+  // どこまで届くかは規則 (domain/rule/noise.ts)。銃声は武器ごとに違う
   const reach =
-    noise.kind === 'shot' ? SHOT_RANGE : STEP_RANGE * (noise.range ?? 1)
+    noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
   const head = headHeight(from.crouching, from.boxed)
 
   // 何の上を踏んだかは地形から出す。申告させるものではない
@@ -198,19 +191,14 @@ export function emitNoise(
     if (listener.id === from.id) continue
     if (!canSee(listener.life)) continue
 
+    // 距離と、見えているかは幾何 (sim)。聞こえるかを決めるのは規則 (domain)
     const distance = Math.hypot(from.x - listener.x, from.z - listener.z)
-    if (distance > reach) continue
-
-    // 見えているなら位置が届いている。二重に鳴らさない。
-    // 「見えている」の定義は位置を配るときと同じでなければならない —
-    // ずれると、姿が見えている相手の音が輪にも出る (二重) か、
-    // 見えていないのに音が出ない (無音の敵) のどちらかになる
     const eye = viewOf(listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
       stageBoxes.length === 0 ||
       hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
-    if (visible) continue
+    if (!isHeard(distance, reach, visible)) continue
 
     sessionOf(listener).socket.send(
       JSON.stringify({
