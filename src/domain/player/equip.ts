@@ -11,7 +11,7 @@
 
 import { HELD, type HeldId } from '../item/held'
 import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from '../item/weapons'
-import type { Player } from './player'
+import { startingKit, type Player } from './player'
 
 /** 支度で選べる主武器か。**受け取った文字列を信じない** */
 export function isPrimaryChoice(id: string): id is WeaponId {
@@ -24,30 +24,19 @@ export function isSupportChoice(id: string): id is SupportId {
 }
 
 /**
- * 誰でも最初から持っている物。
+ * その物を手にできるか。**持ち物 (kit) に在るかどうか、それだけ。**
  *
- * ナイフとダンボールは選ばない。拳銃も枠が 1 つしか無いので固定
- * (item/held.ts の Loadout)。
- */
-const ALWAYS: ReadonlySet<HeldId> = new Set<HeldId>(['none', 'knife', 'box', 'pistol'])
-
-/**
- * その物を手にできるか。
+ * 選んだ物にも拾った物にも特例を作らない。特例を作っていた頃は、**主武器を
+ * 地面に置いても「持っている」ままだった** — 置いた銃を他人に拾わせながら、
+ * 自分もその銃として撃てる (複製)。捨てる = 一覧から外れる、を一様にする。
  *
- * 選んだ主武器と支援、最初から持っている物、そして**拾った物**。落ちている
- * 銃は誰でも拾えるので、選んでいない銃を持っていること自体はおかしくない —
- * 拾ったという記録がサーバー側にあるかどうかで見分ける。
- *
- * 弾倉の囮 (magazine) は撃っているうちに増える物なので通す。数はクライアント
- * が数えている。
+ * 手ぶら (none) と弾倉の囮 (magazine) だけは通す。囮は撃っているうちに増える
+ * 物で、数はクライアントが数えている。
  */
 export function canHold(player: Player, id: HeldId): boolean {
   if (HELD[id] === undefined) return false
-  if (ALWAYS.has(id)) return true
-  if (id === 'magazine') return true
-  if (id === 'grenade' || id === 'claymore') return player.support === id
-  if (id === player.primary) return true
-  return player.carried.includes(id)
+  if (id === 'none' || id === 'magazine') return true
+  return player.kit.includes(id)
 }
 
 /**
@@ -66,6 +55,10 @@ export function chooseLoadout(
   if (!isPrimaryChoice(primary) || !isSupportChoice(support)) return false
   player.primary = primary
   player.support = support
-  if (choosing) player.grenades = SUPPORT_SPECS[support].count
+  if (choosing) {
+    player.grenades = SUPPORT_SPECS[support].count
+    // 支度中は持ち物も選び直したものに揃える。湧いてからは refill が組み直す
+    player.kit = startingKit(player)
+  }
   return true
 }

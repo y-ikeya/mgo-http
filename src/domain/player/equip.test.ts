@@ -25,6 +25,7 @@ describe('何を持てるか', () => {
   test('選んだ主武器は持てる。**選んでいない銃は持てない**', () => {
     const p = fresh()
     chooseLoadout(p, 'sniper', 'grenade', true)
+    refill(p)
     expect(canHold(p, 'sniper')).toBe(true)
     expect(canHold(p, 'rifle')).toBe(false)
     expect(canHold(p, 'smg')).toBe(false)
@@ -33,22 +34,49 @@ describe('何を持てるか', () => {
   test('拾えば持てる。**置けばまた持てなくなる**', () => {
     const p = fresh()
     chooseLoadout(p, 'sniper', 'grenade', true)
-    p.carried.push('rifle')
+    refill(p)
+    p.kit.push('rifle')
     expect(canHold(p, 'rifle')).toBe(true)
-    p.carried = p.carried.filter((id) => id !== 'rifle')
+    p.kit = p.kit.filter((id) => id !== 'rifle')
     expect(canHold(p, 'rifle')).toBe(false)
   })
 
   test('拾った物は次の命へ持ち越さない', () => {
     const p = fresh()
-    p.carried.push('smg')
+    refill(p)
+    p.kit.push('smg')
     refill(p)
     expect(canHold(p, 'smg')).toBe(false)
+  })
+
+  /**
+   * **置いた銃はもう自分の物ではない。**
+   *
+   * 主武器を特例で通していた頃は、地面に置いても名乗り続けられた — 置いた銃を
+   * 他人に拾わせながら、自分もその銃として撃てる。弾数を見ていないので複製に
+   * なる (server/damage.ts は magazine を参照しない)。
+   */
+  test('**主武器も、置けば持てなくなる**', () => {
+    const p = fresh()
+    chooseLoadout(p, 'rifle', 'grenade', true)
+    refill(p)
+    expect(canHold(p, 'rifle')).toBe(true)
+    p.kit = p.kit.filter((id) => id !== 'rifle')
+    expect(canHold(p, 'rifle')).toBe(false)
+  })
+
+  test('**支援も同じ。** 手榴弾を置いたら名乗れない', () => {
+    const p = fresh()
+    chooseLoadout(p, 'rifle', 'grenade', true)
+    refill(p)
+    p.kit = p.kit.filter((id) => id !== 'grenade')
+    expect(canHold(p, 'grenade')).toBe(false)
   })
 
   test('選んだ支援だけ。クレイモアを選んで手榴弾は持てない', () => {
     const p = fresh()
     chooseLoadout(p, 'rifle', 'claymore', true)
+    refill(p)
     expect(canHold(p, 'claymore')).toBe(true)
     expect(canHold(p, 'grenade')).toBe(false)
   })

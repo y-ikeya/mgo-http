@@ -33,7 +33,24 @@ export interface Server {
   terminate(): Promise<void>
 }
 
-let nextPort = 9100
+/**
+ * 空いているポートを 1 つ借りる。
+ *
+ * **連番で決め打ちしていたら、まとめて回したときだけ落ちた。** 9100 から順に
+ * 使うので、試験を 2 つ並行で走らせると (別の窓の make check、別の作業者)
+ * 同じ番号を掴み合って ConnectionRefused になる。落ち方が「サーバーが死んで
+ * いる」に見えるので、原因を探すのに時間が要る。
+ *
+ * OS に選ばせて、すぐ返す。掴み直すまでの隙間に他が取る余地は残るが、
+ * 番号を決め打ちするよりはるかに当たらない。
+ */
+async function freePort(): Promise<number> {
+  const probe = Bun.serve({ port: 0, fetch: () => new Response('') })
+  const port = probe.port ?? 0
+  await probe.stop(true)
+  if (port === 0) throw new Error('空いているポートが分からない')
+  return port
+}
 
 /**
  * 試験用のサーバーを 1 つ立てる。ポートは自動で選ぶ。
@@ -41,7 +58,7 @@ let nextPort = 9100
  * env を渡すと環境変数を足せる (戦績の書き込み先を差し替えるのに使う)
  */
 export async function startServer(env: Record<string, string> = {}): Promise<Server> {
-  const port = nextPort++
+  const port = await freePort()
   const proc = Bun.spawn(['bun', 'server/index.ts'], {
     env: {
       ...process.env,
@@ -208,12 +225,11 @@ export class Client {
   /**
    * クレイモアを手にする。
    *
-   * **選んでもいない物は持てない** (domain/player/equip.ts の canHold) ので、
-   * 支援の枠をクレイモアに変えてから手にする。本物のクライアントも同じ順で
-   * 通る — 支度で選んで、湧いて、持ち替える。
+   * **支度で選んでいなければ持てない** (domain/player/equip.ts の canHold)。
+   * 湧いたあとに枠を変えることはできないので、twoPlayers(server, 'claymore')
+   * で入った人だけが呼べる。本物のクライアントと同じ順序。
    */
   holdClaymore(holding: boolean): void {
-    if (holding) this.send({ type: 'loadout', primary: 'rifle', support: 'claymore' })
     this.holdingClaymore = holding
   }
 
@@ -308,11 +324,25 @@ export function openSpot(dx: number, dz: number): [number, number, number] {
 
 export async function twoPlayers(
   server: Server,
+  /** 支度で選ぶ支援。**湧く前にしか選べない** (domain/player/equip.ts) */
+  support: 'grenade' | 'claymore' = 'grenade',
+  /**
+   * 名乗る id。
+   *
+   * **同じ id で入り直すと席が残っている** (30 秒は待つ) ので、前の試験の
+   * 続きから始まる — 装備を選び直しても、生きている最中の選択は次の湧きまで
+   * 効かない。装備を変える試験は別の id で入る。
+   */
+  names: [string, string] = ['alice', 'bob'],
 ): Promise<{ a: Client; b: Client }> {
-  const a = await new Client(server, 'alice', openSpot(0, -6)).ready()
-  const b = await new Client(server, 'bob', openSpot(0, 6)).ready()
+  const a = await new Client(server, names[0], openSpot(0, -6)).ready()
+  const b = await new Client(server, names[1], openSpot(0, 6)).ready()
   a.live()
   b.live()
+  if (support !== 'grenade') {
+    a.send({ type: 'loadout', primary: 'rifle', support })
+    b.send({ type: 'loadout', primary: 'rifle', support })
+  }
   // 支度が済むまで待って、二人とも出撃する (床は 3 秒)
   await Bun.sleep(3400)
   a.send({ type: 'spawn' })

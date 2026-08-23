@@ -28,17 +28,24 @@ function sourcesOf(dir: string): string[] {
   })
 }
 
-/** `import type { … }` ではない import の行 */
-function valueImports(source: string): string[] {
-  return source
-    .split('\n')
-    .filter((line) => line.startsWith('import ') && !line.startsWith('import type '))
+/**
+ * `import type { … }` ではない import が、どこから引いているか。
+ *
+ * **行で見ない。** 複数行に折れた import は 1 行目に相手先が無いので、
+ * 行単位だと素通りする — 規則を守るための試験が**書き方で破れる**。
+ * 文全体 (import … from '…') を取ってから見る。
+ */
+function valueImportSources(source: string): string[] {
+  const found: string[] = []
+  const pattern = /import\s+(?!type\s)([\s\S]*?)from\s*['"]([^'"]+)['"]/g
+  for (const match of source.matchAll(pattern)) found.push(match[2])
+  return found
 }
 
 describe('置き場所 (sim)', () => {
   test('domain から値も関数も import しない。**受け取る**', () => {
     const guilty = sourcesOf(SIM).filter((file) =>
-      valueImports(readFileSync(file, 'utf8')).some((line) => line.includes('/domain/')),
+      valueImportSources(readFileSync(file, 'utf8')).some((from) => from.includes('/domain/')),
     )
     expect(guilty).toEqual([])
   })

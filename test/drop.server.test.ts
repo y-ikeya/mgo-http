@@ -132,7 +132,7 @@ describe('握ったまま撃たれる', () => {
  */
 describe('クレイモアを置く', () => {
   test('置けたら owner 付きで配られる', async () => {
-    const { a, b } = await twoPlayers(server)
+    const { a, b } = await twoPlayers(server, 'claymore', ['carol', 'dave'])
     a.holdClaymore(true)
     await Bun.sleep(300)
     a.reset()
@@ -141,7 +141,7 @@ describe('クレイモアを置く', () => {
     await Bun.sleep(400)
 
     const placed = a.messages.find((m) => m.type === 'claymorePlaced')
-    expect(placed?.type === 'claymorePlaced' && placed.owner).toBe('alice')
+    expect(placed?.type === 'claymorePlaced' && placed.owner).toBe('carol')
 
     a.holdClaymore(false)
     a.close()

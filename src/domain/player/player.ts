@@ -185,13 +185,16 @@ export interface Player {
    */
   slot: number
   /**
-   * 拾って手に入れた物。**選んだ物とは別**。
+   * **いま持っている物。** この命のあいだ手にできる物の全部。
    *
-   * 落ちている銃は誰でも拾えるので、選んでいない銃を持っていることがある。
-   * 「持てるか」を確かめる (player/equip.ts の canHold) のに、拾った記録が
-   * サーバー側にも要る。湧き直すと消える。
+   * 湧いたときに選んだ装備で種を作り (refill)、拾えば増え、置けば減る。
+   * 「持てるか」はこれだけで決まる (player/equip.ts の canHold)。
+   *
+   * **拾った物だけを覚える形にしていて穴が開いていた。** 主武器は選んだ物
+   * なので一覧に入っておらず、地面に置いても「持っている」ままだった —
+   * 置いた銃を他人に拾わせながら、自分もその銃として撃てる (複製)。
    */
-  carried: HeldId[]
+  kit: HeldId[]
   /**
    * 過去の姿。当てたという申告を遡って照合するのに使う。
    *
@@ -280,7 +283,7 @@ export function newPlayer(seed: {
     locomotion: 'idle',
     footsteps: new Footsteps(),
     concentratingSince: 0,
-    carried: [],
+    kit: startingKit({ primary: 'rifle', support: 'grenade' }),
     weapon: 'rifle',
     primary: 'rifle',
     held: 'rifle',
@@ -375,8 +378,8 @@ export function isProtected(player: Player): boolean {
  */
 export function refill(player: Player): void {
   player.killedBy = ''
-  // 拾った物は持ち越さない。**次の命は選んだ装備から始まる**
-  player.carried = []
+  // **次の命は選んだ装備から始まる。** 拾った物は持ち越さない
+  player.kit = startingKit(player)
   player.health = MAX_HEALTH
   player.ammo = startingAmmo()
   player.grenades = SUPPORT_SPECS[player.support].count
@@ -431,4 +434,14 @@ export function downedBy(
     victim.suicides++
   }
   return credit
+}
+
+/**
+ * その命で持って出る物。**選んだ装備 + 最初から持っている物。**
+ *
+ * ナイフとダンボールは選ばない (item/held.ts の Loadout)。拳銃も枠が 1 つしか
+ * 無いので固定。ここに並んだ物だけが手にできる。
+ */
+export function startingKit(player: Pick<Player, 'primary' | 'support'>): HeldId[] {
+  return ['knife', 'box', 'pistol', player.primary, player.support]
 }
