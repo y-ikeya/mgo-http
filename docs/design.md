@@ -513,7 +513,7 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
 
     src/domain/     遊びの語彙と数字        何も知らない
     src/sim/        世界に訊く手続き        domain の**型だけ** (値は引数)
-    src/protocol/   線の上での形            domain の語彙だけ
+    src/protocol/   通信で流れる形          domain の語彙だけ
     src/replica/    こちら側の状態の写し    domain / protocol
     src/presentation/ 見せる・聞かせる      上の全部 + three
     server/         審判。状態を持ち、配る  domain / sim / protocol

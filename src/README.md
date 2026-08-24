@@ -7,7 +7,7 @@
 domain        遊びの語彙と数字          何も知らない
   ↑
 sim           世界に訊く手続き          domain の**型だけ** (値は引数で受け取る)
-protocol      線の上での形              domain の語彙だけ
+protocol      通信で流れる形            domain の語彙だけ
   ↑
 replica       こちら側の状態の写し      domain / protocol      ※ まだ空
 server/       審判。状態を持ち、配る    domain / sim / protocol  (src の外)
@@ -94,10 +94,25 @@ verifyHit(attacker, target, claim, boxes, window, rules) ← その申告は通�
 **呼ぶ側で直値を書かない** — それをやると、サーバーとクライアントで別の数字を
 渡す余地が戻る。
 
-### protocol — 線の上での形
+### protocol — 通信で流れる形
 
-`types.ts` (メッセージの型) と `snapshot.ts` (位置の 37 バイト)。**server も
-client も同じものを読む。**
+**通信で流れるデータの形式**。中身は 2 つだけ。
+
+```ts
+// types.ts — やり取りする JSON メッセージの型
+{ type: 'kill', killer: 'alice', victim: 'bob', weapon: 'AK47', headshot: true }
+{ type: 'health', id: 'bob', health: 45, damage: 55 }
+```
+
+```
+// snapshot.ts — 位置だけは JSON ではなく 37 バイトのバイト並び。
+// 64Hz で全員ぶん流れるので、{"x":12.5,…} だと桁違いに重い
+0-1   席番号と旗        12-13  向き (yaw)
+2-13  座標 x / y / z    14     モーション番号   ← LOCOMOTIONS の並びがそのまま乗る
+                       …      計 37 バイト
+```
+
+**server も client も同じものを読む。**
 
 domain の**射影**で、語彙を決めるのは向こう。ただし**縛りが逆**:
 
@@ -106,7 +121,7 @@ domain    Locomotion 型 = どんな動きがあるか   → 自由に足す・�
 protocol  LOCOMOTIONS  = 何番を振るか          → **末尾追記のみ。並べ替え禁止**
 ```
 
-番号がそのまま線に乗るので、順序を変えると古いクライアントが別のモーションを
+番号がそのまま通信に乗るので、順序を変えると古いクライアントが別のモーションを
 再生する。「使っていないから消す」ができない型があるのはこのため。
 
 ### replica — こちら側の状態の写し (まだ空)

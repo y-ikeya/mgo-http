@@ -16,7 +16,7 @@ import { dirname, join, relative, resolve } from 'node:path'
  *
  *     domain      遊びの語彙と数字          何も知らない
  *     sim         世界に訊く手続き          domain の**型だけ**
- *     protocol    線の上での形              domain の語彙だけ
+ *     protocol    通信で流れる形            domain の語彙だけ
  *     replica     こちら側の状態の写し      domain / protocol
  *     presentation 見せる・聞かせる         上の全部 + three
  *
