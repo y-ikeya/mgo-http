@@ -20,7 +20,7 @@ import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } fro
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
 import { Weapon } from '../arms/weapon'
-import type { PlayerSnapshot } from '../../../net/types'
+import type { PlayerSnapshot } from '../../../protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
 
 /** カプセルの円柱部分の長さ (m)。全高 = LENGTH + RADIUS * 2 */

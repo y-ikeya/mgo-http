@@ -511,14 +511,33 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
 同じ棚に並んでいた。どちらも「three を import しない」という**技術的な**理由で
 1 か所に居ただけで、意味では別の物。
 
-    src/domain/   遊びの語彙と数字      触る理由 = 遊びを変えたい
-    src/sim/      世界に訊く手続き      触る理由 = 世界の振る舞いが変
-    src/net/      線の上での形          触る理由 = 送る物が変わった
-    server/       審判の運営            誰が居る / いつ配る / 誰を信じる
-    src/presentation/scene/    見せる・聞かせる      three を持つのはここだけ
-    src/input.ts  パッドとキーボード    何にも依存しない
-    src/presentation/ui/       画面 (Solid)
-    src/presentation/screens/  画面の遷移
+    src/domain/     遊びの語彙と数字        何も知らない
+    src/sim/        世界に訊く手続き        domain の**型だけ** (値は引数)
+    src/protocol/   線の上での形            domain の語彙だけ
+    src/replica/    こちら側の状態の写し    domain / protocol
+    src/presentation/ 見せる・聞かせる      上の全部 + three
+    server/         審判。状態を持ち、配る  domain / sim / protocol
+
+    端 (層ではなくアダプタ。誰も彼らに依存しない)
+    src/input.ts    押されたか。何も知らない
+    src/link/       回線 (WebSocket)
+    src/api/        外の口 (部屋一覧・戦績)
+    src/auth/       認証
+
+**段は 4 つ。** 触る理由が 4 つしか無いから — 遊びを変えたい (domain) /
+世界の振る舞いが変 (sim・protocol) / 誰が状態を持ちいつ配るか (server・replica) /
+見え方 (presentation)。
+
+**server と replica は同じ高さの双子。** どちらも状態を持ち、報せを受けて更新
+する。違うのは**決めるか、従うか**だけ。同じ語彙で書いておくと、「サーバーが
+持っている状態」と「クライアントが思っている状態」の食い違いが型で見える —
+これまで見つけた穴はほぼ全部この食い違いだった (段差 0.25m の写し、装備の申告、
+全部の銃が 420 m/s)。
+
+順序は [src/layers.test.ts](../src/layers.test.ts) の表 1 つで決めてある。
+**綴りで禁止先を書かない** — 見張りを domain と sim に 1 つずつ置いて、
+どちらも `/(game|ui|screens)/` のような綴りで持っていた頃は、名前を変えるたびに
+黙って素通りになった (3 回踏んだ)。
 
 **sim は「共有ライブラリ」ではない。** 10 個のうち 6 個は server か client の
 片側しか読んでいない (押し戻しはクライアントだけ、クレイモアの起爆はサーバー

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Client, startServer, type Server } from './server'
-import type { ServerMessage } from '../src/net/types'
+import type { ServerMessage } from '../src/protocol/types'
 
 /**
  * 練習部屋 (echo)。

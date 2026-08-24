@@ -48,7 +48,7 @@ import {
   INTERPOLATION_DELAY,
   type PlayerSnapshot,
   type Team,
-} from "../../../net/types";
+} from "../../../protocol/types";
 
 /*
  * --- 所属の色をテクスチャに掛けるのをやめた (翻意) ---

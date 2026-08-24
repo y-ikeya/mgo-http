@@ -1,5 +1,5 @@
-import { serverHttpUrl } from '.'
-import type { RoomSummary } from './types'
+import { serverHttpUrl } from '../link'
+import type { RoomSummary } from '../protocol/types'
 
 /**
  * 部屋の一覧を取りに行く。
@@ -9,7 +9,7 @@ import type { RoomSummary } from './types'
  * 受けて `as` で押し込んでいた。サーバーが返す形とは別の宣言なので、
  * 片方を変えればもう片方は静かに undefined を読む。
  *
- * 形の宣言は src/net/types.ts に 1 つだけ置いて、サーバーは satisfies で
+ * 形の宣言は src/protocol/types.ts に 1 つだけ置いて、サーバーは satisfies で
  * 名乗り、こちらはそれを読む。
  *
  * --- `as` が 1 つ残っていること ---

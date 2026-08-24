@@ -49,7 +49,7 @@ import { isGun, type HeldId } from "../../domain/item/held";
 import { MODES, isHostile, type Mode } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
-import type { NoiseEvent } from "../../net/types";
+import type { NoiseEvent } from "../../protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
 import { STEP_UP } from "../../domain/player/moving";
 import {
@@ -57,14 +57,14 @@ import {
   flightTime,
   TRAJECTORY_STEPS,
 } from "../../sim/judge/bullet";
-import { createTransport } from "../../net";
+import { createTransport } from "../../link";
 import {
   createCalibration,
   defaultKnobs,
   type Calibration,
   type Knobs,
 } from "./calibration";
-import type { NetTransport } from "../../net/types";
+import type { NetTransport } from "../../protocol/types";
 import type { Identity } from "../../auth/session";
 import { selfSkin } from "./actor/skin";
 import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../../domain/match/scoring";
@@ -75,7 +75,7 @@ import {
   type MatchMessage,
   type ServerMessage,
   type Team,
-} from "../../net/types";
+} from "../../protocol/types";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 export interface GameStats {

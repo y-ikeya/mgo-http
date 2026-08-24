@@ -8,7 +8,7 @@
 import { present } from '../../src/domain/match/match'
 import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
 import { type Player, type Team } from '../../src/domain/player/player'
-import { type ClientMessage } from '../../src/net/types'
+import { type ClientMessage } from '../../src/protocol/types'
 import { type Projectile, throwVelocity } from '../../src/sim/judge/ballistic'
 import { blastExposure } from '../../src/sim/judge/blast'
 import {

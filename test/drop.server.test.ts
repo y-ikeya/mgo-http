@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { openSpot, startServer, twoPlayers, type Server } from './server'
-import type { ServerMessage } from '../src/net/types'
+import type { ServerMessage } from '../src/protocol/types'
 
 /**
  * 武器を地面へ置く / 拾う。

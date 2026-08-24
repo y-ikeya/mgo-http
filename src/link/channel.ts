@@ -1,4 +1,4 @@
-import type { ClientMessage, NetTransport, ServerMessage } from './types'
+import type { ClientMessage, NetTransport, ServerMessage } from '../protocol/types'
 
 /**
  * サーバーの居ない通信路で通してよい種類。

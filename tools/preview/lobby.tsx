@@ -6,7 +6,7 @@
 import { render } from 'solid-js/web'
 import { Router, Route } from '@solidjs/router'
 import Lobby from '../../src/presentation/screens/Lobby'
-import type { RoomSummary } from '../../src/net/types'
+import type { RoomSummary } from '../../src/protocol/types'
 
 const ROOMS: RoomSummary[] = [
   { name: 'alpha', mode: 'DM', label: '個人戦', active: true, players: 3, capacity: 8, phase: 'playing', roster: [], blue: 14, red: 9, remaining: 212 },
