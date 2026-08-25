@@ -19,10 +19,10 @@
 import { dropWeapon, pickUp } from './arms/drops'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
-import { detonate, throwGrenade } from './arms/grenade'
-import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject, sendHealth } from './damage'
+import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
+import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
 import { leaveRoom, matchState, recordSeat, spawn, updateMatch, updateTargets } from './match'
-import { receiveSnapshot, relayShot, relayState } from './relay'
+import { receiveSnapshot, relayShot, relayState, sendHealth } from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { solidBoxes } from './stage'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
@@ -40,7 +40,7 @@ import { flush } from './stats'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { reloadInto } from '../src/domain/item/weapons'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
-import { type ClientMessage, type RoomSummary, type ServerMessage } from '../src/protocol/types'
+import type { ClientMessage, RoomSummary, ServerMessage } from '../src/protocol/types'
 import { chooseLoadout } from '../src/domain/player/equip'
 
 
@@ -297,7 +297,12 @@ function handleMessage(
 
     case 'damage':
       // 送り主を信じない。名乗った ID ではなく接続の ID を使う。
-      applyDamage(room, player, { ...message, id: player.id })
+      {
+        const hurt = applyDamage(room, player, { ...message, id: player.id })
+        // **仰け反れば手が緩む。** 落とすのは武器の側の仕事
+        const victim = room.players.get(message.target)
+        if (hurt.letGo && victim) dropGrenade(room, victim)
+      }
       break
 
     case 'state':
@@ -375,10 +380,12 @@ function handleMessage(
       // 上限を超えた分は効かない
       const amount = fallDamage(Math.min(message.speed, MAX_FALL_SPEED))
       if (amount <= 0) break
-      applyBlastDamage(
+      const hurt = applyBlastDamage(
         room, player, amount,
         player.x, player.z, player.id, 'fall', false,
       )
+      // 落ちて倒れたら、握っていた物は足元へ
+      if (hurt.letGo) dropGrenade(room, player)
       break
     }
     case 'leave':

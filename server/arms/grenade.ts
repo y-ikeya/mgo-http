@@ -7,8 +7,8 @@
 
 import { present } from '../../src/domain/match/match'
 import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
-import { type Player, type Team } from '../../src/domain/player/player'
-import { type ClientMessage } from '../../src/protocol/types'
+import type { Player, Team } from '../../src/domain/player/player'
+import type { ClientMessage } from '../../src/protocol/types'
 import { type Projectile, throwVelocity } from '../../src/sim/judge/ballistic'
 import { blastExposure } from '../../src/sim/judge/blast'
 import {
@@ -179,6 +179,8 @@ export function detonate(room: RoomWorld, nade: Grenade): void {
     const result = blastEffect(seen.distance, seen.cover)
     if (result.damage <= 0) continue
 
-    applyBlastDamage(room, victim, result.damage, x, z, nade.owner, 'grenade', result.knock)
+    const hurt = applyBlastDamage(room, victim, result.damage, x, z, nade.owner, 'grenade', result.knock)
+    // 手が緩んだら握っていた物が足元に落ちる。**誘爆する**
+    if (hurt.letGo) dropGrenade(room, victim)
   }
 }

@@ -12,11 +12,10 @@ import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
 import { downedBy, hurt, type Player, isProtected } from '../src/domain/player/player'
 import { HIT_RULES, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
-import { type ClientMessage } from '../src/protocol/types'
+import type { ClientMessage } from '../src/protocol/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
-import { dropGrenade } from './arms/grenade'
 import { matchState } from './match'
-import { bearingTo } from './relay'
+import { bearingTo, sendHealth } from './relay'
 import { sessionFor, sessionOf } from './session'
 import { stageBoxes } from './stage'
 import { type RoomWorld, broadcast, setLife } from './world'
@@ -43,6 +42,23 @@ export const MAX_FALL_SPEED = 25
 /** 死因の表示。表にしておかないと、増やしたときに三項演算子が伸びる */
 export const KILL_LABEL = { grenade: 'grenade', claymore: 'CLAYMORE', fall: '落下' } as const
 
+/**
+ * 削った結果。**その先の始末は呼ぶ側がやる。**
+ *
+ * 「倒れたら握っていた手榴弾が足元に落ちる」は武器の話で、削る側が知っている
+ * 必要は無い。damage が arms を呼ぶと**審判と武器が互いを呼び合う**ことになり、
+ * どちらが上か決まらなくなる (実際そうなっていた)。
+ */
+export interface Hurt {
+  /** 倒れたか */
+  downed: boolean
+  /** 手が緩んだか。握っていた物を足元に落とす */
+  letGo: boolean
+}
+
+/** 何も起きなかった。申告が通らなかったときなど */
+const NOT_HURT: Hurt = { downed: false, letGo: false }
+
 export function applyBlastDamage(
   room: RoomWorld,
   victim: Player,
@@ -52,7 +68,7 @@ export function applyBlastDamage(
   ownerId: string,
   weapon: 'grenade' | 'claymore' | 'fall',
   knock: boolean,
-): void {
+): Hurt {
   // 削るのも、倒れるかも人の側の振る舞い (domain/player/player.ts)
   const wound = hurt(victim, amount)
 
@@ -64,18 +80,17 @@ export function applyBlastDamage(
     // **的にも爆風は当たる。** 送り先が無いなら送らないだけ
     if (knock && isSeated(victim.life)) {
       sessionFor(victim)?.socket.send(JSON.stringify({ type: 'knockdown' }))
-      // 振りかぶったまま転んだら手を離す。**ピンは抜けている**ので、そのまま爆ぜる
-      dropGrenade(room, victim)
+      // **手が緩んだことは呼ぶ側に返す。** 振りかぶったまま転べば足元に落ちる
+      // (ピンは抜けているのでそのまま爆ぜる) が、それをやるのは武器の側
+      return { downed: false, letGo: true }
     }
-    return
+    return { downed: false, letGo: false }
   }
 
   // 誰の手柄か、戦績にどう残るかは人の側が決める
   const killer = room.players.get(ownerId) ?? null
   downedBy(victim, killer, weapon)
   setLife(room, victim, 'downed')
-  // 握っていたものは足元に落ちる。誘爆する
-  dropGrenade(room, victim)
   // 死因を問わず、倒された側の残機が 1 減る。**削り合わない部屋では動かさない**
   if (room.mode.tickets) loseTicket(room, victim.team)
   sendHealth(room, victim, amount, false, bearing)
@@ -91,43 +106,10 @@ export function applyBlastDamage(
     weapon: KILL_LABEL[weapon],
     headshot: false,
   })
+  // 倒れた。握っていた物は足元に落ちる — **落とすのは呼ぶ側**
+  return { downed: true, letGo: true }
 }
 
-export function sendHealth(
-  room: RoomWorld,
-  player: Player,
-  damage: number,
-  flinch: boolean,
-  fromBearing?: number,
-  zone?: HitZone,
-): void {
-  // 撃たれた方向と部位は本人にだけ渡す。
-  //
-  // 全員へ流すと、位置と合わせて撃った側を逆算できてしまう。被害者の座標は
-  // 状態として配られているので、そこから方向へ線を引けば射手の居場所が出る。
-  // 「誰に撃たれたかは渡さない」と決めた意味が無くなる。
-  // 的には送り先が無い (接続を持たない)
-  if (isSeated(player.life) && !player.bot) {
-    sessionOf(player).socket.send(
-      JSON.stringify({
-        type: 'health',
-        id: player.id,
-        health: player.health,
-        damage,
-        flinch,
-        fromBearing,
-        zone,
-      }),
-    )
-  }
-
-  // 他の人に要るのは、誰がどれだけ削られたかまで。倒れた表現に使う
-  broadcast(
-    room,
-    { type: 'health', id: player.id, health: player.health, damage, flinch },
-    player.id,
-  )
-}
 
 /**
  * ダメージの申告を処理する。
@@ -155,20 +137,20 @@ export function reject(attacker: Player, reason: string): void {
   console.warn(`[却下] ${attacker.name}: ${reason}`)
 }
 
-export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMessage): void {
-  if (event.type !== 'damage') return
+export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMessage): Hurt {
+  if (event.type !== 'damage') return NOT_HURT
   const victim = room.players.get(event.target)
-  if (!victim || !canBeHurt(victim.life)) return
+  if (!victim || !canBeHurt(victim.life)) return NOT_HURT
   // 撃った時点で自分の無敵は切れる。盾にしたまま撃たせない
   if (attacker.life === 'spawning') setLife(room, attacker, 'alive')
   // 湧いた直後の相手には当たらない
-  if (isProtected(victim)) return
+  if (isProtected(victim)) return NOT_HURT
   // 撃てる相手か。**陣営ではなくルールに聞く** — DM では同じ色でも敵で、
   // 休憩部屋では誰も敵ではない (src/domain/match/room.ts)
-  if (!isHostile(room.mode, attacker, victim)) return
+  if (!isHostile(room.mode, attacker, victim)) return NOT_HURT
   // 試合中以外は削らない。支度の間や結果を読んでいる間に得点が動くと、
   // 何が起きたのか分からなくなる
-  if (room.phase !== 'playing') return
+  if (room.phase !== 'playing') return NOT_HURT
 
   // --- ここから、申告が本当かを調べる ---
   //
@@ -182,7 +164,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     const limit = weaponOf(attacker.weapon).fireInterval * 1000 * FIRE_INTERVAL_SLACK
     if (now - sessionOf(attacker).lastShotAt < limit) {
       reject(attacker, `連射が速すぎる (${now - sessionOf(attacker).lastShotAt}ms)`)
-      return
+      return NOT_HURT
     }
     sessionOf(attacker).lastShotAt = now
   }
@@ -202,7 +184,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
   )
   if (!verdict.ok) {
     reject(attacker, verdict.reason)
-    return
+    return NOT_HURT
   }
 
   const amount =
@@ -220,7 +202,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     const flinch = event.kind === 'bullet' && event.zone === 'HEAD'
     // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。
     // 遠くから頭を撃たれた人が、そのまま何事もなく投げ切るのはおかしい
-    if (flinch) dropGrenade(room, victim)
+
     sendHealth(
       room,
       victim,
@@ -229,7 +211,9 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
       bearingTo(victim, attacker),
       event.zone,
     )
-    return
+    // **仰け反れば手が緩む。** 遠くから頭を撃たれた人が、そのまま何事もなく
+    // 投げ切るのはおかしい。落とすのは呼ぶ側
+    return { downed: false, letGo: flinch }
   }
 
   // 記録に残す分。**表示名ではなく安定した id で数える**
@@ -239,7 +223,6 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
   setLife(room, victim, 'downed')
   // 振りかぶったまま倒されたら、足元に落ちて爆ぜる。
   // 撃った側にとっては「今撃つと道連れになる」という読みになる
-  dropGrenade(room, victim)
   // 減るのは倒された側の残機だけ。倒した側には何も入らない
   if (room.mode.tickets) loseTicket(room, victim.team)
   sendHealth(room, victim, amount, false, bearingTo(victim, attacker))
@@ -258,4 +241,5 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     weapon: event.kind === 'melee' ? 'KNIFE' : weaponOf(attacker.weapon).kill,
     headshot: event.kind === 'bullet' && event.zone === 'HEAD',
   })
+  return { downed: true, letGo: true }
 }

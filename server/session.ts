@@ -6,8 +6,8 @@
  * 返さない関数の 2 本に分けてある。
  */
 
-import { type Player } from '../src/domain/player/player'
-import { type Client } from './world'
+import type { Player } from '../src/domain/player/player'
+import type { Client } from './world'
 
 /**
  * 接続 1 本ぶんの帳簿。**人 (Player) とは別。**

@@ -5,12 +5,13 @@
 import { connected, present } from '../../src/domain/match/match'
 import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
-import { type Player, type Team } from '../../src/domain/player/player'
-import { type ServerMessage } from '../../src/protocol/types'
+import type { Player, Team } from '../../src/domain/player/player'
+import type { ServerMessage } from '../../src/protocol/types'
 import { PLACE_FORWARD, type Placed, SHOT_HALF, SHOT_TOP, blastReach, canPlaceAt } from '../../src/sim/judge/claymore'
 import { blastEffect } from '../../src/domain/item/claymore'
 import { type StageBox, groundUnder, hasLineOfSight, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
+import { dropGrenade } from './grenade'
 import { viewOf } from '../relay'
 import { sessionOf } from '../session'
 import { solidBoxes, stageBoxes } from '../stage'
@@ -159,9 +160,11 @@ export function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
     // 距離を測るのは sim、何ダメージかは規則 (domain/item/claymore.ts)
     const hit = blastEffect(blastReach(claymore, victim))
     if (hit.damage <= 0) continue
-    applyBlastDamage(
+    const hurt = applyBlastDamage(
       room, victim, hit.damage,
       claymore.x, claymore.z, claymore.owner, 'claymore', hit.knock,
     )
+    // 手が緩んだら握っていた物が足元に落ちる
+    if (hurt.letGo) dropGrenade(room, victim)
   }
 }

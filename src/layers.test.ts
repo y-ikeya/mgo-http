@@ -24,7 +24,8 @@ import { dirname, join, relative, resolve } from 'node:path'
  *     link        回線 (WebSocket)。protocol を運ぶ
  *     api / auth  外の口 (部屋一覧・戦績・認証)
  *
- * server/ は src の外なので、ここでは見ない (審判は上から全部を読む側)。
+ * server/ は src の外にあり、上から全部を読む側なので順序では縛らない。
+ * 代わりに**循環が無いこと**だけ見る (下の「審判の中に循環が無い」)。
  */
 
 /** 各層が import してよい相手。**自分自身は常に可** */
@@ -166,6 +167,45 @@ describe('層の順序', () => {
       (name) => name.endsWith('.ts') && !name.endsWith('.test.ts'),
     )
     expect(loose).toEqual([])
+  })
+
+  /**
+   * **審判 (server/) の中に循環が無い。**
+   *
+   * server は上から全部を読む側なので、層の順序では縛れない。代わりに
+   * 「互いに呼び合わない」だけを見る — 呼び合うと**どちらが上か決まらず**、
+   * 名前を付けても棚として機能しない。
+   *
+   * 実際 7 本あった。うち 4 本は `import { type X, f }` の形で、型しか使って
+   * いない相手への実行時の依存が残っていたもの (`import type` に分ければ消える)。
+   * 残り 3 本は本物で、こう解いた:
+   *
+   *   world → match      部屋を建てるときの的の設置を world 側へ
+   *   damage → match     体力を配るのは中継の仕事 (sendHealth を relay へ)
+   *   damage → arms      削った結果を**返す**ようにして、落とすのは呼ぶ側
+   */
+  test('審判の中に循環が無い', () => {
+    const dir = resolve(SRC, '..', 'server')
+    const files = sourcesOf(dir)
+    const edges = new Map<string, Set<string>>()
+    for (const file of files) {
+      const out = new Set<string>()
+      for (const { from, typeOnly } of importsOf(readFileSync(file, 'utf8'))) {
+        if (typeOnly || !from.startsWith('.')) continue
+        const target = `${resolve(dirname(file), from)}.ts`
+        if (files.includes(target)) out.add(target)
+      }
+      edges.set(file, out)
+    }
+    const cycles: string[] = []
+    for (const [file, out] of edges) {
+      for (const other of out) {
+        if (edges.get(other)?.has(file) && file < other) {
+          cycles.push(`${relative(dir, file)} ↔ ${relative(dir, other)}`)
+        }
+      }
+    }
+    expect(cycles).toEqual([])
   })
 
   test('下の層は three にも DOM にも触らない', () => {

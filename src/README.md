@@ -188,6 +188,22 @@ auth/      切符 (token) と身元
 | 手触りの微調整 | `presentation/scene/knobs.ts` → 決まったら domain へ |
 | チートを塞ぐ | `server/damage.ts` (検算) と `domain` (規則) |
 
+## server/ (src の外)
+
+審判。**上から全部を読む側**なので、層の順序では縛らない。代わりに
+**中に循環が無い**ことだけ試験で見る (呼び合うと、どちらが上か決まらない)。
+
+```
+index.ts   起動と口 (HTTP / WS / 1 通の振り分け / 刻み)
+world.ts   部屋の世界。試合と、その中に在る物。配る相手もここ
+session.ts 接続 (人とは別。的は Player を持つが Session を持たない)
+stage.ts   ステージの箱
+match.ts   段階と時計
+damage.ts  申告を検算して体力を削る。**その先の始末は呼ぶ側に返す**
+relay.ts   誰に何を見せるか (位置・音・弾・体力)
+arms/      権威側の手榴弾・クレイモア・落ちている武器
+```
+
 ## もっと知りたい
 
 - [domain/README.md](domain/README.md) — このゲームのドメインとは何か。数字の表

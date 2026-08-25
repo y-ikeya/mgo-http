@@ -5,17 +5,16 @@
  * (rule/scoring.ts)、ここに在るのはそれを試合の時間に当てはめる側。
  */
 
-import { MIN_PLAYERS, type Match, connected, holdingSeats, leaderOf, nextSlot, soleTeam } from '../src/domain/match/match'
+import { MIN_PLAYERS, type Match, connected, holdingSeats, leaderOf, soleTeam } from '../src/domain/match/match'
 import { isSeated } from '../src/domain/player/lifecycle'
-import { type Player, type Team, lifeElapsed, newBot, refill, reviveBot } from '../src/domain/player/player'
+import { type Player, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { encodeSnapshot } from '../src/protocol/snapshot'
-import { type ServerMessage } from '../src/protocol/types'
-import { sendHealth } from './damage'
-import { recordPose, relayState } from './relay'
+import type { ServerMessage } from '../src/protocol/types'
+import { recordPose, relayState, sendHealth } from './relay'
 import { sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
-import { type RoomWorld, broadcast, setLife } from './world'
+import { type RoomWorld, TARGET_RESPAWN, broadcast, setLife } from './world'
 
 /** 1 試合の長さ (ms) */
 export const MATCH_DURATION = 5 * 60 * 1000
@@ -54,47 +53,6 @@ export const MATCH_BROADCAST = 1000
  * それは書き出しのときに分かっている。glb と同時に書かれるので、
  * 片方だけ古い形を見ている、ということが起きない。
  */
-/**
- * 練習部屋の的。**建物の西、外壁沿いの一直線に 10m 間隔**で並べる。
- *
- * 用は**距離の練習**。P90 の頭 1 発は 12m まで、AK47 は 25m まで
- * (src/domain/README.md) — その境目は説明を読むより撃ったほうが早い。
- *
- * 青の湧き地点 (-30, 30) から南へ真っ直ぐ伸びる車路で、**湧き地点の遮蔽を
- * 出た所 (z≒22) から 10 / 20 / 30 / 40 / 50m**。建物の外なので柱にも階にも
- * 邪魔されない。5 点とも床が 0m で、押し戻しも視線の遮りも無いことを
- * ステージの箱に当てて確かめてある。
- *
- * 一直線に並べても手前が奥を隠さないのは、**外した弾がそのまま次の的へ飛ぶ**
- * のがむしろ都合がよいため (縦に並んだ的は距離が読みやすい)。
- */
-export const TARGET_SPOTS = [
-  { x: -30, z: 12 },
-  { x: -30, z: 2 },
-  { x: -30, z: -8 },
-  { x: -30, z: -18 },
-  { x: -30, z: -28 },
-]
-
-/** 倒してから戻るまで (ms) */
-export const TARGET_RESPAWN = 3000
-
-export function placeTargets(room: Match): void {
-  const now = Date.now()
-  TARGET_SPOTS.forEach((at, i) => {
-    const bot = newBot({
-      id: `target-${i}`,
-      name: `TARGET ${i + 1}`,
-      slot: nextSlot(room),
-      team: 'red',
-      x: at.x,
-      z: at.z,
-      now,
-    })
-    room.players.set(bot.id, bot)
-  })
-}
-
 /**
  * 的を動かす (動かないが、生き死にと配信はする)。
  *

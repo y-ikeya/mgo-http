@@ -4,13 +4,13 @@
 
 import { canDrop, isGun } from '../../src/domain/item/held'
 import { canAct } from '../../src/domain/player/lifecycle'
-import { type Player } from '../../src/domain/player/player'
-import { type ClientMessage } from '../../src/protocol/types'
+import type { Player } from '../../src/domain/player/player'
+import type { ClientMessage } from '../../src/protocol/types'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast } from '../world'
 
-import { type HeldId } from '../../src/domain/item/held'
-import { type ServerMessage } from '../../src/protocol/types'
+import type { HeldId } from '../../src/domain/item/held'
+import type { ServerMessage } from '../../src/protocol/types'
 
 /**
  * 地面に落ちている武器。

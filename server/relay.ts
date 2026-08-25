@@ -20,11 +20,13 @@ import { cameraPoint } from '../src/sim/space/eyepoint'
 import { groundUnder, hasLineOfSight } from '../src/sim/space/vision'
 import { sessionOf } from './session'
 import { arenaHalf, solidBoxes, stageBoxes } from './stage'
-import { type RoomWorld, setLife } from './world'
+import { type RoomWorld, broadcast, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
 import { headHeightWhen } from '../src/domain/player/stance'
 import { canHold } from '../src/domain/player/equip'
+import type { HitZone } from '../src/domain/rule/damage'
+import { isSeated } from '../src/domain/player/lifecycle'
 
 /**
  * 位置が届いたとき。
@@ -388,4 +390,40 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
  */
 export function bearingTo(from: Player, to: Player): number {
   return Math.atan2(to.x - from.x, -(to.z - from.z))
+}
+
+export function sendHealth(
+  room: RoomWorld,
+  player: Player,
+  damage: number,
+  flinch: boolean,
+  fromBearing?: number,
+  zone?: HitZone,
+): void {
+  // 撃たれた方向と部位は本人にだけ渡す。
+  //
+  // 全員へ流すと、位置と合わせて撃った側を逆算できてしまう。被害者の座標は
+  // 状態として配られているので、そこから方向へ線を引けば射手の居場所が出る。
+  // 「誰に撃たれたかは渡さない」と決めた意味が無くなる。
+  // 的には送り先が無い (接続を持たない)
+  if (isSeated(player.life) && !player.bot) {
+    sessionOf(player).socket.send(
+      JSON.stringify({
+        type: 'health',
+        id: player.id,
+        health: player.health,
+        damage,
+        flinch,
+        fromBearing,
+        zone,
+      }),
+    )
+  }
+
+  // 他の人に要るのは、誰がどれだけ削られたかまで。倒れた表現に使う
+  broadcast(
+    room,
+    { type: 'health', id: player.id, health: player.health, damage, flinch },
+    player.id,
+  )
 }
