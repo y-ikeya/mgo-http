@@ -5,7 +5,7 @@
  * 見えるかどうかを決める幾何は sim (vision / eyepoint)。
  */
 
-import { connected, leaderOf } from '../src/domain/match/match'
+import { connected, isLeaking } from '../src/domain/match/match'
 import { isFriendly } from '../src/domain/match/room'
 import { canSee, onBattlefield } from '../src/domain/player/lifecycle'
 import { STEP_UP } from '../src/domain/player/moving'
@@ -323,6 +323,16 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
 
   const now = Date.now()
   const head = visibleHead(from, now)
+  /*
+   * **光っている人は遮蔽を無視して配る。**
+   *
+   * 光る = 位置が公になっている、という語彙 (docs/design.md の 3)。いまは
+   * 個人戦の 1 位だけで、リンクを抜かれた相手も同じ札に乗る。**誰が光るかは
+   * 規則が決める** (domain/match/match.ts の isLeaking)。
+   *
+   * 見る人には依らないので、ループの外で 1 回だけ引く。
+   */
+  const glowing = isLeaking(room, from)
   // 戦場に居ない人 (支度中・まだ位置を知らせていない) は誰にも配らない。
   // 倒れた場所に体が 30 秒残ることになる
   const present = onBattlefield(from.life)
@@ -343,14 +353,6 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
     // 「どこから撃たれたのか分からないまま死ぬ」よりは読み合いになる、
     // という判断で入れてある。
     const killCam = viewer.life === 'downed' && viewer.killedBy === from.id
-
-    /*
-     * **光っている人は遮蔽を無視して配る。**
-     *
-     * 個人戦の 1 位がこれ (docs/design.md の 2)。光る = 位置が公になっている、
-     * という語彙で、リンクを抜かれた相手も同じ道を通る予定。
-     */
-    const glowing = room.mode.leaderGlows && leaderOf(room)?.id === from.id
 
     // 味方は無条件。TDM で味方の位置が分からないと連携のしようがないし、
     // 隠すべき情報は敵に対するものだけ。判定の回数も半分以下になる

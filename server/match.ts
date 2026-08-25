@@ -5,7 +5,7 @@
  * (rule/scoring.ts)、ここに在るのはそれを試合の時間に当てはめる側。
  */
 
-import { MIN_PLAYERS, type Match, connected, holdingSeats, leaderOf, soleTeam } from '../src/domain/match/match'
+import { MIN_PLAYERS, type Match, connected, holdingSeats, leakingOf, soleTeam } from '../src/domain/match/match'
 import { isSeated } from '../src/domain/player/lifecycle'
 import { type Player, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
@@ -130,7 +130,8 @@ export function decideWinner(room: Match): Team | 'draw' {
 }
 
 export function matchState(room: Match): ServerMessage {
-  const leader = room.mode.leaderGlows ? leaderOf(room) : null
+  // **光っている人**を送る。1 位かどうかではなく、位置が公になっているか
+  const leader = leakingOf(room)
   return {
     type: 'match',
     mode: room.mode.id,

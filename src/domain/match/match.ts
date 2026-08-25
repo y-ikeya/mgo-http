@@ -193,6 +193,33 @@ export function leaderOf(room: Match): Player | null {
 }
 
 /**
+ * 位置が公になっている人。**光っている人。**
+ *
+ * --- なぜ問いにするか ---
+ * 「1 位が光るか」(`mode.leaderGlows`) は素の値で、それを使う側が
+ * `leaderGlows && leaderOf(room)?.id === id` と**条件を組み立てていた**。
+ * 同じ式が配る側 (relay) と名簿 (matchState) の 2 か所にあり、片方だけ直せば
+ * 静かにずれる。しかも壁を無視して位置を配るかどうかを決めている式なので、
+ * ずれたときの出方が「表示がおかしい」で済まない。
+ *
+ * **光る理由はこれから増える。** リンクを抜かれた相手も同じ札に乗る
+ * (docs/design.md の 3)。理由が増えても**ここだけが増える**形にしておく。
+ *
+ * 蓄えずに毎回導くのは、1 位が得点から決まるため。フラグにすると、倒した /
+ * 自爆した / 離脱した / 仕切り直した のすべてで書き直すことになり、1 つ
+ * 忘れると 2 人光るか誰も光らない。`respawnAt` や `protectedUntil` を消して
+ * `lifeElapsed` に寄せたのと同じ判断。
+ */
+export function leakingOf(room: Match): Player | null {
+  return room.mode.leaderGlows ? leaderOf(room) : null
+}
+
+/** その人の位置が公になっているか */
+export function isLeaking(room: Match, player: Player): boolean {
+  return leakingOf(room)?.id === player.id
+}
+
+/**
  * 残っているのが片側だけならその陣営。両方居るか、誰も居なければ null。
  *
  * 不戦勝を出すかどうかの判断に使う。

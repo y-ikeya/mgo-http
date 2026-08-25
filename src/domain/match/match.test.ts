@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { assignTeam, leaderOf, loseTicket, newMatch, type Match } from './match'
+import {
+  assignTeam, isLeaking, leaderOf, leakingOf, loseTicket, newMatch, type Match,
+} from './match'
 import { newPlayer } from '../player/player'
 
 function room(mode: 'DM' | 'TDM'): Match {
@@ -76,5 +78,51 @@ describe('陣営の割り振り', () => {
     const match = room('TDM')
     join(match, 'a', 0, 'blue')
     expect(assignTeam(match)).toBe('red')
+  })
+})
+
+/**
+ * 光る = 位置が公になっている。
+ *
+ * **壁を無視して位置を配るかどうか**を決めているので、ここがずれると
+ * 「表示がおかしい」では済まない。配る側 (relay) と名簿 (matchState) が
+ * 同じ答えを見ていることを、問いを 1 つにすることで守る。
+ */
+describe('光っている人', () => {
+  test('個人戦の 1 位は光る', () => {
+    const match = room('DM')
+    join(match, 'a', 3)
+    join(match, 'b', 1)
+    expect(isLeaking(match, match.players.get('a')!)).toBe(true)
+    expect(isLeaking(match, match.players.get('b')!)).toBe(false)
+  })
+
+  test('**陣営戦では誰も光らない。** 1 位は居ても札が付かない', () => {
+    const match = room('TDM')
+    join(match, 'a', 3)
+    join(match, 'b', 1)
+    // 1 位は決まっている
+    expect(leaderOf(match)?.id).toBe('a')
+    // それでも光らない。規則が違う
+    expect(leakingOf(match)).toBe(null)
+    expect(isLeaking(match, match.players.get('a')!)).toBe(false)
+  })
+
+  test('同数なら誰も光らない。**序盤に 1 人だけ狙われるのを避ける**', () => {
+    const match = room('DM')
+    join(match, 'a', 2)
+    join(match, 'b', 2)
+    expect(leakingOf(match)).toBe(null)
+  })
+
+  test('抜かれたら札が移る。**蓄えていないので書き直しが要らない**', () => {
+    const match = room('DM')
+    join(match, 'a', 3)
+    join(match, 'b', 1)
+    expect(leakingOf(match)?.id).toBe('a')
+
+    match.players.get('b')!.kills = 5
+    expect(leakingOf(match)?.id).toBe('b')
+    expect(isLeaking(match, match.players.get('a')!)).toBe(false)
   })
 })
