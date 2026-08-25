@@ -5,7 +5,8 @@ import { isMesh } from "./util/guards";
 import { Input } from "../../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
-import { Spread } from "./arms/spread";
+import { Spread } from "../../domain/item/spread";
+import { offsetInCone } from "../../sim/space/aim";
 import {
   ARENA_HALF_SIZE,
   buildLights,
@@ -443,7 +444,13 @@ export class Game {
    */
   readonly calibration: Calibration;
 
-  /** 散布と反動。撃つたびに広がり、撃たなければ戻る (arms/spread.ts) */
+  /**
+   * 散布と反動。撃つたびに広がり、撃たなければ戻る。
+   *
+   * **数字も状態機械も domain** (item/spread.ts)。ここが持つのは、返ってきた
+   * 角度をカメラへ足すことと、円錐の中へ実際に向きを傾けること (sim/space/aim.ts)
+   * だけ。サーバーが同じ弾を再現できるように、three を挟まない形にしてある。
+   */
   private readonly spread = new Spread();
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
@@ -1886,7 +1893,11 @@ export class Game {
   private fire(): void {
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
-    this.spread.apply(this.aimDir, this.weapon, { seed: this.shotCount });
+    {
+      // 何度・どこへ散るかは規則が決め、傾けるのは幾何がやる
+      const cone = this.spread.coneFor(this.weapon, this.shotCount);
+      offsetInCone(this.aimDir, cone.degrees, cone.angle01, cone.radius01);
+    }
 
     const shot = this.traceBullet();
     const player = shot.player;
@@ -1948,8 +1959,8 @@ export class Game {
       to: [this.hitPoint.x, this.hitPoint.y, this.hitPoint.z],
     });
 
-    // 跳ね上がりは散布の側が持っている (arms/spread.ts)
-    const [kickPitch, kickYaw] = this.spread.fired({ seed: this.shotCount });
+    // 跳ね上がりは規則の側が持っている (domain/item/spread.ts)
+    const [kickPitch, kickYaw] = this.spread.fired(this.shotCount);
     this.follow.addRecoil(kickPitch, kickYaw);
   }
 

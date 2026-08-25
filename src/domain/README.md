@@ -390,6 +390,7 @@ item/           持ち物
   held.ts         手に持てる物の表
   weapons.ts      武器の性能 (威力・装弾・射程・弾道)
   inventory.ts    持ち物と持ち替えの状態。**一覧を開いて選ぶ**のもここ (hand)
+  spread.ts       散布と反動。**止まって撃つほうが当たる**を作る
   grenade.ts      爆風の届く距離と量 (blastEffect)、投げる強さ
   claymore.ts     見張る距離と角度、爆風の量 (blastEffect)
 
@@ -400,6 +401,7 @@ stage/          面
 rule/           規則。**どの entity のものでもない判断**だけを置く
   damage.ts       部位・距離・落下・近接 / 削って倒れるか (takeDamage)・手柄は誰か
   footsteps.ts    どれだけ歩いたら音が鳴るか
+  random.ts       種から引く乱数。**同じ弾から同じ散り方**が出ることの土台
   lag.ts          遅れをどちらに味方させるか (当てた側に寄せる)
 ```
 
