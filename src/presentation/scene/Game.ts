@@ -64,6 +64,11 @@ import {
   type MatchEffect,
 } from "../../replica/match";
 import {
+  applyRoster,
+  newRoster,
+  type RosterEffect,
+} from "../../replica/roster";
+import {
   createCalibration,
   defaultKnobs,
   type Calibration,
@@ -526,6 +531,13 @@ export class Game {
    * 報せを渡して、返ってきた「やること」を絵と音にする。
    */
   private readonly replica = newMatchReplica();
+  /**
+   * 名簿の写し。**誰が居て、いまどうなっているか** (src/replica/roster.ts)。
+   *
+   * 体 (RemotePlayers) はこれを見て姿を合わせるだけ。名前も所属も体力も状態も、
+   * 決めているのはサーバー。
+   */
+  private readonly roster = newRoster();
   /** 敬礼で繋がった相手。数秒で消える */
   private readonly links: { name: string; at: number }[] = []
   /** 成績表を開いているか */
@@ -1057,10 +1069,39 @@ export class Game {
     }
   }
 
+  /**
+   * 名簿の写しが返してきたことを、体に反映する。
+   *
+   * **写しは three を知らない。** 誰の姿を直すか・誰を消すか・どこで叫ぶかだけ
+   * 受け取って、実際に触るのはこちら。
+   */
+  private performRoster(effect: RosterEffect): void {
+    switch (effect.kind) {
+      // 姿を写しに合わせる。倒れたかを決めるのは写しの側なので、
+      // ここでは返り値を見ない
+      case "sync":
+        this.remotes.sync(effect.id, effect.entry);
+        break;
+      case "died": {
+        // 倒れた相手の位置で叫ぶ。撃った側には当てた手応えになり、
+        // 離れた場所の誰かには「そこで撃ち合いが終わった」と伝わる
+        const at = this.remotes.positionOf(effect.id);
+        if (at) this.addPing("shot", at, this.audio.play("scream", at));
+        break;
+      }
+      case "left":
+        this.remotes.remove(effect.id);
+        break;
+    }
+  }
+
   private receive(message: ServerMessage): void {
     // **写しを先に進める。** 段階も所属もキルログも、持っているのはあちら
     for (const effect of applyMatch(this.replica, message, this.net.id, Date.now())) {
       this.perform(effect);
+    }
+    for (const effect of applyRoster(this.roster, message, this.net.id)) {
+      this.performRoster(effect);
     }
     switch (message.type) {
       case "state":
@@ -1122,19 +1163,6 @@ export class Game {
       // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
       case "respawn":
         if (message.id !== this.net.id) this.remotes.warp(message.id);
-        break;
-
-      case "roster":
-        for (const player of message.players) {
-          // 自分のぶんは写しが受け取っている (team の effect)
-          if (player.id === this.net.id) continue;
-          this.remotes.setName(player.id, player.name);
-          this.remotes.setTeam(player.id, player.team);
-          this.remotes.setHealth(player.id, player.health);
-          // 状態を先に入れる。無いと既定の joining のまま = 戦場に居ない扱いで、
-          // 位置が届いていても一度も描かれない
-          if (player.life) this.remotes.setLife(player.id, player.life);
-        }
         break;
 
       // 光っている人 (個人戦の 1 位) を体に出す。写しは持っているが、
@@ -1246,10 +1274,9 @@ export class Game {
         this.audio.play("blastScream", this.player.position);
         break;
 
+      // 名前と所属は写しが受け取っている。ここでやるのは折り返しだけ —
+      // 参加を知ったら即座に返す。相手の画面に現れるまでを次の周期まで待たせない
       case "join":
-        this.remotes.setName(message.id, message.name);
-        if (message.team) this.remotes.setTeam(message.id, message.team);
-        // 参加を知ったら即座に返す。相手の画面に現れるまでを次の周期まで待たせない。
         this.broadcast();
         break;
 
@@ -1259,14 +1286,9 @@ export class Game {
 
       // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
       // ここから出る。推し量る側の判断はどこにも残さない
+      // 他人のぶんは写しが受け取っている (sync / died)
       case "life":
         if (message.id === this.net.id) this.setLife(message.state);
-        else {
-          const at = this.remotes.setLife(message.id, message.state);
-          // 倒れた相手の位置で叫ぶ。撃った側には当てた手応えになり、
-          // 離れた場所の誰かには「そこで撃ち合いが終わった」と伝わる
-          if (at) this.addPing("shot", at, this.audio.play("scream", at));
-        }
         break;
 
       // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
@@ -1275,9 +1297,7 @@ export class Game {
         this.remotes.hide(message.id);
         break;
 
-      case "leave":
-        this.remotes.remove(message.id);
-        break;
+
     }
   }
 
@@ -1290,7 +1310,7 @@ export class Game {
    */
   private applyHealth(message: HealthMessage): void {
     if (message.id !== this.net.id) {
-      this.remotes.setHealth(message.id, message.health);
+      // 体力そのものは写しが持っている (sync)。ここは見た目の反応だけ
       if (message.flinch) this.remotes.flinch(message.id);
       // 倒れた相手の叫びは life で鳴らす (倒れたと決めるのは体力ではなく状態)。
       // 倒れなかった頭への一発はうめきになる。近くの相手にだけ届く。

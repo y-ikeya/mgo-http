@@ -44,6 +44,7 @@ import { Hitbox } from "./hitbox";
 import { dampAngle } from "../util/math";
 import { Weapon } from "../arms/weapon";
 import { onBattlefield } from "../../../domain/player/lifecycle";
+import type { RosterEntry } from "../../../replica/roster";
 import {
   INTERPOLATION_DELAY,
   type PlayerSnapshot,
@@ -834,6 +835,27 @@ export class RemotePlayers {
     this.pending.set(id, { ...this.pending.get(id), ...info });
   }
 
+  /**
+   * 名簿の写しに姿を合わせる。**真実は写しの側** (src/replica/roster.ts)。
+   *
+   * 名前も所属も体力も状態も、決めているのはサーバー。ここは受け取った通りに
+   * 体を直すだけで、覚えておく必要は無い — 体がまだ無ければ、位置が届いて
+   * 作られるときに同じものを当てる。
+   *
+   */
+  sync(id: string, entry: RosterEntry): void {
+    const player = this.players.get(id);
+    if (!player) {
+      this.remember(id, { ...entry });
+      return;
+    }
+    player.name = entry.name;
+    player.setTeam(entry.team);
+    this.refreshAlly(player);
+    player.applyHealth(entry.health);
+    player.setLife(entry.life);
+  }
+
   remove(id: string): void {
     this.pending.delete(id);
     const player = this.players.get(id);
@@ -1020,12 +1042,6 @@ export class RemotePlayers {
     this.players.get(id)?.flinch();
   }
 
-  /** サーバーが確定させた体力を控える。倒れる表示は setLife が持つ */
-  setHealth(id: string, health: number): void {
-    const player = this.players.get(id);
-    if (!player) this.remember(id, { health });
-    else player.applyHealth(health);
-  }
 
   /** 撃った相手にボルト操作を流す。撃った音もその銃のものにする */
   shot(id: string): WeaponId {
@@ -1048,15 +1064,6 @@ export class RemotePlayers {
   /** 今いる場所。倒れていなくても音を鳴らす先が要るとき用 */
   positionOf(id: string): THREE.Vector3 | null {
     return this.players.get(id)?.object.position ?? null;
-  }
-
-  /** 所属を控える。参加時と名簿で届く */
-  setTeam(id: string, team: Team): void {
-    const player = this.players.get(id);
-    if (player) {
-      player.setTeam(team);
-      this.refreshAlly(player);
-    } else this.remember(id, { team });
   }
 
   /**
@@ -1116,27 +1123,6 @@ export class RemotePlayers {
   /** 繋がりを断つ。倒れたら結び直し */
   clearLinks(): void {
     for (const player of this.players.values()) player.setLinked(false);
-  }
-
-  /** 名前を控える。参加時と名簿でまとめて届く */
-  setName(id: string, name: string): void {
-    const player = this.players.get(id);
-    if (player) player.name = name;
-    else this.remember(id, { name });
-  }
-
-  /**
-   * サーバーが決めた状態を渡す。
-   *
-   * @returns 倒れた瞬間なら、その位置 (叫ぶのに使う)
-   */
-  setLife(id: string, state: Life): THREE.Vector3 | null {
-    const player = this.players.get(id);
-    if (!player) {
-      this.remember(id, { life: state });
-      return null;
-    }
-    return player.setLife(state) ? player.object.position : null;
   }
 
   dispose(): void {
