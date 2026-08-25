@@ -9,7 +9,7 @@ domain        遊びの語彙と数字          何も知らない
 sim           世界に訊く手続き          domain の**型だけ** (値は引数で受け取る)
 protocol      通信で流れる形            domain の語彙だけ
   ↑
-replica       こちら側の状態の写し      domain / protocol      ※ まだ空
+replica       こちら側の状態の写し      domain / protocol
 server/       審判。状態を持ち、配る    domain / sim / protocol  (src の外)
   ↑
 presentation  見せる・聞かせる          上の全部 + three

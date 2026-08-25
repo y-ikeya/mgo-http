@@ -50,6 +50,13 @@ const LAYERS: Record<string, readonly string[]> = {
     'input',
     'i18n',
   ],
+  // 押されたか。**何も知らない** — 動詞に訳すのは domain/player/intent.ts で、
+  // ここが持つのはキーコードとパッドの番号だけ
+  input: [],
+  i18n: [],
+  // 組み立てる所。画面を並べて、認証が済むまで待たせる
+  App: ['auth', 'presentation'],
+  index: ['App'],
 }
 
 /** three も DOM も知らない層。**サーバーがそのまま読む**ので入れられない */
@@ -67,29 +74,57 @@ function sourcesOf(dir: string): string[] {
   })
 }
 
-/** import 文を丸ごと拾う。**行では見ない** — 複数行に折れた import をすり抜ける */
+/**
+ * 依存を丸ごと拾う。
+ *
+ * **行では見ない** — 複数行に折れた import をすり抜ける。
+ *
+ * **`export … from` も依存。** import だけを見ていた頃は、再エクスポートで
+ * いくらでも外へ出せた (`export { BLAST_RADIUS } from '../../domain/item/grenade'`
+ * を sim に置いても素通りした)。書き方が変わっただけで見張りが黙るのは、
+ * 綴りで禁止先を書いていた頃と同じ形の穴。
+ *
+ * `=` と `;` を挟まないことで、`export const A = 1` の後ろに続く import を
+ * 巻き込まない (貪欲に読むと 2 文が 1 つに潰れる)。
+ */
 function importsOf(source: string): { from: string; typeOnly: boolean }[] {
   const found: { from: string; typeOnly: boolean }[] = []
-  for (const match of source.matchAll(/import\s+([\s\S]*?)from\s*['"]([^'"]+)['"]/g)) {
+  const statement = /(?:^|\n)\s*(?:import|export)\s+([^;=]*?)\bfrom\s*['"]([^'"]+)['"]/g
+  for (const match of source.matchAll(statement)) {
     found.push({ from: match[2], typeOnly: match[1].trimStart().startsWith('type ') })
   }
   return found
 }
 
-/** その import が着地する層。src の外や外部パッケージなら null */
+/** その import が着地する層。src の外・外部パッケージ・資産なら null */
 function layerOf(file: string, spec: string): string | null {
   if (!spec.startsWith('.')) return null
-  const target = resolve(dirname(file), spec)
-  const rel = relative(SRC, target)
+  const rel = relative(SRC, resolve(dirname(file), spec))
   if (rel.startsWith('..')) return null
-  return rel.split('/')[0].replace(/\.tsx?$/, '')
+  const head = rel.split('/')[0]
+  if (/\.tsx?$/.test(head)) return head.replace(/\.tsx?$/, '')
+  // css や glb は層ではない。棚 (拡張子の無い名前) だけを層として数える
+  return head.includes('.') ? null : head
+}
+
+/**
+ * その層のファイル。**棚でも、直下の 1 枚でも同じに扱う。**
+ *
+ * ディレクトリだけを見ていた頃は `src/input.ts` が永久に空を返していた —
+ * 表に載せても検査されない。「押されたか。**何も知らない**」と README に
+ * 書いてあるのに、それを留めるものが無かった。
+ */
+function filesOf(layer: string): string[] {
+  const dir = join(SRC, layer)
+  if (existsSync(dir) && statSync(dir).isDirectory()) return sourcesOf(dir)
+  return ['.ts', '.tsx'].map((ext) => dir + ext).filter((file) => existsSync(file))
 }
 
 describe('層の順序', () => {
   for (const [layer, allowed] of Object.entries(LAYERS)) {
     test(`${layer} が読んでよいのは ${allowed.join(' / ') || '(何も無い)'}`, () => {
       const guilty: string[] = []
-      for (const file of sourcesOf(join(SRC, layer))) {
+      for (const file of filesOf(layer)) {
         for (const { from } of importsOf(readFileSync(file, 'utf8'))) {
           const target = layerOf(file, from)
           if (target === null || target === layer) continue
@@ -102,6 +137,24 @@ describe('層の順序', () => {
       expect(guilty).toEqual([])
     })
   }
+
+  /**
+   * **表に載っていない置き場所を作らない。**
+   *
+   * 順序を宣言しても、宣言の外に置かれた物は検査されない。`input.ts` が
+   * まさにそれで、README には「何も知らない」と書いてあるのに読み放題だった。
+   * ここが落ちたら、増やした物を上の表に足す — **足すこと自体が「何を読んで
+   * よいか」を決める作業**になる。
+   */
+  test('src の置き場所は全部、上の表に載っている', () => {
+    const missing = readdirSync(SRC)
+      .filter((name) => !name.startsWith('.') && name !== 'layers.test.ts')
+      .map((name) => (/\.tsx?$/.test(name) ? name.replace(/\.tsx?$/, '') : name))
+      // css などの資産は層ではない
+      .filter((name) => !name.includes('.'))
+      .filter((name) => !(name in LAYERS))
+    expect(missing).toEqual([])
+  })
 
   /**
    * **domain の直下に .ts を置かない。** 語彙は entity ごとの棚 (player /
@@ -118,7 +171,7 @@ describe('層の順序', () => {
   test('下の層は three にも DOM にも触らない', () => {
     const guilty: string[] = []
     for (const layer of HEADLESS) {
-      for (const file of sourcesOf(join(SRC, layer))) {
+      for (const file of filesOf(layer)) {
         if (/from\s+['"]three/.test(readFileSync(file, 'utf8'))) guilty.push(relative(SRC, file))
       }
     }
@@ -134,7 +187,7 @@ describe('層の順序', () => {
    */
   test('sim は domain の型だけを借りる', () => {
     const guilty: string[] = []
-    for (const file of sourcesOf(join(SRC, 'sim'))) {
+    for (const file of filesOf('sim')) {
       for (const { from, typeOnly } of importsOf(readFileSync(file, 'utf8'))) {
         if (typeOnly) continue
         if (layerOf(file, from) === 'domain') guilty.push(`${relative(SRC, file)} → ${from}`)
