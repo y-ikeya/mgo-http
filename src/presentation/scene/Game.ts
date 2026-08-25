@@ -46,7 +46,7 @@ import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
 import { isGun, type HeldId } from "../../domain/item/held";
-import { MODES, isHostile, type Mode } from "../../domain/match/room";
+import { MODES, isHostile } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../protocol/types";
@@ -59,6 +59,11 @@ import {
 } from "../../sim/judge/bullet";
 import { createTransport } from "../../link";
 import {
+  applyMatch,
+  newMatchReplica,
+  type MatchEffect,
+} from "../../replica/match";
+import {
   createCalibration,
   defaultKnobs,
   type Calibration,
@@ -67,7 +72,6 @@ import {
 import type { NetTransport } from "../../protocol/types";
 import type { Identity } from "../../auth/session";
 import { selfSkin } from "./actor/skin";
-import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from "../../domain/match/scoring";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -281,7 +285,6 @@ const PICKUP_RANGE = 1.0;
 
 /** キル表示を残す時間 (秒) と、同時に出す行数 */
 const KILL_FEED_DURATION = 6;
-const KILL_FEED_MAX = 5;
 
 /**
  * 点の増減を残す時間 (秒) と行数。
@@ -290,7 +293,6 @@ const KILL_FEED_MAX = 5;
  * 「いま入った」という手応えなので、残り続けると邪魔になる。
  */
 const POINT_FEED_DURATION = 2.5;
-const POINT_FEED_MAX = 4;
 
 /**
  * スポーン地点をどれだけ散らすか (m)。
@@ -517,7 +519,13 @@ export class Game {
   /** 状態を送るタイマーの ID。描画ループとは独立して回る */
   private snapshotHandle = 0;
   /** 直近のキル表示。新しいものが先頭 */
-  private readonly killFeed: (KillEvent & { at: number })[] = []
+  /**
+   * 試合の写し。**サーバーが持っている状態を追従するだけ** (src/replica)。
+   *
+   * 段階・残機・得点・自分の所属・キルログは全部あちらが持つ。ここは受けた
+   * 報せを渡して、返ってきた「やること」を絵と音にする。
+   */
+  private readonly replica = newMatchReplica();
   /** 敬礼で繋がった相手。数秒で消える */
   private readonly links: { name: string; at: number }[] = []
   /** 成績表を開いているか */
@@ -605,9 +613,9 @@ export class Game {
     this.player.setSelfVisible(!this.scoped);
   }
   /** 自分の所属。名簿で届くまでは青として振る舞う */
-  private team: Team = "blue";
+
   /** 試合の状態。サーバーが持っているものをそのまま控える */
-  private match: MatchMessage | null = null;
+
   /** 遠隔の弾道を描くための作業ベクトル */
   private readonly remoteFrom = new THREE.Vector3();
   private readonly remoteTo = new THREE.Vector3();
@@ -813,7 +821,7 @@ export class Game {
     // もう散らばっている。位置取りは試合が始まってから始まってほしい。
     //
     // 視点は動かせるままにする。周りを見て、どこへ向かうか決める時間になる。
-    if (this.match?.phase === "countdown") this.moveDir.set(0, 0, 0);
+    if (this.replica.match?.phase === "countdown") this.moveDir.set(0, 0, 0);
 
     // クレイモアを構えている / 置いている間は動けない。
     //
@@ -1011,7 +1019,49 @@ export class Game {
   }
 
   /** 他プレイヤーからのメッセージ。自分宛ての被弾はここで受ける */
+  /**
+   * 写しが返してきた「やること」を絵と音にする。
+   *
+   * **写しは three を知らない。** 段階が変わったことは向こうが決め、飛んでいる
+   * 手榴弾を捨てるのはこちら、という分け方。
+   */
+  private perform(effect: MatchEffect): void {
+    switch (effect.kind) {
+      case "phase":
+        // 陣営が無い部屋には基地も無い
+        if (this.bases) this.bases.visible = effect.teams;
+        // 試合が切り替わったら飛んでいる物を捨てる。サーバー側も同じ所で
+        // 捨てるので、爆発が届かないまま残り続ける
+        if (effect.to !== "playing") {
+          this.grenades.clear();
+          this.claymores.clear();
+        }
+        /*
+         * 決着したら成績表を開く。
+         *
+         * 誰が何点取ったかは、終わった直後にしか意味を持たない。Tab を押した人
+         * だけが見られる形だと、押さない人には勝ち負けの結果しか残らない。
+         *
+         * 次の試合が始まったら畳む。開いたままだとポインタが離れていて、
+         * 始まった瞬間に動けない
+         */
+        if (effect.to === "over") this.setMenu(true);
+        else if (effect.to === "playing" && this.menuOpen) this.setMenu(false);
+        break;
+
+      case "team":
+        // 誰が味方かは自分の所属が分かって初めて決まる
+        this.remotes.setSelfTeam(effect.team);
+        this.placeAtSpawn();
+        break;
+    }
+  }
+
   private receive(message: ServerMessage): void {
+    // **写しを先に進める。** 段階も所属もキルログも、持っているのはあちら
+    for (const effect of applyMatch(this.replica, message, this.net.id, Date.now())) {
+      this.perform(effect);
+    }
     switch (message.type) {
       case "state":
         this.remotes.receive(message.snapshot);
@@ -1040,16 +1090,6 @@ export class Game {
         this.applyHealth(message);
         break;
 
-      case "kill":
-        this.killFeed.unshift({ ...message, at: Date.now() });
-        this.killFeed.length = Math.min(this.killFeed.length, KILL_FEED_MAX);
-        this.recordPoints(message);
-        // 倒された。この後の 5 秒はこの人を映す。
-        // 自爆なら映すものが無いので空のままにする
-        if (message.victim === this.net.id) {
-          this.killedBy = message.killer === this.net.id ? "" : message.killer;
-        }
-        break;
 
       // 繋ぎ直したときに届く、離脱前の続き。
       //
@@ -1086,14 +1126,8 @@ export class Game {
 
       case "roster":
         for (const player of message.players) {
-          // 自分の所属もここで分かる。湧き位置がこれで決まる
-          if (player.id === this.net.id) {
-            this.team = player.team;
-            // 誰が味方かは自分の所属が分かって初めて決まる
-            this.remotes.setSelfTeam(this.team);
-            this.placeAtSpawn();
-            continue;
-          }
+          // 自分のぶんは写しが受け取っている (team の effect)
+          if (player.id === this.net.id) continue;
           this.remotes.setName(player.id, player.name);
           this.remotes.setTeam(player.id, player.team);
           this.remotes.setHealth(player.id, player.health);
@@ -1103,37 +1137,11 @@ export class Game {
         }
         break;
 
-      case "match": {
-        // ルールは 1 秒ごとに届く。**部屋に入った時点では分からない**ので、
-        // ここで初めて「陣営で分かれる部屋か」が決まる
-        this.mode = message.mode;
-        // 陣営が無い部屋には基地も無い
-        if (this.bases) this.bases.visible = MODES[this.mode].teams;
-        // 光っている人 (個人戦の 1 位)。自分なら HUD に出す
+      // 光っている人 (個人戦の 1 位) を体に出す。写しは持っているが、
+      // 光らせるのは絵の仕事
+      case "match":
         this.remotes.setLeaking(message.leader ?? null);
-        this.leaking = message.leader === this.net.id;
-        const changed = this.match?.phase !== message.phase;
-        // 試合が切り替わったら飛んでいる手榴弾を捨てる。
-        // サーバー側も同じ所で捨てるので、爆発が届かないまま残り続ける
-        if (changed && message.phase !== "playing") {
-          this.grenades.clear();
-          this.claymores.clear();
-        }
-        this.match = message;
-
-        // 決着したら成績表を開く。
-        //
-        // 誰が何点取ったかは、終わった直後にしか意味を持たない。Tab を
-        // 押した人だけが見られる形だと、押さない人には勝ち負けの結果しか残らない。
-        //
-        // 次の試合が始まったら畳む。開いたままだとポインタが離れていて、
-        // 始まった瞬間に動けない
-        if (changed) {
-          if (message.phase === "over") this.setMenu(true);
-          else if (message.phase === "playing" && this.menuOpen) this.setMenu(false);
-        }
         break;
-      }
 
       case "throw":
         // 初速だけが届く。同じ物理を同じ地形に対して解くので、
@@ -1329,8 +1337,8 @@ export class Game {
      * 個人戦で角の 2 つに全員が湧くと、出た所で撃ち合いになって「湧き待ち」が
      * 成立する。8 点から選んで、死ぬたびに変える (同じ所へ戻ると待たれる)。
      */
-    const base = MODES[this.mode].teams
-      ? TEAM_SPAWNS[this.team]
+    const base = MODES[this.replica.mode].teams
+      ? TEAM_SPAWNS[this.replica.team]
       : SOLO_SPAWNS[Math.floor(Math.random() * SOLO_SPAWNS.length)];
     // 同じ点に重なると互いが見えないので、ID から決まる向きへ散らす
     const spread = spawnAngle(this.net.id + this.shotCount);
@@ -1419,7 +1427,7 @@ export class Game {
     // 支度へ移った。倒した相手を映すのをやめて、自分の湧き地点へ戻る。
     // ここで初めて装備画面が出るので、その背景が自分の湧き地点になる
     if (state === "choosing") {
-      this.killedBy = "";
+      this.replica.killedBy = "";
       this.placeAtSpawn();
       this.player.respawn();
       this.follow.snapTo(this.player, this.cameraWorld);
@@ -1435,7 +1443,7 @@ export class Game {
    * その 5 秒はこの人を映す。遮蔽の裏に居てもサーバーが位置を配ってくれる
    * (倒れている間だけ)。
    */
-  private killedBy = "";
+
   private readonly killCamAt = new THREE.Vector3();
 
   /**
@@ -1445,8 +1453,8 @@ export class Game {
    * その場合は倒れた自分の体をそのまま映し続ける
    */
   private get killCamTarget(): THREE.Vector3 | null {
-    if (this.life !== "downed" || !this.killedBy) return null;
-    const at = this.remotes.positionOf(this.killedBy);
+    if (this.life !== "downed" || !this.replica.killedBy) return null;
+    const at = this.remotes.positionOf(this.replica.killedBy);
     if (!at) return null;
     return this.killCamAt.copy(at);
   }
@@ -2391,8 +2399,8 @@ export class Game {
    */
   private hostileTo(id: string, side: Team): boolean {
     return isHostile(
-      MODES[this.mode],
-      { id: this.net.id, team: this.team ?? "blue" } as never,
+      MODES[this.replica.mode],
+      { id: this.net.id, team: this.replica.team ?? "blue" } as never,
       { id, team: side } as never,
     );
   }
@@ -2539,7 +2547,7 @@ export class Game {
       this.player.isSaluting,
       this.player.position,
       LINK_RANGE,
-      this.team,
+      this.replica.team,
     );
     for (const name of formed) {
       this.links.unshift({ name, at: Date.now() });
@@ -2549,36 +2557,15 @@ export class Game {
     }
   }
 
-  /**
-   * 自分の点が動いたことを控える。
-   *
-   * **数字はルールから引く** (domain/match/scoring.ts)。ここで 3 や -2 を直に
-   * 書くと、点の付け方を変えたときに画面だけ古い数を出し続ける。
-   *
-   * 練習部屋のように点が記録されない部屋でも出る。**手応えとしての表示**なので、
-   * 記録に残るかどうかとは別で構わない。
-   */
-  private recordPoints(message: KillEvent): void {
-    const me = this.net.id;
-    const mine = message.killer === me;
-    const died = message.victim === me;
-    if (!mine && !died) return;
-
-    const suicide = mine && died;
-    const label = suicide ? "SUICIDE" : mine ? "KILL" : "DEATH";
-    const delta = suicide ? SUICIDE_POINTS : mine ? KILL_POINTS : DEATH_POINTS;
-    this.pointFeed.unshift({ label, delta, at: Date.now() });
-    this.pointFeed.length = Math.min(this.pointFeed.length, POINT_FEED_MAX);
-  }
 
   /** その部屋のルール。1 秒ごとに届く match で分かる */
-  private mode: Mode = "TDM";
+
   /** 陣営の基地を示す枠。陣営が無い部屋では隠す */
   private bases: THREE.Object3D | null = null;
   /** 自分が光っているか (個人戦の 1 位)。位置が全員に漏れている */
-  private leaking = false;
+
   /** 直近の点の増減。画面の右下に流す */
-  private readonly pointFeed: { label: string; delta: number; at: number }[] = [];
+
 
   /**
    * 姿の見えない相手が立てた音。
@@ -2769,7 +2756,7 @@ export class Game {
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
-      scores: this.match?.players ?? [],
+      scores: this.replica.match?.players ?? [],
       health: this.player.health,
       maxHealth: MAX_HEALTH,
       dead: this.player.isDead,
@@ -2781,13 +2768,13 @@ export class Game {
        */
       canPickUp: this.drops.nearest(this.player.position) <= PICKUP_RANGE,
       /** いま自分が光っているか。個人戦の 1 位は位置が漏れる */
-      leaking: this.leaking,
-      points: this.pointFeed.filter(
+      leaking: this.replica.leaking,
+      points: this.replica.pointFeed.filter(
         (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
       ),
-      kills: this.killFeed.filter(
-        (entry) => now - entry.at < KILL_FEED_DURATION * 1000,
-      ),
+      kills: this.replica.killFeed
+        .filter((entry) => now - entry.at < KILL_FEED_DURATION * 1000)
+        .map((entry) => entry.event),
       throwables: this.inv.countOf('magazine'),
       grenades: this.inv.supportCount,
       /**
@@ -2821,8 +2808,8 @@ export class Game {
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物
       support: (this.inv.supportId as SupportId | null) ?? this.loadout.support,
-      team: this.team,
-      match: this.match,
+      team: this.replica.team,
+      match: this.replica.match,
       players: this.remotes.count,
       sendRate: this.sendGap > 0 ? 1000 / this.sendGap : 0,
       peerRates: this.remotes.rates(),
