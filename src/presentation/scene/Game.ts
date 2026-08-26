@@ -2120,6 +2120,18 @@ export class Game {
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
+      // **転がりの絵が流れている間は振りかぶれない。**
+      //
+      // ローリングは全身の型なので、振りかぶりの型はそこで上書きされる。
+      // ここで畳まないと、構えたまま転がった人は転がり終わりに腕を引いた
+      // 状態で立ち上がる — 画面には振りかぶりが一度も映っていないのに、
+      // クリックすれば即座に飛ぶ。転がりが振りかぶりの時間を丸ごと踏み倒す。
+      //
+      // **見るのは rolling ではなく rollShowing。** 拘束 (rolling) は
+      // ROLL_EXIT_PHASE で先に解けるので、そこで再開すると振りかぶりが
+      // **転がりの尻尾の中で始まって終わる** — 畳んだのに、やはり一度も映らない。
+      // 絵が終わるまで待てば、立ち上がってから振りかぶり直すのが見える。
+      !this.player.rollShowing &&
       !this.cocking;
     const held = canThrow && this.input.aiming;
     /*
@@ -2238,6 +2250,9 @@ export class Game {
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
+      // 手榴弾と同じ。転がりは全身の型なので、構えを跨がせない。
+      // **絵が終わるまで**待つ (rolling だと尻尾の中で始まって見えない)
+      !this.player.rollShowing &&
       !this.cocking;
     const held = canPlace && this.input.aiming;
     // 手榴弾と同じ規則。**構え始めと同じフレームに引かれた分も覚えておく**

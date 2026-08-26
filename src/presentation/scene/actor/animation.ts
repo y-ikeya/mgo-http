@@ -1820,8 +1820,33 @@ export class CharacterAnimator {
     return true
   }
 
+  /**
+   * 転がりの**拘束**が続いているか。この間は撃てず、向きも変えられない。
+   *
+   * 終盤で先に解ける (releaseRollIfSettling)。立ち上がりに入った時点で操作を
+   * 返さないと、最終ポーズに固まった所からブレンドが始まって一拍止まって見える。
+   */
   get rolling(): boolean {
     return this.upperState === 'roll'
+  }
+
+  /**
+   * 転がりの**絵**がまだ流れているか。
+   *
+   * --- rolling と何が違うか ---
+   * あちらは「もう動かしてよいか」。こちらは「もう転がって見えていないか」。
+   * 拘束は ROLL_EXIT_PHASE (0.78) で先に解けるので、**クリップはまだ 2 割
+   * 残っている**。同じ getter で兼ねていたせいで、二段の型 (手榴弾の振りかぶり
+   * など) が転がりの尻尾の中で始まって終わり、**一度も画面に映らなかった**。
+   *
+   * 一度だけ流す型 (ONE_SHOT_LOWER) なので、終われば time が尺で止まる。
+   */
+  get rollShowing(): boolean {
+    if (this.upperState === 'roll') return true
+    const action = this.lower.get('roll')
+    if (!action || !action.isRunning()) return false
+    const duration = action.getClip().duration
+    return duration > 0 && action.time < duration
   }
 
   /** 終盤に入ったら拘束を解く。クリップ自体は流れ続け、重みで抜けていく */

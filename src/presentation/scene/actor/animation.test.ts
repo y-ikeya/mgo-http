@@ -118,3 +118,67 @@ describe('弾倉を替える', () => {
     expect(scaleOf(anim, 'reload')).toBeCloseTo(clip / 2.5, 3)
   })
 })
+
+/**
+ * 転がりの「拘束」と「絵」は別。
+ *
+ * 拘束 (rolling) は終盤 (ROLL_EXIT_PHASE = 0.78) で先に解ける — 最終ポーズに
+ * 固まった所からブレンドすると一拍止まって見えるため。**クリップはまだ 2 割
+ * 残っている。**
+ *
+ * 同じ getter で兼ねていたせいで、手榴弾の振りかぶりが**転がりの尻尾の中で
+ * 始まって終わり**、画面には一度も映らないのに投げられる状態になっていた。
+ */
+describe('転がりの拘束と絵', () => {
+  /** 1 フレームずつ進めて、それぞれが偽になった時刻を測る */
+  function transitions(): { rolling: number; showing: number } {
+    const anim = animator()
+    anim.playRoll()
+    let t = 0
+    let rolling = Infinity
+    let showing = Infinity
+    for (let i = 0; i < 240; i++) {
+      anim.setLocomotion('roll' as never)
+      anim.setAiming(false)
+      anim.update(1 / 60)
+      t += 1 / 60
+      if (rolling === Infinity && !anim.rolling) rolling = t
+      if (showing === Infinity && !anim.rollShowing) showing = t
+    }
+    return { rolling, showing }
+  }
+
+  test('始めた直後はどちらも真', () => {
+    const anim = animator()
+    anim.playRoll()
+    expect(anim.rolling).toBe(true)
+    expect(anim.rollShowing).toBe(true)
+  })
+
+  /**
+   * **ここが要。** 拘束が先に解けて、絵はしばらく残る。
+   *
+   * この隙間 (実測 0.25 秒) に二段の型を始めると、振りかぶりが転がりの尻尾の
+   * 中で終わって画面に映らない。**定数ではなく関係を留める** — 尺も時間倍率も
+   * ROLL_EXIT_PHASE も調整される値なので、数字で書くと調整のたびに落ちる。
+   */
+  test('**拘束のほうが先に解ける。** そこで絵はまだ流れている', () => {
+    const { rolling, showing } = transitions()
+    expect(rolling).toBeLessThan(showing)
+    // 隙間が潰れたら、二段の型を始めてよい判断が rolling で足りることになる。
+    // そのときはこの試験ごと消す (getter を 1 つに戻せる)
+    expect(showing - rolling).toBeGreaterThan(0.05)
+  })
+
+  test('絵が終われば両方とも偽', () => {
+    const { showing } = transitions()
+    expect(showing).toBeLessThan(2)
+  })
+
+  test('転がっていなければ最初から偽', () => {
+    const anim = animator()
+    run(anim, 0.5, 'idle')
+    expect(anim.rolling).toBe(false)
+    expect(anim.rollShowing).toBe(false)
+  })
+})
