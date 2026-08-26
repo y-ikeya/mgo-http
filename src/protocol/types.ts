@@ -309,6 +309,31 @@ export interface LoadoutEvent {
 }
 
 /**
+ * スキルの選択。**両向き。**
+ *
+ *     client → server   これにしたい
+ *     server → client   これになった
+ *
+ * --- なぜ装備と別の通にするか ---
+ * 選び直せる窓が違う。装備は 1 つの命ごと、**スキルは 1 試合に 1 度**
+ * (domain/player/skill.ts の canChooseSkills)。同じ通に混ぜると、湧くたびに
+ * 送られてくるスキルを毎回弾くことになり、「弾いた」のか「変えていない」のかが
+ * 送る側から見えなくなる。
+ *
+ * --- なぜサーバーからも来るか ---
+ * **途中参加した人は自分で選んでいない。** 走っている試合に入ると窓は閉じて
+ * いて、前回の選択をサーバーが DB から持ってくる (server/skills.ts)。本人の
+ * 画面に何が効いているかを出すには、こちらから知らせるしかない。
+ *
+ * 段は 1..3。取っていないスキルは**載せない** (0 を送らない) — 「取っていない」
+ * と「Lv0 を取った」を区別しないため。
+ */
+export interface SkillsEvent {
+  type: 'skills'
+  skills: Record<string, number>
+}
+
+/**
  * クレイモアを置く。
  *
  * **位置も向きも送らない。** サーバーが持っている位置と向きから決める —
@@ -710,6 +735,7 @@ export type ClientMessage =
   | DamageEvent
   | GrenadeThrow
   | LoadoutEvent
+  | SkillsEvent
   | PlaceClaymoreEvent
   | DropWeaponEvent
   | PickUpEvent
@@ -736,6 +762,7 @@ export type ServerMessage =
   | PickedMessage
   | NoiseEvent
   | LifeEvent
+  | SkillsEvent
   | HiddenEvent
   | ExplosionEvent
   | KnockDownEvent

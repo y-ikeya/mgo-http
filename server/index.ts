@@ -37,11 +37,13 @@ import { HELD } from '../src/domain/item/held'
 import { triggeredBy } from '../src/sim/judge/claymore'
 import { TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
+import { loadSkills } from './skills'
+import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { reloadInto } from '../src/domain/item/weapons'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/protocol/types'
-import { chooseLoadout } from '../src/domain/player/equip'
+import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
 
 
 const PORT = Number(process.env.PORT ?? 8787)
@@ -256,6 +258,40 @@ const CORS = {
 
 
 /**
+ * 前回の選択を席へ載せ直す。**待たせない。**
+ *
+ * スキルは試合が始まる前にしか選べないので、走っている試合へ入ってきた人は
+ * 選ぶ窓の外に居る。本人に申告させると劣勢の側を見てから組み替えられるので、
+ * 前回の選択をサーバーが持ってくる (server/skills.ts)。
+ *
+ * 入室は先に済ませて、届いたときに載せる。DB が遅くても落ちても、**空のまま
+ * 遊べる**状態は壊さない。
+ *
+ * **既に選んでいたら上書きしない。** 支度の間に選び直した人の選択が、遅れて
+ * 届いた読み出しで巻き戻る — 支度は数秒あるので、実際に起こり得る順番。
+ */
+function restoreSkills(player: Player): void {
+  void loadSkills(player.id).then((skills) => {
+    if (costOf(player.skills) > 0) return
+    player.skills = skills
+    sendSkills(player)
+  })
+}
+
+/**
+ * いま効いているスキルを本人へ返す。
+ *
+ * **選んでいない人にも要る。** 途中参加した人は窓の外に居るので、前回の選択を
+ * サーバーが持ってくる — 何が効いているかを画面に出すには、こちらから知らせる
+ * しかない。
+ */
+function sendSkills(player: Player): void {
+  sessionFor(player)?.socket.send(
+    JSON.stringify({ type: 'skills', skills: player.skills } satisfies ServerMessage),
+  )
+}
+
+/**
  * 届いた 1 通を捌く。
  *
  * **本体を関数に出してある。** 呼ぶ側 (websocket.message) が try で包むため —
@@ -324,6 +360,21 @@ function handleMessage(
         reject(player, `選べない装備 (${message.primary} / ${message.support})`)
       }
       break
+
+    /*
+     * スキルを選び直した。**窓が閉じていたら黙って弾く。**
+     *
+     * 通っても弾いても、**いま効いている物を返す**。弾いたときに何も返さないと、
+     * 送った側の画面だけが選び直したつもりで残る (途中参加した人には窓が
+     * 最初から閉じているので、これは普通に起きる)。
+     */
+    case 'skills': {
+      if (!chooseSkills(player, message.skills, room.phase)) {
+        reject(player, `選べないスキル (${JSON.stringify(message.skills)})`)
+      }
+      sendSkills(player)
+      break
+    }
 
     // 支度ができた。ここで初めて戦場へ出す。
     //
@@ -582,6 +633,7 @@ const server = Bun.serve<Client>({
         })
         room.players.set(joined.id, joined)
         sessions.set(joined.id, newSession(joined, socket))
+        restoreSkills(joined)
       }
 
       // 今いる全員と試合の状態を渡す。

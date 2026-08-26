@@ -33,6 +33,7 @@ import {
 } from '../item/weapons'
 import { MAX_HEALTH } from '../rule/damage'
 import { Footsteps } from '../rule/footsteps'
+import type { Skills } from './skill'
 
 /**
  * ある時刻の姿。**当てたという申告を遡って照合する**のに使う。
@@ -163,6 +164,25 @@ export interface Player {
    */
   primary: WeaponId
   /**
+   * 取っているスキルと、その段。**4 コストの予算で選ぶ** (player/skill.ts)。
+   *
+   * 湧き直しても変わらない — 装備と同じく、支度で選び直すまで持ち越す。
+   * **効果を引くのは持っている側**なので、サーバーもクライアントも同じ表から
+   * 同じ倍率を出す。
+   */
+  skills: Skills
+  /**
+   * 光っている札が切れる時刻 (Date.now)。0 なら光っていない。
+   *
+   * ENEMY EXPOSURE を持つ相手に当てられると付く。**死ねば消える** — 死が
+   * 漏洩を止める手段になっている (docs/design.md の 3)。
+   *
+   * 「A は B の位置を知っている」という見る側 × 見られる側の表ではなく、
+   * **見られる側だけの札**にしてある。当人が光っているので、抜かれた本人にも
+   * 分かるし、配信の規則も 1 行で済む。
+   */
+  leakedUntil: number
+  /**
    * いま手にある物。位置と一緒に届く。
    *
    * 撃てない物 (手榴弾・ナイフ・箱) を持っている間の射撃を弾くのに使う。
@@ -284,6 +304,8 @@ export function newPlayer(seed: {
     footsteps: new Footsteps(),
     concentratingSince: 0,
     kit: startingKit({ primary: 'rifle', support: 'grenade' }),
+    skills: {},
+    leakedUntil: 0,
     weapon: 'rifle',
     primary: 'rifle',
     held: 'rifle',
@@ -378,6 +400,8 @@ export function isProtected(player: Player): boolean {
  */
 export function refill(player: Player): void {
   player.killedBy = ''
+  // **死ねば漏洩が止まる。** 死が情報を切る手段になっている
+  player.leakedUntil = 0
   // **次の命は選んだ装備から始まる。** 拾った物は持ち越さない
   player.kit = startingKit(player)
   player.health = MAX_HEALTH

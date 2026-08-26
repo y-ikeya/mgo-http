@@ -105,7 +105,7 @@ const STAB_SPEED_SCALE = 0
  *
  * 中のキャラは見えないので、しゃがみと違って再生速度との一致は要らない。
  */
-const BOX_SPEED_SCALE = 0.5
+const BOX_SPEED_SCALE = 0.7
 
 /**
  * 集中しているとみなす速度の上限 (m/s)。

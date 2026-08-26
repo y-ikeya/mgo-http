@@ -12,6 +12,8 @@
 import { HELD, type HeldId } from '../item/held'
 import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from '../item/weapons'
 import { startingKit, type Player } from './player'
+import { canChooseSkills, isAffordable, type Skills } from './skill'
+import type { Phase } from '../match/match'
 
 /** 支度で選べる主武器か。**受け取った文字列を信じない** */
 export function isPrimaryChoice(id: string): id is WeaponId {
@@ -60,5 +62,31 @@ export function chooseLoadout(
     // 支度中は持ち物も選び直したものに揃える。湧いてからは refill が組み直す
     player.kit = startingKit(player)
   }
+  return true
+}
+
+/**
+ * スキルを選び直す。**通ったら true。**
+ *
+ * --- 装備とは粒度が違う ---
+ *
+ *     装備    1 つの命ごと (chooseLoadout)
+ *     スキル  **1 試合に 1 度。** 始まったら固定
+ *
+ * 倒されるたびに組み替えられると、相手を見てから後出しするゲームになる
+ * (skill.ts の canChooseSkills に理由)。
+ *
+ * --- 2 つとも弾く ---
+ *
+ *     窓が閉じている        走っている試合の最中
+ *     予算を超えている      知らない名前・段の外れた値も含む
+ *
+ * どちらも**黙って一部だけ通さない**。半分だけ効いた状態を本人に説明できない。
+ */
+export function chooseSkills(player: Player, skills: unknown, phase: Phase): boolean {
+  if (!canChooseSkills(phase)) return false
+  if (skills === null || typeof skills !== 'object') return false
+  if (!isAffordable(skills as Skills)) return false
+  player.skills = skills as Skills
   return true
 }

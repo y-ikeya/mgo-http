@@ -14,6 +14,7 @@ import type { ServerMessage } from '../src/protocol/types'
 import { recordPose, relayState, sendHealth } from './relay'
 import { sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
+import { saveSkills } from './skills'
 import { type RoomWorld, TARGET_RESPAWN, broadcast, setLife } from './world'
 
 /** 1 試合の長さ (ms) */
@@ -350,6 +351,17 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // 装備画面の裏で立ち尽くす人が出ないように
     for (const player of connected(room)) {
       if (player.life === 'choosing') spawn(room, player, now)
+      /*
+       * **スキルはここで確定する。** 選べる窓が閉じた瞬間 (skill.ts の
+       * canChooseSkills) なので、残すならこの 1 か所でよい。
+       *
+       * 試合ごとに書くのは、**次の試合まで選び直せない**から — 途中参加した人に
+       * 持ってこられるのは「前の試合で使っていた物」で、支度の途中で触っていた
+       * 値ではない。始まった時の形をそのまま残す。
+       *
+       * 待たない。書けなくても試合は続く (次に入ったとき前回の選択が戻らないだけ)。
+       */
+      if (!player.bot) saveSkills(player.id, player.skills)
     }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる

@@ -102,17 +102,47 @@ left join match_players mp on mp.player_id = p.id
 group by p.id, p.name, p.created_at;
 
 -- ============================================================
+-- スキル
+-- ============================================================
+-- いま装備しているスキルと段。**1 人 1 スキル 1 行。**
+--
+-- --- なぜ表を分けるか ---
+-- players に jsonb 1 列で持つこともできるが、**習熟度がここへ来る**。
+-- MGO2 のスキルは戦闘中の行動で段が上がるので、スキルごとに生の数 (走った距離 /
+-- 光らせた回数) を持つことになる。1 列の jsonb に後から入れると、列を足すのでは
+-- なく中身の形を変えることになって、古い行と新しい行が混ざる。
+--
+-- --- なぜ「装備」を DB に置くか ---
+-- スキルは**試合が始まる前にしか選べない** (domain/player/skill.ts の
+-- canChooseSkills)。途中参加した人はその窓の後に来るので、選ばせるわけには
+-- いかない — 劣勢の側を見てから強い組み合わせで入り直せてしまう。
+-- **前回の選択で戦ってもらう**ので、席が消えても残る場所が要る。
+--
+-- 段は導かない。**選択そのもの**なので生の値で持つ (点や Lv とは違う)。
+create table if not exists player_skills (
+  player_id uuid     not null references players (id) on delete cascade,
+  skill_id  text     not null,
+  -- 1..3。0 は「取っていない」なので行ごと消す
+  level     smallint not null check (level between 1 and 3),
+  primary key (player_id, skill_id)
+);
+
+-- ============================================================
 -- 誰が読めて、誰が書けるか
 -- ============================================================
 alter table players       enable row level security;
 alter table matches       enable row level security;
 alter table match_players enable row level security;
+alter table player_skills enable row level security;
 
 -- 読むのは認証済みの誰でも。**他人の戦績も見える** (MGO2 もそうだった)。
 -- 成績表から名前を押したらその人のプロフィールが開く、をやりたいので
 create policy "読むのは誰でも" on players       for select to authenticated using (true);
 create policy "読むのは誰でも" on matches       for select to authenticated using (true);
 create policy "読むのは誰でも" on match_players for select to authenticated using (true);
+-- スキルも隠さない。**何を取っているかは相手にも見えてよい** — 装備画面に
+-- 並ぶ物と同じで、隠して得をする類ではない (見た目が幾何を変えないのと同じ)
+create policy "読むのは誰でも" on player_skills for select to authenticated using (true);
 
 -- 表示名だけは本人が変えられる。**それ以外の列は触らせない**
 create policy "名前は本人が変えられる" on players
@@ -208,10 +238,74 @@ begin
 end;
 $$;
 
+-- ============================================================
+-- スキルの読み書き
+-- ============================================================
+--
+-- **ここで初めて対戦サーバーが DB を読む。**
+--
+-- それまでは書き込み専用にしてあった (読むのは各自が anon key で直接読む)。
+-- 破った理由は、途中参加した人のスキルを**本人に申告させられない**から —
+-- 選ばせると劣勢の側を見てから選び直せる。前回の選択を持ってこられるのは
+-- サーバーだけ。
+--
+-- 入室のたびに 1 回だけ引く。刻みの中では読まない。
+
+-- 取っているスキルを {"runner": 2, ...} の形で返す。
+-- 居ない人・取っていない人には空の {} が返る (null ではない)
+create or replace function get_player_skills(p_auth_subject text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(jsonb_object_agg(s.skill_id, s.level), '{}'::jsonb)
+  from players p
+  join player_skills s on s.player_id = p.id
+  where p.auth_subject = p_auth_subject;
+$$;
+
+-- 選択を丸ごと入れ替える。
+--
+-- **差分ではなく総取っ替え。** スキルを外したことも記録に残す必要があるので、
+-- 「入っている物を書く」だけでは前回の残りが消えない。
+--
+-- p_skills は {"runner": 2, "exposure": 1}。段が 1..3 の外なら check で落ちる
+-- (呼ぶ側でも domain/player/skill.ts の isAffordable が弾いている)。
+create or replace function set_player_skills(p_auth_subject text, p_skills jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_player uuid;
+begin
+  select id into v_player from players where auth_subject = p_auth_subject;
+  -- 一度も試合をしていない人は行が無い。**ここでは作らない** —
+  -- 作るのは戦績を書くとき (record_match_player) の 1 か所に寄せる
+  if v_player is null then
+    return;
+  end if;
+
+  delete from player_skills where player_id = v_player;
+
+  insert into player_skills (player_id, skill_id, level)
+  select v_player, key, value::smallint
+  from jsonb_each_text(p_skills);
+end;
+$$;
+
 -- 呼べるのはサーバーだけ。**認証済みの利用者には渡さない**。
 --
 -- 引数まで書いて指定する。create or replace は引数が違うと**差し替えではなく
 -- 追加**になるので、古い形が残っていると名前だけでは狙いが定まらない
+revoke all on function get_player_skills(text) from public, anon, authenticated;
+revoke all on function set_player_skills(text, jsonb) from public, anon, authenticated;
+grant execute on function get_player_skills(text) to service_role;
+grant execute on function set_player_skills(text, jsonb) to service_role;
+
 revoke all on function record_match_player(uuid, text, timestamptz, text, text, text, int, int, int, int, int, jsonb, boolean)
   from public, anon, authenticated;
 revoke all on function close_match(uuid, text, timestamptz, text)

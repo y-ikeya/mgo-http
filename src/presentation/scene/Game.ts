@@ -6,6 +6,7 @@ import { Input } from "../../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
+import { canChooseSkills, type SkillId, type Skills } from "../../domain/player/skill";
 import { offsetInCone } from "../../sim/space/aim";
 import {
   ARENA_HALF_SIZE,
@@ -130,6 +131,15 @@ export interface GameStats {
   loadoutLeft: number;
   /** OK が効くようになるまで (秒)。0 なら押せる */
   loadoutWait: number;
+  /**
+   * いま効いているスキル。**サーバーが決める。**
+   *
+   * 選んだ物をそのまま出さないのは、途中参加した人が自分で選んでいないため —
+   * 前回の選択を DB から持ってくるので、返ってきた物だけが正しい。
+   */
+  skills: Skills;
+  /** スキルを選び直せるか。**試合が始まったら閉じる** */
+  skillsOpen: boolean;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
   /** いま持っている銃。調整パネルが追従する */
@@ -451,6 +461,14 @@ export class Game {
    * 角度をカメラへ足すことと、円錐の中へ実際に向きを傾けること (sim/space/aim.ts)
    * だけ。サーバーが同じ弾を再現できるように、three を挟まない形にしてある。
    */
+  /**
+   * いま効いているスキル。**サーバーが返した物だけを持つ。**
+   *
+   * 送った物を控えて表示に使うと、弾かれたときに画面だけ先へ行く。選び直せる
+   * 窓は試合が始まる前だけなので、そこを外して送るのは普通に起きる。
+   */
+  private skills: Skills = {};
+
   private readonly spread = new Spread();
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
@@ -1167,6 +1185,17 @@ export class Game {
         this.follow.snapTo(this.player, this.cameraWorld);
         break;
 
+      /*
+       * スキルが決まった。**送った物ではなく返ってきた物を持つ。**
+       *
+       * 弾かれたときも今の値が返るので、こちらの画面だけ選び直したつもりで
+       * 残らない。途中参加した人はそもそも送っていない (窓が閉じている) ので、
+       * これが唯一の入り口になる。
+       */
+      case "skills":
+        this.skills = message.skills as Skills;
+        break;
+
       // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
       case "respawn":
         if (message.id !== this.net.id) this.remotes.warp(message.id);
@@ -1636,6 +1665,20 @@ export class Game {
     this.sendLoadout();
     this.applyLoadoutNow();
     this.onLoadout?.(this.pendingLoadout);
+  }
+
+  /**
+   * スキルを 1 つ選び直す。段に 0 を渡せば外す。
+   *
+   * **こちらでは書き換えない。** 通ったかどうかを決めるのはサーバーで、
+   * 結果は skills の通で返ってくる (弾かれたときも今の値が返る)。
+   * 先に書き換えると、予算を超えた選択が一瞬効いて見える。
+   */
+  setSkill(id: SkillId, level: number): void {
+    const next: Skills = { ...this.skills };
+    if (level <= 0) delete next[id];
+    else next[id] = level as 1 | 2 | 3;
+    this.net.send({ type: "skills", skills: next });
   }
 
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
@@ -2798,6 +2841,9 @@ export class Game {
       loadoutLeft: Math.max(0, Math.ceil(CHOOSE_TIMEOUT - this.chooseElapsed)),
       // OK が効くようになるまで。押せないボタンを押させないための表示
       loadoutWait: Math.max(0, Math.ceil(CHOOSE_FLOOR - this.chooseElapsed)),
+      skills: this.skills,
+      // 窓が開いているかは試合の段階で決まる。規則は domain が持つ
+      skillsOpen: canChooseSkills(this.replica.match?.phase ?? "waiting"),
       scoped: this.scoped,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",

@@ -101,6 +101,9 @@ export default function Play(props: { identity: Identity }) {
           left={stats()?.loadoutLeft ?? 0}
           wait={stats()?.loadoutWait ?? 0}
           onSpawn={() => game()?.closeLoadout()}
+          skills={stats()?.skills ?? {}}
+          skillsOpen={stats()?.skillsOpen ?? false}
+          onSkill={(id, level) => game()?.setSkill(id, level)}
         />
       </Show>
 

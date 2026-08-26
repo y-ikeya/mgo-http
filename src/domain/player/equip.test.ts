@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { canHold, chooseLoadout, isPrimaryChoice, isSupportChoice } from './equip'
+import { canHold, chooseLoadout, chooseSkills, isPrimaryChoice, isSupportChoice } from './equip'
 import { newPlayer, refill } from './player'
 
 /**
@@ -119,5 +119,59 @@ describe('装備を選ぶ', () => {
     expect(isPrimaryChoice('knife')).toBe(false)
     expect(isSupportChoice('claymore')).toBe(true)
     expect(isSupportChoice('rifle')).toBe(false)
+  })
+})
+
+/**
+ * スキルの選び直し。**装備とは粒度が違う。**
+ *
+ *     装備    1 つの命ごと
+ *     スキル  1 試合に 1 度。始まったら固定
+ *
+ * 倒されるたびに組み替えられると、相手を見てから後出しするゲームになる。
+ */
+describe('スキルを選び直す', () => {
+  test('始まる前なら通る', () => {
+    const p = fresh()
+    expect(chooseSkills(p, { runner: 2, exposure: 1 }, 'waiting')).toBe(true)
+    expect(p.skills).toEqual({ runner: 2, exposure: 1 })
+  })
+
+  test('**始まったら弾く。** いま効いている物はそのまま', () => {
+    const p = fresh()
+    chooseSkills(p, { runner: 2 }, 'countdown')
+    expect(chooseSkills(p, { sniperMastery: 3 }, 'playing')).toBe(false)
+    expect(p.skills).toEqual({ runner: 2 })
+  })
+
+  test('決着したら開く。試合をまたげば組み替えてよい', () => {
+    const p = fresh()
+    expect(chooseSkills(p, { boxMove: 3 }, 'over')).toBe(true)
+  })
+
+  test('予算を超えたら弾く', () => {
+    const p = fresh()
+    expect(chooseSkills(p, { runner: 3, boxMove: 3 }, 'waiting')).toBe(false)
+    expect(p.skills).toEqual({})
+  })
+
+  test('知らない名前が混ざったら**丸ごと**弾く', () => {
+    const p = fresh()
+    expect(chooseSkills(p, { runner: 1, aimbot: 1 }, 'waiting')).toBe(false)
+    expect(p.skills).toEqual({})
+  })
+
+  test('object でない物を送られても落ちない', () => {
+    const p = fresh()
+    expect(chooseSkills(p, null, 'waiting')).toBe(false)
+    expect(chooseSkills(p, 'runner', 'waiting')).toBe(false)
+    expect(chooseSkills(p, 3, 'waiting')).toBe(false)
+  })
+
+  test('空にするのは通る。**全部外すのも選択**', () => {
+    const p = fresh()
+    chooseSkills(p, { runner: 2 }, 'waiting')
+    expect(chooseSkills(p, {}, 'waiting')).toBe(true)
+    expect(p.skills).toEqual({})
   })
 })
