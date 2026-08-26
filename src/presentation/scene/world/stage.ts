@@ -158,42 +158,64 @@ const BLOCKS: readonly [number, number, number, number, number][] = [
 export const ARENA_HALF_SIZE = GROUND_SIZE / 2
 
 /**
- * 初期位置。原点は中央の建物の内側なので、南側の開けた場所に置いて建物を正面に見る。
- * (原点のままだと生成直後にコリジョンで建物の外へ弾き出される)
- */
-/**
- * チームごとの湧き位置。**対角の角。**
+ * --- モールの寸法 (仮) ---
  *
- * 辺の中央どうしに置いていた頃は、どちらから出ても同じ 1 本の通りを進むことに
- * なっていた。角どうしにすると**建物を斜めに横切る**ので、西のスロープから
- * 上がるか、東の階段まで回るか、地上を突っ切るかが分かれる。
+ * 2 棟が東西に並び、**中央の通路で繋がっている**。中庭がそれぞれの棟の中心に
+ * あって、そこが湧き地点になる。
  *
- * 原点を挟んで点対称なので、どちらの陣営も同じ形の地形から始まる。
- * 湧き地点の脇には L 字の遮蔽があり、出た瞬間に 2 方向から抜かれることはない
- * (tools/make_garage.py の「湧き地点の遮蔽」)。
+ *     西棟   x -32.7 〜  -3.8   中庭の中心 x = -18.2
+ *     通路   x -17.8 〜  18.3   幅 8m / 高さ 5m (concrete_link_*)
+ *     東棟   x   4.3 〜  33.2   中庭の中心 x =  18.7
+ *
+ * 湧き地点をここから出しておくと、建物を動かしたときに直すのが 1 か所で済む。
  */
-export const TEAM_SPAWNS = {
-  blue: { x: -30, z: 30 },
-  red: { x: 30, z: -30 },
+const MALL = {
+  /**
+   * 陣営の基地。**噴水より外側**、棟のいちばん奥。
+   *
+   * 中庭の真ん中は噴水が占めていて (西 x -26〜-19 / 東 x 20〜27)、そこに
+   * 湧かせると噴水の上に立つ。奥へ寄せると**噴水が湧き地点の盾**になり、
+   * 通路から真っ直ぐ抜かれない。
+   *
+   * 地上階の開いている所を 1m の升目で数えて選んである。
+   */
+  baseWest: -30.5,
+  baseEast: 30.5,
+  z: 0,
 } as const
 
 /**
  * 個人戦の湧き地点。**陣営が無いので散らす。**
  *
- * 角の 2 つに全員が湧くと、出た所で撃ち合いになって「湧き待ち」が成立する。
- * 建物の外周を回るように 8 点。どれも**床が 0m で押し戻しの無い所**を
- * ステージの箱に当てて選んである (建物は x ±24 / z ±20)。
+ * 1 か所に全員が湧くと、出た所で撃ち合いになって「湧き待ち」が成立する。
+ * 噴水を挟んで奥と手前、それに南北の 4 点を 2 棟ぶん。どれも地上階の開いて
+ * いる升目に当ててある。
  */
-export const SOLO_SPAWNS = [
-  { x: -30, z: 30 },
-  { x: 0, z: 32 },
-  { x: 30, z: 30 },
-  { x: 32, z: 0 },
-  { x: 30, z: -30 },
-  { x: 0, z: -32 },
-  { x: -30, z: -30 },
-  { x: -32, z: 0 },
+const SOLO_POINTS = [
+  [-30.5, 0], [-16, 0], [-22, -8], [-22, 8],
+  [30.5, 0], [16, 0], [22, -8], [22, 8],
 ] as const
+
+/**
+ * チームごとの湧き位置。**それぞれの棟の中庭。**
+ *
+ * 外周に置いていた頃 (立体駐車場) は、出た所から建物まで走る時間があった。
+ * モールは 2 棟が通路で繋がった形なので、**片方ずつの中庭に湧かせて、
+ * 通路を交戦地帯にする**。
+ *
+ * 通路は幅 8m の 1 本道で、そこを抜けるか抜けないかが最初の判断になる。
+ * どちらの中庭も同じ形 (東棟は西棟の複製) なので、地形の有利不利は無い。
+ *
+ * **仮。** 店舗の絵はまだ判定を持っていない (noplayer) ので、壁を通り抜ける。
+ * 遮蔽として効かせるには col_ の箱を別に置くことになる。そのとき、出た瞬間に
+ * 通路から抜かれない位置へ置き直す。
+ */
+export const TEAM_SPAWNS = {
+  blue: { x: MALL.baseWest, z: MALL.z },
+  red: { x: MALL.baseEast, z: MALL.z },
+} as const
+
+export const SOLO_SPAWNS = SOLO_POINTS.map(([x, z]) => ({ x, z }))
 
 /**
  * 基地の枠の大きさ (m)。中心から端まで。**4m 角。**
@@ -692,6 +714,9 @@ const SURFACE_TEXTURES: Record<Surface, string> = {
   metal: 'rust',
   concrete: 'ground',
   wood: 'wood',
+  // ガラスは絵を貼らない。**透けることそのものが見た目**なので、模様を乗せると
+  // 向こうが読めなくなる。materialFor が手前で分岐して、ここには来ない
+  glass: '',
 }
 
 /**
@@ -704,6 +729,46 @@ const SURFACE_TILE: Record<Surface, number> = {
   metal: 2.5,
   concrete: 2.5,
   wood: 1.2,
+  // 貼らないので効かないが、Record を埋めるために置く
+  glass: 2.5,
+}
+
+/**
+ * ガラス。**透けて、日の光を通す。**
+ *
+ * --- 影を落とさない ---
+ * castShadow を切ることで、太陽 (DirectionalLight) の影の描画から外れる。
+ * ガラス屋根の下が屋外と同じ明るさになる — 透明に描くだけだと**姿は透けるのに
+ * 足元は真っ暗**という、一番おかしな見え方になる。
+ *
+ * --- 両面を描く ---
+ * 天井は下から見上げる。片面だけだと、中に居る人には何も見えない。
+ *
+ * --- 深度を書かない ---
+ * ドームは手前の面と奥の面が重なる。書き込むと手前が奥を消して、
+ * 継ぎ目が黒い線として出る。
+ */
+function createGlassMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: 0xc8dce6,
+    transparent: true,
+    /*
+     * **少し曇らせる。**
+     *
+     * 透明度を上げ切ると、そこに面が在ることが分からなくなって「屋根が無い」
+     * のと見分けが付かない。ガラスらしさは**向こうが見えること**ではなく
+     * **見えるのに隔てられていること**なので、薄く白を乗せて面を残す。
+     */
+    opacity: 0.28,
+    /*
+     * 粗さで曇りを出す。0 に近いと鏡のように空を映して、**金属と区別が
+     * 付かなくなる**。すりガラスほど散らすと向こうが読めないので、その間。
+     */
+    roughness: 0.35,
+    metalness: 0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
 }
 
 /**
@@ -811,8 +876,9 @@ async function replaceWithModel(
   const materialFor = (surface: Surface) => {
     let material = materials.get(surface)
     if (!material) {
-      material = createBlockoutMaterial()
-      void applyStructureTexture(material, surface)
+      // ガラスだけは絵を読まない。透けることが見た目なので貼る物が無い
+      material = surface === 'glass' ? createGlassMaterial() : createBlockoutMaterial()
+      if (surface !== 'glass') void applyStructureTexture(material, surface)
       materials.set(surface, material)
     }
     return material
@@ -831,14 +897,25 @@ async function replaceWithModel(
       const surface = surfaceOf(name)
       obj.material = materialFor(surface)
       for (const material of new Set(replaced)) material.dispose()
-      projectWorldUv(obj, SURFACE_TILE[surface])
+      // ガラスは絵を貼らないので UV を作り直す意味が無い
+      if (surface !== 'glass') projectWorldUv(obj, SURFACE_TILE[surface])
     }
 
     const flags = flagsOf(name)
 
     if (flags.draw) {
-      obj.castShadow = true
-      obj.receiveShadow = true
+      /*
+       * **ガラスは日の光を通す。**
+       *
+       * castShadow を切ると影の描画から外れるので、ガラス屋根の下が屋外と
+       * 同じ明るさになる。透明に描くだけだと**姿は透けるのに足元は真っ暗**、
+       * という一番おかしな見え方になる。
+       *
+       * 受ける側も切る。透ける面に他の物の影が落ちると、宙に影だけが浮く。
+       */
+      const glass = surfaceOf(name) === 'glass'
+      obj.castShadow = !glass
+      obj.receiveShadow = !glass
     } else {
       obj.visible = false
     }

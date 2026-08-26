@@ -40,6 +40,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
   const mode = () => props.stats?.match?.mode ?? 'TDM'
   const teams = () => MODES[mode()].teams
+  /** 1 人でも成立する部屋か。**相手待ちを出さない** (練習・休憩) */
+  const soloRoom = () => MODES[mode()].solo
   const won = () => {
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner === props.stats?.team
@@ -266,8 +268,15 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <div class="hud-leak">位置が漏れている</div>
       </Show>
 
-      {/* 人待ち。時計は動かない */}
-      <Show when={phase() === 'waiting'}>
+      {/*
+        人待ち。時計は動かない。
+
+        **相手を待たない部屋では出さない** (練習・休憩)。1 人で成立するので、
+        待っている物が無いのに「STANDBY」と出ると、始まらないのを待たされて
+        いるように見える。段階が playing に固定される前の一瞬もここで消える
+        (規則は domain/match/room.ts の solo)。
+      */}
+      <Show when={phase() === 'waiting' && !soloRoom()}>
         <div class="hud-standby">
           <div class="hud-standby-title">STANDBY</div>
           <div class="hud-standby-sub">

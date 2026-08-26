@@ -20,7 +20,7 @@ import json
 REF_PREFIX = 'ref_'
 
 # 名前に付けられる札。これ以外の接頭辞は打ち間違いの可能性が高い
-KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'ref_')
+KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_')
 
 # 面が何を止めるか。既定は全部止めて、名前で個別に外す。
 # (src/domain/stage/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
@@ -283,6 +283,7 @@ TEXEL = 2.0
 # 立方投影で使う軸。添字が「一番強い法線の軸」で、中身が UV に使う 2 軸
 PROJECT_AXES = ((1, 2), (0, 2), (0, 1))
 
+# ガラスは絵を貼らないので UV を作り直す意味が無い (透けることが見た目)
 SURFACE_TAGS = ('metal_', 'concrete_', 'wood_')
 
 
@@ -340,7 +341,7 @@ bpy.ops.export_scene.gltf(
 # 材質の内訳も出す。札の付け忘れは数を見ると気づける
 counts = {}
 for name in exported:
-    tag = next((t for t in ('metal_', 'concrete_', 'wood_') if t in name), '(既定=金属)')
+    tag = next((t for t in ('metal_', 'concrete_', 'wood_', 'glass_') if t in name), '(既定=金属)')
     counts[tag] = counts.get(tag, 0) + 1
 
 print(f'\n書き出し: {glb_path}')
