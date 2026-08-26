@@ -17,6 +17,16 @@ import { type StageBox, sightBlockers, solidBlockers } from '../src/sim/space/vi
  * 手榴弾はそこで跳ねる。逆に見えない壁 (vis_) は視線を止めるだけで物は通る。
  */
 export const [stageBoxes, solidBoxes]: [StageBox[], StageBox[]] = await (async () => {
+  // **地形なしで立てる。** 規則の試験にステージを噛ませない、というだけの札。
+  //
+  // 試験は長らく「建物の外の開けた場所」に人を置いて、遮蔽を避けながら
+  // 点数や残機を見ていた。避け方はステージの形に依存するので、**地図を
+  // 描き替えるたびに、地形と関係ない試験が 15 本まとめて落ちる**。
+  // 落ち方も「当たりの申告が全部弾かれる」なので、規則を疑って探すことになる。
+  //
+  // 遮蔽そのものを見たくなったら、そのときに専用の試験を書く。
+  if (process.env.MGO2_NO_STAGE === '1') return [[], []]
+
   const path = new URL('../public/models/stage.json', import.meta.url)
   try {
     const data = (await Bun.file(path).json()) as { boxes: StageBox[] }

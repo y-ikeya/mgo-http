@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { Client, startServer, twoPlayers, type Server, openSpot } from './server'
+import { Client, startServer, twoPlayers, type Server, spot } from './server'
 
 /**
  * 戦績が残るかの試験。
@@ -45,6 +45,22 @@ function recorder(): Recorder {
     },
   })
   return { port: listening.port ?? 0, calls, stop: () => listening.stop(true) }
+}
+
+/**
+ * 戦績として送られた通だけ。
+ *
+ * **箱には戦績以外も来る。** スキルを入れてから、入室のたびに
+ * `get_player_skills` が飛ぶようになった。「何も書いていない」を
+ * `calls.length === 0` で見ていると、**戦績と無関係な問い合わせで落ちる**。
+ * 見たいのは戦績なので、戦績の 2 本に絞って数える。
+ *
+ * **鍵を渡さない試験だけは絞らない。** あちらが見ているのは「何処へも
+ * 送らない」ことそのもので、絞ると番犬が弱くなる。鍵が無ければスキルの
+ * 問い合わせも飛ばないので、全通を数えて 0 のままでよい。
+ */
+function written(stub: Recorder): { fn: string; body: Record<string, unknown> }[] {
+  return stub.calls.filter((c) => c.fn === 'record_match_player' || c.fn === 'close_match')
 }
 
 /** その人の記録。無ければ落ちる */
@@ -119,11 +135,11 @@ describe('戦績', () => {
 
     b.close()
     await Bun.sleep(2000)
-    const back = await new Client(server, b.id, openSpot(0, 6)).ready()
+    const back = await new Client(server, b.id, spot(0, 6)).ready()
     back.live()
     await Bun.sleep(1000)
 
-    expect(stub.calls).toHaveLength(0)
+    expect(written(stub)).toHaveLength(0)
 
     back.close()
     a.close()

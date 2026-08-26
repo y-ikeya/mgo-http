@@ -64,6 +64,12 @@ export async function startServer(env: Record<string, string> = {}): Promise<Ser
       ...process.env,
       PORT: String(port),
       MGO2_TEST_AUTH: '1',
+      // **地形を読ませない。** ここで見るのは規則であって地図ではない。
+      //
+      // 以前は「建物の外の開けた場所」に人を置いて遮蔽を避けていたが、
+      // 避け方がステージの形に依存するので、**地図を描き替えると
+      // 地形と関係ない試験がまとめて落ちた** (当たりの申告が全部弾かれる形で)。
+      MGO2_NO_STAGE: '1',
       // **試験は本番の表に書かない。**
       //
       // bun は .env を勝手に読むので、何もしないと手元の秘密鍵をそのまま継いで
@@ -298,30 +304,14 @@ function snapshotOf(
   } as PlayerSnapshot
 }
 
-/**
- * 2 人で試合を始めるところまで進める。
- *
- * 位置は開けた場所に向かい合わせで置く。**遮蔽の裏かどうかを問わない試験**は
- * これで足りる (問う試験はステージから座標を探す必要があるので、別に書く)。
- */
-/**
- * ステージの中で**必ず開けている場所**。試験はここを基準に人を置く。
- *
- * 原点あたりに置いていたが、ステージを立体駐車場にしたときに中央へ柱が立って、
- * 2 人の間が塞がった (視線が通らないので当たりの申告が全部弾かれた)。
- * 試験が見たいのは点数の増え方であって地形ではないので、**地形の都合を 1 か所に
- * 集める**。ステージを作り直すときは、ここが開いていることだけ守ればよい。
- *
- * いまの立体駐車場は建物が x ∈ [-21, 21] なので、その東の外側を取ってある。
- */
-const OPEN_X = 30
-const OPEN_Z = 0
-
-/** 開けている場所からの相対で座標を作る */
-export function openSpot(dx: number, dz: number): [number, number, number] {
-  return [OPEN_X + dx, 0, OPEN_Z + dz]
+/** 向かい合わせに立たせる座標。**地形が無いので原点でよい** */
+export function spot(dx: number, dz: number): [number, number, number] {
+  return [dx, 0, dz]
 }
 
+/**
+ * 2 人で試合を始めるところまで進める。位置は向かい合わせ。
+ */
 export async function twoPlayers(
   server: Server,
   /** 支度で選ぶ支援。**湧く前にしか選べない** (domain/player/equip.ts) */
@@ -335,8 +325,8 @@ export async function twoPlayers(
    */
   names: [string, string] = ['alice', 'bob'],
 ): Promise<{ a: Client; b: Client }> {
-  const a = await new Client(server, names[0], openSpot(0, -6)).ready()
-  const b = await new Client(server, names[1], openSpot(0, 6)).ready()
+  const a = await new Client(server, names[0], spot(0, -6)).ready()
+  const b = await new Client(server, names[1], spot(0, 6)).ready()
   a.live()
   b.live()
   if (support !== 'grenade') {

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { Client, openSpot, startServer, type Server } from './server'
+import { Client, spot, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/protocol/types'
 
 /**
@@ -18,8 +18,8 @@ afterAll(() => server.stop())
 
 /** 2 人を個人戦の部屋へ入れて、撃てる状態まで進める */
 async function twoInDM(): Promise<{ a: Client; b: Client }> {
-  const a = await new Client(server, 'alice', openSpot(0, -6), 'alpha').ready()
-  const b = await new Client(server, 'bob', openSpot(0, 6), 'alpha').ready()
+  const a = await new Client(server, 'alice', spot(0, -6), 'alpha').ready()
+  const b = await new Client(server, 'bob', spot(0, 6), 'alpha').ready()
   a.live()
   b.live()
   await Bun.sleep(3400)
