@@ -231,9 +231,30 @@ describe('手ブレ', () => {
     expect(reach(trace(rifle, still, { sniperMastery: 3 }))).toBeCloseTo(reach(trace()), 10)
   })
 
-  /** 極めても 0 にはしない。0 だと止まって撃つ限り必中に戻る */
-  test('極めても止まらない', () => {
-    expect(reach(trace(rifle, still, { rifleMastery: 3 }))).toBeGreaterThan(0)
+  /**
+   * **Lv3 で完全に止まる。** 極めた銃は構えれば泳がない。
+   *
+   * 「その銃を極めた」ことが手触りで分かる形がここにしか無い — 散布も装填も
+   * 数字は動くが、撃った結果でしか分からない。照準が止まることは構えた瞬間に見える。
+   */
+  test('MASTERY Lv3 なら泳がない', () => {
+    expect(reach(trace(rifle, still, { rifleMastery: 3 }))).toBe(0)
+  })
+
+  test('Lv2 まではまだ泳ぐ', () => {
+    expect(reach(trace(rifle, still, { rifleMastery: 2 }))).toBeGreaterThan(0)
+  })
+
+  /**
+   * **止まっても必中にはならない。** 消えるのは構えている間の泳ぎだけで、
+   * 動けば散り、連射すれば開く。撃ち方の巧拙はそのまま残る。
+   */
+  test('Lv3 でも、動けば散る / 連射すれば開く', () => {
+    const spread = new Spread()
+    spread.update(0.016, rifle, running)
+    expect(spread.degrees(rifle, { rifleMastery: 3 })).toBeGreaterThan(0)
+    for (let i = 0; i < 5; i++) spread.fired(i, rifle, { rifleMastery: 3 })
+    expect(spread.degrees(rifle, { rifleMastery: 3 })).toBeGreaterThan(0)
   })
 
   /**
@@ -244,8 +265,17 @@ describe('手ブレ', () => {
     expect(reach(trace(rifle, running))).toBeCloseTo(reach(trace(rifle, still)), 10)
   })
 
-  test('銃が重いほど大きく泳ぐ', () => {
-    expect(WEAPONS.smg.sway).toBeLessThan(WEAPONS.rifle.sway)
-    expect(WEAPONS.rifle.sway).toBeLessThan(WEAPONS.sniper.sway)
+  /**
+   * **主武器は 3 挺とも同じ。** 銃の性格は威力の帯・連射・弾倉・重さで既に
+   * 分かれていて、そこへ泳ぎ方の差を足すと何が効いているのか分からなくなる。
+   */
+  test('主武器の振れ幅は揃っている', () => {
+    expect(WEAPONS.smg.sway).toBe(WEAPONS.rifle.sway)
+    expect(WEAPONS.rifle.sway).toBe(WEAPONS.sniper.sway)
+  })
+
+  /** **主武器のほうが大きく泳ぐ。** 遠くを狙うなら極める動機が要る */
+  test('拳銃は主武器より泳がない', () => {
+    expect(WEAPONS.pistol.sway).toBeLessThan(WEAPONS.rifle.sway)
   })
 })

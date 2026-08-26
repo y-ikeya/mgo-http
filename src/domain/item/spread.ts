@@ -20,7 +20,12 @@
  */
 
 import { randomSigned, randomUnit, RandomStream } from '../rule/random'
-import { masteryJitterScale, masterySpreadScale, type Skills } from '../player/skill'
+import {
+  masteryJitterScale,
+  masterySpreadScale,
+  masterySwayScale,
+  type Skills,
+} from '../player/skill'
 import type { WeaponSpec } from './weapons'
 
 /**
@@ -176,13 +181,17 @@ export class Spread {
    * 往復するだけになって、円を描かない。
    *
    * --- 何で縮むか ---
-   * しゃがみ (spreadCrouchScale) と、その銃の MASTERY。**動いていても増えない** —
-   * 走りながらの乱れは散布 (degrees) が持っていて、二重に掛ける理由が無い。
+   * しゃがみ (spreadCrouchScale) と、その銃の MASTERY。**Lv3 なら完全に止まる**
+   * (masterySwayScale)。極めた銃は構えれば止まる、というのがこのスキルの
+   * 手触りになる。
+   *
+   * **動いていても増えない。** 走りながらの乱れは散布 (degrees) が持っていて、
+   * 二重に掛ける理由が無い。
    */
   sway(weapon: WeaponSpec, skills: Skills, posture: Posture): [number, number] {
     const amplitude =
       weapon.sway *
-      masterySpreadScale(skills, weapon.id) *
+      masterySwayScale(skills, weapon.id) *
       (posture.crouching ? weapon.spreadCrouchScale : 1)
     if (amplitude <= 0) return [0, 0]
     const t = this.age

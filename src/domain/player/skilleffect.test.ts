@@ -34,14 +34,16 @@ describe('MASTERY が散布に効く', () => {
    * 無かった (散布の合計が 0 で、倍率が掛かる先が無かった)。手ブレを
    * 入れたので、止まっていても差が出る。
    */
-  test('止まって構えていても、極めた銃は泳ぎが小さい', () => {
+  test('止まって構えていても、極めた銃は泳ぎが小さい (Lv3 で止まる)', () => {
     const spread = settled()
     const swayOf = (skills: Skills) => {
       const [r, u] = spread.sway(WEAPONS.rifle, skills, still)
       return Math.hypot(r, u)
     }
-    expect(swayOf({ rifleMastery: 3 })).toBeLessThan(swayOf(NONE))
-    expect(swayOf({ rifleMastery: 3 })).toBeGreaterThan(0)
+    // **Lv3 は完全に止まる**
+    expect(swayOf({ rifleMastery: 3 })).toBe(0)
+    expect(swayOf({ rifleMastery: 1 })).toBeLessThan(swayOf(NONE))
+    expect(swayOf({ rifleMastery: 1 })).toBeGreaterThan(0)
   })
 
   test('動きながらも締まる', () => {

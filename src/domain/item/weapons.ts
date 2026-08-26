@@ -198,8 +198,13 @@ export interface WeaponSpec {
    *     0.30 度   画面 ±7px    25m で 13cm   ← ここ
    *     0.50 度   画面 ±11px   25m で 22cm   頭が入らない
    *
-   * 基準を突撃銃の 0.30 度に置いて、銃ごとの差は重さの順に付けた。頭は約 20cm
-   * なので、**25m までは狙えば頭が入る**が、50m を超えると胴を狙う形になる。
+   * --- 主武器は 3 挺とも同じ ---
+   * 銃ごとに変えない。**変える理由が無い** — 銃の性格は威力の帯・連射・
+   * 弾倉・重さで既に分かれていて、そこへ「泳ぎ方も違う」を足すと、
+   * どれが効いているのか撃っている側から分からなくなる。
+   *
+   * 拳銃 (secondary) だけ小さい。**主武器のほうが大きく泳ぐ**ので、
+   * 遠くを狙うなら主武器を極める (MASTERY) 動機が要る形になる。
    *
    * しゃがみで締まる (spreadCrouchScale)。狙撃銃はここが最も強く効くので、
    * **立って撃てば胴、しゃがめば頭**という差が距離で出る。
@@ -302,7 +307,7 @@ const SMG: WeaponSpec = {
   noiseRange: 110,
 
   // **反動が小さい。** 押しっぱなしでも散らばりにくいのがこの銃の取り柄
-  sway: 0.24,
+  sway: 0.30,
   spreadPerShot: 0.08,
   spreadMax: 1.1,
   spreadPerSpeed: 0.2,
@@ -432,7 +437,7 @@ const SNIPER: WeaponSpec = {
   noiseRange: 170,
 
   // 連射で広がる分は大きいが、そもそも連射できない
-  sway: 0.42,
+  sway: 0.30,
   spreadPerShot: 0.9,
   spreadMax: 3.5,
   // 動くと当たらない。突撃銃の 3 倍以上散る
@@ -512,7 +517,7 @@ const PISTOL: WeaponSpec = {
   bulletGravity: 9.8,
   noiseRange: 85,
   // 片手で構えるので跳ねる。連射するほど散る
-  sway: 0.46,
+  sway: 0.20,
   spreadPerShot: 0.28,
   spreadMax: 2.2,
   spreadPerSpeed: 0.34,
