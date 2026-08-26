@@ -1,10 +1,17 @@
 # ステージの叩き台を作る。
 #
-#   /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python tools/make_stage.py
+#   $BLENDER -b --factory-startup --python tools/make_stage.py -- <名前>
 #
-# **既にある stage.blend は上書きしない。** これは白紙から叩き台を起こすためのもので、
-# 普段の改修は Blender で stage.blend を直接いじり、export_stage.py で書き出す。
-# 作り直したいときは stage.blend を自分で消すか名前を変えてから走らせる。
+# 書き出すのは **tools/stage_<名前>.blend**。名前を省くと stage_new.blend。
+#
+# --- ステージは stage_ で始める ---
+# 見張り (watch_stage.ts) が拾うのが tools/stage_*.blend なので、そこから外れた
+# 名前で作ると**書き出しても誰も見ない**。tools/ には props の変換元など別の
+# .blend も混ざるため、札で見分けている。
+#
+# **既にある .blend は上書きしない。** これは白紙から叩き台を起こすためのもので、
+# 普段の改修は Blender で直接いじり、export_stage.py で書き出す。
+# 作り直したいときは自分で消すか名前を変えてから走らせる。
 #
 # .blend と glb の両方を書き出す。glb はそのままゲームに乗るので、まず歩いて確かめてから
 # .blend を開いて箱を動かす、という順で進められる。
@@ -35,6 +42,7 @@
 
 import bpy
 import os
+import sys
 import math
 
 # --- 寸法の語彙 -------------------------------------------------------------
@@ -184,7 +192,10 @@ for name, height, x in (('ref_stand', 1.80, 34.0), ('ref_crouch', 0.94, 35.5), (
 
 # --- 書き出し ---------------------------------------------------------------
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-blend_path = os.path.join(root, 'tools', 'stage.blend')
+# 名前は引数で受ける。-- の後ろが Blender ではなく script への引数になる
+argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+name = argv[0] if argv else 'new'
+blend_path = os.path.join(root, 'tools', f'stage_{name}.blend')
 glb_path = os.path.join(root, 'public', 'models', 'stage.glb')
 
 if os.path.exists(blend_path):

@@ -13,7 +13,8 @@ BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
 普段の流れはこう:
 
 ```
-bun run stage        # tools/stage.blend を見張って、保存されたら書き出す
+bun run stage        # tools/stage_*.blend を見張って、保存されたら書き出す
+bun run stage mall   # 複数あるときは名前で選ぶ
 ```
 
 Blender で `Ctrl+S` を押すと glb が作り直され、Vite がページを読み直す。
@@ -34,7 +35,7 @@ Blender で `Ctrl+S` を押すと glb が作り直され、Vite がページを�
 
 サーバーが glb を解析する必要は無い。要るのは箱の形だけで、それは書き出しのときに
 分かっている。同時に書くので、片方だけ古い形を見ていることが起きない。
-| `make_stage.py` | 白紙から叩き台を起こす。`tools/stage.blend` があれば**拒否する** |
+| `make_stage.py` | 白紙から叩き台を起こす。**ステージは `stage_<名前>.blend`**。既にあれば**拒否する** |
 
 ### 書き出しのときに調べていること
 

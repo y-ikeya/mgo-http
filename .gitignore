@@ -15,12 +15,11 @@ tools/raw/
 
 # --- 変換の中間物 ---
 # public/ に入った glb と jpg は成果物なので追跡する (数 MB)。
-# 手で編集する .blend は元データなので追跡する (stage.blend、100KB 程度)。
+# **手で編集する .blend は元データなので追跡する。**
 #
-# **生成される .blend は追跡しない。** garage.blend は make_garage.py が毎回
-# 白紙から起こすもので、手では触らない。車のテクスチャを抱えて 5MB あり、
-# 中身は make_garage.py と tools/props/ から作り直せる。
-tools/garage.blend
+# ステージは tools/stage_*.blend (stage_mall.blend など)。テクスチャを抱えて
+# 数 MB あるが、**手で作った物は作り直せない**ので中に入れる。生成物と違って
+# script から起こせない。
 # 配布モデルを変換した中間物。ステージに焼き込まれた分が public/ にあるので、
 # これ自体は成果物ではない。作り直す手順は tools/convert_car.py と CREDITS.md。
 tools/props/

@@ -257,6 +257,63 @@ json_path = os.path.join(root, 'public', 'models', 'stage.json')
 with open(json_path, 'w') as f:
     json.dump({'boxes': boxes}, f, ensure_ascii=False, indent=0)
 
+
+# --- テクスチャを伸ばさない ---------------------------------------------------
+#
+# **UV は scale を知らない。** 立方体を X に 10 倍伸ばしても UV は 0..1 のままなので、
+# 同じ絵が 10 倍に引き伸ばされる。壁を 1 枚作って寸法だけ変える、という一番自然な
+# 作り方をすると必ずこれを踏む (concrete_wall_n が scale 10 になっている)。
+#
+# Blender 側で「scale を適用してから展開し直す」でも直るが、**寸法を変えるたびに
+# 手でやり直すことになる**。人の手順から外したいので、書き出す前に毎回やる。
+#
+# やっているのは**ワールド座標の立方投影**。面の向きが一番強い軸を選んで、残り
+# 2 軸のメートルをそのまま UV にする。scale がいくつでも、1 タイルは必ず TEXEL
+# メートルになる。
+#
+# --- 何に掛けるか ---
+# **札を持つ物だけ** (metal_ / concrete_ / wood_)。停めてある車のような、絵を
+# 持ち込んだ物は自前の UV が正しいので触らない。名前で宣言する、という他の
+# 決めごとと同じ形にしてある。
+import bmesh
+
+# 1 タイルが何メートルか。小さいほど模様が細かく繰り返す
+TEXEL = 2.0
+
+# 立方投影で使う軸。添字が「一番強い法線の軸」で、中身が UV に使う 2 軸
+PROJECT_AXES = ((1, 2), (0, 2), (0, 1))
+
+SURFACE_TAGS = ('metal_', 'concrete_', 'wood_')
+
+
+def reproject(obj):
+    """ワールド座標の立方投影で UV を張り直す。**scale がいくつでも伸びない**"""
+    mesh = obj.data
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    layer = bm.loops.layers.uv.verify()
+    mw = obj.matrix_world
+    for face in bm.faces:
+        n = (mw.to_3x3() @ face.normal)
+        axis = max(range(3), key=lambda i: abs(n[i]))
+        u_axis, v_axis = PROJECT_AXES[axis]
+        for loop in face.loops:
+            world = mw @ loop.vert.co
+            loop[layer].uv = (world[u_axis] / TEXEL, world[v_axis] / TEXEL)
+    bm.to_mesh(mesh)
+    bm.free()
+
+
+reprojected = 0
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or not obj.select_get():
+        continue
+    if not any(tag in obj.name for tag in SURFACE_TAGS):
+        continue
+    reproject(obj)
+    reprojected += 1
+print(f'  UV を張り直した: {reprojected} 個 (1 タイル = {TEXEL}m)')
+
 # 材質は載せる。
 #
 # 以前は 'NONE' にして「見た目はゲーム側で付ける」ことにしていた。箱しか無かった
