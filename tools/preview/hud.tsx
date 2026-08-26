@@ -7,8 +7,8 @@
  * のを 1 度見落とした。以後はこの頁で確かめる。
  */
 import { render } from 'solid-js/web'
-import Hud from '../../src/ui/Hud'
-import type { GameStats } from '../../src/game/Game'
+import Hud from '../../src/presentation/ui/Hud'
+import type { GameStats } from '../../src/presentation/scene/Game'
 
 const base = {
   stage: 'GARAGE', backend: 'webgpu', fps: 120, x: 0, z: 0, speed: 0,
@@ -61,13 +61,15 @@ const cases: Record<string, Partial<GameStats>> = {
   },
   browsingTool: {
     browsingFamily: 'tool',
-    tool: 'box',
-    toolInHand: true,
+    tool: 'none',
+    toolInHand: false,
     browsing: {
       items: [
         { id: 'box', n: null, loaded: null, mag: null },
         { id: 'none', n: null, loaded: null, mag: null },
       ],
+      // **NONE を選んでいる状態から C.BOX を指している所**。角が C.BOX に
+      // なっていないと、送っても何も変わらないように見える
       at: 0,
     },
   },

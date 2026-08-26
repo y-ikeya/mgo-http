@@ -1,7 +1,8 @@
 /**
- * stage.blend を見張って、保存されたら glb を書き出す。
+ * ステージの .blend を見張って、保存されたら glb を書き出す。
  *
- *   bun run stage
+ *   bun run stage         (tools/stage_*.blend が 1 つならそれ)
+ *   bun run stage mall    (tools/stage_mall.blend)
  *
  * Blender で Ctrl+S を押すだけで、ゲームの画面が作り直したステージに切り替わる
  * (glb が変わると Vite がページを読み直す)。
@@ -14,12 +15,56 @@
  * (別のプロセスが .blend を読むだけ)。
  */
 
-import { watch } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { readdirSync, watch } from 'node:fs'
 
 const BLENDER = '/Applications/Blender.app/Contents/MacOS/Blender'
-const BLEND = 'tools/stage.blend'
+const DIR = 'tools'
 const SCRIPT = 'tools/export_stage.py'
+
+/**
+ * ステージの元データの名前。**`stage_` で始まる .blend。**
+ *
+ * 名前で見分けるのは、`tools/` に他の .blend (props の変換元など) が混ざるため。
+ * 札で宣言する、という他の決めごとと同じ形にしてある。
+ *
+ * どれを書き出すかは引数で選ぶ。省いたら 1 つしか無いときだけ黙って選び、
+ * 複数あるなら**選ばせる** — 「どれが乗っているか分からない」が一番困る。
+ *
+ *     bun run stage           1 つしか無ければそれ
+ *     bun run stage mall      tools/stage_mall.blend
+ */
+const PREFIX = 'stage_'
+
+function stages(): string[] {
+  return readdirSync(DIR)
+    .filter((name) => name.startsWith(PREFIX) && name.endsWith('.blend'))
+    .sort()
+}
+
+function pick(): string {
+  const found = stages()
+  if (found.length === 0) {
+    console.error(`${DIR}/${PREFIX}*.blend が無い。先に make_stage.py で叩き台を作る`)
+    process.exit(1)
+  }
+  const asked = process.argv[2]
+  if (asked) {
+    const name = asked.endsWith('.blend') ? asked : `${PREFIX}${asked}.blend`
+    if (!found.includes(name)) {
+      console.error(`${name} が無い。あるのは: ${found.join(' / ')}`)
+      process.exit(1)
+    }
+    return `${DIR}/${name}`
+  }
+  if (found.length > 1) {
+    console.error(`どれを書き出すか選ぶ: ${found.map((n) => n.slice(PREFIX.length, -6)).join(' / ')}`)
+    console.error('  bun run stage mall')
+    process.exit(1)
+  }
+  return `${DIR}/${found[0]}`
+}
+
+const BLEND = pick()
 
 /**
  * 保存が落ち着くまで待つ時間 (ms)。
@@ -71,11 +116,6 @@ async function exportStage(): Promise<void> {
     void exportStage()
   }
 }
-
-await stat(BLEND).catch(() => {
-  console.error(`${BLEND} が無い。先に make_stage.py で叩き台を作る`)
-  process.exit(1)
-})
 
 console.info(`${BLEND} を見張っている。Blender で保存すると書き出す。`)
 void exportStage()

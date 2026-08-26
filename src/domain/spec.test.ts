@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { HELD, SWITCH_TIME, type HeldId } from './item/held'
 import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from './item/weapons'
 import { MAX_HEALTH } from './rule/damage'
-import { CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from './lifecycle'
-import { MIN_PLAYERS, RECONNECT_GRACE } from './match'
+import { CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from './player/lifecycle'
+import { MIN_PLAYERS, RECONNECT_GRACE } from './match/match'
 
 /**
  * **README が数字の出どころ。** そこに書いた表と実装が合っているかを見る。
@@ -103,6 +103,26 @@ describe('README が数字の出どころ', () => {
       .sort()
     const listed = tableOf('射程').map((cells) => cells[0])
     expect(primaries.filter((id) => !listed.includes(id))).toEqual([])
+  })
+
+  test('弾道 (速さと落ち方)', () => {
+    for (const [id, speed, gravity] of tableOf('弾道')) {
+      const spec = WEAPONS[id as WeaponId]
+      expect(spec, `README に無い武器: ${id}`).toBeDefined()
+      expect([id, spec.bulletSpeed, spec.bulletGravity]).toEqual([
+        id,
+        Number(speed),
+        Number(gravity),
+      ])
+    }
+  })
+
+  test('銃声の届く距離', () => {
+    for (const [id, range] of tableOf('銃声')) {
+      const spec = WEAPONS[id as WeaponId]
+      expect(spec, `README に無い武器: ${id}`).toBeDefined()
+      expect([id, spec.noiseRange]).toEqual([id, Number(range)])
+    }
   })
 
   test('1 つの命で持てる数', () => {

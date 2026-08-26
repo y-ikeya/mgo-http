@@ -1,9 +1,12 @@
 # 立体駐車場のステージを作る。3 層 (地上 / 2F / 3F)。
 #
 #   /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python tools/make_garage.py
-#   /Applications/Blender.app/Contents/MacOS/Blender -b tools/garage.blend --python tools/export_stage.py
+#   bun run stage garage
 #
-# **既にある garage.blend は上書きしない** (make_stage.py と同じ約束)。
+# 書き出すのは **tools/stage_garage.blend**。ステージの元データは stage_ で始める
+# 決めごとで、見張り (watch_stage.ts) が拾うのもその名前 (make_stage.py に理由)。
+#
+# **既にある .blend は上書きしない** (make_stage.py と同じ約束)。
 #
 # --- なぜ駐車場か ---
 # 階を作れるようになった (Obstacle が下面を持った) ので、それが効く形にしたい。
@@ -57,7 +60,7 @@ LEVEL = 4.0
 SLAB = 0.10
 LEVELS = (0.0, LEVEL, LEVEL * 2)   # 各階の床の上面
 
-STEP_RISE = 0.25   # collision.ts の STEP_UP と揃える
+STEP_RISE = 0.25   # domain/player/moving.ts の STEP_UP と揃える
 STEP_DEPTH = 0.7
 STAIR_DEPTH = 0.35   # 床に開けた穴に収めるための浅い段
 
@@ -469,7 +472,7 @@ for name, height, x in (('ref_stand', 1.80, 34.0), ('ref_crouch', 0.94, 35.5)):
 
 # --- 書き出し ---------------------------------------------------------------
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-blend_path = os.path.join(root, 'tools', 'garage.blend')
+blend_path = os.path.join(root, 'tools', 'stage_garage.blend')
 
 if os.path.exists(blend_path):
     raise SystemExit(
@@ -478,4 +481,4 @@ if os.path.exists(blend_path):
 
 bpy.ops.wm.save_as_mainfile(filepath=blend_path)
 print(f'書いた {blend_path} (メッシュ {len(objects)} 個)')
-print('  次: Blender -b tools/garage.blend --python tools/export_stage.py')
+print('  次: bun run stage garage')

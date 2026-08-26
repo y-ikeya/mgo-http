@@ -1,0 +1,273 @@
+/*
+ * 装備を組む画面。
+ *
+ * 全画面で出す。決めるまで操作を受け付けないので、隅の小さな板ではなく
+ * 「今はこれを決める場面だ」と分かる大きさにしてある。
+ *
+ * 色はロビーや成績表と同じ域に置く。MGO2 の橙をなぞらないのは、
+ * この作りの他の画面と地続きに見せたいため。
+ */
+.loadout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 6;
+  background: rgba(6, 9, 6, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.loadout-panel {
+  width: min(760px, 88vw);
+  background: rgba(12, 16, 10, 0.9);
+  border: 1px solid rgba(160, 190, 140, 0.24);
+}
+
+.loadout-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.16);
+}
+
+.loadout-title {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: 0.24em;
+  color: rgba(206, 224, 190, 0.92);
+}
+
+.loadout-note {
+  font-size: 12px;
+  color: rgba(190, 206, 176, 0.5);
+}
+
+.loadout-row {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.08);
+}
+
+.loadout-slot {
+  width: 96px;
+  flex: none;
+  align-self: center;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: rgba(190, 206, 176, 0.42);
+}
+
+.loadout-items {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.loadout-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+  padding: 12px 16px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.2);
+  color: rgba(190, 206, 176, 0.7);
+}
+
+.loadout-item:hover:not(:disabled) {
+  border-color: rgba(160, 190, 140, 0.45);
+  color: rgba(210, 226, 196, 0.9);
+}
+
+/* 選択中。角を強めるのではなく、面で示す */
+.loadout-item-on {
+  background: rgba(150, 214, 132, 0.12);
+  border-color: rgba(150, 214, 132, 0.5);
+  color: rgba(206, 232, 190, 0.95);
+}
+
+/* 選択肢が 1 つしか無い枠。押せないことを見た目でも示す */
+.loadout-item-only {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.loadout-name {
+  display: flex;
+  align-items: center;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+}
+
+.loadout-spec {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(190, 206, 176, 0.45);
+}
+
+/* 押すキー。名前の前に小さく添える */
+.loadout-key {
+  display: inline-block;
+  min-width: 16px;
+  margin-right: 8px;
+  padding: 1px 4px;
+  font-size: 10px;
+  text-align: center;
+  border: 1px solid rgba(160, 190, 140, 0.35);
+  color: rgba(190, 206, 176, 0.6);
+}
+
+.loadout-key-wide {
+  margin-right: 0;
+  margin-left: 10px;
+}
+
+.loadout-ok {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 16px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  background: rgba(150, 214, 132, 0.1);
+  border: none;
+  border-top: 1px solid rgba(160, 190, 140, 0.24);
+  color: rgba(206, 232, 190, 0.9);
+}
+
+.loadout-ok:hover:not(:disabled) {
+  background: rgba(150, 214, 132, 0.18);
+}
+
+/* 出撃までの床。押せないことが見て分かるようにする */
+.loadout-ok:disabled {
+  cursor: default;
+  color: rgba(214, 226, 200, 0.45);
+  background: rgba(150, 214, 132, 0.04);
+}
+
+/*
+ * スキル。**予算が見えることが要。**
+ *
+ * 段がそのまま値段なので、残りが読めれば「何を諦めるか」がその場で分かる。
+ * 8 つ並ぶので 1 つあたりは小さく、名前と段だけにしてある。
+ */
+.loadout-skills .loadout-items {
+  gap: 8px;
+}
+
+/* 残り予算。枠の名前の下に小さく添える */
+.loadout-budget {
+  margin-top: 4px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(150, 214, 132, 0.75);
+}
+
+/* 使い切った。**止めではなく合図** — ここから先は何かを外すことになる */
+.loadout-budget-full {
+  color: rgba(226, 190, 120, 0.9);
+}
+
+.loadout-skill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 210px;
+  padding: 7px 10px 7px 12px;
+  border: 1px solid rgba(160, 190, 140, 0.14);
+  color: rgba(190, 206, 176, 0.55);
+}
+
+/* 取っている物。装備の枠と同じ「面で示す」に揃える */
+.loadout-skill-on {
+  background: rgba(150, 214, 132, 0.1);
+  border-color: rgba(150, 214, 132, 0.4);
+  color: rgba(206, 232, 190, 0.92);
+}
+
+.loadout-skill-name {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+
+.loadout-levels {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+
+/*
+ * 段。押した所まで点く (Lv2 なら 1 と 2)。
+ *
+ * 同じ段をもう一度押すと外れる。「外す」を別のボタンにすると、8 つ並んだ
+ * ところで押す物が 32 個になる。
+ */
+.loadout-level {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.25);
+  color: rgba(190, 206, 176, 0.5);
+}
+
+.loadout-level:hover:not(:disabled) {
+  border-color: rgba(160, 190, 140, 0.55);
+  color: rgba(210, 226, 196, 0.9);
+}
+
+.loadout-level-on {
+  background: rgba(150, 214, 132, 0.3);
+  border-color: rgba(150, 214, 132, 0.6);
+  color: rgba(18, 26, 16, 0.9);
+}
+
+/*
+ * 買えない段と、閉じた窓。
+ *
+ * **押せないことを見せる。** 押しても何も起きない物を残すと、弾かれたのか
+ * 壊れているのか分からない。
+ */
+.loadout-level:disabled {
+  cursor: not-allowed;
+  opacity: 0.28;
+}
+
+/*
+ * **押せないことと、何を持っているかは別。**
+ *
+ * 試合が始まると全部の段が押せなくなるが、そこで取っている段まで薄くすると
+ * 「何が効いているか」が読めなくなる。閉じている間こそ、それだけが要る情報。
+ */
+.loadout-level-on:disabled {
+  opacity: 0.8;
+}
+
+/* 窓が閉じている理由。**押せない物を出すなら、なぜかも出す** */
+.loadout-budget-locked {
+  color: rgba(190, 206, 176, 0.4);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}

@@ -11,8 +11,8 @@
  *   - 切れた瞬間に leave を配っていないか
  *   - resume は名簿のあとに来るか
  */
-import { encodeSnapshot, isSnapshot, LOCOMOTIONS } from '../src/net/snapshot'
-import type { ClientMessage, PlayerSnapshot, ServerMessage } from '../src/net/types'
+import { encodeSnapshot, isSnapshot, LOCOMOTIONS } from '../src/protocol/snapshot'
+import type { ClientMessage, PlayerSnapshot, ServerMessage } from '../src/protocol/types'
 
 /** 起動を待つ上限 (ms) */
 const BOOT_TIMEOUT = 10_000
@@ -33,7 +33,24 @@ export interface Server {
   terminate(): Promise<void>
 }
 
-let nextPort = 9100
+/**
+ * 空いているポートを 1 つ借りる。
+ *
+ * **連番で決め打ちしていたら、まとめて回したときだけ落ちた。** 9100 から順に
+ * 使うので、試験を 2 つ並行で走らせると (別の窓の make check、別の作業者)
+ * 同じ番号を掴み合って ConnectionRefused になる。落ち方が「サーバーが死んで
+ * いる」に見えるので、原因を探すのに時間が要る。
+ *
+ * OS に選ばせて、すぐ返す。掴み直すまでの隙間に他が取る余地は残るが、
+ * 番号を決め打ちするよりはるかに当たらない。
+ */
+async function freePort(): Promise<number> {
+  const probe = Bun.serve({ port: 0, fetch: () => new Response('') })
+  const port = probe.port ?? 0
+  await probe.stop(true)
+  if (port === 0) throw new Error('空いているポートが分からない')
+  return port
+}
 
 /**
  * 試験用のサーバーを 1 つ立てる。ポートは自動で選ぶ。
@@ -41,12 +58,18 @@ let nextPort = 9100
  * env を渡すと環境変数を足せる (戦績の書き込み先を差し替えるのに使う)
  */
 export async function startServer(env: Record<string, string> = {}): Promise<Server> {
-  const port = nextPort++
+  const port = await freePort()
   const proc = Bun.spawn(['bun', 'server/index.ts'], {
     env: {
       ...process.env,
       PORT: String(port),
       MGO2_TEST_AUTH: '1',
+      // **地形を読ませない。** ここで見るのは規則であって地図ではない。
+      //
+      // 以前は「建物の外の開けた場所」に人を置いて遮蔽を避けていたが、
+      // 避け方がステージの形に依存するので、**地図を描き替えると
+      // 地形と関係ない試験がまとめて落ちた** (当たりの申告が全部弾かれる形で)。
+      MGO2_NO_STAGE: '1',
       // **試験は本番の表に書かない。**
       //
       // bun は .env を勝手に読むので、何もしないと手元の秘密鍵をそのまま継いで
@@ -180,12 +203,23 @@ export class Client {
     const [x, y, z] = this.position
     this.socket.send(
       encodeSnapshot(
-        snapshotOf(this.id, x, y, z, locomotion, this.holdingGrenade, this.holdingClaymore),
+        snapshotOf(
+          this.id,
+          x,
+          y,
+          z,
+          locomotion,
+          this.holdingGrenade,
+          this.holdingClaymore,
+          this.claimedWeapon,
+        ),
       ),
     )
   }
 
   /** 振りかぶって持っているか。位置に乗せて送る */
+  /** 位置と一緒に名乗る銃。**選んでいない物を名乗れるか**を試すのに使う */
+  claimedWeapon: 'rifle' | 'sniper' | 'smg' | 'pistol' = 'rifle'
   private holdingGrenade = false
   /** クレイモアを手にしているか */
   private holdingClaymore = false
@@ -194,6 +228,13 @@ export class Client {
     this.holdingGrenade = holding
   }
 
+  /**
+   * クレイモアを手にする。
+   *
+   * **支度で選んでいなければ持てない** (domain/player/equip.ts の canHold)。
+   * 湧いたあとに枠を変えることはできないので、twoPlayers(server, 'claymore')
+   * で入った人だけが呼べる。本物のクライアントと同じ順序。
+   */
   holdClaymore(holding: boolean): void {
     this.holdingClaymore = holding
   }
@@ -230,6 +271,8 @@ function snapshotOf(
   locomotion: string,
   holdingGrenade = false,
   holdingClaymore = false,
+  /** 名乗る銃。**選んでいない物を名乗る試験**に使う */
+  claimed: 'rifle' | 'sniper' | 'smg' | 'pistol' = 'rifle',
 ): PlayerSnapshot {
   return {
     id,
@@ -253,7 +296,7 @@ function snapshotOf(
     concentrating: false,
     saluteHeld: false,
     reloading: false,
-    weapon: 'rifle',
+    weapon: claimed,
     // 振りかぶっている間だけ立つ (FLAG2_WINDUP)
     holdingGrenade,
     protectedNow: false,
@@ -261,37 +304,35 @@ function snapshotOf(
   } as PlayerSnapshot
 }
 
-/**
- * 2 人で試合を始めるところまで進める。
- *
- * 位置は開けた場所に向かい合わせで置く。**遮蔽の裏かどうかを問わない試験**は
- * これで足りる (問う試験はステージから座標を探す必要があるので、別に書く)。
- */
-/**
- * ステージの中で**必ず開けている場所**。試験はここを基準に人を置く。
- *
- * 原点あたりに置いていたが、ステージを立体駐車場にしたときに中央へ柱が立って、
- * 2 人の間が塞がった (視線が通らないので当たりの申告が全部弾かれた)。
- * 試験が見たいのは点数の増え方であって地形ではないので、**地形の都合を 1 か所に
- * 集める**。ステージを作り直すときは、ここが開いていることだけ守ればよい。
- *
- * いまの立体駐車場は建物が x ∈ [-21, 21] なので、その東の外側を取ってある。
- */
-const OPEN_X = 30
-const OPEN_Z = 0
-
-/** 開けている場所からの相対で座標を作る */
-export function openSpot(dx: number, dz: number): [number, number, number] {
-  return [OPEN_X + dx, 0, OPEN_Z + dz]
+/** 向かい合わせに立たせる座標。**地形が無いので原点でよい** */
+export function spot(dx: number, dz: number): [number, number, number] {
+  return [dx, 0, dz]
 }
 
+/**
+ * 2 人で試合を始めるところまで進める。位置は向かい合わせ。
+ */
 export async function twoPlayers(
   server: Server,
+  /** 支度で選ぶ支援。**湧く前にしか選べない** (domain/player/equip.ts) */
+  support: 'grenade' | 'claymore' = 'grenade',
+  /**
+   * 名乗る id。
+   *
+   * **同じ id で入り直すと席が残っている** (30 秒は待つ) ので、前の試験の
+   * 続きから始まる — 装備を選び直しても、生きている最中の選択は次の湧きまで
+   * 効かない。装備を変える試験は別の id で入る。
+   */
+  names: [string, string] = ['alice', 'bob'],
 ): Promise<{ a: Client; b: Client }> {
-  const a = await new Client(server, 'alice', openSpot(0, -6)).ready()
-  const b = await new Client(server, 'bob', openSpot(0, 6)).ready()
+  const a = await new Client(server, names[0], spot(0, -6)).ready()
+  const b = await new Client(server, names[1], spot(0, 6)).ready()
   a.live()
   b.live()
+  if (support !== 'grenade') {
+    a.send({ type: 'loadout', primary: 'rifle', support })
+    b.send({ type: 'loadout', primary: 'rifle', support })
+  }
   // 支度が済むまで待って、二人とも出撃する (床は 3 秒)
   await Bun.sleep(3400)
   a.send({ type: 'spawn' })

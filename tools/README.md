@@ -13,7 +13,8 @@ BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
 普段の流れはこう:
 
 ```
-bun run stage        # tools/stage.blend を見張って、保存されたら書き出す
+bun run stage        # tools/stage_*.blend を見張って、保存されたら書き出す
+bun run stage mall   # 複数あるときは名前で選ぶ
 ```
 
 Blender で `Ctrl+S` を押すと glb が作り直され、Vite がページを読み直す。
@@ -34,7 +35,7 @@ Blender で `Ctrl+S` を押すと glb が作り直され、Vite がページを�
 
 サーバーが glb を解析する必要は無い。要るのは箱の形だけで、それは書き出しのときに
 分かっている。同時に書くので、片方だけ古い形を見ていることが起きない。
-| `make_stage.py` | 白紙から叩き台を起こす。`tools/stage.blend` があれば**拒否する** |
+| `make_stage.py` | 白紙から叩き台を起こす。**ステージは `stage_<名前>.blend`**。既にあれば**拒否する** |
 
 ### 書き出しのときに調べていること
 
@@ -53,7 +54,7 @@ Blender の中では問題なく見えるのに、ゲームに入れて初めて
 
 - 軸に沿った箱だけ。回した壁は回す前の箱として判定される
 - アーチやトンネルの下はくぐれない。屋根は架けられない (壁で囲った中庭にする)
-- 斜面は段の積み重ね。**ジャンプが無い**ので 1 段は 0.25m 以下 (`collision.ts` の `STEP_UP`)
+- 斜面は段の積み重ね。**ジャンプが無い**ので 1 段は 0.25m 以下 (`domain/player/moving.ts` の `STEP_UP`)
 
 オブジェクト名の接頭辞で役割を宣言する:
 
@@ -178,7 +179,7 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 静かに消えて素の姿勢 (T ポーズ) が出る。
 
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
-`fall_roll` `up_stair`) は
+`fall_roll` `up_stair` `down_stair`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 

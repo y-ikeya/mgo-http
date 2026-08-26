@@ -7,7 +7,7 @@
    * DOM にも依存しないのはこの検査で守られる — 依存した瞬間にここが落ちる。
    *
    * 起点は server/ と src/domain/ と src/sim/ の 3 つ。src/net の protocol (types, snapshot) は
-   * server が import するので一緒に検査される。逆に src/net/socket.ts のような
+   * server が import するので一緒に検査される。逆に src/link/socket.ts のような
    * **クライアント専用の物は起点に入れない** — サーバーがうっかり import したら
    * そこで初めて window が見つからずに落ちる。それが正しい落ち方。
    */

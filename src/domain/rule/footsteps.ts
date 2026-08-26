@@ -1,5 +1,5 @@
-import type { Locomotion } from "../locomotion";
-import { stanceOf } from "./stance";
+import type { Locomotion } from "../player/locomotion";
+import { stanceOf } from "../player/stance";
 
 /**
  * 足音。

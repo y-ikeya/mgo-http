@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { openSpot, startServer, twoPlayers, type Server } from './server'
-import type { ServerMessage } from '../src/net/types'
+import { spot, startServer, twoPlayers, type Server } from './server'
+import type { ServerMessage } from '../src/protocol/types'
 
 /**
  * 武器を地面へ置く / 拾う。
@@ -38,7 +38,7 @@ describe('置いて拾う', () => {
     expect(b.messages.some((m) => m.type === 'picked')).toBe(false)
 
     // 近づけば拾える (半径 1m)。**中身は拾った人にだけ返る**
-    b.moveTo(...openSpot(0, -5.5))
+    b.moveTo(...spot(0, -5.5))
     await Bun.sleep(400)
     b.send({ type: 'pickup' })
     await Bun.sleep(300)
@@ -85,8 +85,8 @@ describe('握ったまま撃たれる', () => {
   test('頭に当たって仰け反ると、手榴弾が足元に落ちる', async () => {
     const { a, b } = await twoPlayers(server)
     // **倒れない距離まで離れる。** 25m まで頭 1 発なので、それより遠くから
-    a.moveTo(...openSpot(0, -15))
-    b.moveTo(...openSpot(0, 15))
+    a.moveTo(...spot(0, -15))
+    b.moveTo(...spot(0, 15))
     // b が振りかぶる (位置に holdingGrenade を立てて送り続ける)
     b.holdGrenade(true)
     await Bun.sleep(400)
@@ -132,7 +132,7 @@ describe('握ったまま撃たれる', () => {
  */
 describe('クレイモアを置く', () => {
   test('置けたら owner 付きで配られる', async () => {
-    const { a, b } = await twoPlayers(server)
+    const { a, b } = await twoPlayers(server, 'claymore', ['carol', 'dave'])
     a.holdClaymore(true)
     await Bun.sleep(300)
     a.reset()
@@ -141,7 +141,7 @@ describe('クレイモアを置く', () => {
     await Bun.sleep(400)
 
     const placed = a.messages.find((m) => m.type === 'claymorePlaced')
-    expect(placed?.type === 'claymorePlaced' && placed.owner).toBe('alice')
+    expect(placed?.type === 'claymorePlaced' && placed.owner).toBe('carol')
 
     a.holdClaymore(false)
     a.close()
