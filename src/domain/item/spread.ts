@@ -20,6 +20,7 @@
  */
 
 import { randomSigned, randomUnit, RandomStream } from '../rule/random'
+import { masteryJitterScale, masterySpreadScale, type Skills } from '../player/skill'
 import type { WeaponSpec } from './weapons'
 
 /**
@@ -136,15 +137,27 @@ export class Spread {
     // 移動と同じ重みを持つ (遮蔽を越えるかがそれで決まる)。ここが只だと、
     // 止まったまましゃがみ連打で頭だけ上下させるのが一番安い覗き方になる。
     const changing = posture.stanceRate * weapon.spreadPerStance
-    const target = posture.grounded
-      ? moving * (posture.crouching ? weapon.spreadCrouchScale : 1) + changing
-      : weapon.spreadAirborne
+    // **手ブレは止まっていても残る** (spreadIdle)。しゃがみは移動と同じだけ
+    // これも締める — 「腰を落とす」が姿勢の話である以上、動いている分だけ
+    // 効いて構えている分には効かない、という切り分けにする理由が無い。
+    const held = (weapon.spreadIdle + moving) * (posture.crouching ? weapon.spreadCrouchScale : 1)
+    const target = posture.grounded ? held + changing : weapon.spreadAirborne
     this.posture = Math.max(target, damp(this.posture, target, SPREAD_SETTLE_LAMBDA, dt))
   }
 
-  /** 現在の散布界 (度)。連射で広がる分と、姿勢で広がる分の合計 */
-  degrees(weapon: WeaponSpec): number {
-    return Math.min(this.burst * weapon.spreadPerShot + this.posture, weapon.spreadMax)
+  /**
+   * 現在の散布界 (度)。連射で広がる分と、姿勢で広がる分の合計。
+   *
+   * **極めた銃だけ締まる。** 倍率は合計に掛ける — 手ブレにも連射の広がりにも
+   * 同じだけ効く。動きながらの乱れだけ、あるいは連射の開きだけを締めると、
+   * 「極めた人はこの撃ち方が得」という偏りが生まれて、銃の性格が人によって
+   * 変わってしまう。**速くなるのではなく、同じ銃が素直になる。**
+   *
+   * 上限 (spreadMax) を掛けたあとに当てるのは、極めても銃の限界は動かないため。
+   */
+  degrees(weapon: WeaponSpec, skills: Skills): number {
+    const raw = this.burst * weapon.spreadPerShot + this.posture
+    return Math.min(raw * masterySpreadScale(skills, weapon.id), weapon.spreadMax)
   }
 
   /**
@@ -153,9 +166,9 @@ export class Spread {
    * **種から引く。** 同じ通し番号なら同じ所へ散るので、サーバーが独立に
    * 再現できる (rule/random.ts)。
    */
-  coneFor(weapon: WeaponSpec, seed: number): Cone {
+  coneFor(weapon: WeaponSpec, seed: number, skills: Skills): Cone {
     return {
-      degrees: this.degrees(weapon),
+      degrees: this.degrees(weapon, skills),
       angle01: randomUnit(seed, RandomStream.spreadAngle),
       radius01: randomUnit(seed, RandomStream.spreadRadius),
     }
@@ -164,12 +177,23 @@ export class Spread {
   /**
    * 撃った。**反動は撃った「後」に加える** — この一発はまだ狙った向きへ飛ぶ。
    *
+   * --- 極めても反動そのものは減らない ---
+   * 動かすのは**乱れ** (JITTER) だけで、パターン (RECOIL_PATTERN) には触らない。
+   * 跳ね上がる量が同じまま予測できるようになる = **表を覚えて押さえ戻せる度合い**
+   * が上がる。反動自体を弱めると「上手くなくても当たる」ほうへ倒れて、
+   * 技量が効く余地を潰すことになる。
+   *
+   * 0 にはしないので (MASTERY_JITTER の Lv3 が 0.4)、極めてもマクロでは
+   * 打ち消せない。
+   *
    * @returns 視点へ加える跳ね上がり (rad)。[上, 右]
    */
-  fired(seed: number): [number, number] {
+  fired(seed: number, weapon: WeaponSpec, skills: Skills): [number, number] {
     const [pitch, yaw] = RECOIL_PATTERN[Math.min(this.burst, RECOIL_PATTERN.length - 1)]
-    const kickPitch = pitch * (1 + RECOIL_PITCH_JITTER * randomSigned(seed, RandomStream.recoilPitch))
-    const kickYaw = yaw + RECOIL_YAW_JITTER * randomSigned(seed, RandomStream.recoilYaw)
+    const jitter = masteryJitterScale(skills, weapon.id)
+    const kickPitch =
+      pitch * (1 + RECOIL_PITCH_JITTER * jitter * randomSigned(seed, RandomStream.recoilPitch))
+    const kickYaw = yaw + RECOIL_YAW_JITTER * jitter * randomSigned(seed, RandomStream.recoilYaw)
     this.burst++
     this.sinceShot = 0
     return [kickPitch * DEG_TO_RAD, kickYaw * DEG_TO_RAD]

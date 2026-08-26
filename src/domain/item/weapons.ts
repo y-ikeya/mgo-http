@@ -171,6 +171,22 @@ export interface WeaponSpec {
   noiseRange: number
 
   // --- 散布 (度) ---
+  /**
+   * 止まって構えていても残る揺れ。**手ブレ。**
+   *
+   * 長らく 0 だった — 止まれば散布界がちょうど 0 になり、**1 発目は必ず
+   * 狙った一点へ飛んだ**。そのぶん「止まって撃つほうが当たる」は極端に効いて
+   * いたが、代わりに 2 つが死んでいた:
+   *
+   *   - **距離が効かない。** 止まってさえいれば 10m も 100m も同じ確度。
+   *     間合いという概念が、弾速と落下にしか残っていなかった
+   *   - **MASTERY が効かない。** 倍率は合計に掛かるので、0 に何を掛けても 0。
+   *     極めた人と素の人が、止まって撃つ限り 1 ミリも変わらなかった
+   *
+   * しゃがみで締まる (spreadCrouchScale)。狙撃銃はここが最も強く効くので、
+   * **立って撃てば胴、しゃがめば頭**という差が距離で出る。
+   */
+  spreadIdle: number
   /** 1 発ごとに広がる量 */
   spreadPerShot: number
   /** 連射で広がる上限 */
@@ -268,6 +284,7 @@ const SMG: WeaponSpec = {
   noiseRange: 110,
 
   // **反動が小さい。** 押しっぱなしでも散らばりにくいのがこの銃の取り柄
+  spreadIdle: 0.10,
   spreadPerShot: 0.08,
   spreadMax: 1.1,
   spreadPerSpeed: 0.2,
@@ -337,6 +354,7 @@ const RIFLE: WeaponSpec = {
   bulletGravity: 9.8,
   noiseRange: 130,
 
+  spreadIdle: 0.14,
   spreadPerShot: 0.13,
   spreadMax: 1.6,
   spreadPerSpeed: 0.28,
@@ -396,6 +414,7 @@ const SNIPER: WeaponSpec = {
   noiseRange: 170,
 
   // 連射で広がる分は大きいが、そもそも連射できない
+  spreadIdle: 0.20,
   spreadPerShot: 0.9,
   spreadMax: 3.5,
   // 動くと当たらない。突撃銃の 3 倍以上散る
@@ -475,6 +494,7 @@ const PISTOL: WeaponSpec = {
   bulletGravity: 9.8,
   noiseRange: 85,
   // 片手で構えるので跳ねる。連射するほど散る
+  spreadIdle: 0.22,
   spreadPerShot: 0.28,
   spreadMax: 2.2,
   spreadPerSpeed: 0.34,

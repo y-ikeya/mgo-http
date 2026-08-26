@@ -177,11 +177,23 @@ export interface Player {
    * ENEMY EXPOSURE を持つ相手に当てられると付く。**死ねば消える** — 死が
    * 漏洩を止める手段になっている (docs/design.md の 3)。
    *
-   * 「A は B の位置を知っている」という見る側 × 見られる側の表ではなく、
-   * **見られる側だけの札**にしてある。当人が光っているので、抜かれた本人にも
-   * 分かるし、配信の規則も 1 行で済む。
+   * 見る側 × 見られる側の表は作らない。**見られる側に 2 つ持たせる** —
+   * いつまで (leakedUntil) と、誰に (leakedTo)。当人が光るので抜かれた本人にも
+   * 分かるし、配信の規則は 1 行のままで済む。
    */
   leakedUntil: number
+  /**
+   * 誰に漏れているか。`team:blue` か `id:alice` の形 (leakTag)。
+   *
+   * **1 位の光とはここが違う。** あちらは全員に公開される札なので誰に、が要らない。
+   * EE は当てた側の陣営だけが見えるので、宛先を持たないと「当てられた側の陣営にも
+   * 自分が光って見える」ことになり、抜かれたことが相手に丸見えになる。
+   *
+   * **後から当てた側が上書きする。** 個人戦で 2 人が同じ相手に当てると、
+   * 先に当てた人の側が消える。1 人ぶんしか持たないのは、複数を持つと
+   * 「誰に見えているか」の表が結局要るため — そこまでの価値は無いと見ている。
+   */
+  leakedTo: string
   /**
    * いま手にある物。位置と一緒に届く。
    *
@@ -306,6 +318,7 @@ export function newPlayer(seed: {
     kit: startingKit({ primary: 'rifle', support: 'grenade' }),
     skills: {},
     leakedUntil: 0,
+    leakedTo: '',
     weapon: 'rifle',
     primary: 'rifle',
     held: 'rifle',
@@ -393,6 +406,32 @@ export function isProtected(player: Player): boolean {
 }
 
 /**
+ * 抜いた側を宛先の形にする。
+ *
+ * **陣営のある部屋は陣営ぜんぶ、無い部屋は本人だけ。** 抜いた情報を味方に
+ * 渡せるからチーム戦で 1 枠割く価値が出る。個人戦には渡す相手が居ないので、
+ * 同じ規則が自動的に「本人だけ」に落ちる — 部屋ごとに分岐を書かなくて済む。
+ *
+ * @param teams その部屋に陣営があるか (domain/match/room.ts の mode.teams)
+ */
+export function leakTag(attacker: Player, teams: boolean): string {
+  return teams ? `team:${attacker.team}` : `id:${attacker.id}`
+}
+
+/**
+ * その人にとって、相手が光って見えるか。
+ *
+ * **抜かれた側には見えない。** 自分が光っていることを本人が知れると、
+ * 「どこかから撃たれた = いま位置が漏れている」まで確定してしまい、
+ * 抜いた側の利が消える。当てられたこと自体は体力で分かるので、
+ * そこから先を教えるかどうかがこの 1 行。
+ */
+export function isLeakedTo(target: Player, viewer: Player, now: number): boolean {
+  if (now >= target.leakedUntil) return false
+  return target.leakedTo === `team:${viewer.team}` || target.leakedTo === `id:${viewer.id}`
+}
+
+/**
  * 湧いたときの詰め直し。
  *
  * **装備から詰め直す。** 式は共有なので、画面に出る数と必ず一致する。
@@ -402,6 +441,7 @@ export function refill(player: Player): void {
   player.killedBy = ''
   // **死ねば漏洩が止まる。** 死が情報を切る手段になっている
   player.leakedUntil = 0
+  player.leakedTo = ''
   // **次の命は選んだ装備から始まる。** 拾った物は持ち越さない
   player.kit = startingKit(player)
   player.health = MAX_HEALTH

@@ -8,6 +8,7 @@
 import { connected, isLeaking } from '../src/domain/match/match'
 import { isFriendly } from '../src/domain/match/room'
 import { canSee, onBattlefield } from '../src/domain/player/lifecycle'
+import { isLeakedTo } from '../src/domain/player/player'
 import { STEP_UP } from '../src/domain/player/moving'
 import { type Player, isProtected, lifeElapsed } from '../src/domain/player/player'
 import { stanceOf } from '../src/domain/player/stance'
@@ -354,9 +355,26 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
     // という判断で入れてある。
     const killCam = viewer.life === 'downed' && viewer.killedBy === from.id
 
+    // **抜いた相手は遮蔽越しに見える。** ENEMY EXPOSURE (domain/player/skill.ts)。
+    //
+    // 1 位の光 (glowing) と違って、**見る人によって答えが変わる** — 抜いた側の
+    // 陣営にだけ配る。だから輪の中で引く。
+    //
+    // ここが EE の本体。輪郭を出すだけなら「見えている相手が光る」で終わって
+    // しまい、既に見えているものに色が付くだけで情報が増えない。壁を通すから、
+    // 当てたことが次の一手を選ぶ材料になる。
+    const exposed = isLeakedTo(from, viewer, now)
+
     // 味方は無条件。TDM で味方の位置が分からないと連携のしようがないし、
     // 隠すべき情報は敵に対するものだけ。判定の回数も半分以下になる
-    if (visible && !killCam && !glowing && !isFriendly(room.mode, viewer, from) && stageBoxes.length > 0) {
+    if (
+      visible &&
+      !killCam &&
+      !glowing &&
+      !exposed &&
+      !isFriendly(room.mode, viewer, from) &&
+      stageBoxes.length > 0
+    ) {
       // **目ではなくカメラから**線を引く。三人称なので、画面に映るものを
       // 決めているのはカメラの位置。目で見ると、遮蔽の裏にしゃがんだ相手が
       // 「カメラからは見えているのに送られてこない」ことになる。

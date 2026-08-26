@@ -6,7 +6,13 @@ import { Input } from "../../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
-import { canChooseSkills, type SkillId, type Skills } from "../../domain/player/skill";
+import {
+  canChooseSkills,
+  masteryReloadScale,
+  type SkillId,
+  type Skills,
+} from "../../domain/player/skill";
+import { throwSpeedOf } from "../../domain/item/grenade";
 import { offsetInCone } from "../../sim/space/aim";
 import {
   ARENA_HALF_SIZE,
@@ -1194,6 +1200,9 @@ export class Game {
        */
       case "skills":
         this.skills = message.skills as Skills;
+        // 速さは体が持っている。**同じ値を 2 か所に置かない** — 渡し忘れると
+        // 「散布だけ締まって走りは素のまま」という半端な効き方になる
+        this.player.setSkills(this.skills);
         break;
 
       // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
@@ -1205,6 +1214,17 @@ export class Game {
       // 光らせるのは絵の仕事
       case "match":
         this.remotes.setLeaking(message.leader ?? null);
+        break;
+
+      /*
+       * 抜いた相手が光り始めた (ENEMY EXPOSURE)。
+       *
+       * **届くのは抜いた側だけ。** サーバーが宛先を決めているので、
+       * ここで陣営を見る必要は無い。同じ通で遮蔽も外れるので、
+       * 壁の裏に居た相手の位置がこの後から流れてくる。
+       */
+      case "exposed":
+        this.remotes.expose(message.id, message.seconds);
         break;
 
       case "throw":
@@ -1925,7 +1945,8 @@ export class Game {
      * 時間**だった。表には P90 3.0 / AK47 2.5 / XM2010 3.2 と書いてあるのに
      * 手応えが同じで、選んだ銃が入っていないように感じる。
      */
-    this.reloadTimer = this.weapon.reload;
+    // **極めた銃だけ速い。** 拾った銃は素の尺のまま (masteryReloadScale)
+    this.reloadTimer = this.weapon.reload * masteryReloadScale(this.skills, this.weapon.id);
     this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
     this.reloadSoundIn = this.reloadTimer * this.knobs.reloadSoundAt;
@@ -1938,7 +1959,7 @@ export class Game {
     this.follow.aimDirection(this.aimDir);
     {
       // 何度・どこへ散るかは規則が決め、傾けるのは幾何がやる
-      const cone = this.spread.coneFor(this.weapon, this.shotCount);
+      const cone = this.spread.coneFor(this.weapon, this.shotCount, this.skills);
       offsetInCone(this.aimDir, cone.degrees, cone.angle01, cone.radius01);
     }
 
@@ -2003,7 +2024,11 @@ export class Game {
     });
 
     // 跳ね上がりは規則の側が持っている (domain/item/spread.ts)
-    const [kickPitch, kickYaw] = this.spread.fired(this.shotCount);
+    const [kickPitch, kickYaw] = this.spread.fired(
+      this.shotCount,
+      this.weapon,
+      this.skills,
+    );
     this.follow.addRecoil(kickPitch, kickYaw);
   }
 
@@ -2206,7 +2231,12 @@ export class Game {
         this.player.position.y + GRENADE_RELEASE_HEIGHT,
         this.player.position.z + (this.aimDir.z / flat) * GRENADE_RELEASE_FORWARD,
       );
-      this.grenades.showPreview(this.grenadeOrigin, this.aimDir, this.stageBoxes);
+      this.grenades.showPreview(
+        this.grenadeOrigin,
+        this.aimDir,
+        this.stageBoxes,
+        throwSpeedOf(this.skills),
+      );
       // 体を照準の方へ向ける。投げる向きと見た目を一致させる
       this.player.setThrowing(true);
       return;
@@ -2832,7 +2862,7 @@ export class Game {
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
-      spread: this.spread.degrees(this.weapon),
+      spread: this.spread.degrees(this.weapon, this.skills),
       crouching: this.player.isCrouching,
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),

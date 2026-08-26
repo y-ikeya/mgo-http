@@ -465,6 +465,24 @@ export interface HiddenEvent {
 }
 
 /**
+ * その相手が光り始めた。**ENEMY EXPOSURE で位置を抜いた。**
+ *
+ * **見える人にだけ送る。** 抜いた側の陣営 (個人戦なら抜いた本人) が受け取り、
+ * 抜かれた本人には届かない — 光っていることを本人が知れると、
+ * 「いま位置が漏れている」まで確定して抜いた側の利が消える。
+ *
+ * 残り時間は**秒**で送る。サーバーの時刻で終わりを渡すと、時計のずれが
+ * そのまま光る長さのずれになる (ずれは実測で ±数百 ms ある)。
+ * 受け取った側が自分の時計で数える。
+ */
+export interface ExposedEvent {
+  type: 'exposed'
+  id: string
+  /** これから何秒光るか */
+  seconds: number
+}
+
+/**
  * 接続した直後にサーバーから届く、今いる全員。
  *
  * **状態 (life) も載せる。** life は「変わった時」にしか配られないので、
@@ -764,6 +782,7 @@ export type ServerMessage =
   | LifeEvent
   | SkillsEvent
   | HiddenEvent
+  | ExposedEvent
   | ExplosionEvent
   | KnockDownEvent
   | GrenadeSpawn

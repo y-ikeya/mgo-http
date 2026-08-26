@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { Spread } from './spread'
+import type { Skills } from '../player/skill'
 import { WEAPONS } from './weapons'
 
 /**
@@ -9,38 +10,52 @@ import { WEAPONS } from './weapons'
  * 動かせず試験が 1 本も無かった。規則の側へ出したので、報せを入れて数字を見る
  * だけで済む。
  */
+/** スキル無し。**素の値を見る試験**はこれを渡す */
+const NONE: Skills = {}
+
 const rifle = WEAPONS.rifle
 const still = { speed: 0, stanceRate: 0, crouching: false, grounded: true }
 const running = { speed: 3, stanceRate: 0, crouching: false, grounded: true }
 
 describe('連射で広がる', () => {
-  test('止まっていれば散らない', () => {
+  /**
+   * **止まっても 0 にはならない。** 長らく 0 で、1 発目は必ず狙った一点へ
+   * 飛んでいた。距離が効かず (10m も 100m も同じ確度)、MASTERY も効かない
+   * (0 に何を掛けても 0) ので、手ブレを入れた。
+   */
+  test('止まっていても手ブレは残る', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, still)
-    expect(spread.degrees(rifle)).toBe(0)
+    expect(spread.degrees(rifle, NONE)).toBeCloseTo(rifle.spreadIdle, 5)
+  })
+
+  test('**動いたぶんは上に乗る。** 手ブレが下限になる', () => {
+    const spread = new Spread()
+    spread.update(0.016, rifle, running)
+    expect(spread.degrees(rifle, NONE)).toBeGreaterThan(rifle.spreadIdle)
   })
 
   test('撃つほど広がる', () => {
     const spread = new Spread()
-    const first = spread.degrees(rifle)
-    spread.fired(1)
-    spread.fired(2)
-    expect(spread.degrees(rifle)).toBeGreaterThan(first)
+    const first = spread.degrees(rifle, NONE)
+    spread.fired(1, rifle, NONE)
+    spread.fired(2, rifle, NONE)
+    expect(spread.degrees(rifle, NONE)).toBeGreaterThan(first)
   })
 
   test('**上限がある。** 押しっぱなしでも無限には広がらない', () => {
     const spread = new Spread()
-    for (let i = 0; i < 200; i++) spread.fired(i)
-    expect(spread.degrees(rifle)).toBe(rifle.spreadMax)
+    for (let i = 0; i < 200; i++) spread.fired(i, rifle, NONE)
+    expect(spread.degrees(rifle, NONE)).toBe(rifle.spreadMax)
   })
 
   test('撃たない時間が続けば頭に戻る。**バーストが手になる**', () => {
     const spread = new Spread()
-    for (let i = 0; i < 5; i++) spread.fired(i)
-    expect(spread.degrees(rifle)).toBeGreaterThan(0)
-    // 間を置く
+    for (let i = 0; i < 5; i++) spread.fired(i, rifle, NONE)
+    expect(spread.degrees(rifle, NONE)).toBeGreaterThan(0)
+    // 間を置く。**戻る先は 0 ではなく手ブレ**
     spread.update(0.4, rifle, still)
-    expect(spread.degrees(rifle)).toBe(0)
+    expect(spread.degrees(rifle, NONE)).toBeCloseTo(rifle.spreadIdle, 5)
   })
 })
 
@@ -48,7 +63,7 @@ describe('姿勢で広がる', () => {
   test('走れば散る', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, running)
-    expect(spread.degrees(rifle)).toBeGreaterThan(0)
+    expect(spread.degrees(rifle, NONE)).toBeGreaterThan(0)
   })
 
   /**
@@ -58,15 +73,15 @@ describe('姿勢で広がる', () => {
   test('走り出した瞬間に上がりきる', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, running)
-    expect(spread.degrees(rifle)).toBeCloseTo(3 * rifle.spreadPerSpeed, 5)
+    expect(spread.degrees(rifle, NONE)).toBeCloseTo(rifle.spreadIdle + 3 * rifle.spreadPerSpeed, 5)
   })
 
   test('止まっても一拍は残る', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, running)
-    const moving = spread.degrees(rifle)
+    const moving = spread.degrees(rifle, NONE)
     spread.update(0.05, rifle, still)
-    const settling = spread.degrees(rifle)
+    const settling = spread.degrees(rifle, NONE)
     expect(settling).toBeLessThan(moving)
     expect(settling).toBeGreaterThan(0)
   })
@@ -76,13 +91,13 @@ describe('姿勢で広がる', () => {
     crouched.update(0.016, rifle, { ...running, crouching: true })
     const standing = new Spread()
     standing.update(0.016, rifle, running)
-    expect(crouched.degrees(rifle)).toBeLessThan(standing.degrees(rifle))
+    expect(crouched.degrees(rifle, NONE)).toBeLessThan(standing.degrees(rifle, NONE))
   })
 
   test('**姿勢を変えている間も散る。** しゃがみ連打を只にしない', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, { ...still, stanceRate: 1 })
-    expect(spread.degrees(rifle)).toBeGreaterThan(0)
+    expect(spread.degrees(rifle, NONE)).toBeGreaterThan(0)
   })
 
   /**
@@ -96,13 +111,13 @@ describe('姿勢で広がる', () => {
   test('空中は上限まで散る', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, { ...still, grounded: false })
-    expect(spread.degrees(rifle)).toBe(rifle.spreadMax)
+    expect(spread.degrees(rifle, NONE)).toBe(rifle.spreadMax)
   })
 
   test('拳銃だけは上限に届かない (spreadAirborne < spreadMax)', () => {
     const spread = new Spread()
     spread.update(0.016, WEAPONS.pistol, { ...still, grounded: false })
-    expect(spread.degrees(WEAPONS.pistol)).toBeCloseTo(WEAPONS.pistol.spreadAirborne, 5)
+    expect(spread.degrees(WEAPONS.pistol, NONE)).toBeCloseTo(WEAPONS.pistol.spreadAirborne, 5)
   })
 })
 
@@ -114,34 +129,34 @@ describe('反動', () => {
   test('種が同じなら同じ値', () => {
     const a = new Spread()
     const b = new Spread()
-    expect(a.fired(42)).toEqual(b.fired(42))
+    expect(a.fired(42, rifle, NONE)).toEqual(b.fired(42, rifle, NONE))
   })
 
   test('種が違えば違う値。**マクロで打ち消せない**', () => {
     const a = new Spread()
     const b = new Spread()
-    expect(a.fired(1)).not.toEqual(b.fired(2))
+    expect(a.fired(1, rifle, NONE)).not.toEqual(b.fired(2, rifle, NONE))
   })
 
   test('1 発目が最も強い', () => {
     const spread = new Spread()
-    const [first] = spread.fired(1)
-    const [second] = spread.fired(2)
+    const [first] = spread.fired(1, rifle, NONE)
+    const [second] = spread.fired(2, rifle, NONE)
     expect(first).toBeGreaterThan(second)
   })
 
   test('表を超えても値が消えない', () => {
     const spread = new Spread()
-    for (let i = 0; i < 50; i++) spread.fired(i)
-    const [pitch] = spread.fired(50)
+    for (let i = 0; i < 50; i++) spread.fired(i, rifle, NONE)
+    const [pitch] = spread.fired(50, rifle, NONE)
     expect(pitch).toBeGreaterThan(0)
   })
 
   test('散る場所も種から決まる', () => {
     const a = new Spread()
     const b = new Spread()
-    a.fired(7)
-    b.fired(7)
-    expect(a.coneFor(rifle, 9)).toEqual(b.coneFor(rifle, 9))
+    a.fired(7, rifle, NONE)
+    b.fired(7, rifle, NONE)
+    expect(a.coneFor(rifle, 9, NONE)).toEqual(b.coneFor(rifle, 9, NONE))
   })
 })

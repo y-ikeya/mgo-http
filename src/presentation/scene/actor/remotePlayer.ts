@@ -897,6 +897,15 @@ export class RemotePlayers {
    * 出す / 出さないの判断は RemotePlayer が持つ (refreshVisibility)。
    */
   update(dt: number, now: number): void {
+    // 光る札の期限を落とす。**切れたことは通で来ない** — 来させると、
+    // 消える瞬間に接続が詰まっていた相手が光ったままになる
+    for (const [id, until] of this.exposed) {
+      if (now >= until) this.exposed.delete(id);
+    }
+    // 毎フレーム配り直す。**遅れて現れた相手にも乗る** — 抜いた直後は
+    // まだ体が無い (壁の裏なので一度も届いていない) ことが普通にあり、
+    // 通が来た時だけ配ると、その相手だけ光らないまま数秒が終わる
+    this.applyLeaking();
     for (const player of this.players.values()) player.update(dt, now);
   }
 
@@ -1096,7 +1105,40 @@ export class RemotePlayers {
    * 要らない — 1 秒ごとに来る match がそのまま最新の答えになる。
    */
   setLeaking(id: string | null): void {
-    for (const [key, player] of this.players) player.setLeaking(key === id);
+    this.leader = id;
+    this.applyLeaking();
+  }
+
+  /**
+   * ENEMY EXPOSURE で抜いた相手。**何秒光るかだけ届く。**
+   *
+   * 終わりの時刻ではなく残り秒で受けるのは、サーバーとの時計のずれが
+   * そのまま光る長さのずれになるため (実測で ±数百 ms ある)。
+   * ここから先はこちらの時計で数える。
+   *
+   * **1 位の光と重なってよい。** どちらも「位置が公になっている」という
+   * 同じ意味なので、色も同じ (LEAK_GLOW_TINT) で構わない。
+   */
+  expose(id: string, seconds: number): void {
+    this.exposed.set(id, Date.now() + seconds * 1000);
+    this.applyLeaking();
+  }
+
+  /** 個人戦の 1 位。match が来るたび入れ替わる */
+  private leader: string | null = null;
+  /** EE で光っている人と、消える時刻 (Date.now)。update と同じ時計 */
+  private readonly exposed = new Map<string, number>();
+
+  /**
+   * 光る札を体へ配り直す。**2 つの出どころを 1 か所で合流させる。**
+   *
+   * 別々に setLeaking すると、片方が false を配った瞬間にもう片方の光が消える
+   * (最後に呼んだほうが勝つ)。合流させておけば、EE が切れても 1 位ならまだ光る。
+   */
+  private applyLeaking(): void {
+    for (const [key, player] of this.players) {
+      player.setLeaking(key === this.leader || this.exposed.has(key));
+    }
   }
 
   /**

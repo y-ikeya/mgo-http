@@ -1,4 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
+import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import { fallDamage } from '../../../domain/rule/damage'
 import * as THREE from 'three'
@@ -272,6 +273,19 @@ export class Player {
   private model: THREE.Object3D | null = null
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle'
+
+  /**
+   * 選んでいるスキル。速さに効く 2 つ (FAST MOVE / CBOX MOVE) をここで読む。
+   *
+   * **決めるのはサーバー。** ここに入るのは skills の通で返ってきた値なので、
+   * 予算を超えた選択が一瞬でも効くことはない (Game.setSkill)。
+   */
+  private skills: Skills = {}
+
+  /** サーバーが認めたスキルを受け取る。試合中は変わらない */
+  setSkills(skills: Skills): void {
+    this.skills = skills
+  }
 
   /**
    * いま手にある物。
@@ -1233,13 +1247,24 @@ export class Player {
     //
     // 構えている間だけは重さを見ない。あちらは狙いを保つために遅くしている
     // (aimSpeedScale) ので、重さと二重に掛けると狙撃銃が止まってしまう。
-    const carrying = carrySpeedScale(weaponOf(this.weaponKind))
+    //
+    // **FAST MOVE は重さと同じ場所に掛ける。** 足すのではなく掛けるので、
+    // 重い銃の不利は割合として残る — 狙撃銃を提げた Lv3 が、拳銃の素の人に
+    // 追いつくことはない (domain/player/skill.ts)。構えている間に効かないのも
+    // 重さと同じ理由で、そこは狙いを保つための遅さだから。
+    const carrying = carrySpeedScale(weaponOf(this.weaponKind)) * runnerScale(this.skills)
     let targetSpeed = this.crouching
       ? this.moveSpeed * CROUCH_SPEED_SCALE * carrying
       : this.moveSpeed * (this.aiming ? this.aimSpeedScale : carrying)
     if (this.stabbing) targetSpeed *= STAB_SPEED_SCALE
-    // ダンボールを被っている間も担いでいる物は同じ
-    if (this.boxed) targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * carrying
+    // ダンボールを被っている間も担いでいる物は同じ。
+    //
+    // **CBOX MOVE と FAST MOVE は重なる** (carrying に FAST MOVE が入っている)。
+    // 箱で速く動きたいなら両方に予算を割く、という選択にしてある — 被っている間は
+    // 撃てないので、速さを買うことが攻撃力を捨てることと釣り合う。
+    if (this.boxed) {
+      targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * boxMoveScale(this.skills) * carrying
+    }
     if (this.down) targetSpeed = 0
     this.currentSpeed = damp(this.currentSpeed, targetSpeed, SPEED_LAMBDA, dt)
 
