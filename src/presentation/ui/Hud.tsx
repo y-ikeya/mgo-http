@@ -387,8 +387,12 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={locked() && props.stats?.aiming && !props.stats?.scoped}>
         <div
           class="crosshair"
-          // 散布界に応じて開く。数字で見せずに「今どれだけ散るか」を伝える
-          style={{ '--crosshair-gap': `${9 + (props.stats?.spread ?? 0) * 11}px` }}
+          style={{
+            // 散布界に応じて開く。数字で見せずに「今どれだけ散るか」を伝える
+            '--crosshair-gap': `${9 + (props.stats?.spread ?? 0) * 11}px`,
+            // 手ブレで狙点そのものが泳ぐ。**開きではなく位置**が動く
+            transform: `translate(${props.stats?.swayX ?? 0}px, ${props.stats?.swayY ?? 0}px)`,
+          }}
         >
           <span class="crosshair-dot" />
           <span class="crosshair-arm crosshair-arm-up" />

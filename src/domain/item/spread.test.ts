@@ -16,23 +16,19 @@ const NONE: Skills = {}
 const rifle = WEAPONS.rifle
 const still = { speed: 0, stanceRate: 0, crouching: false, grounded: true }
 const running = { speed: 3, stanceRate: 0, crouching: false, grounded: true }
+const crouching = { speed: 0, stanceRate: 0, crouching: true, grounded: true }
 
 describe('連射で広がる', () => {
   /**
-   * **止まっても 0 にはならない。** 長らく 0 で、1 発目は必ず狙った一点へ
-   * 飛んでいた。距離が効かず (10m も 100m も同じ確度)、MASTERY も効かない
-   * (0 に何を掛けても 0) ので、手ブレを入れた。
+   * **散布は「動いた・撃った」でだけ開く。**
+   *
+   * 止まって構えていても狙点は泳ぐが、それは散布ではなく手ブレ (sway) の側。
+   * 散らすのと動かすのを分けてあるのは、**動くほうは撃つ前に見える**から。
    */
-  test('止まっていても手ブレは残る', () => {
+  test('止まっていれば散らない', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, still)
-    expect(spread.degrees(rifle, NONE)).toBeCloseTo(rifle.spreadIdle, 5)
-  })
-
-  test('**動いたぶんは上に乗る。** 手ブレが下限になる', () => {
-    const spread = new Spread()
-    spread.update(0.016, rifle, running)
-    expect(spread.degrees(rifle, NONE)).toBeGreaterThan(rifle.spreadIdle)
+    expect(spread.degrees(rifle, NONE)).toBe(0)
   })
 
   test('撃つほど広がる', () => {
@@ -53,9 +49,9 @@ describe('連射で広がる', () => {
     const spread = new Spread()
     for (let i = 0; i < 5; i++) spread.fired(i, rifle, NONE)
     expect(spread.degrees(rifle, NONE)).toBeGreaterThan(0)
-    // 間を置く。**戻る先は 0 ではなく手ブレ**
+    // 間を置く
     spread.update(0.4, rifle, still)
-    expect(spread.degrees(rifle, NONE)).toBeCloseTo(rifle.spreadIdle, 5)
+    expect(spread.degrees(rifle, NONE)).toBe(0)
   })
 })
 
@@ -73,7 +69,7 @@ describe('姿勢で広がる', () => {
   test('走り出した瞬間に上がりきる', () => {
     const spread = new Spread()
     spread.update(0.016, rifle, running)
-    expect(spread.degrees(rifle, NONE)).toBeCloseTo(rifle.spreadIdle + 3 * rifle.spreadPerSpeed, 5)
+    expect(spread.degrees(rifle, NONE)).toBeCloseTo(3 * rifle.spreadPerSpeed, 5)
   })
 
   test('止まっても一拍は残る', () => {
@@ -158,5 +154,98 @@ describe('反動', () => {
     a.fired(7, rifle, NONE)
     b.fired(7, rifle, NONE)
     expect(a.coneFor(rifle, 9, NONE)).toEqual(b.coneFor(rifle, 9, NONE))
+  })
+})
+
+/**
+ * 手ブレ。**散らすのではなく、狙点そのものを動かす。**
+ *
+ * 散布は撃った結果でしか分からないので、撃つ前の判断に使えない。こちらは
+ * 照準が泳いで見えるので、**折り返しを読んで撃つ**という手が成立する。
+ */
+describe('手ブレ', () => {
+  /** 構えたまま 40 秒ぶん進めて、振れ幅と軌跡を集める */
+  function trace(weapon = rifle, posture = still, skills: Skills = NONE) {
+    const spread = new Spread()
+    const points: [number, number][] = []
+    for (let i = 0; i < 60 * 40; i++) {
+      spread.update(1 / 60, weapon, posture)
+      points.push(spread.sway(weapon, skills, posture))
+    }
+    return points
+  }
+
+  const reach = (points: [number, number][]) =>
+    Math.max(...points.map(([r, u]) => Math.max(Math.abs(r), Math.abs(u))))
+
+  test('止まって構えていても動く', () => {
+    expect(reach(trace())).toBeGreaterThan(0)
+  })
+
+  /**
+   * **1 度は超えない。** 肩越しの画角では 1 度が 25 画素ほどで、それ以上
+   * 泳ぐと狙う行為そのものが成立しない (25m で 44cm ずれる)。
+   */
+  test('振れ幅は銃の値の内側に収まる', () => {
+    expect(reach(trace())).toBeLessThanOrEqual(rifle.sway)
+    expect(reach(trace())).toBeLessThan(1)
+  })
+
+  /**
+   * **跳ばない。** 乱数で毎フレーム跳ばすと震えるだけで、次にどちらへ行くかが
+   * 読めない。読めなければ待つ意味が無く、結局は運になる。
+   */
+  test('滑らかに動く。1 フレームで飛ばない', () => {
+    const points = trace()
+    for (let i = 1; i < points.length; i++) {
+      const step = Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1])
+      expect(step).toBeLessThan(rifle.sway * 0.1)
+    }
+  })
+
+  /** 直線を往復するだけだと、折り返しが 2 か所しか無くて読み切られる */
+  test('直線ではなく円を描く。**2 軸が揃っていない**', () => {
+    const points = trace()
+    // 右と上の相関。揃っていれば ±1 に寄る
+    const n = points.length
+    const mr = points.reduce((a, p) => a + p[0], 0) / n
+    const mu = points.reduce((a, p) => a + p[1], 0) / n
+    let cov = 0
+    let vr = 0
+    let vu = 0
+    for (const [r, u] of points) {
+      cov += (r - mr) * (u - mu)
+      vr += (r - mr) ** 2
+      vu += (u - mu) ** 2
+    }
+    expect(Math.abs(cov / Math.sqrt(vr * vu))).toBeLessThan(0.5)
+  })
+
+  test('しゃがめば締まる', () => {
+    expect(reach(trace(rifle, crouching))).toBeLessThan(reach(trace(rifle, still)))
+  })
+
+  /** **極めた銃だけ。** 拾った銃は素のまま泳ぐ */
+  test('MASTERY で締まる', () => {
+    expect(reach(trace(rifle, still, { rifleMastery: 3 }))).toBeLessThan(reach(trace()))
+    expect(reach(trace(rifle, still, { sniperMastery: 3 }))).toBeCloseTo(reach(trace()), 10)
+  })
+
+  /** 極めても 0 にはしない。0 だと止まって撃つ限り必中に戻る */
+  test('極めても止まらない', () => {
+    expect(reach(trace(rifle, still, { rifleMastery: 3 }))).toBeGreaterThan(0)
+  })
+
+  /**
+   * **走っても増えない。** 走りながらの乱れは散布 (degrees) が持っている。
+   * 二重に掛けると、動いたことの代償を 2 回払うことになる。
+   */
+  test('動いても振れ幅は変わらない', () => {
+    expect(reach(trace(rifle, running))).toBeCloseTo(reach(trace(rifle, still)), 10)
+  })
+
+  test('銃が重いほど大きく泳ぐ', () => {
+    expect(WEAPONS.smg.sway).toBeLessThan(WEAPONS.rifle.sway)
+    expect(WEAPONS.rifle.sway).toBeLessThan(WEAPONS.sniper.sway)
   })
 })

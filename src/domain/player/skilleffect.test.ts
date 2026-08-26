@@ -30,15 +30,18 @@ function settled(weapon = WEAPONS.rifle, posture = still): Spread {
 
 describe('MASTERY が散布に効く', () => {
   /**
-   * **ここが本命。** 手ブレを入れるまで、止まって撃つ限り極めた人と素の人の
-   * 差が 1 ミリも無かった (合計が 0 で、倍率が掛かる先が無かった)。
+   * **ここが本命。** 止まって撃つ限り、極めた人と素の人の差が 1 ミリも
+   * 無かった (散布の合計が 0 で、倍率が掛かる先が無かった)。手ブレを
+   * 入れたので、止まっていても差が出る。
    */
-  test('止まって構えていても、極めた銃は締まる', () => {
+  test('止まって構えていても、極めた銃は泳ぎが小さい', () => {
     const spread = settled()
-    const plain = spread.degrees(WEAPONS.rifle, NONE)
-    const master = spread.degrees(WEAPONS.rifle, { rifleMastery: 3 })
-    expect(master).toBeLessThan(plain)
-    expect(master).toBeGreaterThan(0)
+    const swayOf = (skills: Skills) => {
+      const [r, u] = spread.sway(WEAPONS.rifle, skills, still)
+      return Math.hypot(r, u)
+    }
+    expect(swayOf({ rifleMastery: 3 })).toBeLessThan(swayOf(NONE))
+    expect(swayOf({ rifleMastery: 3 })).toBeGreaterThan(0)
   })
 
   test('動きながらも締まる', () => {

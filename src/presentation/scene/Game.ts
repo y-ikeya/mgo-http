@@ -14,7 +14,7 @@ import {
   type Skills,
 } from "../../domain/player/skill";
 import { throwSpeedOf } from "../../domain/item/grenade";
-import { offsetInCone } from "../../sim/space/aim";
+import { offsetBy, offsetInCone } from "../../sim/space/aim";
 import {
   ARENA_HALF_SIZE,
   buildLights,
@@ -122,6 +122,15 @@ export interface GameStats {
   aiming: boolean;
   /** 現在の散布界 (度)。クロスヘアの開き具合に使う */
   spread: number;
+  /**
+   * 手ブレで + がどれだけずれているか (画素)。
+   *
+   * **開き具合 (spread) とは別のもの。** あちらは「どれだけ散るか」で、
+   * こちらは「いま銃がどこを向いているか」。散布は撃った結果でしか分からないが、
+   * ずれは撃つ前に見える — **落ち着いた瞬間に撃つ**という手はこちらから出る。
+   */
+  swayX: number;
+  swayY: number;
   /** しゃがんでいるか */
   crouching: boolean;
   /** 直近に当てた部位。空文字なら表示しない */
@@ -475,6 +484,13 @@ export class Game {
   private skills: Skills = {};
 
   private readonly spread = new Spread();
+  /**
+   * いまの手ブレ [右へ, 上へ] (度)。
+   *
+   * **1 か所で作って 2 か所が読む** — 撃つ向き (fire) と、画面の + (stats)。
+   * それぞれで計算すると、見えている所と当たる所がずれる。
+   */
+  private sway: [number, number] = [0, 0];
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -965,12 +981,16 @@ export class Game {
     this.player.setGhost(this.life === "spawning" || this.loadoutBlocking);
     this.updateRollContact();
     this.updateStab(dt);
-    this.spread.update(dt, this.weapon, {
+    const posture = {
       speed: this.player.speed,
       stanceRate: this.player.stanceRate,
       crouching: this.player.isCrouching,
       grounded: this.player.grounded,
-    });
+    };
+    this.spread.update(dt, this.weapon, posture);
+    // 手ブレ。**撃つ向きと画面の + が同じ値を見る** — 別々に持つと
+    // 「見えている所と当たる所が違う」になって、狙う意味が消える
+    this.sway = this.spread.sway(this.weapon, this.skills, posture);
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
     this.drops.update(dt);
@@ -1946,6 +1966,20 @@ export class Game {
     this.fire();
   }
 
+  /**
+   * 角度 (度) を画面の画素に直す。
+   *
+   * 画角の半分で割って高さの半分を掛ける。**縦を基準にする**のは three の
+   * PerspectiveCamera.fov が垂直画角だから — 横で測ると画面比で変わる。
+   */
+  private swayPixels(degrees: number): number {
+    const camera = this.follow.camera;
+    const half = Math.tan(((camera.fov / 2) * Math.PI) / 180);
+    if (half <= 0) return 0;
+    const height = this.container.clientHeight || window.innerHeight;
+    return (Math.tan((degrees * Math.PI) / 180) / half) * (height / 2);
+  }
+
   private startReload(): void {
     if (this.reloadTimer > 0 || this.stabTimer > 0 || this.player.rolling)
       return;
@@ -1976,6 +2010,10 @@ export class Game {
   private fire(): void {
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
+    // **手ブレを先に、散布を後に。** 手ブレは「銃がいまどこを向いているか」で、
+    // 散布はその向きからのばらつき。順に重ねると、画面の + が指している所を
+    // 中心に散る形になる
+    offsetBy(this.aimDir, this.sway[0], this.sway[1]);
     {
       // 何度・どこへ散るかは規則が決め、傾けるのは幾何がやる
       const cone = this.spread.coneFor(this.weapon, this.shotCount, this.skills);
@@ -2882,6 +2920,11 @@ export class Game {
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
       spread: this.spread.degrees(this.weapon, this.skills),
+      // 手ブレを画素に直して渡す。**角度のままだと画角で見え方が変わる** —
+      // 覗くと画角が狭まるぶん、同じ揺れが画面上では大きく振れる
+      swayX: this.swayPixels(this.sway[0]),
+      // 上へ揺れたら画面では上 = y は負
+      swayY: -this.swayPixels(this.sway[1]),
       crouching: this.player.isCrouching,
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
