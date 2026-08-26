@@ -24,7 +24,6 @@ import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
 import { leaveRoom, matchState, recordSeat, spawn, updateMatch, updateTargets } from './match'
 import { receiveSnapshot, relayShot, relayState, sendHealth } from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
-import { solidBoxes } from './stage'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
@@ -179,7 +178,7 @@ setInterval(() => {
       for (let i = room.grenades.length - 1; i >= 0; i--) {
         const nade = room.grenades[i]
         const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
-        for (let k = 0; k < steps; k++) stepProjectile(nade.body, solidBoxes)
+        for (let k = 0; k < steps; k++) stepProjectile(nade.body, room.stage.solid)
         nade.fuse -= TICK_MS / 1000
         if (nade.fuse <= 0) {
           detonate(room, nade)

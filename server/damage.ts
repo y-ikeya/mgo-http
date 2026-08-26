@@ -25,7 +25,6 @@ import { verifyHit } from '../src/sim/judge/hitcheck'
 import { matchState } from './match'
 import { bearingTo, sendHealth } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { stageBoxes } from './stage'
 import { type RoomWorld, broadcast, setLife } from './world'
 
 /**
@@ -231,7 +230,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
       distance: event.distance,
       fromBehind: event.fromBehind,
     },
-    stageBoxes,
+    room.stage.sight,
     LAG_WINDOW,
     HIT_RULES,
   )

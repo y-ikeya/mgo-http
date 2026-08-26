@@ -6,6 +6,7 @@ import { Input } from "../../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
+import { STAGES, type StageName } from "../../domain/match/stage";
 import {
   canChooseSkills,
   masteryReloadScale,
@@ -19,8 +20,6 @@ import {
   buildLights,
   buildBases,
   buildStage,
-  SOLO_SPAWNS,
-  TEAM_SPAWNS,
   STAGE_CODE,
   loadStageBoxes,
   type Stage,
@@ -54,7 +53,7 @@ import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
 import { isGun, type HeldId } from "../../domain/item/held";
-import { MODES, isHostile } from "../../domain/match/room";
+import { MODES, ROOM_STAGES, isHostile, isRoomName } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../protocol/types";
@@ -665,8 +664,24 @@ export class Game {
   private fps = 0;
   private onStats: ((stats: GameStats) => void) | null = null;
 
+  /** 乗っているステージ。**部屋が決める** (ROOM_STAGES) */
+  private readonly stageName: StageName;
+
   constructor(container: HTMLElement, identity: Identity, room: string) {
     this.container = container;
+    /*
+     * どのステージに乗るか。**部屋から引く** (domain/match/room.ts)。
+     *
+     * サーバーに訊かないのは、画面を組み始める時点でまだ 1 通も届いていない
+     * ため。同じ表をこちらも読むので食い違わない。
+     *
+     * **試合ごとに切り替えるようになったら、ここがサーバーからの通に変わる**
+     * (回す表は既に domain/match/stage.ts に在る)。そのときは地形を
+     * 読み直す道が要る。
+     */
+    this.stageName = STAGES[
+      isRoomName(room) ? ROOM_STAGES[room].stages[0] : 'mall'
+    ].name;
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room);
     // 自機のモデルはここで読み始める。**構築時ではない** —
@@ -689,7 +704,7 @@ export class Game {
     this.renderer.toneMappingExposure = DEFAULT_EXPOSURE;
     container.appendChild(this.renderer.domElement);
 
-    this.stage = buildStage(this.scene);
+    this.stage = buildStage(this.scene, this.stageName);
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
      * 陣営の基地。**個人戦では出さない。**
@@ -698,7 +713,7 @@ export class Game {
      * 付いた枠があると「そこが自分の陣地」に読めるが、個人戦にはそんな場所は
      * 無い (湧く所も毎回変わる)。
      */
-    this.bases = buildBases();
+    this.bases = buildBases(this.stageName);
     this.scene.add(this.bases);
     this.sun = buildLights(this.scene);
     this.placeAtSpawn();
@@ -711,7 +726,7 @@ export class Game {
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
-    void loadStageBoxes().then((boxes) => {
+    void loadStageBoxes(this.stageName).then((boxes) => {
       // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
       this.stageBoxes = solidBlockers(boxes);
     });
@@ -1413,14 +1428,18 @@ export class Game {
      * 個人戦で角の 2 つに全員が湧くと、出た所で撃ち合いになって「湧き待ち」が
      * 成立する。8 点から選んで、死ぬたびに変える (同じ所へ戻ると待たれる)。
      */
+    const spawns = STAGES[this.stageName];
+    const solo = spawns.solo;
     const base = MODES[this.replica.mode].teams
-      ? TEAM_SPAWNS[this.replica.team]
-      : SOLO_SPAWNS[Math.floor(Math.random() * SOLO_SPAWNS.length)];
+      ? spawns.bases[this.replica.team]
+      : solo[Math.floor(Math.random() * solo.length)];
     // 同じ点に重なると互いが見えないので、ID から決まる向きへ散らす
     const spread = spawnAngle(this.net.id + this.shotCount);
+    // 高さは点が持っている。**地形からは決まらない** — 同じ柱に床が
+    // 何枚もあるので (domain/match/stage.ts の Spot)
     this.player.position.set(
       base.x + Math.cos(spread) * SPAWN_SPREAD,
-      0,
+      base.y ?? 0,
       base.z + Math.sin(spread) * SPAWN_SPREAD,
     );
     // 跳んだ距離を足音に積ませない。積むと着いた先で連打になる

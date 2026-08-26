@@ -628,7 +628,7 @@
 {
 "name": "FrontSide_1.001_noplayer_noeye_nocamera",
 "min": [
-5.145,
+11.817,
 0.013,
 -7.871
 ],
@@ -704,16 +704,16 @@
 "name": "concrete_link_floor",
 "min": [
 -12.5,
--0.1,
+-0.05,
 -2.8
 ],
 "max": [
 13.5,
-0.0,
+0.05,
 2.8
 ],
 "top": {
-"h": 0.0,
+"h": 0.05,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -778,12 +778,12 @@
 {
 "name": "concrete_link_wall_s",
 "min": [
--12.5,
+-13.461,
 0.0,
-2.5
+1.926
 ],
 "max": [
-13.5,
+12.539,
 4.5,
 2.8
 ],
@@ -5751,31 +5751,6 @@
 }
 },
 {
-"name": "concrete_mall_198_nodraw",
-"min": [
--8.75,
-0.0,
--3.0
-],
-"max": [
--4.5,
-4.0,
--2.75
-],
-"top": {
-"h": 4.0,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": false,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "concrete_mall_199_nodraw",
 "min": [
 -4.75,
@@ -5836,31 +5811,6 @@
 9.25,
 4.0,
 -2.25
-],
-"top": {
-"h": 4.0,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": false,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "concrete_mall_202_nodraw",
-"min": [
-5.0,
-0.0,
-2.75
-],
-"max": [
-9.25,
-4.0,
-3.0
 ],
 "top": {
 "h": 4.0,

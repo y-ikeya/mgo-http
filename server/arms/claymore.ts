@@ -14,7 +14,6 @@ import { applyBlastDamage } from '../damage'
 import { dropGrenade } from './grenade'
 import { viewOf } from '../relay'
 import { sessionOf } from '../session'
-import { solidBoxes, stageBoxes } from '../stage'
 import { type RoomWorld, broadcast, friendlyTeam, hostileToOwner } from '../world'
 
 /**
@@ -50,8 +49,8 @@ export function placeClaymore(room: RoomWorld, from: Player): void {
 
   // 壁の中や縁の外へは置けない。**弾いても数は減らさない** —
   // 置けなかったのに手札が減ると、押し間違いが取り返しの付かない損になる
-  const ground = groundUnder(x, z, from.y, solidBoxes, STEP_UP).top
-  if (!canPlaceAt(x, z, from.y, ground, solidBoxes)) return
+  const ground = groundUnder(x, z, from.y, room.stage.solid, STEP_UP).top
+  if (!canPlaceAt(x, z, from.y, ground, room.stage.solid)) return
 
   from.grenades--
   const claymore: Claymore = {
@@ -84,14 +83,14 @@ export function relayClaymores(room: RoomWorld): void {
     for (const claymore of room.claymores) {
       // 味方の物は無条件。どこに置いたか分からないと自分が引っ掛かる
       let visible = friendlyTeam(room, viewer, claymore.team)
-      if (!visible && stageBoxes.length > 0) {
-        const eye = viewOf(viewer)
+      if (!visible && room.stage.sight.length > 0) {
+        const eye = viewOf(room, viewer)
         visible = hasLineOfSight(
           eye.x, eye.y, eye.z,
           claymore.x, claymore.y, claymore.z,
           // 本体の高さ。頭の高さと同じ引数の意味 (足元からどれだけ上か)
           0.2,
-          stageBoxes,
+          room.stage.sight,
         )
       } else if (!visible) {
         visible = true

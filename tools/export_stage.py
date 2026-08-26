@@ -98,7 +98,37 @@ def check(objects):
     return problems
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-glb_path = os.path.join(root, 'public', 'models', 'stage.glb')
+
+# 書き出し先は**元データの名前から決める**。
+#
+# 長らく stage.glb 固定で、ステージが 1 枚しか無いうちは足りていた。
+# 2 枚目 (stage_training) を作った時点で、書き出すたびに前のステージを
+# 潰すことになる — しかも潰れたことに気づけるのは、そのステージの部屋に
+# 入った時なので遠い。
+#
+#     tools/stage_mall.blend  →  public/models/stage_mall.glb / .json
+#
+# 名前は札と同じ考え方で、**ファイル名がそのまま宣言**。どのステージが
+# 乗っているかを、中身を開かずに知れる状態を保つ。
+stage_name = os.path.splitext(os.path.basename(bpy.data.filepath))[0]
+glb_path = os.path.join(root, 'public', 'models', stage_name + '.glb')
+
+# **編集モードで保存された .blend を受ける。**
+#
+# Blender は最後のモードごと保存する。Edit Mode のまま Ctrl+S された .blend を
+# 開くと、object の操作が全部 poll() で弾かれて書き出しがそこで止まる
+# (RuntimeError: context is incorrect)。作っている本人にとっては
+# 「保存しただけ」なので、原因が結び付かない。
+#
+# こちらで Object Mode へ戻してから始める。開いているのは別プロセスなので、
+# 人が触っている Blender には影響しない。
+if bpy.context.view_layer.objects.active is None:
+    for candidate in bpy.context.scene.objects:
+        if candidate.type == 'MESH':
+            bpy.context.view_layer.objects.active = candidate
+            break
+if bpy.context.object is not None and bpy.context.object.mode != 'OBJECT':
+    bpy.ops.object.mode_set(mode='OBJECT')
 
 bpy.ops.object.select_all(action='DESELECT')
 
@@ -253,7 +283,7 @@ for obj in bpy.context.scene.objects:
         'flags': flags_of(obj.name),
     })
 
-json_path = os.path.join(root, 'public', 'models', 'stage.json')
+json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
 with open(json_path, 'w') as f:
     json.dump({'boxes': boxes}, f, ensure_ascii=False, indent=0)
 

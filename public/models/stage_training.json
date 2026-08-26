@@ -1,0 +1,154 @@
+{
+"boxes": [
+{
+"name": "concrete_wall_e",
+"min": [
+40.0,
+0.0,
+-40.4
+],
+"max": [
+41.0,
+32.0,
+40.4
+],
+"top": {
+"h": 32.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall_w",
+"min": [
+-41.0,
+0.0,
+-40.4
+],
+"max": [
+-40.0,
+32.0,
+40.4
+],
+"top": {
+"h": 32.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall_n",
+"min": [
+-41.0,
+0.0,
+-40.75
+],
+"max": [
+41.0,
+32.0,
+-40.25
+],
+"top": {
+"h": 32.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall_s",
+"min": [
+-41.0,
+0.0,
+40.25
+],
+"max": [
+41.0,
+32.0,
+40.75
+],
+"top": {
+"h": 32.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_base_blue",
+"min": [
+-40.041,
+-0.059,
+-40.285
+],
+"max": [
+-34.202,
+5.393,
+-35.243
+],
+"top": {
+"h": 5.3933,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_base_red",
+"min": [
+34.075,
+-0.059,
+35.208
+],
+"max": [
+39.914,
+5.393,
+40.251
+],
+"top": {
+"h": 5.3933,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+}
+]
+}

@@ -25,6 +25,7 @@ import type { Obstacle } from '../../../sim/space/collision'
 import { isPathClear, sightBlockers } from '../../../sim/space/vision'
 import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
+import { STAGES, type StageName } from '../../../domain/match/stage'
 import { isMesh } from '../util/guards'
 
 /**
@@ -157,65 +158,6 @@ const BLOCKS: readonly [number, number, number, number, number][] = [
 /** 地面の一辺の半分 (m)。プレイヤーを閉じ込める外周にあたる */
 export const ARENA_HALF_SIZE = GROUND_SIZE / 2
 
-/**
- * --- モールの寸法 (仮) ---
- *
- * 2 棟が東西に並び、**中央の通路で繋がっている**。中庭がそれぞれの棟の中心に
- * あって、そこが湧き地点になる。
- *
- *     西棟   x -32.7 〜  -3.8   中庭の中心 x = -18.2
- *     通路   x -17.8 〜  18.3   幅 8m / 高さ 5m (concrete_link_*)
- *     東棟   x   4.3 〜  33.2   中庭の中心 x =  18.7
- *
- * 湧き地点をここから出しておくと、建物を動かしたときに直すのが 1 か所で済む。
- */
-const MALL = {
-  /**
-   * 陣営の基地。**噴水より外側**、棟のいちばん奥。
-   *
-   * 中庭の真ん中は噴水が占めていて (西 x -26〜-19 / 東 x 20〜27)、そこに
-   * 湧かせると噴水の上に立つ。奥へ寄せると**噴水が湧き地点の盾**になり、
-   * 通路から真っ直ぐ抜かれない。
-   *
-   * 地上階の開いている所を 1m の升目で数えて選んである。
-   */
-  baseWest: -30.5,
-  baseEast: 30.5,
-  z: 0,
-} as const
-
-/**
- * 個人戦の湧き地点。**陣営が無いので散らす。**
- *
- * 1 か所に全員が湧くと、出た所で撃ち合いになって「湧き待ち」が成立する。
- * 噴水を挟んで奥と手前、それに南北の 4 点を 2 棟ぶん。どれも地上階の開いて
- * いる升目に当ててある。
- */
-const SOLO_POINTS = [
-  [-30.5, 0], [-16, 0], [-22, -8], [-22, 8],
-  [30.5, 0], [16, 0], [22, -8], [22, 8],
-] as const
-
-/**
- * チームごとの湧き位置。**それぞれの棟の中庭。**
- *
- * 外周に置いていた頃 (立体駐車場) は、出た所から建物まで走る時間があった。
- * モールは 2 棟が通路で繋がった形なので、**片方ずつの中庭に湧かせて、
- * 通路を交戦地帯にする**。
- *
- * 通路は幅 8m の 1 本道で、そこを抜けるか抜けないかが最初の判断になる。
- * どちらの中庭も同じ形 (東棟は西棟の複製) なので、地形の有利不利は無い。
- *
- * **仮。** 店舗の絵はまだ判定を持っていない (noplayer) ので、壁を通り抜ける。
- * 遮蔽として効かせるには col_ の箱を別に置くことになる。そのとき、出た瞬間に
- * 通路から抜かれない位置へ置き直す。
- */
-export const TEAM_SPAWNS = {
-  blue: { x: MALL.baseWest, z: MALL.z },
-  red: { x: MALL.baseEast, z: MALL.z },
-} as const
-
-export const SOLO_SPAWNS = SOLO_POINTS.map(([x, z]) => ({ x, z }))
 
 /**
  * 基地の枠の大きさ (m)。中心から端まで。**4m 角。**
@@ -249,9 +191,9 @@ const BASE_COLOR = { blue: 0x7ea6ff, red: 0xff8a72 } as const
  *
  * 塗り潰さず枠線にするのは、床の材質 (足音が変わる) を隠さないため。
  */
-export function buildBases(): THREE.Object3D {
+export function buildBases(stage: StageName): THREE.Object3D {
   const group = new THREE.Group()
-  for (const [team, base] of Object.entries(TEAM_SPAWNS)) {
+  for (const [team, base] of Object.entries(STAGES[stage].bases)) {
     const frame = new THREE.Mesh(
       frameGeometry(BASE_HALF, BASE_LINE),
       // 露出に左右されない。位置を示すための印なので、明るさが変わっても読めてほしい
@@ -263,7 +205,8 @@ export function buildBases(): THREE.Object3D {
         side: THREE.DoubleSide,
       }),
     )
-    frame.position.set(base.x, BASE_Y, base.z)
+    // 高台の上に基地があるなら、枠もその床に敷く
+    frame.position.set(base.x, (base.y ?? 0) + BASE_Y, base.z)
     frame.frustumCulled = false
     group.add(frame)
   }
@@ -346,8 +289,8 @@ function createBlockoutMaterial(): THREE.MeshStandardMaterial {
  * なかった割合を色にする。あちらは書き出しのときに 1 度、こちらは地面が
  * コードで作られているので読み込みのたびに。1600 点 × 9 本なので一瞬で終わる。
  */
-async function bakeGroundSky(geometry: THREE.BufferGeometry): Promise<void> {
-  const boxes = sightBlockers(await loadStageBoxes())
+async function bakeGroundSky(stage: StageName, geometry: THREE.BufferGeometry): Promise<void> {
+  const boxes = sightBlockers(await loadStageBoxes(stage))
   if (boxes.length === 0) return
 
   const position = geometry.getAttribute('position')
@@ -610,21 +553,22 @@ export function setCloudCoverage(coverage: number): void {
  * 坂の傾きと、手榴弾が跳ねる面がこれにあたる。描画用のメッシュから測り直すと、
  * 見えている場所と爆ぜる場所がずれる。
  */
-let stageBoxes: Promise<StageBox[]> | null = null
+const stageBoxes = new Map<StageName, Promise<StageBox[]>>()
 
-export function loadStageBoxes(): Promise<StageBox[]> {
-  if (!stageBoxes) {
-    const url = asset.model('stage.json')
-    stageBoxes = fetch(url)
-      .then((res) => res.json() as Promise<{ boxes: StageBox[] }>)
-      .then((data) => data.boxes)
-      .catch((error) => {
-        // 読めなくても遊べる。坂が壁に戻り、手榴弾は地面だけで跳ねる
-        console.warn('[Stage] stage.json が読めない', error)
-        return []
-      })
-  }
-  return stageBoxes
+export function loadStageBoxes(name: StageName): Promise<StageBox[]> {
+  const cached = stageBoxes.get(name)
+  if (cached) return cached
+  const url = asset.model(`stage_${name}.json`)
+  const pending = fetch(url)
+    .then((res) => res.json() as Promise<{ boxes: StageBox[] }>)
+    .then((data) => data.boxes)
+    .catch((error) => {
+      // 読めなくても遊べる。坂が壁に戻り、手榴弾は地面だけで跳ねる
+      console.warn(`[Stage] stage_${name}.json が読めない`, error)
+      return []
+    })
+  stageBoxes.set(name, pending)
+  return pending
 }
 
 /**
@@ -636,8 +580,8 @@ export function loadStageBoxes(): Promise<StageBox[]> {
  *
  * 読めなくても平らな箱として成立する。坂が壁に戻るだけで、遊べなくはならない。
  */
-async function applySlopes(obstacles: Obstacle[]): Promise<void> {
-  const boxes = await loadStageBoxes()
+async function applySlopes(name: StageName, obstacles: Obstacle[]): Promise<void> {
+  const boxes = await loadStageBoxes(name)
   if (boxes.length === 0) return
 
   const byName = new Map(boxes.map((b) => [b.name, b]))
@@ -778,7 +722,7 @@ function createGlassMaterial(): THREE.MeshStandardMaterial {
  * glb の読み込みは非同期なので、先にブロックアウトを出しておいて、
  * 届いた時点で差し替える。Game 側は Stage の配列を都度読むので入れ替えが効く。
  */
-export function buildStage(scene: THREE.Scene): Stage {
+export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   scene.add(buildSky())
   // フォグは空の地平線側と同じ色にする。違うと遠景が地平線で不自然に切れる。
   // 開始距離を遠くしてあるのは、近すぎると中距離の遮蔽物まで白んで索敵の判断材料が減るため。
@@ -807,7 +751,7 @@ export function buildStage(scene: THREE.Scene): Stage {
   // テクスチャは非同期。届くまでは単色のまま出しておく。
   void applyGroundTexture(groundMaterial)
   // 明暗は箱が届いてから。**歩く床がここ**なので、ここが平らだと効果が出ない
-  void bakeGroundSky(ground.geometry)
+  void bakeGroundSky(name, ground.geometry)
 
   // stage.glb が届いたら丸ごと外せるよう 1 つにまとめておく
   const blockout = new THREE.Group()
@@ -839,7 +783,7 @@ export function buildStage(scene: THREE.Scene): Stage {
   }
 
   const stage: Stage = { collidables, cameraBlockers, obstacles }
-  void replaceWithModel(scene, stage, blockout)
+  void replaceWithModel(scene, name, stage, blockout)
   return stage
 }
 
@@ -852,12 +796,14 @@ export function buildStage(scene: THREE.Scene): Stage {
  */
 async function replaceWithModel(
   scene: THREE.Scene,
+  /** どのステージを読むか。**メッシュの name と紛れるので別名にしてある** */
+  stageName: StageName,
   stage: Stage,
   blockout: THREE.Group,
 ): Promise<void> {
   let gltf
   try {
-    gltf = await loadStage()
+    gltf = await loadStage(stageName)
   } catch {
     // stage.glb が無いのは異常ではない。コード側のブロックアウトで動く。
     return
@@ -944,7 +890,7 @@ async function replaceWithModel(
     })
   })
 
-  await applySlopes(obstacles)
+  await applySlopes(stageName, obstacles)
 
   let meshCount = 0
   model.traverse((obj) => {
