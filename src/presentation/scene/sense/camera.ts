@@ -147,6 +147,20 @@ export class FollowCamera {
    */
   private recoilPitch = 0
   private recoilYaw = 0
+
+  /**
+   * 手ブレによる照準のずれ (rad)。反動と同じく、マウス由来とは別に持つ。
+   *
+   * --- 画面が揺れる。カーソルは動かない ---
+   * 最初はクロスヘアだけを動かしていた。**銃口はずれているのに視界は微動だに
+   * しない**という、どこにも無い見え方になる。実際は銃を保持している腕が
+   * 揺れるので、構えている**画面ごと揺れて**、照準は中央のまま。
+   *
+   * ここへ足すと弾道も一緒に動く (aimDirection がこの向きから出る) ので、
+   * **見えている中心と当たる場所が必ず一致する**。別々に持つ必要が無くなる。
+   */
+  private swayPitch = 0
+  private swayYaw = 0
   /** 最後に反動が加わってからの経過 (秒) */
   private recoilAge = 0
 
@@ -203,13 +217,27 @@ export class FollowCamera {
     this.recoilAge = 0
   }
 
-  /** 反動を含んだ最終的な照準の向き。弾道もキャラの向きもこれに従う */
+  /**
+   * 手ブレを差し込む (rad)。毎フレーム上書きする。
+   *
+   * 反動と違って**積まない**。あちらは撃つたびに加わって減衰していく量だが、
+   * こちらは「いまどれだけ泳いでいるか」そのもの。
+   */
+  setSway(pitch: number, yaw: number): void {
+    this.swayPitch = pitch
+    this.swayYaw = yaw
+  }
+
+  /** 反動と手ブレを含んだ最終的な照準の向き。弾道もキャラの向きもこれに従う */
   get aimYaw(): number {
-    return this.yaw + this.recoilYaw
+    return this.yaw + this.recoilYaw + this.swayYaw
   }
 
   get aimPitch(): number {
-    return Math.min(MAX_PITCH, Math.max(MIN_PITCH, this.pitch + this.recoilPitch))
+    return Math.min(
+      MAX_PITCH,
+      Math.max(MIN_PITCH, this.pitch + this.recoilPitch + this.swayPitch),
+    )
   }
 
   /** 構え時のカメラの寄り具合 (調整用。確定したら AIM_VIEW へ焼き込む) */

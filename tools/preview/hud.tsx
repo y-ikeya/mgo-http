@@ -92,10 +92,10 @@ const cases: Record<string, Partial<GameStats>> = {
 const which = new URLSearchParams(location.search).get('case') ?? 'normal'
 
 /**
- * 構えている所。**手ブレを本物の Spread で動かす。**
+ * 構えている所。**散布界に応じてクロスヘアが開くのを見る。**
  *
- * 止めた絵では「泳いでいるか」が分からない。写しの正弦波をここに書くと、
- * 画面が動いても本物と同じ動きかは確かめられないので、domain をそのまま回す。
+ * 手ブレはここには出ない — あれは**画面ごと揺れる** (カメラの向きに差し込んで
+ * ある) ので、HUD だけでは再現できない。ここで見るのは開き具合のほう。
  */
 if (which === 'aiming') {
   const weapon = WEAPONS[(new URLSearchParams(location.search).get('weapon') ?? 'rifle') as WeaponId]
@@ -110,24 +110,12 @@ if (which === 'aiming') {
     spread: 0,
   } as GameStats)
 
-  // 画面の高さと画角から画素に直す。Game.swayPixels と同じ式
-  const toPixels = (degrees: number) => {
-    const half = Math.tan(((weapon.aimFov / 2) * Math.PI) / 180)
-    return (Math.tan((degrees * Math.PI) / 180) / half) * (window.innerHeight / 2)
-  }
-
   let last = performance.now()
   const tick = (now: number) => {
     const dt = Math.min((now - last) / 1000, 0.1)
     last = now
     spread.update(dt, weapon, posture)
-    const [right, up] = spread.sway(weapon, {}, posture)
-    setStats((prev) => ({
-      ...prev,
-      spread: spread.degrees(weapon, {}),
-      swayX: toPixels(right),
-      swayY: -toPixels(up),
-    }))
+    setStats((prev) => ({ ...prev, spread: spread.degrees(weapon, {}) }))
     requestAnimationFrame(tick)
   }
   requestAnimationFrame(tick)
