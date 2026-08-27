@@ -152,19 +152,28 @@ const JUMP_LOOP_MAX_SPEED = 3
  * 再生速度のほうを合わせる)。ローリングのように加減速がある動作は、平均速度で
  * 動かすと着地して止まっているのに前へ滑る。クリップの動きをそのまま使う。
  */
-const ROOT_MOTION_CLIPS = new Set(['roll'])
+const ROOT_MOTION_CLIPS = new Set(['roll', 'fall_roll'])
 
 /** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
 const ROLL_TIME_SCALE = 1.32
 
 /**
- * ローリングで進む距離の倍率。
+ * 全身で転がる型が、クリップに焼かれた移動をどれだけ辿るか。
  *
  * 再生速度とは別に持つ必要がある。速く回せばそのぶん短い時間で終わるが、
  * クリップに焼かれた移動量は変わらないので距離は同じになる。
  * 「速くて短い」を作るには、移動そのものを削るしかない。
+ *
+ * --- 受け身にも要る ---
+ * 長らく roll だけだった。**受け身はその場で回っていた** — 焼かれた移動を
+ * 誰も読まないので、腰が 179 度振れるだけで 1 ミリも進まない。高い所から
+ * 落ちた人がその場でくるりと回る、という絵になっていた。
+ *
+ * 受け身は 1.0 = **クリップに焼かれた通り**で 3.1m。倍率を掛けないので
+ * 足が滑らない (回避ローリングは 0.8 なので 2 割ぶん滑っている)。
+ * 落ちた勢いが前へ流れて消える、という絵がそのまま出る。
  */
-const ROLL_DISTANCE_SCALE = 0.8
+const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8, fall_roll: 1 }
 /**
  * ローリングの拘束を解く時点 (クリップ尺に対する割合)。
  *
@@ -179,6 +188,15 @@ const ROLL_EXIT_PHASE = 0.78
 const ONE_SHOT_LOWER = new Set<Locomotion>([
   'stab',
   'roll',
+  /*
+   * 落下の受け身。**ここに無くて、下半身だけループしていた。**
+   *
+   * 尺 (1.67 秒) と拘束 (FALL_ROLL_TIME) がほぼ同時なので、絵の上では
+   * 気づけない。焼かれた移動を辿るようにした途端に出た — クリップが頭へ
+   * 戻ると根元の位置も頭へ戻るので、**1 フレームで 3m 引き戻される**。
+   * 「進んでから着地点へ滑って戻る」という形で、しかも競り合いなので毎回は出ない。
+   */
+  'fall_roll',
   // 倒れる / 起き上がる。留めておかないと、倒れた姿勢を保てず
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
@@ -638,6 +656,8 @@ export class CharacterAnimator {
   /** 前フレームに読んだルートモーションの値。差分を出すのに使う */
   private readonly lastRootSample = new THREE.Vector3()
   private rootSampleValid = false
+  /** 前回どこまで再生していたか。頭へ戻ったのを見つけるのに使う */
+  private lastRootTime = 0
   /** 骨格のスケール (Armature の 0.01)。トラックの単位をメートルに直すのに使う */
   private skeletonScale = 0
   private readonly referenceHips = new THREE.Quaternion()
@@ -673,6 +693,23 @@ export class CharacterAnimator {
      * ことが多いので、そこで必ず出ていた。
      */
     if (this.upperState === 'death') return
+
+    /*
+     * **いま上半身を動かしている物が終わったときだけ畳む。**
+     *
+     * 終わったのが何かを見ずに、下の一覧に載っていれば畳んでいた。**前の型が
+     * 残ったまま終わると、後から始めた型まで一緒に畳まれる。**
+     *
+     * 高い所から落ちると下半身だけ回る、という形で出た。着地の 0.22 秒後に
+     * **前の回避ローリング**が終わり、その通知で受け身の上半身が構えへ戻る。
+     * 下半身は locomotion で決まるので受け身のまま残り、腰から上だけが
+     * 銃を構え直して見える。
+     *
+     * 一覧を足し引きしても直らない — 載っている型はどれも同じ踏み方をする。
+     * **持ち主かどうか**を見るのが筋で、それは今どの鍵が選ばれているかで分かる。
+     */
+    if (finished !== this.upper.get(this.resolveUpperKey())) return
+
     // 倒れたときだけは戻さない。最終ポーズのまま留める。
     if (
       finished === this.upper.get(RELOAD_KEY) ||
@@ -1791,9 +1828,13 @@ export class CharacterAnimator {
    * @returns 差分が取れたら true
    */
   consumeRootMotion(out: THREE.Vector3): boolean {
-    const stored = this.rootMotion.get('roll')
-    const action = this.lower.get('roll')
-    if (!stored || !action || this.locomotion !== 'roll') return false
+    // **いま流れている全身の型から引く。** roll だけを見ていたので、
+    // 受け身は焼かれた移動を持っているのに誰も読まなかった
+    const name = this.locomotion
+    if (!ROOT_MOTION_CLIPS.has(name)) return false
+    const stored = this.rootMotion.get(name)
+    const action = this.lower.get(name)
+    if (!stored || !action) return false
 
     if (this.skeletonScale === 0) {
       const armature = this.hipsBone?.parent
@@ -1802,6 +1843,21 @@ export class CharacterAnimator {
     }
 
     sampleVectorTrack(stored.times, stored.values, action.time, this.scratchVector)
+
+    /*
+     * **頭へ戻ったら、その差は移動ではない。**
+     *
+     * クリップが 1 周して time が 0 に戻ると、根元の位置も先頭へ跳ぶ。差を
+     * そのまま渡すと**進んだぶんを 1 フレームで引き戻す**。一度きりにして
+     * あれば起きないが、一覧から漏れた型がまた出たときにここで止まる。
+     */
+    if (this.rootSampleValid && action.time < this.lastRootTime) {
+      this.lastRootSample.copy(this.scratchVector)
+      this.lastRootTime = action.time
+      return false
+    }
+    this.lastRootTime = action.time
+
     if (!this.rootSampleValid) {
       this.lastRootSample.copy(this.scratchVector)
       this.rootSampleValid = true
@@ -1810,7 +1866,7 @@ export class CharacterAnimator {
 
     // トラック空間は X/Y が水平、Z が上下 (Armature の +90°X 回転のため)。
     // モデル空間では armature ローカルの +Y が前方 (+Z) に対応する。
-    const scale = this.skeletonScale * ROLL_DISTANCE_SCALE
+    const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1)
     out.set(
       (this.scratchVector.x - this.lastRootSample.x) * scale,
       0,

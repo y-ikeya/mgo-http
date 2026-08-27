@@ -749,6 +749,21 @@ export class Game {
     this.shots = new Shots(this.scene);
     this.net.onMessage((message) => this.receive(message));
 
+    /*
+     * **開発中だけ、動いている本体を窓から掴めるようにする。**
+     *
+     * 見た目の不具合は、コードを読んでも模擬を回しても掴めないことがある。
+     * 「高い所から落ちると下半身だけ回る」を追ったとき、手元の模擬では
+     * 上下とも受け身が乗っていて**再現しなかった**。実機の骨の向きを
+     * 1/60 秒ごとに読めれば、模擬と実機のどこが違うかを直接測れる。
+     *
+     * 本番のバンドルには入らない (import.meta.env.DEV は build 時に false へ
+     * 畳まれ、この塊ごと落ちる)。**遊ぶ人に本体を触らせない。**
+     */
+    if (import.meta.env.DEV) {
+      (window as unknown as { __game?: Game }).__game = this;
+    }
+
     this.raycaster.far = MAX_RANGE;
 
     this.follow = new FollowCamera(1);

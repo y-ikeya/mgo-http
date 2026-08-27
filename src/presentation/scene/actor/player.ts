@@ -414,6 +414,13 @@ export class Player {
   private fallReferenceHeight = FALL_REFERENCE_HEIGHT
   /** ローリング中に進む向き。踏み切った時点で固定する */
   private rollYaw = 0
+  /**
+   * 受け身で流れる向き。**着いた瞬間に固定する。**
+   *
+   * 転がっている間に舵を切れると、落下が移動手段になる。落ちた勢いは
+   * 落ちる前に決めた向きへ逃がす。
+   */
+  private fallRollYaw = 0
   /** 転がり始めたか。音を鳴らす側が 1 回だけ拾う */
   private rollStarted = false
   private moveSpeed = MOVE_SPEED
@@ -1268,19 +1275,28 @@ export class Player {
     if (this.down) targetSpeed = 0
     this.currentSpeed = damp(this.currentSpeed, targetSpeed, SPEED_LAMBDA, dt)
 
-    // ローリング中はクリップに焼かれた移動をそのまま辿る。入力は受け付けない。
-    // 速度に直して渡すのは、移動の規則を 1 本に通すため。位置へ直接足すと
-    // 押し戻しも接地も素通りする。
+    /*
+     * 全身で転がっている間はクリップに焼かれた移動をそのまま辿る。入力は
+     * 受け付けない。速度に直して渡すのは、移動の規則を 1 本に通すため。
+     * 位置へ直接足すと押し戻しも接地も素通りする。
+     *
+     * **受け身も同じ道を通す。** 以前は回避ローリングだけで、受け身は焼かれた
+     * 移動を誰も読まないまま腰だけ 179 度振れていた — その場でくるりと回る絵。
+     * 落ちた勢いは前へ流れて消える、というのが受け身の意味なので、
+     * 動かないと「なぜ転がったのか」が絵から抜ける。
+     */
     let overrideX: number | undefined
     let overrideZ: number | undefined
-    if (this.rolling) {
+    const tumbling = this.rolling || this.fallRollTimer > 0
+    if (tumbling) {
       overrideX = 0
       overrideZ = 0
       if (dt > 0 && this.animator?.consumeRootMotion(this.scratchVelocity)) {
         // モデル空間 (正面 +Z) の移動をワールドへ写す。
         // モデルは 180° 回してあるので yaw + π の回転になる。
-        const sin = Math.sin(this.rollYaw)
-        const cos = Math.cos(this.rollYaw)
+        const yaw = this.rolling ? this.rollYaw : this.fallRollYaw
+        const sin = Math.sin(yaw)
+        const cos = Math.cos(yaw)
         const dx = this.scratchVelocity.x
         const dz = this.scratchVelocity.z
         overrideX = (-dx * cos - dz * sin) / dt
@@ -1364,6 +1380,8 @@ export class Player {
       this.landingTimer = LANDING_TIME
       if (fallDamage(moved.impactSpeed) > 0) {
         this.fallRollTimer = FALL_ROLL_TIME
+        // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
+        this.fallRollYaw = this.yaw
         this.animator?.playFallRoll()
       } else {
         this.animator?.playLanding()
