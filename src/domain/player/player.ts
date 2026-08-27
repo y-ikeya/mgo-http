@@ -26,8 +26,6 @@ import { creditOf, takeDamage, type Credit, type Wound } from '../rule/damage'
 import type { HeldId } from '../item/held'
 import {
   SUPPORT_SPECS,
-  startingAmmo,
-  type Ammo,
   type SupportId,
   type WeaponId,
 } from '../item/weapons'
@@ -273,18 +271,6 @@ export interface Player {
   locomotion: Locomotion
   /** 持っている銃。威力と連射の上限をこれで引く */
   weapon: WeaponId
-  /**
-   * 銃ごとの弾数。**写しであって、権威ではない。**
-   *
-   * 空撃ちの判断はクライアントがやる (押した瞬間に音が要るので)。ここが持って
-   * いるのは、繋ぎ直した人へ続きを返すため。持たせないと、30 秒の猶予が
-   * 「瀕死でリロードすれば全快して弾も満タン」という抜け道になる。
-   *
-   * 減らすのは shot が届いたとき。増やすのは reload が届いたとき —
-   * **クライアントは装填が終わった瞬間に送る**ので、こちらは銃ごとの尺を
-   * 知らなくてよい。
-   */
-  ammo: Ammo
 }
 
 /**
@@ -330,7 +316,6 @@ export function newPlayer(seed: {
     primary: 'rifle',
     held: 'rifle',
     support: 'grenade',
-    ammo: startingAmmo(),
     grenades: SUPPORT_SPECS.grenade.count,
     holdingGrenade: false,
     wasAlive: false,
@@ -456,7 +441,6 @@ export function refill(player: Player): void {
     support: player.support,
   })
   player.health = MAX_HEALTH
-  player.ammo = startingAmmo()
   player.grenades = SUPPORT_SPECS[player.support].count
   player.holdingGrenade = false
   player.concentratingSince = 0

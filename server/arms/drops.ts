@@ -99,11 +99,6 @@ export function dropWeapon(room: RoomWorld, player: Player, message: ClientMessa
   // 弾数も一緒に消える (持ち物が弾を抱えているので)。以前は kit と ammo を
   // 別々に消していて、**片方だけ消し忘れる余地**があった
   player.inventory.drop(message.weapon)
-  const put = message.weapon
-  if (isGun(put)) {
-    player.ammo.magazine[put] = 0
-    player.ammo.reserve[put] = 0
-  }
   broadcast(room, droppedMessage(item))
 }
 
@@ -125,14 +120,9 @@ export function pickUp(room: RoomWorld, player: Player): void {
   }
   if (!best) return
   room.dropped.splice(room.dropped.indexOf(best), 1)
-  const got = best.weapon
   // **拾えば持ち物に入る。** 選んでいない銃を持てるのはこれがあるから。
   // 弾も一緒に入る — 地面に落ちていた残弾をそのまま引き継ぐ
   player.inventory.pick(carriedOf(best))
-  if (isGun(got)) {
-    player.ammo.magazine[got] = best.ammo
-    player.ammo.reserve[got] = best.reserve
-  }
   sessionOf(player).socket.send(
     JSON.stringify({
     type: 'picked',

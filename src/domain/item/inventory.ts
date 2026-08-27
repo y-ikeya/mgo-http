@@ -19,7 +19,7 @@ import {
   type Carried, type Family, type GunId, type HeldId, type Loadout,
 } from './held'
 import type { Intent } from '../player/intent'
-import { WEAPONS, type WeaponSpec } from './weapons'
+import { WEAPONS, type Ammo, type WeaponId, type WeaponSpec } from './weapons'
 import { Trigger } from './trigger'
 import { canAct } from '../player/lifecycle'
 import type { Life } from '../player/lifecycle'
@@ -606,6 +606,54 @@ export class Inventory {
   }
 
   /** 装填。予備から弾倉へ、入るぶんだけ移す */
+  /**
+   * その銃を 1 発ぶん減らす。**空でも拒まない。**
+   *
+   * 手にある物ではなく id で指す。サーバーは持ち替えを追っていないので、
+   * 「いま手にある物」から引くと違う銃の弾が減る。
+   *
+   * 空でも拒まないのは、**通信のずれで正当な 1 発が消えるのを避ける**ため。
+   * 空撃ちの判断はクライアントがやっている (押した瞬間に音が要る)。
+   */
+  spendGun(id: HeldId): void {
+    const item = find(this.items, id)
+    if (!item || !('ammo' in item)) return
+    item.ammo = Math.max(0, item.ammo - 1)
+  }
+
+  /**
+   * その銃に弾を込める。**装填が終わった、という知らせで呼ぶ。**
+   *
+   * 尺 (何秒かかるか) は持たない。あれはクライアントが数えていて、
+   * ここへ届くのは終わったあと。
+   */
+  reloadGun(id: HeldId): boolean {
+    const item = find(this.items, id)
+    if (!item || !('ammo' in item)) return false
+    const room = WEAPONS[item.id].magazine - item.ammo
+    if (room <= 0 || item.reserve <= 0) return false
+    const moved = Math.min(room, item.reserve)
+    item.ammo += moved
+    item.reserve -= moved
+    return true
+  }
+
+  /**
+   * 銃ごとの弾数の表。**繋ぎ直した人へ返すのに使う。**
+   *
+   * 持っていない銃は 0。protocol が銃ごとの表で流す形なので、そこへ合わせる
+   * ためだけの変換で、**こちらの持ち方 (持っている物だけ) は変えない**。
+   */
+  ammoTable(): Ammo {
+    const magazine = {} as Record<WeaponId, number>
+    const reserve = {} as Record<WeaponId, number>
+    for (const id of Object.keys(WEAPONS) as WeaponId[]) {
+      magazine[id] = this.ammoOf(id)
+      reserve[id] = this.reserveOf(id)
+    }
+    return { magazine, reserve }
+  }
+
   reload(): boolean {
     const item = this.item
     if (!item || !('ammo' in item)) return false
