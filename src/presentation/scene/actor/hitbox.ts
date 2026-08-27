@@ -28,17 +28,21 @@ export interface HitboxHit {
 }
 
 /**
- * 頭の球の半径 (m)。
+ * 頭の球を、実際の頭より何割大きく取るか。
  *
- * 小さいほど技量が要るが、小さすぎると当たったように見えて外れる。
- * 頭の実寸 (幅 0.15m ほど) より気持ち大きく取って、見た目と結果を一致させる。
+ * 小さいほど技量が要るが、小さすぎると**当たったように見えて外れる**。
+ * 見た目と結果を一致させるほうへ倒して、少しだけ大きく取る。
  */
-const HEAD_RADIUS = 0.13
+const HEAD_MARGIN = 1.06
+
 /**
- * 頭ボーンから球の中心までの距離 (m)。
- * 頭ボーンは首の付け根にあるので、そのままだと球が顎の位置に来る。
+ * 大きさと位置が測れなかったときの逃げ道 (m)。
+ *
+ * 骨だけは在ってメッシュが読めない、という形になったときでも判定は要る。
+ * 頭ボーンから少し上に、頭ほどの球を置く。
  */
-const HEAD_OFFSET = 0.08
+const HEAD_FALLBACK_RADIUS = 0.14
+const HEAD_FALLBACK_OFFSET = 0.18
 
 /** 胴と脚の太さ (m) */
 const BODY_RADIUS = 0.20
@@ -67,6 +71,23 @@ export class Hitbox {
   private foot: THREE.Bone | null = null
   private resolved = false
 
+  /**
+   * 頭の球の中心。**頭ボーンのローカル座標で持つ。**
+   *
+   * 世界の上方向へずらす形にしていて、**頭を実物の 10cm 下に置いていた** —
+   * 実測すると頭のメッシュは 1.512〜1.793m なのに、球は 1.418〜1.678m。
+   * 首を撃っても頭になり、頭のてっぺんは当たらない。
+   *
+   * 数字を手で置き直すのではなく、**読み込んだモデルから測る** (measureHead)。
+   * 骨のローカルで持つので、見上げても倒れても頭に付いて回る — 世界の上へ
+   * ずらす形だと、寝ている相手の球が体の上に浮く。
+   */
+  private readonly headLocal = new THREE.Vector3(0, HEAD_FALLBACK_OFFSET, 0)
+  /** 頭の球の半径 (m)。**モデルから測る** (measureHead) */
+  headRadius = HEAD_FALLBACK_RADIUS
+  /** モデルから測れたか。測れなければ世界の上へずらす昔の形で動く */
+  private measured = false
+
   private readonly headCenter = new THREE.Vector3()
   private readonly neckPos = new THREE.Vector3()
   private readonly hipsPos = new THREE.Vector3()
@@ -84,14 +105,89 @@ export class Hitbox {
     this.foot = findBoneBySuffix(root, 'LeftFoot')
     this.resolved = !!(this.head && this.neck && this.hips && this.foot)
     if (!this.resolved) console.warn('[Hitbox] 判定に要るボーンが揃っていない')
+    if (this.head) this.measureHead(root, this.head)
     return this.resolved
+  }
+
+  /**
+   * 頭の球の中心と大きさを、**モデルの頂点から測る**。読み込み時に 1 回だけ。
+   *
+   * 手で置いた数字 (頭ボーンから 0.08m 上、半径 0.13m) は 10cm 低く、頭の
+   * てっぺんにも届いていなかった。モデルを差し替えたときに黙ってずれる形でも
+   * あるので、**在る物から測る**。
+   *
+   * 頭に 5 割以上の重みが乗っている頂点だけを見る。首や肩に引っ張られた
+   * 頂点を混ぜると、球が下へ伸びて首まで頭になる。
+   *
+   * 中心は**外接箱の真ん中**。頂点の重心だと、顔の細かい頂点が下に多いぶん
+   * 引っ張られて、球が首まで落ちる (実測で 7cm 下がった)。
+   *
+   * 半径は外接箱の**一番長い辺の半分**。頭は縦長 (0.28 × 0.18 ほど) なので、
+   * 縦を覆えば横は余る。余るほうへ倒すのは、足りないと**当たったように見えて
+   * 外れる**から。
+   */
+  private measureHead(root: THREE.Object3D, head: THREE.Bone): void {
+    let mesh: THREE.SkinnedMesh | null = null
+    root.traverse((o) => {
+      if (!mesh && (o as THREE.SkinnedMesh).isSkinnedMesh) mesh = o as THREE.SkinnedMesh
+    })
+    if (!mesh) return
+    const skinned = mesh as THREE.SkinnedMesh
+    // **名前で突き合わせる。** clone した骨格は別の実体になるので、
+    // 同一性で引くと必ず外れる (実際に外れて、逃げ道の値のまま動いていた)
+    const index = skinned.skeleton.bones.findIndex((b) => b.name === head.name)
+    if (index < 0) {
+      console.warn('[Hitbox] 頭のボーンが骨格に無い。頭の判定は逃げ道の値になる')
+      return
+    }
+
+    const position = skinned.geometry.attributes.position
+    const skinIndex = skinned.geometry.attributes.skinIndex
+    const skinWeight = skinned.geometry.attributes.skinWeight
+    if (!position || !skinIndex || !skinWeight) return
+
+    root.updateMatrixWorld(true)
+    const point = new THREE.Vector3()
+    const bounds = new THREE.Box3()
+    let found = 0
+    for (let i = 0; i < position.count; i++) {
+      let weight = 0
+      for (let k = 0; k < 4; k++) {
+        if (skinIndex.getComponent(i, k) === index) weight += skinWeight.getComponent(i, k)
+      }
+      if (weight < 0.5) continue
+      // **生の position は使えない。** スキン前の空間なので、そのまま世界へ
+      // 移すと 1/100 の大きさになる (実際に半径 2mm の球ができた)。
+      // getVertexPosition が bind 行列と骨の行列を通したあとを返す
+      skinned.getVertexPosition(i, point)
+      skinned.localToWorld(point)
+      // **骨のローカルで囲う。** 世界で囲って後から移すと、測ったときの姿勢と
+      // 使うときの姿勢の差がそのままずれになる (実測で 6cm 落ちた)
+      head.worldToLocal(point)
+      bounds.expandByPoint(point)
+      found++
+    }
+    if (found < 32) {
+      console.warn(`[Hitbox] 頭の頂点が足りない (${found})。頭の判定は逃げ道の値になる`)
+      return
+    }
+
+    const size = bounds.getSize(point)
+    // 骨の尺度は 1/100 (Armature) なので、長さは世界の縮尺へ戻す
+    const scale = new THREE.Vector3().setFromMatrixScale(head.matrixWorld).x || 1
+    this.headRadius = (Math.max(size.x, size.y, size.z) / 2) * scale * HEAD_MARGIN
+    bounds.getCenter(this.headLocal)
+    this.measured = true
   }
 
   /** 頭の中心 (ワールド)。カメラの注視点などにも使える */
   headPosition(out: THREE.Vector3): THREE.Vector3 | null {
     if (!this.head) return null
+    if (this.measured) return out.copy(this.headLocal).applyMatrix4(this.head.matrixWorld)
+    // 測れなかったとき。**骨のローカルは使えない** (骨の尺度が 1/100 なので
+    // そのまま乗せると 1.8mm しか上がらない)。世界の上へずらす
     out.setFromMatrixPosition(this.head.matrixWorld)
-    out.y += HEAD_OFFSET
+    out.y += HEAD_FALLBACK_OFFSET
     return out
   }
 
@@ -130,7 +226,7 @@ export class Hitbox {
     this.hipsPos.setFromMatrixPosition(this.hips!.matrixWorld)
 
     if (this.headPosition(this.headCenter)) {
-      const t = raySphere(origin, dir, this.headCenter, HEAD_RADIUS, maxDistance)
+      const t = raySphere(origin, dir, this.headCenter, this.headRadius, maxDistance)
       // **当たった点が首より上なら頭。** 頭に当たったら胴に譲らない
       if (t !== null && origin.y + dir.y * t >= this.neckPos.y) {
         return { zone: 'HEAD', distance: t }
