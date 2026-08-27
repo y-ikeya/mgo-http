@@ -1,14 +1,14 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Profile from '../ui/Profile'
-import { profilesAvailable } from '../../api/profile'
-import { useLevels } from '../../api/levels'
+import { profilesAvailable } from '../../infra/api/profile'
+import { useLevels } from '../../infra/api/levels'
 import { t } from '../../i18n'
 import { useNavigate } from '@solidjs/router'
 import { MODES } from '../../domain/match/room'
-import { fetchRooms } from '../../api/rooms'
-import type { MatchPhase, RoomSummary } from '../../protocol/types'
-import type { Identity } from '../../auth/session'
-import { signOut } from '../../auth/session'
+import { fetchRooms } from '../../infra/api/rooms'
+import type { MatchPhase, RoomSummary } from '../../application/protocol/types'
+import type { Identity } from '../../infra/auth/session'
+import { signOut } from '../../infra/auth/session'
 import './Lobby.css'
 
 /**
@@ -38,7 +38,7 @@ export default function Lobby(props: { identity: Identity }) {
   const [error, setError] = createSignal('')
   /** 戦績を開いている相手。null なら閉じている */
   const [opened, setOpened] = createSignal<{ id: string; name: string } | null>(null)
-  // 札に出す Lv。入る前に「この部屋は強いのばかり」が読めるように
+  // カードに出す Lv。入る前に「この部屋は強いのばかり」が読めるように
   const levelFor = useLevels(
     () => rooms().flatMap((room) => room.roster.map((who) => who.id)),
     props.identity,
@@ -105,7 +105,7 @@ export default function Lobby(props: { identity: Identity }) {
               }}
             >
               {/*
-                入るのはこのボタン。**名前の札は別のボタン**なので、行ごと
+                入るのはこのボタン。**名前のカードは別のボタン**なので、行ごと
                 1 つのボタンにはできない (button の中に button は置けない)。
               */}
               <button

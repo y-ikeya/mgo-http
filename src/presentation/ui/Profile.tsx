@@ -1,7 +1,7 @@
 import { createResource, Show } from 'solid-js'
-import { fetchTotals } from '../../api/profile'
+import { fetchTotals } from '../../infra/api/profile'
 import { levelOf, levelProgress, pointsForLevel, pointsOf } from '../../domain/match/scoring'
-import type { Identity } from '../../auth/session'
+import type { Identity } from '../../infra/auth/session'
 import './Profile.css'
 
 /**

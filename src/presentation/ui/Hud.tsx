@@ -25,7 +25,7 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
   )
 }
 
-/** 1 段送ったときに滑る距離 (px)。札 1 枚より小さくして「動いた」だけを見せる */
+/** 1 段送ったときに滑る距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
 const BROWSE_SLIDE = 26
 
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
@@ -76,7 +76,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * 左下のカードに出す道具。
    *
    * **一覧を送っている間は、指している物を映す。** 武器のカード (held) と同じ
-   * 規則 — 角のカードが選択の印を兼ねているので、送っても変わらないと
+   * ドメインルール — 角のカードが選択の印を兼ねているので、送っても変わらないと
    * 「これを選んだらこうなる」が読めない (ずっと NONE のままに見えていた)。
    */
   const shownTool = (): HeldId => {
@@ -150,7 +150,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   /*
    * 送った向きに滑らせる。
    *
-   * **どちらへ動いたかが分からない**という指摘。札の中身だけが入れ替わるので、
+   * **どちらへ動いたかが分からない**という指摘。カードの中身だけが入れ替わるので、
    * 上へ送ったのか下へ送ったのかが読めなかった。1 段ごとに、来た方向から
    * 滑り込ませる。
    *
@@ -181,7 +181,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
      * **入れ物ではなく、中の 2 つを動かす。**
      *
      * L 字の列と行はそれぞれ画面に絶対配置してある。入れ物に transform を掛けると
-     * **そこが配置の基準になってしまい**、札が画面の隅へ飛んで L 字が消えた。
+     * **そこが配置の基準になってしまい**、カードが画面の隅へ飛んで L 字が消えた。
      */
     for (const part of [columnEl, rowEl]) {
       part?.animate(
@@ -274,7 +274,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         **相手を待たない部屋では出さない** (練習・休憩)。1 人で成立するので、
         待っている物が無いのに「STANDBY」と出ると、始まらないのを待たされて
         いるように見える。段階が playing に固定される前の一瞬もここで消える
-        (規則は domain/match/room.ts の solo)。
+        (ドメインルールは domain/match/room.ts の solo)。
       */}
       <Show when={phase() === 'waiting' && !soloRoom()}>
         <div class="hud-standby">
@@ -529,7 +529,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             {/*
               角は出さない。**角にあるのは武器のカードそのもの** (下の hud-weapon)。
               選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。
-              別に札を出すと同じ名前が 2 つ並ぶ。
+              別にカードを出すと同じ名前が 2 つ並ぶ。
             */}
           <div class="hud-browse-column" ref={columnEl}>
             <For each={above()}>{(item) => <BrowseItem item={item} />}</For>

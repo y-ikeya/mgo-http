@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import { Client, startServer, twoPlayers, type Server, spot } from './server'
+import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
  * 「クライアントが期待するものが、期待する順で届くか」の試験。
@@ -166,3 +167,74 @@ async function hurt(server: Server, name: string): Promise<number> {
   const line = text.match(new RegExp(`${name} \\((\\d+)\\)`))
   return line ? Number(line[1]) : -1
 }
+
+/**
+ * 名簿をもう一度くれ。**取りこぼしに気づいたクライアントが頼む。**
+ *
+ * 名簿はサーバーが決まった時 (入室・試合の頭) に送っていた。押し付ける形だと
+ * **落ちたことに誰も気づけない** — 名簿が欠けると人が描かれず、陣営が古いと
+ * 敵味方が逆になる (撃てる相手かはクライアントが陣営で判断している)。
+ */
+describe('名簿を頼み直す', () => {
+  let server: Server
+
+  beforeAll(async () => {
+    server = await startServer()
+  })
+  afterAll(() => server.stop())
+
+  test('頼めば、その人にだけ返ってくる', async () => {
+    const a = await new Client(server, 'asker', spot(0, -6)).ready()
+    const b = await new Client(server, 'other', spot(0, 6)).ready()
+    a.live()
+    b.live()
+    await Bun.sleep(600)
+
+    a.reset()
+    b.reset()
+    a.send({ type: 'refetchRoster' })
+    await Bun.sleep(400)
+
+    expect(a.got('roster')).toBe(1)
+    // **その人にだけ。** 全員へ配ると、1 人の取りこぼしで全員に届く
+    expect(b.got('roster')).toBe(0)
+
+    a.close()
+    b.close()
+  }, 20_000)
+
+  test('**何度でも頼める。** 来なければもう一度言う、が成り立つ', async () => {
+    const a = await new Client(server, 'repeat', spot(3, -6)).ready()
+    a.live()
+    await Bun.sleep(600)
+    a.reset()
+
+    for (let i = 0; i < 3; i++) {
+      a.send({ type: 'refetchRoster' })
+      await Bun.sleep(150)
+    }
+    await Bun.sleep(300)
+    expect(a.got('roster')).toBe(3)
+    a.close()
+  }, 20_000)
+
+  test('返ってくる名簿には、居る人が全員入っている', async () => {
+    const a = await new Client(server, 'countA', spot(6, -6)).ready()
+    const b = await new Client(server, 'countB', spot(6, 6)).ready()
+    a.live()
+    b.live()
+    await Bun.sleep(600)
+
+    a.reset()
+    a.send({ type: 'refetchRoster' })
+    await Bun.sleep(400)
+
+    const roster = a.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
+    const ids = roster.players.map((p) => p.id)
+    expect(ids).toContain('countA')
+    expect(ids).toContain('countB')
+
+    a.close()
+    b.close()
+  }, 20_000)
+})

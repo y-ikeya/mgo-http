@@ -12,7 +12,7 @@
  * 確かめたいときは `?lang=en` を付ける。
  *
  * --- 英語のまま残しているもの ---
- * `LOADOUT` `PRIMARY` `OK` `Leave` `Login` `VICTORY` などの札は**どちらの言語でも
+ * `LOADOUT` `PRIMARY` `OK` `Leave` `Login` `VICTORY` などのラベルは**どちらの言語でも
  * 英語**。訳し漏れではなく、元のゲームがそう表示していた物を踏襲している。
  * 訳すのは説明文のほうだけ。
  */

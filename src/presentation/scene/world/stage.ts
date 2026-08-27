@@ -645,12 +645,12 @@ async function applyGroundTexture(material: THREE.MeshStandardMaterial): Promise
  */
 
 /**
- * 名前の先頭に付ける材質の札。
+ * 名前の先頭に付ける材質のタグ。
  *
  * 見た目と足音の両方をここから決める。1 か所で宣言することで、
  * 「金属に見えるのにコンクリートの足音」が構造的に起きない。
  *
- * 札は組み合わせられる (col_metal_wall など)。Blender は複製すると名前の
+ * タグは組み合わせられる (col_metal_wall など)。Blender は複製すると名前の
  * 末尾に .001 を足すので、先頭に置くほうが壊れにくい。
  */
 /** 材質ごとのテクスチャ。ファイル名の頭だけが違う */
@@ -866,7 +866,7 @@ async function replaceWithModel(
       obj.visible = false
     }
 
-    // 止める対象ごとに別の一覧へ。1 つの札で全部を決めない
+    // 止める対象ごとに別の一覧へ。1 つのタグで全部を決めない
     if (flags.bullet) collidables.push(obj)
     if (flags.camera) cameraBlockers.push(obj)
     if (!flags.player) return

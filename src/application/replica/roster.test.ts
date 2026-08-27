@@ -3,7 +3,7 @@ import { applyRoster, newRoster } from './roster'
 import type { ServerMessage } from '../protocol/types'
 
 /**
- * 名簿は**サーバーが持っている状態**なので、写しの側で試せる。
+ * 名簿は**サーバーが持っている状態**なので、レプリカの側で試せる。
  *
  * これまでは three のオブジェクト (RemotePlayer) が名前も陣営も体力も持って
  * いたので、GL 無しでは 1 行も確かめられなかった。
@@ -13,7 +13,7 @@ const SELF = 'alice'
 const roster = (players: unknown[]): ServerMessage =>
   ({ type: 'roster', players }) as ServerMessage
 
-describe('名簿の写し', () => {
+describe('名簿のレプリカ', () => {
   test('**自分は入れない。** 自分の体も体力も別の道で届く', () => {
     const r = newRoster()
     applyRoster(r, roster([{ id: SELF, name: 'A', health: 100, team: 'blue', slot: 0 }]), SELF)

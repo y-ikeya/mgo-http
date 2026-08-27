@@ -21,7 +21,7 @@ import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } fro
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
 import { Weapon } from '../arms/weapon'
-import type { PlayerSnapshot } from '../../../protocol/types'
+import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
 
 /** カプセルの円柱部分の長さ (m)。全高 = LENGTH + RADIUS * 2 */
@@ -340,7 +340,7 @@ export class Player {
   private boxLift = 0
   /** 鉛直方向の速度 (m/s)。接地中は 0 */
   /**
-   * 移動の規則へ渡す体。位置は object のものをそのまま指す。
+   * 移動のドメインルールへ渡す体。位置は object のものをそのまま指す。
    *
    * 速度と接地はここが持ち主になる。Player 側の同名のフィールドは
    * このオブジェクトを覗くだけにして、真実の置き場を 1 つにする。
@@ -1027,9 +1027,9 @@ export class Player {
   }
 
   /**
-   * 転がりの絵がまだ流れているか。**拘束 (rolling) より少し長い。**
+   * 転がりの絵がまだ流れているか。**ロック (rolling) より少し長い。**
    *
-   * 二段の型 (振りかぶり → 放す) を始めてよいかの判断に使う。拘束が解けた
+   * 二段の型 (振りかぶり → 放す) を始めてよいかの判断に使う。ロックが解けた
    * 瞬間に始めると、まだ転がっている絵の中で振りかぶりが終わってしまい、
    * **画面には一度も映らないのに投げられる**状態になる。
    */
@@ -1277,7 +1277,7 @@ export class Player {
 
     /*
      * 全身で転がっている間はクリップに焼かれた移動をそのまま辿る。入力は
-     * 受け付けない。速度に直して渡すのは、移動の規則を 1 本に通すため。
+     * 受け付けない。速度に直して渡すのは、移動のドメインルールを 1 本に通すため。
      * 位置へ直接足すと押し戻しも接地も素通りする。
      *
      * **受け身も同じ道を通す。** 以前は回避ローリングだけで、受け身は焼かれた
@@ -1687,7 +1687,7 @@ export class Player {
   /**
    * 再生すべきクリップを選ぶ。
    *
-   * 規則そのものは presentation/scene/actor/motion.ts にある。ここでやるのは、その規則が要る値を
+   * ドメインルールそのものは presentation/scene/actor/motion.ts にある。ここでやるのは、そのドメインルールが要る値を
    * 集めることと、決まった結果に応じて**こちら側の状態を畳む**ことだけ。
    * (敬礼をやめる、落下ループの尺を渡す、といった副作用は共有側に置けない)
    */

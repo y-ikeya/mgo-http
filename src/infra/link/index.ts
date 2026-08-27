@@ -1,6 +1,6 @@
 import { NetChannel } from './channel'
 import { NetSocket } from './socket'
-import type { NetTransport } from '../protocol/types'
+import type { NetTransport } from '../../application/protocol/types'
 import type { Identity } from '../auth/session'
 
 /**

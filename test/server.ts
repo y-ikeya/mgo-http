@@ -11,8 +11,8 @@
  *   - 切れた瞬間に leave を配っていないか
  *   - resume は名簿のあとに来るか
  */
-import { encodeSnapshot, isSnapshot, LOCOMOTIONS } from '../src/protocol/snapshot'
-import type { ClientMessage, PlayerSnapshot, ServerMessage } from '../src/protocol/types'
+import { encodeSnapshot, isSnapshot, LOCOMOTIONS } from '../src/infra/codec/snapshot'
+import type { ClientMessage, PlayerSnapshot, ServerMessage } from '../src/application/protocol/types'
 
 /** 起動を待つ上限 (ms) */
 const BOOT_TIMEOUT = 10_000

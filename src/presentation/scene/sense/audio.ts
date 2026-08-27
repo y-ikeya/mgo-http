@@ -54,7 +54,7 @@ const SOUNDS = {
   smg: { file: "p90_shot1.mp3", reference: 5, max: weaponOf("smg").noiseRange },
   smgReload: { file: "p90_reload1.mp3", reference: 2, max: 24 },
   /**
-   * 足音。**届く距離は規則から引く** (domain/rule/noise.ts の STEP_RANGE)。
+   * 足音。**届く距離はドメインルールから引く** (domain/rule/noise.ts の STEP_RANGE)。
    *
    * 走り (音量 1.0) が 20m、しゃがみ (0.3) は実質 8m ほどで聞こえなくなる。
    * 姿勢ごとに max を変えなくても、音量の違いが届く距離の違いになる。

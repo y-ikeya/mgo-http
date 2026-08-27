@@ -1,5 +1,5 @@
-import { decodeSnapshot, encodeSnapshot, isSnapshot, readSlot } from '../protocol/snapshot'
-import type { ClientMessage, NetTransport, ServerMessage } from '../protocol/types'
+import { decodeSnapshot, encodeSnapshot, isSnapshot, readSlot } from '../codec/snapshot'
+import type { ClientMessage, NetTransport, ServerMessage } from '../../application/protocol/types'
 
 /**
  * WebSocket の通信路。別のマシンにいる相手と繋ぐ。

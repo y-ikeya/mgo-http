@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
-import { Input } from "../../input";
+import { Input } from "../../infra/input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
@@ -56,7 +56,7 @@ import { isGun, type HeldId } from "../../domain/item/held";
 import { MODES, ROOM_STAGES, isHostile, isRoomName } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
-import type { NoiseEvent } from "../../protocol/types";
+import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
 import { STEP_UP } from "../../domain/player/moving";
 import {
@@ -64,34 +64,37 @@ import {
   flightTime,
   TRAJECTORY_STEPS,
 } from "../../sim/judge/bullet";
-import { createTransport } from "../../link";
+import { createTransport } from "../../infra/link";
 import {
   applyMatch,
   newMatchReplica,
   type MatchEffect,
-} from "../../replica/match";
+} from "../../application/replica/match";
 import {
   applyRoster,
   newRoster,
   type RosterEffect,
-} from "../../replica/roster";
+} from "../../application/replica/roster";
+import { applySelf, driftOf, newSelfReplica } from "../../application/replica/self";
 import {
   createCalibration,
   defaultKnobs,
   type Calibration,
   type Knobs,
 } from "./calibration";
-import type { NetTransport } from "../../protocol/types";
-import type { Identity } from "../../auth/session";
+import type { NetTransport } from "../../application/protocol/types";
+import type { Identity } from "../../infra/auth/session";
 import { selfSkin } from "./actor/skin";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
+  type MatchPhase,
+  type SelfMessage,
   type KillEvent,
   type MatchMessage,
   type ServerMessage,
   type Team,
-} from "../../protocol/types";
+} from "../../application/protocol/types";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 export interface GameStats {
@@ -238,9 +241,13 @@ const STAB_HIT_PHASE = 0.35;
 /** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
 const FALLBACK_STAB_DURATION = 1.9;
 
-/** 着弾痕の色。地形 / 命中 / 倒した */
+/**
+ * 弾痕の色。**地形に当たった分だけ。**
+ *
+ * 人に当たった痕は出さない — 痕はワールドに置くので、相手が動いた後もその場に
+ * 浮いてしまう。削られたことは足元の血で残す (Shots.blood)。
+ */
 const IMPACT_WORLD = 0xffd9a0;
-const IMPACT_HIT = 0xff5c47;
 /** 命中表示を HUD に出しておく時間 (秒) */
 const HIT_FEEDBACK_DURATION = 0.6;
 
@@ -323,6 +330,16 @@ const POINT_FEED_DURATION = 2.5;
  */
 const SPAWN_SPREAD = 1.5;
 
+/**
+ * 名簿を頼み直す間隔 (ms)。
+ *
+ * 往復は普通 30〜60ms なので、1 秒あれば来ているはず。それでも来ないなら
+ * **頼みか答えのどちらかが落ちている**ので、もう一度言う。
+ *
+ * 短くしすぎると、往復を待っている間に何十通も投げることになる。
+ */
+const ROSTER_RETRY = 1000;
+
 /** ID から湧く方向を決める。同じタブなら再読み込みしても同じ場所 */
 function spawnAngle(id: string): number {
   let hash = 0;
@@ -381,7 +398,7 @@ export class Game {
    * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
    *
    * --- なぜ 1 か所で数えるか ---
-   * 以前は「引いていたか」を控える札を 3 つの投げ物 (弾倉・手榴弾・クレイモア)
+   * 以前は「引いていたか」を控えるフラグを 3 つの投げ物 (弾倉・手榴弾・クレイモア)
    * が**共有して、それぞれが自分の番で倒していた**。順番が先の弾倉が先に倒すので、
    * 後から見る手榴弾には「もう引かれている」としか見えず、**手榴弾が投げられ
    * なかった**。
@@ -446,7 +463,7 @@ export class Game {
    * 手触りの仮置き。**調整パネルだけが動かす** (calibration.ts)。
    *
    * 既定は knobs.ts。パネルは開発時にしか出ないので通常は動かないが、
-   * Game が読むのはここ 1 つで、写しは持たない。
+   * Game が読むのはここ 1 つで、重複は持たない。
    */
   private readonly knobs: Knobs = defaultKnobs();
   /**
@@ -474,6 +491,22 @@ export class Game {
   private skills: Skills = {};
 
   private readonly spread = new Spread();
+  /**
+   * サーバーが持っている自分の値。**予測を直すためだけに持つ。**
+   *
+   * 描くのに使うのはこちらではなく、予測した側 (player / inv)。
+   */
+  private readonly self = newSelfReplica();
+  /**
+   * 名簿を待っているか。**試合が始まったら立ち、届いたら降りる。**
+   *
+   * 立っている間は 1 秒ごとに頼み直す (askRoster)。
+   */
+  private rosterWanted = false;
+  /** 最後に頼んだ時刻 (Date.now)。**頼みすぎない**ための間隔 */
+  private rosterAskedAt = 0;
+  /** 直前に見た段階。**変わった瞬間**を捕まえるのに要る */
+  private phaseSeen: MatchPhase | null = null;
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -554,14 +587,14 @@ export class Game {
   private snapshotHandle = 0;
   /** 直近のキル表示。新しいものが先頭 */
   /**
-   * 試合の写し。**サーバーが持っている状態を追従するだけ** (src/replica)。
+   * 試合のレプリカ。**サーバーが持っている状態を追従するだけ** (src/application/replica)。
    *
    * 段階・残機・得点・自分の所属・キルログは全部あちらが持つ。ここは受けた
    * 報せを渡して、返ってきた「やること」を絵と音にする。
    */
   private readonly replica = newMatchReplica();
   /**
-   * 名簿の写し。**誰が居て、いまどうなっているか** (src/replica/roster.ts)。
+   * 名簿のレプリカ。**誰が居て、いまどうなっているか** (src/application/replica/roster.ts)。
    *
    * 体 (RemotePlayers) はこれを見て姿を合わせるだけ。名前も所属も体力も状態も、
    * 決めているのはサーバー。
@@ -660,6 +693,8 @@ export class Game {
   /** 遠隔の弾道を描くための作業ベクトル */
   private readonly remoteFrom = new THREE.Vector3();
   private readonly remoteTo = new THREE.Vector3();
+  /** 他人の弾痕を向ける先。**弾の向きの逆** — 面の法線の代わりに使う */
+  private readonly impactFacing = new THREE.Vector3();
   private fps = 0;
   private onStats: ((stats: GameStats) => void) | null = null;
 
@@ -952,7 +987,7 @@ export class Game {
     // 押している間は手を挙げたまま。離すと下ろす
     this.player.setSaluteHeld(this.input.isActionDown("salute", "KeyV"));
     // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
-    // 先に見た物が倒した札を後の物が読むことになる
+    // 先に見た物が倒したフラグを後の物が読むことになる
     this.triggerEdge = this.input.firing && !this.wasFiring;
     this.wasFiring = this.input.firing;
     this.updateThrowAim();
@@ -979,6 +1014,7 @@ export class Game {
     this.player.setGhost(this.life === "spawning" || this.loadoutBlocking);
     this.updateRollContact();
     this.updateStab(dt);
+    this.askRosterIfWanted();
     const posture = {
       speed: this.player.speed,
       stanceRate: this.player.stanceRate,
@@ -1104,9 +1140,9 @@ export class Game {
 
   /** 他プレイヤーからのメッセージ。自分宛ての被弾はここで受ける */
   /**
-   * 写しが返してきた「やること」を絵と音にする。
+   * レプリカが返してきた「やること」を絵と音にする。
    *
-   * **写しは three を知らない。** 段階が変わったことは向こうが決め、飛んでいる
+   * **レプリカは three を知らない。** 段階が変わったことは向こうが決め、飛んでいる
    * 手榴弾を捨てるのはこちら、という分け方。
    */
   private perform(effect: MatchEffect): void {
@@ -1142,14 +1178,14 @@ export class Game {
   }
 
   /**
-   * 名簿の写しが返してきたことを、体に反映する。
+   * 名簿のレプリカが返してきたことを、体に反映する。
    *
-   * **写しは three を知らない。** 誰の姿を直すか・誰を消すか・どこで叫ぶかだけ
+   * **レプリカは three を知らない。** 誰の姿を直すか・誰を消すか・どこで叫ぶかだけ
    * 受け取って、実際に触るのはこちら。
    */
   private performRoster(effect: RosterEffect): void {
     switch (effect.kind) {
-      // 姿を写しに合わせる。倒れたかを決めるのは写しの側なので、
+      // 姿をレプリカに合わせる。倒れたかを決めるのはレプリカの側なので、
       // ここでは返り値を見ない
       case "sync":
         this.remotes.sync(effect.id, effect.entry);
@@ -1168,7 +1204,24 @@ export class Game {
   }
 
   private receive(message: ServerMessage): void {
-    // **写しを先に進める。** 段階も所属もキルログも、持っているのはあちら
+    /*
+     * 名簿の取りこぼしに気づく。**試合が始まったら、届くまで頼み続ける。**
+     *
+     * 試合の頭で陣営が切り直される。名簿を落とすと前の試合の色のまま描き、
+     * **敵味方が逆になる** — 撃てる相手かはクライアントが陣営で判断している
+     * ので、味方を撃ちに行って削れない、が起きる。
+     *
+     * サーバーからの自発的な送信は残っている (普段は 1 往復ぶん速い)。ここは
+     * それが落ちたときのための道で、**来なければもう一度頼む**。頼みのほうが
+     * 落ちることもあるので、「言えば来る」ではなく「来るまで言う」にする。
+     */
+    if (message.type === "match" && message.phase === "countdown") {
+      if (this.phaseSeen !== "countdown") this.rosterWanted = true;
+    }
+    if (message.type === "match") this.phaseSeen = message.phase;
+    if (message.type === "roster") this.rosterWanted = false;
+
+    // **レプリカを先に進める。** 段階も所属もキルログも、持っているのはあちら
     for (const effect of applyMatch(this.replica, message, this.net.id, Date.now())) {
       this.perform(effect);
     }
@@ -1185,7 +1238,25 @@ export class Game {
         // 当たったかどうかはここには載っていない (health で別に届く)。
         this.remoteFrom.fromArray(message.from);
         this.remoteTo.fromArray(message.to);
-        this.shots.fire(this.remoteFrom, this.remoteTo, null, IMPACT_WORLD);
+        /*
+         * **他人の弾も痕を残す。**
+         *
+         * 長らく痕を出していなかった (法線を渡していなかった)。自分が外した
+         * 痕だけが残る形で、**索敵の材料になるのは他人の痕のほう**なので、
+         * 残す意味の半分が消えていた。
+         *
+         * 面の向きは弾の向きで代用する。`to` は撃った本人が出した着弾点なので
+         * 位置は分かるが、どの面に当たったかは届いていない。正面から当たれば
+         * 正しく、**浅い角度だと壁へ食い込む** — そこが気になったら地形の箱と
+         * 突き合わせて本当の法線を出す (この時点では割に合わない)。
+         */
+        this.impactFacing.subVectors(this.remoteFrom, this.remoteTo).normalize();
+        this.shots.fire(
+          this.remoteFrom,
+          this.remoteTo,
+          this.impactFacing,
+          IMPACT_WORLD,
+        );
         {
           // 撃った本人にボルト操作を流し、音もその銃のものにする。
           // 全部ライフルの音だと、撃たれた側は相手の武器を読み違える
@@ -1203,11 +1274,23 @@ export class Game {
         this.applyHealth(message);
         break;
 
+      /*
+       * 自分の本当の値。**3 秒ごとに届く。**
+       *
+       * 撃った瞬間に減らすのも、体力 0 で倒れるのもこちらがやっている
+       * (押した瞬間に返らないと手触りが壊れる)。ここで受けるのは
+       * 「本当はこう」という値だけで、**ずれていたら合わせる**ために使う。
+       * 普段は一致しているので何も起きない。
+       */
+      case "self":
+        this.applySelf(message);
+        break;
+
 
       // 繋ぎ直したときに届く、離脱前の続き。
       //
       // 湧き地点へは戻さない。**その命の続き**なので、居た場所に居た体力で戻る。
-      // 弾数もサーバーが写しを持っているので、そちらを正とする
+      // 弾数もサーバーがレプリカを持っているので、そちらを正とする
       case "resume":
         this.player.resumeAt(message.x, message.y, message.z, message.health);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
@@ -1251,7 +1334,7 @@ export class Game {
         if (message.id !== this.net.id) this.remotes.warp(message.id);
         break;
 
-      // 光っている人 (個人戦の 1 位) を体に出す。写しは持っているが、
+      // 光っている人 (個人戦の 1 位) を体に出す。レプリカは持っているが、
       // 光らせるのは絵の仕事
       case "match":
         this.remotes.setLeaking(message.leader ?? null);
@@ -1371,7 +1454,7 @@ export class Game {
         this.audio.play("blastScream", this.player.position);
         break;
 
-      // 名前と所属は写しが受け取っている。ここでやるのは折り返しだけ —
+      // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —
       // 参加を知ったら即座に返す。相手の画面に現れるまでを次の周期まで待たせない
       case "join":
         this.broadcast();
@@ -1383,7 +1466,7 @@ export class Game {
 
       // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
       // ここから出る。推し量る側の判断はどこにも残さない
-      // 他人のぶんは写しが受け取っている (sync / died)
+      // 他人のぶんはレプリカが受け取っている (sync / died)
       case "life":
         if (message.id === this.net.id) this.setLife(message.state);
         break;
@@ -1405,9 +1488,73 @@ export class Game {
    * サーバーの計算とずれて「死んだはずが生きている」が起きる。
    * 表示が一拍遅れる代わりに、全員が同じ数字を見る。
    */
+  /**
+   * サーバーが持っている自分の値と突き合わせる。
+   *
+   * --- 直し方は物によって違う ---
+   * 弾数は**黙って合わせる**。ずれる原因は「撃った申告が届かなかった」なので、
+   * 音も画面の反応も要らない — 数字が正しくなればよい。
+   *
+   * 体力は**合わせない。** 減ったことは health の報せが音と画面の反応ごと
+   * 運んでいて、こちらで上書きすると**同じダメージを 2 回受けたように見える**。
+   * ここでは食い違いを控えるだけにして、直すのは health の道に任せる。
+   */
+  /**
+   * 名簿を待っている間、**1 秒ごとに頼み直す**。
+   *
+   * 間隔を空けるのは、届くまでの往復のあいだに何十通も投げないため。
+   * 1 秒あれば往復は済んでいるので、それでも来ないなら落ちている。
+   */
+  private askRosterIfWanted(): void {
+    if (!this.rosterWanted) return;
+    const now = Date.now();
+    if (now - this.rosterAskedAt < ROSTER_RETRY) return;
+    this.rosterAskedAt = now;
+    this.net.send({ type: "refetchRoster" });
+  }
+
+  private applySelf(message: SelfMessage): void {
+    applySelf(this.self, message);
+
+    const gun = this.weapon.id;
+    const drift = driftOf(
+      this.self,
+      {
+        health: this.player.health,
+        magazine: this.inv.ammoOf(gun),
+        reserve: this.inv.reserveOf(gun),
+        grenades: this.inv.supportCount,
+      },
+      gun,
+    );
+
+    // 弾数と投擲物だけ合わせる。**持っている物にだけ当たる** (restore)
+    if (drift.magazine !== 0 || drift.reserve !== 0 || drift.grenades !== 0) {
+      this.inv.restore(message.magazine, message.reserve, message.grenades);
+    }
+  }
+
   private applyHealth(message: HealthMessage): void {
+    /*
+     * 削られた人の足元に血を落とす。**弾も爆風もここを通る。**
+     *
+     * 撃った所ではなく health で見るのは、道が 1 本だからで — 手榴弾も
+     * クレイモアも落下も、削れたことは全部この報せで届く。撃つ側に書くと
+     * **爆風のぶんを書き忘れる**。
+     *
+     * 体ではなく地面に残す。体に貼るには骨で動く頂点に沿わせる必要があって
+     * 費用が跳ね上がるが、地面なら弾痕と同じ仕掛けでよい。
+     */
+    if (message.damage > 0) {
+      const at =
+        message.id === this.net.id
+          ? this.player.position
+          : this.remotes.positionOf(message.id);
+      if (at) this.shots.blood(at);
+    }
+
     if (message.id !== this.net.id) {
-      // 体力そのものは写しが持っている (sync)。ここは見た目の反応だけ
+      // 体力そのものはレプリカが持っている (sync)。ここは見た目の反応だけ
       if (message.flinch) this.remotes.flinch(message.id);
       // 倒れた相手の叫びは life で鳴らす (倒れたと決めるのは体力ではなく状態)。
       // 倒れなかった頭への一発はうめきになる。近くの相手にだけ届く。
@@ -1523,7 +1670,7 @@ export class Game {
   }
 
   /**
-   * 自分がどういう状態に居るか。**サーバーが決めたものの写し。**
+   * 自分がどういう状態に居るか。**サーバーが決めたもののレプリカ。**
    *
    * 以前はここが無く、「体力が 0 か」「試合の段階は何か」から必要な場所で
    * 都度組み立てていた。組み立て方が場所ごとにずれて不具合になっていたので、
@@ -1537,8 +1684,8 @@ export class Game {
    * サーバーが状態を移した。
    *
    * 装備画面の出し入れも、無敵の見た目も、入力を受けるかも全部ここから出る。
-   * 「開いているか」という別の札は持たない — 持つと、状態と札の 2 つが
-   * 食い違い得る場所が生まれる (実際、札が閉じたまま開き直らない不具合があった)。
+   * 「開いているか」という別のフラグは持たない — 持つと、状態とフラグの 2 つが
+   * 食い違い得る場所が生まれる (実際、フラグが閉じたまま開き直らない不具合があった)。
    */
   private setLife(state: Life): void {
     if (this.life === state) return;
@@ -1683,7 +1830,7 @@ export class Game {
    *
    * 組めるのは湧くときだけなので、その場面では**すぐ**効かせる。
    * 次の湧きを待つと、支度の間に選び直した分が 1 試合ぶん遅れて効く。
-   * サーバーも同じ規則で手榴弾を配っているので、ここを揃えないと
+   * サーバーも同じドメインルールで手榴弾を配っているので、ここを揃えないと
    * 画面には 3 個あるのに投げられない、が起きる。
    */
   private applyLoadoutNow(): void {
@@ -1972,7 +2119,7 @@ export class Game {
       return;
     // ボルトを送り終えるまでは弾倉に触れない。
     //
-    // 持ち替え・ダンボール・ローリングで飛ばせないようにしてあるのと同じ規則。
+    // 持ち替え・ダンボール・ローリングで飛ばせないようにしてあるのと同じドメインルール。
     // ここが抜けていて、撃った直後に R を押すとコッキングを省略できた。
     if (this.cocking) return;
     if (this.ammo >= this.weapon.magazine) return;
@@ -1998,7 +2145,7 @@ export class Game {
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
     {
-      // 何度・どこへ散るかは規則が決め、傾けるのは幾何がやる
+      // 何度・どこへ散るかはドメインルールが決め、傾けるのは幾何がやる
       const cone = this.spread.coneFor(this.weapon, this.shotCount, this.skills);
       offsetInCone(this.aimDir, cone.degrees, cone.angle01, cone.radius01);
     }
@@ -2008,7 +2155,6 @@ export class Game {
     const terrain = shot.terrain;
     // 距離は銃口からではなく照準の起点から測る。弾道の判定と同じ基準にする。
     const distance = shot.distance;
-    const hit = player || terrain;
     if (player) {
       /*
        * 撃てる相手か。**陣営ではなくルールに聞く。**
@@ -2048,8 +2194,10 @@ export class Game {
     this.shots.fire(
       this.muzzlePos,
       this.hitPoint,
-      hit ? this.hitNormal : null,
-      player ? IMPACT_HIT : IMPACT_WORLD,
+      // **人に当たったら痕を出さない。** 痕はワールドに置くので、当たった
+      // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
+      player ? null : terrain ? this.hitNormal : null,
+      IMPACT_WORLD,
     );
     this.shotCount++;
     this.inv.spend();
@@ -2063,7 +2211,7 @@ export class Game {
       to: [this.hitPoint.x, this.hitPoint.y, this.hitPoint.z],
     });
 
-    // 跳ね上がりは規則の側が持っている (domain/item/spread.ts)
+    // 跳ね上がりはドメインルールの側が持っている (domain/item/spread.ts)
     const [kickPitch, kickYaw] = this.spread.fired(
       this.shotCount,
       this.weapon,
@@ -2115,16 +2263,16 @@ export class Game {
    * 押した瞬間に飛ぶ形だと、狙った場所へ落とすのが運になる。
    *
    * 数を限ってあるのは、無制限だと「とりあえず投げ続ける」が最適になって
-   * 読み合いにならないため。1 回の命につき数発で、外せば手札が減る。
+   * 読み合いにならないため。1 回の命につき数発で、外せば手フラグが減る。
    */
   private updateThrowAim(): void {
     // ボルトを送り終えるまでは投げられない。持ち替え・ダンボール・ローリング・
-    // リロードと同じ規則。ここが抜けていて、撃った直後に投げるとコッキングを
+    // リロードと同じドメインルール。ここが抜けていて、撃った直後に投げるとコッキングを
     // 省略できた
     const canThrow =
       this.inv.held === "magazine" && canAct(this.life) && !this.cocking;
     const held = canThrow && this.input.aiming;
-    // 手榴弾・クレイモアと同じ規則。構え始めと同じフレームの分も覚えておく
+    // 手榴弾・クレイモアと同じドメインルール。構え始めと同じフレームの分も覚えておく
     const pulled = this.triggerEdge || this.pendingDecoy;
     const release = held && this.throwAiming && pulled;
 
@@ -2235,7 +2383,7 @@ export class Game {
       // 状態で立ち上がる — 画面には振りかぶりが一度も映っていないのに、
       // クリックすれば即座に飛ぶ。転がりが振りかぶりの時間を丸ごと踏み倒す。
       //
-      // **見るのは rolling ではなく rollShowing。** 拘束 (rolling) は
+      // **見るのは rolling ではなく rollShowing。** ロック (rolling) は
       // ROLL_EXIT_PHASE で先に解けるので、そこで再開すると振りかぶりが
       // **転がりの尻尾の中で始まって終わる** — 畳んだのに、やはり一度も映らない。
       // 絵が終わるまで待てば、立ち上がってから振りかぶり直すのが見える。
@@ -2254,6 +2402,20 @@ export class Game {
     const release = held && this.grenadeAiming && pulled;
 
     if (held && !release) {
+      /*
+       * **前の 1 個が手を離れるまで、次を構え始めない。**
+       *
+       * 構えたまま (Shift を押したまま) 引き金を引くと、その次のフレームには
+       * grenadeAiming が倒れていて「構え始め」に見える。そこで振りかぶりを
+       * 頭から流し直していたので、**振り上げている最中に前の 1 個が飛んだ**。
+       * 振り上げ切った時には 2 個目が構えられている、という形で出る。
+       *
+       * 手を離れるのは引き金を引いた 1.5 秒後まで遅れることがある
+       * (振りかぶりの残りを待つため)。その間は投げの型が流れているので、
+       * 新しい振りかぶりを重ねてはいけない。
+       */
+      if (this.grenadeRelease > 0) return;
+
       // 構えた瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
       // 落下点はその間ずっと見える — どこへ落とすかを見てから放せるように
       if (!this.grenadeAiming) {
@@ -2368,7 +2530,7 @@ export class Game {
       !this.player.rollShowing &&
       !this.cocking;
     const held = canPlace && this.input.aiming;
-    // 手榴弾と同じ規則。**構え始めと同じフレームに引かれた分も覚えておく**
+    // 手榴弾と同じドメインルール。**構え始めと同じフレームに引かれた分も覚えておく**
     const pulled = this.triggerEdge || this.pendingSetup;
     const release = held && this.setupAiming && pulled;
 
@@ -2385,7 +2547,7 @@ export class Game {
 
     if (!this.setupAiming) {
       /*
-       * 置き切る前に構えをやめた。**置かない** (手榴弾と同じ規則)。
+       * 置き切る前に構えをやめた。**置かない** (手榴弾と同じドメインルール)。
        *
        * 手を離れるのは引き金を引いたあと。その間に構えを解けば腕は下りるので、
        * 画面では置いていない。**見た通りに起きる**ほうを取る。
@@ -2486,7 +2648,7 @@ export class Game {
    * それが投げること・刺すことの代償になっている (docs/design.md の 5)。
    */
   /**
-   * 手にある物。**押されている物を Intent に訳して、規則へ渡すだけ。**
+   * 手にある物。**押されている物を Intent に訳して、ドメインルールへ渡すだけ。**
    *
    * 判断そのものは domain (item/inventory.ts の hand)。ここに残るのは
    * キーコードと、返ってきた結果を通信・音・右スティックの用途に配ること。
@@ -2912,7 +3074,7 @@ export class Game {
       // OK が効くようになるまで。押せないボタンを押させないための表示
       loadoutWait: Math.max(0, Math.ceil(CHOOSE_FLOOR - this.chooseElapsed)),
       skills: this.skills,
-      // 窓が開いているかは試合の段階で決まる。規則は domain が持つ
+      // 窓が開いているかは試合の段階で決まる。ドメインルールは domain が持つ
       skillsOpen: canChooseSkills(this.replica.match?.phase ?? "waiting"),
       scoped: this.scoped,
       equipped: this.player.equipped,

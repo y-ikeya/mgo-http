@@ -1,9 +1,9 @@
-import type { Locomotion } from '../domain/player/locomotion'
-import type { HitZone } from '../domain/rule/damage'
-import type { Surface } from '../domain/stage/surface'
-import type { SupportId, WeaponId } from '../domain/item/weapons'
-import type { HeldId } from '../domain/item/held'
-import type { Life } from '../domain/player/lifecycle'
+import type { Locomotion } from '../../domain/player/locomotion'
+import type { HitZone } from '../../domain/rule/damage'
+import type { Surface } from '../../domain/stage/surface'
+import type { SupportId, WeaponId } from '../../domain/item/weapons'
+import type { HeldId } from '../../domain/item/held'
+import type { Life } from '../../domain/player/lifecycle'
 
 /**
  * ネットワークで流す型。
@@ -24,8 +24,8 @@ import type { Life } from '../domain/player/lifecycle'
  * 通信の型が陣営を宣言していたのは順番が逆で、protocol はゲームの言葉を
  * 借りて話す側。ここから出しているのは、読む側の import を変えないため。
  */
-import type { Team } from '../domain/player/player'
-import type { Mode } from '../domain/match/room'
+import type { Team } from '../../domain/player/player'
+import type { Mode } from '../../domain/match/room'
 export type { Team }
 
 /** 1 人分の見た目の状態。体力はここに含めない (サーバーが持つ) */
@@ -114,7 +114,7 @@ export interface PlayerSnapshot {
    * locomotion が 'salute' であることだけでは、手を挙げたままなのか
    * 下ろしている途中なのかが区別できない。再生位置を送るより、
    * 「まだ押している」という 1 ビットを送って、受け取った側が
-   * 同じ規則で止めるほうが小さいし、途中で取りこぼしても次で復帰する。
+   * 同じドメインルールで止めるほうが小さいし、途中で取りこぼしても次で復帰する。
    */
   saluteHeld: boolean
 }
@@ -459,6 +459,54 @@ export interface SpawnRequest {
   type: 'spawn'
 }
 
+/**
+ * 名簿をもう一度くれ。**取りこぼしに気づいたクライアントが頼む。**
+ *
+ * --- なぜ頼む形が要るか ---
+ * 名簿はサーバーが決まった時 (入室・試合の頭) に送っていた。押し付ける形だと、
+ * **落ちたことに誰も気づけない**。名簿が欠けると人が描かれず、陣営が古いと
+ * 味方を撃ちに行くのに削れない (敵味方はクライアントが陣営で判断している)。
+ *
+ * 頼む形にすると、**来なければもう一度頼める**。落ちるのは頼みのほうかも
+ * しれないので、「言えば必ず来る」ではなく「来るまで言う」が本体になる。
+ *
+ * サーバーからの自発的な送信は残してある。普段は 1 往復ぶん速い。
+ */
+export interface RefetchRoster {
+  type: 'refetchRoster'
+}
+
+/**
+ * 自分の本当の値。**3 秒ごとに、1 人ずつ届く。**
+ *
+ * --- なぜ要るか ---
+ * 体力も弾数もサーバーが持っているのに、**弾数は届いていなかった**。
+ * クライアントは自分で数えていて、サーバーも別に数えていて、突き合わせるのは
+ * 繋ぎ直したときだけ。ずれても直しようが無い。
+ *
+ * --- 予測は残す ---
+ * 撃った瞬間に残弾が減り、体力が 0 で倒れる、という反応はクライアントが
+ * 自分の数でやる。**押した瞬間に返らないと手触りが壊れる**ので、届くのを
+ * 待たない。これはサーバーが正しい値を後から渡すだけで、**ずれていたら
+ * 合わせる**ためにある。
+ *
+ * roster が「全員のこと」を運ぶのに対して、こちらは「自分のこと」。
+ *
+ * 試合の便 (match) より粗い。あちらは全員へ同じ物を 1 通だが、こちらは
+ * **人ごとに違う物を人数分**送るので、同じ間隔だと 8 人部屋で 8 倍になる。
+ */
+export interface SelfMessage {
+  type: 'self'
+  /** 体力 */
+  health: number
+  /** 銃ごとの装填済み。持っていない銃は 0 */
+  magazine: Record<WeaponId, number>
+  /** 銃ごとの予備 */
+  reserve: Record<WeaponId, number>
+  /** 残りの投擲物 */
+  grenades: number
+}
+
 export interface HiddenEvent {
   type: 'hidden'
   id: string
@@ -694,7 +742,7 @@ export interface RespawnMessage {
  * 武器を地面へ置く。
  *
  * **中身も一緒に送る。** 持ち物を持っているのはクライアント側で、サーバーは
- * 銃ごとの弾の写ししか持っていない (繋ぎ直し用)。置いた物の残弾は本人しか
+ * 銃ごとの弾のレプリカしか持っていない (繋ぎ直し用)。置いた物の残弾は本人しか
  * 知らないので、申告してもらう。
  *
  * 撃ち合いの結果に効くのは「拾った人がその銃を使えるか」までで、残弾を多めに
@@ -759,6 +807,7 @@ export type ClientMessage =
   | PickUpEvent
   | FallEvent
   | SpawnRequest
+  | RefetchRoster
   | ReloadEvent
   // 見た目だけの物。当たったかどうかに関わらないので素通しする
   | ShotEvent
@@ -783,6 +832,7 @@ export type ServerMessage =
   | SkillsEvent
   | HiddenEvent
   | ExposedEvent
+  | SelfMessage
   | ExplosionEvent
   | KnockDownEvent
   | GrenadeSpawn

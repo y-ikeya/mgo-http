@@ -5,7 +5,7 @@
  * 「誰が席に着いているか」「残機はいくつか」「いまどの段階か」で、
  * **誰にどう配るかは接続の話**なので入れない。
  *
- * 置き場所の規則は docs/design.md の 7。
+ * 置き場所の決めごとは docs/design.md の 7。
  */
 import { isSeated } from '../player/lifecycle'
 import type { Player, Team } from '../player/player'
@@ -49,6 +49,8 @@ export interface Match {
   winner?: Team | 'draw'
   /** 最後に状態を配った時刻。1 秒ごとに配る */
   lastBroadcast: number
+  /** 自分の本当の値を最後に配った時刻。**全員へ配る便とは別の時計** */
+  lastSelfAt: number
   /** 最後に「切れた人の体」を配り直した時刻 */
   lastLimbo: number
   /**
@@ -70,6 +72,7 @@ export function newMatch(mode: Mode): Match {
     endsAt: 0,
     phase: 'waiting',
     lastBroadcast: 0,
+    lastSelfAt: 0,
     lastLimbo: 0,
     matchId: null,
     startedAt: 0,
@@ -141,6 +144,40 @@ export function assignTeam(room: Match): Team {
 }
 
 /**
+ * 試合の頭で陣営を切り直す。**毎回、顔ぶれが変わる。**
+ *
+ * --- なぜ切り直すか ---
+ * 入室のときに 1 回決めたきりだと、**同じ面子が同じ側で何試合も続く**。
+ * 強い人が固まった側が勝ち続け、負けている側は抜ける。人が少ないうちほど
+ * 効いてしまう。
+ *
+ * --- どう切るか ---
+ * 順番を混ぜてから、半分ずつに割る。**人数の偏りは作らない** — 偏ったまま
+ * 始まると腕前より頭数で決まる、というのは入室のときと同じ (assignTeam)。
+ *
+ * 奇数なら青が 1 人多い。どちらかに寄せるしかないので、決め打ちにして
+ * 揺らさない。
+ *
+ * @param roll 0..1 の一様乱数を返す関数。**時計も乱数もここでは引かない** —
+ *   引くと同じ引数で答えが変わり、試験が書けなくなる
+ */
+export function shuffleTeams(room: Match, roll: () => number): void {
+  // 陣営で分かれない部屋 (個人戦・休憩・練習) は切り直す物が無い
+  if (!room.mode.teams || room.mode.id === 'PRACTICE') return
+
+  const seats = connected(room)
+  // Fisher-Yates。後ろから順に、まだ決まっていない範囲と入れ替える
+  for (let i = seats.length - 1; i > 0; i--) {
+    const j = Math.floor(roll() * (i + 1))
+    ;[seats[i], seats[j]] = [seats[j], seats[i]]
+  }
+  const half = Math.ceil(seats.length / 2)
+  seats.forEach((player, index) => {
+    player.team = index < half ? 'blue' : 'red'
+  })
+}
+
+/**
  * 残機を 1 減らす。**残機が動く道はここ 1 本だけ**にする。
  *
  * 以前は点を 2 箇所 (銃と手榴弾) で別々に動かしていた。片方に足し忘れても
@@ -202,7 +239,7 @@ export function leaderOf(room: Match): Player | null {
  * 静かにずれる。しかも壁を無視して位置を配るかどうかを決めている式なので、
  * ずれたときの出方が「表示がおかしい」で済まない。
  *
- * **光る理由はこれから増える。** リンクを抜かれた相手も同じ札に乗る
+ * **光る理由はこれから増える。** リンクを抜かれた相手も同じフラグに乗る
  * (docs/design.md の 3)。理由が増えても**ここだけが増える**形にしておく。
  *
  * 蓄えずに毎回導くのは、1 位が得点から決まるため。フラグにすると、倒した /

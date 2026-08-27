@@ -21,7 +21,16 @@ import { dropWeapon, pickUp } from './arms/drops'
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
 import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
-import { leaveRoom, matchState, recordSeat, spawn, updateMatch, updateTargets } from './match'
+import {
+  leaveRoom,
+  matchState,
+  recordSeat,
+  rosterMessage,
+  sendSelf,
+  spawn,
+  updateMatch,
+  updateTargets,
+} from './match'
 import { receiveSnapshot, relayShot, relayState, sendHealth } from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
@@ -30,7 +39,7 @@ import { verifyToken, type Identity } from './auth'
 import { lifeElapsed, newPlayer, type Player } from '../src/domain/player/player'
 import { MODES, ROOM_MODE, ROOM_NAMES, isRoomName, modeOf } from '../src/domain/match/room'
 import { RECONNECT_GRACE, assignTeam, connected, present, nextSlot } from '../src/domain/match/match'
-import { stampLocomotion, stampProtected } from '../src/protocol/snapshot'
+import { stampLocomotion, stampProtected } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD } from '../src/domain/item/held'
 import { triggeredBy } from '../src/sim/judge/claymore'
@@ -40,7 +49,7 @@ import { loadSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
-import type { ClientMessage, RoomSummary, ServerMessage } from '../src/protocol/types'
+import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
 
 
@@ -80,6 +89,8 @@ setInterval(() => {
   try {
     const now = Date.now()
     for (const room of rooms.values()) {
+      // 自分の本当の値を 1 人ずつ配る。**予測を直すため**で、普段は一致している
+      sendSelf(room, now)
       // 切れた人の体をその場に残す。
       //
       // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
@@ -405,7 +416,7 @@ function handleMessage(
      * 武器を地面へ置く。
      *
      * **持ち物を持っているのはクライアント側**なので、何を置いたかは
-     * 申告してもらう。こちらは「その銃の写しを捨てる」だけ — 繋ぎ直した
+     * 申告してもらう。こちらは「その銃のレプリカを捨てる」だけ — 繋ぎ直した
      * ときに、置いたはずの銃が戻ってきては困る。
      */
     case 'drop':
@@ -477,6 +488,16 @@ function handleMessage(
       break
     }
 
+    /*
+     * 名簿をくれ、と言われた。**その人にだけ返す。**
+     *
+     * 取りこぼしに気づいたクライアントが頼んでくる。来なければまた頼んで
+     * くるので、こちらは受けたら返すだけでよい — 届いたかを覚えない。
+     */
+    case 'refetchRoster':
+      sessionOf(player).socket.send(JSON.stringify(rosterMessage(room)))
+      break
+
     // 装填が**終わった**。尺はクライアントが持っているので、
     // こちらは移すだけでよい
     case 'reload':
@@ -535,7 +556,7 @@ const server = Bun.serve<Client>({
 
     // --- 部屋の一覧 ---
     if (url.pathname === '/rooms') {
-      // 返す形は src/protocol/types.ts の RoomSummary。画面側も同じ宣言を読む。
+      // 返す形は src/application/protocol/types.ts の RoomSummary。画面側も同じ宣言を読む。
       // satisfies なので、増やしても減らしてもここで落ちる
       const summaries = ROOM_NAMES.map((name) => {
         const room = rooms.get(name)
@@ -643,22 +664,10 @@ const server = Bun.serve<Client>({
 
       // 今いる全員と試合の状態を渡す。
       // 参加の通知を 1 通取りこぼしても、名簿で回復できる。
-      socket.send(
-        JSON.stringify({
-          type: 'roster',
-          players: present(room).map((p) => ({
-            id: p.id,
-            name: p.name,
-            health: p.health,
-            team: p.team,
-            slot: p.slot,
-            // 状態も載せる。life は変わった時にしか配らないので、後から
-            // 繋いだ人はここで受け取らないと既定値 (joining) のままになり、
-            // **その人たちが一度も描かれない**
-            life: p.life,
-          })),
-        } satisfies ServerMessage),
-      )
+      //
+      // 同じ物を試合の頭でも配る (resetPlayers) — **陣営を切り直すので、
+      // 配らないと前の試合の色のまま描く**
+      socket.send(JSON.stringify(rosterMessage(room)))
       socket.send(JSON.stringify(matchState(room)))
 
       // **名簿のあとに渡す。** 名簿を受けたクライアントは placeAtSpawn で

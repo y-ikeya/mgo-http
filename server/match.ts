@@ -1,18 +1,27 @@
 /**
  * 試合の段階と時計。
  *
- * 誰が湧いて、いつ始まって、いつ終わるか。得点そのものの規則は domain
+ * 誰が湧いて、いつ始まって、いつ終わるか。得点そのもののドメインルールは domain
  * (rule/scoring.ts)、ここに在るのはそれを試合の時間に当てはめる側。
  */
 
-import { MIN_PLAYERS, type Match, connected, holdingSeats, leakingOf, soleTeam } from '../src/domain/match/match'
+import {
+  MIN_PLAYERS,
+  type Match,
+  connected,
+  holdingSeats,
+  leakingOf,
+  present,
+  shuffleTeams,
+  soleTeam,
+} from '../src/domain/match/match'
 import { isSeated } from '../src/domain/player/lifecycle'
 import { type Player, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
-import { encodeSnapshot } from '../src/protocol/snapshot'
-import type { ServerMessage } from '../src/protocol/types'
+import { encodeSnapshot } from '../src/infra/codec/snapshot'
+import type { ServerMessage } from '../src/application/protocol/types'
 import { recordPose, relayState, sendHealth } from './relay'
-import { sessionOf, sessions } from './session'
+import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
 import { saveSkills } from './skills'
 import { type RoomWorld, TARGET_RESPAWN, broadcast, setLife } from './world'
@@ -46,6 +55,19 @@ export const COUNTDOWN = 5 * 1000
 
 /** 試合の状態を配る間隔 (ms)。残り時間の表示に要る */
 export const MATCH_BROADCAST = 1000
+
+/**
+ * 自分の本当の値を配る間隔 (ms)。**試合の便より粗い。**
+ *
+ * あちらは全員へ同じ物を 1 通、こちらは**人ごとに違う物を人数分**送るので、
+ * 同じ間隔だと 8 人部屋で 8 倍になる。
+ *
+ * 粗くてよいのは、これが**ずれ直し専用**だから。撃った瞬間に減らすのも
+ * 体力 0 で倒れるのもクライアントがやっていて、ここは「本当はこう」を
+ * 後から渡すだけ。ずれるのは申告が落ちたときだけなので稀で、3 秒直らなくても
+ * 遊びには出ない。
+ */
+export const SELF_BROADCAST = 3000
 
 /**
  * 遮蔽になる箱。ステージの書き出しが glb と一緒に作る。
@@ -171,6 +193,14 @@ export function matchState(room: Match): ServerMessage {
 export function resetPlayers(room: RoomWorld): void {
   // 前の試合の手榴弾が残っていると、始まった直後に爆発する
   room.grenades.length = 0
+  /*
+   * **陣営を切り直す。** 入室で 1 回決めたきりだと、同じ面子が同じ側で
+   * 何試合も続く。強い側が勝ち続け、負けている側から抜けていく。
+   *
+   * 切ったら名簿を配り直す。**差分 (life / health) では陣営が動かない**ので、
+   * 配らないとクライアントは前の試合の色のまま描く。
+   */
+  shuffleTeams(room, Math.random)
   for (const player of connected(room)) {
     player.kills = 0
     player.deaths = 0
@@ -187,6 +217,7 @@ export function resetPlayers(room: RoomWorld): void {
     player.concentratingSince = 0
     sendHealth(room, player, 0, false)
   }
+  broadcast(room, rosterMessage(room))
 }
 
 /**
@@ -381,5 +412,56 @@ export function updateMatch(room: RoomWorld, now: number): void {
   if (previous !== room.phase || now - room.lastBroadcast >= MATCH_BROADCAST) {
     room.lastBroadcast = now
     broadcast(room, matchState(room))
+  }
+}
+
+/**
+ * 名簿を組む。**入った人へ 1 回、試合の頭でもう 1 回。**
+ *
+ * 入室のときにしか配っていなかった。陣営が入室で決まったきりだったので
+ * それで足りていたが、**試合ごとに切り直す**ようにした以上、切った後に
+ * 配り直さないとクライアントは古い色のまま描く。
+ */
+export function rosterMessage(room: RoomWorld): ServerMessage {
+  return {
+    type: 'roster',
+    players: present(room).map((p) => ({
+      id: p.id,
+      name: p.name,
+      health: p.health,
+      team: p.team,
+      slot: p.slot,
+      // 状態も載せる。life は変わった時にしか配らないので、後から
+      // 繋いだ人はここで受け取らないと既定値 (joining) のままになり、
+      // **その人たちが一度も描かれない**
+      life: p.life,
+    })),
+  } satisfies ServerMessage
+}
+
+/**
+ * 自分の本当の値を、1 人ずつ配る。**3 秒ごと** (SELF_BROADCAST)。
+ *
+ * 全員へ同じ物を配る便 (matchState) には乗せられない。体力も弾数も人ごとに
+ * 違うので、**送り先ごとに中身が変わる**。
+ *
+ * これはクライアントの予測を**直すため**にある。撃った瞬間に減らすのも、
+ * 体力 0 で倒れるのもクライアントがやっていて、ここが渡すのは「本当はこう」
+ * という値だけ。普段は一致しているので、届いても何も起きない。
+ */
+export function sendSelf(room: RoomWorld, now: number): void {
+  if (now - room.lastSelfAt < SELF_BROADCAST) return
+  room.lastSelfAt = now
+  for (const player of connected(room)) {
+    const ammo = player.inventory.ammoTable()
+    sessionFor(player)?.socket.send(
+      JSON.stringify({
+        type: 'self',
+        health: player.health,
+        magazine: ammo.magazine,
+        reserve: ammo.reserve,
+        grenades: player.grenades,
+      } satisfies ServerMessage),
+    )
   }
 }

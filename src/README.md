@@ -4,22 +4,28 @@
 [layers.test.ts](layers.test.ts) の表 1 つで宣言してあり、破ると試験が落ちる。
 
 ```
-domain        遊びの語彙と数字          何も知らない
+domain        遊びの語彙と数字          依存なし
   ↑
 sim           世界に訊く手続き          domain の**型だけ** (値は引数で受け取る)
-protocol      通信で流れる形            domain の語彙だけ
   ↑
-replica       こちら側の状態の写し      domain / protocol
+application   こちら側の状態と、外との約束
+  protocol/     線を流れる形 (client と server の約束)   domain の語彙だけ
+  replica/      サーバーの状態を追う                     domain / protocol
 server/       審判。状態を持ち、配る    domain / sim / protocol  (src の外)
   ↑
 presentation  見せる・聞かせる          上の全部 + three
 
-端 (層ではない。誰も彼らに依存しない)
-  input.ts    押されたか
-  link/       回線 (WebSocket)
-  api/        外の口 (部屋一覧・戦績)
-  auth/       認証
+infra/        外と繋ぐ口 (差し替えの壁)。**遊びの状態は持たない**
+  input.ts    押されたか。装置 (キーボード / パッド)   依存なし
+  codec/      位置をバイトへ詰める                    application/protocol
+  link/       回線 (WebSocket)                        application/protocol / codec
+  api/        外の口 (部屋一覧・戦績)                  protocol / domain / …
+  auth/       誰なのか。発行元の都合はここで止まる       依存なし
 ```
+
+**infra が消えても遊びの状態は残るが、application が消えたら運ぶ物が無くなる。**
+その向きが層の位置を決めている。WebTransport にしても認証を移しても、
+書き換えるのは `infra/` の下だけで済む、という形を保つ。
 
 ## 迷ったときの問い
 
@@ -30,7 +36,7 @@ presentation  見せる・聞かせる          上の全部 + three
 | 遊びを変えたい | `domain` |
 | そう見えない / 破綻するから直す | `sim` (世界の側) / `presentation` (見え方) |
 | 送る物が変わった | `protocol` |
-| 誰が状態を持ち、いつ配るか | `server/` と `replica` |
+| 誰が状態を持ち、いつ配るか | `server/` と `application/replica` |
 
 判定に使える 2 つ:
 
@@ -124,20 +130,29 @@ protocol  LOCOMOTIONS  = 何番を振るか          → **末尾追記のみ。
 番号がそのまま通信に乗るので、順序を変えると古いクライアントが別のモーションを
 再生する。「使っていないから消す」ができない型があるのはこのため。
 
-### replica — こちら側の状態の写し
+### application/replica — こちら側の状態のレプリカ
 
 サーバーが持っている状態を、クライアント側で追従するだけの層。**決めない。**
 
 ```
-match.ts    試合の写し — 段階・残機・得点・自分の所属・1 位・キルログ・点
-roster.ts   名簿の写し — 誰が居て、名前・所属・体力・状態はどうか
+match.ts    試合のレプリカ — 段階・残機・得点・自分の所属・1 位・キルログ・点
+roster.ts   名簿のレプリカ — 誰が居て、名前・所属・体力・状態はどうか
+self.ts     自分のレプリカ — 体力・弾数・投擲物。予測とのずれを出す
 ```
 
-報せを受けて写しを進め、**やることは返り値で返す**（`MatchEffect`）。three も
+**`server/` と同じ高さの双子。** どちらも状態を持ち、報せを受けて更新する。
+違うのは決めるか従うかだけ。`server/` が「サーバーを立てる」仕事を持つのに
+対して、`application` は**その状態の形**を持つ。
+
+three も presentation も読めない。層を引くときに長い名前から先に当てるので、
+`application/replica` は親 (`application`) とは別の行として検査される
+(`layers.test.ts`)。
+
+報せを受けてレプリカを進め、**やることは返り値で返す**（`MatchEffect`）。three も
 音も知らないので GL 無しで試せる — ここは長いあいだ 218 秒の統合試験でしか
 触れなかった。
 
-**体は写しを見て姿を合わせるだけ。** 名簿はもともと three のオブジェクト
+**体はレプリカを見て姿を合わせるだけ。** 名簿はもともと three のオブジェクト
 (`RemotePlayer`) が持っていて、位置が届く前に来た報せは `pending` に溜めて
 いた — 体が無い相手のことは体のクラスに聞くしかない、という形だった。
 
@@ -163,7 +178,7 @@ ui/        HUD と部品 (Solid)
 screens/   画面の遷移 (Login / Lobby / Play)
 ```
 
-`knobs.ts` は**遊びの規則ではない**。「撃ってからボルトに手を掛けるまで 0.54 秒」
+`knobs.ts` は**遊びのドメインルールではない**。「撃ってからボルトに手を掛けるまで 0.54 秒」
 のような、見ていて忙しなくないかで決まる数字。**決まったら domain へ移す** —
 弾の落下がそうだった。
 
@@ -189,7 +204,7 @@ auth/      切符 (token) と身元
 | HUD の表示 | `presentation/ui/` (状態は `Game.ts` の `publishStats` 経由) |
 | 動きが変に見える | `presentation/scene/actor/motion.ts` (どの型を流すか) |
 | 手触りの微調整 | `presentation/scene/knobs.ts` → 決まったら domain へ |
-| チートを塞ぐ | `server/damage.ts` (検算) と `domain` (規則) |
+| チートを塞ぐ | `server/damage.ts` (検算) と `domain` (ドメインルール) |
 
 ## server/ (src の外)
 

@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import * as THREE from 'three'
 import type { BoxTuning } from '../scene/actor/box'
 import type { GameStats } from '../scene/Game'
-import type { InputDevice } from '../../input'
+import type { InputDevice } from '../../infra/input'
 import './Calibrator.css'
 import { WEAPONS } from '../../domain/item/weapons'
 
@@ -125,7 +125,7 @@ const INITIAL_RELOAD_SOUND = 0.28
 /** Game.ts の DEFAULT_EXPOSURE と揃えること */
 const INITIAL_EXPOSURE = 3.0
 /**
- * 弾に掛かる重力の初期値。**写しではなく domain から引く。**
+ * 弾に掛かる重力の初期値。**重複を作らず domain から引く。**
  *
  * 揃えるつもりで書き写した数字は、片方を変えたときに黙って古くなる
  * (段差 0.25m がサーバーとクライアントで二重に書いてあったのと同じ形)。

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { WebGPURenderer } from 'three/webgpu'
 import type { Player } from './actor/player'
 import type { FollowCamera } from './sense/camera'
-import type { Input, InputDevice } from '../../input'
+import type { Input, InputDevice } from '../../infra/input'
 import { setBoxTuning, type BoxTuning } from './actor/box'
 import { setAmbientIntensity, setCloudCoverage } from './world/stage'
 import { GRENADE_RELEASE_RATIO, BOLT_DELAY, RELOAD_SOUND_AT } from './knobs'
@@ -19,7 +19,7 @@ import { GRENADE_RELEASE_RATIO, BOLT_DELAY, RELOAD_SOUND_AT } from './knobs'
  * 1 つの入れ物に集めて `game.calibration.…` にすると、**本体の顔から消える**。
  * 製品ビルドでは Calibrator ごと落ちるので、ここも呼ばれない。
  *
- * ここに在るのは**仮置きの数字**であって遊びの規則ではない (docs/design.md の
+ * ここに在るのは**仮置きの数字**であって遊びのドメインルールではない (docs/design.md の
  * 7)。決まったものは domain へ移す — 弾の落下がそうだった。
  */
 

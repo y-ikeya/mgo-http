@@ -44,12 +44,12 @@ import { Hitbox } from "./hitbox";
 import { dampAngle } from "../util/math";
 import { Weapon } from "../arms/weapon";
 import { onBattlefield } from "../../../domain/player/lifecycle";
-import type { RosterEntry } from "../../../replica/roster";
+import type { RosterEntry } from "../../../application/replica/roster";
 import {
   INTERPOLATION_DELAY,
   type PlayerSnapshot,
   type Team,
-} from "../../../protocol/types";
+} from "../../../application/protocol/types";
 
 /*
  * --- 所属の色をテクスチャに掛けるのをやめた (翻意) ---
@@ -207,7 +207,7 @@ export class RemotePlayer {
    * いま刃が通る構えか。
    *
    * locomotion をそのまま公開せず、**問いの形で出す**。外から構えを見て
-   * 各所で判定を組み立てると、サーバー側の規則とだんだんずれる。
+   * 各所で判定を組み立てると、サーバー側のドメインルールとだんだんずれる。
    */
   stabbableFrom(aimPitch: number): boolean {
     return canBeStabbed(stanceOf(this.locomotion), aimPitch);
@@ -360,7 +360,7 @@ export class RemotePlayer {
       : this.footsteps.update(state.x, state.z, locomotion, true);
 
     animator.setLocomotion(locomotion);
-    // 敬礼を保っているかは送られてくる。再生位置は送らず、同じ規則で止める
+    // 敬礼を保っているかは送られてくる。再生位置は送らず、同じドメインルールで止める
     animator.setSaluteHeld(state.saluteHeld)
     this.saluting = locomotion === 'salute' && state.saluteHeld
     animator.setAiming(state.aiming && !this.serverDead);
@@ -381,7 +381,7 @@ export class RemotePlayer {
     // 無敵の間は半透明。撃てない相手だと見て分かる必要がある
     this.setGhost(state.protectedNow)
 
-    // 銃を隠す場面は自機と同じ規則で当てる。片方だけだと、自分では納めているのに
+    // 銃を隠す場面は自機と同じドメインルールで当てる。片方だけだと、自分では納めているのに
     // 相手の画面には出たままになる。
     //   敬礼中 / ダンボール … 手が塞がっている
     //   拳銃を構えていない  … ホルスターに納まっている
@@ -587,7 +587,7 @@ export class RemotePlayer {
       else this.animator?.revive();
     }
     // 出す / 出さないの判断は Presence が持つ
-    // 「戦場に居るか」を決めるのは規則 (domain)。presence には答えだけ渡す
+    // 「戦場に居るか」を決めるのはドメインルール (domain)。presence には答えだけ渡す
     this.presence.setOnField(onBattlefield(state));
     return dead;
   }
@@ -858,7 +858,7 @@ export class RemotePlayers {
   }
 
   /**
-   * 名簿の写しに姿を合わせる。**真実は写しの側** (src/replica/roster.ts)。
+   * 名簿のレプリカに姿を合わせる。**真実はレプリカの側** (src/application/replica/roster.ts)。
    *
    * 名前も所属も体力も状態も、決めているのはサーバー。ここは受け取った通りに
    * 体を直すだけで、覚えておく必要は無い — 体がまだ無ければ、位置が届いて
@@ -897,7 +897,7 @@ export class RemotePlayers {
    * 出す / 出さないの判断は RemotePlayer が持つ (refreshVisibility)。
    */
   update(dt: number, now: number): void {
-    // 光る札の期限を落とす。**切れたことは通で来ない** — 来させると、
+    // 光るフラグの期限を落とす。**切れたことは通で来ない** — 来させると、
     // 消える瞬間に接続が詰まっていた相手が光ったままになる
     for (const [id, until] of this.exposed) {
       if (now >= until) this.exposed.delete(id);
@@ -1130,7 +1130,7 @@ export class RemotePlayers {
   private readonly exposed = new Map<string, number>();
 
   /**
-   * 光る札を体へ配り直す。**2 つの出どころを 1 か所で合流させる。**
+   * 光るフラグを体へ配り直す。**2 つの出どころを 1 か所で合流させる。**
    *
    * 別々に setLeaking すると、片方が false を配った瞬間にもう片方の光が消える
    * (最後に呼んだほうが勝つ)。合流させておけば、EE が切れても 1 位ならまだ光る。

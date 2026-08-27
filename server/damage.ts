@@ -1,7 +1,7 @@
 /**
  * ダメージを入れる。**審判はここ。**
  *
- * 量を決める規則は domain (rule/damage.ts)。ここでやるのは、申告を検算して、
+ * 量を決めるドメインルールは domain (rule/damage.ts)。ここでやるのは、申告を検算して、
  * 通ったぶんを体力から引き、倒れたら記録に残すこと。
  */
 
@@ -20,7 +20,7 @@ import {
 import { HIT_RULES, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
-import type { ClientMessage, ServerMessage } from '../src/protocol/types'
+import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
 import { matchState } from './match'
 import { bearingTo, sendHealth } from './relay'
@@ -32,7 +32,7 @@ import { type RoomWorld, broadcast, setLife } from './world'
  *
  * **手榴弾とクレイモアが同じ道を通る。** 倒したときに動くものが多い
  * (体力・残機・戦績・キル表示・握っていた物・倒した相手を映す先) ので、
- * 2 つ目の爆発物を足すときにここを写すと、必ずどれかを写し忘れる。
+ * 2 つ目の爆発物を足すときにここを写すと、必ずどれかをレプリカ忘れる。
  *
  * @param amount 与える量。届くかどうかと、どれだけ届くかは呼ぶ側が決める
  * @param knock 転ばせるか。手榴弾もクレイモアも、近ければ転ぶ
@@ -80,7 +80,7 @@ const NOT_HURT: Hurt = { downed: false, letGo: false }
  *
  * --- 上書きする ---
  * 既に光っていても、当て直せば伸びる。別の人が当てれば宛先ごと移る
- * (札は 1 人ぶんしか無い)。**短いほうへは縮めない** — Lv1 の人が当てたせいで
+ * (フラグは 1 人ぶんしか無い)。**短いほうへは縮めない** — Lv1 の人が当てたせいで
  * Lv3 の人の光が消えるのは、当てた側から見て理屈が通らない。
  */
 function expose(room: RoomWorld, victim: Player, attacker: Player | undefined): void {

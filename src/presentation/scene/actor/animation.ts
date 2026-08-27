@@ -175,7 +175,10 @@ const ROLL_TIME_SCALE = 1.32
  */
 const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8, fall_roll: 1 }
 /**
- * ローリングの拘束を解く時点 (クリップ尺に対する割合)。
+ * ローリングの**操作ロック**を解く時点 (クリップ尺に対する割合)。
+ *
+ * ロック = 撃てず、向きも変えられない時間。ポインタロック (infra/input.ts) とは
+ * 別物で、こちらは動きが操作を受け付けない、という意味。
  *
  * 最後まで再生し切ってから移動へ戻すと、clampWhenFinished で最終ポーズに
  * 固まった状態からブレンドが始まるので、一拍止まって見える。
@@ -191,7 +194,7 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   /*
    * 落下の受け身。**ここに無くて、下半身だけループしていた。**
    *
-   * 尺 (1.67 秒) と拘束 (FALL_ROLL_TIME) がほぼ同時なので、絵の上では
+   * 尺 (1.67 秒) とロック (FALL_ROLL_TIME) がほぼ同時なので、絵の上では
    * 気づけない。焼かれた移動を辿るようにした途端に出た — クリップが頭へ
    * 戻ると根元の位置も頭へ戻るので、**1 フレームで 3m 引き戻される**。
    * 「進んでから着地点へ滑って戻る」という形で、しかも競り合いなので毎回は出ない。
@@ -546,7 +549,7 @@ export class CharacterAnimator {
    * いま流している 2 段の型。振りかぶって止まり、放すと振り切る物。
    *
    * 手榴弾とクレイモアが同じ仕組みを通る。**別々に書くと片方だけ直してずれる** —
-   * 実際、刺さる姿勢の規則をサーバーにだけ入れて同じ形の穴を開けた。
+   * 実際、刺さる姿勢のドメインルールをサーバーにだけ入れて同じ形の穴を開けた。
    */
   private pair: { windup: string; release: string; held: boolean; whole: boolean } | null = null
   /** 置く型の後半の尺 (秒) */
@@ -1249,7 +1252,7 @@ export class CharacterAnimator {
   }
 
   private resolveAimAxes(): AimAxis[] {
-    // キャラの右方向 = 親 (Player のルート) のローカル +X をワールドへ写したもの
+    // キャラの右方向 = 親 (Player のルート) のローカル +X をワールドへレプリカたもの
     const right = new THREE.Vector3(1, 0, 0)
     const parent = this.root.parent
     if (parent) {
@@ -1877,7 +1880,7 @@ export class CharacterAnimator {
   }
 
   /**
-   * 転がりの**拘束**が続いているか。この間は撃てず、向きも変えられない。
+   * 転がりの**ロック**が続いているか。この間は撃てず、向きも変えられない。
    *
    * 終盤で先に解ける (releaseRollIfSettling)。立ち上がりに入った時点で操作を
    * 返さないと、最終ポーズに固まった所からブレンドが始まって一拍止まって見える。
@@ -1891,7 +1894,7 @@ export class CharacterAnimator {
    *
    * --- rolling と何が違うか ---
    * あちらは「もう動かしてよいか」。こちらは「もう転がって見えていないか」。
-   * 拘束は ROLL_EXIT_PHASE (0.78) で先に解けるので、**クリップはまだ 2 割
+   * ロックは ROLL_EXIT_PHASE (0.78) で先に解けるので、**クリップはまだ 2 割
    * 残っている**。同じ getter で兼ねていたせいで、二段の型 (手榴弾の振りかぶり
    * など) が転がりの尻尾の中で始まって終わり、**一度も画面に映らなかった**。
    *
@@ -1905,7 +1908,7 @@ export class CharacterAnimator {
     return duration > 0 && action.time < duration
   }
 
-  /** 終盤に入ったら拘束を解く。クリップ自体は流れ続け、重みで抜けていく */
+  /** 終盤に入ったらロックを解く。クリップ自体は流れ続け、重みで抜けていく */
   private releaseRollIfSettling(): void {
     if (this.upperState !== 'roll') return
     const action = this.lower.get('roll')
@@ -2154,10 +2157,10 @@ function sampleQuaternionTrack(
  *
  * GLTFLoader はノード名にもトラック名にも PropertyBinding.sanitizeNodeName を通すので
  * (`mixamorig:Hips` -> `mixamorigHips`) 通常は単純比較で一致する。
- * 別経路で読み込んだモデルでもズレないよう、同じ規則で正規化してから比べる。
+ * 別経路で読み込んだモデルでもズレないよう、同じドメインルールで正規化してから比べる。
  */
 function sameNode(trackName: string, boneName: string): boolean {
-  // three.js の sanitizeNodeName と同じ規則: 空白は _、[ ] . : / は除去
+  // three.js の sanitizeNodeName と同じやり方: 空白は _、[ ] . : / は除去
   const normalize = (value: string) => value.replace(/\s/g, '_').replace(/[[\].:/]/g, '')
   return normalize(nodeNameOf(trackName)) === normalize(boneName)
 }

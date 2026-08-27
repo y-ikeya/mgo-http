@@ -69,7 +69,7 @@ describe('落下の受け身', () => {
     ).toBe('fall_roll')
   })
 
-  test('受け身は着いてから。**空中では立たない札**なので、そもそも来ない', () => {
+  test('受け身は着いてから。**空中では立たないフラグ**なので、そもそも来ない', () => {
     // fallRoll は着地した瞬間に立てる (player.ts)。空中で立っていることは無い
     expect(resolveLocomotion({ ...base, fallRoll: 0 } as StanceInput)).not.toBe('fall_roll')
   })

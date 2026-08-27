@@ -5,12 +5,12 @@
 import { canDrop, isGun, type Carried } from '../../src/domain/item/held'
 import { canAct } from '../../src/domain/player/lifecycle'
 import type { Player } from '../../src/domain/player/player'
-import type { ClientMessage } from '../../src/protocol/types'
+import type { ClientMessage } from '../../src/application/protocol/types'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast } from '../world'
 
 import type { HeldId } from '../../src/domain/item/held'
-import type { ServerMessage } from '../../src/protocol/types'
+import type { ServerMessage } from '../../src/application/protocol/types'
 
 /**
  * 地面に落ちている武器。
@@ -73,7 +73,7 @@ function carriedOf(item: Dropped): Carried {
  * 武器を地面へ置く。
  *
  * **持ち物を持っているのはクライアント側**なので、何を置いたかは申告して
- * もらう。こちらは「その銃の写しを捨てる」だけ — 繋ぎ直したときに、置いた
+ * もらう。こちらは「その銃のレプリカを捨てる」だけ — 繋ぎ直したときに、置いた
  * はずの銃が戻ってきては困る。
  */
 export function dropWeapon(room: RoomWorld, player: Player, message: ClientMessage): void {
