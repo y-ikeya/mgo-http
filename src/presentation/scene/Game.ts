@@ -402,7 +402,6 @@ export class Game {
    * (弾切れ・リロード中・構えていない) で押し始めたときに、条件が解けた瞬間へ
    * 1 発ぶん持ち越さないため。
    */
-  private triggerReleased = true;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
   /** 投げる構えを取っているか。離した瞬間に投げる */
@@ -940,7 +939,7 @@ export class Game {
     this.updateLoadoutKeys();
     this.syncLoadoutPointer();
     this.syncHeld();
-    this.inv.update(dt);
+    this.inv.update(dt, this.input.firing);
     this.updateTrigger();
     this.updateZoom();
     this.applyWeaponView();
@@ -1867,12 +1866,12 @@ export class Game {
     if (!canAct(this.life) || this.loadoutBlocking) return;
     if (this.inv.switching) return;
     if (this.inv.held !== "knife") return;
-    // ナイフは押した瞬間に振る。押しっぱなしで連打しない
-    if (this.input.firing && this.triggerReleased) {
-      this.triggerReleased = false;
+    // ナイフは押した瞬間に振る。押しっぱなしで連打しない。
+    // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
+    if (this.input.firing && this.inv.pressedOnce) {
+      this.inv.consumePress();
       this.startStab();
     }
-    if (!this.input.firing) this.triggerReleased = true;
   }
 
   private updateWeapon(dt: number): void {
@@ -1929,31 +1928,26 @@ export class Game {
       this.emptyCooldown = EMPTY_INTERVAL;
     }
 
-    // 単発の銃は、押しっぱなしでは 1 発しか出ない。
-    //
-    // 表に auto があるのに誰も見ていなかった。狙撃銃が連射できないのは
-    // ボルト操作の時間で塞がれていたからで、単発だからではなかった。
-    // 拳銃はその時間が無いので、そのままだと押しっぱなしで撃ち続けられる。
-    //
-    // 引き金を離すまで次を撃たせない。離した瞬間に撃てるようにするのではなく、
-    // **離してから押し直す**まで待たせる。
-    if (!this.input.firing) this.triggerReleased = true;
-    const pulled = this.weapon.auto || this.triggerReleased;
-
-    // 構えていないと撃てない。空になっても自動でリロードはしない。
-    const firing =
-      pulled &&
-      this.input.firing &&
-      this.player.isAiming &&
-      canAct(this.life) &&
-      this.reloadTimer <= 0 &&
-      this.stabTimer <= 0 &&
-      !this.player.rolling &&
-      // **撃てる物を手にしていて、持ち替えが終わっていること。**
-      // 手榴弾やナイフに持ち替えている間は引き金が効かない。これが
-      // 投げること・刺すことの代償になる (docs/design.md の 5)
-      this.inv.canShoot &&
-      this.ammo > 0;
+    /*
+     * 撃てるか。**問いは 1 つ、答えるのは domain。**
+     *
+     * 以前はここに 9 個の && が並んでいた。ドメインルール (装填中は撃てない、
+     * 転がりながらは撃てない) と、装置の話 (ボタンが押されているか) と、
+     * 単発の再現 (離して押し直したか) が同じ行に混ざっていて、**どれを変えると
+     * 遊びが変わるのかが読めなかった**。
+     *
+     * 渡すのは真偽だけ。秒を数えるのはこちらの仕事で、domain が数え始めると
+     * three の時間と二重管理になる。
+     */
+    const firing = this.inv.canShoot(this.weapon, {
+      held: this.input.firing,
+      aiming: this.player.isAiming,
+      life: this.life,
+      reloading: this.reloadTimer > 0,
+      stabbing: this.stabTimer > 0,
+      rolling: this.player.rolling,
+      ammo: this.ammo,
+    });
     this.player.setFiring(firing);
 
     if (!firing || this.fireCooldown > 0) return;
@@ -1968,8 +1962,8 @@ export class Game {
     } else {
       this.fireCooldown = this.weapon.fireInterval;
     }
-    // 単発の銃はここで引き金を「使い切る」。次は離して押し直すまで出ない
-    if (!this.weapon.auto) this.triggerReleased = false;
+    // 単発の銃はここで引き金を使い切る。次は離して押し直すまで出ない
+    this.inv.fired(this.weapon);
     this.fire();
   }
 

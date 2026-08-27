@@ -33,6 +33,7 @@ import {
 } from '../item/weapons'
 import { MAX_HEALTH } from '../rule/damage'
 import { Footsteps } from '../rule/footsteps'
+import { Inventory } from '../item/inventory'
 import type { Skills } from './skill'
 
 /**
@@ -217,16 +218,22 @@ export interface Player {
    */
   slot: number
   /**
-   * **いま持っている物。** この命のあいだ手にできる物の全部。
+   * 持ち物。**クライアントと同じ物を、サーバーも持つ。**
    *
-   * 湧いたときに選んだ装備で種を作り (refill)、拾えば増え、置けば減る。
-   * 「持てるか」はこれだけで決まる (player/equip.ts の canHold)。
+   * --- なぜ寄せたか ---
+   * 同じ「持ち物」が 2 か所に別の形で書かれていた。クライアントは Inventory、
+   * サーバーは kit (id の配列) と ammo (銃ごとの弾数) という**別々の欄**。
+   * 拾う・落とすたびに 2 つを揃えて書く必要があり、**片方だけ消し忘れる余地**が
+   * あった。
    *
-   * **拾った物だけを覚える形にしていて穴が開いていた。** 主武器は選んだ物
-   * なので一覧に入っておらず、地面に置いても「持っている」ままだった —
-   * 置いた銃を他人に拾わせながら、自分もその銃として撃てる (複製)。
+   * 「打った相手の銃を数秒使えなくする」「CQC で主武器を落とさせる」の
+   * ように、サーバーが権威を持つ操作を入れるとき、置き場所が 2 つあると必ずずれる。
+   *
+   * 持てるか (equip.ts の canHold) も、拾う・落とす (server/arms/drops.ts) も
+   * ここを通る。**ammo はまだ別に残っている** — 繋ぎ直した人へ返すための
+   * 写しなので、そちらも順に寄せる。
    */
-  kit: HeldId[]
+  inventory: Inventory
   /**
    * 過去の姿。当てたという申告を遡って照合するのに使う。
    *
@@ -315,7 +322,7 @@ export function newPlayer(seed: {
     locomotion: 'idle',
     footsteps: new Footsteps(),
     concentratingSince: 0,
-    kit: startingKit({ primary: 'rifle', support: 'grenade' }),
+    inventory: new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' }),
     skills: {},
     leakedUntil: 0,
     leakedTo: '',
@@ -443,7 +450,11 @@ export function refill(player: Player): void {
   player.leakedUntil = 0
   player.leakedTo = ''
   // **次の命は選んだ装備から始まる。** 拾った物は持ち越さない
-  player.kit = startingKit(player)
+  player.inventory.refill({
+    primary: player.primary,
+    secondary: 'pistol',
+    support: player.support,
+  })
   player.health = MAX_HEALTH
   player.ammo = startingAmmo()
   player.grenades = SUPPORT_SPECS[player.support].count
@@ -500,12 +511,3 @@ export function downedBy(
   return credit
 }
 
-/**
- * その命で持って出る物。**選んだ装備 + 最初から持っている物。**
- *
- * ナイフとダンボールは選ばない (item/held.ts の Loadout)。拳銃も枠が 1 つしか
- * 無いので固定。ここに並んだ物だけが手にできる。
- */
-export function startingKit(player: Pick<Player, 'primary' | 'support'>): HeldId[] {
-  return ['knife', 'box', 'pistol', player.primary, player.support]
-}

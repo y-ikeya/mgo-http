@@ -11,7 +11,7 @@
 
 import { HELD, type HeldId } from '../item/held'
 import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from '../item/weapons'
-import { startingKit, type Player } from './player'
+import type { Player } from './player'
 import { canChooseSkills, isAffordable, type Skills } from './skill'
 import type { Phase } from '../match/match'
 
@@ -26,7 +26,7 @@ export function isSupportChoice(id: string): id is SupportId {
 }
 
 /**
- * その物を手にできるか。**持ち物 (kit) に在るかどうか、それだけ。**
+ * その物を手にできるか。**持ち物に在るかどうか、それだけ。**
  *
  * 選んだ物にも拾った物にも特例を作らない。特例を作っていた頃は、**主武器を
  * 地面に置いても「持っている」ままだった** — 置いた銃を他人に拾わせながら、
@@ -38,7 +38,7 @@ export function isSupportChoice(id: string): id is SupportId {
 export function canHold(player: Player, id: HeldId): boolean {
   if (HELD[id] === undefined) return false
   if (id === 'none' || id === 'magazine') return true
-  return player.kit.includes(id)
+  return player.inventory.has(id)
 }
 
 /**
@@ -60,7 +60,11 @@ export function chooseLoadout(
   if (choosing) {
     player.grenades = SUPPORT_SPECS[support].count
     // 支度中は持ち物も選び直したものに揃える。湧いてからは refill が組み直す
-    player.kit = startingKit(player)
+    player.inventory.refill({
+      primary: player.primary,
+      secondary: 'pistol',
+      support: player.support,
+    })
   }
   return true
 }

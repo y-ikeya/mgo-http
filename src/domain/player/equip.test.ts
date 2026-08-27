@@ -35,16 +35,16 @@ describe('何を持てるか', () => {
     const p = fresh()
     chooseLoadout(p, 'sniper', 'grenade', true)
     refill(p)
-    p.kit.push('rifle')
+    p.inventory.pick({ id: 'rifle', ammo: 30, reserve: 90 })
     expect(canHold(p, 'rifle')).toBe(true)
-    p.kit = p.kit.filter((id) => id !== 'rifle')
+    p.inventory.drop('rifle')
     expect(canHold(p, 'rifle')).toBe(false)
   })
 
   test('拾った物は次の命へ持ち越さない', () => {
     const p = fresh()
     refill(p)
-    p.kit.push('smg')
+    p.inventory.pick({ id: 'smg', ammo: 50, reserve: 100 })
     refill(p)
     expect(canHold(p, 'smg')).toBe(false)
   })
@@ -61,7 +61,7 @@ describe('何を持てるか', () => {
     chooseLoadout(p, 'rifle', 'grenade', true)
     refill(p)
     expect(canHold(p, 'rifle')).toBe(true)
-    p.kit = p.kit.filter((id) => id !== 'rifle')
+    p.inventory.drop('rifle')
     expect(canHold(p, 'rifle')).toBe(false)
   })
 
@@ -69,7 +69,7 @@ describe('何を持てるか', () => {
     const p = fresh()
     chooseLoadout(p, 'rifle', 'grenade', true)
     refill(p)
-    p.kit = p.kit.filter((id) => id !== 'grenade')
+    p.inventory.drop('grenade')
     expect(canHold(p, 'grenade')).toBe(false)
   })
 
