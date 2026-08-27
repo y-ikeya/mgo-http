@@ -459,6 +459,37 @@ export interface SpawnRequest {
   type: 'spawn'
 }
 
+/**
+ * 自分の本当の値。**3 秒ごとに、1 人ずつ届く。**
+ *
+ * --- なぜ要るか ---
+ * 体力も弾数もサーバーが持っているのに、**弾数は届いていなかった**。
+ * クライアントは自分で数えていて、サーバーも別に数えていて、突き合わせるのは
+ * 繋ぎ直したときだけ。ずれても直しようが無い。
+ *
+ * --- 予測は残す ---
+ * 撃った瞬間に残弾が減り、体力が 0 で倒れる、という反応はクライアントが
+ * 自分の数でやる。**押した瞬間に返らないと手触りが壊れる**ので、届くのを
+ * 待たない。これはサーバーが正しい値を後から渡すだけで、**ずれていたら
+ * 合わせる**ためにある。
+ *
+ * roster が「全員のこと」を運ぶのに対して、こちらは「自分のこと」。
+ *
+ * 試合の便 (match) より粗い。あちらは全員へ同じ物を 1 通だが、こちらは
+ * **人ごとに違う物を人数分**送るので、同じ間隔だと 8 人部屋で 8 倍になる。
+ */
+export interface SelfMessage {
+  type: 'self'
+  /** 体力 */
+  health: number
+  /** 銃ごとの装填済み。持っていない銃は 0 */
+  magazine: Record<WeaponId, number>
+  /** 銃ごとの予備 */
+  reserve: Record<WeaponId, number>
+  /** 残りの投擲物 */
+  grenades: number
+}
+
 export interface HiddenEvent {
   type: 'hidden'
   id: string
@@ -783,6 +814,7 @@ export type ServerMessage =
   | SkillsEvent
   | HiddenEvent
   | ExposedEvent
+  | SelfMessage
   | ExplosionEvent
   | KnockDownEvent
   | GrenadeSpawn

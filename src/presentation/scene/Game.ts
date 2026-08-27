@@ -75,6 +75,7 @@ import {
   newRoster,
   type RosterEffect,
 } from "../../replica/roster";
+import { applySelf, driftOf, newSelfReplica } from "../../replica/self";
 import {
   createCalibration,
   defaultKnobs,
@@ -87,6 +88,7 @@ import { selfSkin } from "./actor/skin";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
+  type SelfMessage,
   type KillEvent,
   type MatchMessage,
   type ServerMessage,
@@ -474,6 +476,12 @@ export class Game {
   private skills: Skills = {};
 
   private readonly spread = new Spread();
+  /**
+   * サーバーが持っている自分の値。**予測を直すためだけに持つ。**
+   *
+   * 描くのに使うのはこちらではなく、予測した側 (player / inv)。
+   */
+  private readonly self = newSelfReplica();
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -1203,6 +1211,18 @@ export class Game {
         this.applyHealth(message);
         break;
 
+      /*
+       * 自分の本当の値。**3 秒ごとに届く。**
+       *
+       * 撃った瞬間に減らすのも、体力 0 で倒れるのもこちらがやっている
+       * (押した瞬間に返らないと手触りが壊れる)。ここで受けるのは
+       * 「本当はこう」という値だけで、**ずれていたら合わせる**ために使う。
+       * 普段は一致しているので何も起きない。
+       */
+      case "self":
+        this.applySelf(message);
+        break;
+
 
       // 繋ぎ直したときに届く、離脱前の続き。
       //
@@ -1405,6 +1425,38 @@ export class Game {
    * サーバーの計算とずれて「死んだはずが生きている」が起きる。
    * 表示が一拍遅れる代わりに、全員が同じ数字を見る。
    */
+  /**
+   * サーバーが持っている自分の値と突き合わせる。
+   *
+   * --- 直し方は物によって違う ---
+   * 弾数は**黙って合わせる**。ずれる原因は「撃った申告が届かなかった」なので、
+   * 音も画面の反応も要らない — 数字が正しくなればよい。
+   *
+   * 体力は**合わせない。** 減ったことは health の報せが音と画面の反応ごと
+   * 運んでいて、こちらで上書きすると**同じダメージを 2 回受けたように見える**。
+   * ここでは食い違いを控えるだけにして、直すのは health の道に任せる。
+   */
+  private applySelf(message: SelfMessage): void {
+    applySelf(this.self, message);
+
+    const gun = this.weapon.id;
+    const drift = driftOf(
+      this.self,
+      {
+        health: this.player.health,
+        magazine: this.inv.ammoOf(gun),
+        reserve: this.inv.reserveOf(gun),
+        grenades: this.inv.supportCount,
+      },
+      gun,
+    );
+
+    // 弾数と投擲物だけ合わせる。**持っている物にだけ当たる** (restore)
+    if (drift.magazine !== 0 || drift.reserve !== 0 || drift.grenades !== 0) {
+      this.inv.restore(message.magazine, message.reserve, message.grenades);
+    }
+  }
+
   private applyHealth(message: HealthMessage): void {
     if (message.id !== this.net.id) {
       // 体力そのものは写しが持っている (sync)。ここは見た目の反応だけ

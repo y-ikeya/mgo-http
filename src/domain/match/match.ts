@@ -49,6 +49,8 @@ export interface Match {
   winner?: Team | 'draw'
   /** 最後に状態を配った時刻。1 秒ごとに配る */
   lastBroadcast: number
+  /** 自分の本当の値を最後に配った時刻。**全員へ配る便とは別の時計** */
+  lastSelfAt: number
   /** 最後に「切れた人の体」を配り直した時刻 */
   lastLimbo: number
   /**
@@ -70,6 +72,7 @@ export function newMatch(mode: Mode): Match {
     endsAt: 0,
     phase: 'waiting',
     lastBroadcast: 0,
+    lastSelfAt: 0,
     lastLimbo: 0,
     matchId: null,
     startedAt: 0,

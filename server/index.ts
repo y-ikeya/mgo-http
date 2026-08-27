@@ -21,7 +21,7 @@ import { dropWeapon, pickUp } from './arms/drops'
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
 import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
-import { leaveRoom, matchState, recordSeat, spawn, updateMatch, updateTargets } from './match'
+import { leaveRoom, matchState, recordSeat, sendSelf, spawn, updateMatch, updateTargets } from './match'
 import { receiveSnapshot, relayShot, relayState, sendHealth } from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
@@ -80,6 +80,8 @@ setInterval(() => {
   try {
     const now = Date.now()
     for (const room of rooms.values()) {
+      // 自分の本当の値を 1 人ずつ配る。**予測を直すため**で、普段は一致している
+      sendSelf(room, now)
       // 切れた人の体をその場に残す。
       //
       // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
