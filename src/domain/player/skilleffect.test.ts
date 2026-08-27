@@ -13,7 +13,7 @@ import { masteryReloadScale, runnerScale, type Skills } from './skill'
  * 画面に出るのに、走る速さも散布も全員同じだった。
  *
  * 「値がある」と「効いている」は別の問いなので、繋ぎ目のほうをここで見る。
- * 速さだけは presentation (actor/player.ts) に居るので、掛け算の形だけ写して
+ * 速さだけは presentation (actor/player.ts) に居るので、掛け算の形だけレプリカて
  * 確かめる — そこが崩れたらこの試験も一緒に直す。
  */
 
@@ -199,7 +199,7 @@ describe('ENEMY EXPOSURE の宛先', () => {
     expect(isLeakedTo(bob, bobMate, now)).toBe(false)
   })
 
-  /** 陣営が無い部屋 (個人戦)。渡す相手が居ないので、同じ規則が本人だけに落ちる */
+  /** 陣営が無い部屋 (個人戦)。渡す相手が居ないので、同じドメインルールが本人だけに落ちる */
   test('陣営の無い部屋では、当てた本人だけ', () => {
     const alice = player('alice', 'blue')
     const carol = player('carol', 'blue')

@@ -1,20 +1,20 @@
 /**
- * 名簿の写し。**部屋に誰が居て、いまどうなっているか。**
+ * 名簿のレプリカ。**部屋に誰が居て、いまどうなっているか。**
  *
- * --- なぜ写しが要るか ---
+ * --- なぜレプリカが要るか ---
  * これまで名簿は**体 (three のオブジェクト) が持っていた**。名前も陣営も体力も
  * 状態も `RemotePlayer` の中で、位置が届く前に来た報せは `pending` に溜めて
  * いた。**体が無い相手のことは、体のクラスに聞くしかない**という形。
  *
- * 名簿はサーバーが持っている状態そのものなので、写しの側に置く。体は写しを見て
+ * 名簿はサーバーが持っている状態そのものなので、レプリカの側に置く。体はレプリカを見て
  * 姿を合わせるだけになる。
  *
  * three も音も知らない。**やることは返り値で返す** (RosterEffect)。
  */
 
-import type { Life } from '../domain/player/lifecycle'
-import type { Team } from '../domain/player/player'
-import type { ServerMessage } from '../protocol/types'
+import type { Life } from '../../domain/player/lifecycle'
+import type { Team } from '../../domain/player/player'
+import type { ServerMessage } from '../../protocol/types'
 
 /** 名簿の 1 人ぶん。**サーバーが決めたことだけ** */
 export interface RosterEntry {
@@ -32,13 +32,13 @@ export function newRoster(): Roster {
 }
 
 /**
- * 写しが変わった結果、呼ぶ側にやってもらうこと。
+ * レプリカが変わった結果、呼ぶ側にやってもらうこと。
  *
  * **体を触るのは呼ぶ側。** 誰の姿を直すか (sync)、誰を消すか (left)、
  * どこで叫ぶか (died) だけを渡す。
  */
 export type RosterEffect =
-  /** その人の姿を写しに合わせる。まだ体が無ければ、届いたときに合わせる */
+  /** その人の姿をレプリカに合わせる。まだ体が無ければ、届いたときに合わせる */
   | { kind: 'sync'; id: string; entry: RosterEntry }
   /** 部屋を出た。体ごと消す */
   | { kind: 'left'; id: string }

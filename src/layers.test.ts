@@ -9,18 +9,18 @@ import { dirname, join, relative, resolve } from 'node:path'
  * 見張りは domain と sim に 1 つずつあって、どちらも禁止先を**綴りで**
  * 持っていた (`/(game|ui|screens)/`)。おかげで名前を変えるたびに、見張りが
  * 黙って素通りになった — `game → scene → presentation/scene` と `net →
- * protocol / link / api` で 3 回踏んでいる。**規則を守るための試験が、
+ * protocol / link / api` で 3 回踏んでいる。**層の決めごとを守るための試験が、
  * 名前の書き換えで壊れる**のは急所なので、順序の宣言をここ 1 つにする。
  *
  * --- 層 (docs/design.md の 7) ---
  *
- *     domain      遊びの語彙と数字          何も知らない
+ *     domain      遊びの語彙と数字          依存なし
  *     sim         世界に訊く手続き          domain の**型だけ**
  *     protocol    通信で流れる形            domain の語彙だけ
- *     replica     こちら側の状態の写し      domain / protocol
+ *     replica     こちら側の状態のレプリカ      domain / protocol
  *     presentation 見せる・聞かせる         上の全部 + three
  *
- *     input       押されたか。何も知らない
+ *     input       押されたか。依存なし
  *     link        回線 (WebSocket)。protocol を運ぶ
  *     api / auth  外の口 (部屋一覧・戦績・認証)
  *
@@ -33,25 +33,38 @@ const LAYERS: Record<string, readonly string[]> = {
   domain: [],
   sim: ['domain'],
   protocol: ['domain'],
-  replica: ['domain', 'protocol'],
+
   // 回線と外の口は**端**。認証の切符を持って行く先が同じなので auth を読む
   link: ['protocol', 'auth'],
   // サーバーの居場所 (serverHttpUrl) は回線と共有する。ws:// と http:// の
   // 書き分けを 2 か所に置かないため
   api: ['protocol', 'domain', 'auth', 'link'],
   auth: [],
+  /**
+   * アプリケーションの状態。**server/ と同じ高さの双子。**
+   *
+   * どちらも状態を持ち、報せを受けて更新する。違うのは**決めるか、従うか**だけ
+   * (docs/design.md)。`server/` が「サーバーを立てる」という仕事を持つのに対し、
+   * ここは**その状態の形**を持つ。
+   *
+   * いま入っているのはレプリカだけ。この先「部屋を選んで入るまでの流れ」や
+   * 「支度の進み方」のような、画面ではなく**筋道**の側もここへ来る。
+   */
+  application: [],
+  /** サーバーの状態を追う。**決めない** — 報せを受けて進むだけ */
+  'application/replica': ['domain', 'protocol'],
   presentation: [
     'domain',
     'sim',
     'protocol',
-    'replica',
+    'application/replica',
     'link',
     'api',
     'auth',
     'input',
     'i18n',
   ],
-  // 押されたか。**何も知らない** — 動詞に訳すのは domain/player/intent.ts で、
+  // 押されたか。**どこにも依存しない** — 動詞に訳すのは domain/player/intent.ts で、
   // ここが持つのはキーコードとパッドの番号だけ
   input: [],
   i18n: [],
@@ -61,7 +74,7 @@ const LAYERS: Record<string, readonly string[]> = {
 }
 
 /** three も DOM も知らない層。**サーバーがそのまま読む**ので入れられない */
-const HEADLESS = ['domain', 'sim', 'protocol', 'replica']
+const HEADLESS = ['domain', 'sim', 'protocol', 'application/replica']
 
 const SRC = join(import.meta.dir)
 
@@ -102,22 +115,44 @@ function layerOf(file: string, spec: string): string | null {
   if (!spec.startsWith('.')) return null
   const rel = relative(SRC, resolve(dirname(file), spec))
   if (rel.startsWith('..')) return null
+  /*
+   * **長い名前から先に当てる。**
+   *
+   * 先頭の 1 つだけを見ていると、入れ子にした層 (application/replica) が
+   * 親 (presentation) として数えられて、**親に許した相手を全部読めてしまう**。
+   * 表に載っている名前のうち、前方一致する一番長い物を採る。
+   */
+  for (const layer of NESTED) {
+    if (rel === layer || rel.startsWith(layer + '/')) return layer
+  }
   const head = rel.split('/')[0]
   if (/\.tsx?$/.test(head)) return head.replace(/\.tsx?$/, '')
   // css や glb は層ではない。棚 (拡張子の無い名前) だけを層として数える
   return head.includes('.') ? null : head
 }
 
+/** 入れ子の層。長い順に見るので、親より先に当たる */
+const NESTED = Object.keys(LAYERS)
+  .filter((name) => name.includes('/'))
+  .sort((a, b) => b.length - a.length)
+
 /**
  * その層のファイル。**棚でも、直下の 1 枚でも同じに扱う。**
  *
  * ディレクトリだけを見ていた頃は `src/input.ts` が永久に空を返していた —
- * 表に載せても検査されない。「押されたか。**何も知らない**」と README に
+ * 表に載せても検査されない。「押されたか。**依存なし**」と README に
  * 書いてあるのに、それを留めるものが無かった。
  */
 function filesOf(layer: string): string[] {
   const dir = join(SRC, layer)
-  if (existsSync(dir) && statSync(dir).isDirectory()) return sourcesOf(dir)
+  if (existsSync(dir) && statSync(dir).isDirectory()) {
+    // **子の層は親から除く。** 入れ子にした層は自分の行で検査されるので、
+    // 親の行にも混ぜると「親に許した相手」で通ってしまう
+    const nested = NESTED.filter((name) => name.startsWith(layer + '/')).map((name) =>
+      join(SRC, name),
+    )
+    return sourcesOf(dir).filter((file) => !nested.some((inner) => file.startsWith(inner)))
+  }
   return ['.ts', '.tsx'].map((ext) => dir + ext).filter((file) => existsSync(file))
 }
 
@@ -143,7 +178,7 @@ describe('層の順序', () => {
    * **表に載っていない置き場所を作らない。**
    *
    * 順序を宣言しても、宣言の外に置かれた物は検査されない。`input.ts` が
-   * まさにそれで、README には「何も知らない」と書いてあるのに読み放題だった。
+   * まさにそれで、README には「依存なし」と書いてあるのに読み放題だった。
    * ここが落ちたら、増やした物を上の表に足す — **足すこと自体が「何を読んで
    * よいか」を決める作業**になる。
    */

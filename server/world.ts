@@ -67,7 +67,7 @@ export const rooms = new Map<RoomName, RoomWorld>()
  * 投げた物・置いた物の持ち主から見て敵か。
  *
  * 弾と違って手元に Player が無い (飛んでいる物は陣営しか覚えていない) ので、
- * 陣営を渡して同じ規則に通す。DM では同じ色でも巻き込む。
+ * 陣営を渡して同じドメインルールに通す。DM では同じ色でも巻き込む。
  */
 export function hostileToOwner(room: Match, owner: Team, victim: Player): boolean {
   if (room.mode.hostility === 'none') return false
@@ -150,7 +150,7 @@ export const TARGET_RESPAWN = 3000
 /**
  * 的を並べる。**座標はステージが持っている** (domain/match/stage.ts)。
  *
- * ここに写しを置いていて、モールの的を東棟へ移したときに取り残された
+ * ここにレプリカを置いていて、モールの的を東棟へ移したときに取り残された
  * (試験だけが 45m 先を撃っていた)。地形の点は地形の側に 1 つ。
  */
 export function placeTargets(room: RoomWorld): void {

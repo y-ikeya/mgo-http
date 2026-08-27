@@ -164,19 +164,19 @@ export function detonate(room: RoomWorld, nade: Grenade): void {
   broadcast(room, { type: 'explosion', id: nade.id, at: [x, y, z] })
 
   // 削るのは試合中だけ。支度の間や結果を読んでいる間に得点が動くと、
-  // 何が起きたのか分からなくなる (銃と同じ規則)。
+  // 何が起きたのか分からなくなる (銃と同じドメインルール)。
   // 飛ぶことと爆ぜることは止めない — 一人で立ち上げて試せなくなる
   if (room.phase !== 'playing') return
 
   for (const victim of present(room)) {
     // 撃たれる状態に居る人だけ。まだ湧いていない・無敵・倒れている最中は通らない
     if (!canBeHurt(victim.life)) continue
-    // 味方は巻き込まない。銃と同じ規則にする (誤爆で試合が壊れるより分かりやすい)。
+    // 味方は巻き込まない。銃と同じドメインルールにする (誤爆で試合が壊れるより分かりやすい)。
     // 投げた本人だけは例外 — 足元に落とせば自分が吹き飛ぶ
     if (victim.id !== nade.owner && !hostileToOwner(room, nade.team, victim)) continue
 
     // sim が測るのは**どこに誰がどれだけ晒されていたか**まで。
-    // 何ダメージかを決めるのは規則の側 (domain/item/grenade.ts)
+    // 何ダメージかを決めるのはドメインルールの側 (domain/item/grenade.ts)
     const head = headHeightWhen(victim.crouching, victim.boxed)
     const seen = blastExposure(x, y, z, victim, head, BLAST_RADIUS, room.stage.sight)
     if (!seen) continue

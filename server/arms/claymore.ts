@@ -72,7 +72,7 @@ export function placeClaymore(room: RoomWorld, from: Player): void {
 /**
  * 置かれたクレイモアを、見えている人にだけ配る。
  *
- * 位置の配り方 (relayState) と同じ規則。味方には無条件、敵にはカメラから線が
+ * 位置の配り方 (relayState) と同じドメインルール。味方には無条件、敵にはカメラから線が
  * 通ったときだけ。**見えなくなったら消す** — 一度見せたまま置きっぱなしにすると、
  * 物陰へ回った相手の画面に残り続けて「そこに在る」ことが漏れ続ける。
  *
@@ -145,7 +145,7 @@ export function shotHitsClaymore(room: RoomWorld, from: readonly number[], to: r
 
 /** 起爆。前に居た敵だけを巻き込む */
 export function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
-  // 起爆は隠さない。音も光も壁を回り込んで届く (手榴弾と同じ規則)
+  // 起爆は隠さない。音も光も壁を回り込んで届く (手榴弾と同じドメインルール)
   broadcast(room, { type: 'claymoreGone', id: claymore.id, blast: true })
   for (const viewer of connected(room)) sessionOf(viewer).seenClaymores.delete(claymore.id)
   if (room.phase !== 'playing') return
@@ -153,10 +153,10 @@ export function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
   for (const victim of present(room)) {
     if (!canBeHurt(victim.life)) continue
     // 味方は巻き込まない。**置いた本人だけは例外** — 手榴弾を足元に落としたときと
-    // 同じ規則で、自分の物で死ぬことがある。誰が味方かはルールが決める
+    // 同じドメインルールで、自分の物で死ぬことがある。誰が味方かはルールが決める
     if (victim.id !== claymore.owner && !hostileToOwner(room, claymore.team, victim)) continue
 
-    // 距離を測るのは sim、何ダメージかは規則 (domain/item/claymore.ts)
+    // 距離を測るのは sim、何ダメージかはドメインルール (domain/item/claymore.ts)
     const hit = blastEffect(blastReach(claymore, victim))
     if (hit.damage <= 0) continue
     const hurt = applyBlastDamage(

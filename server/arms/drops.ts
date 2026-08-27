@@ -73,7 +73,7 @@ function carriedOf(item: Dropped): Carried {
  * 武器を地面へ置く。
  *
  * **持ち物を持っているのはクライアント側**なので、何を置いたかは申告して
- * もらう。こちらは「その銃の写しを捨てる」だけ — 繋ぎ直したときに、置いた
+ * もらう。こちらは「その銃のレプリカを捨てる」だけ — 繋ぎ直したときに、置いた
  * はずの銃が戻ってきては困る。
  */
 export function dropWeapon(room: RoomWorld, player: Player, message: ClientMessage): void {

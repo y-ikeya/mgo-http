@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { blastEffect, BLAST_MAX, BLAST_MIN, BLAST_RANGE, TRIGGER_RANGE } from './claymore'
 
 /**
- * **どれだけ削れるかは規則。** 距離を測るのは sim (judge/claymore.ts) で、
+ * **どれだけ削れるかはドメインルール。** 距離を測るのは sim (judge/claymore.ts) で、
  * その距離をここが量に直す。
  */
 describe('クレイモアの爆風', () => {

@@ -19,7 +19,7 @@ import { GRENADE_RELEASE_RATIO, BOLT_DELAY, RELOAD_SOUND_AT } from './knobs'
  * 1 つの入れ物に集めて `game.calibration.…` にすると、**本体の顔から消える**。
  * 製品ビルドでは Calibrator ごと落ちるので、ここも呼ばれない。
  *
- * ここに在るのは**仮置きの数字**であって遊びの規則ではない (docs/design.md の
+ * ここに在るのは**仮置きの数字**であって遊びのドメインルールではない (docs/design.md の
  * 7)。決まったものは domain へ移す — 弾の落下がそうだった。
  */
 

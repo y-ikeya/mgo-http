@@ -126,7 +126,7 @@ export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffe
    *
    * 位置と一緒に流れてくるので素通ししていたが、これは状態ではなく意思。
    * 選んでいない銃を名乗って撃つ、が形の上では通っていた (撃つ側で 1 か所
-   * 見ていただけ)。持てるかどうかは規則が決める (domain/player/equip.ts)。
+   * 見ていただけ)。持てるかどうかはドメインルールが決める (domain/player/equip.ts)。
    *
    * **弾いたら前の値のまま。** 送り返して直させるより、こちらが知っている
    * 姿を配り続けるほうが素直 — 他人の画面には正しい物が映る。
@@ -154,7 +154,7 @@ export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffe
   stampSlot(view, player.slot)
   // 無敵かどうかはこちらが知っている。送り主に名乗らせない
   stampProtected(view, isProtected(player))
-  // 切れたときに配り直せるよう、写しを取っておく。
+  // 切れたときに配り直せるよう、レプリカを取っておく。
   // bytes は受信バッファなので、持ち回すなら複製が要る
   sessionOf(player).lastPayload = new Uint8Array(bytes)
   relayState(room, player, bytes)
@@ -190,7 +190,7 @@ export function emitNoise(
   noise: { kind: 'step' | 'shot'; volume?: number; range?: number },
 ): void {
 
-  // どこまで届くかは規則 (domain/rule/noise.ts)。銃声は武器ごとに違う
+  // どこまで届くかはドメインルール (domain/rule/noise.ts)。銃声は武器ごとに違う
   const reach =
     noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
   const head = headHeightWhen(from.crouching, from.boxed)
@@ -205,7 +205,7 @@ export function emitNoise(
     if (listener.id === from.id) continue
     if (!canSee(listener.life)) continue
 
-    // 距離と、見えているかは幾何 (sim)。聞こえるかを決めるのは規則 (domain)
+    // 距離と、見えているかは幾何 (sim)。聞こえるかを決めるのはドメインルール (domain)
     const distance = Math.hypot(from.x - listener.x, from.z - listener.z)
     const eye = viewOf(room, listener)
     const visible =
@@ -328,7 +328,7 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
    *
    * 光る = 位置が公になっている、という語彙 (docs/design.md の 3)。いまは
    * 個人戦の 1 位だけで、リンクを抜かれた相手も同じ札に乗る。**誰が光るかは
-   * 規則が決める** (domain/match/match.ts の isLeaking)。
+   * ドメインルールが決める** (domain/match/match.ts の isLeaking)。
    *
    * 見る人には依らないので、ループの外で 1 回だけ引く。
    */

@@ -44,7 +44,7 @@ import { Hitbox } from "./hitbox";
 import { dampAngle } from "../util/math";
 import { Weapon } from "../arms/weapon";
 import { onBattlefield } from "../../../domain/player/lifecycle";
-import type { RosterEntry } from "../../../replica/roster";
+import type { RosterEntry } from "../../../application/replica/roster";
 import {
   INTERPOLATION_DELAY,
   type PlayerSnapshot,
@@ -207,7 +207,7 @@ export class RemotePlayer {
    * いま刃が通る構えか。
    *
    * locomotion をそのまま公開せず、**問いの形で出す**。外から構えを見て
-   * 各所で判定を組み立てると、サーバー側の規則とだんだんずれる。
+   * 各所で判定を組み立てると、サーバー側のドメインルールとだんだんずれる。
    */
   stabbableFrom(aimPitch: number): boolean {
     return canBeStabbed(stanceOf(this.locomotion), aimPitch);
@@ -360,7 +360,7 @@ export class RemotePlayer {
       : this.footsteps.update(state.x, state.z, locomotion, true);
 
     animator.setLocomotion(locomotion);
-    // 敬礼を保っているかは送られてくる。再生位置は送らず、同じ規則で止める
+    // 敬礼を保っているかは送られてくる。再生位置は送らず、同じドメインルールで止める
     animator.setSaluteHeld(state.saluteHeld)
     this.saluting = locomotion === 'salute' && state.saluteHeld
     animator.setAiming(state.aiming && !this.serverDead);
@@ -381,7 +381,7 @@ export class RemotePlayer {
     // 無敵の間は半透明。撃てない相手だと見て分かる必要がある
     this.setGhost(state.protectedNow)
 
-    // 銃を隠す場面は自機と同じ規則で当てる。片方だけだと、自分では納めているのに
+    // 銃を隠す場面は自機と同じドメインルールで当てる。片方だけだと、自分では納めているのに
     // 相手の画面には出たままになる。
     //   敬礼中 / ダンボール … 手が塞がっている
     //   拳銃を構えていない  … ホルスターに納まっている
@@ -587,7 +587,7 @@ export class RemotePlayer {
       else this.animator?.revive();
     }
     // 出す / 出さないの判断は Presence が持つ
-    // 「戦場に居るか」を決めるのは規則 (domain)。presence には答えだけ渡す
+    // 「戦場に居るか」を決めるのはドメインルール (domain)。presence には答えだけ渡す
     this.presence.setOnField(onBattlefield(state));
     return dead;
   }
@@ -858,7 +858,7 @@ export class RemotePlayers {
   }
 
   /**
-   * 名簿の写しに姿を合わせる。**真実は写しの側** (src/replica/roster.ts)。
+   * 名簿のレプリカに姿を合わせる。**真実はレプリカの側** (src/application/replica/roster.ts)。
    *
    * 名前も所属も体力も状態も、決めているのはサーバー。ここは受け取った通りに
    * 体を直すだけで、覚えておく必要は無い — 体がまだ無ければ、位置が届いて

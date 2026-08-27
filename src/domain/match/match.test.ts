@@ -103,7 +103,7 @@ describe('光っている人', () => {
     join(match, 'b', 1)
     // 1 位は決まっている
     expect(leaderOf(match)?.id).toBe('a')
-    // それでも光らない。規則が違う
+    // それでも光らない。ドメインルールが違う
     expect(leakingOf(match)).toBe(null)
     expect(isLeaking(match, match.players.get('a')!)).toBe(false)
   })

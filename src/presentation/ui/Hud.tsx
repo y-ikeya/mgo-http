@@ -76,7 +76,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * 左下のカードに出す道具。
    *
    * **一覧を送っている間は、指している物を映す。** 武器のカード (held) と同じ
-   * 規則 — 角のカードが選択の印を兼ねているので、送っても変わらないと
+   * ドメインルール — 角のカードが選択の印を兼ねているので、送っても変わらないと
    * 「これを選んだらこうなる」が読めない (ずっと NONE のままに見えていた)。
    */
   const shownTool = (): HeldId => {
@@ -274,7 +274,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         **相手を待たない部屋では出さない** (練習・休憩)。1 人で成立するので、
         待っている物が無いのに「STANDBY」と出ると、始まらないのを待たされて
         いるように見える。段階が playing に固定される前の一瞬もここで消える
-        (規則は domain/match/room.ts の solo)。
+        (ドメインルールは domain/match/room.ts の solo)。
       */}
       <Show when={phase() === 'waiting' && !soloRoom()}>
         <div class="hud-standby">

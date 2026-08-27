@@ -58,7 +58,7 @@ async function rpc(fn: string, params: Record<string, unknown>): Promise<unknown
  * 入室そのものは通す。スキルが付かないだけで遊べる状態を壊さない。
  *
  * 返ってきた形も信じない。DB に古い名前や段が残っていることはあるので、
- * **選ぶときと同じ規則** (isAffordable) に通してから返す。
+ * **選ぶときと同じドメインルール** (isAffordable) に通してから返す。
  */
 export async function loadSkills(subject: string): Promise<Skills> {
   if (!enabled) return {}

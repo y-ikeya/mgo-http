@@ -16,7 +16,7 @@
  * three を抱えた src/presentation/scene/actor/player.ts で、同じ人物のことを別々の言葉で
  * 書いている。そこを寄せていく足場になる。
  *
- * 置き場所の規則は docs/design.md の 7。ここは domain なので幾何 (src/sim) を
+ * 置き場所の決めごとは docs/design.md の 7。ここは domain なので幾何 (src/sim) を
  * 知らない — 知ると「弾がどう飛ぶか」を変えるたびに「何発で死ぬか」が動く。
  */
 import { canTransition, type Life } from './lifecycle'
@@ -178,7 +178,7 @@ export interface Player {
    *
    * 見る側 × 見られる側の表は作らない。**見られる側に 2 つ持たせる** —
    * いつまで (leakedUntil) と、誰に (leakedTo)。当人が光るので抜かれた本人にも
-   * 分かるし、配信の規則は 1 行のままで済む。
+   * 分かるし、配信のドメインルールは 1 行のままで済む。
    */
   leakedUntil: number
   /**
@@ -229,7 +229,7 @@ export interface Player {
    *
    * 持てるか (equip.ts の canHold) も、拾う・落とす (server/arms/drops.ts) も
    * ここを通る。**ammo はまだ別に残っている** — 繋ぎ直した人へ返すための
-   * 写しなので、そちらも順に寄せる。
+   * レプリカなので、そちらも順に寄せる。
    */
   inventory: Inventory
   /**
@@ -402,7 +402,7 @@ export function isProtected(player: Player): boolean {
  *
  * **陣営のある部屋は陣営ぜんぶ、無い部屋は本人だけ。** 抜いた情報を味方に
  * 渡せるからチーム戦で 1 枠割く価値が出る。個人戦には渡す相手が居ないので、
- * 同じ規則が自動的に「本人だけ」に落ちる — 部屋ごとに分岐を書かなくて済む。
+ * 同じドメインルールが自動的に「本人だけ」に落ちる — 部屋ごとに分岐を書かなくて済む。
  *
  * @param teams その部屋に陣営があるか (domain/match/room.ts の mode.teams)
  */
@@ -453,7 +453,7 @@ export function refill(player: Player): void {
  *
  * 体力を引くのは審判 (server) の仕事に見えるが、「0 になったら倒れる」も
  * 「削られたら集中が切れる」も遊びの決めごとで、**同じ判断をクライアントも
- * 先に回している**。2 か所に書くと、片方だけ規則が変わる。
+ * 先に回している**。2 か所に書くと、片方だけドメインルールが変わる。
  */
 export function hurt(player: Player, amount: number): Wound {
   const wound = takeDamage(player.health, amount)

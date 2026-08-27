@@ -5,7 +5,7 @@
  * 「誰が席に着いているか」「残機はいくつか」「いまどの段階か」で、
  * **誰にどう配るかは接続の話**なので入れない。
  *
- * 置き場所の規則は docs/design.md の 7。
+ * 置き場所の決めごとは docs/design.md の 7。
  */
 import { isSeated } from '../player/lifecycle'
 import type { Player, Team } from '../player/player'

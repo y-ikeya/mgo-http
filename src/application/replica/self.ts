@@ -22,8 +22,8 @@
  * presentation が決める** (弾数は静かに合わせる、体力は音を出す、など)。
  */
 
-import type { WeaponId } from '../domain/item/weapons'
-import type { SelfMessage, ServerMessage } from '../protocol/types'
+import type { WeaponId } from '../../domain/item/weapons'
+import type { SelfMessage, ServerMessage } from '../../protocol/types'
 
 export interface SelfReplica {
   /** 一度でも届いたか。**届く前は何も比べない** */

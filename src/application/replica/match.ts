@@ -1,11 +1,11 @@
 /**
- * 試合の写し。**サーバーが持っている状態を、こちら側で追従するだけ。**
+ * 試合のレプリカ。**サーバーが持っている状態を、こちら側で追従するだけ。**
  *
  * --- なぜ層を分けるか ---
  * `server/` と同じことをしている — 状態を持ち、報せを受けて更新する。違うのは
  * **決めるか従うか**だけ。同じ語彙で書いておくと、「サーバーが持っている状態」と
  * 「クライアントが思っている状態」の食い違いが型で見える。この repo で見つけた
- * 穴はほぼ全部その食い違いだった (段差 0.25m の写し、装備の申告、全部の銃が
+ * 穴はほぼ全部その食い違いだった (段差 0.25m のレプリカ、装備の申告、全部の銃が
  * 420 m/s、主武器を置いても名乗れる)。
  *
  * --- 何を持たないか ---
@@ -13,14 +13,14 @@
  * おかげで GL 無しで試せる — いままでここは 218 秒の統合試験でしか触れなかった。
  *
  * 不変にはしない。domain がすでに書き換える流儀 (hurt / enterLife) で、
- * サーバーも同じオブジェクトを持ち回っている。写しだけ別の流儀にすると、
+ * サーバーも同じオブジェクトを持ち回っている。レプリカだけ別の流儀にすると、
  * 同じ状態を 2 通りで書くことになる。
  */
 
-import { MODES, type Mode } from '../domain/match/room'
-import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from '../domain/match/scoring'
-import type { Team } from '../domain/player/player'
-import type { KillEvent, MatchMessage, ServerMessage } from '../protocol/types'
+import { MODES, type Mode } from '../../domain/match/room'
+import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
+import type { Team } from '../../domain/player/player'
+import type { KillEvent, MatchMessage, ServerMessage } from '../../protocol/types'
 
 /** キルログに残す数。古いものから落ちる */
 const KILL_FEED_MAX = 5
@@ -68,10 +68,10 @@ export function newMatchReplica(): MatchReplica {
 }
 
 /**
- * 写しが変わった結果、**呼ぶ側にやってもらうこと**。
+ * レプリカが変わった結果、**呼ぶ側にやってもらうこと**。
  *
  * ここで音を鳴らしたり three を触ったりしない。何をどう出すかは presentation の
- * 領分で、写しは「何が起きたか」だけを渡す。
+ * 領分で、レプリカは「何が起きたか」だけを渡す。
  */
 export type MatchEffect =
   /** 試合の段階が変わった。飛んでいる物を捨てる / 成績表を開く・畳む */
@@ -80,7 +80,7 @@ export type MatchEffect =
   | { kind: 'team'; team: Team }
 
 /**
- * 報せを 1 つ受けて、写しを進める。
+ * 報せを 1 つ受けて、レプリカを進める。
  *
  * @param selfId 自分の id。**自分に関わる報せだけ別に扱う**ため
  * @param now 届いた時刻。表示を間引くのに使う (時計は持ち込まない)

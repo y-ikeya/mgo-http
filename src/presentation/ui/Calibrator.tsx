@@ -125,7 +125,7 @@ const INITIAL_RELOAD_SOUND = 0.28
 /** Game.ts の DEFAULT_EXPOSURE と揃えること */
 const INITIAL_EXPOSURE = 3.0
 /**
- * 弾に掛かる重力の初期値。**写しではなく domain から引く。**
+ * 弾に掛かる重力の初期値。**重複を作らず domain から引く。**
  *
  * 揃えるつもりで書き写した数字は、片方を変えたときに黙って古くなる
  * (段差 0.25m がサーバーとクライアントで二重に書いてあったのと同じ形)。

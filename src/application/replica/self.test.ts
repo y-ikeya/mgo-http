@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { applySelf, driftOf, newSelfReplica } from './self'
-import type { ServerMessage } from '../protocol/types'
-import type { WeaponId } from '../domain/item/weapons'
+import type { ServerMessage } from '../../protocol/types'
+import type { WeaponId } from '../../domain/item/weapons'
 
 /**
  * 自分の本当の値。**サーバーが持っている、自分についての状態。**

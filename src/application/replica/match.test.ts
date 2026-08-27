@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import { applyMatch, newMatchReplica } from './match'
-import { KILL_POINTS, DEATH_POINTS, SUICIDE_POINTS } from '../domain/match/scoring'
-import type { MatchMessage, ServerMessage } from '../protocol/types'
+import { KILL_POINTS, DEATH_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
+import type { MatchMessage, ServerMessage } from '../../protocol/types'
 
 /**
- * **写しは GL 無しで試せる。**
+ * **レプリカは GL 無しで試せる。**
  *
  * ここは長いあいだ Game.ts の receive() の中にあり、three のオブジェクトを直に
- * 触っていたので、218 秒かかる統合試験でしか触れなかった。写しに出したので
+ * 触っていたので、218 秒かかる統合試験でしか触れなかった。レプリカに出したので
  * 「報せを入れて、状態を見る」で済む。
  */
 const SELF = 'alice'
@@ -23,7 +23,7 @@ function matchMessage(over: Partial<MatchMessage> = {}): ServerMessage {
   } as ServerMessage
 }
 
-describe('試合の写し', () => {
+describe('試合のレプリカ', () => {
   test('ルールは入った時点では分からない。**最初の報せで決まる**', () => {
     const replica = newMatchReplica()
     applyMatch(replica, matchMessage({ mode: 'DM' }), SELF, 0)

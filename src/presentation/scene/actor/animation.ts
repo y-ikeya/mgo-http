@@ -546,7 +546,7 @@ export class CharacterAnimator {
    * いま流している 2 段の型。振りかぶって止まり、放すと振り切る物。
    *
    * 手榴弾とクレイモアが同じ仕組みを通る。**別々に書くと片方だけ直してずれる** —
-   * 実際、刺さる姿勢の規則をサーバーにだけ入れて同じ形の穴を開けた。
+   * 実際、刺さる姿勢のドメインルールをサーバーにだけ入れて同じ形の穴を開けた。
    */
   private pair: { windup: string; release: string; held: boolean; whole: boolean } | null = null
   /** 置く型の後半の尺 (秒) */
@@ -1249,7 +1249,7 @@ export class CharacterAnimator {
   }
 
   private resolveAimAxes(): AimAxis[] {
-    // キャラの右方向 = 親 (Player のルート) のローカル +X をワールドへ写したもの
+    // キャラの右方向 = 親 (Player のルート) のローカル +X をワールドへレプリカたもの
     const right = new THREE.Vector3(1, 0, 0)
     const parent = this.root.parent
     if (parent) {
@@ -2154,10 +2154,10 @@ function sampleQuaternionTrack(
  *
  * GLTFLoader はノード名にもトラック名にも PropertyBinding.sanitizeNodeName を通すので
  * (`mixamorig:Hips` -> `mixamorigHips`) 通常は単純比較で一致する。
- * 別経路で読み込んだモデルでもズレないよう、同じ規則で正規化してから比べる。
+ * 別経路で読み込んだモデルでもズレないよう、同じドメインルールで正規化してから比べる。
  */
 function sameNode(trackName: string, boneName: string): boolean {
-  // three.js の sanitizeNodeName と同じ規則: 空白は _、[ ] . : / は除去
+  // three.js の sanitizeNodeName と同じやり方: 空白は _、[ ] . : / は除去
   const normalize = (value: string) => value.replace(/\s/g, '_').replace(/[[\].:/]/g, '')
   return normalize(nodeNameOf(trackName)) === normalize(boneName)
 }

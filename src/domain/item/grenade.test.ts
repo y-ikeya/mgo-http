@@ -3,7 +3,7 @@ import { blastEffect, BLAST_DAMAGE, BLAST_RADIUS, BLAST_SHADOWED } from './grena
 import { MAX_HEALTH, takeDamage } from '../rule/damage'
 
 /**
- * **どれだけ削れるかは規則。** 距離と遮蔽を測るのは sim
+ * **どれだけ削れるかはドメインルール。** 距離と遮蔽を測るのは sim
  * (judge/blast.ts の blastExposure) で、その事実をここが量に直す。
  */
 describe('手榴弾の爆風', () => {
@@ -38,7 +38,7 @@ describe('手榴弾の爆風', () => {
 })
 
 /**
- * 削る量から「倒れたか」を決めるのも規則 (rule/damage.ts の takeDamage)。
+ * 削る量から「倒れたか」を決めるのもドメインルール (rule/damage.ts の takeDamage)。
  * **同じ判断をクライアントも先に回す**ので、2 か所に書かない。
  */
 describe('倒れるか', () => {
