@@ -1,6 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 import { t } from '../../i18n'
-import { signIn, signUp, type Identity } from '../../auth/session'
+import { signIn, signUp, type Identity } from '../../infra/auth/session'
 import './Login.css'
 
 /**

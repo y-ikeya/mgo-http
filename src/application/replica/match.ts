@@ -20,7 +20,7 @@
 import { MODES, type Mode } from '../../domain/match/room'
 import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
 import type { Team } from '../../domain/player/player'
-import type { KillEvent, MatchMessage, ServerMessage } from '../../protocol/types'
+import type { KillEvent, MatchMessage, ServerMessage } from '../protocol/types'
 
 /** キルログに残す数。古いものから落ちる */
 const KILL_FEED_MAX = 5

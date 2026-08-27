@@ -39,7 +39,7 @@ import { verifyToken, type Identity } from './auth'
 import { lifeElapsed, newPlayer, type Player } from '../src/domain/player/player'
 import { MODES, ROOM_MODE, ROOM_NAMES, isRoomName, modeOf } from '../src/domain/match/room'
 import { RECONNECT_GRACE, assignTeam, connected, present, nextSlot } from '../src/domain/match/match'
-import { stampLocomotion, stampProtected } from '../src/protocol/snapshot'
+import { stampLocomotion, stampProtected } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD } from '../src/domain/item/held'
 import { triggeredBy } from '../src/sim/judge/claymore'
@@ -49,7 +49,7 @@ import { loadSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
-import type { ClientMessage, RoomSummary, ServerMessage } from '../src/protocol/types'
+import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
 
 
@@ -556,7 +556,7 @@ const server = Bun.serve<Client>({
 
     // --- 部屋の一覧 ---
     if (url.pathname === '/rooms') {
-      // 返す形は src/protocol/types.ts の RoomSummary。画面側も同じ宣言を読む。
+      // 返す形は src/application/protocol/types.ts の RoomSummary。画面側も同じ宣言を読む。
       // satisfies なので、増やしても減らしてもここで落ちる
       const summaries = ROOM_NAMES.map((name) => {
         const room = rooms.get(name)

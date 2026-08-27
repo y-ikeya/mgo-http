@@ -4,7 +4,7 @@
  * --- なぜ src/game から出したか ---
  * ここは**共有の層**。サーバーも、位置の符号化も、足音も、姿勢のドメインルールも
  * この型を読む。にもかかわらず src/presentation/scene/actor/animation.ts (three を読み込む)
- * に置いてあったので、three に依存しないはずの src/sim と src/protocol が
+ * に置いてあったので、three に依存しないはずの src/sim と src/application/protocol が
  * **型の上では three へ繋がっていた**。
  *
  * 動いてはいた (bun は型を剥がすだけなので) が、サーバー側を型検査に

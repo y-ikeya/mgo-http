@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { applySelf, driftOf, newSelfReplica } from './self'
-import type { ServerMessage } from '../../protocol/types'
+import type { ServerMessage } from '../protocol/types'
 import type { WeaponId } from '../../domain/item/weapons'
 
 /**

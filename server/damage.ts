@@ -20,7 +20,7 @@ import {
 import { HIT_RULES, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
-import type { ClientMessage, ServerMessage } from '../src/protocol/types'
+import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
 import { matchState } from './match'
 import { bearingTo, sendHealth } from './relay'

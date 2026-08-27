@@ -14,7 +14,7 @@
 
 import type { Life } from '../../domain/player/lifecycle'
 import type { Team } from '../../domain/player/player'
-import type { ServerMessage } from '../../protocol/types'
+import type { ServerMessage } from '../protocol/types'
 
 /** 名簿の 1 人ぶん。**サーバーが決めたことだけ** */
 export interface RosterEntry {

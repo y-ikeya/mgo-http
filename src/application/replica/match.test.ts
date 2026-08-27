@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { applyMatch, newMatchReplica } from './match'
 import { KILL_POINTS, DEATH_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
-import type { MatchMessage, ServerMessage } from '../../protocol/types'
+import type { MatchMessage, ServerMessage } from '../protocol/types'
 
 /**
  * **レプリカは GL 無しで試せる。**

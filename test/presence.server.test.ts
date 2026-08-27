@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import { Client, startServer, twoPlayers, type Server, spot } from './server'
-import type { ServerMessage } from '../src/protocol/types'
+import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
  * 「クライアントが期待するものが、期待する順で届くか」の試験。

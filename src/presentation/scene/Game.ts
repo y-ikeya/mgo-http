@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { WebGPURenderer } from "three/webgpu";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
-import { Input } from "../../input";
+import { Input } from "../../infra/input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
@@ -56,7 +56,7 @@ import { isGun, type HeldId } from "../../domain/item/held";
 import { MODES, ROOM_STAGES, isHostile, isRoomName } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
-import type { NoiseEvent } from "../../protocol/types";
+import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
 import { STEP_UP } from "../../domain/player/moving";
 import {
@@ -64,7 +64,7 @@ import {
   flightTime,
   TRAJECTORY_STEPS,
 } from "../../sim/judge/bullet";
-import { createTransport } from "../../link";
+import { createTransport } from "../../infra/link";
 import {
   applyMatch,
   newMatchReplica,
@@ -82,8 +82,8 @@ import {
   type Calibration,
   type Knobs,
 } from "./calibration";
-import type { NetTransport } from "../../protocol/types";
-import type { Identity } from "../../auth/session";
+import type { NetTransport } from "../../application/protocol/types";
+import type { Identity } from "../../infra/auth/session";
 import { selfSkin } from "./actor/skin";
 import {
   SNAPSHOT_INTERVAL,
@@ -94,7 +94,7 @@ import {
   type MatchMessage,
   type ServerMessage,
   type Team,
-} from "../../protocol/types";
+} from "../../application/protocol/types";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 export interface GameStats {

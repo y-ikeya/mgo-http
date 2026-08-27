@@ -23,7 +23,7 @@
  */
 
 import type { WeaponId } from '../../domain/item/weapons'
-import type { SelfMessage, ServerMessage } from '../../protocol/types'
+import type { SelfMessage, ServerMessage } from '../protocol/types'
 
 export interface SelfReplica {
   /** 一度でも届いたか。**届く前は何も比べない** */

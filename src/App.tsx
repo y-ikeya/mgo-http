@@ -1,6 +1,6 @@
 import { createSignal, onMount, Show } from 'solid-js'
 import { Route, Router, Navigate } from '@solidjs/router'
-import { AUTH_READY, restore, type Identity } from './auth/session'
+import { AUTH_READY, restore, type Identity } from './infra/auth/session'
 import { checkGpu } from './presentation/scene/util/gpu'
 import GpuBlocked from './presentation/ui/GpuBlocked'
 import Login from './presentation/screens/Login'

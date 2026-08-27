@@ -1,9 +1,9 @@
-import type { Locomotion } from '../domain/player/locomotion'
-import type { HitZone } from '../domain/rule/damage'
-import type { Surface } from '../domain/stage/surface'
-import type { SupportId, WeaponId } from '../domain/item/weapons'
-import type { HeldId } from '../domain/item/held'
-import type { Life } from '../domain/player/lifecycle'
+import type { Locomotion } from '../../domain/player/locomotion'
+import type { HitZone } from '../../domain/rule/damage'
+import type { Surface } from '../../domain/stage/surface'
+import type { SupportId, WeaponId } from '../../domain/item/weapons'
+import type { HeldId } from '../../domain/item/held'
+import type { Life } from '../../domain/player/lifecycle'
 
 /**
  * ネットワークで流す型。
@@ -24,8 +24,8 @@ import type { Life } from '../domain/player/lifecycle'
  * 通信の型が陣営を宣言していたのは順番が逆で、protocol はゲームの言葉を
  * 借りて話す側。ここから出しているのは、読む側の import を変えないため。
  */
-import type { Team } from '../domain/player/player'
-import type { Mode } from '../domain/match/room'
+import type { Team } from '../../domain/player/player'
+import type { Mode } from '../../domain/match/room'
 export type { Team }
 
 /** 1 人分の見た目の状態。体力はここに含めない (サーバーが持つ) */

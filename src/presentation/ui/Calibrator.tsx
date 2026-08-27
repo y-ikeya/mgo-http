@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import * as THREE from 'three'
 import type { BoxTuning } from '../scene/actor/box'
 import type { GameStats } from '../scene/Game'
-import type { InputDevice } from '../../input'
+import type { InputDevice } from '../../infra/input'
 import './Calibrator.css'
 import { WEAPONS } from '../../domain/item/weapons'
 

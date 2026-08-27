@@ -14,10 +14,10 @@
  * three.js に依存しない。サーバー (bun) がこのファイルをそのまま読む。
  */
 
-import { MOVE_DIRECTIONS, type Locomotion } from '../domain/player/locomotion'
-import type { PlayerSnapshot } from './types'
-import type { WeaponId } from '../domain/item/weapons'
-import type { HeldId } from '../domain/item/held'
+import { MOVE_DIRECTIONS, type Locomotion } from '../../domain/player/locomotion'
+import type { PlayerSnapshot } from '../../application/protocol/types'
+import type { WeaponId } from '../../domain/item/weapons'
+import type { HeldId } from '../../domain/item/held'
 
 /** 先頭 1 バイト。将来 2 進の種類が増えたときに見分ける */
 export const PACKET_STATE = 1

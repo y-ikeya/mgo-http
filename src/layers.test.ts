@@ -32,14 +32,36 @@ import { dirname, join, relative, resolve } from 'node:path'
 const LAYERS: Record<string, readonly string[]> = {
   domain: [],
   sim: ['domain'],
-  protocol: ['domain'],
 
-  // 回線と外の口は**端**。認証の切符を持って行く先が同じなので auth を読む
-  link: ['protocol', 'auth'],
+  /**
+   * 外と繋ぐ口。**輸送・HTTP・発行元・装置。**
+   *
+   * どれも「どう届けるか / どこから来るか」であって、遊びの状態は持たない。
+   * infra が消えても状態は残るが、application が消えたら運ぶ物が無くなる —
+   * その向きが層の位置を決めている。
+   *
+   * 差し替えの壁でもある。WebTransport にしても、認証を Supabase から
+   * 移しても、**この下のファイルだけ書き換えれば済む**という形を保つ。
+   */
+  infra: [],
+  /**
+   * 位置をバイトへ詰める。**約束の形は読むが、意味は持たない。**
+   *
+   * 位置だけ他と桁違いに多いので、ここだけ JSON をやめている (1 通 264 バイトが
+   * 33 バイト)。**輸送の都合**なので infra。読むのは回線とサーバーだけで、
+   * 画面は読まない。
+   */
+  'infra/codec': ['domain', 'application/protocol'],
+  // 回線。認証の切符を持って行く先が同じなので auth を読む
+  'infra/link': ['application/protocol', 'infra/codec', 'infra/auth'],
   // サーバーの居場所 (serverHttpUrl) は回線と共有する。ws:// と http:// の
   // 書き分けを 2 か所に置かないため
-  api: ['protocol', 'domain', 'auth', 'link'],
-  auth: [],
+  'infra/api': ['application/protocol', 'domain', 'infra/auth', 'infra/link'],
+  /** 誰なのか。**発行元 (いまは Supabase) の都合をここから外へ出さない** */
+  'infra/auth': [],
+  // 押されたか。**どこにも依存しない** — 動詞に訳すのは domain/player/intent.ts で、
+  // ここが持つのはキーコードとパッドの番号だけ
+  'infra/input': [],
   /**
    * アプリケーションの状態。**server/ と同じ高さの双子。**
    *
@@ -51,30 +73,37 @@ const LAYERS: Record<string, readonly string[]> = {
    * 「支度の進み方」のような、画面ではなく**筋道**の側もここへ来る。
    */
   application: [],
+  /**
+   * 線を流れる形。**client と server の間の約束。**
+   *
+   * どちらか片方の持ち物ではないが、**約束の中身は遊びの語彙で書かれている**
+   * (体力・残機・部位)。だから application の下で、infra ではない。
+   *
+   * バイトへ詰める所は別 (infra/codec)。あちらは「264 バイトを 33 バイトに」
+   * という**輸送の都合**で、遊びの意味を 1 つも持っていない。
+   */
+  'application/protocol': ['domain'],
   /** サーバーの状態を追う。**決めない** — 報せを受けて進むだけ */
-  'application/replica': ['domain', 'protocol'],
+  'application/replica': ['domain', 'application/protocol'],
   presentation: [
     'domain',
     'sim',
-    'protocol',
+    'application/protocol',
     'application/replica',
-    'link',
-    'api',
-    'auth',
-    'input',
+    'infra/link',
+    'infra/api',
+    'infra/auth',
+    'infra/input',
     'i18n',
   ],
-  // 押されたか。**どこにも依存しない** — 動詞に訳すのは domain/player/intent.ts で、
-  // ここが持つのはキーコードとパッドの番号だけ
-  input: [],
   i18n: [],
   // 組み立てる所。画面を並べて、認証が済むまで待たせる
-  App: ['auth', 'presentation'],
+  App: ['infra/auth', 'presentation'],
   index: ['App'],
 }
 
 /** three も DOM も知らない層。**サーバーがそのまま読む**ので入れられない */
-const HEADLESS = ['domain', 'sim', 'protocol', 'application/replica']
+const HEADLESS = ['domain', 'sim', 'application/protocol', 'application/replica', 'infra/codec']
 
 const SRC = join(import.meta.dir)
 
@@ -122,8 +151,9 @@ function layerOf(file: string, spec: string): string | null {
    * 親 (presentation) として数えられて、**親に許した相手を全部読めてしまう**。
    * 表に載っている名前のうち、前方一致する一番長い物を採る。
    */
+  const bare = rel.replace(/\.tsx?$/, '')
   for (const layer of NESTED) {
-    if (rel === layer || rel.startsWith(layer + '/')) return layer
+    if (bare === layer || rel.startsWith(layer + '/')) return layer
   }
   const head = rel.split('/')[0]
   if (/\.tsx?$/.test(head)) return head.replace(/\.tsx?$/, '')
@@ -139,7 +169,7 @@ const NESTED = Object.keys(LAYERS)
 /**
  * その層のファイル。**棚でも、直下の 1 枚でも同じに扱う。**
  *
- * ディレクトリだけを見ていた頃は `src/input.ts` が永久に空を返していた —
+ * ディレクトリだけを見ていた頃は `input.ts` が永久に空を返していた —
  * 表に載せても検査されない。「押されたか。**依存なし**」と README に
  * 書いてあるのに、それを留めるものが無かった。
  */

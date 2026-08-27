@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { applyRoster, newRoster } from './roster'
-import type { ServerMessage } from '../../protocol/types'
+import type { ServerMessage } from '../protocol/types'
 
 /**
  * 名簿は**サーバーが持っている状態**なので、レプリカの側で試せる。

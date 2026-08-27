@@ -49,7 +49,7 @@ import {
   INTERPOLATION_DELAY,
   type PlayerSnapshot,
   type Team,
-} from "../../../protocol/types";
+} from "../../../application/protocol/types";
 
 /*
  * --- 所属の色をテクスチャに掛けるのをやめた (翻意) ---

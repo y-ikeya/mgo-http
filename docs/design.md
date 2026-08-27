@@ -513,16 +513,12 @@ MGO2 から読み取れた事実 (スクリーンショットから。推測で�
 
     src/domain/     遊びの語彙と数字        依存なし
     src/sim/        世界に訊く手続き        domain の**型だけ** (値は引数)
-    src/protocol/   通信で流れる形          domain の語彙だけ
-    src/application/    こちら側の状態          domain / protocol
+    src/application/    約束 (protocol) と状態 (replica)   domain のみ
     src/presentation/ 見せる・聞かせる      上の全部 + three
     server/         審判。状態を持ち、配る  domain / sim / protocol
 
     端 (層ではなくアダプタ。誰も彼らに依存しない)
-    src/input.ts    押されたか。依存なし
-    src/link/       回線 (WebSocket)
-    src/api/        外の口 (部屋一覧・戦績)
-    src/auth/       認証
+    src/infra/      外と繋ぐ口 (input / codec / link / api / auth)
 
 **段は 4 つ。** 触る理由が 4 つしか無いから — 遊びを変えたい (domain) /
 世界の振る舞いが変 (sim・protocol) / 誰が状態を持ちいつ配るか (server・replica) /
@@ -579,7 +575,7 @@ sim に置くのは **主語が「世界」であるもの** — 世界に訊け
 で棚に分ける。
 
     src/presentation/scene/Game.ts    まとめ役。毎フレームここから降りていく
-    src/input.ts   パッドとキーボード
+    src/infra/input.ts   パッドとキーボード
     src/presentation/scene/assets.ts  モデルの読み込み (棚をまたいで共有する)
       actor/    人 — 自機・他人・モーション (どれを流すか)・当たり判定・ダンボール
       arms/     武器と投げた物 — 銃・弾道・手榴弾・クレイモア・落ちている銃

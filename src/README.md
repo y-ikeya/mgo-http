@@ -7,19 +7,25 @@
 domain        遊びの語彙と数字          依存なし
   ↑
 sim           世界に訊く手続き          domain の**型だけ** (値は引数で受け取る)
-protocol      通信で流れる形            domain の語彙だけ
   ↑
-application   こちら側の状態            domain / protocol
+application   こちら側の状態と、外との約束
+  protocol/     線を流れる形 (client と server の約束)   domain の語彙だけ
+  replica/      サーバーの状態を追う                     domain / protocol
 server/       審判。状態を持ち、配る    domain / sim / protocol  (src の外)
   ↑
 presentation  見せる・聞かせる          上の全部 + three
 
-端 (層ではない。誰も彼らに依存しない)
-  input.ts    押されたか
-  link/       回線 (WebSocket)
-  api/        外の口 (部屋一覧・戦績)
-  auth/       認証
+infra/        外と繋ぐ口 (差し替えの壁)。**遊びの状態は持たない**
+  input.ts    押されたか。装置 (キーボード / パッド)   依存なし
+  codec/      位置をバイトへ詰める                    application/protocol
+  link/       回線 (WebSocket)                        application/protocol / codec
+  api/        外の口 (部屋一覧・戦績)                  protocol / domain / …
+  auth/       誰なのか。発行元の都合はここで止まる       依存なし
 ```
+
+**infra が消えても遊びの状態は残るが、application が消えたら運ぶ物が無くなる。**
+その向きが層の位置を決めている。WebTransport にしても認証を移しても、
+書き換えるのは `infra/` の下だけで済む、という形を保つ。
 
 ## 迷ったときの問い
 
