@@ -98,8 +98,21 @@ export class Hitbox {
   /**
    * 射線との交差を調べる。
    *
-   * 呼ぶ前にワールド行列が更新されていること。頭を先に見るのは、頭と胴が
-   * 重なる位置 (真上から撃つ場合など) で頭を優先したいため。
+   * 呼ぶ前にワールド行列が更新されていること。
+   *
+   * --- 頭に当たったら頭 ---
+   * 「頭を先に見る」と書いてあったが、**実際は近いほうが勝つ形**だった。
+   * 胴の球は首 (Neck) を中心に半径 0.20m あるので上端が 1.61m まで届き、
+   * 頭の球 (1.42〜1.68m) の**下 15cm を食っていた**。後ろから撃つと、
+   * 頭のボーンより 12cm 上 — 頭骨のてっぺん — でないと HEAD にならない。
+   * うなじの上を撃っても胴、という形で出る。
+   *
+   * 重なった所は頭にする。**代償**は、胴を貫いた先に頭がある角度 (下から
+   * 見上げて撃つ) で頭になること。弾は当たった所で止まるので厳密ではないが、
+   * 「頭を撃ったのに胴になる」ほうが遊ぶ側から見て理不尽なので、そちらへ倒す。
+   *
+   * 球を小さくして重なりを消す手もあるが、それは**当たったように見えて外れる**
+   * を増やす。判定は見た目より気持ち大きく、が元の方針 (HEAD_RADIUS)。
    *
    * @param dir 正規化済みの方向
    * @param maxDistance これより遠い交差は無視する。手前の地形で遮られている場合に渡す
@@ -107,24 +120,25 @@ export class Hitbox {
   raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDistance: number): HitboxHit | null {
     if (!this.resolved) return null
 
-    let best: HitboxHit | null = null
-
     if (this.headPosition(this.headCenter)) {
       const t = raySphere(origin, dir, this.headCenter, HEAD_RADIUS, maxDistance)
-      if (t !== null) best = { zone: 'HEAD', distance: t }
+      // **頭に当たったら、そこで決まり。** 胴と重なる所を胴に譲らない
+      if (t !== null) return { zone: 'HEAD', distance: t }
     }
 
     this.neckPos.setFromMatrixPosition(this.neck!.matrixWorld)
     this.hipsPos.setFromMatrixPosition(this.hips!.matrixWorld)
     this.footPos.setFromMatrixPosition(this.foot!.matrixWorld)
 
+    // 頭でなければ、胴と脚は**近いほう**。あちらは重なっても意味が変わらない
+    // (腰のあたりで胴と脚が重なるが、どちらを取っても威力の帯は隣り合っている)
     const body = this.raySpheres(origin, dir, this.hipsPos, this.neckPos, BODY_RADIUS, BODY_SEGMENTS, maxDistance)
-    if (body !== null && (!best || body < best.distance)) best = { zone: 'BODY', distance: body }
-
     const legs = this.raySpheres(origin, dir, this.footPos, this.hipsPos, LEG_RADIUS, LEG_SEGMENTS, maxDistance)
-    if (legs !== null && (!best || legs < best.distance)) best = { zone: 'LEGS', distance: legs }
-
-    return best
+    if (body === null && legs === null) return null
+    if (legs === null || (body !== null && body <= legs)) {
+      return { zone: 'BODY', distance: body! }
+    }
+    return { zone: 'LEGS', distance: legs }
   }
 
   /** 2 点の間に球を並べて、最も手前の交差を返す */
