@@ -20,13 +20,17 @@ const gltf = await new GLTFLoader().parseAsync(
   '',
 )
 
-/** 立ち姿で落ち着かせた 1 体と、その骨の位置 */
-function standing() {
+/** hitbox.ts と揃えてある。ここを変えたらあちらも */
+const HEAD_RADIUS = 0.13
+const HEAD_OFFSET = 0.08
+
+/** 姿勢を落ち着かせた 1 体と、その骨の位置 */
+function poseOf(locomotion: string, aiming: boolean) {
   const scene = gltf.scene.clone(true)
   const anim = new CharacterAnimator(scene, gltf.animations, 4.5)
-  for (let i = 0; i < 60; i++) {
-    anim.setLocomotion('idle' as never)
-    anim.setAiming(false)
+  for (let i = 0; i < 90; i++) {
+    anim.setLocomotion(locomotion as never)
+    anim.setAiming(aiming)
     anim.update(1 / 60)
   }
   scene.updateMatrixWorld(true)
@@ -44,6 +48,15 @@ function standing() {
     return at
   }
   return { box, head: boneAt('Head'), neck: boneAt('Neck'), hips: boneAt('Hips') }
+}
+
+const standing = () => poseOf('idle', false)
+
+/** 背中側から水平に撃つ */
+function shootAt(p: ReturnType<typeof poseOf>, y: number): string {
+  origin.set(p.head.x, y, p.head.z + 3)
+  dir.set(0, 0, -1)
+  return p.box.raycast(origin, dir, 10)?.zone ?? 'MISS'
 }
 
 const origin = new THREE.Vector3()
@@ -90,6 +103,55 @@ describe('頭の判定', () => {
   /** 頭の上を通せば当たらない。**当たり判定が青天井ではない** */
   test('頭より上は外れる', () => {
     expect(shootFromBehind(s, s.head.y + 0.35)).toBe('MISS')
+  })
+
+  /**
+   * **首より下は、頭の球に入っていても胴。**
+   *
+   * 優先させただけだと逆に食い過ぎた。頭の球は下端が首のボーンまで落ちて
+   * いるので、首の下を撃っても頭になる。当たった点の高さで切る。
+   */
+  test('構えている相手の、首の下は BODY', () => {
+    // **構えると首が上がる** (1.415 → 1.434) 一方、頭の球は頭のボーンから
+    // 決まるので下端が動かない。そこに「頭の球なのに首より下」の帯ができる。
+    // 撃ち合いの姿勢そのものなので、ここが頭になると首の下で倒せてしまう
+    const aim = poseOf('idle', true)
+    const band = aim.neck.y - 0.01
+    expect(band).toBeGreaterThan(aim.head.y + HEAD_OFFSET - HEAD_RADIUS)
+    expect(shootAt(aim, band)).toBe('BODY')
+    expect(shootAt(aim, aim.neck.y + 0.02)).toBe('HEAD')
+  })
+
+  /**
+   * **境目は骨。** 高さを直書きすると、しゃがんだ相手 (頭 0.94m) で
+   * 切れる場所がずれる。首のボーンは姿勢と一緒に動く。
+   */
+  test('しゃがんでも境目は首のまま', () => {
+    const scene = gltf.scene.clone(true)
+    const anim = new CharacterAnimator(scene, gltf.animations, 4.5)
+    for (let i = 0; i < 90; i++) {
+      anim.setLocomotion('crouch_idle' as never)
+      anim.setAiming(false)
+      anim.update(1 / 60)
+    }
+    scene.updateMatrixWorld(true)
+    const box = new Hitbox()
+    box.bind(scene)
+    let neck: THREE.Object3D | null = null
+    scene.traverse((o) => {
+      if (!neck && o.name.endsWith('Neck')) neck = o
+    })
+    const at = new THREE.Vector3()
+    at.setFromMatrixPosition((neck as unknown as THREE.Object3D).matrixWorld)
+
+    const shoot = (y: number) => {
+      origin.set(at.x, y, at.z + 3)
+      dir.set(0, 0, -1)
+      return box.raycast(origin, dir, 10)?.zone ?? 'MISS'
+    }
+    // しゃがむと頭は 0.95m あたりまで下がる。それでも切れるのは首
+    expect(shoot(at.y - 0.05)).toBe('BODY')
+    expect(shoot(at.y + 0.05)).toBe('HEAD')
   })
 
   /**

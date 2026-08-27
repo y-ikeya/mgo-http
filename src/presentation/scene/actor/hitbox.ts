@@ -111,8 +111,14 @@ export class Hitbox {
    * 見上げて撃つ) で頭になること。弾は当たった所で止まるので厳密ではないが、
    * 「頭を撃ったのに胴になる」ほうが遊ぶ側から見て理不尽なので、そちらへ倒す。
    *
+   * --- ただし首から下は頭にしない ---
+   * 優先させただけだと逆に食い過ぎた。頭の球は下端が 1.416m で、**首のボーン
+   * (1.412m) まで落ちている** — 首の下を撃っても頭になる。
+   *
    * 球を小さくして重なりを消す手もあるが、それは**当たったように見えて外れる**
    * を増やす。判定は見た目より気持ち大きく、が元の方針 (HEAD_RADIUS)。
+   * 代わりに**当たった点の高さ**で切る。首のボーンが体の上での境目そのもの
+   * なので、姿勢が変わっても一緒に動く (しゃがんでも倒れても正しい所で切れる)。
    *
    * @param dir 正規化済みの方向
    * @param maxDistance これより遠い交差は無視する。手前の地形で遮られている場合に渡す
@@ -120,14 +126,17 @@ export class Hitbox {
   raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDistance: number): HitboxHit | null {
     if (!this.resolved) return null
 
-    if (this.headPosition(this.headCenter)) {
-      const t = raySphere(origin, dir, this.headCenter, HEAD_RADIUS, maxDistance)
-      // **頭に当たったら、そこで決まり。** 胴と重なる所を胴に譲らない
-      if (t !== null) return { zone: 'HEAD', distance: t }
-    }
-
     this.neckPos.setFromMatrixPosition(this.neck!.matrixWorld)
     this.hipsPos.setFromMatrixPosition(this.hips!.matrixWorld)
+
+    if (this.headPosition(this.headCenter)) {
+      const t = raySphere(origin, dir, this.headCenter, HEAD_RADIUS, maxDistance)
+      // **当たった点が首より上なら頭。** 頭に当たったら胴に譲らない
+      if (t !== null && origin.y + dir.y * t >= this.neckPos.y) {
+        return { zone: 'HEAD', distance: t }
+      }
+    }
+
     this.footPos.setFromMatrixPosition(this.foot!.matrixWorld)
 
     // 頭でなければ、胴と脚は**近いほう**。あちらは重なっても意味が変わらない
