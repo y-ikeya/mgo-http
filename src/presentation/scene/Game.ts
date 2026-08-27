@@ -88,6 +88,7 @@ import { selfSkin } from "./actor/skin";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
+  type MatchPhase,
   type SelfMessage,
   type KillEvent,
   type MatchMessage,
@@ -325,6 +326,16 @@ const POINT_FEED_DURATION = 2.5;
  */
 const SPAWN_SPREAD = 1.5;
 
+/**
+ * 名簿を頼み直す間隔 (ms)。
+ *
+ * 往復は普通 30〜60ms なので、1 秒あれば来ているはず。それでも来ないなら
+ * **頼みか答えのどちらかが落ちている**ので、もう一度言う。
+ *
+ * 短くしすぎると、往復を待っている間に何十通も投げることになる。
+ */
+const ROSTER_RETRY = 1000;
+
 /** ID から湧く方向を決める。同じタブなら再読み込みしても同じ場所 */
 function spawnAngle(id: string): number {
   let hash = 0;
@@ -482,6 +493,16 @@ export class Game {
    * 描くのに使うのはこちらではなく、予測した側 (player / inv)。
    */
   private readonly self = newSelfReplica();
+  /**
+   * 名簿を待っているか。**試合が始まったら立ち、届いたら降りる。**
+   *
+   * 立っている間は 1 秒ごとに頼み直す (askRoster)。
+   */
+  private rosterWanted = false;
+  /** 最後に頼んだ時刻 (Date.now)。**頼みすぎない**ための間隔 */
+  private rosterAskedAt = 0;
+  /** 直前に見た段階。**変わった瞬間**を捕まえるのに要る */
+  private phaseSeen: MatchPhase | null = null;
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -987,6 +1008,7 @@ export class Game {
     this.player.setGhost(this.life === "spawning" || this.loadoutBlocking);
     this.updateRollContact();
     this.updateStab(dt);
+    this.askRosterIfWanted();
     const posture = {
       speed: this.player.speed,
       stanceRate: this.player.stanceRate,
@@ -1176,6 +1198,23 @@ export class Game {
   }
 
   private receive(message: ServerMessage): void {
+    /*
+     * 名簿の取りこぼしに気づく。**試合が始まったら、届くまで頼み続ける。**
+     *
+     * 試合の頭で陣営が切り直される。名簿を落とすと前の試合の色のまま描き、
+     * **敵味方が逆になる** — 撃てる相手かはクライアントが陣営で判断している
+     * ので、味方を撃ちに行って削れない、が起きる。
+     *
+     * サーバーからの自発的な送信は残っている (普段は 1 往復ぶん速い)。ここは
+     * それが落ちたときのための道で、**来なければもう一度頼む**。頼みのほうが
+     * 落ちることもあるので、「言えば来る」ではなく「来るまで言う」にする。
+     */
+    if (message.type === "match" && message.phase === "countdown") {
+      if (this.phaseSeen !== "countdown") this.rosterWanted = true;
+    }
+    if (message.type === "match") this.phaseSeen = message.phase;
+    if (message.type === "roster") this.rosterWanted = false;
+
     // **写しを先に進める。** 段階も所属もキルログも、持っているのはあちら
     for (const effect of applyMatch(this.replica, message, this.net.id, Date.now())) {
       this.perform(effect);
@@ -1436,6 +1475,20 @@ export class Game {
    * 運んでいて、こちらで上書きすると**同じダメージを 2 回受けたように見える**。
    * ここでは食い違いを控えるだけにして、直すのは health の道に任せる。
    */
+  /**
+   * 名簿を待っている間、**1 秒ごとに頼み直す**。
+   *
+   * 間隔を空けるのは、届くまでの往復のあいだに何十通も投げないため。
+   * 1 秒あれば往復は済んでいるので、それでも来ないなら落ちている。
+   */
+  private askRosterIfWanted(): void {
+    if (!this.rosterWanted) return;
+    const now = Date.now();
+    if (now - this.rosterAskedAt < ROSTER_RETRY) return;
+    this.rosterAskedAt = now;
+    this.net.send({ type: "refetchRoster" });
+  }
+
   private applySelf(message: SelfMessage): void {
     applySelf(this.self, message);
 

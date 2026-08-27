@@ -488,6 +488,16 @@ function handleMessage(
       break
     }
 
+    /*
+     * 名簿をくれ、と言われた。**その人にだけ返す。**
+     *
+     * 取りこぼしに気づいたクライアントが頼んでくる。来なければまた頼んで
+     * くるので、こちらは受けたら返すだけでよい — 届いたかを覚えない。
+     */
+    case 'refetchRoster':
+      sessionOf(player).socket.send(JSON.stringify(rosterMessage(room)))
+      break
+
     // 装填が**終わった**。尺はクライアントが持っているので、
     // こちらは移すだけでよい
     case 'reload':
