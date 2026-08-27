@@ -222,7 +222,7 @@ describe('選び直せる窓', () => {
     expect(player.skills).toEqual({ runner: 2, exposure: 1 })
   })
 
-  test('**光っている札のほうは湧き直しで消える。** 死が漏洩を止める', () => {
+  test('**光っているフラグのほうは湧き直しで消える。** 死が漏洩を止める', () => {
     const player = newPlayer({ id: 'a', name: 'a', team: 'blue', slot: 0, now: 0 })
     player.leakedUntil = Date.now() + 5000
     refill(player)

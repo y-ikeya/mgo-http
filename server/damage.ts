@@ -80,7 +80,7 @@ const NOT_HURT: Hurt = { downed: false, letGo: false }
  *
  * --- 上書きする ---
  * 既に光っていても、当て直せば伸びる。別の人が当てれば宛先ごと移る
- * (札は 1 人ぶんしか無い)。**短いほうへは縮めない** — Lv1 の人が当てたせいで
+ * (フラグは 1 人ぶんしか無い)。**短いほうへは縮めない** — Lv1 の人が当てたせいで
  * Lv3 の人の光が消えるのは、当てた側から見て理屈が通らない。
  */
 function expose(room: RoomWorld, victim: Player, attacker: Player | undefined): void {

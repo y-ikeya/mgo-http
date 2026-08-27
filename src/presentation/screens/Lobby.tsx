@@ -38,7 +38,7 @@ export default function Lobby(props: { identity: Identity }) {
   const [error, setError] = createSignal('')
   /** 戦績を開いている相手。null なら閉じている */
   const [opened, setOpened] = createSignal<{ id: string; name: string } | null>(null)
-  // 札に出す Lv。入る前に「この部屋は強いのばかり」が読めるように
+  // カードに出す Lv。入る前に「この部屋は強いのばかり」が読めるように
   const levelFor = useLevels(
     () => rooms().flatMap((room) => room.roster.map((who) => who.id)),
     props.identity,
@@ -105,7 +105,7 @@ export default function Lobby(props: { identity: Identity }) {
               }}
             >
               {/*
-                入るのはこのボタン。**名前の札は別のボタン**なので、行ごと
+                入るのはこのボタン。**名前のカードは別のボタン**なので、行ごと
                 1 つのボタンにはできない (button の中に button は置けない)。
               */}
               <button

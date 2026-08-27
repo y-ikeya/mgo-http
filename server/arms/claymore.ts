@@ -48,7 +48,7 @@ export function placeClaymore(room: RoomWorld, from: Player): void {
   const z = from.z + forward[1] * PLACE_FORWARD
 
   // 壁の中や縁の外へは置けない。**弾いても数は減らさない** —
-  // 置けなかったのに手札が減ると、押し間違いが取り返しの付かない損になる
+  // 置けなかったのに手フラグが減ると、押し間違いが取り返しの付かない損になる
   const ground = groundUnder(x, z, from.y, room.stage.solid, STEP_UP).top
   if (!canPlaceAt(x, z, from.y, ground, room.stage.solid)) return
 

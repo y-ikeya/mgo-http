@@ -175,7 +175,10 @@ const ROLL_TIME_SCALE = 1.32
  */
 const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8, fall_roll: 1 }
 /**
- * ローリングの拘束を解く時点 (クリップ尺に対する割合)。
+ * ローリングの**操作ロック**を解く時点 (クリップ尺に対する割合)。
+ *
+ * ロック = 撃てず、向きも変えられない時間。ポインタロック (infra/input.ts) とは
+ * 別物で、こちらは動きが操作を受け付けない、という意味。
  *
  * 最後まで再生し切ってから移動へ戻すと、clampWhenFinished で最終ポーズに
  * 固まった状態からブレンドが始まるので、一拍止まって見える。
@@ -191,7 +194,7 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   /*
    * 落下の受け身。**ここに無くて、下半身だけループしていた。**
    *
-   * 尺 (1.67 秒) と拘束 (FALL_ROLL_TIME) がほぼ同時なので、絵の上では
+   * 尺 (1.67 秒) とロック (FALL_ROLL_TIME) がほぼ同時なので、絵の上では
    * 気づけない。焼かれた移動を辿るようにした途端に出た — クリップが頭へ
    * 戻ると根元の位置も頭へ戻るので、**1 フレームで 3m 引き戻される**。
    * 「進んでから着地点へ滑って戻る」という形で、しかも競り合いなので毎回は出ない。
@@ -1877,7 +1880,7 @@ export class CharacterAnimator {
   }
 
   /**
-   * 転がりの**拘束**が続いているか。この間は撃てず、向きも変えられない。
+   * 転がりの**ロック**が続いているか。この間は撃てず、向きも変えられない。
    *
    * 終盤で先に解ける (releaseRollIfSettling)。立ち上がりに入った時点で操作を
    * 返さないと、最終ポーズに固まった所からブレンドが始まって一拍止まって見える。
@@ -1891,7 +1894,7 @@ export class CharacterAnimator {
    *
    * --- rolling と何が違うか ---
    * あちらは「もう動かしてよいか」。こちらは「もう転がって見えていないか」。
-   * 拘束は ROLL_EXIT_PHASE (0.78) で先に解けるので、**クリップはまだ 2 割
+   * ロックは ROLL_EXIT_PHASE (0.78) で先に解けるので、**クリップはまだ 2 割
    * 残っている**。同じ getter で兼ねていたせいで、二段の型 (手榴弾の振りかぶり
    * など) が転がりの尻尾の中で始まって終わり、**一度も画面に映らなかった**。
    *
@@ -1905,7 +1908,7 @@ export class CharacterAnimator {
     return duration > 0 && action.time < duration
   }
 
-  /** 終盤に入ったら拘束を解く。クリップ自体は流れ続け、重みで抜けていく */
+  /** 終盤に入ったらロックを解く。クリップ自体は流れ続け、重みで抜けていく */
   private releaseRollIfSettling(): void {
     if (this.upperState !== 'roll') return
     const action = this.lower.get('roll')

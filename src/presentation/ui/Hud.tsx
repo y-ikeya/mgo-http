@@ -25,7 +25,7 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
   )
 }
 
-/** 1 段送ったときに滑る距離 (px)。札 1 枚より小さくして「動いた」だけを見せる */
+/** 1 段送ったときに滑る距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
 const BROWSE_SLIDE = 26
 
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
@@ -150,7 +150,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   /*
    * 送った向きに滑らせる。
    *
-   * **どちらへ動いたかが分からない**という指摘。札の中身だけが入れ替わるので、
+   * **どちらへ動いたかが分からない**という指摘。カードの中身だけが入れ替わるので、
    * 上へ送ったのか下へ送ったのかが読めなかった。1 段ごとに、来た方向から
    * 滑り込ませる。
    *
@@ -181,7 +181,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
      * **入れ物ではなく、中の 2 つを動かす。**
      *
      * L 字の列と行はそれぞれ画面に絶対配置してある。入れ物に transform を掛けると
-     * **そこが配置の基準になってしまい**、札が画面の隅へ飛んで L 字が消えた。
+     * **そこが配置の基準になってしまい**、カードが画面の隅へ飛んで L 字が消えた。
      */
     for (const part of [columnEl, rowEl]) {
       part?.animate(
@@ -529,7 +529,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             {/*
               角は出さない。**角にあるのは武器のカードそのもの** (下の hud-weapon)。
               選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。
-              別に札を出すと同じ名前が 2 つ並ぶ。
+              別にカードを出すと同じ名前が 2 つ並ぶ。
             */}
           <div class="hud-browse-column" ref={columnEl}>
             <For each={above()}>{(item) => <BrowseItem item={item} />}</For>

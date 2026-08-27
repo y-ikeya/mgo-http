@@ -897,7 +897,7 @@ export class RemotePlayers {
    * 出す / 出さないの判断は RemotePlayer が持つ (refreshVisibility)。
    */
   update(dt: number, now: number): void {
-    // 光る札の期限を落とす。**切れたことは通で来ない** — 来させると、
+    // 光るフラグの期限を落とす。**切れたことは通で来ない** — 来させると、
     // 消える瞬間に接続が詰まっていた相手が光ったままになる
     for (const [id, until] of this.exposed) {
       if (now >= until) this.exposed.delete(id);
@@ -1130,7 +1130,7 @@ export class RemotePlayers {
   private readonly exposed = new Map<string, number>();
 
   /**
-   * 光る札を体へ配り直す。**2 つの出どころを 1 か所で合流させる。**
+   * 光るフラグを体へ配り直す。**2 つの出どころを 1 か所で合流させる。**
    *
    * 別々に setLeaking すると、片方が false を配った瞬間にもう片方の光が消える
    * (最後に呼んだほうが勝つ)。合流させておけば、EE が切れても 1 位ならまだ光る。

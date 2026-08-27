@@ -327,7 +327,7 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
    * **光っている人は遮蔽を無視して配る。**
    *
    * 光る = 位置が公になっている、という語彙 (docs/design.md の 3)。いまは
-   * 個人戦の 1 位だけで、リンクを抜かれた相手も同じ札に乗る。**誰が光るかは
+   * 個人戦の 1 位だけで、リンクを抜かれた相手も同じフラグに乗る。**誰が光るかは
    * ドメインルールが決める** (domain/match/match.ts の isLeaking)。
    *
    * 見る人には依らないので、ループの外で 1 回だけ引く。

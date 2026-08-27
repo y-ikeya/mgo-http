@@ -97,7 +97,7 @@ describe('光っている人', () => {
     expect(isLeaking(match, match.players.get('b')!)).toBe(false)
   })
 
-  test('**陣営戦では誰も光らない。** 1 位は居ても札が付かない', () => {
+  test('**陣営戦では誰も光らない。** 1 位は居てもフラグが付かない', () => {
     const match = room('TDM')
     join(match, 'a', 3)
     join(match, 'b', 1)
@@ -115,7 +115,7 @@ describe('光っている人', () => {
     expect(leakingOf(match)).toBe(null)
   })
 
-  test('抜かれたら札が移る。**蓄えていないので書き直しが要らない**', () => {
+  test('抜かれたらフラグが移る。**蓄えていないので書き直しが要らない**', () => {
     const match = room('DM')
     join(match, 'a', 3)
     join(match, 'b', 1)
