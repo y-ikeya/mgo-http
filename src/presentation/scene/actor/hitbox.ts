@@ -36,6 +36,25 @@ export interface HitboxHit {
 const HEAD_MARGIN = 1.06
 
 /**
+ * 頭として認める下端を、頭の高さの何割ぶん持ち上げるか。
+ *
+ * **頭の頂点群は首の皮まで含んでいる。** 下端をそのまま使うと、首の骨の
+ * 1cm 上から頭になり、肩の上 (うなじの下) を撃っても頭になる。
+ *
+ * 顎のあたりまで持ち上げる。**ここが「頭とみなす下端」の摘み** — 頭が
+ * 取りにくいと感じたら下げ、首で取れてしまうなら上げる。
+ */
+const HEAD_FLOOR_LIFT = 0.15
+
+/**
+ * 顎のラインの傾き。**前へ 1m 出るごとに境目が何 m 下がるか。**
+ *
+ * 頭の奥行きは 0.2m ほどなので、0.6 なら前後で 12cm の差が付く。
+ * 顎 (前・低い) とうなじ (後ろ・高い) が、同じ 1 枚の面で表せる。
+ */
+const HEAD_FLOOR_TILT = 0.6
+
+/**
  * 大きさと位置が測れなかったときの逃げ道 (m)。
  *
  * 骨だけは在ってメッシュが読めない、という形になったときでも判定は要る。
@@ -83,6 +102,24 @@ export class Hitbox {
    * ずらす形だと、寝ている相手の球が体の上に浮く。
    */
   private readonly headLocal = new THREE.Vector3(0, HEAD_FALLBACK_OFFSET, 0)
+  /**
+   * 頭の**下端**。骨のローカルで持つ (headLocal と同じ理由)。
+   *
+   * 球は少し大きく取ってあるので、下へもはみ出す。そのはみ出しが首の柱の
+   * 高さに当たって、**肩の上を撃っても頭**になっていた。上や横へ余裕を残す
+   * のはよいが、下だけは見えている頭で切る — 首は頭ではない。
+   */
+  private readonly headFloorLocal = new THREE.Vector3()
+  private readonly headFloor = new THREE.Vector3()
+  /**
+   * 顔の向き (骨のローカル)。**顎のラインを前下がりに傾けるのに使う。**
+   *
+   * 顎は前が低く、うなじは後ろが高い。水平に切ると、前から見て顎の高さが
+   * 後ろから見るとうなじの下になる — **同じ高さなのに前後で意味が違う**。
+   */
+  private readonly headForwardLocal = new THREE.Vector3()
+  private readonly headForward = new THREE.Vector3()
+  private readonly headToHit = new THREE.Vector3()
   /** 頭の球の半径 (m)。**モデルから測る** (measureHead) */
   headRadius = HEAD_FALLBACK_RADIUS
   /** モデルから測れたか。測れなければ世界の上へずらす昔の形で動く */
@@ -177,6 +214,38 @@ export class Hitbox {
     const scale = new THREE.Vector3().setFromMatrixScale(head.matrixWorld).x || 1
     this.headRadius = (Math.max(size.x, size.y, size.z) / 2) * scale * HEAD_MARGIN
     bounds.getCenter(this.headLocal)
+    // 下端は箱の底から、高さの HEAD_FLOOR_LIFT ぶん上。中心と同じ柱の上で取る
+    this.headFloorLocal.set(
+      this.headLocal.x,
+      bounds.min.y + size.y * HEAD_FLOOR_LIFT,
+      this.headLocal.z,
+    )
+
+    /*
+     * 顔の向き。**骨から頭の中心へ。**
+     *
+     * 骨のローカル軸のどれが前かはリグによって違うので、当てずっぽうでは決め
+     * られない。最初は鼻 (中心から一番張り出した頂点) で取ったが、**張り出して
+     * いるのは後頭部だった** — 前後が逆になり、顎が上がってうなじが下がった。
+     *
+     * 頭の骨は頭蓋の**後ろ下**に付いていて、顔はそこから前へ張り出す。だから
+     * 骨から頭の中心へ向かう水平の向きが前になる。これはリグに依らない。
+     */
+    const forwardWorld = new THREE.Vector3()
+      .copy(this.headLocal)
+      .applyMatrix4(head.matrixWorld)
+      .sub(new THREE.Vector3().setFromMatrixPosition(head.matrixWorld))
+    forwardWorld.y = 0
+    if (forwardWorld.lengthSq() > 1e-8) {
+      forwardWorld.normalize()
+      // 骨のローカルへ。姿勢が変われば一緒に回る
+      this.headForwardLocal
+        .copy(forwardWorld)
+        .applyQuaternion(
+          new THREE.Quaternion().setFromRotationMatrix(head.matrixWorld).invert(),
+        )
+        .normalize()
+    }
     this.measured = true
   }
 
@@ -227,8 +296,11 @@ export class Hitbox {
 
     if (this.headPosition(this.headCenter)) {
       const t = raySphere(origin, dir, this.headCenter, this.headRadius, maxDistance)
-      // **当たった点が首より上なら頭。** 頭に当たったら胴に譲らない
-      if (t !== null && origin.y + dir.y * t >= this.neckPos.y) {
+      // **当たった点が頭の下端より上なら頭。** 頭に当たったら胴に譲らない。
+      //
+      // 切る高さは首のボーンではなく**見えている頭の下端**。首のボーンは首の
+      // 付け根 (肩のライン) にあるので、そこで切ると首まるごと頭になる。
+      if (t !== null && this.aboveJaw(origin, dir, t)) {
         return { zone: 'HEAD', distance: t }
       }
     }
@@ -244,6 +316,38 @@ export class Hitbox {
       return { zone: 'BODY', distance: body! }
     }
     return { zone: 'LEGS', distance: legs }
+  }
+
+  /**
+   * 当たった点が、顎のラインより上か。
+   *
+   * **前後で高さが違う。** 顎は前が低く、うなじは後ろが高い。水平に切ると、
+   * 前から見て顎の高さが後ろから見るとうなじの下になる — 正面からは正しく、
+   * 後ろからは首を撃っても頭、という食い違いが出る。
+   *
+   * 顔の向きへ傾けた面で切る。前へ出るほど下がり、後ろへ回るほど上がる。
+   */
+  private aboveJaw(origin: THREE.Vector3, dir: THREE.Vector3, t: number): boolean {
+    if (!this.measured || !this.head) {
+      return origin.y + dir.y * t >= this.neckPos.y
+    }
+    this.headFloor.copy(this.headFloorLocal).applyMatrix4(this.head.matrixWorld)
+    this.headForward
+      .copy(this.headForwardLocal)
+      .transformDirection(this.head.matrixWorld)
+    this.headForward.y = 0
+    const reach = this.headForward.length()
+    if (reach < 1e-6) return origin.y + dir.y * t >= this.headFloor.y
+    this.headForward.divideScalar(reach)
+
+    this.headToHit.set(
+      origin.x + dir.x * t - this.headFloor.x,
+      0,
+      origin.z + dir.z * t - this.headFloor.z,
+    )
+    // 前へ出ているぶんだけ境目を下げる (顎)、後ろなら上げる (うなじ)
+    const ahead = this.headToHit.dot(this.headForward)
+    return origin.y + dir.y * t >= this.headFloor.y - ahead * HEAD_FLOOR_TILT
   }
 
   /** 2 点の間に球を並べて、最も手前の交差を返す */

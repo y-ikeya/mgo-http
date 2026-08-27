@@ -80,16 +80,46 @@ function poseOf(locomotion: string, aiming: boolean, animate = true) {
     high = Math.max(high, point.y)
   }
 
-  return { box, head: boneAt('Head'), neck: boneAt('Neck'), hips: boneAt('Hips'), low, high }
+  /*
+   * 顔の向き。**モデルから取る。**
+   *
+   * ゲームの中ではモデルを 180 度回して置いているので、生の GLTF を +Z 側から
+   * 撃つと**顔のほう**に当たる。「後ろから」のつもりで前を撃っていた。
+   * 頭の骨から頭の中心へ向かう水平の向きが前 (Hitbox と同じ決め方)。
+   */
+  const centre = new THREE.Vector3()
+  box.headPosition(centre)
+  const facing = centre.clone().sub(boneAt('Head'))
+  facing.y = 0
+  facing.normalize()
+
+  return {
+    box,
+    head: boneAt('Head'),
+    neck: boneAt('Neck'),
+    hips: boneAt('Hips'),
+    low,
+    high,
+    facing,
+  }
 }
 
 type Pose = ReturnType<typeof poseOf>
 
-/** 背中側から水平に撃つ。高さだけを変えて部位を見る */
-function shootAt(p: Pose, y: number): string {
-  origin.set(p.head.x, y, p.head.z + 3)
-  dir.set(0, 0, -1)
+/** 水平に撃つ。**背中側から**が既定 (うなじの高さを見る試験が多いので) */
+function shootAt(p: Pose, y: number, from: 'back' | 'front' = 'back'): string {
+  const sign = from === 'front' ? 1 : -1
+  origin.set(p.head.x + p.facing.x * sign * 3, y, p.head.z + p.facing.z * sign * 3)
+  dir.copy(p.facing).multiplyScalar(-sign)
   return p.box.raycast(origin, dir, 10)?.zone ?? 'MISS'
+}
+
+/** その向きから撃って、HEAD になる一番下の高さ */
+function headFloorFrom(p: Pose, from: 'back' | 'front'): number {
+  for (let y = p.neck.y - 0.15; y <= p.high; y += 0.005) {
+    if (shootAt(p, y, from) === 'HEAD') return y
+  }
+  return Number.POSITIVE_INFINITY
 }
 
 describe('頭の判定は、見えている頭と一致する', () => {
@@ -127,6 +157,35 @@ describe('頭の判定は、見えている頭と一致する', () => {
    */
   test('見えている頭より下は BODY', () => {
     expect(shootAt(standing, standing.low - 0.03)).toBe('BODY')
+  })
+
+  /**
+   * **頭の頂点群は首の皮まで含んでいる。** 下端をそのまま境目にすると、
+   * 首の骨の 1cm 上から頭になり、肩の上を撃っても頭になった。
+   * 顎のあたりまで持ち上げてある (HEAD_FLOOR_LIFT)。
+   */
+  test('頭の下端すれすれ (首の柱) は BODY', () => {
+    expect(shootAt(standing, standing.low + 0.01)).toBe('BODY')
+  })
+
+  /**
+   * **顎は前が低く、うなじは後ろが高い。**
+   *
+   * 水平に切ると、前から見て顎の高さが後ろから見るとうなじの下になる —
+   * 正面からは正しく、後ろからは首を撃っても頭、という食い違いが出る。
+   * 顔の向きへ傾けた面で切ってある (HEAD_FLOOR_TILT)。
+   */
+  test('うなじ側の境目は、顎側より高い', () => {
+    const front = headFloorFrom(standing, 'front')
+    const back = headFloorFrom(standing, 'back')
+    expect(Number.isFinite(front)).toBe(true)
+    expect(Number.isFinite(back)).toBe(true)
+    // 頭の高さの 2 割以上は差が付く。**前後で意味が変わる**ので、誤差では困る
+    expect(back - front).toBeGreaterThan((standing.high - standing.low) * 0.2)
+  })
+
+  test('うなじ側は、首の骨よりずっと上でないと HEAD にならない', () => {
+    expect(headFloorFrom(standing, 'back') - standing.neck.y).toBeGreaterThan(0.1)
   })
 
   test('首のボーンの高さは BODY', () => {
@@ -183,8 +242,10 @@ describe('頭と胴が重なったら頭', () => {
    * そちらへ倒してある。
    */
   test('胴の球の中に居る高さでも、頭に当たれば HEAD', () => {
-    const y = standing.low + 0.02
+    // 顎のあたり (頭の下端から高さの 2 割) を**正面から**。
+    // うなじ側は境目が高いので、重なりを見るならこちら
+    const y = standing.low + (standing.high - standing.low) * 0.2
     expect(y).toBeLessThan(standing.neck.y + 0.2) // 胴の球の上端より下
-    expect(shootAt(standing, y)).toBe('HEAD')
+    expect(shootAt(standing, y, 'front')).toBe('HEAD')
   })
 })
