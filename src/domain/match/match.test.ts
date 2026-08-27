@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  assignTeam, isLeaking, leaderOf, leakingOf, loseTicket, newMatch, type Match,
+  assignTeam, isLeaking, leaderOf, leakingOf, loseTicket, newMatch, shuffleTeams, type Match,
 } from './match'
 import { newPlayer } from '../player/player'
 
@@ -124,5 +124,70 @@ describe('光っている人', () => {
     match.players.get('b')!.kills = 5
     expect(leakingOf(match)?.id).toBe('b')
     expect(isLeaking(match, match.players.get('a')!)).toBe(false)
+  })
+})
+
+/**
+ * 陣営の切り直し。**試合ごとに顔ぶれが変わる。**
+ *
+ * 入室で 1 回決めたきりだと、同じ面子が同じ側で何試合も続く。強い側が
+ * 勝ち続け、負けている側から抜けていく。人が少ないうちほど効く。
+ */
+describe('陣営を切り直す', () => {
+  /** 決まった目を返す。**乱数を引数で受ける**ので、答えが動かない */
+  const rolls = (...values: number[]) => {
+    let at = 0
+    return () => values[at++ % values.length]
+  }
+
+  const teamsOf = (match: Match) => [...match.players.values()].map((p) => p.team)
+
+  test('人数は偏らない。**偶数なら半々**', () => {
+    const match = room('TDM')
+    for (const id of ['a', 'b', 'c', 'd']) join(match, id)
+    shuffleTeams(match, rolls(0.1, 0.9, 0.5, 0.3))
+    const teams = teamsOf(match)
+    expect(teams.filter((t) => t === 'blue')).toHaveLength(2)
+    expect(teams.filter((t) => t === 'red')).toHaveLength(2)
+  })
+
+  /** どちらかへ寄せるしかないので、決め打ちにして揺らさない */
+  test('奇数なら青が 1 人多い', () => {
+    const match = room('TDM')
+    for (const id of ['a', 'b', 'c']) join(match, id)
+    shuffleTeams(match, rolls(0.4, 0.6))
+    expect(teamsOf(match).filter((t) => t === 'blue')).toHaveLength(2)
+  })
+
+  /** **同じ目なら同じ結果。** 乱数を中で引いていたら成り立たない */
+  test('同じ目を渡せば同じ分かれ方', () => {
+    const one = room('TDM')
+    const two = room('TDM')
+    for (const id of ['a', 'b', 'c', 'd']) {
+      join(one, id)
+      join(two, id)
+    }
+    shuffleTeams(one, rolls(0.7, 0.2, 0.9))
+    shuffleTeams(two, rolls(0.7, 0.2, 0.9))
+    expect(teamsOf(one)).toEqual(teamsOf(two))
+  })
+
+  /** **切り直す物が無い部屋。** 個人戦は全員同じ色 */
+  test('陣営で分かれない部屋では何もしない', () => {
+    const match = room('DM')
+    for (const id of ['a', 'b', 'c', 'd']) join(match, id)
+    shuffleTeams(match, rolls(0.9))
+    expect(teamsOf(match).every((t) => t === 'blue')).toBe(true)
+  })
+
+  test('目が違えば分かれ方も変わりうる', () => {
+    const seen = new Set<string>()
+    for (const roll of [0.0, 0.25, 0.5, 0.75, 0.99]) {
+      const match = room('TDM')
+      for (const id of ['a', 'b', 'c', 'd']) join(match, id)
+      shuffleTeams(match, rolls(roll))
+      seen.add(teamsOf(match).join(''))
+    }
+    expect(seen.size).toBeGreaterThan(1)
   })
 })

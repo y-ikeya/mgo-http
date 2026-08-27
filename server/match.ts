@@ -5,7 +5,16 @@
  * (rule/scoring.ts)、ここに在るのはそれを試合の時間に当てはめる側。
  */
 
-import { MIN_PLAYERS, type Match, connected, holdingSeats, leakingOf, soleTeam } from '../src/domain/match/match'
+import {
+  MIN_PLAYERS,
+  type Match,
+  connected,
+  holdingSeats,
+  leakingOf,
+  present,
+  shuffleTeams,
+  soleTeam,
+} from '../src/domain/match/match'
 import { isSeated } from '../src/domain/player/lifecycle'
 import { type Player, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
@@ -184,6 +193,14 @@ export function matchState(room: Match): ServerMessage {
 export function resetPlayers(room: RoomWorld): void {
   // 前の試合の手榴弾が残っていると、始まった直後に爆発する
   room.grenades.length = 0
+  /*
+   * **陣営を切り直す。** 入室で 1 回決めたきりだと、同じ面子が同じ側で
+   * 何試合も続く。強い側が勝ち続け、負けている側から抜けていく。
+   *
+   * 切ったら名簿を配り直す。**差分 (life / health) では陣営が動かない**ので、
+   * 配らないとクライアントは前の試合の色のまま描く。
+   */
+  shuffleTeams(room, Math.random)
   for (const player of connected(room)) {
     player.kills = 0
     player.deaths = 0
@@ -200,6 +217,7 @@ export function resetPlayers(room: RoomWorld): void {
     player.concentratingSince = 0
     sendHealth(room, player, 0, false)
   }
+  broadcast(room, rosterMessage(room))
 }
 
 /**
@@ -395,6 +413,30 @@ export function updateMatch(room: RoomWorld, now: number): void {
     room.lastBroadcast = now
     broadcast(room, matchState(room))
   }
+}
+
+/**
+ * 名簿を組む。**入った人へ 1 回、試合の頭でもう 1 回。**
+ *
+ * 入室のときにしか配っていなかった。陣営が入室で決まったきりだったので
+ * それで足りていたが、**試合ごとに切り直す**ようにした以上、切った後に
+ * 配り直さないとクライアントは古い色のまま描く。
+ */
+export function rosterMessage(room: RoomWorld): ServerMessage {
+  return {
+    type: 'roster',
+    players: present(room).map((p) => ({
+      id: p.id,
+      name: p.name,
+      health: p.health,
+      team: p.team,
+      slot: p.slot,
+      // 状態も載せる。life は変わった時にしか配らないので、後から
+      // 繋いだ人はここで受け取らないと既定値 (joining) のままになり、
+      // **その人たちが一度も描かれない**
+      life: p.life,
+    })),
+  } satisfies ServerMessage
 }
 
 /**

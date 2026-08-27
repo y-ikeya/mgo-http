@@ -21,7 +21,16 @@ import { dropWeapon, pickUp } from './arms/drops'
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
 import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
-import { leaveRoom, matchState, recordSeat, sendSelf, spawn, updateMatch, updateTargets } from './match'
+import {
+  leaveRoom,
+  matchState,
+  recordSeat,
+  rosterMessage,
+  sendSelf,
+  spawn,
+  updateMatch,
+  updateTargets,
+} from './match'
 import { receiveSnapshot, relayShot, relayState, sendHealth } from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
@@ -645,22 +654,10 @@ const server = Bun.serve<Client>({
 
       // 今いる全員と試合の状態を渡す。
       // 参加の通知を 1 通取りこぼしても、名簿で回復できる。
-      socket.send(
-        JSON.stringify({
-          type: 'roster',
-          players: present(room).map((p) => ({
-            id: p.id,
-            name: p.name,
-            health: p.health,
-            team: p.team,
-            slot: p.slot,
-            // 状態も載せる。life は変わった時にしか配らないので、後から
-            // 繋いだ人はここで受け取らないと既定値 (joining) のままになり、
-            // **その人たちが一度も描かれない**
-            life: p.life,
-          })),
-        } satisfies ServerMessage),
-      )
+      //
+      // 同じ物を試合の頭でも配る (resetPlayers) — **陣営を切り直すので、
+      // 配らないと前の試合の色のまま描く**
+      socket.send(JSON.stringify(rosterMessage(room)))
       socket.send(JSON.stringify(matchState(room)))
 
       // **名簿のあとに渡す。** 名簿を受けたクライアントは placeAtSpawn で
