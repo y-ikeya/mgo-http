@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { loadGrenade } from '../assets'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../../../sim/judge/ballistic'
 import type { StageBox } from '../../../sim/space/vision'
-import { THROW_LOFT, THROW_SPEED } from '../../../domain/item/grenade'
+import { THROW_LOFT } from '../../../domain/item/grenade'
 
 /**
  * 手榴弾。
@@ -195,7 +195,13 @@ export class Grenades {
    * 落とすのが運になる。手榴弾は「そこへ落とす」判断そのものが手なので、
    * 見せないと成立しない。
    */
-  showPreview(origin: THREE.Vector3, direction: THREE.Vector3, boxes: StageBox[]): void {
+  showPreview(
+    origin: THREE.Vector3,
+    direction: THREE.Vector3,
+    boxes: StageBox[],
+    /** 投げ出す速さ。**スキルを掛けた後の値を渡す** (domain の throwSpeedOf) */
+    speed: number,
+  ): void {
     const p = this.probe
     p.x = origin.x
     p.y = origin.y
@@ -206,7 +212,7 @@ export class Grenades {
       direction.x,
       direction.y,
       direction.z,
-      THROW_SPEED,
+      speed,
       THROW_LOFT,
       this.launch,
     )

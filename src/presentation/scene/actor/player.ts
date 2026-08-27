@@ -1,4 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
+import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import { fallDamage } from '../../../domain/rule/damage'
 import * as THREE from 'three'
@@ -274,6 +275,19 @@ export class Player {
   private weaponKind: WeaponId = 'rifle'
 
   /**
+   * 選んでいるスキル。速さに効く 2 つ (FAST MOVE / CBOX MOVE) をここで読む。
+   *
+   * **決めるのはサーバー。** ここに入るのは skills の通で返ってきた値なので、
+   * 予算を超えた選択が一瞬でも効くことはない (Game.setSkill)。
+   */
+  private skills: Skills = {}
+
+  /** サーバーが認めたスキルを受け取る。試合中は変わらない */
+  setSkills(skills: Skills): void {
+    this.skills = skills
+  }
+
+  /**
    * いま手にある物。
    *
    * **見た目の唯一の在り処。** どのモデルを出すか、銃を納めるかが全部ここから
@@ -400,6 +414,13 @@ export class Player {
   private fallReferenceHeight = FALL_REFERENCE_HEIGHT
   /** ローリング中に進む向き。踏み切った時点で固定する */
   private rollYaw = 0
+  /**
+   * 受け身で流れる向き。**着いた瞬間に固定する。**
+   *
+   * 転がっている間に舵を切れると、落下が移動手段になる。落ちた勢いは
+   * 落ちる前に決めた向きへ逃がす。
+   */
+  private fallRollYaw = 0
   /** 転がり始めたか。音を鳴らす側が 1 回だけ拾う */
   private rollStarted = false
   private moveSpeed = MOVE_SPEED
@@ -1233,29 +1254,49 @@ export class Player {
     //
     // 構えている間だけは重さを見ない。あちらは狙いを保つために遅くしている
     // (aimSpeedScale) ので、重さと二重に掛けると狙撃銃が止まってしまう。
-    const carrying = carrySpeedScale(weaponOf(this.weaponKind))
+    //
+    // **FAST MOVE は重さと同じ場所に掛ける。** 足すのではなく掛けるので、
+    // 重い銃の不利は割合として残る — 狙撃銃を提げた Lv3 が、拳銃の素の人に
+    // 追いつくことはない (domain/player/skill.ts)。構えている間に効かないのも
+    // 重さと同じ理由で、そこは狙いを保つための遅さだから。
+    const carrying = carrySpeedScale(weaponOf(this.weaponKind)) * runnerScale(this.skills)
     let targetSpeed = this.crouching
       ? this.moveSpeed * CROUCH_SPEED_SCALE * carrying
       : this.moveSpeed * (this.aiming ? this.aimSpeedScale : carrying)
     if (this.stabbing) targetSpeed *= STAB_SPEED_SCALE
-    // ダンボールを被っている間も担いでいる物は同じ
-    if (this.boxed) targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * carrying
+    // ダンボールを被っている間も担いでいる物は同じ。
+    //
+    // **CBOX MOVE と FAST MOVE は重なる** (carrying に FAST MOVE が入っている)。
+    // 箱で速く動きたいなら両方に予算を割く、という選択にしてある — 被っている間は
+    // 撃てないので、速さを買うことが攻撃力を捨てることと釣り合う。
+    if (this.boxed) {
+      targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * boxMoveScale(this.skills) * carrying
+    }
     if (this.down) targetSpeed = 0
     this.currentSpeed = damp(this.currentSpeed, targetSpeed, SPEED_LAMBDA, dt)
 
-    // ローリング中はクリップに焼かれた移動をそのまま辿る。入力は受け付けない。
-    // 速度に直して渡すのは、移動の規則を 1 本に通すため。位置へ直接足すと
-    // 押し戻しも接地も素通りする。
+    /*
+     * 全身で転がっている間はクリップに焼かれた移動をそのまま辿る。入力は
+     * 受け付けない。速度に直して渡すのは、移動の規則を 1 本に通すため。
+     * 位置へ直接足すと押し戻しも接地も素通りする。
+     *
+     * **受け身も同じ道を通す。** 以前は回避ローリングだけで、受け身は焼かれた
+     * 移動を誰も読まないまま腰だけ 179 度振れていた — その場でくるりと回る絵。
+     * 落ちた勢いは前へ流れて消える、というのが受け身の意味なので、
+     * 動かないと「なぜ転がったのか」が絵から抜ける。
+     */
     let overrideX: number | undefined
     let overrideZ: number | undefined
-    if (this.rolling) {
+    const tumbling = this.rolling || this.fallRollTimer > 0
+    if (tumbling) {
       overrideX = 0
       overrideZ = 0
       if (dt > 0 && this.animator?.consumeRootMotion(this.scratchVelocity)) {
         // モデル空間 (正面 +Z) の移動をワールドへ写す。
         // モデルは 180° 回してあるので yaw + π の回転になる。
-        const sin = Math.sin(this.rollYaw)
-        const cos = Math.cos(this.rollYaw)
+        const yaw = this.rolling ? this.rollYaw : this.fallRollYaw
+        const sin = Math.sin(yaw)
+        const cos = Math.cos(yaw)
         const dx = this.scratchVelocity.x
         const dz = this.scratchVelocity.z
         overrideX = (-dx * cos - dz * sin) / dt
@@ -1339,6 +1380,8 @@ export class Player {
       this.landingTimer = LANDING_TIME
       if (fallDamage(moved.impactSpeed) > 0) {
         this.fallRollTimer = FALL_ROLL_TIME
+        // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
+        this.fallRollYaw = this.yaw
         this.animator?.playFallRoll()
       } else {
         this.animator?.playLanding()

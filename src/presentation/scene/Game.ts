@@ -6,15 +6,20 @@ import { Input } from "../../input";
 import { Player, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/player";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
-import { canChooseSkills, type SkillId, type Skills } from "../../domain/player/skill";
+import { STAGES, type StageName } from "../../domain/match/stage";
+import {
+  canChooseSkills,
+  masteryReloadScale,
+  type SkillId,
+  type Skills,
+} from "../../domain/player/skill";
+import { throwSpeedOf } from "../../domain/item/grenade";
 import { offsetInCone } from "../../sim/space/aim";
 import {
   ARENA_HALF_SIZE,
   buildLights,
   buildBases,
   buildStage,
-  SOLO_SPAWNS,
-  TEAM_SPAWNS,
   STAGE_CODE,
   loadStageBoxes,
   type Stage,
@@ -48,7 +53,7 @@ import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
 import { isGun, type HeldId } from "../../domain/item/held";
-import { MODES, isHostile } from "../../domain/match/room";
+import { MODES, ROOM_STAGES, isHostile, isRoomName } from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../protocol/types";
@@ -397,7 +402,6 @@ export class Game {
    * (弾切れ・リロード中・構えていない) で押し始めたときに、条件が解けた瞬間へ
    * 1 発ぶん持ち越さないため。
    */
-  private triggerReleased = true;
   private readonly grenadeOrigin = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
   /** 投げる構えを取っているか。離した瞬間に投げる */
@@ -659,8 +663,24 @@ export class Game {
   private fps = 0;
   private onStats: ((stats: GameStats) => void) | null = null;
 
+  /** 乗っているステージ。**部屋が決める** (ROOM_STAGES) */
+  private readonly stageName: StageName;
+
   constructor(container: HTMLElement, identity: Identity, room: string) {
     this.container = container;
+    /*
+     * どのステージに乗るか。**部屋から引く** (domain/match/room.ts)。
+     *
+     * サーバーに訊かないのは、画面を組み始める時点でまだ 1 通も届いていない
+     * ため。同じ表をこちらも読むので食い違わない。
+     *
+     * **試合ごとに切り替えるようになったら、ここがサーバーからの通に変わる**
+     * (回す表は既に domain/match/stage.ts に在る)。そのときは地形を
+     * 読み直す道が要る。
+     */
+    this.stageName = STAGES[
+      isRoomName(room) ? ROOM_STAGES[room].stages[0] : 'mall'
+    ].name;
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room);
     // 自機のモデルはここで読み始める。**構築時ではない** —
@@ -683,7 +703,7 @@ export class Game {
     this.renderer.toneMappingExposure = DEFAULT_EXPOSURE;
     container.appendChild(this.renderer.domElement);
 
-    this.stage = buildStage(this.scene);
+    this.stage = buildStage(this.scene, this.stageName);
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
      * 陣営の基地。**個人戦では出さない。**
@@ -692,7 +712,7 @@ export class Game {
      * 付いた枠があると「そこが自分の陣地」に読めるが、個人戦にはそんな場所は
      * 無い (湧く所も毎回変わる)。
      */
-    this.bases = buildBases();
+    this.bases = buildBases(this.stageName);
     this.scene.add(this.bases);
     this.sun = buildLights(this.scene);
     this.placeAtSpawn();
@@ -705,12 +725,27 @@ export class Game {
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
-    void loadStageBoxes().then((boxes) => {
+    void loadStageBoxes(this.stageName).then((boxes) => {
       // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
       this.stageBoxes = solidBlockers(boxes);
     });
     this.shots = new Shots(this.scene);
     this.net.onMessage((message) => this.receive(message));
+
+    /*
+     * **開発中だけ、動いている本体を窓から掴めるようにする。**
+     *
+     * 見た目の不具合は、コードを読んでも模擬を回しても掴めないことがある。
+     * 「高い所から落ちると下半身だけ回る」を追ったとき、手元の模擬では
+     * 上下とも受け身が乗っていて**再現しなかった**。実機の骨の向きを
+     * 1/60 秒ごとに読めれば、模擬と実機のどこが違うかを直接測れる。
+     *
+     * 本番のバンドルには入らない (import.meta.env.DEV は build 時に false へ
+     * 畳まれ、この塊ごと落ちる)。**遊ぶ人に本体を触らせない。**
+     */
+    if (import.meta.env.DEV) {
+      (window as unknown as { __game?: Game }).__game = this;
+    }
 
     this.raycaster.far = MAX_RANGE;
 
@@ -904,7 +939,7 @@ export class Game {
     this.updateLoadoutKeys();
     this.syncLoadoutPointer();
     this.syncHeld();
-    this.inv.update(dt);
+    this.inv.update(dt, this.input.firing);
     this.updateTrigger();
     this.updateZoom();
     this.applyWeaponView();
@@ -944,12 +979,24 @@ export class Game {
     this.player.setGhost(this.life === "spawning" || this.loadoutBlocking);
     this.updateRollContact();
     this.updateStab(dt);
-    this.spread.update(dt, this.weapon, {
+    const posture = {
       speed: this.player.speed,
       stanceRate: this.player.stanceRate,
       crouching: this.player.isCrouching,
       grounded: this.player.grounded,
-    });
+    };
+    this.spread.update(dt, this.weapon, posture);
+    /*
+     * 手ブレ。**画面ごと揺らす。**
+     *
+     * カメラの向きへ差し込むので、弾道も一緒に動く (aimDirection がこの向きから
+     * 出る)。画面中央のクロスヘアは中央のままで、狙っている景色のほうが泳ぐ。
+     *
+     * 最初はクロスヘアだけを動かしていた。**銃口はずれているのに視界は微動だに
+     * しない**という、どこにも無い見え方になっていた。
+     */
+    const [swayRight, swayUp] = this.spread.sway(this.weapon, this.skills, posture);
+    this.follow.setSway((swayUp * Math.PI) / 180, (-swayRight * Math.PI) / 180);
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
     this.drops.update(dt);
@@ -1194,6 +1241,9 @@ export class Game {
        */
       case "skills":
         this.skills = message.skills as Skills;
+        // 速さは体が持っている。**同じ値を 2 か所に置かない** — 渡し忘れると
+        // 「散布だけ締まって走りは素のまま」という半端な効き方になる
+        this.player.setSkills(this.skills);
         break;
 
       // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
@@ -1205,6 +1255,17 @@ export class Game {
       // 光らせるのは絵の仕事
       case "match":
         this.remotes.setLeaking(message.leader ?? null);
+        break;
+
+      /*
+       * 抜いた相手が光り始めた (ENEMY EXPOSURE)。
+       *
+       * **届くのは抜いた側だけ。** サーバーが宛先を決めているので、
+       * ここで陣営を見る必要は無い。同じ通で遮蔽も外れるので、
+       * 壁の裏に居た相手の位置がこの後から流れてくる。
+       */
+      case "exposed":
+        this.remotes.expose(message.id, message.seconds);
         break;
 
       case "throw":
@@ -1393,14 +1454,18 @@ export class Game {
      * 個人戦で角の 2 つに全員が湧くと、出た所で撃ち合いになって「湧き待ち」が
      * 成立する。8 点から選んで、死ぬたびに変える (同じ所へ戻ると待たれる)。
      */
+    const spawns = STAGES[this.stageName];
+    const solo = spawns.solo;
     const base = MODES[this.replica.mode].teams
-      ? TEAM_SPAWNS[this.replica.team]
-      : SOLO_SPAWNS[Math.floor(Math.random() * SOLO_SPAWNS.length)];
+      ? spawns.bases[this.replica.team]
+      : solo[Math.floor(Math.random() * solo.length)];
     // 同じ点に重なると互いが見えないので、ID から決まる向きへ散らす
     const spread = spawnAngle(this.net.id + this.shotCount);
+    // 高さは点が持っている。**地形からは決まらない** — 同じ柱に床が
+    // 何枚もあるので (domain/match/stage.ts の Spot)
     this.player.position.set(
       base.x + Math.cos(spread) * SPAWN_SPREAD,
-      0,
+      base.y ?? 0,
       base.z + Math.sin(spread) * SPAWN_SPREAD,
     );
     // 跳んだ距離を足音に積ませない。積むと着いた先で連打になる
@@ -1801,12 +1866,12 @@ export class Game {
     if (!canAct(this.life) || this.loadoutBlocking) return;
     if (this.inv.switching) return;
     if (this.inv.held !== "knife") return;
-    // ナイフは押した瞬間に振る。押しっぱなしで連打しない
-    if (this.input.firing && this.triggerReleased) {
-      this.triggerReleased = false;
+    // ナイフは押した瞬間に振る。押しっぱなしで連打しない。
+    // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
+    if (this.input.firing && this.inv.pressedOnce) {
+      this.inv.consumePress();
       this.startStab();
     }
-    if (!this.input.firing) this.triggerReleased = true;
   }
 
   private updateWeapon(dt: number): void {
@@ -1863,31 +1928,26 @@ export class Game {
       this.emptyCooldown = EMPTY_INTERVAL;
     }
 
-    // 単発の銃は、押しっぱなしでは 1 発しか出ない。
-    //
-    // 表に auto があるのに誰も見ていなかった。狙撃銃が連射できないのは
-    // ボルト操作の時間で塞がれていたからで、単発だからではなかった。
-    // 拳銃はその時間が無いので、そのままだと押しっぱなしで撃ち続けられる。
-    //
-    // 引き金を離すまで次を撃たせない。離した瞬間に撃てるようにするのではなく、
-    // **離してから押し直す**まで待たせる。
-    if (!this.input.firing) this.triggerReleased = true;
-    const pulled = this.weapon.auto || this.triggerReleased;
-
-    // 構えていないと撃てない。空になっても自動でリロードはしない。
-    const firing =
-      pulled &&
-      this.input.firing &&
-      this.player.isAiming &&
-      canAct(this.life) &&
-      this.reloadTimer <= 0 &&
-      this.stabTimer <= 0 &&
-      !this.player.rolling &&
-      // **撃てる物を手にしていて、持ち替えが終わっていること。**
-      // 手榴弾やナイフに持ち替えている間は引き金が効かない。これが
-      // 投げること・刺すことの代償になる (docs/design.md の 5)
-      this.inv.canShoot &&
-      this.ammo > 0;
+    /*
+     * 撃てるか。**問いは 1 つ、答えるのは domain。**
+     *
+     * 以前はここに 9 個の && が並んでいた。ドメインルール (装填中は撃てない、
+     * 転がりながらは撃てない) と、装置の話 (ボタンが押されているか) と、
+     * 単発の再現 (離して押し直したか) が同じ行に混ざっていて、**どれを変えると
+     * 遊びが変わるのかが読めなかった**。
+     *
+     * 渡すのは真偽だけ。秒を数えるのはこちらの仕事で、domain が数え始めると
+     * three の時間と二重管理になる。
+     */
+    const firing = this.inv.canShoot(this.weapon, {
+      held: this.input.firing,
+      aiming: this.player.isAiming,
+      life: this.life,
+      reloading: this.reloadTimer > 0,
+      stabbing: this.stabTimer > 0,
+      rolling: this.player.rolling,
+      ammo: this.ammo,
+    });
     this.player.setFiring(firing);
 
     if (!firing || this.fireCooldown > 0) return;
@@ -1902,8 +1962,8 @@ export class Game {
     } else {
       this.fireCooldown = this.weapon.fireInterval;
     }
-    // 単発の銃はここで引き金を「使い切る」。次は離して押し直すまで出ない
-    if (!this.weapon.auto) this.triggerReleased = false;
+    // 単発の銃はここで引き金を使い切る。次は離して押し直すまで出ない
+    this.inv.fired(this.weapon);
     this.fire();
   }
 
@@ -1925,7 +1985,8 @@ export class Game {
      * 時間**だった。表には P90 3.0 / AK47 2.5 / XM2010 3.2 と書いてあるのに
      * 手応えが同じで、選んだ銃が入っていないように感じる。
      */
-    this.reloadTimer = this.weapon.reload;
+    // **極めた銃だけ速い。** 拾った銃は素の尺のまま (masteryReloadScale)
+    this.reloadTimer = this.weapon.reload * masteryReloadScale(this.skills, this.weapon.id);
     this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
     this.reloadSoundIn = this.reloadTimer * this.knobs.reloadSoundAt;
@@ -1938,7 +1999,7 @@ export class Game {
     this.follow.aimDirection(this.aimDir);
     {
       // 何度・どこへ散るかは規則が決め、傾けるのは幾何がやる
-      const cone = this.spread.coneFor(this.weapon, this.shotCount);
+      const cone = this.spread.coneFor(this.weapon, this.shotCount, this.skills);
       offsetInCone(this.aimDir, cone.degrees, cone.angle01, cone.radius01);
     }
 
@@ -2003,7 +2064,11 @@ export class Game {
     });
 
     // 跳ね上がりは規則の側が持っている (domain/item/spread.ts)
-    const [kickPitch, kickYaw] = this.spread.fired(this.shotCount);
+    const [kickPitch, kickYaw] = this.spread.fired(
+      this.shotCount,
+      this.weapon,
+      this.skills,
+    );
     this.follow.addRecoil(kickPitch, kickYaw);
   }
 
@@ -2206,7 +2271,12 @@ export class Game {
         this.player.position.y + GRENADE_RELEASE_HEIGHT,
         this.player.position.z + (this.aimDir.z / flat) * GRENADE_RELEASE_FORWARD,
       );
-      this.grenades.showPreview(this.grenadeOrigin, this.aimDir, this.stageBoxes);
+      this.grenades.showPreview(
+        this.grenadeOrigin,
+        this.aimDir,
+        this.stageBoxes,
+        throwSpeedOf(this.skills),
+      );
       // 体を照準の方へ向ける。投げる向きと見た目を一致させる
       this.player.setThrowing(true);
       return;
@@ -2832,7 +2902,7 @@ export class Game {
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
-      spread: this.spread.degrees(this.weapon),
+      spread: this.spread.degrees(this.weapon, this.skills),
       crouching: this.player.isCrouching,
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),

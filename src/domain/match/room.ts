@@ -1,4 +1,5 @@
 import type { Player } from '../player/player'
+import { only, type Rotation } from './stage'
 
 /**
  * 部屋とルール。
@@ -76,6 +77,22 @@ export const MODES: Record<Mode, ModeSpec> = {
    * 消えるため。ここで武器の距離感と当て方を確かめる。
    */
   PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false },
+}
+
+/**
+ * 部屋ごとの、回すステージ。
+ *
+ * **いまは全部 1 枚だけの fixed。** 部屋を作った人が並びと順を決められるように
+ * するのが行き先で (match/stage.ts)、ここはその過渡期の姿。作れるように
+ * なったら、この表が「作るときの既定値」に変わるだけで読む側は動かない。
+ */
+export const ROOM_STAGES: Record<RoomName, Rotation> = {
+  alpha: only('mall'),
+  bravo: only('mall'),
+  charlie: only('mall'),
+  delta: only('mall'),
+  // 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**
+  echo: only('training'),
 }
 
 /** 部屋の割り当て。**変えるならここ 1 か所** */

@@ -31,7 +31,7 @@ describe('湧いた直後', () => {
   })
 
   test('すぐ撃てる。湧いた瞬間に持ち替えの待ちは無い', () => {
-    expect(make().canShoot).toBe(true)
+    expect(make().handReady).toBe(true)
   })
 })
 
@@ -40,7 +40,7 @@ describe('持ち替えの代償', () => {
     const inv = make()
     inv.switchTo('grenade')
     expect(inv.switching).toBe(true)
-    expect(inv.canShoot).toBe(false)
+    expect(inv.handReady).toBe(false)
   })
 
   test('時間が経つと持ち替えが終わる', () => {
@@ -48,7 +48,7 @@ describe('持ち替えの代償', () => {
     inv.switchTo('pistol')
     settle(inv)
     expect(inv.switching).toBe(false)
-    expect(inv.canShoot).toBe(true)
+    expect(inv.handReady).toBe(true)
   })
 
   test('**撃てない物を持っている間は、持ち替えが終わっても撃てない**', () => {
@@ -56,14 +56,14 @@ describe('持ち替えの代償', () => {
     inv.switchTo('grenade')
     settle(inv)
     expect(inv.switching).toBe(false)
-    expect(inv.canShoot).toBe(false)
+    expect(inv.handReady).toBe(false)
   })
 
   test('ナイフも撃てない。刺しに行くと決めた時点で撃つ手段を手放す', () => {
     const inv = make()
     inv.switchTo('knife')
     settle(inv)
-    expect(inv.canShoot).toBe(false)
+    expect(inv.handReady).toBe(false)
   })
 
   test('持ち替えの最中に更に持ち替えられない。代償を踏み倒せてしまう', () => {
@@ -208,7 +208,7 @@ describe('道具の枠と NONE', () => {
     inv.toggle('tool'); settle(inv)   // box
     inv.toggle('tool'); settle(inv)   // none
     expect(inv.held).toBe('rifle')
-    expect(inv.canShoot).toBe(true)
+    expect(inv.handReady).toBe(true)
   })
 
   test('NONE から戻るのは持っていた武器。主武器ではない', () => {
@@ -224,7 +224,7 @@ describe('道具の枠と NONE', () => {
     inv.switchTo('grenade'); settle(inv)
     inv.toggle('tool'); settle(inv)
     expect(inv.weapon).toBe('grenade')
-    expect(inv.canShoot).toBe(false)
+    expect(inv.handReady).toBe(false)
   })
 
   test('道具の一覧は 箱 → NONE の順', () => {
@@ -246,7 +246,7 @@ describe('地面へ置く', () => {
     inv.switchTo('rifle'); settle(inv)
     inv.drop('rifle'); settle(inv)
     expect(inv.held).not.toBe('rifle')
-    expect(inv.canShoot || inv.held === 'knife').toBe(true)
+    expect(inv.handReady || inv.held === 'knife').toBe(true)
   })
 
   test('**ナイフは置けない。** 全部置いても手ぶらにはならない', () => {

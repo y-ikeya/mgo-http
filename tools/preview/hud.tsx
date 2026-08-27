@@ -7,6 +7,9 @@
  * のを 1 度見落とした。以後はこの頁で確かめる。
  */
 import { render } from 'solid-js/web'
+import { createSignal } from 'solid-js'
+import { Spread } from '../../src/domain/item/spread'
+import { WEAPONS, type WeaponId } from '../../src/domain/item/weapons'
 import Hud from '../../src/presentation/ui/Hud'
 import type { GameStats } from '../../src/presentation/scene/Game'
 
@@ -87,5 +90,37 @@ const cases: Record<string, Partial<GameStats>> = {
   },
 }
 const which = new URLSearchParams(location.search).get('case') ?? 'normal'
-const stats = { ...base, ...cases[which] } as GameStats
-render(() => <Hud stats={stats} selfId="me" />, document.getElementById('root')!)
+
+/**
+ * 構えている所。**散布界に応じてクロスヘアが開くのを見る。**
+ *
+ * 手ブレはここには出ない — あれは**画面ごと揺れる** (カメラの向きに差し込んで
+ * ある) ので、HUD だけでは再現できない。ここで見るのは開き具合のほう。
+ */
+if (which === 'aiming') {
+  const weapon = WEAPONS[(new URLSearchParams(location.search).get('weapon') ?? 'rifle') as WeaponId]
+  const crouching = new URLSearchParams(location.search).has('crouch')
+  const posture = { speed: 0, stanceRate: 0, crouching, grounded: true }
+  const spread = new Spread()
+  const [stats, setStats] = createSignal<GameStats>({
+    ...base,
+    aiming: true,
+    crouching,
+    equipped: weapon.id,
+    spread: 0,
+  } as GameStats)
+
+  let last = performance.now()
+  const tick = (now: number) => {
+    const dt = Math.min((now - last) / 1000, 0.1)
+    last = now
+    spread.update(dt, weapon, posture)
+    setStats((prev) => ({ ...prev, spread: spread.degrees(weapon, {}) }))
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+  render(() => <Hud stats={stats()} selfId="me" />, document.getElementById('root')!)
+} else {
+  const stats = { ...base, ...cases[which] } as GameStats
+  render(() => <Hud stats={stats} selfId="me" />, document.getElementById('root')!)
+}

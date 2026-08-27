@@ -387,7 +387,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={locked() && props.stats?.aiming && !props.stats?.scoped}>
         <div
           class="crosshair"
-          // 散布界に応じて開く。数字で見せずに「今どれだけ散るか」を伝える
+          // 散布界に応じて開く。数字で見せずに「今どれだけ散るか」を伝える。
+          //
+          // **位置は動かさない。** 手ブレは画面ごと揺れる (カメラの向きに
+          // 差し込んである) ので、クロスヘアは中央に固定されたまま
           style={{ '--crosshair-gap': `${9 + (props.stats?.spread ?? 0) * 11}px` }}
         >
           <span class="crosshair-dot" />

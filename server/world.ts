@@ -5,7 +5,8 @@
  */
 
 import { type Match, connected, newMatch, nextSlot } from '../src/domain/match/match'
-import { ROOM_MODE, type RoomName } from '../src/domain/match/room'
+import { ROOM_MODE, ROOM_STAGES, type RoomName } from '../src/domain/match/room'
+import { STAGES, nextStage } from '../src/domain/match/stage'
 import type { Life } from '../src/domain/player/lifecycle'
 import { type Player, type Team, enterLife, newBot } from '../src/domain/player/player'
 import type { ServerMessage } from '../src/protocol/types'
@@ -13,6 +14,7 @@ import type { Claymore } from './arms/claymore'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
 import { sessionOf } from './session'
+import { terrainOf, type Terrain } from './stage'
 
 export interface Client {
   /** 発行元が保証した ID。名乗った値ではない (認証が有効なとき) */
@@ -46,6 +48,17 @@ export interface RoomWorld extends Match {
   claymores: Claymore[]
   /** 落ちている武器 */
   dropped: Dropped[]
+  /**
+   * いま乗っている地形。
+   *
+   * **部屋が持つ。** module の定数として全員が見ていたが、部屋ごとに違う
+   * ステージを回すようになった時点で、それは「どの部屋も同じ地形」を
+   * 前提にした形だった。
+   *
+   * 回す表 (domain/match/stage.ts) から選び直すのは試合の切れ目で、
+   * いまはどの部屋も 1 枚だけの fixed なので変わらない。
+   */
+  stage: Terrain
 }
 
 export const rooms = new Map<RoomName, RoomWorld>()
@@ -74,7 +87,16 @@ export const ROOM_CAPACITY = 8
 export function roomOf(name: RoomName): RoomWorld {
   let room = rooms.get(name)
   if (!room) {
-    room = { ...newMatch(ROOM_MODE[name]), name, grenades: [], claymores: [], dropped: [] }
+    // 回す表から 1 枚選ぶ。**初回なので前は無い** (previous = null)
+    const stage = nextStage(ROOM_STAGES[name], null, Math.random())
+    room = {
+      ...newMatch(ROOM_MODE[name]),
+      name,
+      grenades: [],
+      claymores: [],
+      dropped: [],
+      stage: terrainOf(stage),
+    }
     if (room.mode.id === 'PRACTICE') placeTargets(room)
     rooms.set(name, room)
   }
@@ -122,22 +144,18 @@ export function setLife(room: RoomWorld, player: Player, next: Life, now = Date.
  * 一直線に並べても手前が奥を隠さないのは、**外した弾がそのまま次の的へ飛ぶ**
  * のがむしろ都合がよいため (縦に並んだ的は距離が読みやすい)。
  */
-export const TARGET_SPOTS = [
-  // 東棟の中庭 (中心 x = 18.7)。西棟から湧いて**通路を抜けた先**に並ぶので、
-  // 距離を変えながら撃てる。**仮** — 店舗の絵に判定が入ったら置き直す
-  { x: 14, z: 6 },
-  { x: 18, z: 6 },
-  { x: 22, z: 6 },
-  { x: 18, z: -6 },
-  { x: 22, z: -6 },
-]
-
 /** 倒してから戻るまで (ms) */
 export const TARGET_RESPAWN = 3000
 
-export function placeTargets(room: Match): void {
+/**
+ * 的を並べる。**座標はステージが持っている** (domain/match/stage.ts)。
+ *
+ * ここに写しを置いていて、モールの的を東棟へ移したときに取り残された
+ * (試験だけが 45m 先を撃っていた)。地形の点は地形の側に 1 つ。
+ */
+export function placeTargets(room: RoomWorld): void {
   const now = Date.now()
-  TARGET_SPOTS.forEach((at, i) => {
+  STAGES[room.stage.name].targets.forEach((at, i) => {
     const bot = newBot({
       id: `target-${i}`,
       name: `TARGET ${i + 1}`,

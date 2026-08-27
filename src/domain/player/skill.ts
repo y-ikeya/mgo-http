@@ -222,6 +222,26 @@ export function masterySpreadScale(skills: Skills, weapon: WeaponId): number {
 }
 
 /**
+ * 手ブレの倍率。**Lv3 で 0 になる。**
+ *
+ * --- 散布とは別の表で持つ ---
+ * masterySpreadScale をそのまま 0 まで下げると、連射で開く分も姿勢で開く分も
+ * 一緒に消える。走りながら撃っても散らない銃ができてしまい、**動かない側が
+ * 有利**という土台が崩れる。動かすのは狙点の泳ぎだけにする。
+ *
+ * --- なぜ 0 まで下げるのか ---
+ * 極めた銃は**構えれば止まる**。「その銃を極めた」ことが手触りで分かる形が
+ * ここにしか無い — 散布も装填も、数字は動くが撃った結果でしか分からない。
+ * 照準が止まることは構えた瞬間に見える。
+ *
+ * 止まっても必中にはならない。**動けば散り、連射すれば開く** — 消えるのは
+ * 「止まって構えている間の泳ぎ」だけで、撃ち方の巧拙はそのまま残る。
+ */
+export function masterySwayScale(skills: Skills, weapon: WeaponId): number {
+  return MASTERY_SWAY[levelOf(skills, MASTERY_OF[weapon])]
+}
+
+/**
  * 反動の乱れの倍率。小さいほど**押さえ戻しやすい**。
  *
  * 反動そのもの (RECOIL_PATTERN) は動かさない。動かすのは**乱れ**のほうで、
@@ -258,6 +278,8 @@ export function exposeSeconds(skills: Skills): number {
 const RUNNER_SCALE = [1, 1.05, 1.1, 1.16] as const
 const BOX_MOVE_SCALE = [1, 1.25, 1.5, 1.8] as const
 const MASTERY_SPREAD = [1, 0.92, 0.85, 0.78] as const
+// **Lv3 で 0。** 極めた銃は構えれば止まる
+const MASTERY_SWAY = [1, 0.66, 0.33, 0] as const
 const MASTERY_RELOAD = [1, 0.92, 0.85, 0.78] as const
 const MASTERY_JITTER = [1, 0.8, 0.6, 0.4] as const
 const THROW_SCALE = [1, 1.1, 1.2, 1.35] as const

@@ -19,7 +19,10 @@ import {
   type Carried, type Family, type GunId, type HeldId, type Loadout,
 } from './held'
 import type { Intent } from '../player/intent'
-import { WEAPONS } from './weapons'
+import { WEAPONS, type Ammo, type WeaponId, type WeaponSpec } from './weapons'
+import { Trigger } from './trigger'
+import { canAct } from '../player/lifecycle'
+import type { Life } from '../player/lifecycle'
 
 /** 銃の初期弾数。表から引く */
 function fullAmmo(id: GunId): { ammo: number; reserve: number } {
@@ -71,6 +74,29 @@ export type HandEvent =
   /** 一覧の中で選び直した。音を鳴らすのに使う */
   | { kind: 'selected' }
 
+/**
+ * 撃てるかを決めるのに要る、いまの体の状態。
+ *
+ * **時計ではなく真偽で受け取る。** 「あと何秒で装填が終わるか」は
+ * presentation が数えていて、ここに要るのは「終わったか」だけ。
+ */
+export interface ShootContext {
+  /** 引き金が引かれているか。装置の話 (input) をここで受ける */
+  held: boolean
+  /** 構えているか。**構えていないと撃てない** */
+  aiming: boolean
+  /** 生死。倒れている間や湧く前は撃てない */
+  life: Life
+  /** 装填中か */
+  reloading: boolean
+  /** ナイフを振っている最中か */
+  stabbing: boolean
+  /** 転がっている最中か */
+  rolling: boolean
+  /** 弾倉に残っている弾。**空撃ちはここで止まる** */
+  ammo: number
+}
+
 export class Inventory {
   private items: Carried[] = []
   /** 箱を被れる体勢か。hand() が毎フレーム書き込む (既定は被れる) */
@@ -80,6 +106,13 @@ export class Inventory {
   private last: HeldId | null = null
   /** 持ち替えが終わるまでの残り (秒)。0 なら手に馴染んでいる */
   private switchLeft = 0
+  /**
+   * 引き金。**持ち物が持つ。**
+   *
+   * 継承ではなく合成。持ち物一覧が引き金である、は嘘になる。外から見える
+   * 問いは canShoot 1 つで、単発かどうかの面倒はこの中に閉じる。
+   */
+  private readonly trigger = new Trigger()
 
   constructor(loadout: Loadout) {
     this.refill(loadout)
@@ -151,13 +184,57 @@ export class Inventory {
   }
 
   /**
-   * 引き金が効くか。
+   * 手が整っているか。
    *
    * 撃てる物を持っていて、かつ持ち替えが終わっていること。**投げると決めた
    * 瞬間に撃つ手段を手放す**、が持ち替えの代償なので、ここが要になる。
+   *
+   * これだけでは撃てない。撃てるかは canShoot が答える。
    */
-  get canShoot(): boolean {
+  get handReady(): boolean {
     return HELD[this.held].shoots && !this.switching
+  }
+
+  /**
+   * 撃てるか。**撃つ前に立つ条件を 1 つの問いにまとめたもの。**
+   *
+   * --- なぜここに集めるか ---
+   * 以前は presentation に 9 個の && として並んでいた。ドメインルール
+   * (装填中は撃てない、転がりながらは撃てない) と、装置の話 (ボタンが
+   * 押されているか) と、単発の再現 (離して押し直したか) が同じ行に混ざり、
+   * **どれを変えると遊びが変わるのかが読めなかった**。
+   *
+   * --- 時計は渡す側が持つ ---
+   * 「装填中か」は真偽で受け取る。秒を数えるのは presentation の仕事で、
+   * ここが数え始めると three の時間と二重管理になる。
+   */
+  canShoot(weapon: WeaponSpec, ctx: ShootContext): boolean {
+    if (!this.handReady) return false
+    if (!ctx.held || !this.trigger.pulled(weapon.auto)) return false
+    if (!ctx.aiming) return false
+    if (!canAct(ctx.life)) return false
+    if (ctx.reloading || ctx.stabbing || ctx.rolling) return false
+    return ctx.ammo > 0
+  }
+
+  /** 撃った。単発の銃の引き金を使い切る */
+  fired(weapon: WeaponSpec): void {
+    this.trigger.fired(weapon.auto)
+  }
+
+  /**
+   * 押した瞬間だけ効く物か。**ナイフ。**
+   *
+   * 武器の表を持たない物も、単発の銃と同じ引き金に乗せる — 押しっぱなしで
+   * 連打しない、というのは物が違っても同じドメインルール。
+   */
+  get pressedOnce(): boolean {
+    return this.trigger.pulled(false)
+  }
+
+  /** その一押しを使い切る */
+  consumePress(): void {
+    this.trigger.fired(false)
   }
 
   /** いま手にある物の中身 (弾数など)。持っていなければ undefined */
@@ -406,7 +483,14 @@ export class Inventory {
   }
 
   /** 時計を進める。持ち替えが終わったら、溜めていた行き先へ続けて移る */
-  update(dt: number): void {
+  /**
+   * 1 フレーム進める。
+   *
+   * @param held 引き金が引かれているか。**装置の話をここで受け止める** —
+   *   これ以降、単発かどうかの判断は Trigger の中で完結する
+   */
+  update(dt: number, held = false): void {
+    this.trigger.update(held)
     if (this.switchLeft <= 0) return
     this.switchLeft = Math.max(0, this.switchLeft - dt)
     if (this.switchLeft > 0) return
@@ -522,6 +606,54 @@ export class Inventory {
   }
 
   /** 装填。予備から弾倉へ、入るぶんだけ移す */
+  /**
+   * その銃を 1 発ぶん減らす。**空でも拒まない。**
+   *
+   * 手にある物ではなく id で指す。サーバーは持ち替えを追っていないので、
+   * 「いま手にある物」から引くと違う銃の弾が減る。
+   *
+   * 空でも拒まないのは、**通信のずれで正当な 1 発が消えるのを避ける**ため。
+   * 空撃ちの判断はクライアントがやっている (押した瞬間に音が要る)。
+   */
+  spendGun(id: HeldId): void {
+    const item = find(this.items, id)
+    if (!item || !('ammo' in item)) return
+    item.ammo = Math.max(0, item.ammo - 1)
+  }
+
+  /**
+   * その銃に弾を込める。**装填が終わった、という知らせで呼ぶ。**
+   *
+   * 尺 (何秒かかるか) は持たない。あれはクライアントが数えていて、
+   * ここへ届くのは終わったあと。
+   */
+  reloadGun(id: HeldId): boolean {
+    const item = find(this.items, id)
+    if (!item || !('ammo' in item)) return false
+    const room = WEAPONS[item.id].magazine - item.ammo
+    if (room <= 0 || item.reserve <= 0) return false
+    const moved = Math.min(room, item.reserve)
+    item.ammo += moved
+    item.reserve -= moved
+    return true
+  }
+
+  /**
+   * 銃ごとの弾数の表。**繋ぎ直した人へ返すのに使う。**
+   *
+   * 持っていない銃は 0。protocol が銃ごとの表で流す形なので、そこへ合わせる
+   * ためだけの変換で、**こちらの持ち方 (持っている物だけ) は変えない**。
+   */
+  ammoTable(): Ammo {
+    const magazine = {} as Record<WeaponId, number>
+    const reserve = {} as Record<WeaponId, number>
+    for (const id of Object.keys(WEAPONS) as WeaponId[]) {
+      magazine[id] = this.ammoOf(id)
+      reserve[id] = this.reserveOf(id)
+    }
+    return { magazine, reserve }
+  }
+
   reload(): boolean {
     const item = this.item
     if (!item || !('ammo' in item)) return false

@@ -74,3 +74,51 @@ export function offsetInCone(dir: Aim, degrees: number, angle01: number, radius0
   dir.y = y / length
   dir.z = z / length
 }
+
+/**
+ * 向きを右へ / 上へ、そのまま傾ける。**dir を破壊的に書き換える。**
+ *
+ * @param dir      正規化済みの向き
+ * @param rightDeg 右へ何度 (負なら左)
+ * @param upDeg    上へ何度 (負なら下)
+ *
+ * 円錐 (offsetInCone) との違いは**どこへ向けるかを呼ぶ側が決めている**こと。
+ * あちらは「円の中のどこか」で、乱数を 2 つ受け取る。こちらは行き先が
+ * 分かっている — 手ブレのように、時間から滑らかに決まる向きに使う。
+ *
+ * 小角なので接平面の上で足して正規化する。0.2 度なら誤差は 10^-6 度未満で、
+ * 三角関数を 2 回回す形と結果が変わらない。
+ */
+export function offsetBy(dir: Aim, rightDeg: number, upDeg: number): void {
+  if (rightDeg === 0 && upDeg === 0) return
+
+  // 円錐と同じ理由で、真上を向いているときだけ基準を変える
+  const steep = Math.abs(dir.y) > 0.99
+  const upX = 0
+  const upY = steep ? 0 : 1
+  const upZ = steep ? -1 : 0
+
+  let rx = dir.y * upZ - dir.z * upY
+  let ry = dir.z * upX - dir.x * upZ
+  let rz = dir.x * upY - dir.y * upX
+  const rLen = Math.hypot(rx, ry, rz) || 1
+  rx /= rLen
+  ry /= rLen
+  rz /= rLen
+
+  const ux = ry * dir.z - rz * dir.y
+  const uy = rz * dir.x - rx * dir.z
+  const uz = rx * dir.y - ry * dir.x
+
+  const right = Math.tan(rightDeg * DEG_TO_RAD)
+  const up = Math.tan(upDeg * DEG_TO_RAD)
+
+  const x = dir.x + rx * right + ux * up
+  const y = dir.y + ry * right + uy * up
+  const z = dir.z + rz * right + uz * up
+
+  const length = Math.hypot(x, y, z) || 1
+  dir.x = x / length
+  dir.y = y / length
+  dir.z = z / length
+}

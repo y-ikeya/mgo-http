@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Client, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/protocol/types'
-import { TARGET_SPOTS } from '../server/world'
+import { STAGES } from '../src/domain/match/stage'
+import { ROOM_STAGES } from '../src/domain/match/room'
 
 /**
  * 練習部屋 (echo)。
@@ -22,8 +23,11 @@ afterAll(() => server.stop())
  *
  * ここは座標を写して書いていて、的を東棟へ移したときに置き去りになった
  * (的まで 45m になり、当たりの申告が届かなくなる)。写さずに元から採る。
+ *
+ * **echo が乗るステージから引く。** 部屋とステージの結び付きが変わっても、
+ * ここは黙って追随する。
  */
-const TARGET = TARGET_SPOTS[0]
+const TARGET = STAGES[ROOM_STAGES.echo.stages[0]].targets[0]
 
 async function enterPractice(id: string): Promise<Client> {
   const client = new Client(server, id, [TARGET.x, 0, TARGET.z + 3], 'echo')

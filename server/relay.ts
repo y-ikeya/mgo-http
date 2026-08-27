@@ -8,6 +8,7 @@
 import { connected, isLeaking } from '../src/domain/match/match'
 import { isFriendly } from '../src/domain/match/room'
 import { canSee, onBattlefield } from '../src/domain/player/lifecycle'
+import { isLeakedTo } from '../src/domain/player/player'
 import { STEP_UP } from '../src/domain/player/moving'
 import { type Player, isProtected, lifeElapsed } from '../src/domain/player/player'
 import { stanceOf } from '../src/domain/player/stance'
@@ -19,7 +20,6 @@ import { checkMove } from '../src/sim/judge/motioncheck'
 import { cameraPoint } from '../src/sim/space/eyepoint'
 import { groundUnder, hasLineOfSight } from '../src/sim/space/vision'
 import { sessionOf } from './session'
-import { arenaHalf, solidBoxes, stageBoxes } from './stage'
 import { type RoomWorld, broadcast, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
@@ -93,7 +93,7 @@ export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffe
   // 繋ぎ直した直後も前の位置とは繋がっていない
   const settled = onBattlefield(player.life) && lifeElapsed(player, arrived) > WARP_GRACE
   if (settled) {
-    const verdict = checkMove(player, snapshot, solidBoxes, arenaHalf)
+    const verdict = checkMove(player, snapshot, room.stage.solid, room.stage.arenaHalf)
     if (!verdict.ok) {
       sessionOf(player).rejected++
       if (arrived - sessionOf(player).badMoveAt > 5000) {
@@ -198,7 +198,7 @@ export function emitNoise(
   // 何の上を踏んだかは地形から出す。申告させるものではない
   const surface =
     noise.kind === 'step'
-      ? surfaceOf(groundUnder(from.x, from.z, from.y, stageBoxes, STEP_UP).name)
+      ? surfaceOf(groundUnder(from.x, from.z, from.y, room.stage.sight, STEP_UP).name)
       : undefined
 
   for (const listener of connected(room)) {
@@ -207,11 +207,11 @@ export function emitNoise(
 
     // 距離と、見えているかは幾何 (sim)。聞こえるかを決めるのは規則 (domain)
     const distance = Math.hypot(from.x - listener.x, from.z - listener.z)
-    const eye = viewOf(listener)
+    const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
-      stageBoxes.length === 0 ||
-      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
+      room.stage.sight.length === 0 ||
+      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
     if (!isHeard(distance, reach, visible)) continue
 
     sessionOf(listener).socket.send(
@@ -239,12 +239,12 @@ export function relayShot(room: RoomWorld, from: Player, message: ServerMessage)
   for (const listener of connected(room)) {
     if (listener.id === from.id) continue
 
-    const eye = viewOf(listener)
+    const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
-      stageBoxes.length === 0 ||
+      room.stage.sight.length === 0 ||
       !canSee(listener.life) ||
-      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
+      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
 
     if (visible) sessionOf(listener).socket.send(payload)
   }
@@ -304,7 +304,7 @@ export const viewEye = { x: 0, y: 0, z: 0 }
  * 可視を問うところは全部これを通す。位置を配るとき・銃声を配るとき・
  * 足音を配るときで別々に出すと、定義がずれて「姿も音も無い敵」が生まれる。
  */
-export function viewOf(player: Player): { x: number; y: number; z: number } {
+export function viewOf(room: RoomWorld, player: Player): { x: number; y: number; z: number } {
   return cameraPoint(
     player.x,
     player.y,
@@ -314,7 +314,7 @@ export function viewOf(player: Player): { x: number; y: number; z: number } {
     player.aiming,
     // 壁に寄せる。省くと壁を背にした瞬間にカメラが壁の中へ入り、
     // その人だけ全方位が見えなくなる
-    stageBoxes,
+    room.stage.sight,
     viewEye,
   )
 }
@@ -354,17 +354,34 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
     // という判断で入れてある。
     const killCam = viewer.life === 'downed' && viewer.killedBy === from.id
 
+    // **抜いた相手は遮蔽越しに見える。** ENEMY EXPOSURE (domain/player/skill.ts)。
+    //
+    // 1 位の光 (glowing) と違って、**見る人によって答えが変わる** — 抜いた側の
+    // 陣営にだけ配る。だから輪の中で引く。
+    //
+    // ここが EE の本体。輪郭を出すだけなら「見えている相手が光る」で終わって
+    // しまい、既に見えているものに色が付くだけで情報が増えない。壁を通すから、
+    // 当てたことが次の一手を選ぶ材料になる。
+    const exposed = isLeakedTo(from, viewer, now)
+
     // 味方は無条件。TDM で味方の位置が分からないと連携のしようがないし、
     // 隠すべき情報は敵に対するものだけ。判定の回数も半分以下になる
-    if (visible && !killCam && !glowing && !isFriendly(room.mode, viewer, from) && stageBoxes.length > 0) {
+    if (
+      visible &&
+      !killCam &&
+      !glowing &&
+      !exposed &&
+      !isFriendly(room.mode, viewer, from) &&
+      room.stage.sight.length > 0
+    ) {
       // **目ではなくカメラから**線を引く。三人称なので、画面に映るものを
       // 決めているのはカメラの位置。目で見ると、遮蔽の裏にしゃがんだ相手が
       // 「カメラからは見えているのに送られてこない」ことになる。
       //
       // カメラのほうが後ろ上から見下ろすぶん、目より広く見える。そこは許す —
       // 描いている物と送る物がずれているほうが困る
-      const eye = viewOf(viewer)
-      visible = hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, stageBoxes)
+      const eye = viewOf(room, viewer)
+      visible = hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
     }
 
     if (!visible) {

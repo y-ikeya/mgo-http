@@ -6,6 +6,8 @@
  * sim/judge/ballistic.ts にある。
  */
 
+import { throwScale, type Skills } from '../player/skill'
+
 /** 爆風が届く距離 (m) */
 export const BLAST_RADIUS = 7
 
@@ -51,6 +53,21 @@ export const KNOCK_NEAR = 0.28
  * サーバーが上限として使い、予測線もこれで引く。申告された速さは信じない。
  */
 export const THROW_SPEED = 12
+
+/**
+ * その人が投げ出す速さ (m/s)。**THROWING MASTERY を掛けた後の値。**
+ *
+ * ここを通すのは、**予測線と実際の軌道を必ず一致させる**ため。素の
+ * THROW_SPEED を直に読む場所が 2 つ (サーバーの投擲と、画面の予測線) あって、
+ * 片方だけにスキルを掛けると**見えている落下点と落ちる場所がずれる**。
+ * 手榴弾は「そこへ落とす」判断そのものが手なので、ずれた時点で武器が壊れる。
+ *
+ * 速さだけを動かして上向きの下駄 (THROW_LOFT) は据え置く。角度も変えると
+ * 距離だけでなく山なりの形まで変わって、投げ慣れた感覚が段ごとに別物になる。
+ */
+export function throwSpeedOf(skills: Skills): number {
+  return THROW_SPEED * throwScale(skills)
+}
 
 /**
  * 狙った向きより何度上へ投げるか (rad)。

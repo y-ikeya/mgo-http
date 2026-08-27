@@ -26,13 +26,12 @@ import { creditOf, takeDamage, type Credit, type Wound } from '../rule/damage'
 import type { HeldId } from '../item/held'
 import {
   SUPPORT_SPECS,
-  startingAmmo,
-  type Ammo,
   type SupportId,
   type WeaponId,
 } from '../item/weapons'
 import { MAX_HEALTH } from '../rule/damage'
 import { Footsteps } from '../rule/footsteps'
+import { Inventory } from '../item/inventory'
 import type { Skills } from './skill'
 
 /**
@@ -177,11 +176,23 @@ export interface Player {
    * ENEMY EXPOSURE を持つ相手に当てられると付く。**死ねば消える** — 死が
    * 漏洩を止める手段になっている (docs/design.md の 3)。
    *
-   * 「A は B の位置を知っている」という見る側 × 見られる側の表ではなく、
-   * **見られる側だけの札**にしてある。当人が光っているので、抜かれた本人にも
-   * 分かるし、配信の規則も 1 行で済む。
+   * 見る側 × 見られる側の表は作らない。**見られる側に 2 つ持たせる** —
+   * いつまで (leakedUntil) と、誰に (leakedTo)。当人が光るので抜かれた本人にも
+   * 分かるし、配信の規則は 1 行のままで済む。
    */
   leakedUntil: number
+  /**
+   * 誰に漏れているか。`team:blue` か `id:alice` の形 (leakTag)。
+   *
+   * **1 位の光とはここが違う。** あちらは全員に公開される札なので誰に、が要らない。
+   * EE は当てた側の陣営だけが見えるので、宛先を持たないと「当てられた側の陣営にも
+   * 自分が光って見える」ことになり、抜かれたことが相手に丸見えになる。
+   *
+   * **後から当てた側が上書きする。** 個人戦で 2 人が同じ相手に当てると、
+   * 先に当てた人の側が消える。1 人ぶんしか持たないのは、複数を持つと
+   * 「誰に見えているか」の表が結局要るため — そこまでの価値は無いと見ている。
+   */
+  leakedTo: string
   /**
    * いま手にある物。位置と一緒に届く。
    *
@@ -205,16 +216,22 @@ export interface Player {
    */
   slot: number
   /**
-   * **いま持っている物。** この命のあいだ手にできる物の全部。
+   * 持ち物。**クライアントと同じ物を、サーバーも持つ。**
    *
-   * 湧いたときに選んだ装備で種を作り (refill)、拾えば増え、置けば減る。
-   * 「持てるか」はこれだけで決まる (player/equip.ts の canHold)。
+   * --- なぜ寄せたか ---
+   * 同じ「持ち物」が 2 か所に別の形で書かれていた。クライアントは Inventory、
+   * サーバーは kit (id の配列) と ammo (銃ごとの弾数) という**別々の欄**。
+   * 拾う・落とすたびに 2 つを揃えて書く必要があり、**片方だけ消し忘れる余地**が
+   * あった。
    *
-   * **拾った物だけを覚える形にしていて穴が開いていた。** 主武器は選んだ物
-   * なので一覧に入っておらず、地面に置いても「持っている」ままだった —
-   * 置いた銃を他人に拾わせながら、自分もその銃として撃てる (複製)。
+   * 「打った相手の銃を数秒使えなくする」「CQC で主武器を落とさせる」の
+   * ように、サーバーが権威を持つ操作を入れるとき、置き場所が 2 つあると必ずずれる。
+   *
+   * 持てるか (equip.ts の canHold) も、拾う・落とす (server/arms/drops.ts) も
+   * ここを通る。**ammo はまだ別に残っている** — 繋ぎ直した人へ返すための
+   * 写しなので、そちらも順に寄せる。
    */
-  kit: HeldId[]
+  inventory: Inventory
   /**
    * 過去の姿。当てたという申告を遡って照合するのに使う。
    *
@@ -254,18 +271,6 @@ export interface Player {
   locomotion: Locomotion
   /** 持っている銃。威力と連射の上限をこれで引く */
   weapon: WeaponId
-  /**
-   * 銃ごとの弾数。**写しであって、権威ではない。**
-   *
-   * 空撃ちの判断はクライアントがやる (押した瞬間に音が要るので)。ここが持って
-   * いるのは、繋ぎ直した人へ続きを返すため。持たせないと、30 秒の猶予が
-   * 「瀕死でリロードすれば全快して弾も満タン」という抜け道になる。
-   *
-   * 減らすのは shot が届いたとき。増やすのは reload が届いたとき —
-   * **クライアントは装填が終わった瞬間に送る**ので、こちらは銃ごとの尺を
-   * 知らなくてよい。
-   */
-  ammo: Ammo
 }
 
 /**
@@ -303,14 +308,14 @@ export function newPlayer(seed: {
     locomotion: 'idle',
     footsteps: new Footsteps(),
     concentratingSince: 0,
-    kit: startingKit({ primary: 'rifle', support: 'grenade' }),
+    inventory: new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' }),
     skills: {},
     leakedUntil: 0,
+    leakedTo: '',
     weapon: 'rifle',
     primary: 'rifle',
     held: 'rifle',
     support: 'grenade',
-    ammo: startingAmmo(),
     grenades: SUPPORT_SPECS.grenade.count,
     holdingGrenade: false,
     wasAlive: false,
@@ -393,6 +398,32 @@ export function isProtected(player: Player): boolean {
 }
 
 /**
+ * 抜いた側を宛先の形にする。
+ *
+ * **陣営のある部屋は陣営ぜんぶ、無い部屋は本人だけ。** 抜いた情報を味方に
+ * 渡せるからチーム戦で 1 枠割く価値が出る。個人戦には渡す相手が居ないので、
+ * 同じ規則が自動的に「本人だけ」に落ちる — 部屋ごとに分岐を書かなくて済む。
+ *
+ * @param teams その部屋に陣営があるか (domain/match/room.ts の mode.teams)
+ */
+export function leakTag(attacker: Player, teams: boolean): string {
+  return teams ? `team:${attacker.team}` : `id:${attacker.id}`
+}
+
+/**
+ * その人にとって、相手が光って見えるか。
+ *
+ * **抜かれた側には見えない。** 自分が光っていることを本人が知れると、
+ * 「どこかから撃たれた = いま位置が漏れている」まで確定してしまい、
+ * 抜いた側の利が消える。当てられたこと自体は体力で分かるので、
+ * そこから先を教えるかどうかがこの 1 行。
+ */
+export function isLeakedTo(target: Player, viewer: Player, now: number): boolean {
+  if (now >= target.leakedUntil) return false
+  return target.leakedTo === `team:${viewer.team}` || target.leakedTo === `id:${viewer.id}`
+}
+
+/**
  * 湧いたときの詰め直し。
  *
  * **装備から詰め直す。** 式は共有なので、画面に出る数と必ず一致する。
@@ -402,10 +433,14 @@ export function refill(player: Player): void {
   player.killedBy = ''
   // **死ねば漏洩が止まる。** 死が情報を切る手段になっている
   player.leakedUntil = 0
+  player.leakedTo = ''
   // **次の命は選んだ装備から始まる。** 拾った物は持ち越さない
-  player.kit = startingKit(player)
+  player.inventory.refill({
+    primary: player.primary,
+    secondary: 'pistol',
+    support: player.support,
+  })
   player.health = MAX_HEALTH
-  player.ammo = startingAmmo()
   player.grenades = SUPPORT_SPECS[player.support].count
   player.holdingGrenade = false
   player.concentratingSince = 0
@@ -460,12 +495,3 @@ export function downedBy(
   return credit
 }
 
-/**
- * その命で持って出る物。**選んだ装備 + 最初から持っている物。**
- *
- * ナイフとダンボールは選ばない (item/held.ts の Loadout)。拳銃も枠が 1 つしか
- * 無いので固定。ここに並んだ物だけが手にできる。
- */
-export function startingKit(player: Pick<Player, 'primary' | 'support'>): HeldId[] {
-  return ['knife', 'box', 'pistol', player.primary, player.support]
-}

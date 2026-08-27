@@ -9,15 +9,22 @@ import { bulletDamage, weaponOf } from '../src/domain/item/weapons'
 import { loseTicket } from '../src/domain/match/match'
 import { isHostile } from '../src/domain/match/room'
 import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
-import { downedBy, hurt, type Player, isProtected } from '../src/domain/player/player'
+import {
+  downedBy,
+  hurt,
+  isLeakedTo,
+  leakTag,
+  type Player,
+  isProtected,
+} from '../src/domain/player/player'
 import { HIT_RULES, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
-import type { ClientMessage } from '../src/protocol/types'
+import { exposeSeconds } from '../src/domain/player/skill'
+import type { ClientMessage, ServerMessage } from '../src/protocol/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
 import { matchState } from './match'
 import { bearingTo, sendHealth } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { stageBoxes } from './stage'
 import { type RoomWorld, broadcast, setLife } from './world'
 
 /**
@@ -59,6 +66,48 @@ export interface Hurt {
 /** 何も起きなかった。申告が通らなかったときなど */
 const NOT_HURT: Hurt = { downed: false, letGo: false }
 
+/**
+ * 当てた相手を光らせる。**ENEMY EXPOSURE。**
+ *
+ * --- 倒さなくても情報になる、という枠 ---
+ * 当てただけで数秒ぶんの位置が抜ける。**撃ち合いに勝てなくても仕事になる**ので、
+ * 「見つけて撃つ」以外の役割が予算 4 の中に生まれる。
+ *
+ * --- 誰に見えるか ---
+ * 陣営ぜんぶ (個人戦なら本人だけ)。宛先の決め方は domain (leakTag)。
+ * **抜かれた本人には送らない** — 光っていることを本人が知れると、
+ * 「いま位置が漏れている」まで確定して抜いた側の利が消える。
+ *
+ * --- 上書きする ---
+ * 既に光っていても、当て直せば伸びる。別の人が当てれば宛先ごと移る
+ * (札は 1 人ぶんしか無い)。**短いほうへは縮めない** — Lv1 の人が当てたせいで
+ * Lv3 の人の光が消えるのは、当てた側から見て理屈が通らない。
+ */
+function expose(room: RoomWorld, victim: Player, attacker: Player | undefined): void {
+  if (!attacker || attacker.id === victim.id) return
+  const seconds = exposeSeconds(attacker.skills)
+  if (seconds <= 0) return
+
+  const now = Date.now()
+  const until = now + seconds * 1000
+  const tag = leakTag(attacker, room.mode.teams)
+  // 同じ宛先で、いまより短くなるなら何もしない
+  if (tag === victim.leakedTo && until <= victim.leakedUntil) return
+  victim.leakedUntil = until
+  victim.leakedTo = tag
+
+  const notice = JSON.stringify({
+    type: 'exposed',
+    id: victim.id,
+    seconds,
+  } satisfies ServerMessage)
+  for (const viewer of room.players.values()) {
+    if (viewer.id === victim.id) continue
+    if (!isLeakedTo(victim, viewer, now)) continue
+    sessionFor(viewer)?.socket.send(notice)
+  }
+}
+
 export function applyBlastDamage(
   room: RoomWorld,
   victim: Player,
@@ -71,6 +120,9 @@ export function applyBlastDamage(
 ): Hurt {
   // 削るのも、倒れるかも人の側の振る舞い (domain/player/player.ts)
   const wound = hurt(victim, amount)
+  // **爆風でも抜ける。** 手榴弾とクレイモアで被曝させた相手も光る。
+  // 落下 (weapon: 'fall') は持ち主が居ないので何も起きない
+  expose(room, victim, room.players.get(ownerId))
 
   // 爆心の方向。撃たれたときと同じで、どこから来たかだけ渡す
   const bearing = Math.atan2(fromX - victim.x, -(fromZ - victim.z))
@@ -178,7 +230,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
       distance: event.distance,
       fromBehind: event.fromBehind,
     },
-    stageBoxes,
+    room.stage.sight,
     LAG_WINDOW,
     HIT_RULES,
   )
@@ -195,6 +247,8 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
   const wound = hurt(victim, amount)
   // 撃たれたら集中は途切れる。回復は最初から待ち直し。
   victim.concentratingSince = 0
+  // **倒さなくても情報になる。** 当てた時点で数秒ぶんの位置が抜ける
+  expose(room, victim, attacker)
 
   if (!wound.downed) {
     // 頭に当たったのに倒れなかったときだけ怯ませる。

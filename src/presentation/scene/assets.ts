@@ -1,6 +1,7 @@
 import type * as THREE from 'three'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DEFAULT_SKIN } from './actor/skin'
+import type { StageName } from '../../domain/match/stage'
 
 /**
  * モデルの読み込みを 1 回に集約する。
@@ -34,7 +35,6 @@ const CASING_URL = asset.model('casing_rifle.glb')
 const KNIFE_URL = asset.model('knife.glb')
 const CLAYMORE_URL = asset.model('claymore.glb')
 const GRENADE_URL = asset.model('grenade.glb')
-const STAGE_URL = asset.model('stage.glb')
 
 const cache = new Map<string, Promise<GLTF>>()
 
@@ -114,7 +114,12 @@ export function loadGrenade(): Promise<GLTF> {
   return load(GRENADE_URL)
 }
 
-/** ステージ。無ければコード側のブロックアウトを使うので、失敗しても構わない */
-export function loadStage(): Promise<GLTF> {
-  return load(STAGE_URL)
+/**
+ * ステージ。**名前で引く。**
+ *
+ * 無ければコード側のブロックアウトを使うので、失敗しても構わない。
+ * どれを読むかは部屋が決める (domain/match/room.ts の ROOM_STAGES)。
+ */
+export function loadStage(name: StageName): Promise<GLTF> {
+  return load(asset.model(`stage_${name}.glb`))
 }

@@ -24,7 +24,6 @@ import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
 import { leaveRoom, matchState, recordSeat, spawn, updateMatch, updateTargets } from './match'
 import { receiveSnapshot, relayShot, relayState, sendHealth } from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
-import { solidBoxes } from './stage'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
@@ -40,7 +39,6 @@ import { flush } from './stats'
 import { loadSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
-import { reloadInto } from '../src/domain/item/weapons'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
@@ -179,7 +177,7 @@ setInterval(() => {
       for (let i = room.grenades.length - 1; i >= 0; i--) {
         const nade = room.grenades[i]
         const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
-        for (let k = 0; k < steps; k++) stepProjectile(nade.body, solidBoxes)
+        for (let k = 0; k < steps; k++) stepProjectile(nade.body, room.stage.solid)
         nade.fuse -= TICK_MS / 1000
         if (nade.fuse <= 0) {
           detonate(room, nade)
@@ -455,11 +453,18 @@ function handleMessage(
        * 持ち替えは位置と同じ流れで届くので、撃った瞬間の状態と揃っている。
        */
       if (!HELD[player.held]?.shoots) break
-      // 弾数の写しを減らす。**空でも拒否しない** — 空撃ちの判断は
-      // クライアントがやっている (押した瞬間に音が要る)。ここで拒めば、
-      // 通信のずれで正当な 1 発が消える
-      const left = player.ammo.magazine[player.weapon]
-      if (left > 0) player.ammo.magazine[player.weapon] = left - 1
+      /*
+       * 弾を 1 発減らす。**数を持っているのはこちら** (Player.inventory)。
+       *
+       * **空でも拒否はしない。** 空撃ちの音は押した瞬間に要るので、
+       * 鳴らす判断はクライアントに置いてある。ここで拒むと、通信のずれで
+       * 正当な 1 発が消える。
+       *
+       * 数が権威になったので、拒む形にはいつでも移せる (damage の側で
+       * 残弾を見る)。移すなら、ずれたときに**サーバーの数を配り直す**道が
+       * 先に要る — いまは繋ぎ直したときにしか返していない。
+       */
+      player.inventory.spendGun(player.weapon)
       // 弾道の上にクレイモアがあれば起爆する
       shotHitsClaymore(room, message.from, message.to)
       // 銃声だけは扱いが違う。
@@ -475,7 +480,7 @@ function handleMessage(
     // 装填が**終わった**。尺はクライアントが持っているので、
     // こちらは移すだけでよい
     case 'reload':
-      reloadInto(player.ammo, message.weapon)
+      player.inventory.reloadGun(message.weapon)
       break
 
     default:
@@ -666,8 +671,10 @@ const server = Bun.serve<Client>({
             y: resumed.y,
             z: resumed.z,
             health: resumed.health,
-            magazine: resumed.ammo.magazine,
-            reserve: resumed.ammo.reserve,
+            ...(() => {
+              const ammo = resumed.inventory.ammoTable()
+              return { magazine: ammo.magazine, reserve: ammo.reserve }
+            })(),
             grenades: resumed.grenades,
             support: resumed.support,
             primary: resumed.primary,

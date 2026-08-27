@@ -2,7 +2,7 @@
  * 落ちている武器 (サーバー側)。
  */
 
-import { canDrop, isGun } from '../../src/domain/item/held'
+import { canDrop, isGun, type Carried } from '../../src/domain/item/held'
 import { canAct } from '../../src/domain/player/lifecycle'
 import type { Player } from '../../src/domain/player/player'
 import type { ClientMessage } from '../../src/protocol/types'
@@ -58,6 +58,17 @@ export function droppedMessage(item: Dropped): ServerMessage {
 }
 
 
+/** 落ちている物を、持ち物の形へ。**弾数を持つ物と、数だけの物がある** */
+function carriedOf(item: Dropped): Carried {
+  if (isGun(item.weapon)) {
+    return { id: item.weapon, ammo: item.ammo, reserve: item.reserve }
+  }
+  if (item.weapon === 'grenade' || item.weapon === 'claymore' || item.weapon === 'magazine') {
+    return { id: item.weapon, count: item.count }
+  }
+  return { id: item.weapon } as Carried
+}
+
 /**
  * 武器を地面へ置く。
  *
@@ -83,13 +94,11 @@ export function dropWeapon(room: RoomWorld, player: Player, message: ClientMessa
   }
   room.dropped.push(item)
   // 手放したら持ち物から外れる。**選んだ主武器でも同じ** — 置いた銃を他人に
-  // 拾わせながら自分も撃てる、が無くなる
-  player.kit = player.kit.filter((id) => id !== message.weapon)
-  const put = message.weapon
-  if (isGun(put)) {
-    player.ammo.magazine[put] = 0
-    player.ammo.reserve[put] = 0
-  }
+  // 拾わせながら自分も撃てる、が無くなる。
+  //
+  // 弾数も一緒に消える (持ち物が弾を抱えているので)。以前は kit と ammo を
+  // 別々に消していて、**片方だけ消し忘れる余地**があった
+  player.inventory.drop(message.weapon)
   broadcast(room, droppedMessage(item))
 }
 
@@ -111,13 +120,9 @@ export function pickUp(room: RoomWorld, player: Player): void {
   }
   if (!best) return
   room.dropped.splice(room.dropped.indexOf(best), 1)
-  const got = best.weapon
-  // **拾えば持ち物に入る。** 選んでいない銃を持てるのはこれがあるから
-  if (!player.kit.includes(got)) player.kit.push(got)
-  if (isGun(got)) {
-    player.ammo.magazine[got] = best.ammo
-    player.ammo.reserve[got] = best.reserve
-  }
+  // **拾えば持ち物に入る。** 選んでいない銃を持てるのはこれがあるから。
+  // 弾も一緒に入る — 地面に落ちていた残弾をそのまま引き継ぐ
+  player.inventory.pick(carriedOf(best))
   sessionOf(player).socket.send(
     JSON.stringify({
     type: 'picked',

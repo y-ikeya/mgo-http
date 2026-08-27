@@ -15,11 +15,10 @@ import {
   blastEffect,
   BLAST_RADIUS,
   THROW_LOFT,
-  THROW_SPEED,
+  throwSpeedOf,
 } from '../../src/domain/item/grenade'
 import { headHeightWhen } from '../../src/domain/player/stance'
 import { applyBlastDamage } from '../damage'
-import { stageBoxes } from '../stage'
 import { type RoomWorld, broadcast, hostileToOwner, setLife } from '../world'
 
 /**
@@ -80,8 +79,13 @@ export function throwGrenade(room: RoomWorld, from: Player, event: ClientMessage
   const [dx, dy, dz] = event.dir
   const length = Math.hypot(dx, dy, dz)
   if (!(length > 0.001)) return
-  // 速さと上向きの下駄は共有の式で決める。予測線と同じ軌道になる
-  const v = throwVelocity(dx / length, dy / length, dz / length, THROW_SPEED, THROW_LOFT)
+  // 速さと上向きの下駄は共有の式で決める。予測線と同じ軌道になる。
+  //
+  // **速さは投げた本人のスキルから引く。** 申告された速さは相変わらず信じない
+  // — 見るのは席に付いているスキルで、それを決めたのはこちら (server/skills.ts)。
+  const v = throwVelocity(
+    dx / length, dy / length, dz / length, throwSpeedOf(from.skills), THROW_LOFT,
+  )
 
   from.grenades--
   // 投げた時点で無敵は切れる。守られたまま攻撃はできない
@@ -174,7 +178,7 @@ export function detonate(room: RoomWorld, nade: Grenade): void {
     // sim が測るのは**どこに誰がどれだけ晒されていたか**まで。
     // 何ダメージかを決めるのは規則の側 (domain/item/grenade.ts)
     const head = headHeightWhen(victim.crouching, victim.boxed)
-    const seen = blastExposure(x, y, z, victim, head, BLAST_RADIUS, stageBoxes)
+    const seen = blastExposure(x, y, z, victim, head, BLAST_RADIUS, room.stage.sight)
     if (!seen) continue
     const result = blastEffect(seen.distance, seen.cover)
     if (result.damage <= 0) continue
