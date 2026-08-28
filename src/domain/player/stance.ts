@@ -28,10 +28,23 @@ export type Stance = 'stand' | 'crouch' | 'box' | 'prone' | 'down'
 
 /** そのモーションのときの構え */
 export function stanceOf(locomotion: Locomotion): Stance {
-  if (locomotion === 'death') return 'down'
+  if (locomotion === 'death' || locomotion === 'death_front' || locomotion === 'death_back')
+    return 'down'
   // 爆風で倒れている間。起き上がりの途中も含めて低い姿勢として扱う
   if (locomotion === 'sweep' || locomotion === 'stand') return 'prone'
   if (locomotion === 'sneak' || locomotion === 'sit') return 'box'
+  // ダンボールが落ちた直後。棒立ちなので、頭は立ちの高さに戻っている
+  if (locomotion === 'bump') return 'stand'
+  // 伏せている。爆風で倒れているのと同じ高さで扱う
+  if (locomotion === 'prone_idle' || locomotion === 'crawl_f') return 'prone'
+  /*
+   * 伏せへの出入り。**高いほうで採る。**
+   *
+   * 頭は 0.84m から 0.34m まで動く (逆も同じ)。低いほうで採ると、まだ立って
+   * いる体が遮蔽の裏に居ることになって「見えているのに映らない」が起きる。
+   * 迷ったら送る側に倒す、はこのファイルの他の判断と同じ。
+   */
+  if (locomotion === 'prone_down' || locomotion === 'prone_rise') return 'crouch'
   // クレイモアはかがんで置く。頭が下がるので、見つかりにくさもしゃがみと同じ
   if (locomotion === 'claymore_windup' || locomotion === 'claymore_place') return 'crouch'
   if (locomotion === 'crouch_idle' || locomotion.startsWith('crouch_')) return 'crouch'
@@ -55,6 +68,20 @@ export const HEAD_HEIGHT: Record<Stance, number> = {
   prone: 0.5,
   down: 0.3,
 }
+
+/**
+ * 伏せているときの速さ (立って走る速さに対する倍率)。
+ *
+ * 這う型の実効速度は 0.41 m/s (tools/measure/stride.js)。それをそのまま採ると
+ * 10m 進むのに 24 秒かかって、移動として成立しない。**型より速く這わせて、
+ * 再生速度のほうを合わせる** — 0.85 m/s で 2.07 倍。足は滑らないが、手足の
+ * 運びは実際より忙しない。
+ *
+ * ここに置くのは**遊びが変わる数字**だから。速ければ伏せて詰められるし、
+ * 遅ければ待ち伏せる姿勢になる。しゃがみと箱の倍率はまだ
+ * presentation/scene/actor/player.ts に居るので、揃えるならそちらを寄せる。
+ */
+export const PRONE_SPEED_SCALE = 0.28
 
 /** そのモーションのときの頭の高さ */
 export function headHeightOf(locomotion: Locomotion): number {

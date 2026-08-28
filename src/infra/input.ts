@@ -95,8 +95,16 @@ const LOCK_KEYS = new Set([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'Space', 'ShiftLeft', 'ShiftRight',
   'KeyR', 'KeyF', 'KeyC', 'KeyG', 'KeyV', 'KeyQ', 'KeyZ', 'KeyE',
-  // 装備を選ぶ。ポインタを掴んだままなのでボタンは押せない
-  'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyL', 'Enter',
+  'KeyL', 'Enter',
+  /*
+   * 装備を選ぶ数字。ポインタを掴んだままなのでボタンは押せない。
+   *
+   * **数を並びから出す。** 4 つまでを直に書いていたので、銃が 1 挺増えて
+   * 番号が 5・6 まで伸びたときに、画面には出ているのに押しても効かない
+   * 番号ができた。番号そのものは並び順から出している (Game の
+   * updateLoadoutKeys) のに、見張る側だけが取り残されていた。
+   */
+  ...Array.from({ length: 9 }, (_, i) => `Digit${i + 1}`),
 ])
 
 /**

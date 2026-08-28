@@ -5,7 +5,13 @@
  * 通ったぶんを体力から引き、倒れたら記録に残すこと。
  */
 
-import { bulletDamage, weaponOf } from '../src/domain/item/weapons'
+import {
+  bulletDamage,
+  pelletsOf,
+  shotgunBand,
+  weaponOf,
+  type ShotgunBand,
+} from '../src/domain/item/weapons'
 import { loseTicket } from '../src/domain/match/match'
 import { isHostile } from '../src/domain/match/room'
 import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
@@ -17,15 +23,15 @@ import {
   type Player,
   isProtected,
 } from '../src/domain/player/player'
-import { HIT_RULES, type HitZone, meleeDamage } from '../src/domain/rule/damage'
+import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
 import { matchState } from './match'
-import { bearingTo, sendHealth } from './relay'
+import { bearingTo, isBehind, sendHealth } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { type RoomWorld, broadcast, setLife } from './world'
+import { TARGET_DOWN, type RoomWorld, broadcast, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -108,6 +114,84 @@ function expose(room: RoomWorld, victim: Player, attacker: Player | undefined): 
   }
 }
 
+/**
+ * その場所と逆へ突き飛ばして転ばせる。**爆風も散弾も同じ道を通る。**
+ *
+ * **人には向きだけ渡す** — 位置を持っているのはクライアントなので、動かすのは
+ * あちら。**的は自分で動かす** — 接続を持たないので渡す先が無い
+ * (server/match.ts の updateTargets が滑らせる)。
+ *
+ * 2 か所に書いていた頃、散弾を足すときに片方だけ直すことになった。飛ばす形は
+ * 1 つなので、呼び分けるのは「いつ飛ばすか」だけにする。
+ */
+function knockAway(victim: Player, fromX: number, fromZ: number): void {
+  const awayX = victim.x - fromX
+  const awayZ = victim.z - fromZ
+  const reach = Math.hypot(awayX, awayZ) || 1
+  victim.knockX = awayX / reach
+  victim.knockZ = awayZ / reach
+  if (victim.bot) {
+    victim.knockLeft = KNOCK_TIME
+    // 滑り終わってからも転んだまま。**時間で立ち上がる**
+    victim.downLeft = TARGET_DOWN
+    return
+  }
+  sessionFor(victim)?.socket.send(
+    JSON.stringify({
+      type: 'knockdown',
+      dirX: victim.knockX,
+      dirZ: victim.knockZ,
+    } satisfies ServerMessage),
+  )
+}
+
+/**
+ * その申告が散弾のどの帯か。
+ *
+ *     null    散弾ではない (今まで通りの計算へ)
+ *     'miss'  一番外の帯より遠い / この 1 発ではもう削った
+ *     帯      その量だけ削る
+ *
+ * **1 発につき 1 回だけ削る。** 8 粒ぶん届くので、2 粒目からは 'miss' に
+ * なる。粒は散らばりと当たり判定のためにあって、威力を数えるためではない。
+ */
+function shotgunBandFor(
+  attacker: Player,
+  event: Extract<ClientMessage, { type: 'damage' }>,
+): ShotgunBand | null | 'miss' {
+  if (event.kind !== 'bullet') return null
+  if (pelletsOf(weaponOf(attacker.weapon)) <= 1) return null
+  const session = sessionOf(attacker)
+  if (session.hitThisShot) return 'miss'
+  const band = shotgunBand(event.distance ?? Number.POSITIVE_INFINITY)
+  if (!band) return 'miss'
+  session.hitThisShot = true
+  return band
+}
+
+/**
+ * 散弾を近くで食らったら突き飛ばす。
+ *
+ * --- なぜ弾で飛ばすのがここだけか ---
+ * 弾は当たっても体を動かさない。突き飛ばすのは爆風だけ、という形にしてある —
+ * 撃たれるたびに位置がずれると、撃ち合いが「動かない側が有利」でなくなる。
+ *
+ * 散弾だけ別にするのは、**近さがそのまま効き目**という武器だから。粒が
+ * まとまって当たる間合い (SHOTGUN_KNOCK_RANGE) に入られた時点で撃ち合いは
+ * 終わっている、という形にする。離れれば数粒しか届かないので飛ばさない —
+ * 掠っただけで転ぶことにはしない。
+ *
+ * **1 発につき 1 回。** 粒ごとに飛ばすと 8 回重なって吹き飛ぶ (怯みと同じ)。
+ */
+function pushIfShotgun(attacker: Player, victim: Player, band: ShotgunBand | null): void {
+  if (!band?.knock) return
+  const session = sessionOf(attacker)
+  if (session.pushedThisShot) return
+  session.pushedThisShot = true
+  if (!isSeated(victim.life)) return
+  knockAway(victim, attacker.x, attacker.z)
+}
+
 export function applyBlastDamage(
   room: RoomWorld,
   victim: Player,
@@ -131,7 +215,7 @@ export function applyBlastDamage(
     sendHealth(room, victim, amount, false, bearing)
     // **的にも爆風は当たる。** 送り先が無いなら送らないだけ
     if (knock && isSeated(victim.life)) {
-      sessionFor(victim)?.socket.send(JSON.stringify({ type: 'knockdown' }))
+      knockAway(victim, fromX, fromZ)
       // **手が緩んだことは呼ぶ側に返す。** 振りかぶったまま転べば足元に落ちる
       // (ピンは抜けているのでそのまま爆ぜる) が、それをやるのは武器の側
       return { downed: false, letGo: true }
@@ -210,15 +294,31 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
   // あちらだけなので)。だからこそ、位置から分かることは信じない。
   // 撃った本人しか知り得ないことは信じ、こちらで確かめられることは確かめる。
 
-  // 連射の速さ。0.09 秒間隔が上限なので、それを超えて届いたら作り物
+  /*
+   * 連射の速さ。0.09 秒間隔が上限なので、それを超えて届いたら作り物。
+   *
+   * **散弾だけは 1 発が何通にもなる。** 8 粒が同じ瞬間に届くので、そのまま
+   * 当てると 1 粒目以外が全部弾かれて、当たっているのに削れない。1 発ぶんの
+   * 窓の中では粒の数まで通して、それを超えたら弾く。
+   */
   if (event.kind === 'bullet') {
     const now = Date.now()
-    const limit = weaponOf(attacker.weapon).fireInterval * 1000 * FIRE_INTERVAL_SLACK
-    if (now - sessionOf(attacker).lastShotAt < limit) {
-      reject(attacker, `連射が速すぎる (${now - sessionOf(attacker).lastShotAt}ms)`)
-      return NOT_HURT
+    const spec = weaponOf(attacker.weapon)
+    const limit = spec.fireInterval * 1000 * FIRE_INTERVAL_SLACK
+    const session = sessionOf(attacker)
+    if (now - session.lastShotAt < limit) {
+      if (session.pelletsLeft <= 0) {
+        reject(attacker, `連射が速すぎる (${now - session.lastShotAt}ms)`)
+        return NOT_HURT
+      }
+      session.pelletsLeft--
+    } else {
+      session.lastShotAt = now
+      session.pelletsLeft = pelletsOf(spec) - 1
+      session.flinchedThisShot = false
+      session.pushedThisShot = false
+      session.hitThisShot = false
     }
-    sessionOf(attacker).lastShotAt = now
   }
 
   const verdict = verifyHit(
@@ -239,10 +339,25 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     return NOT_HURT
   }
 
+  /*
+   * 削る量。**散弾だけ別の道。**
+   *
+   * 他の銃は「部位 × 距離の減衰」だが、散弾は**当たった距離の帯**で決まる
+   * (domain/item/weapons.ts の SHOTGUN_BANDS)。粒を数えないので、1 発の
+   * うち最初に通った 1 粒だけが削る。
+   */
+  const band = shotgunBandFor(attacker, event)
+  if (band === 'miss') return NOT_HURT
   const amount =
-    event.kind === 'melee'
-      ? meleeDamage(event.fromBehind ?? false)
-      : bulletDamage(weaponOf(attacker.weapon), (event.zone ?? 'BODY') as HitZone, event.distance ?? 0)
+    band !== null
+      ? band.damage
+      : event.kind === 'melee'
+        ? meleeDamage(event.fromBehind ?? false)
+        : bulletDamage(
+            weaponOf(attacker.weapon),
+            (event.zone ?? 'BODY') as HitZone,
+            event.distance ?? 0,
+          )
 
   const wound = hurt(victim, amount)
   // 撃たれたら集中は途切れる。回復は最初から待ち直し。
@@ -251,11 +366,22 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
   expose(room, victim, attacker)
 
   if (!wound.downed) {
-    // 頭に当たったのに倒れなかったときだけ怯ませる。
-    // 胴でも出すと、連射している間ずっと怯み続けて棒立ちになる。
-    const flinch = event.kind === 'bullet' && event.zone === 'HEAD'
+    /*
+     * 頭に当たったのに倒れなかったときだけ怯ませる。
+     * 胴でも出すと、連射している間ずっと怯み続けて棒立ちになる。
+     *
+     * **1 発につき 1 回。** 散弾は 1 発が 8 粒に分かれるので、粒ごとに送ると
+     * 近距離で 8 回重なって体が跳ね回る。当たった数は削れる量で出ている。
+     */
+    const session = sessionOf(attacker)
+    // 散弾は距離の帯が決める。他の銃は今まで通り「頭に当たったのに倒れなかった」
+    const wants = band ? band.flinch : event.kind === 'bullet' && event.zone === 'HEAD'
+    const flinch = wants && !session.flinchedThisShot
+    if (flinch) session.flinchedThisShot = true
     // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。
     // 遠くから頭を撃たれた人が、そのまま何事もなく投げ切るのはおかしい
+
+    pushIfShotgun(attacker, victim, band)
 
     sendHealth(
       room,
@@ -270,6 +396,12 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     return { downed: false, letGo: flinch }
   }
 
+  // 倒れても飛ばす。**近くで散弾を食らえば体ごと持って行かれる**
+  pushIfShotgun(attacker, victim, band)
+  // どちら側から撃たれたか。**的は自分で倒れる**ので、控えてから状態を移す
+  const behind = event.kind === 'melee' ? (event.fromBehind ?? false) : isBehind(victim, attacker)
+  victim.downFromBehind = behind
+
   // 記録に残す分。**表示名ではなく安定した id で数える**
   const headshot = event.kind === 'bullet' && event.zone === 'HEAD'
   const by = event.kind === 'melee' ? 'knife' : attacker.weapon
@@ -279,7 +411,8 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
   // 撃った側にとっては「今撃つと道連れになる」という読みになる
   // 減るのは倒された側の残機だけ。倒した側には何も入らない
   if (room.mode.tickets) loseTicket(room, victim.team)
-  sendHealth(room, victim, amount, false, bearingTo(victim, attacker))
+  // **倒れる向きは倒れた瞬間だけ。** 前へ倒れるか後ろへ倒れるかが絵に出る
+  sendHealth(room, victim, amount, false, bearingTo(victim, attacker), undefined, behind)
   broadcast(room, matchState(room))
   broadcast(room, {
     type: 'kill',

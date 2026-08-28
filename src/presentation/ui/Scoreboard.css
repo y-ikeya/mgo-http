@@ -16,12 +16,47 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
 }
 
+/*
+ * 枠。**大きさを固定する。**
+ *
+ * 板を替えるたびに高さが変わると、次に押すアイコンが動く。押した所へもう一度
+ * 指を戻せないと、見比べるのに毎回目で探すことになる。中身の一番かさばる板
+ * (スキル 8 つ) が収まる高さに揃えて、余った分は下を空ける。
+ */
 .score-panel {
-  width: min(560px, calc(100vw - 40px));
+  width: min(640px, calc(100vw - 40px));
+  height: min(460px, calc(100vh - 48px));
   background: rgba(10, 15, 9, 0.9);
   border: 1px solid rgba(160, 190, 140, 0.24);
   display: flex;
   flex-direction: column;
+}
+
+/*
+ * 入れ替わる板。**余りを飲む。**
+ *
+ * 上 (得点) と下 (ボタン) は動かさず、真ん中だけが伸び縮みする。定員 8 人
+ * ぶんとスキル 8 つは入るので、普段は溢れない。
+ */
+.score-teams,
+.score-solo,
+.score-skills {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/*
+ * **陣営の仕切りは下まで引く。** 枠を固定した以上、線が途中で切れると
+ * 割れているように見える。列は伸ばして、中の行だけ上に詰める。
+ */
+.score-teams {
+  align-content: stretch;
+}
+
+/* 札は上から並べる。4 行しかないので、伸ばすと間延びする */
+.score-skills-list {
+  align-content: start;
 }
 
 .score-head {
@@ -336,4 +371,100 @@
   font-size: 1.3em;
   color: #eaf1fb;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 板を選ぶ列。**アイコンだけで、左上に小さく。**
+ *
+ * 成績表そのものより手前に大きな物を置くと、Tab を押した目的の方が後ろに
+ * 下がる。選べることが分かる大きさで足りる。
+ */
+.score-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 0;
+}
+
+.score-tab {
+  width: 34px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.16);
+  border-bottom: none;
+  color: rgba(190, 206, 176, 0.45);
+}
+
+.score-tab svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.score-tab:hover {
+  color: rgba(210, 226, 196, 0.85);
+  border-color: rgba(160, 190, 140, 0.4);
+}
+
+/* 見ている板。**面で示す** — 枠線だけだと、どちらが手前か読めない */
+.score-tab-on {
+  background: rgba(150, 214, 132, 0.14);
+  border-color: rgba(150, 214, 132, 0.45);
+  color: rgba(206, 232, 190, 0.95);
+}
+
+/*
+ * スキルの板。
+ *
+ * 8 つを 2 列に畳む。1 列だと縦に伸びて、成績表と切り替えるたびに枠の高さが
+ * 変わる。
+ */
+.score-skills {
+  padding: 14px 16px 16px;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.16);
+}
+
+.score-skills-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.score-skills-budget {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(150, 214, 132, 0.75);
+}
+
+/* 使い切った。**止めではなく合図** — ここから先は何かを外すことになる */
+.score-skills-full {
+  color: rgba(226, 190, 120, 0.9);
+}
+
+/* 窓が閉じている理由。**押せない物を出すなら、なぜかも出す** */
+.score-skills-locked {
+  color: rgba(190, 206, 176, 0.4);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.score-skills-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* 対戦表の幅に収まればよいので、装備画面のような下限は要らない */
+.score-skills-list .skill {
+  min-width: 0;
 }

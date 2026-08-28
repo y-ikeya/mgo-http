@@ -24,6 +24,7 @@
  */
 
 import type { Phase } from '../match/match'
+import type { ModeSpec } from '../match/room'
 import type { WeaponId } from '../item/weapons'
 
 export type SkillId =
@@ -32,6 +33,7 @@ export type SkillId =
   | 'smgMastery'
   | 'rifleMastery'
   | 'sniperMastery'
+  | 'shotgunMastery'
   | 'pistolMastery'
   | 'throwing'
   | 'exposure'
@@ -77,6 +79,11 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
     label: 'SNIPER MASTERY',
     hint: 'XM2010 の散布が締まり、装填が速い',
   },
+  shotgunMastery: {
+    id: 'shotgunMastery',
+    label: 'SG MASTERY',
+    hint: 'M870 の**ポンプと装填が速い**。粒の散りは変わらない',
+  },
   pistolMastery: {
     id: 'pistolMastery',
     label: 'HANDGUN MASTERY',
@@ -105,6 +112,7 @@ export const MASTERY_OF: Record<WeaponId, SkillId> = {
   smg: 'smgMastery',
   rifle: 'rifleMastery',
   sniper: 'sniperMastery',
+  shotgun: 'shotgunMastery',
   pistol: 'pistolMastery',
 }
 
@@ -166,7 +174,11 @@ export function maxLevelOf(_id: SkillId): SkillLevel {
  * 逆に空にすると、抜けて入り直しただけの人が丸腰になる。**持ち越すのが、
  * どちらにも寄らない形。**
  */
-export function canChooseSkills(phase: Phase): boolean {
+export function canChooseSkills(phase: Phase, mode?: ModeSpec): boolean {
+  // **練習部屋はいつでも組み替えられる。** 相手が棒立ちの的なので、後出しに
+  // なる相手が居ない。ここは効き目を試す場所で、試すたびに試合の切れ目を
+  // 待たせると**確かめられない**
+  if (mode?.id === 'PRACTICE') return true
   return phase !== 'playing'
 }
 
@@ -244,13 +256,41 @@ export function masterySwayScale(skills: Skills, weapon: WeaponId): number {
 /**
  * 反動の乱れの倍率。小さいほど**押さえ戻しやすい**。
  *
- * 反動そのもの (RECOIL_PATTERN) は動かさない。動かすのは**乱れ**のほうで、
- * 表を覚えた人がその通りに押さえ戻せる度合いが上がる。極めた人ほど連射が
- * 素直になる、という形 — **上手さが効く余地を増やす**のであって、
- * 上手くなくても当たるようにするのではない。
+ * 動かすのは**乱れ**のほうで、表を覚えた人がその通りに押さえ戻せる度合いが
+ * 上がる。極めた人ほど連射が素直になる、という形。
  */
 export function masteryJitterScale(skills: Skills, weapon: WeaponId): number {
   return MASTERY_JITTER[levelOf(skills, MASTERY_OF[weapon])]
+}
+
+/**
+ * 反動そのものの倍率 (RECOIL_PATTERN に掛かる)。小さいほど跳ねない。
+ *
+ * --- なぜ控えめなのか ---
+ * ここを大きく削ると**押さえ戻せない人が一番得をする**。跳ね上がりは
+ * 覚えて押さえ戻す対象なので、消してしまうと上手さの効く余地がそのまま減る。
+ * Lv3 で 12% だけ削るのは、**極めた実感を出しつつ、押しっぱなしを強くしない**
+ * 幅として選んである (10 発撃った累積で 6.25 度 → 5.50 度)。
+ *
+ * 主に効かせているのは戻る速さのほう (masteryRecoveryScale)。あちらは
+ * **指を離せる人**が得をするので、区切って撃つという判断を太らせる。
+ */
+export function masteryRecoilScale(skills: Skills, weapon: WeaponId): number {
+  return MASTERY_RECOIL[levelOf(skills, MASTERY_OF[weapon])]
+}
+
+/**
+ * 反動が戻る速さの倍率。大きいほど早く狙点へ帰る。
+ *
+ * **押しっぱなしの間は効かない。** 戻り始めるまでに猶予があり (camera.ts の
+ * RECOIL_RECOVERY_DELAY = 0.1 秒)、AK の発射間隔 0.09 秒はそれより短い —
+ * 撃ち続けている限り一度も戻らないので、ここを上げても連射は変わらない。
+ *
+ * 得をするのは**指を離した人**だけ。散布の締まり方 (MASTERY_SPREAD) と同じ
+ * 向きで、極めた効き目が「長く押せる」ではなく「短く区切ったときに得」に出る。
+ */
+export function masteryRecoveryScale(skills: Skills, weapon: WeaponId): number {
+  return MASTERY_RECOVERY[levelOf(skills, MASTERY_OF[weapon])]
 }
 
 /** その銃の装填時間の倍率。小さいほど速い */
@@ -282,5 +322,9 @@ const MASTERY_SPREAD = [1, 0.92, 0.85, 0.78] as const
 const MASTERY_SWAY = [1, 0.66, 0.33, 0] as const
 const MASTERY_RELOAD = [1, 0.92, 0.85, 0.78] as const
 const MASTERY_JITTER = [1, 0.8, 0.6, 0.4] as const
+// **控えめ。** 大きく削ると押さえ戻せない人が一番得をする
+const MASTERY_RECOIL = [1, 0.96, 0.92, 0.88] as const
+// 戻る速さ。**指を離した人だけが得をする**ので、こちらは強めでよい
+const MASTERY_RECOVERY = [1, 1.1, 1.2, 1.35] as const
 const THROW_SCALE = [1, 1.1, 1.2, 1.35] as const
 const EXPOSE_SECONDS = [0, 3, 5, 8] as const

@@ -23,7 +23,7 @@ import { sessionOf } from './session'
 import { type RoomWorld, broadcast, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
-import { headHeightWhen } from '../src/domain/player/stance'
+import { HEAD_HEIGHT, headHeightOf } from '../src/domain/player/stance'
 import { canHold } from '../src/domain/player/equip'
 import type { HitZone } from '../src/domain/rule/damage'
 import { isSeated } from '../src/domain/player/lifecycle'
@@ -173,7 +173,7 @@ export const LOWER_SETTLE_MS = 300
 /** 遮蔽の判定に使う頭の高さ。沈み切るまでは立った高さで見る */
 export function visibleHead(player: Player, now: number): number {
   const settled = player.loweredAt > 0 && now - player.loweredAt >= LOWER_SETTLE_MS
-  return settled ? headHeightWhen(player.crouching, player.boxed) : headHeightWhen(false, false)
+  return settled ? headHeightOf(player.locomotion) : HEAD_HEIGHT.stand
 }
 
 /**
@@ -193,7 +193,7 @@ export function emitNoise(
   // どこまで届くかはドメインルール (domain/rule/noise.ts)。銃声は武器ごとに違う
   const reach =
     noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
-  const head = headHeightWhen(from.crouching, from.boxed)
+  const head = headHeightOf(from.locomotion)
 
   // 何の上を踏んだかは地形から出す。申告させるものではない
   const surface =
@@ -234,7 +234,7 @@ export function emitNoise(
  */
 export function relayShot(room: RoomWorld, from: Player, message: ServerMessage): void {
   const payload = JSON.stringify(message)
-  const head = headHeightWhen(from.crouching, from.boxed)
+  const head = headHeightOf(from.locomotion)
 
   for (const listener of connected(room)) {
     if (listener.id === from.id) continue
@@ -411,6 +411,19 @@ export function bearingTo(from: Player, to: Player): number {
   return Math.atan2(to.x - from.x, -(to.z - from.z))
 }
 
+/**
+ * その相手は背後に居たか。**倒れる向きを決めるのに使う。**
+ *
+ * yaw = θ のとき前方は (-sinθ, -cosθ)。そこへ射影して負なら背後。
+ * 刺突の「背後を取った」(BACKSTAB_DOT) とは別の問い — あちらは**同じ向きを
+ * 向いているか**で、こちらは**どちら側に居るか**。
+ */
+export function isBehind(victim: Player, attacker: Player): boolean {
+  const dx = attacker.x - victim.x
+  const dz = attacker.z - victim.z
+  return dx * -Math.sin(victim.yaw) + dz * -Math.cos(victim.yaw) < 0
+}
+
 export function sendHealth(
   room: RoomWorld,
   player: Player,
@@ -418,6 +431,7 @@ export function sendHealth(
   flinch: boolean,
   fromBearing?: number,
   zone?: HitZone,
+  fromBehind?: boolean,
 ): void {
   // 撃たれた方向と部位は本人にだけ渡す。
   //
@@ -435,6 +449,7 @@ export function sendHealth(
         flinch,
         fromBearing,
         zone,
+        fromBehind,
       }),
     )
   }

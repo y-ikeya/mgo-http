@@ -232,6 +232,55 @@ describe('道具の枠と NONE', () => {
   })
 })
 
+/**
+ * 取り上げられる。**選んで降ろしたのではない。**
+ *
+ * ダンボールで敵にぶつかると箱が落ちる。持ち替えで武器へ移るだけだと道具の
+ * 枠には箱が残り、一覧には C.BOX が出たまま — 落とされたのにそう見えない。
+ */
+describe('道具を取り上げられる', () => {
+  test('枠ごと NONE に戻る', () => {
+    const inv = make()
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('box')
+    inv.dropTool()
+    expect(inv.tool).toBe('none')
+    expect(inv.selected).toBe('rifle')
+    expect(inv.usingTool).toBe(false)
+  })
+
+  test('手には持っていた武器が戻る。**手ぶらにはならない**', () => {
+    const inv = make()
+    inv.switchTo('pistol'); settle(inv)
+    inv.toggle('tool'); settle(inv)
+    inv.dropTool()
+    expect(inv.held).toBe('pistol')
+  })
+
+  test('**持ち替えの時間は取らない。** 取り上げられている間は他ができない', () => {
+    const inv = make()
+    inv.toggle('tool'); settle(inv)
+    inv.dropTool()
+    expect(inv.switching).toBe(false)
+    expect(inv.handReady).toBe(true)
+  })
+
+  test('道具を手にしていなければ何も起きない', () => {
+    const inv = make()
+    inv.dropTool()
+    expect(inv.selected).toBe('rifle')
+    expect(inv.tool).toBe('none')
+  })
+
+  test('取り上げられた後も、C を押せばまた被れる', () => {
+    const inv = make()
+    inv.toggle('tool'); settle(inv)
+    inv.dropTool()
+    inv.toggle('tool'); settle(inv)
+    expect(inv.selected).toBe('box')
+  })
+})
+
 describe('地面へ置く', () => {
   test('外した物が弾ごと返る。持ち物からは消える', () => {
     const inv = make()

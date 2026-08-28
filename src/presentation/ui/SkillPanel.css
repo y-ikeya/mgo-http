@@ -1,0 +1,88 @@
+/*
+ * スキルの一覧。**装備画面と対戦表で同じ見た目にする。**
+ *
+ * 同じ物が場所によって違う顔をしていると、対戦表で見ている段と装備画面で
+ * 押す段が同じ物だと思えない。枠や見出しは呼ぶ側が持つので、ここにあるのは
+ * 1 つぶんの札と段のボタンだけ。
+ */
+
+.skill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 210px;
+  padding: 7px 10px 7px 12px;
+  border: 1px solid rgba(160, 190, 140, 0.14);
+  color: rgba(190, 206, 176, 0.55);
+}
+
+/* 取っている物。装備の枠と同じ「面で示す」に揃える */
+.skill-on {
+  background: rgba(150, 214, 132, 0.1);
+  border-color: rgba(150, 214, 132, 0.4);
+  color: rgba(206, 232, 190, 0.92);
+}
+
+.skill-name {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+
+.skill-levels {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+
+/*
+ * 段。押した所まで点く (Lv2 なら 1 と 2)。
+ *
+ * 同じ段をもう一度押すと外れる。「外す」を別のボタンにすると、8 つ並んだ
+ * ところで押す物が 32 個になる。
+ */
+.skill-level {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.25);
+  color: rgba(190, 206, 176, 0.5);
+}
+
+.skill-level:hover:not(:disabled) {
+  border-color: rgba(160, 190, 140, 0.55);
+  color: rgba(210, 226, 196, 0.9);
+}
+
+.skill-level-on {
+  background: rgba(150, 214, 132, 0.3);
+  border-color: rgba(150, 214, 132, 0.6);
+  color: rgba(18, 26, 16, 0.9);
+}
+
+/*
+ * 買えない段と、閉じた窓。
+ *
+ * **押せないことを見せる。** 押しても何も起きない物を残すと、弾かれたのか
+ * 壊れているのか分からない。
+ */
+.skill-level:disabled {
+  cursor: not-allowed;
+  opacity: 0.28;
+}
+
+/*
+ * **押せないことと、何を持っているかは別。**
+ *
+ * 試合が始まると全部の段が押せなくなるが、そこで取っている段まで薄くすると
+ * 「何が効いているか」が読めなくなる。閉じている間こそ、それだけが要る情報。
+ */
+.skill-level-on:disabled {
+  opacity: 0.8;
+}

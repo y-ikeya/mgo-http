@@ -10,10 +10,13 @@ import { STAGES, type StageName } from "../../domain/match/stage";
 import {
   canChooseSkills,
   masteryReloadScale,
+  masteryRecoveryScale,
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
 import { throwSpeedOf } from "../../domain/item/grenade";
+import { pelletsOf } from "../../domain/item/weapons";
+import type { Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
 import {
   ARENA_HALF_SIZE,
@@ -32,7 +35,7 @@ import {
   resolveCircle,
   surfaceAt,
 } from "../../sim/space/collision";
-import { GameAudio } from "./sense/audio";
+import { GameAudio, type SoundToken } from "./sense/audio";
 import type { Step } from "../../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./sense/soundRing";
 import { ThrownItems } from "./arms/thrown";
@@ -41,7 +44,8 @@ import { Claymores } from "./arms/claymores";
 import { BlastFx } from "./fx/blastfx";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { fallDamage, MAX_HEALTH } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH } from "../../domain/rule/damage";
+import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
   canChoose,
@@ -125,8 +129,26 @@ export interface GameStats {
   aiming: boolean;
   /** 現在の散布界 (度)。クロスヘアの開き具合に使う */
   spread: number;
+  /**
+   * 粒が散る角度 (度)。散弾でなければ 0。
+   *
+   * **0 でなければクロスヘアが輪になる。** 十字は「その一点へ 1 発飛ぶ」の形で、
+   * 8 粒に分かれる銃に出すと狙った点へ集まるように読めてしまう。
+   *
+   * 輪の大きさは**狙いの散布に粒の散りを足した幅**。粒がどこまで飛び散るかを
+   * そのまま出すので、間合いの外では輪が画面を覆うほど大きくなる。
+   */
+  pelletSpread: number;
   /** しゃがんでいるか */
   crouching: boolean;
+  /**
+   * いまの構え。**旗ではなく構えそのもの。**
+   *
+   * 伏せは屈みの旗も立てている (低い姿勢としての扱いが要る) ので、旗を
+   * 読むと CROUCH に見える。頭の高さも当たり判定も構えのほうで決まって
+   * いるので、見せる値もそちらから引く。
+   */
+  stance: Stance;
   /** 直近に当てた部位。空文字なら表示しない */
   hitZone: string;
   /** 敬礼で繋がったばかりの味方 */
@@ -562,8 +584,16 @@ export class Game {
   private get ammo(): number {
     return this.inv.ammo;
   }
+  /** ポンプ / ボルトを流す速さ。撃った時に決めて、動作を始める時に使う */
+  private boltRate = 1;
   /** 0 より大きい間はリロード中で、発砲できない */
   private reloadTimer = 0;
+  /** その装填を始めたときに伏せていたか。**姿勢をまたいだら中断する** */
+  private reloadProne = false;
+  /** どの銃を替えていたか。**持ち替えたら中断する** */
+  private reloadWeapon: WeaponId | null = null;
+  /** 鳴らした弾倉の音の札。中断したら途中でも止める */
+  private reloadSoundToken: SoundToken | null = null;
   /** リロードの音を鳴らすまでの残り時間 (秒)。0 なら鳴らし終えている */
   private reloadSoundIn = 0;
   /** ボルト操作を始めるまでの残り時間 (秒) */
@@ -1013,12 +1043,14 @@ export class Game {
     // 回すと、サーバーが解いたのにこちらは半透明のまま、が起きる
     this.player.setGhost(this.life === "spawning" || this.loadoutBlocking);
     this.updateRollContact();
+    this.updateBoxContact();
     this.updateStab(dt);
     this.askRosterIfWanted();
     const posture = {
       speed: this.player.speed,
       stanceRate: this.player.stanceRate,
       crouching: this.player.isCrouching,
+      stance: this.player.stance,
       grounded: this.player.grounded,
     };
     this.spread.update(dt, this.weapon, posture);
@@ -1033,6 +1065,9 @@ export class Game {
      */
     const [swayRight, swayUp] = this.spread.sway(this.weapon, this.skills, posture);
     this.follow.setSway((swayUp * Math.PI) / 180, (-swayRight * Math.PI) / 180);
+    // 反動の戻りも極めた銃ほど速い。**押しっぱなしの間は効かない** —
+    // 戻り始めるまでの猶予より発射間隔のほうが短いので (skill.ts)
+    this.follow.setRecoilRecovery(masteryRecoveryScale(this.skills, this.weapon.id));
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
     this.drops.update(dt);
@@ -1449,6 +1484,8 @@ export class Game {
 
       case "knockdown":
         this.player.knockDown();
+        // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
+        this.player.knockPush(message.dirX, message.dirZ);
         // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
         this.loseHeldGrenade();
         this.audio.play("blastScream", this.player.position);
@@ -1567,7 +1604,9 @@ export class Game {
 
     // **仰け反れば手が緩む。** 振りかぶったまま頭を撃たれたら足元に落ちる
     if (message.flinch) this.loseHeldGrenade();
-    const died = this.player.setHealth(message.health, message.flinch);
+    // 倒れる向きはサーバーが決める (位置と向きの両方を持っているので)。
+    // **他人の画面にはこちらの姿勢として届く** — 見た側が撃たれた向きを読める
+    const died = this.player.setHealth(message.health, message.flinch, message.fromBehind);
     if (message.damage > 0) {
       this.lastHitZone = "HIT";
       this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
@@ -1946,6 +1985,34 @@ export class Game {
     }
   }
 
+  /**
+   * ダンボールで走っていて敵にぶつかる。**箱が落ちて棒立ちになる。**
+   *
+   * 見るのは走っている間だけ。止まっている箱に敵が寄ってきても落ちない —
+   * 隠れて息を潜めることは成立させたい。落とすのは**こちらから当たりに
+   * 行った**ときだけにする。
+   *
+   * 判定はこちらの機械で行う。ぶつかったのは自分の体なので、自分の位置と
+   * 相手の位置を持っているのはこの画面 (体当たり rollInto と同じ形)。
+   * **サーバーは検算していない** — 箱を被っているという申告自体が
+   * こちら発なので、今の作りではここが素直。
+   */
+  private updateBoxContact(): void {
+    if (!this.player.isBoxed) return;
+    // 止まっているなら当たりに行っていない。しきい値は箱の型が
+    // 歩きへ移るのと同じ (motion.ts の IDLE_EXIT_SPEED)
+    if (this.player.speed < IDLE_EXIT_SPEED) return;
+
+    const touched = this.remotes.touching(this.player.position, BOX_BUMP_RANGE);
+    if (!touched.some((other) => this.hostileTo(other.id, other.side))) return;
+
+    this.player.bump();
+    // 手も箱から戻す。**選んで降ろしたのではなく取り上げられた**ので、
+    // 道具の枠ごと none へ戻す (持ち替えだと枠に C.BOX が残る)
+    this.inv.dropTool();
+    this.syncHeld();
+  }
+
   /** ナイフを振り始める。リロード中と多重の振りは受け付けない */
   private startStab(): void {
     if (this.stabTimer > 0 || this.reloadTimer > 0 || this.player.rolling)
@@ -1992,6 +2059,8 @@ export class Game {
 
     this.lastHitZone = result.fromBehind ? "BACKSTAB" : "KNIFE";
     this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
+    // 刺さった音。**空振りでは鳴らさない** — 当てたかどうかで結果が全部決まる
+    this.audio.play("stab", this.player.position);
     this.net.send({
       type: "damage",
       id: this.net.id,
@@ -2029,7 +2098,23 @@ export class Game {
       this.boltIn -= dt;
       if (this.boltIn <= 0) {
         this.boltIn = 0;
-        this.player.playBolt();
+        this.player.playBolt(this.boltRate);
+        // ポンプの音。狙撃銃は発砲音に入っているので鳴らさない (boltSound 無し)
+        if (this.weapon.boltSound) {
+          this.audio.play(this.weapon.boltSound, this.player.position);
+        }
+      }
+    }
+
+    if (this.reloadTimer > 0) {
+      // 両立しないことを始めたら中断する (reloadBroken に一覧)
+      if (this.reloadBroken()) {
+        this.reloadTimer = 0;
+        this.reloadSoundIn = 0;
+        // **鳴り始めていたら途中で切る。** 起きなかったことの音を残さない
+        if (this.reloadSoundToken) this.audio.stop(this.reloadSoundToken);
+        this.reloadSoundToken = null;
+        this.player.cancelReload();
       }
     }
 
@@ -2049,24 +2134,45 @@ export class Game {
         if (this.reloadSoundIn <= 0) {
           this.reloadSoundIn = 0;
           this.audio.play(this.weapon.reloadSound, this.player.position);
+          // 中断したら途中で止められるように控える
+          this.reloadSoundToken = this.audio.lastToken;
         }
       }
     }
+
+    /*
+     * 伏せて装填している間は這えない。**替えるか進むかのどちらか。**
+     *
+     * 這い出したら中断、にはしない — 打ち消された動作の弾倉の音を、押した
+     * 本人だけが聞くことになる (他人へ届くのは終わったときの通知だけ)。
+     * 動けないほうが、押した意味がそのまま残る。
+     *
+     * 起き上がるのは通す。あちらは中断になるので、**動きたいなら姿勢を
+     * 変える**という一手が代償として残る。
+     */
+    this.player.setReloadHold(this.reloadTimer > 0);
 
     if (this.input.consumeAction("reload", "KeyR")) this.startReload();
 
     this.fireCooldown -= dt;
 
-    // 弾が無いのに引き金を引いた。撃てないことを音で返す。
-    //
-    // 何も起きないと、撃てているのか当たっていないのかが分からない。
-    // 自動でリロードはしない — 弾を切らしたこと自体が代償なので、
-    // そこを黙って埋めると弾数を数える意味が消える。
+    /*
+     * 弾が無いのに引き金を引いた。撃てないことを音で返す。
+     *
+     * 何も起きないと、撃てているのか当たっていないのかが分からない。
+     * 自動でリロードはしない — 弾を切らしたこと自体が代償なので、そこを
+     * 黙って埋めると弾数を数える意味が消える。
+     *
+     * **手にあるのが銃のときだけ。** 残弾は「持ち物に ammo があれば その値、
+     * 無ければ 0」なので (domain/item/inventory.ts)、ナイフや手榴弾を持って
+     * いる間もずっと 0 になる。刺すたびに空撃ちの音が鳴っていた。
+     */
     if (this.emptyCooldown > 0) this.emptyCooldown -= dt;
     if (
       this.input.firing &&
       this.player.isAiming &&
       canAct(this.life) &&
+      isGun(this.inv.held) &&
       this.reloadTimer <= 0 &&
       this.ammo <= 0 &&
       this.emptyCooldown <= 0
@@ -2093,6 +2199,8 @@ export class Game {
       reloading: this.reloadTimer > 0,
       stabbing: this.stabTimer > 0,
       rolling: this.player.rolling,
+      crawling: this.player.crawling,
+      landing: this.player.landing,
       ammo: this.ammo,
     });
     this.player.setFiring(firing);
@@ -2104,8 +2212,17 @@ export class Game {
     // 動作は撃った瞬間ではなく少し置いてから始める。撃った反動を受けてから
     // 手を掛ける、という順になる。
     if (this.weapon.bolt && this.player.boltDuration > 0) {
+      /*
+       * ポンプ / ボルトの速さ。**銃ごとの重さに、極めた度合いを掛ける。**
+       *
+       * 撃てない時間は型の尺そのもの。同じ倍率で割って待つので、**動きと
+       * 待ち時間が必ず一致する** (片方だけ変えると、型が終わったのに撃てない
+       * 時間が残る)。
+       */
+      this.boltRate =
+        (this.weapon.boltScale ?? 1) / masteryReloadScale(this.skills, this.weapon.id);
       this.boltIn = this.knobs.boltDelay;
-      this.fireCooldown = this.knobs.boltDelay + this.player.boltDuration;
+      this.fireCooldown = this.knobs.boltDelay + this.player.boltDuration / this.boltRate;
     } else {
       this.fireCooldown = this.weapon.fireInterval;
     }
@@ -2114,9 +2231,43 @@ export class Game {
     this.fire();
   }
 
+  /**
+   * 始めた装填が続けられなくなったか。
+   *
+   * --- なぜ要るか ---
+   * 始めるのを塞ぐ条件は前からあった (startReload) が、**逆向きが無かった。**
+   * 始めた後に別のことを始めると、両方が通る:
+   *
+   *     転がる      転がりながら弾倉を替え終わる
+   *     箱を被る    被ったまま替え終わる
+   *     這き出す    動きながら替え終わる
+   *     起き上がる  伏せの型のまま立ちで替え終わる
+   *     持ち替える  **今持っている別の銃に弾が入る**
+   *
+   * どれも「始めるときは弾いているのに、始めた後なら通る」という同じ形。
+   * 塞ぐ側と対にして、ここに並べておく。
+   *
+   * 弾は入らない。押し直しになるが、**別のことを始めたのは本人**。
+   */
+  private reloadBroken(): boolean {
+    if (this.player.rolling || this.player.isBoxed) return true;
+    // 伏せて動く / 姿勢をまたぐ。装填の型は姿勢ごとに違う (animation.ts の reloadKey)
+    if (this.player.crawling || this.player.isProne !== this.reloadProne) return true;
+    // 替えている銃を持っていない。**手にある物に弾が入ってしまう**
+    return this.weapon.id !== this.reloadWeapon;
+  }
+
   private startReload(): void {
     if (this.reloadTimer > 0 || this.stabTimer > 0 || this.player.rolling)
       return;
+    // 這いながらは弾倉を替えられない。撃つのと同じ (domain/item/inventory.ts)。
+    // 伏せへの出入りの最中も同じ — 型が全身で決まっているので手が塞がっている
+    if (this.player.crawling || this.player.proneShifting) return;
+    // どの姿勢で始めたかを控える。**途中で姿勢が変わったら中断する**
+    this.reloadProne = this.player.isProne;
+    this.reloadWeapon = this.weapon.id;
+    this.reloadSoundToken = null;
+
     // ボルトを送り終えるまでは弾倉に触れない。
     //
     // 持ち替え・ダンボール・ローリングで飛ばせないようにしてあるのと同じドメインルール。
@@ -2150,9 +2301,83 @@ export class Game {
       offsetInCone(this.aimDir, cone.degrees, cone.angle01, cone.radius01);
     }
 
+    /*
+     * 粒ごとに道を引く。**散弾以外は 1 粒なので今まで通り。**
+     *
+     * 狙いの散布は 1 発につき 1 つ (上で当てた) で、そこからさらに粒ごとに
+     * 散らす。当たった数だけ削れるので、**近いほど効く**が距離の減衰では
+     * なく当たる粒の数として出る。
+     *
+     * 音・排莢・反動・弾の消費は 1 発につき 1 回。粒の数だけ鳴らすと
+     * 撃つたびに音が重なって割れる。
+     */
+    const pellets = pelletsOf(this.weapon);
+    // 狙いの向き。粒はここから散らすので、粒ごとに取り直さない
+    this.pelletBase.copy(this.aimDir);
+    let hitPlayer: { player: RemotePlayer; zone: HitZone; distance: number } | null = null;
+    let hitTerrain: THREE.Intersection | null = null;
+
+    for (let i = 0; i < pellets; i++) {
+      if (pellets > 1) {
+        this.aimDir.copy(this.pelletBase);
+        const grain = this.spread.pelletFor(this.weapon, this.shotCount, i);
+        offsetInCone(this.aimDir, grain.degrees, grain.angle01, grain.radius01);
+      }
+      this.firePellet();
+      if (!hitPlayer && this.pelletHit.player) hitPlayer = this.pelletHit.player;
+      if (!hitTerrain && this.pelletHit.terrain) hitTerrain = this.pelletHit.terrain;
+    }
+
+    // トレーサーだけは銃口から描く。判定は照準線、見た目は銃口という TPS 共通の割り切り。
+    this.player.muzzle(this.muzzlePos);
+    // 排莢。当たり判定も音も無く、撃っている手応えのためだけに出す
+    this.player.ejectPort(this.ejectPos);
+    this.casings.eject(this.ejectPos, this.player.yaw);
+    this.audio.play(this.weapon.shotSound, this.muzzlePos);
+    // 撃っている間は何も聞こえない
+    this.soundRing.suppress(1);
+    this.shots.fire(
+      this.muzzlePos,
+      this.hitPoint,
+      // **人に当たったら痕を出さない。** 痕はワールドに置くので、当たった
+      // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
+      hitPlayer ? null : hitTerrain ? this.hitNormal : null,
+      IMPACT_WORLD,
+    );
+    this.shotCount++;
+    this.inv.spend();
+    this.countRoundForDecoy();
+
+    // 弾道と発砲音のためだけの通知。当たったかどうかは damage で別に送っている。
+    this.net.send({
+      type: "shot",
+      id: this.net.id,
+      from: [this.muzzlePos.x, this.muzzlePos.y, this.muzzlePos.z],
+      to: [this.hitPoint.x, this.hitPoint.y, this.hitPoint.z],
+    });
+
+    // 跳ね上がりはドメインルールの側が持っている (domain/item/spread.ts)
+    const [kickPitch, kickYaw] = this.spread.fired(
+      this.shotCount,
+      this.weapon,
+      this.skills,
+    );
+    this.follow.addRecoil(kickPitch, kickYaw);
+  }
+
+  /** 粒 1 つぶんの道と、当たったことの申告。散弾以外は 1 発 = 1 粒 */
+  private readonly pelletBase = new THREE.Vector3();
+  private readonly pelletHit: {
+    player: { player: RemotePlayer; zone: HitZone; distance: number } | null;
+    terrain: THREE.Intersection | null;
+  } = { player: null, terrain: null };
+
+  private firePellet(): void {
     const shot = this.traceBullet();
     const player = shot.player;
     const terrain = shot.terrain;
+    this.pelletHit.player = player;
+    this.pelletHit.terrain = terrain;
     // 距離は銃口からではなく照準の起点から測る。弾道の判定と同じ基準にする。
     const distance = shot.distance;
     if (player) {
@@ -2182,42 +2407,6 @@ export class Game {
       this.lastHitZone = friendly ? "FF" : `${player.zone} ${distance.toFixed(0)}m`;
       this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
     }
-
-    // トレーサーだけは銃口から描く。判定は照準線、見た目は銃口という TPS 共通の割り切り。
-    this.player.muzzle(this.muzzlePos);
-    // 排莢。当たり判定も音も無く、撃っている手応えのためだけに出す
-    this.player.ejectPort(this.ejectPos);
-    this.casings.eject(this.ejectPos, this.player.yaw);
-    this.audio.play(this.weapon.shotSound, this.muzzlePos);
-    // 撃っている間は何も聞こえない
-    this.soundRing.suppress(1);
-    this.shots.fire(
-      this.muzzlePos,
-      this.hitPoint,
-      // **人に当たったら痕を出さない。** 痕はワールドに置くので、当たった
-      // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
-      player ? null : terrain ? this.hitNormal : null,
-      IMPACT_WORLD,
-    );
-    this.shotCount++;
-    this.inv.spend();
-    this.countRoundForDecoy();
-
-    // 弾道と発砲音のためだけの通知。当たったかどうかは damage で別に送っている。
-    this.net.send({
-      type: "shot",
-      id: this.net.id,
-      from: [this.muzzlePos.x, this.muzzlePos.y, this.muzzlePos.z],
-      to: [this.hitPoint.x, this.hitPoint.y, this.hitPoint.z],
-    });
-
-    // 跳ね上がりはドメインルールの側が持っている (domain/item/spread.ts)
-    const [kickPitch, kickYaw] = this.spread.fired(
-      this.shotCount,
-      this.weapon,
-      this.skills,
-    );
-    this.follow.addRecoil(kickPitch, kickYaw);
   }
 
   /**
@@ -2246,6 +2435,16 @@ export class Game {
         // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
         if (!this.cocking) this.player.roll();
       }
+      /*
+       * **押したまま転がり切ると、立たずに伏せる。**
+       *
+       * 伏せるための操作を別に置かず、転がりの出口にしてある。飛び込んで
+       * そのまま腹這いになる、という一続きの動作になるし、指を離せば
+       * 今まで通り立ち上がるので**選んだ結果**として伏せる形になる。
+       *
+       * 起き上がるのは Space のタップ (player.toggleCrouch)。
+       */
+      if (this.stanceRolled && !this.player.rolling) this.player.setProne(true);
       return;
     }
 
@@ -3065,7 +3264,10 @@ export class Game {
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
       spread: this.spread.degrees(this.weapon, this.skills),
+      // 粒が散る角度 (度)。**0 でなければクロスヘアが輪になる**
+      pelletSpread: pelletsOf(this.weapon) > 1 ? (this.weapon.pelletSpread ?? 0) : 0,
       crouching: this.player.isCrouching,
+      stance: this.player.stance,
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
       menuOpen: this.menuOpen,
@@ -3075,7 +3277,10 @@ export class Game {
       loadoutWait: Math.max(0, Math.ceil(CHOOSE_FLOOR - this.chooseElapsed)),
       skills: this.skills,
       // 窓が開いているかは試合の段階で決まる。ドメインルールは domain が持つ
-      skillsOpen: canChooseSkills(this.replica.match?.phase ?? "waiting"),
+      skillsOpen: canChooseSkills(
+        this.replica.match?.phase ?? "waiting",
+        MODES[this.replica.mode],
+      ),
       scoped: this.scoped,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",

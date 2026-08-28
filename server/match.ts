@@ -17,14 +17,13 @@ import {
 } from '../src/domain/match/match'
 import { isSeated } from '../src/domain/player/lifecycle'
 import { type Player, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
-import { MAX_HEALTH } from '../src/domain/rule/damage'
+import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { recordPose, relayState, sendHealth } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
-import { saveSkills } from './skills'
-import { type RoomWorld, TARGET_RESPAWN, broadcast, setLife } from './world'
+import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, setLife } from './world'
 
 /** 1 試合の長さ (ms) */
 export const MATCH_DURATION = 5 * 60 * 1000
@@ -54,6 +53,9 @@ export const INTERMISSION = 10 * 1000
 export const COUNTDOWN = 5 * 1000
 
 /** 試合の状態を配る間隔 (ms)。残り時間の表示に要る */
+/** 刻み 1 回ぶんの秒。**index.ts の TICK_MS と揃える** */
+const TICK_SECONDS = 1 / 64
+
 export const MATCH_BROADCAST = 1000
 
 /**
@@ -86,6 +88,25 @@ export const SELF_BROADCAST = 3000
 export function updateTargets(room: RoomWorld, now: number): void {
   for (const bot of room.players.values()) {
     if (!bot.bot) continue
+
+    /*
+     * 爆風で飛んでいる間、こちらが滑らせる。
+     *
+     * **的は接続を持たない**ので、動かす人が居ない。人は自分の画面で自分を
+     * 動かす (位置を持っているのがクライアント) が、的はサーバーが持っている。
+     *
+     * 速さの式は人と同じ (domain/rule/damage.ts の knockSpeed)。別に持つと
+     * **同じ爆風で飛ぶ距離が変わる**。
+     */
+    if (bot.knockLeft > 0) {
+      const step = Math.min(bot.knockLeft, TICK_SECONDS)
+      const speed = knockSpeed(bot.knockLeft)
+      bot.x += bot.knockX * speed * step
+      bot.z += bot.knockZ * speed * step
+      bot.knockLeft = Math.max(0, bot.knockLeft - TICK_SECONDS)
+    }
+    if (bot.downLeft > 0) bot.downLeft = Math.max(0, bot.downLeft - TICK_SECONDS)
+
     if (bot.life === 'downed' && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
       reviveBot(bot, now)
       broadcast(room, { type: 'life', id: bot.id, state: 'alive' })
@@ -110,7 +131,22 @@ export function targetPayload(bot: Player, now: number): Uint8Array {
         yaw: bot.yaw,
         pitch: 0,
         cameraYaw: bot.yaw,
-        locomotion: bot.life === 'downed' ? 'death' : 'idle',
+        /*
+         * 倒れた / 転んでいる / 起き上がっている / 立っている。
+         *
+         * **起き上がる型を挟む。** 転んだ姿から直に立ち姿へ飛ばすと、寝た脚と
+         * 立った上半身が混ざって、銃を上空へ構えて見える。
+         */
+        locomotion:
+          bot.life === 'downed'
+            ? bot.downFromBehind
+              ? 'death_front'
+              : 'death_back'
+            : bot.downLeft > TARGET_STAND
+              ? 'sweep'
+              : bot.downLeft > 0
+                ? 'stand'
+                : 'idle',
         aiming: false,
         weapon: 'rifle',
         crouching: false,
@@ -382,17 +418,6 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // 装備画面の裏で立ち尽くす人が出ないように
     for (const player of connected(room)) {
       if (player.life === 'choosing') spawn(room, player, now)
-      /*
-       * **スキルはここで確定する。** 選べる窓が閉じた瞬間 (skill.ts の
-       * canChooseSkills) なので、残すならこの 1 か所でよい。
-       *
-       * 試合ごとに書くのは、**次の試合まで選び直せない**から — 途中参加した人に
-       * 持ってこられるのは「前の試合で使っていた物」で、支度の途中で触っていた
-       * 値ではない。始まった時の形をそのまま残す。
-       *
-       * 待たない。書けなくても試合は続く (次に入ったとき前回の選択が戻らないだけ)。
-       */
-      if (!player.bot) saveSkills(player.id, player.skills)
     }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる

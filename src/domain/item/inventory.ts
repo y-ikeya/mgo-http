@@ -93,6 +93,25 @@ export interface ShootContext {
   stabbing: boolean
   /** 転がっている最中か */
   rolling: boolean
+  /**
+   * 削られる高さから落ちて、堪えている最中か。
+   *
+   * **全身で堪えている間は撃てない。** 膝を突いて衝撃を逃がしている体が、
+   * 同時に銃を構えて撃つのは形として無理がある。高い所から飛び降りて
+   * 詰めるのが只にならない、という代償にもなっている。
+   */
+  landing: boolean
+  /**
+   * 伏せて這っている最中か。**這いながらは撃てない。**
+   *
+   * 伏せは一番見つかりにくく、一番安定して撃てる姿勢。そのまま動きながら
+   * 撃てると、**低いまま詰めて低いまま撃つ**が全部の場面で最善になる。
+   * 止まれば撃てる、という一手を挟むことで「進むか撃つか」の選択が残る。
+   *
+   * 立ちとしゃがみで動き撃ちができるのは、あちらは散布が開くから
+   * (domain/item/spread.ts)。伏せは散布でも代償を作れない。
+   */
+  crawling: boolean
   /** 弾倉に残っている弾。**空撃ちはここで止まる** */
   ammo: number
 }
@@ -213,7 +232,8 @@ export class Inventory {
     if (!ctx.held || !this.trigger.pulled(weapon.auto)) return false
     if (!ctx.aiming) return false
     if (!canAct(ctx.life)) return false
-    if (ctx.reloading || ctx.stabbing || ctx.rolling) return false
+    if (ctx.reloading || ctx.stabbing || ctx.rolling || ctx.crawling) return false
+    if (ctx.landing) return false
     return ctx.ammo > 0
   }
 
@@ -539,6 +559,28 @@ export class Inventory {
     else this.lastTool = id
     this.switchLeft = SWITCH_TIME
     return true
+  }
+
+  /**
+   * 道具を手放す。**取り上げられたときに呼ぶ。**
+   *
+   * 持ち替え (switchTo) とは別に置く。あちらは「次に何を持つか選んだ」で、
+   * こちらは**選んでいないのに無くなった**。道具の枠まで `none` へ戻すのが
+   * 違いで、持ち替えで武器へ移っただけだと枠には箱が残り、一覧には
+   * C.BOX が出たままになる (ダンボールを落とされたのにそう見えない)。
+   *
+   * 手には武器が戻る。手ぶらという状態は無い (held のコメント)。
+   *
+   * **持ち替えの時間は取らない。** 取り上げられている間は他のことができない
+   * ので、そのうえ手が塞がると二重に払うことになる。
+   */
+  dropTool(): void {
+    if (HELD[this.current].family !== 'tool') return
+    this.last = this.current
+    this.current = this.lastWeapon
+    this.lastTool = 'none'
+    this.switchLeft = 0
+    this.queued = null
   }
 
   /** 持ち替え中に押された行き先。1 つだけ溜める */

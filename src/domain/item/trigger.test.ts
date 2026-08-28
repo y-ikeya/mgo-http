@@ -73,6 +73,8 @@ describe('撃てるか', () => {
     reloading: false,
     stabbing: false,
     rolling: false,
+    crawling: false,
+    landing: false,
     ammo: 30,
   }
 
@@ -101,8 +103,14 @@ describe('撃てるか', () => {
     expect(make().canShoot(WEAPONS.rifle, { ...ready, life: 'downed' })).toBe(false)
   })
 
-  /** **装填・刺突・転がりは、撃つことと排他。** そこが選択の代償になる */
-  for (const busy of ['reloading', 'stabbing', 'rolling'] as const) {
+  /**
+   * **装填・刺突・転がり・匍匐は、撃つことと排他。** そこが選択の代償になる。
+   *
+   * 匍匐だけ毛色が違う。あちらは「動作の最中だから」ではなく、**伏せは
+   * 動きながら撃てる姿勢ではない**という決めごと — 一番見つかりにくく一番
+   * 安定して撃てる姿勢が動き撃ちまでできると、低いまま詰めるのが常に最善になる。
+   */
+  for (const busy of ['reloading', 'stabbing', 'rolling', 'crawling', 'landing'] as const) {
     test(`${busy} の間は撃てない`, () => {
       expect(make().canShoot(WEAPONS.rifle, { ...ready, [busy]: true })).toBe(false)
     })

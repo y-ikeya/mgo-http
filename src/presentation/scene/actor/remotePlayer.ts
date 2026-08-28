@@ -18,7 +18,7 @@ import { canBeStabbed } from "../../../domain/rule/damage";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { stanceOf } from "../../../domain/player/stance";
-import { isWholeBody, type WholeBodyLocomotion } from "./motion";
+import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import {
   advanceBoxLift,
@@ -118,15 +118,23 @@ const PLAY_WHOLE_BODY: Record<
 > = {
   roll: (a) => a.playRoll(),
   // 落下の受け身。削られる高さから落ちた着地
-  fall_roll: (a) => a.playFallRoll(),
+  hard_land: (a) => a.playHardLand(),
   stab: (a) => a.playStab(),
   death: (a) => a.playDeath(),
+  // 倒れる向き。**倒れた側が決める** — 位置と向きを持っているのがそこ
+  death_front: (a) => a.playDeath(true),
+  death_back: (a) => a.playDeath(false),
   salute: (a) => a.playSalute(),
   // 爆風で倒れる / 起き上がる
   sweep: (a) => a.playSweep(),
   stand: (a) => a.playStand(),
   // 接続が切れた人。1 枚の静止ポーズ
   away: (a) => a.playAway(),
+  // ダンボールで敵にぶつかって、箱が落ちた
+  bump: (a) => a.playBump(),
+  // 伏せへの出入り
+  prone_down: (a) => a.playProneDown(),
+  prone_rise: (a) => a.playProneRise(),
   // 着地。ここだけは「全身だが専用の入口がある」ではなく元からこれ
   jump_down: (a) => a.playLanding(),
   // クレイモア。構え始めと、置き切る所。**置く型から見え始めることがある**ので、
@@ -326,8 +334,23 @@ export class RemotePlayer {
     const animator = this.animator;
     if (!animator) return;
 
-    // 倒れているかはサーバーが決める。送られてきた姿勢より優先する。
-    const locomotion = this.serverDead ? "death" : state.locomotion;
+    /*
+     * 倒れているかはサーバーが決める。送られてきた姿勢より優先する。
+     *
+     * **ただし倒れる向きは姿勢が運んでいる** (death_front / death_back)。
+     * 一律 death へ潰していた頃は、前後の別が消えて元の 1 本しか出なかった。
+     *
+     * 逆向きも塞ぐ。**湧いた後に倒れる姿勢が届いても流さない** — 倒れた時の
+     * 一通が遅れて着くと、生き返った体がその場で崩れて伏せたまま固まる
+     * (的で実際に出た。湧いてから床に臥せたままになる)。
+     */
+    const locomotion = this.serverDead
+      ? isDeath(state.locomotion)
+        ? state.locomotion
+        : "death"
+      : isDeath(state.locomotion)
+        ? "idle"
+        : state.locomotion;
 
     // 全身モーションは重みの補間では出せない。状態が切り替わった瞬間に頭から流す。
     this.rollStarted = false;
@@ -364,7 +387,10 @@ export class RemotePlayer {
     animator.setSaluteHeld(state.saluteHeld)
     this.saluting = locomotion === 'salute' && state.saluteHeld
     animator.setAiming(state.aiming && !this.serverDead);
-    animator.setAimPitch(state.aiming && !this.serverDead ? state.pitch : 0);
+    // 伏せている間は上体を傾けない。腹這いでは背骨の回転面が横倒しなので、
+    // 同じ角度を当てると体が起き上がって見える (player.ts に理由)
+    const prone = state.locomotion === "prone_idle" || state.locomotion === "crawl_f";
+    animator.setAimPitch(state.aiming && !this.serverDead && !prone ? state.pitch : 0);
     animator.update(dt);
 
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている
@@ -583,8 +609,20 @@ export class RemotePlayer {
     const dead = state === "downed";
     if (dead !== this.serverDead) {
       this.serverDead = dead;
+      /*
+       * **倒れたことは先に出す。向きは姿勢が追いかけて上書きする。**
+       *
+       * 生死の一通のほうが姿勢より先に着くことがあるので、ここで流さないと
+       * 倒れたのに立っている瞬間ができる。向きを持った姿勢が届いたら
+       * (death_front / death_back)、頭から流し直される。
+       */
       if (dead) this.animator?.playDeath();
-      else this.animator?.revive();
+      else {
+        this.animator?.revive();
+        // 湧いた側の姿勢を先に戻す。**倒れた姿勢のまま比べると、次の一通で
+        // 倒れ直す** (湧いてから床に臥せたままになっていた)
+        this.locomotion = "idle";
+      }
     }
     // 出す / 出さないの判断は Presence が持つ
     // 「戦場に居るか」を決めるのはドメインルール (domain)。presence には答えだけ渡す
@@ -1067,6 +1105,26 @@ export class RemotePlayers {
     }
 
     return knocks;
+  }
+
+  /**
+   * その間合いに居る相手を返す。**ダンボールでぶつかったかを見るのに使う。**
+   *
+   * 敵かどうかはここでは決めない。個人戦では同じ色でも敵なので、ルールを
+   * 知っている側 (Game) が判断する — 体当たり (rollInto) と同じ形。
+   *
+   * @param origin 被っている側の位置
+   */
+  touching(origin: THREE.Vector3, range: number): { id: string; side: Team }[] {
+    const found: { id: string; side: Team }[] = [];
+    for (const player of this.players.values()) {
+      if (player.health <= 0) continue;
+      this.scratch.subVectors(player.object.position, origin);
+      this.scratch.y = 0;
+      if (this.scratch.length() > range) continue;
+      found.push({ id: player.id, side: player.side });
+    }
+    return found;
   }
 
   /** 指定の相手を怯ませる。誰の画面でも同じように見えるよう、撃った本人以外も呼ぶ */

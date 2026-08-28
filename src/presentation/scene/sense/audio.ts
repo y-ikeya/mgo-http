@@ -48,11 +48,36 @@ const SOUNDS = {
    * 別に決めると、サーバーが「聞こえる」と判断した音が手元では無音になる。
    */
   snipe: { file: "xm2010_shot1.mp3", reference: 8, max: weaponOf("sniper").noiseRange },
+  /**
+   * ナイフが刺さった音。**当たった時だけ鳴る。**
+   *
+   * 空振りでは鳴らさない。刺突は当てたかどうかで結果が全部決まる (背後なら
+   * 即死) ので、当たったことが音でも分かるようにしておく。
+   *
+   * 届く距離は短い。刺す間合い (2m) に居る相手には確実に届くが、離れた人には
+   * 何が起きたか分からない — **静かに始末できる**、が刃物の値打ちなので。
+   */
+  stab: { file: "knife_stab1.mp3", reference: 3, max: 18 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
   // P90。突撃銃より軽い音で、間隔が詰まるぶん 1 発を短く聞かせたい
   smg: { file: "p90_shot1.mp3", reference: 5, max: weaponOf("smg").noiseRange },
   smgReload: { file: "p90_reload1.mp3", reference: 2, max: 24 },
+  /**
+   * 散弾銃。**1 発が重い音**。届く距離は武器の性能から引く。
+   *
+   * 遠くまで届かない銃なので、音も突撃銃より近くで消える (noiseRange 140)。
+   * 「その音が聞こえたら、もう間合いに居る」という形にしたい。
+   */
+  shotgun: { file: "shotgun_shot1.mp3", reference: 7, max: weaponOf("shotgun").noiseRange },
+  /**
+   * ポンプを引く音。**撃った直後に必ず鳴る。**
+   *
+   * 狙撃銃はボルトの音が発砲音に入っているが、こちらは別の音源なので
+   * 撃った少し後に鳴らす (Game の boltIn)。近くの相手には「次が来るまで
+   * 間がある」が伝わる。
+   */
+  shotgunCock: { file: "shotgun_cock1.mp3", reference: 4, max: 30 },
   /**
    * 足音。**届く距離はドメインルールから引く** (domain/rule/noise.ts の STEP_RANGE)。
    *
@@ -192,6 +217,17 @@ export type SoundName = keyof typeof SOUNDS;
 /** 同時に鳴らせる数。使い回しなので撃ち続けても増えない */
 const POOL_SIZE = 12;
 
+/**
+ * 鳴らした音への札。**枠と通し番号の組。**
+ *
+ * 枠だけだと使い回された後に別の音を止めてしまう。番号を添えて、その枠が
+ * まだその音である時だけ効かせる。
+ */
+export interface SoundToken {
+  slot: number;
+  generation: number;
+}
+
 /** 再生ごとのピッチのゆらぎ。同じ波形の繰り返しが機械的に聞こえるのを防ぐ */
 const PITCH_JITTER = 0.06;
 
@@ -229,6 +265,16 @@ export class GameAudio {
   private readonly pool: THREE.PositionalAudio[] = [];
   private readonly anchors: THREE.Object3D[] = [];
   private next = 0;
+  /**
+   * 枠ごとの通し番号。**止めてよい音かを見分けるのに使う。**
+   *
+   * 枠は使い回すので、「さっき鳴らした音を止めて」と言われた時には別の音が
+   * 入っていることがある。素朴に止めると無関係な音を切る。鳴らすたびに番号を
+   * 進めておいて、札の番号と合っている時だけ止める。
+   */
+  private readonly generation: number[] = [];
+  /** 最後に鳴らした音の札。止めたい呼び手だけが控える */
+  private token: SoundToken = { slot: -1, generation: -1 };
   private readonly listenerPosition = new THREE.Vector3();
   private disposed = false;
 
@@ -290,6 +336,9 @@ export class GameAudio {
     this.next = (this.next + 1) % POOL_SIZE;
 
     if (sound.isPlaying) sound.stop();
+    const slot = this.next === 0 ? POOL_SIZE - 1 : this.next - 1;
+    this.generation[slot] = (this.generation[slot] ?? 0) + 1;
+    this.token = { slot, generation: this.generation[slot] };
     anchor.position.copy(position);
     const profile = SOUNDS[name];
     sound.setRefDistance(profile.reference * range);
@@ -301,6 +350,28 @@ export class GameAudio {
     sound.play();
 
     return this.audibility(position, profile.reference * range, profile.max * range) * volume;
+  }
+
+  /**
+   * 直前に鳴らした音の札。**止めたい呼び手だけが控える。**
+   *
+   * play() の戻り値は聞こえた強さ (レーダーが使う) なので、そちらは変えない。
+   * 止めるつもりが無い呼び手に札を持たせても使い道が無い。
+   */
+  get lastToken(): SoundToken {
+    return this.token;
+  }
+
+  /**
+   * 鳴っている途中の音を止める。**その枠がまだその音なら。**
+   *
+   * 動作を途中でやめたのに音だけ続くと、起きなかったことの音を聞かせること
+   * になる (伏せたまま弾倉に手を掛けて、途中で起き上がった場合など)。
+   */
+  stop(token: SoundToken): void {
+    if (token.slot < 0 || this.generation[token.slot] !== token.generation) return;
+    const sound = this.pool[token.slot];
+    if (sound?.isPlaying) sound.stop();
   }
 
   /**
@@ -323,6 +394,9 @@ export class GameAudio {
     this.ambience?.removeFromParent();
     for (const sound of this.pool) {
       if (sound.isPlaying) sound.stop();
+    const slot = this.next === 0 ? POOL_SIZE - 1 : this.next - 1;
+    this.generation[slot] = (this.generation[slot] ?? 0) + 1;
+    this.token = { slot, generation: this.generation[slot] };
       sound.removeFromParent();
     }
     for (const anchor of this.anchors) anchor.removeFromParent();

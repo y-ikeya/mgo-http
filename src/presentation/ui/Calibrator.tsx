@@ -29,6 +29,15 @@ const INITIAL_WEAPONS = {
     grip: { x: -0.105, y: 0.14, z: -0.2 },
     rotation: { x: -34, y: -3, z: 80 },
   },
+  // M870。銃口の位置が突撃銃とほぼ同じなので、握りもそこから始める
+  shotgun: {
+    grip: { x: 0.02, y: 0.1, z: -0.05 },
+    rotation: { x: -6, y: -17, z: -9 },
+  },
+  shotgunCrouch: {
+    grip: { x: -0.105, y: 0.14, z: -0.2 },
+    rotation: { x: -34, y: -3, z: 80 },
+  },
   sniper: {
     grip: { x: -0.02, y: 0.27, z: 0.11 },
     rotation: { x: 0, y: -10, z: -172 },
@@ -269,7 +278,7 @@ export default function Calibrator(props: {
       { label: 'POS', value: `${(s?.x ?? 0).toFixed(1)}, ${(s?.z ?? 0).toFixed(1)}` },
       { label: 'SPD', value: `${(s?.speed ?? 0).toFixed(1)} m/s` },
       { label: 'HP', value: `${Math.ceil(s?.health ?? 0)} / ${s?.maxHealth ?? 100}` },
-      { label: 'STANCE', value: s?.crouching ? 'CROUCH' : 'STAND' },
+      { label: 'STANCE', value: (s?.stance ?? 'stand').toUpperCase() },
       { label: 'SHOTS', value: String(s?.shots ?? 0) },
       { label: 'PLAYERS', value: String((s?.players ?? 0) + 1) },
     ]
@@ -326,6 +335,14 @@ export default function Calibrator(props: {
     // 常に一致させる (見えていない銃の値を触っても画面は動かない)
     const gun = props.stats?.equipped ?? 'rifle'
     const next = (props.stats?.crouching ? `${gun}Crouch` : gun) as WeaponTarget
+    /*
+     * **知らない銃なら触らない。**
+     *
+     * 銃を 1 挺増やしたときに、この表に足し忘れると `weapons()[target()]` が
+     * undefined になってパネルごと描けなくなる。持ち替えただけで調整の画面が
+     * 消えるので、原因が銃の追加だと気づきにくい。
+     */
+    if (!(next in INITIAL_WEAPONS)) return
     if (target() !== next) {
       setTarget(next)
       apply()
@@ -488,6 +505,15 @@ export default function Calibrator(props: {
             onClick={() => selectTarget(props.stats?.crouching ? 'rifleCrouch' : 'rifle')}
           >
             ライフル
+          </button>
+          <button
+            classList={{
+              'calib-tab': true,
+              'calib-tab-on': target() === 'shotgun' || target() === 'shotgunCrouch',
+            }}
+            onClick={() => selectTarget(props.stats?.crouching ? 'shotgunCrouch' : 'shotgun')}
+          >
+            ショットガン
           </button>
           <button
             classList={{

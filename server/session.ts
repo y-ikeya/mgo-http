@@ -73,6 +73,31 @@ export interface Session {
   /** 最後に撃った時刻 (Date.now)。連射の速さの上限を見るのに使う */
   lastShotAt: number
   /**
+   * その 1 発でまだ受け付けられる粒の数。
+   *
+   * 散弾は 1 発が 8 粒に分かれて、**同じ瞬間に 8 通の申告が届く**。
+   * 連射の検査をそのまま当てると 1 粒目以外が全部弾かれる。1 発ぶんの窓の
+   * 中で、粒の数までは通す (それを超えれば作り物)。
+   */
+  pelletsLeft: number
+  /**
+   * この 1 発でもう怯ませたか。
+   *
+   * 怯みは**弾 1 発につき 1 回**。粒ごとに送ると、近距離で 8 回重なって
+   * 体が跳ね回る (実際そう見えた)。当たった数は削れる量で出ているので、
+   * 仰け反りまで数えると二重になる。
+   */
+  flinchedThisShot: boolean
+  /** この 1 発でもう突き飛ばしたか。怯みと同じで**弾 1 発につき 1 回** */
+  pushedThisShot: boolean
+  /**
+   * この 1 発でもう削ったか。**散弾だけに要る。**
+   *
+   * 散弾は 1 発が 8 粒に分かれるが、削るのは 1 回だけ (距離の帯で決まる)。
+   * 粒ごとに削ると「たまたま何粒入ったか」で結果が変わる。
+   */
+  hitThisShot: boolean
+  /**
    * 形の合わない位置を最後に警告した時刻 (Date.now)。
    *
    * 古いクライアントが繋ぐと毎フレーム落ちるので、間引かないとログが埋まる
@@ -113,6 +138,10 @@ export function newSession(player: Player, socket: Bun.ServerWebSocket<Client>):
     badPacketAt: 0,
     badMoveAt: 0,
     lastShotAt: 0,
+    pelletsLeft: 0,
+    flinchedThisShot: false,
+    pushedThisShot: false,
+    hitThisShot: false,
   }
 }
 

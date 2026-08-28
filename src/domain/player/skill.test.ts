@@ -1,3 +1,4 @@
+import { MODES } from '../match/room'
 import { describe, expect, test } from 'bun:test'
 import {
   MASTERY_OF, SKILLS, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
@@ -47,8 +48,8 @@ describe('4 コストの予算', () => {
     expect(isAffordable({ runner: 9 } as never)).toBe(false)
   })
 
-  test('**8 つある。** 2 つだと全員が両方取って選択が生まれない', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(8)
+  test('**9 つある。** 2 つだと全員が両方取って選択が生まれない', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(9)
   })
 })
 
@@ -112,8 +113,9 @@ describe('CBOX MOVE', () => {
 
 describe('武器の mastery', () => {
   test('**主武器ごとに別のスキル。** 予算 4 では 2 挺を極められない', () => {
+    // 銃の数だけある。**同じスキルで 2 挺が締まることはない**
     const ids = new Set<SkillId>(Object.values(MASTERY_OF))
-    expect(ids.size).toBe(4)
+    expect(ids.size).toBe(Object.keys(MASTERY_OF).length)
     expect(costOf({ smgMastery: 3, sniperMastery: 3 })).toBeGreaterThan(SKILL_BUDGET)
   })
 
@@ -204,6 +206,20 @@ describe('選び直せる窓', () => {
 
   test('決着したら開く。**試合をまたげば組み替えてよい**', () => {
     expect(canChooseSkills('over')).toBe(true)
+  })
+
+  /**
+   * **練習部屋だけは走っている最中でも開く。**
+   *
+   * 後出しになる相手が居ない (的は撃ち返さない)。効き目を試す場所で試合の
+   * 切れ目を待たせると、そもそも確かめられない。
+   */
+  test('練習部屋は試合中でも組み替えられる', () => {
+    expect(canChooseSkills('playing', MODES.PRACTICE)).toBe(true)
+  })
+
+  test('練習でない部屋は、ルールを渡しても試合中は固定', () => {
+    expect(canChooseSkills('playing', MODES.TDM)).toBe(false)
   })
 
   /**

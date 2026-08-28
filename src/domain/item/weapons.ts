@@ -19,9 +19,9 @@
  * src/presentation/scene/arms/weapon.ts が持つ。**遊びに効く数字だけ**をここに置く。
  */
 
-import type { HitZone } from '../rule/damage'
+import { MAX_HEALTH, type HitZone } from '../rule/damage'
 
-export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'pistol'
+export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'pistol' | 'shotgun'
 
 /**
  * 装備の枠。
@@ -36,7 +36,7 @@ export type Slot = 'primary' | 'secondary' | 'support'
 
 /** その枠に入れられる銃 */
 export const CHOICES: Record<'primary' | 'secondary', WeaponId[]> = {
-  primary: ['smg', 'rifle', 'sniper'],
+  primary: ['smg', 'rifle', 'sniper', 'shotgun'],
   secondary: ['pistol'],
 }
 
@@ -95,7 +95,7 @@ export interface WeaponSpec {
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
   reloadSound: 'reload' | 'pistolReload' | 'smgReload'
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe' | 'pistol' | 'smg'
+  shotSound: 'rifle' | 'snipe' | 'pistol' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
 
@@ -119,6 +119,34 @@ export interface WeaponSpec {
   fireInterval: number
   /** 押しっぱなしで撃ち続けるか */
   auto: boolean
+  /**
+   * 1 発で飛ぶ粒の数。**散弾だけ 1 より大きい。**
+   *
+   * 粒ごとに別々に当たり判定を取って、当たった数だけ削る。1 発の威力を
+   * 上げるのとは違う — **近いほど多く当たり、離れるほど当たらなくなる**ので、
+   * 距離の減衰を書かなくても間合いの武器になる。
+   */
+  pellets?: number
+  /**
+   * 粒が散る角度 (度、半角)。**銃そのものの散らばり。**
+   *
+   * 狙いの散布 (spread.ts の degrees) とは別に足す。あちらは動くと開く
+   * 「腕の乱れ」で、こちらは止まって構えても消えない銃の性質。
+   */
+  pelletSpread?: number
+  /** ボルトを操作する音。無ければ鳴らさない (狙撃銃は発砲音に入っている) */
+  boltSound?: 'shotgunCock'
+  /**
+   * ボルトを操作する型の再生速度。**1 より小さいほど遅い。**
+   *
+   * 次の 1 発までの間隔は型の尺そのものなので、ここを下げると**撃てない時間が
+   * 伸びる**。動きと待ち時間が必ず一致する形は保ったまま、銃ごとに重さを
+   * 変えられる。
+   *
+   * **その銃を極めれば速くなる** (masteryReloadScale で割る)。弾倉の入れ替えと
+   * 同じで「手が速い」という一つの効き目にしてある。
+   */
+  boltScale?: number
   /**
    * 1 発ごとにボルトを操作するか。
    *
@@ -532,14 +560,155 @@ const PISTOL: WeaponSpec = {
   scope: [],
 }
 
+/**
+ * 散弾銃。**間合いの武器。**
+ *
+ * 1 発が 8 粒に分かれて、粒ごとに当たり判定を取る。近ければ全部当たって
+ * 一撃で倒れ、離れると散って数粒しか掠らない。**距離の減衰を書かなくても
+ * 間合いが決まる** — 当たる粒の数がそのまま威力になる。
+ *
+ * --- 威力は当たった距離で決まる ---
+ * **粒の数では数えない。** 1 発のうち 1 粒でも当たれば、その距離の帯の量だけ
+ * 削る (SHOTGUN_BANDS)。粒は散らばりと当たり判定のためにあって、8 粒当たった
+ * から 8 倍、にはしない — 近さがそのまま威力、を段で言い切る形にしてある。
+ *
+ *     〜8m    50 削って**吹き飛ばす**。2 発で倒れる
+ *     〜16m   25 削って**怯ませる**。撃ち合いには入れるが押し切れない
+ *     〜24m   12.5 だけ。怯みもしないので、牽制にもならない
+ *     24m〜   **当たらない**
+ *
+ * --- なぜ 1 発が重いのか ---
+ * ポンプ式なので次の 1 発まで 0.9 秒かかる。**外したら詰められる**ので、
+ * 曲がり角を取る武器であって、開けた場所へ持ち出す物ではない。
+ * 突撃銃と真っ向から撃ち合うと、間合いへ入る前に削り切られる。
+ */
+const SHOTGUN: WeaponSpec = {
+  id: 'shotgun',
+  label: 'ショットガン',
+  kill: 'M870',
+  shotSound: 'shotgun',
+  boltSound: 'shotgunCock',
+  reloadSound: 'reload',
+  model: 'shotgun',
+
+  slot: 'primary',
+  cost: 0,
+  // M870。木製ストックの実銃の値
+  weight: 3.6,
+  /*
+   * 部位では変えない。**距離だけで決まる** (SHOTGUN_BANDS)。
+   *
+   * 撒いた粒のどれが頭に入ったかで倍率が変わると、近距離では常に頭に
+   * 当たって即死、遠距離では当たっても意味が無い、という両極になる。
+   * 部位を捨てて距離で言い切ると、**間合いを詰めるかどうか**だけが問いになる。
+   *
+   * この表は他の銃と同じ形を保つためだけに置いてある (bulletDamage は
+   * 散弾を通らない)。
+   */
+  zone: { HEAD: 50, BODY: 50, LEGS: 50 },
+  pellets: 8,
+  // 粒の散り。**止まって構えても消えない** — 銃そのものの性質
+  pelletSpread: 3.2,
+  // 距離の効きは帯が持つ (SHOTGUN_BANDS)。ここは通らない
+  fullRange: 200,
+  minRange: 200,
+  minScale: 1,
+
+  /*
+   * ポンプ式。**次の 1 発までの間隔は型の尺が決める** (boltScale)。
+   *
+   * ここに書いてあるのはサーバーが弾く下限。極めた人の間隔 (1.32 秒) より
+   * 短くしておかないと、速く撃てるようになった本人の申告が弾かれる。
+   */
+  fireInterval: 1.2,
+  auto: false,
+  bolt: true,
+  /*
+   * ポンプを遅くしてある。素で 1.69 秒、極めれば 1.32 秒。
+   *
+   * **1 発の重さがこの銃の性格**なので、撃ってから次までの間が長いほど
+   * 「外したら詰められる」が効く。同時に SG MASTERY の値打ちにもなる —
+   * 極めれば 0.37 秒早く次が撃てる。
+   */
+  boltScale: 0.75,
+  magazine: 6,
+  // 弾倉 4 つぶん。1 発が重いので数は少なくてよい
+  reserve: 24,
+  // 1 発ずつ装填する銃なので長い。極めれば 3.4 秒
+  reload: 4.4,
+
+  // 粒は軽くてすぐ落ちる。遠くまで届かないことが弾道にも出る
+  bulletSpeed: 380,
+  bulletGravity: 9.8,
+  noiseRange: 140,
+
+  // 構えても腕は揺れる。突撃銃と同じ
+  sway: 0.30,
+  // 連射できないので、開く分は 1 発ぶんだけ大きく採る
+  spreadPerShot: 0.5,
+  spreadMax: 2.4,
+  spreadPerSpeed: 0.32,
+  spreadCrouchScale: 0.45,
+  spreadAirborne: 2.2,
+  spreadPerStance: 0.12,
+
+  // 覗く物ではない。肩越しのまま間合いへ入る
+  aimFov: 42,
+  aimDistance: 1.35,
+  aimShoulder: 0.42,
+  aimSpeedScale: 0.5,
+  // 覗く段は持たない。間合いへ入る武器なので、遠くを見る道具が要らない
+  scope: [],
+}
+
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   smg: SMG,
+  shotgun: SHOTGUN,
   rifle: RIFLE,
   sniper: SNIPER,
   pistol: PISTOL,
 }
 
 export const DEFAULT_WEAPON: WeaponId = 'rifle'
+
+/**
+ * 散弾の威力の帯。**近い順に並べる。**
+ *
+ * 1 発のうち 1 粒でも当たれば、その距離の帯の量だけ削る。粒を数えないのは、
+ * 数えると「たまたま何粒入ったか」で結果が変わるから — 近さで言い切るほうが、
+ * **間合いを詰めるかどうか**という一つの問いになる。
+ *
+ * 一番外 (24m) より遠ければ当たらない。撒いた粒が偶然届いて削れる、を無くす。
+ *
+ * 刻みは 8m。10m 刻みにしていた頃は**中距離でも押せて**、突撃銃と正面から
+ * 撃ち合えてしまった。間合いの武器である、を保つ幅として詰めてある。
+ */
+export interface ShotgunBand {
+  /** ここまでの距離 (m) */
+  within: number
+  /** 削る量 */
+  damage: number
+  /** 吹き飛ばすか */
+  knock: boolean
+  /** 怯ませるか */
+  flinch: boolean
+}
+
+export const SHOTGUN_BANDS: readonly ShotgunBand[] = [
+  { within: 8, damage: MAX_HEALTH / 2, knock: true, flinch: false },
+  { within: 16, damage: MAX_HEALTH / 4, knock: false, flinch: true },
+  { within: 24, damage: MAX_HEALTH / 8, knock: false, flinch: false },
+]
+
+/** その距離の帯。**外れていれば当たらない** */
+export function shotgunBand(distance: number): ShotgunBand | null {
+  return SHOTGUN_BANDS.find((band) => distance <= band.within) ?? null
+}
+
+/** 1 発で飛ぶ粒の数。**散弾以外は 1** */
+export function pelletsOf(spec: WeaponSpec): number {
+  return spec.pellets ?? 1
+}
 
 export function weaponOf(id: WeaponId | undefined): WeaponSpec {
   return WEAPONS[id ?? DEFAULT_WEAPON] ?? RIFLE

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadRifle, loadSmg, loadSniper, loadPistol } from '../assets'
+import { loadKnife, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
 import { isMesh } from '../util/guards'
 
 /**
@@ -44,6 +44,22 @@ const RIFLE: WeaponConfig = {
   crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
   crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
   tip: new THREE.Vector3(0, 0.171, -0.845),
+}
+
+/**
+ * M870。全長 1190mm のポンプ式。
+ *
+ * 銃口の位置が突撃銃とほぼ同じ (0.174 対 0.171) なので、握りの調整値も
+ * そのまま流用できる — convert_gltf_gun.py が銃口を揃えて書き出すのは
+ * このため。
+ */
+const SHOTGUN: WeaponConfig = {
+  // 実機で詰めた値
+  grip: new THREE.Vector3(0.02, 0.1, -0.05),
+  rotation: new THREE.Euler(degrees(-6), degrees(-17), degrees(-9)),
+  crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
+  crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
+  tip: new THREE.Vector3(0.007, 0.174, -0.845),
 }
 
 /**
@@ -120,7 +136,7 @@ const PISTOL: WeaponConfig = {
   tip: new THREE.Vector3(0, 0.067, -0.172),
 }
 
-export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, sniper: SNIPER, pistol: PISTOL, knife: KNIFE } as const
+export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, shotgun: SHOTGUN, sniper: SNIPER, pistol: PISTOL, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
 
 /**
@@ -133,6 +149,8 @@ export type WeaponTarget =
   | 'smgCrouch'
   | 'rifle'
   | 'rifleCrouch'
+  | 'shotgun'
+  | 'shotgunCrouch'
   | 'sniper'
   | 'sniperCrouch'
   | 'pistol'
@@ -199,7 +217,9 @@ export class Weapon {
             ? await loadPistol()
             : kind === 'smg'
               ? await loadSmg()
-              : await loadRifle()
+              : kind === 'shotgun'
+                ? await loadShotgun()
+                : await loadRifle()
     return new Weapon(cloneSkinned(gltf.scene), WEAPON_CONFIGS[kind])
   }
 

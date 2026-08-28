@@ -29,6 +29,9 @@ export const RandomStream = {
   recoilYaw: 2,
   spreadAngle: 3,
   spreadRadius: 4,
+  /** 散弾の粒。1 発の中で粒ごとに別の向きへ散らす */
+  pelletAngle: 5,
+  pelletRadius: 6,
 } as const
 
 export type RandomStream = (typeof RandomStream)[keyof typeof RandomStream]

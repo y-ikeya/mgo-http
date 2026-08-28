@@ -148,6 +148,21 @@ export function setLife(room: RoomWorld, player: Player, next: Life, now = Date.
 export const TARGET_RESPAWN = 3000
 
 /**
+ * 起き上がる型の尺 (秒)。**モデルの stand クリップに合わせてある。**
+ *
+ * ここを短くすると、起き上がり切る前に立ち姿へ飛んで**脚だけワープ**する。
+ */
+export const TARGET_STAND = 3.1
+
+/**
+ * 的が爆風で転んでから立ち終わるまで (秒)。**転ぶ間 + 起き上がる間。**
+ *
+ * 人は押すまで倒れたままだが、的は誰も操作しないので時間で起きる。
+ * 残りが TARGET_STAND を切ったら起き上がりへ移る。
+ */
+export const TARGET_DOWN = 2.0 + TARGET_STAND
+
+/**
  * 的を並べる。**座標はステージが持っている** (domain/match/stage.ts)。
  *
  * ここにレプリカを置いていて、モールの的を東棟へ移したときに取り残された

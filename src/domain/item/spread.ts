@@ -22,6 +22,7 @@
 import { randomSigned, randomUnit, RandomStream } from '../rule/random'
 import {
   masteryJitterScale,
+  masteryRecoilScale,
   masterySpreadScale,
   masterySwayScale,
   type Skills,
@@ -215,15 +216,38 @@ export class Spread {
   }
 
   /**
+   * その粒がどこへ散るか。**狙いの散布とは別に足す。**
+   *
+   * 狙いの散布 (coneFor) は 1 発につき 1 つで、腕の乱れ — 動けば開く。
+   * こちらは銃そのものの散らばりで、**止まって構えても消えない**。
+   * 散弾銃が間合いの武器になるのはこちらのおかげ。
+   *
+   * 種は 1 発の通し番号と粒の番号から作る。同じ弾の粒が同じ所へ飛ばない
+   * ようにするためで、サーバーは粒の道を再現しない (当たった部位と距離だけ
+   * 検算する) ので、ここは手元で決めてよい。
+   */
+  pelletFor(weapon: WeaponSpec, seed: number, index: number): Cone {
+    const grain = seed * 31 + index
+    return {
+      degrees: weapon.pelletSpread ?? 0,
+      angle01: randomUnit(grain, RandomStream.pelletAngle),
+      radius01: randomUnit(grain, RandomStream.pelletRadius),
+    }
+  }
+
+  /**
    * 撃った。**反動は撃った「後」に加える** — この一発はまだ狙った向きへ飛ぶ。
    *
-   * --- 極めても反動そのものは減らない ---
-   * 動かすのは**乱れ** (JITTER) だけで、パターン (RECOIL_PATTERN) には触らない。
-   * 跳ね上がる量が同じまま予測できるようになる = **表を覚えて押さえ戻せる度合い**
-   * が上がる。反動自体を弱めると「上手くなくても当たる」ほうへ倒れて、
-   * 技量が効く余地を潰すことになる。
+   * --- 極めると、少しだけ跳ねなくなる ---
+   * 動かすのは 2 つ。**乱れ** (MASTERY_JITTER) と、**跳ね上がりそのもの**
+   * (MASTERY_RECOIL)。乱れのほうが大きく効く — 表を覚えて押さえ戻せる度合いが
+   * 上がる、が主で、跳ね上がりは Lv3 で 12% しか削らない。
    *
-   * 0 にはしないので (MASTERY_JITTER の Lv3 が 0.4)、極めてもマクロでは
+   * **削り過ぎると押さえ戻せない人が一番得をする。** 跳ね上がりは覚えて
+   * 押さえ戻す対象なので、消すと上手さの効く余地がそのまま減る。極めた実感は
+   * 戻る速さのほうで出す (skill.ts の masteryRecoveryScale)。
+   *
+   * 乱れは 0 にしないので (MASTERY_JITTER の Lv3 が 0.4)、極めてもマクロでは
    * 打ち消せない。
    *
    * @returns 視点へ加える跳ね上がり (rad)。[上, 右]
@@ -231,9 +255,15 @@ export class Spread {
   fired(seed: number, weapon: WeaponSpec, skills: Skills): [number, number] {
     const [pitch, yaw] = RECOIL_PATTERN[Math.min(this.burst, RECOIL_PATTERN.length - 1)]
     const jitter = masteryJitterScale(skills, weapon.id)
+    // 極めた銃は少しだけ跳ねない。**表の形は変えず、丈だけ縮める** —
+    // 覚えた押さえ戻しがそのまま通じる
+    const recoil = masteryRecoilScale(skills, weapon.id)
     const kickPitch =
-      pitch * (1 + RECOIL_PITCH_JITTER * jitter * randomSigned(seed, RandomStream.recoilPitch))
-    const kickYaw = yaw + RECOIL_YAW_JITTER * jitter * randomSigned(seed, RandomStream.recoilYaw)
+      pitch *
+      recoil *
+      (1 + RECOIL_PITCH_JITTER * jitter * randomSigned(seed, RandomStream.recoilPitch))
+    const kickYaw =
+      yaw * recoil + RECOIL_YAW_JITTER * jitter * randomSigned(seed, RandomStream.recoilYaw)
     this.burst++
     this.sinceShot = 0
     return [kickPitch * DEG_TO_RAD, kickYaw * DEG_TO_RAD]

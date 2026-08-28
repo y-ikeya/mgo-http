@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { verifyHit, type Pose } from './hitcheck'
 import type { Stance } from '../../domain/player/stance'
+import type { StageBox } from '../space/vision'
 
 /**
  * 申告の検証。ここでは**ナイフが刺さる姿勢**だけを見る。
@@ -36,7 +37,9 @@ function history(at: [number, number], stance: Stance, yaw = 0, pitch = 0): Pose
 const DOWN_PITCH = -0.35
 
 const RULES = {
-  headHeight: (crouching: boolean, boxed: boolean) => (crouching || boxed ? 0.94 : 1.47),
+  // 伏せだけ低い。**本物の数字は持ち込まない** — 判定の形だけを見る
+  headHeight: (stance: string) =>
+    stance === 'prone' ? 0.4 : stance === 'crouch' || stance === 'box' ? 0.94 : 1.47,
   // 立ち・しゃがみ・箱は刺さる。倒れている相手は見下ろしたときだけ
   canBeStabbed: (stance: string, aimPitch: number) =>
     stance === 'stand' || stance === 'crouch' || stance === 'box' || aimPitch <= DOWN_PITCH,
@@ -120,5 +123,59 @@ describe('倒れている相手を刺す', () => {
 
   test('立っている相手は見下ろさなくても刺さる', () => {
     expect(stab('stand', 0).ok).toBe(true)
+  })
+})
+
+/**
+ * 伏せている相手の頭の位置。
+ *
+ * **構えごとに頭の高さが違う。** 長らく「しゃがみか / 箱か」の 2 つの真偽から
+ * 引いていて、伏せを足した途端に穴が開いた — 這っている人は屈みの旗が
+ * 立っているので 0.94m の所に頭があることになり、実際に頭がある 0.4m を
+ * 撃っても遮蔽の裏と判定されて通らなかった。
+ *
+ * 姿勢が増えるたびに増える引数ではなく、**姿勢を 1 つ**渡す形にしてある。
+ */
+describe('伏せている相手の高さ', () => {
+  /*
+   * 相手の手前に置いた高さ 0.7m の壁。
+   *
+   * 撃つ側は立っている (目線 1.47m) ので、**壁は相手のすぐ手前に置く** —
+   * 遠くに置くと見下ろす線が壁を越えてしまい、伏せていても見えてしまう。
+   * この位置なら、しゃがんだ頭 (0.94m) は越えて見え、伏せた頭 (0.4m) は隠れる。
+   */
+  const LOW_WALL: StageBox[] = [
+    { name: 'concrete_low', min: [-2, 0, 2.7], max: [2, 0.7, 2.9] },
+  ]
+
+  function headShot(stance: Stance) {
+    return verifyHit(
+      history([0, 0], 'stand'),
+      history([0, 3], stance),
+      { kind: 'bullet', zone: 'HEAD', distance: 3 },
+      LOW_WALL,
+      WINDOW,
+      RULES,
+    )
+  }
+
+  test('しゃがんだ頭は壁から出ているので通る', () => {
+    expect(headShot('crouch').ok).toBe(true)
+  })
+
+  test('**伏せた頭は壁の裏。** 屈みの高さで見ていた頃はここが通っていた', () => {
+    expect(headShot('prone').ok).toBe(false)
+  })
+
+  test('壁が無ければ伏せていても通る。**低いこと自体は盾ではない**', () => {
+    const verdict = verifyHit(
+      history([0, 0], 'stand'),
+      history([0, 3], 'prone'),
+      { kind: 'bullet', zone: 'HEAD', distance: 3 },
+      [],
+      WINDOW,
+      RULES,
+    )
+    expect(verdict.ok).toBe(true)
   })
 })
