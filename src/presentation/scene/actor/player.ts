@@ -1,7 +1,8 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isTwoHanded, type HeldId } from '../../../domain/item/held'
-import { fallDamage } from '../../../domain/rule/damage'
+import { BOX_BUMP_STUN, KNOCK_TIME, fallDamage, knockSpeed } from '../../../domain/rule/damage'
+import { PRONE_SPEED_SCALE, stanceOf, type Stance } from '../../../domain/player/stance'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
@@ -11,6 +12,7 @@ import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
 import { stepMovement, type Mover } from '../../../sim/space/movement'
 import {
+  crawlSurge,
   resolveLocomotion,
   STAIR_DROP_MAX,
   STAIR_DROP_MIN,
@@ -190,12 +192,16 @@ const LANDING_TIME = 0.16
 
 
 /**
- * 受け身の尺 (秒)。**クリップの長さ (1.67s) に合わせる。**
+ * 堪える着地の尺 (秒)。**クリップの長さ (2.03s) に合わせる。**
  *
- * 途中で移動の型に戻すと、転がっている最中に立ち上がって滑る。削られた高さから
- * 落ちたことを見せる動きなので、最後まで流す。
+ * 途中で移動の型に戻すと、膝を突いたまま滑り出す。削られた高さから落ちたことを
+ * 見せる動きなので、最後まで流す。
+ *
+ * **その場から動かない。** 転がる型だった頃は 3m 進んでいて、焼かれた移動を
+ * 辿る仕掛け (ROOT_MOTION_CLIPS) が要った。膝を突いて堪えるだけの型に
+ * 差し替わったので、その仕掛けからは外してある。
  */
-const FALL_ROLL_TIME = 1.67
+const HARD_LAND_TIME = 2.03
 /**
  * 着地モーションを出す落下速度の下限 (m/s)。
  *
@@ -204,6 +210,7 @@ const FALL_ROLL_TIME = 1.67
  * 0.6m のジャンプの着地は 3.4 m/s なので、それは拾って段差は捨てる高さに置く。
  */
 const LANDING_MIN_SPEED = 3.0
+
 /**
  * 空中で進行方向を変えられる度合い (0 = 変えられない)。
  *
@@ -395,7 +402,7 @@ export class Player {
   /** 地面を離れたときの高さ。**どれだけ落ちたか**を測るのに使う */
   private airFromY = 0
   /** 受け身の残り時間。ただの着地より長い */
-  private fallRollTimer = 0
+  private hardLandTimer = 0
   /**
    * 跳躍の設定。高さを固定したまま重力を変えられるよう、初速は毎回 sqrt(2gh) で出す。
    * 重力だけ上げれば「同じ高さまで跳ぶが滞空が短い」になる。
@@ -414,13 +421,17 @@ export class Player {
   private fallReferenceHeight = FALL_REFERENCE_HEIGHT
   /** ローリング中に進む向き。踏み切った時点で固定する */
   private rollYaw = 0
+  /** 爆風で飛ぶ向きと、残り時間 (秒)。0 なら飛んでいない */
+  private knockX = 0
+  private knockZ = 0
+  private knockLeft = 0
   /**
    * 受け身で流れる向き。**着いた瞬間に固定する。**
    *
    * 転がっている間に舵を切れると、落下が移動手段になる。落ちた勢いは
    * 落ちる前に決めた向きへ逃がす。
    */
-  private fallRollYaw = 0
+  private hardLandYaw = 0
   /** 転がり始めたか。音を鳴らす側が 1 回だけ拾う */
   private rollStarted = false
   private moveSpeed = MOVE_SPEED
@@ -583,6 +594,10 @@ export class Player {
   get canWearBox(): boolean {
     if (this.down || !this.onGround || this.rolling || this.stabbing) return false
     if (this.downed || this.standing) return false
+    // 落とされた直後は被り直せない。**弾かれた意味が無くなる**
+    if (this.bumpLeft > 0) return false
+    // 伏せたまま被れない。箱はしゃがんだ体に被せてある
+    if (this.proneStage !== 'none') return false
     return !this.saluting
   }
 
@@ -591,6 +606,32 @@ export class Player {
     if (!this.boxed) return
     this.boxed = false
     this.animator?.setBoxed(false)
+  }
+
+  /** 箱が落ちて棒立ちになっている残り時間 (秒)。0 なら動ける */
+  private bumpLeft = 0
+
+  /** いま箱を落とされて固まっている最中か。呼ぶ側が操作を止めるのに使う */
+  get bumping(): boolean {
+    return this.bumpLeft > 0
+  }
+
+  /**
+   * ダンボールで走っていて敵にぶつかった。**箱が落ちて棒立ちになる。**
+   *
+   * 被っていなければ何も起きない。走っているかどうかは呼ぶ側 (Game) が
+   * 見ている — 止まって触れただけで弾かれると、狭い所を通れなくなる。
+   *
+   * 倒しはしない (domain/rule/damage.ts の BOX_BUMP_STUN)。動けないだけで、
+   * 見つけた側がその間に撃てる。
+   */
+  bump(): void {
+    if (!this.boxed || this.down || this.downed) return
+    this.dropBox()
+    // 屈んだ姿勢は箱と一緒に解く。**棒立ち**にならないと型と食い違う
+    this.crouching = false
+    this.bumpLeft = BOX_BUMP_STUN
+    this.animator?.playBump()
   }
 
 
@@ -611,7 +652,7 @@ export class Player {
    *   サーバーが「頭に当たったが倒れなかった」場面に絞って立てる
    * @returns このフレームで倒れたら true
    */
-  setHealth(health: number, flinch = false): boolean {
+  setHealth(health: number, flinch = false, fromBehind?: boolean): boolean {
     const wasAlive = !this.down
     this.health = health
 
@@ -626,14 +667,16 @@ export class Player {
     // 裏に回ったタブでは走らない。ここで倒さないと、相手へは生きた姿勢を
     // 送り続けることになる (相手側はサーバーの体力で倒すので破綻はしないが、
     // 送っている中身が嘘になる)。
-    this.locomotion = 'death'
+    // 倒れる向きも姿勢に出す。**他人の画面はこれを見て型を選ぶ**
+    this.locomotion =
+      fromBehind === undefined ? 'death' : fromBehind ? 'death_front' : 'death_back'
     // 構えも発砲も解いてから倒す。解かないと倒れた姿勢に構えの補正が乗る。
     this.dropBox()
     this.aiming = false
     this.crouching = false
     this.animator?.setAiming(false)
     this.animator?.setFiring(false)
-    this.animator?.playDeath()
+    this.animator?.playDeath(fromBehind)
     return true
   }
 
@@ -680,6 +723,10 @@ export class Player {
     this.health = health
     this.down = false
     this.boxed = false
+    // 箱を落とされた直後に倒された場合。戻さないと湧いてから固まったまま
+    this.bumpLeft = 0
+    this.proneStage = 'none'
+    this.proneShiftLeft = 0
     this.velocityY = 0
     this.downed_ = false
     this.downElapsed = 0
@@ -694,6 +741,10 @@ export class Player {
     this.health = MAX_HEALTH
     this.down = false
     this.boxed = false
+    // 箱を落とされた直後に倒された場合。戻さないと湧いてから固まったまま
+    this.bumpLeft = 0
+    this.proneStage = 'none'
+    this.proneShiftLeft = 0
     this.velocityY = 0
     // 爆風で転んだまま倒された場合、ここで戻さないと復帰しても転んだまま。
     // 姿勢は毎フレーム downed から引き直しているので、他の人の画面では
@@ -721,6 +772,22 @@ export class Player {
   knockBack(x: number, z: number): void {
     this.object.position.x += x
     this.object.position.z += z
+  }
+
+  /**
+   * 爆風で吹き飛ばす。**向きだけ受けて、こちらが滑らせる。**
+   *
+   * 位置を直に足すと**ワープに見える**うえ、押し戻しも接地も素通りする
+   * (壁を抜ける)。転がりと同じで、速度に直して移動の道へ通す。
+   *
+   * @param dirX 爆心から見た向き (単位ベクトル、水平)
+   */
+  knockPush(dirX: number, dirZ: number): void {
+    const reach = Math.hypot(dirX, dirZ)
+    if (reach < 1e-4) return
+    this.knockX = dirX / reach
+    this.knockZ = dirZ / reach
+    this.knockLeft = KNOCK_TIME
   }
 
   /** リロードモーションの尺 (秒)。モデル未着なら 0 */
@@ -845,8 +912,8 @@ export class Player {
     return this.animator?.throwWoundUp ?? false
   }
 
-  playBolt(): void {
-    this.animator?.playBolt()
+  playBolt(rate = 1): void {
+    this.animator?.playBolt(rate)
   }
 
   /** ボルト操作の尺 (秒)。モデル未着なら 0 */
@@ -873,6 +940,7 @@ export class Player {
    */
   salute(): void {
     if (this.down || this.boxed || this.rolling || this.stabbing || this.aiming) return
+    if (this.bumping) return
     this.animator?.playSalute()
   }
 
@@ -908,6 +976,8 @@ export class Player {
   stab(): void {
     if (this.down || this.boxed || this.saluting) return
     if (this.downed || this.standing) return
+    // 箱を落とされた直後は棒立ち。刺しに転じられない
+    if (this.bumping) return
     this.animator?.playStab()
   }
 
@@ -926,6 +996,17 @@ export class Player {
     // 敬礼が終わるまでは構えられない。礼と戦闘は両立しないので、
     // 途中で打ち切るのではなく最後まで下ろさせる
     if (this.saluting) return
+    /*
+     * 箱を落とされた直後も構えられない。**撃てなくなるのはここ。**
+     *
+     * 撃つかどうかは持ち物が決めていて (domain/item/inventory.ts の canShoot)、
+     * その第一条件が「構えているか」。棒立ちの間を撃てなくするのに、
+     * 撃つ側の条件を増やさずに済む。
+     */
+    if (this.bumping) {
+      this.aiming = false
+      return
+    }
     // 箱の中では構えられない。入力そのものを捨てるので、押しても脱げない。
     //
     // 「構えたら自動で脱ぐ」にしていたが、それだと隠れることの代償が無くなる。
@@ -964,6 +1045,16 @@ export class Player {
   }
 
   /** しゃがんでいるか。散布と視点の高さに効く */
+  /**
+   * いまの構え。**モーションから引く。**
+   *
+   * 屈みの旗とは別。伏せも爆風で転んでいる間も旗の上では屈みなので、
+   * そちらを読むと区別が付かない (頭の高さも当たり判定も構えで決まる)。
+   */
+  get stance(): Stance {
+    return stanceOf(this.locomotion)
+  }
+
   get isCrouching(): boolean {
     return this.crouching
   }
@@ -1013,7 +1104,112 @@ export class Player {
       this.dropBox()
       return
     }
+    // 出入りの最中は受け付けない。**繋ぎを途中で切らない**
+    if (this.proneShifting) return
+    // 伏せているなら、まず起き上がる。**戻る先はしゃがみ** (型がそこで終わる)
+    if (this.proneStage === 'prone') {
+      this.riseFromProne()
+      return
+    }
     this.crouching = !this.crouching
+  }
+
+  /**
+   * 伏せの段取り。
+   *
+   *     none        伏せていない
+   *     prone_down  伏せに入っている最中 (0.9 秒)
+   *     prone       伏せている
+   *     prone_rise  起き上がっている最中 (1.8 秒)
+   *
+   * **入り / 出を旗 1 つで表せない。** 入っている最中はまだ伏せていないし、
+   * 出ている最中はもう伏せていない。旗 1 つにすると、繋ぎのモーションが
+   * 流れている間の頭の高さも動けるかどうかも決められなくなる。
+   */
+  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' = 'none'
+  /** 繋ぎのモーションの残り時間 (秒) */
+  private proneShiftLeft = 0
+  /** 這う向きの置き場。毎フレーム作らない */
+  private readonly crawlDir = new THREE.Vector3()
+
+  /** 伏せ切っているか。入り / 出の最中は false */
+  get isProne(): boolean {
+    return this.proneStage === 'prone'
+  }
+
+  /**
+   * いま進む速さの倍率。**這っている間だけ蹴りに合わせて脈打つ。**
+   *
+   * 這う動きは腕で進むので、足が地面を掻いた瞬間だけ体が前へ出る。等速で
+   * 滑らせると、手足を動かしているのに一定の速さで運ばれる形になる。
+   */
+  private crawlSurge(): number {
+    if (!this.crawling || !this.animator) return 1
+    return crawlSurge(this.animator.crawlPhase)
+  }
+
+  /** 堪える着地の最中か。**この間は撃てない** (domain/item/inventory.ts) */
+  get landing(): boolean {
+    return this.hardLandTimer > 0
+  }
+
+  /**
+   * 伏せて這っている最中か。**這いながらは撃てない** (domain/item/inventory.ts)。
+   *
+   * 速さではなくモーションから見る。**画面に出ている型と撃てるかどうかを
+   * 一致させる**ため — 速さで別に線を引くと、這う型に見えているのに撃てたり、
+   * 止まって見えるのに撃てなかったりする (境目でのちらつきも別々に出る)。
+   */
+  get crawling(): boolean {
+    return this.locomotion === 'crawl_f'
+  }
+
+  /** 伏せへ出入りしている最中か。**この間は動けない** */
+  get proneShifting(): 'prone_down' | 'prone_rise' | null {
+    return this.proneStage === 'prone_down' || this.proneStage === 'prone_rise'
+      ? this.proneStage
+      : null
+  }
+
+  /**
+   * 伏せる。**飛び込んだ勢いのまま腹這いになる。**
+   *
+   * 入口はローリングの終わりだけ (Game の updateStanceInput)。押しっぱなしで
+   * 転がり切ると立たずに伏せる、という形にしてある — 単独の姿勢切り替えを
+   * 置くより、**転がって身を隠す**という一続きの動作になる。
+   *
+   * すぐには伏せない。膝を突いてから腹這いになる型を挟む — **間を見せることが
+   * 代償**で、倒れる (sweep) / 起き上がる (stand) と同じ形。
+   *
+   * 起き上がるのは Space のタップ (toggleCrouch)。
+   */
+  setProne(on: boolean): void {
+    if (!on) {
+      this.proneStage = 'none'
+      this.proneShiftLeft = 0
+      return
+    }
+    if (this.proneStage !== 'none') return
+    if (this.down || this.downed || this.standing || this.boxed) return
+    if (!this.onGround) return
+    this.proneStage = 'prone_down'
+    this.proneShiftLeft = this.animator?.proneDownDuration ?? 0
+    // 伏せは屈みの延長。頭の高さも音の届き方もそちら側で扱う
+    this.crouching = true
+    this.animator?.playProneDown()
+  }
+
+  /**
+   * 伏せから起き上がる。**戻る先はしゃがみ。**
+   *
+   * 型がしゃがみで終わるので、立ちへ戻すと型の終わりと姿勢が食い違う。
+   * 立ちたければもう一度押す。
+   */
+  private riseFromProne(): void {
+    if (this.proneStage !== 'prone') return
+    this.proneStage = 'prone_rise'
+    this.proneShiftLeft = this.animator?.proneRiseDuration ?? 0
+    this.animator?.playProneRise()
   }
 
   /** ローリングの尺 (秒)。モデル未着なら 0 */
@@ -1049,6 +1245,10 @@ export class Player {
     // 箱を被ったままは転がれない。脱ぐ動作を挟ませることで、
     // 隠れている状態から即座に回避へ移れないようにする。
     if (this.boxed || this.saluting) return
+    // 箱を落とされた直後は棒立ち。**ここで転がれると代償が消える**
+    if (this.bumping) return
+    // 伏せからは転がれない。**起き上がる一手を挟ませる**
+    if (this.proneStage !== 'none') return
     this.crouching = false
     // 向きは踏み切った時点で固定する。転がっている間は舵が効かない。
     this.rollYaw = this.yaw
@@ -1075,21 +1275,42 @@ export class Player {
     this.animator?.playReload(seconds)
   }
 
+  /** 装填を途中でやめる。姿勢が変わったときに呼ぶ */
+  cancelReload(): void {
+    this.animator?.cancelReload()
+  }
+
+  /**
+   * 装填の最中か。**伏せている間だけ体を縛る。**
+   *
+   * 立ちとしゃがみは動きながら替えられるので、見るのは伏せの分岐だけ。
+   * 縛るのは**這うことだけ**で、起き上がるのは通す — あちらは中断になる
+   * (Game の updateWeapon)。動きたいなら姿勢を変えろ、という形。
+   */
+  private reloadHold = false
+
+  setReloadHold(on: boolean): void {
+    this.reloadHold = on
+  }
+
   /** 武器の握り位置と角度を作り直す (調整用。確定したら weapon.ts の定数へ焼き込む) */
   calibrateWeapon(target: WeaponTarget, grip: THREE.Vector3, rotation: THREE.Euler): void {
     if (target === 'knife') {
       this.knife?.setStanceValues(false, grip, rotation)
       return
     }
+    /*
+     * どの銃への調整か。**名前から機械的に出す。**
+     *
+     * 前方一致を並べて、どれにも当たらなければライフル、という書き方をして
+     * いた。銃を 1 挺増やしたときに一覧へ足し忘れると、**その銃をいじった値が
+     * 黙ってライフルへ流れる** — パネルは動くのに手元の銃は変わらない、という
+     * 形で出た。名前は「銃の id + Crouch」で作られているので、後ろを落とせば
+     * それが答えになる。
+     */
+    const kind = target.replace(/Crouch$/, '') as WeaponId
     // 持っていない銃への調整は捨てる。パネル側が持ち替えに追従するので、
     // 通常はここで落ちない
-    const kind: WeaponId = target.startsWith('sniper')
-      ? 'sniper'
-      : target.startsWith('pistol')
-        ? 'pistol'
-        : target.startsWith('smg')
-          ? 'smg'
-          : 'rifle'
     if (kind !== this.weaponKind) return
     this.weapon?.setStanceValues(target.endsWith('Crouch'), grip, rotation)
   }
@@ -1250,6 +1471,41 @@ export class Player {
     // 意味が出る。挙げると決めたら、下ろし切るまでは無防備でいる。
     if (this.saluting) moveDir = ZERO_MOVE
 
+    // 箱を落とされた直後も同じ。**驚いている間は入力そのものを捨てる** —
+    // 速さを 0 にするだけだと、体は動かないのに向きだけ入力どおりに変わる
+    if (this.bumpLeft > 0) moveDir = ZERO_MOVE
+
+    /*
+     * 伏せている間は**前へしか這えない。**
+     *
+     * 這う型が前進の 1 本しかない。横や後ろへ滑る体が前へ進む型をしていると
+     * 確実に崩れるので、行けない向きは行けないままにする。向きはマウスで
+     * 変えられるので、進む先を選べないわけではない。
+     *
+     * 前を向いている成分だけを残す。斜め入力でも前へ進むぶんだけ効く。
+     */
+    // 出入りの最中は入力ごと捨てる。向きだけ変わるのを防ぐ
+    if (this.proneShifting) moveDir = ZERO_MOVE
+    // 伏せて装填している間は這えない。**替えるか進むかのどちらか**
+    if (this.reloadHold && this.proneStage === 'prone') moveDir = ZERO_MOVE
+    /*
+     * 堪える着地の間も動けない。
+     *
+     * 転がる型だった頃は焼かれた移動を辿る仕掛けが入力ごと押さえていた
+     * (tumbling)。堪える型に差し替えてそこから外したときに、**押さえる側も
+     * 一緒に外れて**いた — 膝を突いたまま走り出せる形になっていた。
+     */
+    if (this.hardLandTimer > 0) moveDir = ZERO_MOVE
+
+    if (this.proneStage === 'prone' && moveDir !== ZERO_MOVE) {
+      const sin = Math.sin(facingYaw)
+      const cos = Math.cos(facingYaw)
+      // yaw = θ のとき前方は (-sinθ, -cosθ)
+      const forward = moveDir.x * -sin + moveDir.z * -cos
+      if (forward <= 0) moveDir = ZERO_MOVE
+      else moveDir = this.crawlDir.set(-sin * forward, 0, -cos * forward)
+    }
+
     // 銃の重さはどの姿勢でも効く。担いでいる物が軽くなるわけではないので。
     //
     // 構えている間だけは重さを見ない。あちらは狙いを保つために遅くしている
@@ -1272,7 +1528,18 @@ export class Player {
     if (this.boxed) {
       targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * boxMoveScale(this.skills) * carrying
     }
+    // 伏せは一番遅い。**担いでいる物は効かない** — 腕で這うので、
+    // 背中の銃の重さが進みに出る形になっていない
+    if (this.proneStage === 'prone') targetSpeed = this.moveSpeed * PRONE_SPEED_SCALE
+    // 出入りの最中は動けない。倒れる / 起き上がるのと同じ
+    if (this.proneShifting) targetSpeed = 0
     if (this.down) targetSpeed = 0
+    // 箱を落とされた直後は動けない。**慣性も残さない** — 滑りながら驚くと、
+    // 見つかったことが代償に見えない
+    if (this.bumpLeft > 0) {
+      targetSpeed = 0
+      this.currentSpeed = 0
+    }
     this.currentSpeed = damp(this.currentSpeed, targetSpeed, SPEED_LAMBDA, dt)
 
     /*
@@ -1287,14 +1554,31 @@ export class Player {
      */
     let overrideX: number | undefined
     let overrideZ: number | undefined
-    const tumbling = this.rolling || this.fallRollTimer > 0
+
+    /*
+     * 爆風で飛んでいる間。**転がりより先に見る。**
+     *
+     * 吹き飛ばされたら転がりも受け身も始まらない (倒れているので)。ぶつかれば
+     * 止まる — 速度として渡しているので、押し戻しも接地も効く。
+     */
+    if (this.knockLeft > 0) {
+      this.knockLeft = Math.max(0, this.knockLeft - dt)
+      // 速さの式はドメインルール。**的も同じ式で滑る** (server/match.ts) ので、
+      // ここで別に持つと同じ爆風で飛ぶ距離が変わる
+      const speed = knockSpeed(this.knockLeft)
+      overrideX = this.knockX * speed
+      overrideZ = this.knockZ * speed
+    }
+
+    // 転がっている間だけ、焼かれた移動を辿る。**着地は動かない**
+    const tumbling = overrideX === undefined && this.rolling
     if (tumbling) {
       overrideX = 0
       overrideZ = 0
       if (dt > 0 && this.animator?.consumeRootMotion(this.scratchVelocity)) {
         // モデル空間 (正面 +Z) の移動をワールドへ写す。
         // モデルは 180° 回してあるので yaw + π の回転になる。
-        const yaw = this.rolling ? this.rollYaw : this.fallRollYaw
+        const yaw = this.rolling ? this.rollYaw : this.hardLandYaw
         const sin = Math.sin(yaw)
         const cos = Math.cos(yaw)
         const dx = this.scratchVelocity.x
@@ -1309,7 +1593,10 @@ export class Player {
       {
         dirX: moveDir.x,
         dirZ: moveDir.z,
-        speed: this.currentSpeed,
+        // **蹴った瞬間だけ前へ出る。** 均せば今までと同じ速さ (crawlSurge)。
+        // currentSpeed のほうは動かさない — あれは型の再生速度も決めているので、
+        // 揺らすと足の運びまで速くなったり遅くなったりする
+        speed: this.currentSpeed * this.crawlSurge(),
         overrideX,
         overrideZ,
       },
@@ -1379,10 +1666,10 @@ export class Player {
     if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED && !stepDown) {
       this.landingTimer = LANDING_TIME
       if (fallDamage(moved.impactSpeed) > 0) {
-        this.fallRollTimer = FALL_ROLL_TIME
+        this.hardLandTimer = HARD_LAND_TIME
         // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
-        this.fallRollYaw = this.yaw
-        this.animator?.playFallRoll()
+        this.hardLandYaw = this.yaw
+        this.animator?.playHardLand()
       } else {
         this.animator?.playLanding()
       }
@@ -1391,7 +1678,16 @@ export class Player {
     // サーバーなので、速さを申告して同じ式 (damage.ts) を向こうで通してもらう
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.landingTimer > 0) this.landingTimer -= dt
-    if (this.fallRollTimer > 0) this.fallRollTimer -= dt
+    if (this.hardLandTimer > 0) this.hardLandTimer -= dt
+    if (this.bumpLeft > 0) this.bumpLeft -= dt
+    // 繋ぎが終わったら次の段へ。起き上がりの先はしゃがみ
+    if (this.proneShiftLeft > 0) {
+      this.proneShiftLeft -= dt
+      if (this.proneShiftLeft <= 0) {
+        this.proneStage = this.proneStage === 'prone_down' ? 'prone' : 'none'
+        if (this.proneStage === 'none') this.crouching = true
+      }
+    }
     /*
      * 最後に地面へ触れていた高さ。**判定を通したあとで控える。**
      *
@@ -1437,7 +1733,15 @@ export class Player {
       }
       this.animator.setLocomotion(this.resolveLocomotion(moveDir))
       // 構えていないときに体が照準の上下へ傾くと、ただ歩いているのに前後に折れて見える
-      this.animator.setAimPitch(this.aiming ? aimPitch : 0)
+      /*
+       * 上体を照準の上下へ傾けるのは**立っている体の話**。
+       *
+       * 腹這いだと背骨の回転面が横倒しなので、同じ角度を当てると体を起こす
+       * 向きに効く。伏せている間は 0 のままにする (伏せ撃ちの型が入るまでは
+       * 上半身も這う型なので、傾ける先の姿勢がそもそも無い)。
+       */
+      const upright = this.aiming && this.proneStage === 'none'
+      this.animator.setAimPitch(upright ? aimPitch : 0)
       this.animator.setAiming(this.aiming)
       this.animator.update(dt)
 
@@ -1702,12 +2006,15 @@ export class Player {
       saluting,
       downed: this.downed,
       standingUp: this.standing,
+      bumped: this.bumpLeft,
+      prone: this.proneStage === 'prone',
+      proneShift: this.proneShifting,
       stabbing: this.stabbing,
       setting: this.animator?.setupLocomotion ?? null,
       rolling: this.rolling,
       onGround: this.onGround,
       landing: this.landingTimer,
-      fallRoll: this.fallRollTimer,
+      hardLand: this.hardLandTimer,
       airborneFor: this.airborneFor,
       stairFor: this.stairFor,
       stairDown: this.stairDown,

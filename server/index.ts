@@ -45,7 +45,7 @@ import { HELD } from '../src/domain/item/held'
 import { triggeredBy } from '../src/sim/judge/claymore'
 import { TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
-import { loadSkills } from './skills'
+import { loadSkills, saveSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
@@ -378,9 +378,22 @@ function handleMessage(
      * 最初から閉じているので、これは普通に起きる)。
      */
     case 'skills': {
-      if (!chooseSkills(player, message.skills, room.phase)) {
+      const before = JSON.stringify(player.skills)
+      if (!chooseSkills(player, message.skills, room.phase, room.mode)) {
         reject(player, `選べないスキル (${JSON.stringify(message.skills)})`)
       }
+      /*
+       * **通った選択はその場で残す。**
+       *
+       * 長らく試合が始まった瞬間に 1 回だけ書いていた。選べる窓が閉じる瞬間
+       * なので 1 か所で足りる、という理屈だったが、**練習の部屋は試合が
+       * 終わらない** (room.ts の tickets: false)。始まりが一度しか来ないので、
+       * そこで選び直した分は永久に書かれず、繋ぎ直すたびに未選択に戻っていた。
+       *
+       * 変わっていないなら書かない。段を触るたびに送られてくるので、
+       * 同じ物を書き直す往復だけが増える。
+       */
+      if (JSON.stringify(player.skills) !== before) saveSkills(player.id, player.skills)
       sendSkills(player)
       break
     }

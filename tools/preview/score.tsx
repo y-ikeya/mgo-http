@@ -3,9 +3,11 @@
  *
  *     bunx vite → http://localhost:5173/tools/preview/score.html?case=dm
  */
+import { createSignal, onMount } from 'solid-js'
 import { render } from 'solid-js/web'
 import Scoreboard from '../../src/presentation/ui/Scoreboard'
 import type { GameStats } from '../../src/presentation/scene/Game'
+import type { Skills } from '../../src/domain/player/skill'
 
 const players = [
   { id: 'me', name: 'pepa1404', team: 'blue', kills: 7, deaths: 3, suicides: 0, away: false, rate: 64 },
@@ -27,7 +29,29 @@ const tdm = {
 } as unknown as GameStats
 
 const which = new URLSearchParams(location.search).get('case') ?? 'dm'
-render(
-  () => <Scoreboard stats={which === 'tdm' ? tdm : dm} selfId="me" identity={{ subject: 'me' } as never} />,
-  document.getElementById('root')!,
-)
+/** 練習部屋なら組み替えられる。?open=1 でその姿を見る */
+const open = new URLSearchParams(location.search).get('open') === '1'
+
+function Preview() {
+  const [skills, setSkills] = createSignal<Skills>({ rifleMastery: 2, runner: 1 })
+  // ?tab=skills でスキルの板を開いた姿を写す (無頭では押せないので代わりに押す)
+  onMount(() => {
+    if (new URLSearchParams(location.search).get('tab') !== 'skills') return
+    const tabs = document.querySelectorAll<HTMLButtonElement>('.score-tab')
+    tabs[1]?.click()
+  })
+  return (
+    <Scoreboard
+      stats={which === 'tdm' ? tdm : dm}
+      selfId="me"
+      identity={{ subject: 'me' } as never}
+      skills={skills()}
+      skillsOpen={open}
+      onSkill={(id, level) => setSkills({ ...skills(), [id]: level || undefined })}
+      onClose={() => {}}
+      onLeave={() => {}}
+    />
+  )
+}
+
+render(() => <Preview />, document.getElementById('root')!)

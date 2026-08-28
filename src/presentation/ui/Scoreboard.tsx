@@ -1,10 +1,12 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../../i18n'
 import { MODES } from '../../domain/match/room'
+import { SKILL_BUDGET, costOf, type SkillId, type Skills } from '../../domain/player/skill'
 import { pointsOf } from '../../domain/match/scoring'
 import { useLevels } from '../../infra/api/levels'
 import type { Identity } from '../../infra/auth/session'
 import type { GameStats } from '../scene/Game'
+import { SkillList } from './SkillPanel'
 import './Scoreboard.css'
 
 /**
@@ -25,7 +27,19 @@ export default function Scoreboard(props: {
   selfId: string
   onClose: () => void
   onLeave: () => void
+  /** いま付けているスキル */
+  skills: Skills
+  /** 組み替えてよいか。練習部屋はいつでも開いている (domain/player/skill.ts) */
+  skillsOpen: boolean
+  onSkill: (id: SkillId, level: number) => void
 }) {
+  /**
+   * どの板を見ているか。**成績表とスキルを 1 枚に重ねる。**
+   *
+   * どちらも「Tab を押して、撃ち合いを止めて見る物」なので、開き方を別に
+   * するとキーが 2 つ要る。指を離している間に見る物はここに集める。
+   */
+  const [tab, setTab] = createSignal<'board' | 'skills'>('board')
   /** 決着したあとか。そのときは成績表がそのままリザルト画面になる */
   // 名前の横に出す Lv。通算から出るのでサーバーは知らない
   const levelFor = useLevels(
@@ -120,6 +134,37 @@ export default function Scoreboard(props: {
           </Show>
         </header>
 
+        {/*
+          板を選ぶ。**アイコンだけ。** 名前を書くほどの数ではないし、
+          Tab で開いた直後に読ませたいのは中身のほう。
+        */}
+        <nav class="score-tabs">
+          <button
+            class="score-tab"
+            classList={{ 'score-tab-on': tab() === 'board' }}
+            title="対戦表"
+            onClick={() => setTab('board')}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="2.5" y="1.5" width="11" height="13" rx="1" />
+              <path d="M5 5h6M5 8h6M5 11h4" />
+            </svg>
+          </button>
+          <button
+            class="score-tab"
+            classList={{ 'score-tab-on': tab() === 'skills' }}
+            title="スキル"
+            onClick={() => setTab('skills')}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 6h9v2.5H2z" />
+              <path d="M11 7h3.5M5 8.5l-1 3h2.2l.8-3M8.6 8.5l-.7 2.7" />
+            </svg>
+          </button>
+        </nav>
+
+
+        <Show when={tab() === 'board'}>
         {/*
           個人戦。**1 本の順位表。** 陣営で分けると「味方が居る」に読める。
           順位を左に振って、上から強い順であることを見せる。
@@ -230,6 +275,31 @@ export default function Scoreboard(props: {
             )}
           </For>
         </div>
+        </Show>
+        </Show>
+
+        {/*
+          スキル。**練習部屋は組み替えられる、それ以外は見るだけ。**
+
+          効き目を確かめる場所で試合の切れ目を待たせると確かめられないので、
+          練習部屋だけ窓を開けてある (domain/player/skill.ts の canChooseSkills)。
+          閉じている部屋でも並べるのは、**いま自分が何を付けているか**が
+          撃ち合いの最中に思い出せないから。
+        */}
+        <Show when={tab() === 'skills'}>
+          <div class="score-skills">
+            <div class="score-skills-head">
+              <span class="score-skills-budget" classList={{ 'score-skills-full': costOf(props.skills) >= SKILL_BUDGET }}>
+                {costOf(props.skills)} / {SKILL_BUDGET}
+              </span>
+              <Show when={!props.skillsOpen}>
+                <span class="score-skills-locked">試合中は変更不可</span>
+              </Show>
+            </div>
+            <div class="score-skills-list">
+              <SkillList skills={props.skills} open={props.skillsOpen} onSkill={props.onSkill} />
+            </div>
+          </div>
         </Show>
 
         <footer class="score-foot">

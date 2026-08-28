@@ -23,7 +23,7 @@
  */
 
 /** 撃てる物 */
-export type GunId = 'smg' | 'rifle' | 'sniper' | 'pistol'
+export type GunId = 'smg' | 'rifle' | 'sniper' | 'pistol' | 'shotgun'
 
 /** 投げる物・置く物。support の枠に入る */
 export type ThrowId = 'grenade' | 'claymore' | 'magazine'
@@ -111,6 +111,7 @@ export const HELD: Record<HeldId, HeldSpec> = {
   smg: { id: 'smg', label: 'P90', family: 'weapon', slot: 'primary', weight: 2.6, shoots: true, twoHanded: true },
   rifle: { id: 'rifle', label: 'AK47', family: 'weapon', slot: 'primary', weight: 3.5, shoots: true, twoHanded: true },
   sniper: { id: 'sniper', label: 'XM2010', family: 'weapon', slot: 'primary', weight: 5.5, shoots: true, twoHanded: true },
+  shotgun: { id: 'shotgun', label: 'M870', family: 'weapon', slot: 'primary', weight: 3.6, shoots: true, twoHanded: true },
   pistol: { id: 'pistol', label: 'M9', family: 'weapon', slot: 'secondary', weight: 0.95, shoots: true, twoHanded: false },
 
   // 投げる物は軽い。**持ち替えると速くなる**のがそのまま戦い方になる

@@ -179,7 +179,7 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 静かに消えて素の姿勢 (T ポーズ) が出る。
 
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
-`fall_roll` `up_stair` `down_stair`) は
+`hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 

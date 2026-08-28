@@ -35,9 +35,17 @@
     "Sneaking Forward.fbx": "sneak",
     "Male Sitting Pose.fbx": "sit",
     "pose.fbx": "away",
-    "fallRoll.fbx": "fall_roll",
+    "hardLanding.fbx": "hard_land",
     "upStair.fbx": "up_stair",
-    "downStair.fbx": "down_stair"
+    "downStair.fbx": "down_stair",
+    "boxHit.fbx": "bump",
+    "proneForward.fbx": "crawl_f",
+    "kneelToProne.fbx": "prone_down",
+    "proneToCrouch.fbx": "prone_rise",
+    "proneFiring.fbx": "prone_fire",
+    "proneReload.fbx": "prone_reload",
+    "dieFront.fbx": "death_front",
+    "dieBack.fbx": "death_back"
   },
   "out": "public/models/soldier.glb",
   "maxTexture": 1024

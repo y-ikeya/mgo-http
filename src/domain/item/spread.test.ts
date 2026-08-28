@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { Spread } from './spread'
-import type { Skills } from '../player/skill'
-import { WEAPONS } from './weapons'
+import { masterySpreadScale, type Skills } from '../player/skill'
+import { pelletsOf, shotgunBand, WEAPONS } from './weapons'
 
 /**
  * 散布と反動は「**止まって撃つほうが当たる**」を作るためにある。
@@ -277,5 +277,122 @@ describe('手ブレ', () => {
   /** **主武器のほうが大きく泳ぐ。** 遠くを狙うなら極める動機が要る */
   test('拳銃は主武器より泳がない', () => {
     expect(WEAPONS.pistol.sway).toBeLessThan(WEAPONS.rifle.sway)
+  })
+})
+
+/**
+ * 散弾の粒。**銃そのものの散らばり。**
+ *
+ * 狙いの散布 (degrees) は腕の乱れで、動けば開いて止まれば締まる。粒の散りは
+ * 銃の性質なので、**止まって構えても、極めても消えない** — 消せてしまうと
+ * 散弾銃が「近距離で必ず全弾当たる銃」になって、間合いの武器でなくなる。
+ */
+describe('散弾の粒', () => {
+  const shotgun = WEAPONS.shotgun
+
+  test('粒は 1 発で 8 つに分かれる', () => {
+    expect(pelletsOf(shotgun)).toBe(8)
+  })
+
+  test('**散弾以外は 1 粒。** 今までの銃は 1 発が 1 つの道を通る', () => {
+    for (const id of ['rifle', 'smg', 'sniper', 'pistol'] as const) {
+      expect(pelletsOf(WEAPONS[id])).toBe(1)
+    }
+  })
+
+  test('粒ごとに別の向きへ散る', () => {
+    const spread = new Spread()
+    const first = spread.pelletFor(shotgun, 7, 0)
+    const second = spread.pelletFor(shotgun, 7, 1)
+    expect(first.angle01).not.toBe(second.angle01)
+  })
+
+  test('**同じ弾の同じ粒なら同じ所へ。** 種から引いている', () => {
+    const a = new Spread().pelletFor(shotgun, 7, 3)
+    const b = new Spread().pelletFor(shotgun, 7, 3)
+    expect(a).toEqual(b)
+  })
+
+  test('別の弾なら別の所へ', () => {
+    const spread = new Spread()
+    expect(spread.pelletFor(shotgun, 7, 0)).not.toEqual(spread.pelletFor(shotgun, 8, 0))
+  })
+
+  /**
+   * **止まっても締まらない。** 狙いの散布は止まれば 0 まで落ちるが、粒の散りは
+   * そこと関係が無い。
+   */
+  test('姿勢でも連射でも変わらない', () => {
+    const advance = (posture: typeof still) => {
+      const spread = new Spread()
+      for (let i = 0; i < 180; i++) spread.update(1 / 60, shotgun, posture)
+      return spread
+    }
+    const moving = advance(running)
+    const stopped = advance(still)
+    expect(moving.degrees(shotgun, NONE)).toBeGreaterThan(stopped.degrees(shotgun, NONE))
+    // 粒の散りはどちらでも同じ
+    expect(moving.pelletFor(shotgun, 1, 0).degrees).toBe(
+      stopped.pelletFor(shotgun, 1, 0).degrees,
+    )
+  })
+
+  test('**極めても粒は散る。** 締まるのは狙いのほうだけ', () => {
+    const spread = new Spread()
+    const master: Skills = { shotgunMastery: 3 }
+    expect(spread.pelletFor(shotgun, 1, 0).degrees).toBe(shotgun.pelletSpread ?? 0)
+    expect(masterySpreadScale(master, 'shotgun')).toBeLessThan(1)
+  })
+
+  test('散弾以外は粒が散らない (0 度)', () => {
+    expect(new Spread().pelletFor(WEAPONS.rifle, 1, 0).degrees).toBe(0)
+  })
+})
+
+/**
+ * 散弾の威力。**当たった距離だけで決まる。**
+ *
+ * 粒の数では数えない。数えると「たまたま何粒入ったか」で結果が変わる。
+ * 近さで言い切ると、**間合いを詰めるかどうか**という一つの問いになる。
+ */
+describe('散弾の帯', () => {
+  test('8m 以内は半分削って吹き飛ばす', () => {
+    const band = shotgunBand(6)
+    expect(band?.damage).toBe(50)
+    expect(band?.knock).toBe(true)
+    expect(band?.flinch).toBe(false)
+  })
+
+  test('16m 以内は 1/4 で怯ませる。**押し切れない**', () => {
+    const band = shotgunBand(12)
+    expect(band?.damage).toBe(25)
+    expect(band?.knock).toBe(false)
+    expect(band?.flinch).toBe(true)
+  })
+
+  test('24m 以内は 1/8 だけ。怯みもしないので牽制にもならない', () => {
+    const band = shotgunBand(20)
+    expect(band?.damage).toBe(12.5)
+    expect(band?.knock).toBe(false)
+    expect(band?.flinch).toBe(false)
+  })
+
+  test('**24m より先は当たらない。** 撒いた粒が偶然届いて削れる、を無くす', () => {
+    expect(shotgunBand(24.1)).toBeNull()
+    expect(shotgunBand(60)).toBeNull()
+  })
+
+  test('境目は内側に含む', () => {
+    expect(shotgunBand(8)?.damage).toBe(50)
+    expect(shotgunBand(16)?.damage).toBe(25)
+    expect(shotgunBand(24)?.damage).toBe(12.5)
+  })
+
+  test('**近いほど強い。** 帯をまたぐたびに半分になる', () => {
+    const near = shotgunBand(4)!.damage
+    const mid = shotgunBand(12)!.damage
+    const far = shotgunBand(20)!.damage
+    expect(mid).toBe(near / 2)
+    expect(far).toBe(mid / 2)
   })
 })

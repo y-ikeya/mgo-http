@@ -14,6 +14,7 @@ import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from '../item/w
 import type { Player } from './player'
 import { canChooseSkills, isAffordable, type Skills } from './skill'
 import type { Phase } from '../match/match'
+import type { ModeSpec } from '../match/room'
 
 /** 支度で選べる主武器か。**受け取った文字列を信じない** */
 export function isPrimaryChoice(id: string): id is WeaponId {
@@ -87,8 +88,13 @@ export function chooseLoadout(
  *
  * どちらも**黙って一部だけ通さない**。半分だけ効いた状態を本人に説明できない。
  */
-export function chooseSkills(player: Player, skills: unknown, phase: Phase): boolean {
-  if (!canChooseSkills(phase)) return false
+export function chooseSkills(
+  player: Player,
+  skills: unknown,
+  phase: Phase,
+  mode?: ModeSpec,
+): boolean {
+  if (!canChooseSkills(phase, mode)) return false
   if (skills === null || typeof skills !== 'object') return false
   if (!isAffordable(skills as Skills)) return false
   player.skills = skills as Skills

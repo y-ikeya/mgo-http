@@ -53,12 +53,23 @@ export const LOCOMOTIONS: Locomotion[] = [
   'claymore_place',
   // しゃがんだまま刺す。**末尾に足す**
   'crouch_stab',
-  // 落下の受け身。**末尾に足す**
-  'fall_roll',
+  // 削られる高さから落ちた着地。**末尾に足す**
+  'hard_land',
   // 階段を上る。**末尾に足す**
   'up_stair',
   // 階段を下りる。**末尾に足す**
   'down_stair',
+  // ダンボールで敵にぶつかった。**末尾に足す**
+  'bump',
+  // 伏せ / 匍匐前進。**末尾に足す**
+  'prone_idle',
+  'crawl_f',
+  // 伏せへの出入り。**末尾に足す**
+  'prone_down',
+  'prone_rise',
+  // 倒れる向き。**末尾に足す**
+  'death_front',
+  'death_back',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -105,28 +116,31 @@ const OFF_FLAGS2 = 35 // u8
  * 描かないといけないし、サーバーは威力の計算にそれを使う。
  */
 const OFF_HELD = 36 // u8
-export const SNAPSHOT_BYTES = 37
+/**
+ * 提げている銃。**1 バイトに移した。**
+ *
+ * 長らく旗の 2 ビットに詰めていて、4 挺で埋まっていた。ショットガンを足す
+ * 時に溢れる — 足りないまま増やすと別の銃として読まれて威力が変わる
+ * (狙撃銃で実際に起きた)。
+ *
+ * 手にある物 (held) から導けそうに見えるが、**別物**。手榴弾を構えている間も
+ * 提げている銃は決まっていて、サーバーはそちらで威力を引く。1 バイトずつ
+ * 持つのが素直で、64 通/秒でも 1 バイトは問題にならない。
+ */
+const OFF_WEAPON = 37 // u8
+export const SNAPSHOT_BYTES = 38
 
 const FLAG_AIMING = 1
 const FLAG_CROUCHING = 2
 const FLAG_CONCENTRATING = 8
 const FLAG_SALUTE = 16
 /**
- * 持っている銃。2 ビットで 4 種類まで。**P90 で埋まった。**
+ * 提げている銃の番号。**末尾に足す** — 変えると古い版が別の銃として読む。
  *
  * 見た目 (相手が何を構えているか) と、サーバーの威力の計算に要る。
- * 銃を増やすときはここを広げる — 足りないまま増やすと、別の銃として扱われて
- * 威力が変わる (狙撃銃で実際に起きた)。
- *
- * 次の 1 挺 (SG) を足すときは、ここを広げるのではなく **held (u8) に寄せる**。
- * 「いま手にある物」は既にあちらが 1 バイトで持っていて、この 2 ビットは
- * 同じことを別の場所で言っている。
  */
-const FLAG_WEAPON_LOW = 32
-const FLAG_WEAPON_HIGH = 128
-
-/** 番号の並び。変えると古い版が別の銃として読む */
-const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol', 'smg']
+const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol', 'smg', 'shotgun']
+const WEAPON_INDEX = new Map(WEAPON_BITS.map((id, i) => [id, i]))
 
 /**
  * 手にある物の番号。**末尾に足す** — 並びを変えると古い版が別の物を持って見える。
@@ -136,6 +150,8 @@ const HELD_BITS: HeldId[] = [
   // 道具を使っていない状態。**末尾に足す**
   'none',
   'smg',
+  // 散弾銃。**末尾に足す**
+  'shotgun',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 
@@ -176,9 +192,6 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   if (snapshot.crouching) flags |= FLAG_CROUCHING
   if (snapshot.concentrating) flags |= FLAG_CONCENTRATING
   if (snapshot.saluteHeld) flags |= FLAG_SALUTE
-  const weapon = Math.max(0, WEAPON_BITS.indexOf(snapshot.weapon))
-  if (weapon & 1) flags |= FLAG_WEAPON_LOW
-  if (weapon & 2) flags |= FLAG_WEAPON_HIGH
   view.setUint8(OFF_FLAGS, flags)
 
   const turns = snapshot.cameraYaw / (Math.PI * 2)
@@ -189,6 +202,7 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
     (snapshot.reloading ? FLAG2_RELOADING : 0) | (snapshot.holdingGrenade ? FLAG2_WINDUP : 0),
   )
   view.setUint8(OFF_HELD, HELD_INDEX.get(snapshot.held) ?? 0)
+  view.setUint8(OFF_WEAPON, WEAPON_INDEX.get(snapshot.weapon) ?? 0)
 
   return buffer
 }
@@ -213,10 +227,7 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     boxed: held === 'box',
     concentrating: (flags & FLAG_CONCENTRATING) !== 0,
     saluteHeld: (flags & FLAG_SALUTE) !== 0,
-    weapon:
-      WEAPON_BITS[
-        ((flags & FLAG_WEAPON_LOW) !== 0 ? 1 : 0) | ((flags & FLAG_WEAPON_HIGH) !== 0 ? 2 : 0)
-      ] ?? 'rifle',
+    weapon: WEAPON_BITS[view.getUint8(OFF_WEAPON)] ?? 'rifle',
     // **振りかぶっているか。** 手にしているだけでは立たない
     holdingGrenade: (view.getUint8(OFF_FLAGS2) & FLAG2_WINDUP) !== 0,
     cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,

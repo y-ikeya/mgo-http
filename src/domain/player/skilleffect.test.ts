@@ -3,7 +3,7 @@ import { Spread } from '../item/spread'
 import { carrySpeedScale, WEAPONS } from '../item/weapons'
 import { THROW_SPEED, throwSpeedOf } from '../item/grenade'
 import { isLeakedTo, leakTag, newPlayer, refill, type Player } from './player'
-import { masteryReloadScale, runnerScale, type Skills } from './skill'
+import { masteryRecoveryScale, masteryReloadScale, runnerScale, type Skills } from './skill'
 
 /**
  * スキルが**効いているか**の試験。
@@ -96,17 +96,74 @@ describe('MASTERY が反動の乱れに効く', () => {
     expect(spreadOf({ rifleMastery: 3 })).toBeLessThan(spreadOf(NONE))
   })
 
-  /**
-   * **反動そのものは動かさない。** 弱めると「上手くなくても当たる」ほうへ
-   * 倒れる。表を覚えて押さえ戻す余地を増やすのが狙い。
-   */
-  test('跳ね上がる量そのものは変わらない (乱れの無い左右で見る)', () => {
-    // パターン 1 発目の左右は 0。乱れだけが乗るので、そこで比べる
+  test('乱れの無い左右でも縮む (パターン 1 発目の左右は 0)', () => {
     const plain = kick(NONE, 5)[1]
     const master = kick({ rifleMastery: 3 }, 5)[1]
     expect(Math.abs(master)).toBeLessThan(Math.abs(plain))
     // 向きは変わらない。**押さえ戻す方向が段で反転したら覚え直しになる**
     expect(Math.sign(master)).toBe(Math.sign(plain))
+  })
+})
+
+/**
+ * 跳ね上がりそのもの。**控えめに削る。**
+ *
+ * 大きく削ると押さえ戻せない人が一番得をする。表を覚えて押さえ戻す対象を
+ * 消すと、上手さの効く余地がそのまま減る。
+ */
+describe('MASTERY が跳ね上がりに効く', () => {
+  /** 連射したときの累積の上がり幅 (度) */
+  function climb(skills: Skills, shots: number): number {
+    const spread = new Spread()
+    let total = 0
+    for (let n = 0; n < shots; n++) total += spread.fired(n, WEAPONS.rifle, skills)[0]
+    return (total * 180) / Math.PI
+  }
+
+  test('極めた銃は跳ねる丈が縮む', () => {
+    expect(climb({ rifleMastery: 3 }, 10)).toBeLessThan(climb(NONE, 10))
+  })
+
+  test('**削るのは 12% まで。** 消してしまわない', () => {
+    const ratio = climb({ rifleMastery: 3 }, 10) / climb(NONE, 10)
+    expect(ratio).toBeGreaterThan(0.85)
+    expect(ratio).toBeLessThan(0.92)
+  })
+
+  test('段が上がるほど縮む', () => {
+    const lv1 = climb({ rifleMastery: 1 }, 10)
+    const lv3 = climb({ rifleMastery: 3 }, 10)
+    expect(lv3).toBeLessThan(lv1)
+    expect(lv1).toBeLessThan(climb(NONE, 10))
+  })
+
+  test('**別の銃には効かない。** 極めたのはその銃だけ', () => {
+    const spread = new Spread()
+    const other = spread.fired(3, WEAPONS.smg, { rifleMastery: 3 })[0]
+    const plain = new Spread().fired(3, WEAPONS.smg, NONE)[0]
+    expect(other).toBe(plain)
+  })
+})
+
+/**
+ * 戻る速さ。**指を離した人だけが得をする。**
+ *
+ * 戻り始めるまでの猶予 (0.1 秒) より AK の発射間隔 (0.09 秒) のほうが短いので、
+ * 押しっぱなしの間は一度も戻らない。区切って撃つ判断がここで太る。
+ */
+describe('MASTERY が反動の戻りに効く', () => {
+  test('極めた銃ほど早く狙点へ帰る', () => {
+    expect(masteryRecoveryScale({ rifleMastery: 3 }, 'rifle')).toBeGreaterThan(
+      masteryRecoveryScale(NONE, 'rifle'),
+    )
+  })
+
+  test('取っていなければ素のまま', () => {
+    expect(masteryRecoveryScale(NONE, 'rifle')).toBe(1)
+  })
+
+  test('別の銃には効かない', () => {
+    expect(masteryRecoveryScale({ rifleMastery: 3 }, 'smg')).toBe(1)
   })
 })
 

@@ -140,3 +140,91 @@ describe('練習部屋で爆風', () => {
     shooter.close()
   }, 30000)
 })
+
+/**
+ * 散弾で的が吹っ飛ぶか、そして**どちらへ倒れるか**。
+ *
+ * 弾は普通は体を動かさない (撃たれるたびに位置がずれると「動かない側が有利」で
+ * なくなる) ので、突き飛ばすのは爆風だけにしてある。散弾だけ別で、粒がまとまって
+ * 当たる間合い (SHOTGUN_KNOCK_RANGE) なら転ばせる。
+ *
+ * 的で見るのは**接続を持たない相手はサーバーが自分で動かす**から。人には向きだけ
+ * 渡して動かすのはクライアント、という分担なので、ここが繋がっていないと
+ * 「人は飛ぶが的は飛ばない」になる (実際そうなっていた)。
+ */
+describe('散弾で的を突き飛ばす', () => {
+  /*
+   * **前の試験が触っていない的を使う。** 同じサーバーを 1 本で使い回すので、
+   * 倒したり吹き飛ばしたりした的をもう一度使うと、始まりの位置が違う。
+   */
+  const MINE = STAGES[ROOM_STAGES.echo.stages[0]].targets[2]
+  const MINE_ID = 'target-2'
+
+  /** 的の 3m 手前に立って、散弾銃を持って湧く */
+  async function shooter(): Promise<Client> {
+    const client = new Client(server, 'sg', [MINE.x, 0, MINE.z + 3], 'echo')
+    await client.ready()
+    client.live()
+    // **湧く前に選ぶ。** 走っている試合では持ち替えられない (domain/player/equip.ts)
+    client.send({ type: 'loadout', primary: 'shotgun', support: 'grenade' })
+    await Bun.sleep(3400)
+    client.claimedWeapon = 'shotgun'
+    client.send({ type: 'spawn' })
+    await Bun.sleep(600)
+    return client
+  }
+
+  function firstTarget(client: Client): { id: string; slot: number } {
+    const roster = client.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
+    const found = roster.players.find((p) => p.id === MINE_ID)
+    if (!found || found.slot === undefined) throw new Error('的が名簿に居ない')
+    return { id: found.id, slot: found.slot }
+  }
+
+  test('近くで撃てば滑って転ぶ', async () => {
+    const me = await shooter()
+    const target = firstTarget(me)
+    const before = { ...me.poses.get(target.slot)! }
+
+    me.send({ type: 'damage', id: me.id, target: target.id, kind: 'bullet', zone: 'BODY', distance: 3 })
+    await Bun.sleep(500)
+
+    const after = me.poses.get(target.slot)!
+    expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeGreaterThan(1)
+    // 滑るだけでなく転ぶ。**時間で立ち上がる** (server/match.ts)
+    expect(after.locomotion).toBe('sweep')
+    me.close()
+  })
+
+  test('**離れていれば飛ばない。** 掠っただけで転ぶことにはしない', async () => {
+    const me = await shooter()
+    const target = firstTarget(me)
+    const before = { ...me.poses.get(target.slot)! }
+
+    // 吹き飛ぶ帯 (8m) の外
+    me.send({ type: 'damage', id: me.id, target: target.id, kind: 'bullet', zone: 'BODY', distance: 12 })
+    await Bun.sleep(500)
+
+    const after = me.poses.get(target.slot)!
+    expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeLessThan(0.1)
+    me.close()
+  })
+
+  /**
+   * **正面から撃たれたら後ろへ倒れる。** 倒れ方そのものが「どこから撃たれたか」の
+   * 情報になる。的は自分の前に居る人を向いているので、後ろ倒れになる。
+   */
+  test('倒れる向きが撃たれた向きに合う', async () => {
+    const me = await shooter()
+    const target = firstTarget(me)
+    // 的の体力は 100。8m 以内は 1 発 50 なので 2 発で倒れる
+    for (let i = 0; i < 2; i++) {
+      me.send({ type: 'damage', id: me.id, target: target.id, kind: 'bullet', zone: 'BODY', distance: 3 })
+      await Bun.sleep(900)
+    }
+    await Bun.sleep(400)
+    expect(me.poses.get(target.slot)!.locomotion).toBe('death_back')
+    me.close()
+    // 湧くのを待って撃つので、既定の 5 秒では足りない
+  }, 15000)
+})

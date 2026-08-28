@@ -35,11 +35,27 @@ describe('弾の落ち', () => {
     for (let i = 1; i < drops.length; i++) expect(drops[i]).toBeLessThanOrEqual(drops[i - 1])
   })
 
-  test('拳銃は一番落ちる。遠くを撃つ物ではない', () => {
+  /**
+   * **近い間合いの銃ほど遅い。**
+   *
+   * 拳銃と散弾銃が一番落ちて、狙撃銃が一番落ちない。落差そのものが
+   * 「どこまで狙う物か」を体で示している — 遠くを撃つ物ほど素直に飛ぶ。
+   */
+  test('近い物ほど落ちる。遠くを撃つ物ではない', () => {
+    const near = ['pistol', 'shotgun']
     const slowest = Object.values(WEAPONS).reduce((a, b) =>
       a.bulletSpeed <= b.bulletSpeed ? a : b,
     )
-    expect(slowest.id).toBe('pistol')
+    expect(near).toContain(slowest.id)
+    // 遠くを撃つ物は必ず速い
+    for (const id of near) {
+      expect(WEAPONS[id as keyof typeof WEAPONS].bulletSpeed).toBeLessThan(
+        WEAPONS.sniper.bulletSpeed,
+      )
+      expect(WEAPONS[id as keyof typeof WEAPONS].bulletSpeed).toBeLessThan(
+        WEAPONS.rifle.bulletSpeed,
+      )
+    }
   })
 
   test('横には曲がらない。落ちるのは下だけ', () => {

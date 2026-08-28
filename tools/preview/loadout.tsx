@@ -38,15 +38,6 @@ function Harness() {
       wait={0}
       onSpawn={() => {}}
       skills={skills()}
-      skillsOpen={chosen.open}
-      onSkill={(id: SkillId, level: number) =>
-        setSkills((now) => {
-          const next = { ...now }
-          if (level <= 0) delete next[id]
-          else next[id] = level as 1 | 2 | 3
-          return next
-        })
-      }
     />
   )
 }

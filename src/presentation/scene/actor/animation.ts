@@ -49,7 +49,7 @@ const AIM_HIP_LAMBDA = 10
 const LOWER_CLIPS: Record<Locomotion, string> = {
   idle: 'idle',
   // 落下の受け身。着地 (jump_down) とは別のクリップ
-  fall_roll: 'fall_roll',
+  hard_land: 'hard_land',
   // 階段を上る。**下半身だけ** — 上は構えたまま上れる
   up_stair: 'up_stair',
   // 階段を下りる。上りとは別のクリップ
@@ -67,12 +67,28 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 起き上がりは仰向け用 (STAND_CLIP) を引く — sweep が仰向けで終わるため
   sweep: 'sweep',
   stand: 'stand_front',
+  // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
+  bump: 'bump',
+  /*
+   * 伏せ。**止まっている姿も這う型から取る。**
+   *
+   * 素材が這う 1 本しかないので、止まっている姿は再生を止めて作る
+   * (FROZEN_CLIPS)。専用のクリップが手に入ったら差し替えるだけで済む。
+   */
+  prone_idle: 'crawl_f',
+  crawl_f: 'crawl_f',
+  // 伏せへの出入り。全身の型なので上半身も同じクリップから取る
+  prone_down: 'prone_down',
+  prone_rise: 'prone_rise',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
   // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
   crouch_stab: 'crouch_idle',
   roll: 'roll',
   death: 'death',
+  // 倒れる向き。**背後から撃たれたら前へ、正面からなら後ろへ**
+  death_front: 'death_front',
+  death_back: 'death_back',
   jump_up: 'jump_up',
   jump_loop: 'jump_loop',
   jump_down: 'jump_down',
@@ -98,7 +114,12 @@ type UpperState =
   | 'stab'
   | 'crouch_stab'
   | 'roll'
-  | 'fall_roll'
+  | 'hard_land'
+  // 伏せへの出入り
+  | 'prone_down'
+  | 'prone_rise'
+  // ダンボールで敵にぶつかって、箱が落ちた
+  | 'bump'
   | 'death'
   | 'hit'
   | 'salute'
@@ -118,6 +139,13 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   // 上半身も同じクリップから取る。全身で 1 つの型なので分けると腰で食い違う
   sneak: 'sneak',
   sit: 'sit',
+  bump: 'bump',
+  // 伏せは上半身も同じクリップから。**構えれば上だけ差し替わる** —
+  // 伏せ撃ちは爆風で倒れている間と同じ仕組みに乗る
+  prone_idle: 'crawl_f',
+  crawl_f: 'crawl_f',
+  prone_down: 'prone_down',
+  prone_rise: 'prone_rise',
   salute: 'salute',
   away: 'away',
   claymore_windup: 'claymore_windup',
@@ -142,6 +170,15 @@ const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
   ...MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion),
 ])
 
+/**
+ * 伏せている間の状態。**上半身に立ち姿のクリップを載せない。**
+ *
+ * 腰が水平なので、立ち姿を前提に作られた上半身を載せると背骨の補正が
+ * 効きすぎて暴れる。出入りの繋ぎ (prone_down / prone_rise) は全身の型として
+ * 最後まで流れるので、ここには含めない。
+ */
+const PRONE_LOCOMOTIONS = new Set<Locomotion>(['prone_idle', 'crawl_f'])
+
 /** 落下ループの再生速度の上限。これ以上速くすると脚が忙しなく見える */
 const JUMP_LOOP_MAX_SPEED = 3
 
@@ -152,7 +189,13 @@ const JUMP_LOOP_MAX_SPEED = 3
  * 再生速度のほうを合わせる)。ローリングのように加減速がある動作は、平均速度で
  * 動かすと着地して止まっているのに前へ滑る。クリップの動きをそのまま使う。
  */
-const ROOT_MOTION_CLIPS = new Set(['roll', 'fall_roll'])
+/**
+ * クリップに焼かれた移動をそのまま辿る型。
+ *
+ * **着地は入れない。** 転がる型だった頃は 3m 進む必要があったが、いまの
+ * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
+ */
+const ROOT_MOTION_CLIPS = new Set(['roll'])
 
 /** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
 const ROLL_TIME_SCALE = 1.32
@@ -173,7 +216,7 @@ const ROLL_TIME_SCALE = 1.32
  * 足が滑らない (回避ローリングは 0.8 なので 2 割ぶん滑っている)。
  * 落ちた勢いが前へ流れて消える、という絵がそのまま出る。
  */
-const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8, fall_roll: 1 }
+const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 /**
  * ローリングの**操作ロック**を解く時点 (クリップ尺に対する割合)。
  *
@@ -194,12 +237,17 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   /*
    * 落下の受け身。**ここに無くて、下半身だけループしていた。**
    *
-   * 尺 (1.67 秒) とロック (FALL_ROLL_TIME) がほぼ同時なので、絵の上では
+   * 尺 (1.67 秒) とロック (HARD_LAND_TIME) がほぼ同時なので、絵の上では
    * 気づけない。焼かれた移動を辿るようにした途端に出た — クリップが頭へ
    * 戻ると根元の位置も頭へ戻るので、**1 フレームで 3m 引き戻される**。
    * 「進んでから着地点へ滑って戻る」という形で、しかも競り合いなので毎回は出ない。
    */
-  'fall_roll',
+  'hard_land',
+  // ダンボールが落ちた反応。留めないと 1.47 秒ごとに驚き直す
+  'bump',
+  // 伏せへの出入り。留めないと、伏せた瞬間にまた膝立ちから伏せ直す
+  'prone_down',
+  'prone_rise',
   // 倒れる / 起き上がる。留めておかないと、倒れた姿勢を保てず
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
@@ -207,6 +255,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'jump_up',
   'jump_down',
   'death',
+  'death_front',
+  'death_back',
   'salute',
   // クレイモアを置く型。**構えは最後のフレームで止める** —
   // 一度だけにしないと 1.77 秒で頭から流れ直して、かがむ動作を繰り返す
@@ -351,8 +401,11 @@ const ROLL_KEY = 'roll'
  * 下だけに流したら、銃を構えたまま脚だけが転がった。全身の型は上下ともに
  * 差し替えないと、腰から上が構えの姿勢のまま残る。
  */
-const FALL_ROLL_KEY = 'fall_roll'
+const HARD_LAND_KEY = 'hard_land'
 const DEATH_KEY = 'death'
+/** 倒れる向き。撃たれた側から見て前か後ろか */
+const DEATH_FRONT_KEY = 'death_front'
+const DEATH_BACK_KEY = 'death_back'
 
 /**
  * 接続が切れた人の姿。
@@ -361,6 +414,22 @@ const DEATH_KEY = 'death'
  */
 const AWAY_KEY = 'away'
 const HIT_KEY = 'hit'
+/** ダンボールで敵にぶつかった反応。全身の型なので上下そろえて流す */
+const BUMP_KEY = 'bump'
+/** 伏せへの出入り。全身の型 */
+const PRONE_DOWN_KEY = 'prone_down'
+const PRONE_RISE_KEY = 'prone_rise'
+/**
+ * 伏せ撃ち。**構えと発砲を同じクリップから作る。**
+ *
+ * 素材は発砲の 1 本 (0.87 秒)。頭で止めれば構えた 1 枚の姿勢になるので、
+ * 待機用に止めた action と、撃つ間だけ流す action の 2 つに分ける
+ * (立ちの AIM_KEY / FIRE_KEY と同じ形)。
+ */
+const PRONE_AIM_KEY = 'prone_aim'
+const PRONE_FIRE_KEY = 'prone_fire'
+/** 伏せたままの装填。立ちの型を腹這いに載せると上体だけ起き上がる */
+const PRONE_RELOAD_KEY = 'prone_reload'
 const SALUTE_KEY = 'salute'
 /**
  * 敬礼を止めておく位置 (クリップ尺に対する割合)。
@@ -375,6 +444,7 @@ const relaxedKey = (state: Locomotion) => `relaxed:${state}`
 const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   RELOAD_KEY,
   PISTOL_RELOAD_KEY,
+  PRONE_RELOAD_KEY,
   STAB_KEY,
   BOLT_KEY,
   SWEEP_KEY,
@@ -384,7 +454,12 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   SETUP_WINDUP_KEY,
   SETUP_RELEASE_KEY,
   ROLL_KEY,
-  FALL_ROLL_KEY,
+  HARD_LAND_KEY,
+  BUMP_KEY,
+  DEATH_FRONT_KEY,
+  DEATH_BACK_KEY,
+  PRONE_DOWN_KEY,
+  PRONE_RISE_KEY,
   DEATH_KEY,
   HIT_KEY,
   SALUTE_KEY,
@@ -429,8 +504,49 @@ const SNEAK_CLIP_SPEED = 1.3
  * 足の同期より見え方を取る。
  */
 const SNEAK_RATE = 0.65
+/**
+ * 這うクリップ本来の速度 (m/s)。**tools/measure/stride.js の実測。**
+ *
+ * 歩幅 0.64m を 3.90 秒で送るので 0.33 m/s。その場這いで書き出されているので
+ * 移動量からは測れず、sneak と同じ方法で出している。
+ */
+const CRAWL_CLIP_SPEED = 0.33
+
+/**
+ * 再生を止めて 1 枚の姿勢として使う型。
+ *
+ * **速さ任せにできない。** 渡ってくる速さ (setMoveSpeed) はその姿勢で出せる
+ * 上限であって、いま動いているかではない — 止まって伏せていても 0.85 m/s の
+ * まま来る。そのまま流すと、進んでいないのに腕だけ掻き続ける。
+ *
+ * 止まって伏せている姿は這う型と同じクリップなので、頭で止めれば腹這いの
+ * 姿勢になる。専用のクリップが手に入ったらここから外す。
+ */
+const FROZEN_CLIPS: readonly Locomotion[] = ['prone_idle']
+
+/**
+ * 這う型の再生倍率。**1 より小さい = 進む速さより手足の運びを遅くする。**
+ *
+ * 速さぴったりに合わせると (倍率 1)、腕の掻きが忙しなくて這っているように
+ * 見えない。箱 (SNEAK_RATE) と同じ判断で、**足が少し滑るのを承知で見え方を
+ * 取る** — 腹這いは体が地面に沈んでいるので、滑りが目に付きにくい。
+ *
+ * 進む速さは変えない (domain/player/stance.ts の PRONE_SPEED_SCALE)。
+ */
+const CRAWL_RATE = 0.75
+
+/**
+ * 起き上がる型の再生倍率。**1 より大きい = 速く流す。**
+ *
+ * 素の尺は 1.83 秒。伏せから戻るのにそれだけ動けないと、伏せることが
+ * 「一度入ったら抜けられない」姿勢になる。動けない時間もこの倍率で縮む
+ * (proneRiseDuration が割った後の値を返す)。
+ */
+const PRONE_RISE_RATE = 1.5
+
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
   sneak: SNEAK_CLIP_SPEED,
+  crawl_f: CRAWL_CLIP_SPEED,
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, RUN_CLIP_SPEED],
@@ -568,6 +684,11 @@ export class CharacterAnimator {
   readonly deathDuration: number
   /** 怯みモーションの尺 (秒)。0 ならクリップが無い */
   readonly hitDuration: number
+  /** ダンボールで敵にぶつかった反応の尺 (秒)。0 ならクリップが無い */
+  readonly bumpDuration: number
+  /** 伏せへの出入りの尺 (秒)。0 ならクリップが無い */
+  readonly proneDownDuration: number = 0
+  readonly proneRiseDuration: number = 0
   /** 敬礼の尺 (秒)。0 ならクリップが無い */
   readonly saluteDuration: number
 
@@ -717,9 +838,13 @@ export class CharacterAnimator {
     if (
       finished === this.upper.get(RELOAD_KEY) ||
       finished === this.upper.get(PISTOL_RELOAD_KEY) ||
+      finished === this.upper.get(PRONE_RELOAD_KEY) ||
       finished === this.upper.get(STAB_KEY) ||
       finished === this.upper.get(ROLL_KEY) ||
-      finished === this.upper.get(FALL_ROLL_KEY) ||
+      finished === this.upper.get(HARD_LAND_KEY) ||
+      finished === this.upper.get(BUMP_KEY) ||
+      finished === this.upper.get(PRONE_DOWN_KEY) ||
+      finished === this.upper.get(PRONE_RISE_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
@@ -949,10 +1074,58 @@ export class CharacterAnimator {
     }
     this.rollDuration = roll?.duration ?? 0
 
-    const fallRoll = byName.get('fall_roll')
-    if (fallRoll) {
-      const action = registerUpper(FALL_ROLL_KEY, fallRoll)
+    const hardLand = byName.get('hard_land')
+    if (hardLand) {
+      const action = registerUpper(HARD_LAND_KEY, hardLand)
       action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+
+    const proneReload = byName.get('prone_reload')
+    if (proneReload) {
+      const action = registerUpper(PRONE_RELOAD_KEY, proneReload)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+
+    const proneFire = byName.get('prone_fire')
+    if (proneFire) {
+      // 構えは頭で止めた 1 枚。撃つほうは流す
+      registerUpper(PRONE_AIM_KEY, proneFire).setEffectiveTimeScale(0)
+      registerUpper(PRONE_FIRE_KEY, proneFire)
+    }
+
+    for (const [key, name] of [
+      [PRONE_DOWN_KEY, 'prone_down'],
+      [PRONE_RISE_KEY, 'prone_rise'],
+    ] as const) {
+      const clip = byName.get(name)
+      if (!clip) continue
+      const action = registerUpper(key, clip)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+      // **流す速さで割った尺**を持つ。動けない時間を絵と一致させるため
+      if (key === PRONE_DOWN_KEY) this.proneDownDuration = clip.duration
+      else this.proneRiseDuration = clip.duration / PRONE_RISE_RATE
+    }
+
+    const bump = byName.get('bump')
+    if (bump) {
+      const action = registerUpper(BUMP_KEY, bump)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+    this.bumpDuration = bump?.duration ?? 0
+
+    for (const [key, name] of [
+      [DEATH_FRONT_KEY, 'death_front'],
+      [DEATH_BACK_KEY, 'death_back'],
+    ] as const) {
+      const clip = byName.get(name)
+      if (!clip) continue
+      const action = registerUpper(key, clip)
+      action.setLoop(THREE.LoopOnce, 1)
+      // 倒れた姿勢のまま留める。ここを緩めると死体が立ち上がる
       action.clampWhenFinished = true
     }
 
@@ -1038,13 +1211,26 @@ export class CharacterAnimator {
      *
      * 腕は Spine2 の子なので、背骨が下を向けば刃も下を向く。
      */
+    /*
+     * 伏せも同じ扱い。**姿勢が決まっているので、照準由来の補正を掛けない。**
+     *
+     * とくに squareHips が効く — あれは腰を「構えの基準姿勢」へ寄せるので、
+     * 腹這いの腰を立った向きへ引き起こす。構えた瞬間に体が起き上がって見えた
+     * のはこれ。出入りの繋ぎ (prone_down / prone_rise) も途中で腰を起こされる
+     * と型が崩れるので同じく外す。
+     */
+    const prone =
+      PRONE_LOCOMOTIONS.has(this.locomotion) ||
+      this.upperState === 'prone_down' ||
+      this.upperState === 'prone_rise'
     const committed =
       (this.upperState === 'stab' && this.locomotion !== 'crouch_stab') ||
       this.upperState === 'salute' ||
       this.upperState === 'roll' ||
-      this.upperState === 'fall_roll' ||
+      this.upperState === 'hard_land' ||
       this.upperState === 'death' ||
-      this.upperState === 'hit'
+      this.upperState === 'hit' ||
+      prone
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
     this.hipSquare = damp(
       this.hipSquare,
@@ -1200,6 +1386,14 @@ export class CharacterAnimator {
 
     // 上下が同じクリップなら食い違いようがない。補正は掛けない。
     if (this.upperClipNames.get(key) === LOWER_CLIPS[this.locomotion]) return
+    /*
+     * 伏せている間も掛けない。
+     *
+     * この補正が戻す先は**立った腰**を基準にした向き (uprightHips)。腹這いでは
+     * その基準そのものが当てはまらないので、寄せるほど体が起きる。伏せの型は
+     * 上下ともほぼ同じ腰の向きで作られているので、補正しなくても食い違わない。
+     */
+    if (PRONE_LOCOMOTIONS.has(this.locomotion)) return
 
     const track = this.upperHipsTracks.get(key)
     const action = this.upper.get(key)
@@ -1285,6 +1479,20 @@ export class CharacterAnimator {
     return resolved
   }
 
+  /**
+   * 這う型の再生位置 (0..1)。**蹴る瞬間を体の進みに合わせるのに使う。**
+   *
+   * 進む速さのほうを型に合わせる (motion.ts の crawlSurge)。逆に型を速さへ
+   * 合わせると、速い時ほど足が速く回るだけで、蹴った瞬間に出るという形にならない。
+   */
+  get crawlPhase(): number {
+    const action = this.lower.get('crawl_f')
+    if (!action) return 0
+    const duration = action.getClip().duration
+    if (duration <= 0) return 0
+    return (action.time % duration) / duration
+  }
+
   /** 移動速度が変わったら、足が滑らないよう再生速度を引き直す */
   setMoveSpeed(speed: number): void {
     this.moveSpeed = speed
@@ -1295,10 +1503,28 @@ export class CharacterAnimator {
   private applyLocomotionTimeScales(): void {
     for (const [state, clipSpeed] of Object.entries(CLIP_SPEED)) {
       if (!clipSpeed) continue
-      const rate = state === 'sneak' ? SNEAK_RATE : 1
-      this.lower
-        .get(state as Locomotion)
-        ?.setEffectiveTimeScale((this.moveSpeed / clipSpeed) * rate)
+      // 箱と匍匐は意図して遅くしてある。それ以外は実測どおり
+      const rate = state === 'sneak' ? SNEAK_RATE : state === 'crawl_f' ? CRAWL_RATE : 1
+      const scale = (this.moveSpeed / clipSpeed) * rate
+      const locomotion = state as Locomotion
+      this.lower.get(locomotion)?.setEffectiveTimeScale(scale)
+      /*
+       * **上下が同じクリップなら、速さも同じにする。**
+       *
+       * 上半身は別の action として持っているので、下だけ速さを当てると
+       * 腰から上と下が別々の速度で同じ型を流すことになる。伏せで出た —
+       * 止まっているのに腕だけ掻き続け、這っている間も腕が半分の速さで動いた。
+       * (這う動きは腕で進むので、そこがずれると進んで見えない)
+       */
+      if (RELAXED_CLIPS[locomotion] === LOWER_CLIPS[locomotion]) {
+        this.upper.get(relaxedKey(locomotion))?.setEffectiveTimeScale(scale)
+      }
+    }
+
+    // 止めておく型。**上下そろえて止める** — 下だけ止めると腕が動き続ける
+    for (const state of FROZEN_CLIPS) {
+      this.lower.get(state)?.setEffectiveTimeScale(0)
+      this.upper.get(relaxedKey(state))?.setEffectiveTimeScale(0)
     }
   }
 
@@ -1414,14 +1640,30 @@ export class CharacterAnimator {
    * 倒れる。全身動作なので上下を同時に流し、最終ポーズで固める。
    * clampWhenFinished を外すと死体が立ち上がる。
    */
-  playDeath(): void {
-    const upper = this.upper.get(DEATH_KEY)
-    const lower = this.lower.get('death')
+  /**
+   * 倒れる。**撃たれた向きで型を変える。**
+   *
+   * 背後から撃たれたら前へ、正面からなら後ろへ倒れる。倒れた人を見た側が
+   * 「どこから撃たれたか」を読めるので、**倒れ方そのものが情報**になる。
+   *
+   * 向きが分からない場合 (落下や爆風、古い型しか無い皮) は元の 1 本を流す。
+   *
+   * @param fromBehind 背後から撃たれたか。分からなければ省く
+   */
+  playDeath(fromBehind?: boolean): void {
+    const state: Locomotion =
+      fromBehind === undefined ? 'death' : fromBehind ? 'death_front' : 'death_back'
+    const key =
+      state === 'death_front' ? DEATH_FRONT_KEY : state === 'death_back' ? DEATH_BACK_KEY : DEATH_KEY
+    // 型が無い皮でも倒れる。**倒れないほうが困る**
+    const fallback = this.upper.has(key) && this.lower.has(state)
+    const upper = this.upper.get(fallback ? key : DEATH_KEY)
+    const lower = this.lower.get(fallback ? state : 'death')
     if (!upper || !lower) return
     upper.reset().play()
     lower.reset().play()
     this.upperState = 'death'
-    this.locomotion = 'death'
+    this.locomotion = fallback ? state : 'death'
   }
 
   /**
@@ -1486,16 +1728,29 @@ export class CharacterAnimator {
     //
     // 撃ったことは銃口炎・音・カメラの反動・照準の散らばりで既に伝わっている。
     // 型が無くても分からなくはならない。
-    if (this.upperState === 'fire' && !this.pistol && this.upper.has(FIRE_KEY)) {
-      return FIRE_KEY
+    if (this.upperState === 'fire' && !this.pistol) {
+      // 伏せ撃ちは専用の型。立ちの発砲を腹這いに載せると上体だけ起き上がる
+      if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_FIRE_KEY)) {
+        return PRONE_FIRE_KEY
+      }
+      if (this.upper.has(FIRE_KEY)) return FIRE_KEY
     }
     if (this.upperState === 'reload') {
       // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
-      const key = this.pistol && this.upper.has(PISTOL_RELOAD_KEY) ? PISTOL_RELOAD_KEY : RELOAD_KEY
+      const key = this.reloadKey()
       if (this.upper.has(key)) return key
     }
     // 倒れている間は他の何よりも優先する
-    if (this.upperState === 'death' && this.upper.has(DEATH_KEY)) return DEATH_KEY
+    if (this.upperState === 'death') {
+      // 倒れる向きの型があればそちら。無ければ元の 1 本
+      if (this.locomotion === 'death_front' && this.upper.has(DEATH_FRONT_KEY)) {
+        return DEATH_FRONT_KEY
+      }
+      if (this.locomotion === 'death_back' && this.upper.has(DEATH_BACK_KEY)) {
+        return DEATH_BACK_KEY
+      }
+      if (this.upper.has(DEATH_KEY)) return DEATH_KEY
+    }
     if (this.upperState === 'hit' && this.upper.has(HIT_KEY)) return HIT_KEY
     if (this.upperState === 'salute' && this.upper.has(SALUTE_KEY)) return SALUTE_KEY
     if (this.upperState === 'stab' && this.upper.has(STAB_KEY)) return STAB_KEY
@@ -1519,7 +1774,12 @@ export class CharacterAnimator {
     if (this.upperState === 'stand' && this.upper.has(STAND_KEY)) return STAND_KEY
     if (this.upperState === 'roll' && this.upper.has(ROLL_KEY)) return ROLL_KEY
     // 落下の受け身も中断させない。**上半身だけ構えに戻ると、脚だけ転がる**
-    if (this.upperState === 'fall_roll' && this.upper.has(FALL_ROLL_KEY)) return FALL_ROLL_KEY
+    if (this.upperState === 'hard_land' && this.upper.has(HARD_LAND_KEY)) return HARD_LAND_KEY
+    // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
+    if (this.upperState === 'bump' && this.upper.has(BUMP_KEY)) return BUMP_KEY
+    // 伏せへの出入りも同じ。上だけ構えに戻ると、寝ながら銃を構える形になる
+    if (this.upperState === 'prone_down' && this.upper.has(PRONE_DOWN_KEY)) return PRONE_DOWN_KEY
+    if (this.upperState === 'prone_rise' && this.upper.has(PRONE_RISE_KEY)) return PRONE_RISE_KEY
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
     //
@@ -1528,6 +1788,30 @@ export class CharacterAnimator {
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
     if (!this.aiming && this.locomotion === 'sweep' && this.upper.has(SWEEP_KEY)) {
       return SWEEP_KEY
+    }
+
+    /*
+     * 匍匐は**構えていても這う型のまま**。
+     *
+     * 立ち姿の照準クリップを腹這いの腰に載せると、背骨の補正
+     * (alignSpineToUpperClip) が「立っている腰」との差を毎フレーム埋めようとして
+     * 上半身が暴れる。腰が水平なので差が大きく、しかも再生位置で揺れる。
+     *
+     * 伏せ撃ち用のクリップが手に入るまでは、上下とも這う型で通す。撃てなくは
+     * ならない (撃てるかどうかは持ち物が決めていて、絵とは別)。
+     */
+    if (PRONE_LOCOMOTIONS.has(this.locomotion)) {
+      /*
+       * 伏せ撃ちの型は**止まっているときだけ**。
+       *
+       * 這いながらは撃てない (domain/item/inventory.ts の canShoot)。撃てない
+       * のに構えた型を出すと、狙えているように見えて弾が出ない。
+       */
+      if (this.aiming && this.locomotion === 'prone_idle' && this.upper.has(PRONE_AIM_KEY)) {
+        return PRONE_AIM_KEY
+      }
+      const key = relaxedKey(this.locomotion)
+      if (this.upper.has(key)) return key
     }
 
     if (this.aiming) {
@@ -1572,17 +1856,59 @@ export class CharacterAnimator {
    * ただの着地 (playLanding) と分ける。体力が減ったことが体の動きにも出る
    * ようにしたいので、転がる型を最後まで流す。
    */
-  playFallRoll(): void {
+  playHardLand(): void {
     if (this.dead) return
-    const upper = this.upper.get(FALL_ROLL_KEY)
-    const lower = this.lower.get('fall_roll')
+    const upper = this.upper.get(HARD_LAND_KEY)
+    const lower = this.lower.get('hard_land')
     if (!upper || !lower) return
     // **上下そろえて流す。** 下だけだと銃を構えたまま脚が転がる
     upper.reset().play()
     lower.reset().play()
-    this.upperState = 'fall_roll'
-    this.locomotion = 'fall_roll'
+    this.upperState = 'hard_land'
+    this.locomotion = 'hard_land'
     this.rootSampleValid = false
+  }
+
+  /**
+   * ダンボールで敵にぶつかった。**箱が落ちて棒立ちになる。**
+   *
+   * 受け身と同じで上下そろえて流す。下だけだと銃を構えたまま脚が跳ねる。
+   * 焼き込まれた移動は無い (実測 0.00m) ので、その場で反応して終わる。
+   */
+  playBump(): void {
+    if (this.dead) return
+    const upper = this.upper.get(BUMP_KEY)
+    const lower = this.lower.get('bump')
+    if (!upper || !lower) return
+    upper.reset().play()
+    lower.reset().play()
+    this.upperState = 'bump'
+    this.locomotion = 'bump'
+  }
+
+  /**
+   * 伏せに入る / 伏せから起き上がる。**上下そろえて流す。**
+   *
+   * 姿勢が繋がっていないと、立った姿から 1 フレームで腹這いになる。
+   * 起き上がりの型はしゃがみで終わるので、終わった先もしゃがみ。
+   */
+  playProneDown(): void {
+    this.playWholeBody(PRONE_DOWN_KEY, 'prone_down')
+  }
+
+  playProneRise(): void {
+    this.playWholeBody(PRONE_RISE_KEY, 'prone_rise', PRONE_RISE_RATE)
+  }
+
+  private playWholeBody(key: string, state: Locomotion, rate = 1): void {
+    if (this.dead) return
+    const upper = this.upper.get(key)
+    const lower = this.lower.get(state)
+    if (!upper || !lower) return
+    upper.reset().setEffectiveTimeScale(rate).play()
+    lower.reset().setEffectiveTimeScale(rate).play()
+    this.upperState = state as UpperState
+    this.locomotion = state
   }
 
   /** 着地のモーション。頭から流す */
@@ -1720,6 +2046,17 @@ export class CharacterAnimator {
     this.upperState = 'stance'
   }
 
+  /**
+   * 装填を途中でやめる。**止めずに重みを構えへ移すだけ** (cancelThrow と同じ)。
+   *
+   * stop() すると、再生されていない型が重みの行き先として残り、足りない分に
+   * バインドポーズ (T ポーズ) が混ざる。
+   */
+  cancelReload(): void {
+    if (this.upperState !== 'reload') return
+    this.upperState = 'stance'
+  }
+
   /** 振りかぶりが終わるまであと何秒か。軽く叩いただけなら残っている */
   get throwWindupLeft(): number {
     if (!this.pair || this.upperState !== 'throw') return 0
@@ -1750,11 +2087,17 @@ export class CharacterAnimator {
     }
   }
 
-  playBolt(): void {
+  /**
+   * ボルト / ポンプを操作する。
+   *
+   * @param rate 再生速度。**撃てない時間と必ず一致させる** — 呼ぶ側は
+   *   同じ倍率で尺を割って待つ (Game の fireCooldown)
+   */
+  playBolt(rate = 1): void {
     if (this.dead) return
     const upper = this.upper.get(BOLT_KEY)
     if (!upper) return
-    upper.reset().play()
+    upper.reset().setEffectiveTimeScale(rate).play()
     this.upperState = 'bolt'
   }
 
@@ -1949,14 +2292,27 @@ export class CharacterAnimator {
    */
   playReload(seconds = 0): void {
     if (this.dead) return
-    // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
-    const key = this.pistol && this.upper.has(PISTOL_RELOAD_KEY) ? PISTOL_RELOAD_KEY : RELOAD_KEY
-    const action = this.upper.get(key)
+    const action = this.upper.get(this.reloadKey())
     if (!action) return
     const clip = action.getClip().duration
     action.setEffectiveTimeScale(seconds > 0 && clip > 0 ? clip / seconds : 1)
     action.reset().play()
     this.upperState = 'reload'
+  }
+
+  /**
+   * どの装填の型を流すか。**姿勢が先、銃が後。**
+   *
+   * 腹這いに立ちの型を載せると上体だけ起き上がる (伏せ撃ちと同じ理由)。
+   * 拳銃で伏せている場合も伏せの型を採る — 片手か両手かの違いより、
+   * 立っているか寝ているかの違いのほうが大きく崩れる。
+   */
+  private reloadKey(): string {
+    if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_RELOAD_KEY)) {
+      return PRONE_RELOAD_KEY
+    }
+    if (this.pistol && this.upper.has(PISTOL_RELOAD_KEY)) return PISTOL_RELOAD_KEY
+    return RELOAD_KEY
   }
 
   dispose(): void {

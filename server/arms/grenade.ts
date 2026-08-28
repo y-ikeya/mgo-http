@@ -17,7 +17,7 @@ import {
   THROW_LOFT,
   throwSpeedOf,
 } from '../../src/domain/item/grenade'
-import { headHeightWhen } from '../../src/domain/player/stance'
+import { headHeightOf } from '../../src/domain/player/stance'
 import { applyBlastDamage } from '../damage'
 import { type RoomWorld, broadcast, hostileToOwner, setLife } from '../world'
 
@@ -177,7 +177,7 @@ export function detonate(room: RoomWorld, nade: Grenade): void {
 
     // sim が測るのは**どこに誰がどれだけ晒されていたか**まで。
     // 何ダメージかを決めるのはドメインルールの側 (domain/item/grenade.ts)
-    const head = headHeightWhen(victim.crouching, victim.boxed)
+    const head = headHeightOf(victim.locomotion)
     const seen = blastExposure(x, y, z, victim, head, BLAST_RADIUS, room.stage.sight)
     if (!seen) continue
     const result = blastEffect(seen.distance, seen.cover)

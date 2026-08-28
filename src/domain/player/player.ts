@@ -240,6 +240,45 @@ export interface Player {
    */
   history: Pose[]
   /**
+   * 爆風で飛んでいる向きと、残り時間 (秒)。0 なら飛んでいない。
+   *
+   * **的だけが使う。** 人は自分の画面で自分を動かすので (位置を持っているのが
+   * クライアント)、サーバーは向きを渡すだけでよい。的は接続を持たないので、
+   * 動かす人が居ない — サーバーが自分で滑らせる。
+   */
+  knockX: number
+  knockZ: number
+  knockLeft: number
+  /**
+   * 的が最初に置かれた場所。**倒れて戻るときだけここへ返る。**
+   *
+   * 吹き飛ばされただけならその場で立ち上がる — 転んだ所から起きるのが自然で、
+   * 元の位置へ滑って戻ると「引き戻された」に見える。**倒したときだけ並び直す。**
+   *
+   * 人は使わない (湧き地点はクライアントが選ぶ)。
+   */
+  homeX: number
+  homeZ: number
+  /**
+   * 的が起き上がるまでの残り (秒)。0 なら立っている。
+   *
+   * **人は自分で立ち上がる** (押すまで倒れたまま) が、的は誰も操作しないので
+   * 時間で起きる。
+   *
+   * **1 つの時計で 2 段に分ける。** 残りが起き上がりの尺より多い間は転んだ姿、
+   * それを切ったら起き上がる型。転んだ姿から直に立ち姿へ飛ばすと、**寝た脚と
+   * 立った上半身が混ざる** (銃を上空へ構えて見える)。
+   */
+  downLeft: number
+  /**
+   * 倒された時、撃った相手が背後に居たか。**倒れる向きに出る。**
+   *
+   * 人は自分で決めて姿勢に載せる (撃たれた側が位置と向きを持っている) が、
+   * **的は接続を持たない**ので、サーバーが控えてから姿を組み立てる
+   * (server/match.ts の targetPayload)。
+   */
+  downFromBehind: boolean
+  /**
    * 人ではなく的か。
    *
    * **接続を持たない Player。** 練習部屋に並ぶ棒立ちがこれで、倒すと数秒後に
@@ -312,6 +351,13 @@ export function newPlayer(seed: {
     skills: {},
     leakedUntil: 0,
     leakedTo: '',
+    knockX: 0,
+    knockZ: 0,
+    knockLeft: 0,
+    homeX: 0,
+    homeZ: 0,
+    downLeft: 0,
+    downFromBehind: false,
     weapon: 'rifle',
     primary: 'rifle',
     held: 'rifle',
@@ -350,6 +396,9 @@ export function newBot(seed: {
   bot.bot = true
   bot.x = seed.x
   bot.z = seed.z
+  // 倒れて戻るときの場所。**吹き飛ばされただけなら戻らない**
+  bot.homeX = seed.x
+  bot.homeZ = seed.z
   bot.life = 'alive'
   // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
   bot.yaw = Math.PI
@@ -371,6 +420,11 @@ export function reviveBot(bot: Player, now: number): void {
   bot.life = 'alive'
   bot.lifeAt = now
   bot.killedBy = ''
+  bot.knockLeft = 0
+  bot.downLeft = 0
+  // **倒れて戻るときだけ並び直す。** 吹き飛ばされただけならその場で立ち上がる
+  bot.x = bot.homeX
+  bot.z = bot.homeZ
 }
 
 /**

@@ -13,6 +13,7 @@
  */
 import { encodeSnapshot, isSnapshot, LOCOMOTIONS } from '../src/infra/codec/snapshot'
 import type { ClientMessage, PlayerSnapshot, ServerMessage } from '../src/application/protocol/types'
+import type { WeaponId } from '../src/domain/item/weapons'
 
 /** 起動を待つ上限 (ms) */
 const BOOT_TIMEOUT = 10_000
@@ -129,6 +130,8 @@ export class Client {
   readonly order: string[] = []
   /** 種類ごとの最後の 1 通 */
   readonly last = new Map<string, ServerMessage>()
+  /** 席ごとの最後の姿。位置と動きだけ */
+  readonly poses = new Map<number, { x: number; z: number; locomotion: string }>()
   /** 種類ごとの通数 */
   readonly count = new Map<string, number>()
   /** 位置の通数と、最後の姿勢 */
@@ -166,6 +169,13 @@ export class Client {
         if (!isSnapshot(view)) return
         this.states++
         this.locomotion = LOCOMOTIONS[view.getUint8(31)] ?? '?'
+        // **席ごとに控える。** 誰が動いたかを見るのに要る (的が吹っ飛ぶか、など)。
+        // 上の locomotion は「最後に届いた 1 通」なので、相手を名指しで見られない
+        this.poses.set(view.getUint16(1), {
+          x: view.getFloat32(11),
+          z: view.getFloat32(19),
+          locomotion: LOCOMOTIONS[view.getUint8(31)] ?? '?',
+        })
         return
       }
       const message = JSON.parse(event.data) as ServerMessage
@@ -219,7 +229,7 @@ export class Client {
 
   /** 振りかぶって持っているか。位置に乗せて送る */
   /** 位置と一緒に名乗る銃。**選んでいない物を名乗れるか**を試すのに使う */
-  claimedWeapon: 'rifle' | 'sniper' | 'smg' | 'pistol' = 'rifle'
+  claimedWeapon: WeaponId = 'rifle'
   private holdingGrenade = false
   /** クレイモアを手にしているか */
   private holdingClaymore = false
@@ -272,7 +282,7 @@ function snapshotOf(
   holdingGrenade = false,
   holdingClaymore = false,
   /** 名乗る銃。**選んでいない物を名乗る試験**に使う */
-  claimed: 'rifle' | 'sniper' | 'smg' | 'pistol' = 'rifle',
+  claimed: WeaponId = 'rifle',
 ): PlayerSnapshot {
   return {
     id,

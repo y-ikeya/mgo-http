@@ -52,6 +52,27 @@
 
 /* --- クロスヘア --- */
 
+/*
+ * 散弾の輪。**粒がこの中に散る。**
+ *
+ * 十字と同じ --crosshair-gap から半径を取るので、散布界が開けば輪も広がる。
+ * 十字が「その一点へ 1 発」を言っているのに対して、こちらは「この範囲へ
+ * 撒く」を言っている。
+ */
+.crosshair-ring {
+  position: absolute;
+  /* 縁の太さを外へ出さない。出すと中心がずれる */
+  box-sizing: border-box;
+  width: calc(var(--crosshair-gap) * 2);
+  height: calc(var(--crosshair-gap) * 2);
+  transform: translate(calc(-1 * var(--crosshair-gap)), calc(-1 * var(--crosshair-gap)));
+  border: 2px solid rgba(230, 240, 220, 0.85);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
 .crosshair {
   position: absolute;
   top: 50%;

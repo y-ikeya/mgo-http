@@ -102,8 +102,6 @@ export default function Play(props: { identity: Identity }) {
           wait={stats()?.loadoutWait ?? 0}
           onSpawn={() => game()?.closeLoadout()}
           skills={stats()?.skills ?? {}}
-          skillsOpen={stats()?.skillsOpen ?? false}
-          onSkill={(id, level) => game()?.setSkill(id, level)}
         />
       </Show>
 
@@ -113,6 +111,9 @@ export default function Play(props: { identity: Identity }) {
           stats={stats()}
           identity={props.identity}
           selfId={game()?.selfId ?? ''}
+          skills={stats()?.skills ?? {}}
+          skillsOpen={stats()?.skillsOpen ?? false}
+          onSkill={(id, level) => game()?.setSkill(id, level)}
           onClose={() => game()?.setMenu(false)}
           onLeave={() => {
             // 出ることを伝えてから離れる。伝えないと、残った人は

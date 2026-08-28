@@ -9,7 +9,7 @@
  * 外部への依存を持たせない (これが sim/ の唯一のドメインルール)。
  */
 
-import { headHeightWhen, type Stance } from '../player/stance'
+import { HEAD_HEIGHT, type Stance } from '../player/stance'
 import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
@@ -54,6 +54,25 @@ export const ROLL_HIT_RANGE = 1.1
  * 倒すのではなく体勢を崩させる。ダメージは入れない。
  */
 export const ROLL_KNOCKBACK = 0.8
+
+/**
+ * ダンボールで走っていて敵にぶつかったと見なす距離 (m)。
+ *
+ * 体当たりなのでローリングと同じ間合い。**箱を被っていること自体は
+ * 見つからないが、ぶつかれば分かる** — 隠れて動くことに代償を作る。
+ */
+export const BOX_BUMP_RANGE = 1.1
+/**
+ * ぶつかってから動けるようになるまで (秒)。
+ *
+ * リアクションの型の尺 (実測 1.47 秒、tools/measure/clip_speed.js) に合わせる。
+ * 短くすると型の途中で走り出して、箱を落とした所だけが飛ぶ。
+ *
+ * **倒れはしない。棒立ちになるだけ。** 隠れて詰めた側が失うのはこの 1.5 秒で、
+ * 見つけた側はその間に撃てる。倒すところまでやると、箱で近づくこと自体が
+ * 選べなくなる。
+ */
+export const BOX_BUMP_STUN = 1.47
 
 /** 倒れてから復帰するまでの待ち時間 (秒)。倒れるモーションの尺に足される */
 export const RESPAWN_DELAY = 3
@@ -216,11 +235,42 @@ export function creditOf(victimId: string, killerId: string | null): Credit {
  * 別々に組み立てると、片方だけ古い数字を渡す余地が残る。
  */
 export const HIT_RULES = {
-  headHeight: headHeightWhen,
+  headHeight: (stance: Stance) => HEAD_HEIGHT[stance],
   canBeStabbed,
   meleeRange: MELEE_RANGE,
   meleeSlack: MELEE_SLACK,
   backstabDot: BACKSTAB_DOT,
   distanceSlack: DISTANCE_SLACK,
   distanceSlackRate: DISTANCE_SLACK_RATE,
+}
+
+/**
+ * 爆風で飛ぶ距離 (m)。**近さで変えない。**
+ *
+ * 転ぶ型が 1 つしか無いので、距離だけ変えても絵が合わない (同じ動きで 2m 飛ぶ人と
+ * 5m 飛ぶ人が並ぶ)。爆心から離れれば**そもそも転ばない** (item/grenade.ts の
+ * KNOCK_NEAR) ので、そこで強弱は付いている。
+ */
+export const KNOCK_DISTANCE = 3
+
+/**
+ * 飛んでいる時間 (秒)。
+ *
+ * 転ぶ型の入りに合わせてある。長いと引っ張られて見え、短いと瞬間移動に見える。
+ */
+export const KNOCK_TIME = 0.42
+
+/**
+ * 飛び始めてからの経過に対する速さ (m/s)。
+ *
+ * **人も的も同じ式で滑る。** 人は自分の画面で、的はサーバーが動かすが、
+ * 別の式で動かすと**同じ爆風で飛ぶ距離が変わる**。
+ *
+ * 線形に落とす — 入りが速くて終わりが緩い。平均が距離/時間になるよう初速は 2 倍。
+ *
+ * @param left 残り時間 (秒)
+ */
+export function knockSpeed(left: number): number {
+  if (left <= 0) return 0
+  return ((2 * KNOCK_DISTANCE) / KNOCK_TIME) * (left / KNOCK_TIME)
 }

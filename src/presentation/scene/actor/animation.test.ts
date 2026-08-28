@@ -37,59 +37,52 @@ function run(anim: CharacterAnimator, seconds: number, locomotion: string, aimin
   }
 }
 
-describe('落下の受け身', () => {
+describe('堪える着地', () => {
   /**
    * **前の型が残ったまま終わっても、いま流れている型は畳まれない。**
    *
    * 「終わった」の受け口が、終わったのが何かを見ずに畳んでいた。回避ローリング
    * (1.6 秒) の直後に着地すると、その 0.22 秒後に前の roll が終わり、その通知で
-   * **受け身の上半身だけが構えへ戻る**。下半身は locomotion で決まるので受け身の
+   * **着地の上半身だけが構えへ戻る**。下半身は locomotion で決まるので着地の
    * まま残り、腰から上だけが銃を構え直して見えた。
    *
    * 実機で骨を測って初めて掴めた (手元の模擬では前の型が残らないので出ない)。
    */
-  test('**前のローリングが終わっても、受け身は畳まれない**', () => {
+  test('**前のローリングが終わっても、着地は畳まれない**', () => {
     const anim = animator()
-    // 回避ローリングの途中で着地して受け身へ移る。**前の roll はまだ流れている**
+    // 回避ローリングの途中で着地して堪える型へ移る。**前の roll はまだ流れている**
     anim.playRoll()
     run(anim, 0.9, 'roll', true)
-    anim.playFallRoll()
+    anim.playHardLand()
 
     // 混ざり切るまで待つ
-    run(anim, 0.3, 'fall_roll', true)
-    expect(playing(anim, 'upper')).toEqual(['fall_roll'])
+    run(anim, 0.3, 'hard_land', true)
+    expect(playing(anim, 'upper')).toEqual(['hard_land'])
 
-    // 受け身の残りを通して、**前の roll が終わる瞬間を跨ぐ**。
-    // どの時点でも上半身は受け身のまま
+    // 着地の残りを通して、**前の roll が終わる瞬間を跨ぐ**。
+    // どの時点でも上半身は着地のまま
     for (let i = 0; i < Math.round(1.2 * 60); i++) {
-      run(anim, 1 / 60, 'fall_roll', true)
-      expect(playing(anim, 'upper')).toEqual(['fall_roll'])
+      run(anim, 1 / 60, 'hard_land', true)
+      expect(playing(anim, 'upper')).toEqual(['hard_land'])
     }
-    expect(playing(anim, 'lower')).toEqual(['fall_roll'])
+    expect(playing(anim, 'lower')).toEqual(['hard_land'])
   })
 
   /**
-   * **受け身も前へ流れる。** 焼かれた移動を誰も読んでいなくて、腰が 179 度
-   * 振れるだけの「その場でくるりと回る」絵になっていた。
-   *
-   * 落ちた勢いが前へ流れて消えるのが受け身なので、動かないと**なぜ転がったのか**
-   * が絵から抜ける。
-   */
-  /**
    * **1 周して頭へ戻っても、進んだぶんを引き戻さない。**
    *
-   * 下半身の受け身がループしていて (一度きりの一覧から漏れていた)、尺とロックが
+   * 下半身の着地がループしていて (一度きりの一覧から漏れていた)、尺とロックが
    * ほぼ同時なので競り合っていた。先にクリップが頭へ戻った回だけ、根元の位置も
    * 先頭へ跳んで **1 フレームで 3m 戻る**。毎回は出ないので絵では掴みにくい。
    */
   test('**一度きりで流す。** 頭へ戻って引き戻されない', () => {
     const anim = animator()
-    anim.playFallRoll()
+    anim.playHardLand()
     const step = new THREE.Vector3()
     let back = 0
     // 尺 (1.67 秒) より長く回して、1 周を跨がせる
     for (let i = 0; i < Math.round(3 * 60); i++) {
-      anim.setLocomotion('fall_roll' as never)
+      anim.setLocomotion('hard_land' as never)
       anim.update(1 / 60)
       if (anim.consumeRootMotion(step)) back = Math.max(back, Math.hypot(step.x, step.z))
     }
@@ -97,17 +90,24 @@ describe('落下の受け身', () => {
     expect(back).toBeLessThan(0.5)
   })
 
-  test('焼かれた移動を辿る。**その場では回らない**', () => {
+  /**
+   * **その場で堪える。転がらない。**
+   *
+   * 転がる型だった頃は 3m 進む必要があって、焼かれた移動を辿る仕掛けに
+   * 載せていた。膝を突いて堪えるだけの型に差し替えたので、その仕掛けからは
+   * 外してある — 残したままだと、着地した所から前へ滑る。
+   */
+  test('移動しない。**着地した所で堪える**', () => {
     const anim = animator()
-    anim.playFallRoll()
+    anim.playHardLand()
     const step = new THREE.Vector3()
     let travelled = 0
-    for (let i = 0; i < Math.round(1.6 * 60); i++) {
-      anim.setLocomotion('fall_roll' as never)
+    for (let i = 0; i < Math.round(2.1 * 60); i++) {
+      anim.setLocomotion('hard_land' as never)
       anim.update(1 / 60)
       if (anim.consumeRootMotion(step)) travelled += Math.hypot(step.x, step.z)
     }
-    expect(travelled).toBeGreaterThan(2)
+    expect(travelled).toBe(0)
   })
 
   test('**上半身も一緒に転がる。** 銃を構えたまま脚だけ動かない', () => {
@@ -115,16 +115,16 @@ describe('落下の受け身', () => {
     run(anim, 0.5, 'jump_loop', true)
     expect(playing(anim, 'upper')).toEqual(['aim'])
 
-    anim.playFallRoll()
-    run(anim, 0.2, 'fall_roll', true)
-    expect(playing(anim, 'upper')).toEqual(['fall_roll'])
-    expect(playing(anim, 'lower')).toEqual(['fall_roll'])
+    anim.playHardLand()
+    run(anim, 0.2, 'hard_land', true)
+    expect(playing(anim, 'upper')).toEqual(['hard_land'])
+    expect(playing(anim, 'lower')).toEqual(['hard_land'])
   })
 
   test('**受け身の途中で死んでも、死体は構え直さない。**', () => {
     const anim = animator()
-    anim.playFallRoll()
-    run(anim, 0.2, 'fall_roll', true)
+    anim.playHardLand()
+    run(anim, 0.2, 'hard_land', true)
 
     // player.setHealth(0) と同じ順で倒す
     anim.setAiming(false)

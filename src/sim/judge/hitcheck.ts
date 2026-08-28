@@ -14,6 +14,7 @@
 import type { HitZone } from '../../domain/rule/damage'
 import { isPathClear, type StageBox } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
+import type { Stance } from '../../domain/player/stance'
 
 // 姿の形は domain (Player の過去の姿そのものなので)。ここからも出す
 export type { Pose }
@@ -29,8 +30,15 @@ export type { Pose }
  * 渡す物は domain がひとまとめにして持っている (rule/damage.ts の HIT_RULES)。
  */
 export interface HitRules {
-  /** 姿勢から頭の高さ (m) */
-  headHeight(crouching: boolean, boxed: boolean): number
+  /**
+   * その構えの頭の高さ (m)。
+   *
+   * **構えそのものを渡す。** しゃがみと箱の 2 つの真偽で引いていた頃、
+   * 伏せを足した途端に穴が開いた — 這っている人は crouching が立っているので
+   * 0.94m の所に頭があることになり、実際に頭がある 0.4m を撃っても
+   * 通らなかった。姿勢が増えるたびに増える引数ではなく、**姿勢を 1 つ**渡す。
+   */
+  headHeight(stance: Stance): number
   /** その構えに刃が通るか */
   canBeStabbed(stance: string, aimPitch: number): boolean
   /** ナイフの間合い (m) と、そこに許す余裕 */
@@ -100,8 +108,8 @@ function zoneExposed(
 ): boolean {
   if (boxes.length === 0) return true
 
-  const eyeY = attacker.y + rules.headHeight(attacker.crouching, attacker.boxed)
-  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.crouching, target.boxed))
+  const eyeY = attacker.y + rules.headHeight(attacker.stance)
+  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
 
   // 攻撃者から相手へ向かう線に直交する向き。ここへ肩の幅だけずらす
   const dx = tx - attacker.x
@@ -132,8 +140,8 @@ function verifyPose(
   rules: HitRules,
 ): Verdict {
   const zone: HitZone = claim.zone ?? 'BODY'
-  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.crouching, target.boxed))
-  const eyeY = attacker.y + rules.headHeight(attacker.crouching, attacker.boxed)
+  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
+  const eyeY = attacker.y + rules.headHeight(attacker.stance)
   const actual = Math.hypot(tx - attacker.x, ty - eyeY, tz - attacker.z)
 
   if (claim.kind === 'melee') {

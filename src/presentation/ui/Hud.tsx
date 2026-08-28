@@ -384,20 +384,49 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <div class="scope-hint">{t('hud.scopeHint')}</div>
       </Show>
 
-      <Show when={locked() && props.stats?.aiming && !props.stats?.scoped}>
+      {/*
+        刃物では出さない。**十字も輪も「そこへ飛ぶ」ための印**で、
+        届く範囲が体の前 2m しかない刃物には言うことが無い。
+      */}
+      <Show
+        when={
+          locked() &&
+          props.stats?.aiming &&
+          !props.stats?.scoped &&
+          props.stats?.weaponHeld !== 'knife'
+        }
+      >
         <div
           class="crosshair"
           // 散布界に応じて開く。数字で見せずに「今どれだけ散るか」を伝える。
           //
+          // **散弾は粒の散りも足す。** 狙いの散布だけだと、止まって構えた
+          // 瞬間に輪が点まで縮んで「一点へ飛ぶ」に見える
+          //
           // **位置は動かさない。** 手ブレは画面ごと揺れる (カメラの向きに
           // 差し込んである) ので、クロスヘアは中央に固定されたまま
-          style={{ '--crosshair-gap': `${9 + (props.stats?.spread ?? 0) * 11}px` }}
+          style={{
+            '--crosshair-gap': `${9 + ((props.stats?.spread ?? 0) + (props.stats?.pelletSpread ?? 0)) * 11}px`,
+          }}
         >
           <span class="crosshair-dot" />
-          <span class="crosshair-arm crosshair-arm-up" />
-          <span class="crosshair-arm crosshair-arm-down" />
-          <span class="crosshair-arm crosshair-arm-left" />
-          <span class="crosshair-arm crosshair-arm-right" />
+          {/*
+            散弾は輪。**粒がその中に散る**という形をそのまま出す。
+            十字は「その一点へ 1 発飛ぶ」の形なので、8 粒に分かれる銃には嘘になる。
+          */}
+          <Show
+            when={(props.stats?.pelletSpread ?? 0) > 0}
+            fallback={
+              <>
+                <span class="crosshair-arm crosshair-arm-up" />
+                <span class="crosshair-arm crosshair-arm-down" />
+                <span class="crosshair-arm crosshair-arm-left" />
+                <span class="crosshair-arm crosshair-arm-right" />
+              </>
+            }
+          >
+            <span class="crosshair-ring" />
+          </Show>
         </div>
       </Show>
 

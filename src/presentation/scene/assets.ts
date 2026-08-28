@@ -29,6 +29,7 @@ export const asset = {
 
 const SMG_URL = asset.model('smg.glb')
 const RIFLE_URL = asset.model('rifle.glb')
+const SHOTGUN_URL = asset.model('shotgun.glb')
 const SNIPER_URL = asset.model('sniper.glb')
 const PISTOL_URL = asset.model('pistol.glb')
 const CASING_URL = asset.model('casing_rifle.glb')
@@ -84,6 +85,10 @@ export function loadSmg(): Promise<GLTF> {
 
 export function loadRifle(): Promise<GLTF> {
   return load(RIFLE_URL)
+}
+
+export function loadShotgun(): Promise<GLTF> {
+  return load(SHOTGUN_URL)
 }
 
 export function loadSniper(): Promise<GLTF> {

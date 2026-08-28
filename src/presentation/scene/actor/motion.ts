@@ -72,29 +72,42 @@ export const STAIR_DROP_MAX = 0.8
 
 export type WholeBodyLocomotion =
   | 'roll'
-  | 'fall_roll'
+  | 'hard_land'
   | 'stab'
   | 'death'
+  | 'death_front'
+  | 'death_back'
   | 'salute'
   | 'jump_down'
   | 'sweep'
   | 'stand'
   | 'away'
+  | 'bump'
+  | 'prone_down'
+  | 'prone_rise'
   | 'claymore_windup'
   | 'claymore_place'
 
 export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>([
   'roll',
   // 受け身。転がるので上半身だけ別の型は重ねられない
-  'fall_roll',
+  'hard_land',
   'stab',
   'death',
+  // 倒れる向き。背後から撃たれたら前へ、正面からなら後ろへ
+  'death_front',
+  'death_back',
   'salute',
   'jump_down',
   'sweep',
   'stand',
   // 切れた人の姿。上半身だけ別の型を重ねると、銃を構えたまま固まる
   'away',
+  // ダンボールで敵にぶつかった反応。上だけ構えに戻ると、銃を構えたまま驚く
+  'bump',
+  // 伏せへの出入り。上だけ構えに戻ると、寝ながら銃を構える形になる
+  'prone_down',
+  'prone_rise',
   // クレイモアを置く。かがむので上下を分けられない
   'claymore_windup',
   'claymore_place',
@@ -107,6 +120,55 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
  */
 export function isWholeBody(locomotion: Locomotion): locomotion is WholeBodyLocomotion {
   return WHOLE_BODY.has(locomotion)
+}
+
+/**
+ * 倒れている姿勢か。**向きの別を含める。**
+ *
+ * 生死を決めるのはサーバーで、姿勢はそれに従う。ただし**向きは姿勢が運んで
+ * いる**ので、倒れている間に姿勢を 1 つへ潰すと前後の別が消える。
+ */
+export function isDeath(locomotion: Locomotion): boolean {
+  return locomotion === 'death' || locomotion === 'death_front' || locomotion === 'death_back'
+}
+
+/**
+ * 這う動きの、1 周期あたりの蹴りの回数と位置。
+ *
+ * **実測** (tools/measure/stride.js と同じ要領で、接地している足が体に対して
+ * 後ろへ流れる速さを見た)。3.90 秒の周期に山が 2 つあり、位相 0.31 と 0.80 に
+ * 立つ。**前へ寄せてある** (0.19) — 実測どおりだと蹴り終わってから体が出る
+ * ように見えた。足が地面を捉えた所から進み始めるので、掻き始めに合わせる。
+ * 腕で這う動きなので、足が地面を掻いた瞬間だけ体が前へ出る。
+ */
+const CRAWL_PUSHES = 2
+const CRAWL_PUSH_PHASE = 0.19
+
+/**
+ * 蹴りの鋭さ。大きいほど山が細く、間が止まる。
+ *
+ * 2 だと山の間で 0 まで落ちるので、**足が止まっている間は進まない**。
+ * 這っている感じはこれで出るが、完全に止まると引っ掛かって見えるので
+ * 下限 (CRAWL_FLOOR) を残す。
+ */
+const CRAWL_SHARP = 2
+/** 蹴っていない間も残る進み (割合)。0 にすると 1 周期に 2 回止まって見える */
+const CRAWL_FLOOR = 0.15
+
+/**
+ * その位相で、平均の何倍の速さで進むか。
+ *
+ * **平均は 1。** 均すと今までと同じ速さになるので、進む距離も間合いも変わらない
+ * — 変わるのは進み方だけ。等速で滑っていたのが、蹴るたびにぐいと出る形になる。
+ *
+ * @param phase 這う型の再生位置 (0..1)
+ */
+export function crawlSurge(phase: number): number {
+  const wave = 0.5 + 0.5 * Math.cos(2 * Math.PI * CRAWL_PUSHES * (phase - CRAWL_PUSH_PHASE))
+  const shaped = CRAWL_FLOOR + (1 - CRAWL_FLOOR) * wave ** CRAWL_SHARP
+  // 均して 1 になるよう割る。cos^2 の平均は 3/8
+  const mean = CRAWL_FLOOR + (1 - CRAWL_FLOOR) * 0.375
+  return shaped / mean
 }
 
 /**
@@ -139,6 +201,23 @@ export interface StanceInput {
    * 実際に起きた: 下半身だけ idle に戻り、立ったまま腕を前へ伸ばす形になった
    */
   standingUp: boolean
+  /**
+   * ダンボールで敵にぶつかった直後の残り時間 (秒)。
+   *
+   * 箱はもう落ちているので boxed は false になっている。**それでも箱の判定より
+   * 先に見る** — 落とした瞬間に走りの型へ戻ると、リアクションが 1 フレームも
+   * 出ないまま普通に走り出す。
+   */
+  bumped: number
+  /** 伏せているか。しゃがみの下にもう一段 */
+  prone: boolean
+  /**
+   * 伏せへ入っている / 伏せから起き上がっている最中。終わっていれば null。
+   *
+   * **伏せているかとは別に持つ。** 入っている最中はまだ伏せていないし、
+   * 起き上がっている最中はもう伏せていない — 旗 1 つでは表せない。
+   */
+  proneShift: 'prone_down' | 'prone_rise' | null
   rolling: boolean
   onGround: boolean
   /** 着地モーションの残り時間 (秒) */
@@ -160,7 +239,7 @@ export interface StanceInput {
    * ただの着地 (landing) と別に持つ。落下ダメージが入る速さで落ちたときだけで、
    * 尺もクリップに合わせて長い。
    */
-  fallRoll: number
+  hardLand: number
   /** 上下の速度 (m/s)。空中で上昇と下降を分ける */
   velocityY: number
   /** 入力された移動方向 (ワールド、正規化済み)。停止なら 0 */
@@ -184,6 +263,24 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
   if (input.downed) return 'sweep'
+
+  // 箱が落ちて棒立ちになっている間。動けないので方向も速さも見ない
+  if (input.bumped > 0) return 'bump'
+
+  /*
+   * 伏せている間。**8 方向には分けない。**
+   *
+   * 這う型が前進の 1 本しかないので、向きの区別を作れない。動いているかだけ
+   * 見て、止まったら伏せたまま静止する (箱の sneak / sit と同じ形)。
+   * 前以外へ動けないことは、動かす側 (player.ts) が入力を捨てて作っている。
+   */
+  // 伏せへの出入り。**終わるまで他へ移らない** (全身の型)
+  if (input.proneShift) return input.proneShift
+
+  if (input.prone) {
+    const threshold = input.previous === 'crawl_f' ? IDLE_ENTER_SPEED : IDLE_EXIT_SPEED
+    return input.actualSpeed >= threshold ? 'crawl_f' : 'prone_idle'
+  }
 
   // ダンボールを被っている間は専用の姿勢。8 方向には分けず、動いているかだけ見る
   // (箱で隠れていて向きの違いが見えないので、方向ごとのクリップは無駄になる)。
@@ -217,7 +314,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
    *
    * 滞空のループ (jump_loop) は、走って段から落ちる場面に合っていなかった —
    * 走っている脚が止まって空中で構え直す絵になる。落ちるのは一瞬なので、
-   * 走ったまま落ちて、着地で受け止める (jump_down / fall_roll) ほうが素直。
+   * 走ったまま落ちて、着地で受け止める (jump_down / hard_land) ほうが素直。
    *
    * 型としては残してある。**通信の並びから外すと、古い版が別の姿勢を再生する。**
    */
@@ -227,7 +324,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // 階段の間は専用の型。**坂は含まない** (段差が無いので走りで足りる)
   if (input.stairFor > 0) return input.stairDown ? 'down_stair' : 'up_stair'
   // 削られる高さから落ちた着地は受け身。ただの着地より長く、転がり切るまで続く
-  if (input.fallRoll > 0) return 'fall_roll'
+  if (input.hardLand > 0) return 'hard_land'
   if (input.landing > 0) return 'jump_down'
 
   const stopping =

@@ -9,12 +9,11 @@ import {
   type WeaponId,
 } from '../../domain/item/weapons'
 import {
-  SKILLS,
   SKILL_BUDGET,
   costOf,
-  type SkillId,
   type Skills,
 } from '../../domain/player/skill'
+import { SkillList } from './SkillPanel'
 import './Loadout.css'
 
 /**
@@ -46,14 +45,11 @@ export default function Loadout(props: {
   /** いま効いているスキル。**サーバーが返した物** */
   skills: Skills
   /** 選び直せるか。試合が始まったら閉じる */
-  skillsOpen: boolean
-  onSkill: (id: SkillId, level: number) => void
 }) {
   /** その銃の予備弾 */
   const reserveOf = (id: WeaponId) => WEAPONS[id].reserve
 
   /** 表の並び順で出す。**予算の残りは段の合計から出る** */
-  const skillList = Object.values(SKILLS)
   const spent = () => costOf(props.skills)
 
   const rows = () => [
@@ -134,12 +130,16 @@ export default function Loadout(props: {
         </div>
 
         {/*
-          スキル。**装備とは選び直せる窓が違う** — 装備は 1 つの命ごと、
-          スキルは 1 試合に 1 度 (domain/player/skill.ts の canChooseSkills)。
+          スキル。**ここでは見るだけ。** 変えるのは Tab の板 (ui/Scoreboard.tsx)。
 
-          段がそのまま値段なので、予算の残りを見せるだけで「何を諦めるか」が
-          読める。押せない段を薄くするのではなく **disabled で触れなくする** —
-          押しても何も起きない物を残すと、弾かれたのか壊れているのか分からない。
+          --- なぜ 1 か所にするか ---
+          装備とスキルは選び直せる窓が違う — 装備は 1 つの命ごと、スキルは
+          1 試合に 1 度 (domain/player/skill.ts の canChooseSkills)。同じ画面に
+          並べると、同じ画面で押した 2 つが違うタイミングで効くことになって、
+          いつ何が変わったのかが読めない。
+
+          それでも並べておくのは、**装備を選ぶときに何が効いているかが要る**から。
+          走る速さも散布も装填の速さもスキルで動くので、銃を選ぶ材料になる。
         */}
         <div class="loadout-row loadout-skills">
           <div class="loadout-slot">
@@ -147,42 +147,11 @@ export default function Loadout(props: {
             <div class="loadout-budget" classList={{ 'loadout-budget-full': spent() >= SKILL_BUDGET }}>
               {spent()} / {SKILL_BUDGET}
             </div>
-            {/*
-              閉じているなら理由を出す。**押せない物を並べるなら、なぜかも要る** —
-              途中参加した人には最初から閉じているので、壊れているように見える
-            */}
-            {!props.skillsOpen && <div class="loadout-budget-locked">試合中は変更不可</div>}
+            {/* 押せない物を並べるなら、どこで変えられるかも出す */}
+            <div class="loadout-budget-locked">Tab から変更</div>
           </div>
           <div class="loadout-items">
-            <For each={skillList}>
-              {(spec) => {
-                const level = () => props.skills[spec.id] ?? 0
-                return (
-                  <div class="loadout-skill" classList={{ 'loadout-skill-on': level() > 0 }}>
-                    <span class="loadout-skill-name">{spec.label}</span>
-                    <div class="loadout-levels">
-                      <For each={[1, 2, 3] as const}>
-                        {(n) => (
-                          <button
-                            class="loadout-level"
-                            classList={{ 'loadout-level-on': level() >= n }}
-                            /*
-                              その段にできないなら押せない。**いま入っている分を
-                              返してから**考えるので、Lv2 から Lv3 は差額 1 で足りる。
-                            */
-                            disabled={!props.skillsOpen || spent() - level() + n > SKILL_BUDGET}
-                            title={spec.hint}
-                            onClick={() => props.onSkill(spec.id, level() === n ? 0 : n)}
-                          >
-                            {n}
-                          </button>
-                        )}
-                      </For>
-                    </div>
-                  </div>
-                )
-              }}
-            </For>
+            <SkillList skills={props.skills} open={false} onSkill={() => {}} />
           </div>
         </div>
 

@@ -163,6 +163,14 @@ export class FollowCamera {
   private swayYaw = 0
   /** 最後に反動が加わってからの経過 (秒) */
   private recoilAge = 0
+  /**
+   * 反動が戻る速さの倍率。**その銃の MASTERY で決まる** (domain/player/skill.ts)。
+   *
+   * 猶予 (RECOIL_RECOVERY_DELAY) のほうは動かさない。あちらを縮めると
+   * 連射中にも戻り始めて、跳ね上がりが頭打ちになる — 押しっぱなしが強くなる
+   * 方向で、このスキルで出したい効き目と逆を向く。
+   */
+  private recoilRecovery = 1
 
   private aiming = false
   private distance = HIP_VIEW.distance
@@ -208,6 +216,16 @@ export class FollowCamera {
   /** 注視点の高さ (m)。姿勢とアニメーションの上下動を含んだ実測値を受ける */
   setViewHeight(height: number): void {
     this.viewHeight = height
+  }
+
+  /**
+   * 反動が戻る速さの倍率を差し込む。持ち替えとスキルの変更で変わる。
+   *
+   * 速さの決め方は**その銃を極めているか**なので domain。ここはその答えを
+   * 受け取って掛けるだけ。
+   */
+  setRecoilRecovery(scale: number): void {
+    this.recoilRecovery = scale
   }
 
   /** 1 発分の反動を加える (rad)。弾道はこの向きで決まるので見た目だけではない */
@@ -326,8 +344,9 @@ export class FollowCamera {
     // 撃っている間は溜まり、止めてから戻る
     this.recoilAge += dt
     if (this.recoilAge >= RECOIL_RECOVERY_DELAY) {
-      this.recoilPitch = damp(this.recoilPitch, 0, RECOIL_RECOVERY_LAMBDA, dt)
-      this.recoilYaw = damp(this.recoilYaw, 0, RECOIL_RECOVERY_LAMBDA, dt)
+      const lambda = RECOIL_RECOVERY_LAMBDA * this.recoilRecovery
+      this.recoilPitch = damp(this.recoilPitch, 0, lambda, dt)
+      this.recoilYaw = damp(this.recoilYaw, 0, lambda, dt)
     }
 
     this.currentViewHeight = damp(this.currentViewHeight, this.viewHeight, STANCE_LAMBDA, dt)
