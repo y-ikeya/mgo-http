@@ -208,8 +208,6 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     return browsing.items.filter((_, i) => !skip.has(i))
   }
 
-  /** スタミナ (0..100)。**満タンなら出さない** — 減っていない目盛りは飾り */
-  const stamina = () => props.stats?.stamina ?? 100
   /** 眠りが明けるまで。眠っていなければ 0 */
   const asleep = () => props.stats?.asleep === true
   /**
@@ -351,15 +349,22 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       />
 
       {/*
-        スタミナ。**麻酔を受けたときだけ出す。**
+        麻酔を受けている。**曇るだけ。数字も棒も出さない。**
 
-        体力と違って回復しないので、「あと何発で眠るか」がそのまま判断になる。
-        常に出しておくと画面の飾りになって、減った瞬間の意味が薄れる。
+        棒を出していたが、撃ち合いの最中に読む人は居なかった。しかも眠って
+        いる間は 0 のまま動かないので、空の枠が残るだけになる。
+
+        効いているのは手ブレのほうで (scene/Game.ts)、こちらは「そろそろ
+        危ない」を知らせるだけ。当たるかどうかには効かない。
+
+        中央は残す。曇らせるのは視界の縁で、狙っている先まで見えなくなると
+        撃ち合いにならない。
       */}
-      <Show when={stamina() < 100}>
-        <div class="hud-stamina">
-          <div class="hud-stamina-bar" style={{ width: `${stamina()}%` }} />
-        </div>
+      <Show when={(props.stats?.stamina ?? 0) > 0.02 && !asleep()}>
+        <div
+          class="hud-drowsy"
+          style={{ '--drowsy': `${(props.stats?.stamina ?? 0).toFixed(3)}` }}
+        />
       </Show>
 
       {/*

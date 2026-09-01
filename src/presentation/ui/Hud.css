@@ -1005,28 +1005,38 @@
 
 
 /*
- * スタミナ。**麻酔を受けたときだけ出る。**
+ * 麻酔が効いている間の視界。**縁からぼやける。**
  *
- * 体力 (hud-damage の赤み) と場所を分けてある。同じ所に置くと、どちらが
- * 減ったのか一瞬読めない — 片方は死に、片方は眠りで、取る手が違う。
+ * --drowsy は 0..1 で、麻酔を受けるほど大きい (domain の staminaBlur)。
+ *
+ * 目盛りを出していたが、撃ち合いの最中に読む人は居なかった。しかも眠って
+ * いる間は 0 のまま動かないので、空の枠が残るだけになる。**読む物ではなく
+ * 効く物にする。**
+ *
+ * 中央は残す。狙っている先まで曇ると撃ち合いにならないし、**不利にするのは
+ * 手ブレの仕事** (scene/Game.ts)。こちらは「効いている」と知らせるだけ。
+ *
+ * 眠る一歩手前で一番濃くなるので、**あと 1 発で眠る**が目で分かる。
  */
-.hud-stamina {
+.hud-drowsy {
   position: absolute;
-  left: 50%;
-  bottom: 13%;
-  transform: translateX(-50%);
-  width: 148px;
-  height: 4px;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.hud-stamina-bar {
-  height: 100%;
-  /* 青。体力の赤と取り違えないように、色から別物にする */
-  background: linear-gradient(90deg, #4d8fd6, #7fc4ff);
-  transition: width 0.18s ease-out;
+  inset: 0;
+  pointer-events: none;
+  backdrop-filter: blur(calc(var(--drowsy, 0) * 7px));
+  /* 中心は素通し。半分より外へ向かって効きが上がる */
+  mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 18%,
+    rgba(0, 0, 0, 0.55) 52%,
+    #000 100%
+  );
+  /* 曇りだけでは色が変わらないので、ごく薄く沈める */
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent 30%,
+    rgba(10, 18, 32, calc(var(--drowsy, 0) * 0.22)) 100%
+  );
+  transition: backdrop-filter 0.3s linear, background 0.3s linear;
 }
 
 /*

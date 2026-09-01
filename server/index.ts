@@ -58,7 +58,7 @@ import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { inWater, waterOf } from '../src/domain/match/stage'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
-import { MAX_STAMINA } from '../src/domain/player/stamina'
+import { MAX_STAMINA, recoverStamina } from '../src/domain/player/stamina'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/equip'
@@ -179,13 +179,46 @@ setInterval(() => {
         /*
          * --- 眠りから醒める ---
          *
-         * **スタミナはここでだけ戻る** (domain/player/stamina.ts)。時間で
-         * 戻る仕掛けを持たないので、眠りがそのまま回復になっている。
+         * 眠りが明けたらスタミナは満タンで起きる。**30 秒寝たのだから**、
+         * 残ったまま起こすと起きた瞬間にもう一度眠らされる。
          */
         if (player.sleepUntil > 0 && now >= player.sleepUntil) {
           player.sleepUntil = 0
           player.stamina = MAX_STAMINA
           sendStamina(player)
+        }
+
+        /*
+         * --- 屈んで待った分だけスタミナが戻る ---
+         *
+         * 体力の回復と同じ条件 (concentratingSince) を読む。**しゃがんで
+         * 動いていない**間だけ進み、立っても歩いても 0 からやり直し。
+         *
+         * 減ったスタミナは手ブレと視界に効くので、戻せないと麻酔を 1 発
+         * もらった時点でその命の間ずっと不利になる。戻す代償は時間と場所で、
+         * 屈んでいる間は撃ち合いに出られない。
+         *
+         * **配るのは表示が変わるときだけ。** 体力と同じで、変わらない値を
+         * 64Hz で流す意味が無い。
+         */
+        if (
+          player.stamina < MAX_STAMINA &&
+          player.sleepUntil === 0 &&
+          player.concentratingSince > 0
+        ) {
+          const healed = recoverStamina(
+            player.stamina,
+            (now - player.concentratingSince) / 1000,
+            TICK_MS / 1000,
+          )
+          if (healed !== player.stamina) {
+            player.stamina = healed
+            const shown = Math.ceil(healed)
+            if (shown !== sessionOf(player).staminaShown) {
+              sessionOf(player).staminaShown = shown
+              sendStamina(player)
+            }
+          }
         }
 
         /*

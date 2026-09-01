@@ -67,6 +67,8 @@ export interface Session {
    *
    * 回復は毎 tick 少しずつ動くので、丸めた値が変わったときだけ配る
    */
+  /** 最後に配ったスタミナ (切り上げ)。変わらない値を流さないための控え */
+  staminaShown: number
   healthShown: number
   /** 却下した申告の数。/health に出す (当たり判定が疑わしい人が分かる) */
   rejected: number
@@ -134,6 +136,7 @@ export function newSession(player: Player, socket: Bun.ServerWebSocket<Client>):
     lastPacketAt: 0,
     clockSkew: 0,
     healthShown: player.health,
+    staminaShown: player.stamina,
     rejected: 0,
     badPacketAt: 0,
     badMoveAt: 0,

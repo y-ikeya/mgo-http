@@ -783,6 +783,16 @@ export class Player {
     this.boxed = false
     // 箱を落とされた直後に倒された場合。戻さないと湧いてから固まったまま
     this.bumpLeft = 0
+    /*
+     * 眠っている最中に倒された場合。**戻さないと湧いてからも眠ったまま。**
+     *
+     * 眠りの残り時間は自分で数えていて、サーバーは 30 秒経ったときにしか
+     * 知らせてこない。倒されて湧き直しても数え続けるので、画面が暗いまま
+     * 動ける、という形で出た。
+     */
+    this.sleepLeft = 0
+    this.sleepSpan = 0
+    this.animator?.wakeFromSleep()
     this.proneStage = 'none'
     this.proneShiftLeft = 0
     this.velocityY = 0
@@ -801,6 +811,16 @@ export class Player {
     this.boxed = false
     // 箱を落とされた直後に倒された場合。戻さないと湧いてから固まったまま
     this.bumpLeft = 0
+    /*
+     * 眠っている最中に倒された場合。**戻さないと湧いてからも眠ったまま。**
+     *
+     * 眠りの残り時間は自分で数えていて、サーバーは 30 秒経ったときにしか
+     * 知らせてこない。倒されて湧き直しても数え続けるので、画面が暗いまま
+     * 動ける、という形で出た。
+     */
+    this.sleepLeft = 0
+    this.sleepSpan = 0
+    this.animator?.wakeFromSleep()
     this.proneStage = 'none'
     this.proneShiftLeft = 0
     this.velocityY = 0
