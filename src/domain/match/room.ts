@@ -1,5 +1,7 @@
 import type { Player } from '../player/player'
 import { only, type Rotation } from './stage'
+import { CHOICES, type WeaponId } from '../item/weapons'
+import type { GunId } from '../item/held'
 
 /**
  * 部屋とルール。
@@ -80,28 +82,72 @@ export const MODES: Record<Mode, ModeSpec> = {
 }
 
 /**
- * 部屋ごとの、回すステージ。
+ * 部屋の設定。**部屋について決まっていることは全部ここ。**
  *
- * **いまは全部 1 枚だけの fixed。** 部屋を作った人が並びと順を決められるように
- * するのが行き先で (match/stage.ts)、ここはその過渡期の姿。作れるように
- * なったら、この表が「作るときの既定値」に変わるだけで読む側は動かない。
+ * --- なぜ 1 つの表にしたか ---
+ * ルール・ステージ・覚え書き・持ち込める銃を、部屋名を鍵にした表で別々に
+ * 持っていた。部屋を 1 つ足すたびに直す場所が増えるし、**片方だけ直した部屋**
+ * が作れてしまう。読む側も「その部屋の全部」を 1 回で引ける。
+ *
+ * 行き先は**部屋を作った人がこれを決める**こと (match/stage.ts の Rotation)。
+ * そうなったら、この表は「作るときの既定値」に変わるだけで読む側は動かない。
  */
-export const ROOM_STAGES: Record<RoomName, Rotation> = {
-  alpha: only('mall'),
-  bravo: only('mall'),
-  charlie: only('mall'),
-  delta: only('mall'),
-  // 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**
-  echo: only('training'),
+export interface RoomSpec {
+  mode: Mode
+  /** 回すステージ。**いまは全部 1 枚だけの fixed** */
+  stages: Rotation
+  /**
+   * 部屋の覚え書き。一覧に出る。
+   *
+   * **ルールの名前だけでは伝わらないこと**を書く場所。同じ TDM でも、持ち込める
+   * 銃を絞ってあれば別の遊びになる。
+   */
+  note?: string
+  /**
+   * 持ち込める主武器。**省けば全部。**
+   *
+   * 絞ると、その部屋は同じルールでも別の撃ち合いになる — 狙撃銃だけの部屋は
+   * 「見つける前に見つけられたら負け」に寄る。
+   *
+   * 受け取った申告もこれで弾く (domain/player/equip.ts)。画面に出さないだけでは、
+   * 送ってくる側を止められない。
+   */
+  primaries?: readonly WeaponId[]
+  /**
+   * 副武器。**省けば拳銃、null なら持たない。**
+   *
+   * 外すと、詰められた時に残るのがナイフだけになる。狙撃銃の部屋で「間合いへ
+   * 入られたら終わり」を成立させるのはこれ — 拳銃が残っていると、詰めた側が
+   * 近距離の撃ち合いに勝てるとは限らなくなる。
+   */
+  secondary?: GunId | null
 }
 
-/** 部屋の割り当て。**変えるならここ 1 か所** */
-export const ROOM_MODE: Record<RoomName, Mode> = {
-  alpha: 'DM',
-  bravo: 'TDM',
-  charlie: 'TSNE',
-  delta: 'INT',
-  echo: 'PRACTICE',
+export const ROOMS: Record<RoomName, RoomSpec> = {
+  alpha: { mode: 'DM', stages: only('mall') },
+  bravo: { mode: 'TDM', stages: only('mall') },
+  charlie: { mode: 'TSNE', stages: only('mall') },
+  delta: {
+    mode: 'TDM',
+    stages: only('garden'),
+    note: '砂部屋',
+    // **狙撃銃だけ。** 副武器も外すので、詰められたらナイフしか残らない
+    primaries: ['sniper'],
+    secondary: null,
+  },
+  // 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**
+  echo: { mode: 'PRACTICE', stages: only('training') },
+}
+
+/** その部屋で持ち込める主武器。**省いてあれば全部** */
+export function primariesOf(room: RoomName): readonly WeaponId[] {
+  return ROOMS[room].primaries ?? CHOICES.primary
+}
+
+/** その部屋の副武器。**省いてあれば拳銃、null なら持たない** */
+export function secondaryOf(room: RoomName): GunId | null {
+  const spec = ROOMS[room]
+  return spec.secondary === undefined ? 'm9' : spec.secondary
 }
 
 export function isRoomName(name: string): name is RoomName {
@@ -109,7 +155,7 @@ export function isRoomName(name: string): name is RoomName {
 }
 
 export function modeOf(room: RoomName): ModeSpec {
-  return MODES[ROOM_MODE[room]]
+  return MODES[ROOMS[room].mode]
 }
 
 /**

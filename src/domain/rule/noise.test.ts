@@ -14,7 +14,28 @@ describe('音の届き方', () => {
 
   test('**撃てば居場所が漏れる。** 銃声は足音よりずっと遠くまで届く', () => {
     for (const spec of Object.values(WEAPONS)) {
+      if (spec.tranquilizer) continue
       expect(shotReach(spec)).toBeGreaterThan(STEP_RANGE * 3)
+    }
+  })
+
+  /*
+   * 麻酔銃だけが例外。**撃っても居場所が漏れない。**
+   *
+   * これが麻酔銃を選ぶ理由の半分になっている — 殺せないぶん、静かに 1 人
+   * 抜ける。他の銃と同じだけ響くなら、撃った時点で周りに知らせることになって
+   * 「静かに始末する道具」が成り立たない。
+   *
+   * ただし**無音ではない**。走る足音と同じだけは届く — そこを走り抜けるのと
+   * 同じ、という所に置いてある。完全に消すと、近くに居る人にも何も起きて
+   * いないことになる。
+   */
+  test('**麻酔銃だけは漏れない。** 走る足音と同じだけしか届かない', () => {
+    const tranq = Object.values(WEAPONS).filter((spec) => spec.tranquilizer)
+    expect(tranq.length).toBeGreaterThan(0)
+    for (const spec of tranq) {
+      expect(shotReach(spec)).toBeLessThanOrEqual(STEP_RANGE)
+      expect(shotReach(spec)).toBeGreaterThan(0)
     }
   })
 
@@ -25,11 +46,11 @@ describe('音の届き方', () => {
     expect(widest.id).toBe('sniper')
   })
 
-  test('拳銃が一番静か。**近づいて撃つ道具**', () => {
+  test('麻酔銃が一番静か。**気づかれずに撃つ道具**', () => {
     const quietest = Object.values(WEAPONS).reduce((a, b) =>
       a.noiseRange <= b.noiseRange ? a : b,
     )
-    expect(quietest.id).toBe('pistol')
+    expect(quietest.id).toBe('m9')
   })
 
   test('届く距離の外では聞こえない', () => {

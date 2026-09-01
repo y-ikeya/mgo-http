@@ -12,7 +12,10 @@ import {
   mix,
   normalize,
   positionLocal,
+  positionWorld,
+  cameraPosition,
   pow,
+  reflector,
   screenCoordinate,
   sin,
   smoothstep,
@@ -25,7 +28,7 @@ import type { Obstacle } from '../../../sim/space/collision'
 import { isPathClear, sightBlockers } from '../../../sim/space/vision'
 import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
-import { STAGES, type StageName } from '../../../domain/match/stage'
+import { STAGES, waterOf, type StageName } from '../../../domain/match/stage'
 import { isMesh } from '../util/guards'
 
 /**
@@ -242,6 +245,9 @@ function frameGeometry(half: number, width: number): THREE.BufferGeometry {
   return geometry
 }
 
+/** 差し替えで中身が入れ替わる部分。配列そのものは作り直さない */
+type StageParts = Pick<Stage, 'collidables' | 'cameraBlockers' | 'obstacles'>
+
 export interface Stage {
   /** 弾が当たる物。撃った先を決めるのに使う */
   readonly collidables: THREE.Object3D[]
@@ -249,6 +255,24 @@ export interface Stage {
   readonly cameraBlockers: THREE.Object3D[]
   /** 移動判定用の XZ 平面 AABB */
   readonly obstacles: Obstacle[]
+  /**
+   * 水面。敷いていなければ null。
+   *
+   * **撃った先が水かどうかを撃つ側が知る**ために出す (弾痕ではなく水柱を出す)。
+   * 当たり判定には入らない — 歩く床は地面のまま。
+   */
+  readonly water: { half: number; y: number } | null
+  /**
+   * 地形 (glb) が届いて、当たり判定が入れ替わったか。
+   *
+   * **届くまでは足場が無い。** buildStage はブロックアウトの箱だけ持って
+   * すぐ返り、本物は後から差し替わる。庭園は足場が水の 10m 上にあるので、
+   * 届く前に湧くと**そのまま落ちて溺れる** (ブロックアウトの箱は y=0 に
+   * 立っていて、10m の高さには何も無い)。
+   *
+   * 呼ぶ側はこれを待ってから人を置く。
+   */
+  readonly ready: Promise<void>
 }
 
 /**
@@ -428,10 +452,17 @@ function projectWorldUv(mesh: THREE.Mesh, tile: number): void {
  *
  * @param sunDirection 太陽の向き (正規化前でよい)。平行光と揃えると影の向きと一致する
  */
-function buildSky(sunDirection = new THREE.Vector3(18, 30, 12)): THREE.Mesh {
-  // 調整パネルから触る値と、時間で流れる値。
-  // TSL の time は描画器が毎フレーム進めるので、こちらで配線しなくてよい。
-  const coverage = uniform(CLOUD_COVERAGE)
+/**
+ * その向きの空の色。**空そのものと、水面の映り込みが同じ式を読む。**
+ *
+ * ドームに貼るときは頂点の向き、水に映すときは反射した視線を渡す。別々に
+ * 書くと、雲を動かしたのに水面の雲が動かない、が起きる。
+ */
+function skyColorAt(
+  dir: Node<'vec3'>,
+  coverage: Node<'float'>,
+  sunDirection: THREE.Vector3,
+): Node<'vec3'> {
   const zenith = uniform(new THREE.Color(SKY_ZENITH))
   const horizon = uniform(new THREE.Color(SKY_HORIZON))
   const sunColor = uniform(new THREE.Color(SKY_SUN))
@@ -472,7 +503,6 @@ function buildSky(sunDirection = new THREE.Vector3(18, 30, 12)): THREE.Mesh {
     return total
   }
 
-  const dir = normalize(positionLocal)
   // 地平線付近を厚く見せる。線形に混ぜると空の上半分が一様な青になって奥行きが出ない
   const height = pow(clamp(dir.y, 0, 1), 0.42)
   const toSun = max(dot(dir, sunDir), 0)
@@ -520,6 +550,19 @@ function buildSky(sunDirection = new THREE.Vector3(18, 30, 12)): THREE.Mesh {
   // 地平線より下。地面で隠れるが、高台から見下ろすと端が見える
   color = mix(color, horizon.mul(0.82), float(1).sub(smoothstep(-0.12, 0, dir.y)))
 
+  return color
+}
+
+/**
+ * 空。**背景として描く。**
+ *
+ * scene.background に色を入れるとクリアカラーになって階調が作れず、
+ * テクスチャを入れるとトーンマッピングを通って露出 3.0 で白く飛ぶ。
+ */
+function buildSky(sunDirection = SUN_DIRECTION): THREE.Mesh {
+  const coverage = uniform(CLOUD_COVERAGE)
+  let color = skyColorAt(normalize(positionLocal), coverage, sunDirection)
+
   // 階調の段差を散らす。空はなだらかな面が広いので、
   // 8 bit で出すと縞が見える。1/255 未満の雑音を足すと目立たなくなる。
   const dither = fract(sin(dot(screenCoordinate, vec2(12.9898, 78.233))).mul(43758.5453))
@@ -539,6 +582,114 @@ function buildSky(sunDirection = new THREE.Vector3(18, 30, 12)): THREE.Mesh {
   sky.renderOrder = -1
   skyCoverage = coverage
   return sky
+}
+
+/**
+ * 水面を敷くステージと、その広さ。
+ *
+ * **見た目だけ。** 当たり判定にも足音にも触らない — 歩く床は今まで通り地面で、
+ * その上に水を張っているように見せる。深さのある水にすると、泳ぐ・沈む・
+ * 足音が変わる、が全部要る。
+ */
+/** 水の色。浅い所と深い所。**濁りではなく深さで青くする** */
+const WATER_SHALLOW = 0x1a5a9c
+const WATER_DEEP = 0x061c3a
+/**
+ * 映り込みの強さ (0..1)。
+ *
+ * 1 にすると鏡になって水に見えない。**濁った水**にしたいので、浅い角度でも
+ * 水の色が残るところで止める。
+ */
+const WATER_MIRROR = 0.72
+
+/**
+ * 映り込みを描く大きさ (画面に対する比)。
+ *
+ * 場面をもう一度描くので、ここがそのまま負担になる。**水面は歪んで映るし、
+ * 混ぜる相手も水の色なので、粗くても分からない。** 半分で足りる。
+ */
+const WATER_MIRROR_SCALE = 0.5
+
+/**
+ * 映り込みの縁のならし。
+ *
+ * 半分の大きさで描くと、**水際の輪郭が階段状に見える** — 塀の裾のように
+ * 水平に近い線が最も出る。大きさを戻すより、ここを 4 にするほうが安い。
+ */
+const WATER_MIRROR_SAMPLES = 4
+
+/** 太陽の向き。空と水面で同じ物を見る (buildSky の既定と揃える) */
+const SUN_DIRECTION = new THREE.Vector3(18, 30, 12)
+
+/**
+ * 水面。**堀の中に 1 枚敷くだけ。**
+ *
+ * --- 本当に映す ---
+ * 水面を挟んで反対側にカメラをもう 1 台置き、**場面をもう一度描く**
+ * (three/tsl の reflector)。灯篭も塀も人も映る。
+ *
+ * 長らく空だけを映していた。空は向きから色を作っている (skyColorAt) ので、
+ * 反射した視線をそこへ渡すだけで済み、描画が増えなかった。ただし**空しか
+ * 知らない**ので、水の上に立っている物が 1 つも映らない。止まった水面ほど
+ * 鏡に見えるので、そこに何も映らないのは余計に目に付く。
+ *
+ * 代償は場面を 2 度描くこと。この庭園は箱が 30 個しかなく、映り込みは半分の
+ * 大きさで描くので (WATER_MIRROR_SCALE) 釣り合う。
+ *
+ * 空と太陽も**同じ絵に入っている** — 空は背景の球として実際に立っているので、
+ * もう一度描けばそこに映る。別に足す必要はない。
+ *
+ * --- 混ぜ方 ---
+ * 浅い角度ほど映り込み、見下ろすほど水の色 (フレネル)。真上から覗き込むと
+ * 底の色が見え、遠くの水面は鏡になる。
+ *
+ * --- 止まっている ---
+ * 波は流さない。動くのは**何かが落ちた時の輪だけ** (fx/shots.ts の splash)。
+ * 動きがそこにしか無いから、水しぶきが情報になる。面が平らなので法線は
+ * 真上のままで、傾きの計算も要らない。
+ */
+function buildWater(half: number): THREE.Mesh {
+  const shallow = uniform(new THREE.Color(WATER_SHALLOW))
+  const deep = uniform(new THREE.Color(WATER_DEEP))
+
+  /*
+   * bounces: false — 映り込みの中で映り込みを描かない。水面は 1 枚しかないので
+   * 拾える物が無く、描き直しだけが増える。
+   */
+  const mirror = reflector({
+    resolutionScale: WATER_MIRROR_SCALE,
+    bounces: false,
+    samples: WATER_MIRROR_SAMPLES,
+  })
+
+  const normal = vec3(0, 1, 0)
+  const view = normalize(positionWorld.sub(cameraPosition))
+
+  // 浅い角度ほど映り込み、見下ろすほど水の色
+  const facing = clamp(dot(view.negate(), normal), 0, 1)
+  const sheen = clamp(pow(float(1).sub(facing), float(4)).add(0.03), 0, 1)
+  let color = mix(deep, shallow, sheen.mul(0.35).add(0.1))
+  color = mix(color, mirror.rgb, sheen.mul(WATER_MIRROR))
+
+  /*
+   * **透かさない。** 深さは色で出す。透明度で出すものではない。
+   *
+   * 一度、岸ぎわだけ透かして境を濁す形を試して戻した。岸までの距離を焼いて
+   * 泡と透けを足したが、**縁がぼやけた帯になっただけで余計に作り物に見えた**。
+   * 硬い線のほうがまだ静かだった。
+   */
+  const material = new MeshBasicNodeMaterial()
+  material.colorNode = color
+
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, half * 2, 1, 1), material)
+  water.rotation.x = -Math.PI / 2
+  water.receiveShadow = false
+  /*
+   * 映す面の向きは**この的の姿勢から読む** (的の +Z が面の法線)。水面の子に
+   * すれば、水面を回した分がそのまま伝わって真上を向く。
+   */
+  water.add(mirror.target)
+  return water
 }
 
 /** 雲の量の調整用。確定したら CLOUD_COVERAGE へ焼き込む */
@@ -584,7 +735,18 @@ async function applySlopes(name: StageName, obstacles: Obstacle[]): Promise<void
   const boxes = await loadStageBoxes(name)
   if (boxes.length === 0) return
 
-  const byName = new Map(boxes.map((b) => [b.name, b]))
+  /*
+   * **名前を three の流儀へ揃えてから引く。**
+   *
+   * GLTFLoader は節点の名前から `. : / [ ]` を取り除く (PropertyBinding の
+   * sanitizeNodeName)。書き出した json は Blender の名前をそのまま持っている
+   * ので、`Stair_0.001` と `Stair_0001` で照合が外れる。
+   *
+   * **坂が付かないと 2m の壁になる。** 庭園の階段が登れなかったのはこれで、
+   * 枝番の付いた物 (Blender が複製に付ける .001 …) が全部外れていた。
+   * 同じ関数を通せば、three が流儀を変えても一緒に動く。
+   */
+  const byName = new Map(boxes.map((b) => [THREE.PropertyBinding.sanitizeNodeName(b.name), b]))
   let slopes = 0
   for (const obstacle of obstacles) {
     if (!obstacle.name) continue
@@ -753,6 +915,19 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   // 明暗は箱が届いてから。**歩く床がここ**なので、ここが平らだと効果が出ない
   void bakeGroundSky(name, ground.geometry)
 
+  /*
+   * 水面。**敷くステージだけ** (domain/match/stage.ts の water)。
+   *
+   * どこに水があるかはサーバーも知っている — 投げた物が沈むので、片方だけが
+   * 知っていると落ち先が食い違う。ここは同じ宣言を読んで**描くだけ**。
+   */
+  const water = waterOf(name)
+  if (water) {
+    const surface = buildWater(water.half)
+    surface.position.y = water.y
+    scene.add(surface)
+  }
+
   // stage.glb が届いたら丸ごと外せるよう 1 つにまとめておく
   const blockout = new THREE.Group()
   scene.add(blockout)
@@ -782,9 +957,12 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
     })
   }
 
-  const stage: Stage = { collidables, cameraBlockers, obstacles }
-  void replaceWithModel(scene, name, stage, blockout)
-  return stage
+  /*
+   * 差し替えは**この 3 つの中身を入れ替える**だけ (配列はそのまま使い回す)。
+   * 待てるように、その約束をそのまま ready として返す。
+   */
+  const parts = { collidables, cameraBlockers, obstacles }
+  return { ...parts, water, ready: replaceWithModel(scene, name, parts, blockout) }
 }
 
 /**
@@ -798,7 +976,7 @@ async function replaceWithModel(
   scene: THREE.Scene,
   /** どのステージを読むか。**メッシュの name と紛れるので別名にしてある** */
   stageName: StageName,
-  stage: Stage,
+  stage: StageParts,
   blockout: THREE.Group,
 ): Promise<void> {
   let gltf

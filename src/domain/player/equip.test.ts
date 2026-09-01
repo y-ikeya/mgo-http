@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { canHold, chooseLoadout, chooseSkills, isPrimaryChoice, isSupportChoice } from './equip'
+import {
+  canHold,
+  chooseLoadout,
+  chooseSkills,
+  fitLoadout,
+  isPrimaryChoice,
+  isSupportChoice,
+} from './equip'
 import { newPlayer, refill } from './player'
 
 /**
@@ -19,7 +26,7 @@ describe('何を持てるか', () => {
     const p = fresh()
     expect(canHold(p, 'knife')).toBe(true)
     expect(canHold(p, 'box')).toBe(true)
-    expect(canHold(p, 'pistol')).toBe(true)
+    expect(canHold(p, 'm9')).toBe(true)
   })
 
   test('選んだ主武器は持てる。**選んでいない銃は持てない**', () => {
@@ -97,7 +104,7 @@ describe('装備を選ぶ', () => {
 
   test('主武器の枠に拳銃は入らない', () => {
     const p = fresh()
-    expect(chooseLoadout(p, 'pistol', 'grenade', true)).toBe(false)
+    expect(chooseLoadout(p, 'm9', 'grenade', true)).toBe(false)
   })
 
   test('支度中なら投げ物もすぐ配り直す', () => {
@@ -173,5 +180,71 @@ describe('スキルを選び直す', () => {
     chooseSkills(p, { runner: 2 }, 'waiting')
     expect(chooseSkills(p, {}, 'waiting')).toBe(true)
     expect(p.skills).toEqual({})
+  })
+})
+
+/**
+ * 部屋が持ち込める銃を絞る。
+ *
+ * **画面から消すだけでは足りない。** 一覧に出さなくても送ってくる側は止まらず、
+ * 狙撃銃だけの部屋に突撃銃で入られたら遊びが丸ごと壊れる。
+ */
+describe('部屋が絞る主武器', () => {
+  const SNIPER_ONLY = ['sniper'] as const
+
+  test('絞られていれば、その中からしか選べない', () => {
+    const p = fresh()
+    expect(chooseLoadout(p, 'sniper', 'grenade', true, SNIPER_ONLY)).toBe(true)
+    expect(chooseLoadout(p, 'rifle', 'grenade', true, SNIPER_ONLY)).toBe(false)
+  })
+
+  test('**弾いたら前の装備が残る。** 半分だけ通さない', () => {
+    const p = fresh()
+    chooseLoadout(p, 'sniper', 'grenade', true, SNIPER_ONLY)
+    chooseLoadout(p, 'rifle', 'claymore', true, SNIPER_ONLY)
+    expect(p.primary).toBe('sniper')
+    expect(p.support).toBe('grenade')
+  })
+
+  test('渡さなければ今まで通り。**絞っていない部屋は何でも**', () => {
+    const p = fresh()
+    expect(chooseLoadout(p, 'rifle', 'grenade', true)).toBe(true)
+  })
+})
+
+/**
+ * 部屋を移ったとき。**装備は席に付いて回る。**
+ *
+ * 突撃銃を選んだまま狙撃銃だけの部屋へ入れる。選び直さないまま湧くと、弾く
+ * 仕掛け (chooseLoadout) を一度も通らずにその銃で戦場へ出てしまう。
+ */
+describe('部屋に合わせて丸める', () => {
+  test('持ち込めない銃なら、持てるものへ替わる', () => {
+    const p = fresh()
+    chooseLoadout(p, 'rifle', 'grenade', true)
+    fitLoadout(p, ['sniper'])
+    expect(p.primary).toBe('sniper')
+  })
+
+  test('**持ち物も組み直す。** 名前だけ替えて手には突撃銃、にしない', () => {
+    const p = fresh()
+    chooseLoadout(p, 'rifle', 'grenade', true)
+    fitLoadout(p, ['sniper'])
+    expect(p.inventory.weapon).toBe('sniper')
+  })
+
+  test('持ち込めるならそのまま。**黙って替えない**', () => {
+    const p = fresh()
+    chooseLoadout(p, 'sniper', 'claymore', true)
+    fitLoadout(p, ['sniper', 'rifle'])
+    expect(p.primary).toBe('sniper')
+    expect(p.support).toBe('claymore')
+  })
+
+  test('絞っていない部屋では何も起きない', () => {
+    const p = fresh()
+    chooseLoadout(p, 'rifle', 'grenade', true)
+    fitLoadout(p, [])
+    expect(p.primary).toBe('rifle')
   })
 })

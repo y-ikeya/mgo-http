@@ -46,11 +46,19 @@ const INITIAL_WEAPONS = {
     grip: { x: -0.01, y: 0.3, z: 0.02 },
     rotation: { x: -37, y: 3, z: 173 },
   },
-  pistol: {
+  m9: {
     grip: { x: 0.05, y: 0.005, z: 0.125 },
     rotation: { x: -5, y: 0, z: 0 },
   },
-  pistolCrouch: {
+  m9Crouch: {
+    grip: { x: 0.035, y: 0, z: 0.11 },
+    rotation: { x: -5, y: 0, z: 0 },
+  },
+  m1911: {
+    grip: { x: 0.05, y: 0.005, z: 0.125 },
+    rotation: { x: -5, y: 0, z: 0 },
+  },
+  m1911Crouch: {
     grip: { x: 0.035, y: 0, z: 0.11 },
     rotation: { x: -5, y: 0, z: 0 },
   },
@@ -527,11 +535,20 @@ export default function Calibrator(props: {
           <button
             classList={{
               'calib-tab': true,
-              'calib-tab-on': target() === 'pistol' || target() === 'pistolCrouch',
+              'calib-tab-on': target() === 'm9' || target() === 'm9Crouch',
             }}
-            onClick={() => selectTarget(props.stats?.crouching ? 'pistolCrouch' : 'pistol')}
+            onClick={() => selectTarget(props.stats?.crouching ? 'm9Crouch' : 'm9')}
           >
-            ハンドガン
+            M9
+          </button>
+          <button
+            classList={{
+              'calib-tab': true,
+              'calib-tab-on': target() === 'm1911' || target() === 'm1911Crouch',
+            }}
+            onClick={() => selectTarget(props.stats?.crouching ? 'm1911Crouch' : 'm1911')}
+          >
+            M1911
           </button>
           <button
             classList={{ 'calib-tab': true, 'calib-tab-on': target() === 'knife' }}

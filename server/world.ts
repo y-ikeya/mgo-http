@@ -5,7 +5,7 @@
  */
 
 import { type Match, connected, newMatch, nextSlot } from '../src/domain/match/match'
-import { ROOM_MODE, ROOM_STAGES, type RoomName } from '../src/domain/match/room'
+import { ROOMS, type RoomName } from '../src/domain/match/room'
 import { STAGES, nextStage } from '../src/domain/match/stage'
 import type { Life } from '../src/domain/player/lifecycle'
 import { type Player, type Team, enterLife, newBot } from '../src/domain/player/player'
@@ -88,9 +88,9 @@ export function roomOf(name: RoomName): RoomWorld {
   let room = rooms.get(name)
   if (!room) {
     // 回す表から 1 枚選ぶ。**初回なので前は無い** (previous = null)
-    const stage = nextStage(ROOM_STAGES[name], null, Math.random())
+    const stage = nextStage(ROOMS[name].stages, null, Math.random())
     room = {
-      ...newMatch(ROOM_MODE[name]),
+      ...newMatch(ROOMS[name].mode),
       name,
       grenades: [],
       claymores: [],

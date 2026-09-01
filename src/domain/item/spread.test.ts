@@ -112,8 +112,8 @@ describe('姿勢で広がる', () => {
 
   test('拳銃だけは上限に届かない (spreadAirborne < spreadMax)', () => {
     const spread = new Spread()
-    spread.update(0.016, WEAPONS.pistol, { ...still, grounded: false })
-    expect(spread.degrees(WEAPONS.pistol, NONE)).toBeCloseTo(WEAPONS.pistol.spreadAirborne, 5)
+    spread.update(0.016, WEAPONS.m9, { ...still, grounded: false })
+    expect(spread.degrees(WEAPONS.m9, NONE)).toBeCloseTo(WEAPONS.m9.spreadAirborne, 5)
   })
 })
 
@@ -276,7 +276,7 @@ describe('手ブレ', () => {
 
   /** **主武器のほうが大きく泳ぐ。** 遠くを狙うなら極める動機が要る */
   test('拳銃は主武器より泳がない', () => {
-    expect(WEAPONS.pistol.sway).toBeLessThan(WEAPONS.rifle.sway)
+    expect(WEAPONS.m9.sway).toBeLessThan(WEAPONS.rifle.sway)
   })
 })
 
@@ -295,7 +295,7 @@ describe('散弾の粒', () => {
   })
 
   test('**散弾以外は 1 粒。** 今までの銃は 1 発が 1 つの道を通る', () => {
-    for (const id of ['rifle', 'smg', 'sniper', 'pistol'] as const) {
+    for (const id of ['rifle', 'smg', 'sniper', 'm9'] as const) {
       expect(pelletsOf(WEAPONS[id])).toBe(1)
     }
   })

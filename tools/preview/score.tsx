@@ -10,10 +10,10 @@ import type { GameStats } from '../../src/presentation/scene/Game'
 import type { Skills } from '../../src/domain/player/skill'
 
 const players = [
-  { id: 'me', name: 'pepa1404', team: 'blue', kills: 7, deaths: 3, suicides: 0, away: false, rate: 64 },
-  { id: 'b', name: 'kometh27', team: 'blue', kills: 5, deaths: 4, suicides: 1, away: false, rate: 61 },
-  { id: 'c', name: 'snake', team: 'red', kills: 4, deaths: 6, suicides: 0, away: false, rate: 58 },
-  { id: 'd', name: 'otacon', team: 'red', kills: 1, deaths: 7, suicides: 0, away: true, rate: 0 },
+  { id: 'me', name: 'pepa1404', team: 'blue', kills: 7, deaths: 3, suicides: 0, stuns: 2, away: false, rate: 64 },
+  { id: 'b', name: 'kometh27', team: 'blue', kills: 5, deaths: 4, suicides: 1, stuns: 0, away: false, rate: 61 },
+  { id: 'c', name: 'snake', team: 'red', kills: 4, deaths: 6, suicides: 0, stuns: 5, away: false, rate: 58 },
+  { id: 'd', name: 'otacon', team: 'red', kills: 1, deaths: 7, suicides: 0, stuns: 0, away: true, rate: 0 },
 ]
 
 const dm = {

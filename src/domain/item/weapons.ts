@@ -21,7 +21,7 @@
 
 import { MAX_HEALTH, type HitZone } from '../rule/damage'
 
-export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'pistol' | 'shotgun'
+export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'm9' | 'm1911' | 'shotgun'
 
 /**
  * 装備の枠。
@@ -37,7 +37,7 @@ export type Slot = 'primary' | 'secondary' | 'support'
 /** その枠に入れられる銃 */
 export const CHOICES: Record<'primary' | 'secondary', WeaponId[]> = {
   primary: ['smg', 'rifle', 'sniper', 'shotgun'],
-  secondary: ['pistol'],
+  secondary: ['m9', 'm1911'],
 }
 
 /**
@@ -93,9 +93,9 @@ export interface WeaponSpec {
   /** キル表示に出す名前。実銃の呼び名 */
   kill: string
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
-  reloadSound: 'reload' | 'pistolReload' | 'smgReload'
+  reloadSound: 'reload' | 'pistolReload' | 'm1911Reload' | 'smgReload'
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe' | 'pistol' | 'smg' | 'shotgun'
+  shotSound: 'rifle' | 'snipe' | 'm9' | 'm1911' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
 
@@ -108,6 +108,15 @@ export interface WeaponSpec {
    * 倍率で持っていたときは、その換算を毎回間違えた。
    */
   zone: Record<HitZone, number>
+  /**
+   * 麻酔銃か。**当てても体力は削らない。**
+   *
+   * zone の数字を「体力」ではなく「スタミナ」を削る量として読ませる
+   * (domain/player/stamina.ts)。距離の減衰は同じ式を通るので、**遠くの麻酔は
+   * 効きが薄い** — ここだけ距離を無視すると、当たりさえすればよい銃になって
+   * 狙撃と食い合う。
+   */
+  tranquilizer?: boolean
   /** ここまでは減衰しない (m) */
   fullRange: number
   /** ここから先は minScale で頭打ち (m) */
@@ -498,52 +507,77 @@ const SNIPER: WeaponSpec = {
  * 距離や銃の格で覆さない。
  */
 const PISTOL: WeaponSpec = {
-  id: 'pistol',
+  id: 'm9',
+  // **麻酔銃。** 当てても体力は減らず、スタミナが減る
+  tranquilizer: true,
   slot: 'secondary',
   cost: 0,
   // M9。この作りで一番軽い
   weight: 0.95,
-  label: '拳銃',
+  label: '麻酔銃',
   kill: 'M9',
-  shotSound: 'pistol',
+  shotSound: 'm9',
   reloadSound: 'pistolReload',
-  model: 'pistol',
+  model: 'm9',
   // 胴 4 発。突撃銃 (5 発) よりわずかに速いだけで、離れると減衰で届かなくなる
-  zone: { HEAD: 100, BODY: 25, LEGS: 12 },
+  zone: { HEAD: 100, BODY: 25, LEGS: 12.5 },
   /*
-   * 至近では危険、中距離から先は選択として間違い、になる形。
+   * **距離で弱まらない。** 麻酔は当たれば効く。
    *
-   * **下限 (minScale) が効いていなかった。** 0.5 だと HEAD の下限が 50 =
-   * 体力のちょうど半分になり、**どんなに遠くても頭 2 発で死ぬ**。距離減衰が
-   * 頭に対して何の意味も持っていなかった。60m から 0.28 秒で殺せていた。
+   * 薬が入るかどうかは針が刺さったかどうかで、飛んできた速さとは関係が無い。
+   * 遠くの相手にじわじわ効く、という中間が無いので、減衰させる場所が無い。
    *
-   * 拳銃は軽くて速く動ける。そのうえ遠距離まで 2 発なら、持たない理由が無い。
+   * 代わりに**当てるのが難しい**。弾が遅く (120 m/s、他の銃の 1/3)、そのぶん
+   * 落ちる。
    *
-   *      10m まで  HEAD 100  1 発
-   *      15m       HEAD  69  2 発
-   *      20m       HEAD  38  3 発
-   *      22m 以降  HEAD  25  4 発
+   *      20m   0.17 秒で 14cm 落ちる
+   *      40m   0.33 秒で 54cm  — 頭を狙うなら肩ひとつ上
+   *      60m   0.50 秒で 1.2m  — 落ちる量が体の高さを超える
    *
-   * 10m は同じ部屋の中。そこで頭を抜けば 1 発、というのは残す — 詰めると
-   * 決めた側への報酬であって、遠くから狙う腕前への報酬ではない。
-   *
-   * 22m から先は胴で 16 発かかる (弾倉は 12)。**撃ち切っても倒せない。**
-   * それでよい。遠くの相手に拳銃を向けるのは間違いだ、と数字で言っている。
+   * 遠いほど当たらない、という形は同じだが、**理由が「弱くなる」ではなく
+   * 「当てられない」**になっている。当てさえすれば 4 発で眠る。
    */
-  fullRange: 10,
-  minRange: 22,
-  minScale: 0.25,
-  // 引き金を引くたび 1 発。押しっぱなしでは撃てない。
-  // 連射の下限も遅くしてある — 速く押しても撃てる速さは変わらない
+  fullRange: 200,
+  minRange: 200,
+  minScale: 1,
   fireInterval: 0.28,
   auto: false,
-  bolt: false,
+  /*
+   * **1 発ごとに遊底を引く。**
+   *
+   * 引き金だけで 0.28 秒ごとに撃てた頃は、**当てる腕前が要らない銃**だった。
+   * 胴 4 発が 1.1 秒で揃うので、詰められた側は撃ち返す間もなく眠る。
+   *
+   * 型の尺がそのまま次の 1 発までの間隔になるので、動き・音・撃てない時間が
+   * 必ず揃う。4 発を当て切るのに 2.4 秒かかる — その間ずっと相手を捉えて
+   * いなければならない、という形にした。
+   *
+   * **音は鳴らさない。** 消音された銃なので、遊底の音だけが響くのはおかしい。
+   * 専用の音が来たら boltSound に足す。
+   */
+  bolt: true,
+  boltScale: 1.6,
   magazine: 12,
   reserve: 48,
   reload: 2.1,
-  bulletSpeed: 380,
+  // **遅い。** 他の銃の 1/3 で、そのぶん落ちる
+  bulletSpeed: 120,
   bulletGravity: 9.8,
-  noiseRange: 85,
+  /*
+   * **消音されている。** 銃声が届く距離 (m)。
+   *
+   * 麻酔銃は音が小さい。一番うるさい狙撃銃 (170m) の 1/5 で、**同じ部屋の
+   * 中にしか届かない**。
+   *
+   * これが麻酔銃を選ぶ理由の半分になっている — 殺せないぶん、**撃っても
+   * 気づかれない**。1 人を眠らせて、周りに知られないまま次へ行ける。
+   *
+   * **走る足音 (rule/noise.ts の STEP_RANGE = 20m) と同じ。** 撃っても、
+   * そこを走り抜けるのと同じだけしか漏れない、という所に置いてある。
+   * 85m のままだと撃った時点で部屋の半分に知らせることになって、静かに
+   * 始末する道具にならなかった。
+   */
+  noiseRange: 20,
   // 片手で構えるので跳ねる。連射するほど散る
   sway: 0.20,
   spreadPerShot: 0.28,
@@ -582,6 +616,62 @@ const PISTOL: WeaponSpec = {
  * 曲がり角を取る武器であって、開けた場所へ持ち出す物ではない。
  * 突撃銃と真っ向から撃ち合うと、間合いへ入る前に削り切られる。
  */
+/**
+ * M1911。**殺傷の副武器。**
+ *
+ * M9 が麻酔になったので、拳銃で人を倒したいならこちら。撃ち切っても倒せない
+ * 距離があるのは M9 と同じ考え方で、**副武器は主武器の代わりにならない**。
+ *
+ * M9 との違いは「重い代わりに効く」。7 発で 12 発より少なく、撃つ間隔も遅い。
+ * そのぶん胴 3 発で、M9 の 4 発より 1 発早い。**外せる回数が減る**、という形の
+ * 交換になっている — 弾が少ないほど 1 発の重みが上がる。
+ *
+ *      12m まで  HEAD 100  1 発
+ *      18m       HEAD  66  2 発
+ *      24m 以降  HEAD  30  4 発
+ */
+const M1911: WeaponSpec = {
+  id: 'm1911',
+  slot: 'secondary',
+  cost: 0,
+  // M9 より重い。持つと走りが少しだけ落ちる
+  weight: 1.05,
+  label: '拳銃',
+  kill: 'M1911',
+  shotSound: 'm1911',
+  reloadSound: 'm1911Reload',
+  model: 'm1911',
+  // 胴 3 発。M9 (4 発) より 1 発早い
+  zone: { HEAD: 100, BODY: 34, LEGS: 16 },
+  fullRange: 12,
+  minRange: 24,
+  minScale: 0.3,
+  // M9 (0.28) より遅い。押し切る速さで負ける
+  fireInterval: 0.34,
+  auto: false,
+  bolt: false,
+  // **7 発。** M9 の 12 発に対して、外せる回数がはっきり少ない
+  magazine: 7,
+  reserve: 35,
+  reload: 2.3,
+  bulletSpeed: 390,
+  bulletGravity: 9.8,
+  noiseRange: 95,
+  // 反動は M9 より大きい。連射するほど散る
+  sway: 0.22,
+  spreadPerShot: 0.34,
+  spreadMax: 2.4,
+  spreadPerSpeed: 0.34,
+  spreadCrouchScale: 0.5,
+  spreadAirborne: 2,
+  spreadPerStance: 0.12,
+  aimFov: 44,
+  aimDistance: 1.5,
+  aimShoulder: 0.46,
+  aimSpeedScale: 0.7,
+  scope: [],
+}
+
 const SHOTGUN: WeaponSpec = {
   id: 'shotgun',
   label: 'ショットガン',
@@ -666,7 +756,8 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   shotgun: SHOTGUN,
   rifle: RIFLE,
   sniper: SNIPER,
-  pistol: PISTOL,
+  m9: PISTOL,
+  m1911: M1911,
 }
 
 export const DEFAULT_WEAPON: WeaponId = 'rifle'
@@ -802,4 +893,17 @@ export function reloadInto(ammo: Ammo, id: WeaponId): void {
   if (take <= 0) return
   ammo.magazine[id] += take
   ammo.reserve[id] -= take
+}
+
+
+/**
+ * その持ち物は麻酔銃か。**銃でない物は false。**
+ *
+ * 見せる側 (HUD / 装備画面) が色を分けるのに使う。`WEAPONS[id].tranquilizer`
+ * を直に引くと、ナイフや手榴弾を渡されたときに落ちる — 手にある物は銃とは
+ * 限らないので、**持ち物の id で聞ける口**をここに置く。
+ */
+export function isTranquilizer(id: string): boolean {
+  const spec = (WEAPONS as Record<string, WeaponSpec | undefined>)[id]
+  return spec?.tranquilizer === true
 }

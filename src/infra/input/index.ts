@@ -1,3 +1,5 @@
+import { advanceHold, newHold, takeTap, type Hold } from './hold'
+
 /** 操作方法。auto は「最後に触ったほう」を使う */
 export type InputDevice = 'auto' | 'keyboard' | 'gamepad'
 
@@ -79,6 +81,59 @@ const PAD_BUTTONS = {
 type PadAction = keyof typeof PAD_BUTTONS
 
 /**
+ * 操作の割り当て。**キーもパッドもここだけが知っている。**
+ *
+ * --- なぜ 1 か所に寄せたか ---
+ * 前は呼ぶ側が `consumeAction('roll', 'Space')` のように**キーコードを持って**
+ * いた。同じ割り当てが Game の中に 10 か所以上散っていて、しかも「見張るキー」
+ * の一覧 (LOCK_KEYS) が別にあった。片方だけ直すと**画面には出るのに押しても
+ * 効かない**が起きる — 実際、銃を 1 挺増やして装備の番号が 5・6 まで伸びた
+ * ときに踏んだ。
+ *
+ * 表から見張るキーも導くので、足し忘れる場所が無くなる。
+ *
+ * --- 単押しと長押しもここで決める ---
+ * `hold` がある操作は、**離すまで単押しか長押しか決まらない**。0.17 秒を
+ * 超えたらその場で長押しが立ち、超える前に離せば単押しが立つ。
+ *
+ * 「Space をどれだけ押したか」は遊びのルールでも描画でもないので、数えるのは
+ * ここ。呼ぶ側は**意味だけ**受け取る (しゃがむのか、転がるのか)。
+ */
+const BINDINGS = {
+  /*
+   * しゃがみ (単押し) と回避 (長押し)。どちらも「体を低くする」動作なので、
+   * 同じ指で出せるほうが素直。しゃがむ延長に回避があり、深く押し込むと転がる。
+   *
+   * 0.17 秒 — 短すぎるとしゃがもうとして転がり、長すぎると避けようとして
+   * 間に合わない。人がキーを叩く時間はおよそ 0.1 秒なので、その少し上。
+   */
+  stance: { keys: ['Space'], pad: 'roll', hold: 0.17 },
+  reload: { keys: ['KeyR'], pad: 'reload' },
+  menu: { keys: ['Tab'], pad: 'menu' },
+  salute: { keys: ['KeyV'], pad: 'salute' },
+  zoom: { keys: ['KeyZ'], pad: 'zoom' },
+  /** 武器の一覧。単押しで往復、押している間は一覧を送る */
+  swapWeapon: { keys: ['KeyQ'], pad: 'swap' },
+  /** 道具の一覧。単押しでダンボール、押している間は一覧 */
+  swapTool: { keys: ['KeyC'], pad: 'box' },
+  drop: { keys: ['KeyG'], pad: 'drop' },
+  toSupport: { keys: ['KeyE'], pad: 'grenade' },
+  toKnife: { keys: ['KeyF'], pad: 'knife' },
+  /** 戦場へ出る。**2 つ受ける** — 右手が置き場所によって違う */
+  spawn: { keys: ['Enter', 'KeyL'] },
+} as const satisfies Record<string, { keys: readonly string[]; pad?: PadAction; hold?: number }>
+
+export type Action = keyof typeof BINDINGS
+
+/**
+ * 装備を選ぶ数字。**並び順から出す。**
+ *
+ * 直に書くと、銃が 1 挺増えたときに番号が重なる / 見張り漏れが出る。
+ * 枠の数だけ用意しておいて、いくつ使うかは呼ぶ側が決める。
+ */
+const SLOT_KEYS = Array.from({ length: 9 }, (_, i) => `Digit${i + 1}`)
+
+/**
  * これを押したら視点を掴む。
  *
  * 何のキーでも掴むようにすると、リロード (F5) や開発者ツールを開こうとした
@@ -90,21 +145,19 @@ const WHEEL_STEP = 40
 /** 1 段動かしてから次まで空ける時間 (ms)。トラックパッドの一振りで飛ばないように */
 const WHEEL_COOLDOWN = 140
 
-const LOCK_KEYS = new Set([
+/**
+ * 見張るキー。**割り当ての表から導く。**
+ *
+ * 手で並べていた頃は、操作を足すたびに 2 か所を直すことになっていた
+ * (BINDINGS のコメントに経緯)。移動と構えだけは表に無いので足す —
+ * あちらは「押している間ずっと」なので、操作の名前ではなく生のキーで読む。
+ */
+const LOCK_KEYS = new Set<string>([
   'KeyW', 'KeyA', 'KeyS', 'KeyD',
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  'Space', 'ShiftLeft', 'ShiftRight',
-  'KeyR', 'KeyF', 'KeyC', 'KeyG', 'KeyV', 'KeyQ', 'KeyZ', 'KeyE',
-  'KeyL', 'Enter',
-  /*
-   * 装備を選ぶ数字。ポインタを掴んだままなのでボタンは押せない。
-   *
-   * **数を並びから出す。** 4 つまでを直に書いていたので、銃が 1 挺増えて
-   * 番号が 5・6 まで伸びたときに、画面には出ているのに押しても効かない
-   * 番号ができた。番号そのものは並び順から出している (Game の
-   * updateLoadoutKeys) のに、見張る側だけが取り残されていた。
-   */
-  ...Array.from({ length: 9 }, (_, i) => `Digit${i + 1}`),
+  'ShiftLeft', 'ShiftRight',
+  ...Object.values(BINDINGS).flatMap((bind) => [...bind.keys]),
+  ...SLOT_KEYS,
 ])
 
 /**
@@ -462,33 +515,96 @@ export class Input {
     this.padIndex = null
   }
 
+  /*
+   * --- 操作として読む ---
+   *
+   * ここから下が呼ぶ側の窓口。**キーコードもボタン番号も出てこない。**
+   */
+
+  /**
+   * 操作ごとの押し具合。**数え方は infra/hold.ts。**
+   *
+   * 装置に触らない部分を分けてある — 単押しと長押しの分け方は、鍵盤もパッドも
+   * 無しで確かめられる。
+   */
+  private readonly holds = new Map<Action, Hold>(
+    (Object.keys(BINDINGS) as Action[]).map((action) => [action, newHold()]),
+  )
+
+  /** その操作のキーかボタンが押されているか */
+  private rawDown(action: Action): boolean {
+    const bind = BINDINGS[action]
+    if (bind.keys.some((code) => this.pressed.has(code))) return true
+    return 'pad' in bind && bind.pad !== undefined ? this.padDown(bind.pad) : false
+  }
+
+  /** その操作の立ち上がりを 1 回だけ取る */
+  private rawPressed(action: Action): boolean {
+    const bind = BINDINGS[action]
+    let hit = false
+    // **両方を評価する。** 片方で早く返すと、もう片方の立ち上がりが持ち越される
+    for (const code of bind.keys) if (this.justPressed.delete(code)) hit = true
+    if (hit) this.lastUsed = 'keyboard'
+    const pad = 'pad' in bind && bind.pad !== undefined ? this.padJustPressed(bind.pad) : false
+    return hit || pad
+  }
+
+  /**
+   * 押している時間を進める。**フレームの頭で 1 回だけ呼ぶ。**
+   *
+   * 長押しは押している途中で立てる。離してから立てると、押していた時間ぶんの
+   * 遅れが動作に乗る — 避ける動作でそれは致命的。
+   * 単押しは離した時に立てる (押している間はまだどちらか決まらない)。
+   */
+  advance(dt: number): void {
+    for (const [action, hold] of this.holds) {
+      const bind = BINDINGS[action]
+      advanceHold(hold, this.rawDown(action), dt, 'hold' in bind ? bind.hold : undefined)
+    }
+  }
+
+  /** 押している間ずっと true */
+  down(action: Action): boolean {
+    return this.rawDown(action)
+  }
+
+  /**
+   * 押して離した。**長押しの割り当てがある操作は、離すまで立たない。**
+   *
+   * 消費するので 1 回の押下につき 1 回だけ true。
+   */
+  tapped(action: Action): boolean {
+    const bind = BINDINGS[action]
+    if (!('hold' in bind) || bind.hold === undefined) return this.rawPressed(action)
+    const hold = this.holds.get(action)
+    return hold !== undefined && takeTap(hold)
+  }
+
+  /** 長押しが成立した瞬間。押している途中で 1 回だけ true */
+  holding(action: Action): boolean {
+    const bind = BINDINGS[action]
+    if (!('hold' in bind) || bind.hold === undefined) return false
+    // 押している間ずっと立つ。何度効かせるかは呼ぶ側が決める
+    return this.holds.get(action)?.fired === true
+  }
+
+  /**
+   * 装備の枠を選ぶ数字。**何番まで使うかは呼ぶ側が決める。**
+   *
+   * @param index 0 始まり。Digit1 が 0
+   */
+  slotPressed(index: number): boolean {
+    const code = SLOT_KEYS[index]
+    return code !== undefined && this.consumeKeyPress(code)
+  }
+
   /** このフレームに押し始めたか。消費するので 1 回の押下につき 1 回だけ true */
-  consumeKeyPress(code: string): boolean {
+  private consumeKeyPress(code: string): boolean {
     if (this.justPressed.delete(code)) {
       this.lastUsed = 'keyboard'
       return true
     }
     return false
-  }
-
-  /**
-   * キーとパッドのどちらでも受ける「押しっぱなし」。
-   * 押した瞬間ではなく、押している間ずっと効かせたい操作に使う。
-   */
-  isActionDown(action: PadAction, code: string): boolean {
-    return this.pressed.has(code) || this.padDown(action)
-  }
-
-  /**
-   * キーとパッドのどちらでも受ける操作。
-   * 呼び出し側が「どのデバイスか」を気にせずに済むよう、ここで束ねる。
-   */
-  consumeAction(action: PadAction, code: string): boolean {
-    // 両方を評価する。片方で early return すると、もう片方の立ち上がりが持ち越される。
-    const key = this.justPressed.delete(code)
-    const pad = this.padJustPressed(action)
-    if (key) this.lastUsed = 'keyboard'
-    return key || pad
   }
 
   /** フレーム末に呼ぶ。消費されなかった立ち上がりを持ち越さない */

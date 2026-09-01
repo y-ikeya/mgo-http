@@ -9,6 +9,7 @@ import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
+import { CHOICES } from '../../domain/item/weapons'
 import Loadout from '../ui/Loadout'
 import Stats from '../ui/Stats'
 
@@ -93,15 +94,19 @@ export default function Play(props: { identity: Identity }) {
       */}
       <Show when={stats()?.loadoutOpen}>
         <Loadout
-          primary={primary()}
+          primary={stats()?.primary ?? primary()}
           support={support()}
           onPrimary={(id) => game()?.setLoadout(id)}
+          onSecondary={(id) => game()?.setSecondary(id)}
           onSupport={(id) => game()?.setSupport(id)}
           note={t('loadout.note')}
           left={stats()?.loadoutLeft ?? 0}
           wait={stats()?.loadoutWait ?? 0}
           onSpawn={() => game()?.closeLoadout()}
           skills={stats()?.skills ?? {}}
+          primaries={stats()?.primaries ?? CHOICES.primary}
+          // **null は「持たない」。** ?? で埋めると拳銃へ戻る (null は nullish)
+          secondary={stats() ? stats()!.secondary : 'm9'}
         />
       </Show>
 

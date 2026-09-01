@@ -375,6 +375,14 @@ export class RemotePlayer {
     if (this.locomotion === "salute" && locomotion !== "salute") {
       animator.cancelSalute();
     }
+    /*
+     * 眠りに入った / 醒めた。**倒れる型と同じで、頭から流さないと床に着かない。**
+     *
+     * setLocomotion に任せると重みの補間で入るので、立ったまま寝ている絵に
+     * なる (実測で腰 1.01m。playSleep なら 0.06m)。
+     */
+    if (locomotion === 'sleep' && this.locomotion !== 'sleep') animator.playSleep();
+    if (locomotion !== 'sleep' && this.locomotion === 'sleep') animator.wakeFromSleep();
     this.locomotion = locomotion;
 
     // 足音は送られてこない。補間された位置と姿勢から、撃つ側と同じ式で出す。
@@ -414,7 +422,7 @@ export class RemotePlayer {
     const holstered =
       this.boxed ||
       locomotion === 'salute' ||
-      (state.weapon === 'pistol' && !state.aiming && !state.reloading)
+      (state.weapon === 'm9' && !state.aiming && !state.reloading)
     if (this.weapon) this.weapon.visible = !holstered
 
     this.object.updateMatrixWorld(true);
@@ -731,7 +739,7 @@ export class RemotePlayer {
   private async equip(kind: WeaponId): Promise<void> {
     if (kind === this.weaponKind || this.swapping) return;
     this.weaponKind = kind
-    this.animator?.setPistol(kind === 'pistol');
+    this.animator?.setPistol(kind === 'm9');
     const model = this.model;
     if (!model) return;
 

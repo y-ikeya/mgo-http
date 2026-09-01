@@ -59,8 +59,16 @@ const LAYERS: Record<string, readonly string[]> = {
   'infra/api': ['application/protocol', 'domain', 'infra/auth', 'infra/link'],
   /** 誰なのか。**発行元 (いまは Supabase) の都合をここから外へ出さない** */
   'infra/auth': [],
-  // 押されたか。**どこにも依存しない** — 動詞に訳すのは domain/player/intent.ts で、
-  // ここが持つのはキーコードとパッドの番号だけ
+  /*
+   * 押されたか。**どこにも依存しない。**
+   *
+   * 動詞に訳すのは domain/player/intent.ts で、ここが持つのは割り当て
+   * (どのキーがどの操作か) と、単押し / 長押しの分け方だけ。
+   *
+   * 1 枚だったものを畳んで 1 つの葉にした。時間を数える部分 (hold.ts) は
+   * 装置に触らないので、鍵盤もパッドも無しで確かめられる — 分けた理由が
+   * それで、外から見た形は変わらない。
+   */
   'infra/input': [],
   /**
    * アプリケーションの状態。**server/ と同じ高さの双子。**

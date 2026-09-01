@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { t } from '../../i18n'
 import { HELD, type HeldId } from '../../domain/item/held'
 import { MODES } from '../../domain/match/room'
+import { isTranquilizer } from '../../domain/item/weapons'
 import type { GameStats } from '../scene/Game'
 import './Hud.css'
 
@@ -18,7 +19,10 @@ import './Hud.css'
  */
 function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
   return (
-    <div class="hud-browse-item">
+    <div
+      class="hud-browse-item"
+      classList={{ 'hud-browse-item-tranq': isTranquilizer(props.item.id) }}
+    >
       <div class="hud-browse-n">{props.item.n ?? ''}</div>
       <div class="hud-browse-name">{HELD[props.item.id].label}</div>
     </div>
@@ -88,6 +92,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   }
 
   const heldLabel = () => HELD[held()].label
+  /** 麻酔銃を手にしているか。**色で殺傷と分ける** */
+  const heldIsTranq = () => isTranquilizer(held())
   const heldIsGun = () => HELD[held()].shoots
 
   /**
@@ -200,6 +206,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     if (!browsing) return []
     const skip = new Set([browsing.at, nextAt()])
     return browsing.items.filter((_, i) => !skip.has(i))
+  }
+
+  /** スタミナ (0..100)。**満タンなら出さない** — 減っていない目盛りは飾り */
+  const stamina = () => props.stats?.stamina ?? 100
+  /** 眠りが明けるまで。眠っていなければ 0 */
+  const asleep = () => props.stats?.asleep === true
+  /**
+   * 暗がりが開いている割合 (%)。**深いほど狭い。**
+   *
+   * 眠った瞬間は隅から中央近くまで黒く、時間が経つほど黒が隅へ引いていく。
+   * 起きる直前には画面のほとんどが見えている。
+   */
+  const sleepOpen = () => {
+    const depth = props.stats?.sleepDepth ?? 0
+    return Math.round(6 + (1 - depth) * 94)
   }
 
   const health = () => {
@@ -329,6 +350,32 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         style={{ opacity: `${1 - health() / 100}` }}
       />
 
+      {/*
+        スタミナ。**麻酔を受けたときだけ出す。**
+
+        体力と違って回復しないので、「あと何発で眠るか」がそのまま判断になる。
+        常に出しておくと画面の飾りになって、減った瞬間の意味が薄れる。
+      */}
+      <Show when={stamina() < 100}>
+        <div class="hud-stamina">
+          <div class="hud-stamina-bar" style={{ width: `${stamina()}%` }} />
+        </div>
+      </Show>
+
+      {/*
+        眠らされている間。**画面を伏せる。**
+
+        操作は既に効かない (scene 側で止めている) が、それだけだと壊れたように
+        見える。何が起きているかを言葉で出す。
+      */}
+      <Show when={asleep()}>
+        <div class="hud-asleep" style={{ '--sleep-open': `${sleepOpen()}%` }}>
+          <span class="hud-asleep-word" style={{ opacity: `${props.stats?.sleepDepth ?? 0}` }}>
+            SLEEP
+          </span>
+        </div>
+      </Show>
+
       <div class="hud-left">
         {/*
           キル表示。MGO2 と同じ 倒した人 ▶ 倒された人 (武器) の形。
@@ -432,7 +479,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
       {/* 命中した部位。倍率が違うので、どこに当たったかが分かると狙いを直せる */}
       <Show when={props.stats?.hitZone}>
-        <div class="hud-hit">{props.stats?.hitZone}</div>
+        <div class="hud-hit" classList={{ 'hud-hit-tranq': props.stats?.hitTranq === true }}>
+          {props.stats?.hitZone}
+        </div>
       </Show>
 
       {/* 倒れている間。復帰の時計はサーバーが持っているので秒数は出さない */}
@@ -464,6 +513,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           // 送っている間は指している銃の装填で見る。空の銃が赤いまま並ぶ
           'hud-weapon-empty':
             heldIsGun() && (browsedItem()?.loaded ?? props.stats?.ammo ?? 0) === 0,
+          // 殺傷か麻酔か。**装備画面の札と同じ色** — 選んだ物と手にある物が繋がる
+          'hud-weapon-tranq': heldIsTranq(),
         }}
       >
         <Show when={heldIsGun()}>

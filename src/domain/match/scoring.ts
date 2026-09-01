@@ -20,6 +20,19 @@
 /** 倒したとき入る点 */
 export const KILL_POINTS = 3
 
+/**
+ * 眠らせたとき入る点。**倒したのと同じ。**
+ *
+ * 麻酔で 4 発当てるのは、殺す 4 発を当てるのと同じ難しさ。しかも眠らせても
+ * **相手の残機は減らない**ので、陣営の勝敗には効かない。点だけ同じにして
+ * おかないと「倒せる場面で眠らせる」に理由が無くなる。
+ *
+ * 眠っている相手を仕留めれば、そちらは別に倒した点が入る。**二度取りに
+ * 見えるが、二度手間でもある** — 眠らせてから寄って仕留めるまでの間、
+ * 撃った側は撃ち合いの外に出ている。
+ */
+export const STUN_POINTS = 3
+
 /** 倒されたとき引く点 */
 export const DEATH_POINTS = -2
 
@@ -41,9 +54,16 @@ export function pointsOf(record: {
   kills: number
   deaths: number
   suicides: number
+  /** 眠らせた数。古い記録には無いので省ける */
+  stuns?: number
 }): number {
   const killed = record.deaths - record.suicides
-  return record.kills * KILL_POINTS + killed * DEATH_POINTS + record.suicides * SUICIDE_POINTS
+  return (
+    record.kills * KILL_POINTS +
+    (record.stuns ?? 0) * STUN_POINTS +
+    killed * DEATH_POINTS +
+    record.suicides * SUICIDE_POINTS
+  )
 }
 
 /**

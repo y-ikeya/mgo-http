@@ -31,8 +31,10 @@ import {
 } from '../item/weapons'
 import { MAX_HEALTH } from '../rule/damage'
 import { Footsteps } from '../rule/footsteps'
+import type { GunId } from '../item/held'
 import { Inventory } from '../item/inventory'
 import type { Skills } from './skill'
+import { MAX_STAMINA } from './stamina'
 
 /**
  * ある時刻の姿。**当てたという申告を遡って照合する**のに使う。
@@ -162,6 +164,13 @@ export interface Player {
    * 読み直した瞬間は拳銃を持っているかもしれないので、構えている物からは復元できない。
    */
   primary: WeaponId
+  /**
+   * 副武器。**null なら持たない** (部屋が外している)。
+   *
+   * 主武器と違って選べない — いまは拳銃 1 挺だけなので、選ばせても意味が無い。
+   * 持つか持たないかだけが部屋で変わる (domain/match/room.ts の secondary)。
+   */
+  secondary: GunId | null
   /**
    * 取っているスキルと、その段。**4 コストの予算で選ぶ** (player/skill.ts)。
    *
@@ -298,12 +307,23 @@ export interface Player {
   headDeaths: number
   /** 自爆。倒された数には入るが、誰かの手柄にはならない */
   suicides: number
+  /** 眠らせた数。**倒した数とは別に数える** — 別の手だから */
+  stuns: number
   /**
    * 武器ごとのキル。**表示名ではなく安定した id で数える**
-   * ('rifle' | 'sniper' | 'pistol' | 'knife' | 'grenade')。
+   * ('rifle' | 'sniper' | 'm9' | 'knife' | 'grenade')。
    * 銃の表示名を変えたときに過去の記録が壊れないように
    */
   killsByWeapon: Record<string, number>
+  /**
+   * スタミナ。**麻酔銃だけが削る** (domain/player/stamina.ts)。
+   *
+   * 0 になると眠る。体力と別に持つのは、削り切ったときに起きることが
+   * 違うから — 体力は倒れて湧き直し、スタミナは**その場に残ったまま眠る**。
+   */
+  stamina: number
+  /** 眠りが明ける時刻 (ms)。0 なら眠っていない */
+  sleepUntil: number
   /** 歩いた距離の積算。足音を出す間隔を決める */
   footsteps: Footsteps
   /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
@@ -347,7 +367,7 @@ export function newPlayer(seed: {
     locomotion: 'idle',
     footsteps: new Footsteps(),
     concentratingSince: 0,
-    inventory: new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' }),
+    inventory: new Inventory({ primary: 'rifle', secondary: 'm9', support: 'grenade' }),
     skills: {},
     leakedUntil: 0,
     leakedTo: '',
@@ -360,6 +380,7 @@ export function newPlayer(seed: {
     downFromBehind: false,
     weapon: 'rifle',
     primary: 'rifle',
+    secondary: 'm9',
     held: 'rifle',
     support: 'grenade',
     grenades: SUPPORT_SPECS.grenade.count,
@@ -369,6 +390,9 @@ export function newPlayer(seed: {
     bot: false,
     kills: 0,
     deaths: 0,
+    stuns: 0,
+    stamina: MAX_STAMINA,
+    sleepUntil: 0,
     headshots: 0,
     headDeaths: 0,
     suicides: 0,
@@ -491,10 +515,13 @@ export function refill(player: Player): void {
   // **次の命は選んだ装備から始まる。** 拾った物は持ち越さない
   player.inventory.refill({
     primary: player.primary,
-    secondary: 'pistol',
+    secondary: player.secondary,
     support: player.support,
   })
   player.health = MAX_HEALTH
+  // **眠りは湧き直しで醒める。** 倒された体はもう戦場に無い
+  player.stamina = MAX_STAMINA
+  player.sleepUntil = 0
   player.grenades = SUPPORT_SPECS[player.support].count
   player.holdingGrenade = false
   player.concentratingSince = 0

@@ -17,6 +17,7 @@
  * 跳ねるたびに差が開いて別の場所へ落ちる。
  */
 
+import type { Water } from '../../domain/match/stage'
 import type { StageBox } from '../space/vision'
 import { segmentHitsBox } from '../space/vision'
 
@@ -128,7 +129,20 @@ export interface Projectile {
   resting: boolean
   /** 面に接して転がっているか。跳ね返りが小さくなったらここへ移る */
   rolling?: boolean
+  /** 水に入ったか。**入ったら二度と跳ねない** */
+  sunk?: boolean
 }
+
+/**
+ * 水に入ってから底へ向かう速さ (m/s)。
+ *
+ * 落ちてきた速さを引き継がない。水は空気の 800 倍の密度があって、手榴弾ほどの
+ * 大きさなら**入った瞬間にほぼ終端速度**まで落ちる。引き継ぐと、投げた強さで
+ * 沈む速さが変わって「深い所ほど速い」ように見える。
+ */
+const SINK_SPEED = 1.1
+/** 水に入った瞬間、横向きの速さをどれだけ残すか */
+const WATER_DRAG = 0.12
 
 /**
  * 1 刻み進める。
@@ -140,8 +154,13 @@ export function stepProjectile(
   p: Projectile,
   boxes: StageBox[],
   tuning: ThrowTuning = DEFAULT_THROW,
+  water: Water | null = null,
 ): void {
   if (p.resting) return
+  if (p.sunk) {
+    sink(p, boxes)
+    return
+  }
 
   p.vy -= GRAVITY * FIXED_STEP
   const nx = p.x + p.vx * FIXED_STEP
@@ -155,6 +174,37 @@ export function stepProjectile(
     const t = (GROUND_Y - p.y) / (ny - p.y)
     if (!hit || t < hit.t) {
       hit = { t, x: p.x + (nx - p.x) * t, y: GROUND_Y, z: p.z + (nz - p.z) * t, nx: 0, ny: 1, nz: 0 }
+    }
+  }
+
+  /*
+   * 水面。**跳ねずに入る。**
+   *
+   * 地面と同じ「面」として扱うと、手榴弾が水の上を跳ねて対岸まで渡っていく。
+   * 実際には水は受け止めるので、当たった所から沈めて、以後は跳ねさせない。
+   *
+   * 箱のほうが手前なら箱が勝つ (水に張り出した足場の上に落ちたとき)。
+   */
+  if (water && ny < water.y && p.y >= water.y) {
+    const t = (water.y - p.y) / (ny - p.y)
+    const wx = p.x + (nx - p.x) * t
+    const wz = p.z + (nz - p.z) * t
+    if ((!hit || t < hit.t) && Math.abs(wx) < water.half && Math.abs(wz) < water.half) {
+      p.x = wx
+      p.y = water.y
+      p.z = wz
+      // 横向きは水に持っていかれる。落ちた所からほとんど動かない
+      p.vx *= WATER_DRAG
+      p.vz *= WATER_DRAG
+      p.vy = -SINK_SPEED
+      p.sunk = true
+      p.rolling = false
+      /*
+       * **跳ねた回数に数える。** 呼ぶ側はこれを見て音と水しぶきを出している
+       * ので、数えないと水に落ちたことが誰にも分からない。
+       */
+      p.bounces++
+      return
     }
   }
 
@@ -217,6 +267,42 @@ export function stepProjectile(
   p.vy = ty * tuning.friction - hit.ny * into * tuning.restitution
   p.vz = tz * tuning.friction - hit.nz * into * tuning.restitution
   p.bounces++
+}
+
+/**
+ * 水の中を 1 刻み。**沈んで、底で止まる。**
+ *
+ * 跳ね返りも転がりも要らない。底に触れたらそこで終わり — 水中で転がる物の
+ * 動きまで作っても、水面が不透明なので誰にも見えない。
+ */
+function sink(p: Projectile, boxes: StageBox[]): void {
+  p.vy = -SINK_SPEED
+  const nx = p.x + p.vx * FIXED_STEP
+  const ny = p.y + p.vy * FIXED_STEP
+  const nz = p.z + p.vz * FIXED_STEP
+
+  let hit = sweep(p.x, p.y, p.z, nx, ny, nz, boxes)
+  if (ny < GROUND_Y && p.y >= GROUND_Y) {
+    const t = (GROUND_Y - p.y) / (ny - p.y)
+    if (!hit || t < hit.t) {
+      hit = { t, x: p.x + (nx - p.x) * t, y: GROUND_Y, z: p.z + (nz - p.z) * t, nx: 0, ny: 1, nz: 0 }
+    }
+  }
+
+  if (!hit) {
+    p.x = nx
+    p.y = ny
+    p.z = nz
+    return
+  }
+
+  p.x = hit.x
+  p.y = hit.y + SURFACE_OFFSET
+  p.z = hit.z
+  p.vx = 0
+  p.vy = 0
+  p.vz = 0
+  p.resting = true
 }
 
 interface Hit {

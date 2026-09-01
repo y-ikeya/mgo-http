@@ -1,0 +1,4979 @@
+{
+"boxes": [
+{
+"name": "pasted__polySurface7634_pasted__pasted__pasted__rama2_0.001",
+"min": [
+38.998,
+9.921,
+32.464
+],
+"max": [
+39.603,
+16.099,
+34.244
+],
+"top": {
+"h": 16.0988,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.019",
+"min": [
+34.563,
+10.979,
+35.291
+],
+"max": [
+39.971,
+11.044,
+35.341
+],
+"top": {
+"h": 11.041,
+"dx": -0.00021,
+"dz": 0.15283
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.001",
+"min": [
+34.549,
+10.148,
+35.26
+],
+"max": [
+39.93,
+10.181,
+35.372
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.003",
+"min": [
+38.449,
+10.177,
+35.306
+],
+"max": [
+39.892,
+10.994,
+35.345
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.004",
+"min": [
+37.046,
+10.177,
+35.298
+],
+"max": [
+38.489,
+10.994,
+35.337
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.005",
+"min": [
+34.581,
+10.177,
+35.291
+],
+"max": [
+36.024,
+10.994,
+35.329
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.013",
+"min": [
+35.636,
+10.177,
+35.294
+],
+"max": [
+37.079,
+10.994,
+35.332
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.001",
+"min": [
+34.471,
+10.02,
+35.2
+],
+"max": [
+40.29,
+10.122,
+40.206
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.034",
+"min": [
+40.061,
+10.954,
+35.56
+],
+"max": [
+40.151,
+11.019,
+40.059
+],
+"top": {
+"h": 11.0157,
+"dx": 0.15299,
+"dz": -0.00163
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.035",
+"min": [
+40.058,
+10.148,
+35.443
+],
+"max": [
+40.178,
+10.181,
+40.157
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.036",
+"min": [
+40.085,
+10.177,
+35.621
+],
+"max": [
+40.138,
+10.994,
+37.064
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.037",
+"min": [
+40.07,
+10.177,
+37.035
+],
+"max": [
+40.122,
+10.994,
+38.478
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.038",
+"min": [
+40.068,
+10.177,
+38.45
+],
+"max": [
+40.121,
+10.994,
+39.893
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.039",
+"min": [
+34.563,
+10.979,
+40.044
+],
+"max": [
+39.971,
+11.044,
+40.094
+],
+"top": {
+"h": 11.041,
+"dx": -0.00021,
+"dz": 0.15283
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.040",
+"min": [
+35.636,
+10.177,
+40.047
+],
+"max": [
+37.079,
+10.994,
+40.086
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.041",
+"min": [
+34.581,
+10.177,
+40.044
+],
+"max": [
+36.024,
+10.994,
+40.083
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.042",
+"min": [
+37.046,
+10.177,
+40.051
+],
+"max": [
+38.489,
+10.994,
+40.09
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.043",
+"min": [
+38.449,
+10.177,
+40.059
+],
+"max": [
+39.892,
+10.994,
+40.098
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.044",
+"min": [
+34.549,
+10.148,
+40.013
+],
+"max": [
+39.93,
+10.181,
+40.125
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.045",
+"min": [
+28.96,
+10.148,
+40.013
+],
+"max": [
+34.341,
+10.181,
+40.125
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.046",
+"min": [
+32.859,
+10.177,
+40.059
+],
+"max": [
+34.302,
+10.994,
+40.098
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.047",
+"min": [
+31.457,
+10.177,
+40.051
+],
+"max": [
+32.9,
+10.994,
+40.09
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.048",
+"min": [
+28.992,
+10.177,
+40.044
+],
+"max": [
+30.435,
+10.994,
+40.083
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.049",
+"min": [
+30.047,
+10.177,
+40.047
+],
+"max": [
+31.49,
+10.994,
+40.086
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.050",
+"min": [
+28.974,
+10.979,
+40.044
+],
+"max": [
+34.382,
+11.044,
+40.094
+],
+"top": {
+"h": 11.041,
+"dx": -0.00021,
+"dz": 0.15283
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.052",
+"min": [
+28.974,
+10.979,
+35.291
+],
+"max": [
+34.382,
+11.044,
+35.341
+],
+"top": {
+"h": 11.041,
+"dx": -0.00021,
+"dz": 0.15283
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.056",
+"min": [
+30.047,
+10.177,
+35.294
+],
+"max": [
+31.49,
+10.994,
+35.332
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.057",
+"min": [
+28.992,
+10.177,
+35.291
+],
+"max": [
+30.435,
+10.994,
+35.329
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.058",
+"min": [
+31.457,
+10.177,
+35.298
+],
+"max": [
+32.9,
+10.994,
+35.337
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.059",
+"min": [
+32.859,
+10.177,
+35.306
+],
+"max": [
+34.302,
+10.994,
+35.345
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.061",
+"min": [
+28.96,
+10.148,
+35.26
+],
+"max": [
+34.341,
+10.181,
+35.372
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.002",
+"min": [
+28.659,
+10.02,
+35.2
+],
+"max": [
+34.479,
+10.122,
+40.206
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.064",
+"min": [
+23.919,
+10.177,
+30.22
+],
+"max": [
+23.958,
+10.994,
+31.664
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.066",
+"min": [
+23.922,
+10.177,
+29.165
+],
+"max": [
+23.961,
+10.994,
+30.608
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.067",
+"min": [
+23.914,
+10.177,
+31.63
+],
+"max": [
+23.953,
+10.994,
+33.073
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.072",
+"min": [
+23.906,
+10.177,
+33.033
+],
+"max": [
+23.945,
+10.994,
+34.476
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.073",
+"min": [
+23.879,
+10.148,
+29.133
+],
+"max": [
+23.992,
+10.181,
+34.514
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.093",
+"min": [
+23.876,
+10.979,
+34.67
+],
+"max": [
+23.927,
+11.044,
+40.078
+],
+"top": {
+"h": 11.0488,
+"dx": -0.15287,
+"dz": -0.00026
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.095",
+"min": [
+23.845,
+10.148,
+34.656
+],
+"max": [
+23.958,
+10.181,
+40.037
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.098",
+"min": [
+23.872,
+10.177,
+38.555
+],
+"max": [
+23.911,
+10.994,
+39.999
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.099",
+"min": [
+23.88,
+10.177,
+37.153
+],
+"max": [
+23.919,
+10.994,
+38.596
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.100",
+"min": [
+23.888,
+10.177,
+34.688
+],
+"max": [
+23.927,
+10.994,
+36.131
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.101",
+"min": [
+23.885,
+10.177,
+35.743
+],
+"max": [
+23.924,
+10.994,
+37.186
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.103",
+"min": [
+24.053,
+10.954,
+40.026
+],
+"max": [
+28.55,
+11.019,
+40.132
+],
+"top": {
+"h": 11.0157,
+"dx": -0.00215,
+"dz": 0.15288
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.104",
+"min": [
+23.93,
+10.148,
+40.016
+],
+"max": [
+28.602,
+10.181,
+40.154
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.105",
+"min": [
+24.155,
+10.177,
+40.039
+],
+"max": [
+25.598,
+10.994,
+40.095
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.106",
+"min": [
+25.57,
+10.177,
+40.044
+],
+"max": [
+27.013,
+10.994,
+40.1
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.107",
+"min": [
+26.984,
+10.177,
+40.063
+],
+"max": [
+28.428,
+10.994,
+40.119
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.108",
+"min": [
+23.91,
+10.979,
+29.148
+],
+"max": [
+23.961,
+11.044,
+34.555
+],
+"top": {
+"h": 11.0488,
+"dx": -0.15287,
+"dz": -0.00026
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.109",
+"min": [
+28.707,
+10.979,
+32.153
+],
+"max": [
+28.754,
+11.044,
+35.261
+],
+"top": {
+"h": 11.0482,
+"dx": -0.15275,
+"dz": -0.00026
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.110",
+"min": [
+24.12,
+10.954,
+29.084
+],
+"max": [
+28.618,
+11.019,
+29.189
+],
+"top": {
+"h": 11.0157,
+"dx": -0.00215,
+"dz": 0.15288
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.111",
+"min": [
+28.676,
+10.148,
+32.144
+],
+"max": [
+28.785,
+10.181,
+35.238
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.112",
+"min": [
+23.998,
+10.148,
+29.074
+],
+"max": [
+28.67,
+10.181,
+29.211
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.113",
+"min": [
+24.222,
+10.177,
+29.096
+],
+"max": [
+25.666,
+10.994,
+29.152
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.114",
+"min": [
+28.701,
+10.177,
+33.693
+],
+"max": [
+28.74,
+10.994,
+35.136
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.115",
+"min": [
+28.71,
+10.177,
+32.29
+],
+"max": [
+28.749,
+10.994,
+33.733
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.118",
+"min": [
+25.637,
+10.177,
+29.101
+],
+"max": [
+27.081,
+10.994,
+29.157
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.119",
+"min": [
+27.052,
+10.177,
+29.12
+],
+"max": [
+28.495,
+10.994,
+29.176
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.006",
+"min": [
+23.662,
+10.02,
+34.625
+],
+"max": [
+28.851,
+10.122,
+40.167
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.007",
+"min": [
+23.696,
+10.02,
+29.102
+],
+"max": [
+28.885,
+10.122,
+34.644
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.008",
+"min": [
+28.835,
+10.021,
+29.249
+],
+"max": [
+33.487,
+13.028,
+32.047
+],
+"top": {
+"h": 10.0678,
+"dx": 0.64056,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.009",
+"min": [
+33.481,
+12.919,
+29.32
+],
+"max": [
+38.67,
+13.021,
+34.862
+],
+"top": {
+"h": 13.0209,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.010",
+"min": [
+33.447,
+12.919,
+34.843
+],
+"max": [
+38.636,
+13.021,
+40.384
+],
+"top": {
+"h": 13.0209,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.051",
+"min": [
+36.809,
+13.043,
+29.43
+],
+"max": [
+38.252,
+13.86,
+29.486
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.053",
+"min": [
+35.395,
+13.043,
+29.411
+],
+"max": [
+36.838,
+13.86,
+29.467
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.054",
+"min": [
+33.979,
+13.043,
+29.406
+],
+"max": [
+35.423,
+13.86,
+29.462
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.055",
+"min": [
+33.755,
+13.015,
+29.383
+],
+"max": [
+38.427,
+13.047,
+29.521
+],
+"top": {
+"h": 13.0475,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.060",
+"min": [
+33.877,
+13.821,
+29.394
+],
+"max": [
+38.375,
+13.886,
+29.499
+],
+"top": {
+"h": 13.8823,
+"dx": -0.00215,
+"dz": 0.15288
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.116",
+"min": [
+33.877,
+13.821,
+40.225
+],
+"max": [
+38.375,
+13.886,
+40.33
+],
+"top": {
+"h": 13.8823,
+"dx": -0.00215,
+"dz": 0.15288
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.117",
+"min": [
+33.755,
+13.015,
+40.215
+],
+"max": [
+38.427,
+13.047,
+40.353
+],
+"top": {
+"h": 13.0475,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.120",
+"min": [
+33.979,
+13.043,
+40.238
+],
+"max": [
+35.423,
+13.86,
+40.294
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.121",
+"min": [
+35.395,
+13.043,
+40.243
+],
+"max": [
+36.838,
+13.86,
+40.299
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.122",
+"min": [
+36.809,
+13.043,
+40.262
+],
+"max": [
+38.252,
+13.86,
+40.318
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.123",
+"min": [
+31.365,
+12.029,
+29.335
+],
+"max": [
+33.02,
+13.505,
+29.391
+],
+"top": {
+"h": 13.505,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.124",
+"min": [
+30.184,
+11.251,
+29.316
+],
+"max": [
+31.839,
+12.727,
+29.372
+],
+"top": {
+"h": 12.7274,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.125",
+"min": [
+29.002,
+10.473,
+29.311
+],
+"max": [
+30.657,
+11.949,
+29.367
+],
+"top": {
+"h": 11.9492,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.126",
+"min": [
+29.262,
+10.326,
+29.288
+],
+"max": [
+33.182,
+12.922,
+29.426
+],
+"top": {
+"h": 10.3531,
+"dx": 0.65837,
+"dz": -0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.127",
+"min": [
+28.903,
+11.066,
+29.298
+],
+"max": [
+32.695,
+13.594,
+29.403
+],
+"top": {
+"h": 11.1167,
+"dx": 0.65529,
+"dz": 0.18275
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.128",
+"min": [
+28.903,
+11.066,
+31.89
+],
+"max": [
+32.695,
+13.594,
+31.995
+],
+"top": {
+"h": 11.1167,
+"dx": 0.65529,
+"dz": 0.18275
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.129",
+"min": [
+29.262,
+10.326,
+31.88
+],
+"max": [
+33.182,
+12.922,
+32.018
+],
+"top": {
+"h": 10.3531,
+"dx": 0.65837,
+"dz": -0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.130",
+"min": [
+29.002,
+10.473,
+31.903
+],
+"max": [
+30.657,
+11.949,
+31.959
+],
+"top": {
+"h": 11.9492,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.131",
+"min": [
+30.184,
+11.251,
+31.908
+],
+"max": [
+31.839,
+12.727,
+31.964
+],
+"top": {
+"h": 12.7274,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.132",
+"min": [
+31.365,
+12.029,
+31.927
+],
+"max": [
+33.02,
+13.505,
+31.983
+],
+"top": {
+"h": 13.505,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.133",
+"min": [
+38.45,
+13.821,
+29.866
+],
+"max": [
+38.592,
+13.886,
+34.363
+],
+"top": {
+"h": 13.904,
+"dx": -0.15271,
+"dz": -0.00341
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.134",
+"min": [
+38.427,
+13.015,
+29.742
+],
+"max": [
+38.603,
+13.047,
+34.415
+],
+"top": {
+"h": 13.0475,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.135",
+"min": [
+38.511,
+13.043,
+29.967
+],
+"max": [
+38.579,
+13.86,
+31.411
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.136",
+"min": [
+38.494,
+13.043,
+31.382
+],
+"max": [
+38.562,
+13.86,
+32.826
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.137",
+"min": [
+38.464,
+13.043,
+32.796
+],
+"max": [
+38.531,
+13.86,
+34.24
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.002",
+"min": [
+-37.932,
+13.043,
+-34.318
+],
+"max": [
+-37.889,
+13.86,
+-32.875
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.006",
+"min": [
+-37.925,
+13.043,
+-32.904
+],
+"max": [
+-37.883,
+13.86,
+-31.46
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.007",
+"min": [
+-37.905,
+13.043,
+-31.489
+],
+"max": [
+-37.862,
+13.86,
+-30.046
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.008",
+"min": [
+-37.968,
+13.015,
+-34.492
+],
+"max": [
+-37.813,
+13.047,
+-29.822
+],
+"top": {
+"h": 13.0475,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.009",
+"min": [
+-37.927,
+13.821,
+-34.441
+],
+"max": [
+-37.868,
+13.886,
+-29.943
+],
+"top": {
+"h": 13.8823,
+"dx": 0.15271,
+"dz": -0.00057
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.010",
+"min": [
+-32.394,
+12.029,
+-32.228
+],
+"max": [
+-30.739,
+13.505,
+-32.168
+],
+"top": {
+"h": 13.505,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.012",
+"min": [
+-31.213,
+11.251,
+-32.24
+],
+"max": [
+-29.558,
+12.727,
+-32.18
+],
+"top": {
+"h": 12.7274,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.014",
+"min": [
+-30.032,
+10.473,
+-32.266
+],
+"max": [
+-28.377,
+11.949,
+-32.206
+],
+"top": {
+"h": 11.9492,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.015",
+"min": [
+-32.555,
+10.326,
+-32.304
+],
+"max": [
+-28.636,
+12.922,
+-32.131
+],
+"top": {
+"h": 12.9315,
+"dx": -0.65815,
+"dz": 0.01716
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.016",
+"min": [
+-32.07,
+11.066,
+-32.261
+],
+"max": [
+-28.277,
+13.594,
+-32.184
+],
+"top": {
+"h": 13.6264,
+"dx": -0.65983,
+"dz": -0.16574
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.017",
+"min": [
+-32.002,
+11.066,
+-29.67
+],
+"max": [
+-28.21,
+13.594,
+-29.592
+],
+"top": {
+"h": 13.6264,
+"dx": -0.65984,
+"dz": -0.16593
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.018",
+"min": [
+-32.488,
+10.326,
+-29.713
+],
+"max": [
+-28.569,
+12.922,
+-29.539
+],
+"top": {
+"h": 12.9315,
+"dx": -0.65815,
+"dz": 0.01716
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.020",
+"min": [
+-29.964,
+10.473,
+-29.675
+],
+"max": [
+-28.309,
+11.949,
+-29.614
+],
+"top": {
+"h": 11.9492,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.021",
+"min": [
+-31.146,
+11.251,
+-29.649
+],
+"max": [
+-29.491,
+12.727,
+-29.588
+],
+"top": {
+"h": 12.7274,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.022",
+"min": [
+-32.327,
+12.029,
+-29.637
+],
+"max": [
+-30.672,
+13.505,
+-29.577
+],
+"top": {
+"h": 13.505,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.023",
+"min": [
+-37.842,
+13.043,
+-40.419
+],
+"max": [
+-36.398,
+13.86,
+-40.364
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.024",
+"min": [
+-36.427,
+13.043,
+-40.436
+],
+"max": [
+-34.984,
+13.86,
+-40.382
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.025",
+"min": [
+-35.013,
+13.043,
+-40.468
+],
+"max": [
+-33.569,
+13.86,
+-40.414
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.026",
+"min": [
+-27.797,
+10.177,
+-29.535
+],
+"max": [
+-26.354,
+10.994,
+-29.48
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.027",
+"min": [
+-26.383,
+10.177,
+-29.553
+],
+"max": [
+-24.94,
+10.994,
+-29.498
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.028",
+"min": [
+-38.015,
+13.015,
+-40.519
+],
+"max": [
+-33.346,
+13.047,
+-40.326
+],
+"top": {
+"h": 13.0475,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.029",
+"min": [
+-37.965,
+13.821,
+-40.463
+],
+"max": [
+-33.467,
+13.886,
+-40.368
+],
+"top": {
+"h": 13.8969,
+"dx": -0.00183,
+"dz": -0.15283
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.030",
+"min": [
+-23.189,
+10.151,
+-34.346
+],
+"max": [
+-23.117,
+10.968,
+-32.903
+],
+"top": {
+"h": 10.9682,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.032",
+"min": [
+-24.969,
+10.177,
+-29.585
+],
+"max": [
+-23.525,
+10.994,
+-29.53
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.033",
+"min": [
+-27.971,
+10.148,
+-29.636
+],
+"max": [
+-23.301,
+10.181,
+-29.443
+],
+"top": {
+"h": 10.1809,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.062",
+"min": [
+-23.246,
+10.123,
+-34.491
+],
+"max": [
+-23.1,
+10.155,
+-32.791
+],
+"top": {
+"h": 10.1554,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.063",
+"min": [
+-27.92,
+10.954,
+-29.58
+],
+"max": [
+-23.423,
+11.019,
+-29.484
+],
+"top": {
+"h": 11.0303,
+"dx": -0.00183,
+"dz": -0.15276
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.065",
+"min": [
+-23.213,
+10.954,
+-34.398
+],
+"max": [
+-23.134,
+11.019,
+-32.87
+],
+"top": {
+"h": 11.0156,
+"dx": 0.15273,
+"dz": -0.00373
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.069",
+"min": [
+-28.015,
+10.177,
+-40.476
+],
+"max": [
+-26.572,
+10.994,
+-40.421
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.070",
+"min": [
+-26.601,
+10.177,
+-40.494
+],
+"max": [
+-25.158,
+10.994,
+-40.439
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.071",
+"min": [
+-25.186,
+10.177,
+-40.526
+],
+"max": [
+-23.743,
+10.994,
+-40.471
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.074",
+"min": [
+-28.189,
+10.148,
+-40.577
+],
+"max": [
+-23.519,
+10.181,
+-40.384
+],
+"top": {
+"h": 10.1809,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.075",
+"min": [
+-28.138,
+10.954,
+-40.521
+],
+"max": [
+-23.641,
+11.019,
+-40.425
+],
+"top": {
+"h": 11.0303,
+"dx": -0.00183,
+"dz": -0.15283
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.087",
+"min": [
+-33.803,
+10.148,
+-35.691
+],
+"max": [
+-28.421,
+10.181,
+-35.453
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.088",
+"min": [
+-37.682,
+13.821,
+-29.635
+],
+"max": [
+-33.185,
+13.886,
+-29.54
+],
+"top": {
+"h": 13.8969,
+"dx": -0.00183,
+"dz": -0.15276
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.089",
+"min": [
+-33.764,
+10.177,
+-35.567
+],
+"max": [
+-32.321,
+10.994,
+-35.495
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.090",
+"min": [
+-32.362,
+10.177,
+-35.596
+],
+"max": [
+-30.918,
+10.994,
+-35.523
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.091",
+"min": [
+-29.897,
+10.177,
+-35.653
+],
+"max": [
+-28.454,
+10.994,
+-35.581
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.092",
+"min": [
+-30.953,
+10.177,
+-35.628
+],
+"max": [
+-29.509,
+10.994,
+-35.556
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.094",
+"min": [
+-37.733,
+13.015,
+-29.691
+],
+"max": [
+-33.063,
+13.047,
+-29.498
+],
+"top": {
+"h": 13.0475,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.096",
+"min": [
+-34.73,
+13.043,
+-29.64
+],
+"max": [
+-33.287,
+13.86,
+-29.585
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.097",
+"min": [
+-36.145,
+13.043,
+-29.608
+],
+"max": [
+-34.702,
+13.86,
+-29.553
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.102",
+"min": [
+-33.843,
+10.979,
+-35.659
+],
+"max": [
+-28.436,
+11.044,
+-35.484
+],
+"top": {
+"h": 11.0678,
+"dx": -0.00377,
+"dz": -0.15269
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.138",
+"min": [
+-37.559,
+13.043,
+-29.59
+],
+"max": [
+-36.116,
+13.86,
+-29.536
+],
+"top": {
+"h": 13.8602,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.139",
+"min": [
+-33.967,
+10.979,
+-40.411
+],
+"max": [
+-28.56,
+11.044,
+-40.235
+],
+"top": {
+"h": 11.0678,
+"dx": -0.00377,
+"dz": -0.15269
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.140",
+"min": [
+-31.076,
+10.177,
+-40.38
+],
+"max": [
+-29.633,
+10.994,
+-40.308
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.141",
+"min": [
+-30.021,
+10.177,
+-40.404
+],
+"max": [
+-28.578,
+10.994,
+-40.332
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.142",
+"min": [
+-32.486,
+10.177,
+-40.347
+],
+"max": [
+-31.042,
+10.994,
+-40.275
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.143",
+"min": [
+-33.888,
+10.177,
+-40.319
+],
+"max": [
+-32.444,
+10.994,
+-40.247
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.144",
+"min": [
+-33.927,
+10.148,
+-40.442
+],
+"max": [
+-28.545,
+10.181,
+-40.205
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.145",
+"min": [
+-39.514,
+10.148,
+-40.296
+],
+"max": [
+-34.132,
+10.181,
+-40.059
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.146",
+"min": [
+-39.475,
+10.177,
+-40.173
+],
+"max": [
+-38.032,
+10.994,
+-40.101
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.147",
+"min": [
+-38.073,
+10.177,
+-40.201
+],
+"max": [
+-36.629,
+10.994,
+-40.129
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.148",
+"min": [
+-35.609,
+10.177,
+-40.259
+],
+"max": [
+-34.165,
+10.994,
+-40.186
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.149",
+"min": [
+-36.664,
+10.177,
+-40.234
+],
+"max": [
+-35.22,
+10.994,
+-40.162
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.150",
+"min": [
+-39.554,
+10.979,
+-40.265
+],
+"max": [
+-34.148,
+11.044,
+-40.09
+],
+"top": {
+"h": 11.0678,
+"dx": -0.00377,
+"dz": -0.15269
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.151",
+"min": [
+-39.683,
+10.177,
+-39.928
+],
+"max": [
+-39.625,
+10.994,
+-38.485
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.152",
+"min": [
+-39.648,
+10.177,
+-38.513
+],
+"max": [
+-39.589,
+10.994,
+-37.07
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.153",
+"min": [
+-39.626,
+10.177,
+-37.099
+],
+"max": [
+-39.568,
+10.994,
+-35.656
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.154",
+"min": [
+-39.763,
+10.148,
+-40.19
+],
+"max": [
+-39.52,
+10.181,
+-35.479
+],
+"top": {
+"h": 10.1809,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.155",
+"min": [
+-39.734,
+10.954,
+-40.092
+],
+"max": [
+-39.527,
+11.019,
+-35.596
+],
+"top": {
+"h": 11.0221,
+"dx": -0.15273,
+"dz": 0.00561
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.156",
+"min": [
+-39.431,
+10.979,
+-35.513
+],
+"max": [
+-34.024,
+11.044,
+-35.338
+],
+"top": {
+"h": 11.0678,
+"dx": -0.00377,
+"dz": -0.15269
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.157",
+"min": [
+-36.54,
+10.177,
+-35.483
+],
+"max": [
+-35.096,
+10.994,
+-35.41
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.158",
+"min": [
+-35.485,
+10.177,
+-35.507
+],
+"max": [
+-34.041,
+10.994,
+-35.435
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.159",
+"min": [
+-37.949,
+10.177,
+-35.45
+],
+"max": [
+-36.505,
+10.994,
+-35.378
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.160",
+"min": [
+-39.351,
+10.177,
+-35.422
+],
+"max": [
+-37.908,
+10.994,
+-35.349
+],
+"top": {
+"h": 10.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.161",
+"min": [
+-39.39,
+10.148,
+-35.545
+],
+"max": [
+-34.008,
+10.181,
+-35.308
+],
+"top": {
+"h": 10.1808,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "pasted__polySurface7634_pasted__pasted__pasted__rama2_0.002",
+"min": [
+-39.024,
+9.921,
+-34.306
+],
+"max": [
+-38.393,
+16.099,
+-32.518
+],
+"top": {
+"h": 16.0988,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.003",
+"min": [
+-38.193,
+12.919,
+-40.56
+],
+"max": [
+-32.93,
+13.021,
+-34.948
+],
+"top": {
+"h": 13.0209,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.004",
+"min": [
+-38.083,
+12.919,
+-35.038
+],
+"max": [
+-32.82,
+13.021,
+-29.427
+],
+"top": {
+"h": 13.0209,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.005",
+"min": [
+-32.849,
+10.021,
+-32.344
+],
+"max": [
+-28.154,
+13.028,
+-29.493
+],
+"top": {
+"h": 13.0372,
+"dx": -0.64034,
+"dz": 0.0167
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.011",
+"min": [
+-28.296,
+10.02,
+-35.076
+],
+"max": [
+-23.033,
+10.122,
+-29.464
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.012",
+"min": [
+-28.406,
+10.02,
+-40.598
+],
+"max": [
+-23.143,
+10.122,
+-34.986
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.013",
+"min": [
+-34.067,
+10.02,
+-40.539
+],
+"max": [
+-28.119,
+10.122,
+-35.382
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_base.014",
+"min": [
+-39.877,
+10.02,
+-40.387
+],
+"max": [
+-33.929,
+10.122,
+-35.23
+],
+"top": {
+"h": 10.1222,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0",
+"min": [
+33.105,
+13.003,
+29.42
+],
+"max": [
+33.852,
+14.065,
+30.156
+],
+"top": {
+"h": 14.0651,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.001",
+"min": [
+33.364,
+13.003,
+32.007
+],
+"max": [
+34.111,
+14.065,
+32.743
+],
+"top": {
+"h": 14.0651,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.002",
+"min": [
+33.364,
+13.003,
+32.714
+],
+"max": [
+34.111,
+14.065,
+33.449
+],
+"top": {
+"h": 14.0651,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.003",
+"min": [
+33.364,
+13.003,
+34.139
+],
+"max": [
+34.111,
+14.065,
+34.875
+],
+"top": {
+"h": 14.0651,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.004",
+"min": [
+33.364,
+13.003,
+33.433
+],
+"max": [
+34.111,
+14.065,
+34.168
+],
+"top": {
+"h": 14.0651,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.005",
+"min": [
+-33.496,
+13.027,
+-34.328
+],
+"max": [
+-32.744,
+14.088,
+-33.587
+],
+"top": {
+"h": 14.0883,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.006",
+"min": [
+-33.5,
+13.027,
+-35.034
+],
+"max": [
+-32.749,
+14.088,
+-34.294
+],
+"top": {
+"h": 14.0883,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.007",
+"min": [
+-33.491,
+13.027,
+-33.609
+],
+"max": [
+-32.74,
+14.088,
+-32.869
+],
+"top": {
+"h": 14.0883,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.008",
+"min": [
+-33.487,
+13.027,
+-32.902
+],
+"max": [
+-32.736,
+14.088,
+-32.162
+],
+"top": {
+"h": 14.0883,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "oildrum_low__0.009",
+"min": [
+-33.158,
+13.027,
+-30.297
+],
+"max": [
+-32.386,
+14.088,
+-29.536
+],
+"top": {
+"h": 14.0883,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.011",
+"min": [
+-23.225,
+10.146,
+-35.922
+],
+"max": [
+-23.153,
+10.963,
+-34.478
+],
+"top": {
+"h": 10.9631,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.068",
+"min": [
+-23.282,
+10.118,
+-36.067
+],
+"max": [
+-23.136,
+10.15,
+-34.366
+],
+"top": {
+"h": 10.1503,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.076",
+"min": [
+-23.249,
+10.949,
+-35.973
+],
+"max": [
+-23.17,
+11.014,
+-34.445
+],
+"top": {
+"h": 11.0105,
+"dx": 0.15273,
+"dz": -0.00373
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.077",
+"min": [
+-23.108,
+10.155,
+-31.2
+],
+"max": [
+-23.036,
+10.972,
+-29.757
+],
+"top": {
+"h": 10.9722,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.078",
+"min": [
+-23.165,
+10.127,
+-31.345
+],
+"max": [
+-23.02,
+10.159,
+-29.645
+],
+"top": {
+"h": 10.1594,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.079",
+"min": [
+-23.132,
+10.958,
+-31.252
+],
+"max": [
+-23.053,
+11.023,
+-29.724
+],
+"top": {
+"h": 11.0195,
+"dx": 0.15273,
+"dz": -0.00373
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.080",
+"min": [
+-23.144,
+10.15,
+-32.775
+],
+"max": [
+-23.073,
+10.967,
+-31.332
+],
+"top": {
+"h": 10.9671,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.081",
+"min": [
+-23.202,
+10.122,
+-32.92
+],
+"max": [
+-23.056,
+10.154,
+-31.22
+],
+"top": {
+"h": 10.1543,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.082",
+"min": [
+-23.169,
+10.953,
+-32.827
+],
+"max": [
+-23.09,
+11.018,
+-31.299
+],
+"top": {
+"h": 11.0144,
+"dx": 0.15273,
+"dz": -0.00373
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.031",
+"min": [
+-23.304,
+10.14,
+-38.889
+],
+"max": [
+-23.232,
+10.957,
+-37.446
+],
+"top": {
+"h": 10.9569,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.083",
+"min": [
+-23.361,
+10.112,
+-39.034
+],
+"max": [
+-23.215,
+10.144,
+-37.334
+],
+"top": {
+"h": 10.1442,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.084",
+"min": [
+-23.328,
+10.943,
+-38.941
+],
+"max": [
+-23.249,
+11.007,
+-37.412
+],
+"top": {
+"h": 11.0043,
+"dx": 0.15273,
+"dz": -0.00373
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.085",
+"min": [
+-23.34,
+10.135,
+-40.464
+],
+"max": [
+-23.268,
+10.952,
+-39.021
+],
+"top": {
+"h": 10.9518,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.086",
+"min": [
+-23.398,
+10.107,
+-40.609
+],
+"max": [
+-23.252,
+10.139,
+-38.909
+],
+"top": {
+"h": 10.139,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.162",
+"min": [
+-23.365,
+10.938,
+-40.516
+],
+"max": [
+-23.286,
+11.002,
+-38.988
+],
+"top": {
+"h": 10.9992,
+"dx": 0.15273,
+"dz": -0.00373
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.163",
+"min": [
+-23.26,
+10.139,
+-37.318
+],
+"max": [
+-23.188,
+10.956,
+-35.875
+],
+"top": {
+"h": 10.9558,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.164",
+"min": [
+-23.317,
+10.111,
+-37.463
+],
+"max": [
+-23.171,
+10.143,
+-35.763
+],
+"top": {
+"h": 10.143,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.165",
+"min": [
+-23.284,
+10.941,
+-37.37
+],
+"max": [
+-23.205,
+11.006,
+-35.842
+],
+"top": {
+"h": 11.0031,
+"dx": 0.15273,
+"dz": -0.00373
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.167",
+"min": [
+-28.186,
+10.151,
+-35.341
+],
+"max": [
+-28.143,
+10.968,
+-33.898
+],
+"top": {
+"h": 10.9683,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.168",
+"min": [
+-28.165,
+10.151,
+-33.926
+],
+"max": [
+-28.122,
+10.968,
+-32.483
+],
+"top": {
+"h": 10.9683,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.169",
+"min": [
+-28.221,
+10.123,
+-35.537
+],
+"max": [
+-28.082,
+10.156,
+-32.354
+],
+"top": {
+"h": 10.1556,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden.170",
+"min": [
+-28.185,
+10.929,
+-35.591
+],
+"max": [
+-28.131,
+10.994,
+-32.351
+],
+"top": {
+"h": 10.9904,
+"dx": 0.15278,
+"dz": -0.00057
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Cube",
+"min": [
+-37.971,
+9.431,
+-40.116
+],
+"max": [
+-37.808,
+12.98,
+-39.952
+],
+"top": {
+"h": 12.9804,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Cube.001",
+"min": [
+-33.223,
+9.459,
+-40.223
+],
+"max": [
+-33.061,
+13.008,
+-40.059
+],
+"top": {
+"h": 13.0083,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Cube.002",
+"min": [
+-37.813,
+9.425,
+-29.807
+],
+"max": [
+-37.65,
+12.975,
+-29.644
+],
+"top": {
+"h": 12.9747,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Cube.003",
+"min": [
+38.266,
+9.322,
+29.62
+],
+"max": [
+38.428,
+12.871,
+29.784
+],
+"top": {
+"h": 12.8712,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+}
+]
+}

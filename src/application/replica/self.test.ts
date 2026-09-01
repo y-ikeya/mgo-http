@@ -14,7 +14,7 @@ import type { WeaponId } from '../../domain/item/weapons'
  */
 
 const table = (rifle: number, pistol = 0): Record<WeaponId, number> =>
-  ({ rifle, pistol, smg: 0, sniper: 0 }) as Record<WeaponId, number>
+  ({ rifle, m9: pistol, smg: 0, sniper: 0, shotgun: 0 }) as Record<WeaponId, number>
 
 function selfMessage(over: Partial<{ health: number; magazine: number; reserve: number; grenades: number }> = {}): ServerMessage {
   return {
@@ -84,7 +84,7 @@ describe('ずれ', () => {
     const self = newSelfReplica()
     applySelf(self, selfMessage({ magazine: 30 }))
     // 拳銃の表は 0。拳銃を 12 発持っているつもりならずれる
-    expect(driftOf(self, { health: 100, magazine: 12, reserve: 0, grenades: 3 }, 'pistol').magazine).toBe(-12)
+    expect(driftOf(self, { health: 100, magazine: 12, reserve: 0, grenades: 3 }, 'm9').magazine).toBe(-12)
   })
 
   test('投擲物もずれを見る', () => {

@@ -114,6 +114,18 @@ export interface MoveVerdict {
  * @param boxes 人を止める箱 (solidBlockers を通したもの)
  * @param arenaHalf 遊べる範囲の半分 (m)。arenaHalfOf で一度だけ出しておく
  */
+/**
+ * その点における箱の天面 (m)。**傾いていなければ一番高い所。**
+ *
+ * 見た目の坂 (vision.ts) と同じ式。別に書くと、視線は坂として扱うのに移動は
+ * 壁として扱う、が起きる。
+ */
+function topOfBox(box: StageBox, x: number, z: number): number {
+  const top = box.top
+  if (!top || (top.dx === 0 && top.dz === 0)) return box.max[1]
+  return top.h + top.dx * (x - box.min[0]) + top.dz * (z - box.min[2])
+}
+
 export function checkMove(
   from: Point,
   to: Point,
@@ -137,9 +149,20 @@ export function checkMove(
   if (distance <= PROBE_MAX_STEP) {
     const y = Math.max(from.y, to.y) + PROBE_HEIGHT
     for (const box of boxes) {
-      // 乗っている / 乗った箱は跨いで当たり前。抜けたのではない
-      const top = box.max[1]
-      if (Math.abs(top - from.y) < STANDING_ON || Math.abs(top - to.y) < STANDING_ON) continue
+      /*
+       * 乗っている / 乗った箱は跨いで当たり前。抜けたのではない。
+       *
+       * **坂は足元の高さで見る。** 一番高い所 (max) だけで見ていた頃、階段を
+       * 登っている人は「箱の上に居る」と判定されず、胸の高さの線が段を貫いて
+       * 「壁を抜けた」で弾かれた — **登った先から押し戻される**、という形で
+       * 出た (庭園の階段)。上面が傾いていれば、その点の高さを引く。
+       */
+      if (
+        Math.abs(topOfBox(box, from.x, from.z) - from.y) < STANDING_ON ||
+        Math.abs(topOfBox(box, to.x, to.z) - to.y) < STANDING_ON
+      ) {
+        continue
+      }
       if (segmentHitsBox(from.x, y, from.z, to.x, y, to.z, box)) {
         return { ok: false, reason: `壁を抜けた (${box.name})` }
       }

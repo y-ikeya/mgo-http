@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { Water } from '../../../domain/match/stage'
 
 /**
  * 投げた物。
@@ -86,6 +87,32 @@ export interface Impact {
   strength: number
   /** 他人が投げたものか */
   remote: boolean
+}
+
+/** 水面を跨いだ所。跨がないなら null */
+const CROSSING = { at: new THREE.Vector3(), distance: 0 }
+
+/**
+ * 進む線分が水面を上から下へ跨ぐか。跨ぐならその点と、そこまでの距離。
+ *
+ * 使い回しの入れ物を返す。1 刻みで 1 度しか呼ばないので、持ち帰る前に
+ * 次の呼び出しが来ることはない。
+ */
+function waterCrossing(
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  water: Water | null,
+): { at: THREE.Vector3; distance: number } | null {
+  if (!water) return null
+  if (to.y >= water.y || from.y < water.y) return null
+  const t = (water.y - from.y) / (to.y - from.y)
+  const x = from.x + (to.x - from.x) * t
+  const z = from.z + (to.z - from.z) * t
+  // 水面は堀の中だけ。外へ落ちたなら地面が受け止める
+  if (Math.abs(x) >= water.half || Math.abs(z) >= water.half) return null
+  CROSSING.at.set(x, water.y, z)
+  CROSSING.distance = from.distanceTo(CROSSING.at)
+  return CROSSING
 }
 
 export class ThrownItems {
@@ -188,6 +215,7 @@ export class ThrownItems {
   update(
     dt: number,
     collidables: readonly THREE.Object3D[],
+    water: Water | null,
     onImpact: (impact: Impact) => void,
   ): void {
     // 消える処理だけは実時間で進める。見た目の話なので刻みを揃える必要がない
@@ -207,7 +235,7 @@ export class ThrownItems {
     while (this.accumulator >= FIXED_STEP) {
       this.accumulator -= FIXED_STEP
       for (const item of this.items) {
-        if (!item.resting) this.advance(item, collidables, onImpact)
+        if (!item.resting) this.advance(item, collidables, water, onImpact)
       }
     }
   }
@@ -216,6 +244,7 @@ export class ThrownItems {
   private advance(
     item: Item,
     collidables: readonly THREE.Object3D[],
+    water: Water | null,
     onImpact: (impact: Impact) => void,
   ): void {
     item.velocity.y -= GRAVITY * FIXED_STEP
@@ -230,6 +259,27 @@ export class ThrownItems {
     this.raycaster.set(item.mesh.position, this.step)
     this.raycaster.far = distance
     const hit = this.raycaster.intersectObjects(collidables as THREE.Object3D[], false)[0]
+
+    /*
+     * 水面。**跳ねずに沈む。**
+     *
+     * 手榴弾と同じ (sim/judge/ballistic.ts の stepProjectile)。囮はそちらと別の
+     * 経路で動いている — 面を光線で探して跳ね返す — ので、水も別に見る。
+     *
+     * 面のほうが手前なら面が勝つ。水に張り出した足場の上に落ちたとき。
+     */
+    const surface = waterCrossing(item.mesh.position, this.next, water)
+    if (surface !== null && (!hit || surface.distance < hit.distance)) {
+      item.mesh.position.copy(surface.at)
+      this.impact.position.copy(surface.at)
+      // 水に入る強さ。落ちてきた速さがそのまま水しぶきの大きさになる
+      this.impact.strength = Math.min(Math.abs(item.velocity.y) / THROW_SPEED, 1)
+      this.impact.remote = item.remote
+      onImpact(this.impact)
+      this.sink(item)
+      return
+    }
+
     if (!hit) {
       item.mesh.position.copy(this.next)
       // 回りながら飛ぶ。落ちるまでの目印にしかならないので向きは適当でよい
@@ -263,6 +313,22 @@ export class ThrownItems {
     if (item.velocity.length() < REST_SPEED) this.rest(item)
   }
 
+  /**
+   * 水に入った。**沈んで見えなくなる。**
+   *
+   * 堀の底は水面のすぐ下にある (歩く床は水の下の地面のまま) ので、沈めても
+   * 頭が出る。水は不透明なので、本来なら水中の物は見えない。ここで隠す。
+   *
+   * 止まった扱いにして、鳴らす音も止める — 水の底から音が鳴ると、**そこが
+   * 床に聞こえる**。囮は音でおびき寄せる物なので、鳴る場所が嘘になるのは困る。
+   */
+  private sink(item: Item): void {
+    item.velocity.set(0, 0, 0)
+    item.resting = true
+    item.age = 0
+    item.mesh.visible = false
+  }
+
   private rest(item: Item): void {
     item.velocity.set(0, 0, 0)
     item.resting = true
@@ -294,6 +360,7 @@ export class ThrownItems {
     origin: THREE.Vector3,
     direction: THREE.Vector3,
     collidables: readonly THREE.Object3D[],
+    water: Water | null,
   ): void {
     this.cursor.copy(origin).addScaledVector(direction, RELEASE_FORWARD)
     this.previewVelocity.copy(direction).multiplyScalar(THROW_SPEED)
@@ -316,6 +383,14 @@ export class ThrownItems {
       this.raycaster.set(this.cursor, this.step)
       this.raycaster.far = distance
       const hit = this.raycaster.intersectObjects(collidables as THREE.Object3D[], false)[0]
+
+      // 水に落ちるならそこで終わり。**沈むので跳ねた先は無い**
+      const surface = waterCrossing(this.cursor, this.next, water)
+      if (surface !== null && (!hit || surface.distance < hit.distance)) {
+        this.cursor.copy(surface.at)
+        break
+      }
+
       if (!hit) {
         this.cursor.copy(this.next)
         continue

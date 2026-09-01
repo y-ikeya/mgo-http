@@ -2,6 +2,7 @@ import * as THREE from 'three'
 
 import { loadCasing } from '../assets'
 import { FIXED_STEP, stepProjectile, type Projectile } from '../../../sim/judge/ballistic'
+import type { Water } from '../../../domain/match/stage'
 import type { StageBox } from '../../../sim/space/vision'
 
 /**
@@ -101,18 +102,31 @@ export class Casings {
    * @param onDrop 最初に地面へ当たったときに 1 回だけ呼ぶ。
    *   音を鳴らすのは呼び出し側の仕事
    */
-  update(dt: number, boxes: StageBox[], onDrop: (at: THREE.Vector3) => void): void {
+  /**
+   * @param onDrop 最初に落ちた所。**true を返すと沈めて消す** (水に落ちた場合)
+   */
+  update(
+    dt: number,
+    boxes: StageBox[],
+    water: Water | null,
+    onDrop: (at: THREE.Vector3) => boolean,
+  ): void {
     // 刻みは固定。手榴弾と同じ式なので、そこだけ揃えておく
     this.accumulator = Math.min(this.accumulator + dt, 0.25)
     while (this.accumulator >= FIXED_STEP) {
       this.accumulator -= FIXED_STEP
       for (const shell of this.shells) {
         if (!shell.live || shell.body.resting) continue
-        stepProjectile(shell.body, boxes, TUNING)
+        stepProjectile(shell.body, boxes, TUNING, water)
         // 最初に当たった 1 回だけ。跳ねるたびに鳴らすと鳴りっぱなしになる
         if (!shell.dropped && shell.body.bounces > 0) {
           shell.dropped = true
-          onDrop(this.drop.set(shell.body.x, shell.body.y, shell.body.z))
+          const sank = onDrop(this.drop.set(shell.body.x, shell.body.y, shell.body.z))
+          // 水に落ちた。**転がらずに消える** — 水面の下に薬莢が溜まらない
+          if (sank) {
+            shell.live = false
+            shell.mesh.visible = false
+          }
         }
       }
     }

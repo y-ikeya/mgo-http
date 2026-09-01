@@ -93,7 +93,7 @@
 
 .room-enter {
   display: grid;
-  grid-template-columns: 5.5em 6.8em 3.6em 1fr 6em 4.5em 3.4em;
+  grid-template-columns: 5.5em 6.8em 3.6em 1fr 6em 4.5em 3.4em 5.5em;
   align-items: center;
   gap: 14px;
   width: 100%;
@@ -237,7 +237,7 @@
 
 @media (max-width: 560px) {
   .room-enter {
-    grid-template-columns: 4.5em 6.8em 3.4em 1fr;
+    grid-template-columns: 4.5em 6.8em 3.4em 1fr 5.5em;
     row-gap: 6px;
   }
   .room-phase, .room-score, .room-time {
@@ -258,4 +258,19 @@
 /* まだ開けていない部屋。**一覧には出す** — 何を作れば開くかが見える */
 .room-shut {
   opacity: 0.45;
+}
+
+/*
+ * 部屋の覚え書き。**ルールの隣に小さく。**
+ *
+ * 名前とルールが主で、これは添え物。目立たせると、書いてある部屋と
+ * 書いていない部屋で行の重さが変わってしまう。
+ */
+.room-note {
+  justify-self: end;
+  text-align: right;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: rgba(190, 206, 176, 0.55);
+  white-space: nowrap;
 }

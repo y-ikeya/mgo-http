@@ -177,7 +177,14 @@ const SOUNDS = {
    * 「近くで撃っている」と伝わってほしい音でもある。副武器で撃つのは
    * 詰められたときか、主武器を撃ち切ったときなので、そこは近い戦いになる。
    */
-  pistol: { file: "pistol_shot1.mp3", reference: 5, max: weaponOf("pistol").noiseRange },
+  m9: { file: "m9.mp3", reference: 5, max: weaponOf("m9").noiseRange },
+  /**
+   * M1911 の発砲音。**M9 が麻酔になったので分けた。**
+   *
+   * 音そのものは元の拳銃の物 (pistol_shot1.mp3)。麻酔は消音されていて別の
+   * 音を持っているので、**同じ「拳銃の音」で括れなくなった**。
+   */
+  m1911: { file: "pistol_shot1.mp3", reference: 5, max: weaponOf("m1911").noiseRange },
   /**
    * 拳銃のリロード。
    *
@@ -190,6 +197,8 @@ const SOUNDS = {
    * 伝わる程度に留める。
    */
   pistolReload: { file: "pistol_reload1.mp3", reference: 2, max: 24 },
+  /** M1911 のリロード。M9 とは別の音を持っている */
+  m1911Reload: { file: "m1911_reload.mp3", reference: 2, max: 24 },
   /**
    * 薬莢が落ちた音。
    *
