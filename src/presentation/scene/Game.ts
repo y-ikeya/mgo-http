@@ -106,7 +106,7 @@ import {
   type ServerMessage,
   type Team,
 } from "../../application/protocol/types";
-import { MAX_STAMINA } from "../../domain/player/stamina";
+import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 export interface GameStats {
@@ -246,10 +246,10 @@ export interface GameStats {
   /** 自分の体力 */
   health: number;
   /**
-   * スタミナ。**麻酔でだけ減り、眠って戻る** (domain/player/stamina.ts)。
+   * 視界の曇り (0..1)。**スタミナが減るほど濃い。**
    *
-   * 満タンなら出さない — 減っていないゲージは画面を埋めるだけの飾りで、
-   * 「いま何かが起きている」を伝えられない。
+   * 残りの数字ではなく効き目を渡す。画面は棒を出さずに曇るだけなので、
+   * 数字を持たせても使い道が無い (domain/player/stamina.ts の staminaBlur)。
    */
   stamina: number;
   /** 眠っているか。眠っている間は操作を受け付けない */
@@ -1176,7 +1176,18 @@ export class Game {
      * しない**という、どこにも無い見え方になっていた。
      */
     const [swayRight, swayUp] = this.spread.sway(this.weapon, this.skills, posture);
-    this.follow.setSway((swayUp * Math.PI) / 180, (-swayRight * Math.PI) / 180);
+    /*
+     * **麻酔を受けているほど手が泳ぐ。**
+     *
+     * スタミナの残りを画面の棒で出していたが、撃ち合いの最中に読む人は
+     * 居なかった。狙いが定まらないことで分かるほうが早いし、そのまま
+     * 不利にもなっている (domain/player/stamina.ts)。
+     */
+    const drowsy = staminaSwayScale(this.stamina);
+    this.follow.setSway(
+      (swayUp * drowsy * Math.PI) / 180,
+      (-swayRight * drowsy * Math.PI) / 180,
+    );
     // 反動の戻りも極めた銃ほど速い。**押しっぱなしの間は効かない** —
     // 戻り始めるまでの猶予より発射間隔のほうが短いので (skill.ts)
     this.follow.setRecoilRecovery(masteryRecoveryScale(this.skills, this.weapon.id));
@@ -3546,7 +3557,8 @@ export class Game {
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
       scores: this.replica.match?.players ?? [],
-      stamina: this.stamina,
+      // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
+      stamina: staminaBlur(this.stamina),
       asleep: this.player.sleeping,
       sleepDepth: this.player.sleepDepth,
       health: this.player.health,

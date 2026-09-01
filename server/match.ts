@@ -21,7 +21,7 @@ import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
-import { recordPose, relayState, sendHealth } from './relay'
+import { recordPose, relayState, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
 import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, setLife } from './world'
@@ -291,6 +291,8 @@ export function resetPlayers(room: RoomWorld): void {
  */
 export function spawn(room: RoomWorld, player: Player, now = Date.now()): void {
   refill(player)
+  // **眠りも醒める。** 知らせないと、湧いた本人の画面が暗いまま
+  sendStamina(player)
   setLife(room, player, 'spawning', now)
   broadcast(room, { type: 'respawn', id: player.id })
   sendHealth(room, player, 0, false)

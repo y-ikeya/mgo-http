@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_STAMINA, SLEEP_SECONDS, drainStamina, isAsleep, sleepLeft } from './stamina'
+import {
+  MAX_STAMINA, SLEEP_SECONDS, STAMINA_RECOVER_DELAY,
+  drainStamina, isAsleep, recoverStamina, sleepLeft, staminaBlur, staminaSwayScale,
+} from './stamina'
 import { WEAPONS } from '../item/weapons'
 
 /**
@@ -50,9 +53,25 @@ describe('麻酔で眠るまで', () => {
     expect(drain).toEqual({ stamina: MAX_STAMINA, slept: false })
   })
 
-  test('時間では戻らない。**戻るのは眠って起きたときだけ**', () => {
-    // 回復の関数を持たない、というのがそのまま規則
-    expect(Object.keys({ drainStamina, isAsleep, sleepLeft })).not.toContain('recoverStamina')
+  test('**屈んで待った分だけ戻る。** 立っていても歩いていても戻らない', () => {
+    const hurt = MAX_STAMINA - WEAPONS.m9.zone.BODY
+    // 屈んだ直後はまだ戻らない。留まる時間そのものが代償
+    expect(recoverStamina(hurt, 0, 1)).toBe(hurt)
+    expect(recoverStamina(hurt, STAMINA_RECOVER_DELAY - 0.01, 1)).toBe(hurt)
+    // 待てば戻る
+    expect(recoverStamina(hurt, STAMINA_RECOVER_DELAY, 1)).toBeGreaterThan(hurt)
+  })
+
+  test('**胴 1 発を取り戻すのに 5 秒。** 屈んでいる間は撃ち合いに出られない', () => {
+    let stamina = MAX_STAMINA - WEAPONS.m9.zone.BODY
+    for (let i = 0; i < 5 * 60; i++) {
+      stamina = recoverStamina(stamina, STAMINA_RECOVER_DELAY + i / 60, 1 / 60)
+    }
+    expect(stamina).toBeCloseTo(MAX_STAMINA, 1)
+  })
+
+  test('満タンを超えない', () => {
+    expect(recoverStamina(MAX_STAMINA, 99, 10)).toBe(MAX_STAMINA)
   })
 })
 
@@ -69,5 +88,35 @@ describe('眠っている間', () => {
     const until = now + SLEEP_SECONDS * 1000
     expect(sleepLeft(until, now)).toBe(SLEEP_SECONDS)
     expect(sleepLeft(until, now + SLEEP_SECONDS * 1000)).toBe(0)
+  })
+})
+
+
+/**
+ * 減ったスタミナの効き目。**読ませるのではなく効かせる。**
+ *
+ * 目盛りを出していたが、撃ち合いの最中に読む人は居なかった。狙いが定まらない
+ * ことで分かるほうが早く、そのまま不利にもなっている。
+ */
+describe('スタミナの効き目', () => {
+  test('満タンなら何も起きない', () => {
+    expect(staminaSwayScale(MAX_STAMINA)).toBe(1)
+    expect(staminaBlur(MAX_STAMINA)).toBe(0)
+  })
+
+  test('**減るほど手が泳ぐ。** 1 発ではまだ撃てる', () => {
+    const one = staminaSwayScale(MAX_STAMINA - WEAPONS.m9.zone.BODY)
+    const three = staminaSwayScale(MAX_STAMINA - WEAPONS.m9.zone.BODY * 3)
+    expect(one).toBeCloseTo(1.4, 1)
+    expect(three).toBeCloseTo(2.2, 1)
+    expect(three).toBeGreaterThan(one)
+  })
+
+  test('**曇りは効き始めが遅い。** 手ブレより後から気づく', () => {
+    const one = MAX_STAMINA - WEAPONS.m9.zone.BODY
+    // 1 発では 6%。手ブレ (40% 増) より目立たない
+    expect(staminaBlur(one)).toBeLessThan(0.1)
+    // 眠る一歩手前で一番濃い
+    expect(staminaBlur(WEAPONS.m9.zone.BODY)).toBeGreaterThan(0.5)
   })
 })
