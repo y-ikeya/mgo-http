@@ -103,8 +103,8 @@ const KNIFE: WeaponConfig = {
 const SNIPER: WeaponConfig = {
   grip: new THREE.Vector3(-0.02, 0.27, 0.11),
   rotation: new THREE.Euler(degrees(0), degrees(-10), degrees(-172)),
-  crouchGrip: new THREE.Vector3(-0.01, 0.3, 0.02),
-  crouchRotation: new THREE.Euler(degrees(-37), degrees(3), degrees(173)),
+  crouchGrip: new THREE.Vector3(-0.02, 0.265, 0.095),
+  crouchRotation: new THREE.Euler(degrees(-13), degrees(-6), degrees(173)),
   tip: new THREE.Vector3(0, 0.177, -0.845),
 }
 
