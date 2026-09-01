@@ -107,6 +107,29 @@ export interface CameraWorld {
 
 /** マウス感度 (rad / px) */
 const SENSITIVITY = 0.0022
+
+/**
+ * 覗いている間、見る速さを画角に合わせて落とす倍率。
+ *
+ * --- なぜ要るか ---
+ * 感度は長らく「構えているか」だけで決まる一定値だった。狙撃銃の 16 倍は
+ * 画角 4 度で、肩越し (38 度) の 1/15 しか画面に映らない。**同じマウスの
+ * 動きで狙いが 15 倍飛ぶ**ので、倍率を上げるほど狙いが置けなくなる。
+ * 遠くを見るために覗いているのに、覗くほど当てられない、が起きていた。
+ *
+ * 画面上で動く距離が同じになる比は、角度そのものではなく **tan の比**。
+ * 画角の端は tan(画角/2) の位置に映るので、そこを揃える。
+ *
+ * 肩越しを 1 とする。肩越しの画角は武器ごとに 38〜44 度と幅があるが、
+ * **1 を超えないよう頭を打たせて**あるので、覗いていない間の手触りは
+ * 今までと変わらない。変わるのは段を上げた後だけ。
+ */
+const LOOK_REFERENCE_FOV = AIM_VIEW.fov
+
+export function zoomLookScale(fov: number): number {
+  const half = (deg: number) => Math.tan((deg * Math.PI) / 360)
+  return Math.min(1, half(fov) / half(LOOK_REFERENCE_FOV))
+}
 /** 見下ろし / 見上げの限界 (rad)。見上げ側はカメラが地面に潜るので浅め */
 const MIN_PITCH = -1.1
 const MAX_PITCH = 0.55
@@ -204,7 +227,8 @@ export class FollowCamera {
 
   /** マウス移動量 (px) を向きに反映する */
   addLook(dx: number, dy: number): void {
-    const sensitivity = SENSITIVITY * (this.aiming ? AIM_SENSITIVITY_SCALE : 1)
+    const sensitivity =
+      SENSITIVITY * (this.aiming ? AIM_SENSITIVITY_SCALE * zoomLookScale(this.fov) : 1)
     this.yaw -= dx * sensitivity
     this.pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, this.pitch - dy * sensitivity))
   }

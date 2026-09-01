@@ -608,12 +608,70 @@ export class Player {
     this.animator?.setBoxed(false)
   }
 
+  /**
+   * 麻酔で眠っている残り時間 (秒)。0 なら起きている。
+   *
+   * 秒数を決めるのはサーバー (domain/player/stamina.ts の SLEEP_SECONDS)。
+   * こちらは知らせを受けて数えるだけ — **自分で起きられると麻酔が効かない**。
+   */
+  private sleepLeft = 0
+  /** 眠らされたときの長さ (秒)。残りを割合で出すのに要る */
+  private sleepSpan = 0
+
+  /** いま眠っているか。呼ぶ側が操作を止めるのに使う */
+  get sleeping(): boolean {
+    return this.sleepLeft > 0
+  }
+
+  /**
+   * 眠りの深さ。**1 が眠った瞬間、0 が起きた瞬間。**
+   *
+   * 画面の暗さがこれに従う。残り秒数を数字で出すより、**暗がりが引いていく**
+   * ほうが「もうすぐ起きる」が体で分かる — 数えている間は操作できないので、
+   * 読む物を増やしても仕方がない。
+   */
+  get sleepDepth(): number {
+    if (this.sleepSpan <= 0) return 0
+    return Math.max(0, Math.min(1, this.sleepLeft / this.sleepSpan))
+  }
+
+  /**
+   * 麻酔で眠らされた。**その場に倒れて動けない。**
+   *
+   * 箱も構えも解く。眠った体が箱を被ったままなのも、銃を構えたままなのも
+   * おかしい。倒れるのと違って**起きる**ので、持ち物は失わない。
+   */
+  sleep(seconds: number): void {
+    if (this.down || this.downed) return
+    this.sleepLeft = seconds
+    this.sleepSpan = seconds
+    this.dropBox()
+    this.crouching = false
+    this.aiming = false
+    // **姿勢の切り替えでは床に着かない。** 倒れる型と同じ道で流す
+    this.animator?.playSleep()
+  }
+
+  /** 眠りが明けた。**サーバーが決める** */
+  wake(): void {
+    this.sleepLeft = 0
+    this.sleepSpan = 0
+    this.animator?.wakeFromSleep()
+  }
+
   /** 箱が落ちて棒立ちになっている残り時間 (秒)。0 なら動ける */
   private bumpLeft = 0
 
   /** いま箱を落とされて固まっている最中か。呼ぶ側が操作を止めるのに使う */
   get bumping(): boolean {
-    return this.bumpLeft > 0
+    /*
+     * **眠っている間も同じ扱い。** 撃つ・刺す・転がる・敬礼は全部止まる。
+     *
+     * 別の名前で同じ条件を並べると、片方に足し忘れる (箱を落とされた直後の
+     * 条件は 4 か所ある)。**止まる理由が違っても、止まることは同じ**なので
+     * ここで 1 本にする。
+     */
+    return this.bumpLeft > 0 || this.sleepLeft > 0
   }
 
   /**
@@ -805,7 +863,7 @@ export class Player {
    */
   get reloadDuration(): number {
     if (!this.animator) return 0
-    if (this.weaponKind === 'pistol' && this.animator.pistolReloadDuration > 0) {
+    if (this.weaponKind === 'm9' && this.animator.pistolReloadDuration > 0) {
       return this.animator.pistolReloadDuration
     }
     return this.animator.reloadDuration
@@ -1474,6 +1532,7 @@ export class Player {
     // 箱を落とされた直後も同じ。**驚いている間は入力そのものを捨てる** —
     // 速さを 0 にするだけだと、体は動かないのに向きだけ入力どおりに変わる
     if (this.bumpLeft > 0) moveDir = ZERO_MOVE
+    if (this.sleepLeft > 0) moveDir = ZERO_MOVE
 
     /*
      * 伏せている間は**前へしか這えない。**
@@ -1537,6 +1596,11 @@ export class Player {
     // 箱を落とされた直後は動けない。**慣性も残さない** — 滑りながら驚くと、
     // 見つかったことが代償に見えない
     if (this.bumpLeft > 0) {
+      targetSpeed = 0
+      this.currentSpeed = 0
+    }
+    // 眠っている間は動かない。**慣性も残さない**
+    if (this.sleepLeft > 0) {
       targetSpeed = 0
       this.currentSpeed = 0
     }
@@ -1680,6 +1744,7 @@ export class Player {
     if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
+    if (this.sleepLeft > 0) this.sleepLeft -= dt
     // 繋ぎが終わったら次の段へ。起き上がりの先はしゃがみ
     if (this.proneShiftLeft > 0) {
       this.proneShiftLeft -= dt
@@ -1780,10 +1845,24 @@ export class Player {
       const saluting = this.animator.saluting
       // **表に聞く。** id を並べると、銃が増えたときにここだけ古くなる
       const gun = isGun(this.held)
+      /*
+       * 片手の銃は腰に納めておく。**構えるか、手を掛けている間だけ抜く。**
+       *
+       * 銃ごとの id で書いていた頃 ('m9' 決め打ち)、拳銃が 2 挺になった時点で
+       * **M1911 だけ抜きっぱなし**になった。片手かどうかは持ち物の表が
+       * 知っている (domain/item/held.ts) ので、そちらに聞く。
+       *
+       * 遊底を操作している間も抜く。**麻酔銃に遊底を足した途端**、納めたまま
+       * 見えない銃を操作する絵になった — リロードと同じ理屈で、手が銃に
+       * 掛かっている間は見えていないとおかしい。
+       */
       const holstered =
         !gun ||
         saluting ||
-        (this.weaponKind === 'pistol' && !this.aiming && !this.animator.reloading)
+        (!isTwoHanded(this.held) &&
+          !this.aiming &&
+          !this.animator.reloading &&
+          !this.animator.bolting)
       // ナイフは持ち替えて出す。刺突中の一瞬だけではなくなった
       const knifeOut = (this.held === 'knife' || this.knifePreview) && !saluting && !this.boxed
       if (this.knife) this.knife.visible = knifeOut
@@ -2007,6 +2086,7 @@ export class Player {
       downed: this.downed,
       standingUp: this.standing,
       bumped: this.bumpLeft,
+      asleep: this.sleepLeft > 0,
       prone: this.proneStage === 'prone',
       proneShift: this.proneShifting,
       stabbing: this.stabbing,

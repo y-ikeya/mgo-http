@@ -135,6 +135,17 @@
   color: #ff8a72;
 }
 
+/*
+ * 麻酔が当たった。**赤ではなく青。**
+ *
+ * 赤は「体力を削った」の色。麻酔は削らないので、同じ色で出すと倒しに行けて
+ * いるのか眠らせに行けているのかが読めない。スタミナの目盛りと同じ青にして、
+ * **同じ手の話だと色で繋げる**。
+ */
+.hud-hit-tranq {
+  color: #7fc4ff;
+}
+
 /* --- ポインタロック待ち --- */
 
 /* 接続人数。1 人以上いるときだけ色を変えて、対戦中だと分かるようにする */
@@ -990,4 +1001,94 @@
 
 .hud-match-solo .hud-mode {
   grid-column: 1 / -1;
+}
+
+
+/*
+ * スタミナ。**麻酔を受けたときだけ出る。**
+ *
+ * 体力 (hud-damage の赤み) と場所を分けてある。同じ所に置くと、どちらが
+ * 減ったのか一瞬読めない — 片方は死に、片方は眠りで、取る手が違う。
+ */
+.hud-stamina {
+  position: absolute;
+  left: 50%;
+  bottom: 13%;
+  transform: translateX(-50%);
+  width: 148px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hud-stamina-bar {
+  height: 100%;
+  /* 青。体力の赤と取り違えないように、色から別物にする */
+  background: linear-gradient(90deg, #4d8fd6, #7fc4ff);
+  transition: width 0.18s ease-out;
+}
+
+/*
+ * 眠っている間。**隅から黒く落ちて、時間で引いていく。**
+ *
+ * 残り秒数を数字で出さない。眠っている間は何も操作できないので、読む物を
+ * 増やしても仕方がない。**暗がりが引いていく**ほうが「もうすぐ起きる」が
+ * 体で分かるし、目が覚めていく感じそのものになる。
+ *
+ * 真っ暗にはしない。**倒されたのとは違う** — 体はまだ戦場に在って、周りで
+ * 何が起きているかは薄く見えている。撃たれて死ぬなら、それが見えたほうがいい。
+ */
+.hud-asleep {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  /*
+   * --sleep-open が「見えている円の半径」。深いほど小さい (Hud.tsx)。
+   * 縁をぼかすために、透明から黒へ 2 段で渡す。
+   */
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent 0%,
+    transparent var(--sleep-open, 100%),
+    rgba(2, 5, 12, 0.94) 100%
+  );
+  transition: background 0.25s linear;
+}
+
+.hud-asleep-word {
+  font-size: clamp(28px, 5vw, 54px);
+  letter-spacing: 0.32em;
+  color: #9fc4ea;
+  /* 眠りは静か。点滅させると気絶ではなく警報に見える。醒めるほど薄れる */
+  transition: opacity 0.25s linear;
+}
+
+
+/*
+ * --- 銃の色分け ---
+ *
+ * **殺傷は今までの青灰、麻酔は青。** 装備画面の札と同じ考え方で、名前を
+ * 読まなくても人を殺す物かどうかが分かる。
+ *
+ * ここで殺傷を赤にしないのは、**弾切れの赤と喧嘩する**から (hud-weapon-empty)。
+ * 撃てない状態を示す赤と、殺傷であることを示す赤が同じカードに乗ると、
+ * 数字を見るまでどちらか分からない。**変えるのは例外のほうだけ**にする。
+ */
+.hud-weapon-tranq {
+  border-color: rgba(127, 196, 255, 0.6);
+}
+
+.hud-weapon-tranq .hud-weapon-name {
+  color: #a8d8ff;
+}
+
+.hud-browse-item-tranq {
+  border-color: rgba(127, 196, 255, 0.34);
+}
+
+.hud-browse-item-tranq .hud-browse-name {
+  color: rgba(168, 216, 255, 0.8);
 }

@@ -79,7 +79,7 @@ describe('撃てるか', () => {
   }
 
   function make(): Inventory {
-    return new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' })
+    return new Inventory({ primary: 'rifle', secondary: 'm9', support: 'grenade' })
   }
 
   /** 持ち替えが終わるまで進める (SWITCH_TIME は 0.3 秒)。引き金は離したまま */
@@ -133,23 +133,23 @@ describe('撃てるか', () => {
   /** **持ち替えている最中も撃てない。** そこが投げると決めた代償になる */
   test('持ち替えの最中は撃てない', () => {
     const inv = make()
-    inv.switchTo('pistol')
-    expect(inv.canShoot(WEAPONS.pistol, ready)).toBe(false)
+    inv.switchTo('m9')
+    expect(inv.canShoot(WEAPONS.m9, ready)).toBe(false)
   })
 
   /** 単発の銃。**押しっぱなしでは 1 発** */
   test('M9 は押しっぱなしでは 1 発しか撃てない', () => {
     const inv = make()
-    inv.switchTo('pistol')
+    inv.switchTo('m9')
     settle(inv)
-    expect(inv.canShoot(WEAPONS.pistol, ready)).toBe(true)
+    expect(inv.canShoot(WEAPONS.m9, ready)).toBe(true)
 
-    inv.fired(WEAPONS.pistol)
+    inv.fired(WEAPONS.m9)
     inv.update(0.016, true) // 押したまま
-    expect(inv.canShoot(WEAPONS.pistol, ready)).toBe(false)
+    expect(inv.canShoot(WEAPONS.m9, ready)).toBe(false)
 
     inv.update(0.016, false) // 離す
-    expect(inv.canShoot(WEAPONS.pistol, ready)).toBe(true)
+    expect(inv.canShoot(WEAPONS.m9, ready)).toBe(true)
   })
 
   /** AK47 は押しっぱなしで撃ち続けられる。間隔で塞ぐのは presentation */
@@ -165,7 +165,7 @@ describe('撃てるか', () => {
 /** ナイフ。**表を持たない物も同じ引き金に乗る** */
 describe('押した瞬間だけ効く物', () => {
   test('押しっぱなしでは 1 回だけ', () => {
-    const inv = new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' })
+    const inv = new Inventory({ primary: 'rifle', secondary: 'm9', support: 'grenade' })
     expect(inv.pressedOnce).toBe(true)
     inv.consumePress()
     inv.update(0.016, true)

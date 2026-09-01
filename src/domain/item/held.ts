@@ -23,7 +23,7 @@
  */
 
 /** 撃てる物 */
-export type GunId = 'smg' | 'rifle' | 'sniper' | 'pistol' | 'shotgun'
+export type GunId = 'smg' | 'rifle' | 'sniper' | 'm9' | 'm1911' | 'shotgun'
 
 /** 投げる物・置く物。support の枠に入る */
 export type ThrowId = 'grenade' | 'claymore' | 'magazine'
@@ -112,7 +112,8 @@ export const HELD: Record<HeldId, HeldSpec> = {
   rifle: { id: 'rifle', label: 'AK47', family: 'weapon', slot: 'primary', weight: 3.5, shoots: true, twoHanded: true },
   sniper: { id: 'sniper', label: 'XM2010', family: 'weapon', slot: 'primary', weight: 5.5, shoots: true, twoHanded: true },
   shotgun: { id: 'shotgun', label: 'M870', family: 'weapon', slot: 'primary', weight: 3.6, shoots: true, twoHanded: true },
-  pistol: { id: 'pistol', label: 'M9', family: 'weapon', slot: 'secondary', weight: 0.95, shoots: true, twoHanded: false },
+  m9: { id: 'm9', label: 'M9', family: 'weapon', slot: 'secondary', weight: 0.95, shoots: true, twoHanded: false },
+  m1911: { id: 'm1911', label: 'M1911', family: 'weapon', slot: 'secondary', weight: 1.05, shoots: true, twoHanded: false },
 
   // 投げる物は軽い。**持ち替えると速くなる**のがそのまま戦い方になる
   grenade: { id: 'grenade', label: 'GRENADE', family: 'weapon', slot: 'support', weight: 0.4, shoots: false, twoHanded: false },
@@ -271,7 +272,14 @@ export function dropFrom(carried: Carried[], id: HeldId): Carried | null {
  */
 export interface Loadout {
   primary: GunId
-  secondary: GunId
+  /**
+   * 副武器。**null なら持たない。**
+   *
+   * 部屋が外すことがある (domain/match/room.ts の secondary)。狙撃銃だけの
+   * 部屋で拳銃まで取り上げると、詰められた時に**ナイフしか残らない** —
+   * 間合いを詰める側と詰められる側の読み合いが、そこで初めて成立する。
+   */
+  secondary: GunId | null
   support: 'grenade' | 'claymore'
 }
 
@@ -291,9 +299,13 @@ export const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
  * 湧いた時点では持っていない。
  */
 export function buildCarried(loadout: Loadout, ammoOf: (id: GunId) => { ammo: number; reserve: number }): Carried[] {
+  const secondary: Carried[] =
+    loadout.secondary === null
+      ? []
+      : [{ id: loadout.secondary, ...ammoOf(loadout.secondary) }]
   return [
     { id: loadout.primary, ...ammoOf(loadout.primary) },
-    { id: loadout.secondary, ...ammoOf(loadout.secondary) },
+    ...secondary,
     { id: loadout.support, count: SUPPORT_COUNT[loadout.support] },
     { id: 'knife' },
     { id: 'box' },

@@ -179,3 +179,52 @@ describe('伏せている相手の高さ', () => {
     expect(verdict.ok).toBe(true)
   })
 })
+
+
+/**
+ * 低い遮蔽を越えた弾。**弧で見ないと弾かれる。**
+ *
+ * 麻酔銃は頭 1 発で眠らせるので、遠くから狙う手が成立する。弾が遅くて上へ
+ * 大きく膨らむのに直線で検算すると、**越えて届いた射撃を「壁の裏」と弾く** —
+ * 当てたのに何も起きず、しかも撃った側には理由が分からない。
+ *
+ * 撃つ側と相手の間に、目の高さより少しだけ高い壁を 1 枚置いて見る。
+ */
+describe('低い遮蔽を越えた弾', () => {
+  /** 撃つ側と相手の真ん中に立つ壁。**目の高さより 40cm 高い** */
+  const WALL: StageBox[] = [
+    {
+      name: 'wall',
+      min: [-4, 0, -0.3],
+      max: [4, 1.9, 0.3],
+      flags: { draw: true, player: true, bullet: true, eye: true, camera: true },
+    },
+  ]
+
+  /** 20m 離れて頭を撃つ。sag は「弦からどれだけ上へ膨らんだか」 */
+  function shoot(sag: number) {
+    return verifyHit(
+      history([0, -10], 'stand'),
+      history([0, 10], 'stand'),
+      { kind: 'bullet', zone: 'HEAD', distance: 20, sag },
+      WALL,
+      WINDOW,
+      RULES,
+    )
+  }
+
+  test('直線では通らない。**弦が壁に当たる**', () => {
+    expect(shoot(0).ok).toBe(false)
+  })
+
+  test('速い銃も通らない。膨らみが小さすぎて越えられない', () => {
+    // AK47 が 80m 撃って 4.5cm。壁を越える高さではない
+    expect(shoot(0.045).ok).toBe(false)
+  })
+
+  test('**膨らめば越える。** 麻酔銃はここで成立する', () => {
+    // 20m で 3.5cm しか膨らまないので、これは「もっと遠くから撃った」想定の値。
+    // 見たいのは幾何であって、麻酔銃の実際の数字ではない
+    expect(shoot(1.2).ok).toBe(true)
+  })
+})

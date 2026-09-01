@@ -27,8 +27,113 @@ KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_')
 FLAG_WORDS = ('nodraw', 'noplayer', 'nobullet', 'noeye', 'nocamera')
 
 
-def flags_of(name):
+# 触れる物の名前に入る語。**これが入っていなければ飾り。**
+#
+# 庭園を入れたときに要った。植え込みの葉が 1 枚ずつ判定を持っていて、草むらが
+# 壁になっていた。名前を 2600 個付け直すより、**触れる物のほうを名指しする**
+# ほうが少ない — 建物と地面は polySurface、それ以外は札で分かる。
+#
+# 札 (concrete_ / wood_ …) が付いていれば、この一覧に無くても触れる。
+# rail は手すり。**細くて頂点が多い**ので、名前が無いと飾りの側に落ちる
+# (縦の柵が弾も人も通していた)。手すりは寄りかかれる物なので触れる側に置く。
+SOLID_WORDS = ('polysurface', 'stair', 'wall', 'base', 'floor', 'ground', 'rail')
+
+def is_stair(name):
+    return 'stair' in name.lower()
+
+
+# 階段を何本の帯に割って上端を拾うか
+STAIR_BINS = 12
+
+
+def stair_plane(pts, lo, hi):
+    """段を追う坂を作る。**平らさは見ない。**
+
+    階段の天面は段ごとに水平で、高さが揃っていない。平面に乗るかを見ると必ず
+    外れて、**高さ 2m の壁**になる (庭園の階段が登れなかった)。飾りの多い
+    モデルだと上向きの面が 2 万枚あって、そもそも「1 枚の天面」が無い。
+
+    進む向きに帯を切って、帯ごとの一番高い所を拾い、そこへ直線を通す。
+    段の角を結んだ線がそのまま歩く面になる。
+
+    見た目は段のまま。**足だけが坂を登る** — 段差 0.25m 以下を勝手に上がる
+    仕掛け (moving.ts の STEP_UP) と同じで、絵と足取りは元から一致していない。
+    """
+    span_x = hi[0] - lo[0]
+    span_z = hi[2] - lo[2]
+    axis = 0 if span_x >= span_z else 2
+    span = span_x if axis == 0 else span_z
+    if span < 0.5:
+        return None
+
+    # 帯ごとの上端
+    tops = {}
+    for x, y, z in pts:
+        i = min(STAIR_BINS - 1, int((( x if axis == 0 else z) - lo[axis]) / span * STAIR_BINS))
+        tops[i] = max(tops.get(i, -1e9), y)
+    if len(tops) < 3:
+        return None
+
+    # 最小二乗で直線を通す
+    n = len(tops)
+    cs = [lo[axis] + (i + 0.5) / STAIR_BINS * span for i in tops]
+    ys = list(tops.values())
+    mean_c = sum(cs) / n
+    mean_y = sum(ys) / n
+    denom = sum((c - mean_c) ** 2 for c in cs)
+    if denom < 1e-9:
+        return None
+    grad = sum((c - mean_c) * (y - mean_y) for c, y in zip(cs, ys)) / denom
+    if abs(grad) < 0.05:
+        return None
+
+    h = mean_y + grad * (lo[axis] - mean_c)
+    return {
+        'h': round(h, 4),
+        'dx': round(grad if axis == 0 else 0.0, 5),
+        'dz': round(0.0 if axis == 0 else grad, 5),
+    }
+
+
+# 名前で飾りと分かる物。**細かさに関わらず素通り。**
+#
+# 庭園の草木がこれ。pCube は元のモデルの作り手が植え込みに付けた名前で、
+# 頂点の数は物によって違う (低い草は数百しか無い)。細かさだけで分けると
+# 半分が壁に残る。
+DECORATION_WORDS = ('pcube',)
+
+# 飾りと見なす細かさ (頂点)。**箱は飾りにしない。**
+#
+# 名前だけで決めると、札を付けていない普通の壁まで素通りになる (モールの箱が
+# 全部そうなった)。葉や植え込みは頂点が数千あるので、そこで分ける。
+DECORATION_MIN_VERTS = 2_000
+
+
+def is_decoration(obj):
+    """飾りか。**触れる物の名前でも札でも無く、かつ細かい**物だけ"""
+    lower = obj.name.lower()
+    # **書いてある宣言が勝つ。** noplayer などを名前に書いた物を勝手に変えない
+    # (モールの手すりが「弾は止める」と書いてあるのに素通りになった)
+    if any(word in lower for word in FLAG_WORDS):
+        return False
+    if any(tag in lower for tag in KNOWN_TAGS):
+        return False
+    if any(word in lower for word in SOLID_WORDS):
+        return False
+    if any(word in lower for word in DECORATION_WORDS):
+        return True
+    return len(obj.data.vertices) >= DECORATION_MIN_VERTS
+
+
+def flags_of(obj):
+    name = obj.name
     flags = {'draw': True, 'player': True, 'bullet': True, 'eye': True, 'camera': True}
+    # 飾り。**素通りできる** — vis_ を手で付けたのと同じ扱い
+    if is_decoration(obj):
+        flags['player'] = False
+        flags['bullet'] = False
+        flags['camera'] = False
+        flags['eye'] = False
     # 旧: 判定だけ (見えない)。見えない物が視線を止めるのはおかしいので eye を外す
     if 'col_' in name:
         flags['draw'] = False
@@ -245,7 +350,19 @@ def top_plane(obj, lo, hi):
             rhs[r] -= f * rhs[col]
     a, b, c = (rhs[i] / m[i][i] for i in range(3))
 
-    # 選んだ面が本当に平らか
+    # 選んだ面が本当に平らか。
+    #
+    # **階段だけは段のままで受ける。** 段の天面は水平で、高さが段ごとに違う。
+    # 平らさを見ると必ず外れるので、坂が付かず**高さ 2m の壁**になっていた
+    # (庭園の階段が登れなかった)。段の真ん中を通る平面がそのまま歩く面になる
+    # ので、許す幅を段 1 つぶんまで広げる。
+    #
+    # 見た目は段のまま。**足だけが坂を登る** — 段差 0.25m 以下を勝手に上がる
+    # 仕掛け (moving.ts の STEP_UP) と同じで、絵と足取りは元から一致していない。
+    # 階段は平らさを見ない。**段を追う坂**を別に作る
+    if is_stair(obj.name):
+        return stair_plane(pts, lo, hi) or flat
+
     worst = max(abs(p[1] - (a + b * p[0] + c * p[2])) for p in pts)
     if worst > 0.05:
         return flat
@@ -280,7 +397,7 @@ for obj in bpy.context.scene.objects:
         'min': [round(v, 3) for v in lo],
         'max': [round(v, 3) for v in hi],
         'top': top,
-        'flags': flags_of(obj.name),
+        'flags': flags_of(obj),
     })
 
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
@@ -344,6 +461,99 @@ for obj in bpy.context.scene.objects:
     reproject(obj)
     reprojected += 1
 print(f'  UV を張り直した: {reprojected} 個 (1 タイル = {TEXEL}m)')
+
+# --- 形を間引く -----------------------------------------------------------
+#
+# **配れる大きさに収める。** 頂点 1 つがおよそ 32 バイトなので、そのまま出すと
+# 庭園は 688 万頂点 = 235MB になった (モールは 15 万頂点 = 9.3MB)。読み込みで
+# 数分待たされるし、Pages にも載らない。
+#
+# 予算を決めて、**越えた分だけ**縮める。箱しか無いステージは予算に届かないので
+# 素通りする — 訓練場もモールもこれまでと同じ物が出る。
+#
+# 細かい物だけを対象にする。板 (8 頂点) を間引くと角が落ちて、壁が壁でなくなる。
+VERTEX_BUDGET = 400_000
+DECIMATE_MIN_VERTS = 2_000
+
+# **数えるのは形のデータ。置いてある数ではない。**
+#
+# 同じ形を 160 本置いていても、書き出しに乗る形は 1 つ。物ごとに数えていた頃は
+# 共有していても「160 本ぶん重い」と読んで間引きを掛けていた。
+#
+# **間引きは共有を壊す。** 修飾子は物ごとに付くので、同じ形を指していても
+# 書き出しの評価結果は物ごとに別になり、まとめられなくなる。共有できている物に
+# 間引きを掛けると、軽くするつもりで**逆に重くなる**。
+dense_data = {
+    obj.data.name: obj.data
+    for obj in bpy.context.scene.objects
+    if obj.type == 'MESH' and obj.select_get() and len(obj.data.vertices) >= DECIMATE_MIN_VERTS
+}
+dense_verts = sum(len(mesh.vertices) for mesh in dense_data.values())
+placed = sum(
+    1 for obj in bpy.context.scene.objects
+    if obj.type == 'MESH' and obj.select_get() and obj.data.name in dense_data
+)
+if dense_verts > VERTEX_BUDGET:
+    ratio = VERTEX_BUDGET / dense_verts
+    dense = [
+        obj for obj in bpy.context.scene.objects
+        if obj.type == 'MESH' and obj.select_get() and obj.data.name in dense_data
+    ]
+    for obj in dense:
+        mod = obj.modifiers.new(name='budget', type='DECIMATE')
+        mod.decimate_type = 'COLLAPSE'
+        mod.ratio = ratio
+    print(f'  形を間引いた: 形 {len(dense_data)} 種類 / {dense_verts:,} 頂点 '
+          f'→ 約 {VERTEX_BUDGET:,} (比 {ratio:.3f})')
+else:
+    print(f'  形はそのまま: 細かい形 {len(dense_data)} 種類 / {dense_verts:,} 頂点 '
+          f'({placed} 個が使っている)')
+
+# --- 絵の大きさの上限 ---
+#
+# **1 枚が全体を決めてしまう。** 4K の絵を 1 枚足しただけで glb が 10MB から
+# 21MB へ倍になった。形の側は共有すれば 0.4MB まで落ちるので、**容量のほとんどは
+# 絵**で決まる。
+#
+# 2048 に揃える。壁や床のように大きく映る面でも、遊ぶ距離では 2K と 4K を
+# 見分けられない (人は動いているし、視界の大半は遠景)。読み込みの待ちのほうが
+# 遊びに効く。
+#
+# 縮めるのは**書き出す時だけ**。blend の中の絵はそのままなので、原寸で作り続けて
+# よいし、上限を上げれば元の細かさで出し直せる。
+MAX_TEXTURE = 2048
+
+def shrink_textures():
+    seen = set()
+    shrunk = []
+    for obj in bpy.context.scene.objects:
+        if obj.type != 'MESH' or not obj.select_get():
+            continue
+        for slot in obj.material_slots:
+            mat = slot.material
+            if not mat or not mat.use_nodes:
+                continue
+            for node in mat.node_tree.nodes:
+                if node.type != 'TEX_IMAGE' or not node.image:
+                    continue
+                image = node.image
+                if image.name in seen:
+                    continue
+                seen.add(image.name)
+                w, h = image.size
+                if max(w, h) <= MAX_TEXTURE:
+                    continue
+                scale = MAX_TEXTURE / max(w, h)
+                image.scale(max(1, int(w * scale)), max(1, int(h * scale)))
+                shrunk.append((image.name, w, h, image.size[0], image.size[1]))
+    if shrunk:
+        print(f'  絵を縮めた: {len(shrunk)} 枚 (上限 {MAX_TEXTURE})')
+        for name, w, h, nw, nh in shrunk:
+            print(f'    {name[:38]:40} {w}x{h} → {nw}x{nh}')
+    else:
+        print(f'  絵はそのまま: 上限 {MAX_TEXTURE} を超える物は無い')
+
+shrink_textures()
 
 # 材質は載せる。
 #

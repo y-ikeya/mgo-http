@@ -254,3 +254,55 @@ describe('転がりのロックと絵', () => {
     expect(anim.rollShowing).toBe(false)
   })
 })
+
+
+/**
+ * 床へ行く型は、**頭から流さないと床に着かない。**
+ *
+ * 姿勢を切り替えるだけ (setLocomotion) だと、上半身が構えのままで、しかも
+ * 重みの補間で入るので型が頭から流れない。**立ったまま寝ている**という形で
+ * 出た — 実測すると腰が 1.01m で、立ち姿 (0.97m) とほとんど変わらない。
+ *
+ * 倒れる型は元から専用の道 (playDeath) を通していて、そちらは着く。眠りも
+ * 同じ道 (playSleep) にした。**目で見れば一目**だが、目で見るには実機が要る。
+ */
+describe('床へ行く型', () => {
+  /** その型を流し切ったあとの、腰と頭の高さ (m) */
+  function settle(play: (anim: CharacterAnimator) => void): { hips: number; head: number } {
+    const root = gltf.scene.clone(true)
+    const anim = new CharacterAnimator(root, gltf.animations, 4.5)
+    play(anim)
+    for (let i = 0; i < 240; i++) anim.update(1 / 60)
+    root.updateMatrixWorld(true)
+    let hips = NaN
+    let head = NaN
+    root.traverse((o) => {
+      if (o.name.endsWith('Hips')) hips = o.getWorldPosition(new THREE.Vector3()).y
+      if (o.name.endsWith('Head')) head = o.getWorldPosition(new THREE.Vector3()).y
+    })
+    return { hips, head }
+  }
+
+  test('**倒れたら床に着く。** 立ち姿の高さに残らない', () => {
+    const down = settle((anim) => anim.playDeath(true))
+    expect(down.head).toBeLessThan(0.5)
+    expect(down.hips).toBeLessThan(0.4)
+  })
+
+  test('**麻酔で眠っても床に着く。** 倒れるのと同じ道を通す', () => {
+    const asleep = settle((anim) => anim.playSleep())
+    expect(asleep.head).toBeLessThan(0.5)
+    expect(asleep.hips).toBeLessThan(0.4)
+  })
+
+  test('姿勢を切り替えるだけでは着かない。**この差が不具合だった**', () => {
+    const only = settle((anim) => {
+      for (let i = 0; i < 240; i++) {
+        anim.setLocomotion('sleep')
+        anim.update(1 / 60)
+      }
+    })
+    // 立ったまま。playSleep との差がそのまま「立ちながら寝ている」の正体
+    expect(only.head).toBeGreaterThan(1.2)
+  })
+})

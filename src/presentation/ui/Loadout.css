@@ -68,6 +68,14 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  /*
+   * 空の枠でも行の高さを保つ。
+   *
+   * 部屋が副武器を外すと中身が無くなるが、**行が縮むと枠まで消えたように
+   * 見える**。名前 (1.05em) と弾数 (0.75em) を上下 12px の余白で挟んだ札 1 枚が
+   * 収まる高さ — 札を並べた行と同じ高さになる。
+   */
+  min-height: calc(12px * 2 + 1.05em + 4px + 0.75em);
 }
 
 .loadout-item {
@@ -189,4 +197,50 @@
   color: rgba(190, 206, 176, 0.4);
   font-size: 10px;
   letter-spacing: 0.1em;
+}
+
+
+/*
+ * --- 銃の色分け ---
+ *
+ * **殺傷は赤、麻酔は青。** 名前を読まなくても、手に取ろうとしている物が人を
+ * 殺す物かどうかが分かる。M9 と M1911 は並んでいて名前も似ているので、
+ * 取り違えると「当てたのに死なない」「眠らせるつもりが殺した」が起きる。
+ *
+ * 選んでいない間は枠だけ、選んだら地も染める。緑 (選択の色) と重ならないよう、
+ * **選択の印そのものを色ごと差し替える** — 緑の枠に赤い字だと、どちらが
+ * 「選んでいる」なのか読めない。
+ */
+.loadout-item-lethal {
+  border-color: rgba(214, 116, 96, 0.3);
+}
+
+.loadout-item-lethal .loadout-name {
+  color: rgba(226, 176, 162, 0.75);
+}
+
+.loadout-item-lethal.loadout-item-on {
+  background: rgba(214, 116, 96, 0.14);
+  border-color: rgba(224, 128, 106, 0.6);
+}
+
+.loadout-item-lethal.loadout-item-on .loadout-name {
+  color: rgba(255, 206, 192, 0.95);
+}
+
+.loadout-item-tranq {
+  border-color: rgba(96, 158, 214, 0.32);
+}
+
+.loadout-item-tranq .loadout-name {
+  color: rgba(162, 200, 232, 0.78);
+}
+
+.loadout-item-tranq.loadout-item-on {
+  background: rgba(96, 158, 214, 0.16);
+  border-color: rgba(127, 196, 255, 0.65);
+}
+
+.loadout-item-tranq.loadout-item-on .loadout-name {
+  color: rgba(196, 226, 255, 0.98);
 }

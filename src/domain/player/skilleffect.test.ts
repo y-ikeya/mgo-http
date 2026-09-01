@@ -218,7 +218,7 @@ describe('走る速さ (掛け算の形)', () => {
   test('狙撃銃 + FAST MOVE Lv3 は、拳銃の素の人に追いつかない', () => {
     // skill.test.ts と同じ事実を、こちらは表から引いて確かめる
     const sniper = carrySpeedScale(WEAPONS.sniper) * runnerScale({ runner: 3 })
-    const pistol = carrySpeedScale(WEAPONS.pistol) * runnerScale(NONE)
+    const pistol = carrySpeedScale(WEAPONS.m9) * runnerScale(NONE)
     expect(sniper).toBeLessThan(pistol)
   })
 })

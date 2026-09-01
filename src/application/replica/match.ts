@@ -18,7 +18,7 @@
  */
 
 import { MODES, type Mode } from '../../domain/match/room'
-import { DEATH_POINTS, KILL_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
+import { DEATH_POINTS, KILL_POINTS, STUN_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
 import type { Team } from '../../domain/player/player'
 import type { KillEvent, MatchMessage, ServerMessage } from '../protocol/types'
 
@@ -31,11 +31,13 @@ const POINT_FEED_MAX = 4
 export interface KillEntry {
   event: KillEvent
   at: number
+  /** 倒したのではなく眠らせた。**残機は減っていない** */
+  stun?: boolean
 }
 
 /** 点が動いたこと。右下に出す */
 export interface PointEntry {
-  label: 'KILL' | 'DEATH' | 'SUICIDE'
+  label: 'KILL' | 'DEATH' | 'SUICIDE' | 'STUN'
   delta: number
   at: number
 }
@@ -105,6 +107,37 @@ export function applyMatch(
       if (!me) return []
       replica.team = me.team
       return [{ kind: 'team', team: me.team }]
+    }
+
+    /*
+     * 誰かが眠らされた。**キルログに並べるが、倒したのとは別の行。**
+     *
+     * 同じ流れに載せるのは、見る側にとって「誰が誰に何をしたか」は同じ
+     * 種類の知らせだから。ただし残機は減っていないので、倒したのと同じ
+     * 文言にはしない (出す側が stun を見て書き分ける)。
+     */
+    case 'stun': {
+      replica.killFeed.unshift({
+        event: {
+          type: 'kill',
+          killer: message.by,
+          killerName: message.byName,
+          killerTeam: replica.team,
+          victim: message.target,
+          victimName: message.targetName,
+          victimTeam: replica.team,
+          weapon: 'M9',
+          headshot: message.head,
+        },
+        at: now,
+        stun: true,
+      })
+      replica.killFeed.length = Math.min(replica.killFeed.length, KILL_FEED_MAX)
+      if (message.by === selfId) {
+        replica.pointFeed.unshift({ label: 'STUN', delta: STUN_POINTS, at: now })
+        replica.pointFeed.length = Math.min(replica.pointFeed.length, POINT_FEED_MAX)
+      }
+      return []
     }
 
     case 'kill': {

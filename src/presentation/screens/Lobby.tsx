@@ -144,6 +144,13 @@ export default function Lobby(props: { identity: Identity }) {
                   {String(room.remaining % 60).padStart(2, '0')}
                 </span>
               </Show>
+
+              {/*
+                部屋の覚え書き。**ルールの名前だけでは伝わらないこと** —
+                同じ TDM でも、持ち込める銃を絞ってあれば別の遊びになる。
+                行の右端に置く。名前とルールが主で、これは添え物。
+              */}
+              <span class="room-note">{room.note ?? ''}</span>
               </button>
 
               {/*

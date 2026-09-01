@@ -113,7 +113,8 @@ export const MASTERY_OF: Record<WeaponId, SkillId> = {
   rifle: 'rifleMastery',
   sniper: 'sniperMastery',
   shotgun: 'shotgunMastery',
-  pistol: 'pistolMastery',
+  m9: 'pistolMastery',
+  m1911: 'pistolMastery',
 }
 
 /** 取ったスキルと、その段 */

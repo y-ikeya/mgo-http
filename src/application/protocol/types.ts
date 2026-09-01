@@ -316,6 +316,15 @@ export interface LoadoutEvent {
    * 返すために持たせる**。持っていないと、読み直した人だけが突撃銃へ戻る。
    */
   primary: WeaponId
+  /**
+   * 副武器。**省ける。**
+   *
+   * 拳銃が 1 挺しか無かった頃は選ぶ余地が無く、送る意味も無かった。麻酔銃
+   * (M9) と殺傷 (M1911) に分かれてからは選択になったので載せる。
+   *
+   * 古い版は送ってこないので、**省かれたら今のまま**。
+   */
+  secondary?: WeaponId
 }
 
 /**
@@ -462,6 +471,8 @@ export interface ResumeMessage {
    */
   support: SupportId
   primary: WeaponId
+  /** 副武器。持たせない部屋では null */
+  secondary: WeaponId | null
 }
 
 /** 支度ができたので湧かせてほしい。装備画面の OK が送る */
@@ -591,6 +602,13 @@ export interface RoomSummary {
   mode: Mode
   /** ルールの表示名 */
   label: string
+  /**
+   * 部屋の覚え書き。無ければ出さない。
+   *
+   * **ルールの名前だけでは伝わらないこと**を書く場所 (src/domain/match/room.ts)。
+   * 同じ TDM でも、持ち込める銃を絞ってあれば別の遊びになる。
+   */
+  note?: string
   /** 入れるか。false なら一覧に出るが繋げない */
   active: boolean
   /** いま繋がっている人数 */
@@ -651,6 +669,14 @@ export interface MatchMessage {
      * これが無いと個人の点と陣営の点が黙って食い違う
      */
     suicides: number
+    /**
+     * 眠らせた数。**倒した数には入らない。**
+     *
+     * 眠らせても残機は減らないので、倒したのと同じ欄に混ぜると陣営の勝敗と
+     * 食い違って見える。点は同じ 3 点入る (domain/match/scoring.ts) が、
+     * **何をした人なのかは別の列で読ませる**。
+     */
+    stuns: number
     /** 接続が切れて戻りを待っている。数分で席ごと消える */
     away?: boolean
     /**
@@ -732,6 +758,36 @@ export interface KillEvent {
   /** 表示する武器名 */
   weapon: string
   headshot: boolean
+}
+
+/**
+ * 誰が誰を眠らせたか。**倒したのとは別の出来事。**
+ *
+ * 残機は減らず、体はその場に残る。倒した知らせ (KillEvent) と同じ形で流すと
+ * 「倒された」と読まれるので、別の型にして受け取る側に区別させる。
+ */
+export interface StunEvent {
+  type: 'stun'
+  by: string
+  byName: string
+  target: string
+  targetName: string
+  /** 頭に当たって一発で眠らせたか */
+  head: boolean
+}
+
+/**
+ * スタミナの残り。**本人にだけ届く。**
+ *
+ * 相手の眠気が見えると「あと 1 発」が読めてしまう。当てた手応えは自分の
+ * 目盛りだけで測る。
+ */
+export interface StaminaMessage {
+  type: 'stamina'
+  id: string
+  stamina: number
+  /** 眠りが明ける時刻 (ms)。0 なら眠っていない */
+  sleepUntil: number
 }
 
 /** 復帰してよい。位置はクライアントが決める (地形を知っているのはそちら) */
@@ -841,6 +897,8 @@ export type ServerMessage =
   | MatchMessage
   | HealthMessage
   | KillEvent
+  | StunEvent
+  | StaminaMessage
   | RespawnMessage
   | DroppedMessage
   | DroppedGoneMessage

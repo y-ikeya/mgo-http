@@ -57,6 +57,20 @@ export interface HitClaim {
   zone?: HitZone
   distance?: number
   fromBehind?: boolean
+  /**
+   * 弾道の膨らみ (m)。**弦から見て、どれだけ上を通ったか。**
+   *
+   * 銃口と着弾点を結ぶ直線 (弦) に対して、実際の弾は**上へ膨らむ** —
+   * 落ちるぶんを見越して上へ狙うので、途中は弦より高い所を通る。放り投げた
+   * 球が手と的の直線より上を通るのと同じ。
+   *
+   * 渡さなければ 0 = 直線。速い銃 (AK47 で 80m を撃って 4.5cm) は渡す意味が
+   * 無いが、**麻酔銃は 80m で 54cm** 膨らむので、直線で見ると低い遮蔽の
+   * 向こうへ通した正当な射撃を弾く。
+   *
+   * 出すのは domain (judge/bullet.ts の bulletSag)。ここは受け取るだけ。
+   */
+  sag?: number
 }
 
 export type Verdict = { ok: true } | { ok: false; reason: string }
@@ -72,15 +86,69 @@ const ZONE_RATIO: Record<HitZone, number> = { HEAD: 1, BODY: 0.72, LEGS: 0.28 }
 /**
  * 遮蔽の判定を、肩の幅だけ横にずらしても試す。
  *
- * **ここは直線で見る。** 撃った側の弾は放物線を描くが、弦からの膨らみは
- * 落差の 1/4 — 一番落ちる銃で 80m 撃っても 5cm ほどで、下のぶれ (0.55m) に
- * 埋もれる (judge/bullet.ts の bulletSag)。曲線で見直しても通る / 通らないが
- * 変わる場面が無いので、直線のままにしてある。
- *
  * TPS の照準は肩越しのカメラから引くので、キャラの頭からは見えない角も撃てる。
  * 頭から一直線だけで判定すると、正当な射撃を弾いてしまう。
  */
 const SHOULDER_OFFSET = 0.55
+
+/**
+ * 弾道を何本の線分に割って調べるか。
+ *
+ * 膨らみは滑らかな山なので、細かく割っても答えはほとんど変わらない。6 本だと
+ * 頂点付近の誤差が膨らみの 1% ほど — 麻酔銃の 54cm に対して 5mm で、遮蔽の
+ * 大きさに比べて無視できる。
+ */
+const ARC_STEPS = 6
+
+/**
+ * 膨らみを無視してよい高さ (m)。**これ未満なら直線で見る。**
+ *
+ * 速い銃はここに入る (AK47 が 80m 撃って 4.5cm)。線分を 6 本に増やす負担を、
+ * 答えの変わらない銃にまで払わない。
+ */
+const ARC_IGNORE = 0.06
+
+/**
+ * 弾の通り道が開いているか。**弦ではなく、膨らんだ弧で見る。**
+ *
+ * 弧は弦の**上**を通る。弦の t の位置での高さの差は 4·sag·t·(1-t) で、
+ * 真ん中で sag になる山。
+ *
+ * --- なぜ直線で済ませないか ---
+ * ずれる向きが悪い。弧は弦より上なので、**直線では遮蔽に当たるが実際は越えて
+ * いた**、が起きる。つまり直線で見ると**正当な射撃を弾く**。逆 (実際は当たって
+ * いたのに通す) は起きない。
+ *
+ * 麻酔銃は頭 1 発で眠らせるので、遠くから狙う手が成立する。そこで弾かれると
+ * 「当てたのに何も起きない」になり、しかも撃った側には理由が分からない。
+ */
+function isArcClear(
+  fromX: number,
+  fromY: number,
+  fromZ: number,
+  toX: number,
+  toY: number,
+  toZ: number,
+  boxes: StageBox[],
+  sag: number,
+): boolean {
+  if (sag < ARC_IGNORE) return isPathClear(fromX, fromY, fromZ, toX, toY, toZ, boxes)
+
+  let px = fromX
+  let py = fromY
+  let pz = fromZ
+  for (let i = 1; i <= ARC_STEPS; i++) {
+    const t = i / ARC_STEPS
+    const qx = fromX + (toX - fromX) * t
+    const qy = fromY + (toY - fromY) * t + 4 * sag * t * (1 - t)
+    const qz = fromZ + (toZ - fromZ) * t
+    if (!isPathClear(px, py, pz, qx, qy, qz, boxes)) return false
+    px = qx
+    py = qy
+    pz = qz
+  }
+  return true
+}
 
 
 /** その姿勢での部位の位置 */
@@ -105,6 +173,7 @@ function zoneExposed(
   zone: HitZone,
   boxes: StageBox[],
   rules: HitRules,
+  sag: number,
 ): boolean {
   if (boxes.length === 0) return true
 
@@ -121,7 +190,7 @@ function zoneExposed(
   for (const side of [0, 1, -1]) {
     const ox = attacker.x + px * SHOULDER_OFFSET * side
     const oz = attacker.z + pz * SHOULDER_OFFSET * side
-    if (isPathClear(ox, eyeY, oz, tx, ty, tz, boxes)) return true
+    if (isArcClear(ox, eyeY, oz, tx, ty, tz, boxes, sag)) return true
   }
   return false
 }
@@ -178,7 +247,7 @@ function verifyPose(
   }
 
   // その部位が見えていたか。頭を隠して脚だけ出している相手の頭は撃てない
-  if (!zoneExposed(attacker, target, zone, boxes, rules)) {
+  if (!zoneExposed(attacker, target, zone, boxes, rules, claim.sag ?? 0)) {
     return { ok: false, reason: `${zone} は遮蔽の裏` }
   }
 

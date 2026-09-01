@@ -11,7 +11,7 @@ import { NO_INTENT, type Intent } from '../player/intent'
  * なっている (docs/design.md の 5)。
  */
 
-const loadout = { primary: 'rifle', secondary: 'pistol', support: 'grenade' } as const
+const loadout = { primary: 'rifle', secondary: 'm9', support: 'grenade' } as const
 const make = () => new Inventory(loadout)
 
 /** 持ち替えが終わるまで進める */
@@ -45,7 +45,7 @@ describe('持ち替えの代償', () => {
 
   test('時間が経つと持ち替えが終わる', () => {
     const inv = make()
-    inv.switchTo('pistol')
+    inv.switchTo('m9')
     settle(inv)
     expect(inv.switching).toBe(false)
     expect(inv.handReady).toBe(true)
@@ -69,7 +69,7 @@ describe('持ち替えの代償', () => {
   test('持ち替えの最中に更に持ち替えられない。代償を踏み倒せてしまう', () => {
     const inv = make()
     inv.switchTo('grenade')
-    expect(inv.switchTo('pistol')).toBe(false)
+    expect(inv.switchTo('m9')).toBe(false)
     expect(inv.held).toBe('grenade')
   })
 })
@@ -167,11 +167,11 @@ describe('連打', () => {
     const inv = make()
     inv.switchTo('grenade')
     inv.switchTo('knife')
-    inv.switchTo('pistol')
+    inv.switchTo('m9')
     settle(inv)
-    expect(inv.held).toBe('pistol')
+    expect(inv.held).toBe('m9')
     settle(inv)
-    expect(inv.held).toBe('pistol')
+    expect(inv.held).toBe('m9')
   })
 
   test('いま持っている物を指し直したら溜めない', () => {
@@ -213,10 +213,10 @@ describe('道具の枠と NONE', () => {
 
   test('NONE から戻るのは持っていた武器。主武器ではない', () => {
     const inv = make()
-    inv.switchTo('pistol'); settle(inv)
+    inv.switchTo('m9'); settle(inv)
     inv.toggle('tool'); settle(inv)   // box
     inv.toggle('tool'); settle(inv)   // none
-    expect(inv.held).toBe('pistol')
+    expect(inv.held).toBe('m9')
   })
 
   test('箱を被っている間も武器の選択は覚えている', () => {
@@ -251,10 +251,10 @@ describe('道具を取り上げられる', () => {
 
   test('手には持っていた武器が戻る。**手ぶらにはならない**', () => {
     const inv = make()
-    inv.switchTo('pistol'); settle(inv)
+    inv.switchTo('m9'); settle(inv)
     inv.toggle('tool'); settle(inv)
     inv.dropTool()
-    expect(inv.held).toBe('pistol')
+    expect(inv.held).toBe('m9')
   })
 
   test('**持ち替えの時間は取らない。** 取り上げられている間は他ができない', () => {
@@ -301,7 +301,7 @@ describe('地面へ置く', () => {
   test('**ナイフは置けない。** 全部置いても手ぶらにはならない', () => {
     const inv = make()
     expect(inv.drop('knife')).toBe(null)
-    for (const id of ['rifle', 'pistol', 'grenade'] as const) inv.drop(id)
+    for (const id of ['rifle', 'm9', 'grenade'] as const) inv.drop(id)
     settle(inv)
     expect(inv.held).toBe('knife')
   })
@@ -324,9 +324,9 @@ describe('地面へ置く', () => {
 describe('画面を読み直したとき', () => {
   test('**選んでいた主武器のまま戻る。** 既定の AK47 に戻らない', () => {
     // 画面を読み直すと持ち物は既定 (AK47) で作られる
-    const inv = new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' })
+    const inv = new Inventory({ primary: 'rifle', secondary: 'm9', support: 'grenade' })
     // サーバーが「選んでいたのは P90」と返してくる
-    inv.refill({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    inv.refill({ primary: 'smg', secondary: 'm9', support: 'grenade' })
     inv.restore({ smg: 20 }, { smg: 60 }, 2)
 
     expect(inv.held).toBe('smg')
@@ -337,26 +337,26 @@ describe('画面を読み直したとき', () => {
   })
 
   test('組み直す前に弾を当てると、当てる先が無い', () => {
-    const inv = new Inventory({ primary: 'rifle', secondary: 'pistol', support: 'grenade' })
+    const inv = new Inventory({ primary: 'rifle', secondary: 'm9', support: 'grenade' })
     // 順番を逆にした場合。**P90 を持っていないので弾は捨てられる**
     inv.restore({ smg: 20 }, { smg: 60 }, 2)
-    inv.refill({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    inv.refill({ primary: 'smg', secondary: 'm9', support: 'grenade' })
     expect(inv.ammo).toBe(50)
   })
 })
 
 describe('箱を挟んだ持ち替え', () => {
   test('**箱を被って戻っても、武器の往復は続く。** ナイフが出てこない', () => {
-    const inv = new Inventory({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    const inv = new Inventory({ primary: 'smg', secondary: 'm9', support: 'grenade' })
     // P90 → M9
     inv.toggle('weapon'); settle(inv)
-    expect(inv.held).toBe('pistol')
+    expect(inv.held).toBe('m9')
 
     // ダンボールを被って、また武器へ戻る
     inv.toggle('tool'); settle(inv)
     expect(inv.held).toBe('box')
     inv.toggle('weapon'); settle(inv)
-    expect(inv.held).toBe('pistol')
+    expect(inv.held).toBe('m9')
 
     // **ここが P90 に戻ってほしい所** (直前の武器)
     inv.toggle('weapon'); settle(inv)
@@ -364,7 +364,7 @@ describe('箱を挟んだ持ち替え', () => {
   })
 
   test('投げ物を挟んでも往復の相手は変わらない', () => {
-    const inv = new Inventory({ primary: 'smg', secondary: 'pistol', support: 'grenade' })
+    const inv = new Inventory({ primary: 'smg', secondary: 'm9', support: 'grenade' })
     inv.switchTo('grenade'); settle(inv)
     inv.toggle('weapon'); settle(inv)
     // 手榴弾 → 直前の武器 (P90)
@@ -404,7 +404,7 @@ describe('一覧を開く', () => {
     expect(inv.browsing).toBeNull()
     inv.hand(press(), FREE, 0.016)
     // 主武器 ⇄ 副武器の往復
-    expect(inv.held).toBe('pistol')
+    expect(inv.held).toBe('m9')
   })
 
   test('押さえ続けると一覧が出る', () => {

@@ -70,6 +70,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   // 倒れる向き。**末尾に足す**
   'death_front',
   'death_back',
+  // 麻酔で眠っている。**末尾に足す**
+  'sleep',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -139,19 +141,21 @@ const FLAG_SALUTE = 16
  *
  * 見た目 (相手が何を構えているか) と、サーバーの威力の計算に要る。
  */
-const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'pistol', 'smg', 'shotgun']
+const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'm9', 'smg', 'shotgun', 'm1911']
 const WEAPON_INDEX = new Map(WEAPON_BITS.map((id, i) => [id, i]))
 
 /**
  * 手にある物の番号。**末尾に足す** — 並びを変えると古い版が別の物を持って見える。
  */
 const HELD_BITS: HeldId[] = [
-  'rifle', 'sniper', 'pistol', 'grenade', 'claymore', 'magazine', 'knife', 'box',
+  'rifle', 'sniper', 'm9', 'grenade', 'claymore', 'magazine', 'knife', 'box',
   // 道具を使っていない状態。**末尾に足す**
   'none',
   'smg',
   // 散弾銃。**末尾に足す**
   'shotgun',
+  // 殺傷の拳銃。**末尾に足す** (M9 は麻酔になったので別物)
+  'm1911',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 

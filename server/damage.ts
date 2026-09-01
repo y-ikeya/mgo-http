@@ -26,10 +26,12 @@ import {
 import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
+import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
+import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
-import { bearingTo, isBehind, sendHealth } from './relay'
+import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf } from './session'
 import { TARGET_DOWN, type RoomWorld, broadcast, setLife } from './world'
 
@@ -53,7 +55,7 @@ import { TARGET_DOWN, type RoomWorld, broadcast, setLife } from './world'
 export const MAX_FALL_SPEED = 25
 
 /** 死因の表示。表にしておかないと、増やしたときに三項演算子が伸びる */
-export const KILL_LABEL = { grenade: 'grenade', claymore: 'CLAYMORE', fall: '落下' } as const
+export const KILL_LABEL = { grenade: 'grenade', claymore: 'CLAYMORE', fall: '落下', drown: '溺死' } as const
 
 /**
  * 削った結果。**その先の始末は呼ぶ側がやる。**
@@ -199,13 +201,13 @@ export function applyBlastDamage(
   fromX: number,
   fromZ: number,
   ownerId: string,
-  weapon: 'grenade' | 'claymore' | 'fall',
+  weapon: 'grenade' | 'claymore' | 'fall' | 'drown',
   knock: boolean,
 ): Hurt {
   // 削るのも、倒れるかも人の側の振る舞い (domain/player/player.ts)
   const wound = hurt(victim, amount)
   // **爆風でも抜ける。** 手榴弾とクレイモアで被曝させた相手も光る。
-  // 落下 (weapon: 'fall') は持ち主が居ないので何も起きない
+  // 落下と溺死 (weapon: 'fall' / 'drown') は持ち主が居ないので何も起きない
   expose(room, victim, room.players.get(ownerId))
 
   // 爆心の方向。撃たれたときと同じで、どこから来たかだけ渡す
@@ -277,6 +279,13 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
   if (event.type !== 'damage') return NOT_HURT
   const victim = room.players.get(event.target)
   if (!victim || !canBeHurt(victim.life)) return NOT_HURT
+  /*
+   * **眠っている間は撃てない。**
+   *
+   * 撃つのを止めているのはクライアントだが、そこは信じない — 眠らされても
+   * 撃ち続けられるなら、麻酔は当てても何も起きない銃になる。
+   */
+  if (isAsleep(attacker.sleepUntil, Date.now())) return NOT_HURT
   // 撃った時点で自分の無敵は切れる。盾にしたまま撃たせない
   if (attacker.life === 'spawning') setLife(room, attacker, 'alive')
   // 湧いた直後の相手には当たらない
@@ -321,6 +330,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     }
   }
 
+  const spec = weaponOf(attacker.weapon)
   const verdict = verifyHit(
     attacker.history,
     victim.history,
@@ -329,6 +339,14 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
       zone: event.zone,
       distance: event.distance,
       fromBehind: event.fromBehind,
+      /*
+       * 弾道の膨らみ。**遅い弾ほど弦から離れる。**
+       *
+       * 麻酔銃 (120 m/s) は 80m で 54cm 上へ膨らむ。直線で見ると、低い遮蔽を
+       * 越えて通した射撃を「壁の裏」と弾く — 頭 1 発で眠らせる銃なので、
+       * 遠くから狙う手はちゃんと成立させる。
+       */
+      sag: bulletSag(event.distance ?? 0, spec.bulletSpeed, spec.bulletGravity),
     },
     room.stage.sight,
     LAG_WINDOW,
@@ -358,6 +376,32 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
             (event.zone ?? 'BODY') as HitZone,
             event.distance ?? 0,
           )
+
+  /*
+   * --- 麻酔 ---
+   *
+   * **体力を削らない。** 同じ「当てた」でも、削り切ったときに起きることが
+   * 違う (domain/player/stamina.ts)。倒れるのではなく、その場で眠る。
+   *
+   * 削る量は zone をそのまま使う。距離の減衰も同じ式を通っているので、
+   * 遠くから当てた麻酔は効きが薄い。
+   */
+  if (weaponOf(attacker.weapon).tranquilizer && event.kind === 'bullet') {
+    return applyTranquilizer(room, attacker, victim, amount, event)
+  }
+
+  /*
+   * --- 麻酔 ---
+   *
+   * **体力を削らない。** 同じ「当てた」でも、削り切ったときに起きることが
+   * 違う (domain/player/stamina.ts)。倒れるのではなく、その場で眠る。
+   *
+   * 削る量は zone をそのまま使う。距離の減衰も同じ式を通っているので、
+   * 遠くから当てた麻酔は効きが薄い。
+   */
+  if (weaponOf(attacker.weapon).tranquilizer && event.kind === 'bullet') {
+    return applyTranquilizer(room, attacker, victim, amount, event)
+  }
 
   const wound = hurt(victim, amount)
   // 撃たれたら集中は途切れる。回復は最初から待ち直し。
@@ -429,4 +473,56 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
     headshot: event.kind === 'bullet' && event.zone === 'HEAD',
   })
   return { downed: true, letGo: true }
+}
+
+
+/**
+ * 麻酔が当たった。**スタミナを削り、0 になったら眠らせる。**
+ *
+ * --- 眠りは倒れることではない ---
+ * 残機は減らないし、湧き直しもしない。**体はその場に残る。** 眠らせた側は
+ * まだ仕事が終わっておらず、寄って仕留めるか、置いて先へ進むかを選ぶ。
+ *
+ * 点は倒したのと同じ 3 点 (domain/match/scoring.ts の STUN_POINTS)。当てる
+ * 難しさが同じで、しかも陣営の勝敗には効かないので、ここを下げると
+ * 「倒せる場面で眠らせる」に理由が無くなる。
+ */
+function applyTranquilizer(
+  room: RoomWorld,
+  attacker: Player,
+  victim: Player,
+  amount: number,
+  event: Extract<ClientMessage, { type: 'damage' }>,
+): Hurt {
+  const now = Date.now()
+  const drain = drainStamina(victim.stamina, amount, isAsleep(victim.sleepUntil, now))
+  victim.stamina = drain.stamina
+  // 撃たれたら集中は途切れる。麻酔でも同じ
+  victim.concentratingSince = 0
+  // **倒さなくても情報になる。** 当てた時点で数秒ぶんの位置が抜ける
+  expose(room, victim, attacker)
+
+  if (!drain.slept) {
+    // まだ起きている。**残りを本人にだけ知らせる** — 相手の眠気は見えない
+    sendStamina(victim)
+    return NOT_HURT
+  }
+
+  victim.sleepUntil = now + SLEEP_SECONDS * 1000
+  attacker.stuns++
+  sendStamina(victim)
+  broadcast(room, {
+    type: 'stun',
+    by: attacker.id,
+    byName: attacker.name,
+    target: victim.id,
+    targetName: victim.name,
+    head: event.zone === 'HEAD',
+  })
+  broadcast(room, matchState(room))
+  /*
+   * **手は緩む。** 振りかぶったまま眠らされたら足元に落ちる。倒されたときと
+   * 同じで、眠った体が手榴弾を握ったままなのはおかしい。
+   */
+  return { downed: false, letGo: true }
 }

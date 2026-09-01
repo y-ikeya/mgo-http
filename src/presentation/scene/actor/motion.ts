@@ -184,6 +184,8 @@ export interface StanceInput {
   /** 直前のモーション。しきい値のヒステリシスに使う */
   previous: Locomotion
   down: boolean
+  /** 麻酔で眠っているか。**動けない** */
+  asleep: boolean
   boxed: boolean
   crouching: boolean
   aiming: boolean
@@ -260,6 +262,13 @@ export interface StanceInput {
 export function resolveLocomotion(input: StanceInput): Locomotion {
   // 倒れたら他の何にも移らない
   if (input.down) return 'death'
+  /*
+   * 麻酔で眠っている。**倒れているより後、他の全部より先。**
+   *
+   * 倒れたほうが強い — 眠っている間に撃たれて死ぬので、そのときは倒れる姿へ
+   * 移らないと「眠ったまま」に見える。それ以外の何をしていても眠りが勝つ。
+   */
+  if (input.asleep) return 'sleep'
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
   if (input.downed) return 'sweep'

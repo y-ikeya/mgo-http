@@ -10,7 +10,7 @@
  *     いま      各部屋 stages が 1 枚の fixed
  *     この先    部屋を作るときに stages と order を選ばせる
  *
- * 変わるのは ROOM_STAGES を作る場所だけで済むようにしてある。
+ * 変わるのは ROOMS を作る場所だけで済むようにしてある。
  *
  * --- 座標をここに置く理由 ---
  * 湧き地点と的の位置は、**クライアントとサーバーの両方が要る**。湧くのは
@@ -24,7 +24,7 @@
 
 import type { Team } from '../player/player'
 
-export type StageName = 'mall' | 'training'
+export type StageName = 'mall' | 'training' | 'garden'
 
 /**
  * 地面の上の 1 点。
@@ -43,6 +43,23 @@ export interface Spot {
   y?: number
 }
 
+/**
+ * 水面。**中心から half まで、高さ y の 1 枚。**
+ *
+ * ここに置くのは、水が見た目だけの物ではないから。**投げた物が沈む**ので、
+ * サーバーもクライアントも同じ面を知っていないと落ち先が食い違う。
+ * (置く前は水は presentation にしか無く、手榴弾が水面を跳ねて渡っていた。)
+ *
+ * 歩く床は水の下の地面のまま。**泳がない** — 泳ぎを入れると、沈む・息・
+ * 足音・撃てるかどうかが全部要る。
+ */
+export interface Water {
+  /** 水面の広がりの半分 (m)。中心からこの距離までが水 */
+  half: number
+  /** 水面の高さ (m) */
+  y: number
+}
+
 export interface StageSpec {
   name: StageName
   /** 画面に出す名前 */
@@ -55,6 +72,8 @@ export interface StageSpec {
    * **散らす。** 1 か所だと湧いた瞬間に鉢合わせる。
    */
   solo: Spot[]
+  /** 水面。張っているステージだけ */
+  water?: Water
   /**
    * 練習の的を並べる場所。
    *
@@ -158,9 +177,86 @@ const TRAINING: StageSpec = {
   ],
 }
 
+/**
+ * 庭園。**82m 四方。**
+ *
+ * 塀に囲まれた平地に、対角の角へ台が 2 つ。遮蔽がほとんど無い。
+ *
+ * **隠れる所が無いことがこの地形の中身。** 狙撃銃の部屋 (delta) が乗るので、
+ * 撃ち合いは「先に見つけたか」だけで決まる。動けば見つかり、動かなければ
+ * 詰められる。
+ */
+const GARDEN: StageSpec = {
+  name: 'garden',
+  label: 'GARDEN',
+  /*
+   * **対角の角。** base がその印で、6m 角の台が手すりに囲まれている。
+   *
+   * 直線で 106m。狙撃銃の間合い (減衰なし) を丸ごと使う距離で、**出た瞬間に
+   * 撃ち合いは始まらない** — 開けた中央へ出るかどうかから始まる。
+   *
+   * **高さが 10m あるのは blend ごと持ち上げてあるから。** 水の底はコードが
+   * 敷いている y=0 の地面で、そこは動かせない (投擲物の床でもある)。だから
+   * 板のほうを上げてあり、上げた 10m がそのまま水深になる。
+   *
+   * 数字は書き出した json (public/models/stage_garden.json) の天面と揃える。
+   * **台を動かしたらここも動かす** — ずれると湧いた瞬間に沈んで溺れる。
+   */
+  bases: {
+    blue: { x: -37.5, z: -37.5, y: 10.12 },
+    red: { x: 37.3, z: 37.7, y: 10.12 },
+  },
+  /*
+   * 水はアリーナ全体を覆う。**歩けるのは水に浮いている板の上だけ**で、
+   * 落ちたら溺れる (inWater)。塀は ±40.2 に立っている。
+   *
+   * **塀の外まで張る。** 底上げした結果、塀の向こうに 10m 下の地面が見えて
+   * 崖のようになった。地面の板 (120m 四方) を覆う ±60 まで広げると、
+   * 塀の向こうも海になって水平線まで続く。
+   */
+  water: { half: 60, y: 10.02 },
+  // 台の上。**水の上には湧かせない** — 湧いた瞬間に溺れる
+  solo: [
+    { x: -37.5, z: -37.5, y: 10.12 },
+    { x: -38.5, z: -36.5, y: 10.12 },
+    { x: -36.5, z: -38.5, y: 10.12 },
+    { x: 37.3, z: 37.7, y: 10.12 },
+    { x: 38.3, z: 36.7, y: 10.12 },
+    { x: 36.3, z: 38.7, y: 10.12 },
+  ],
+  // **的は置かない。** 練習は訓練場でやる
+  targets: [],
+}
+
 export const STAGES: Record<StageName, StageSpec> = {
   mall: MALL,
   training: TRAINING,
+  garden: GARDEN,
+}
+
+/**
+ * 水に沈んでいるか。**足元が水面より下なら溺れる。**
+ *
+ * 庭園は水がアリーナ全体を覆っていて、**歩けるのは水に浮いている板の上だけ**。
+ * 縁で見えない壁に止められるより、落ちられて死ぬほうが「板の上だけが世界だ」
+ * と早く分かる。柵で落ちないようにするのが主で、これはその外側の受け皿。
+ *
+ * 判じるのは足元の高さだけ。潜る・泳ぐという状態を持たないので、**入った
+ * 時点で終わり**。中間が無いぶん、規則も見た目も 1 つで済む。
+ */
+export function inWater(x: number, y: number, z: number, water: Water | null): boolean {
+  if (!water) return false
+  // 板の上に立っているだけで沈んだ扱いにならないよう、僅かに沈める
+  if (y >= water.y - DROWN_MARGIN) return false
+  return Math.abs(x) < water.half && Math.abs(z) < water.half
+}
+
+/** 水面からこれだけ足元が下がったら沈んだ扱い (m)。数え落ちを防ぐだけの幅 */
+const DROWN_MARGIN = 0.005
+
+/** その ステージの水面。張っていなければ null */
+export function waterOf(name: StageName): Water | null {
+  return STAGES[name].water ?? null
 }
 
 export function isStageName(name: string): name is StageName {

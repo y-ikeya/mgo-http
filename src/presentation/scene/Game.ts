@@ -57,7 +57,14 @@ import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
 import { isGun, type HeldId } from "../../domain/item/held";
-import { MODES, ROOM_STAGES, isHostile, isRoomName } from "../../domain/match/room";
+import {
+  MODES,
+  ROOMS,
+  isHostile,
+  isRoomName,
+  primariesOf,
+  secondaryOf,
+} from "../../domain/match/room";
 import { RemotePlayers, type RemotePlayer } from "./actor/remotePlayer";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
@@ -99,6 +106,7 @@ import {
   type ServerMessage,
   type Team,
 } from "../../application/protocol/types";
+import { MAX_STAMINA } from "../../domain/player/stamina";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 export interface GameStats {
@@ -129,6 +137,18 @@ export interface GameStats {
   aiming: boolean;
   /** 現在の散布界 (度)。クロスヘアの開き具合に使う */
   spread: number;
+  /** その部屋で選べる主武器。**部屋が絞ることがある** */
+  primaries: readonly WeaponId[];
+  /**
+   * 次に湧いたときの主武器。**選ばれている物。**
+   *
+   * 画面側で信号に持たせていた頃、初期値が 'rifle' で固定されていた。狙撃銃
+   * だけの部屋では**どれも選ばれていない**状態で開く (一覧に rifle が無いので
+   * どの札にも印が付かない)。選んでいる物を知っているのはこちら。
+   */
+  primary: WeaponId;
+  /** 副武器。**部屋が外していれば null** */
+  secondary: WeaponId | null;
   /**
    * 粒が散る角度 (度)。散弾でなければ 0。
    *
@@ -151,6 +171,8 @@ export interface GameStats {
   stance: Stance;
   /** 直近に当てた部位。空文字なら表示しない */
   hitZone: string;
+  /** その命中が麻酔だったか。**青で出す** */
+  hitTranq: boolean;
   /** 敬礼で繋がったばかりの味方 */
   links: string[];
   /** 成績表を開いているか */
@@ -223,6 +245,17 @@ export interface GameStats {
   match: MatchMessage | null
   /** 自分の体力 */
   health: number;
+  /**
+   * スタミナ。**麻酔でだけ減り、眠って戻る** (domain/player/stamina.ts)。
+   *
+   * 満タンなら出さない — 減っていないゲージは画面を埋めるだけの飾りで、
+   * 「いま何かが起きている」を伝えられない。
+   */
+  stamina: number;
+  /** 眠っているか。眠っている間は操作を受け付けない */
+  asleep: boolean;
+  /** 眠りの深さ。**1 が眠った瞬間、0 が起きた瞬間。** 画面の暗さがこれに従う */
+  sleepDepth: number;
   maxHealth: number;
   /** 倒れているか */
   dead: boolean;
@@ -277,12 +310,24 @@ const HIT_FEEDBACK_DURATION = 0.6;
 const DEFAULT_EXPOSURE = 3.0;
 
 /**
- * ローリングに切り替わるまでの押し込み時間 (秒)。
+ * 水面を叩く強さ。**弾を 1 とした比。**
  *
- * 短すぎると、しゃがもうとして転がる。長すぎると、避けようとして間に合わない。
- * 人がキーを叩く時間はおよそ 0.1 秒なので、その少し上に置く。
+ * 落ちる物の重さがそのまま水しぶきの大きさになる。薬莢が手榴弾と同じ音・同じ
+ * 大きさで跳ねると、**水の音で何が落ちたか読めなくなる**。
  */
-const ROLL_HOLD_TIME = 0.17;
+const GRENADE_SPLASH = 2.2;
+const THROWN_SPLASH = 1.6;
+const CASING_SPLASH = 0.45;
+/** 水中で爆ぜたときの水柱。**投げ込んだときより大きい** */
+const BLAST_SPLASH = 3;
+/**
+ * 水面ちょうどと見なす幅 (m)。
+ *
+ * 沈む物は水面ちょうどへ置かれるので、数え落ちを防ぐぶんだけ。**板の厚み
+ * (8cm) より小さく**しておかないと、板の上の物まで水として数える。
+ */
+const SURFACE_TOLERANCE = 0.03;
+
 
 
 
@@ -375,6 +420,18 @@ function spawnAngle(id: string): number {
  * Solid 側はこのクラスの外に一切踏み込まず、onStats 経由で状態を購読するだけ。
  */
 export class Game {
+  /** 地形 (glb) が届いたか。**届くまで人を動かさない** (落ちてしまう) */
+  private stageReady = false;
+
+  /**
+   * スタミナ。**麻酔だけが削る。** 0 で眠る (domain/player/stamina.ts)。
+   *
+   * サーバーが決めた値をそのまま控える。体力と違って撃たれた瞬間に自分で
+   * 減らさないのは、**麻酔は当てた本人にも効いたかどうかが見えない**から —
+   * 見えるのは自分の目盛りだけ。
+   */
+  private stamina = MAX_STAMINA;
+
   private readonly renderer: WebGPURenderer;
   private readonly scene = new THREE.Scene();
   private readonly follow: FollowCamera;
@@ -445,10 +502,6 @@ export class Game {
   /** 手持ちの投げ物。復帰で戻る */
   /** 投げる構えを取っているか。離した瞬間に投げる */
   private throwAiming = false;
-  /** しゃがみ / 回避のキーを押している時間 (秒) */
-  private stanceHeld = 0;
-  /** その押しで既に転がったか。離したときにしゃがませないため */
-  private stanceRolled = false;
   /**
    * 通信路。既定はタブ間 (BroadcastChannel)、URL に ?server= を付けると WebSocket。
    * ゲーム側はどちらで繋がっているかを知らない。
@@ -555,15 +608,21 @@ export class Game {
    * 替えられるのは湧くときだけ。試合中に持ち物を組み替えられると、
    * 状況ごとに最適な物へ乗り換えるだけになって、選ぶ意味が消える。
    */
-  private loadout: { primary: WeaponId; secondary: WeaponId; support: SupportId } = {
+  /**
+   * 湧き地点で組んだ装備。
+   *
+   * 副武器は**部屋が外すことがある** (ROOMS の secondary)。null を持てないと、
+   * サーバーは外しているのに手元にだけ拳銃が残る。
+   */
+  private loadout: { primary: WeaponId; secondary: WeaponId | null; support: SupportId } = {
     primary: "rifle",
-    secondary: "pistol",
+    secondary: "m9",
     support: "grenade",
   };
   /** 次に湧いたときの装備。試合中に変えても、いま持っている物は変わらない */
   private pendingLoadout = {
     primary: "rifle" as WeaponId,
-    secondary: "pistol" as WeaponId,
+    secondary: "m9" as WeaponId | null,
     support: "grenade" as SupportId,
   };
   /** いまどちらの枠を持っているか */
@@ -577,7 +636,7 @@ export class Game {
    */
   private inv = new Inventory({
     primary: "rifle",
-    secondary: "pistol",
+    secondary: "m9",
     support: "grenade",
   });
 
@@ -612,6 +671,13 @@ export class Game {
   private wasRolling = false;
   /** 直近に当てた部位と、その表示を消すまでの残り時間 */
   private lastHitZone = "";
+  /**
+   * その命中が麻酔だったか。**色を変えるためだけに持つ。**
+   *
+   * 赤は「削った」の色。麻酔は削らないので、同じ赤で出すと**倒しに行けている
+   * のか眠らせに行けているのか**が読めない。
+   */
+  private lastHitTranq = false;
   private hitFeedbackTimer = 0;
   /** 状態を送るタイマーの ID。描画ループとは独立して回る */
   private snapshotHandle = 0;
@@ -687,7 +753,7 @@ export class Game {
     this.wheelLeft = 0;
     // Z は 1 段ずつ上げて、一番上まで行ったら肩越しへ戻る。
     // トラックパッドではホイールが扱いにくいので、キーでも回せるようにしてある
-    const cycled = this.input.consumeAction("zoom", "KeyZ");
+    const cycled = this.input.tapped("zoom");
     const levels = this.weapon.scope.length;
 
     if (!this.player.isAiming || levels === 0) {
@@ -728,8 +794,17 @@ export class Game {
   private fps = 0;
   private onStats: ((stats: GameStats) => void) | null = null;
 
-  /** 乗っているステージ。**部屋が決める** (ROOM_STAGES) */
+  /** 乗っているステージ。**部屋が決める** (ROOMS) */
   private readonly stageName: StageName;
+  /**
+   * 持ち込める主武器。**部屋が決める** (ROOMS の primaries)。
+   *
+   * 一覧から消すだけでは足りない — 送ってくる側は止まらないので、
+   * サーバーも同じ表で弾く (domain/player/equip.ts)。ここは見せ方の話。
+   */
+  private readonly primaries: readonly WeaponId[];
+  /** 副武器。**部屋が外していれば null** (ROOMS の secondary) */
+  private readonly secondary: WeaponId | null;
 
   constructor(container: HTMLElement, identity: Identity, room: string) {
     this.container = container;
@@ -744,8 +819,17 @@ export class Game {
      * 読み直す道が要る。
      */
     this.stageName = STAGES[
-      isRoomName(room) ? ROOM_STAGES[room].stages[0] : 'mall'
+      isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall'
     ].name;
+    this.primaries = isRoomName(room) ? primariesOf(room) : CHOICES.primary;
+    this.secondary = isRoomName(room) ? secondaryOf(room) : "m9";
+    // 手元の装備も部屋に合わせる。**サーバーは外しているのにこちらだけ持つ**を防ぐ
+    this.pendingLoadout.secondary = this.secondary;
+    this.loadout.secondary = this.secondary;
+    // 持ち込めない銃を選んだ状態で開かない。**サーバーも同じ表で丸める**
+    if (!this.primaries.includes(this.pendingLoadout.primary)) {
+      this.pendingLoadout.primary = this.primaries[0];
+    }
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room);
     // 自機のモデルはここで読み始める。**構築時ではない** —
@@ -769,6 +853,20 @@ export class Game {
     container.appendChild(this.renderer.domElement);
 
     this.stage = buildStage(this.scene, this.stageName);
+    /*
+     * **地形が届くまで人を落とさない。**
+     *
+     * buildStage はブロックアウトの箱だけ持ってすぐ返り、本物の地形は後から
+     * 差し替わる。庭園は足場が水面の 10m 上にあるので、届く前に湧くと**立つ
+     * 床が無いまま重力が効いて、そのまま落ちて溺れる** — 「たまに試合開始で
+     * 下に落ちる」の正体がこれ。
+     *
+     * 届いたら湧き直す。読み込みの間に流れた分の落下を無かったことにする。
+     */
+    void this.stage.ready.then(() => {
+      this.stageReady = true;
+      this.placeAtSpawn();
+    });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
      * 陣営の基地。**個人戦では出さない。**
@@ -927,6 +1025,8 @@ export class Game {
     // パッドはイベントを出さないので毎フレーム読みに行く。
     // 視点も移動もこの後の処理が読むので、フレームの先頭で更新しておく。
     this.input.pollGamepad(dt);
+    // 押している時間を進める。**単押しと長押しの別はここで決まる** (infra/input)
+    this.input.advance(dt);
 
     // 視点はマウスが唯一の駆動源。カメラを回してから移動方向を解決する。
     const look = this.input.consumeLook(this.look);
@@ -1000,7 +1100,7 @@ export class Game {
     this.follow.setViewHeight(this.player.viewHeight);
 
     this.updateSwitchKeys(dt);
-    this.updateStanceInput(dt);
+    this.updateStanceInput();
     this.updateLoadoutKeys();
     this.syncLoadoutPointer();
     this.syncHeld();
@@ -1010,26 +1110,38 @@ export class Game {
     this.applyWeaponView();
 
     // 成績表。開いている間はポインタを離して、押せる状態にする
-    if (this.input.consumeAction("menu", "Tab")) this.setMenu(!this.menuOpen);
+    if (this.input.tapped("menu")) this.setMenu(!this.menuOpen);
 
-    if (this.input.consumeAction("salute", "KeyV")) this.player.salute();
+    if (this.input.tapped("salute")) this.player.salute();
     this.updateLinks();
     // 押している間は手を挙げたまま。離すと下ろす
-    this.player.setSaluteHeld(this.input.isActionDown("salute", "KeyV"));
+    this.player.setSaluteHeld(this.input.down("salute"));
     // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
     // 先に見た物が倒したフラグを後の物が読むことになる
     this.triggerEdge = this.input.firing && !this.wasFiring;
     this.wasFiring = this.input.firing;
     this.updateThrowAim();
-    // 反動込みの照準を渡す。銃口が跳ね上がる動きが体にも出る。
-    this.player.update(
-      dt,
-      this.moveDir,
-      this.follow.aimYaw,
-      this.follow.aimPitch,
-      this.world,
-    );
-    this.reportFall();
+    /*
+     * **地形が届くまで人を進めない。**
+     *
+     * buildStage はブロックアウトの箱だけ持ってすぐ返り、本物の地形は後から
+     * 差し替わる。庭園は足場が水面の 10m 上にあるので、届く前に進めると
+     * **立つ床が無いまま重力だけが効いて、落ちて溺れる**。
+     *
+     * 止めるのは人の歩みだけで、描画も HUD も回し続ける — ここで tick ごと
+     * 抜けると読み込みの間だけ画面が固まる。
+     */
+    if (this.stageReady) {
+      // 反動込みの照準を渡す。銃口が跳ね上がる動きが体にも出る。
+      this.player.update(
+        dt,
+        this.moveDir,
+        this.follow.aimYaw,
+        this.follow.aimPitch,
+        this.world,
+      );
+      this.reportFall();
+    }
     this.updateFallScream();
     // 倒されている間は倒した相手を映す。それ以外は自分を追う
     const watching = this.killCamTarget;
@@ -1072,7 +1184,16 @@ export class Game {
     this.remotes.update(dt, Date.now());
     this.drops.update(dt);
     this.updateFootsteps();
-    this.grenades.update(dt, this.stageBoxes, (bounce) => {
+    this.grenades.update(dt, this.stageBoxes, this.stage.water, (bounce) => {
+      /*
+       * 水に落ちたら輪を出す。**跳ねる音は鳴らさない** — 水面で金属が跳ねる
+       * 音がすると、そこに硬い床があるように聞こえる。
+       *
+       * 手榴弾そのものは沈んで消えない。爆ぜるのはサーバーが決めていて、
+       * 水中でも同じ場所で爆ぜる。
+       */
+      // 手榴弾は重い。弾より大きく叩く
+      if (this.splashAt(bounce.position, GRENADE_SPLASH)) return;
       // 跳ねた音は全員の輪に出す。自分が投げたものも例外にしない。
       // 手榴弾は隠すものではなく、転がってきたことに気付かせるためのもの
       const gain = this.audio.play("bounce", bounce.position, bounce.strength);
@@ -1081,7 +1202,9 @@ export class Game {
     this.updateGrenadeAim();
     this.updateClaymoreRelease(dt);
     this.updateGrenadeRelease(dt);
-    this.thrown.update(dt, this.stage.collidables, (impact) => {
+    this.thrown.update(dt, this.stage.collidables, this.stage.water, (impact) => {
+      // 水に落ちたら輪だけ。囮の音が水面から鳴ると、そこが床に聞こえる
+      if (this.splashAt(impact.position, THROWN_SPLASH)) return;
       // 跳ねるたびに鳴る。自分が投げたものは輪に出さない
       // (どこへ落ちるかは分かっているので、映しても情報にならない)。
       const gain = this.audio.play("clink", impact.position, impact.strength);
@@ -1095,10 +1218,14 @@ export class Game {
     );
     this.shots.update(dt);
     this.blast.update(dt);
-    this.casings.update(dt, this.stageBoxes, (at) => {
+    this.casings.update(dt, this.stageBoxes, this.stage.water, (at) => {
+      // 水に落ちたら輪だけ出して沈める。**金属の音は鳴らさない**
+      // 薬莢は軽い。小さく叩く
+      if (this.splashAt(at, CASING_SPLASH)) return true;
       // 落ちた音。輪には出さない — 撃った位置は銃声が既に伝えているので、
       // ここで二重に印を付ける意味が無い
       this.audio.play("casingDrop", at);
+      return false;
     });
 
     this.renderer.render(this.scene, this.follow.camera);
@@ -1310,6 +1437,21 @@ export class Game {
         break;
 
       /*
+       * スタミナ。**麻酔を受けた本人にだけ届く。**
+       *
+       * 眠るかどうかを決めるのはサーバー。こちらは知らせを受けて倒れるだけで、
+       * **自分で起きられない** — 起きられるなら麻酔は効かない。
+       */
+      case "stamina": {
+        this.stamina = message.stamina;
+        const left = (message.sleepUntil - Date.now()) / 1000;
+        if (left > 0) this.player.sleep(left);
+        else this.player.wake();
+        break;
+      }
+
+
+      /*
        * 自分の本当の値。**3 秒ごとに届く。**
        *
        * 撃った瞬間に減らすのも、体力 0 で倒れるのもこちらがやっている
@@ -1345,6 +1487,7 @@ export class Game {
         this.inv.restore(message.magazine, message.reserve, message.grenades);
         this.pendingLoadout.support = message.support;
         this.pendingLoadout.primary = message.primary;
+        this.pendingLoadout.secondary = message.secondary;
         this.onLoadout?.(this.pendingLoadout);
         void this.player.equip(message.primary);
         this.follow.snapTo(this.player, this.cameraWorld);
@@ -1694,17 +1837,22 @@ export class Game {
     if (!this.canChooseLoadout) return;
     // 決めたら湧く。閉じるのではなく**戦場へ出る**ので、サーバーに頼む。
     // 湧かせるかどうかを決めるのはあちら (支度に入って 3 秒経つまでは通らない)
-    if (this.input.consumeKeyPress("Enter") || this.input.consumeKeyPress("KeyL")) {
+    if (this.input.tapped("spawn")) {
       this.requestSpawn();
     }
     // **番号は並び順から出す。** 主武器が 1 から、投擲はその続き。
     // 直に書くと、銃が 1 挺増えたときに番号が重なる (P90 を足して実際に重なった)
-    const choices = CHOICES.primary;
+    const choices = this.primaries;
     choices.forEach((id, i) => {
-      if (this.input.consumeKeyPress(`Digit${i + 1}`)) this.setLoadout(id);
+      if (this.input.slotPressed(i)) this.setLoadout(id);
+    });
+    // 副武器。**主武器の続き番号。** 持たせない部屋では番号ごと詰める
+    const seconds = this.secondary === null ? [] : CHOICES.secondary;
+    seconds.forEach((id, i) => {
+      if (this.input.slotPressed(choices.length + i)) this.setSecondary(id);
     });
     SUPPORTS.forEach((id, i) => {
-      if (this.input.consumeKeyPress(`Digit${choices.length + 1 + i}`)) this.setSupport(id);
+      if (this.input.slotPressed(choices.length + seconds.length + i)) this.setSupport(id);
     });
   }
 
@@ -1891,6 +2039,20 @@ export class Game {
   }
 
   /**
+   * 副武器を選ぶ。**その部屋が持たせない場合は何もしない。**
+   *
+   * 拳銃が 1 挺しか無かった頃は選ぶ物が無かった。麻酔銃 (M9) と殺傷 (M1911) に
+   * 分かれてからは、**どちらを腰に提げるか**が判断になっている。
+   */
+  setSecondary(secondary: WeaponId): void {
+    if (this.secondary === null) return;
+    this.pendingLoadout.secondary = secondary;
+    this.sendLoadout();
+    this.applyLoadoutNow();
+    this.onLoadout?.(this.pendingLoadout);
+  }
+
+  /**
    * 選んだ物をサーバーへ知らせる。
    *
    * 数を持っているのがあちらなので、伝えないと選んだ物と配られる物が食い違う。
@@ -1902,6 +2064,8 @@ export class Game {
       type: "loadout",
       support: this.pendingLoadout.support,
       primary: this.pendingLoadout.primary,
+      // 持たせない部屋 (null) では送らない。**送ると弾かれる**
+      secondary: this.pendingLoadout.secondary ?? undefined,
     });
   }
 
@@ -2011,6 +2175,53 @@ export class Game {
     // 道具の枠ごと none へ戻す (持ち替えだと枠に C.BOX が残る)
     this.inv.dropTool();
     this.syncHeld();
+  }
+
+  /**
+   * そこは水面か。**水なら輪を出して true を返す。**
+   *
+   * 弾も薬莢も手榴弾も囮も、水に落ちたときの見え方は同じ — 輪が広がって
+   * 消える。判じ方を 1 か所に置いて、落ちる物ごとに書かない。
+   */
+  private splashAt(at: THREE.Vector3, strength = 1): boolean {
+    const water = this.stage.water;
+    if (!water) return false;
+    /*
+     * **水面ちょうどか、その下か。**
+     *
+     * 長らく「水面より 20cm 上まで」を水として数えていた。地面が水面のすぐ下に
+     * あった頃はそれで足りたが、**板が水面の 8cm 上に浮いている**いまは、
+     * 板の上に置いた手榴弾まで水として数えてしまう (爆ぜずに水柱が立った)。
+     *
+     * 沈む物は水面ちょうどに置かれる (ballistic.ts / thrown.ts) ので、
+     * 数え落ちを防ぐ幅だけあればいい。
+     */
+    if (at.y > water.y + SURFACE_TOLERANCE) return false;
+    if (Math.abs(at.x) >= water.half || Math.abs(at.z) >= water.half) return false;
+    this.shots.splash(at, water.y, strength);
+    return true;
+  }
+
+  /**
+   * 弾道が水面を突いたか。**突いたなら to をそこへ縮める。**
+   *
+   * 弾は水に当たっても止まる物として扱う。水の下には海底があるので、放って
+   * おくと**水面を素通りして 10m 下の底に痕が付く** — 水柱もそこへ出るので、
+   * 撃った所とずれた場所に、しかも水面の下で上がる。
+   *
+   * 当たった地形より水面のほうが手前なら、そこで切る。
+   */
+  private splashOnPath(from: THREE.Vector3, to: THREE.Vector3): boolean {
+    const water = this.stage.water;
+    if (!water) return false;
+    if (to.y >= water.y || from.y < water.y) return false;
+    const t = (water.y - from.y) / (to.y - from.y);
+    const x = from.x + (to.x - from.x) * t;
+    const z = from.z + (to.z - from.z) * t;
+    if (Math.abs(x) >= water.half || Math.abs(z) >= water.half) return false;
+    to.set(x, water.y, z);
+    this.shots.splash(to, water.y);
+    return true;
   }
 
   /** ナイフを振り始める。リロード中と多重の振りは受け付けない */
@@ -2152,7 +2363,7 @@ export class Game {
      */
     this.player.setReloadHold(this.reloadTimer > 0);
 
-    if (this.input.consumeAction("reload", "KeyR")) this.startReload();
+    if (this.input.tapped("reload")) this.startReload();
 
     this.fireCooldown -= dt;
 
@@ -2336,12 +2547,20 @@ export class Game {
     this.audio.play(this.weapon.shotSound, this.muzzlePos);
     // 撃っている間は何も聞こえない
     this.soundRing.suppress(1);
+    /*
+     * 水面を叩いたか。**痕ではなく輪を出す** (splashAt が両方やる)。
+     *
+     * 水に穴は開かないし、痕を残すと撃ち合った跡が水面に溜まる。
+     */
+    const splashed =
+      hitPlayer === null && this.splashOnPath(this.muzzlePos, this.hitPoint);
+
     this.shots.fire(
       this.muzzlePos,
       this.hitPoint,
       // **人に当たったら痕を出さない。** 痕はワールドに置くので、当たった
       // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
-      hitPlayer ? null : hitTerrain ? this.hitNormal : null,
+      hitPlayer || splashed ? null : hitTerrain ? this.hitNormal : null,
       IMPACT_WORLD,
     );
     this.shotCount++;
@@ -2405,6 +2624,7 @@ export class Game {
       // 味方に当てたときは部位を出さない。どこに当たったかは意味を持たず、
       // 知りたいのは「味方を撃った」という一点だけ。
       this.lastHitZone = friendly ? "FF" : `${player.zone} ${distance.toFixed(0)}m`;
+      this.lastHitTranq = this.weapon.tranquilizer === true;
       this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
     }
   }
@@ -2421,17 +2641,19 @@ export class Game {
    * ローリングは押している途中で出す。離してから出すと、判断してから
    * 体が動くまでに押していた時間ぶんの遅れが乗る。避ける動作でそれは致命的。
    * しゃがみのほうは離してから出す (押している間はまだどちらか決まらない)。
+   *
+   * **どちらかを決めるのは入力の側** (infra/input の BINDINGS)。ここは
+   * 「しゃがむのか、転がるのか」だけを受け取る — 秒を数えるのも、キーが
+   * Space なのかパッドの × なのかも、こちらは知らない。
    */
-  private updateStanceInput(dt: number): void {
-    if (this.input.consumeAction("roll", "Space")) {
-      this.stanceHeld = 0;
-      this.stanceRolled = false;
-    }
+  private updateStanceInput(): void {
+    // 短く押して離した = しゃがみの切り替え
+    if (this.input.tapped("stance")) this.player.toggleCrouch();
 
-    if (this.input.isActionDown("roll", "Space")) {
-      this.stanceHeld += dt;
-      if (!this.stanceRolled && this.stanceHeld >= ROLL_HOLD_TIME) {
-        this.stanceRolled = true;
+    if (this.input.holding("stance")) {
+      // 長押しが成立した。**1 回の押下につき 1 度だけ転がる**
+      if (!this.rolledThisHold) {
+        this.rolledThisHold = true;
         // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
         if (!this.cocking) this.player.roll();
       }
@@ -2444,15 +2666,16 @@ export class Game {
        *
        * 起き上がるのは Space のタップ (player.toggleCrouch)。
        */
-      if (this.stanceRolled && !this.player.rolling) this.player.setProne(true);
+      if (this.rolledThisHold && !this.player.rolling) this.player.setProne(true);
       return;
     }
 
-    if (this.stanceHeld > 0) {
-      if (!this.stanceRolled) this.player.toggleCrouch();
-      this.stanceHeld = 0;
-    }
+    // 離した。次の押下でまた転がれる
+    this.rolledThisHold = false;
   }
+
+  /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */
+  private rolledThisHold = false;
 
   /**
    * 投げる構えと、離したときの投擲。
@@ -2478,7 +2701,12 @@ export class Game {
     if (held && !release) {
       this.follow.aimOrigin(this.aimOrigin);
       this.follow.aimDirection(this.aimDir);
-      this.thrown.showPreview(this.aimOrigin, this.aimDir, this.stage.collidables);
+      this.thrown.showPreview(
+        this.aimOrigin,
+        this.aimDir,
+        this.stage.collidables,
+        this.stage.water,
+      );
       if (!this.throwAiming) this.pendingDecoy = this.triggerEdge;
       this.throwAiming = true;
       return;
@@ -2636,6 +2864,7 @@ export class Game {
         this.grenadeOrigin,
         this.aimDir,
         this.stageBoxes,
+        this.stage.water,
         throwSpeedOf(this.skills),
       );
       // 体を照準の方へ向ける。投げる向きと見た目を一致させる
@@ -2863,13 +3092,13 @@ export class Game {
     const wheel = this.input.consumeWheel();
     const intent: Intent = {
       browse: {
-        weapon: this.input.isActionDown("swap", "KeyQ"),
-        tool: this.input.isActionDown("box", "KeyC"),
+        weapon: this.input.down("swapWeapon"),
+        tool: this.input.down("swapTool"),
       },
       select: wheel + this.input.consumeListStep(),
-      drop: this.input.consumeAction("drop", "KeyG"),
-      toSupport: this.input.consumeAction("grenade", "KeyE"),
-      toKnife: this.input.consumeAction("knife", "KeyF"),
+      drop: this.input.tapped("drop"),
+      toSupport: this.input.tapped("toSupport"),
+      toKnife: this.input.tapped("toKnife"),
     };
 
     const events = this.inv.hand(intent, {
@@ -2967,6 +3196,14 @@ export class Game {
       this.grenades.remove(id) ?? new THREE.Vector3(at[0], at[1], at[2]);
     const gain = this.audio.play("explosion", position, 1);
     this.addPing("shot", position, gain);
+    /*
+     * 水の中で爆ぜたか。**火ではなく水を上げる。**
+     *
+     * 沈んだ手榴弾はそのまま底で爆ぜる。火の玉を出しても不透明な水面の下で
+     * 見えないので、「何も起きなかった」ように見える。水柱なら**水面越しに
+     * どこで爆ぜたかが分かる** — 傷は届いているので、見えないほうが困る。
+     */
+    if (this.splashAt(position, BLAST_SPLASH)) return;
     this.blast.explode(position);
   }
 
@@ -3264,11 +3501,34 @@ export class Game {
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
       spread: this.spread.degrees(this.weapon, this.skills),
+      // 持ち込める主武器。**部屋が絞る**ことがある (ROOMS の primaries)
+      primaries: this.primaries,
+      /*
+       * 次に湧いたときの装備。**画面が別に控えない。**
+       *
+       * 画面側で信号に持たせていた頃、初期値が 'rifle' で固定されていた。
+       * 狙撃銃だけの部屋では**どれも選ばれていない**状態で開く (一覧に rifle が
+       * 無いので、どの札にも印が付かない)。選んでいる物を知っているのはこちら。
+       */
+      primary: this.pendingLoadout.primary,
+      /*
+       * 副武器。**選んでいる物を返す** (部屋が外していれば null)。
+       *
+       * 長らく部屋の規則 (this.secondary) をそのまま返していた。拳銃が 1 挺しか
+       * 無かった頃は「許す副武器」と「選んだ副武器」が常に同じだったので気づけ
+       * なかったが、M9 と M1911 に分かれた途端に**印が M9 から動かなくなった** —
+       * 選べてはいるのに、装備画面はいつも M9 が光っている。
+       *
+       * pendingLoadout.secondary は部屋の規則から始まるので、外している部屋では
+       * null のまま。どちらの意味でも読める。
+       */
+      secondary: this.pendingLoadout.secondary,
       // 粒が散る角度 (度)。**0 でなければクロスヘアが輪になる**
       pelletSpread: pelletsOf(this.weapon) > 1 ? (this.weapon.pelletSpread ?? 0) : 0,
       crouching: this.player.isCrouching,
       stance: this.player.stance,
       hitZone: this.hitFeedbackTimer > 0 ? this.lastHitZone : "",
+      hitTranq: this.lastHitTranq,
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
       menuOpen: this.menuOpen,
       loadoutOpen: this.loadoutBlocking,
@@ -3286,6 +3546,9 @@ export class Game {
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
       scores: this.replica.match?.players ?? [],
+      stamina: this.stamina,
+      asleep: this.player.sleeping,
+      sleepDepth: this.player.sleepDepth,
       health: this.player.health,
       maxHealth: MAX_HEALTH,
       dead: this.player.isDead,

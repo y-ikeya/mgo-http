@@ -31,7 +31,7 @@ const base = {
 const cases: Record<string, Partial<GameStats>> = {
   normal: {},
   boxed: { held: 'box', tool: 'box', toolInHand: true },
-  boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'pistol', ammo: 10, magazine: 12, reserve: 48 },
+  boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'm9', ammo: 10, magazine: 12, reserve: 48 },
   noneSelected: { tool: 'none', toolInHand: false },
   empty: { ammo: 0 },
   reloading: { ammo: 0, reloading: true },
@@ -81,7 +81,7 @@ const cases: Record<string, Partial<GameStats>> = {
     browsing: {
       items: [
         { id: 'rifle', n: 84, loaded: 24, mag: 30 },
-        { id: 'pistol', n: 58, loaded: 10, mag: 12 },
+        { id: 'm9', n: 58, loaded: 10, mag: 12 },
         { id: 'grenade', n: 3, loaded: null, mag: null },
         { id: 'knife', n: null, loaded: null, mag: null },
       ],

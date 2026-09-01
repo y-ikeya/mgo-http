@@ -12,6 +12,7 @@
  */
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
+import { CHOICES, type WeaponId } from '../../src/domain/item/weapons'
 import Loadout from '../../src/presentation/ui/Loadout'
 import type { SkillId, Skills } from '../../src/domain/player/skill'
 
@@ -23,21 +24,28 @@ const CASES: Record<string, { skills: Skills; open: boolean; note: string }> = {
 
 const which = new URLSearchParams(location.search).get('case') ?? 'open'
 const chosen = CASES[which] ?? CASES.open
+/** ?room=delta で「砂部屋」(狙撃銃だけ) の姿を見る */
+const sandbox = new URLSearchParams(location.search).get('room') === 'delta'
 
 function Harness() {
   // 押した結果はサーバーが返す物なので、ここでは本物の代わりに素直に書き換える
   const [skills, setSkills] = createSignal<Skills>(chosen.skills)
+  const [pick, setPick] = createSignal<WeaponId>(sandbox ? 'sniper' : 'rifle')
+  const [side, setSide] = createSignal<WeaponId>('m9')
   return (
     <Loadout
-      primary="rifle"
+      primary={pick()}
       support="grenade"
-      onPrimary={() => {}}
+      onPrimary={(id) => setPick(id)}
+      onSecondary={(id) => setSide(id)}
       onSupport={() => {}}
       note={chosen.note}
       left={22}
       wait={0}
       onSpawn={() => {}}
       skills={skills()}
+      primaries={sandbox ? ['sniper'] : CHOICES.primary}
+      secondary={sandbox ? null : side()}
     />
   )
 }

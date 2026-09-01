@@ -176,6 +176,8 @@ export default function Scoreboard(props: {
               <span class="score-cols">
                 <span class="score-col-points">P</span>
                 <span>K</span>
+                {/* 眠らせた数。**倒した数には入らない** — 残機が減っていない */}
+                <span class="score-col-stun">S</span>
                 <span>D</span>
                 <span class="score-col-rate">/s</span>
               </span>
@@ -197,6 +199,7 @@ export default function Scoreboard(props: {
                   </span>
                   <span class="score-num score-points">{pointsOf(player)}</span>
                   <span class="score-num">{player.kills}</span>
+                  <span class="score-num score-stuns">{player.stuns || ''}</span>
                   <span class="score-num score-deaths">{player.deaths}</span>
                   <span
                     class="score-num score-rate"
@@ -224,6 +227,8 @@ export default function Scoreboard(props: {
                     {/* 点。kill +3 / death -2 の合算 */}
                     <span class="score-col-points">P</span>
                     <span>K</span>
+                    {/* 眠らせた数。**倒した数には入らない** */}
+                    <span class="score-col-stun">S</span>
                     <span>D</span>
                     {/* 通信。名目 64 通/秒 */}
                     <span class="score-col-rate">/s</span>
@@ -252,6 +257,7 @@ export default function Scoreboard(props: {
                       */}
                       <span class="score-num score-points">{pointsOf(player)}</span>
                       <span class="score-num">{player.kills}</span>
+                      <span class="score-num score-stuns">{player.stuns || ''}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
                       {/*
                         位置が届いている回数。低い人は自分の機械が送れていない。

@@ -74,6 +74,94 @@ const POOL_SIZE = 24
 const IMPACT_POOL = 256
 
 /**
+ * 水しぶき。**弾や物が水面を叩いたときだけ。**
+ *
+ * 弾痕は残せない — 水面に穴は開かないし、痕を残すと堀が弾痕だらけになる。
+ * その場限りの動きで「そこへ落ちた」を見せる。撃った場所が一瞬だけ見える
+ * ので、外した弾がどこへ行ったかは分かる。
+ *
+ * --- 3 つ重ねる ---
+ * 長らく**平らな輪が 1 枚**広がって消えるだけだった。輪は水面を上から見た
+ * ときの形でしかなく、**上へ上がる水が無い**ので、水に落ちたというより
+ * 白い図形が現れて消えるように見えていた。
+ *
+ * 実際に起きるのは 3 つで、時間の尺度がそれぞれ違う。
+ *
+ *   1. 水の柱 (〜0.4 秒)  叩かれた水が跳ね上がり、崩れて落ちる。**一番速い**
+ *   2. しぶき (〜0.6 秒)  柱から飛び散る粒。落ちて水面に触れた所で消える
+ *   3. 波紋   (〜1.2 秒)  遅れて 2 本、外へ広がる。**一番長く残る**
+ *
+ * 速い物ほど明るく、遅い物ほど薄い。まとめて 1 つの寿命にすると、輪が消える
+ * まで柱が立ったままになるか、柱に合わせて輪が一瞬で消えるかのどちらかになる。
+ */
+const SPLASH_POOL = 48
+
+/**
+ * 水の色。**白ではない。**
+ *
+ * しぶきは泡なので確かに白いが、真っ白で塗ると紙に見える。空を映している
+ * 水の中に置くので、**空側へ寄せた薄い青**にして、白さは不透明度で出す。
+ */
+const FOAM_COLOR = 0xd6e6f2
+const DROP_COLOR = 0xdfecf6
+
+/** 水の柱。立ち上がってから崩れるまで */
+const COLUMN_LIFE = 0.38
+/** 立ち上がり切った高さ (m) と、根元の太さ */
+const COLUMN_HEIGHT = 0.42
+const COLUMN_RADIUS = 0.1
+/** 上ほど開く。杯の形にすると、崩れながら広がる水に見える */
+const COLUMN_FLARE = 2.4
+/** 開き方の曲がり。1 で円錐、大きいほど根元が締まって上で開く */
+const COLUMN_CURVE = 1.9
+/** 上端の消え方。大きいほど上のほうだけ薄くなる */
+const COLUMN_FADE = 1.15
+/** 形の分割。縦は輪郭の滑らかさ、横は円としての角の見えなさ */
+const COLUMN_STEPS = 12
+const COLUMN_SIDES = 16
+/** 立ち上がりに使う割合。残りで崩れる。**上がるほうが速い** */
+const COLUMN_RISE = 0.28
+
+/** 根元の泡。柱の下の硬い縁を隠す */
+const FOAM_LIFE = 0.5
+const FOAM_RADIUS = 0.3
+
+/**
+ * 飛び散る粒。**小さいものを多く。**
+ *
+ * 大きい玉を 7 個にしていたが、1 粒ずつが読めてしまって水ではなく物が飛んで
+ * いるように見えた。血 (1 回 20 枚) と同じで、**粒が細かく散らばっているほど
+ * 液体に見える**。1 つ 1 つを追えない数にする。
+ *
+ * 描く負担は増えない — 1 つの塊にまとめてあるので、増えるのは姿勢の数だけ。
+ */
+const DROPS_PER_SPLASH = 18
+const DROP_POOL = SPLASH_POOL * DROPS_PER_SPLASH
+const DROP_RADIUS = 0.013
+/** 粒ごとの大きさのばらつき (倍)。揃うと粒に見えない */
+const DROP_SIZE_MIN = 0.55
+const DROP_SIZE_MAX = 1.8
+/** 上へ跳ねる速さと、外へ散る速さ (m/s) */
+const DROP_RISE = 3.3
+const DROP_SPREAD = 1.9
+/**
+ * 落ちる速さ。**実際より重くする。**
+ *
+ * 本物の重力で投げると、粒が 1 秒近く空に浮いたままになる。粒は水の一部で
+ * あって放物線を見せる物ではないので、**さっと上がってすぐ戻る**ほうがいい。
+ */
+const DROP_GRAVITY = 11
+
+/** 波紋。1 回あたり 2 本、遅らせて出す */
+const RIPPLES_PER_SPLASH = 2
+const RIPPLE_POOL = SPLASH_POOL * RIPPLES_PER_SPLASH
+const RIPPLE_LIFE = 1.2
+/** 広がり切ったときの半径 (m) */
+const RIPPLE_RADIUS = 1.25
+/** 2 本目が遅れて出るまで (秒) */
+const RIPPLE_DELAY = 0.17
+
+/**
  * 血のプール数。**弾痕とは別に持つ。**
  *
  * 同じ輪を使い回していたら、撃ち合いが続くと**外した弾が血を押し出していた**。
@@ -93,6 +181,40 @@ const IMPACT_RADIUS = 0.05
 
 
 /**
+ * 水の柱の形。**高さ 1、底が原点。**
+ *
+ * 使い回すので 1 つだけ作る (48 本すべてが同じ形を指す)。大きさと寿命は
+ * それぞれの姿勢で持つ。
+ */
+function buildColumnGeometry(): THREE.LatheGeometry {
+  const profile: THREE.Vector2[] = []
+  for (let i = 0; i <= COLUMN_STEPS; i++) {
+    const t = i / COLUMN_STEPS
+    // 上へ行くほど急に開く。直線だと円錐の輪郭が出る
+    profile.push(new THREE.Vector2(COLUMN_RADIUS * (1 + COLUMN_FLARE * t ** COLUMN_CURVE), t))
+  }
+  const geometry = new THREE.LatheGeometry(profile, COLUMN_SIDES)
+
+  /*
+   * 上端を透かす。**縁を線にしない。**
+   *
+   * 濃さを頂点で持たせると、面の途中で滑らかに 0 へ落ちる。切り落とした縁が
+   * 見えなくなるので、崩れた水が空気に散っているように見える。
+   */
+  const position = geometry.getAttribute('position')
+  const colors = new Float32Array(position.count * 4)
+  for (let v = 0; v < position.count; v++) {
+    const t = position.getY(v)
+    colors[v * 4] = 1
+    colors[v * 4 + 1] = 1
+    colors[v * 4 + 2] = 1
+    colors[v * 4 + 3] = (1 - t) ** COLUMN_FADE
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4))
+  return geometry
+}
+
+/**
  * 発砲の見た目 (トレーサー + 着弾痕) だけを担当する。
  *
  * ここにあるのは完全にクライアントローカルな演出で、ヒット判定そのものではない。
@@ -108,6 +230,36 @@ export class Shots {
 
   private readonly impacts: THREE.Mesh[] = []
   private readonly impactLife: number[] = []
+  /** 水の柱。1 回に 1 本 */
+  private readonly columns: THREE.Mesh[] = []
+  private readonly columnLife: number[] = []
+  private readonly columnBase: number[] = []
+  private readonly columnReach: number[] = []
+  private columnNext = 0
+
+  /** 根元の泡 */
+  private readonly foams: THREE.Mesh[] = []
+  private readonly foamLife: number[] = []
+  private readonly foamReach: number[] = []
+  private foamNext = 0
+
+  /** 飛び散る粒。1 つの塊にまとめて描く (1 回 7 個 × 48 回) */
+  private drops!: THREE.InstancedMesh
+  private readonly dropLife = new Float32Array(DROP_POOL)
+  private readonly dropAt = new Float32Array(DROP_POOL * 3)
+  private readonly dropVelocity = new Float32Array(DROP_POOL * 3)
+  private readonly dropFloor = new Float32Array(DROP_POOL)
+  private readonly dropSize = new Float32Array(DROP_POOL)
+  private dropNext = 0
+  private readonly dropMatrix = new THREE.Matrix4()
+  private readonly dropScale = new THREE.Vector3()
+
+  /** 波紋。1 回に 2 本 */
+  private readonly ripples: THREE.Mesh[] = []
+  private readonly rippleLife: number[] = []
+  private readonly rippleDelay: number[] = []
+  private readonly rippleReach: number[] = []
+  private rippleNext = 0
   private impactNext = 0
 
   /** 血。**弾痕とは別の輪** — 外した弾に押し出させない */
@@ -198,9 +350,119 @@ export class Shots {
       this.group.add(impact)
       this.impacts.push(impact)
       this.impactLife.push(0)
-
-
     }
+
+    /*
+     * 水の柱。**上ほど開いて、上ほど薄い。**
+     *
+     * 円錐 (下が太い) だと水滴が落ちてくるように見える。叩かれた水は逆で、
+     * 根元が細く上が開く。蓋を付けないので中が抜けて、**水の膜**に見える。
+     *
+     * 真っ直ぐな筒だと縁が直線になって、水ではなく紙コップに見えた。
+     * 母線を曲げて (t^COLUMN_CURVE) 上へ行くほど急に開かせ、**上端を頂点の
+     * 色で透かして**輪郭を溶かす。上が切り落とされていないので、崩れながら
+     * 空気に散っていく形になる。
+     */
+    const columnGeometry = buildColumnGeometry()
+    for (let i = 0; i < SPLASH_POOL; i++) {
+      const column = new THREE.Mesh(
+        columnGeometry,
+        new THREE.MeshBasicMaterial({
+          color: FOAM_COLOR,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          // 上端を消すための頂点ごとの濃さ
+          vertexColors: true,
+        }),
+      )
+      column.visible = false
+      this.group.add(column)
+      this.columns.push(column)
+      this.columnLife.push(0)
+      this.columnBase.push(0)
+      this.columnReach.push(COLUMN_HEIGHT)
+    }
+
+    /*
+     * 根元の泡。**柱の下の縁を隠す。**
+     *
+     * 筒をそのまま置くと、水面と交わる所に硬い輪郭が出て「置いた物」に見える。
+     * 泡を 1 枚重ねると水が乱れている面になり、柱がそこから生えて見える。
+     */
+    for (let i = 0; i < SPLASH_POOL; i++) {
+      const foam = new THREE.Mesh(
+        new THREE.CircleGeometry(1, 20),
+        new THREE.MeshBasicMaterial({
+          color: FOAM_COLOR,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+        }),
+      )
+      foam.rotation.x = -Math.PI / 2
+      foam.visible = false
+      this.group.add(foam)
+      this.foams.push(foam)
+      this.foamLife.push(0)
+      this.foamReach.push(FOAM_RADIUS)
+    }
+
+    /*
+     * 飛び散る粒。**1 つの塊にまとめる。**
+     *
+     * 1 回で 7 個、48 回ぶんで 336 個。別々の Mesh にすると描く回数がそのまま
+     * 増えるので、姿勢だけ差し替える InstancedMesh にする。
+     *
+     * 玉は 5 面。粒は 1cm ほどで、しかも動いているので、丸さは要らない。
+     */
+    this.drops = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(DROP_RADIUS, 5, 3),
+      new THREE.MeshBasicMaterial({ color: DROP_COLOR, transparent: true, opacity: 0.8, depthWrite: false }),
+      DROP_POOL,
+    )
+    this.drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    this.drops.frustumCulled = false
+    // 使っていない粒は潰して隠す。visible は塊ごとにしか効かない
+    for (let i = 0; i < DROP_POOL; i++) this.hideDrop(i)
+    this.drops.instanceMatrix.needsUpdate = true
+    this.group.add(this.drops)
+
+    /*
+     * 波紋。**平らに寝かせた細い輪。**
+     *
+     * 面を持たない輪 (RingGeometry) にしてあるのは、水面と同じ高さで塗り潰すと
+     * 水の色が消えるから。縁だけなら、広がっていく波として読める。
+     *
+     * 分割を 48 にしてあるのは、**広がると多角形の角が見える**ため。半径 1m を
+     * 超えるので、16 では輪ではなく十六角形に見えていた。
+     */
+    for (let i = 0; i < RIPPLE_POOL; i++) {
+      const ripple = new THREE.Mesh(
+        new THREE.RingGeometry(0.88, 1, 48),
+        new THREE.MeshBasicMaterial({
+          color: FOAM_COLOR,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      )
+      ripple.rotation.x = -Math.PI / 2
+      ripple.visible = false
+      this.group.add(ripple)
+      this.ripples.push(ripple)
+      this.rippleLife.push(0)
+      this.rippleDelay.push(0)
+      this.rippleReach.push(RIPPLE_RADIUS)
+    }
+  }
+
+  /** 使っていない粒を潰して隠す */
+  private hideDrop(index: number): void {
+    this.dropMatrix.makeScale(0, 0, 0)
+    this.drops.setMatrixAt(index, this.dropMatrix)
   }
 
   /**
@@ -237,6 +499,86 @@ export class Shots {
     impact.visible = true
     this.impactLife[this.impactNext] = IMPACT_LIFE
     this.impactNext = (this.impactNext + 1) % IMPACT_POOL
+  }
+
+  /**
+   * 水面を叩いた。**柱が立ち、粒が散り、波紋が広がる。**
+   *
+   * 痕は残さない。水面に穴は開かないし、残すと撃ち合った跡が水に溜まる。
+   *
+   * @param at 叩いた場所
+   * @param surfaceY 水面の高さ。粒が**ここまで落ちたら消える**
+   * @param strength 叩いた強さ (1 = 銃弾)。手榴弾のような重い物は大きく出す
+   */
+  splash(at: THREE.Vector3, surfaceY: number, strength = 1): void {
+    const scale = Math.min(3, Math.max(0.5, strength))
+    /*
+     * **勢いは重さの平方根で効かせる。**
+     *
+     * 高さをそのまま倍にすると、手榴弾のしぶきが人の背丈を越えて噴水になる。
+     * 落ちた物のエネルギーは重さに比例し、上がる高さはその平方根で効く。
+     */
+    const push = Math.sqrt(scale)
+
+    // --- 水の柱 ---
+    const column = this.columns[this.columnNext]
+    column.position.set(at.x, surfaceY, at.z)
+    column.scale.set(scale, 0, scale)
+    // 回しておく。同じ所へ撃ち込んでも同じ形が並ばない
+    column.rotation.y = Math.random() * Math.PI * 2
+    column.visible = true
+    this.columnLife[this.columnNext] = COLUMN_LIFE
+    this.columnBase[this.columnNext] = surfaceY
+    this.columnReach[this.columnNext] = COLUMN_HEIGHT * push
+    this.columnNext = (this.columnNext + 1) % SPLASH_POOL
+
+    // --- 根元の泡 ---
+    const foam = this.foams[this.foamNext]
+    foam.position.set(at.x, surfaceY + 0.008, at.z)
+    foam.scale.setScalar(0.001)
+    foam.visible = true
+    this.foamLife[this.foamNext] = FOAM_LIFE
+    this.foamReach[this.foamNext] = FOAM_RADIUS * scale
+    this.foamNext = (this.foamNext + 1) % SPLASH_POOL
+
+    // --- 飛び散る粒 ---
+    for (let n = 0; n < DROPS_PER_SPLASH; n++) {
+      const i = this.dropNext
+      this.dropNext = (this.dropNext + 1) % DROP_POOL
+      /*
+       * 向きは円周に散らす。**等間隔にしない** — 揃うと花火の形になる。
+       * 半端な角を足して回すと、続けて撃っても同じ形が並ばない。
+       */
+      const angle = (n / DROPS_PER_SPLASH + i * 0.137) * Math.PI * 2 + Math.random() * 0.35
+      // 中心ほど高く、外ほど低く飛ぶ。柱から剥がれて散る形になる
+      const outward = (0.35 + Math.random() * 0.65) * DROP_SPREAD * push
+      const up = (0.6 + Math.random() * 0.7) * DROP_RISE * push
+      this.dropAt[i * 3] = at.x
+      this.dropAt[i * 3 + 1] = surfaceY + 0.03
+      this.dropAt[i * 3 + 2] = at.z
+      this.dropVelocity[i * 3] = Math.cos(angle) * outward
+      this.dropVelocity[i * 3 + 1] = up
+      this.dropVelocity[i * 3 + 2] = Math.sin(angle) * outward
+      this.dropFloor[i] = surfaceY
+      this.dropSize[i] = DROP_SIZE_MIN + Math.random() * (DROP_SIZE_MAX - DROP_SIZE_MIN)
+      // 上がって落ちるまで。落ちた所で消えるので、これは切り上げの保険
+      this.dropLife[i] = 0.9
+    }
+
+    // --- 波紋 ---
+    for (let n = 0; n < RIPPLES_PER_SPLASH; n++) {
+      const i = this.rippleNext
+      this.rippleNext = (this.rippleNext + 1) % RIPPLE_POOL
+      const ripple = this.ripples[i]
+      // 水面と同じ高さだと奥行きで競るので僅かに浮かせる
+      ripple.position.set(at.x, surfaceY + 0.012, at.z)
+      ripple.scale.setScalar(0.001)
+      ripple.visible = false
+      this.rippleLife[i] = RIPPLE_LIFE
+      this.rippleDelay[i] = n * RIPPLE_DELAY
+      // 後から出る輪ほど届かない。**外側が先行する**ので追い越さない
+      this.rippleReach[i] = RIPPLE_RADIUS * scale * (n === 0 ? 1 : 0.62)
+    }
   }
 
   /**
@@ -330,6 +672,118 @@ export class Shots {
       }
       // 最後の 1/3 でだけ消えていく。それまでは痕として見えていてほしい
       material.opacity = Math.min(1, (this.impactLife[i] / IMPACT_LIFE) * 3)
+    }
+
+    /*
+     * 水の柱。**上がるのは速く、崩れるのは遅い。**
+     *
+     * 立ち上がりと崩れを 1 本の曲線にすると、上がった高さでそのまま消えるか、
+     * 上がりきる前に消えるかになる。頂点を持たせるために 2 つに割る。
+     */
+    for (let i = 0; i < SPLASH_POOL; i++) {
+      if (this.columnLife[i] <= 0) continue
+      this.columnLife[i] -= dt
+      const column = this.columns[i]
+      const material = column.material as THREE.MeshBasicMaterial
+      if (this.columnLife[i] <= 0) {
+        column.visible = false
+        material.opacity = 0
+        continue
+      }
+      const age = 1 - this.columnLife[i] / COLUMN_LIFE
+      // 立ち上がり (0..1)。頭を丸めて、頂点で止まって見えるようにする
+      const rise = Math.min(1, age / COLUMN_RISE) ** 0.55
+      // 崩れ (0..1)。頂点を過ぎてから効く
+      const fall = Math.max(0, (age - COLUMN_RISE) / (1 - COLUMN_RISE))
+      const height = this.columnReach[i] * rise * (1 - fall * fall)
+      // 崩れながら横に広がる。落ちる水が外へ逃げる
+      const spread = column.scale.x
+      column.scale.y = Math.max(0.001, height)
+      // 形の底が原点。水面へそのまま置く
+      column.position.y = this.columnBase[i]
+      column.scale.z = spread
+      material.opacity = (1 - age * age) * 0.55
+    }
+
+    /*
+     * 根元の泡。**広がりながら薄れる。**柱より少し長く残って、崩れた水が
+     * 水面に散っている間を埋める。
+     */
+    for (let i = 0; i < SPLASH_POOL; i++) {
+      if (this.foamLife[i] <= 0) continue
+      this.foamLife[i] -= dt
+      const foam = this.foams[i]
+      const material = foam.material as THREE.MeshBasicMaterial
+      if (this.foamLife[i] <= 0) {
+        foam.visible = false
+        material.opacity = 0
+        continue
+      }
+      const age = 1 - this.foamLife[i] / FOAM_LIFE
+      foam.scale.setScalar(this.foamReach[i] * (0.45 + age * 0.85))
+      material.opacity = (1 - age) ** 1.4 * 0.45
+    }
+
+    /*
+     * 飛び散る粒。**水面に触れた所で消す。**
+     *
+     * 薄れて消すと空中で溶けるので、落ちた粒がどこへ行ったか分からない。
+     * 水に戻った所で消えれば、それ自体が「水面はここ」を示す。
+     */
+    let dropsMoved = false
+    for (let i = 0; i < DROP_POOL; i++) {
+      if (this.dropLife[i] <= 0) continue
+      this.dropLife[i] -= dt
+      const p = i * 3
+      this.dropVelocity[p + 1] -= DROP_GRAVITY * dt
+      this.dropAt[p] += this.dropVelocity[p] * dt
+      this.dropAt[p + 1] += this.dropVelocity[p + 1] * dt
+      this.dropAt[p + 2] += this.dropVelocity[p + 2] * dt
+      dropsMoved = true
+      if (this.dropLife[i] <= 0 || this.dropAt[p + 1] <= this.dropFloor[i]) {
+        this.dropLife[i] = 0
+        this.hideDrop(i)
+        continue
+      }
+      /*
+       * 落ちるほど細長くする。**速さの向きに伸ばす**のではなく縦に伸ばす —
+       * 粒は小さすぎて向きが読めないので、伸びだけが速さとして伝わる。
+       */
+      const stretch = 1 + Math.min(0.9, Math.abs(this.dropVelocity[p + 1]) * 0.13)
+      const size = this.dropSize[i]
+      this.dropScale.set((size / Math.sqrt(stretch)), size * stretch, (size / Math.sqrt(stretch)))
+      this.dropMatrix.makeScale(this.dropScale.x, this.dropScale.y, this.dropScale.z)
+      this.dropMatrix.setPosition(this.dropAt[p], this.dropAt[p + 1], this.dropAt[p + 2])
+      this.drops.setMatrixAt(i, this.dropMatrix)
+    }
+    if (dropsMoved) this.drops.instanceMatrix.needsUpdate = true
+
+    /*
+     * 波紋。**広がるほど遅く、薄く。**
+     *
+     * 等速で広げると輪が外へ飛んでいくように見える。実際の波は最初に一番速く
+     * 動いて、あとは惰性で伸びる。1 - (1-t)^2 がその形になる。
+     */
+    for (let i = 0; i < RIPPLE_POOL; i++) {
+      if (this.rippleLife[i] <= 0) continue
+      if (this.rippleDelay[i] > 0) {
+        this.rippleDelay[i] -= dt
+        continue
+      }
+      this.rippleLife[i] -= dt
+      const ripple = this.ripples[i]
+      const material = ripple.material as THREE.MeshBasicMaterial
+      if (this.rippleLife[i] <= 0) {
+        ripple.visible = false
+        material.opacity = 0
+        continue
+      }
+      const age = 1 - this.rippleLife[i] / RIPPLE_LIFE
+      const eased = 1 - (1 - age) * (1 - age)
+      ripple.visible = true
+      ripple.scale.setScalar(0.1 + eased * this.rippleReach[i])
+      // 消え際を長く引く。輪が「散る」より「薄れる」ほうが水に見える
+      material.opacity = (1 - age) ** 1.6 * 0.5
     }
 
     for (let i = 0; i < BLOOD_POOL; i++) {

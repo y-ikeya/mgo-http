@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
+import { loadKnife, loadM1911, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
 import { isMesh } from '../util/guards'
 
 /**
@@ -103,8 +103,8 @@ const KNIFE: WeaponConfig = {
 const SNIPER: WeaponConfig = {
   grip: new THREE.Vector3(-0.02, 0.27, 0.11),
   rotation: new THREE.Euler(degrees(0), degrees(-10), degrees(-172)),
-  crouchGrip: new THREE.Vector3(-0.01, 0.3, 0.02),
-  crouchRotation: new THREE.Euler(degrees(-37), degrees(3), degrees(173)),
+  crouchGrip: new THREE.Vector3(-0.02, 0.265, 0.095),
+  crouchRotation: new THREE.Euler(degrees(-13), degrees(-6), degrees(173)),
   tip: new THREE.Vector3(0, 0.177, -0.845),
 }
 
@@ -126,6 +126,20 @@ function lerpAngle(from: number, to: number, t: number): number {
  * 片手で握るので、長物と違って手のひらの中に収まる。握り位置が原点寄りで
  * 追加回転が 0 なのはそのため — モデルの向きがそのまま手の向きになる。
  */
+/**
+ * M1911。**M9 と同じ握り方から始める。**
+ *
+ * どちらも片手の拳銃で全長も近い (0.22m / 0.21m) ので、置き値を分ける理由が
+ * 無い。ずれていたら調整パネルで詰める。
+ */
+const M1911: WeaponConfig = {
+  grip: new THREE.Vector3(0.05, 0.005, 0.125),
+  rotation: new THREE.Euler(degrees(-5), 0, 0),
+  crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
+  crouchRotation: new THREE.Euler(degrees(-5), 0, 0),
+  tip: new THREE.Vector3(0, 0.067, -0.172),
+}
+
 const PISTOL: WeaponConfig = {
   grip: new THREE.Vector3(0.05, 0.005, 0.125),
   rotation: new THREE.Euler(degrees(-5), 0, 0),
@@ -136,7 +150,7 @@ const PISTOL: WeaponConfig = {
   tip: new THREE.Vector3(0, 0.067, -0.172),
 }
 
-export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, shotgun: SHOTGUN, sniper: SNIPER, pistol: PISTOL, knife: KNIFE } as const
+export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, shotgun: SHOTGUN, sniper: SNIPER, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
 
 /**
@@ -153,8 +167,10 @@ export type WeaponTarget =
   | 'shotgunCrouch'
   | 'sniper'
   | 'sniperCrouch'
-  | 'pistol'
-  | 'pistolCrouch'
+  | 'm9'
+  | 'm9Crouch'
+  | 'm1911'
+  | 'm1911Crouch'
   | 'knife'
 
 /**
@@ -213,8 +229,10 @@ export class Weapon {
         ? await loadKnife()
         : kind === 'sniper'
           ? await loadSniper()
-          : kind === 'pistol'
+          : kind === 'm9'
             ? await loadPistol()
+            : kind === 'm1911'
+              ? await loadM1911()
             : kind === 'smg'
               ? await loadSmg()
               : kind === 'shotgun'

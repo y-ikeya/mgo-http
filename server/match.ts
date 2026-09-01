@@ -18,6 +18,7 @@ import {
 import { isSeated } from '../src/domain/player/lifecycle'
 import { type Player, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
+import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { recordPose, relayState, sendHealth } from './relay'
@@ -107,6 +108,19 @@ export function updateTargets(room: RoomWorld, now: number): void {
     }
     if (bot.downLeft > 0) bot.downLeft = Math.max(0, bot.downLeft - TICK_SECONDS)
 
+    /*
+     * 眠りから醒める。**的も自分では起きられない。**
+     *
+     * 人のほうは接続のある席だけを回して醒ましている (server/index.ts)。的は
+     * 接続を持たないのでその輪に入らず、**一度眠ったら二度と起きなかった**。
+     * 動かす人が居ない物はここで動かす、という他の処理 (爆風で滑る・時間で
+     * 立ち上がる) と同じ扱いにする。
+     */
+    if (bot.sleepUntil > 0 && now >= bot.sleepUntil) {
+      bot.sleepUntil = 0
+      bot.stamina = MAX_STAMINA
+    }
+
     if (bot.life === 'downed' && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
       reviveBot(bot, now)
       broadcast(room, { type: 'life', id: bot.id, state: 'alive' })
@@ -137,16 +151,28 @@ export function targetPayload(bot: Player, now: number): Uint8Array {
          * **起き上がる型を挟む。** 転んだ姿から直に立ち姿へ飛ばすと、寝た脚と
          * 立った上半身が混ざって、銃を上空へ構えて見える。
          */
+        /*
+         * 倒れた / 眠っている / 転んでいる / 起き上がっている / 立っている。
+         *
+         * **倒れたほうが眠りより強い。** 眠っている的を撃って倒したら、
+         * 眠ったままではなく倒れた姿へ移らないと、何が起きたのか読めない。
+         *
+         * 眠りを爆風の転倒より先に見るのは、**眠っている間は飛ばされても
+         * 起き上がらない**から。転んで立ち上がる型に移ると、眠っているのに
+         * 立つ、という絵になる。
+         */
         locomotion:
           bot.life === 'downed'
             ? bot.downFromBehind
               ? 'death_front'
               : 'death_back'
-            : bot.downLeft > TARGET_STAND
-              ? 'sweep'
-              : bot.downLeft > 0
-                ? 'stand'
-                : 'idle',
+            : isAsleep(bot.sleepUntil, now)
+              ? 'sleep'
+              : bot.downLeft > TARGET_STAND
+                ? 'sweep'
+                : bot.downLeft > 0
+                  ? 'stand'
+                  : 'idle',
         aiming: false,
         weapon: 'rifle',
         crouching: false,
@@ -214,6 +240,7 @@ export function matchState(room: Match): ServerMessage {
       kills: p.kills,
       deaths: p.deaths,
       suicides: p.suicides,
+      stuns: p.stuns,
       away: !isSeated(p.life),
       // 位置が届いている回数 (通/秒)。名目は 64。
       //

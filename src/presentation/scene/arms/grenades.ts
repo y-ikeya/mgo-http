@@ -2,6 +2,7 @@ import * as THREE from 'three'
 
 import { loadGrenade } from '../assets'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../../../sim/judge/ballistic'
+import type { Water } from '../../../domain/match/stage'
 import type { StageBox } from '../../../sim/space/vision'
 import { THROW_LOFT } from '../../../domain/item/grenade'
 
@@ -149,7 +150,12 @@ export class Grenades {
    *
    * @param onBounce 跳ねるたびに呼ぶ。音を鳴らすのは呼び出し側の仕事
    */
-  update(dt: number, boxes: StageBox[], onBounce: (bounce: Bounce) => void): void {
+  update(
+    dt: number,
+    boxes: StageBox[],
+    water: Water | null,
+    onBounce: (bounce: Bounce) => void,
+  ): void {
     // 刻みはサーバーと同じ固定値。フレーム間隔で解くと軌道がずれる
     this.accumulator = Math.min(this.accumulator + dt, 0.25)
     while (this.accumulator >= FIXED_STEP) {
@@ -157,7 +163,7 @@ export class Grenades {
       for (const item of this.live) {
         if (item.body.resting) continue
         const before = Math.hypot(item.body.vx, item.body.vy, item.body.vz)
-        stepProjectile(item.body, boxes)
+        stepProjectile(item.body, boxes, undefined, water)
         if (item.body.bounces > item.bounces) {
           item.bounces = item.body.bounces
           this.bounce.position.set(item.body.x, item.body.y, item.body.z)
@@ -171,6 +177,18 @@ export class Grenades {
 
     for (let i = this.live.length - 1; i >= 0; i--) {
       const item = this.live[i]
+      /*
+       * 水に入ったら**消す。**
+       *
+       * 堀の底は水面の 2cm 下にある (歩く床は水の下の地面のまま) ので、沈み
+       * 切っても手榴弾の半分が水面から出たままだった。水は不透明なので、
+       * 本来なら水中の物は見えない。深さを持たせる代わりにここで隠す。
+       *
+       * 消えた瞬間に水しぶきが上がっているので、**どこへ落ちたかは見える**。
+       * 玉そのものは、爆ぜるまで水面の下にある。
+       */
+      if (item.body.sunk) item.mesh.visible = false
+
       const previous = item.mesh.position.clone()
       item.mesh.position.set(item.body.x, item.body.y, item.body.z)
       // 進んだぶんだけ転がす。速度から角速度を作ると、跳ねた瞬間に不自然に回る
@@ -199,6 +217,7 @@ export class Grenades {
     origin: THREE.Vector3,
     direction: THREE.Vector3,
     boxes: StageBox[],
+    water: Water | null,
     /** 投げ出す速さ。**スキルを掛けた後の値を渡す** (domain の throwSpeedOf) */
     speed: number,
   ): void {
@@ -221,6 +240,7 @@ export class Grenades {
     p.vz = this.launch.z
     p.bounces = 0
     p.resting = false
+    p.sunk = false
 
     let count = 0
     for (let i = 0; i < PREVIEW_STEPS; i++) {
@@ -230,7 +250,7 @@ export class Grenades {
       count = i + 1
       // 最初に当たるところまで。跳ねた先まで見せると線が読めなくなる
       if (p.bounces > 0) break
-      stepProjectile(p, boxes)
+      stepProjectile(p, boxes, undefined, water)
     }
     // 使わなかった残りは最後の点に畳む (別の場所へ線が伸びないように)
     for (let i = count; i < PREVIEW_STEPS; i++) {

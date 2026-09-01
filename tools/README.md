@@ -160,6 +160,30 @@ Poly Haven の素材は `diff` (sRGB) / `nor_gl` / `rough` を使い、`disp` �
 | `inspect_fbx.py` | FBX の中身 |
 
 
+## 試写 (`preview/`)
+
+**部屋に入らずに見る。** 対戦部屋へ入ると席を 1 つ潰すし、見たい場面が来る
+まで待つことになる。見たい物だけを立てたページを開く。
+
+`vite` を起こしてから `/tools/preview/<名前>.html`。
+
+| | |
+|---|---|
+| `lobby` / `loadout` / `score` / `hud` | 画面の部品。対戦の状態は作り物を渡す |
+| `water` | 庭園の水面と水しぶき。`?eye=near` で寄る、`?t=0.2` で叩いてからの秒数 |
+
+`water` は**時を止めて 1 枚描く**。柱 (0.4 秒) と波紋 (1.2 秒) は寿命が 3 倍
+違うので、動かして見ると速すぎて比べられない。
+
+```sh
+# 撮る (WebGPU なので旗が要る)
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --enable-unsafe-webgpu --use-angle=metal \
+  --screenshot=/tmp/water.png --window-size=1280,720 --virtual-time-budget=14000 \
+  "http://localhost:5199/tools/preview/water.html?eye=near&t=0.1"
+```
+
+
 ## 元データの置き場
 
 変換前の FBX / 落としてきたモデル / テクスチャの副産物は `tools/raw/` に置く。

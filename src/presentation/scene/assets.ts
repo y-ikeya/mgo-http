@@ -31,7 +31,8 @@ const SMG_URL = asset.model('smg.glb')
 const RIFLE_URL = asset.model('rifle.glb')
 const SHOTGUN_URL = asset.model('shotgun.glb')
 const SNIPER_URL = asset.model('sniper.glb')
-const PISTOL_URL = asset.model('pistol.glb')
+const M1911_URL = asset.model('m1911.glb')
+const PISTOL_URL = asset.model('m9.glb')
 const CASING_URL = asset.model('casing_rifle.glb')
 const KNIFE_URL = asset.model('knife.glb')
 const CLAYMORE_URL = asset.model('claymore.glb')
@@ -99,6 +100,10 @@ export function loadPistol(): Promise<GLTF> {
   return load(PISTOL_URL)
 }
 
+export function loadM1911(): Promise<GLTF> {
+  return load(M1911_URL)
+}
+
 /**
  * 薬莢。銃ごとに分けていない — 飛んで転がるだけの物なので、
  * 見分けが付く距離では既に消えている。
@@ -123,7 +128,7 @@ export function loadGrenade(): Promise<GLTF> {
  * ステージ。**名前で引く。**
  *
  * 無ければコード側のブロックアウトを使うので、失敗しても構わない。
- * どれを読むかは部屋が決める (domain/match/room.ts の ROOM_STAGES)。
+ * どれを読むかは部屋が決める (domain/match/room.ts の ROOMS)。
  */
 export function loadStage(name: StageName): Promise<GLTF> {
   return load(asset.model(`stage_${name}.glb`))

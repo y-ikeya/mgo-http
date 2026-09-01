@@ -4,9 +4,10 @@ import {
   MASTERY_OF, SKILLS, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
   isAffordable, levelOf, masteryJitterScale, masteryReloadScale, masterySpreadScale,
   runnerScale, throwScale,
-  type SkillId, type Skills,
+  type Skills,
 } from './skill'
 import { newPlayer, refill } from './player'
+import { CHOICES } from '../item/weapons'
 
 /**
  * **予算であることが要。** 枠だと「いくつ取れるか」しか決められないが、
@@ -112,10 +113,17 @@ describe('CBOX MOVE', () => {
 })
 
 describe('武器の mastery', () => {
-  test('**主武器ごとに別のスキル。** 予算 4 では 2 挺を極められない', () => {
-    // 銃の数だけある。**同じスキルで 2 挺が締まることはない**
-    const ids = new Set<SkillId>(Object.values(MASTERY_OF))
-    expect(ids.size).toBe(Object.keys(MASTERY_OF).length)
+  test('**主武器は 1 挺ずつ別のスキル。** 予算 4 では 2 挺を極められない', () => {
+    /*
+     * 主武器は銃ごとに別のスキル。**同じスキルで 2 挺が締まることはない。**
+     *
+     * 副武器 (M9 / M1911) だけは 1 つを分け合う。どちらも片手の拳銃で、
+     * 持ち替えても手の内は変わらない — **別々にすると、拳銃を極めるのに
+     * 予算 2 挺ぶん要る**ことになり、副武器に主武器と同じ値段が付く。
+     */
+    const primaries = CHOICES.primary.map((id) => MASTERY_OF[id])
+    expect(new Set(primaries).size).toBe(primaries.length)
+    expect(MASTERY_OF.m9).toBe(MASTERY_OF.m1911)
     expect(costOf({ smgMastery: 3, sniperMastery: 3 })).toBeGreaterThan(SKILL_BUDGET)
   })
 
@@ -131,8 +139,8 @@ describe('武器の mastery', () => {
   })
 
   test('段が上がるほど締まる', () => {
-    expect(masterySpreadScale({ pistolMastery: 3 }, 'pistol'))
-      .toBeLessThan(masterySpreadScale({ pistolMastery: 1 }, 'pistol'))
+    expect(masterySpreadScale({ pistolMastery: 3 }, 'm9'))
+      .toBeLessThan(masterySpreadScale({ pistolMastery: 1 }, 'm9'))
   })
 
   /**

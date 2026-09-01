@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { ROOM_NAMES, ROOM_STAGES } from './room'
-import { STAGES, isStageName, nextStage, only, type Rotation, type StageName } from './stage'
+import { ROOM_NAMES, ROOMS } from './room'
+import { STAGES, inWater, isStageName, nextStage, only, waterOf, type Rotation, type StageName } from './stage'
 
 /**
  * ステージと、その回し方。
@@ -60,18 +60,18 @@ describe('回す順', () => {
 
 describe('部屋の割り当て', () => {
   test('**練習は訓練場。** 遮蔽が無いので、外したのが腕か地形かが分かれる', () => {
-    expect(nextStage(ROOM_STAGES.echo, null, 0)).toBe('training')
+    expect(nextStage(ROOMS.echo.stages, null, 0)).toBe('training')
   })
 
   test('全部の部屋に表がある', () => {
     for (const room of ROOM_NAMES) {
-      expect(ROOM_STAGES[room].stages.length).toBeGreaterThan(0)
+      expect(ROOMS[room].stages.stages.length).toBeGreaterThan(0)
     }
   })
 
   test('表に載っているのは実在するステージだけ', () => {
     for (const room of ROOM_NAMES) {
-      for (const stage of ROOM_STAGES[room].stages) expect(isStageName(stage)).toBe(true)
+      for (const stage of ROOMS[room].stages.stages) expect(isStageName(stage)).toBe(true)
     }
   })
 })
@@ -106,12 +106,52 @@ describe('ステージの点', () => {
 
   /** **練習部屋のステージには的が要る。** 無いと撃つ物が何も無い */
   test('練習を回す部屋のステージには的がある', () => {
-    for (const stage of ROOM_STAGES.echo.stages) {
+    for (const stage of ROOMS.echo.stages.stages) {
       expect(STAGES[stage].targets.length).toBeGreaterThan(0)
     }
   })
 
   test('名前は自分自身を指している', () => {
     for (const name of names) expect(STAGES[name].name).toBe(name)
+  })
+})
+
+
+/**
+ * 溺れる。**人が死ぬ判定なので、境目を数字で押さえる。**
+ *
+ * 庭園は水がアリーナ全体を覆っていて、歩けるのは水に浮いている板の上だけ。
+ * 板の縁で 1cm の差が生死を分けるので、**立っているだけで死なない**ことと、
+ * **落ちたら必ず死ぬ**ことの両方を見る。
+ */
+describe('水に沈んでいるか', () => {
+  const garden = waterOf('garden')
+
+  test('**湧き地点はどれも水の上ではない。** 湧いた瞬間に溺れない', () => {
+    expect(garden).not.toBeNull()
+    const spots = [...Object.values(STAGES.garden.bases), ...STAGES.garden.solo]
+    for (const spot of spots) {
+      expect(inWater(spot.x, spot.y ?? 0, spot.z, garden)).toBe(false)
+    }
+  })
+
+  test('水面と同じ高さでは沈まない。数え落ちで死なせない', () => {
+    expect(inWater(0, garden!.y, 0, garden)).toBe(false)
+  })
+
+  test('**板から落ちたら沈む。** 水の下の地面は歩く床ではない', () => {
+    // 底は y=0 (コードが敷いている地面)。底上げしたぶんがそのまま水深になる
+    expect(inWater(0, 0, 0, garden)).toBe(true)
+    expect(garden!.y).toBeGreaterThan(5)
+  })
+
+  test('水の外は沈まない。塀の向こうまで水にしない', () => {
+    expect(inWater(garden!.half + 1, 0, 0, garden)).toBe(false)
+    expect(inWater(0, 0, -garden!.half - 1, garden)).toBe(false)
+  })
+
+  test('水の無いステージでは沈まない', () => {
+    expect(waterOf('mall')).toBeNull()
+    expect(inWater(0, -100, 0, waterOf('mall'))).toBe(false)
   })
 })

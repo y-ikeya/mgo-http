@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { HeldId } from '../../../domain/item/held'
-import { loadGrenade, loadPistol, loadRifle, loadSmg, loadSniper, loadClaymore } from '../assets'
+import { loadGrenade, loadM1911, loadPistol, loadRifle, loadSmg, loadSniper, loadClaymore } from '../assets'
 
 /**
  * 地面に落ちている武器。
@@ -25,7 +25,8 @@ const SPIN_RATE = Math.PI / 3
 const LOADERS: Partial<Record<HeldId, () => Promise<{ scene: THREE.Object3D }>>> = {
   rifle: loadRifle,
   sniper: loadSniper,
-  pistol: loadPistol,
+  m9: loadPistol,
+  m1911: loadM1911,
   smg: loadSmg,
   grenade: loadGrenade,
   claymore: loadClaymore,

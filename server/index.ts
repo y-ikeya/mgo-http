@@ -31,13 +31,21 @@ import {
   updateMatch,
   updateTargets,
 } from './match'
-import { receiveSnapshot, relayShot, relayState, sendHealth } from './relay'
+import { receiveSnapshot, relayShot, relayState, sendHealth, sendStamina} from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
 import { lifeElapsed, newPlayer, type Player } from '../src/domain/player/player'
-import { MODES, ROOM_MODE, ROOM_NAMES, isRoomName, modeOf } from '../src/domain/match/room'
+import {
+  MODES,
+  ROOMS,
+  ROOM_NAMES,
+  isRoomName,
+  modeOf,
+  primariesOf,
+  secondaryOf,
+} from '../src/domain/match/room'
 import { RECONNECT_GRACE, assignTeam, connected, present, nextSlot } from '../src/domain/match/match'
 import { stampLocomotion, stampProtected } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
@@ -48,9 +56,12 @@ import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
+import { inWater, waterOf } from '../src/domain/match/stage'
+import { MAX_HEALTH } from '../src/domain/rule/damage'
+import { MAX_STAMINA } from '../src/domain/player/stamina'
 import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
-import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
+import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/equip'
 
 
 const PORT = Number(process.env.PORT ?? 8787)
@@ -136,6 +147,8 @@ setInterval(() => {
 
       updateMatch(room, now)
       if (room.mode.id === 'PRACTICE') updateTargets(room, now)
+      // その部屋の水面。溺れの判定と手榴弾の沈みで同じ物を見る
+      const water = waterOf(room.stage.name)
       relayClaymores(room)
       for (const player of connected(room)) {
         // --- 時間で進む遷移 ---
@@ -163,6 +176,43 @@ setInterval(() => {
             continue
         }
 
+        /*
+         * --- 眠りから醒める ---
+         *
+         * **スタミナはここでだけ戻る** (domain/player/stamina.ts)。時間で
+         * 戻る仕掛けを持たないので、眠りがそのまま回復になっている。
+         */
+        if (player.sleepUntil > 0 && now >= player.sleepUntil) {
+          player.sleepUntil = 0
+          player.stamina = MAX_STAMINA
+          sendStamina(player)
+        }
+
+        /*
+         * --- 溺れる ---
+         *
+         * **水の上は歩けない。** 庭園は水がアリーナ全体を覆っていて、歩ける
+         * のは水に浮いている板の上だけ。落ちたら助からない。
+         *
+         * 縁で見えない壁に止めるより、落ちられて死ぬほうが「板の上だけが
+         * 世界だ」と早く伝わる。**柵で落ちないようにするのが主で、これは
+         * その外側の受け皿。**
+         *
+         * 位置はクライアントが持っているが、**溺れたかどうかはここで決める** —
+         * 落ちたのに生きている、を申告できてしまうと柵の意味が無くなる。
+         */
+        if (
+          room.phase === 'playing' &&
+          canBeHurt(player.life) &&
+          inWater(player.x, player.y, player.z, water)
+        ) {
+          applyBlastDamage(
+            room, player, MAX_HEALTH,
+            player.x, player.z, player.id, 'drown', false,
+          )
+          continue
+        }
+
         // --- 回復 ---
         // 集中し続けた時間で買う。全快はせず、瀕死を脱するところまで。
         // 撃ち合いに負けた傷は残り、次の撃ち合いは不利なまま始まる。
@@ -188,7 +238,9 @@ setInterval(() => {
       for (let i = room.grenades.length - 1; i >= 0; i--) {
         const nade = room.grenades[i]
         const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
-        for (let k = 0; k < steps; k++) stepProjectile(nade.body, room.stage.solid)
+        // 水に落ちた手榴弾は沈む。**水面を跳ねて渡らない**
+        for (let k = 0; k < steps; k++)
+          stepProjectile(nade.body, room.stage.solid, undefined, water)
         nade.fuse -= TICK_MS / 1000
         if (nade.fuse <= 0) {
           detonate(room, nade)
@@ -365,8 +417,22 @@ function handleMessage(
     case 'loadout':
       // **選んだ物をそのまま書き込まない。** 表に無い名前を名乗られたら弾く
       // (弾いた先で weaponOf が undefined を返し、判定ごと壊れる)
-      if (!chooseLoadout(player, message.primary, message.support, canChoose(player.life))) {
-        reject(player, `選べない装備 (${message.primary} / ${message.support})`)
+      if (
+        !chooseLoadout(
+          player,
+          message.primary,
+          message.support,
+          canChoose(player.life),
+          // その部屋に持ち込める銃だけ。**申告は信じない**
+          primariesOf(room.name),
+          message.secondary,
+          secondaryOf(room.name),
+        )
+      ) {
+        reject(
+          player,
+          `選べない装備 (${message.primary} / ${message.secondary ?? '-'} / ${message.support})`,
+        )
       }
       break
 
@@ -577,9 +643,11 @@ const server = Bun.serve<Client>({
         return {
           name,
           // **どのルールの部屋かを一覧で見せる。** 入ってから分かるのでは遅い
-          mode: ROOM_MODE[name],
-          label: MODES[ROOM_MODE[name]].label,
-          active: MODES[ROOM_MODE[name]].active,
+          mode: ROOMS[name].mode,
+          label: MODES[ROOMS[name].mode].label,
+          active: MODES[ROOMS[name].mode].active,
+          // 部屋の覚え書き。**ルールの名前だけでは伝わらないこと**
+          note: ROOMS[name].note,
           players: here.length,
           capacity: ROOM_CAPACITY,
           phase: room?.phase ?? 'waiting',
@@ -672,6 +740,8 @@ const server = Bun.serve<Client>({
         })
         room.players.set(joined.id, joined)
         sessions.set(joined.id, newSession(joined, socket))
+        // その部屋に持ち込めない銃なら差し替える。**別の部屋から持って来られる**
+        fitLoadout(joined, primariesOf(room.name), secondaryOf(room.name))
         restoreSkills(joined)
       }
 
@@ -700,6 +770,7 @@ const server = Bun.serve<Client>({
             grenades: resumed.grenades,
             support: resumed.support,
             primary: resumed.primary,
+            secondary: resumed.secondary,
           } satisfies ServerMessage),
         )
       }

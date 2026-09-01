@@ -89,6 +89,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 倒れる向き。**背後から撃たれたら前へ、正面からなら後ろへ**
   death_front: 'death_front',
   death_back: 'death_back',
+  // 麻酔で眠っている。倒れているのとは別の姿。**起きるので死体ではない**
+  sleep: 'sleep',
   jump_up: 'jump_up',
   jump_loop: 'jump_loop',
   jump_down: 'jump_down',
@@ -121,6 +123,8 @@ type UpperState =
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
   | 'death'
+  // 麻酔で眠っている。**倒れるのと同じで、全身の型を頭から流す**
+  | 'sleep'
   | 'hit'
   | 'salute'
   | 'bolt'
@@ -220,7 +224,7 @@ const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 /**
  * ローリングの**操作ロック**を解く時点 (クリップ尺に対する割合)。
  *
- * ロック = 撃てず、向きも変えられない時間。ポインタロック (infra/input.ts) とは
+ * ロック = 撃てず、向きも変えられない時間。ポインタロック (infra/input) とは
  * 別物で、こちらは動きが操作を受け付けない、という意味。
  *
  * 最後まで再生し切ってから移動へ戻すと、clampWhenFinished で最終ポーズに
@@ -257,6 +261,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'death',
   'death_front',
   'death_back',
+  // 眠り。**最後の姿勢で止める** — 流し直すと 30 秒の間ずっと倒れ直す
+  'sleep',
   'salute',
   // クレイモアを置く型。**構えは最後のフレームで止める** —
   // 一度だけにしないと 1.77 秒で頭から流れ直して、かがむ動作を繰り返す
@@ -406,6 +412,14 @@ const DEATH_KEY = 'death'
 /** 倒れる向き。撃たれた側から見て前か後ろか */
 const DEATH_FRONT_KEY = 'death_front'
 const DEATH_BACK_KEY = 'death_back'
+/**
+ * 麻酔で眠っている型。**上半身も要る。**
+ *
+ * 下半身だけ差し替えていた頃、**寝た脚の上に銃を構えた上半身**が乗っていた。
+ * 全身の型は下半身の一覧 (ONE_SHOT_LOWER) に足すだけでは足りず、上半身の側にも
+ * 登録して、選び分けにも書かないと繋がらない (倒れる型と同じ扱い)。
+ */
+const SLEEP_KEY = 'sleep'
 
 /**
  * 接続が切れた人の姿。
@@ -1120,6 +1134,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [DEATH_FRONT_KEY, 'death_front'],
       [DEATH_BACK_KEY, 'death_back'],
+      // 眠り。倒れる型と同じで、最後の姿勢のまま留める
+      [SLEEP_KEY, 'sleep'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -1223,6 +1239,14 @@ export class CharacterAnimator {
       PRONE_LOCOMOTIONS.has(this.locomotion) ||
       this.upperState === 'prone_down' ||
       this.upperState === 'prone_rise'
+    /*
+     * 麻酔で眠っている。**倒れているのと同じ扱い。**
+     *
+     * ここに入れ忘れていて、眠った下半身の上に**照準の曲げ・背骨の揃え・
+     * 上体の傾き**が乗り続けていた。倒れた型を流しているのに体が起き上がる、
+     * という形で出る (伏せを入れたときと同じ罠)。
+     */
+    const asleep = this.locomotion === 'sleep' || this.upperState === 'sleep'
     const committed =
       (this.upperState === 'stab' && this.locomotion !== 'crouch_stab') ||
       this.upperState === 'salute' ||
@@ -1230,6 +1254,7 @@ export class CharacterAnimator {
       this.upperState === 'hard_land' ||
       this.upperState === 'death' ||
       this.upperState === 'hit' ||
+      asleep ||
       prone
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
     this.hipSquare = damp(
@@ -1630,6 +1655,11 @@ export class CharacterAnimator {
   get reloading(): boolean {
     return this.upperState === 'reload'
   }
+  /** 遊底を操作している最中か。**その間は銃を納めない** (見えない銃を操作して見える) */
+  get bolting(): boolean {
+    return this.upperState === 'bolt'
+  }
+
 
   /** 怯み中か。被弾リアクションの再生中 */
   get flinching(): boolean {
@@ -1664,6 +1694,35 @@ export class CharacterAnimator {
     lower.reset().play()
     this.upperState = 'death'
     this.locomotion = fallback ? state : 'death'
+  }
+
+  /**
+   * 麻酔で眠らされた。**倒れるのと同じ道で流す。**
+   *
+   * --- 姿勢を切り替えるだけでは床に着かない ---
+   * setLocomotion('sleep') で下半身を差し替えても、**立ったまま寝ている**絵に
+   * なる。上半身が構えのままで、しかも重みの補間で入るので型が頭から流れない。
+   * 実測すると腰 1.01m / 頭 1.51m — 立ち姿とほとんど同じだった。
+   *
+   * 倒れる型 (playDeath) はここを通していて、腰 0.17m / 頭 0.20m まで下りる。
+   * **全身で床へ行く型は、両面を頭から流さないと着かない。**
+   *
+   * 眠りは倒れるのと違って**醒める**ので、起きるときに元へ戻す (wake)。
+   */
+  playSleep(): void {
+    const upper = this.upper.get(SLEEP_KEY)
+    const lower = this.lower.get('sleep')
+    if (!upper || !lower) return
+    upper.reset().play()
+    lower.reset().play()
+    this.upperState = 'sleep'
+    this.locomotion = 'sleep'
+  }
+
+  /** 眠りが明けた。**構えへ戻す** — 倒れる型と違って、ここから先がある */
+  wakeFromSleep(): void {
+    if (this.upperState !== 'sleep') return
+    this.upperState = 'stance'
   }
 
   /**
@@ -1740,6 +1799,14 @@ export class CharacterAnimator {
       const key = this.reloadKey()
       if (this.upper.has(key)) return key
     }
+    /*
+     * 眠っている間。**倒れているのと同じ強さで留める。**
+     *
+     * 下半身が眠りの型に移っても上半身は構えたままなので、ここで揃えないと
+     * 「寝た脚の上に銃を構えた上半身」になる。撃つ・リロードより後に置いて
+     * あるのは、眠っている間はそもそもその状態に入らないから。
+     */
+    if (this.locomotion === 'sleep' && this.upper.has(SLEEP_KEY)) return SLEEP_KEY
     // 倒れている間は他の何よりも優先する
     if (this.upperState === 'death') {
       // 倒れる向きの型があればそちら。無ければ元の 1 本

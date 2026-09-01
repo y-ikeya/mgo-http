@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Client, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { STAGES } from '../src/domain/match/stage'
-import { ROOM_STAGES } from '../src/domain/match/room'
+import { ROOMS } from '../src/domain/match/room'
 
 /**
  * 練習部屋 (echo)。
@@ -27,7 +27,7 @@ afterAll(() => server.stop())
  * **echo が乗るステージから引く。** 部屋とステージの結び付きが変わっても、
  * ここは黙って追随する。
  */
-const TARGET = STAGES[ROOM_STAGES.echo.stages[0]].targets[0]
+const TARGET = STAGES[ROOMS.echo.stages.stages[0]].targets[0]
 
 async function enterPractice(id: string): Promise<Client> {
   const client = new Client(server, id, [TARGET.x, 0, TARGET.z + 3], 'echo')
@@ -157,7 +157,7 @@ describe('散弾で的を突き飛ばす', () => {
    * **前の試験が触っていない的を使う。** 同じサーバーを 1 本で使い回すので、
    * 倒したり吹き飛ばしたりした的をもう一度使うと、始まりの位置が違う。
    */
-  const MINE = STAGES[ROOM_STAGES.echo.stages[0]].targets[2]
+  const MINE = STAGES[ROOMS.echo.stages.stages[0]].targets[2]
   const MINE_ID = 'target-2'
 
   /** 的の 3m 手前に立って、散弾銃を持って湧く */

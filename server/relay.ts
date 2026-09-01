@@ -424,6 +424,27 @@ export function isBehind(victim: Player, attacker: Player): boolean {
   return dx * -Math.sin(victim.yaw) + dz * -Math.cos(victim.yaw) < 0
 }
 
+/**
+ * スタミナを本人にだけ知らせる。
+ *
+ * **相手の眠気は見えない。** 見えると「あと 1 発で眠る」が撃つ側に分かって、
+ * 麻酔が確実な道具になる。当てた手応えは自分の目盛りだけで読む。
+ *
+ * 眠っているかどうかは別で、これは**全員に見える** (姿勢として出る) —
+ * 倒れている体がそこに在るのは隠しようがない。
+ */
+export function sendStamina(player: Player): void {
+  if (!isSeated(player.life) || player.bot) return
+  sessionOf(player).socket.send(
+    JSON.stringify({
+      type: 'stamina',
+      id: player.id,
+      stamina: player.stamina,
+      sleepUntil: player.sleepUntil,
+    } satisfies ServerMessage),
+  )
+}
+
 export function sendHealth(
   room: RoomWorld,
   player: Player,

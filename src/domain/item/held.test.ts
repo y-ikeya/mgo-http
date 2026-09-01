@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  HELD, buildCarried, carrySpeed, cycle, dropEmpty, firstOf, isTwoHanded, listOf, pickUp, toggle,
+  HELD, buildCarried, carrySpeed, cycle, dropEmpty, find, firstOf, isTwoHanded, listOf, pickUp, toggle,
   type Carried, type HeldId,
 } from './held'
 
@@ -12,7 +12,7 @@ import {
  * (support に手榴弾と弾倉が同時に並ぶ)。
  */
 
-const gun = (id: 'rifle' | 'sniper' | 'pistol', ammo = 30, reserve = 90): Carried =>
+const gun = (id: 'rifle' | 'sniper' | 'm9', ammo = 30, reserve = 90): Carried =>
   ({ id, ammo, reserve })
 
 describe('並び', () => {
@@ -20,11 +20,11 @@ describe('並び', () => {
     const carried: Carried[] = [
       { id: 'knife' },
       { id: 'grenade', count: 3 },
-      { id: 'pistol', ammo: 12, reserve: 48 },
+      { id: 'm9', ammo: 12, reserve: 48 },
       gun('rifle'),
     ]
     expect(listOf(carried, 'weapon').map((c) => c.id)).toEqual([
-      'rifle', 'pistol', 'grenade', 'knife',
+      'rifle', 'm9', 'grenade', 'knife',
     ])
   })
 
@@ -55,8 +55,8 @@ describe('重さと速さ', () => {
   })
 
   test('手榴弾に持ち替えると速くなる。これが持ち替える動機のひとつ', () => {
-    expect(carrySpeed('grenade')).toBeGreaterThan(carrySpeed('pistol'))
-    expect(carrySpeed('pistol')).toBeGreaterThan(carrySpeed('rifle'))
+    expect(carrySpeed('grenade')).toBeGreaterThan(carrySpeed('m9'))
+    expect(carrySpeed('m9')).toBeGreaterThan(carrySpeed('rifle'))
   })
 
   test('狙撃銃は遅い', () => {
@@ -68,7 +68,7 @@ describe('撃てるかどうか', () => {
   test.each<[HeldId, boolean]>([
     ['rifle', true],
     ['sniper', true],
-    ['pistol', true],
+    ['m9', true],
     // 持ち替えている間は撃てない。これが投げること・刺すことの代償になる
     ['grenade', false],
     ['claymore', false],
@@ -113,7 +113,7 @@ describe('拾う', () => {
 
 describe('湧いたときの持ち物', () => {
   const ammo = () => ({ ammo: 30, reserve: 90 })
-  const carried = buildCarried({ primary: 'rifle', secondary: 'pistol', support: 'grenade' }, ammo)
+  const carried = buildCarried({ primary: 'rifle', secondary: 'm9', support: 'grenade' }, ammo)
 
   test('ナイフとダンボールは選ばない。最初から持っている', () => {
     expect(carried.map((c) => c.id)).toContain('knife')
@@ -126,7 +126,7 @@ describe('湧いたときの持ち物', () => {
 
   test('投げ物の数は選んだ物で決まる。クレイモアは手榴弾より少ない', () => {
     const withClaymore = buildCarried(
-      { primary: 'rifle', secondary: 'pistol', support: 'claymore' }, ammo)
+      { primary: 'rifle', secondary: 'm9', support: 'claymore' }, ammo)
     const g = carried.find((c) => c.id === 'grenade') as { count: number }
     const c = withClaymore.find((c) => c.id === 'claymore') as { count: number }
     expect(g.count).toBeGreaterThan(c.count)
@@ -136,7 +136,7 @@ describe('湧いたときの持ち物', () => {
 describe('持ち替え', () => {
   const carried: Carried[] = [
     { id: 'rifle', ammo: 30, reserve: 90 },
-    { id: 'pistol', ammo: 12, reserve: 48 },
+    { id: 'm9', ammo: 12, reserve: 48 },
     { id: 'grenade', count: 3 },
     { id: 'knife' },
     { id: 'box' },
@@ -150,7 +150,7 @@ describe('持ち替え', () => {
   test('直前の物を持っていなければ並びの次へ', () => {
     // 手榴弾を投げ切って持っていない
     const empty = carried.filter((c) => c.id !== 'grenade')
-    expect(toggle(empty, 'rifle', 'grenade')).toBe('pistol')
+    expect(toggle(empty, 'rifle', 'grenade')).toBe('m9')
   })
 
   test('一覧は同じ系統の中だけを回る。武器を送って箱は出ない', () => {
@@ -160,7 +160,7 @@ describe('持ち替え', () => {
       at = cycle(carried, at, 1)
       seen.push(at)
     }
-    expect(seen).toEqual(['pistol', 'grenade', 'knife', 'rifle'])
+    expect(seen).toEqual(['m9', 'grenade', 'knife', 'rifle'])
     expect(seen).not.toContain('box')
   })
 
@@ -200,18 +200,18 @@ describe('投げ切る', () => {
 describe('トグルは系統をまたがない', () => {
   const carried: Carried[] = [
     { id: 'rifle', ammo: 30, reserve: 90 },
-    { id: 'pistol', ammo: 12, reserve: 48 },
+    { id: 'm9', ammo: 12, reserve: 48 },
     { id: 'box' },
   ]
 
   test('直前に持っていた物が別の系統なら、そちらへは戻らない', () => {
     // 箱から銃へ移った直後。previous は 'box'
     expect(toggle(carried, 'rifle', 'box')).not.toBe('box')
-    expect(toggle(carried, 'rifle', 'box')).toBe('pistol')
+    expect(toggle(carried, 'rifle', 'box')).toBe('m9')
   })
 
   test('同じ系統なら往復する', () => {
-    expect(toggle(carried, 'rifle', 'pistol')).toBe('pistol')
+    expect(toggle(carried, 'rifle', 'm9')).toBe('m9')
   })
 })
 
@@ -220,7 +220,7 @@ describe('両手か片手か', () => {
     expect(isTwoHanded('rifle')).toBe(true)
     expect(isTwoHanded('sniper')).toBe(true)
     expect(isTwoHanded('smg')).toBe(true)
-    expect(isTwoHanded('pistol')).toBe(false)
+    expect(isTwoHanded('m9')).toBe(false)
   })
 
   test('**手榴弾は片手。** 身軽に走れる', () => {
@@ -234,5 +234,30 @@ describe('両手か片手か', () => {
     for (const [id, spec] of Object.entries(HELD)) {
       if (spec.twoHanded) expect(spec.weight, id).toBeGreaterThan(2)
     }
+  })
+})
+
+/**
+ * 副武器を持たない部屋。
+ *
+ * 拳銃まで取り上げると、詰められた時に**ナイフしか残らない**。狙撃銃の部屋で
+ * 「間合いへ入られたら終わり」を成立させるのはこれ。
+ */
+describe('副武器なし', () => {
+  const full = () => ({ ammo: 30, reserve: 90 })
+  const carried = buildCarried({ primary: 'sniper', secondary: null, support: 'grenade' }, full)
+
+  test('拳銃が持ち物に入らない', () => {
+    expect(find(carried, 'm9')).toBeUndefined()
+  })
+
+  test('**ナイフは残る。** 何も残らないのとは違う', () => {
+    expect(find(carried, 'knife')).toBeDefined()
+  })
+
+  test('主武器と投げ物とダンボールはそのまま', () => {
+    expect(find(carried, 'sniper')).toBeDefined()
+    expect(find(carried, 'grenade')).toBeDefined()
+    expect(find(carried, 'box')).toBeDefined()
   })
 })
