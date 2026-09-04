@@ -136,10 +136,16 @@ type UpperState =
 /**
  * 構えていないときの上半身。移動状態ごとに使うクリップを変える。
  * しゃがみは上半身も専用。立ち姿勢の上半身を乗せると腰の高さが噛み合わない。
+ *
+ * **しゃがみは 1 本のクリップ (kneeAim) の両端を使う。**
+ *
+ * 始まりが銃を下ろした形、終わりが構え。以前は `crouch_idle` を脱力に当てて
+ * いたが、あれ自体が既に構えた型で、脱力と構えで手が 5cm しか動かなかった
+ * (立ちは 29cm 動く) — しゃがむと構えを解いても銃を下ろさなかった。
  */
 const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
-  crouch_idle: 'crouch_idle',
+  crouch_idle: 'knee_relaxed',
   // 上半身も同じクリップから取る。全身で 1 つの型なので分けると腰で食い違う
   sneak: 'sneak',
   sit: 'sit',
@@ -157,10 +163,29 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   jump_up: 'relaxed_run',
   jump_loop: 'relaxed_run',
   jump_down: 'relaxed_run',
+  /*
+   * 階段。**上半身は走りと同じ。**
+   *
+   * 階段のクリップ自体は素手で上る動きで、腕が空で振れている (実測: 両手の間
+   * 0.38m / 手の高さ 0.07m。銃を持つ relaxed_run は 0.32m / 0.21m)。
+   *
+   * **ここに無いと構えの型で代用される** (resolveUpperKey の最後)。抜けていた
+   * ので、坂を上り切る継ぎ目の段差を踏むたびに勝手に銃を構えていた。
+   */
+  up_stair: 'relaxed_run',
+  down_stair: 'relaxed_run',
+  /*
+   * 落下の受け身。**全身で 1 つの型**なので上半身も同じクリップから取る。
+   *
+   * ここに無いと構えの型 (aim) が出る。上半身の状態が hard_land の間は専用の
+   * 型が流れるが、**状態が先に終わって姿勢だけ残る**と素通りして、坂を下りて
+   * 着地した一瞬だけ銃を構えて見えた。
+   */
+  hard_land: 'hard_land',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, 'relaxed_run'],
-      [`crouch_${d}`, 'crouch_idle'],
+      [`crouch_${d}`, 'knee_relaxed'],
     ]),
   ) as Record<string, string>),
 }
@@ -169,6 +194,15 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
  * 構え中の上半身も、しゃがみでは専用クリップを使う。
  * 立ちの構えは腰が高い前提で背骨が付いているので、しゃがんだ腰に乗せると破綻する。
  */
+/**
+ * 姿勢だけを取り出したクリップ。**流さず頭で止める。**
+ *
+ * kneeAim の両端を 3 標本ずつ切り出したもの。3 標本でも中身は動いていて
+ * (首が 1 コマ 2°)、0.067 秒で回すと 15Hz の震えになる。実測で手が 1 コマ
+ * 6.8mm 動いていた (立ちは 0.12mm)。
+ */
+const POSE_ONLY_CLIPS = new Set(['knee_relaxed', 'knee_ready'])
+
 const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
   'crouch_idle',
   ...MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion),
@@ -309,6 +343,18 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   idle: 'pistol_relaxed',
   crouch_idle: 'pistol_relaxed',
   sneak: 'crouch_unarmed',
+  /*
+   * 階段と跳躍は走りと同じ手ぶら。
+   *
+   * **ここに無いと小銃の型へ落ちる。** 抜けていたので、クレイモアを持って坂を
+   * 下りると一瞬 down_stair に入り、その間だけ**小銃を両手で提げた姿**になって
+   * いた (relaxed_run はライフルを持つ型)。
+   */
+  up_stair: 'run_unarmed',
+  down_stair: 'run_unarmed',
+  jump_up: 'run_unarmed',
+  jump_loop: 'run_unarmed',
+  jump_down: 'run_unarmed',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       // 手ぶらの走り。拳銃は納めているので、腕を振って走るのが正しい
@@ -398,6 +444,10 @@ const SETUP_RELEASE_KEY = 'claymore_place'
  * ただ操作が返ってこない時間になる。
  *
  * 振りかぶり (1.77 秒) はそのまま。押している間の話なので、長くて困らない。
+ *
+ * **一度 1.8 倍に速めたが戻した。** 待ち時間は縮むが、かがむ動作が早送りに
+ * 見える。待ちの本体は「引き金を引いてから手が床に着くまで」で、そちらは
+ * 置く瞬間を測り直して縮めてある (Game の CLAYMORE_PLACE_RATIO)。
  */
 const SETUP_RELEASE_RATE = 2.2
 const ROLL_KEY = 'roll'
@@ -789,6 +839,8 @@ export class CharacterAnimator {
   /** idle から腰の基準が取れたか。取れていなければ載せ替えはしない */
   private uprightHipsKnown = false
   private readonly neutralScratch = new THREE.Quaternion()
+  private readonly rebaseScratch = new THREE.Quaternion()
+  private hipsUp: THREE.Vector3 | null = null
   /** 取り除く前のルートモーション。位置に使うクリップだけ控えておく */
   private readonly rootMotion = new Map<string, RootMotionTrack>()
   /** 前フレームに読んだルートモーションの値。差分を出すのに使う */
@@ -948,12 +1000,13 @@ export class CharacterAnimator {
       if (state === 'jump_loop') this.jumpLoopDuration = clip.duration
       this.lower.set(state, action)
     }
-    this.applyLocomotionTimeScales()
 
     // --- 上半身レイヤー ---
     // 構えは idle の上半身。移動中も銃を構えた姿勢を保つ。
     const registerUpper = (key: string, clip: THREE.AnimationClip): THREE.AnimationAction => {
       const action = this.mixer.clipAction(splitClip(clip, 'upper', key))
+      // 姿勢だけのクリップは頭で止める。回すと震える (POSE_ONLY_CLIPS の注)
+      if (POSE_ONLY_CLIPS.has(clip.name)) action.setEffectiveTimeScale(0)
       this.upper.set(key, action)
       // この上半身が本来乗るはずの腰の動き。下半身が別クリップでもズレを消せる
       this.upperClipNames.set(key, clip.name)
@@ -969,7 +1022,8 @@ export class CharacterAnimator {
     const aim = byName.get('idle')
     if (aim) registerUpper(AIM_KEY, aim)
 
-    const crouchAim = byName.get('crouch_aim')
+    // しゃがみの構え。**脱力と同じ 1 本の両端から取る** (RELAXED_CLIPS の注)
+    const crouchAim = byName.get('knee_ready') ?? byName.get('crouch_aim')
     if (crouchAim) registerUpper(CROUCH_AIM_KEY, crouchAim)
 
     // 拳銃の構えと発砲。無ければライフルの型で代用される
@@ -1002,6 +1056,34 @@ export class CharacterAnimator {
     for (const [state, clipName] of Object.entries(RELAXED_CLIPS) as [Locomotion, string][]) {
       const clip = byName.get(clipName)
       if (clip) registerUpper(relaxedKey(state), clip)
+    }
+
+    /*
+     * 表に無い姿勢は、**下半身と同じクリップ**で埋める。
+     *
+     * 埋めないと構えの型 (AIM_KEY) が出る。上半身に専用の口を持つ姿勢
+     * (倒れる・転がる・受け身) でも、**状態が先に終わって姿勢だけ残る**間は
+     * ここへ落ちるので、構えていないのに銃を構えて見えた。
+     *
+     * 表に書くのは「下半身と違うクリップを使いたいとき」だけでよくなる。
+     * **姿勢を足すたびに 2 つの表へ書き足す**という段取りが要らない。
+     */
+    for (const state of Object.keys(LOWER_CLIPS) as Locomotion[]) {
+      const key = relaxedKey(state)
+      if (this.upper.has(key)) continue
+      const clip = byName.get(LOWER_CLIPS[state])
+      if (!clip) continue
+      const action = registerUpper(key, clip)
+      /*
+       * 一度きりの姿勢は繰り返さない。
+       *
+       * 埋めた action は常時流れている (全 action を再生しておく作り) ので、
+       * 繰り返すと**下半身が終わりで止まっている間に上半身だけ頭へ戻る**。
+       */
+      if (ONE_SHOT_LOWER.has(state)) {
+        action.setLoop(THREE.LoopOnce, 1)
+        action.clampWhenFinished = true
+      }
     }
 
     const fire = byName.get('fire')
@@ -1177,6 +1259,18 @@ export class CharacterAnimator {
       action.clampWhenFinished = true
     }
     this.hitDuration = hit?.duration ?? 0
+
+    /*
+     * 再生速度を当てるのは**上半身を揃え終えてから**。
+     *
+     * 以前は下半身を揃えた直後に呼んでいて、そのとき上半身の action はまだ
+     * 1 本も無かった。**止めておくはずの型 (FROZEN_CLIPS) が下半身しか
+     * 止まらず**、伏せて止まっている人の腕だけが掻き続けた。
+     *
+     * 自機では出ない — Soldier が速度の変化で setMoveSpeed を呼び、そこで
+     * 呼び直されて止まる。**呼ばない側 (RemoteSoldier) にだけ出る。**
+     */
+    this.applyLocomotionTimeScales()
 
     // 全 action を常時再生しておき、見せ方は重みだけで決める。
     // 必要になってから play() すると、その瞬間だけ重みの合計が 1 を割る。
@@ -1439,13 +1533,17 @@ export class CharacterAnimator {
     //
     // idle を上半身に使う構えの姿勢では neutral = uprightHips なので、
     // どちらの端でも恒等変換になり、構え中の挙動は変わらない。
+    //
+    // ただし取り除くのは**縦軸まわりの捻れだけ**。差には前後の傾きも混ざって
+    // いて、そちらは「作られた向き」ではなく本来のポーズなので、一緒に消すと
+    // 上体がのけぞる (実測: 立ちの脱力で首が -6.8° → -15.5°。素材は -5.0°)。
     const neutral = this.upperHipsNeutrals.get(key)
     if (neutral && this.uprightHipsKnown && this.upperTwistFix > 0) {
-      this.neutralScratch
-        .copy(neutral)
-        .invert()
-        .premultiply(this.uprightHips)
-        .multiply(this.referenceHips)
+      this.rebaseScratch
+        .copy(this.uprightHips)
+        .multiply(this.neutralScratch.copy(neutral).invert())
+      keepTwist(this.rebaseScratch, this.hipsUp ?? this.resolveHipsUp())
+      this.neutralScratch.copy(this.rebaseScratch).multiply(this.referenceHips)
       this.referenceHips.slerp(this.neutralScratch, this.upperTwistFix)
     }
 
@@ -1454,13 +1552,33 @@ export class CharacterAnimator {
     spine.quaternion.premultiply(this.scratchRotation)
   }
 
+  /**
+   * 腰のクォータニオンが乗っている空間での「上」。
+   *
+   * 腰の親 (Armature) は +90° 傾いていて、その中では上が -Z になる。素直に
+   * (0,1,0) を使うと縦軸を取り違えて、捻れの補正が丸ごと効かなくなる。
+   */
+  private resolveHipsUp(): THREE.Vector3 {
+    const axis = new THREE.Vector3(0, 1, 0)
+    const parent = this.hipsBone?.parent
+    if (parent) {
+      parent.updateWorldMatrix(true, false)
+      axis.applyQuaternion(parent.getWorldQuaternion(this.scratchQuat).invert()).normalize()
+    }
+    this.hipsUp = axis
+    return axis
+  }
+
   private applyAimPitch(): void {
     const axes = this.aimAxes ?? this.resolveAimAxes()
     if (!axes.length) return
 
-    // 構えていないときは前傾を上乗せする。照準の曲げとは符号が逆 (下向き)。
+    // 構えていないときは前傾を上乗せする。
+    //
+    // 符号は照準の曲げと同じ向きに足す。**引くと前ではなく後ろへ反る** —
+    // 実測で立ちの脱力が首 -8.0° (素材どおり) から -12.2° まで倒れていた。
     const total =
-      THREE.MathUtils.clamp(this.aimPitch * this.aimPitchGain, -MAX_AIM_BEND, MAX_AIM_BEND) -
+      THREE.MathUtils.clamp(this.aimPitch * this.aimPitchGain, -MAX_AIM_BEND, MAX_AIM_BEND) +
       this.lean
     if (total === 0) return
 
@@ -1881,6 +1999,22 @@ export class CharacterAnimator {
       if (this.upper.has(key)) return key
     }
 
+    /*
+     * 転がりの尻尾。**絵が流れている間は転がりの型のまま。**
+     *
+     * ロック (upperState) は終盤 0.78 で先に解ける — 立ち上がりに入った時点で
+     * 操作を返さないと一拍止まって見えるため。そこで上半身まで戻すと、
+     * 下半身は立ち上がりの途中なのに**上半身だけ銃を提げた型**になる。
+     *
+     * **他の型に譲る位置に置く。** 転がりの直後に着地や吹き飛びが始まることが
+     * あり、上に置くと**尻尾がそれを潰す** (着地の型が出なくなった)。
+     *
+     * 返すのは playRoll が下半身と揃えて流し直した action。姿勢の表から引くと
+     * 噛み合わない — あちらは常時繰り返し再生で、下半身が終わりで止まっている
+     * 間に頭へ戻り、立ち上がりながら腕だけ転がり始めの形 (手を挙げた姿) になる。
+     */
+    if (this.rollShowing && this.upper.has(ROLL_KEY)) return ROLL_KEY
+
     if (this.aiming) {
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
       if (this.pistol) {
@@ -2129,7 +2263,13 @@ export class CharacterAnimator {
     if (!this.pair || this.upperState !== 'throw') return 0
     const windup = this.upper.get(this.pair.windup)
     if (!windup) return 0
-    return Math.max(0, windup.getClip().duration - windup.time)
+    /*
+     * **実時間で返す。** 呼ぶ側は待ち時間として足すので (Game の setupRelease)、
+     * クリップの秒のままだと**速めたぶんだけ長く待つ**ことになる。
+     * クレイモアの振りかぶりは 1.8 倍で流している。
+     */
+    const rate = windup.getEffectiveTimeScale() || 1
+    return Math.max(0, (windup.getClip().duration - windup.time) / rate)
   }
 
   /** いま振りかぶった所で止まっているか */
@@ -2149,7 +2289,18 @@ export class CharacterAnimator {
     if (this.throwWindupLeft > 0) return
     release.reset().play()
     if (this.pair.whole) {
-      this.lower.get(this.pair.windup as Locomotion)?.stop()
+      /*
+       * 振りかぶりは**止めずに、重みで抜けさせる。**
+       *
+       * `stop()` は重みも再生位置も即座に 0 にする。置く型のほうは 0 から
+       * 上げていくので、その間**どの型にも重みが乗らない**。実測で合計 0.18 まで
+       * 落ちて素の姿勢が透け、**腰が 0.41m から 0.90m へ跳ねて立ち上がり、
+       * また座り直す**ように見えていた。
+       *
+       * 2 つのクリップは繋がっている (振りかぶりの終わりと置く型の頭は腰も頭も
+       * 差 0.00m) ので、重ねたまま入れ替えれば継ぎ目が出ない。振りかぶりは
+       * 最後の姿勢で留まる (clampWhenFinished) ので、抜けるまで同じ形を保つ。
+       */
       this.lower.get(this.pair.release as Locomotion)?.reset().play()
     }
   }
@@ -2538,6 +2689,25 @@ function sampleVectorTrack(
     values[k * 3 + 1] + (values[(k + 1) * 3 + 1] - values[k * 3 + 1]) * alpha,
     values[k * 3 + 2] + (values[(k + 1) * 3 + 2] - values[k * 3 + 2]) * alpha,
   )
+}
+
+/**
+ * 与えた軸のまわりの成分だけ残す (swing-twist 分解の twist 側)。
+ *
+ * 「素材が作られた向き」を打ち消すのに使う。向きの違いは縦軸まわりの回転なので、
+ * 前後の傾きまで一緒に消してしまわないように切り分ける。
+ */
+function keepTwist(q: THREE.Quaternion, axis: THREE.Vector3): void {
+  const dot = q.x * axis.x + q.y * axis.y + q.z * axis.z
+  const x = axis.x * dot
+  const y = axis.y * dot
+  const z = axis.z * dot
+  const length = Math.sqrt(x * x + y * y + z * z + q.w * q.w)
+  if (length < 1e-6) {
+    q.identity()
+    return
+  }
+  q.set(x / length, y / length, z / length, q.w / length)
 }
 
 /**
