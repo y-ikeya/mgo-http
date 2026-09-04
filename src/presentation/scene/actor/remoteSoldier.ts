@@ -41,10 +41,10 @@ import { Footsteps, type Step } from "../../../domain/rule/footsteps";
 import type { Life } from "../../../domain/player/lifecycle";
 import { BUFFER_SIZE, Presence } from "../../../sim/space/presence";
 import { Hitbox } from "./hitbox";
-import { dampAngle } from "../util/math";
-import { Weapon } from "../arms/weapon";
+import { damp, dampAngle } from "../util/math";
+import { Weapon, WEAPON_STANCE_LAMBDA, weaponStanceOf } from "../arms/weapon";
 import { onBattlefield } from "../../../domain/player/lifecycle";
-import type { RosterEntry } from "../../../application/replica/roster";
+import type { Player } from "../../../domain/player/player";
 import {
   INTERPOLATION_DELAY,
   type PlayerSnapshot,
@@ -98,7 +98,7 @@ const ALLY_GLOW_TINT: Record<Team, number> = {
 const LEAK_GLOW_TINT = 0xffd45c;
 /** 向きが追いつく速さ。角度は補間より追従のほうが素直に見える */
 const YAW_LAMBDA = 16;
-/** モデルの正面 (+Z) を Player の基準 (-Z) に合わせる回転 */
+/** モデルの正面 (+Z) を Soldier の基準 (-Z) に合わせる回転 */
 const MODEL_YAW_OFFSET = Math.PI;
 
 /**
@@ -146,13 +146,13 @@ const PLAY_WHOLE_BODY: Record<
 /**
  * 他のプレイヤー。受信した状態だけで動く。
  *
- * Player と違って入力も物理も持たない。移動アニメを速度から推定することもせず、
+ * Soldier と違って入力も物理も持たない。移動アニメを速度から推定することもせず、
  * 送られてきた locomotion をそのまま再生する。推定は外れるうえ、送るほうが安い。
  *
  * 位置は「少し過去の状態」を 2 点間で補間して描く。届いた位置をそのまま入れると、
  * 受信した瞬間だけ飛んで、次が来るまで止まる。
  */
-export class RemotePlayer {
+export class RemoteSoldier {
   readonly id: string;
   readonly object = new THREE.Group();
   /** ボーンに追従する当たり判定。メッシュではなくこれを撃つ */
@@ -194,6 +194,23 @@ export class RemotePlayer {
 
   private animator: CharacterAnimator | null = null;
   private weapon: Weapon | null = null;
+  /** 銃の持ち方の段階。0 = 立ち / 1 = しゃがみ / 2 = 伏せ */
+  private weaponStance = 0;
+  /** そのステージの水面 (m)。張っていなければ null */
+  private waterY: number | null = null;
+  /** 水面を割った速さ (m/s)。拾われたら 0 に戻る */
+  private splashSpeed = 0;
+
+  setWaterY(y: number | null): void {
+    this.waterY = y;
+  }
+
+  /** 水面を割ったなら、その速さ。**1 回の落水につき 1 度だけ** */
+  consumeSplash(): number {
+    const speed = this.splashSpeed;
+    this.splashSpeed = 0;
+    return speed;
+  }
   private readonly box: THREE.Object3D;
   private boxed = false;
   /**
@@ -323,6 +340,19 @@ export class RemotePlayer {
     if (!state) return;
 
     this.setBoxed(state.boxed);
+    /*
+     * 水面を割ったか。**位置の変わり方から出す。**
+     *
+     * 落ちる動きは相手の画面が計算していて、こちらへは位置しか届かない。
+     * 送るものを増やさずに済むよう、**跨いだかどうか**をここで見る。
+     * しぶきの大きさは 1 刻みぶんの落ち方から出す (dt で割って m/s)。
+     */
+    if (this.waterY !== null && dt > 0) {
+      const was = this.object.position.y;
+      if (was > this.waterY && state.y <= this.waterY) {
+        this.splashSpeed = Math.max(0, (was - state.y) / dt);
+      }
+    }
     this.object.position.set(state.x, state.y, state.z);
     if (!this.yawInitialized) {
       this.yaw = state.yaw;
@@ -400,6 +430,21 @@ export class RemotePlayer {
     const prone = state.locomotion === "prone_idle" || state.locomotion === "crawl_f";
     animator.setAimPitch(state.aiming && !this.serverDead && !prone ? state.pitch : 0);
     animator.update(dt);
+
+    /*
+     * 銃の持ち方も姿勢に合わせる。**自機と同じ式で当てる。**
+     *
+     * 相手の側だけこれが無くて、しゃがんでも伏せても立ちの握りのままだった。
+     * 伏せの向きは立ちから 100° 以上ずれるので、腹這いの相手の銃だけが
+     * あらぬ方を向く。姿勢は locomotion で届いているので、送る量は増えない。
+     */
+    this.weaponStance = damp(
+      this.weaponStance,
+      weaponStanceOf(stanceOf(locomotion)),
+      WEAPON_STANCE_LAMBDA,
+      dt,
+    )
+    this.weapon?.applyStance(this.weaponStance)
 
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている
     void this.equip(state.weapon)
@@ -692,7 +737,7 @@ export class RemotePlayer {
     try {
       gltf = await loadSoldier(this.skin);
     } catch (error) {
-      console.error("[RemotePlayer] 兵士モデルの読み込みに失敗", error);
+      console.error("[RemoteSoldier] 兵士モデルの読み込みに失敗", error);
       return;
     }
     if (this.disposed) return;
@@ -762,7 +807,7 @@ export class RemotePlayer {
     try {
       weapon = await Weapon.load(kind);
     } catch (error) {
-      console.error("[RemotePlayer] 武器の読み込みに失敗", error);
+      console.error("[RemoteSoldier] 武器の読み込みに失敗", error);
       return;
     }
     if (this.disposed) {
@@ -796,7 +841,7 @@ export class RemotePlayer {
   }
 }
 
-/** アニメの再生速度補正に使う基準速度 (m/s)。Player の MOVE_SPEED と揃えてある */
+/** アニメの再生速度補正に使う基準速度 (m/s)。Soldier の MOVE_SPEED と揃えてある */
 const REMOTE_MOVE_SPEED = 3.8;
 
 /**
@@ -813,9 +858,9 @@ interface Pending {
   life?: Life;
 }
 
-export class RemotePlayers {
+export class RemoteSoldiers {
   private readonly scene: THREE.Scene;
-  private readonly players = new Map<string, RemotePlayer>();
+  private readonly players = new Map<string, RemoteSoldier>();
   /**
    * 位置が届く前に知らされたこと。
    *
@@ -842,7 +887,15 @@ export class RemotePlayers {
   }
 
   /** 走査用。足音のように毎フレーム全員を見るものが使う */
-  get all(): Iterable<RemotePlayer> {
+  /** そのステージの水面。**後から来た人にも配る**ので控えておく */
+  private waterY: number | null = null;
+
+  setWaterY(y: number | null): void {
+    this.waterY = y;
+    for (const player of this.players.values()) player.setWaterY(y);
+  }
+
+  get all(): Iterable<RemoteSoldier> {
     return this.players.values();
   }
 
@@ -857,7 +910,9 @@ export class RemotePlayers {
       // **控えを先に引く。** どのモデルを着るかは名前で決まり、モデルの
       // 読み込みは構築と同時に始まる。作ってから名前を入れたのでは間に合わない
       const known = this.pending.get(snapshot.id);
-      player = new RemotePlayer(snapshot.id, this.scene, skinFor(known?.name));
+      player = new RemoteSoldier(snapshot.id, this.scene, skinFor(known?.name));
+      // 水面は部屋ごとに決まっている。作った所で配る
+      player.setWaterY(this.waterY);
       this.players.set(snapshot.id, player);
 
       // 名簿で先に届いていた情報を反映する。
@@ -911,7 +966,7 @@ export class RemotePlayers {
    * 作られるときに同じものを当てる。
    *
    */
-  sync(id: string, entry: RosterEntry): void {
+  sync(id: string, entry: Player): void {
     this.warmSkin(entry.name);
     const player = this.players.get(id);
     if (!player) {
@@ -940,7 +995,7 @@ export class RemotePlayers {
    * 現れる。かといって止まった場所に立たせたままにもしない。そこに居ない相手が
    * 見えていることになる。最後に見えた位置は、こちらの頭の中にだけ残ればよい。
    *
-   * 出す / 出さないの判断は RemotePlayer が持つ (refreshVisibility)。
+   * 出す / 出さないの判断は RemoteSoldier が持つ (refreshVisibility)。
    */
   update(dt: number, now: number): void {
     // 光るフラグの期限を落とす。**切れたことは通で来ない** — 来させると、
@@ -1000,8 +1055,8 @@ export class RemotePlayers {
     origin: THREE.Vector3,
     dir: THREE.Vector3,
     maxDistance: number,
-  ): { player: RemotePlayer; zone: HitZone; distance: number } | null {
-    let best: { player: RemotePlayer; zone: HitZone; distance: number } | null =
+  ): { player: RemoteSoldier; zone: HitZone; distance: number } | null {
+    let best: { player: RemoteSoldier; zone: HitZone; distance: number } | null =
       null;
     for (const player of this.players.values()) {
       if (player.health <= 0) continue;
@@ -1039,7 +1094,7 @@ export class RemotePlayers {
      */
     aimPitch: number,
   ): { id: string; fromBehind: boolean; distance: number; side: Team } | null {
-    let closest: { player: RemotePlayer; distance: number } | null = null;
+    let closest: { player: RemoteSoldier; distance: number } | null = null;
 
     for (const player of this.players.values()) {
       if (player.health <= 0) continue;
@@ -1058,7 +1113,7 @@ export class RemotePlayers {
     }
     if (!closest) return null;
 
-    // 被害者の正面。object は Player と同じ規約で「ローカル -Z が前」。
+    // 被害者の正面。object は Soldier と同じ規約で「ローカル -Z が前」。
     // モデルの正面が +Z である分の 180° は子のモデル側で吸っているので、
     // ここで +Z を使うと背中の向きが取れて背後判定が丸ごと裏返る。
     this.victimForward
@@ -1218,7 +1273,7 @@ export class RemotePlayers {
     for (const player of this.players.values()) this.refreshAlly(player);
   }
 
-  private refreshAlly(player: RemotePlayer): void {
+  private refreshAlly(player: RemoteSoldier): void {
     player.setAlly(this.selfTeam !== null && player.isAlly(this.selfTeam));
   }
 

@@ -11,6 +11,8 @@ import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
 import { stepMovement, type Mover } from '../../../sim/space/movement'
+import { WATER_DRAG } from '../../../sim/judge/ballistic'
+import type { Water } from '../../../domain/stage'
 import {
   crawlSurge,
   resolveLocomotion,
@@ -22,7 +24,7 @@ import {
 import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
-import { Weapon } from '../arms/weapon'
+import { Weapon, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
 
@@ -117,12 +119,6 @@ const BOX_SPEED_SCALE = 0.7
  * 歩き出したかどうかが分かれば足りる。
  */
 const CONCENTRATE_MAX_SPEED = 0.15
-
-/**
- * 銃の持ち方が姿勢へ寄る速さ。
- * しゃがみの入り抜けと同じくらいにして、体と銃が別々に動いて見えないようにする。
- */
-const WEAPON_STANCE_LAMBDA = 10
 
 /**
  * 自分の身体を描く順番。
@@ -224,8 +220,8 @@ const LANDING_MIN_SPEED = 3.0
 const AIR_CONTROL = 0
 
 /**
- * Player から見た世界。地形の形は Game 側が握り、Player は問い合わせるだけ。
- * これにより Player は障害物の表現 (今は AABB、将来は TriMesh) に依存しない。
+ * Soldier から見た世界。地形の形は Game 側が握り、Soldier は問い合わせるだけ。
+ * これにより Soldier は障害物の表現 (今は AABB、将来は TriMesh) に依存しない。
  */
 export interface PlayerWorld {
   /** 位置を障害物の外へ押し戻す */
@@ -238,7 +234,7 @@ export interface PlayerWorld {
 
 /**
  * モデルの正面は +Z (Mixamo/Blender 由来)。
- * Player は「ローカル -Z が前方」で組んであるので、読み込んだモデルを 180° 回して合わせる。
+ * Soldier は「ローカル -Z が前方」で組んであるので、読み込んだモデルを 180° 回して合わせる。
  */
 const MODEL_YAW_OFFSET = Math.PI
 
@@ -252,7 +248,7 @@ const ZERO_MOVE = new THREE.Vector3()
  * 外向きの API はプレースホルダーでもモデルでも同じで、Game 側はどちらの状態かを
  * 知らなくてよい (アニメーション関連の呼び出しはモデル未着なら黙って何もしない)。
  */
-export class Player {
+export class Soldier {
   /** シーンに add するルート */
   readonly object = new THREE.Group()
 
@@ -339,6 +335,35 @@ export class Player {
   /** 集中している時間 (秒)。姿勢を崩すか動いた瞬間に 0 へ戻る */
   private concentrateTime = 0
   /** 倒れているか。操作を一切受け付けなくなる */
+  /**
+   * そのステージの水面。**張っていなければ null。**
+   *
+   * 沈む速さを決めるのに要る。溺れたかどうかを決めるのはサーバー
+   * (server/index.ts) で、こちらは落ち方だけを合わせる。
+   */
+  private water: Water | null = null
+
+  setWater(water: Water | null): void {
+    this.water = water
+  }
+
+  /** いま水の中に居るか。入った瞬間を 1 回だけ拾うのに使う */
+  private inWater = false
+  /** 水面を割った速さ (m/s)。しぶきの大きさになる。拾われたら 0 に戻る */
+  private splashSpeed = 0
+
+  /**
+   * 水面を割ったなら、その速さ。**1 回の落水につき 1 度だけ。**
+   *
+   * しぶきを出すのは Game の仕事 (splashAt が水面の高さも範囲も知っている)。
+   * ここは「割った」と「どれくらいの勢いで」だけを渡す。
+   */
+  consumeSplash(): number {
+    const speed = this.splashSpeed
+    this.splashSpeed = 0
+    return speed
+  }
+
   private down = false
   /** ダンボールを被っているか */
   private boxed = false
@@ -349,7 +374,7 @@ export class Player {
   /**
    * 移動のドメインルールへ渡す体。位置は object のものをそのまま指す。
    *
-   * 速度と接地はここが持ち主になる。Player 側の同名のフィールドは
+   * 速度と接地はここが持ち主になる。Soldier 側の同名のフィールドは
    * このオブジェクトを覗くだけにして、真実の置き場を 1 つにする。
    */
   private readonly mover: Mover = {
@@ -412,7 +437,7 @@ export class Player {
   /**
    * このフレームで着地したときの落下速度 (m/s)。着地していなければ 0。
    *
-   * 呼ぶ側 (Game) が拾ってサーバーへ送る。Player は体力を持たないので、
+   * 呼ぶ側 (Game) が拾ってサーバーへ送る。Soldier は体力を持たないので、
    * ここで削らない。
    */
   landedSpeed = 0
@@ -531,7 +556,7 @@ export class Player {
       crouching: this.crouching,
       boxed: this.boxed,
       // いま手にある物。**ここが唯一の在り処になる。** いまは既存の状態から
-      // 組み立てているが、持ち物 (Carried[]) を Player が持つようになったら
+      // 組み立てているが、持ち物 (Carried[]) を Soldier が持つようになったら
       // そちらを直接返す
       held: this.held,
       concentrating: this.isConcentrating,
@@ -1270,8 +1295,17 @@ export class Player {
     if (this.proneStage !== 'none') return
     if (this.down || this.downed || this.standing || this.boxed) return
     if (!this.onGround) return
+    /*
+     * **型が読めるまで伏せない。**
+     *
+     * 尺が 0 のまま prone_down に入ると、繋ぎの秒読み (update) が `> 0` を
+     * 見ているので一度も進まず、**そこで固まる**。対戦ではモデルが届く前に
+     * Space を押せないので出なかったが、姿勢を直に立てる所 (調整の画面) で出た。
+     */
+    const span = this.animator?.proneDownDuration ?? 0
+    if (span <= 0) return
     this.proneStage = 'prone_down'
-    this.proneShiftLeft = this.animator?.proneDownDuration ?? 0
+    this.proneShiftLeft = span
     // 伏せは屈みの延長。頭の高さも音の届き方もそちら側で扱う
     this.crouching = true
     this.animator?.playProneDown()
@@ -1374,7 +1408,7 @@ export class Player {
   /** 武器の握り位置と角度を作り直す (調整用。確定したら weapon.ts の定数へ焼き込む) */
   calibrateWeapon(target: WeaponTarget, grip: THREE.Vector3, rotation: THREE.Euler): void {
     if (target === 'knife') {
-      this.knife?.setStanceValues(false, grip, rotation)
+      this.knife?.setStanceValues('stand', grip, rotation)
       return
     }
     /*
@@ -1386,11 +1420,16 @@ export class Player {
      * 形で出た。名前は「銃の id + Crouch」で作られているので、後ろを落とせば
      * それが答えになる。
      */
-    const kind = target.replace(/Crouch$/, '') as WeaponId
+    const kind = target.replace(/(Crouch|Prone)$/, '') as WeaponId
     // 持っていない銃への調整は捨てる。パネル側が持ち替えに追従するので、
     // 通常はここで落ちない
     if (kind !== this.weaponKind) return
-    this.weapon?.setStanceValues(target.endsWith('Crouch'), grip, rotation)
+    const stance = target.endsWith('Prone')
+      ? 'prone'
+      : target.endsWith('Crouch')
+        ? 'crouch'
+        : 'stand'
+    this.weapon?.setStanceValues(stance, grip, rotation)
   }
 
   /**
@@ -1672,6 +1711,29 @@ export class Player {
       }
     }
 
+    /*
+     * --- 水に入った ---
+     *
+     * **沈む速さは落とさない。** 一気に沈めば海底に着くのは 1 秒ほどで、
+     * カメラは水面で止まるので (Game の follow.minY) その間だけ見えなくなる。
+     * ゆっくり沈めた版は、**水の中を 9 秒かけて横へ 41m 滑って**いった。
+     *
+     * 横向きの勢いだけは殺す。空中では踏み切った時点の速さで進み続けるので
+     * (sim/space/movement.ts の airX)、そのままだと水に入って真横へ飛ぶ。
+     * 手榴弾と同じ倍率を使う (WATER_DRAG)。
+     */
+    if (this.water && this.position.y < this.water.y) {
+      if (!this.inWater) {
+        this.inWater = true
+        // 落ちた速さがそのまましぶきの大きさになる。呼ぶ側が 1 回だけ拾う
+        this.splashSpeed = Math.max(0, -this.velocityY)
+      }
+      this.mover.airX *= WATER_DRAG
+      this.mover.airZ *= WATER_DRAG
+    } else if (this.water && this.position.y > this.water.y) {
+      this.inWater = false
+    }
+
     const moved = stepMovement(
       this.mover,
       {
@@ -1842,7 +1904,14 @@ export class Player {
 
       // 銃の持ち方を姿勢に合わせる。切り替わりで跳ねないよう補間して追う
       const before = this.weaponStance
-      this.weaponStance = damp(this.weaponStance, this.crouching ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+      /*
+       * 銃の持ち方を姿勢に合わせる。**0 = 立ち / 1 = しゃがみ / 2 = 伏せ。**
+       *
+       * 伏せは長らくしゃがみの値をそのまま使っていた。腹這いでは肘の付き方も
+       * 上半身の向きも違うので、しゃがみの握りだと銃が体に埋まる。
+       */
+      const target = this.proneStage === 'none' ? (this.crouching ? 1 : 0) : 2
+      this.weaponStance = damp(this.weaponStance, target, WEAPON_STANCE_LAMBDA, dt)
       this.weapon?.applyStance(this.weaponStance)
       // 姿勢がどれだけ速く変わっているか。散布に効かせる
       this.stanceRateValue = dt > 0 ? Math.abs(this.weaponStance - before) / dt : 0
@@ -1910,7 +1979,7 @@ export class Player {
       gltf = await loadSoldier(skin)
     } catch (error) {
       // 読み込みに失敗してもプレースホルダーのまま操作は続けられる
-      console.error('[Player] 兵士モデルの読み込みに失敗', error)
+      console.error('[Soldier] 兵士モデルの読み込みに失敗', error)
       return
     }
     if (this.disposed) return
@@ -2021,7 +2090,7 @@ export class Player {
       weapon = await Weapon.load(kind)
     } catch (error) {
       // 武器が無くてもキャラは動く。銃口はフォールバックの固定オフセットになる。
-      console.error('[Player] 武器の読み込みに失敗', error)
+      console.error('[Soldier] 武器の読み込みに失敗', error)
       return
     }
     if (this.disposed) return
@@ -2033,7 +2102,7 @@ export class Player {
     const rightHand = findBoneBySuffix(model, 'RightHand')
     const leftHand = findBoneBySuffix(model, 'LeftHand')
     if (!rightHand || !leftHand) {
-      console.warn('[Player] 手ボーンが見つからない。武器を取り付けられない')
+      console.warn('[Soldier] 手ボーンが見つからない。武器を取り付けられない')
       weapon.dispose()
       return
     }
@@ -2064,7 +2133,7 @@ export class Player {
     // 刃を持っているのは左手側。向きは肘から手首への線を刃の方向とする。
     const foreArm = findBoneBySuffix(model, 'LeftForeArm')
     if (!foreArm) {
-      console.warn('[Player] 左前腕のボーンが無い。ナイフを付けられない')
+      console.warn('[Soldier] 左前腕のボーンが無い。ナイフを付けられない')
       return
     }
     try {
@@ -2083,7 +2152,7 @@ export class Player {
       knife.visible = false
       this.knife = knife
     } catch (error) {
-      console.error('[Player] ナイフの読み込みに失敗', error)
+      console.error('[Soldier] ナイフの読み込みに失敗', error)
     }
   }
 

@@ -39,8 +39,8 @@ const INITIAL_WEAPONS = {
     rotation: { x: -34, y: -3, z: 80 },
   },
   sniper: {
-    grip: { x: -0.02, y: 0.27, z: 0.11 },
-    rotation: { x: 0, y: -10, z: -172 },
+    grip: { x: 0, y: 0.24, z: 0.135 },
+    rotation: { x: -3, y: -11, z: -180 },
   },
   sniperCrouch: {
     grip: { x: -0.02, y: 0.265, z: 0.095 },
