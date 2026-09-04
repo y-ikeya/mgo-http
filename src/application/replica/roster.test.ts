@@ -5,7 +5,7 @@ import type { ServerMessage } from '../protocol/types'
 /**
  * 名簿は**サーバーが持っている状態**なので、レプリカの側で試せる。
  *
- * これまでは three のオブジェクト (RemotePlayer) が名前も陣営も体力も持って
+ * これまでは three のオブジェクト (RemoteSoldier) が名前も陣営も体力も持って
  * いたので、GL 無しでは 1 行も確かめられなかった。
  */
 const SELF = 'alice'

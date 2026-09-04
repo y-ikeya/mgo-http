@@ -306,3 +306,438 @@ describe('床へ行く型', () => {
     expect(only.head).toBeGreaterThan(1.2)
   })
 })
+
+describe('脱力の立ち姿', () => {
+  /**
+   * **素材どおりに立っているか。** 腰→首が前後どちらへ振れているかを測る。
+   *
+   * 正 = 前傾 / 負 = のけぞり。前方は腰のラインの法線から取るので、
+   * モデルがどちらを向いていても同じ数字になる。
+   */
+  function neckTilt(root: THREE.Object3D): number {
+    root.updateMatrixWorld(true)
+    const at = (suffix: string): THREE.Vector3 => {
+      const hits: THREE.Object3D[] = []
+      root.traverse((o) => {
+        if (o.name.endsWith(suffix) && !o.name.includes('End')) hits.push(o)
+      })
+      const found = hits[0]
+      if (!found) throw new Error(suffix)
+      return found.getWorldPosition(new THREE.Vector3())
+    }
+    const hips = at('Hips')
+    const right = at('RightUpLeg').sub(at('LeftUpLeg')).setY(0).normalize()
+    const forward = new THREE.Vector3(0, 1, 0).cross(right).normalize()
+    const d = at('Neck').sub(hips)
+    return (Math.atan2(d.dot(forward), d.y) * 180) / Math.PI
+  }
+
+  /** クリップを 1 本そのまま流したときの首の振れ */
+  function clipTilt(name: string): number {
+    const root = gltf.scene.clone(true)
+    const mixer = new THREE.AnimationMixer(root)
+    const clip = gltf.animations.find((a: THREE.AnimationClip) => a.name === name)
+    if (!clip) throw new Error(name)
+    mixer.clipAction(clip).play()
+    mixer.update(clip.duration / 2)
+    return neckTilt(root)
+  }
+
+  /**
+   * **素材は relaxed_idle (Rifle Idle.fbx) のまま、コードが 15° 反らせていた。**
+   *
+   * 2 つ重なっていた。腰の載せ替えが「作られた向きの差」を丸ごと消していて、
+   * その差には前後の傾きも混ざっていた (-6.8° → -15.5°)。その上に、前傾のはずの
+   * relaxedLean が符号違いで後ろへ効いていた (-15.5° → -19.7°)。
+   *
+   * 目で見ると「ふんぞり返っている」としか言えず、2 つあることは測って分かった。
+   */
+  test('**脱力の立ち姿は素材から離れない**', () => {
+    const root = gltf.scene.clone(true)
+    const holder = new THREE.Group()
+    holder.add(root)
+    const anim = new CharacterAnimator(root, gltf.animations, 4.5)
+    run(anim, 4, 'idle')
+
+    const source = clipTilt('relaxed_idle')
+    expect(Math.abs(neckTilt(root) - source)).toBeLessThan(6)
+  })
+
+  test('構えると素材の idle の姿勢へ寄る', () => {
+    const root = gltf.scene.clone(true)
+    const holder = new THREE.Group()
+    holder.add(root)
+    const anim = new CharacterAnimator(root, gltf.animations, 4.5)
+    run(anim, 4, 'idle', true)
+
+    expect(Math.abs(neckTilt(root) - clipTilt('idle'))).toBeLessThan(6)
+  })
+})
+
+describe('姿勢が震えない', () => {
+  /**
+   * **1 コマあたり手がどれだけ動くか。** 立ち止まっている姿は動かないはず。
+   *
+   * 姿勢だけを切り出した短いクリップ (kneeAim の両端、0.067 秒) を普通に
+   * 流すと、0.067 秒で頭へ戻る = 15Hz で震える。実測で手が 1 コマ 6.8mm
+   * 動いていた (立ちは 0.12mm)。下半身にそれを引いてしまった回もある。
+   *
+   * 見た目には「なんか震えてる」としか分からず、原因が上か下かも分からない。
+   * 数字にすれば一発で出る。
+   */
+  function jitter(locomotion: string, aiming: boolean): number {
+    const root = gltf.scene.clone(true)
+    const holder = new THREE.Group()
+    holder.add(root)
+    const anim = new CharacterAnimator(root, gltf.animations, 4.5)
+    const at = (suffix: string): THREE.Vector3 => {
+      const hits: THREE.Object3D[] = []
+      root.traverse((o) => {
+        if (o.name.endsWith(suffix) && !o.name.includes('End')) hits.push(o)
+      })
+      return hits[0]!.getWorldPosition(new THREE.Vector3())
+    }
+    let previous: THREE.Vector3 | null = null
+    let worst = 0
+    for (let i = 0; i < 180; i++) {
+      anim.setLocomotion(locomotion as never)
+      anim.setAiming(aiming)
+      anim.update(1 / 60)
+      // 混ざり切ってから測る。切り替えの補間そのものは震えではない
+      if (i < 120) continue
+      holder.updateWorldMatrix(true, true)
+      const hand = at('RightHand').sub(at('Hips'))
+      if (previous) worst = Math.max(worst, hand.distanceTo(previous))
+      previous = hand
+    }
+    return worst * 1000
+  }
+
+  test('**しゃがんで止まっていれば手も止まる**', () => {
+    expect(jitter('crouch_idle', false)).toBeLessThan(1)
+    expect(jitter('crouch_idle', true)).toBeLessThan(1)
+  })
+
+  test('立ちも同じ', () => {
+    expect(jitter('idle', false)).toBeLessThan(1)
+    expect(jitter('idle', true)).toBeLessThan(1)
+  })
+})
+
+describe('止めておく型', () => {
+  /**
+   * **作った直後から止まっていること。**
+   *
+   * 伏せて止まっている姿は、這う型 (crawl_f) の再生を止めて作っている。
+   * その「止める」を下半身しか掛けていない時期があった — 速度を当てる処理を
+   * 上半身を揃える前に呼んでいて、そのとき上半身の action がまだ無かった。
+   *
+   * **自機では出ない。** Soldier は速度が変わるたびに setMoveSpeed を呼び、
+   * そこで掛け直されて止まる。呼ばない RemoteSoldier にだけ残るので、
+   * 「自分の画面では止まっているのに、相手の画面では腕を掻き続ける」になる。
+   * 自機だけ見ていても気づけないので、ここで押さえる。
+   */
+  function timeScales(anim: CharacterAnimator): { lower: number; upper: number } {
+    const layer = anim as unknown as Record<string, Map<string, THREE.AnimationAction>>
+    return {
+      lower: layer.lower.get('prone_idle')?.getEffectiveTimeScale() ?? NaN,
+      upper: layer.upper.get('relaxed:prone_idle')?.getEffectiveTimeScale() ?? NaN,
+    }
+  }
+
+  test('**伏せて止まる型は上下とも止まっている。** 速度を当て直さなくても', () => {
+    const fresh = timeScales(animator())
+    expect(fresh.lower).toBe(0)
+    expect(fresh.upper).toBe(0)
+  })
+
+  test('速度を当て直しても止まったまま', () => {
+    const anim = animator()
+    anim.setMoveSpeed(4.5)
+    const after = timeScales(anim)
+    expect(after.lower).toBe(0)
+    expect(after.upper).toBe(0)
+  })
+
+  test('伏せて止まっていれば手も動かない', () => {
+    const root = gltf.scene.clone(true)
+    const holder = new THREE.Group()
+    holder.add(root)
+    const anim = new CharacterAnimator(root, gltf.animations, 4.5)
+    const at = (suffix: string): THREE.Vector3 => {
+      const hits: THREE.Object3D[] = []
+      root.traverse((o) => {
+        if (o.name.endsWith(suffix) && !o.name.includes('End')) hits.push(o)
+      })
+      return hits[0]!.getWorldPosition(new THREE.Vector3())
+    }
+    let previous: THREE.Vector3 | null = null
+    let worst = 0
+    for (let i = 0; i < 180; i++) {
+      anim.setLocomotion('prone_idle' as never)
+      anim.update(1 / 60)
+      if (i < 120) continue
+      holder.updateWorldMatrix(true, true)
+      const hand = at('RightHand').sub(at('Hips'))
+      if (previous) worst = Math.max(worst, hand.distanceTo(previous))
+      previous = hand
+    }
+    // 1 コマ 1mm 未満。這っていれば桁が変わる
+    expect(worst * 1000).toBeLessThan(1)
+  })
+})
+
+describe('勝手に構えない', () => {
+  /**
+   * **非構えの型が無い姿勢は、構えの型で代用される。**
+   *
+   * `resolveUpperKey` の最後がそうなっていて、それ自体は正しい (どこにも
+   * 当たらないより構えのほうがまし)。ただし**代用されていることに気づけない**
+   * ので、抜けているとその姿勢の間ずっと銃を構える。
+   *
+   * 実際、階段 (up_stair / down_stair) が抜けていた。坂を上り切って板に乗る
+   * 継ぎ目の段差を踏むたびに、押していないのに構える形で出た。
+   *
+   * 全身の型 (倒れる・眠る・転がる・刺す) は別の口を通るので、ここでは
+   * **移動している姿勢だけ**を見る。
+   */
+  /**
+   * **どの姿勢でも、構えていなければ構えの型は出ない。**
+   *
+   * 一部だけ並べると、次に姿勢を足したときにまた抜ける。**下半身が持っている
+   * 姿勢を全部**回す。表に無いものは下半身と同じクリップで埋まるので、
+   * ここは「埋め忘れが無い」ことの見張りになる。
+   */
+  function allLocomotions(anim: CharacterAnimator): string[] {
+    const lower = (anim as unknown as Record<string, Map<string, unknown>>).lower
+    return [...lower.keys()]
+  }
+
+  test('**どの姿勢でも、構えていなければ構えの型が出ない**', () => {
+    const guilty: string[] = []
+    for (const locomotion of allLocomotions(animator())) {
+      const anim = animator()
+      run(anim, 1.2, locomotion)
+      if (playing(anim, 'upper').includes('aim')) guilty.push(locomotion)
+    }
+    expect(guilty).toEqual([])
+  })
+
+  test('構えれば構える', () => {
+    const anim = animator()
+    run(anim, 1.2, 'idle', true)
+    expect(playing(anim, 'upper')).toEqual(['aim'])
+  })
+})
+
+describe('片手の物を持っている姿', () => {
+  /**
+   * **拳銃や道具を持っている間、小銃の型へ落ちない。**
+   *
+   * 上半身は「持っている物 × 移動状態」で引く。表に無い状態は
+   * 両手 (小銃) の表へ落ちる作りなので、**抜けているとその状態の間だけ
+   * 小銃を提げて見える。**
+   *
+   * 実際、階段と跳躍が抜けていた。クレイモアを持って坂を下りると一瞬
+   * down_stair に入り、その間だけ小銃を両手で構える形で出た。
+   *
+   * 全身の型 (倒れる・転がる・刺す) は別の口を通るので、ここでは
+   * **移動している姿勢だけ**を見る。
+   */
+  const MOVING = [
+    'idle', 'crouch_idle', 'sneak',
+    'up_stair', 'down_stair',
+    'jump_up', 'jump_loop', 'jump_down',
+    'run_f', 'run_b', 'crouch_f', 'crouch_b',
+  ] as const
+
+  function upperFor(locomotion: string, pistol: boolean): string {
+    const anim = animator()
+    anim.setPistol(pistol)
+    run(anim, 1.5, locomotion)
+    return (anim as unknown as { resolveUpperKey(): string }).resolveUpperKey()
+  }
+
+  test('**移動している間は、片手の表から引く**', () => {
+    const guilty: string[] = []
+    for (const locomotion of MOVING) {
+      if (!upperFor(locomotion, true).startsWith('pistol_relaxed:')) guilty.push(locomotion)
+    }
+    expect(guilty).toEqual([])
+  })
+
+  test('両手のときは今までどおり', () => {
+    for (const locomotion of MOVING) {
+      expect(upperFor(locomotion, false)).toBe(`relaxed:${locomotion}`)
+    }
+  })
+})
+
+describe('転がりの後半', () => {
+  /**
+   * **絵が流れている間は、ずっと転がりの型。**
+   *
+   * ロックは終盤 0.78 で先に解ける — 立ち上がりに入った時点で操作を返さないと、
+   * 最終ポーズに固まった所からブレンドが始まって一拍止まって見える。
+   *
+   * そこで上半身まで戻すと、下半身は立ち上がりの途中なのに**上半身だけ銃を
+   * 提げた型**へ移る。持ち武器に関わらず、転がりの後半で銃を構えて見えていた。
+   *
+   * 姿勢の表 (relaxed:roll) で埋めるのでは駄目だった。あちらは常時繰り返し
+   * 再生なので、下半身が終わりで止まっている間に頭へ戻り、**立ち上がりながら
+   * 腕だけ転がり始めの形 (手を挙げた姿)** になる。playRoll が下半身と揃えて
+   * 流し直した action をそのまま使う。
+   */
+  function traceRoll(pistol: boolean): string[] {
+    const anim = animator()
+    anim.setPistol(pistol)
+    anim.playRoll()
+    const seen: string[] = []
+    for (let i = 0; i < 140; i++) {
+      // Soldier と同じ判じ方 (姿勢はロックで決める)
+      anim.setLocomotion((anim.rolling ? 'roll' : 'idle') as never)
+      anim.setAiming(false)
+      anim.update(1 / 60)
+      const key = (anim as unknown as { resolveUpperKey(): string }).resolveUpperKey()
+      if (seen[seen.length - 1] !== key) seen.push(key)
+    }
+    return seen
+  }
+
+  test('**転がりの間に別の型が挟まらない**', () => {
+    // 転がり → 立ち姿。**間に何も入らない**
+    expect(traceRoll(false)).toEqual(['roll', 'relaxed:idle'])
+    expect(traceRoll(true)).toEqual(['roll', 'pistol_relaxed:idle'])
+  })
+
+  test('ロックが解けても、絵が流れている間は転がりの型', () => {
+    const anim = animator()
+    anim.playRoll()
+    let afterUnlock = ''
+    for (let i = 0; i < 140; i++) {
+      anim.setLocomotion((anim.rolling ? 'roll' : 'idle') as never)
+      anim.update(1 / 60)
+      if (!anim.rolling && anim.rollShowing) {
+        afterUnlock = (anim as unknown as { resolveUpperKey(): string }).resolveUpperKey()
+      }
+    }
+    expect(afterUnlock).toBe('roll')
+  })
+})
+
+describe('置く動作の待ち', () => {
+  /**
+   * **振りかぶりの残りは実時間で返す。**
+   *
+   * 呼ぶ側は待ち時間として足すので (Game の setupRelease)、クリップの秒のまま
+   * だと**速めたぶんだけ長く待つ**。クレイモアの振りかぶりは 1.8 倍で流して
+   * いるので、1.77 秒のクリップの残りをそのまま返すと 1.8 倍の待ちになる。
+   */
+  test('**振りかぶりの残りは、流す速さで割った実時間**', () => {
+    const anim = animator()
+    anim.playSetup()
+    run(anim, 1 / 30, 'claymore_windup')
+
+    const upper = (anim as unknown as Record<string, Map<string, THREE.AnimationAction>>).upper
+    const windup = upper.get('claymore_windup')!
+    const clip = windup.getClip()
+    const rate = windup.getEffectiveTimeScale()
+
+    // クリップの残りではなく、それを速さで割った値。
+    // **速さを変えても壊れない形**にしておく (いまの振りかぶりは等速)
+    expect(rate).toBeGreaterThan(0)
+    expect(anim.throwWindupLeft).toBeCloseTo((clip.duration - windup.time) / rate, 2)
+  })
+
+  /** 置く型も同じ。**尺ではなく流れる秒数**を持つ */
+  test('置く型の長さも流す速さで割った実時間', () => {
+    const anim = animator()
+    const upper = (anim as unknown as Record<string, Map<string, THREE.AnimationAction>>).upper
+    const place = upper.get('claymore_place')!
+    expect(anim.setupReleaseDuration).toBeCloseTo(
+      place.getClip().duration / place.getEffectiveTimeScale(),
+      2,
+    )
+  })
+})
+
+describe('置く動作へ移る継ぎ目', () => {
+  /** 腰の高さ。**立ち上がったかどうかがそのまま出る** */
+  function hipsHeight(anim: CharacterAnimator): number {
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    root.updateMatrixWorld(true)
+    let y = 0
+    root.traverse((o) => {
+      if (o.name.endsWith('Hips')) y = o.getWorldPosition(new THREE.Vector3()).y
+    })
+    return y
+  }
+
+  /**
+   * **かがんだまま置く。立ち上がって座り直さない。**
+   *
+   * 振りかぶりを `stop()` で即座に消していた。置く型は重み 0 から上げるので、
+   * その間**どの型にも重みが乗らず素の姿勢が透ける** — 実測で腰が 0.41m から
+   * 0.90m へ跳ねていた。2 つのクリップは繋がっている (継ぎ目で腰も頭も差 0.00m)
+   * ので、重ねたまま入れ替えれば穴が開かない。
+   */
+  test('**かがみから置きへ移る間、腰が上がらない**', () => {
+    const anim = animator()
+    anim.playSetup()
+    // 振りかぶりは 1.77 秒。**かがみ切るまで待つ** — 途中だと腰がまだ高い
+    run(anim, 2, 'claymore_windup')
+    const crouched = hipsHeight(anim)
+    expect(crouched).toBeLessThan(0.5)
+
+    anim.releaseSetup()
+    let highest = 0
+    for (let i = 0; i < 40; i++) {
+      anim.setLocomotion((anim.setupLocomotion ?? 'idle') as never)
+      anim.update(1 / 60)
+      highest = Math.max(highest, hipsHeight(anim))
+    }
+    // かがんだ高さから 10cm 以上跳ねない (直す前は 0.41 → 0.90 だった)
+    expect(highest).toBeLessThan(crouched + 0.1)
+  })
+})
+
+describe('置き切るまで構え直さない', () => {
+  /**
+   * **振りかぶりを流し直すと、立ち姿から始まる。**
+   *
+   * 振りかぶりのクリップは腰 1.00m (立ち) から 0.41m (かがみ) へ下りる。
+   * 置く型の途中で流し直すと、**立ち上がってしゃがみ直す**ように見える。
+   *
+   * 手榴弾には同じ罠への関門が既にあった (Game の grenadeRelease > 0)。
+   * クレイモアだけ抜けていて、引き金を引いた次のフレームに「構え始め」と
+   * 読まれて流し直していた。
+   *
+   * ここでは**クリップがそういう形であること**を押さえる。関門そのものは
+   * Game 側にあるが、この形が変われば関門の要否も変わる。
+   */
+  test('**振りかぶりは立ち姿から始まる。** 途中で流し直せない', () => {
+    const anim = animator()
+    const lower = (anim as unknown as Record<string, Map<string, THREE.AnimationAction>>).lower
+    const clip = lower.get('claymore_windup')!.getClip()
+
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    const hipsAt = (phase: number): number => {
+      const mixer = new THREE.AnimationMixer(root)
+      const action = mixer.clipAction(clip)
+      action.play()
+      action.time = clip.duration * phase
+      mixer.update(0)
+      root.updateMatrixWorld(true)
+      let y = 0
+      root.traverse((o) => {
+        if (o.name.endsWith('Hips')) y = o.getWorldPosition(new THREE.Vector3()).y
+      })
+      mixer.stopAllAction()
+      return y
+    }
+
+    // 頭は立ち、終わりはかがみ。**この差が「流し直すと立ち上がる」の正体**
+    expect(hipsAt(0)).toBeGreaterThan(0.8)
+    expect(hipsAt(1)).toBeLessThan(0.5)
+  })
+})

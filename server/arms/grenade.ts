@@ -7,7 +7,7 @@
 
 import { present } from '../../src/domain/match/match'
 import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
-import type { Player, Team } from '../../src/domain/player/player'
+import { headHeightOf, isProtected, type MatchPlayer, type Team } from '../../src/domain/player/player'
 import type { ClientMessage } from '../../src/application/protocol/types'
 import { type Projectile, throwVelocity } from '../../src/sim/judge/ballistic'
 import { blastExposure } from '../../src/sim/judge/blast'
@@ -17,7 +17,6 @@ import {
   THROW_LOFT,
   throwSpeedOf,
 } from '../../src/domain/item/grenade'
-import { headHeightOf } from '../../src/domain/player/stance'
 import { applyBlastDamage } from '../damage'
 import { type RoomWorld, broadcast, hostileToOwner, setLife } from '../world'
 
@@ -69,7 +68,7 @@ export const RELEASE_FORWARD = 0.45
  * 手榴弾 3 / クレイモア 2 という差もそこに書いてある。
  */
 
-export function throwGrenade(room: RoomWorld, from: Player, event: ClientMessage): void {
+export function throwGrenade(room: RoomWorld, from: MatchPlayer, event: ClientMessage): void {
   if (event.type !== 'grenade') return
   if (!canAct(from.life) || from.grenades <= 0) return
 
@@ -89,7 +88,7 @@ export function throwGrenade(room: RoomWorld, from: Player, event: ClientMessage
 
   from.grenades--
   // 投げた時点で無敵は切れる。守られたまま攻撃はできない
-  if (from.life === 'spawning') setLife(room, from, 'alive')
+  if (isProtected(from)) setLife(room, from, 'alive')
   const id = ++grenadeId
   // 前へ出す量は水平方向だけで測る (上下を向いても手の位置が動かないように)
   const flat = Math.hypot(v.x, v.z) || 1
@@ -127,7 +126,7 @@ export function throwGrenade(room: RoomWorld, from: Player, event: ClientMessage
  *
  * 投げるときと同じ経路に乗せるので、見た目も音も爆風も全部そのまま働く。
  */
-export function dropGrenade(room: RoomWorld, from: Player): void {
+export function dropGrenade(room: RoomWorld, from: MatchPlayer): void {
   // **振りかぶっている手榴弾だけ。** 手にしているだけなら落ちないし、
   // クレイモアを構えていた人の足元に手榴弾が湧いても困る
   if (!from.holdingGrenade || from.held !== 'grenade' || from.grenades <= 0) return
@@ -177,7 +176,7 @@ export function detonate(room: RoomWorld, nade: Grenade): void {
 
     // sim が測るのは**どこに誰がどれだけ晒されていたか**まで。
     // 何ダメージかを決めるのはドメインルールの側 (domain/item/grenade.ts)
-    const head = headHeightOf(victim.locomotion)
+    const head = headHeightOf(victim)
     const seen = blastExposure(x, y, z, victim, head, BLAST_RADIUS, room.stage.sight)
     if (!seen) continue
     const result = blastEffect(seen.distance, seen.cover)

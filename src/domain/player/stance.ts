@@ -7,7 +7,7 @@
  *
  * --- なぜ 1 本にするか ---
  * 構えは 3 か所で解釈されている。動かす側 (presentation/scene/actor/player)、映す側
- * (presentation/scene/actor/remotePlayer)、判定する側 (server)。同じ名前の状態を別の意味で
+ * (presentation/scene/actor/remoteSoldier)、判定する側 (server)。同じ名前の状態を別の意味で
  * 読むと、片方だけ壊れる。
  *
  * 頭の高さがまさにその穴だった。遮蔽の判定に使う 1.47 / 0.94 はクリップから
@@ -82,11 +82,6 @@ export const HEAD_HEIGHT: Record<Stance, number> = {
  * presentation/scene/actor/player.ts に居るので、揃えるならそちらを寄せる。
  */
 export const PRONE_SPEED_SCALE = 0.28
-
-/** そのモーションのときの頭の高さ */
-export function headHeightOf(locomotion: Locomotion): number {
-  return HEAD_HEIGHT[stanceOf(locomotion)]
-}
 
 
 /**

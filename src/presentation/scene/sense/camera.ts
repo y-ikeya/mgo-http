@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { damp } from '../util/math'
-import type { Player } from '../actor/player'
-import { PLAYER_HEIGHT } from '../actor/player'
+import type { Soldier } from '../actor/soldier'
+import { PLAYER_HEIGHT } from '../actor/soldier'
 
 /**
  * 構えていないとき / 構えているときのカメラ。
@@ -157,6 +157,18 @@ const RECOIL_RECOVERY_LAMBDA = 9
 export class FollowCamera {
   readonly camera: THREE.PerspectiveCamera
 
+  /**
+   * カメラが下がれる下限 (m)。
+   *
+   * **水面のあるステージでは水面に上げる。** 水は上からしか描いていないので、
+   * 潜ると裏側から見ることになって、水面が消えて海底が丸見えになる。
+   * 溺れた体は沈んで見えなくなるが、見ている側は水の上に残る。
+   *
+   * 既定は地面に潜らないための値。庭園のように**板ごと 10m 持ち上げた**
+   * ステージでは、固定値のままだと海底 (y=0) まで付いていってしまう。
+   */
+  minY = MIN_CAMERA_Y
+
   /** Y 軸回りの向き (rad)。移動入力をワールド空間へ変換する基準にもなる */
   yaw = 0
   /** 上下の向き (rad)。+ が見上げ */
@@ -201,7 +213,7 @@ export class FollowCamera {
   private fov = HIP_VIEW.fov
   /** 構え時の目標値。実機で詰められるよう定数ではなくインスタンスに持つ */
   private readonly aimView = { ...AIM_VIEW }
-  /** 注視点の高さ (m)。Player が実測した頭の位置から決める */
+  /** 注視点の高さ (m)。Soldier が実測した頭の位置から決める */
   private viewHeight = PLAYER_HEIGHT * 0.85
   /** 均した足元の高さ。段差で視点が跳ねないようにするためのもの */
   private footY = 0
@@ -354,7 +366,7 @@ export class FollowCamera {
     this.camera.lookAt(this.pivot)
   }
 
-  snapTo(player: Player, world?: CameraWorld): void {
+  snapTo(player: Soldier, world?: CameraWorld): void {
     // 映すのをやめたら回り込みも最初から。次に倒されたときに続きから
     // 回り始めると、角度が毎回変わって落ち着かない
     this.watchAngle = 0
@@ -364,7 +376,7 @@ export class FollowCamera {
     this.camera.rotation.copy(this.euler)
   }
 
-  update(dt: number, player: Player, world?: CameraWorld): void {
+  update(dt: number, player: Soldier, world?: CameraWorld): void {
     // 撃っている間は溜まり、止めてから戻る
     this.recoilAge += dt
     if (this.recoilAge >= RECOIL_RECOVERY_DELAY) {
@@ -403,7 +415,7 @@ export class FollowCamera {
   }
 
   /** euler / viewDir / pivot / desired を現在の yaw・pitch とキャラ位置から更新する */
-  private computeDesired(player: Player, world: CameraWorld | undefined, dt: number): void {
+  private computeDesired(player: Soldier, world: CameraWorld | undefined, dt: number): void {
     const yaw = this.aimYaw
     this.euler.set(this.aimPitch, yaw, 0)
     this.viewDir.set(0, 0, -1).applyEuler(this.euler)
@@ -434,7 +446,7 @@ export class FollowCamera {
     this.back.copy(this.viewDir).negate()
     this.occludedDistance = this.resolveDistance(world, dt)
     this.desired.copy(this.pivot).addScaledVector(this.back, this.occludedDistance)
-    if (this.desired.y < MIN_CAMERA_Y) this.desired.y = MIN_CAMERA_Y
+    if (this.desired.y < this.minY) this.desired.y = this.minY
   }
 
   /**

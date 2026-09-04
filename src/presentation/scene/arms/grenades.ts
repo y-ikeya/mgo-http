@@ -2,7 +2,7 @@ import * as THREE from 'three'
 
 import { loadGrenade } from '../assets'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../../../sim/judge/ballistic'
-import type { Water } from '../../../domain/match/stage'
+import type { Water } from '../../../domain/stage'
 import type { StageBox } from '../../../sim/space/vision'
 import { THROW_LOFT } from '../../../domain/item/grenade'
 

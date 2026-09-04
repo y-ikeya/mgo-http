@@ -126,6 +126,26 @@ function sourcesOf(dir: string): string[] {
 }
 
 /**
+ * index.ts を持つ棚。**そこが唯一の扉になる棚**の一覧。
+ *
+ * 表に書き並べない。置いた時点で決まる — 一覧を別に持つと、index を足したのに
+ * 見張りに載せ忘れる、が起きる。
+ */
+function shelvesWithDoor(): string[] {
+  const found: string[] = []
+  const walk = (dir: string): void => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      if (!statSync(full).isDirectory()) continue
+      if (existsSync(join(full, 'index.ts'))) found.push(full)
+      walk(full)
+    }
+  }
+  walk(SRC)
+  return found
+}
+
+/**
  * 依存を丸ごと拾う。
  *
  * **行では見ない** — 複数行に折れた import をすり抜ける。
@@ -240,6 +260,40 @@ describe('層の順序', () => {
       (name) => name.endsWith('.ts') && !name.endsWith('.test.ts'),
     )
     expect(loose).toEqual([])
+  })
+
+  /**
+   * **index.ts を置いた棚は、そこが唯一の扉。**
+   *
+   * 棚の中のファイルを外の層から名指ししない。要る物は index が取り次ぐ。
+   *
+   *     import { surfaceOf } from '.../domain/stage'         ○
+   *     import { surfaceOf } from '.../domain/stage/surface' ×
+   *
+   * **中を名指しできるかぎり、並べ替えるだけで外が全部書き換えになる。**
+   * ステージがそうなっていた — `domain/match/stage.ts` (ステージ) と
+   * `domain/stage/` (面) に分かれていて、名前が同じなのに指す物が違い、
+   * 外の 18 か所がその並びを直に握っていた。
+   *
+   * 棚の中どうし (index が surface を読む、surface が flags を読む) は自由。
+   * 縛るのは**外から中への名指し**だけ。
+   */
+  test('棚の中は外から名指しされない', () => {
+    const doors = shelvesWithDoor()
+    const outside = [...sourcesOf(SRC), ...sourcesOf(resolve(SRC, '..', 'server'))]
+    const guilty: string[] = []
+    for (const file of outside) {
+      for (const { from } of importsOf(readFileSync(file, 'utf8'))) {
+        if (!from.startsWith('.')) continue
+        const target = resolve(dirname(file), from)
+        for (const door of doors) {
+          if (file.startsWith(`${door}/`)) continue
+          if (target === door || !target.startsWith(`${door}/`)) continue
+          guilty.push(`${relative(SRC, file)} → ${from}`)
+        }
+      }
+    }
+    expect(guilty).toEqual([])
   })
 
   /**

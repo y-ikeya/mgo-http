@@ -8,13 +8,13 @@
  * --- 1 枚ではなくなった ---
  * 長らく stage.json 1 枚を起動時に読んで、module の定数として全員が見ていた。
  * ステージが増えた時点でそれは通らない — **部屋ごとに違う地形**を見るし、
- * 行き先では試合ごとに切り替わる (domain/match/stage.ts の Rotation)。
+ * 行き先では試合ごとに切り替わる (domain/stage の Rotation)。
  *
  * ここは名前で引ける表にして、**どれを見るかは部屋が持つ** (server/world.ts)。
  * 読むのは起動時に 1 回だけで、切り替わっても読み直さない。
  */
 
-import { STAGES, type StageName } from '../src/domain/match/stage'
+import { STAGES, type StageName } from '../src/domain/stage'
 import { arenaHalfOf } from '../src/sim/judge/motioncheck'
 import { type StageBox, sightBlockers, solidBlockers } from '../src/sim/space/vision'
 
@@ -64,10 +64,8 @@ async function load(name: StageName): Promise<Terrain> {
 }
 
 /**
- * 全部のステージ。**起動時に 1 回だけ読む。**
- *
- * 数が増えても、部屋が使うのはそのうち 1 枚。読み込みは箱の配列を持つだけなので
- * (モールで 431 個)、使わない分を抱えても安い。
+ * 全部のステージ。起動時に 1 回だけ読む。
+ * 数が増えても、部屋が使うのはそのうち 1 枚。
  */
 const TERRAINS: Record<StageName, Terrain> = Object.fromEntries(
   await Promise.all(

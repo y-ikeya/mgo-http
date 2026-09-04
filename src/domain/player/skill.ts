@@ -39,12 +39,12 @@ export type SkillId =
   | 'exposure'
 
 /** 取れるレベル。0 は「取っていない」 */
-export type SkillLevel = 1 | 2 | 3
+type SkillLevel = 1 | 2 | 3
 
 /** 1 人が持てる合計 (docs/design.md の 3) */
 export const SKILL_BUDGET = 4
 
-export interface SkillSpec {
+interface SkillSpec {
   id: SkillId
   label: string
   hint: string
@@ -147,7 +147,7 @@ export function costOf(skills: Skills): number {
  * **いまは全部解放。** 習熟度 (戦闘中の行動で上がる) を入れるまでの素通し。
  * ここを通しておくと、締めるときに書き換えるのがこの 1 か所で済む。
  */
-export function maxLevelOf(_id: SkillId): SkillLevel {
+function maxLevelOf(_id: SkillId): SkillLevel {
   return 3
 }
 

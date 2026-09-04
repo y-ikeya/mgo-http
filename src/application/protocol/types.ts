@@ -1,6 +1,6 @@
 import type { Locomotion } from '../../domain/player/locomotion'
 import type { HitZone } from '../../domain/rule/damage'
-import type { Surface } from '../../domain/stage/surface'
+import type { Surface } from '../../domain/stage'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import type { HeldId } from '../../domain/item/held'
 import type { Life } from '../../domain/player/lifecycle'
@@ -310,12 +310,12 @@ export interface LoadoutEvent {
   /** support の枠に何を入れたか。弾倉はここに入らない (撃った弾から勝手に増える) */
   support: SupportId
   /**
-   * 主武器。
+   * 主武器。**持たせない部屋では null。**
    *
    * 遊びの上では要らない (何を構えているかは位置に乗っている) が、**繋ぎ直したときに
    * 返すために持たせる**。持っていないと、読み直した人だけが突撃銃へ戻る。
    */
-  primary: WeaponId
+  primary: WeaponId | null
   /**
    * 副武器。**省ける。**
    *
@@ -470,9 +470,21 @@ export interface ResumeMessage {
    * 出すのに、数を持っているサーバーはクレイモアのまま、という形で出た。
    */
   support: SupportId
-  primary: WeaponId
+  /** 主武器。持たせない部屋では null */
+  primary: WeaponId | null
   /** 副武器。持たせない部屋では null */
   secondary: WeaponId | null
+}
+
+/**
+ * 支度が済んだ / まだ、と言う。**準備画面の READY が送る。**
+ *
+ * 全員が済んだと言えば待たずに始まる。押さなくても 60 秒で始まるので、
+ * これは早く始めるための物。押し間違えたときのために取り消せる。
+ */
+export interface ReadyEvent {
+  type: 'ready'
+  ready: boolean
 }
 
 /** 支度ができたので湧かせてほしい。装備画面の OK が送る */
@@ -586,7 +598,7 @@ export interface RosterMessage {
  *   playing   … 試合中。ダメージが入るのはここだけ
  *   over      … 決着。結果を見せている
  */
-export type MatchPhase = 'waiting' | 'countdown' | 'playing' | 'over'
+export type MatchPhase = 'waiting' | 'ready' | 'countdown' | 'playing' | 'over'
 
 /**
  * 部屋の一覧 (`GET /rooms`) が返す 1 部屋ぶん。
@@ -677,6 +689,8 @@ export interface MatchMessage {
      * **何をした人なのかは別の列で読ませる**。
      */
     stuns: number
+    /** 支度が済んだと言ったか。**準備画面で誰を待っているかが分かる** */
+    ready: boolean
     /** 接続が切れて戻りを待っている。数分で席ごと消える */
     away?: boolean
     /**
@@ -881,6 +895,7 @@ export type ClientMessage =
   | PickUpEvent
   | FallEvent
   | SpawnRequest
+  | ReadyEvent
   | RefetchRoster
   | ReloadEvent
   // 見た目だけの物。当たったかどうかに関わらないので素通しする
@@ -977,6 +992,6 @@ export const INTERPOLATION_DELAY = 0.05
  *
  * かつては「退出とみなして消す」ための値だった。サーバーが見えている相手にしか
  * 位置を配らなくなったので、音沙汰が無いことは切断ではなく遮蔽を意味する。
- * 消す判断は leave に任せ、こちらは表示だけを止める (remotePlayer.ts の HIDE_AFTER)。
+ * 消す判断は leave に任せ、こちらは表示だけを止める (remoteSoldier.ts の HIDE_AFTER)。
  */
 export const PLAYER_TIMEOUT = 10

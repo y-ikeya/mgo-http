@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>武器の構えを詰める</title>
+<style>
+  html, body { margin: 0; background: #0b0e0b; color: #cfe0c2;
+               font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+  #views { display: block; }
+  #panel { position: fixed; right: 0; top: 0; width: 320px; height: 100vh;
+           overflow-y: auto; padding: 14px 16px; box-sizing: border-box;
+           background: rgba(8, 12, 8, 0.92); border-left: 1px solid rgba(160,190,140,0.2);
+           font-size: 12px; }
+  h1 { font-size: 13px; letter-spacing: .18em; margin: 0 0 12px; color: #a8c898; }
+  .group { margin-bottom: 14px; }
+  label { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  label span:first-child { width: 22px; opacity: .7; }
+  input[type=range] { flex: 1; }
+  output { width: 54px; text-align: right; font-variant-numeric: tabular-nums; }
+  select, button { width: 100%; padding: 6px; margin: 4px 0; background: #131a12;
+                   color: #cfe0c2; border: 1px solid rgba(160,190,140,0.3); font: inherit; }
+  .tabs { display: flex; gap: 4px; margin: 6px 0 10px; }
+  .tabs button { flex: 1; }
+  .tabs button[data-on=true] { background: rgba(150,214,132,0.18);
+                               border-color: rgba(150,214,132,0.6); }
+  pre { white-space: pre-wrap; font-size: 11px; background: #0f140e; padding: 8px;
+        border: 1px solid rgba(160,190,140,0.2); }
+</style>
+<div id="views"></div>
+<div id="panel"></div>
+<script type="module" src="./weapon.ts"></script>

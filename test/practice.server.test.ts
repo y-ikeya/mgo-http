@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Client, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
-import { STAGES } from '../src/domain/match/stage'
+import { STAGES } from '../src/domain/stage'
 import { ROOMS } from '../src/domain/match/room'
 
 /**

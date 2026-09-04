@@ -5,7 +5,7 @@
 import { connected, present } from '../../src/domain/match/match'
 import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
-import type { Player, Team } from '../../src/domain/player/player'
+import type { MatchPlayer, Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
 import { PLACE_FORWARD, type Placed, SHOT_HALF, SHOT_TOP, blastReach, canPlaceAt } from '../../src/sim/judge/claymore'
 import { blastEffect } from '../../src/domain/item/claymore'
@@ -38,7 +38,7 @@ export let nextClaymoreId = 1
  * (sim/claymore.ts の canPlaceAt)。高さは地面に乗せる — 足元の y をそのまま
  * 使うと、段差の上に置いたときに床へ沈む。
  */
-export function placeClaymore(room: RoomWorld, from: Player): void {
+export function placeClaymore(room: RoomWorld, from: MatchPlayer): void {
   // **手にある物で決める。** 装備の選択 (support) で見ていたので、落ちている
   // クレイモアを拾って持ち替えた人が置けなかった
   if (!canAct(from.life) || from.held !== 'claymore' || from.grenades <= 0) return

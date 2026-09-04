@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "kneeAim.fbx": "knee_aim" },
+  "out": "kneeaim.glb",
+  "maxTexture": 64
+}

@@ -6,7 +6,7 @@ import {
   runnerScale, throwScale,
   type Skills,
 } from './skill'
-import { newPlayer, refill } from './player'
+import { newMatchPlayer, refill } from './player'
 import { CHOICES } from '../item/weapons'
 
 /**
@@ -240,14 +240,14 @@ describe('選び直せる窓', () => {
    * 消さない。消す行が足された日にここが落ちる。
    */
   test('湧き直してもスキルは消えない', () => {
-    const player = newPlayer({ id: 'a', name: 'a', team: 'blue', slot: 0, now: 0 })
+    const player = newMatchPlayer({ id: 'a', name: 'a', team: 'blue', slot: 0, now: 0 })
     player.skills = { runner: 2, exposure: 1 }
     refill(player)
     expect(player.skills).toEqual({ runner: 2, exposure: 1 })
   })
 
   test('**光っているフラグのほうは湧き直しで消える。** 死が漏洩を止める', () => {
-    const player = newPlayer({ id: 'a', name: 'a', team: 'blue', slot: 0, now: 0 })
+    const player = newMatchPlayer({ id: 'a', name: 'a', team: 'blue', slot: 0, now: 0 })
     player.leakedUntil = Date.now() + 5000
     refill(player)
     expect(player.leakedUntil).toBe(0)

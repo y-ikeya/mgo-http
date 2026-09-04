@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../../domain/stage/surface'
-import { flagsOf } from '../../../domain/stage/flags'
+import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../../domain/stage'
+import { flagsOf } from '../../../domain/stage'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
   clamp,
@@ -28,7 +28,7 @@ import type { Obstacle } from '../../../sim/space/collision'
 import { isPathClear, sightBlockers } from '../../../sim/space/vision'
 import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
-import { STAGES, waterOf, type StageName } from '../../../domain/match/stage'
+import { STAGES, waterOf, type StageName } from '../../../domain/stage'
 import { isMesh } from '../util/guards'
 
 /**
@@ -916,7 +916,7 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   void bakeGroundSky(name, ground.geometry)
 
   /*
-   * 水面。**敷くステージだけ** (domain/match/stage.ts の water)。
+   * 水面。**敷くステージだけ** (domain/stage の water)。
    *
    * どこに水があるかはサーバーも知っている — 投げた物が沈むので、片方だけが
    * 知っていると落ち先が食い違う。ここは同じ宣言を読んで**描くだけ**。

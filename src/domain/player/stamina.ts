@@ -65,10 +65,10 @@ export const STAMINA_RECOVER_DELAY = 1.5
  * 屈んでいる**という重さ。空から満ちるまでは 20 秒かかるが、空になった時点で
  * 眠っているので、そこまで戻すことはない。
  */
-export const STAMINA_RECOVER_RATE = 5
+const STAMINA_RECOVER_RATE = 5
 
 /** 削った結果 */
-export interface Drain {
+interface Drain {
   /** 残ったスタミナ */
   stamina: number
   /** これで眠ったか。**0 になった瞬間の 1 回だけ true** */

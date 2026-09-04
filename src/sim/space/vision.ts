@@ -9,7 +9,7 @@
  * 同じ判定を 2 か所に書くと、必ずどちらかがずれる。
  */
 
-import type { SurfaceFlags } from '../../domain/stage/flags'
+import type { SurfaceFlags } from '../../domain/stage'
 
 /** 遮蔽になる箱。ステージの書き出しが作る stage.json の中身 */
 export interface StageBox {
@@ -25,7 +25,24 @@ export interface StageBox {
    * 坂の上の空いている空間まで遮蔽として扱ってしまい、坂の上に立った相手が
    * 誰からも見えなくなる。
    */
-  top?: { h: number; dx: number; dz: number }
+  top?: {
+    h: number
+    dx: number
+    dz: number
+    /**
+     * 板の厚み (m)。**上面から下へ、どこまで詰まっているか。**
+     *
+     * 傾いた板を箱で持つと、上を切っても**下が三角形に埋まる**。坂の脇に
+     * しゃがんだ相手が誰からも見えなくなっていた — 見た目は下が空いている
+     * のに、判定では詰まっている。
+     *
+     * 楔のように下まで詰まっている形なら、厚みは箱の高さと同じになるので
+     * 今までどおり全部が塞がる。**表せない形を無理に薄くしない。**
+     *
+     * 無ければ min まで詰まっているものとして扱う (古い書き出しとの互換)。
+     */
+    thick?: number
+  }
 }
 
 /**
@@ -105,6 +122,29 @@ export function segmentHitsBox(
         near = cross
       }
       if (near > far) return false
+    }
+
+    /*
+     * 下面。**厚みぶんだけ下も切る。**
+     *
+     * 上と同じ平面を厚みだけ下げた物。ここを切らないと、坂の下の空いている
+     * 所が詰まったままになる (坂の脇にしゃがむと消える)。
+     */
+    const thick = top.thick
+    if (thick !== undefined && thick > 0) {
+      const below0 = at0 + thick
+      if (Math.abs(rate) < 1e-9) {
+        if (below0 < 0) return false
+      } else {
+        const cross = -below0 / rate
+        // rate < 0 なら進むほど下へ抜ける → cross より手前だけが中身
+        if (rate < 0) {
+          if (cross < far) far = cross
+        } else if (cross > near) {
+          near = cross
+        }
+        if (near > far) return false
+      }
     }
   }
 

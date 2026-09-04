@@ -6,9 +6,9 @@
 
 import { type Match, connected, newMatch, nextSlot } from '../src/domain/match/match'
 import { ROOMS, type RoomName } from '../src/domain/match/room'
-import { STAGES, nextStage } from '../src/domain/match/stage'
+import { STAGES, nextStage } from '../src/domain/stage'
 import type { Life } from '../src/domain/player/lifecycle'
-import { type Player, type Team, enterLife, newBot } from '../src/domain/player/player'
+import { type MatchPlayer, type Team, enterLife, newBot } from '../src/domain/player/player'
 import type { ServerMessage } from '../src/application/protocol/types'
 import type { Claymore } from './arms/claymore'
 import type { Dropped } from './arms/drops'
@@ -55,7 +55,7 @@ export interface RoomWorld extends Match {
    * ステージを回すようになった時点で、それは「どの部屋も同じ地形」を
    * 前提にした形だった。
    *
-   * 回す表 (domain/match/stage.ts) から選び直すのは試合の切れ目で、
+   * 回す表 (domain/stage) から選び直すのは試合の切れ目で、
    * いまはどの部屋も 1 枚だけの fixed なので変わらない。
    */
   stage: Terrain
@@ -66,17 +66,17 @@ export const rooms = new Map<RoomName, RoomWorld>()
 /**
  * 投げた物・置いた物の持ち主から見て敵か。
  *
- * 弾と違って手元に Player が無い (飛んでいる物は陣営しか覚えていない) ので、
+ * 弾と違って手元に人が無い (飛んでいる物は陣営しか覚えていない) ので、
  * 陣営を渡して同じドメインルールに通す。DM では同じ色でも巻き込む。
  */
-export function hostileToOwner(room: Match, owner: Team, victim: Player): boolean {
+export function hostileToOwner(room: Match, owner: Team, victim: MatchPlayer): boolean {
   if (room.mode.hostility === 'none') return false
   if (room.mode.hostility === 'all') return true
   return victim.team !== owner
 }
 
-/** 同じ側か。物の側に Player が無いとき用 */
-export function friendlyTeam(room: Match, viewer: Player, owner: Team): boolean {
+/** 同じ側か。物の側に MatchPlayer が無いとき用 */
+export function friendlyTeam(room: Match, viewer: MatchPlayer, owner: Team): boolean {
   if (room.mode.hostility === 'all') return false
   return viewer.team === owner
 }
@@ -121,7 +121,7 @@ export function broadcast(room: RoomWorld, message: ServerMessage, except?: stri
  * 変わったことは全員へ知らせる。知らせないと、受け取る側がまた
  * 「位置が来ないから倒れたのだろう」と推し量ることになる。
  */
-export function setLife(room: RoomWorld, player: Player, next: Life, now = Date.now()): void {
+export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = Date.now()): void {
   const before = player.life
   if (!enterLife(player, next, now)) {
     if (before !== next) console.warn(`[状態] ${player.name}: ${before} → ${next} は通れない`)
@@ -163,7 +163,7 @@ export const TARGET_STAND = 3.1
 export const TARGET_DOWN = 2.0 + TARGET_STAND
 
 /**
- * 的を並べる。**座標はステージが持っている** (domain/match/stage.ts)。
+ * 的を並べる。**座標はステージが持っている** (domain/stage)。
  *
  * ここにレプリカを置いていて、モールの的を東棟へ移したときに取り残された
  * (試験だけが 45m 先を撃っていた)。地形の点は地形の側に 1 つ。

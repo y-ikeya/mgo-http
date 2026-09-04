@@ -9,19 +9,26 @@
  *
  * 分けた形:
  *
- *     Player   (ここ)         体力・状態・位置・持ち物・成績
+ *     MatchPlayer   (ここ)         体力・状態・位置・持ち物・成績
  *     Session  (server 側)    socket・届く間隔・時計のずれ・配った控え
  *
- * こうしておくと、**クライアントも同じ Player を読める**。いまは片方が
- * three を抱えた src/presentation/scene/actor/player.ts で、同じ人物のことを別々の言葉で
- * 書いている。そこを寄せていく足場になる。
+ * 人は 2 段になっている。**外から見える分が `Player`、試合の中の全部が
+ * `MatchPlayer`。**
+ *
+ *     Player       名前・陣営・体力・状態      名簿が配るのはここまで
+ *     MatchPlayer  それ + 位置・持ち物・成績   サーバーだけが持つ
+ *
+ * 分けてあるので、**クライアントも同じ `Player` を読める。** 画面側が持てるのは
+ * 名簿の行だけ (`MatchPlayer` を作るのは newMatchPlayer / newBot だけ) なので、
+ * 分けていなかった頃は人ではなく `Life` を直に持って状態名で比べていた。
+ * いまは問いを両側から同じ形で呼べる — `isProtected(player)` は名簿の行でも通る。
  *
  * 置き場所の決めごとは docs/design.md の 7。ここは domain なので幾何 (src/sim) を
  * 知らない — 知ると「弾がどう飛ぶか」を変えるたびに「何発で死ぬか」が動く。
  */
-import { canTransition, type Life } from './lifecycle'
+import { canTransition, isSpawning, type Life } from './lifecycle'
 import type { Locomotion } from './locomotion'
-import type { Stance } from './stance'
+import { HEAD_HEIGHT, stanceOf, type Stance } from './stance'
 import { creditOf, takeDamage, type Credit, type Wound } from '../rule/damage'
 import type { HeldId } from '../item/held'
 import {
@@ -31,7 +38,6 @@ import {
 } from '../item/weapons'
 import { MAX_HEALTH } from '../rule/damage'
 import { Footsteps } from '../rule/footsteps'
-import type { GunId } from '../item/held'
 import { Inventory } from '../item/inventory'
 import type { Skills } from './skill'
 import { MAX_STAMINA } from './stamina'
@@ -76,8 +82,27 @@ export interface Pose {
  */
 export type Team = 'blue' | 'red'
 
+/**
+ * 人。**誰で、どちら側で、どれだけ無事で、いまどうか。**
+ *
+ * **他人から見えるのはここまで。** 名簿 (server/match.ts の rosterMessage) が
+ * 配るのもこの 4 つで、**配ってはいけない物がそもそも入っていない**形にしてある。
+ * 残りは `MatchPlayer` — 位置・持ち物・成績は持ち主にしか関係しない。
+ *
+ * --- なぜ 2 段に分けるか ---
+ * これは**クライアントが持てる唯一の人**でもある。`MatchPlayer` を作るのは
+ * サーバーだけなので (newMatchPlayer / newBot)、画面側には名簿で届く分しか無い。
+ *
+ * 分けていなかった頃、画面側は人を持てず **`Life` を直に握って状態名で
+ * 比べていた** (`life === 'spawning'`)。人に訊けないから状態に訊く、という形。
+ * `MatchPlayer` がこれを含むので、**問いは両側から同じ形で呼べる** —
+ * `isProtected(player)` はサーバーの人でも名簿の人でも通る。
+ *
+ * **「名簿の行」とは呼ばない。** どこに載るかは使い道であって、この型が何で
+ * あるかではない (domain/README.md の「入れ物の名前は entity」)。名簿には
+ * 自分も的も載るので、敵味方を表す語でもない。
+ */
 export interface Player {
-  id: string
   name: string
   team: Team
   health: number
@@ -89,6 +114,10 @@ export interface Player {
    * 同じ問いへの答えが場所ごとにずれて、そのまま不具合になっていた。
    */
   life: Life
+}
+
+export interface MatchPlayer extends Player {
+  id: string
   /**
    * 倒した相手の id。倒れている間だけ意味がある。
    *
@@ -158,19 +187,22 @@ export interface Player {
    */
   support: SupportId
   /**
-   * 主武器の選択。
+   * 主武器の選択。**null なら持たない** (部屋が外している)。
    *
    * `weapon` (いま構えている物) とは別。繋ぎ直したときに返すためだけに持つ —
    * 読み直した瞬間は拳銃を持っているかもしれないので、構えている物からは復元できない。
+   *
+   * 副武器と同じで、部屋が銃を外すことがある (domain/match/room.ts の primaries を
+   * 空にする)。**両方外れてもナイフは残る。**
    */
-  primary: WeaponId
+  primary: WeaponId | null
   /**
    * 副武器。**null なら持たない** (部屋が外している)。
    *
    * 主武器と違って選べない — いまは拳銃 1 挺だけなので、選ばせても意味が無い。
    * 持つか持たないかだけが部屋で変わる (domain/match/room.ts の secondary)。
    */
-  secondary: GunId | null
+  secondary: WeaponId | null
   /**
    * 取っているスキルと、その段。**4 コストの予算で選ぶ** (player/skill.ts)。
    *
@@ -290,7 +322,7 @@ export interface Player {
   /**
    * 人ではなく的か。
    *
-   * **接続を持たない Player。** 練習部屋に並ぶ棒立ちがこれで、倒すと数秒後に
+   * **接続を持たない人。** 練習部屋に並ぶ棒立ちがこれで、倒すと数秒後に
    * 同じ場所へ戻る。戦績には残さない。
    */
   bot: boolean
@@ -309,6 +341,14 @@ export interface Player {
   suicides: number
   /** 眠らせた数。**倒した数とは別に数える** — 別の手だから */
   stuns: number
+  /**
+   * 支度が済んだと言ったか。**試合が始まるたびに戻る。**
+   *
+   * 全員が押すと待たずに始まる (server/match.ts)。押さない人が居ても
+   * 60 秒で始まるので、これは「早く始める」ための物であって、止めるための
+   * 物ではない。
+   */
+  ready: boolean
   /**
    * 武器ごとのキル。**表示名ではなく安定した id で数える**
    * ('rifle' | 'sniper' | 'm9' | 'knife' | 'grenade')。
@@ -338,13 +378,13 @@ export interface Player {
  * **既定値を実体の側に置く。** 以前はこの 35 個の初期値が socket の open の中に
  * 直接書いてあり、フィールドを足すたびに「初期化を書き忘れる」余地があった。
  */
-export function newPlayer(seed: {
+export function newMatchPlayer(seed: {
   id: string
   name: string
   team: Team
   slot: number
   now: number
-}): Player {
+}): MatchPlayer {
   return {
     id: seed.id,
     name: seed.name,
@@ -391,6 +431,7 @@ export function newPlayer(seed: {
     kills: 0,
     deaths: 0,
     stuns: 0,
+    ready: false,
     stamina: MAX_STAMINA,
     sleepUntil: 0,
     headshots: 0,
@@ -401,7 +442,7 @@ export function newPlayer(seed: {
 }
 
 /**
- * 練習部屋の的。**接続を持たない Player。**
+ * 練習部屋の的。**接続を持たない人。**
  *
  * 動かない・撃たない・戦績に残らない。撃たれて倒れ、数秒後に同じ場所へ戻る。
  * 位置を固定で持つのは、**距離の練習**がこの部屋の用だから — 何 m の的かが
@@ -415,8 +456,8 @@ export function newBot(seed: {
   x: number
   z: number
   now: number
-}): Player {
-  const bot = newPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
+}): MatchPlayer {
+  const bot = newMatchPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
   bot.bot = true
   bot.x = seed.x
   bot.z = seed.z
@@ -439,7 +480,7 @@ export function newBot(seed: {
  * これに気づかず enterLife(bot, 'alive') を呼んでいて、的が倒れたきり戻って
  * こなかった。試験は通っていた — 撃った本人の respawn を数えていたため。
  */
-export function reviveBot(bot: Player, now: number): void {
+export function reviveBot(bot: MatchPlayer, now: number): void {
   refill(bot)
   bot.life = 'alive'
   bot.lifeAt = now
@@ -457,7 +498,7 @@ export function reviveBot(bot: Player, now: number): void {
  * 知らせる (broadcast) のは呼ぶ側の仕事。ここは人の側の話だけで、
  * 誰に何を送るかは接続の話なので混ぜない。
  */
-export function enterLife(player: Player, next: Life, now: number): boolean {
+export function enterLife(player: MatchPlayer, next: Life, now: number): boolean {
   if (player.life === next) return false
   if (!canTransition(player.life, next)) return false
   player.life = next
@@ -466,13 +507,36 @@ export function enterLife(player: Player, next: Life, now: number): boolean {
 }
 
 /** その状態に入ってから経った時間 (ms) */
-export function lifeElapsed(player: Player, now: number): number {
+export function lifeElapsed(player: MatchPlayer, now: number): number {
   return now - player.lifeAt
 }
 
-/** いま無敵か */
-export function isProtected(player: Player): boolean {
-  return player.life === 'spawning'
+/**
+ * その人の頭の高さ (m)。
+ *
+ * **訊く相手は人。** 数字そのものは構えの表 (stance.ts の HEAD_HEIGHT) が
+ * 持っていて、屈めば 1.47m から 0.94m へ下がる。ここはその表を人の言葉で
+ * 引き直す口。
+ *
+ * 以前は `headHeightOf(locomotion)` という形で/stanceの側に置いてあり、呼ぶ側
+ * 4 か所が全部 `headHeightOf(player.locomotion)` と書いていた。
+ * /playerに訊きたいのに、/stanceをこじ開けて欄を 1 つ渡していた。
+ *
+ * 構えや、しゃがみ/箱の別しか手元に無い場面 (過去を遡る照合) は
+ * `HEAD_HEIGHT` と `headHeightWhen` を直に使う — そちらは訊く相手が人ではない。
+ */
+export function headHeightOf(player: MatchPlayer): number {
+  return HEAD_HEIGHT[stanceOf(player.locomotion)]
+}
+
+/**
+ * いま無敵か。**人に訊く形。**中身は lifecycle の問い 1 つ。
+ *
+ * 受けるのは名簿の 1 行 — `MatchPlayer` はそれを含むので、サーバー (人を持つ側) も
+ * 画面 (名簿しか持たない側) も同じ問いを呼べる。
+ */
+export function isProtected(who: Player): boolean {
+  return isSpawning(who.life)
 }
 
 /**
@@ -484,7 +548,7 @@ export function isProtected(player: Player): boolean {
  *
  * @param teams その部屋に陣営があるか (domain/match/room.ts の mode.teams)
  */
-export function leakTag(attacker: Player, teams: boolean): string {
+export function leakTag(attacker: MatchPlayer, teams: boolean): string {
   return teams ? `team:${attacker.team}` : `id:${attacker.id}`
 }
 
@@ -496,7 +560,7 @@ export function leakTag(attacker: Player, teams: boolean): string {
  * 抜いた側の利が消える。当てられたこと自体は体力で分かるので、
  * そこから先を教えるかどうかがこの 1 行。
  */
-export function isLeakedTo(target: Player, viewer: Player, now: number): boolean {
+export function isLeakedTo(target: MatchPlayer, viewer: MatchPlayer, now: number): boolean {
   if (now >= target.leakedUntil) return false
   return target.leakedTo === `team:${viewer.team}` || target.leakedTo === `id:${viewer.id}`
 }
@@ -507,7 +571,7 @@ export function isLeakedTo(target: Player, viewer: Player, now: number): boolean
  * **装備から詰め直す。** 式は共有なので、画面に出る数と必ず一致する。
  * 状態を spawning にするのと、それを知らせるのは呼ぶ側 (接続の話が要るため)。
  */
-export function refill(player: Player): void {
+export function refill(player: MatchPlayer): void {
   player.killedBy = ''
   // **死ねば漏洩が止まる。** 死が情報を切る手段になっている
   player.leakedUntil = 0
@@ -536,7 +600,7 @@ export function refill(player: Player): void {
  * 「削られたら集中が切れる」も遊びの決めごとで、**同じ判断をクライアントも
  * 先に回している**。2 か所に書くと、片方だけドメインルールが変わる。
  */
-export function hurt(player: Player, amount: number): Wound {
+export function hurt(player: MatchPlayer, amount: number): Wound {
   const wound = takeDamage(player.health, amount)
   player.health = wound.health
   // 撃たれても爆風でも集中は途切れる。回復は最初からやり直し
@@ -554,8 +618,8 @@ export function hurt(player: Player, amount: number): Wound {
  * 残機を減らすのは試合の側 (match.loseTicket)。人が持つのは自分の戦績だけ。
  */
 export function downedBy(
-  victim: Player,
-  killer: Player | null,
+  victim: MatchPlayer,
+  killer: MatchPlayer | null,
   weapon: string,
   headshot = false,
 ): Credit {

@@ -591,7 +591,7 @@ domain 側の棚 (player / match / item / stage / rule) は
 
     server/index.ts    起動と口 (HTTP / WebSocket / 1 通の振り分け / 刻み)
       world.ts   部屋の世界 — 試合と、その中に在る物。配る相手もここ
-      session.ts 接続 (人とは別。的は Player を持つが Session を持たない)
+      session.ts 接続 (人とは別。的は MatchPlayer を持つが Session を持たない)
       stage.ts   ステージの箱
       match.ts   段階と時計 — 誰が湧いて、いつ始まって、いつ終わるか
       damage.ts  申告を検算して体力を削る

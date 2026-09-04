@@ -27,7 +27,7 @@ export class NetSocket implements NetTransport {
    * ゲーム側からは今までどおり ID の付いた state に見える。
    */
   private readonly slots = new Map<number, string>()
-  private reconnectTimer = 0
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private disposed = false
 
   /**
@@ -73,7 +73,8 @@ export class NetSocket implements NetTransport {
 
   dispose(): void {
     this.disposed = true
-    window.clearTimeout(this.reconnectTimer)
+    if (this.reconnectTimer !== null) clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
     this.listeners.clear()
     // 明示的に閉じる。サーバー側の close で他の参加者へ leave が配られる。
     this.socket?.close()
@@ -148,7 +149,7 @@ export class NetSocket implements NetTransport {
       // 繋ぎ直すと席番号は割り当て直される。古い対応を残すと他人の位置になる
       this.slots.clear()
       // 落ちたら繋ぎ直す。サーバーを再起動しても対戦が終わらないように。
-      this.reconnectTimer = window.setTimeout(() => this.connect(), RECONNECT_DELAY)
+      this.reconnectTimer = setTimeout(() => this.connect(), RECONNECT_DELAY)
     }
 
     socket.onerror = () => {

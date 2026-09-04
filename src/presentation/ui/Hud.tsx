@@ -1,4 +1,5 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
+import { CRITICAL_HEALTH } from '../../domain/rule/damage'
 import { t } from '../../i18n'
 import { HELD, type HeldId } from '../../domain/item/held'
 import { MODES } from '../../domain/match/room'
@@ -344,7 +345,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       */}
       <div
         class="hud-damage"
-        classList={{ 'hud-damage-critical': health() <= 30 }}
+        classList={{ 'hud-damage-critical': health() <= CRITICAL_HEALTH }}
         style={{ opacity: `${1 - health() / 100}` }}
       />
 
@@ -419,12 +420,37 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={props.stats?.scoped}>
         <div class="scope">
           <div class="scope-glass">
-            <div class="scope-cross scope-cross-v" />
-            <div class="scope-cross scope-cross-h" />
-            <div class="scope-dot" />
-            {/* 目盛り。距離感の手掛かりになる */}
-            <div class="scope-ticks">
-              <span /><span /><span /><span />
+            {/*
+              柱 (post)。**上・左・右の 3 本。**
+
+              実物の狙撃眼鏡は、太い線が縁から伸びて中心の手前で止まる。
+              太いのは覗いた瞬間に線を見つけるためで、中心を空けるのは
+              的を隠さないため。下だけ無いのは、そこに距離の目盛りが入るから。
+            */}
+            <div class="scope-post scope-post-t" />
+            <div class="scope-post scope-post-l" />
+            <div class="scope-post scope-post-r" />
+            {/* 柱の先から中心までの細かい刻み。ここで的の大きさを測る */}
+            <div class="scope-fine scope-fine-t" />
+            <div class="scope-fine scope-fine-l" />
+            <div class="scope-fine scope-fine-r" />
+            {/*
+              中心の赤い縦線。**着弾はこの線の上に来る。**
+
+              黒い線だけだと、暗い的に重ねた瞬間にどこを狙っているか分からなくなる。
+            */}
+            <div class="scope-red" />
+            {/*
+              距離の目盛り。**中央を空けて左右に分ける。**
+
+              真ん中を点で埋めると、狙っている所が点に隠れる。実物も中心線の
+              両脇に刻む。下へ行くほど広がるのは、遠いほど弾が落ちるから。
+            */}
+            <div class="scope-mils">
+              <div><span /><span /></div>
+              <div><span /><span /></div>
+              <div><span /><span /></div>
+              <div><span /><span /></div>
             </div>
             <div class="scope-zoom">{props.stats?.zoom}</div>
           </div>

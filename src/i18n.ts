@@ -45,6 +45,7 @@ const JA = {
 
   // --- 部屋の一覧 ---
   'lobby.waiting': '待機中',
+  'lobby.ready': '支度中',
   'lobby.countdown': 'まもなく開始',
   'lobby.playing': '対戦中',
   'lobby.over': '結果表示',
@@ -96,6 +97,7 @@ const EN: Record<Key, string> = {
   'login.toSignUp': 'Create an account (Sign up)',
 
   'lobby.waiting': 'Waiting',
+  'lobby.ready': 'Getting ready',
   'lobby.countdown': 'Starting soon',
   'lobby.playing': 'In progress',
   'lobby.over': 'Results',

@@ -7,6 +7,7 @@
 
 import {
   MIN_PLAYERS,
+  READY_SECONDS,
   type Match,
   connected,
   holdingSeats,
@@ -15,8 +16,8 @@ import {
   shuffleTeams,
   soleTeam,
 } from '../src/domain/match/match'
-import { isSeated } from '../src/domain/player/lifecycle'
-import { type Player, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
+import { canChoose, isDowned, isSeated } from '../src/domain/player/lifecycle'
+import { type MatchPlayer, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
@@ -121,7 +122,7 @@ export function updateTargets(room: RoomWorld, now: number): void {
       bot.stamina = MAX_STAMINA
     }
 
-    if (bot.life === 'downed' && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
+    if (isDowned(bot.life) && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
       reviveBot(bot, now)
       broadcast(room, { type: 'life', id: bot.id, state: 'alive' })
       broadcast(room, { type: 'respawn', id: bot.id })
@@ -133,7 +134,7 @@ export function updateTargets(room: RoomWorld, now: number): void {
 }
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
-export function targetPayload(bot: Player, now: number): Uint8Array {
+export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
   return new Uint8Array(
     encodeSnapshot(
       {
@@ -162,7 +163,7 @@ export function targetPayload(bot: Player, now: number): Uint8Array {
          * 立つ、という絵になる。
          */
         locomotion:
-          bot.life === 'downed'
+          isDowned(bot.life)
             ? bot.downFromBehind
               ? 'death_front'
               : 'death_back'
@@ -241,6 +242,7 @@ export function matchState(room: Match): ServerMessage {
       deaths: p.deaths,
       suicides: p.suicides,
       stuns: p.stuns,
+      ready: p.ready,
       away: !isSeated(p.life),
       // 位置が届いている回数 (通/秒)。名目は 64。
       //
@@ -289,7 +291,7 @@ export function resetPlayers(room: RoomWorld): void {
  * 支度からしか呼ばない。倒れた直後にここへ跳ぶと装備が配り直されない
  * (setLife が通してくれないので、書き間違えても状態が壊れることはない)。
  */
-export function spawn(room: RoomWorld, player: Player, now = Date.now()): void {
+export function spawn(room: RoomWorld, player: MatchPlayer, now = Date.now()): void {
   refill(player)
   // **眠りも醒める。** 知らせないと、湧いた本人の画面が暗いまま
   sendStamina(player)
@@ -303,7 +305,7 @@ export function spawn(room: RoomWorld, player: Player, now = Date.now()): void {
  *
  * 名乗った id ではなく接続の player を受ける。他人を追い出せてしまうので。
  */
-export function leaveRoom(room: RoomWorld, player: Player): void {
+export function leaveRoom(room: RoomWorld, player: MatchPlayer): void {
   // 走っている試合を捨てて出た。抜けたことごと残す
   if (room.phase === 'playing') recordSeat(room, player, true)
   room.players.delete(player.id)
@@ -319,7 +321,7 @@ export function leaveRoom(room: RoomWorld, player: Player): void {
  * 居ないので、席を畳む側からもここを呼ぶ。関数は冪等なので、同じ人を
  * 二度書いても増えない。
  */
-export function recordSeat(room: RoomWorld, player: Player, leftEarly: boolean): void {
+export function recordSeat(room: RoomWorld, player: MatchPlayer, leftEarly: boolean): void {
   if (!room.matchId) return
   recordPlayer({
     matchId: room.matchId,
@@ -359,6 +361,34 @@ export function finishMatch(room: RoomWorld): void {
  * 時間切れで決着、しばらく結果を見せてから次の試合を始める。
  * クライアント側で時計を回すと、タブが裏に回ったぶんだけずれるのでサーバーが持つ。
  */
+
+/**
+ * 支度の段階へ入る。**READY を全員ぶん戻してから。**
+ *
+ * 前の試合で押した READY が残っていると、次の試合が押した覚えのないまま
+ * 始まる。段階に入るたびに聞き直す。
+ */
+function enterReady(room: RoomWorld, now: number): void {
+  room.phase = 'ready'
+  room.endsAt = now + READY_SECONDS * 1000
+  room.blue = TICKETS
+  room.red = TICKETS
+  room.winner = undefined
+  for (const player of room.players.values()) player.ready = false
+  resetPlayers(room)
+}
+
+/**
+ * 全員の支度が済んだか。**居る人だけ数える。**
+ *
+ * 接続の切れた人 (dropped) を数えると、戻ってこない人が居る限り始まらない。
+ * 席は 30 秒残るので、そこを待っていると部屋が止まる。
+ */
+function allReady(room: RoomWorld): boolean {
+  const here = connected(room).filter((p) => !p.bot)
+  return here.length > 0 && here.every((p) => p.ready)
+}
+
 export function updateMatch(room: RoomWorld, now: number): void {
   const seats = holdingSeats(room, now)
   /*
@@ -401,12 +431,8 @@ export function updateMatch(room: RoomWorld, now: number): void {
     if (now < room.endsAt) {
       // まだ見せている最中
     } else if (enough) {
-      room.phase = 'countdown'
-      room.endsAt = now + COUNTDOWN
-      room.blue = TICKETS
-      room.red = TICKETS
-      room.winner = undefined
-      resetPlayers(room)
+      // **次の試合の前にもう一度支度させる。** ここでスキルを組み替え直せる
+      enterReady(room, now)
     } else {
       room.phase = 'waiting'
       room.endsAt = 0
@@ -431,22 +457,39 @@ export function updateMatch(room: RoomWorld, now: number): void {
       room.winner = undefined
     }
   } else if (room.phase === 'waiting' && enough) {
-    room.phase = 'countdown'
-    room.endsAt = now + COUNTDOWN
-    room.blue = TICKETS
-    room.red = TICKETS
-    room.winner = undefined
-    resetPlayers(room)
+    enterReady(room, now)
+  } else if (room.phase === 'ready') {
+    /*
+     * 支度の段階。**全員が押すか、締め切りが来たら数え始める。**
+     *
+     * 押さない人が居ても止めない。席を離れた人 1 人で部屋が止まるのは、
+     * 装備の打ち切り (CHOOSE_TIMEOUT) と同じ理由で困る。
+     */
+    if (allReady(room) || now >= room.endsAt) {
+      room.phase = 'countdown'
+      room.endsAt = now + COUNTDOWN
+    }
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく
     room.matchId = crypto.randomUUID()
     room.startedAt = now
-    // 支度がまだ済んでいない人はここで押し出す。始まっているのに
-    // 装備画面の裏で立ち尽くす人が出ないように
+    /*
+     * **押し出さない。武器を選ぶのはここから。**
+     *
+     * 支度の段階 (ready) で決めるのは、誰と戦うかとスキルまで。武器は試合が
+     * 始まってから選ぶ物なので、始まった時点で装備画面に入っていてほしい。
+     *
+     * 支度の時計だけ入れ直す。ready の 60 秒を待っている間ずっと choosing に
+     * 居るので、そのままだと**始まった瞬間に打ち切り (30 秒) を過ぎている**
+     * ことになって、選ぶ間もなく湧かされる。
+     *
+     * 選ばない人は今までどおり 30 秒で湧かされる (lifecycle.ts の
+     * CHOOSE_TIMEOUT)。始まっているのに画面の裏で立ち尽くす人は出ない。
+     */
     for (const player of connected(room)) {
-      if (player.life === 'choosing') spawn(room, player, now)
+      if (canChoose(player.life)) player.lifeAt = now
     }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる

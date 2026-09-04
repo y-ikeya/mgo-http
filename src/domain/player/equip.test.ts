@@ -7,7 +7,7 @@ import {
   isPrimaryChoice,
   isSupportChoice,
 } from './equip'
-import { newPlayer, refill } from './player'
+import { newMatchPlayer, refill } from './player'
 
 /**
  * **申告を鵜呑みにしない。**
@@ -18,7 +18,7 @@ import { newPlayer, refill } from './player'
  * では通っていた。
  */
 function fresh() {
-  return newPlayer({ id: 'a', name: 'A', team: 'blue', slot: 0, now: 0 })
+  return newMatchPlayer({ id: 'a', name: 'A', team: 'blue', slot: 0, now: 0 })
 }
 
 describe('何を持てるか', () => {
@@ -241,10 +241,48 @@ describe('部屋に合わせて丸める', () => {
     expect(p.support).toBe('claymore')
   })
 
-  test('絞っていない部屋では何も起きない', () => {
+  /**
+   * **空の一覧は「銃を持たせない」。** 絞っていないことではない。
+   *
+   * 絞らない部屋は primaries を書かず、primariesOf が全部を返すので、空が
+   * 届くのは「ナイフだけ」と宣言した部屋からだけ (domain/match/room.ts)。
+   * 以前ここは「絞っていない部屋では何も起きない」と読んでいて、**同じ空配列に
+   * 2 つの意味**が乗っていた。
+   */
+  test('**主武器を外した部屋では、拳銃に下がる**', () => {
     const p = fresh()
     chooseLoadout(p, 'rifle', 'grenade', true)
     fitLoadout(p, [])
-    expect(p.primary).toBe('rifle')
+    expect(p.primary).toBeNull()
+    // 副武器は残っているので、手にあるのは拳銃
+    expect(p.inventory.held).toBe('m9')
+  })
+
+  test('**銃を 1 挺も持たない部屋では、手にあるのはナイフ**', () => {
+    const p = fresh()
+    chooseLoadout(p, 'rifle', 'grenade', true)
+    // 主武器も副武器も外す = ナイフ部屋
+    fitLoadout(p, [], null)
+    expect(p.primary).toBeNull()
+    expect(p.secondary).toBeNull()
+    // 手ぶらにはならない。ナイフと箱は誰でも持っている (buildCarried)
+    expect(p.inventory.held).toBe('knife')
+  })
+
+  test('**銃のある部屋で丸腰は名乗れない。** 部屋の作りが決める', () => {
+    const p = fresh()
+    // 絞っていない部屋 (allowed を渡さない) でも通らない
+    expect(chooseLoadout(p, null, 'grenade', true)).toBe(false)
+    // 狙撃銃だけの部屋でも通らない
+    expect(chooseLoadout(p, null, 'grenade', true, ['sniper'])).toBe(false)
+  })
+
+  test('銃を外した部屋でだけ、丸腰を名乗れる', () => {
+    const p = fresh()
+    expect(chooseLoadout(p, null, 'grenade', true, [])).toBe(true)
+    expect(p.primary).toBeNull()
+    // その部屋では銃を名乗っても入れない
+    expect(chooseLoadout(p, 'rifle', 'grenade', true, [])).toBe(false)
+    expect(p.primary).toBeNull()
   })
 })

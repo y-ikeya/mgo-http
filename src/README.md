@@ -153,7 +153,7 @@ three も presentation も読めない。層を引くときに長い名前から
 触れなかった。
 
 **体はレプリカを見て姿を合わせるだけ。** 名簿はもともと three のオブジェクト
-(`RemotePlayer`) が持っていて、位置が届く前に来た報せは `pending` に溜めて
+(`RemoteSoldier`) が持っていて、位置が届く前に来た報せは `pending` に溜めて
 いた — 体が無い相手のことは体のクラスに聞くしかない、という形だった。
 
 `receive()` に残っているのは**出すことだけ** (弾・爆発・音・落ちている物)。
@@ -214,7 +214,7 @@ auth/      切符 (token) と身元
 ```
 index.ts   起動と口 (HTTP / WS / 1 通の振り分け / 刻み)
 world.ts   部屋の世界。試合と、その中に在る物。配る相手もここ
-session.ts 接続 (人とは別。的は Player を持つが Session を持たない)
+session.ts 接続 (人とは別。的は MatchPlayer を持つが Session を持たない)
 stage.ts   ステージの箱
 match.ts   段階と時計
 damage.ts  申告を検算して体力を削る。**その先の始末は呼ぶ側に返す**

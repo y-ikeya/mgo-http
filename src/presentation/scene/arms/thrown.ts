@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { Water } from '../../../domain/match/stage'
+import type { Water } from '../../../domain/stage'
 
 /**
  * 投げた物。

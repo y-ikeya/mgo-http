@@ -20,6 +20,7 @@
  */
 
 import { MAX_HEALTH, type HitZone } from '../rule/damage'
+import { HELD } from './held'
 
 export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'm9' | 'm1911' | 'shotgun'
 
@@ -32,12 +33,26 @@ export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'm9' | 'm1911' | 'shotgun'
  * **2 本目以降は戦場で手に入れる。** 味方が外した銃を拾う、CQC で落とさせる。
  * 持てる数に上限は置かない — 上限で縛る代わりに「奪ってこないと増えない」で縛る。
  */
-export type Slot = 'primary' | 'secondary' | 'support'
-
-/** その枠に入れられる銃 */
+/**
+ * その枠に入れられる銃。**持ち物の表から導く。**
+ *
+ * 手で並べ直さない。どの枠に入るかは `HELD` が既に宣言していて (held.ts の
+ * slot)、以前はここと `WeaponSpec.slot` にも同じことが書いてあった —
+ * **同じ事実が 3 か所**にあり、銃を足すときに 1 か所書き忘れれば黙ってずれる。
+ *
+ * 並び順は表の順そのまま。装備画面の番号 (1..n) がこれで決まるので、
+ * **表に足した位置がそのまま画面の位置**になる。
+ */
 export const CHOICES: Record<'primary' | 'secondary', WeaponId[]> = {
-  primary: ['smg', 'rifle', 'sniper', 'shotgun'],
-  secondary: ['m9', 'm1911'],
+  primary: gunsIn('primary'),
+  secondary: gunsIn('secondary'),
+}
+
+/** その枠に入る銃を、持ち物の表の順で拾う */
+function gunsIn(slot: 'primary' | 'secondary'): WeaponId[] {
+  return Object.values(HELD)
+    .filter((item) => item.slot === slot && item.shoots)
+    .map((item) => item.id as WeaponId)
 }
 
 /**
@@ -54,7 +69,7 @@ export type SupportId = 'grenade' | 'claymore'
 
 export const SUPPORTS: SupportId[] = ['grenade', 'claymore']
 
-export interface SupportSpec {
+interface SupportSpec {
   id: SupportId
   /**
    * 装備画面に出す名前。
@@ -164,8 +179,6 @@ export interface WeaponSpec {
    */
   bolt: boolean
   magazine: number
-  /** どの枠に入る銃か */
-  slot: Slot
   /**
    * 重さ (kg)。実銃の値。
    *
@@ -306,7 +319,6 @@ const SMG: WeaponSpec = {
   model: 'smg',
 
   // 頭 1 発 / 胴 7 発 (0.39 秒) / 脚 15 発
-  slot: 'primary',
   cost: 0,
   // P90 の実重量 (空)。3.5kg を等倍として 105%
   weight: 2.6,
@@ -376,7 +388,6 @@ const RIFLE: WeaponSpec = {
   model: 'rifle',
 
   // 頭 1 発 / 胴 5 発 / 脚 10 発
-  slot: 'primary',
   cost: 0,
   // AK47 の実重量。速さの基準になる
   weight: 3.5,
@@ -451,7 +462,6 @@ const SNIPER: WeaponSpec = {
   //
   // 当てさえすれば良い武器にしない。外れ気味に当たった脚では決まらないので、
   // 狙った所に当たったときだけ 1.57 秒の間隔が報われる。
-  slot: 'primary',
   cost: 0,
   // XM2010。長物のうえに照準器が乗るので重い
   weight: 5.5,
@@ -510,7 +520,6 @@ const PISTOL: WeaponSpec = {
   id: 'm9',
   // **麻酔銃。** 当てても体力は減らず、スタミナが減る
   tranquilizer: true,
-  slot: 'secondary',
   cost: 0,
   // M9。この作りで一番軽い
   weight: 0.95,
@@ -632,7 +641,6 @@ const PISTOL: WeaponSpec = {
  */
 const M1911: WeaponSpec = {
   id: 'm1911',
-  slot: 'secondary',
   cost: 0,
   // M9 より重い。持つと走りが少しだけ落ちる
   weight: 1.05,
@@ -681,7 +689,6 @@ const SHOTGUN: WeaponSpec = {
   reloadSound: 'reload',
   model: 'shotgun',
 
-  slot: 'primary',
   cost: 0,
   // M870。木製ストックの実銃の値
   weight: 3.6,
@@ -760,7 +767,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   m1911: M1911,
 }
 
-export const DEFAULT_WEAPON: WeaponId = 'rifle'
+const DEFAULT_WEAPON: WeaponId = 'rifle'
 
 /**
  * 散弾の威力の帯。**近い順に並べる。**
@@ -801,7 +808,14 @@ export function pelletsOf(spec: WeaponSpec): number {
   return spec.pellets ?? 1
 }
 
-export function weaponOf(id: WeaponId | undefined): WeaponSpec {
+/**
+ * 銃の性能。**無ければ既定 (突撃銃)。**
+ *
+ * null も受ける — 銃を持たない部屋 (ナイフだけ) では主武器が null になるが、
+ * 「何発で削れるか」を訊かれる場面では既定を返しておくほうが、
+ * 呼ぶ側 20 か所に null の分岐を配るより壊れにくい。
+ */
+export function weaponOf(id: WeaponId | null | undefined): WeaponSpec {
   return WEAPONS[id ?? DEFAULT_WEAPON] ?? RIFLE
 }
 
@@ -811,7 +825,7 @@ export function weaponOf(id: WeaponId | undefined): WeaponSpec {
  * 近距離では減らず、遠くなるほど落ちて、ある距離から先は一定。
  * 「遠いほど当たらない」は散布のほうで作るので、こちらは緩やかでよい。
  */
-export function falloff(spec: WeaponSpec, distance: number): number {
+function falloff(spec: WeaponSpec, distance: number): number {
   if (distance <= spec.fullRange) return 1
   if (distance >= spec.minRange) return spec.minScale
   const t = (distance - spec.fullRange) / (spec.minRange - spec.fullRange)
@@ -861,16 +875,6 @@ export interface Ammo {
   reserve: Record<WeaponId, number>
 }
 
-export function startingAmmo(): Ammo {
-  const magazine = {} as Record<WeaponId, number>
-  const reserve = {} as Record<WeaponId, number>
-  for (const id of Object.keys(WEAPONS) as WeaponId[]) {
-    magazine[id] = WEAPONS[id].magazine
-    reserve[id] = WEAPONS[id].reserve
-  }
-  return { magazine, reserve }
-}
-
 /**
  * 投げられる弾倉が 1 個増えるまでに撃つ発数。
  *
@@ -880,19 +884,6 @@ export function startingAmmo(): Ammo {
  */
 export function roundsPerDecoy(id: WeaponId): number {
   return WEAPONS[id].magazine
-}
-
-/**
- * 装填。予備から弾倉へ、入るぶんだけ移す。
- *
- * 弾倉に残っていた分は捨てない (差分だけ足す)。**その場で書き換える** —
- * サーバーもクライアントも、自分が持っている表を直に更新したいので。
- */
-export function reloadInto(ammo: Ammo, id: WeaponId): void {
-  const take = Math.min(WEAPONS[id].magazine - ammo.magazine[id], ammo.reserve[id])
-  if (take <= 0) return
-  ammo.magazine[id] += take
-  ammo.reserve[id] -= take
 }
 
 

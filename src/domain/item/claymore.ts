@@ -28,7 +28,7 @@ export const TRIGGER_RANGE = 4
  * 広げると「置いた場所が危ない」に近づき、狭めると避けやすくなりすぎる。
  * 正面 120 度は、通路を塞ぐには足りて、横を抜けるには広すぎない辺り。
  */
-export const TRIGGER_ANGLE = 60
+const TRIGGER_ANGLE = 60
 export const TRIGGER_COS = Math.cos((TRIGGER_ANGLE * Math.PI) / 180)
 
 /** 爆風が届く距離 (m)。反応する距離より少し広い — 反応した時点で逃げ切れない */
@@ -56,7 +56,7 @@ export const BLAST_MIN = 25
  * それに揃える。道具ごとに別の勘で決めると、受けた側が「どこまで下がれば
  * 立っていられるか」を覚え直すことになる。
  */
-export const KNOCK_RATIO = 0.72
+const KNOCK_RATIO = 0.72
 
 /** 爆風を受けた結果。手榴弾と同じ形 (item/grenade.ts) */
 export interface BlastEffect {

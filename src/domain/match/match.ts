@@ -8,7 +8,7 @@
  * 置き場所の決めごとは docs/design.md の 7。
  */
 import { isSeated } from '../player/lifecycle'
-import type { Player, Team } from '../player/player'
+import type { MatchPlayer, Team } from '../player/player'
 import { MODES, type Mode, type ModeSpec } from './room'
 
 /**
@@ -19,10 +19,26 @@ import { MODES, type Mode, type ModeSpec } from './room'
  *     playing     走っている
  *     over        決着。結果を読む時間
  */
-export type Phase = 'waiting' | 'countdown' | 'playing' | 'over'
+export type Phase =
+  /** 対戦者が足りない。**時計は回らない** */
+  | 'waiting'
+  /**
+   * 支度の時間。**全員が READY を押すか、60 秒経つと始まる。**
+   *
+   * 人が揃った瞬間に始めていた頃は、装備もスキルも選ぶ間が無かった。しかも
+   * スキルは試合中に組み替えられないので、入った時に選び損ねると 1 試合ずっと
+   * そのままになる。**始まる前に必ず一度、全員が同じ画面を見るようにする。
+   *
+   * 押さない人が居ても止まらない。席を離れた人 1 人で部屋が止まるのは、
+   * 装備の打ち切り (lifecycle.ts の CHOOSE_TIMEOUT) と同じ理由で困る。
+   */
+  | 'ready'
+  | 'countdown'
+  | 'playing'
+  | 'over'
 
 /**
- * 試合を始めるのに要る人数。
+ * 試合を始めるのに要る対戦者数。
  *
  * 各陣営に 1 人。片方しか居ない状態で時計を回すと、誰も居ない相手に対して
  * 勝ったことになる。
@@ -30,17 +46,26 @@ export type Phase = 'waiting' | 'countdown' | 'playing' | 'over'
 export const MIN_PLAYERS = 2
 
 /**
+ * 支度に使える時間 (秒)。押さなくてもここで始まる。
+ *
+ * 60 秒は「装備とスキルを選び直して、誰が居るか見る」に要る長さ。短くすると
+ * 読む前に始まるし、長くすると全員が押した後に待たされる — 押せば早く始まる
+ * ので、上限だけ決めておけばよい。
+ */
+export const READY_SECONDS = 60
+
+/**
  * 席を空けて待つ時間 (ms)。
  *
  * リロードや一瞬の電波切れで戻ってこられる長さ。長くすると、抜けた相手を
  * 待って試合が始まらない時間も伸びるので、ほどほどに。
  */
-export const RECONNECT_GRACE = 30_000
+export const RECONNECT_GRACE_MS = 30_000
 
 export interface Match {
   /** この部屋のルール。部屋ごとに固定 (src/domain/match/room.ts) */
   mode: ModeSpec
-  players: Map<string, Player>
+  players: Map<string, MatchPlayer>
   /** 残機。0 にされた側が負け */
   blue: number
   red: number
@@ -91,7 +116,7 @@ export function nextSlot(room: Match): number {
  *
  * **的 (bot) は入らない。** 接続を持たないので、送る相手にも数にもならない。
  */
-export function connected(room: Match): Player[] {
+export function connected(room: Match): MatchPlayer[] {
   return [...room.players.values()].filter((p) => isSeated(p.life) && !p.bot)
 }
 
@@ -102,7 +127,7 @@ export function connected(room: Match): Player[] {
  * 「送る相手」(connected) と「居る者」を分けておかないと、的に向かって
  * 配信しようとして落ちる。
  */
-export function present(room: Match): Player[] {
+export function present(room: Match): MatchPlayer[] {
   return [...room.players.values()].filter((p) => isSeated(p.life))
 }
 
@@ -113,13 +138,13 @@ export function present(room: Match): Player[] {
  * 片方がリロードした瞬間に人数が割れて待ちへ戻り、戻ってきたときに
  * countdown からやり直しになっていた — 得点も試合の時計も最初から。
  *
- * 席は RECONNECT_GRACE の間だけ空けて待つ、と決めてある。人数もその間は
- * 空けて待つのが筋で、そうでないと「席を残す」という仕掛けが試合の側から
- * 台無しにされる。戻ってこなければ席ごと消えて、そこで初めて人数が割れる。
+ * 席は RECONNECT_GRACE_MS の間だけ空けて待つ、と決めてある。
+ * 人数もその間は空けて待つのが筋で、そうでないと「席を残す」という仕掛けが試合の側から台無しにされる。
+ * 戻ってこなければ席ごと消えて、そこで初めて人数が割れる。
  */
-export function holdingSeats(room: Match, now: number): Player[] {
+export function holdingSeats(room: Match, now: number): MatchPlayer[] {
   return [...room.players.values()].filter(
-    (p) => isSeated(p.life) || now - p.lifeAt < RECONNECT_GRACE,
+    (p) => isSeated(p.life) || now - p.lifeAt < RECONNECT_GRACE_MS,
   )
 }
 
@@ -214,8 +239,8 @@ export function loseTicket(room: Match, team: Team): void {
  *
  * 個人戦ではこの人が光って位置が漏れる (docs/design.md の 2)。
  */
-export function leaderOf(room: Match): Player | null {
-  let best: Player | null = null
+export function leaderOf(room: Match): MatchPlayer | null {
+  let best: MatchPlayer | null = null
   let tied = false
   for (const player of room.players.values()) {
     if (player.bot || player.kills <= 0) continue
@@ -247,12 +272,12 @@ export function leaderOf(room: Match): Player | null {
  * 忘れると 2 人光るか誰も光らない。`respawnAt` や `protectedUntil` を消して
  * `lifeElapsed` に寄せたのと同じ判断。
  */
-export function leakingOf(room: Match): Player | null {
+export function leakingOf(room: Match): MatchPlayer | null {
   return room.mode.leaderGlows ? leaderOf(room) : null
 }
 
 /** その人の位置が公になっているか */
-export function isLeaking(room: Match, player: Player): boolean {
+export function isLeaking(room: Match, player: MatchPlayer): boolean {
   return leakingOf(room)?.id === player.id
 }
 
@@ -261,7 +286,7 @@ export function isLeaking(room: Match, player: Player): boolean {
  *
  * 不戦勝を出すかどうかの判断に使う。
  */
-export function soleTeam(seats: Player[]): Team | null {
+export function soleTeam(seats: MatchPlayer[]): Team | null {
   const blue = seats.some((p) => p.team === 'blue')
   const red = seats.some((p) => p.team === 'red')
   if (blue === red) return null

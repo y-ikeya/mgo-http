@@ -1,15 +1,15 @@
-import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import Profile from '../ui/Profile'
-import { profilesAvailable } from '../../infra/api/profile'
-import { useLevels } from '../../infra/api/levels'
-import { t } from '../../i18n'
-import { useNavigate } from '@solidjs/router'
-import { MODES } from '../../domain/match/room'
-import { fetchRooms } from '../../infra/api/rooms'
-import type { MatchPhase, RoomSummary } from '../../application/protocol/types'
-import type { Identity } from '../../infra/auth/session'
-import { signOut } from '../../infra/auth/session'
-import './Lobby.css'
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import Profile from "../ui/Profile";
+import { profilesAvailable } from "../../infra/api/profile";
+import { useLevels } from "../../infra/api/levels";
+import { t } from "../../i18n";
+import { useNavigate } from "@solidjs/router";
+import { MODES } from "../../domain/match/room";
+import { fetchRooms } from "../../infra/api/rooms";
+import type { MatchPhase, RoomSummary } from "../../application/protocol/types";
+import type { Identity } from "../../infra/auth/session";
+import { signOut } from "../../infra/auth/session";
+import "./Lobby.css";
 
 /**
  * 部屋の一覧。
@@ -22,46 +22,49 @@ import './Lobby.css'
  */
 
 /** 一覧を取り直す間隔 (ms)。人の出入りに気づける程度で、叩きすぎない */
-const POLL_MS = 2000
+const POLL_MS = 2000;
 
 /** 段階の呼び名。引くたびに t() を通す (言語は起動時に決まっているので実質定数) */
 const PHASE_LABEL: Record<MatchPhase, () => string> = {
-  waiting: () => t('lobby.waiting'),
-  countdown: () => t('lobby.countdown'),
-  playing: () => t('lobby.playing'),
-  over: () => t('lobby.over'),
-}
+  waiting: () => t("lobby.waiting"),
+  ready: () => t("lobby.ready"),
+  countdown: () => t("lobby.countdown"),
+  playing: () => t("lobby.playing"),
+  over: () => t("lobby.over"),
+};
 
 export default function Lobby(props: { identity: Identity }) {
-  const navigate = useNavigate()
-  const [rooms, setRooms] = createSignal<RoomSummary[]>([])
-  const [error, setError] = createSignal('')
+  const navigate = useNavigate();
+  const [rooms, setRooms] = createSignal<RoomSummary[]>([]);
+  const [error, setError] = createSignal("");
   /** 戦績を開いている相手。null なら閉じている */
-  const [opened, setOpened] = createSignal<{ id: string; name: string } | null>(null)
+  const [opened, setOpened] = createSignal<{ id: string; name: string } | null>(
+    null,
+  );
   // カードに出す Lv。入る前に「この部屋は強いのばかり」が読めるように
   const levelFor = useLevels(
     () => rooms().flatMap((room) => room.roster.map((who) => who.id)),
     props.identity,
-  )
+  );
 
   const poll = async () => {
     try {
-      setRooms(await fetchRooms())
-      setError('')
+      setRooms(await fetchRooms());
+      setError("");
     } catch {
-      setError(t('lobby.unreachable'))
+      setError(t("lobby.unreachable"));
     }
-  }
+  };
 
   onMount(() => {
-    void poll()
-    const timer = window.setInterval(() => void poll(), POLL_MS)
-    onCleanup(() => window.clearInterval(timer))
-  })
+    void poll();
+    const timer = setInterval(() => void poll(), POLL_MS);
+    onCleanup(() => clearInterval(timer));
+  });
 
-  const full = (room: RoomSummary) => room.players >= room.capacity
+  const full = (room: RoomSummary) => room.players >= room.capacity;
   /** 入れない部屋。まだ開けていないルール (TSNE は非殺傷武器が要る) */
-  const shut = (room: RoomSummary) => !room.active
+  const shut = (room: RoomSummary) => !room.active;
 
   /**
    * 部屋へ移るとき、クエリをそのまま持っていく。
@@ -69,7 +72,7 @@ export default function Lobby(props: { identity: Identity }) {
    * `?server=` や `?panel=open` は部屋に入ってから読まれるので、
    * ここで落とすと効かない (手元の画面から本番のサーバーへ繋ぐ、ができなくなる)。
    */
-  const enter = (name: string) => navigate(`/rooms/${name}${location.search}`)
+  const enter = (name: string) => navigate(`/rooms/${name}${location.search}`);
 
   return (
     <div class="lobby">
@@ -80,8 +83,8 @@ export default function Lobby(props: { identity: Identity }) {
           <button
             class="lobby-signout"
             onClick={() => {
-              signOut()
-              location.reload()
+              signOut();
+              location.reload();
             }}
           >
             Logout
@@ -99,9 +102,9 @@ export default function Lobby(props: { identity: Identity }) {
             <div
               class="room"
               classList={{
-                'room-full': full(room),
-                'room-live': room.phase === 'playing',
-                'room-shut': shut(room),
+                "room-full": full(room),
+                "room-live": room.phase === "playing",
+                "room-shut": shut(room),
               }}
             >
               {/*
@@ -113,44 +116,56 @@ export default function Lobby(props: { identity: Identity }) {
                 disabled={full(room) || shut(room)}
                 onClick={() => enter(room.name)}
               >
-              <span class="room-name">{room.name}</span>
-              {/* **どのルールの部屋かを一覧で見せる。** 入ってから分かるのでは遅い */}
-              <span class="room-mode">{room.mode}</span>
+                <span class="room-name">{room.name}</span>
+                {/* **どのルールの部屋かを一覧で見せる。** 入ってから分かるのでは遅い */}
+                <span class="room-mode">{room.mode}</span>
 
-              <span class="room-count">
-                <span class="room-count-now">{room.players}</span>
-                <span class="room-count-max">/ {room.capacity}</span>
-              </span>
-
-              {/* 空き具合を棒で。数字を読む前に埋まり具合が分かる */}
-              <span class="room-bar">
-                <span class="room-bar-fill" style={{ width: `${(room.players / room.capacity) * 100}%` }} />
-              </span>
-
-              <span class="room-phase">{shut(room) ? '準備中' : PHASE_LABEL[room.phase]()}</span>
-
-              {/* 残機は削り合う部屋だけ。休憩と練習に 0–0 が出ても意味が無い */}
-              <Show when={MODES[room.mode].tickets && (room.phase === 'playing' || room.phase === 'over')}>
-                <span class="room-score">
-                  <span class="room-blue">{room.blue}</span>
-                  <span class="room-dash">–</span>
-                  <span class="room-red">{room.red}</span>
+                <span class="room-count">
+                  <span class="room-count-now">{room.players}</span>
+                  <span class="room-count-max">/ {room.capacity}</span>
                 </span>
-              </Show>
 
-              <Show when={room.remaining > 0}>
-                <span class="room-time">
-                  {Math.floor(room.remaining / 60)}:
-                  {String(room.remaining % 60).padStart(2, '0')}
+                {/* 空き具合をバー表示で。数字を読む前に埋まり具合が分かる */}
+                <span class="room-bar">
+                  <span
+                    class="room-bar-fill"
+                    style={{
+                      width: `${(room.players / room.capacity) * 100}%`,
+                    }}
+                  />
                 </span>
-              </Show>
 
-              {/*
+                <span class="room-phase">
+                  {shut(room) ? "準備中" : PHASE_LABEL[room.phase]()}
+                </span>
+
+                {/* 残機は削り合う部屋だけ。休憩と練習に 0–0 が出ても意味が無い */}
+                <Show
+                  when={
+                    MODES[room.mode].tickets &&
+                    (room.phase === "playing" || room.phase === "over")
+                  }
+                >
+                  <span class="room-score">
+                    <span class="room-blue">{room.blue}</span>
+                    <span class="room-dash">–</span>
+                    <span class="room-red">{room.red}</span>
+                  </span>
+                </Show>
+
+                <Show when={room.remaining > 0}>
+                  <span class="room-time">
+                    {Math.floor(room.remaining / 60)}:
+                    {String(room.remaining % 60).padStart(2, "0")}
+                  </span>
+                </Show>
+
+                {/*
                 部屋の覚え書き。**ルールの名前だけでは伝わらないこと** —
                 同じ TDM でも、持ち込める銃を絞ってあれば別の遊びになる。
                 行の右端に置く。名前とルールが主で、これは添え物。
               */}
-              <span class="room-note">{room.note ?? ''}</span>
+                <span class="room-note">{room.note ?? ""}</span>
               </button>
 
               {/*
@@ -164,7 +179,9 @@ export default function Lobby(props: { identity: Identity }) {
                       <button
                         class={`room-player room-player-${who.team}`}
                         disabled={!profilesAvailable}
-                        onClick={() => setOpened({ id: who.id, name: who.name })}
+                        onClick={() =>
+                          setOpened({ id: who.id, name: who.name })
+                        }
                       >
                         <span class="room-player-lv">{levelFor(who.id)}</span>
                         {who.name}
@@ -179,7 +196,7 @@ export default function Lobby(props: { identity: Identity }) {
       </div>
 
       <Show when={rooms().length === 0 && !error()}>
-        <div class="lobby-empty">{t('lobby.loading')}</div>
+        <div class="lobby-empty">{t("lobby.loading")}</div>
       </Show>
 
       <Show when={opened()} keyed>
@@ -193,5 +210,5 @@ export default function Lobby(props: { identity: Identity }) {
         )}
       </Show>
     </div>
-  )
+  );
 }

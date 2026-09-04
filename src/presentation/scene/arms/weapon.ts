@@ -2,6 +2,23 @@ import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { loadKnife, loadM1911, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
 import { isMesh } from '../util/guards'
+import type { Stance } from '../../../domain/player/stance'
+
+/**
+ * 銃の持ち方が姿勢へ寄る速さ。
+ * しゃがみの入り抜けと同じくらいにして、体と銃が別々に動いて見えないようにする。
+ */
+export const WEAPON_STANCE_LAMBDA = 10
+
+/**
+ * 姿勢を持ち方の段階に直す。**0 = 立ち / 1 = しゃがみ / 2 = 伏せ。**
+ *
+ * 自機と相手で同じ式を使う。相手の側がこれを当てていなくて、**伏せた相手だけ
+ * 銃が立ちの握りのまま**になっていた (伏せの向きは立ちから 100° 以上ずれる)。
+ */
+export function weaponStanceOf(stance: Stance): number {
+  return stance === 'prone' ? 2 : stance === 'crouch' || stance === 'box' ? 1 : 0
+}
 
 /**
  * 武器ごとの取り付け設定。モデルは convert_gun.py で正規化済みで、
@@ -18,6 +35,15 @@ export interface WeaponConfig {
   /** しゃがみ姿勢での値。無ければ立ちと同じものを使う */
   crouchGrip?: THREE.Vector3
   crouchRotation?: THREE.Euler
+  /**
+   * 伏せ姿勢での値。無ければしゃがみと同じものを使う。
+   *
+   * 伏せ撃ちの型を足したのに握りは足していなかったので、**しゃがみの値が
+   * そのまま使われていた**。腹這いでは肘の付き方も上半身の向きも違うので、
+   * しゃがみの握りだと銃が体に埋まるか浮く。
+   */
+  proneGrip?: THREE.Vector3
+  proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
   tip: THREE.Vector3
   /** 左手を添える位置。片手武器は null で、その場合 IK を掛けない */
@@ -101,23 +127,13 @@ const KNIFE: WeaponConfig = {
  * 実際の見え方は調整パネルで詰める。ここは出発点。
  */
 const SNIPER: WeaponConfig = {
-  grip: new THREE.Vector3(-0.02, 0.27, 0.11),
-  rotation: new THREE.Euler(degrees(0), degrees(-10), degrees(-172)),
-  crouchGrip: new THREE.Vector3(-0.02, 0.265, 0.095),
-  crouchRotation: new THREE.Euler(degrees(-13), degrees(-6), degrees(173)),
+  grip: new THREE.Vector3(0, 0.24, 0.135),
+  rotation: new THREE.Euler(degrees(-3), degrees(-11), degrees(-180)),
+  crouchGrip: new THREE.Vector3(-0.02, 0.195, 0.165),
+  crouchRotation: new THREE.Euler(degrees(1), degrees(-14), degrees(-180)),
+  proneGrip: new THREE.Vector3(-0.03, 0.235, 0.14),
+  proneRotation: new THREE.Euler(degrees(-2), degrees(-14), degrees(147)),
   tip: new THREE.Vector3(0, 0.177, -0.845),
-}
-
-/**
- * 角度を近いほうへ回して補間する。
- *
- * 成分ごとに素直に混ぜると、-172° から 173° へ動かすときに 345° 回る
- * (逆回りに一周する)。角度は 360° で一周する量なので、差を ±180° に
- * 畳んでから足す。
- */
-function lerpAngle(from: number, to: number, t: number): number {
-  const diff = ((to - from + Math.PI) % (Math.PI * 2)) - Math.PI
-  return from + (diff < -Math.PI ? diff + Math.PI * 2 : diff) * t
 }
 
 /**
@@ -172,6 +188,13 @@ export type WeaponTarget =
   | 'm1911'
   | 'm1911Crouch'
   | 'knife'
+  // 伏せ。**しゃがみとは別の握り** — 腹這いは肘の付き方が違う
+  | 'smgProne'
+  | 'rifleProne'
+  | 'shotgunProne'
+  | 'sniperProne'
+  | 'm9Prone'
+  | 'm1911Prone'
 
 /**
  * キャラクターが持つ武器。
@@ -192,10 +215,20 @@ export class Weapon {
   private readonly rotation: THREE.Euler
   private readonly crouchGrip: THREE.Vector3
   private readonly crouchRotation: THREE.Euler
-  /** 今どちらの姿勢に寄っているか (0 = 立ち, 1 = しゃがみ) */
+  private readonly proneGrip: THREE.Vector3
+  private readonly proneRotation: THREE.Euler
+  /**
+   * 今どの姿勢に寄っているか。**0 = 立ち / 1 = しゃがみ / 2 = 伏せ。**
+   *
+   * 3 つを 1 本の数で持つのは、遷移が必ず**立ち → しゃがみ → 伏せ**の順で
+   * 起きるから。伏せから立ちへ跳ぶ道は無い (prone_rise がしゃがみを経る) ので、
+   * 隣どうしを繋いだ 1 本の軸で足りる。
+   */
   private stance = -1
   private readonly blendGrip = new THREE.Vector3()
-  private readonly blendRotation = new THREE.Euler()
+  private readonly blendRotation = new THREE.Quaternion()
+  private readonly fromRotation = new THREE.Quaternion()
+  private readonly toRotation = new THREE.Quaternion()
 
   /**
    * 取り付け時の状態。再調整のたびにこれを基準に計算し直す。
@@ -217,6 +250,9 @@ export class Weapon {
     this.rotation = config.rotation.clone()
     this.crouchGrip = (config.crouchGrip ?? config.grip).clone()
     this.crouchRotation = (config.crouchRotation ?? config.rotation).clone()
+    // 伏せは書いていなければしゃがみと同じ。**書くまでは今までの見え方のまま**
+    this.proneGrip = (config.proneGrip ?? this.crouchGrip).clone()
+    this.proneRotation = (config.proneRotation ?? this.crouchRotation).clone()
     this.object.traverse((obj) => {
       if (isMesh(obj)) obj.castShadow = true
     })
@@ -305,7 +341,7 @@ export class Weapon {
    * しゃがむと上半身の角度が変わるぶん、立ちと同じ握り方では銃が体から浮く。
    * 姿勢ごとの値の間を補間して、切り替わりで銃が跳ねないようにする。
    *
-   * @param blend 0 = 立ち、1 = しゃがみ
+   * @param blend 0 = 立ち、1 = しゃがみ、2 = 伏せ
    */
   applyStance(blend: number): void {
     // 変化が無ければ作り直さない。毎フレーム呼ばれる想定なので
@@ -316,11 +352,14 @@ export class Weapon {
 
   /** 調整用に、姿勢ごとの値を差し替える。今の姿勢のまま反映する */
   setStanceValues(
-    crouching: boolean,
+    stance: 'stand' | 'crouch' | 'prone',
     grip: THREE.Vector3,
     rotation: THREE.Euler,
   ): void {
-    if (crouching) {
+    if (stance === 'prone') {
+      this.proneGrip.copy(grip)
+      this.proneRotation.copy(rotation)
+    } else if (stance === 'crouch') {
       this.crouchGrip.copy(grip)
       this.crouchRotation.copy(rotation)
     } else {
@@ -331,13 +370,35 @@ export class Weapon {
   }
 
   private rebuild(blend: number): void {
-    this.blendGrip.lerpVectors(this.grip, this.crouchGrip, blend)
-    this.blendRotation.set(
-      lerpAngle(this.rotation.x, this.crouchRotation.x, blend),
-      lerpAngle(this.rotation.y, this.crouchRotation.y, blend),
-      lerpAngle(this.rotation.z, this.crouchRotation.z, blend),
+    /*
+     * 隣どうしを繋ぐ。0〜1 は立ち→しゃがみ、1〜2 はしゃがみ→伏せ。
+     *
+     * 3 つを一度に混ぜない。真ん中 (しゃがみ) を通らずに立ちと伏せを混ぜると、
+     * **どちらの姿勢でもない握り**が途中に出る。
+     */
+    const from = blend <= 1 ? this.grip : this.crouchGrip
+    const to = blend <= 1 ? this.crouchGrip : this.proneGrip
+    const fromR = blend <= 1 ? this.rotation : this.crouchRotation
+    const toR = blend <= 1 ? this.crouchRotation : this.proneRotation
+    const t = blend <= 1 ? blend : blend - 1
+
+    this.blendGrip.lerpVectors(from, to, t)
+    /*
+     * 向きは**回転として**混ぜる。成分ごとに混ぜない。
+     *
+     * 姿勢ごとの値は 3 つの角度で持っているが、その 3 つを別々に動かすと
+     * 途中がどちらでもない向きになる。しゃがみ (1, -14, -180) から
+     * 伏せ (-93, -135, 20) で実測したところ、**銃口が最短の道から 57° 外れて**
+     * 一度右を向いてから戻っていた。伏せる 0.3 秒がそのまま見える。
+     *
+     * 両端は変わらないので、調整した値はそのまま効く。
+     */
+    this.blendRotation.slerpQuaternions(
+      this.fromRotation.setFromEuler(fromR),
+      this.toRotation.setFromEuler(toR),
+      t,
     )
-    this.calibrate(this.blendGrip, this.blendRotation)
+    this.calibrateWith(this.blendGrip, this.blendRotation)
   }
 
   /**
@@ -345,12 +406,14 @@ export class Weapon {
    * 調整用に毎フレーム呼んでも問題ない程度には軽い。
    */
   calibrate(grip: THREE.Vector3, extraRotation: THREE.Euler): void {
+    this.calibrateWith(grip, new THREE.Quaternion().setFromEuler(extraRotation))
+  }
+
+  private calibrateWith(grip: THREE.Vector3, extra: THREE.Quaternion): void {
     const ctx = this.context
     if (!ctx) return
 
-    const rotation = ctx.baseRotation
-      .clone()
-      .multiply(new THREE.Quaternion().setFromEuler(extraRotation))
+    const rotation = ctx.baseRotation.clone().multiply(extra)
     // グリップが手に重なるよう、原点を逆算する
     const origin = grip.clone().applyQuaternion(rotation).negate().add(ctx.anchor)
     const world = new THREE.Matrix4().compose(origin, rotation, new THREE.Vector3(1, 1, 1))

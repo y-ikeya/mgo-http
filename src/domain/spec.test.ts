@@ -2,10 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { HELD, SWITCH_TIME, type HeldId } from './item/held'
-import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from './item/weapons'
+import { CHOICES, SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from './item/weapons'
 import { MAX_HEALTH } from './rule/damage'
 import { CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from './player/lifecycle'
-import { MIN_PLAYERS, RECONNECT_GRACE } from './match/match'
+import { MIN_PLAYERS, RECONNECT_GRACE_MS } from './match/match'
 
 /**
  * **README が数字の出どころ。** そこに書いた表と実装が合っているかを見る。
@@ -97,10 +97,7 @@ describe('README が数字の出どころ', () => {
     }
     // **主武器が README に全部並んでいること。** 1 挺増やしたときに棲み分けの
     // 表を書き足し忘れると、同じ距離で 2 挺が競合していても気づけない
-    const primaries = Object.values(WEAPONS)
-      .filter((w) => w.slot === 'primary')
-      .map((w) => w.id)
-      .sort()
+    const primaries = [...CHOICES.primary].sort()
     const listed = tableOf('射程').map((cells) => cells[0])
     expect(primaries.filter((id) => !listed.includes(id))).toEqual([])
   })
@@ -159,7 +156,7 @@ describe('README が数字の出どころ', () => {
 
   test('試合', () => {
     expect(valueOf('試合', '始めるのに要る人数')).toBe(MIN_PLAYERS)
-    expect(valueOf('試合', '席を空けて待つ')).toBe(RECONNECT_GRACE / 1000)
+    expect(valueOf('試合', '席を空けて待つ')).toBe(RECONNECT_GRACE_MS / 1000)
   })
 
   test('時間', () => {

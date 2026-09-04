@@ -63,6 +63,25 @@ await renderer.init()
 // glb が届くのを待つ。届く前に描くと箱だけの下絵が映る
 await new Promise((done) => setTimeout(done, 4000))
 
+/*
+ * ?fx=blood で血だけ見る。**上から覗き込む。**
+ *
+ * 濃さと色を 1 枚ずつばらしたので、重なった所が滲んで見えるかを確かめる。
+ * 撃ち合いの最中は足元をまじまじ見ないが、**倒れた場所に残る**ので、
+ * 通りかかった人はこれを見る。
+ */
+if (query.get('fx') === 'blood') {
+  const DECK = { x: -37, y: 10.13, z: -38 }
+  camera.position.set(DECK.x + 0.9, DECK.y + 1.5, DECK.z + 0.9)
+  camera.lookAt(DECK.x, DECK.y, DECK.z)
+  for (let n = 0; n < 3; n++) {
+    shots.blood(new THREE.Vector3(DECK.x + n * 0.35 - 0.35, DECK.y, DECK.z))
+  }
+  shots.update(0.05)
+  await renderer.renderAsync(scene, camera)
+  ;(globalThis as unknown as { ready: boolean }).ready = true
+}
+
 const fired = new Set<number>()
 for (let t = 0; t < UNTIL; t += STEP) {
   SPLASH_AT.forEach((s, i) => {

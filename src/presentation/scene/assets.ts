@@ -1,7 +1,7 @@
 import type * as THREE from 'three'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DEFAULT_SKIN } from './actor/skin'
-import type { StageName } from '../../domain/match/stage'
+import type { StageName } from '../../domain/stage'
 
 /**
  * モデルの読み込みを 1 回に集約する。

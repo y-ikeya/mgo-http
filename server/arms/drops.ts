@@ -4,7 +4,7 @@
 
 import { canDrop, isGun, type Carried } from '../../src/domain/item/held'
 import { canAct } from '../../src/domain/player/lifecycle'
-import type { Player } from '../../src/domain/player/player'
+import type { MatchPlayer } from '../../src/domain/player/player'
 import type { ClientMessage } from '../../src/application/protocol/types'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast } from '../world'
@@ -76,7 +76,7 @@ function carriedOf(item: Dropped): Carried {
  * もらう。こちらは「その銃のレプリカを捨てる」だけ — 繋ぎ直したときに、置いた
  * はずの銃が戻ってきては困る。
  */
-export function dropWeapon(room: RoomWorld, player: Player, message: ClientMessage): void {
+export function dropWeapon(room: RoomWorld, player: MatchPlayer, message: ClientMessage): void {
   if (message.type !== 'drop') return
   if (!canDrop(message.weapon)) return
   if (!canAct(player.life)) return
@@ -108,7 +108,7 @@ export function dropWeapon(room: RoomWorld, player: Player, message: ClientMessa
  * 位置を持っているのはサーバーなので、離れた所の物を指して「拾った」と
  * 言われても通らない。
  */
-export function pickUp(room: RoomWorld, player: Player): void {
+export function pickUp(room: RoomWorld, player: MatchPlayer): void {
   if (!canAct(player.life)) return
   let best: Dropped | null = null
   let nearest = PICKUP_RANGE

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { WebGPURenderer } from 'three/webgpu'
-import type { Player } from './actor/player'
+import type { Soldier } from './actor/soldier'
 import type { FollowCamera } from './sense/camera'
 import type { Input, InputDevice } from '../../infra/input'
 import { setBoxTuning, type BoxTuning } from './actor/box'
@@ -46,7 +46,7 @@ export function defaultKnobs(): Knobs {
 
 export interface CalibrationTargets {
   knobs: Knobs
-  player: Player
+  player: Soldier
   follow: FollowCamera
   input: Input
   sun: THREE.DirectionalLight
@@ -57,7 +57,7 @@ export interface CalibrationTargets {
 export function createCalibration(t: CalibrationTargets) {
   return {
     /** 手に持つ物の位置と角度 */
-    calibrateWeapon(target: Parameters<Player['calibrateWeapon']>[0], grip: THREE.Vector3, rotation: THREE.Euler) {
+    calibrateWeapon(target: Parameters<Soldier['calibrateWeapon']>[0], grip: THREE.Vector3, rotation: THREE.Euler) {
       t.player.calibrateWeapon(target, grip, rotation)
     },
     /** 吹き飛ばされる / 起き上がる型の再生速度 */

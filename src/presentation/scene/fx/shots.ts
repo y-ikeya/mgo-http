@@ -26,8 +26,32 @@ const IMPACT_LIFE = 30
  *
  * 鮮やかに取ってある。地面 (コンクリート) の上で暗い赤は錆や汚れに見えて、
  * **人の血だと読めない**。**目に留まること**が仕事なので、写実より読みやすさ。
+ *
+ * --- 1 枚ずつ色と濃さを変える ---
+ * 全部が同じ色・同じ濃さだと、大きさを散らしても**版画のように平ら**に見える。
+ * 本物は厚い所ほど暗く、薄く伸びた所ほど明るく、しかも触れた瞬間から酸化して
+ * 褐色へ寄っていく。1 滴ずつばらすと、重なった所が自然に濃くなって**滲みに
+ * 見える**。
+ *
+ * 新しい色と、酸化した色の間で 1 枚ずつ引く。
  */
-const BLOOD_COLOR = 0x8a0a10
+const BLOOD_FRESH = 0x8a1418
+/**
+ * 酸化した色。**褐色寄り。**
+ *
+ * 鉄が錆びる方向。ここへ寄せすぎると土や錆と区別が付かなくなるので、
+ * 赤みは残す — 読めなくなっては仕事にならない。
+ */
+const BLOOD_OXIDISED = 0x521010
+
+/**
+ * 濃さの幅。**薄いほうへ寄せる。**
+ *
+ * 濃い物ばかりだと塗り絵になる。薄い滴が多く、たまに濃い滴が混ざるほうが、
+ * 重なった所だけが濃くなって深さが出る。
+ */
+const BLOOD_ALPHA_MIN = 0.32
+const BLOOD_ALPHA_MAX = 1
 
 /** 溜まり 1 枚の大きさ (m)。足元に残る本体 */
 const BLOOD_POOL_SIZE = 0.16
@@ -282,6 +306,9 @@ export class Shots {
    * 円のメッシュだと真円しか作れない。真円が並ぶと「そういう柄」に見えて、
    * 液体に読めない。形も濃淡も絵の側に持たせれば、メッシュは四角 2 種類で済む。
    */
+  /** 酸化した色。1 枚ずつ混ぜるので使い回しの入れ物として持つ */
+  private readonly oxidised = new THREE.Color(BLOOD_OXIDISED)
+
   private readonly poolGeometry = new THREE.PlaneGeometry(BLOOD_POOL_SIZE, BLOOD_POOL_SIZE)
   private readonly dropGeometry = new THREE.PlaneGeometry(BLOOD_DROP_SIZE, BLOOD_DROP_SIZE)
   /** 型紙。**何枚か作って選ぶ** — 1 枚だと回しても同じ輪郭だと分かる */
@@ -319,8 +346,9 @@ export class Shots {
     for (let i = 0; i < BLOOD_POOL; i++) {
       const blood = new THREE.Mesh(
         this.dropGeometry,
+        // 色は 1 枚ずつ差し替えるので、材質も 1 枚ずつ持つ
         new THREE.MeshBasicMaterial({
-          color: BLOOD_COLOR,
+          color: BLOOD_FRESH,
           transparent: true,
           opacity: 0,
           depthWrite: false,
@@ -615,6 +643,14 @@ export class Shots {
       impact.geometry = geometry
       const material = impact.material as THREE.MeshBasicMaterial
       material.map = textures[Math.floor(Math.random() * textures.length)]
+      /*
+       * 色を 1 枚ずつ引く。**濃い滴ほど酸化した色へ寄せる。**
+       *
+       * 厚く溜まった所は暗く、薄く伸びた所は明るい。濃さと色を別々に引くと
+       * 「濃いのに明るい」滴ができて、絵の具を散らしたように見える。
+       */
+      const oxidised = Math.random()
+      material.color.setHex(BLOOD_FRESH).lerp(this.oxidised, oxidised * 0.85)
       material.needsUpdate = true
 
       /*
@@ -641,7 +677,14 @@ export class Shots {
       impact.rotateZ(Math.random() * Math.PI * 2)
       impact.visible = true
       this.bloodLife[this.bloodNext] = IMPACT_LIFE
-      this.bloodAlpha[this.bloodNext] = alpha
+      /*
+       * 濃さも 1 枚ずつ。**薄いほうへ寄せる** (2 乗で引く)。
+       *
+       * 溜まりは飛沫より濃くしてある (alpha が上限を決める)。同じ濃さを並べる
+       * と版画になるので、幅の中で散らす。
+       */
+      this.bloodAlpha[this.bloodNext] =
+        alpha * (BLOOD_ALPHA_MIN + (1 - Math.random() ** 2) * (BLOOD_ALPHA_MAX - BLOOD_ALPHA_MIN))
       this.bloodNext = (this.bloodNext + 1) % BLOOD_POOL
     }
   }
@@ -836,7 +879,7 @@ export class Shots {
  * 波を重ねただけだと花びらになる。何本かだけ外へ長く伸ばすと、**飛んできて
  * 着地した**形になる。
  *
- * 描くのは白だけ。色は材質の color が掛ける (BLOOD_COLOR) ので、これは
+ * 描くのは白だけ。色は材質の color が掛ける (BLOOD_FRESH / BLOOD_OXIDISED) ので、これは
  * 形と濃さの型紙として働く。
  *
  * @param size 一辺の画素数

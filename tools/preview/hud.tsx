@@ -40,6 +40,8 @@ const cases: Record<string, Partial<GameStats>> = {
   downed: { ammo: 12, downed: true },
   // 拾える物が近くにある
   pickup: { canPickUp: true },
+  // 狙撃眼鏡を覗いている。**網目だけを見る**ので他は普段どおり
+  scoped: { scoped: true, equipped: 'sniper', held: 'sniper', weaponHeld: 'sniper', zoom: 'x6', ammo: 5, magazine: 5, reserve: 20 },
   // 個人戦。残機は 1 つ、上に DM
   dm: {
     match: { phase: 'playing', mode: 'DM', blue: 14, red: 0, endsAt: Date.now() + 212000, present: 5, required: 2, players: [] },
