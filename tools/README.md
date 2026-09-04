@@ -66,7 +66,14 @@ Blender の中では問題なく見えるのに、ゲームに入れて初めて
 | `concrete_◯◯` | コンクリート |
 | `wood_◯◯` | 木。テクスチャの繰り返しが細かい (板の幅が見えるため) |
 | `ref_◯◯` | 書き出しから除外 (寸法の物差し) |
+| `◯◯_nouv` | **UV を触らない。**焼き込んだ絵を持つ物に付ける (後置き) |
 | 札なし | 描画も判定もする / 材質は金属 |
+
+**繰り返しの絵と焼き込んだ絵は別。** 書き出しは材質の札が付いた物の UV を
+立方投影で貼り直す。板・金属・コンクリートのように**繰り返す絵**なら箱の
+大きさが変わっても伸びないが、持ち込んだモデルのように**1 枚に焼き込んだ絵**は
+作り直すと崩れる。そういう物には `_nouv` を後置きする
+(`wood_box_nouv` = 木の音と足音を持つが、絵は自前)。
 
 札は組み合わせられる (`col_metal_wall`)。Blender は複製すると名前の末尾に `.001` を足すので、**先頭に置く**ほうが壊れにくい。
 
@@ -104,6 +111,25 @@ bun tools/split_clip.js public/models/soldier.glb throw 1.5 throw_windup throw_r
 
 1.5 秒は手が一番後ろ (腰から -0.48m) かつ高い (1.57m) 位置の実測値。ここで割ると
 腕を引き切った形が前半の最後になり、`clampWhenFinished` がそのまま保持になる。
+
+### 姿勢だけが欲しいときは両端を切り出す
+
+しゃがみの脱力と構えは `kneeAim.fbx` 1 本の**両端**を使っている。始まりが銃を
+下ろした形、終わりが構え。間の振り上げは上半身レイヤーの混ぜ合わせが作るので
+要らない。
+
+```sh
+# 単体の glb にしてから、両端 3 標本ずつを切り出して 2 本だけ取り込む
+$BLENDER -b --factory-startup --python tools/convert_character.py -- kneeaim.json
+bun tools/split_clip.js kneeaim.glb knee_aim 0.067 knee_relaxed knee_rest
+bun tools/split_clip.js kneeaim.glb knee_rest 0.700 knee_swing knee_ready
+bun tools/merge_clip.js public/models/soldier.glb kneeaim.glb knee_relaxed public/models/soldier.glb
+bun tools/merge_clip.js public/models/soldier.glb kneeaim.glb knee_ready  public/models/soldier.glb
+```
+
+**切り分けは取り込む前に済ませる。** soldier.glb の中で割ると、要らない中間
+(`knee_swing`) と、参照されなくなった元データが残って 740KB 増えた。小さい
+ほうで割ってから 2 本だけ足せば 180KB で済む。
 
 **割る理由**は「止める位置をコードが絶対秒で持たなくて済む」こと。以前は
 `THROW_HOLD_AT = 1.5` を持っていて、尺の違うモデルに差し替えると別の場所を指した
@@ -154,6 +180,8 @@ Poly Haven の素材は `diff` (sRGB) / `nor_gl` / `rough` を使い、`disp` �
 | `stride.js` | その場歩きのクリップから実効速度を歩幅で推定。歩行なら誤差 5% |
 | `clip_speed.js` | ルートモーションから移動速度。取り除かれていると 0 が返る |
 | `twist.js` | 肩のラインと腰のラインの差 = 上半身のねじれ |
+| `tilt.ts` | **上半身の前後の傾き。**素材のクリップと、コードを回した合成後を並べる |
+| `tilt_fbx.py` | 同じ定義を FBX に対して。**素材そのものと見比べる** |
 | `chest_yaw.js` | クリップごとの背骨チェーンの向き |
 | `obj_bounds.py` | OBJ の寸法と、銃身がどの軸か |
 | `avg_color.py` | テクスチャの平均色と彩度 |
@@ -170,10 +198,17 @@ Poly Haven の素材は `diff` (sRGB) / `nor_gl` / `rough` を使い、`disp` �
 | | |
 |---|---|
 | `lobby` / `loadout` / `score` / `hud` | 画面の部品。対戦の状態は作り物を渡す |
-| `water` | 庭園の水面と水しぶき。`?eye=near` で寄る、`?t=0.2` で叩いてからの秒数 |
+| `water` | 庭園の水面と水しぶき。`?eye=near` で寄る、`?t=0.2` で叩いてからの秒数、`?fx=blood` で血 |
+| `weapon` | **武器の構え。** 6 通り (立ち / しゃがみ / 伏せ × 脱力 / 構え) を同時に出す |
 
 `water` は**時を止めて 1 枚描く**。柱 (0.4 秒) と波紋 (1.2 秒) は寿命が 3 倍
 違うので、動かして見ると速すぎて比べられない。
+
+`weapon` は**6 枚を同時に出す**。対戦の中の調整パネルは 1 つの姿勢しか映らない
+ので、構えを合わせている間に脱力の型が壊れても気づけない。値は 3 組 (立ち /
+しゃがみ / 伏せ) で、構えているかどうかは型が変えている — **同じ握りが両方で
+成り立つか**を見るために並べてある。右の板で動かすと 6 枚が同時に動き、
+`weapon.ts` へ貼れる形で出る。
 
 ```sh
 # 撮る (WebGPU なので旗が要る)
@@ -203,7 +238,8 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 静かに消えて素の姿勢 (T ポーズ) が出る。
 
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
-`hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`) は
+`hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`
+`knee_relaxed` `knee_ready`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 

@@ -16,7 +16,7 @@ import { isPathClear, type StageBox } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
 import type { Stance } from '../../domain/player/stance'
 
-// 姿の形は domain (Player の過去の姿そのものなので)。ここからも出す
+// 姿の形は domain (人の過去の姿そのものなので)。ここからも出す
 export type { Pose }
 
 /**

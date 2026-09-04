@@ -376,10 +376,27 @@ def top_plane(obj, lo, hi):
     if abs(b) < 0.01 and abs(c) < 0.01:
         return flat
 
+    # --- 板の厚み ---
+    #
+    # **坂の下は空いている。** 上面より下がどこまで詰まっているかを測る。
+    #
+    # 箱は上下を平らな面で切っているので、傾いた板を入れると**下が三角形に
+    # 埋まる**。坂の脇にしゃがんだ相手が誰からも見えなくなっていた
+    # (sim/space/vision.ts が上は切っているが、下は切っていなかった)。
+    #
+    # 上面から一番深い頂点までの距離をそのまま厚みにする。楔のように下まで
+    # 詰まっている形なら厚み = 高さになって、今までどおり全部が塞がる。
+    # **表せない形を無理に薄くしない。**
+    thick = 0.0
+    for v in obj.data.vertices:
+        g = to_gltf(mw @ v.co)
+        thick = max(thick, (a + b * g[0] + c * g[2]) - g[1])
+
     return {
         'h': round(a + b * lo[0] + c * lo[2], 4),   # min の角における高さ
         'dx': round(b, 5),
         'dz': round(c, 5),
+        'thick': round(thick, 4),
     }
 
 
@@ -433,6 +450,15 @@ PROJECT_AXES = ((1, 2), (0, 2), (0, 1))
 # ガラスは絵を貼らないので UV を作り直す意味が無い (透けることが見た目)
 SURFACE_TAGS = ('metal_', 'concrete_', 'wood_')
 
+# **焼き込んだ絵を持っている物の札。** UV を触らない。
+#
+# 立方投影で貼り直せるのは**繰り返しの絵**だけ (板・金属・コンクリート)。
+# 持ち込んだモデルは 1 枚の絵に焼き込んであることが多く、作り直すと崩れる。
+#
+# 材質の札とは別の軸なので、後置きで組み合わせる (noeye / nobullet と同じ形)。
+# `wood_box_nouv` = 木の音と足音を持つが、絵は自前。
+KEEP_UV = 'nouv'
+
 
 def reproject(obj):
     """ワールド座標の立方投影で UV を張り直す。**scale がいくつでも伸びない**"""
@@ -457,6 +483,8 @@ for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or not obj.select_get():
         continue
     if not any(tag in obj.name for tag in SURFACE_TAGS):
+        continue
+    if KEEP_UV in obj.name:
         continue
     reproject(obj)
     reprojected += 1
