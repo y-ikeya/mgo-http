@@ -7,13 +7,13 @@
 
 import { connected, isLeaking } from '../src/domain/match/match'
 import { isFriendly } from '../src/domain/match/room'
-import { canSee, onBattlefield } from '../src/domain/player/lifecycle'
+import { canSee, isDowned, isJoining, onBattlefield } from '../src/domain/player/lifecycle'
 import { isLeakedTo } from '../src/domain/player/player'
 import { STEP_UP } from '../src/domain/player/moving'
-import { type Player, isProtected, lifeElapsed } from '../src/domain/player/player'
+import { type MatchPlayer, headHeightOf, isProtected, lifeElapsed } from '../src/domain/player/player'
 import { stanceOf } from '../src/domain/player/stance'
-import { LAG_WINDOW } from '../src/domain/rule/lag'
-import { surfaceOf } from '../src/domain/stage/surface'
+import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
+import { surfaceOf } from '../src/domain/stage'
 import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/infra/codec/snapshot'
 import { SNAPSHOT_INTERVAL, type ServerMessage } from '../src/application/protocol/types'
 import { checkMove } from '../src/sim/judge/motioncheck'
@@ -23,7 +23,7 @@ import { sessionOf } from './session'
 import { type RoomWorld, broadcast, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
-import { HEAD_HEIGHT, headHeightOf } from '../src/domain/player/stance'
+import { HEAD_HEIGHT } from '../src/domain/player/stance'
 import { canHold } from '../src/domain/player/equip'
 import type { HitZone } from '../src/domain/rule/damage'
 import { isSeated } from '../src/domain/player/lifecycle'
@@ -42,7 +42,7 @@ import { isSeated } from '../src/domain/player/lifecycle'
  */
 export const WARP_GRACE = 1000
 
-export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffer | ArrayBufferView): void {
+export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
     raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -137,7 +137,7 @@ export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffe
   // 振りかぶって持っているか。倒された瞬間に足元へ落とすのに要る
   player.holdingGrenade = snapshot.holdingGrenade
   // 位置が届いた。どこに居るか分かったので支度に進める
-  if (player.life === 'joining') setLife(room, player, 'choosing')
+  if (isJoining(player.life)) setLife(room, player, 'choosing')
   recordPose(player)
 
   // 足音は位置が動いた分から出す。見えない相手にも音だけは届ける。
@@ -171,9 +171,9 @@ export function receiveSnapshot(room: RoomWorld, player: Player, raw: ArrayBuffe
 export const LOWER_SETTLE_MS = 300
 
 /** 遮蔽の判定に使う頭の高さ。沈み切るまでは立った高さで見る */
-export function visibleHead(player: Player, now: number): number {
+export function visibleHead(player: MatchPlayer, now: number): number {
   const settled = player.loweredAt > 0 && now - player.loweredAt >= LOWER_SETTLE_MS
-  return settled ? headHeightOf(player.locomotion) : HEAD_HEIGHT.stand
+  return settled ? headHeightOf(player) : HEAD_HEIGHT.stand
 }
 
 /**
@@ -186,14 +186,14 @@ export function visibleHead(player: Player, now: number): number {
  */
 export function emitNoise(
   room: RoomWorld,
-  from: Player,
+  from: MatchPlayer,
   noise: { kind: 'step' | 'shot'; volume?: number; range?: number },
 ): void {
 
   // どこまで届くかはドメインルール (domain/rule/noise.ts)。銃声は武器ごとに違う
   const reach =
     noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
-  const head = headHeightOf(from.locomotion)
+  const head = headHeightOf(from)
 
   // 何の上を踏んだかは地形から出す。申告させるものではない
   const surface =
@@ -232,9 +232,9 @@ export function emitNoise(
 /**
  * 発砲を配る。見えている相手には曳光ごと、見えない相手には音だけ。
  */
-export function relayShot(room: RoomWorld, from: Player, message: ServerMessage): void {
+export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMessage): void {
   const payload = JSON.stringify(message)
-  const head = headHeightOf(from.locomotion)
+  const head = headHeightOf(from)
 
   for (const listener of connected(room)) {
     if (listener.id === from.id) continue
@@ -271,12 +271,12 @@ export function relayShot(room: RoomWorld, from: Player, message: ServerMessage)
  *
  * **送る間隔から出す。** 20Hz の頃に 12 個 (= 0.6 秒) と決め打ちしていたのを、
  * 64Hz へ上げたときに直し忘れていた。12 個では 0.19 秒しか遡れず、
- * LAG_WINDOW が 0.4 秒あっても半分より前は届かない — 回線の遠い人ほど
+ * LAG_WINDOW_MS が 0.4 秒あっても半分より前は届かない — 回線の遠い人ほど
  * 「当てたのに通らない」が増える、という形で静かに効いていた。
  */
-export const HISTORY_SIZE = Math.ceil(LAG_WINDOW / (SNAPSHOT_INTERVAL * 1000)) + 2
+export const HISTORY_SIZE = Math.ceil(LAG_WINDOW_MS / (SNAPSHOT_INTERVAL * 1000)) + 2
 
-export function recordPose(player: Player): void {
+export function recordPose(player: MatchPlayer): void {
   player.history.push({
     time: Date.now(),
     x: player.x,
@@ -304,7 +304,7 @@ export const viewEye = { x: 0, y: 0, z: 0 }
  * 可視を問うところは全部これを通す。位置を配るとき・銃声を配るとき・
  * 足音を配るときで別々に出すと、定義がずれて「姿も音も無い敵」が生まれる。
  */
-export function viewOf(room: RoomWorld, player: Player): { x: number; y: number; z: number } {
+export function viewOf(room: RoomWorld, player: MatchPlayer): { x: number; y: number; z: number } {
   return cameraPoint(
     player.x,
     player.y,
@@ -319,7 +319,7 @@ export function viewOf(room: RoomWorld, player: Player): { x: number; y: number;
   )
 }
 
-export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): void {
+export function relayState(room: RoomWorld, from: MatchPlayer, payload: Uint8Array): void {
 
   const now = Date.now()
   const head = visibleHead(from, now)
@@ -352,7 +352,7 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
     // 味方に伝えられるので、隠れている側の利は少し削られる。それでも
     // 「どこから撃たれたのか分からないまま死ぬ」よりは読み合いになる、
     // という判断で入れてある。
-    const killCam = viewer.life === 'downed' && viewer.killedBy === from.id
+    const killCam = isDowned(viewer.life) && viewer.killedBy === from.id
 
     // **抜いた相手は遮蔽越しに見える。** ENEMY EXPOSURE (domain/player/skill.ts)。
     //
@@ -407,7 +407,7 @@ export function relayState(room: RoomWorld, from: Player, payload: Uint8Array): 
  * 位置そのものは渡さない。方向だけなら、遮蔽の向こうに居る相手を
  * 特定する手掛かりにならない。
  */
-export function bearingTo(from: Player, to: Player): number {
+export function bearingTo(from: MatchPlayer, to: MatchPlayer): number {
   return Math.atan2(to.x - from.x, -(to.z - from.z))
 }
 
@@ -418,7 +418,7 @@ export function bearingTo(from: Player, to: Player): number {
  * 刺突の「背後を取った」(BACKSTAB_DOT) とは別の問い — あちらは**同じ向きを
  * 向いているか**で、こちらは**どちら側に居るか**。
  */
-export function isBehind(victim: Player, attacker: Player): boolean {
+export function isBehind(victim: MatchPlayer, attacker: MatchPlayer): boolean {
   const dx = attacker.x - victim.x
   const dz = attacker.z - victim.z
   return dx * -Math.sin(victim.yaw) + dz * -Math.cos(victim.yaw) < 0
@@ -433,7 +433,7 @@ export function isBehind(victim: Player, attacker: Player): boolean {
  * 眠っているかどうかは別で、これは**全員に見える** (姿勢として出る) —
  * 倒れている体がそこに在るのは隠しようがない。
  */
-export function sendStamina(player: Player): void {
+export function sendStamina(player: MatchPlayer): void {
   if (!isSeated(player.life) || player.bot) return
   sessionOf(player).socket.send(
     JSON.stringify({
@@ -447,7 +447,7 @@ export function sendStamina(player: Player): void {
 
 export function sendHealth(
   room: RoomWorld,
-  player: Player,
+  player: MatchPlayer,
   damage: number,
   flinch: boolean,
   fromBearing?: number,

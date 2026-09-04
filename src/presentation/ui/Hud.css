@@ -481,68 +481,175 @@
   width: min(86vh, 86vw);
   height: min(86vh, 86vw);
   border-radius: 50%;
-  /* レンズの縁。内側にわずかな光を残すと硝子に見える */
+  /*
+   * 鏡筒の縁。**厚みを見せる。**
+   *
+   * 1px の線だと画面に円を描いただけに見える。内側へ太い影を落とすと、
+   * 覗いている筒の中に居るように読める。
+   */
   box-shadow:
-    inset 0 0 0 1px rgba(150, 170, 140, 0.28),
-    inset 0 0 40px rgba(0, 0, 0, 0.55);
+    inset 0 0 0 2px rgba(150, 170, 140, 0.22),
+    inset 0 0 0 14px rgba(10, 12, 9, 0.85),
+    inset 0 0 60px 10px rgba(0, 0, 0, 0.6);
 }
 
-/* 十字線。中心は空けて的を隠さない */
-.scope-cross {
+/*
+ * --- 網目 (reticle) ---
+ *
+ * 実物の狙撃眼鏡に寄せる。**太い柱が縁から伸びて中心の手前で止まり**、
+ * そこから先は細かい刻みになる。
+ *
+ * 太い線を外側に置くのは、覗いた瞬間に線を見つけるため。中心を細くするのは
+ * 的を隠さないため。**1px の十字を端から端まで引くと、遠くの的が線に埋もれて
+ * 見えなくなる** — 前がそうなっていた。
+ *
+ * 下だけ柱が無いのは、そこに距離の目盛りが入るから (scope-mils)。
+ */
+.scope-post {
   position: absolute;
-  background: rgba(20, 24, 18, 0.85);
+  background: rgba(16, 18, 14, 0.92);
 }
 
-.scope-cross-v {
+/*
+ * **縁から生やす。** 円の縁は left:50% では箱の上辺そのものなので、0 でよい。
+ * 外側の数 px は鏡筒の影に隠れて、筒の下から出てくるように見える。
+ *
+ * 中心の 21% 手前で止める。そこから先は細かい刻み。
+ */
+.scope-post-t {
   left: 50%;
-  top: 4%;
-  bottom: 4%;
+  top: 0;
+  height: 29%;
+  width: 7px;
+  transform: translateX(-3.5px);
+}
+
+.scope-post-l {
+  top: 50%;
+  left: 0;
+  width: 29%;
+  height: 7px;
+  transform: translateY(-3.5px);
+}
+
+.scope-post-r {
+  top: 50%;
+  right: 0;
+  width: 29%;
+  height: 7px;
+  transform: translateY(-3.5px);
+}
+
+/*
+ * 柱の先から中心までの細かい刻み。
+ *
+ * 繰り返しの背景で描く。**点の数は幅で決まる**ので、画面の大きさが変わっても
+ * 間隔が保たれる (要素を並べると数が固定されてしまう)。
+ */
+.scope-fine {
+  position: absolute;
+  background-repeat: repeat-y;
+  background-position: center;
+}
+
+.scope-fine-t {
+  left: 50%;
+  top: 29%;
+  height: 20%;
+  width: 5px;
+  transform: translateX(-2.5px);
+  background-image: linear-gradient(
+    to bottom,
+    rgba(16, 18, 14, 0.85) 0 2px,
+    transparent 2px 100%
+  );
+  background-size: 100% 13px;
+}
+
+.scope-fine-l,
+.scope-fine-r {
+  top: 50%;
+  height: 5px;
+  width: 22%;
+  transform: translateY(-2.5px);
+  background-repeat: repeat-x;
+  background-image: linear-gradient(
+    to right,
+    rgba(16, 18, 14, 0.85) 0 2px,
+    transparent 2px 100%
+  );
+  background-size: 13px 100%;
+}
+
+.scope-fine-l { left: 29%; }
+.scope-fine-r { right: 29%; }
+
+/*
+ * 中心の赤い縦線。**着弾はこの線の上に来る。**
+ *
+ * 黒だけだと、暗い的に重ねた瞬間に狙点を見失う。細く、薄く、中心から下へ長く。
+ */
+.scope-red {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  bottom: 12%;
   width: 1px;
   transform: translateX(-0.5px);
+  background: linear-gradient(
+    to bottom,
+    rgba(196, 60, 48, 0) 0,
+    rgba(196, 60, 48, 0.75) 12%,
+    rgba(196, 60, 48, 0.75) 100%
+  );
 }
 
-.scope-cross-h {
-  top: 50%;
-  left: 4%;
-  right: 4%;
-  height: 1px;
-  transform: translateY(-0.5px);
-}
-
-.scope-dot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 3px;
-  height: 3px;
-  margin: -1.5px 0 0 -1.5px;
-  background: rgba(20, 24, 18, 0.9);
-  border-radius: 50%;
-}
-
-/* 縦の目盛り。中心より下に並べて落差の目安にする */
-.scope-ticks {
+/*
+ * 距離の目盛り。**下へ行くほど広がる。**
+ *
+ * 弾は落ちるので、遠い的は中心より下の目盛りに合わせて撃つ。行ごとに幅を
+ * 変えているのは、どの段に居るかを幅で読めるようにするため。
+ */
+.scope-mils {
   position: absolute;
   left: 50%;
   top: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5.5%;
+  gap: 3.6%;
   padding-top: 6%;
   transform: translateX(-50%);
 }
 
-.scope-ticks span {
-  display: block;
-  width: 12px;
-  height: 1px;
-  background: rgba(20, 24, 18, 0.7);
+/* 1 段。**中央を空けて左右に分ける** — 狙っている所を点で隠さない */
+.scope-mils > div {
+  display: flex;
+  align-items: center;
+  gap: 26px;
 }
 
-.scope-ticks span:nth-child(even) {
-  width: 7px;
+.scope-mils span {
+  display: block;
+  height: 3px;
+  background-repeat: repeat-x;
+  background-image: radial-gradient(
+    circle at 1.5px 1.5px,
+    rgba(16, 18, 14, 0.82) 1.4px,
+    transparent 1.5px
+  );
+  background-size: 15px 3px;
 }
+
+/* 下へ行くほど広がる。遠いほど弾が落ちるので、拾う幅も広くなる */
+.scope-mils > div:nth-child(1) span { width: 30px; }
+.scope-mils > div:nth-child(2) span { width: 45px; }
+.scope-mils > div:nth-child(3) span { width: 60px; }
+.scope-mils > div:nth-child(4) span { width: 75px; }
+
+/* 左側は右端を基準に並べる。中央から外へ伸びて見えるように */
+.scope-mils > div span:first-child { background-position: right center; }
+.scope-mils > div span:last-child { background-position: left center; }
 
 /* 倍率。レンズの下側、視界の邪魔にならない位置 */
 .scope-zoom {

@@ -92,7 +92,7 @@ function call(fn: string, params: Record<string, unknown>): void {
   void sending.finally(() => inFlight.delete(sending))
 }
 
-/** 書き込む中身。server/index.ts の Player に依存しないよう、必要な分だけ受ける */
+/** 書き込む中身。server/index.ts の MatchPlayer に依存しないよう、必要な分だけ受ける */
 export interface MatchRecord {
   matchId: string
   room: string

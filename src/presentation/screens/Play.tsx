@@ -53,7 +53,8 @@ export default function Play(props: { identity: Identity }) {
    * Game 側にも持っているが、あちらは signal ではないので画面が追従しない。
    * 数字キーでもボタンでも変わるので、押した結果をここへ映して表示に使う。
    */
-  const [primary, setPrimary] = createSignal<WeaponId>('rifle')
+  // 銃を持たない部屋 (ナイフだけ) では null
+  const [primary, setPrimary] = createSignal<WeaponId | null>('rifle')
   const [support, setSupport] = createSignal<SupportId>('grenade')
   const [game, setGame] = createSignal<Game | null>(null)
   let container!: HTMLDivElement
@@ -107,6 +108,19 @@ export default function Play(props: { identity: Identity }) {
           primaries={stats()?.primaries ?? CHOICES.primary}
           // **null は「持たない」。** ?? で埋めると拳銃へ戻る (null は nullish)
           secondary={stats() ? stats()!.secondary : 'm9'}
+          /*
+            準備の段階かどうか。**画面の性格が変わる。**
+
+            支度の段階では「全員が同じ画面を見て、READY を押し合う」場所に
+            なるので、参加者の一覧と締め切りを出す。倒れて次に湧くまでの
+            支度では、待っている相手が居ないので出さない。
+          */
+          phase={stats()?.match?.phase ?? 'waiting'}
+          players={stats()?.scores ?? []}
+          selfId={game()?.selfId ?? ''}
+          onReady={(next) => game()?.setReady(next)}
+          skillsOpen={stats()?.skillsOpen ?? false}
+          onSkill={(id, level) => game()?.setSkill(id, level)}
         />
       </Show>
 

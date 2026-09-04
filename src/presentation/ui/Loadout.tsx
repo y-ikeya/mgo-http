@@ -1,4 +1,4 @@
-import { For } from 'solid-js'
+import { For, Show } from 'solid-js'
 import { t } from '../../i18n'
 import {
   CHOICES,
@@ -11,9 +11,11 @@ import {
 import {
   SKILL_BUDGET,
   costOf,
+  type SkillId,
   type Skills,
 } from '../../domain/player/skill'
 import { SkillList } from './SkillPanel'
+import type { MatchPhase, MatchMessage } from '../../application/protocol/types'
 import './Loadout.css'
 
 /**
@@ -31,7 +33,8 @@ import './Loadout.css'
  * それでも 3 段を出しているのは、持ち物の全体が一目で分かる形にしたいため。
  */
 export default function Loadout(props: {
-  primary: WeaponId
+  /** 選んでいる主武器。**銃を外した部屋では null** (一覧も空になる) */
+  primary: WeaponId | null
   /** その部屋で選べる主武器。**部屋が絞ることがある** (domain/match/room.ts) */
   primaries: readonly WeaponId[]
   /** 副武器。**null なら持たない** — 部屋が外している */
@@ -50,8 +53,31 @@ export default function Loadout(props: {
   onSpawn: () => void
   /** いま効いているスキル。**サーバーが返した物** */
   skills: Skills
-  /** 選び直せるか。試合が始まったら閉じる */
+  /**
+   * 試合の段階。**画面の性格が変わる。**
+   *
+   * `ready` の間は「全員が同じ画面を見て、押し合う」場所になる。倒れて次に
+   * 湧くまでの支度では待っている相手が居ないので、参加者も READY も出さない。
+   */
+  phase: MatchPhase
+  /** 部屋に居る人。**誰を待っているかを見せる** */
+  players: MatchMessage['players']
+  selfId: string
+  onReady: (ready: boolean) => void
+  /**
+   * スキルを組み替えてよいか (domain/player/skill.ts の canChooseSkills)。
+   *
+   * **支度の段階でだけ、この画面から触れる。** 倒れて次に湧くまでの支度では
+   * 読むだけ — 試合中に組み替えられると、相手を見てから後出しになる。
+   */
+  skillsOpen: boolean
+  onSkill: (id: SkillId, level: number) => void
 }) {
+  /** 支度の段階か。**押し合う場所になるのはここだけ** */
+  const preparing = () => props.phase === 'ready'
+  /** 自分の行。READY を押しているかを引く */
+  const mine = () => props.players.find((p) => p.id === props.selfId)
+
   /** その銃の予備弾 */
   const reserveOf = (id: WeaponId) => WEAPONS[id].reserve
 
@@ -78,13 +104,14 @@ export default function Loadout(props: {
     {
       key: 'PRIMARY',
       ids: () => props.primaries,
-      current: () => props.primary,
+      // null なら一覧も空なので、どの札にも印は付かない
+      current: (): WeaponId | null => props.primary,
       pick: (id: WeaponId) => props.onPrimary(id),
     },
     {
       key: 'SECONDARY',
       ids: () => (props.secondary === null ? [] : CHOICES.secondary),
-      current: () => props.secondary ?? ('m9' as WeaponId),
+      current: (): WeaponId | null => props.secondary ?? 'm9',
       pick: (id: WeaponId) => props.onSecondary(id),
     },
   ]
@@ -112,12 +139,52 @@ export default function Loadout(props: {
     <div class="loadout">
       <div class="loadout-panel">
         <header class="loadout-head">
-          <span class="loadout-title">LOADOUT</span>
+          <span class="loadout-title">{preparing() ? 'READY UP' : 'LOADOUT'}</span>
           <span class="loadout-note">
-            {props.note} · 残り {props.left} 秒
+            {preparing() ? `開始まで 残り ${props.left} 秒` : `${props.note} · 残り ${props.left} 秒`}
           </span>
         </header>
 
+        {/*
+          参加者。**支度の段階だけ。**
+
+          誰が居て、誰を待っているかが分かる。倒れて次に湧くまでの支度では
+          出さない — その時は待っている相手が居ないので、並べても読む理由が無い。
+        */}
+        <Show when={preparing()}>
+          <div class="loadout-row loadout-roster-row">
+            <div class="loadout-slot">MEMBERS</div>
+            <div class="loadout-roster">
+              <For each={props.players}>
+                {(player) => (
+                  <div
+                    class="loadout-member"
+                    classList={{
+                      'loadout-member-ready': player.ready,
+                      'loadout-member-mine': player.id === props.selfId,
+                      'loadout-member-away': player.away === true,
+                    }}
+                  >
+                    <span class={`loadout-member-team loadout-member-${player.team}`} />
+                    <span class="loadout-member-name">{player.name}</span>
+                    <span class="loadout-member-mark">{player.ready ? 'READY' : '…'}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+
+        {/*
+          武器。**試合が始まってから選ぶ。**
+
+          支度の段階 (ready) では出さない。あそこで決めるのは「誰と戦うか」と
+          スキルまでで、武器は始まってから — 画面ごとに決める物を 1 つにして
+          おかないと、押した物がいつ効くのかが読めない。
+
+          スキルはその逆で、支度の段階にしか出ない。**窓が違うから場所も分ける。**
+        */}
+        <Show when={!preparing()}>
         <For each={rows}>
           {(row) => (
             <div class="loadout-row">
@@ -194,32 +261,37 @@ export default function Loadout(props: {
             </For>
           </div>
         </div>
+        </Show>
 
         {/*
-          スキル。**ここでは見るだけ。** 変えるのは Tab の板 (ui/Scoreboard.tsx)。
+          スキル。**支度の段階だけ出す。**
 
-          --- なぜ 1 か所にするか ---
+          --- なぜ湧き直しの装備画面から消したか ---
           装備とスキルは選び直せる窓が違う — 装備は 1 つの命ごと、スキルは
-          1 試合に 1 度 (domain/player/skill.ts の canChooseSkills)。同じ画面に
-          並べると、同じ画面で押した 2 つが違うタイミングで効くことになって、
+          試合の切れ目だけ (domain/player/skill.ts の canChooseSkills)。並べて
+          置くと、同じ画面で押した 2 つが違うタイミングで効くことになって、
           いつ何が変わったのかが読めない。
 
-          それでも並べておくのは、**装備を選ぶときに何が効いているかが要る**から。
-          走る速さも散布も装填の速さもスキルで動くので、銃を選ぶ材料になる。
+          読むだけの一覧を残していた時期もあった。「装備を選ぶ材料になる」と
+          いう理屈だったが、**押せない物が並んでいると押せると思う**。効いて
+          いる物を確かめたいだけなら Tab の板がある。
+
+          支度の段階では話が別で、そこは**両方を決める場所**。押した物がその
+          まま次の試合に効くので、同じ画面にあってよい。
         */}
-        <div class="loadout-row loadout-skills">
-          <div class="loadout-slot">
-            SKILL
-            <div class="loadout-budget" classList={{ 'loadout-budget-full': spent() >= SKILL_BUDGET }}>
-              {spent()} / {SKILL_BUDGET}
+        <Show when={preparing()}>
+          <div class="loadout-row loadout-skills">
+            <div class="loadout-slot">
+              SKILL
+              <div class="loadout-budget" classList={{ 'loadout-budget-full': spent() >= SKILL_BUDGET }}>
+                {spent()} / {SKILL_BUDGET}
+              </div>
             </div>
-            {/* 押せない物を並べるなら、どこで変えられるかも出す */}
-            <div class="loadout-budget-locked">Tab から変更</div>
+            <div class="loadout-items">
+              <SkillList skills={props.skills} open={props.skillsOpen} onSkill={props.onSkill} />
+            </div>
           </div>
-          <div class="loadout-items">
-            <SkillList skills={props.skills} open={false} onSkill={() => {}} />
-          </div>
-        </div>
+        </Show>
 
         {/*
           押して初めて戦場へ出る。閉じるボタンではない。
@@ -228,10 +300,34 @@ export default function Loadout(props: {
           途中で湧いて画面が消えていた。ただし早く押したぶん早く戻れる、には
           しない — 倒された直後に戻ってこられると、勝った側が休めない。
         */}
-        <button class="loadout-ok" disabled={props.wait > 0} onClick={props.onSpawn}>
-          {props.wait > 0 ? t('loadout.deployIn', { n: props.wait }) : 'OK'}
-          <span class="loadout-key loadout-key-wide">Enter</span>
-        </button>
+        <Show
+          when={preparing()}
+          fallback={
+            <button class="loadout-ok" disabled={props.wait > 0} onClick={props.onSpawn}>
+              {props.wait > 0 ? t('loadout.deployIn', { n: props.wait }) : 'OK'}
+              <span class="loadout-key loadout-key-wide">Enter</span>
+            </button>
+          }
+        >
+          {/*
+            READY。**押しても閉じない。**
+
+            装備もスキルも押した後に変えられる。押すのは「自分はもう待たせて
+            いない」という表明であって、選び終えた宣言ではない。押し間違えたら
+            もう一度押して取り消せる。
+
+            全員が押せば締め切りを待たずに始まる。押さなくても 60 秒で始まる
+            ので、これは早く始めるための物。
+          */}
+          <button
+            class="loadout-ok"
+            classList={{ 'loadout-ok-ready': mine()?.ready === true }}
+            onClick={() => props.onReady(!mine()?.ready)}
+          >
+            {mine()?.ready ? 'READY を取り消す' : 'READY'}
+            <span class="loadout-key loadout-key-wide">Enter</span>
+          </button>
+        </Show>
       </div>
     </div>
   )

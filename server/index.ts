@@ -36,7 +36,7 @@ import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
-import { lifeElapsed, newPlayer, type Player } from '../src/domain/player/player'
+import { lifeElapsed, newMatchPlayer, type MatchPlayer } from '../src/domain/player/player'
 import {
   MODES,
   ROOMS,
@@ -46,7 +46,7 @@ import {
   primariesOf,
   secondaryOf,
 } from '../src/domain/match/room'
-import { RECONNECT_GRACE, assignTeam, connected, present, nextSlot } from '../src/domain/match/match'
+import { RECONNECT_GRACE_MS, assignTeam, connected, present, nextSlot } from '../src/domain/match/match'
 import { stampLocomotion, stampProtected } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD } from '../src/domain/item/held'
@@ -56,10 +56,10 @@ import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
-import { inWater, waterOf } from '../src/domain/match/stage'
+import { inWater, waterOf } from '../src/domain/stage'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { MAX_STAMINA, recoverStamina } from '../src/domain/player/stamina'
-import { canBeHurt, canChoose, CHOOSE_FLOOR, CHOOSE_TIMEOUT, DOWN_DURATION, SPAWN_PROTECT } from '../src/domain/player/lifecycle'
+import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/equip'
 
@@ -90,7 +90,7 @@ const LIMBO_MS = 100
 /**
  * 時計を進める。
  *
- * **例外でサーバーごと落とさない。** 的 (接続を持たない Player) に向かって
+ * **例外でサーバーごと落とさない。** 的 (接続を持たない人) に向かって
  * 送ろうとした所で例外が出て、**プロセスが落ちて全部屋が消えた**ことがある。
  * 1 回の刻みを捨てるだけなら、次の刻みで何事もなく続く。
  *
@@ -115,7 +115,7 @@ setInterval(() => {
         room.lastLimbo = now
         for (const player of room.players.values()) {
           // 的は切れない (接続を持たない)。ここは人の話
-          if (player.bot || player.life !== 'dropped') continue
+          if (player.bot || !isAwaitingReturn(player.life)) continue
           const last = sessionOf(player).lastPayload
           if (!last) continue
           const view = new DataView(last.buffer, last.byteOffset, last.byteLength)
@@ -127,7 +127,7 @@ setInterval(() => {
 
       // 待ち切った席を畳む。部屋が空になったらここで初めて部屋も消える
       for (const player of room.players.values()) {
-        if (player.life === 'dropped' && lifeElapsed(player, now) >= RECONNECT_GRACE) {
+        if (isAwaitingReturn(player.life) && lifeElapsed(player, now) >= RECONNECT_GRACE_MS) {
           // 待ち切っても戻らなかった。走っている試合を置いて消えたのと同じ
           if (room.phase === 'playing') recordSeat(room, player, true)
           room.players.delete(player.id)
@@ -151,30 +151,23 @@ setInterval(() => {
       const water = waterOf(room.stage.name)
       relayClaymores(room)
       for (const player of connected(room)) {
-        // --- 時間で進む遷移 ---
-        //
-        // 状態ごとに別の時計を持たない。「その状態に入ってから何秒経ったか」
-        // だけを見る。以前は respawnAt と protectedUntil が別々にあり、
-        // 置き忘れた場所 (途中参加) だけ無敵が付かなかった。
-        switch (player.life) {
-          case 'downed':
-            // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る
-            if (lifeElapsed(player, now) >= DOWN_DURATION * 1000) {
-              setLife(room, player, 'choosing', now)
-            }
-            continue
-          case 'choosing':
-            // 決めないまま放っておかれた。相手の試合を止めないために打ち切る
-            if (lifeElapsed(player, now) >= CHOOSE_TIMEOUT * 1000) spawn(room, player, now)
-            continue
-          case 'spawning':
-            if (lifeElapsed(player, now) >= SPAWN_PROTECT * 1000) {
-              setLife(room, player, 'alive', now)
-            }
-            break
-          case 'joining':
-            continue
-        }
+        /*
+         * --- 時間で進む遷移 ---
+         *
+         * **決めるのはドメイン** (advanceLife)。尺も遷移先も遊びの数字なので、
+         * ここは返ってきたことをやるだけ — 配るのも装備を配り直すのも権威の仕事。
+         */
+        const effect = advanceLife(player.life, lifeElapsed(player, now))
+        if (effect?.kind === 'life') setLife(room, player, effect.to, now)
+        else if (effect?.kind === 'spawn') spawn(room, player, now)
+
+        /*
+         * ここから下は**戦場に立っている人だけ** (眠り・スタミナ・溺れ)。
+         *
+         * canAct = spawning | alive。支度中・倒れている・位置がまだ届いて
+         * いない人は、そもそも水に落ちようがないし手も動かない。
+         */
+        if (!canAct(player.life)) continue
 
         /*
          * --- 眠りから醒める ---
@@ -364,7 +357,7 @@ const CORS = {
  * **既に選んでいたら上書きしない。** 支度の間に選び直した人の選択が、遅れて
  * 届いた読み出しで巻き戻る — 支度は数秒あるので、実際に起こり得る順番。
  */
-function restoreSkills(player: Player): void {
+function restoreSkills(player: MatchPlayer): void {
   void loadSkills(player.id).then((skills) => {
     if (costOf(player.skills) > 0) return
     player.skills = skills
@@ -379,7 +372,7 @@ function restoreSkills(player: Player): void {
  * サーバーが持ってくる — 何が効いているかを画面に出すには、こちらから知らせる
  * しかない。
  */
-function sendSkills(player: Player): void {
+function sendSkills(player: MatchPlayer): void {
   sessionFor(player)?.socket.send(
     JSON.stringify({ type: 'skills', skills: player.skills } satisfies ServerMessage),
   )
@@ -577,7 +570,7 @@ function handleMessage(
        */
       if (!HELD[player.held]?.shoots) break
       /*
-       * 弾を 1 発減らす。**数を持っているのはこちら** (Player.inventory)。
+       * 弾を 1 発減らす。**数を持っているのはこちら** (MatchPlayer.inventory)。
        *
        * **空でも拒否はしない。** 空撃ちの音は押した瞬間に要るので、
        * 鳴らす判断はクライアントに置いてある。ここで拒むと、通信のずれで
@@ -614,6 +607,21 @@ function handleMessage(
     // こちらは移すだけでよい
     case 'reload':
       player.inventory.reloadGun(message.weapon)
+      break
+
+    /*
+     * 支度が済んだ / まだ。**準備の段階でしか意味を持たない。**
+     *
+     * 走っている試合の最中に押されても無視する。押した本人の画面が閉じる
+     * わけでもないので、黙って捨ててよい。
+     *
+     * 名簿を配り直すのは、**誰を待っているかが全員に見える**必要があるから。
+     */
+    case 'ready':
+      if (room.phase !== 'ready') break
+      if (player.ready === message.ready) break
+      player.ready = message.ready
+      broadcast(room, rosterMessage(room))
       break
 
     default:
@@ -735,9 +743,9 @@ const server = Bun.serve<Client>({
       const room = roomOf(socket.data.room)
       const seat = room.players.get(socket.data.id)
       /** 続きへ戻す人。名簿を送ったあとに渡す */
-      let resumed: Player | null = null
+      let resumed: MatchPlayer | null = null
 
-      if (seat && seat.life === 'dropped') {
+      if (seat && isAwaitingReturn(seat.life)) {
         // 席が残っていた。**その命の続きから始める。**
         //
         // 猶予を 30 秒空けているのは「うっかり切れた人が戻ってこられるように」で
@@ -764,7 +772,7 @@ const server = Bun.serve<Client>({
         seat.holdingGrenade = false
       } else {
         // 名前は発行元が持っていればそれ、無ければ join で名乗るまで仮のもの
-        const joined = newPlayer({
+        const joined = newMatchPlayer({
           id: socket.data.id,
           name: socket.data.name ?? socket.data.id.slice(0, 4).toUpperCase(),
           team: assignTeam(room),
@@ -828,7 +836,7 @@ const server = Bun.serve<Client>({
 
       // 席は残す。畳むのは待ち切ってから (tick)
       // 続きへ戻せる状態だったかを控える。倒れている最中なら、どのみち次は湧く
-      player.wasAlive = player.life === 'alive' || player.life === 'spawning'
+      player.wasAlive = canAct(player.life)
       setLife(room, player, 'dropped')
 
       // **leave は配らない。**

@@ -1,25 +1,25 @@
 /**
  * 接続。**人 (Player) とは別の物。**
  *
- * 同じ人が繋ぎ直せば Session は新しくなるが、Player は席に残る。的 (bot) は
- * Player を持つが Session を持たない — だから sessionOf は投げる関数と
+ * 同じ人が繋ぎ直せば Session は新しくなるが、人は席に残る。的 (bot) は
+ * 席を持つが Session を持たない — だから sessionOf は投げる関数と
  * 返さない関数の 2 本に分けてある。
  */
 
-import type { Player } from '../src/domain/player/player'
+import type { MatchPlayer } from '../src/domain/player/player'
 import type { Client } from './world'
 
 /**
  * 接続 1 本ぶんの帳簿。**人 (Player) とは別。**
  *
  * socket も「届く間隔」も「誰に何を配ったか」も、人ではなく**接続**の持ち物。
- * 同じ人が繋ぎ直せば新しい Session になるが、Player は席に残ったままになる —
+ * 同じ人が繋ぎ直せば新しい Session になるが、人は席に残ったままになる —
  * その違いが型に出ていなかったので、30 秒の猶予まわりのドメインルールが読み取れなかった。
  *
  * 人の側は src/domain/player/player.ts。
  */
 export interface Session {
-  player: Player
+  player: MatchPlayer
   /**
    * 位置が届く間隔 (ms) の均し。64Hz で送っているので 16 前後が正常。
    *
@@ -113,7 +113,7 @@ export interface Session {
 /**
  * 接続の帳簿。人の id で引く。
  *
- * Player に socket を持たせない代わりに、こちら側から人を指す。**人は
+ * 人に socket を持たせない代わりに、こちら側から人を指す。**人は
  * 部屋 (Match) が持ち、接続はここが持つ。**
  */
 export const sessions = new Map<string, Session>()
@@ -125,7 +125,7 @@ export const sessions = new Map<string, Session>()
  * 出ないまま見えていることになり、届く間隔を引き継ぐと巨大な間隔になり、
  * 過去の姿を引き継ぐと**離脱前の位置で当たってしまう**。
  */
-export function newSession(player: Player, socket: Bun.ServerWebSocket<Client>): Session {
+export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Client>): Session {
   return {
     player,
     socket,
@@ -154,12 +154,12 @@ export function newSession(player: Player, socket: Bun.ServerWebSocket<Client>):
  * 「人にも的にも起こりうる」場所ではこちらを使う。sessionOf は投げるので、
  * **的が混ざった瞬間にサーバーが落ちる** (実際、爆風の転倒を送る所で落ちた)。
  */
-export function sessionFor(player: Player): Session | null {
+export function sessionFor(player: MatchPlayer): Session | null {
   return sessions.get(player.id) ?? null
 }
 
 /** その人の接続。席に着いている**人**には必ず在る (的には無い) */
-export function sessionOf(player: Player): Session {
+export function sessionOf(player: MatchPlayer): Session {
   const found = sessions.get(player.id)
   if (!found) throw new Error(`接続が無い: ${player.id}`)
   return found

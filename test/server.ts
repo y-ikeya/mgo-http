@@ -343,7 +343,20 @@ export async function twoPlayers(
     a.send({ type: 'loadout', primary: 'rifle', support })
     b.send({ type: 'loadout', primary: 'rifle', support })
   }
-  // 支度が済むまで待って、二人とも出撃する (床は 3 秒)
+  /*
+   * 支度の段階を抜ける。**押さないと 60 秒待たされる。**
+   *
+   * 二人揃うと部屋は ready へ入り、全員が押すか 60 秒経つまで playing に
+   * ならない (server/match.ts の allReady)。試験の待ちは 20 秒なので、
+   * 押さないまま撃つと **damage が phase !== 'playing' で捨てられる**。
+   *
+   * 少し置いてから押すのは、部屋が ready に入る前に届いた ready を
+   * サーバーが黙って捨てるため (server/index.ts の case 'ready')。
+   */
+  await Bun.sleep(400)
+  a.send({ type: 'ready', ready: true })
+  b.send({ type: 'ready', ready: true })
+  // 数え終わって湧けるようになるまで待って、二人とも出撃する (床は 3 秒)
   await Bun.sleep(3400)
   a.send({ type: 'spawn' })
   b.send({ type: 'spawn' })

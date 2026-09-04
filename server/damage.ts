@@ -20,11 +20,11 @@ import {
   hurt,
   isLeakedTo,
   leakTag,
-  type Player,
+  type MatchPlayer,
   isProtected,
 } from '../src/domain/player/player'
 import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage } from '../src/domain/rule/damage'
-import { LAG_WINDOW } from '../src/domain/rule/lag'
+import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
 import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
@@ -91,7 +91,7 @@ const NOT_HURT: Hurt = { downed: false, letGo: false }
  * (フラグは 1 人ぶんしか無い)。**短いほうへは縮めない** — Lv1 の人が当てたせいで
  * Lv3 の人の光が消えるのは、当てた側から見て理屈が通らない。
  */
-function expose(room: RoomWorld, victim: Player, attacker: Player | undefined): void {
+function expose(room: RoomWorld, victim: MatchPlayer, attacker: MatchPlayer | undefined): void {
   if (!attacker || attacker.id === victim.id) return
   const seconds = exposeSeconds(attacker.skills)
   if (seconds <= 0) return
@@ -126,7 +126,7 @@ function expose(room: RoomWorld, victim: Player, attacker: Player | undefined): 
  * 2 か所に書いていた頃、散弾を足すときに片方だけ直すことになった。飛ばす形は
  * 1 つなので、呼び分けるのは「いつ飛ばすか」だけにする。
  */
-function knockAway(victim: Player, fromX: number, fromZ: number): void {
+function knockAway(victim: MatchPlayer, fromX: number, fromZ: number): void {
   const awayX = victim.x - fromX
   const awayZ = victim.z - fromZ
   const reach = Math.hypot(awayX, awayZ) || 1
@@ -158,7 +158,7 @@ function knockAway(victim: Player, fromX: number, fromZ: number): void {
  * なる。粒は散らばりと当たり判定のためにあって、威力を数えるためではない。
  */
 function shotgunBandFor(
-  attacker: Player,
+  attacker: MatchPlayer,
   event: Extract<ClientMessage, { type: 'damage' }>,
 ): ShotgunBand | null | 'miss' {
   if (event.kind !== 'bullet') return null
@@ -185,7 +185,7 @@ function shotgunBandFor(
  *
  * **1 発につき 1 回。** 粒ごとに飛ばすと 8 回重なって吹き飛ぶ (怯みと同じ)。
  */
-function pushIfShotgun(attacker: Player, victim: Player, band: ShotgunBand | null): void {
+function pushIfShotgun(attacker: MatchPlayer, victim: MatchPlayer, band: ShotgunBand | null): void {
   if (!band?.knock) return
   const session = sessionOf(attacker)
   if (session.pushedThisShot) return
@@ -196,7 +196,7 @@ function pushIfShotgun(attacker: Player, victim: Player, band: ShotgunBand | nul
 
 export function applyBlastDamage(
   room: RoomWorld,
-  victim: Player,
+  victim: MatchPlayer,
   amount: number,
   fromX: number,
   fromZ: number,
@@ -270,12 +270,12 @@ export const FIRE_INTERVAL_SLACK = 0.85
  * 落とすだけで、撃った側には何も返さない。「弾かれた」と伝えると、
  * 何が通って何が通らないかを試して回れてしまう。
  */
-export function reject(attacker: Player, reason: string): void {
+export function reject(attacker: MatchPlayer, reason: string): void {
   sessionOf(attacker).rejected++
   console.warn(`[却下] ${attacker.name}: ${reason}`)
 }
 
-export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMessage): Hurt {
+export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: ClientMessage): Hurt {
   if (event.type !== 'damage') return NOT_HURT
   const victim = room.players.get(event.target)
   if (!victim || !canBeHurt(victim.life)) return NOT_HURT
@@ -287,7 +287,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
    */
   if (isAsleep(attacker.sleepUntil, Date.now())) return NOT_HURT
   // 撃った時点で自分の無敵は切れる。盾にしたまま撃たせない
-  if (attacker.life === 'spawning') setLife(room, attacker, 'alive')
+  if (isProtected(attacker)) setLife(room, attacker, 'alive')
   // 湧いた直後の相手には当たらない
   if (isProtected(victim)) return NOT_HURT
   // 撃てる相手か。**陣営ではなくルールに聞く** — DM では同じ色でも敵で、
@@ -349,7 +349,7 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
       sag: bulletSag(event.distance ?? 0, spec.bulletSpeed, spec.bulletGravity),
     },
     room.stage.sight,
-    LAG_WINDOW,
+    LAG_WINDOW_MS,
     HIT_RULES,
   )
   if (!verdict.ok) {
@@ -489,8 +489,8 @@ export function applyDamage(room: RoomWorld, attacker: Player, event: ClientMess
  */
 function applyTranquilizer(
   room: RoomWorld,
-  attacker: Player,
-  victim: Player,
+  attacker: MatchPlayer,
+  victim: MatchPlayer,
   amount: number,
   event: Extract<ClientMessage, { type: 'damage' }>,
 ): Hurt {

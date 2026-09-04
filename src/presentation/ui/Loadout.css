@@ -15,13 +15,29 @@
   justify-content: center;
   pointer-events: auto;
   z-index: 6;
-  background: rgba(6, 9, 6, 0.72);
-  backdrop-filter: blur(4px);
+  /*
+   * 背景。**ステージをうっすら残す。**
+   *
+   * 真っ暗にすると、どこで戦うのかが分からないまま装備を選ぶことになる。
+   * 薄く透かして、ぼかしておけば「向こうに戦場がある」ことは伝わるまま、
+   * 目は手前の画面に留まる。
+   */
+  background: rgba(6, 9, 6, 0.62);
+  backdrop-filter: blur(6px);
 }
 
 .loadout-panel {
-  width: min(760px, 88vw);
-  background: rgba(12, 16, 10, 0.9);
+  /*
+   * **画面いっぱいに近い。**
+   *
+   * スキルと参加者を同時に見せるので、760px では収まらない。大きくすることで
+   * 「いまはこの画面の時間」と分かるようにもなる — 小さい窓だと、戦場の
+   * ついでに開いている物に見える。
+   */
+  width: min(1180px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: rgba(12, 16, 10, 0.88);
   border: 1px solid rgba(160, 190, 140, 0.24);
 }
 
@@ -192,12 +208,6 @@
   color: rgba(226, 190, 120, 0.9);
 }
 
-/* 窓が閉じている理由。**押せない物を出すなら、なぜかも出す** */
-.loadout-budget-locked {
-  color: rgba(190, 206, 176, 0.4);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-}
 
 
 /*
@@ -243,4 +253,75 @@
 
 .loadout-item-tranq.loadout-item-on .loadout-name {
   color: rgba(196, 226, 255, 0.98);
+}
+
+
+/*
+ * --- 参加者 ---
+ *
+ * 誰が居て、誰を待っているか。**支度の段階だけ出る。**
+ *
+ * 名前を並べるだけにしてある。成績も Lv も出さない — ここで見たいのは
+ * 「あと誰を待つか」だけで、強さの話は始まってからでよい。
+ */
+.loadout-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loadout-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgba(160, 190, 140, 0.18);
+  background: rgba(150, 214, 132, 0.03);
+  font-size: 13px;
+  color: rgba(190, 206, 176, 0.7);
+}
+
+/* 陣営。名前の色を変えず、印だけで示す (名前は読む物なので色を奪わない) */
+.loadout-member-team {
+  width: 4px;
+  height: 14px;
+  background: rgba(150, 170, 140, 0.4);
+}
+
+.loadout-member-blue {
+  background: #7ea6ff;
+}
+
+.loadout-member-red {
+  background: #ff8a72;
+}
+
+/* 自分の行。所属の色は変えず、地の色で示す (成績表と同じ扱い) */
+.loadout-member-mine {
+  background: rgba(150, 214, 132, 0.12);
+}
+
+/* 支度が済んだ人。**待っている相手が一目で残る** */
+.loadout-member-ready {
+  border-color: rgba(150, 214, 132, 0.55);
+  color: rgba(206, 232, 190, 0.95);
+}
+
+/* 離脱中。行は残す — 戻ってくるかもしれないし、居ないことは分かる */
+.loadout-member-away {
+  opacity: 0.4;
+}
+
+.loadout-member-mark {
+  margin-left: 4px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  opacity: 0.75;
+}
+
+/* 押した後。取り消せることが分かるように、押す前と別の色にする */
+.loadout-ok-ready {
+  background: rgba(150, 214, 132, 0.22);
+  border-color: rgba(150, 214, 132, 0.6);
 }

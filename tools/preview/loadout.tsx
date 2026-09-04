@@ -27,7 +27,18 @@ const chosen = CASES[which] ?? CASES.open
 /** ?room=delta で「砂部屋」(狙撃銃だけ) の姿を見る */
 const sandbox = new URLSearchParams(location.search).get('room') === 'delta'
 
+/** ?phase=ready で支度の画面を見る */
+const ready = new URLSearchParams(location.search).get('phase') === 'ready'
+
+const ROSTER = [
+  { id: 'me', name: 'pepa1404', team: 'blue' as const, kills: 0, deaths: 0, suicides: 0, stuns: 0, ready: false },
+  { id: 'b', name: 'kometh27', team: 'blue' as const, kills: 0, deaths: 0, suicides: 0, stuns: 0, ready: true },
+  { id: 'c', name: 'snake', team: 'red' as const, kills: 0, deaths: 0, suicides: 0, stuns: 0, ready: true },
+  { id: 'd', name: 'otacon', team: 'red' as const, kills: 0, deaths: 0, suicides: 0, stuns: 0, ready: false, away: true },
+]
+
 function Harness() {
+  const [roster, setRoster] = createSignal(ROSTER)
   // 押した結果はサーバーが返す物なので、ここでは本物の代わりに素直に書き換える
   const [skills, setSkills] = createSignal<Skills>(chosen.skills)
   const [pick, setPick] = createSignal<WeaponId>(sandbox ? 'sniper' : 'rifle')
@@ -46,6 +57,15 @@ function Harness() {
       skills={skills()}
       primaries={sandbox ? ['sniper'] : CHOICES.primary}
       secondary={sandbox ? null : side()}
+      /* ?phase=ready で支度の画面 (参加者と READY が出る) */
+      phase={ready ? 'ready' : 'countdown'}
+      players={roster()}
+      selfId="me"
+      skillsOpen={ready}
+      onSkill={(id, level) => setSkills((s) => ({ ...s, [id]: level }))}
+      onReady={(next) =>
+        setRoster((rows) => rows.map((r) => (r.id === 'me' ? { ...r, ready: next } : r)))
+      }
     />
   )
 }
