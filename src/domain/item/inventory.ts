@@ -16,7 +16,7 @@
 import {
   BROWSE_HOLD, HELD, SWITCH_TIME, buildCarried, canDrop, cycle as cycleId, dropEmpty, dropFrom,
   find, firstOf, listOf, pickUp, toggle as toggleId,
-  type Carried, type Family, type GunId, type HeldId, type Loadout,
+  type Carried, type Family, type HeldId, type Loadout,
 } from './held'
 import type { Intent } from '../player/intent'
 import { WEAPONS, type Ammo, type WeaponId, type WeaponSpec } from './weapons'
@@ -25,7 +25,7 @@ import { canAct } from '../player/lifecycle'
 import type { Life } from '../player/lifecycle'
 
 /** 銃の初期弾数。表から引く */
-function fullAmmo(id: GunId): { ammo: number; reserve: number } {
+function fullAmmo(id: WeaponId): { ammo: number; reserve: number } {
   return { ammo: WEAPONS[id].magazine, reserve: WEAPONS[id].reserve }
 }
 
@@ -33,7 +33,7 @@ function fullAmmo(id: GunId): { ammo: number; reserve: number } {
 const FAMILIES: readonly Family[] = ['weapon', 'tool']
 
 /** 開いている一覧。どの系統の、何番目を指しているか */
-export interface Browsing {
+interface Browsing {
   family: Family
   at: number
 }
@@ -66,7 +66,7 @@ export interface HandContext {
 }
 
 /** 手にある物が動いた結果、呼ぶ側にやってもらうこと */
-export type HandEvent =
+type HandEvent =
   /** 足元の物を拾いたい。誰の何を拾うかはサーバーが決める */
   | { kind: 'pickup' }
   /** 手放した。地面に置くのはサーバーなので、残弾ごと知らせる */
@@ -140,10 +140,18 @@ export class Inventory {
   /** 湧いたとき。持ち物を選択から組み直す */
   refill(loadout: Loadout): void {
     this.items = buildCarried(loadout, fullAmmo)
-    this.current = loadout.primary
+    /*
+     * **銃が 1 挺も無ければナイフを握る。**
+     *
+     * 手ぶらという状態を作らない。`held` は「道具を降ろしたら武器へ戻る」形に
+     * なっていて、戻る先が無いと降ろした瞬間に何も持っていないことになる。
+     * ナイフは誰でも持っている (buildCarried) ので、そこが底になる。
+     */
+    const first = loadout.primary ?? loadout.secondary ?? 'knife'
+    this.current = first
     this.last = loadout.secondary
     this.previousWeapon = loadout.secondary
-    this.lastWeapon = loadout.primary
+    this.lastWeapon = first
     this.lastTool = 'none'
     this.switchLeft = 0
     this.queued = null
@@ -361,9 +369,9 @@ export class Inventory {
    * **持ち替えを入れ切るまでの繋ぎ。** いまの操作は銃どうしの往復しかできないので、
    * 手榴弾やナイフに移らないようここで絞る。一覧 (長押し) を入れたら消える。
    */
-  guns(): GunId[] {
+  guns(): WeaponId[] {
     return this.items
-      .filter((item): item is { id: GunId; ammo: number; reserve: number } => 'ammo' in item)
+      .filter((item): item is { id: WeaponId; ammo: number; reserve: number } => 'ammo' in item)
       .map((item) => item.id)
   }
 
@@ -715,8 +723,8 @@ export class Inventory {
    * こちらは持っている物しか持たない。持っていない銃の弾は捨てる。
    */
   restore(
-    magazine: Partial<Record<GunId, number>>,
-    reserve: Partial<Record<GunId, number>>,
+    magazine: Partial<Record<WeaponId, number>>,
+    reserve: Partial<Record<WeaponId, number>>,
     support: number,
   ): void {
     for (const item of this.items) {

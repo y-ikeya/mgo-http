@@ -22,11 +22,18 @@
  * three にも DOM にも依存しない。サーバーが同じ表を読む。
  */
 
-/** 撃てる物 */
-export type GunId = 'smg' | 'rifle' | 'sniper' | 'm9' | 'm1911' | 'shotgun'
+/*
+ * 撃てる物は weapons.ts の `WeaponId`。**ここで別名を建てない。**
+ *
+ * 以前は同じ 6 つを `GunId` としてここに書き直していて、`primary: WeaponId` /
+ * `secondary: GunId` のように**同じ物へ 2 つの名前**が付いていた。中身が一字
+ * 一句同じなので型検査は何も言わず、読む側だけが「違う物か」と迷う。
+ */
+import type { WeaponId } from './weapons'
+export type { WeaponId }
 
 /** 投げる物・置く物。support の枠に入る */
-export type ThrowId = 'grenade' | 'claymore' | 'magazine'
+type ThrowId = 'grenade' | 'claymore' | 'magazine'
 
 /**
  * 手に持てる物すべて。
@@ -34,7 +41,7 @@ export type ThrowId = 'grenade' | 'claymore' | 'magazine'
  * `none` は**道具を何も使っていない**という選択。手ぶらという意味ではない —
  * 道具の枠が空なだけで、手には武器がある (Inventory.held を参照)。
  */
-export type HeldId = GunId | ThrowId | 'knife' | 'box' | 'none'
+export type HeldId = WeaponId | ThrowId | 'knife' | 'box' | 'none'
 
 /**
  * 系統。持ち替えの操作が別々に割り当たる (MGO2 の十字左右)。
@@ -58,14 +65,14 @@ export function isTwoHanded(id: HeldId): boolean {
   return HELD[id].twoHanded
 }
 
-export function isGun(id: HeldId): id is GunId {
+export function isGun(id: HeldId): id is WeaponId {
   return HELD[id].shoots
 }
 
 /** 湧くときに選ぶ枠。並びの順もこれで決まる */
-export type Slot = 'primary' | 'secondary' | 'support' | 'knife' | 'tool'
+type Slot = 'primary' | 'secondary' | 'support' | 'knife' | 'tool'
 
-export interface HeldSpec {
+interface HeldSpec {
   id: HeldId
   /** HUD と装備画面に出す名前 */
   label: string
@@ -145,15 +152,11 @@ export const HELD: Record<HeldId, HeldSpec> = {
  * 表から引く。持たせると二重になって、片方だけ直したときに静かにずれる。
  */
 export type Carried =
-  | { id: GunId; ammo: number; reserve: number }
+  | { id: WeaponId; ammo: number; reserve: number }
   | { id: ThrowId; count: number }
   | { id: 'knife' }
   | { id: 'box' }
   | { id: 'none' }
-
-export function specOf(id: HeldId): HeldSpec {
-  return HELD[id]
-}
 
 /** その物を持っている間の移動の速さ (倍率) */
 export function carrySpeed(id: HeldId): number {
@@ -271,7 +274,16 @@ export function dropFrom(carried: Carried[], id: HeldId): Carried | null {
  * 出てこない。混ぜたのが以前の失敗。
  */
 export interface Loadout {
-  primary: GunId
+  /**
+   * 主武器。**null なら持たない** (部屋が外している)。
+   *
+   * 副武器と同じ形。銃を 1 挺も持たない部屋 (ナイフだけ) がここに乗る —
+   * `domain/match/room.ts` の primaries を空にすると、選べる銃が無くなる。
+   *
+   * **手ぶらにはならない。** ナイフと箱は誰でも持っているので (buildCarried)、
+   * 銃が無ければ手にあるのはナイフになる。
+   */
+  primary: WeaponId | null
   /**
    * 副武器。**null なら持たない。**
    *
@@ -279,12 +291,12 @@ export interface Loadout {
    * 部屋で拳銃まで取り上げると、詰められた時に**ナイフしか残らない** —
    * 間合いを詰める側と詰められる側の読み合いが、そこで初めて成立する。
    */
-  secondary: GunId | null
+  secondary: WeaponId | null
   support: 'grenade' | 'claymore'
 }
 
 /** 1 つの命で持てる投げ物の数 */
-export const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
+const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
   grenade: 3,
   // 置きっぱなしで効き続けるので、手榴弾と同じ数を配ると通り道を全部塞げる
   claymore: 2,
@@ -298,13 +310,17 @@ export const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
  * 弾倉 (囮) は入れない。撃った弾が 1 弾倉ぶん溜まって初めて増える物なので、
  * 湧いた時点では持っていない。
  */
-export function buildCarried(loadout: Loadout, ammoOf: (id: GunId) => { ammo: number; reserve: number }): Carried[] {
+export function buildCarried(loadout: Loadout, ammoOf: (id: WeaponId) => { ammo: number; reserve: number }): Carried[] {
   const secondary: Carried[] =
     loadout.secondary === null
       ? []
       : [{ id: loadout.secondary, ...ammoOf(loadout.secondary) }]
+  const primary: Carried[] =
+    loadout.primary === null
+      ? []
+      : [{ id: loadout.primary, ...ammoOf(loadout.primary) }]
   return [
-    { id: loadout.primary, ...ammoOf(loadout.primary) },
+    ...primary,
     ...secondary,
     { id: loadout.support, count: SUPPORT_COUNT[loadout.support] },
     { id: 'knife' },

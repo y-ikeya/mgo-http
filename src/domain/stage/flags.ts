@@ -30,7 +30,7 @@ export interface SurfaceFlags {
   camera: boolean
 }
 
-export const SOLID: SurfaceFlags = {
+const SOLID: SurfaceFlags = {
   draw: true,
   player: true,
   bullet: true,
@@ -73,9 +73,4 @@ export function flagsOf(name: string): SurfaceFlags {
   if (name.includes('nocamera')) flags.camera = false
 
   return flags
-}
-
-/** 何も止めず描画もしないなら、持っている意味が無い */
-export function isInert(flags: SurfaceFlags): boolean {
-  return !flags.draw && !flags.player && !flags.bullet && !flags.eye && !flags.camera
 }

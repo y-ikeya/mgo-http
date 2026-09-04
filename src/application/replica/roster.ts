@@ -3,7 +3,7 @@
  *
  * --- なぜレプリカが要るか ---
  * これまで名簿は**体 (three のオブジェクト) が持っていた**。名前も陣営も体力も
- * 状態も `RemotePlayer` の中で、位置が届く前に来た報せは `pending` に溜めて
+ * 状態も `RemoteSoldier` の中で、位置が届く前に来た報せは `pending` に溜めて
  * いた。**体が無い相手のことは、体のクラスに聞くしかない**という形。
  *
  * 名簿はサーバーが持っている状態そのものなので、レプリカの側に置く。体はレプリカを見て
@@ -12,20 +12,12 @@
  * three も音も知らない。**やることは返り値で返す** (RosterEffect)。
  */
 
-import type { Life } from '../../domain/player/lifecycle'
-import type { Team } from '../../domain/player/player'
+import { isDowned } from '../../domain/player/lifecycle'
+// 人の核は遊びの語彙 (domain)。ここはそれを追うだけ
+import type { Player } from '../../domain/player/player'
 import type { ServerMessage } from '../protocol/types'
 
-/** 名簿の 1 人ぶん。**サーバーが決めたことだけ** */
-export interface RosterEntry {
-  name: string
-  team: Team
-  health: number
-  /** サーバーが決めた状態。装備画面も倒れる姿勢も無敵の見た目もここから出る */
-  life: Life
-}
-
-export type Roster = Map<string, RosterEntry>
+export type Roster = Map<string, Player>
 
 export function newRoster(): Roster {
   return new Map()
@@ -39,19 +31,19 @@ export function newRoster(): Roster {
  */
 export type RosterEffect =
   /** その人の姿をレプリカに合わせる。まだ体が無ければ、届いたときに合わせる */
-  | { kind: 'sync'; id: string; entry: RosterEntry }
+  | { kind: 'sync'; id: string; entry: Player }
   /** 部屋を出た。体ごと消す */
   | { kind: 'left'; id: string }
   /** 倒れた。**倒れた場所で叫ぶ** — 撃った側には手応え、遠くの人には合図 */
   | { kind: 'died'; id: string }
 
-const UNKNOWN: Omit<RosterEntry, 'name'> = { team: 'blue', health: 100, life: 'joining' }
+const UNKNOWN: Omit<Player, 'name'> = { team: 'blue', health: 100, life: 'joining' }
 
 /** 居なければ作る。名簿より先に位置が届くことがある */
-function entryOf(roster: Roster, id: string, name = ''): RosterEntry {
+function entryOf(roster: Roster, id: string, name = ''): Player {
   const found = roster.get(id)
   if (found) return found
-  const fresh: RosterEntry = { name, ...UNKNOWN }
+  const fresh: Player = { name, ...UNKNOWN }
   roster.set(id, fresh)
   return fresh
 }
@@ -102,7 +94,7 @@ export function applyRoster(
     case 'life': {
       if (message.id === selfId) return []
       const entry = entryOf(roster, message.id)
-      const died = entry.life !== 'downed' && message.state === 'downed'
+      const died = !isDowned(entry.life) && isDowned(message.state)
       entry.life = message.state
       const effects: RosterEffect[] = [{ kind: 'sync', id: message.id, entry }]
       if (died) effects.push({ kind: 'died', id: message.id })

@@ -53,7 +53,7 @@ interface StoredSession {
 }
 
 let session: StoredSession | null = load()
-let refreshTimer = 0
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
 function load(): StoredSession | null {
   try {
@@ -137,10 +137,11 @@ function adopt(data: Record<string, unknown>): StoredSession | null {
  * あらかじめ更新しておく。
  */
 function scheduleRefresh(): void {
-  window.clearTimeout(refreshTimer)
+  if (refreshTimer !== null) clearTimeout(refreshTimer)
+  refreshTimer = null
   if (!session) return
   const wait = (session.expires_at - REFRESH_MARGIN) * 1000 - Date.now()
-  refreshTimer = window.setTimeout(() => void refresh(), Math.max(wait, 5_000))
+  refreshTimer = setTimeout(() => void refresh(), Math.max(wait, 5_000))
 }
 
 async function refresh(): Promise<void> {

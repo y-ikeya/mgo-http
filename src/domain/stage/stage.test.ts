@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { ROOM_NAMES, ROOMS } from './room'
-import { STAGES, inWater, isStageName, nextStage, only, waterOf, type Rotation, type StageName } from './stage'
+import { ROOM_NAMES, ROOMS } from '../match/room'
+import { STAGES, inWater, isStageName, nextStage, only, waterOf, type Rotation, type StageName } from './index'
 
 /**
  * ステージと、その回し方。

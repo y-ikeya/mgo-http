@@ -1,7 +1,6 @@
-import type { Player } from '../player/player'
-import { only, type Rotation } from './stage'
+import type { MatchPlayer } from '../player/player'
+import { only, type Rotation } from '../stage'
 import { CHOICES, type WeaponId } from '../item/weapons'
-import type { GunId } from '../item/held'
 
 /**
  * 部屋とルール。
@@ -89,10 +88,10 @@ export const MODES: Record<Mode, ModeSpec> = {
  * 持っていた。部屋を 1 つ足すたびに直す場所が増えるし、**片方だけ直した部屋**
  * が作れてしまう。読む側も「その部屋の全部」を 1 回で引ける。
  *
- * 行き先は**部屋を作った人がこれを決める**こと (match/stage.ts の Rotation)。
+ * 行き先は**部屋を作った人がこれを決める**こと (stage/index.ts の Rotation)。
  * そうなったら、この表は「作るときの既定値」に変わるだけで読む側は動かない。
  */
-export interface RoomSpec {
+interface RoomSpec {
   mode: Mode
   /** 回すステージ。**いまは全部 1 枚だけの fixed** */
   stages: Rotation
@@ -112,6 +111,12 @@ export interface RoomSpec {
    * 受け取った申告もこれで弾く (domain/player/equip.ts)。画面に出さないだけでは、
    * 送ってくる側を止められない。
    */
+  /**
+   * 持ち込める主武器。**省けば全部、空なら 1 挺も持たせない。**
+   *
+   * 空にするとナイフだけの部屋になる。副武器 (secondary) を null にするのと
+   * 同じ形で、両方外せば手にあるのはナイフと箱だけ。
+   */
   primaries?: readonly WeaponId[]
   /**
    * 副武器。**省けば拳銃、null なら持たない。**
@@ -120,7 +125,7 @@ export interface RoomSpec {
    * 入られたら終わり」を成立させるのはこれ — 拳銃が残っていると、詰めた側が
    * 近距離の撃ち合いに勝てるとは限らなくなる。
    */
-  secondary?: GunId | null
+  secondary?: WeaponId | null
 }
 
 export const ROOMS: Record<RoomName, RoomSpec> = {
@@ -145,7 +150,7 @@ export function primariesOf(room: RoomName): readonly WeaponId[] {
 }
 
 /** その部屋の副武器。**省いてあれば拳銃、null なら持たない** */
-export function secondaryOf(room: RoomName): GunId | null {
+export function secondaryOf(room: RoomName): WeaponId | null {
   const spec = ROOMS[room]
   return spec.secondary === undefined ? 'm9' : spec.secondary
 }
@@ -164,7 +169,7 @@ export function modeOf(room: RoomName): ModeSpec {
  * **陣営とは別の問い。** DM では同じ色でも敵で、休憩部屋では誰も敵ではない。
  * 弾も爆風もクレイモアもここを通す (docs/design.md の 3)。
  */
-export function isHostile(mode: ModeSpec, from: Player, to: Player): boolean {
+export function isHostile(mode: ModeSpec, from: MatchPlayer, to: MatchPlayer): boolean {
   if (from.id === to.id) return false
   if (mode.hostility === 'none') return false
   if (mode.hostility === 'all') return true
@@ -176,7 +181,7 @@ export function isHostile(mode: ModeSpec, from: Player, to: Player): boolean {
  *
  * 足音や声が届く相手、クレイモアが見える相手がこれ。
  */
-export function isFriendly(mode: ModeSpec, a: Player, b: Player): boolean {
+export function isFriendly(mode: ModeSpec, a: MatchPlayer, b: MatchPlayer): boolean {
   if (a.id === b.id) return true
   if (mode.hostility === 'all') return false
   return a.team === b.team

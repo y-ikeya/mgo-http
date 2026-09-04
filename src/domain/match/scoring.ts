@@ -76,7 +76,7 @@ export function pointsOf(record: {
  * 良い試合 1 回でおよそ +14 点 (10 キル 8 デス) なので、Lv2 まで数試合、
  * Lv10 は相当遊んだ人、くらいの見当。**回してから詰める数字**。
  */
-export const LEVEL_STEP = 25
+const LEVEL_STEP = 25
 
 /** その Lv に届くのに要る通算点 */
 export function pointsForLevel(level: number): number {

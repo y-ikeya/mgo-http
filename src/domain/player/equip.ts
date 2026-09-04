@@ -9,16 +9,16 @@
  * (item/held.ts の SWITCH_TIME) の管理はまだクライアントにしかない。
  */
 
-import { HELD, type GunId, type HeldId } from '../item/held'
-import { SUPPORT_SPECS, WEAPONS, type SupportId, type WeaponId } from '../item/weapons'
-import type { Player } from './player'
+import { HELD, type HeldId } from '../item/held'
+import { CHOICES, SUPPORT_SPECS, type SupportId, type WeaponId } from '../item/weapons'
+import type { MatchPlayer } from './player'
 import { canChooseSkills, isAffordable, type Skills } from './skill'
 import type { Phase } from '../match/match'
 import type { ModeSpec } from '../match/room'
 
 /** 支度で選べる主武器か。**受け取った文字列を信じない** */
 export function isPrimaryChoice(id: string): id is WeaponId {
-  return WEAPONS[id as WeaponId]?.slot === 'primary'
+  return CHOICES.primary.includes(id as WeaponId)
 }
 
 /**
@@ -27,8 +27,8 @@ export function isPrimaryChoice(id: string): id is WeaponId {
  * **null も通す。** 副武器を持たせない部屋がある (砂部屋)。持たないことも
  * 選択の 1 つなので、弾くのではなく受け取る。
  */
-export function isSecondaryChoice(id: string): id is WeaponId {
-  return WEAPONS[id as WeaponId]?.slot === 'secondary'
+function isSecondaryChoice(id: string): id is WeaponId {
+  return CHOICES.secondary.includes(id as WeaponId)
 }
 
 /** 支度で選べる支援か */
@@ -46,7 +46,7 @@ export function isSupportChoice(id: string): id is SupportId {
  * 手ぶら (none) と弾倉の囮 (magazine) だけは通す。囮は撃っているうちに増える
  * 物で、数はクライアントが数えている。
  */
-export function canHold(player: Player, id: HeldId): boolean {
+export function canHold(player: MatchPlayer, id: HeldId): boolean {
   if (HELD[id] === undefined) return false
   if (id === 'none' || id === 'magazine') return true
   return player.inventory.has(id)
@@ -56,7 +56,7 @@ export function canHold(player: Player, id: HeldId): boolean {
  * 支度で選び直す。**通ったら true。**
  *
  * 生きている間に選び直すのは通す。効くのは次に湧いたときで、いま手にある物は
- * 変わらない (Player の primary は「繋ぎ直したときに返すため」の控え)。
+ * 変わらない (MatchPlayer の primary は「繋ぎ直したときに返すため」の控え)。
  * **支度中だけはすぐ効かせる** — 次の湧きを待つと、選び直した分が 1 つ遅れる。
  */
 /**
@@ -70,13 +70,22 @@ export function canHold(player: Player, id: HeldId): boolean {
  * 「その装備では入れません」と止めても、直す場所が無い。
  */
 export function fitLoadout(
-  player: Player,
+  player: MatchPlayer,
   allowed: readonly WeaponId[],
-  secondary: GunId | null = 'm9',
+  secondary: WeaponId | null = 'm9',
 ): void {
-  const fits = allowed.length === 0 || allowed.includes(player.primary)
+  /*
+   * **空の一覧は「銃を持たせない」。** 絞っていないことではない。
+   *
+   * 絞らない部屋は primaries を書かないので、primariesOf が全部を返す —
+   * 空が届くのは「ナイフだけ」と宣言した部屋からだけ (domain/match/room.ts)。
+   */
+  const none = allowed.length === 0
+  const fits = none
+    ? player.primary === null
+    : player.primary !== null && allowed.includes(player.primary)
   if (fits && player.secondary === secondary) return
-  if (!fits) player.primary = allowed[0]
+  if (!fits) player.primary = none ? null : allowed[0]
   player.secondary = secondary
   player.inventory.refill({
     primary: player.primary,
@@ -86,8 +95,9 @@ export function fitLoadout(
 }
 
 export function chooseLoadout(
-  player: Player,
-  primary: string,
+  player: MatchPlayer,
+  /** 主武器。**null は「持たない」という申告** — 銃を外した部屋でだけ通る */
+  primary: string | null,
   support: string,
   choosing: boolean,
   allowed?: readonly WeaponId[],
@@ -99,9 +109,32 @@ export function chooseLoadout(
    * 部屋の作りが丸ごと崩れる。
    */
   secondary?: string,
-  allowedSecondary?: GunId | null,
+  allowedSecondary?: WeaponId | null,
 ): boolean {
-  if (!isPrimaryChoice(primary) || !isSupportChoice(support)) return false
+  if (!isSupportChoice(support)) return false
+  /*
+   * **銃を持たない申告。** 部屋が 1 挺も許していないときだけ通す。
+   *
+   * 逆も要る — 銃のある部屋で null を名乗られたら弾く。通すと、丸腰を
+   * 自分で選べることになって、部屋の作り (何を持ち込めるか) が意味を失う。
+   */
+  if (primary === null) {
+    if (allowed === undefined || allowed.length > 0) return false
+    player.primary = null
+    player.support = support
+    if (choosing) {
+      player.grenades = SUPPORT_SPECS[support].count
+      player.inventory.refill({
+        primary: null,
+        secondary: player.secondary,
+        support: player.support,
+      })
+    }
+    return true
+  }
+  if (!isPrimaryChoice(primary)) return false
+  /** 銃を外した部屋では、何を名乗られても持ち込ませない */
+  if (allowed && allowed.length === 0) return false
   /*
    * その部屋に持ち込めるか。**画面に出さないだけでは足りない。**
    *
@@ -148,7 +181,7 @@ export function chooseLoadout(
  * どちらも**黙って一部だけ通さない**。半分だけ効いた状態を本人に説明できない。
  */
 export function chooseSkills(
-  player: Player,
+  player: MatchPlayer,
   skills: unknown,
   phase: Phase,
   mode?: ModeSpec,

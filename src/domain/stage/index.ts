@@ -20,9 +20,29 @@
  *
  * 地形そのもの (箱) はここに書かない。あれは .blend から書き出されるもので、
  * 手で書く物ではない。ここに在るのは**遊びの側が決める点**だけ。
+ *
+ * --- この棚の扉はここ 1 つ ---
+ * `surface.ts` (面の材質) と `flags.ts` (面が何を止めるか) も同じ棚に居るが、
+ * **外の層はそれを名指ししない。** 要る物はここが取り次ぐ。
+ *
+ *     import { surfaceOf } from '.../domain/stage'       ○
+ *     import { surfaceOf } from '.../domain/stage/surface' ×
+ *
+ * 扉を 1 つにするのは、**棚の中の並びを外に握らせない**ため。以前は
+ * `domain/match/stage.ts` (ステージ) と `domain/stage/` (面) が別の棚に
+ * 分かれていて、名前が同じなのに指す物が違った。中を名指しできるかぎり、
+ * 並べ替えるだけで外が全部書き換えになる。
+ *
+ * 同じ形が `infra/link` と `infra/input` にもある (index が顔で、
+ * `socket.ts` や `hold.ts` は外から呼ばれない)。守れているかは
+ * `src/layers.test.ts` が見張る。
  */
 
 import type { Team } from '../player/player'
+
+// --- 面の宣言。棚の中から取り次ぐ ---
+export { DEFAULT_SURFACE, surfaceOf, type Surface } from './surface'
+export { flagsOf, type SurfaceFlags } from './flags'
 
 export type StageName = 'mall' | 'training' | 'garden'
 
@@ -60,7 +80,7 @@ export interface Water {
   y: number
 }
 
-export interface StageSpec {
+interface StageSpec {
   name: StageName
   /** 画面に出す名前 */
   label: string
@@ -74,6 +94,16 @@ export interface StageSpec {
   solo: Spot[]
   /** 水面。張っているステージだけ */
   water?: Water
+  /**
+   * 環境音。**そのステージで鳴り続ける音。**
+   *
+   * 屋内なら街の音、水に囲まれていれば波。**ここに置くのは、どこに居るかで
+   * 決まるものだから** — 音の道具 (presentation/scene/sense/audio.ts) は
+   * 「与えられた音を流す」だけにして、どれを流すかは場所が決める。
+   *
+   * 索敵の邪魔にならない程度に小さく流す。大きいと足音が埋もれる。
+   */
+  ambience: string
   /**
    * 練習の的を並べる場所。
    *
@@ -95,6 +125,8 @@ export interface StageSpec {
 const MALL: StageSpec = {
   name: 'mall',
   label: 'MALL',
+  // 屋内の街。人けの無いモールに残っている設備の音
+  ambience: 'city_loop1.mp3',
   /*
    * **噴水より外側**、棟のいちばん奥。
    *
@@ -146,6 +178,7 @@ const MALL: StageSpec = {
 const TRAINING: StageSpec = {
   name: 'training',
   label: 'TRAINING',
+  ambience: 'city_loop1.mp3',
   /*
    * **高台の上。** concrete_base_* は高さ 5.4m の塊で、その天面が基地になる。
    *
@@ -189,11 +222,17 @@ const TRAINING: StageSpec = {
 const GARDEN: StageSpec = {
   name: 'garden',
   label: 'GARDEN',
+  // **水に囲まれている。** 板の上だけが世界なので、外は波の音
+  ambience: 'wave_loop1.mp3',
   /*
    * **対角の角。** base がその印で、6m 角の台が手すりに囲まれている。
    *
    * 直線で 106m。狙撃銃の間合い (減衰なし) を丸ごと使う距離で、**出た瞬間に
    * 撃ち合いは始まらない** — 開けた中央へ出るかどうかから始まる。
+   *
+   * **湧くのは 1 階。** 角には 2 階の台が架かっていて、その天面は 12.9m ある。
+   * 高いほうへ湧かせると、始まった瞬間に見晴らしの良い足場に立つことになる。
+   * 頭上には 2.8m の余裕があり、1 階は台の下をくぐって続いている。
    *
    * **高さが 10m あるのは blend ごと持ち上げてあるから。** 水の底はコードが
    * 敷いている y=0 の地面で、そこは動かせない (投擲物の床でもある)。だから
@@ -204,7 +243,7 @@ const GARDEN: StageSpec = {
    */
   bases: {
     blue: { x: -37.5, z: -37.5, y: 10.12 },
-    red: { x: 37.3, z: 37.7, y: 10.12 },
+    red: { x: 37.3, z: 37.7, y: 10.17 },
   },
   /*
    * 水はアリーナ全体を覆う。**歩けるのは水に浮いている板の上だけ**で、
@@ -220,9 +259,9 @@ const GARDEN: StageSpec = {
     { x: -37.5, z: -37.5, y: 10.12 },
     { x: -38.5, z: -36.5, y: 10.12 },
     { x: -36.5, z: -38.5, y: 10.12 },
-    { x: 37.3, z: 37.7, y: 10.12 },
-    { x: 38.3, z: 36.7, y: 10.12 },
-    { x: 36.3, z: 38.7, y: 10.12 },
+    { x: 37.3, z: 37.7, y: 10.17 },
+    { x: 38.3, z: 36.7, y: 10.17 },
+    { x: 36.3, z: 38.7, y: 10.17 },
   ],
   // **的は置かない。** 練習は訓練場でやる
   targets: [],
@@ -271,7 +310,7 @@ export function isStageName(name: string): name is StageName {
  *     random  毎回引き直す。**同じ物が続くのは許す** — 避けると
  *             「次はこれではない」が読めて、それ自体が情報になる
  */
-export type RotationOrder = 'fixed' | 'cycle' | 'random'
+type RotationOrder = 'fixed' | 'cycle' | 'random'
 
 export interface Rotation {
   stages: StageName[]
@@ -287,8 +326,7 @@ export function only(stage: StageName): Rotation {
  * 次の試合のステージ。
  *
  * @param previous 前の試合のステージ。初回は null
- * @param roll     0..1 の一様乱数。**時計も乱数もここでは引かない** —
- *                 引くと同じ引数で答えが変わり、試験が書けなくなる
+ * @param roll     0..1 の一様乱数。引くと同じ引数で答えが変わり、試験が書けなくなるので時計も乱数もここでは引かない
  */
 export function nextStage(rotation: Rotation, previous: StageName | null, roll: number): StageName {
   const list = rotation.stages.length > 0 ? rotation.stages : (['mall'] as StageName[])

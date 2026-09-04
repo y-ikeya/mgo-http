@@ -36,8 +36,8 @@ export const MELEE_CONE_COS = Math.cos((60 * Math.PI) / 180)
  * 持ち替えが入るまでは正面 50 (2 回) にしてあった。銃を持ったまま一瞬で
  * 刺せる状態で即死にすると、代償が無いまま報酬だけが残る。
  */
-export const MELEE_BACK_DAMAGE = MAX_HEALTH
-export const MELEE_FRONT_DAMAGE = MAX_HEALTH
+const MELEE_BACK_DAMAGE = MAX_HEALTH
+const MELEE_FRONT_DAMAGE = MAX_HEALTH
 /**
  * 「背後から」と判定する内積の閾値。
  * 攻撃者と被害者が同じ向きを向いていれば背後を取っている。
@@ -142,7 +142,7 @@ export const FALL_SAFE_SPEED = 12
  * 死ぬのは筋が通る (12.6m で致死)。手榴弾が単体で殺さないのは、相手の一手で
  * 一方的に決まらないためであって、自傷には当てはまらない。
  */
-export const FALL_DAMAGE_PER_SPEED = 11
+const FALL_DAMAGE_PER_SPEED = 11
 
 /** その着地速度で受ける量。無傷なら 0 */
 export function fallDamage(impactSpeed: number): number {
@@ -251,7 +251,7 @@ export const HIT_RULES = {
  * 5m 飛ぶ人が並ぶ)。爆心から離れれば**そもそも転ばない** (item/grenade.ts の
  * KNOCK_NEAR) ので、そこで強弱は付いている。
  */
-export const KNOCK_DISTANCE = 3
+const KNOCK_DISTANCE = 3
 
 /**
  * 飛んでいる時間 (秒)。

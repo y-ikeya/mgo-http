@@ -151,6 +151,52 @@ export function canChoose(life: Life): boolean {
 }
 
 /**
+ * まだ自分の位置を知らせていないか。
+ *
+ * 席はあるが場所が分からない状態。位置が届いた時点で支度へ進める
+ * (server/relay.ts)。
+ */
+export function isJoining(life: Life): boolean {
+  return life === 'joining'
+}
+
+/**
+ * 湧いた直後の無敵の最中か。
+ *
+ * 人を持っているなら `isProtected(player)` (domain/player/player.ts) のほうが読みやすい。
+ * こちらは `Life` しか手元に無い側 (画面のレプリカ) のための形。
+ */
+export function isSpawning(life: Life): boolean {
+  return life === 'spawning'
+}
+
+/**
+ * 倒れているか。
+ *
+ * **`life === 'downed'` を外で書かせないための問い。** 倒れている間に何が
+ * 起きるかは場所ごとに違う (的は湧き直す / 死体の型を流す / キルカメラを許す)
+ * が、**倒れているかどうかの判断は 1 つ**。段階を足したときに読み直す場所を
+ * ここだけにする。
+ */
+export function isDowned(life: Life): boolean {
+  return life === 'downed'
+}
+
+/**
+ * 席を空けて待っている人か。
+ *
+ * 切れたが席は残してある状態。**待つ長さは RECONNECT_GRACE_MS** で、
+ * 過ぎたら席を畳む (server/index.ts)。
+ *
+ * `isSeated` と裏返しの値になるが、問いが違う — あちらは「送っても届くか」で、
+ * こちらは「戻ってくるのを待っている席か」。実装が同じでも、片方の意味が
+ * 変わったときに巻き添えにならないよう分けてある。
+ */
+export function isAwaitingReturn(life: Life): boolean {
+  return life === 'dropped'
+}
+
+/**
  * **送れる相手か。**
  *
  * 切れた人はもう聞いていないので、送っても意味が無い。戦場に居るか
@@ -158,6 +204,48 @@ export function canChoose(life: Life): boolean {
  */
 export function isSeated(life: Life): boolean {
   return life !== 'dropped'
+}
+
+/**
+ * 時計だけで進む遷移の結果。**やることは返り値で返す。**
+ *
+ * `setLife` は他の人へ配りもするし、`spawn` は装備を配り直す。どちらも
+ * 権威 (server) の仕事なので、ここは**何をすべきか**だけを言う。
+ * `application/replica` の `RosterEffect` と同じ形。
+ */
+type LifeEffect =
+  /** この状態へ移す */
+  | { kind: 'life'; to: Life }
+  /** 湧かせる。装備を配り直すので、状態を書き換えるだけでは足りない */
+  | { kind: 'spawn' }
+
+/**
+ * 時間だけで進む遷移。**何も起きなければ null。**
+ *
+ * 状態ごとに別の時計を持たない。「その状態に入ってから何秒経ったか」だけを見る。
+ * 以前は respawnAt と protectedUntil が別々にあり、置き忘れた場所 (途中参加)
+ * だけ無敵が付かなかった。
+ *
+ * ここに置くのは、**尺も遷移先も遊びの数字**だから (倒れて 5 秒・選ばず 30 秒・
+ * 湧いて 3 秒)。数字はここに在るのに if だけ server に在ると、規則の続きが
+ * 片方だけ外に出る。回すのは server の仕事 — 毎 tick 全員を見るのも、
+ * 返ってきたことを実際にやるのも。
+ *
+ * @param elapsed その状態に入ってから経った時間 (ms)
+ */
+export function advanceLife(life: Life, elapsed: number): LifeEffect | null {
+  switch (life) {
+    // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る
+    case 'downed':
+      return elapsed >= DOWN_DURATION * 1000 ? { kind: 'life', to: 'choosing' } : null
+    // 決めないまま放っておかれた。相手の試合を止めないために打ち切る
+    case 'choosing':
+      return elapsed >= CHOOSE_TIMEOUT * 1000 ? { kind: 'spawn' } : null
+    case 'spawning':
+      return elapsed >= SPAWN_PROTECT * 1000 ? { kind: 'life', to: 'alive' } : null
+    default:
+      return null
+  }
 }
 
 /**

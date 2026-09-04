@@ -95,7 +95,7 @@ function damp(current: number, target: number, lambda: number, dt: number): numb
 }
 
 /** 散布に効く体の状態。**意思ではなく、いまどうなっているか** */
-export interface Posture {
+interface Posture {
   /** 水平の速さ (m/s) */
   speed: number
   /** 姿勢が変わっている速さ。しゃがみ連打を只にしないために要る */
@@ -105,7 +105,7 @@ export interface Posture {
 }
 
 /** 円錐の中のどこへ散らすか。**幾何 (sim/space/aim.ts) へ渡す** */
-export interface Cone {
+interface Cone {
   /** 散布界の半角 (度) */
   degrees: number
   /** 円周のどこか (0..1) */

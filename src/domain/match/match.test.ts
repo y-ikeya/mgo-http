@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   assignTeam, isLeaking, leaderOf, leakingOf, loseTicket, newMatch, shuffleTeams, type Match,
 } from './match'
-import { newPlayer } from '../player/player'
+import { newMatchPlayer } from '../player/player'
 
 function room(mode: 'DM' | 'TDM'): Match {
   const match = newMatch(mode)
@@ -12,7 +12,7 @@ function room(mode: 'DM' | 'TDM'): Match {
 }
 
 function join(match: Match, id: string, kills = 0, team: 'blue' | 'red' = 'blue'): void {
-  const player = newPlayer({ id, name: id, team, slot: match.players.size, now: 0 })
+  const player = newMatchPlayer({ id, name: id, team, slot: match.players.size, now: 0 })
   player.kills = kills
   player.life = 'alive'
   match.players.set(id, player)

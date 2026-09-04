@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { MODES, ROOMS, ROOM_NAMES, isFriendly, isHostile, modeOf, primariesOf, secondaryOf } from './room'
 import { CHOICES } from '../item/weapons'
-import { newPlayer, type Player } from '../player/player'
+import { newMatchPlayer, type MatchPlayer } from '../player/player'
 
 /** 試験用の人。id と陣営だけあればよい */
-const who = (id: string, team: 'blue' | 'red'): Player =>
-  newPlayer({ id, name: id, team, slot: 0, now: 0 })
+const who = (id: string, team: 'blue' | 'red'): MatchPlayer =>
+  newMatchPlayer({ id, name: id, team, slot: 0, now: 0 })
 
 describe('誰が敵か', () => {
   const a = who('a', 'blue')

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { Spread } from '../item/spread'
 import { carrySpeedScale, WEAPONS } from '../item/weapons'
 import { THROW_SPEED, throwSpeedOf } from '../item/grenade'
-import { isLeakedTo, leakTag, newPlayer, refill, type Player } from './player'
+import { isLeakedTo, leakTag, newMatchPlayer, refill, type MatchPlayer } from './player'
 import { masteryRecoveryScale, masteryReloadScale, runnerScale, type Skills } from './skill'
 
 /**
@@ -224,8 +224,8 @@ describe('走る速さ (掛け算の形)', () => {
 })
 
 describe('ENEMY EXPOSURE の宛先', () => {
-  function player(id: string, team: 'blue' | 'red'): Player {
-    return newPlayer({ id, name: id, team, slot: 0, now: 0 })
+  function player(id: string, team: 'blue' | 'red'): MatchPlayer {
+    return newMatchPlayer({ id, name: id, team, slot: 0, now: 0 })
   }
 
   const now = 1_000_000
