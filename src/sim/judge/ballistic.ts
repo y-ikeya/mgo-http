@@ -17,7 +17,7 @@
  * 跳ねるたびに差が開いて別の場所へ落ちる。
  */
 
-import type { Water } from '../../domain/match/stage'
+import type { Water } from '../../domain/stage'
 import type { StageBox } from '../space/vision'
 import { segmentHitsBox } from '../space/vision'
 
@@ -140,9 +140,9 @@ export interface Projectile {
  * 大きさなら**入った瞬間にほぼ終端速度**まで落ちる。引き継ぐと、投げた強さで
  * 沈む速さが変わって「深い所ほど速い」ように見える。
  */
-const SINK_SPEED = 1.1
+export const SINK_SPEED = 1.1
 /** 水に入った瞬間、横向きの速さをどれだけ残すか */
-const WATER_DRAG = 0.12
+export const WATER_DRAG = 0.12
 
 /**
  * 1 刻み進める。

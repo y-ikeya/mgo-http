@@ -111,6 +111,26 @@ const SOUNDS = {
    */
   clink: { file: "step_metal1.mp3", reference: 3, max: 30, rate: 1.15 },
   /**
+   * 水に落ちた音。人や手榴弾が水面を割ったとき。
+   *
+   * **姿は水の下へ消えるので、音が唯一の報せになる。** 誰かが縁から落ちた
+   * ことも、投げた手榴弾が水に入った (もう爆風は届かない) ことも、これで分かる。
+   *
+   * 足音より遠くまで (32m)。落ちるのは大きな出来事なので。
+   */
+  splash: { file: "splash1.mp3", reference: 3, max: 32 },
+  /**
+   * 弾が金属に当たった音。
+   *
+   * **撃った側にも撃たれた側にも要る。** 外した弾がどこに当たったかは、
+   * 撃った本人には狙いの手掛かりで、近くに居る側には「その辺を撃たれている」
+   * という報せになる。
+   *
+   * 発砲音 (95m) より近くまでしか届かない。着弾は発砲より小さい音なので、
+   * 銃声の届く範囲すべてで着弾まで聞こえると、どこから撃たれたのか読めなくなる。
+   */
+  hitMetal: { file: "hit_metal1.mp3", reference: 3, max: 34 },
+  /**
    * 武器を地面へ置く / 拾う。
    *
    * **足音より少し遠くまで届く (20m)。** 近くで誰かが銃を捨てた・拾ったことは
@@ -153,6 +173,20 @@ const SOUNDS = {
    * 爆発だけは全員へ配っている (server の detonate) のと同じ理由。
    */
   explosion: { file: "explosion1.mp3", reference: 12, max: 160 },
+  /**
+   * 水の中で爆ぜた音。**こもって、遠くまで届かない。**
+   *
+   * 高い成分が水と水面で失われるので、低い所だけが残る (lowpass)。音そのものも
+   * 小さく、届く距離も半分以下にする — 水に落ちた手榴弾は**当たりどころが
+   * 悪かった**という結果なので、地上と同じ存在感で鳴ると強く聞こえすぎる。
+   */
+  explosionWater: {
+    file: "explosion1.mp3",
+    reference: 10,
+    max: 70,
+    rate: 0.82,
+    lowpass: 420,
+  },
   /**
    * クレイモアの起爆。
    *
@@ -256,9 +290,13 @@ const jitter = () => 1 + (Math.random() * 2 - 1) * PITCH_JITTER;
  * 小さくするのは索敵のため。この遊びは音で相手を探すので、環境音が大きいと
  * 足音が埋もれる。
  */
-const AMBIENCE_FILE = 'city_loop1.mp3';
 /*
- * 音源は 96kbps に落としてある (256kbps から 5.1MB → 1.8MB)。
+ * どの音を流すかは**ステージが決める** (domain/stage の ambience)。ここは
+ * 与えられた物を流すだけ — 屋内なら街の音、水に囲まれていれば波。
+ *
+ * 音源は 96kbps に落としてある (街は 256kbps から 5.1MB → 1.8MB、
+ * 波は 9 分 17MB → 2 分 1.4MB。前後は 2 秒かけて出入りさせて繋ぎ目を
+ * 目立たなくしてある)。
  *
  * **小さく流し続ける音**なので、音質の差は聞き取れない。読み込みの重さのほうが
  * 効く — 部屋に入った直後に落ちてくるものなので。
@@ -267,8 +305,10 @@ const AMBIENCE_VOLUME = 0.12;
 
 export class GameAudio {
   readonly listener = new THREE.AudioListener();
-  /** 街の音。読み込めたら鳴り続ける */
+  /** 環境音。読み込めたら鳴り続ける */
   private ambience: THREE.Audio | null = null;
+  /** どの音を流すか。ステージが決める (domain/stage の ambience) */
+  private ambienceFile = 'city_loop1.mp3';
 
   private readonly buffers = new Map<SoundName, AudioBuffer>();
   private readonly pool: THREE.PositionalAudio[] = [];
@@ -287,7 +327,8 @@ export class GameAudio {
   private readonly listenerPosition = new THREE.Vector3();
   private disposed = false;
 
-  constructor(camera: THREE.Camera, scene: THREE.Scene) {
+  constructor(camera: THREE.Camera, scene: THREE.Scene, ambience?: string) {
+    if (ambience) this.ambienceFile = ambience;
     // 聴取点はカメラ。三人称なので厳密にはキャラの耳ではないが、
     // プレイヤーが見ている場所と音の定位が一致するほうが分かりやすい。
     camera.add(this.listener);
@@ -356,9 +397,34 @@ export class GameAudio {
     sound.setVolume(volume);
     // 音ごとの基準の高さに、毎回のゆらぎを掛ける
     sound.setPlaybackRate(("rate" in profile ? profile.rate : 1) * jitter());
+    /*
+     * こもらせる音だけ低い所を残す。
+     *
+     * **枠は使い回すので、要らないときは必ず外す。** 付けっぱなしにすると、
+     * 次にその枠へ来た銃声までこもる。
+     */
+    if ("lowpass" in profile) {
+      sound.setFilter(this.lowpassFor(slot, profile.lowpass));
+    } else if (sound.getFilters().length > 0) {
+      sound.setFilters([]);
+    }
     sound.play();
 
     return this.audibility(position, profile.reference * range, profile.max * range) * volume;
+  }
+
+  /** 枠ごとの低域通過。作り直すと繋ぎ直しで音が途切れるので控えておく */
+  private readonly lowpass: (BiquadFilterNode | undefined)[] = [];
+
+  private lowpassFor(slot: number, hz: number): BiquadFilterNode {
+    let filter = this.lowpass[slot];
+    if (!filter) {
+      filter = this.listener.context.createBiquadFilter();
+      filter.type = "lowpass";
+      this.lowpass[slot] = filter;
+    }
+    filter.frequency.value = hz;
+    return filter;
   }
 
   /**
@@ -413,15 +479,15 @@ export class GameAudio {
   }
 
   /**
-   * 街の音を用意する。**失敗しても遊べる。**
+   * 環境音を用意する。**失敗しても遊べる。**
    *
-   * 3 分近い 5MB の音源なので、他の音とは別に読む。届く前に部屋へ入っても
+   * 1〜2 分の大きな音源なので、他の音とは別に読む。届く前に部屋へ入っても
    * 困らないよう、届いた時点で鳴らし始める。
    */
   private async loadAmbience(): Promise<void> {
     const loader = new THREE.AudioLoader();
     try {
-      const buffer = await loader.loadAsync(asset.audio(AMBIENCE_FILE));
+      const buffer = await loader.loadAsync(asset.audio(this.ambienceFile));
       if (this.disposed) return;
       const sound = new THREE.Audio(this.listener);
       sound.setBuffer(buffer);
@@ -430,7 +496,7 @@ export class GameAudio {
       this.ambience = sound;
       this.startAmbience();
     } catch (error) {
-      console.error(`[Audio] 街の音を読めなかった: ${AMBIENCE_FILE}`, error);
+      console.error(`[Audio] 環境音を読めなかった: ${this.ambienceFile}`, error);
     }
   }
 
