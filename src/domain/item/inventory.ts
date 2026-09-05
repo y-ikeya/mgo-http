@@ -480,8 +480,19 @@ export class Inventory {
   }
 
   /** 一覧を開いた時点の位置。いま手にある物に合わせる */
+  /**
+   * 一覧を開いた時点の位置。**その系統で選んでいる物に合わせる。**
+   *
+   * 手にある物で探してはいけない。**ダンボールを被っている間、手にあるのは
+   * 箱**で、武器の一覧には居ないので先頭へ落ちる — M9 を提げて箱を被った人が
+   * 武器の一覧を開くと AK47 を指していて、離すと AK47 に持ち替わっていた。
+   *
+   * 「抜けば構える銃」は箱を被っていても決まっている (weapon の getter)。
+   * 道具の側も同じで、銃を持っている間の道具の枠は覚えたまま (tool)。
+   */
   private startOf(family: Family): number {
-    const at = this.list(family).findIndex((item) => item.id === this.held)
+    const target = family === 'weapon' ? this.weapon : this.tool
+    const at = this.list(family).findIndex((item) => item.id === target)
     return at < 0 ? 0 : at
   }
 

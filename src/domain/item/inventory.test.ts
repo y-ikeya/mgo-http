@@ -446,6 +446,33 @@ describe('一覧を開く', () => {
     expect(inv.list('weapon')[at]?.id).toBe('rifle')
   })
 
+  /**
+   * **箱を被っていても、一覧は「抜けば構える銃」を指す。**
+   *
+   * 手にある物で探していた頃は、箱を被っている間だけ手が `box` になるので
+   * 武器の一覧から外れて先頭へ落ちていた。M9 を提げた人が箱を被って武器の
+   * 一覧を開くと AK47 を指していて、**離した瞬間に AK47 へ持ち替わる。**
+   * 送っていないのに持ち物が変わるので、押し間違えたようにしか見えない。
+   */
+  test('箱を被っていても、武器の一覧は提げている銃を指す', () => {
+    const inv = make()
+    inv.switchTo('m9')
+    settle(inv)
+    // 箱を被る (道具を短く押して離す)
+    hold(inv, 'tool', 0.01)
+    inv.hand(press(), FREE, 0.01)
+    settle(inv)
+    expect(inv.held).toBe('box')
+
+    hold(inv, 'weapon', BROWSE_HOLD)
+    expect(inv.list('weapon')[inv.browsing!.at]?.id).toBe('m9')
+
+    // 送らずに離せば、提げていた銃のまま (箱は脱ぐ)
+    inv.hand(press(), FREE, 0.016)
+    settle(inv)
+    expect(inv.held).toBe('m9')
+  })
+
   test('送って離すと、選んだ物へ移る', () => {
     const inv = make()
     hold(inv, 'weapon', BROWSE_HOLD)
