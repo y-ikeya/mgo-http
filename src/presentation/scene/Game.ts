@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { WebGPURenderer } from "three/webgpu";
+import { RenderPipeline, WebGPURenderer } from "three/webgpu";
+import { pass } from "three/tsl";
+import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
 import { Input } from "../../infra/input";
@@ -351,6 +353,15 @@ const SPLASH_SOUND_MIN = 1.2;
  * 伝わらない。落ちた速さで 0.6〜1.6 倍する (BODY_SPLASH の呼び出し)。
  */
 const BODY_SPLASH = 3.4;
+/**
+ * 発光の効き。**閃光と銃口炎だけが越える所に閾値を置く。**
+ *
+ * 下げると昼の空や水面まで滲んで眠い絵になる。強さを上げると暗い所での
+ * 索敵が効かなくなる (光る物が全部にじんで輪郭が溶ける)。
+ */
+const BLOOM_STRENGTH = 0.6;
+const BLOOM_RADIUS = 0.5;
+const BLOOM_THRESHOLD = 0.9;
 /** この速さで落ちたらしぶきが最大になる (m/s)。板の縁から落ちて 2 秒ぶん */
 const FALL_SPLASH_SPEED = 14;
 /** 水中で爆ぜたときの水柱。**投げ込んだときより大きい** */
@@ -479,6 +490,16 @@ export class Game {
   private shock: { seq: number; power: number } | null = null;
 
   private readonly renderer: WebGPURenderer;
+  /**
+   * 発光 (ブルーム)。**明るい所を周りへ滲ませる。**
+   *
+   * 閃光を「明るい色で描く」のと、それが眩しく見えるのは別。前者は
+   * blastfx.ts が既にやっている (toneMapped: false)。滲ませるのはここ。
+   *
+   * ?bloom=off で切れる。**重さを比べるため** — 全画面をもう 1 度通すので、
+   * 弱い機械では効きが出る (gpu.ts に 3〜13 回/秒 しか出ない例がある)。
+   */
+  private post: RenderPipeline | null = null;
   private readonly scene = new THREE.Scene();
   private readonly follow: FollowCamera;
   private readonly player = new Soldier();
@@ -1020,6 +1041,30 @@ export class Game {
     if (backend.isWebGLBackend) void this.reportWebGPUFallback();
 
     this.lastTime = performance.now();
+    /*
+     * 発光を挟む。**明るい所だけを拾って滲ませる** (threshold)。
+     *
+     * 閾値を下げると昼の空や水面まで光って眠い絵になるので、閃光と銃口炎が
+     * 越える所に置く。強さは控えめ — 強いと爆発以外も滲んで、暗い所での
+     * 索敵が効かなくなる。
+     */
+    if (new URLSearchParams(location.search).get("bloom") !== "off") {
+      /*
+       * 一度描いた絵を受け取って、滲みを足して戻す。**足す** (add) ので、
+       * 元の絵はそのまま残って上に光だけが乗る。
+       *
+       * RenderPipeline は PostProcessing の今の名前 (three r183 で改名)。
+       * 古い名前でも動くが、呼ぶたびに警告が出る。
+       *
+       * 画面を一度別の板へ描くことになるが、**縁のならし (antialias) は
+       * 消えない** — PassNode が renderer.samples をそのまま引き継ぐ。
+       */
+      const scenePass = pass(this.scene, this.follow.camera);
+      this.post = new RenderPipeline(this.renderer);
+      this.post.outputNode = scenePass.add(
+        bloom(scenePass, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD),
+      );
+    }
     this.renderer.setAnimationLoop((time) => this.tick(time));
     this.broadcast();
     this.snapshotHandle = setInterval(
@@ -1316,7 +1361,8 @@ export class Game {
       return false;
     });
 
-    this.renderer.render(this.scene, this.follow.camera);
+    if (this.post) this.post.render();
+    else this.renderer.render(this.scene, this.follow.camera);
     this.publishStats(dt);
     this.input.endFrame();
   }
