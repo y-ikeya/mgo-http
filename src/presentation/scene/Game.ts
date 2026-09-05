@@ -17,7 +17,7 @@ import {
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
-import { throwSpeedOf } from "../../domain/item/grenade";
+import { BLAST_RADIUS, throwSpeedOf } from "../../domain/item/grenade";
 import { pelletsOf } from "../../domain/item/weapons";
 import type { Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
@@ -379,6 +379,23 @@ const BODY_SPLASH = 3.4;
 const BLOOM_STRENGTH = 0.6;
 const BLOOM_RADIUS = 0.5;
 const BLOOM_THRESHOLD = 0.9;
+/**
+ * 爆風で目をやられる距離 (m)。**ここより遠いと何も起きない。**
+ *
+ * 傷が届くのは BLAST_RADIUS (7m) まで。その外でも近ければ効くが、**傷の
+ * 届く範囲の倍**で切る。爆心で最大、そこから真っ直ぐ薄くなる。
+ *
+ * 音の届く距離 (160m) とは桁が違ってよい。**聞こえることと、頭を殴られる
+ * ことは別。** 揃えていた頃は 100m 先の爆発で 4 割ぼやけていた。
+ */
+const SHOCK_RANGE = BLAST_RADIUS * 2;
+
+/** 爆心からの距離を、目のやられ具合 (0..1) に直す */
+function shockPower(distance: number): number {
+  if (distance >= SHOCK_RANGE) return 0;
+  return 1 - distance / SHOCK_RANGE;
+}
+
 /** この速さで落ちたらしぶきが最大になる (m/s)。板の縁から落ちて 2 秒ぶん */
 const FALL_SPLASH_SPEED = 14;
 /** 水中で爆ぜたときの水柱。**投げ込んだときより大きい** */
@@ -3532,16 +3549,18 @@ export class Game {
     const gain = this.audio.play(inWater ? "explosionWater" : "explosion", position, 1);
     this.addPing("shot", position, gain);
     /*
-     * 頭を殴られた感じを出す。**近さは音の強さをそのまま使う。**
+     * 頭を殴られた感じを出す。**近さは距離で測る。音の強さでは測らない。**
      *
-     * 遠いほど薄い、が音と同じ式で揃う。距離の閾値をもう 1 つ持つと、
-     * 「聞こえるのに効かない」「効くのに聞こえない」がどこかで出る。
+     * 音と同じ式で揃えていたが、爆発音は 160m まで届く (聞かせるための距離)。
+     * **100m 先で爆ぜても 4 割ぼやけていた** — 音は聞こえてよいが、頭は
+     * 殴られていない。聞こえることと衝撃を受けることは別。
      *
      * **カメラは動かさない。** このゲームは軸がそのまま弾道なので
      * (aimDirection が viewDir を返す)、揺らすと狙いまで動く。それ以前に、
      * 回すと画面が斜めに傾いて見えて、衝撃ではなく「傾いた」に読める。
      */
-    this.shock = { seq: this.shock ? this.shock.seq + 1 : 1, power: gain };
+    const near = shockPower(this.player.position.distanceTo(position));
+    if (near > 0) this.shock = { seq: this.shock ? this.shock.seq + 1 : 1, power: near };
     if (inWater) return;
     this.blast.explode(position);
   }
