@@ -253,6 +253,15 @@ const SOUNDS = {
    * 空撃ちしたら気付かれるということで、それは正しい。
    */
   empty: { file: "gun_empty1.mp3", reference: 1, max: 3.5 },
+  /**
+   * 持ち物の一覧が出た音。
+   *
+   * **手元だけ (3.5m)。** 一覧は自分の指の中の話で、周りに聞かせる物ではない。
+   * 遠くまで届かせると、押さえているだけで居場所が漏れる。
+   *
+   * 空撃ち (empty) と同じ届き方。あちらも本人にしか意味がない音。
+   */
+  browse: { file: "clang1.mp3", reference: 1, max: 3.5 },
 } as const;
 
 export type SoundName = keyof typeof SOUNDS;

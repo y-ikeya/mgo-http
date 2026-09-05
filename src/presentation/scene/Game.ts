@@ -3334,6 +3334,9 @@ export class Game {
           // ここでも鳴らすと自分だけ 2 回聞こえる
           break;
         }
+        case "opened":
+          this.audio.play("browse", this.player.position);
+          break;
         case "selected":
           break;
       }

@@ -416,6 +416,29 @@ describe('一覧を開く', () => {
     expect(inv.switching).toBe(false)
   })
 
+  /**
+   * **出た瞬間を 1 回だけ知らせる。**
+   *
+   * 押さえている間ずっと知らせると、鳴らす側が毎フレーム音を重ねる。開くのは
+   * 一度きりの出来事なので、出来事として 1 回出す。
+   */
+  test('出た瞬間だけ知らせる。押さえ続けても増えない', () => {
+    const inv = make()
+    expect(hold(inv, 'weapon', BROWSE_HOLD)).toContainEqual({ kind: 'opened' })
+    // 開いたまま押さえ続ける
+    expect(hold(inv, 'weapon', 0.016)).not.toContainEqual({ kind: 'opened' })
+  })
+
+  test('出る前は知らせない', () => {
+    const inv = make()
+    expect(hold(inv, 'weapon', BROWSE_HOLD / 2)).not.toContainEqual({ kind: 'opened' })
+  })
+
+  test('道具の一覧でも知らせる', () => {
+    const inv = make()
+    expect(hold(inv, 'tool', BROWSE_HOLD)).toContainEqual({ kind: 'opened' })
+  })
+
   test('一覧は手にある物を指して開く', () => {
     const inv = make()
     hold(inv, 'weapon', BROWSE_HOLD)

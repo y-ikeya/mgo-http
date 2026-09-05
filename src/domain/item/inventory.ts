@@ -73,6 +73,8 @@ type HandEvent =
   | { kind: 'dropped'; item: Carried }
   /** 一覧の中で選び直した。音を鳴らすのに使う */
   | { kind: 'selected' }
+  /** 一覧が出た。音を鳴らすのに使う */
+  | { kind: 'opened' }
 
 /**
  * 撃てるかを決めるのに要る、いまの体の状態。
@@ -450,6 +452,7 @@ export class Inventory {
         // 画面が騒がしくなる
         if (this.heldFor[family] >= BROWSE_HOLD && !this.browse) {
           this.browse = { family, at: this.startOf(family) }
+          events.push({ kind: 'opened' })
         }
         if (this.browse?.family === family && intent.select !== 0) {
           this.browse.at = this.moveBy(this.browse, -intent.select)
