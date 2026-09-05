@@ -254,6 +254,16 @@ export interface GameStats {
    * 数字を持たせても使い道が無い (domain/player/stamina.ts の staminaBlur)。
    */
   stamina: number;
+  /**
+   * 直近の爆風。**近くで爆ぜるたび、別物に差し替わる。**
+   *
+   * 続いている効き目 (stamina) と違って、これは起きた一瞬を知らせる合図。
+   * 0.1 秒ごとの stats に乗せるので、いつ届くかは揃わない — **濃さと長さは
+   * 受けた側 (Hud.css) が時間で決める。** ここが持つのは近さだけ。
+   *
+   * seq は毎回増える番号。**同じ場所で続けて爆ぜても新しい 1 発と分かる。**
+   */
+  shock: { seq: number; power: number } | null;
   /** 眠っているか。眠っている間は操作を受け付けない */
   asleep: boolean;
   /** 眠りの深さ。**1 が眠った瞬間、0 が起きた瞬間。** 画面の暗さがこれに従う */
@@ -460,6 +470,13 @@ export class Game {
    * 見えるのは自分の目盛りだけ。
    */
   private stamina = MAX_STAMINA;
+  /**
+   * 直近の爆風。**同じ物を送り続ける** — 新しく爆ぜたときだけ差し替える。
+   *
+   * 毎 tick 作り直すと、受けた Solid 側から見て「毎回新しい爆風」になって、
+   * 曇りが 0.1 秒ごとに掛け直される。
+   */
+  private shock: { seq: number; power: number } | null = null;
 
   private readonly renderer: WebGPURenderer;
   private readonly scene = new THREE.Scene();
@@ -3346,12 +3363,16 @@ export class Game {
     const gain = this.audio.play(inWater ? "explosionWater" : "explosion", position, 1);
     this.addPing("shot", position, gain);
     /*
-     * 画面を揺らす。**近さは音の強さをそのまま使う。**
+     * 頭を殴られた感じを出す。**近さは音の強さをそのまま使う。**
      *
-     * 遠いほど小さく揺れる、が音と同じ式で揃う。距離の閾値をもう 1 つ持つと、
-     * 「聞こえるのに揺れない」「揺れるのに聞こえない」がどこかで出る。
+     * 遠いほど薄い、が音と同じ式で揃う。距離の閾値をもう 1 つ持つと、
+     * 「聞こえるのに効かない」「効くのに聞こえない」がどこかで出る。
+     *
+     * **カメラは動かさない。** このゲームは軸がそのまま弾道なので
+     * (aimDirection が viewDir を返す)、揺らすと狙いまで動く。それ以前に、
+     * 回すと画面が斜めに傾いて見えて、衝撃ではなく「傾いた」に読める。
      */
-    this.follow.punch(gain);
+    this.shock = { seq: this.shock ? this.shock.seq + 1 : 1, power: gain };
     if (inWater) return;
     this.blast.explode(position);
   }
@@ -3748,6 +3769,7 @@ export class Game {
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
       stamina: staminaBlur(this.stamina),
+      shock: this.shock,
       asleep: this.player.sleeping,
       sleepDepth: this.player.sleepDepth,
       health: this.player.health,

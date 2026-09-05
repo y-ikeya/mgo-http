@@ -122,6 +122,35 @@ if (which === 'aiming') {
   }
   requestAnimationFrame(tick)
   render(() => <Hud stats={stats()} selfId="me" />, document.getElementById('root')!)
+} else if (which === 'shock') {
+  /*
+   * 爆風を受けた所。**近くで爆ぜるたび、画面がぼやけて戻る。**
+   *
+   *     http://localhost:5173/tools/preview/hud.html?case=shock
+   *
+   * 背後に細かい模様を敷く。**ぼかしは模様が無いと効いているか分からない** —
+   * 頁の下地は滑らかな階調なので、11px ぼかしても見た目が変わらない。
+   *
+   * 1.5 秒ごとに掛け直す。**続けて爆ぜても掛かり直す**かをここで見る。
+   */
+  const power = Number(new URLSearchParams(location.search).get('power') ?? '1')
+  const [stats, setStats] = createSignal<GameStats>({ ...base, shock: null } as GameStats)
+  let seq = 0
+  const blast = () => {
+    seq += 1
+    setStats((prev) => ({ ...prev, shock: { seq, power } }))
+  }
+  setInterval(blast, 1500)
+  blast()
+  render(
+    () => (
+      <>
+        <div class="preview-grain" />
+        <Hud stats={stats()} selfId="me" />
+      </>
+    ),
+    document.getElementById('root')!,
+  )
 } else {
   const stats = { ...base, ...cases[which] } as GameStats
   render(() => <Hud stats={stats} selfId="me" />, document.getElementById('root')!)
