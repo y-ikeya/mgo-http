@@ -30,6 +30,9 @@ const sandbox = new URLSearchParams(location.search).get('room') === 'delta'
 /** ?phase=ready で支度の画面を見る */
 const ready = new URLSearchParams(location.search).get('phase') === 'ready'
 
+/** ?locked で「READY を押したので触れない」姿を見る */
+const locked = new URLSearchParams(location.search).has('locked')
+
 /**
  * ?focus=support でパッドが指している枠を見る。
  *
@@ -69,7 +72,7 @@ function Harness() {
       phase={ready ? 'ready' : 'countdown'}
       players={roster()}
       selfId="me"
-      skillsOpen={ready}
+      skillsOpen={ready && !locked}
       focus={focus as never}
       onSkill={(id, level) => setSkills((s) => ({ ...s, [id]: level }))}
       onReady={(next) =>

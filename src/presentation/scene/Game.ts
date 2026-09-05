@@ -2026,6 +2026,20 @@ export class Game {
     return rows;
   }
 
+  /**
+   * いまスキルを組み替えてよいか。**画面もパッドも同じ答えを見る。**
+   *
+   * 画面のボタンだけ止めても、パッドの左右は別の道を通って setSkill へ
+   * 行き着く — **押せないはずの物が、指では押せる**という形で抜ける。
+   */
+  private get canChooseSkillsNow(): boolean {
+    return canChooseSkills(
+      this.replica.match?.phase ?? "waiting",
+      MODES[this.replica.mode],
+      this.selfReady,
+    );
+  }
+
   /** いま指している枠。窓が切り替わって番号が余ったら先頭へ戻す */
   private get loadoutFocus(): LoadoutFocus {
     const rows = this.loadoutRows;
@@ -2071,6 +2085,7 @@ export class Game {
      * 予算を超える段はサーバーが弾くので、こちらでは数えない
      * (setSkill のコメント)。
      */
+    if (!this.canChooseSkillsNow) return;
     const level = (this.skills[focus] ?? 0) + step;
     this.setSkill(focus, Math.max(0, Math.min(3, level)));
   }
@@ -3913,10 +3928,7 @@ export class Game {
       skills: this.skills,
       // 窓が開いているかは試合の段階で決まる。ドメインルールは domain が持つ
       loadoutFocus: this.loadoutFocus,
-      skillsOpen: canChooseSkills(
-        this.replica.match?.phase ?? "waiting",
-        MODES[this.replica.mode],
-      ),
+      skillsOpen: this.canChooseSkillsNow,
       scoped: this.scoped,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",

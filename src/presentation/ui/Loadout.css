@@ -98,6 +98,20 @@
   color: rgba(190, 206, 176, 0.42);
 }
 
+/*
+ * スキルを触れない理由。**枠名の下に小さく。**
+ *
+ * 灰色になった段だけが並んでいると、壊れたのか押してはいけないのかが
+ * 分からない。行き止まりではないので、戻り道も一緒に出す。
+ */
+.loadout-locked {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: rgba(190, 206, 176, 0.32);
+}
+
 .loadout-items {
   display: flex;
   gap: 10px;

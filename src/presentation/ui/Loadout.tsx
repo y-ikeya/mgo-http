@@ -297,6 +297,15 @@ export default function Loadout(props: {
               <div class="loadout-budget" classList={{ 'loadout-budget-full': spent() >= SKILL_BUDGET }}>
                 {spent()} / {SKILL_BUDGET}
               </div>
+              {/*
+                押せなくなった理由を出す。**灰色になった物だけ並んでいると、
+                壊れたのか押してはいけないのかが分からない。**
+
+                取り消せば直せるので、行き止まりではないことも一緒に言う。
+              */}
+              <Show when={!props.skillsOpen}>
+                <div class="loadout-locked">READY 中<br />取り消すと直せる</div>
+              </Show>
             </div>
             <div class="loadout-items">
               <SkillList
