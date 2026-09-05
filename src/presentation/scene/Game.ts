@@ -3439,7 +3439,8 @@ export class Game {
           break;
         }
         case "opened":
-          this.audio.play("browse", this.player.position);
+          // **画面の音。** 戦場では鳴っていないので位置を持たせない
+          this.audio.playUi("browse");
           break;
         case "selected":
           break;

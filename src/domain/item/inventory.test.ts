@@ -84,13 +84,33 @@ describe('押すだけのトグル', () => {
     expect(inv.held).toBe('grenade')
   })
 
-  test('系統が違えば、その系統の先頭へ行く', () => {
+  /**
+   * **箱を被っている間、武器のボタンでは脱げない。**
+   *
+   * 押した人は「抜く」と言っていない。隠れている最中に勝手に姿が出ると、
+   * 見つかったかどうかの読みごと崩れる。**押した物と起きることを系統ごとに
+   * 揃える** — 武器のボタンは武器の枠、道具のボタンは道具の枠。
+   */
+  test('箱を被ったまま武器を選んでも、脱がない', () => {
     const inv = make()
     inv.toggle('tool'); settle(inv)
     expect(inv.held).toBe('box')
-    // 戻るときは武器系の直前ではなく先頭 (箱から見た「直前」は武器系なので戻れる)
+
     inv.toggle('weapon'); settle(inv)
-    expect(inv.held).toBe('rifle')
+    // 手は箱のまま。動いたのは**抜けば構える銃**のほう
+    expect(inv.held).toBe('box')
+    expect(inv.weapon).toBe('m9')
+  })
+
+  test('脱ぐのは道具のボタン。**手には選んだ銃が来る**', () => {
+    const inv = make()
+    inv.toggle('tool'); settle(inv)
+    inv.toggle('weapon'); settle(inv)
+    expect(inv.weapon).toBe('m9')
+
+    // 箱 → NONE。**道具を降ろすと、選んでおいた銃が手に来る**
+    inv.toggle('tool'); settle(inv)
+    expect(inv.held).toBe('m9')
   })
 })
 
@@ -352,14 +372,17 @@ describe('箱を挟んだ持ち替え', () => {
     inv.toggle('weapon'); settle(inv)
     expect(inv.held).toBe('m9')
 
-    // ダンボールを被って、また武器へ戻る
+    // ダンボールを被る。**被っている間も武器のボタンは武器の枠を動かす**
     inv.toggle('tool'); settle(inv)
     expect(inv.held).toBe('box')
-    inv.toggle('weapon'); settle(inv)
-    expect(inv.held).toBe('m9')
 
-    // **ここが P90 に戻ってほしい所** (直前の武器)
+    // **ここが P90 に戻ってほしい所** (直前の武器)。
+    // 手で見ると箱なので、往復の起点は weapon で見ないと一覧を送ってしまう
     inv.toggle('weapon'); settle(inv)
+    expect(inv.weapon).toBe('smg')
+
+    // 脱げば、その銃が手に来る
+    inv.toggle('tool'); settle(inv)
     expect(inv.held).toBe('smg')
   })
 
@@ -467,10 +490,37 @@ describe('一覧を開く', () => {
     hold(inv, 'weapon', BROWSE_HOLD)
     expect(inv.list('weapon')[inv.browsing!.at]?.id).toBe('m9')
 
-    // 送らずに離せば、提げていた銃のまま (箱は脱ぐ)
+    // 送らずに離しても、**箱は脱がない**。動くのは武器の枠だけ
     inv.hand(press(), FREE, 0.016)
     settle(inv)
-    expect(inv.held).toBe('m9')
+    expect(inv.held).toBe('box')
+    expect(inv.weapon).toBe('m9')
+  })
+
+  /**
+   * **箱を被ったまま一覧で選び直せる。脱がない。**
+   *
+   * 隠れている最中に「抜いたら何を構えるか」を決めておけるのが値打ちで、
+   * 選んだ瞬間に姿が出るなら、隠れながら決める意味が無い。
+   */
+  test('箱を被ったまま一覧で選び直しても、脱がない', () => {
+    const inv = make()
+    hold(inv, 'tool', 0.01)
+    inv.hand(press(), FREE, 0.01)
+    settle(inv)
+    expect(inv.held).toBe('box')
+
+    hold(inv, 'weapon', BROWSE_HOLD)
+    hold(inv, 'weapon', 0.016, { select: 1 })
+    const picked = inv.list('weapon')[inv.browsing!.at]!.id
+    inv.hand(press(), FREE, 0.016)
+    settle(inv)
+
+    expect(inv.held).toBe('box')
+    expect(inv.weapon).toBe(picked)
+    // 脱げば、選んでおいた物が手に来る
+    inv.toggle('tool'); settle(inv)
+    expect(inv.held).toBe(picked)
   })
 
   test('送って離すと、選んだ物へ移る', () => {
