@@ -105,6 +105,18 @@ export interface CameraWorld {
   distanceToObstruction(origin: THREE.Vector3, dir: THREE.Vector3, maxDistance: number): number
 }
 
+/**
+ * 衝撃で画面が揺れる長さ (秒) と、一番強いときの振れ幅 (rad)。
+ *
+ * **短く、浅く。** 長いと酔うし、深いと狙いが動いたように錯覚する
+ * (実際には動いていない)。0.05 rad = 約 2.9°。
+ */
+const SHAKE_TIME = 0.35
+const SHAKE_MAX = 0.05
+/** 揺れの速さ。2 つ重ねて規則正しさを消す */
+const SHAKE_FAST = 42
+const SHAKE_SLOW = 17
+
 /** マウス感度 (rad / px) */
 const SENSITIVITY = 0.0022
 
@@ -223,6 +235,11 @@ export class FollowCamera {
   /** 注視点 = 弾道の始点。カメラの視線軸上にあるのでクロスヘアと一致する */
   private readonly pivot = new THREE.Vector3()
   private readonly viewDir = new THREE.Vector3()
+  /** 揺れを乗せた向き。euler は狙いのままにしておく */
+  private readonly shaken = new THREE.Euler()
+  private shakeLeft = 0
+  private shakeAmount = 0
+  private shakeAge = 0
   private readonly desired = new THREE.Vector3()
   /** 視線の逆方向 (カメラが引く向き)。遮蔽の判定に使う */
   private readonly back = new THREE.Vector3()
@@ -376,6 +393,20 @@ export class FollowCamera {
     this.camera.rotation.copy(this.euler)
   }
 
+  /**
+   * 衝撃で画面を揺らす。**狙いは動かない。**
+   *
+   * @param strength 0..1。爆発なら「実際に聞こえた強さ」をそのまま渡せる
+   *   (audio.play の返り値)。遠いほど小さく揺れる、が音と同じ式で揃う。
+   */
+  punch(strength: number): void {
+    const amount = Math.min(1, Math.max(0, strength)) * SHAKE_MAX
+    // 弱い揺れで強い揺れを上書きしない。近い爆発の途中で遠いのが鳴っても消えない
+    if (amount <= this.shakeAmount * (this.shakeLeft / SHAKE_TIME)) return
+    this.shakeAmount = amount
+    this.shakeLeft = SHAKE_TIME
+  }
+
   update(dt: number, player: Soldier, world?: CameraWorld): void {
     // 撃っている間は溜まり、止めてから戻る
     this.recoilAge += dt
@@ -406,6 +437,34 @@ export class FollowCamera {
       damp(p.y, this.desired.y, POSITION_LAMBDA, dt),
       damp(p.z, this.desired.z, POSITION_LAMBDA, dt),
     )
+    /*
+     * 揺れは**カメラだけ**に乗せる。
+     *
+     * viewDir はこの手前で euler から出ているので (computeDesired)、ここへ
+     * 足しても弾道は動かない。**衝撃で狙いまで狂わせない** — 反動 (recoilPitch)
+     * は狙いごと動かす別の仕掛けで、あちらは撃った本人の代償として意図している。
+     */
+    this.shakeLeft = Math.max(0, this.shakeLeft - dt)
+    if (this.shakeLeft > 0) {
+      // 残り時間の 2 乗で減らす。**終わり際にすっと消える** — 線形だと
+      // 止まる瞬間が見えて、揺れが「切れた」ように見える
+      const fade = (this.shakeLeft / SHAKE_TIME) ** 2
+      const amount = this.shakeAmount * fade
+      this.shakeAge += dt
+      // 2 つの速さを重ねる。1 つだけだと規則正しく揺れて機械に見える
+      const pitch =
+        Math.sin(this.shakeAge * SHAKE_FAST) * 0.6 + Math.sin(this.shakeAge * SHAKE_SLOW) * 0.4
+      const yaw =
+        Math.cos(this.shakeAge * SHAKE_FAST * 1.3) * 0.6 +
+        Math.cos(this.shakeAge * SHAKE_SLOW * 0.7) * 0.4
+      this.shaken.set(
+        this.euler.x + pitch * amount,
+        this.euler.y + yaw * amount,
+        this.euler.z + yaw * amount * 0.5,
+      )
+      this.camera.rotation.copy(this.shaken)
+      return
+    }
     this.camera.rotation.copy(this.euler)
   }
 

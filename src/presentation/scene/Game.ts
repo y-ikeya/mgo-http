@@ -3345,6 +3345,13 @@ export class Game {
     // 水の中はこもって小さい。届く距離も半分以下 (audio.ts の explosionWater)
     const gain = this.audio.play(inWater ? "explosionWater" : "explosion", position, 1);
     this.addPing("shot", position, gain);
+    /*
+     * 画面を揺らす。**近さは音の強さをそのまま使う。**
+     *
+     * 遠いほど小さく揺れる、が音と同じ式で揃う。距離の閾値をもう 1 つ持つと、
+     * 「聞こえるのに揺れない」「揺れるのに聞こえない」がどこかで出る。
+     */
+    this.follow.punch(gain);
     if (inWater) return;
     this.blast.explode(position);
   }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { zoomLookScale } from './camera'
+import * as THREE from 'three'
+import { FollowCamera, zoomLookScale } from './camera'
 
 /**
  * 覗いている間の見る速さ。
@@ -38,5 +39,83 @@ describe('覗いたときの見る速さ', () => {
   test('16 倍では肩越しの 1/10 まで落ちる', () => {
     // tan(2°) / tan(19°) = 0.1014
     expect(zoomLookScale(4)).toBeCloseTo(0.101, 3)
+  })
+})
+
+/**
+ * 衝撃で画面を揺らす。
+ *
+ * --- なぜ試すか ---
+ * このゲームは**カメラの軸がそのまま弾道**なので、素直に揺らすと狙いまで動く。
+ * 反動 (recoilPitch) は狙いごと動かす別の仕掛けで、あちらは撃った本人の代償と
+ * して意図している。**爆風で狙いが狂うのは意図していない。**
+ *
+ * 揺れはカメラの向きにだけ乗せて、`aimDirection` は動かさない。
+ */
+describe('衝撃で揺れる', () => {
+  function rig(): { camera: FollowCamera; player: unknown } {
+    const camera = new FollowCamera(1)
+    // 追従の相手。位置と頭の高さだけ見ている
+    const player = {
+      position: new THREE.Vector3(0, 0, 0),
+      viewHeight: 1.5,
+      speed: 0,
+      stanceRate: 0,
+      crouching: false,
+    }
+    return { camera, player }
+  }
+
+  test('**揺れても弾道は動かない**', () => {
+    const { camera, player } = rig()
+    camera.update(1 / 60, player as never)
+    const before = camera.aimDirection(new THREE.Vector3()).clone()
+    const beforeYaw = camera.aimYaw
+    const beforePitch = camera.aimPitch
+
+    camera.punch(1)
+    camera.update(1 / 60, player as never)
+
+    expect(camera.aimDirection(new THREE.Vector3()).distanceTo(before)).toBeCloseTo(0, 6)
+    expect(camera.aimYaw).toBeCloseTo(beforeYaw, 6)
+    expect(camera.aimPitch).toBeCloseTo(beforePitch, 6)
+  })
+
+  test('カメラの向きは実際に動く', () => {
+    const { camera, player } = rig()
+    camera.update(1 / 60, player as never)
+    const still = camera.camera.rotation.clone()
+
+    camera.punch(1)
+    camera.update(1 / 60, player as never)
+    const shaken = camera.camera.rotation.clone()
+
+    expect(Math.abs(shaken.x - still.x) + Math.abs(shaken.y - still.y)).toBeGreaterThan(0.001)
+  })
+
+  test('**遠いほど小さい。** 近さは呼ぶ側が渡す', () => {
+    const near = rig()
+    const far = rig()
+    near.camera.update(1 / 60, near.player as never)
+    far.camera.update(1 / 60, far.player as never)
+    const base = near.camera.camera.rotation.x
+
+    near.camera.punch(1)
+    far.camera.punch(0.2)
+    near.camera.update(1 / 60, near.player as never)
+    far.camera.update(1 / 60, far.player as never)
+
+    expect(Math.abs(near.camera.camera.rotation.x - base)).toBeGreaterThan(
+      Math.abs(far.camera.camera.rotation.x - base),
+    )
+  })
+
+  test('やがて収まる', () => {
+    const { camera, player } = rig()
+    camera.update(1 / 60, player as never)
+    const still = camera.camera.rotation.x
+    camera.punch(1)
+    for (let i = 0; i < 60; i++) camera.update(1 / 60, player as never)
+    expect(camera.camera.rotation.x).toBeCloseTo(still, 5)
   })
 })
