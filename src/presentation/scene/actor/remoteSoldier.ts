@@ -261,8 +261,8 @@ export class RemoteSoldier {
   }
 
   /** サーバーから「もう見えない」と届いた。次の位置が来るまで隠す */
-  hide(): void {
-    this.presence.hide();
+  hide(now: number): void {
+    this.presence.hide(now);
   }
 
   /** この相手を何秒過去で描くか (ms) */
@@ -1025,9 +1025,14 @@ export class RemoteSoldiers {
     return out.sort((a, b) => a.rate - b.rate);
   }
 
-  /** サーバーが「もう見えない」と言ってきた。位置が止まるのを待たずに消す */
-  hide(id: string): void {
-    this.players.get(id)?.hide();
+  /**
+   * サーバーが「もう見えない」と言ってきた。
+   *
+   * **消えるのは、描いている時刻がその瞬間に追いついてから** (presence.ts の
+   * hide)。今すぐ消すと、物陰に入る前に居なくなったように見える。
+   */
+  hide(id: string, now: number): void {
+    this.players.get(id)?.hide(now);
   }
 
   /** 退出。サーバーが配る leave で消える */

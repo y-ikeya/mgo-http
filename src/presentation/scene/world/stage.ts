@@ -4,14 +4,17 @@ import { flagsOf } from '../../../domain/stage'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
   clamp,
+  color,
   dot,
   float,
   floor,
+  fog,
   fract,
   max,
   mix,
   normalize,
   positionLocal,
+  positionView,
   positionWorld,
   cameraPosition,
   pow,
@@ -884,11 +887,36 @@ function createGlassMaterial(): THREE.MeshStandardMaterial {
  * glb の読み込みは非同期なので、先にブロックアウトを出しておいて、
  * 届いた時点で差し替える。Game 側は Stage の配列を都度読むので入れ替えが効く。
  */
+/**
+ * 霧の始まりと終わり (m)。
+ *
+ * 近すぎると中距離の遮蔽物まで白んで、索敵の判断材料が減る。
+ */
+const FOG_NEAR = 55
+const FOG_FAR = 135
+
 export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   scene.add(buildSky())
   // フォグは空の地平線側と同じ色にする。違うと遠景が地平線で不自然に切れる。
   // 開始距離を遠くしてあるのは、近すぎると中距離の遮蔽物まで白んで索敵の判断材料が減るため。
-  scene.fog = new THREE.Fog(new THREE.Color(SKY_HORIZON), 55, 135)
+  scene.fog = new THREE.Fog(new THREE.Color(SKY_HORIZON), FOG_NEAR, FOG_FAR)
+  /*
+   * 濃さを**カメラからの本当の距離**で測り直す。
+   *
+   * three の既定は視線方向の深さ (positionView.z) で数える。画面の端に映る
+   * 物は斜めに遠いので、**同じ深さでも本当の距離は長い** — なのに霧が薄い。
+   *
+   * 索敵に直に効いた。**画面の端に相手の陣地が映るように向くと、霧が晴れて
+   * 遠くの様子が読める。** 正面に捉えると白む。向きを変えるだけで見える物が
+   * 変わるので、覗き方の技になってしまっていた。
+   *
+   * 長さ (positionView.length) で数えれば、画面のどこに映っていても
+   * 同じ距離なら同じ濃さになる。
+   */
+  scene.fogNode = fog(
+    color(SKY_HORIZON),
+    smoothstep(float(FOG_NEAR), float(FOG_FAR), positionView.length()),
+  )
 
   const collidables: THREE.Object3D[] = []
   const cameraBlockers: THREE.Object3D[] = []
