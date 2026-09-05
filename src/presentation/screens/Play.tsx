@@ -121,6 +121,8 @@ export default function Play(props: { identity: Identity }) {
           onReady={(next) => game()?.setReady(next)}
           skillsOpen={stats()?.skillsOpen ?? false}
           onSkill={(id, level) => game()?.setSkill(id, level)}
+          // パッド / 矢印キーで指している枠。マウスと数字キーでは動かない
+          focus={stats()?.loadoutFocus ?? 'primary'}
         />
       </Show>
 

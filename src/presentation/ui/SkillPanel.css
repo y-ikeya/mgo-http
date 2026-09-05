@@ -24,6 +24,17 @@
   color: rgba(206, 232, 190, 0.92);
 }
 
+/*
+ * パッドと矢印キーで指している技。**縁を明るくするだけ。**
+ *
+ * 取っている物 (skill-on) は面で塗ってあるので、指している印は塗らない —
+ * 塗り分けを 2 つ重ねると、取っているのか指しているのかが読めない。
+ */
+.skill-focus {
+  border-color: rgba(206, 232, 190, 0.75);
+  box-shadow: inset 3px 0 0 rgba(150, 214, 132, 0.65);
+}
+
 .skill-name {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 11.5px;

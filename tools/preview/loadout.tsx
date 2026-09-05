@@ -30,6 +30,14 @@ const sandbox = new URLSearchParams(location.search).get('room') === 'delta'
 /** ?phase=ready で支度の画面を見る */
 const ready = new URLSearchParams(location.search).get('phase') === 'ready'
 
+/**
+ * ?focus=support でパッドが指している枠を見る。
+ *
+ * 本物は上下で動くが、ここは**指されている姿が読めるか**を見るための頁なので
+ * 動かさない。渡せるのは枠の名前 (primary / secondary / support / スキルの id)。
+ */
+const focus = new URLSearchParams(location.search).get('focus') ?? 'primary'
+
 const ROSTER = [
   { id: 'me', name: 'pepa1404', team: 'blue' as const, kills: 0, deaths: 0, suicides: 0, stuns: 0, ready: false },
   { id: 'b', name: 'kometh27', team: 'blue' as const, kills: 0, deaths: 0, suicides: 0, stuns: 0, ready: true },
@@ -62,6 +70,7 @@ function Harness() {
       players={roster()}
       selfId="me"
       skillsOpen={ready}
+      focus={focus as never}
       onSkill={(id, level) => setSkills((s) => ({ ...s, [id]: level }))}
       onReady={(next) =>
         setRoster((rows) => rows.map((r) => (r.id === 'me' ? { ...r, ready: next } : r)))

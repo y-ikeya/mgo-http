@@ -1,4 +1,5 @@
 import { For, Show } from 'solid-js'
+import type { LoadoutFocus } from '../scene/Game'
 import { t } from '../../i18n'
 import {
   CHOICES,
@@ -72,6 +73,14 @@ export default function Loadout(props: {
    */
   skillsOpen: boolean
   onSkill: (id: SkillId, level: number) => void
+  /**
+   * パッドと矢印キーで指している枠。**印を出すだけ。**
+   *
+   * どこを指しているかを数えるのは scene 側 (Game.ts の loadoutAt)。ここは
+   * 受け取った名前と自分の枠を見比べる — **番号で受け取ると、副武器の無い
+   * 部屋で片方だけ詰め忘れて 1 つずれる。**
+   */
+  focus: LoadoutFocus
 }) {
   /** 支度の段階か。**押し合う場所になるのはここだけ** */
   const preparing = () => props.phase === 'ready'
@@ -103,6 +112,7 @@ export default function Loadout(props: {
   const rows = [
     {
       key: 'PRIMARY',
+      focus: 'primary' as const,
       ids: () => props.primaries,
       // null なら一覧も空なので、どの札にも印は付かない
       current: (): WeaponId | null => props.primary,
@@ -110,6 +120,7 @@ export default function Loadout(props: {
     },
     {
       key: 'SECONDARY',
+      focus: 'secondary' as const,
       ids: () => (props.secondary === null ? [] : CHOICES.secondary),
       current: (): WeaponId | null => props.secondary ?? 'm9',
       pick: (id: WeaponId) => props.onSecondary(id),
@@ -187,7 +198,7 @@ export default function Loadout(props: {
         <Show when={!preparing()}>
         <For each={rows}>
           {(row) => (
-            <div class="loadout-row">
+            <div class="loadout-row" classList={{ 'loadout-row-focus': props.focus === row.focus }}>
               <div class="loadout-slot">{row.key}</div>
               <div class="loadout-items">
                 <For each={row.ids()}>
@@ -232,7 +243,7 @@ export default function Loadout(props: {
         </For>
 
         {/* 投擲。**どちらか一方**しか持てない */}
-        <div class="loadout-row">
+        <div class="loadout-row" classList={{ 'loadout-row-focus': props.focus === 'support' }}>
           <div class="loadout-slot">SUPPORT</div>
           <div class="loadout-items">
             <For each={SUPPORTS}>
@@ -288,7 +299,12 @@ export default function Loadout(props: {
               </div>
             </div>
             <div class="loadout-items">
-              <SkillList skills={props.skills} open={props.skillsOpen} onSkill={props.onSkill} />
+              <SkillList
+                skills={props.skills}
+                open={props.skillsOpen}
+                onSkill={props.onSkill}
+                focus={props.focus}
+              />
             </div>
           </div>
         </Show>
@@ -305,7 +321,7 @@ export default function Loadout(props: {
           fallback={
             <button class="loadout-ok" disabled={props.wait > 0} onClick={props.onSpawn}>
               {props.wait > 0 ? t('loadout.deployIn', { n: props.wait }) : 'OK'}
-              <span class="loadout-key loadout-key-wide">Enter</span>
+              <span class="loadout-key loadout-key-wide">Enter / ×</span>
             </button>
           }
         >
@@ -325,7 +341,7 @@ export default function Loadout(props: {
             onClick={() => props.onReady(!mine()?.ready)}
           >
             {mine()?.ready ? 'READY を取り消す' : 'READY'}
-            <span class="loadout-key loadout-key-wide">Enter</span>
+            <span class="loadout-key loadout-key-wide">Enter / ×</span>
           </button>
         </Show>
       </div>

@@ -70,6 +70,24 @@
   border-bottom: 1px solid rgba(160, 190, 140, 0.08);
 }
 
+/*
+ * パッドと矢印キーで指している枠。**左に線を立てる。**
+ *
+ * 選んでいる物 (loadout-item-on) と同じ緑で塗ると、指しているだけの枠が
+ * 選んだ物に見える。**指すのと選ぶのは別**なので、色ではなく位置で示す —
+ * 行の外側に線を置けば、中の札とは重ならない。
+ *
+ * 枠名も一緒に明るくする。線だけだと、行が長いので端まで目が届かない。
+ */
+.loadout-row-focus {
+  box-shadow: inset 3px 0 0 rgba(150, 214, 132, 0.65);
+  background: rgba(150, 214, 132, 0.04);
+}
+
+.loadout-row-focus .loadout-slot {
+  color: rgba(206, 232, 190, 0.92);
+}
+
 .loadout-slot {
   width: 96px;
   flex: none;

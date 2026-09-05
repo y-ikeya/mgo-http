@@ -21,6 +21,12 @@ export function SkillList(props: {
   /** 組み替えてよいか。false なら見るだけ */
   open: boolean
   onSkill: (id: SkillId, level: number) => void
+  /**
+   * パッドと矢印キーで指している技。**装備画面だけが渡す。**
+   *
+   * 対戦表は読むだけの場所なので渡さない (印を出しても押せない)。
+   */
+  focus?: string
 }) {
   const skillList = Object.values(SKILLS)
   const spent = () => costOf(props.skills)
@@ -30,7 +36,10 @@ export function SkillList(props: {
       {(spec) => {
         const level = () => props.skills[spec.id] ?? 0
         return (
-          <div class="skill" classList={{ 'skill-on': level() > 0 }}>
+          <div
+            class="skill"
+            classList={{ 'skill-on': level() > 0, 'skill-focus': props.focus === spec.id }}
+          >
             <span class="skill-name">{spec.label}</span>
             <div class="skill-levels">
               <For each={[1, 2, 3] as const}>
