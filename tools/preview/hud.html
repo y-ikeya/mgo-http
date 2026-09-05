@@ -3,6 +3,9 @@
   html,body{margin:0;height:100%;background:#5b6b78;
     background-image:linear-gradient(120deg,#8fa2ad 0%,#3d4a55 55%,#1c2228 100%);}
   #root{position:fixed;inset:0}
+  /* ぼかしを見るための細かい模様。滑らかな階調の上では効きが見えない */
+  .preview-grain{position:fixed;inset:0;
+    background-image:repeating-linear-gradient(45deg,#cfd8de 0 6px,#2b333b 6px 12px)}
 </style>
 <div id="root"></div>
 <script type="module" src="./hud.tsx"></script>

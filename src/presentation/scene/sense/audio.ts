@@ -253,6 +253,7 @@ const SOUNDS = {
    * 空撃ちしたら気付かれるということで、それは正しい。
    */
   empty: { file: "gun_empty1.mp3", reference: 1, max: 3.5 },
+
 } as const;
 
 export type SoundName = keyof typeof SOUNDS;
@@ -303,6 +304,30 @@ const jitter = () => 1 + (Math.random() * 2 - 1) * PITCH_JITTER;
  */
 const AMBIENCE_VOLUME = 0.12;
 
+/**
+ * 画面の音。**戦場では鳴っていない。**
+ *
+ * 上の表 (SOUNDS) は世界のどこかで起きた出来事で、**どこで鳴ったかに意味が
+ * ある** — 距離で減り、遮蔽で曇り、レーダーにも映る。こちらは自分が押した
+ * ことへの返事なので、鳴っている場所が無い。**何 m 離れているかを問うこと
+ * 自体が意味を持たない。**
+ *
+ * 位置を持たせると、肩越し (4.2m) と覗いている間 (1.35m) で大きさが変わる。
+ * 押した手応えが**カメラの寄り引きで変わる**のはおかしい。届く距離を 3.5m に
+ * していた頃は、肩越しでは減衰が 0 になって**完全に無音**だった。
+ *
+ * 環境音と同じ THREE.Audio (位置を持たない) で鳴らす。
+ */
+const UI_SOUNDS = {
+  /** 持ち物の一覧が出た。**押さえ続けて出るので、出た瞬間が要る** */
+  browse: { file: "clang1.mp3", volume: 0.55 },
+} as const;
+
+export type UiSoundName = keyof typeof UI_SOUNDS;
+
+/** 画面の音の枠。重ねて鳴ることは無いが、連続で開くので 2 つ持つ */
+const UI_POOL_SIZE = 2;
+
 export class GameAudio {
   readonly listener = new THREE.AudioListener();
   /** 環境音。読み込めたら鳴り続ける */
@@ -311,6 +336,10 @@ export class GameAudio {
   private ambienceFile = 'city_loop1.mp3';
 
   private readonly buffers = new Map<SoundName, AudioBuffer>();
+  /** 画面の音。世界の音とは別の棚に置く — 同じ名前が両方に居てよい */
+  private readonly uiBuffers = new Map<UiSoundName, AudioBuffer>();
+  private readonly uiPool: THREE.Audio[] = [];
+  private uiNext = 0;
   private readonly pool: THREE.PositionalAudio[] = [];
   private readonly anchors: THREE.Object3D[] = [];
   private next = 0;
@@ -345,6 +374,11 @@ export class GameAudio {
       this.anchors.push(anchor);
     }
 
+    // 画面の音。**位置を持たないので anchor も scene も要らない**
+    for (let i = 0; i < UI_POOL_SIZE; i++) {
+      this.uiPool.push(new THREE.Audio(this.listener));
+    }
+
     void this.load();
   }
 
@@ -365,6 +399,24 @@ export class GameAudio {
     const sound = this.ambience;
     if (!sound || sound.isPlaying || this.disposed) return;
     if (this.listener.context.state === "suspended") return;
+    sound.play();
+  }
+
+  /**
+   * 画面の音を 1 回鳴らす。**位置を持たない。**
+   *
+   * どこに立っていても、どこを向いていても同じ大きさ。返す物も無い —
+   * レーダーに映る音ではないので、聞こえた強さを問う相手が居ない。
+   */
+  playUi(name: UiSoundName): void {
+    const buffer = this.uiBuffers.get(name);
+    if (!buffer) return;
+    const sound = this.uiPool[this.uiNext];
+    this.uiNext = (this.uiNext + 1) % UI_POOL_SIZE;
+    if (!sound) return;
+    if (sound.isPlaying) sound.stop();
+    sound.setBuffer(buffer);
+    sound.setVolume(UI_SOUNDS[name].volume);
     sound.play();
   }
 
@@ -503,6 +555,18 @@ export class GameAudio {
   private async load(): Promise<void> {
     void this.loadAmbience();
     const loader = new THREE.AudioLoader();
+    void Promise.all(
+      (Object.entries(UI_SOUNDS) as [UiSoundName, (typeof UI_SOUNDS)[UiSoundName]][]).map(
+        async ([name, profile]) => {
+          try {
+            const buffer = await loader.loadAsync(asset.audio(profile.file));
+            if (!this.disposed) this.uiBuffers.set(name, buffer);
+          } catch (error) {
+            console.error(`[Audio] 読み込みに失敗: ${profile.file}`, error);
+          }
+        },
+      ),
+    );
     await Promise.all(
       (Object.entries(SOUNDS) as [SoundName, (typeof SOUNDS)[SoundName]][]).map(
         async ([name, profile]) => {

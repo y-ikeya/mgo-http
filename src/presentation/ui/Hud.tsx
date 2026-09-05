@@ -369,6 +369,24 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
+        近くで爆ぜた。**画面がぼやけて、戻る。**
+
+        カメラを揺らしていたが、**回すと画面が斜めに傾いて見えて**、殴られた
+        のではなく「傾いた」に読めた。狙いが軸そのものなので (scene 側)、
+        揺らせば狙いも動く。**目のほうを効かなくするほうが、爆風で頭を
+        殴られた感じに近い。**
+
+        keyed にしてあるので、爆ぜるたびに div ごと作り直される。**同じ場所で
+        続けて爆ぜても掛かり直す** — class を付け替えるだけだと、既に流れて
+        いる CSS の動きは最初へ戻らない。
+
+        濃さと長さは CSS が持つ。scene から届くのは近さ (power) だけ。
+      */}
+      <Show when={props.stats?.shock} keyed>
+        {(shock) => <div class="hud-shock" style={{ '--shock': `${shock.power.toFixed(3)}` }} />}
+      </Show>
+
+      {/*
         眠らされている間。**画面を伏せる。**
 
         操作は既に効かない (scene 側で止めている) が、それだけだと壊れたように

@@ -73,6 +73,8 @@ type HandEvent =
   | { kind: 'dropped'; item: Carried }
   /** 一覧の中で選び直した。音を鳴らすのに使う */
   | { kind: 'selected' }
+  /** 一覧が出た。音を鳴らすのに使う */
+  | { kind: 'opened' }
 
 /**
  * 撃てるかを決めるのに要る、いまの体の状態。
@@ -450,6 +452,7 @@ export class Inventory {
         // 画面が騒がしくなる
         if (this.heldFor[family] >= BROWSE_HOLD && !this.browse) {
           this.browse = { family, at: this.startOf(family) }
+          events.push({ kind: 'opened' })
         }
         if (this.browse?.family === family && intent.select !== 0) {
           this.browse.at = this.moveBy(this.browse, -intent.select)
@@ -472,14 +475,24 @@ export class Inventory {
       const support = this.supportId
       if (support) this.switchTo(support)
     }
-    if (intent.toKnife) this.switchTo('knife')
 
     return events
   }
 
   /** 一覧を開いた時点の位置。いま手にある物に合わせる */
+  /**
+   * 一覧を開いた時点の位置。**その系統で選んでいる物に合わせる。**
+   *
+   * 手にある物で探してはいけない。**ダンボールを被っている間、手にあるのは
+   * 箱**で、武器の一覧には居ないので先頭へ落ちる — M9 を提げて箱を被った人が
+   * 武器の一覧を開くと AK47 を指していて、離すと AK47 に持ち替わっていた。
+   *
+   * 「抜けば構える銃」は箱を被っていても決まっている (weapon の getter)。
+   * 道具の側も同じで、銃を持っている間の道具の枠は覚えたまま (tool)。
+   */
   private startOf(family: Family): number {
-    const at = this.list(family).findIndex((item) => item.id === this.held)
+    const target = family === 'weapon' ? this.weapon : this.tool
+    const at = this.list(family).findIndex((item) => item.id === target)
     return at < 0 ? 0 : at
   }
 
@@ -541,6 +554,26 @@ export class Inventory {
     if (!find(this.items, id)) return false
     // 被れない体勢なら箱には持ち替えない。**手にした形だけ作らない**
     if (id === 'box' && !this.wearable) return false
+    /*
+     * **道具を使っている間に武器を選んだら、枠だけ差し替える。**
+     *
+     * ダンボールを被ったまま武器を選ぶと箱が脱げていた。**脱ぐつもりで
+     * 押していない** — 選んだのは「抜いたときに構える銃」であって、いま
+     * 抜くとは言っていない。隠れている最中に勝手に姿が出るので、
+     * 見つかったかどうかの読みごと崩れる。
+     *
+     * 脱ぐのは道具の側のボタン (箱 → NONE)。**押した物と起きることを
+     * 系統ごとに揃える** — 武器のボタンは武器の枠、道具のボタンは道具の枠。
+     *
+     * 持ち替えの代償は取らない。手は箱のままで、抜く動作はまだ起きて
+     * いない。払うのは脱いだときで、そのとき switchTo をもう一度通る。
+     */
+    if (this.usingTool && HELD[id].family === 'weapon') {
+      if (id === this.lastWeapon) return false
+      this.previousWeapon = this.lastWeapon
+      this.lastWeapon = id
+      return true
+    }
     if (this.switching) {
       this.queued = id === this.current ? null : id
       return false
@@ -606,6 +639,18 @@ export class Inventory {
    *   武器に居る     … 直前に持っていた武器と往復
    */
   toggle(family: Family): boolean {
+    /*
+     * **箱を被っている間も、武器のボタンは武器の枠を動かす。脱がない。**
+     *
+     * 押した人は「抜く」と言っていない。隠れている最中に姿が出ると、
+     * 見つかったかどうかの読みごと崩れる。脱ぐのは道具の側 (箱 → NONE)。
+     *
+     * 往復の起点は手にある物ではなく**抜けば構える銃** (weapon)。手で見ると
+     * 箱なので、同じ系統に居ないと判じて一覧を送ってしまう。
+     */
+    if (family === 'weapon' && this.usingTool) {
+      return this.switchTo(toggleId(this.items, this.weapon, this.previousWeapon))
+    }
     if (HELD[this.current].family !== family) {
       const target = family === 'weapon' ? this.weapon : this.tool
       // 道具の枠が none のまま入っても意味が無いので、そのときは箱へ

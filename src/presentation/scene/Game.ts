@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { WebGPURenderer } from "three/webgpu";
+import { RenderPipeline, WebGPURenderer } from "three/webgpu";
+import { pass } from "three/tsl";
+import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
 import { Input } from "../../infra/input";
@@ -8,6 +10,7 @@ import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
 import { STAGES, surfaceOf, waterOf, type StageName } from "../../domain/stage";
 import {
+  SKILLS,
   canChooseSkills,
   masteryReloadScale,
   masteryRecoveryScale,
@@ -111,6 +114,14 @@ import {
 import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
+/**
+ * 支度の画面で指せる枠。
+ *
+ * 装備を選ぶ間は 3 つ、支度の段階ではスキルの並び (SkillId がそのまま入る)。
+ * **窓によって並ぶ物が違う**ので、1 つの union にまとめてある。
+ */
+export type LoadoutFocus = "primary" | "secondary" | "support" | SkillId;
+
 export interface GameStats {
   stage: string;
   /**
@@ -194,6 +205,14 @@ export interface GameStats {
   skills: Skills;
   /** スキルを選び直せるか。**試合が始まったら閉じる** */
   skillsOpen: boolean;
+  /**
+   * 支度の画面でいま指している枠。**パッドと矢印キー用。**
+   *
+   * 番号ではなく枠の名前を渡す。番号だと**並び順を画面と scene の 2 か所が
+   * 握る**ことになり、副武器の無い部屋で片方だけ詰め忘れると 1 つずれる。
+   * 名前なら画面は自分の枠と見比べるだけで済む。
+   */
+  loadoutFocus: LoadoutFocus;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
   /** いま持っている銃。調整パネルが追従する */
@@ -254,6 +273,16 @@ export interface GameStats {
    * 数字を持たせても使い道が無い (domain/player/stamina.ts の staminaBlur)。
    */
   stamina: number;
+  /**
+   * 直近の爆風。**近くで爆ぜるたび、別物に差し替わる。**
+   *
+   * 続いている効き目 (stamina) と違って、これは起きた一瞬を知らせる合図。
+   * 0.1 秒ごとの stats に乗せるので、いつ届くかは揃わない — **濃さと長さは
+   * 受けた側 (Hud.css) が時間で決める。** ここが持つのは近さだけ。
+   *
+   * seq は毎回増える番号。**同じ場所で続けて爆ぜても新しい 1 発と分かる。**
+   */
+  shock: { seq: number; power: number } | null;
   /** 眠っているか。眠っている間は操作を受け付けない */
   asleep: boolean;
   /** 眠りの深さ。**1 が眠った瞬間、0 が起きた瞬間。** 画面の暗さがこれに従う */
@@ -341,6 +370,15 @@ const SPLASH_SOUND_MIN = 1.2;
  * 伝わらない。落ちた速さで 0.6〜1.6 倍する (BODY_SPLASH の呼び出し)。
  */
 const BODY_SPLASH = 3.4;
+/**
+ * 発光の効き。**閃光と銃口炎だけが越える所に閾値を置く。**
+ *
+ * 下げると昼の空や水面まで滲んで眠い絵になる。強さを上げると暗い所での
+ * 索敵が効かなくなる (光る物が全部にじんで輪郭が溶ける)。
+ */
+const BLOOM_STRENGTH = 0.6;
+const BLOOM_RADIUS = 0.5;
+const BLOOM_THRESHOLD = 0.9;
 /** この速さで落ちたらしぶきが最大になる (m/s)。板の縁から落ちて 2 秒ぶん */
 const FALL_SPLASH_SPEED = 14;
 /** 水中で爆ぜたときの水柱。**投げ込んだときより大きい** */
@@ -460,8 +498,25 @@ export class Game {
    * 見えるのは自分の目盛りだけ。
    */
   private stamina = MAX_STAMINA;
+  /**
+   * 直近の爆風。**同じ物を送り続ける** — 新しく爆ぜたときだけ差し替える。
+   *
+   * 毎 tick 作り直すと、受けた Solid 側から見て「毎回新しい爆風」になって、
+   * 曇りが 0.1 秒ごとに掛け直される。
+   */
+  private shock: { seq: number; power: number } | null = null;
 
   private readonly renderer: WebGPURenderer;
+  /**
+   * 発光 (ブルーム)。**明るい所を周りへ滲ませる。**
+   *
+   * 閃光を「明るい色で描く」のと、それが眩しく見えるのは別。前者は
+   * blastfx.ts が既にやっている (toneMapped: false)。滲ませるのはここ。
+   *
+   * ?bloom=off で切れる。**重さを比べるため** — 全画面をもう 1 度通すので、
+   * 弱い機械では効きが出る (gpu.ts に 3〜13 回/秒 しか出ない例がある)。
+   */
+  private post: RenderPipeline | null = null;
   private readonly scene = new THREE.Scene();
   private readonly follow: FollowCamera;
   private readonly player = new Soldier();
@@ -1003,6 +1058,30 @@ export class Game {
     if (backend.isWebGLBackend) void this.reportWebGPUFallback();
 
     this.lastTime = performance.now();
+    /*
+     * 発光を挟む。**明るい所だけを拾って滲ませる** (threshold)。
+     *
+     * 閾値を下げると昼の空や水面まで光って眠い絵になるので、閃光と銃口炎が
+     * 越える所に置く。強さは控えめ — 強いと爆発以外も滲んで、暗い所での
+     * 索敵が効かなくなる。
+     */
+    if (new URLSearchParams(location.search).get("bloom") !== "off") {
+      /*
+       * 一度描いた絵を受け取って、滲みを足して戻す。**足す** (add) ので、
+       * 元の絵はそのまま残って上に光だけが乗る。
+       *
+       * RenderPipeline は PostProcessing の今の名前 (three r183 で改名)。
+       * 古い名前でも動くが、呼ぶたびに警告が出る。
+       *
+       * 画面を一度別の板へ描くことになるが、**縁のならし (antialias) は
+       * 消えない** — PassNode が renderer.samples をそのまま引き継ぐ。
+       */
+      const scenePass = pass(this.scene, this.follow.camera);
+      this.post = new RenderPipeline(this.renderer);
+      this.post.outputNode = scenePass.add(
+        bloom(scenePass, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD),
+      );
+    }
     this.renderer.setAnimationLoop((time) => this.tick(time));
     this.broadcast();
     this.snapshotHandle = setInterval(
@@ -1172,10 +1251,11 @@ export class Game {
     // 成績表。開いている間はポインタを離して、押せる状態にする
     if (this.input.tapped("menu")) this.setMenu(!this.menuOpen);
 
-    if (this.input.tapped("salute")) this.player.salute();
+    // 支度の画面が開いている間は出さない。**十字キー下は行を送るほうに使う**
+    if (!this.loadoutBlocking && this.input.tapped("salute")) this.player.salute();
     this.updateLinks();
     // 押している間は手を挙げたまま。離すと下ろす
-    this.player.setSaluteHeld(this.input.down("salute"));
+    this.player.setSaluteHeld(!this.loadoutBlocking && this.input.down("salute"));
     // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
     // 先に見た物が倒したフラグを後の物が読むことになる
     this.triggerEdge = this.input.firing && !this.wasFiring;
@@ -1299,7 +1379,8 @@ export class Game {
       return false;
     });
 
-    this.renderer.render(this.scene, this.follow.camera);
+    if (this.post) this.post.render();
+    else this.renderer.render(this.scene, this.follow.camera);
     this.publishStats(dt);
     this.input.endFrame();
   }
@@ -1920,8 +2001,95 @@ export class Game {
    * ポインタを離す必要があり、そうすると死んでいる間に視点が動かせなくなる。
    * 選ぶのはキーで済ませる。
    */
+  /**
+   * 支度の画面で指している枠。**上下で動く番号。**
+   *
+   * 番号で持つのは、並ぶ物が窓によって変わるから (装備 3 つ / スキル 5 つ)。
+   * 外へ出すときは名前に直す — GameStats の loadoutFocus を見よ。
+   */
+  private loadoutAt = 0;
+
+  /**
+   * いま並んでいる枠。**上から順に。**
+   *
+   * 支度の段階は決めるのがスキルだけ、それ以外は装備だけ (Loadout.tsx が
+   * 同じ分け方で描いている)。**副武器を外している部屋では行ごと飛ばす** —
+   * 空の行に止まると、左右を押しても何も起きない枠が 1 つできる。
+   */
+  private get loadoutRows(): LoadoutFocus[] {
+    if (this.replica.match?.phase === "ready") {
+      return Object.keys(SKILLS) as SkillId[];
+    }
+    const rows: LoadoutFocus[] = ["primary"];
+    if (this.secondary !== null) rows.push("secondary");
+    rows.push("support");
+    return rows;
+  }
+
+  /** いま指している枠。窓が切り替わって番号が余ったら先頭へ戻す */
+  private get loadoutFocus(): LoadoutFocus {
+    const rows = this.loadoutRows;
+    return rows[Math.min(this.loadoutAt, rows.length - 1)] ?? "primary";
+  }
+
+  /**
+   * 一覧の中を隣へ送る。**端では回る。**
+   *
+   * 選び直すのは「送った先の物」で、決定の一手間は無い。数字キーで押したのと
+   * 同じ形にしてある — 一手間を挟むと、選んだのに効いていない状態が生まれて、
+   * READY を押すまで気づけない。
+   */
+  private stepChoice<T>(list: readonly T[], current: T | null, step: number): T | null {
+    if (list.length === 0) return null;
+    const at = current === null ? 0 : list.indexOf(current);
+    const from = at < 0 ? 0 : at;
+    return list[(from + step + list.length) % list.length] ?? null;
+  }
+
+  /** 支度の画面を左右に送る。指している枠によって送る物が変わる */
+  private stepLoadout(step: number): void {
+    const focus = this.loadoutFocus;
+    if (focus === "primary") {
+      const next = this.stepChoice(this.primaries, this.pendingLoadout.primary, step);
+      if (next) this.setLoadout(next);
+      return;
+    }
+    if (focus === "secondary") {
+      const next = this.stepChoice(CHOICES.secondary, this.secondary, step);
+      if (next) this.setSecondary(next);
+      return;
+    }
+    if (focus === "support") {
+      const next = this.stepChoice(SUPPORTS, this.pendingLoadout.support, step);
+      if (next) this.setSupport(next);
+      return;
+    }
+    /*
+     * スキルは段を上げ下げする。**0 (付けない) から 3 まで。**
+     *
+     * 回さずに端で止める — 一番上から 0 へ落ちると、上げようとして外れる。
+     * 予算を超える段はサーバーが弾くので、こちらでは数えない
+     * (setSkill のコメント)。
+     */
+    const level = (this.skills[focus] ?? 0) + step;
+    this.setSkill(focus, Math.max(0, Math.min(3, level)));
+  }
+
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
+    /*
+     * 十字キーと矢印キー。**上下で枠、左右でその中。**
+     *
+     * パッドしか無い人はここを通らないと何も選べない。数字キーは残してある —
+     * 一発で名指しできるほうが速いので、鍵盤ではそちらが本筋。
+     */
+    const rows = this.loadoutRows;
+    if (this.input.tapped("menuDown")) this.loadoutAt = (this.loadoutAt + 1) % rows.length;
+    if (this.input.tapped("menuUp")) {
+      this.loadoutAt = (this.loadoutAt + rows.length - 1) % rows.length;
+    }
+    if (this.input.tapped("menuRight")) this.stepLoadout(1);
+    if (this.input.tapped("menuLeft")) this.stepLoadout(-1);
     /*
      * Enter。**支度の段階では READY の切り替え、それ以外は湧く。**
      *
@@ -3235,7 +3403,6 @@ export class Game {
       select: wheel + this.input.consumeListStep(),
       drop: this.input.tapped("drop"),
       toSupport: this.input.tapped("toSupport"),
-      toKnife: this.input.tapped("toKnife"),
     };
 
     const events = this.inv.hand(intent, {
@@ -3271,6 +3438,10 @@ export class Game {
           // ここでも鳴らすと自分だけ 2 回聞こえる
           break;
         }
+        case "opened":
+          // **画面の音。** 戦場では鳴っていないので位置を持たせない
+          this.audio.playUi("browse");
+          break;
         case "selected":
           break;
       }
@@ -3345,6 +3516,17 @@ export class Game {
     // 水の中はこもって小さい。届く距離も半分以下 (audio.ts の explosionWater)
     const gain = this.audio.play(inWater ? "explosionWater" : "explosion", position, 1);
     this.addPing("shot", position, gain);
+    /*
+     * 頭を殴られた感じを出す。**近さは音の強さをそのまま使う。**
+     *
+     * 遠いほど薄い、が音と同じ式で揃う。距離の閾値をもう 1 つ持つと、
+     * 「聞こえるのに効かない」「効くのに聞こえない」がどこかで出る。
+     *
+     * **カメラは動かさない。** このゲームは軸がそのまま弾道なので
+     * (aimDirection が viewDir を返す)、揺らすと狙いまで動く。それ以前に、
+     * 回すと画面が斜めに傾いて見えて、衝撃ではなく「傾いた」に読める。
+     */
+    this.shock = { seq: this.shock ? this.shock.seq + 1 : 1, power: gain };
     if (inWater) return;
     this.blast.explode(position);
   }
@@ -3730,6 +3912,7 @@ export class Game {
       loadoutWait: Math.max(0, Math.ceil(CHOOSE_FLOOR - this.chooseElapsed)),
       skills: this.skills,
       // 窓が開いているかは試合の段階で決まる。ドメインルールは domain が持つ
+      loadoutFocus: this.loadoutFocus,
       skillsOpen: canChooseSkills(
         this.replica.match?.phase ?? "waiting",
         MODES[this.replica.mode],
@@ -3741,6 +3924,7 @@ export class Game {
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
       stamina: staminaBlur(this.stamina),
+      shock: this.shock,
       asleep: this.player.sleeping,
       sleepDepth: this.player.sleepDepth,
       health: this.player.health,

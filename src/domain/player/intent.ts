@@ -3,7 +3,7 @@
  *
  * --- なぜ domain なのか ---
  * 動詞の一覧は遊びの定義そのもの (docs/design.md の 4)。「敬礼できる」
- * 「スキャンできる」を足すのは遊びが変わることで、`KeyF` を `KeyG` に
+ * 「スキャンできる」を足すのは遊びが変わることで、`KeyG` を `KeyH` に
  * 変えるのは変わらない。**動詞はここ、キーの割り当ては presentation。**
  *
  * いずれサーバーへ送ることになる (design.md の TO-BE「入力を受けてサーバーが
@@ -47,8 +47,6 @@ export interface Intent {
   drop: boolean
   /** 名指しで支援装備へ。一覧を開かずに行き先が決まっているとき */
   toSupport: boolean
-  /** 名指しでナイフへ */
-  toKnife: boolean
 }
 
 /** 何も押していない。試験と、入力を受け付けない場面で使う */
@@ -57,5 +55,4 @@ export const NO_INTENT: Intent = {
   select: 0,
   drop: false,
   toSupport: false,
-  toKnife: false,
 }

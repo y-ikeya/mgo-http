@@ -484,7 +484,7 @@ export default function Calibrator(props: {
           {status().connected ? 'パッド接続あり' : 'パッド未接続'} / 現在:{' '}
           {status().active === 'gamepad' ? 'ゲームパッド' : 'キーボード'}
           <br />
-          左スティック 移動 · 右スティック 視点 · L2 構え · R2 射撃 · × ローリング · □ リロード · ○ ナイフ · L3 しゃがみ
+          左スティック 移動 · 右スティック 視点 · L2 構え (構えたまま L1 で眼鏡) · R2 射撃 · × ローリング · □ リロード · L3 しゃがみ · 支度の画面は十字キーで送って × で決定
         </div>
 
         <div class="calib-section">

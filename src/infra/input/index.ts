@@ -47,8 +47,6 @@ const PAD_BUTTONS = {
   roll: [0],
   /** □ / X */
   reload: [2],
-  /** ○ / B */
-  knife: [1],
   /** L3 / 左スティック押し込み */
   crouch: [10],
   /**
@@ -58,11 +56,19 @@ const PAD_BUTTONS = {
    * 送っているかが指で分かる。
    */
   box: [4],
-  /** 十字キー上 */
-  throwItem: [12],
+  /**
+   * 十字キー。**支度の画面を送る。**
+   *
+   * 遊びの最中は上と左が空いている。下 (敬礼) と右 (倍率) は塞がっているが、
+   * **支度の画面が開いている間は遊びの操作を読まない**ので、ぶつからない。
+   */
+  menuUp: [12],
+  menuDown: [13],
+  menuLeft: [14],
+  menuRight: [15],
   /** R3 / 右スティック押し込み。手榴弾 (押している間に落下点、離して投げる) */
   grenade: [11],
-  /** 十字キー下 */
+  /** 十字キー下。**支度の画面では行を送るほうに使う** */
   salute: [13],
   /** OPTIONS / START */
   menu: [9],
@@ -72,8 +78,14 @@ const PAD_BUTTONS = {
    * 鍵盤の Q と同じ役。撃つ指 (R2) の隣に置いて、構えたまま持ち替えられる。
    */
   swap: [5],
-  /** 十字キー右。倍率を 1 段上げる (一番上まで行ったら戻る) */
-  zoom: [15],
+  /**
+   * L1、および十字キー右。倍率を 1 段上げる (一番上まで行ったら戻る)。
+   *
+   * **L1 は構えている間だけ眼鏡。** 素で押せばダンボール (box) のまま。
+   * 構えている最中に箱を被る場面が無いので、同じ指に 2 つの役を持たせられる。
+   * 譲るのは box のほう — 下の swapTool を見よ。
+   */
+  zoom: [4, 15],
   /** △ / Y。置く / 拾う */
   drop: [3],
 } as const
@@ -114,14 +126,38 @@ const BINDINGS = {
   zoom: { keys: ['KeyZ'], pad: 'zoom' },
   /** 武器の一覧。単押しで往復、押している間は一覧を送る */
   swapWeapon: { keys: ['KeyQ'], pad: 'swap' },
-  /** 道具の一覧。単押しでダンボール、押している間は一覧 */
-  swapTool: { keys: ['KeyC'], pad: 'box' },
+  /**
+   * 道具の一覧。単押しでダンボール、押している間は一覧。
+   *
+   * **構えている間は L1 を眼鏡に譲る** (zoom を見よ)。譲るのはパッドだけ —
+   * 鍵盤の C は構えとぶつからないので、そのまま効く。
+   */
+  swapTool: { keys: ['KeyC'], pad: 'box', yieldsWhenAiming: true },
   drop: { keys: ['KeyG'], pad: 'drop' },
   toSupport: { keys: ['KeyE'], pad: 'grenade' },
-  toKnife: { keys: ['KeyF'], pad: 'knife' },
-  /** 戦場へ出る。**2 つ受ける** — 右手が置き場所によって違う */
-  spawn: { keys: ['Enter', 'KeyL'] },
-} as const satisfies Record<string, { keys: readonly string[]; pad?: PadAction; hold?: number }>
+  /**
+   * 戦場へ出る / READY。**3 つ受ける** — 右手が置き場所によって違う。
+   *
+   * パッドは × (roll と同じボタン)。**遊びの最中は転がる**が、支度の画面が
+   * 開いている間は転がれないので取り合いにならない。決定に × を使うのは、
+   * 一覧を送る指 (十字キー) の反対側に置くため。
+   */
+  spawn: { keys: ['Enter', 'KeyL'], pad: 'roll' },
+  /**
+   * 支度の画面を送る。**遊びの最中は読まない** (呼ぶ側が支度中しか見ない)。
+   *
+   * 上下で枠を移り、左右でその枠の中を選ぶ。**選んだ時点で効く** — 数字キーで
+   * 押したときと同じで、決定の一手間を挟まない。挟むと、選んだのに効いて
+   * いない状態が生まれて、READY を押すまで気づけない。
+   */
+  menuUp: { keys: ['ArrowUp'], pad: 'menuUp' },
+  menuDown: { keys: ['ArrowDown'], pad: 'menuDown' },
+  menuLeft: { keys: ['ArrowLeft'], pad: 'menuLeft' },
+  menuRight: { keys: ['ArrowRight'], pad: 'menuRight' },
+} as const satisfies Record<
+  string,
+  { keys: readonly string[]; pad?: PadAction; hold?: number; yieldsWhenAiming?: boolean }
+>
 
 export type Action = keyof typeof BINDINGS
 
@@ -531,10 +567,25 @@ export class Input {
     (Object.keys(BINDINGS) as Action[]).map((action) => [action, newHold()]),
   )
 
+  /**
+   * そのボタンを今この操作が握っているか。
+   *
+   * **同じボタンが構えの有無で別の役になる。** L1 は素でダンボール、構えて
+   * いれば眼鏡。譲る側 (印の付いた操作) が構えている間だけ手を引くので、
+   * 両方が同時に立つことがない。
+   *
+   * 譲るのはパッドだけ。鍵盤は指が別なのでぶつからない。
+   */
+  private padYields(action: Action): boolean {
+    const bind = BINDINGS[action]
+    return 'yieldsWhenAiming' in bind && bind.yieldsWhenAiming === true && this.aiming
+  }
+
   /** その操作のキーかボタンが押されているか */
   private rawDown(action: Action): boolean {
     const bind = BINDINGS[action]
     if (bind.keys.some((code) => this.pressed.has(code))) return true
+    if (this.padYields(action)) return false
     return 'pad' in bind && bind.pad !== undefined ? this.padDown(bind.pad) : false
   }
 
@@ -545,7 +596,10 @@ export class Input {
     // **両方を評価する。** 片方で早く返すと、もう片方の立ち上がりが持ち越される
     for (const code of bind.keys) if (this.justPressed.delete(code)) hit = true
     if (hit) this.lastUsed = 'keyboard'
-    const pad = 'pad' in bind && bind.pad !== undefined ? this.padJustPressed(bind.pad) : false
+    const pad =
+      !this.padYields(action) && 'pad' in bind && bind.pad !== undefined
+        ? this.padJustPressed(bind.pad)
+        : false
     return hit || pad
   }
 

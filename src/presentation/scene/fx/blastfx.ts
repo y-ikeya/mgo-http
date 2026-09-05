@@ -48,6 +48,19 @@ interface Puff {
   delay: number
 }
 
+/**
+ * 白より明るく描く倍率。**発光 (Game.ts の bloom) はこれが無いと効かない。**
+ *
+ * 画像の一番明るい所は白 = 1.0 で頭打ちなので、閾値 0.9 を越える分が 0.1 しか
+ * 残らない。それを広くぼかすので、目で見て何も変わらない。**眩しさは「白」では
+ * 出せない** — 白より明るい値が要る。
+ *
+ * 2 まで。3.5 まで上げると閃光の形が飛んで、ただの白い丸になる。
+ *
+ * 色は変えない (白のまま明るさだけ上げる)。色は Blender と画像の領分。
+ */
+const FLASH_GAIN = 2
+
 /** 種類ごとの数と振る舞い */
 const RECIPE = [
   // 閃光。爆心に一瞬だけ、大きく
@@ -107,6 +120,11 @@ export class BlastFx {
           depthWrite: false,
           // 露出に左右されない。爆発が明るく見えないと何が起きたか分からない
           toneMapped: false,
+          // 閃光だけ白より明るく。発光が拾えるのはここを越えた分だけ
+          color:
+            kind.row === ROW_FLASH
+              ? new THREE.Color(FLASH_GAIN, FLASH_GAIN, FLASH_GAIN)
+              : undefined,
         })
         const sprite = new THREE.Sprite(material)
         sprite.visible = false
