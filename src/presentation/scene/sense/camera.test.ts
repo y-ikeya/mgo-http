@@ -110,6 +110,55 @@ describe('衝撃で揺れる', () => {
     )
   })
 
+  /**
+   * **周期的に揺らさない。** 正弦波だと滑らかに行ったり来たりして、
+   * 叩かれたというより気味悪く漂って見える。
+   */
+  test('**不規則に震える。** 一定の周期で行き来しない', () => {
+    const { camera, player } = rig()
+    for (let i = 0; i < 120; i++) camera.update(1 / 60, player as never)
+    const base = camera.camera.rotation.x
+
+    camera.punch(1)
+    const offsets: number[] = []
+    for (let i = 0; i < 24; i++) {
+      camera.update(1 / 60, player as never)
+      offsets.push(camera.camera.rotation.x - base)
+    }
+    let flips = 0
+    for (let i = 1; i < offsets.length; i++) {
+      if (Math.sign(offsets[i]) !== Math.sign(offsets[i - 1])) flips++
+    }
+    // 何度か向きが変わる。1 回も変わらなければ片側へ寄っているだけ
+    expect(flips).toBeGreaterThanOrEqual(2)
+  })
+
+  /**
+   * **位置も動く。** 回すだけだと画角そのものは動かない。
+   *
+   * 揺らした位置を次の均しの起点にすると、ずれが毎フレーム積み上がる
+   * (実測で 3.5m まで流れた)。均すのは揺れていない位置で、揺れは最後に乗せる。
+   */
+  test('**画角そのものが動く。** そして流されない', () => {
+    const { camera, player } = rig()
+    for (let i = 0; i < 120; i++) camera.update(1 / 60, player as never)
+    const settled = camera.camera.position.clone()
+
+    camera.punch(1)
+    let farthest = 0
+    for (let i = 0; i < 24; i++) {
+      camera.update(1 / 60, player as never)
+      farthest = Math.max(farthest, camera.camera.position.distanceTo(settled))
+    }
+    // 動くが、流れていかない
+    expect(farthest).toBeGreaterThan(0.01)
+    expect(farthest).toBeLessThan(0.3)
+
+    // 収まったら元の位置へ戻る
+    for (let i = 0; i < 60; i++) camera.update(1 / 60, player as never)
+    expect(camera.camera.position.distanceTo(settled)).toBeCloseTo(0, 3)
+  })
+
   test('やがて収まる', () => {
     const { camera, player } = rig()
     camera.update(1 / 60, player as never)

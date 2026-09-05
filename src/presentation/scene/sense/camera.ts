@@ -113,9 +113,39 @@ export interface CameraWorld {
  */
 const SHAKE_TIME = 0.35
 const SHAKE_MAX = 0.05
-/** 揺れの速さ。2 つ重ねて規則正しさを消す */
-const SHAKE_FAST = 42
-const SHAKE_SLOW = 17
+/** 揺れを引き直す速さ (回/秒)。速いほど細かく震える */
+const SHAKE_RATE = 26
+/**
+ * 一番強いときに位置がずれる量 (m)。**画角そのものを動かす分。**
+ *
+ * 揺れの強さ (rad) に掛けるので、実際のずれは SHAKE_MAX × これ = 12cm ほど。
+ * 大きくすると壁を突き抜けて中が見える。
+ */
+const SHAKE_SHIFT = 2.4
+
+/**
+ * 不規則な揺れ。**刻みごとに引き直した値を滑らかに繋ぐ。**
+ *
+ * 正弦波だと周期が見えて「漂う」ように見える。かといって毎フレーム乱数だと
+ * 1 コマごとに飛んで画面が壊れる。**整数の刻みで値を決めて、その間を滑らかに
+ * 繋ぐ**と、不規則なのに繋がった揺れになる。
+ *
+ * 種で系列を分ける。同じ種なら同じ揺れ方になるので、向き 3 軸と位置 2 軸に
+ * 別々の種を渡して、全部が同じ方向へ動くのを避ける。
+ */
+function wobble(t: number, seed: number): number {
+  const i = Math.floor(t)
+  const f = t - i
+  // なめらかに繋ぐ (smoothstep)。線形だと折れ目が見える
+  const w = f * f * (3 - 2 * f)
+  return hashUnit(i, seed) * (1 - w) + hashUnit(i + 1, seed) * w
+}
+
+/** 整数 2 つから -1..1 を作る。**乱数を持たない** — 同じ入力なら同じ値 */
+function hashUnit(i: number, seed: number): number {
+  const x = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
+  return (x - Math.floor(x)) * 2 - 1
+}
 
 /** マウス感度 (rad / px) */
 const SENSITIVITY = 0.0022
@@ -240,6 +270,8 @@ export class FollowCamera {
   private shakeLeft = 0
   private shakeAmount = 0
   private shakeAge = 0
+  /** いま乗せている位置のずれ。次の均しの前に戻す */
+  private readonly shakeShift = new THREE.Vector3()
   private readonly desired = new THREE.Vector3()
   /** 視線の逆方向 (カメラが引く向き)。遮蔽の判定に使う */
   private readonly back = new THREE.Vector3()
@@ -432,17 +464,28 @@ export class FollowCamera {
     this.computeDesired(player, world, dt)
 
     const p = this.camera.position
+    /*
+     * **前フレームの揺れを戻してから均す。**
+     *
+     * 揺らした位置をそのまま次の均しの起点にすると、ずれが毎フレーム積み上がる
+     * (実測で 3.5m まで流れた)。均すのは揺れていない位置で、揺れは最後に乗せる。
+     */
+    p.sub(this.shakeShift)
     p.set(
       damp(p.x, this.desired.x, POSITION_LAMBDA, dt),
       damp(p.y, this.desired.y, POSITION_LAMBDA, dt),
       damp(p.z, this.desired.z, POSITION_LAMBDA, dt),
     )
+    this.shakeShift.set(0, 0, 0)
     /*
      * 揺れは**カメラだけ**に乗せる。
      *
      * viewDir はこの手前で euler から出ているので (computeDesired)、ここへ
      * 足しても弾道は動かない。**衝撃で狙いまで狂わせない** — 反動 (recoilPitch)
      * は狙いごと動かす別の仕掛けで、あちらは撃った本人の代償として意図している。
+     *
+     * **正弦波では駄目だった。** 滑らかで周期的なので、叩かれたというより
+     * 気味悪く漂って見える。刻みごとに引き直した値を繋いで不規則に震わせる。
      */
     this.shakeLeft = Math.max(0, this.shakeLeft - dt)
     if (this.shakeLeft > 0) {
@@ -451,18 +494,26 @@ export class FollowCamera {
       const fade = (this.shakeLeft / SHAKE_TIME) ** 2
       const amount = this.shakeAmount * fade
       this.shakeAge += dt
-      // 2 つの速さを重ねる。1 つだけだと規則正しく揺れて機械に見える
-      const pitch =
-        Math.sin(this.shakeAge * SHAKE_FAST) * 0.6 + Math.sin(this.shakeAge * SHAKE_SLOW) * 0.4
-      const yaw =
-        Math.cos(this.shakeAge * SHAKE_FAST * 1.3) * 0.6 +
-        Math.cos(this.shakeAge * SHAKE_SLOW * 0.7) * 0.4
+      const t = this.shakeAge * SHAKE_RATE
       this.shaken.set(
-        this.euler.x + pitch * amount,
-        this.euler.y + yaw * amount,
-        this.euler.z + yaw * amount * 0.5,
+        this.euler.x + wobble(t, 1) * amount,
+        this.euler.y + wobble(t, 2) * amount,
+        this.euler.z + wobble(t, 3) * amount * 0.6,
       )
       this.camera.rotation.copy(this.shaken)
+
+      /*
+       * **位置も動かす。** 回すだけだと画角そのものは動かないので、
+       * 覗いている先が揺れているように見えない。
+       *
+       * 視線に対して横と上へずらす。前後は動かさない — 寄ったり引いたりに
+       * 見えて、揺れではなく画角が変わったように読める。
+       */
+      const yaw = this.euler.y
+      const shift = amount * SHAKE_SHIFT
+      const side = wobble(t, 4) * shift
+      this.shakeShift.set(Math.cos(yaw) * side, wobble(t, 5) * shift, -Math.sin(yaw) * side)
+      p.add(this.shakeShift)
       return
     }
     this.camera.rotation.copy(this.euler)
