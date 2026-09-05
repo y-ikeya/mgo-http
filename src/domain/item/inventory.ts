@@ -475,7 +475,6 @@ export class Inventory {
       const support = this.supportId
       if (support) this.switchTo(support)
     }
-    if (intent.toKnife) this.switchTo('knife')
 
     return events
   }

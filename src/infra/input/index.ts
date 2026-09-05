@@ -47,8 +47,6 @@ const PAD_BUTTONS = {
   roll: [0],
   /** □ / X */
   reload: [2],
-  /** ○ / B */
-  knife: [1],
   /** L3 / 左スティック押し込み */
   crouch: [10],
   /**
@@ -129,7 +127,6 @@ const BINDINGS = {
   swapTool: { keys: ['KeyC'], pad: 'box', yieldsWhenAiming: true },
   drop: { keys: ['KeyG'], pad: 'drop' },
   toSupport: { keys: ['KeyE'], pad: 'grenade' },
-  toKnife: { keys: ['KeyF'], pad: 'knife' },
   /** 戦場へ出る。**2 つ受ける** — 右手が置き場所によって違う */
   spawn: { keys: ['Enter', 'KeyL'] },
 } as const satisfies Record<

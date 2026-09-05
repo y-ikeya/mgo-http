@@ -534,12 +534,6 @@ describe('名指しの持ち替え', () => {
     inv.hand(press({ toSupport: true }), FREE, 0.016)
     expect(inv.held).toBe('grenade')
   })
-
-  test('ナイフへ直接移る', () => {
-    const inv = make()
-    inv.hand(press({ toKnife: true }), FREE, 0.016)
-    expect(inv.held).toBe('knife')
-  })
 })
 
 /**

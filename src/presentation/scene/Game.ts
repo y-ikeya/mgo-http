@@ -3298,7 +3298,6 @@ export class Game {
       select: wheel + this.input.consumeListStep(),
       drop: this.input.tapped("drop"),
       toSupport: this.input.tapped("toSupport"),
-      toKnife: this.input.tapped("toKnife"),
     };
 
     const events = this.inv.hand(intent, {
