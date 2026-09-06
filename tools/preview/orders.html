@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  html,body{margin:0;height:100%;background:#2b3a2f;
+    background-image:repeating-linear-gradient(58deg,#3d4f42 0 22px,#33453a 22px 44px);}
+  #root{position:fixed;inset:0}
+  /*
+   * ?hide=<0..1> で、消える途中の姿で止める。
+   *
+   * 本物は 3.2 秒待ってから 0.9 秒かけて消えるので、**仮想時計の頁撮りでは
+   * まず捉えられない。** 同じ動きを負の遅れで進めて、止めて見る。
+   */
+  body[data-hide] .orders-band{
+    animation:orders-stripes .9s ease-in forwards;
+    animation-play-state:paused;
+  }
+</style>
+<div id="root"></div>
+<script type="module" src="./orders.tsx"></script>

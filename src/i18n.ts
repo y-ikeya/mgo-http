@@ -76,6 +76,11 @@ const JA = {
     'になっていたら、GPU のドライバを入れてください。',
   'gpu.recheck': '直したらこのページを開き直してください。',
 
+  // --- 試合が始まった瞬間の指令 ---
+  'orders.tdm.red': 'レッドチームを倒せ!',
+  'orders.tdm.blue': 'ブルーチームを倒せ!',
+  'orders.dm': '全員が敵だ。生き残れ!',
+
   // --- 遅れが直らない人 ---
   'lag.title': '通信の遅れが大きすぎます',
   'lag.lede':
@@ -137,6 +142,10 @@ const EN: Record<Key, string> = {
     'If Device Manager shows "Microsoft Basic Display Adapter" under Display adapters, ' +
     'install your GPU driver.',
   'gpu.recheck': 'Reload this page once it is fixed.',
+
+  'orders.tdm.red': 'ELIMINATE THE RED TEAM!',
+  'orders.tdm.blue': 'ELIMINATE THE BLUE TEAM!',
+  'orders.dm': 'EVERYONE IS HOSTILE. SURVIVE!',
 
   'lag.title': 'YOUR CONNECTION IS TOO SLOW',
   'lag.lede':

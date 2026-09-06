@@ -1,0 +1,146 @@
+/*
+ * 試合が始まった瞬間の指令。
+ *
+ * 画面いっぱいの帯を 1 本。**真ん中を横切る**ので、出ている間は前が見えない
+ * — だから短い。始まった直後の動かない時間にだけ置く。
+ */
+
+.orders {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+/*
+ * 帯そのもの。**陣営の色は文字と線だけ。** 地は黒で共通にする。
+ *
+ * 地まで色を付けると、赤の側だけ画面が赤くなって「撃たれている」に見える
+ * (体力が減った表示と同じ色になる)。
+ */
+.orders-band {
+  position: relative;
+  width: 100%;
+  padding: 18px 0 22px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.82) 12%,
+    rgba(0, 0, 0, 0.82) 88%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  text-align: center;
+  /*
+   * 帯を横縞へ割るための面。**消えるときにだけ効く。**
+   *
+   * --on が縞 1 本の厚み、--pitch が縞の間隔。出ている間は on = pitch なので
+   * 隙間が無く、ただの帯に見える。
+   */
+  -webkit-mask-image: repeating-linear-gradient(
+    to bottom,
+    #000 0 var(--on),
+    transparent var(--on) var(--pitch)
+  );
+  mask-image: repeating-linear-gradient(
+    to bottom,
+    #000 0 var(--on),
+    transparent var(--on) var(--pitch)
+  );
+  --on: 14px;
+  --pitch: 14px;
+}
+
+/*
+ * 割れて消える。**縞が細くなりながら、間隔が広がる。**
+ *
+ * 単に薄くして消すと「表示が終わった」だけになる。縞に割れると、**閉じた
+ * ブラインドが開くように**見えて、隠れていた景色が戻ってくる感じになる。
+ *
+ * 変数を動かすので @property で型を宣言する。宣言しないと補間されず、
+ * 途中の値を飛ばして終わりの値へ跳ぶ。
+ */
+@property --on {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 14px;
+}
+
+@property --pitch {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 14px;
+}
+
+.orders-leaving .orders-band {
+  animation: orders-stripes 0.9s ease-in forwards;
+}
+
+@keyframes orders-stripes {
+  0% {
+    --on: 14px;
+    --pitch: 14px;
+    opacity: 1;
+  }
+  100% {
+    /* 縞が細く、間隔は広く。**残るのは線だけになって、それも薄れる** */
+    --on: 1px;
+    --pitch: 26px;
+    opacity: 0;
+  }
+}
+
+/* 陣営の名前。帯の上端に小さく */
+.orders-heading {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 0.42em;
+  /* 字間を空けたぶん右へ寄るので、その分だけ戻す */
+  text-indent: 0.42em;
+  color: var(--orders-ink);
+}
+
+/*
+ * 見出しと文の間の横線。**画面の端まで伸ばす。**
+ *
+ * 帯の中に収めると札のように見える。端まで伸びていると「画面に割り込んで
+ * いる」ものとして読める。
+ */
+.orders-rule {
+  height: 1px;
+  margin: 7px 0 9px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    var(--orders-ink) 6%,
+    var(--orders-ink) 94%,
+    transparent 100%
+  );
+  opacity: 0.75;
+}
+
+/* 指令そのもの。**ここだけ大きい** */
+.orders-text {
+  font-size: 27px;
+  letter-spacing: 0.08em;
+  color: var(--orders-ink);
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.9);
+}
+
+/*
+ * 陣営の色。**HUD の得点と同じ色**にしてある。
+ *
+ * 別の赤・別の青を使うと、上の得点と見比べたときに自分がどちらか迷う。
+ */
+.orders-red {
+  --orders-ink: #ff8a72;
+}
+
+.orders-blue {
+  --orders-ink: #7ea6ff;
+}
+
+/* 個人戦。**陣営が無いので中立の色** */
+.orders-solo {
+  --orders-ink: rgba(214, 226, 196, 0.92);
+}

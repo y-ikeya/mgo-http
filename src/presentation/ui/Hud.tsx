@@ -5,6 +5,7 @@ import { HELD, type HeldId } from '../../domain/item/held'
 import { MODES } from '../../domain/match/room'
 import { isTranquilizer } from '../../domain/item/weapons'
 import type { GameStats } from '../scene/Game'
+import Orders from './Orders'
 import './Hud.css'
 
 /**
@@ -313,6 +314,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           <div class="hud-standby-sub">{t('hud.startingSoon')}</div>
         </div>
       </Show>
+
+      {/*
+        始まった瞬間の指令。**何をすれば勝ちかを、一度だけ言う。**
+
+        出す長さも消え方も Orders が持つ。ここは段階と陣営を渡すだけ。
+      */}
+      <Orders mode={mode()} team={props.stats?.team} phase={phase()} />
 
       {/* 決着。次の支度が始まるまでの間だけ出る */}
       <Show when={phase() === 'over'}>
