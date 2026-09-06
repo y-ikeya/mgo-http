@@ -22,6 +22,13 @@
 .orders-band {
   position: relative;
   width: 100%;
+  /*
+   * 真ん中より上へ置く。**下に数字が来る。**
+   *
+   * 「何をするか」を先に読ませて、「あと何秒か」を目の高さに残す。数字の
+   * ほうが動くので、そちらを中央寄りに置く。
+   */
+  transform: translateY(-118px);
   padding: 18px 0 22px;
   background: linear-gradient(
     to bottom,

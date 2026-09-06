@@ -13,14 +13,18 @@ import './Orders.css'
  * 分かるのは名前の色だけ。入ったばかりの人は撃っていい相手を探すところから
  * 始まる。
  *
- * --- なぜ消えるか ---
- * 出しっぱなしにすると画面の真ん中が塞がる。**始まった直後は動かない時間**
- * なので、そこだけ塞いで、動き出す頃には消えている。
+ * --- いつ出して、いつ消えるか ---
+ * **数えている間だけ。** 数え終わるまでは誰も動けないので、その時間はもともと
+ * 空いている — 塞いでよいのはそこだけ。始まってから出していた頃は、読んで
+ * いる間に撃たれた。
+ *
+ * 出しておく長さを持たない。**数え終わるまでが出しておく長さ。** 秒数を別に
+ * 持つと、数え方を変えたときに片方だけずれる。
  */
 export default function Orders(props: {
   mode: Mode
   team: Team | 0 | undefined
-  /** 試合の段階。playing に変わった瞬間に出す */
+  /** 試合の段階。countdown の間だけ出して、playing で退く */
   phase: string | undefined
 }) {
   const [showing, setShowing] = createSignal(false)
@@ -33,22 +37,40 @@ export default function Orders(props: {
   }
 
   /*
-   * **段階が playing へ移った瞬間だけ。**
+   * **数えている間に出して、始まった瞬間に退く。**
    *
-   * playing の間ずっと出す条件にすると、途中から入った人にも出るし、
-   * 画面を読み直すたびに出る。移り変わりを見る。
+   * 始まってから出していた頃は、読んでいる間に撃たれた。数え終わるまでは
+   * 誰も動けないので、**その時間はもともと空いている** — 塞いでよいのは
+   * そこだけ。
+   *
+   * 出しておく長さを決めない。**数え終わるまでが出しておく長さ**なので、
+   * 秒数を別に持つと数え方を変えたときに片方だけずれる。
    */
   let was: string | undefined
   createEffect(() => {
     const now = props.phase
-    const started = now === 'playing' && was !== 'playing' && was !== undefined
+    const before = was
     was = now
-    if (!started) return
-    clear()
-    setLeaving(false)
-    setShowing(true)
-    timers.push(setTimeout(() => setLeaving(true), HOLD_MS))
-    timers.push(setTimeout(() => setShowing(false), HOLD_MS + LEAVE_MS))
+
+    if (now === 'countdown') {
+      clear()
+      setLeaving(false)
+      setShowing(true)
+      return
+    }
+    // 数え終わって始まった。**割れて退く**
+    if (before === 'countdown' && now === 'playing') {
+      clear()
+      setLeaving(true)
+      timers.push(setTimeout(() => setShowing(false), LEAVE_MS))
+      return
+    }
+    // 数えるのが途中で止まった (人が抜けたなど)。**待たずに消す**
+    if (before === 'countdown') {
+      clear()
+      setShowing(false)
+      setLeaving(false)
+    }
   })
 
   onCleanup(clear)
@@ -81,9 +103,6 @@ export default function Orders(props: {
     </Show>
   )
 }
-
-/** 出しておく時間 (ms)。**始まった直後の動かない時間**に収まる長さ */
-const HOLD_MS = 3200
 
 /**
  * 消えるのにかける時間 (ms)。縞に割れて広がりながら薄れる。

@@ -307,11 +307,19 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </div>
       </Show>
 
-      {/* 支度。湧き地点へ戻してから数える */}
+      {/*
+        支度。湧き地点へ戻してから数える。
+
+        **帯が上、数字が下。** 数えている間は指令 (Orders) が出るので、
+        「何をするか」を先に読ませて、「あと何秒か」を目の高さに残す。
+        数字のほうが動くので、そちらを中央寄りに置く。
+
+        「まもなく開始」の一行は出さない。**数字がそれを言っている**うえ、
+        下には指令が出ている。
+      */}
       <Show when={phase() === 'countdown'}>
-        <div class="hud-standby">
+        <div class="hud-standby hud-standby-under">
           <div class="hud-standby-count">{remaining()}</div>
-          <div class="hud-standby-sub">{t('hud.startingSoon')}</div>
         </div>
       </Show>
 

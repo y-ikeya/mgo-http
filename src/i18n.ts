@@ -54,7 +54,6 @@ const JA = {
 
   // --- 試合中 ---
   'hud.waitingForOpponent': '対戦相手を待っています',
-  'hud.startingSoon': 'まもなく開始',
   'hud.scopeHint': 'Z / ホイールで覗く',
   'hud.standUpHint': '移動で起き上がる',
   // --- 装備 ---
@@ -123,7 +122,6 @@ const EN: Record<Key, string> = {
   'lobby.loading': 'Loading…',
 
   'hud.waitingForOpponent': 'Waiting for an opponent',
-  'hud.startingSoon': 'Starting soon',
   'hud.scopeHint': 'Z / wheel to scope',
   'hud.standUpHint': 'MOVE TO GET UP',
   'loadout.note': 'Choose your loadout',
