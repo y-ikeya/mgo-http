@@ -2620,6 +2620,14 @@ export class Game {
       return;
     }
 
+    /*
+     * 手元の表示。**削る量を決めるのはサーバー。**
+     *
+     * 背後かどうかは申告に載せない — 位置と向きから分かるので、サーバーが
+     * 通ったコマから出す (sim/judge/hitcheck.ts の isBackstab)。ここに残って
+     * いるのは、刺した瞬間に何か出さないと手応えが無いから。**巻き戻しの
+     * 結果と食い違うことはあり得る**が、数字が動くわけではない。
+     */
     this.lastHitZone = result.fromBehind ? "BACKSTAB" : "KNIFE";
     this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
     // 刺さった音。**空振りでは鳴らさない** — 当てたかどうかで結果が全部決まる
@@ -2629,7 +2637,6 @@ export class Game {
       id: this.net.id,
       target: result.id,
       kind: "melee",
-      fromBehind: result.fromBehind,
     });
   }
 

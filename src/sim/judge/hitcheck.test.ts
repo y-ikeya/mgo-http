@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { verifyHit, type Pose } from './hitcheck'
+import { isBackstab, verifyHit, type Pose } from './hitcheck'
 import type { Stance } from '../../domain/player/stance'
 import type { StageBox } from '../space/vision'
 
@@ -93,6 +93,43 @@ describe('ナイフの刺さる姿勢', () => {
     const verdict = verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW, RULES)
     expect(verdict.ok).toBe(false)
     if (!verdict.ok) expect(verdict.reason).toContain('姿勢')
+  })
+})
+
+/**
+ * 背後から刺したか。
+ *
+ * **申告で受け取っていた頃がある。** 位置と向きから分かるので受け取る理由が
+ * 無く、通ったコマから出すようにした。判じるのが**通ったコマ**であることが
+ * 肝で、別のコマの向きで数えると「間合いに居るのは A のコマ、背後なのは
+ * B のコマ」という食い違いが起きる。
+ */
+describe('背後から刺したか', () => {
+  /** その向きで立っている 1 コマ */
+  const facing = (yaw: number): Pose =>
+    ({ time: 0, x: 0, y: 0, z: 0, yaw, pitch: 0, stance: 'stand' }) as Pose
+
+  test('**同じ向きを向いていれば背後。** 追いかけて刺した形', () => {
+    expect(isBackstab(facing(0), facing(0), RULES.backstabDot)).toBe(true)
+  })
+
+  test('向かい合っていれば背後ではない', () => {
+    expect(isBackstab(facing(0), facing(Math.PI), RULES.backstabDot)).toBe(false)
+  })
+
+  test('真横は背後ではない', () => {
+    expect(isBackstab(facing(0), facing(Math.PI / 2), RULES.backstabDot)).toBe(false)
+  })
+
+  /**
+   * **どこまでを背後と認めるかは渡された値で決まる。**
+   *
+   * 幾何の側で数字を持たない。緩めれば横からでも背後になる。
+   */
+  test('認める幅は渡された値で決まる', () => {
+    const oblique = Math.PI / 3
+    expect(isBackstab(facing(0), facing(oblique), 0.9)).toBe(false)
+    expect(isBackstab(facing(0), facing(oblique), 0.2)).toBe(true)
   })
 })
 

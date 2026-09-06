@@ -28,7 +28,7 @@ import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
 import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
-import { verifyHit } from '../src/sim/judge/hitcheck'
+import { isBackstab, verifyHit } from '../src/sim/judge/hitcheck'
 import { posesOf } from './history'
 import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
@@ -339,7 +339,6 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
       kind: event.kind,
       zone: event.zone,
       distance: event.distance,
-      fromBehind: event.fromBehind,
       /*
        * 弾道の膨らみ。**遅い弾ほど弦から離れる。**
        *
@@ -359,6 +358,20 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
   }
 
   /*
+   * 背後から刺したか。**通ったコマから出す。**
+   *
+   * 申告に載せてもらっていた頃があるが、位置と向きから分かるので受け取る
+   * 理由が無い。**通ったコマで判じる**のが肝 — 巻き戻しは 28 コマを舐めて
+   * 1 つでも成立したら確定するので、別のコマの向きで数えると「間合いに
+   * 居るのは A のコマ、背後なのは B のコマ」という食い違いが起きる。
+   *
+   * 弾は撃った側の位置から出す (isBehind)。あちらは向き合っているかではなく、
+   * **どちら側から飛んできたか**なので別の式。
+   */
+  const stabbedBehind =
+    event.kind === 'melee' && isBackstab(verdict.attacker, verdict.target, HIT_RULES.backstabDot)
+
+  /*
    * 削る量。**散弾だけ別の道。**
    *
    * 他の銃は「部位 × 距離の減衰」だが、散弾は**当たった距離の帯**で決まる
@@ -371,7 +384,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
     band !== null
       ? band.damage
       : event.kind === 'melee'
-        ? meleeDamage(event.fromBehind ?? false)
+        ? meleeDamage(stabbedBehind)
         : bulletDamage(
             weaponOf(attacker.weapon),
             (event.zone ?? 'BODY') as HitZone,
@@ -444,7 +457,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
   // 倒れても飛ばす。**近くで散弾を食らえば体ごと持って行かれる**
   pushIfShotgun(attacker, victim, band)
   // どちら側から撃たれたか。**的は自分で倒れる**ので、控えてから状態を移す
-  const behind = event.kind === 'melee' ? (event.fromBehind ?? false) : isBehind(victim, attacker)
+  const behind = event.kind === 'melee' ? stabbedBehind : isBehind(victim, attacker)
   victim.downFromBehind = behind
 
   // 記録に残す分。**表示名ではなく安定した id で数える**

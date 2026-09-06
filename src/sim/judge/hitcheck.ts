@@ -56,7 +56,6 @@ export interface HitClaim {
   kind: 'bullet' | 'melee'
   zone?: HitZone
   distance?: number
-  fromBehind?: boolean
   /**
    * 弾道の膨らみ (m)。**弦から見て、どれだけ上を通ったか。**
    *
@@ -73,7 +72,21 @@ export interface HitClaim {
   sag?: number
 }
 
-export type Verdict = { ok: true } | { ok: false; reason: string }
+/**
+ * 判定の答え。
+ *
+ * **通ったときは、通った瞬間の姿も返す。** 巻き戻しは 28 コマを舐めて 1 つでも
+ * 成立したら確定するので、**どのコマで通ったかは呼ぶ側から見えない。** 返さない
+ * と、削る量を決める側が別のコマの向きで背後刺しを判じることになる。
+ *
+ *     コマ A   間合いに居るが、正面
+ *     コマ B   背後だが、間合いの外
+ *
+ * A で成立させたのに B の向きで数えてしまう、という食い違いが起きる。
+ */
+export type Verdict =
+  | { ok: true; attacker: Pose; target: Pose }
+  | { ok: false; reason: string }
 
 /**
  * 部位の高さ。足元からの比率で持つ。
@@ -225,15 +238,13 @@ function verifyPose(
       return { ok: false, reason: `ナイフの間合いの外 (${flat.toFixed(1)}m)` }
     }
 
-    // 背後からかどうかは、位置と向きから分かる。申告を信じる理由が無い
-    if (claim.fromBehind) {
-      const [vfx, vfz] = forwardOf(target.yaw)
-      const [afx, afz] = forwardOf(attacker.yaw)
-      if (vfx * afx + vfz * afz <= rules.backstabDot) {
-        return { ok: false, reason: '背後ではない' }
-      }
-    }
-    return { ok: true }
+    /*
+     * **背後かどうかはここで判じない。**
+     *
+     * 位置と向きから分かるので、申告を受け取る理由が無い。通ったコマを返すので、
+     * 削る量を決める側がそこから出す (isBackstab)。
+     */
+    return { ok: true, attacker, target }
   }
 
   // 弾。申告された距離が実際と合っているか
@@ -251,7 +262,20 @@ function verifyPose(
     return { ok: false, reason: `${zone} は遮蔽の裏` }
   }
 
-  return { ok: true }
+  return { ok: true, attacker, target }
+}
+
+/**
+ * 背後から刺したか。**通ったコマから出す。**
+ *
+ * 申告で受け取っていた頃があるが、位置と向きから分かるので受け取る理由が無い。
+ * **通ったコマで判じる**のが肝で、別のコマの向きで数えると「間合いに居るのは
+ * A のコマ、背後なのは B のコマ」という食い違いが起きる。
+ */
+export function isBackstab(attacker: Pose, target: Pose, backstabDot: number): boolean {
+  const [vfx, vfz] = forwardOf(target.yaw)
+  const [afx, afz] = forwardOf(attacker.yaw)
+  return vfx * afx + vfz * afz > backstabDot
 }
 
 /**

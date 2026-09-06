@@ -155,8 +155,6 @@ export interface DamageEvent {
   /** 弾のとき。部位と距離からダメージが決まる */
   zone?: HitZone
   distance?: number
-  /** ナイフのとき。背後からなら即死 */
-  fromBehind?: boolean
 }
 
 /**
