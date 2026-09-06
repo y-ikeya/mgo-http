@@ -27,10 +27,8 @@ import {
   buildBases,
   buildStage,
   STAGE_CODE,
-  loadStageBoxes,
   type Stage,
 } from "./world/stage";
-import { solidBlockers, type StageBox } from "../../sim/space/vision";
 import {
   ceilingHeight,
   clampToArena,
@@ -568,7 +566,6 @@ export class Game {
   /** 地面に落ちている武器。浮かせて回している */
   private readonly drops: Drops;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
-  private stageBoxes: StageBox[] = [];
   /**
    * 一覧を開いている最中。
    *
@@ -1033,10 +1030,6 @@ export class Game {
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
-    void loadStageBoxes(this.stageName).then((boxes) => {
-      // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
-      this.stageBoxes = solidBlockers(boxes);
-    });
     this.shots = new Shots(this.scene);
     this.net.onMessage((message) => this.receive(message));
 
@@ -1368,7 +1361,7 @@ export class Game {
     this.remotes.update(dt, Date.now());
     this.drops.update(dt);
     this.updateFootsteps();
-    this.grenades.update(dt, this.stageBoxes, this.stage.water, (bounce) => {
+    this.grenades.update(dt, this.stage.thrownWorld, this.stage.water, (bounce) => {
       /*
        * 水に落ちたら輪を出す。**跳ねる音は鳴らさない** — 水面で金属が跳ねる
        * 音がすると、そこに硬い床があるように聞こえる。
@@ -1402,7 +1395,7 @@ export class Game {
     );
     this.shots.update(dt);
     this.blast.update(dt);
-    this.casings.update(dt, this.stageBoxes, this.stage.water, (at) => {
+    this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
       // 水に落ちたら輪だけ出して沈める。**金属の音は鳴らさない**
       // 薬莢は軽い。小さく叩く
       if (this.splashAt(at, CASING_SPLASH)) return true;
@@ -3224,7 +3217,7 @@ export class Game {
       this.grenades.showPreview(
         this.grenadeOrigin,
         this.aimDir,
-        this.stageBoxes,
+        this.stage.thrownWorld,
         this.stage.water,
         throwSpeedOf(this.skills),
       );

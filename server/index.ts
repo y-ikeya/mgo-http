@@ -283,7 +283,7 @@ setInterval(() => {
         const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
         // 水に落ちた手榴弾は沈む。**水面を跳ねて渡らない**
         for (let k = 0; k < steps; k++)
-          stepProjectile(nade.body, room.stage.solid, undefined, water)
+          stepProjectile(nade.body, room.stage.thrown, undefined, water)
         nade.fuse -= TICK_MS / 1000
         if (nade.fuse <= 0) {
           detonate(room, nade)

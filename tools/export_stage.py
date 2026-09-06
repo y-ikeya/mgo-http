@@ -449,18 +449,35 @@ def triangles_of(obj):
         obj.to_mesh_clear()
 
 
+# 面ごとに何を止めるか。**視線と物で別々の木を組む**ので、印を持たせる。
+#
+# 物のほうは弾と同じ集合を使う。**手すりは「人は止めるが弾は通す」**設定に
+# なっていて、あれを物の側に入れると三角が 8 倍になる (47 万枚)。手すりを
+# 弾がすり抜けるなら、投げた物もすり抜けるほうが揃う。
+#
+# 人が壁で止まるのは別の話 (箱のまま)。あちらは線ではなく円柱の押し戻し。
+#
+# 別々のファイルに出すと、両方を止める面 (ほとんどの壁) の頂点が 2 度書かれる。
+# 1 枚に印を添えて、読む側が振り分ける。
+EYE_BIT = 1
+BULLET_BIT = 2
+
 positions = []
+marks = []
 mesh_objects = 0
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
         continue
-    # 視線を止めない物は出さない。飾りも、見えない当たり判定 (col_) も
-    if not flags_of(obj)['eye']:
+    flags = flags_of(obj)
+    mark = (EYE_BIT if flags['eye'] else 0) | (BULLET_BIT if flags['bullet'] else 0)
+    # どちらも止めないなら出さない。飾りはここで落ちる
+    if mark == 0:
         continue
     tris = triangles_of(obj)
     if not tris:
         continue
     positions.extend(tris)
+    marks.extend([mark] * (len(tris) // 9))
     mesh_objects += 1
 
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
@@ -475,13 +492,19 @@ with open(json_path, 'w') as f:
 # 読むのはサーバーだけ。クライアントは glb のメッシュを既に持っているので、
 # 木は手元の形から組める。
 #
-# json ではなく生の float で書く。57000 枚で 4.3MB が 2.0MB になり、読む側は
+# json ではなく生の数値で書く。57000 枚で 4.3MB が 2.1MB になり、読む側は
 # 解析せずに Float32Array へ載せるだけで済む。
+#
+#   [uint32 枚数][float32 頂点 × 枚数×9][uint8 印 × 枚数]
+#
+# 印は「何を止めるか」。読む側が視線用と物用に振り分けて、別々の木を組む。
 import struct
 
-bin_path = os.path.join(root, 'public', 'models', stage_name + '.sight.bin')
+bin_path = os.path.join(root, 'public', 'models', stage_name + '.mesh.bin')
 with open(bin_path, 'wb') as f:
+    f.write(struct.pack('<I', len(marks)))
     f.write(struct.pack('<%df' % len(positions), *positions))
+    f.write(struct.pack('<%dB' % len(marks), *marks))
 
 
 # --- テクスチャを伸ばさない ---------------------------------------------------
@@ -676,7 +699,10 @@ for name in exported:
 
 print(f'\n書き出し: {glb_path}')
 print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個)')
-print(f'          {bin_path} (視線を止める三角 {len(positions) // 9} 枚 / {mesh_objects} メッシュ)')
+eyes = sum(1 for m in marks if m & EYE_BIT)
+bullets = sum(1 for m in marks if m & BULLET_BIT)
+print(f'          {bin_path} (三角 {len(marks)} 枚 / {mesh_objects} メッシュ)')
+print(f'          視線を止める {eyes} 枚 / 物を止める {bullets} 枚')
 print(f'メッシュ {len(exported)} 個' + (f' / 物差し {len(skipped)} 個は除外' if skipped else ''))
 print('材質: ' + ' / '.join(f'{k} {v}' for k, v in sorted(counts.items())))
 

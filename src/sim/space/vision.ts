@@ -9,6 +9,9 @@
  * 同じ判定を 2 か所に書くと、必ずどちらかがずれる。
  */
 
+import type { SurfaceHit } from './bvh'
+export type { SurfaceHit } from './bvh'
+
 import type { SurfaceFlags } from '../../domain/stage'
 
 /** 遮蔽になる箱。ステージの書き出しが作る stage.json の中身 */
@@ -173,6 +176,25 @@ export function segmentHitsBox(
 export interface SightBlocker {
   /** a から b へ線が通るか */
   clear(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean
+}
+
+/**
+ * 線分で掃いて、**最初に当たった面**を返せる物。
+ *
+ * SightBlocker (通るかどうか) では足りない場面のため。跳ね返りには面の向きが
+ * 要るし、カメラを壁の手前へ寄せるには距離が要る。
+ *
+ * TriangleBvh がそのまま満たす。箱の側は包みを作る (ballistic.ts の boxSolid)。
+ */
+export interface SolidWorld {
+  hit(
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+  ): SurfaceHit | null
 }
 
 /**

@@ -34,6 +34,16 @@ export interface TriangleMesh {
   positions: Float32Array
 }
 
+/** 当たった所。**跳ね返りに要る** */
+export interface SurfaceHit {
+  /** 始点からの割合 (0..1) */
+  t: number
+  /** 面の向き。**線の来た側を向いている** */
+  nx: number
+  ny: number
+  nz: number
+}
+
 /** 木の節点。葉なら三角を持ち、そうでなければ子を 2 つ持つ */
 interface Node {
   minX: number
@@ -78,6 +88,91 @@ export class TriangleBvh {
   /** 三角の枚数 */
   get size(): number {
     return this.tris.length
+  }
+
+  /**
+   * a から b へ線を引いて、**最初に当たった面**を返す。当たらなければ null。
+   *
+   * clear() と違って**どこで当たったかまで返す。** 跳ね返りには面の向き
+   * (法線) が要るので、通るかどうかだけでは足りない。
+   *
+   * 法線は**線の来た側へ向けて返す。** 三角に表裏は無いものとして扱っている
+   * ので (壁は片面しか無いことがある)、頂点の並びから出た向きが線と同じ側を
+   * 向いていたら裏返す。裏返さないと、裏から当たった物が壁へ押し込まれる。
+   */
+  hit(
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+  ): SurfaceHit | null {
+    if (this.nodes.length === 0) return null
+    const dx = bx - ax
+    const dy = by - ay
+    const dz = bz - az
+    const found = this.nearest(0, ax, ay, az, dx, dy, dz, 1 / dx, 1 / dy, 1 / dz, null)
+    return found
+  }
+
+  /** その枝の中で一番手前の当たりを探す */
+  private nearest(
+    at: number,
+    ax: number,
+    ay: number,
+    az: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    invX: number,
+    invY: number,
+    invZ: number,
+    best: SurfaceHit | null,
+  ): SurfaceHit | null {
+    const node = this.nodes[at]!
+    if (!segmentHitsBounds(node, ax, ay, az, invX, invY, invZ)) return best
+    if (node.count > 0) {
+      for (let i = node.from; i < node.from + node.count; i++) {
+        const t = this.triangleDistance(this.tris[i]!, ax, ay, az, dx, dy, dz)
+        if (t === null || (best && t >= best.t)) continue
+        best = { t, ...this.normalOf(this.tris[i]!, dx, dy, dz) }
+      }
+      return best
+    }
+    best = this.nearest(node.left, ax, ay, az, dx, dy, dz, invX, invY, invZ, best)
+    return this.nearest(node.right, ax, ay, az, dx, dy, dz, invX, invY, invZ, best)
+  }
+
+  /** その三角の面の向き。**線の来た側へ向ける** */
+  private normalOf(
+    tri: number,
+    dx: number,
+    dy: number,
+    dz: number,
+  ): { nx: number; ny: number; nz: number } {
+    const p = this.positions
+    const o = tri * 9
+    const e1x = p[o + 3]! - p[o]!
+    const e1y = p[o + 4]! - p[o + 1]!
+    const e1z = p[o + 5]! - p[o + 2]!
+    const e2x = p[o + 6]! - p[o]!
+    const e2y = p[o + 7]! - p[o + 1]!
+    const e2z = p[o + 8]! - p[o + 2]!
+    let nx = e1y * e2z - e1z * e2y
+    let ny = e1z * e2x - e1x * e2z
+    let nz = e1x * e2y - e1y * e2x
+    const length = Math.hypot(nx, ny, nz) || 1
+    nx /= length
+    ny /= length
+    nz /= length
+    // 線と同じ側を向いていたら裏返す
+    if (nx * dx + ny * dy + nz * dz > 0) {
+      nx = -nx
+      ny = -ny
+      nz = -nz
+    }
+    return { nx, ny, nz }
   }
 
   /**
@@ -126,12 +221,7 @@ export class TriangleBvh {
     )
   }
 
-  /**
-   * 線分がその三角を貫くか (Möller–Trumbore)。
-   *
-   * **表裏を区別しない。** 壁は片面しか無いことがあるので、裏から当てた弾が
-   * 素通りすると「後ろから撃つと壁を抜ける」になる。
-   */
+  /** 線分がその三角を貫くか。通るかどうかだけ要るときの近道 */
   private hitsTriangle(
     tri: number,
     ax: number,
@@ -141,6 +231,24 @@ export class TriangleBvh {
     dy: number,
     dz: number,
   ): boolean {
+    return this.triangleDistance(tri, ax, ay, az, dx, dy, dz) !== null
+  }
+
+  /**
+   * 線分がその三角を貫くなら、始点からの割合 (0..1) を返す。
+   *
+   * **表裏を区別しない。** 壁は片面しか無いことがあるので、裏から当てた弾が
+   * 素通りすると「後ろから撃つと壁を抜ける」になる。
+   */
+  private triangleDistance(
+    tri: number,
+    ax: number,
+    ay: number,
+    az: number,
+    dx: number,
+    dy: number,
+    dz: number,
+  ): number | null {
     const p = this.positions
     const o = tri * 9
     const e1x = p[o + 3]! - p[o]!
@@ -154,24 +262,24 @@ export class TriangleBvh {
     const hy = dz * e2x - dx * e2z
     const hz = dx * e2y - dy * e2x
     const det = e1x * hx + e1y * hy + e1z * hz
-    if (det > -PARALLEL && det < PARALLEL) return false
+    if (det > -PARALLEL && det < PARALLEL) return null
 
     const inv = 1 / det
     const sx = ax - p[o]!
     const sy = ay - p[o + 1]!
     const sz = az - p[o + 2]!
     const u = inv * (sx * hx + sy * hy + sz * hz)
-    if (u < 0 || u > 1) return false
+    if (u < 0 || u > 1) return null
 
     const qx = sy * e1z - sz * e1y
     const qy = sz * e1x - sx * e1z
     const qz = sx * e1y - sy * e1x
     const v = inv * (dx * qx + dy * qy + dz * qz)
-    if (v < 0 || u + v > 1) return false
+    if (v < 0 || u + v > 1) return null
 
     // 線分の内側か。**外は当たらない** — 的の向こう側の壁で遮られたことにしない
     const t = inv * (e2x * qx + e2y * qy + e2z * qz)
-    return t > PARALLEL && t < 1
+    return t > PARALLEL && t < 1 ? t : null
   }
 
   /**

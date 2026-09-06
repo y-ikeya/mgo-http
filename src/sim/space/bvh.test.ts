@@ -58,6 +58,43 @@ describe('線が通るか', () => {
   })
 })
 
+describe('当たった所を返す', () => {
+  test('**距離と面の向きが返る。** 跳ね返りに要る', () => {
+    // 板は z = 0。z = -5 から z = 5 へ 10m 進むうち、5m の所で当たる
+    const found = bvh(panel(0)).hit(0, 0, -5, 0, 0, 5)
+    expect(found).not.toBeNull()
+    expect(found!.t).toBeCloseTo(0.5, 3)
+    // 成分ごとに見る。**-0 と 0 は toEqual で別物**になるので、値で比べる
+    expect(found!.nx).toBeCloseTo(0, 6)
+    expect(found!.ny).toBeCloseTo(0, 6)
+    expect(found!.nz).toBeCloseTo(-1, 6)
+  })
+
+  test('当たらなければ null', () => {
+    expect(bvh(panel(0)).hit(5, 5, -5, 5, 5, 5)).toBeNull()
+  })
+
+  /**
+   * **面の向きは、線の来た側へ向けて返す。**
+   *
+   * 三角に表裏は無いものとして扱っている (壁は片面しか無いことがある) ので、
+   * 頂点の並びから出た向きをそのまま返すと、裏から当たった物が壁へ押し込まれる。
+   */
+  test('裏から当たっても、向きはこちら側を向く', () => {
+    const front = bvh(panel(0)).hit(0, 0, -5, 0, 0, 5)
+    const back = bvh(panel(0)).hit(0, 0, 5, 0, 0, -5)
+    expect(front!.nz).toBe(-1)
+    expect(back!.nz).toBe(1)
+  })
+
+  test('**一番手前の面を返す。** 奥の板は無視する', () => {
+    const two = bvh([...panel(0), ...panel(4)])
+    // z = -5 から z = 8 へ 13m。手前の板は 5m の所
+    const found = two.hit(0, 0, -5, 0, 0, 8)
+    expect(found!.t).toBeCloseTo(5 / 13, 3)
+  })
+})
+
 describe('たくさんの板', () => {
   /** z = 0, 4, 8 ... に板を並べる */
   const wall = (n: number) => {

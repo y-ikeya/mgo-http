@@ -28,6 +28,8 @@ import {
   vec3,
 } from 'three/tsl'
 import type { Obstacle } from '../../../sim/space/collision'
+import { TriangleBvh } from '../../../sim/space/bvh'
+import type { SolidWorld } from '../../../sim/space/vision'
 import { isPathClear, sightBlockers } from '../../../sim/space/vision'
 import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
@@ -251,9 +253,69 @@ function frameGeometry(half: number, width: number): THREE.BufferGeometry {
 /** 差し替えで中身が入れ替わる部分。配列そのものは作り直さない */
 type StageParts = Pick<Stage, 'collidables' | 'cameraBlockers' | 'obstacles'>
 
+/**
+ * 描いているメッシュから、三角の網をそのまま取り出す。
+ *
+ * **クライアントは形を落とさなくていい。** サーバーは three を積んでいないので
+ * 書き出しの時に三角を別ファイルへ出しているが (public/models/*.mesh.bin)、
+ * こちらは glb を既に読んでいる。同じ形が手元にあるのに落とし直すのは無駄。
+ *
+ * 世界の位置に置いた形で取る (matrixWorld を掛ける)。
+ */
+/**
+ * いま描いている形をそのまま当たり判定にする世界。
+ *
+ * **形は途中で入れ替わる。** 最初はコード側のブロックアウトで、glb が届いたら
+ * そちらへ差し替わる。木を組み直すのはそのときだけなので、外から見える顔は
+ * ずっと同じ物にしておく (呼ぶ側が持ち直さなくていい)。
+ */
+class MeshWorld implements SolidWorld {
+  private bvh: TriangleBvh | null = null
+
+  /** 形が入れ替わった。**木を組み直す** */
+  rebuild(objects: THREE.Object3D[]): void {
+    this.bvh = new TriangleBvh({ positions: meshTriangles(objects) })
+  }
+
+  hit(ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
+    return this.bvh?.hit(ax, ay, az, bx, by, bz) ?? null
+  }
+}
+
+export function meshTriangles(objects: THREE.Object3D[]): Float32Array {
+  const out: number[] = []
+  const corner = new THREE.Vector3()
+  for (const object of objects) {
+    object.updateWorldMatrix(true, false)
+    object.traverse((node) => {
+      if (!isMesh(node)) return
+      const position = node.geometry.getAttribute('position')
+      if (!position) return
+      const index = node.geometry.getIndex()
+      const count = index ? index.count : position.count
+      for (let i = 0; i < count; i++) {
+        const at = index ? index.getX(i) : i
+        corner.fromBufferAttribute(position, at).applyMatrix4(node.matrixWorld)
+        out.push(corner.x, corner.y, corner.z)
+      }
+    })
+  }
+  return new Float32Array(out)
+}
+
 export interface Stage {
   /** 弾が当たる物。撃った先を決めるのに使う */
   readonly collidables: THREE.Object3D[]
+  /**
+   * 投げた物がぶつかる形。**三角の網。**
+   *
+   * 箱で見ていた頃は、メッシュを包む直方体で跳ねていた — **手すりの無い側の
+   * 空中で跳ね返る。** 弾が当たる物と同じ集合を使う (手すりを弾がすり抜ける
+   * なら、投げた物もすり抜けるほうが揃う)。
+   *
+   * サーバーも同じ集合で回している (書き出しの BULLET_BIT)。
+   */
+  readonly thrownWorld: SolidWorld
   /** カメラが寄る物。壁抜けを防ぐ */
   readonly cameraBlockers: THREE.Object3D[]
   /** 移動判定用の XZ 平面 AABB */
@@ -990,7 +1052,20 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    * 待てるように、その約束をそのまま ready として返す。
    */
   const parts = { collidables, cameraBlockers, obstacles }
-  return { ...parts, water, ready: replaceWithModel(scene, name, parts, blockout) }
+  /*
+   * 投げた物がぶつかる形。**いま描いている物から組む。**
+   *
+   * ブロックアウトの間はその形、glb が届いたらそちらで組み直す。差し替えは
+   * replaceWithModel の中。
+   */
+  const thrownWorld = new MeshWorld()
+  thrownWorld.rebuild(collidables)
+  return {
+    ...parts,
+    thrownWorld,
+    water,
+    ready: replaceWithModel(scene, name, parts, blockout, thrownWorld),
+  }
 }
 
 /**
@@ -1006,6 +1081,8 @@ async function replaceWithModel(
   stageName: StageName,
   stage: StageParts,
   blockout: THREE.Group,
+  /** 投げた物の世界。**形が入れ替わったら組み直す** */
+  thrownWorld: MeshWorld,
 ): Promise<void> {
   let gltf
   try {
@@ -1097,6 +1174,13 @@ async function replaceWithModel(
   })
 
   await applySlopes(stageName, obstacles)
+
+  /*
+   * 投げた物の世界を組み直す。**ここでしか形は入れ替わらない。**
+   *
+   * 57000 枚で 100ms 前後。地形が差し替わる瞬間なので、そこに乗せてよい。
+   */
+  thrownWorld.rebuild(collidables)
 
   let meshCount = 0
   model.traverse((obj) => {
