@@ -99,7 +99,19 @@ const LIMBO_MS = 100
  *
  * 握り潰さずに大きく出す。落ちなくなったぶん、気づけるのはログだけになる。
  */
+/**
+ * 刻みの重さ。**追いつけているかを /health で読むため。**
+ *
+ * 平均だけでは足りない。**詰まるのは一瞬**で、平均に埋もれる — 64Hz なので
+ * 1 回 15.6ms を超えたら、その刻みは次を押している。最悪も一緒に持つ。
+ *
+ * 窓を切り直すのは 1 秒ごと。ずっと持つと、起動直後の重い 1 回が最悪として
+ * 居座って、いま詰まっているかが読めなくなる。
+ */
+const tickCost = { total: 0, count: 0, worst: 0, windowFrom: 0, average: 0, lastWorst: 0 }
+
 setInterval(() => {
+  const startedAt = performance.now()
   try {
     const now = Date.now()
     for (const room of rooms.values()) {
@@ -298,6 +310,24 @@ setInterval(() => {
     }
   } catch (error) {
     console.error('[刻み] 例外。この刻みは捨てる', error)
+  }
+  /*
+   * 重さを控える。**例外で抜けた刻みも数える** — 落ちた刻みだけ軽く見えると、
+   * 詰まっているのに平均が下がる。
+   */
+  const cost = performance.now() - startedAt
+  tickCost.total += cost
+  tickCost.count += 1
+  if (cost > tickCost.worst) tickCost.worst = cost
+  const at = Date.now()
+  if (tickCost.windowFrom === 0) tickCost.windowFrom = at
+  else if (at - tickCost.windowFrom >= 1000) {
+    tickCost.average = tickCost.total / tickCost.count
+    tickCost.lastWorst = tickCost.worst
+    tickCost.total = 0
+    tickCost.count = 0
+    tickCost.worst = 0
+    tickCost.windowFrom = at
   }
 }, TICK_MS)
 
@@ -701,7 +731,17 @@ const server = Bun.serve<Client>({
             )
             .join('\n'),
       )
-      return new Response(`ok\n${lines.join('\n')}\n`, {
+      /*
+       * 刻みの重さと持ち物。**追いついているかはここでしか見えない。**
+       *
+       * 1 回 15.6ms を超えたら次を押している。人数を増やしたときに、どこで
+       * 詰まり始めるかを読むために出す。heap は履歴の作り直しが効くところ。
+       */
+      const heap = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+      const cost =
+        `刻み 平均 ${tickCost.average.toFixed(2)}ms / 最悪 ${tickCost.lastWorst.toFixed(2)}ms ` +
+        `(上限 ${TICK_MS.toFixed(1)}ms)  heap ${heap}MB\n`
+      return new Response(`ok\n${cost}${lines.join('\n')}\n`, {
         headers: { 'content-type': 'text/plain; charset=utf-8' },
       })
     }
