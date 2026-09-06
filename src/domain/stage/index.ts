@@ -44,7 +44,7 @@ import type { Team } from '../player/player'
 export { DEFAULT_SURFACE, surfaceOf, type Surface } from './surface'
 export { flagsOf, type SurfaceFlags } from './flags'
 
-export type StageName = 'mall' | 'training' | 'garden'
+export type StageName = 'mall' | 'training' | 'raft'
 
 /**
  * 地面の上の 1 点。
@@ -211,7 +211,7 @@ const TRAINING: StageSpec = {
 }
 
 /**
- * 庭園。**82m 四方。**
+ * 筏。**82m 四方。**
  *
  * 塀に囲まれた平地に、対角の角へ台が 2 つ。遮蔽がほとんど無い。
  *
@@ -219,9 +219,9 @@ const TRAINING: StageSpec = {
  * 撃ち合いは「先に見つけたか」だけで決まる。動けば見つかり、動かなければ
  * 詰められる。
  */
-const GARDEN: StageSpec = {
-  name: 'garden',
-  label: 'GARDEN',
+const RAFT: StageSpec = {
+  name: 'raft',
+  label: 'RAFT',
   // **水に囲まれている。** 板の上だけが世界なので、外は波の音
   ambience: 'wave_loop1.mp3',
   /*
@@ -238,7 +238,7 @@ const GARDEN: StageSpec = {
    * 敷いている y=0 の地面で、そこは動かせない (投擲物の床でもある)。だから
    * 板のほうを上げてあり、上げた 10m がそのまま水深になる。
    *
-   * 数字は書き出した json (public/models/stage_garden.json) の天面と揃える。
+   * 数字は書き出した json (public/models/stage_raft.json) の天面と揃える。
    * **台を動かしたらここも動かす** — ずれると湧いた瞬間に沈んで溺れる。
    */
   bases: {
@@ -270,13 +270,13 @@ const GARDEN: StageSpec = {
 export const STAGES: Record<StageName, StageSpec> = {
   mall: MALL,
   training: TRAINING,
-  garden: GARDEN,
+  raft: RAFT,
 }
 
 /**
  * 水に沈んでいるか。**足元が水面より下なら溺れる。**
  *
- * 庭園は水がアリーナ全体を覆っていて、**歩けるのは水に浮いている板の上だけ**。
+ * 筏は水がアリーナ全体を覆っていて、**歩けるのは水に浮いている板の上だけ**。
  * 縁で見えない壁に止められるより、落ちられて死ぬほうが「板の上だけが世界だ」
  * と早く分かる。柵で落ちないようにするのが主で、これはその外側の受け皿。
  *

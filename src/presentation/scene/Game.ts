@@ -1001,7 +1001,7 @@ export class Game {
      * **地形が届くまで人を落とさない。**
      *
      * buildStage はブロックアウトの箱だけ持ってすぐ返り、本物の地形は後から
-     * 差し替わる。庭園は足場が水面の 10m 上にあるので、届く前に湧くと**立つ
+     * 差し替わる。筏は足場が水面の 10m 上にあるので、届く前に湧くと**立つ
      * 床が無いまま重力が効いて、そのまま落ちて溺れる** — 「たまに試合開始で
      * 下に落ちる」の正体がこれ。
      *
@@ -1060,7 +1060,7 @@ export class Game {
     this.follow = new FollowCamera(1);
     if (water) this.follow.minY = water.y + Game.WATER_CLEARANCE;
     this.follow.snapTo(this.player, this.cameraWorld);
-    // 環境音はステージが決める。庭園は波、屋内は街の音 (domain/stage の ambience)
+    // 環境音はステージが決める。筏は波、屋内は街の音 (domain/stage の ambience)
     this.audio = new GameAudio(this.follow.camera, this.scene, STAGES[this.stageName].ambience);
 
     this.calibration = createCalibration({
@@ -1298,7 +1298,7 @@ export class Game {
      * **地形が届くまで人を進めない。**
      *
      * buildStage はブロックアウトの箱だけ持ってすぐ返り、本物の地形は後から
-     * 差し替わる。庭園は足場が水面の 10m 上にあるので、届く前に進めると
+     * 差し替わる。筏は足場が水面の 10m 上にあるので、届く前に進めると
      * **立つ床が無いまま重力だけが効いて、落ちて溺れる**。
      *
      * 止めるのは人の歩みだけで、描画も HUD も回し続ける — ここで tick ごと

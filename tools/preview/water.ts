@@ -7,7 +7,7 @@ import { Shots } from '../../src/presentation/scene/fx/shots'
  * 水面だけの試写。**部屋に入らずに見る。**
  *
  * 映り込みは場面をもう一度描くので、組み上がるまで分からない。対戦部屋へ
- * 入ると席を 1 つ潰すので、庭園とカメラだけを立てて 1 枚描く。
+ * 入ると席を 1 つ潰すので、筏とカメラだけを立てて 1 枚描く。
  */
 const WIDTH = 1280
 const HEIGHT = 720
@@ -20,7 +20,7 @@ renderer.toneMappingExposure = EXPOSURE
 document.body.appendChild(renderer.domElement)
 
 const scene = new THREE.Scene()
-buildStage(scene, 'garden')
+buildStage(scene, 'raft')
 buildLights(scene)
 
 /*

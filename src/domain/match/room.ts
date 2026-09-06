@@ -134,7 +134,7 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
   charlie: { mode: 'TSNE', stages: only('mall') },
   delta: {
     mode: 'TDM',
-    stages: only('garden'),
+    stages: only('raft'),
     note: '砂部屋',
     // **狙撃銃だけ。** 副武器も外すので、詰められたらナイフしか残らない
     primaries: ['sniper'],
