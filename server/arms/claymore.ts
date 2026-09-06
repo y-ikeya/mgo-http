@@ -83,7 +83,7 @@ export function relayClaymores(room: RoomWorld): void {
     for (const claymore of room.claymores) {
       // 味方の物は無条件。どこに置いたか分からないと自分が引っ掛かる
       let visible = friendlyTeam(room, viewer, claymore.team)
-      if (!visible && room.stage.sight.length > 0) {
+      if (!visible) {
         const eye = viewOf(room, viewer)
         visible = hasLineOfSight(
           eye.x, eye.y, eye.z,

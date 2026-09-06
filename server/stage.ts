@@ -16,7 +16,16 @@
 
 import { STAGES, type StageName } from '../src/domain/stage'
 import { arenaHalfOf } from '../src/sim/judge/motioncheck'
-import { type StageBox, sightBlockers, solidBlockers } from '../src/sim/space/vision'
+import {
+  OPEN_SIGHT,
+  boxSight,
+  cameraBlockers,
+  sightBlockers,
+  solidBlockers,
+  type SightBlocker,
+  type StageBox,
+} from '../src/sim/space/vision'
+import { TriangleBvh } from '../src/sim/space/bvh'
 
 /**
  * 1 枚ぶんの地形。**用途で 2 つに分ける。**
@@ -27,15 +36,33 @@ import { type StageBox, sightBlockers, solidBlockers } from '../src/sim/space/vi
  */
 export interface Terrain {
   name: StageName
-  sight: StageBox[]
+  /**
+   * 視線を止める形。**三角の網。**
+   *
+   * 箱で持っていた頃は、メッシュを包む直方体を判定に使っていたので**見えて
+   * いる形と当たる形が違った** — 手すりの上を撃っているのに止められる、が
+   * 起きる。三角なら見た目と一致する (sim/space/bvh.ts)。
+   *
+   * 読めなければ素通しの世界 (OPEN_SIGHT)。**遮蔽なしで動く** (位置は全員へ
+   * 配られる)。
+   */
+  sight: SightBlocker
+  /** 物がぶつかる面。**まだ箱** — 移動の当たり判定は別の形 (XZ の四角 + 上面) */
   solid: StageBox[]
+  /**
+   * カメラが入れない面。**これも箱。**
+   *
+   * 壁の手前へ寄せるには「どこで当たったか」が要るので、通るかどうかしか
+   * 答えない三角の網では足りない。
+   */
+  camera: StageBox[]
   /** 遊べる範囲の半分 (m)。**箱の外接から出す** — 広げた分が場外にならないように */
   arenaHalf: number
 }
 
 /** 地形が読めなかったときの姿。**対戦は成立する** (全員が全員を見られる) */
 function bare(name: StageName): Terrain {
-  return { name, sight: [], solid: [], arenaHalf: Number.POSITIVE_INFINITY }
+  return { name, sight: OPEN_SIGHT, solid: [], camera: [], arenaHalf: Number.POSITIVE_INFINITY }
 }
 
 async function load(name: StageName): Promise<Terrain> {
@@ -49,17 +76,41 @@ async function load(name: StageName): Promise<Terrain> {
   const path = new URL(`../public/models/stage_${name}.json`, import.meta.url)
   try {
     const data = (await Bun.file(path).json()) as { boxes: StageBox[] }
-    const sight = sightBlockers(data.boxes)
     const solid = solidBlockers(data.boxes)
     const half = arenaHalfOf(solid)
+    const sight = await loadSight(name, data.boxes)
     console.info(
-      `ステージ ${name}: 箱 ${data.boxes.length} 個 / 視線を止める ${sight.length} 個 / ` +
-        `物が当たる ${solid.length} 個 / 範囲 ±${half.toFixed(1)}m`,
+      `ステージ ${name}: 三角 ${sight instanceof TriangleBvh ? sight.size : 0} 枚 / ` +
+        `物が当たる ${solid.length} 個 / ` +
+        `範囲 ±${half.toFixed(1)}m`,
     )
-    return { name, sight, solid, arenaHalf: half }
+    return { name, sight, solid, camera: cameraBlockers(data.boxes), arenaHalf: half }
   } catch {
     console.warn(`stage_${name}.json が読めない。遮蔽の判定なしで動かす (位置は全員へ配られる)`)
     return bare(name)
+  }
+}
+
+/**
+ * 視線を止める形を用意する。**起動時に 1 回だけ。**
+ *
+ * 三角があればそれを使い、無ければ箱へ戻る。**書き出し直していないステージが
+ * 素通しになる**のを避ける — 遮蔽が丸ごと消えるのは、少し粗い遮蔽よりずっと
+ * 悪い (全員がどこからでも見える)。
+ *
+ * 三角は json とは別の口から読む。**クライアントは json を落とす**ので、
+ * 混ぜると遊ぶ人全員が 4MB を毎回落とすことになる (書き出しの側にも同じ
+ * 理由を書いた)。生の float なので解析は要らない。
+ */
+async function loadSight(name: StageName, boxes: StageBox[]): Promise<SightBlocker> {
+  const path = new URL(`../public/models/stage_${name}.sight.bin`, import.meta.url)
+  try {
+    const buffer = await Bun.file(path).arrayBuffer()
+    return new TriangleBvh({ positions: new Float32Array(buffer) })
+  } catch {
+    const boxed = sightBlockers(boxes)
+    console.info(`ステージ ${name}: 三角がまだ無いので箱で遮る (${boxed.length} 個)`)
+    return boxed.length > 0 ? boxSight(boxed) : OPEN_SIGHT
   }
 }
 

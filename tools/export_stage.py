@@ -417,9 +417,71 @@ for obj in bpy.context.scene.objects:
         'flags': flags_of(obj),
     })
 
+
+# --- 三角の網 -----------------------------------------------------------------
+#
+# **箱では見えている形と当たる形が違う。** メッシュを包む直方体を判定に使って
+# いるので、斜めの手すりを包む箱は手すりの無い側の空間まで含む。手すりの上を
+# 撃っているのに止められる、が起きる。
+#
+# 三角をそのまま吐く。読む側は木 (BVH) を組んで引く (src/sim/space/bvh.ts)。
+#
+# **視線を止める面だけ。** 移動の当たり判定はまだ箱なので (あちらは XZ の四角と
+# 上面の高さという別の形)、ここで出すのは遮蔽と射線に使う分だけにする。
+#
+# 平らな配列で持つ。三角 1 枚につき 9 個 (x,y,z を 3 つ)。オブジェクトの配列に
+# すると、読む側で数千個の入れ物ができる。
+
+
+def triangles_of(obj):
+    """そのメッシュの三角を、glTF の座標で返す。**世界の位置に置いた形。**"""
+    mesh = obj.to_mesh()
+    try:
+        mesh.calc_loop_triangles()
+        matrix = obj.matrix_world
+        out = []
+        for tri in mesh.loop_triangles:
+            for i in tri.vertices:
+                v = to_gltf(matrix @ mesh.vertices[i].co)
+                out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
+        return out
+    finally:
+        obj.to_mesh_clear()
+
+
+positions = []
+mesh_objects = 0
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
+        continue
+    # 視線を止めない物は出さない。飾りも、見えない当たり判定 (col_) も
+    if not flags_of(obj)['eye']:
+        continue
+    tris = triangles_of(obj)
+    if not tris:
+        continue
+    positions.extend(tris)
+    mesh_objects += 1
+
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
 with open(json_path, 'w') as f:
     json.dump({'boxes': boxes}, f, ensure_ascii=False, indent=0)
+
+# 三角は別の口へ、しかも生の数値で。
+#
+# **クライアントはこの json を落とす** (坂の傾きを引くため)。三角を混ぜると
+# 4MB になって、遊ぶ人全員が毎回落とすことになる。
+#
+# 読むのはサーバーだけ。クライアントは glb のメッシュを既に持っているので、
+# 木は手元の形から組める。
+#
+# json ではなく生の float で書く。57000 枚で 4.3MB が 2.0MB になり、読む側は
+# 解析せずに Float32Array へ載せるだけで済む。
+import struct
+
+bin_path = os.path.join(root, 'public', 'models', stage_name + '.sight.bin')
+with open(bin_path, 'wb') as f:
+    f.write(struct.pack('<%df' % len(positions), *positions))
 
 
 # --- テクスチャを伸ばさない ---------------------------------------------------
@@ -614,6 +676,7 @@ for name in exported:
 
 print(f'\n書き出し: {glb_path}')
 print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個)')
+print(f'          {bin_path} (視線を止める三角 {len(positions) // 9} 枚 / {mesh_objects} メッシュ)')
 print(f'メッシュ {len(exported)} 個' + (f' / 物差し {len(skipped)} 個は除外' if skipped else ''))
 print('材質: ' + ' / '.join(f'{k} {v}' for k, v in sorted(counts.items())))
 

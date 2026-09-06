@@ -194,10 +194,15 @@ export function emitNoise(
     noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
   const head = headHeightOf(from)
 
-  // 何の上を踏んだかは地形から出す。申告させるものではない
+  /*
+   * 何の上を踏んだかは地形から出す。申告させるものではない。
+   *
+   * **立てる面 (solid) から引く。** 視線を止める面 (sight) は三角の網になって
+   * 材質を持たないし、そもそも「乗っている面」は物がぶつかる側の話。
+   */
   const surface =
     noise.kind === 'step'
-      ? surfaceOf(groundUnder(from.x, from.z, from.y, room.stage.sight, STEP_UP).name)
+      ? surfaceOf(groundUnder(from.x, from.z, from.y, room.stage.solid, STEP_UP).name)
       : undefined
 
   for (const listener of connected(room)) {
@@ -209,7 +214,6 @@ export function emitNoise(
     const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
-      room.stage.sight.length === 0 ||
       hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
     if (!isHeard(distance, reach, visible)) continue
 
@@ -241,7 +245,6 @@ export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMes
     const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
-      room.stage.sight.length === 0 ||
       !canSee(listener.life) ||
       hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
 
@@ -283,8 +286,8 @@ export function viewOf(room: RoomWorld, player: MatchPlayer): { x: number; y: nu
     player.pitch,
     player.aiming,
     // 壁に寄せる。省くと壁を背にした瞬間にカメラが壁の中へ入り、
-    // その人だけ全方位が見えなくなる
-    room.stage.sight,
+    // その人だけ全方位が見えなくなる。**どこで当たったかが要るので箱**
+    room.stage.camera,
     viewEye,
   )
 }
@@ -341,8 +344,7 @@ export function relayState(room: RoomWorld, from: MatchPlayer, payload: Uint8Arr
       !killCam &&
       !glowing &&
       !exposed &&
-      !isFriendly(room.mode, viewer, from) &&
-      room.stage.sight.length > 0
+      !isFriendly(room.mode, viewer, from)
     ) {
       // **目ではなくカメラから**線を引く。三人称なので、画面に映るものを
       // 決めているのはカメラの位置。目で見ると、遮蔽の裏にしゃがんだ相手が

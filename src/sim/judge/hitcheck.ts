@@ -12,7 +12,7 @@
  */
 
 import type { HitZone } from '../../domain/rule/damage'
-import { isPathClear, type StageBox } from '../space/vision'
+import type { SightBlocker } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
 import type { Stance } from '../../domain/player/stance'
 
@@ -142,10 +142,10 @@ function isArcClear(
   toX: number,
   toY: number,
   toZ: number,
-  boxes: StageBox[],
+  world: SightBlocker,
   sag: number,
 ): boolean {
-  if (sag < ARC_IGNORE) return isPathClear(fromX, fromY, fromZ, toX, toY, toZ, boxes)
+  if (sag < ARC_IGNORE) return world.clear(fromX, fromY, fromZ, toX, toY, toZ)
 
   let px = fromX
   let py = fromY
@@ -155,7 +155,7 @@ function isArcClear(
     const qx = fromX + (toX - fromX) * t
     const qy = fromY + (toY - fromY) * t + 4 * sag * t * (1 - t)
     const qz = fromZ + (toZ - fromZ) * t
-    if (!isPathClear(px, py, pz, qx, qy, qz, boxes)) return false
+    if (!world.clear(px, py, pz, qx, qy, qz)) return false
     px = qx
     py = qy
     pz = qz
@@ -184,11 +184,10 @@ function zoneExposed(
   attacker: Pose,
   target: Pose,
   zone: HitZone,
-  boxes: StageBox[],
+  world: SightBlocker,
   rules: HitRules,
   sag: number,
 ): boolean {
-  if (boxes.length === 0) return true
 
   const eyeY = attacker.y + rules.headHeight(attacker.stance)
   const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
@@ -203,7 +202,7 @@ function zoneExposed(
   for (const side of [0, 1, -1]) {
     const ox = attacker.x + px * SHOULDER_OFFSET * side
     const oz = attacker.z + pz * SHOULDER_OFFSET * side
-    if (isArcClear(ox, eyeY, oz, tx, ty, tz, boxes, sag)) return true
+    if (isArcClear(ox, eyeY, oz, tx, ty, tz, world, sag)) return true
   }
   return false
 }
@@ -218,7 +217,7 @@ function verifyPose(
   attacker: Pose,
   target: Pose,
   claim: HitClaim,
-  boxes: StageBox[],
+  world: SightBlocker,
   rules: HitRules,
 ): Verdict {
   const zone: HitZone = claim.zone ?? 'BODY'
@@ -258,7 +257,7 @@ function verifyPose(
   }
 
   // その部位が見えていたか。頭を隠して脚だけ出している相手の頭は撃てない
-  if (!zoneExposed(attacker, target, zone, boxes, rules, claim.sag ?? 0)) {
+  if (!zoneExposed(attacker, target, zone, world, rules, claim.sag ?? 0)) {
     return { ok: false, reason: `${zone} は遮蔽の裏` }
   }
 
@@ -295,7 +294,7 @@ export function verifyHit(
   attackerHistory: readonly Pose[],
   targetHistory: readonly Pose[],
   claim: HitClaim,
-  boxes: StageBox[],
+  world: SightBlocker,
   window: number,
   rules: HitRules,
 ): Verdict {
@@ -320,7 +319,7 @@ export function verifyHit(
       best = gap
     }
 
-    last = verifyPose(attacker, target, claim, boxes, rules)
+    last = verifyPose(attacker, target, claim, world, rules)
     if (last.ok) return last
   }
 
