@@ -273,14 +273,7 @@ export interface MatchPlayer extends Player {
    * レプリカなので、そちらも順に寄せる。
    */
   inventory: Inventory
-  /**
-   * 過去の姿。当てたという申告を遡って照合するのに使う。
-   *
-   * **接続ではなく人が持つ。** 練習部屋の的は接続を持たないが、撃たれる以上
-   * 照合の相手にはなる。長さは呼ぶ側が決める (送る間隔から出す)。
-   */
-  history: Pose[]
-  /**
+    /**
    * 爆風で飛んでいる向きと、残り時間 (秒)。0 なら飛んでいない。
    *
    * **的だけが使う。** 人は自分の画面で自分を動かすので (位置を持っているのが
@@ -426,7 +419,6 @@ export function newMatchPlayer(seed: {
     grenades: SUPPORT_SPECS.grenade.count,
     holdingGrenade: false,
     wasAlive: false,
-    history: [],
     bot: false,
     kills: 0,
     deaths: 0,

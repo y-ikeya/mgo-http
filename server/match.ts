@@ -22,10 +22,11 @@ import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
-import { recordPose, relayState, sendHealth, sendStamina } from './relay'
+import { relayState, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
 import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, setLife } from './world'
+import { forgetPoses, recordPose } from './history'
 
 /** 1 試合の長さ (ms) */
 export const MATCH_DURATION_MS = 5 * 60 * 1000
@@ -318,6 +319,8 @@ export function leaveRoom(room: RoomWorld, player: MatchPlayer): void {
   // 走っている試合を捨てて出た。抜けたことごと残す
   if (room.phase === 'playing') recordSeat(room, player, true)
   room.players.delete(player.id)
+  // 持っていた過去も捨てる。**残すと、入り直した人が前の命の位置で当たる**
+  forgetPoses(player.id)
   sessions.delete(player.id)
   // 本人はもう聞いていない。残った人に消してもらう
   broadcast(room, { type: 'leave', id: player.id })

@@ -268,8 +268,8 @@ function verifyPose(
  * @param targetHistory 同上
  */
 export function verifyHit(
-  attackerHistory: Pose[],
-  targetHistory: Pose[],
+  attackerHistory: readonly Pose[],
+  targetHistory: readonly Pose[],
   claim: HitClaim,
   boxes: StageBox[],
   window: number,

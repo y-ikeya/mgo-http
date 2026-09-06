@@ -29,6 +29,7 @@ import { exposeSeconds } from '../src/domain/player/skill'
 import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
 import { verifyHit } from '../src/sim/judge/hitcheck'
+import { posesOf } from './history'
 import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
 import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
@@ -332,8 +333,8 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
 
   const spec = weaponOf(attacker.weapon)
   const verdict = verifyHit(
-    attacker.history,
-    victim.history,
+    posesOf(attacker),
+    posesOf(victim),
     {
       kind: event.kind,
       zone: event.zone,
