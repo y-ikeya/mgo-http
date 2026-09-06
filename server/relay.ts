@@ -276,6 +276,14 @@ export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMes
  */
 export const HISTORY_SIZE = Math.ceil(LAG_WINDOW_MS / (SNAPSHOT_INTERVAL * 1000)) + 2
 
+/**
+ * 履歴を 1 コマ書く。
+ *
+ * **毎 tick に人数ぶんの Pose を作って捨てている。** リングバッファにすれば
+ * 確保も shift も消えるが、測ったら上限の 0.19% が 0.13% になるだけだった。
+ * 動く実装と数字を docs/notes/history-ring-buffer.md に取ってある —
+ * 定員を増やすときはそこから戻す。
+ */
 export function recordPose(player: MatchPlayer): void {
   player.history.push({
     time: Date.now(),
