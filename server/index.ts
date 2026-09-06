@@ -812,6 +812,28 @@ const server = Bun.serve<Client>({
 
   websocket: {
     open(socket) {
+      /*
+       * 別の部屋に席が残っていたら畳む。**1 人が持てる接続は 1 本。**
+       *
+       * 接続の帳簿は**人の id で引く** (sessions)。別の部屋に席が残っていると、
+       * そちらの席から引いた接続が**いま遊んでいる部屋の接続**になる — つまり
+       * 前の部屋の試合状況が、いまの画面へ配られる。
+       *
+       * 実際に出た形: 商店街を抜けて庭園へ入った人の画面で、STANDBY (前の部屋は
+       * まだ人待ち) と試合中が交互に出た。位置も点数も正しいのに、試合の段階
+       * だけが 2 つの部屋から届いていた。
+       *
+       * 猶予 (30 秒) は「うっかり切れた人が戻ってこられるように」であって、
+       * **別の部屋へ移った人の席を取っておくためではない。**
+       */
+      for (const [name, other] of rooms) {
+        if (name === socket.data.room) continue
+        const stale = other.players.get(socket.data.id)
+        if (!stale) continue
+        console.info(`[入室] ${stale.name} の席を ${name} から畳む (${socket.data.room} へ移った)`)
+        leaveRoom(other, stale)
+      }
+
       const room = roomOf(socket.data.room)
       const seat = room.players.get(socket.data.id)
       /** 続きへ戻す人。名簿を送ったあとに渡す */
