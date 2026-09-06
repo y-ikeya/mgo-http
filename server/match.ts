@@ -74,6 +74,15 @@ export const MATCH_BROADCAST = 1000
 export const SELF_BROADCAST = 3000
 
 /**
+ * 往復の時間を測る間隔 (ms)。
+ *
+ * 細かく測っても使い道が無い (切る判断は 5 回続いたときなので、1 秒でも
+ * 5 秒で答えが出る)。**測るために通信を増やすのは本末転倒**なので、
+ * 1 人 1 秒に 1 往復までにする。
+ */
+export const PING_INTERVAL = 1000
+
+/**
  * 遮蔽になる箱。ステージの書き出しが glb と一緒に作る。
  *
  * サーバーが glb を解析する必要は無い。要るのは箱の位置と寸法だけで、
@@ -546,6 +555,34 @@ export function rosterMessage(room: RoomWorld): ServerMessage {
  * 体力 0 で倒れるのもクライアントがやっていて、ここが渡すのは「本当はこう」
  * という値だけ。普段は一致しているので、届いても何も起きない。
  */
+/**
+ * 往復の時間を測る。**1 秒に 1 度、1 人ずつ。**
+ *
+ * 打ち返しを待っている間は次を投げない。投げ続けると、遅れている人ほど
+ * 未処理が溜まって**遅れをこちらで作る**ことになる。
+ *
+ * 前回測れた値を一緒に載せる。打ち返す側は自分の遅れを知りようがない
+ * (往路も復路も片道しか見えない) ので、画面に出すにはこちらが教えるしかない。
+ */
+export function sendPing(room: RoomWorld, now: number): void {
+  if (now - room.lastPingAt < PING_INTERVAL) return
+  room.lastPingAt = now
+  for (const player of connected(room)) {
+    const session = sessionFor(player)
+    if (!session) continue
+    // 打ち返しがまだ。**投げ直さない** — 返ってこないこと自体が答え
+    if (session.pingAt !== 0) continue
+    session.pingAt = now
+    session.socket.send(
+      JSON.stringify({
+        type: 'ping',
+        at: now,
+        rtt: Math.round(session.lag.rtt),
+      } satisfies ServerMessage),
+    )
+  }
+}
+
 export function sendSelf(room: RoomWorld, now: number): void {
   if (now - room.lastSelfAt < SELF_BROADCAST) return
   room.lastSelfAt = now

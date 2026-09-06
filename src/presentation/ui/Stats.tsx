@@ -1,4 +1,5 @@
 import { For, Show } from 'solid-js'
+import { LAG_LIMIT_MS } from '../../domain/match/lag'
 import type { GameStats } from '../scene/Game'
 import './Stats.css'
 
@@ -35,6 +36,24 @@ export default function Stats(props: { stats: GameStats | null }) {
         {/* WebGL2 に落ちていると描画が重くなり、そのぶん送信も細る */}
         <span class="stats-val" classList={{ 'stats-warn': props.stats?.backend === 'WebGL2' }}>
           {props.stats?.backend ?? '—'}
+        </span>
+      </div>
+      {/*
+        往復の時間。**回数 (FPS / TX / RX) とは別物。**
+
+        あちらは「何回」、こちらは「どれだけ待つか」。64 通/秒 届いていても
+        全部が 300ms 遅れていることはあるので、回数だけでは分からない。
+
+        限界に近づいたら赤くする。**切られる前に見えている**ようにしておく
+        (domain/match/lag.ts の LAG_LIMIT_MS)。
+      */}
+      <div class="stats-row">
+        <span class="stats-key">PING</span>
+        <span
+          class="stats-val"
+          classList={{ 'stats-warn': round(props.stats?.latency) >= LAG_LIMIT_MS / 2 }}
+        >
+          {round(props.stats?.latency) > 0 ? `${round(props.stats?.latency)}ms` : '—'}
         </span>
       </div>
       <div class="stats-row">

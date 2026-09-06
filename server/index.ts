@@ -17,6 +17,8 @@
  */
 
 import { dropWeapon, pickUp } from './arms/drops'
+import { recordLag } from '../src/domain/match/lag'
+import { LAG_CLOSE_CODE } from '../src/application/protocol/types'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
@@ -26,6 +28,7 @@ import {
   matchState,
   recordSeat,
   rosterMessage,
+  sendPing,
   sendSelf,
   spawn,
   updateMatch,
@@ -102,6 +105,8 @@ setInterval(() => {
     for (const room of rooms.values()) {
       // 自分の本当の値を 1 人ずつ配る。**予測を直すため**で、普段は一致している
       sendSelf(room, now)
+      // 往復の時間を測る。**遅れすぎている人には席を空けてもらう** (pong の枝)
+      sendPing(room, now)
       // 切れた人の体をその場に残す。
       //
       // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
@@ -623,6 +628,33 @@ function handleMessage(
       player.ready = message.ready
       broadcast(room, rosterMessage(room))
       break
+
+    /*
+     * ping の打ち返し。**中継しない。**
+     *
+     * 測るのはこの接続の遅れだけで、他の人には関係が無い。既定の枝へ落ちると
+     * 全員へ流れる (型がそれを教えてくれた)。
+     */
+    case 'pong': {
+      const session = sessionOf(player)
+      // 投げていない ping への返事は捨てる。時刻を差し替えて短く見せられる
+      if (session.pingAt === 0 || message.at !== session.pingAt) break
+      session.pingAt = 0
+      if (recordLag(session.lag, Date.now() - message.at)) {
+        /*
+         * **続けて遅れている人には席を空けてもらう。**
+         *
+         * その人の回線が悪いという話では済まない — 遅れている人が居ると、
+         * 撃ち合いが読み合いとして成立しなくなる (domain/match/lag.ts)。
+         *
+         * 理由を添えて閉じる。黙って切ると、繋ぎ直しては切られるを
+         * 繰り返すことになる。
+         */
+        console.warn(`[遅延] ${player.name} を切る rtt=${Math.round(session.lag.rtt)}ms`)
+        session.socket.close(LAG_CLOSE_CODE, '通信の遅れが大きすぎます')
+      }
+      break
+    }
 
     default:
       // 見た目のもの (knock) は中身を見ずに流す

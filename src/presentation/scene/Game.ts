@@ -298,6 +298,19 @@ export interface GameStats {
    * 名目は 64。**下回っていたら、描画が重くて setInterval が発火できていない。**
    * 相手の画面ではその分だけ自分がカクつく
    */
+  /**
+   * 往復の時間 (ms)。**サーバーが測ってくれた値。**
+   *
+   * 0 ならまだ測れていない。回数 (FPS / TX / RX) とは別物で、あちらは
+   * 「何回」、こちらは「どれだけ待つか」。
+   */
+  latency: number;
+  /**
+   * 断られた理由。**入っていればもう戻らない。**
+   *
+   * 落ちただけなら勝手に繋ぎ直すので、ここには入らない。
+   */
+  rejected: string | null;
   sendRate: number;
   /** 相手ごとに、位置が届いている回数 (通/秒) */
   peerRates: { name: string; rate: number }[];
@@ -522,6 +535,9 @@ export class Game {
    * 曇りが 0.1 秒ごとに掛け直される。
    */
   private shock: { seq: number; power: number } | null = null;
+
+  /** 往復の時間 (ms)。サーバーの ping に乗って届く */
+  private latency = 0;
 
   private readonly renderer: WebGPURenderer;
   /**
@@ -1838,6 +1854,20 @@ export class Game {
 
       // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
       // 待つと、遅れて届いているだけの相手と区別が付かない
+      /*
+       * 往復の時間を測られている。**そのまま打ち返す。**
+       *
+       * 測るのはサーバー。こちらで測って申告する形にすると、遅い人が
+       * 「速い」と名乗れる (protocol/types.ts の PingMessage)。
+       *
+       * 一緒に届く rtt は前回の答え。1 秒遅れの値だが、出すのは診断のため
+       * なので困らない。
+       */
+      case "ping":
+        this.latency = message.rtt;
+        this.net.send({ type: "pong", at: message.at });
+        break;
+
       case "hidden":
         this.remotes.hide(message.id, Date.now());
         break;
@@ -4012,6 +4042,8 @@ export class Game {
       team: this.replica.team,
       match: this.replica.match,
       players: this.remotes.count,
+      latency: this.latency,
+      rejected: this.net.rejected ?? null,
       sendRate: this.sendGap > 0 ? 1000 / this.sendGap : 0,
       peerRates: this.remotes.rates(),
     });

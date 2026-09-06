@@ -369,6 +369,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
+        繋ぎ直しを諦めた。**理由を出す。**
+
+        落ちただけなら勝手に繋ぎ直すので、ここは出ない。出るのは**もう
+        戻らない**ときだけ — 黙って止まると、固まったのか繋がらないのかが
+        分からず、待ち続けることになる。
+      */}
+      <Show when={props.stats?.rejected}>
+        <div class="hud-rejected">
+          <div class="hud-rejected-title">切断されました</div>
+          <div class="hud-rejected-sub">{props.stats?.rejected}</div>
+          <div class="hud-rejected-hint">読み込み直すと入り直せます</div>
+        </div>
+      </Show>
+
+      {/*
         近くで爆ぜた。**画面がぼやけて、戻る。**
 
         カメラを揺らしていたが、**回すと画面が斜めに傾いて見えて**、殴られた

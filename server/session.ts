@@ -7,6 +7,7 @@
  */
 
 import type { MatchPlayer } from '../src/domain/player/player'
+import { newLagRecord, type LagRecord } from '../src/domain/match/lag'
 import type { Client } from './world'
 
 /**
@@ -107,6 +108,15 @@ export interface Session {
   badPacketAt: number
   /** 成立しない移動を最後に警告した時刻 (Date.now)。同じく間引くため */
   badMoveAt: number
+  /**
+   * 往復の時間の控え (domain/match/lag.ts)。
+   *
+   * **接続の持ち物。** 繋ぎ直したら 0 から測り直す — 前の回線の値を持ち越すと、
+   * 悪い回線から良い回線へ移った人がしばらく切られ続ける。
+   */
+  lag: LagRecord
+  /** 打ち返しを待っている ping の時刻。**返るまで次を投げない** */
+  pingAt: number
   socket: Bun.ServerWebSocket<Client>
 }
 
@@ -135,6 +145,8 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     packetGap: 0,
     lastPacketAt: 0,
     clockSkew: 0,
+    lag: newLagRecord(),
+    pingAt: 0,
     healthShown: player.health,
     staminaShown: player.stamina,
     rejected: 0,
