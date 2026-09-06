@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import { LAG_LIMIT_MS } from '../../domain/match/lag'
+import { HIT_LIMIT_MS } from '../../domain/rule/lag'
 import type { GameStats } from '../scene/Game'
 import './Stats.css'
 
@@ -44,14 +44,15 @@ export default function Stats(props: { stats: GameStats | null }) {
         あちらは「何回」、こちらは「どれだけ待つか」。64 通/秒 届いていても
         全部が 300ms 遅れていることはあるので、回数だけでは分からない。
 
-        限界に近づいたら赤くする。**切られる前に見えている**ようにしておく
-        (domain/match/lag.ts の LAG_LIMIT_MS)。
+        **弾が通らなくなる境目で赤くする** (domain/rule/lag.ts の HIT_LIMIT_MS)。
+        切られる境目ではない — 切られるずっと手前から、当てても通らなくなって
+        いる。赤くなった人は当たらない側に居る。
       */}
       <div class="stats-row">
         <span class="stats-key">PING</span>
         <span
           class="stats-val"
-          classList={{ 'stats-warn': round(props.stats?.latency) >= LAG_LIMIT_MS / 2 }}
+          classList={{ 'stats-warn': round(props.stats?.latency) >= HIT_LIMIT_MS }}
         >
           {round(props.stats?.latency) > 0 ? `${round(props.stats?.latency)}ms` : '—'}
         </span>
