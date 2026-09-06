@@ -28,7 +28,7 @@ import { closeMatch, recordPlayer } from './stats'
 import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, setLife } from './world'
 
 /** 1 試合の長さ (ms) */
-export const MATCH_DURATION = 5 * 60 * 1000
+export const MATCH_DURATION_MS = 5 * 60 * 1000
 
 /**
  * 陣営ごとの残機。TDM の勝敗はこれの削り合いで決まる。
@@ -44,7 +44,7 @@ export const MATCH_DURATION = 5 * 60 * 1000
 export const TICKETS = Math.max(1, Number(process.env.MGO2_TICKETS) || 20)
 
 /** 決着してから次の支度が始まるまで (ms)。結果を読む時間 */
-export const INTERMISSION = 10 * 1000
+export const INTERMISSION_MS = 10 * 1000
 
 /**
  * 試合が始まるまでの数え (ms)。
@@ -52,13 +52,13 @@ export const INTERMISSION = 10 * 1000
  * 全員を湧き地点へ戻してから始める。戻す瞬間にいきなり撃ち合いが始まると、
  * 画面が切り替わった側が一方的に不利になる。
  */
-export const COUNTDOWN = 5 * 1000
+export const COUNTDOWN_MS = 5 * 1000
 
 /** 試合の状態を配る間隔 (ms)。残り時間の表示に要る */
 /** 刻み 1 回ぶんの秒。**index.ts の TICK_MS と揃える** */
 const TICK_SECONDS = 1 / 64
 
-export const MATCH_BROADCAST = 1000
+export const MATCH_BROADCAST_MS = 1000
 
 /**
  * 自分の本当の値を配る間隔 (ms)。**試合の便より粗い。**
@@ -71,7 +71,7 @@ export const MATCH_BROADCAST = 1000
  * 後から渡すだけ。ずれるのは申告が落ちたときだけなので稀で、3 秒直らなくても
  * 遊びには出ない。
  */
-export const SELF_BROADCAST = 3000
+export const SELF_BROADCAST_MS = 3000
 
 /**
  * 往復の時間を測る間隔 (ms)。
@@ -80,7 +80,7 @@ export const SELF_BROADCAST = 3000
  * 5 秒で答えが出る)。**測るために通信を増やすのは本末転倒**なので、
  * 1 人 1 秒に 1 往復までにする。
  */
-export const PING_INTERVAL = 1000
+export const PING_INTERVAL_MS = 1000
 
 /**
  * 遮蔽になる箱。ステージの書き出しが glb と一緒に作る。
@@ -416,7 +416,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
     }
     // 支度の打ち切りも湧きも、人の側の刻み (下の switch) が面倒を見る。
     // ここでやることは「終わらせないこと」だけ
-    if (now - room.lastBroadcast >= MATCH_BROADCAST) {
+    if (now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
       room.lastBroadcast = now
       broadcast(room, matchState(room))
     }
@@ -458,7 +458,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
     if (room.phase === 'playing' && survivor) {
       room.phase = 'over'
       room.winner = survivor
-      room.endsAt = now + INTERMISSION
+      room.endsAt = now + INTERMISSION_MS
       finishMatch(room)
     } else {
       room.phase = 'waiting'
@@ -476,11 +476,11 @@ export function updateMatch(room: RoomWorld, now: number): void {
      */
     if (allReady(room) || now >= room.endsAt) {
       room.phase = 'countdown'
-      room.endsAt = now + COUNTDOWN
+      room.endsAt = now + COUNTDOWN_MS
     }
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
-    room.endsAt = now + MATCH_DURATION
+    room.endsAt = now + MATCH_DURATION_MS
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく
     room.matchId = crypto.randomUUID()
     room.startedAt = now
@@ -504,18 +504,18 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     room.phase = 'over'
     room.winner = decideWinner(room)
-    room.endsAt = now + INTERMISSION
+    room.endsAt = now + INTERMISSION_MS
     finishMatch(room)
   } else if (room.phase === 'playing' && now >= room.endsAt) {
     // 時間切れ。陣営戦は多く残っているほう、個人戦は倒した数が一番多い人
     room.phase = 'over'
     room.winner = decideWinner(room)
-    room.endsAt = now + INTERMISSION
+    room.endsAt = now + INTERMISSION_MS
     finishMatch(room)
   }
 
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
-  if (previous !== room.phase || now - room.lastBroadcast >= MATCH_BROADCAST) {
+  if (previous !== room.phase || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
     room.lastBroadcast = now
     broadcast(room, matchState(room))
   }
@@ -546,7 +546,7 @@ export function rosterMessage(room: RoomWorld): ServerMessage {
 }
 
 /**
- * 自分の本当の値を、1 人ずつ配る。**3 秒ごと** (SELF_BROADCAST)。
+ * 自分の本当の値を、1 人ずつ配る。**3 秒ごと** (SELF_BROADCAST_MS)。
  *
  * 全員へ同じ物を配る便 (matchState) には乗せられない。体力も弾数も人ごとに
  * 違うので、**送り先ごとに中身が変わる**。
@@ -565,7 +565,7 @@ export function rosterMessage(room: RoomWorld): ServerMessage {
  * (往路も復路も片道しか見えない) ので、画面に出すにはこちらが教えるしかない。
  */
 export function sendPing(room: RoomWorld, now: number): void {
-  if (now - room.lastPingAt < PING_INTERVAL) return
+  if (now - room.lastPingAt < PING_INTERVAL_MS) return
   room.lastPingAt = now
   for (const player of connected(room)) {
     const session = sessionFor(player)
@@ -584,7 +584,7 @@ export function sendPing(room: RoomWorld, now: number): void {
 }
 
 export function sendSelf(room: RoomWorld, now: number): void {
-  if (now - room.lastSelfAt < SELF_BROADCAST) return
+  if (now - room.lastSelfAt < SELF_BROADCAST_MS) return
   room.lastSelfAt = now
   for (const player of connected(room)) {
     const ammo = player.inventory.ammoTable()
