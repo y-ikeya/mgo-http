@@ -26,7 +26,7 @@ if (hide !== null) {
   document.body.style.setProperty('animation-delay', '')
   const at = Number(hide) || 0
   const style = document.createElement('style')
-  style.textContent = `body[data-hide] .orders-band{animation-delay:${(-0.9 * at).toFixed(2)}s}`
+  style.textContent = `body[data-hide] .orders-band{animation-delay:${(-0.6 * at).toFixed(2)}s}`
   document.head.appendChild(style)
 }
 

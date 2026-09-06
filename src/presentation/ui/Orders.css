@@ -72,8 +72,9 @@
   initial-value: 14px;
 }
 
+/* 尺は Orders.tsx の LEAVE_MS と揃えること */
 .orders-leaving .orders-band {
-  animation: orders-stripes 0.9s ease-in forwards;
+  animation: orders-stripes 0.6s ease-in forwards;
 }
 
 @keyframes orders-stripes {
