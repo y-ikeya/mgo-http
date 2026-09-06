@@ -36,8 +36,6 @@ const emptyPose = (): Pose => ({
   z: 0,
   yaw: 0,
   pitch: 0,
-  crouching: false,
-  boxed: false,
   stance: stanceOf('idle'),
 })
 
@@ -68,8 +66,6 @@ export function recordPose(player: MatchPlayer): void {
     slot.yaw = player.yaw
     // 見下ろしていれば倒れている相手にも刃が通る。刺した瞬間の向きが要るので履歴に持つ
     slot.pitch = player.pitch
-    slot.crouching = player.crouching
-    slot.boxed = player.boxed
     // ナイフが刺さる姿勢かの判定に要る。**遡って照合するので履歴に持つ** —
     // 「いまの姿勢」で見ると、刺した瞬間は立っていた相手が
     // 爆風で転んだ直後に届いた申告を弾いてしまう

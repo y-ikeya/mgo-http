@@ -22,8 +22,6 @@ function history(at: [number, number], stance: Stance, yaw = 0, pitch = 0): Pose
     z,
     yaw,
     pitch,
-    crouching: stance === 'crouch',
-    boxed: stance === 'box',
     stance,
   }))
 }
