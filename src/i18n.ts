@@ -76,6 +76,19 @@ const JA = {
     'になっていたら、GPU のドライバを入れてください。',
   'gpu.recheck': '直したらこのページを開き直してください。',
 
+  // --- 遅れが直らない人 ---
+  'lag.title': '通信の遅れが大きすぎます',
+  'lag.lede':
+    'サーバーとの往復に 1 秒以上かかる状態が続いたため、接続を切りました。' +
+    'この状態では、あなたの姿が相手の画面で飛び、撃っても当たらなくなります。' +
+    '下のどれかで直ることがあります。',
+  'lag.wifi': '無線なら有線に繋ぎ替えるか、ルーターの近くへ移ってください。',
+  'lag.other':
+    '同じ回線で大きな通信をしていませんか (動画・更新・バックアップ)。' +
+    '止めてから入り直してください。',
+  'lag.vpn': 'VPN やプロキシを通していたら、外して試してください。',
+  'lag.recheck': 'このページを開き直すと入り直せます。',
+
   // --- 成績表 ---
   'score.blue': '青',
   'score.red': '赤',
@@ -124,6 +137,18 @@ const EN: Record<Key, string> = {
     'If Device Manager shows "Microsoft Basic Display Adapter" under Display adapters, ' +
     'install your GPU driver.',
   'gpu.recheck': 'Reload this page once it is fixed.',
+
+  'lag.title': 'YOUR CONNECTION IS TOO SLOW',
+  'lag.lede':
+    'The round trip to the server stayed above one second, so you were disconnected. ' +
+    'At that latency you jump around on everyone else\'s screen and your shots stop landing. ' +
+    'One of the steps below may fix it.',
+  'lag.wifi': 'On Wi-Fi? Switch to a wired connection, or move closer to the router.',
+  'lag.other':
+    'Is something else on the same line using bandwidth (video, updates, backups)? ' +
+    'Stop it and rejoin.',
+  'lag.vpn': 'If you are behind a VPN or proxy, try without it.',
+  'lag.recheck': 'Reload this page to rejoin.',
 
   'score.blue': 'BLUE',
   'score.red': 'RED',

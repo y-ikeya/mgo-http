@@ -11,6 +11,7 @@ import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
 import { CHOICES } from '../../domain/item/weapons'
 import Loadout from '../ui/Loadout'
+import Blocked from '../ui/Blocked'
 import Stats from '../ui/Stats'
 
 /**
@@ -123,6 +124,22 @@ export default function Play(props: { identity: Identity }) {
           onSkill={(id, level) => game()?.setSkill(id, level)}
           // パッド / 矢印キーで指している枠。マウスと数字キーでは動かない
           focus={stats()?.loadoutFocus ?? 'primary'}
+        />
+      </Show>
+
+      {/*
+        遅れで席を空けてもらった。**描けない機械と同じ出方。**
+
+        落ちただけなら勝手に繋ぎ直すので、ここは出ない。出るのは**もう
+        戻らない**ときだけ — 黙って止まると、固まったのか繋がらないのかが
+        分からず、待ち続けることになる。
+      */}
+      <Show when={stats()?.rejected}>
+        <Blocked
+          title={t('lag.title')}
+          lede={t('lag.lede')}
+          steps={[t('lag.wifi'), t('lag.other'), t('lag.vpn')]}
+          note={t('lag.recheck')}
         />
       </Show>
 
