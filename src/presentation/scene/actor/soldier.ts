@@ -1022,9 +1022,22 @@ export class Soldier {
     return this.animator?.throwWindupLeft ?? 0
   }
 
-  /** 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る */
+  /**
+   * 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る。
+   *
+   * **いま流している型のもの。** 伏せの投擲は立ちと尺が違う (1.73 / 0.83) ので、
+   * 立ちの尺で測ると伏せて投げたときだけ手を離れる所がずれる。
+   */
   get throwReleaseDuration(): number {
-    return this.animator?.throwReleaseDuration ?? 0
+    if (!this.animator) return 0
+    return this.animator.proneThrowing
+      ? this.animator.proneThrowReleaseDuration
+      : this.animator.throwReleaseDuration
+  }
+
+  /** いま流しているのが伏せの投擲か。放す割合を選び分けるのに要る */
+  get proneThrowing(): boolean {
+    return this.animator?.proneThrowing ?? false
   }
 
   /** 振りかぶり切ったか。投げられる状態になったかの判定に使う */

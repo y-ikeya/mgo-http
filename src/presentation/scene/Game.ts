@@ -17,7 +17,7 @@ import {
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
-import { BLAST_RADIUS, throwSpeedOf } from "../../domain/item/grenade";
+import { BLAST_RADIUS, RELEASE_HEIGHT, throwSpeedOf } from "../../domain/item/grenade";
 import { pelletsOf } from "../../domain/item/weapons";
 import type { Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
@@ -96,6 +96,7 @@ import {
   type Calibration,
   type Knobs,
 } from "./calibration";
+import { PRONE_GRENADE_RELEASE_RATIO } from "./knobs";
 import type { NetTransport } from "../../application/protocol/types";
 import type { Identity } from "../../infra/auth/session";
 import { selfSkin } from "./actor/skin";
@@ -429,13 +430,6 @@ const SURFACE_TOLERANCE = 0.03;
 
 
 
-/**
- * 手を離れる高さ (m)。server の RELEASE_HEIGHT と揃える。
- *
- * 投擲モーションで手が振り切る所の実測が 1.74m (1.65 秒の時点)。
- * そこに合わせてある。低くすると、腕は上にあるのに物が腰から出る。
- */
-const GRENADE_RELEASE_HEIGHT = 1.7;
 
 /**
  * 手を離れる位置を、投げる向きへどれだけ前に出すか (m)。
@@ -3255,9 +3249,10 @@ export class Game {
       // 前へ出す量は水平方向だけで測る。見上げているときに近く、
       // 見下ろしているときに遠く、では手の位置が動いて見える
       const flat = Math.hypot(this.aimDir.x, this.aimDir.z) || 1;
+      // 手を離れる高さは構えで変わる。**伏せていれば腕も低い所を通る**
       this.grenadeOrigin.set(
         this.player.position.x + (this.aimDir.x / flat) * GRENADE_RELEASE_FORWARD,
-        this.player.position.y + GRENADE_RELEASE_HEIGHT,
+        this.player.position.y + RELEASE_HEIGHT[this.player.stance],
         this.player.position.z + (this.aimDir.z / flat) * GRENADE_RELEASE_FORWARD,
       );
       this.grenades.showPreview(
@@ -3328,9 +3323,13 @@ export class Game {
     // 進んでいるので差は 0.16 秒、叩いただけならほぼ丸ごと残る。
     // **振りかぶりの残りを待ってから**、投げの型の途中で手を離れる。
     // 軽く叩いただけなら振りかぶりが残っているぶん遅れて出る
+    // 放す割合は型ごと。**伏せの投擲は弧の頂点** (knobs.ts の注)
+    const ratio = this.player.proneThrowing
+      ? PRONE_GRENADE_RELEASE_RATIO
+      : this.knobs.grenadeRelease;
     this.grenadeRelease = Math.max(
       0.01,
-      this.player.throwWindupLeft + this.knobs.grenadeRelease * this.player.throwReleaseDuration,
+      this.player.throwWindupLeft + ratio * this.player.throwReleaseDuration,
     );
   }
 

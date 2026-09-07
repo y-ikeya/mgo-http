@@ -647,6 +647,41 @@ describe('勝手に構えない', () => {
     expect(playing(anim, 'upper')).not.toContain('bolt')
   })
 
+  /**
+   * **伏せたまま投げる型を出す。**
+   *
+   * 立ちの投擲を腹這いの腰に載せると、腕だけが起き上がって振りかぶる。
+   * 手榴弾は物陰から覗いて投げる道具なので、そこが崩れると使い所が半分になる。
+   */
+  test('伏せている間は、伏せの投擲の型を出す', () => {
+    const anim = animator()
+    run(anim, 1.2, 'prone_idle')
+    anim.playThrow()
+    run(anim, 0.3, 'prone_idle')
+    expect(playing(anim, 'upper')).toEqual(['prone_throw_windup'])
+    expect(anim.proneThrowing).toBe(true)
+  })
+
+  test('立っていれば立ちの投擲のまま', () => {
+    const anim = animator()
+    run(anim, 1.2, 'idle')
+    anim.playThrow()
+    run(anim, 0.3, 'idle')
+    expect(playing(anim, 'upper')).toEqual(['throw_windup'])
+    expect(anim.proneThrowing).toBe(false)
+  })
+
+  /**
+   * **放す割合は後半の尺に対して測る。** 型ごとに尺が違うので、
+   * 立ちの尺で伏せの投擲を測ると手を離れる所がずれる。
+   */
+  test('伏せと立ちで、投げ (後半) の尺が別に取れる', () => {
+    const anim = animator()
+    expect(anim.throwReleaseDuration).toBeGreaterThan(0)
+    expect(anim.proneThrowReleaseDuration).toBeGreaterThan(0)
+    expect(anim.proneThrowReleaseDuration).not.toBeCloseTo(anim.throwReleaseDuration, 2)
+  })
+
   test('立っていればボルトの型はそのまま出る', () => {
     const anim = animator()
     run(anim, 1.2, 'idle', true)

@@ -102,15 +102,22 @@ bun tools/merge_clip.js public/models/soldier.glb new.glb sneak out.glb
 
 ### 作り直したら投擲を割り直すこと
 
-`convert_character.py` で全部作り直すと `throw` が 1 本に戻る。**割り直さないと
-手榴弾が投げられない** (コードは `throw_windup` / `throw_release` を探す)。
+`convert_character.py` で全部作り直すと `throw` と `prone_throw` が 1 本ずつに
+戻る。**割り直さないと手榴弾が投げられない** (コードは `throw_windup` /
+`throw_release` を探す。伏せのほうは無ければ立ちへ落ちるので、投げられなくは
+ならないが伏せの型が出ない)。
 
 ```
 bun tools/split_clip.js public/models/soldier.glb throw 1.5 throw_windup throw_release
+bun tools/split_clip.js public/models/soldier.glb prone_throw 0.95 prone_throw_windup prone_throw_release
 ```
 
 1.5 秒は手が一番後ろ (腰から -0.48m) かつ高い (1.57m) 位置の実測値。ここで割ると
 腕を引き切った形が前半の最後になり、`clampWhenFinished` がそのまま保持になる。
+
+伏せの 0.95 秒も同じで、腕を上げたまま止まる所。**放す割合は型ごとに違う** —
+手が一番高くなるのが立ちは後半の 23%、伏せは 38% (`knobs.ts` の
+`GRENADE_RELEASE_RATIO` / `PRONE_GRENADE_RELEASE_RATIO`)。
 
 ### 姿勢だけが欲しいときは両端を切り出す
 

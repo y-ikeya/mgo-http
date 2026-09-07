@@ -14,9 +14,11 @@ import { blastExposure } from '../../src/sim/judge/blast'
 import {
   blastEffect,
   BLAST_RADIUS,
+  RELEASE_HEIGHT,
   THROW_LOFT,
   throwSpeedOf,
 } from '../../src/domain/item/grenade'
+import { stanceOf } from '../../src/domain/player/stance'
 import { applyBlastDamage } from '../damage'
 import { type RoomWorld, broadcast, hostileToOwner, setLife } from '../world'
 
@@ -42,15 +44,6 @@ export let grenadeId = 0
 
 /** 信管 (秒)。投げてから爆発するまで */
 export const FUSE = 3
-
-/**
- * 手を離れる高さ (m)。足元からの差。
- *
- * 投擲モーションで手が一番高くなる所 (実測 1.74m) に合わせてある。
- * クライアントの GRENADE_RELEASE_HEIGHT と揃えること — ずれると、
- * 落下点の予測線と実際に飛ぶ軌道が食い違う。
- */
-export const RELEASE_HEIGHT = 1.7
 
 /**
  * 手を離れる位置を、投げる向きへどれだけ前に出すか (m)。
@@ -92,9 +85,14 @@ export function throwGrenade(room: RoomWorld, from: MatchPlayer, event: ClientMe
   const id = ++grenadeId
   // 前へ出す量は水平方向だけで測る (上下を向いても手の位置が動かないように)
   const flat = Math.hypot(v.x, v.z) || 1
+  /*
+   * 手を離れる高さは構えで決まる。**申告は受けない** — 位置や速さと同じで、
+   * 見るのは控えてある姿勢 (毎秒 64 通届いている locomotion)。伏せて投げれば
+   * 腕も低い所を通るので、そこから飛ばさないと壁の裏から投げられる。
+   */
   const body: Projectile = {
     x: from.x + (v.x / flat) * RELEASE_FORWARD,
-    y: from.y + RELEASE_HEIGHT,
+    y: from.y + RELEASE_HEIGHT[stanceOf(from.locomotion)],
     z: from.z + (v.z / flat) * RELEASE_FORWARD,
     vx: v.x,
     vy: v.y,

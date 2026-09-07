@@ -433,6 +433,19 @@ const THROW_WINDUP_KEY = 'throw_windup'
 const THROW_RELEASE_KEY = 'throw_release'
 
 /**
+ * 伏せたまま投げる型。**同じ 2 段を、寝た体でやる。**
+ *
+ * 立ちの投擲を腹這いの腰に載せると、腕だけが立ち上がって振りかぶる
+ * (伏せ撃ちや伏せ装填と同じ話)。手榴弾は物陰から覗いて投げる道具なので、
+ * **伏せたまま投げられないと使い所が半分になる。**
+ *
+ * 尺は 0.97 + 1.73 秒。立ち (1.50 + 0.83) と比べて振りかぶりが短く、
+ * 振り切りが長い — 寝たまま腕を回すので、投げ終わって腕を戻すまでが長い。
+ */
+const PRONE_THROW_WINDUP_KEY = 'prone_throw_windup'
+const PRONE_THROW_RELEASE_KEY = 'prone_throw_release'
+
+/**
  * クレイモアを置く型。投擲と**同じ 2 段**で、押している間は構えたまま止まる。
  *
  * 尺は 1.77 秒 + 3.60 秒。投擲 (1.50 + 0.83) よりずっと長い — 置いて離れる道具は
@@ -523,6 +536,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   STAND_KEY,
   THROW_WINDUP_KEY,
   THROW_RELEASE_KEY,
+  PRONE_THROW_WINDUP_KEY,
+  PRONE_THROW_RELEASE_KEY,
   SETUP_WINDUP_KEY,
   SETUP_RELEASE_KEY,
   ROLL_KEY,
@@ -801,6 +816,8 @@ export class CharacterAnimator {
   throwDuration = 0
   /** 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る */
   throwReleaseDuration = 0
+  /** 伏せて投げる (後半) の尺 (秒)。型が違うので、放す割合も別に持つ */
+  proneThrowReleaseDuration = 0
   /** 振りかぶりで止めているか */
   /**
    * いま流している 2 段の型。振りかぶって止まり、放すと振り切る物。
@@ -1236,6 +1253,17 @@ export class CharacterAnimator {
     }
     this.throwDuration = (windup?.duration ?? 0) + (release?.duration ?? 0)
     this.throwReleaseDuration = release?.duration ?? 0
+
+    // 伏せたまま投げる型。**立ちと同じ 2 段**なので同じ扱いで登録する。
+    // 無ければ立ちの型へ落ちる (playThrow が持っているかを見る)
+    for (const key of [PRONE_THROW_WINDUP_KEY, PRONE_THROW_RELEASE_KEY]) {
+      const clip = byName.get(key)
+      if (!clip) continue
+      const action = registerUpper(key, clip)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+    this.proneThrowReleaseDuration = byName.get(PRONE_THROW_RELEASE_KEY)?.duration ?? 0
 
     // クレイモアも同じ 2 段。**同じ仕組みを通す** — 別々に書くと、
     // 片方だけ直したときに静かにずれる
@@ -2411,9 +2439,29 @@ export class CharacterAnimator {
     this.pair = { windup, release, held: true, whole }
   }
 
-  /** 投げ始める */
+  /**
+   * 投げ始める。**伏せていれば伏せの型。**
+   *
+   * 立ちの型を腹這いに載せると腕だけが起き上がって振りかぶる (伏せ撃ちや
+   * ボルトと同じ)。型を持っていなければ立ちへ落ちるので、伏せ用が入って
+   * いないモデルでも投げられなくはならない。
+   */
   playThrow(): void {
+    if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_THROW_WINDUP_KEY)) {
+      this.playPair(PRONE_THROW_WINDUP_KEY, PRONE_THROW_RELEASE_KEY)
+      return
+    }
     this.playPair(THROW_WINDUP_KEY, THROW_RELEASE_KEY)
+  }
+
+  /**
+   * いま流しているのが伏せの投擲か。
+   *
+   * **手を離れる割合が型ごとに違う** ので、呼ぶ側 (Game) がどちらの尺で
+   * 測るかを選ぶのに要る。立ちは振り切る所が 30%、伏せは 36%。
+   */
+  get proneThrowing(): boolean {
+    return this.pair?.windup === PRONE_THROW_WINDUP_KEY
   }
 
   /** クレイモアを構え始める。**かがむので全身** */
