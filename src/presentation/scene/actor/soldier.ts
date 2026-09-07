@@ -1518,6 +1518,14 @@ export class Soldier {
     if (this.animator) this.animator.crouchTorsoYaw = (degrees * Math.PI) / 180
   }
 
+  /** 走りの足の回転の底上げ (倍率)。調整用 */
+  setRunCadence(rate: number): void {
+    if (this.animator) {
+      this.animator.runCadence = rate
+      this.animator.setMoveSpeed(this.currentSpeed)
+    }
+  }
+
   /** 非構え時の上半身の向き補正 (0..1)。調整用 */
   setUpperTwistFix(amount: number): void {
     if (this.animator) this.animator.upperTwistFix = amount

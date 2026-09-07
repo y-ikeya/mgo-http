@@ -1081,6 +1081,13 @@ export class Game {
       if (Number.isFinite(amount)) this.player.setUpperTwistFix(amount);
     }
 
+    // 走りの足の回転。**?cadence=1.4 で速く**、1 で滑りゼロ (間延びする)
+    const cadence = new URLSearchParams(location.search).get("cadence");
+    if (cadence !== null) {
+      const rate = Number(cadence);
+      if (Number.isFinite(rate) && rate > 0) this.player.setRunCadence(rate);
+    }
+
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();

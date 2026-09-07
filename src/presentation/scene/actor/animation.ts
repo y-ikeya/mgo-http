@@ -608,6 +608,25 @@ const CRAWL_RATE = 0.75
  */
 const PRONE_RISE_RATE = 1.5
 
+/**
+ * 走りの足の回転の底上げ (倍率)。**1 で滑りゼロ、大きいほど速く回る。**
+ *
+ * 再生速度は「実速度 ÷ クリップ本来の速度」で決めていて、そのままなら足は
+ * 地面と同じ速さで後ろへ流れる — 滑りが原理的に出ない。ただしクリップは
+ * 4.76 m/s で作られていて、この遊びの走りは 3.04 m/s しかない。**素のままだと
+ * 本来の 64% でしか足が回らず、間延びして見える。**
+ *
+ * 上げたぶんは滑りとして出る。1.25 で足が地面より 25% 速く送られる — 走りの
+ * 型は接地時間が短いので、この程度なら目で追えない。
+ *
+ * FAST MOVE (runner) は実速度のほうを上げるので、こことは別に効く
+ * (Lv3 で 1.16 倍)。**あれは速く動くから速く回る**で、こちらは**同じ速さでも
+ * 足を速く送る**。
+ *
+ * ?cadence=1.4 のように URL から触れる (Game.ts)。
+ */
+const RUN_CADENCE = 1.25
+
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
   sneak: SNEAK_CLIP_SPEED,
   crawl_f: CRAWL_CLIP_SPEED,
@@ -1687,8 +1706,20 @@ export class CharacterAnimator {
   private applyLocomotionTimeScales(): void {
     for (const [state, clipSpeed] of Object.entries(CLIP_SPEED)) {
       if (!clipSpeed) continue
-      // 箱と匍匐は意図して遅くしてある。それ以外は実測どおり
-      const rate = state === 'sneak' ? SNEAK_RATE : state === 'crawl_f' ? CRAWL_RATE : 1
+      /*
+       * 箱と匍匐は意図して遅くしてある。走りは底上げする (RUN_CADENCE)。
+       *
+       * しゃがみ移動は上げない。**あれは音を立てずに寄る動き**で、足が速く
+       * 回ると忍んで見えない。
+       */
+      const rate =
+        state === 'sneak'
+          ? SNEAK_RATE
+          : state === 'crawl_f'
+            ? CRAWL_RATE
+            : RUN_STATES.has(state as Locomotion)
+              ? this.runCadence
+              : 1
       const scale = (this.moveSpeed / clipSpeed) * rate
       const locomotion = state as Locomotion
       this.lower.get(locomotion)?.setEffectiveTimeScale(scale)
@@ -1758,6 +1789,9 @@ export class CharacterAnimator {
    * 銃の種類そのものではなく「片手で構える銃か」を持たせている。
    * 麻酔銃を足すときも同じ型を使うはずなので、そこで分けたくない。
    */
+  /** 走りの足の回転の底上げ。**URL から触れる** (RUN_CADENCE の注) */
+  runCadence = RUN_CADENCE
+
   private pistol = false
 
   /**
