@@ -496,6 +496,23 @@ function frame(): void {
      * (既定がどちらであれ、片道では揃わない)。いまの状態と欲しい状態を
      * 見比べて、違えば 1 回押す。
      */
+    /*
+     * **銃が手に付くまで立たせておく。**
+     *
+     * 銃は最初に付いた瞬間の手の向きを基準にして、以後ずっとそれを使う
+     * (soldier.ts の attachRef)。読み込みは非同期なので、付く前に姿勢を
+     * 変えると**その姿勢を基準にした握り**になる。
+     *
+     * 本番は立って湧くので必ず立ち姿が基準になる。ここが待たずに伏せさせて
+     * いたので、**試写の伏せだけ銃が手から外れて見えた** — 本番では正しく
+     * 持てているのに、詰める場所のほうが間違っているという形。
+     */
+    if (!cell.player.weaponAttached) {
+      cell.player.setAiming(false)
+      cell.player.update(dt, ZERO, cell.player.yaw, 0, WORLD)
+      continue
+    }
+
     if (cell.spec.prone) cell.player.setProne(true)
     else cell.player.setProne(false)
     if (!cell.spec.prone && cell.player.isCrouching !== cell.spec.crouch) {
