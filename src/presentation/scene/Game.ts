@@ -1065,6 +1065,22 @@ export class Game {
       renderer: this.renderer,
     });
 
+    /*
+     * 上半身の向き補正を URL から触れるようにする。**?twistfix=0 で切れる。**
+     *
+     * 走ると上半身だけ右へ 45° 捻れる、という症状を追っている。下半身の
+     * クリップ (run_f) は腰を 33° 振って作られていて、その振れを戻すのが
+     * この補正 (animation.ts の alignSpineToUpperClip)。効いていないのか、
+     * 効きすぎているのかを**実物で切り分けるため**に出す。
+     *
+     * 素の値は 1。0 で「作られた向きの差の打ち消し」だけが外れる。
+     */
+    const twistFix = new URLSearchParams(location.search).get("twistfix");
+    if (twistFix !== null) {
+      const amount = Number(twistFix);
+      if (Number.isFinite(amount)) this.player.setUpperTwistFix(amount);
+    }
+
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
