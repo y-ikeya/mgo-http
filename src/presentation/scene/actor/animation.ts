@@ -687,6 +687,14 @@ const RELAXED_LEAN = THREE.MathUtils.degToRad(17)
  */
 const BOX_LEAN = THREE.MathUtils.degToRad(34)
 
+/** 走りの 8 方向。**構えていない間はここだけ家系を揃える** */
+const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as Locomotion))
+
+/** 脱力中の下半身を引く鍵。**元の状態と、流すクリップの組** */
+function relaxedLowerKey(state: Locomotion, clip: string): string {
+  return `${state}@${clip}`
+}
+
 const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
   // yaw は、しゃがみのときに半身へ構えるための左右の配分。
   // 首から上を負にしてあるのは、子が親の回転を継ぐため。背骨を 0.7 回した
@@ -776,7 +784,7 @@ export class CharacterAnimator {
 
   private readonly root: THREE.Object3D
   private readonly mixer: THREE.AnimationMixer
-  private readonly lower = new Map<Locomotion, THREE.AnimationAction>()
+  private readonly lower = new Map<string, THREE.AnimationAction>()
   private readonly upper = new Map<string, THREE.AnimationAction>()
 
   private locomotion: Locomotion = 'idle'
@@ -790,7 +798,9 @@ export class CharacterAnimator {
   /** 現在の移動速度 (m/s)。クリップの再生速度補正の分母になる */
   private moveSpeed: number
   /** 各レイヤーの現在の重み。合計が必ず 1 になるよう正規化してから action に流す */
-  private readonly lowerWeights = new Map<Locomotion, number>()
+  private readonly lowerWeights = new Map<string, number>()
+  /** 下半身に実際に流しているクリップの名前。上下が同じかを見るのに使う */
+  private readonly lowerClipNames = new Map<string, string>()
   private readonly upperWeights = new Map<string, number>()
 
   /** 照準の上下 (rad)。構えを解いた瞬間に体が跳ねないよう、目標へ補間して追う */
@@ -999,6 +1009,36 @@ export class CharacterAnimator {
       if (state === 'jump_up') this.jumpUpDuration = clip.duration
       if (state === 'jump_loop') this.jumpLoopDuration = clip.duration
       this.lower.set(state, action)
+      this.lowerClipNames.set(state, clip.name)
+    }
+
+    /*
+     * **構えていない間の下半身。上半身と同じクリップから取る。**
+     *
+     * 素材は 2 つの家系に分かれている。8 方向の走り (run_f …) と idle は腰を
+     * 振って作られていて (run_f −39.3°、run_r −66.6°、idle −48.2°)、その振れを
+     * **自分の上半身が戻している。** 脱力の型 (relaxed_run −6.9° / run_unarmed
+     * −0.0°) は正面向きで作られている。
+     *
+     * 混ぜると戻しだけが消えて、上半身が振れた角度そのまま捻れる — 走ると
+     * 上半身が右へ 45° 向く、という形で出ていた。
+     *
+     * **構えている間は 8 方向が要る** (体は照準を向いたまま横へ動く) が、
+     * 脱力中は体が進行方向を向くので前走りしか使わない。だから脱力の間だけ
+     * 上下を同じクリップにする。上下が同じなら向きの補正も要らなくなる。
+     */
+    for (const [state, name] of [
+      ...Object.entries(RELAXED_CLIPS).map(([k, v]) => [k, v] as const),
+      ...Object.entries(PISTOL_RELAXED).map(([k, v]) => [k, v] as const),
+    ]) {
+      if (!RUN_STATES.has(state as Locomotion)) continue
+      const clip = byName.get(name)
+      const key = relaxedLowerKey(state as Locomotion, name)
+      if (!clip || this.lower.has(key)) continue
+      const action = this.mixer.clipAction(splitClip(clip, 'lower', key))
+      action.play()
+      this.lower.set(key, action)
+      this.lowerClipNames.set(key, clip.name)
     }
 
     // --- 上半身レイヤー ---
@@ -1277,7 +1317,7 @@ export class CharacterAnimator {
     // (reload はワンショットなので playReload() の中で始める)
     for (const [state, action] of this.lower) {
       // ワンショットは再生を始める側で play する
-      if (!ONE_SHOT_LOWER.has(state)) action.play()
+      if (!ONE_SHOT_LOWER.has(state as Locomotion)) action.play()
       this.lowerWeights.set(state, state === 'idle' ? 1 : 0)
     }
     for (const [key, action] of this.upper) {
@@ -1308,7 +1348,7 @@ export class CharacterAnimator {
       JUMP_STATES.has(this.locomotion) || JUMP_STATES.has(this.previousLocomotion)
         ? JUMP_BLEND_LAMBDA
         : LOWER_BLEND_LAMBDA
-    this.blend(this.lower, this.lowerWeights, this.locomotion, lowerLambda, dt)
+    this.blend(this.lower, this.lowerWeights, this.resolveLowerKey(), lowerLambda, dt)
     this.previousLocomotion = this.locomotion
     this.blend(this.upper, this.upperWeights, this.resolveUpperKey(), UPPER_BLEND_LAMBDA, dt)
     /*
@@ -1504,7 +1544,8 @@ export class CharacterAnimator {
     const key = this.resolveUpperKey()
 
     // 上下が同じクリップなら食い違いようがない。補正は掛けない。
-    if (this.upperClipNames.get(key) === LOWER_CLIPS[this.locomotion]) return
+    // **実際に流している下半身**と見比べる。脱力中は別のクリップを流している
+    if (this.upperClipNames.get(key) === this.lowerClipNames.get(this.resolveLowerKey())) return
     /*
      * 伏せている間も掛けない。
      *
@@ -1652,6 +1693,15 @@ export class CharacterAnimator {
       const locomotion = state as Locomotion
       this.lower.get(locomotion)?.setEffectiveTimeScale(scale)
       /*
+       * 脱力中の下半身にも同じ速さを掛ける。**掛け忘れると足だけ滑る** —
+       * クリップ本来の速さで割って歩幅と移動速度を合わせているので、
+       * 別のクリップを流す枝にも同じ計算が要る。
+       */
+      for (const table of [RELAXED_CLIPS, PISTOL_RELAXED]) {
+        const name = table[locomotion]
+        if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scale)
+      }
+      /*
        * **上下が同じクリップなら、速さも同じにする。**
        *
        * 上半身は別の action として持っているので、下だけ速さを当てると
@@ -1671,11 +1721,35 @@ export class CharacterAnimator {
     }
   }
 
+  /**
+   * いま流す下半身。**構えていない走りだけ、上半身と同じクリップを使う。**
+   *
+   * 8 方向の走りは腰を振って作られていて、その振れを自分の上半身が戻している
+   * (登録の所に測った値がある)。脱力の型は正面向きで作られているので、混ぜると
+   * 戻しだけが消えて上半身が捻れる。
+   *
+   * **構えている間は 8 方向のまま。** 体が照準を向いたまま横へ動くので、方向
+   * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
+   */
+  private resolveLowerKey(): string {
+    if (this.aiming || !RUN_STATES.has(this.locomotion)) return this.locomotion
+    const name = this.pistol ? PISTOL_RELAXED[this.locomotion] : RELAXED_CLIPS[this.locomotion]
+    if (!name) return this.locomotion
+    const key = relaxedLowerKey(this.locomotion, name)
+    return this.lower.has(key) ? key : this.locomotion
+  }
+
   setLocomotion(next: Locomotion): void {
     // 倒れたら他の状態を一切受け付けない。死体が走り出さないため。
     if (this.dead) return
-    // 実際の切り替えは重みの補間に任せる。ここは目標を記録するだけ。
-    if (this.lower.has(next)) this.locomotion = next
+    /*
+     * 実際の切り替えは重みの補間に任せる。ここは目標を記録するだけ。
+     *
+     * **表に在る姿勢だけを受ける。** 下半身には脱力用の枝も入っている
+     * (run_f@relaxed_run など) が、あれは姿勢ではなく「その姿勢のときに流す
+     * 別のクリップ」なので、姿勢として渡されては困る。
+     */
+    if (LOWER_CLIPS[next] !== undefined) this.locomotion = next
   }
 
   /**

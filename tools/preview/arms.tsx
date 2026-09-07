@@ -120,6 +120,8 @@ await renderer.init()
 const gltf = await loadSoldier()
 const byName = new Map(gltf.animations.map((c) => [c.name, c]))
 
+console.log('CLIPS ' + gltf.animations.map((c) => c.name).sort().join(' '))
+
 const labels = document.getElementById('labels')!
 labels.style.gridTemplateColumns = `repeat(${CELLS.length}, 1fr)`
 

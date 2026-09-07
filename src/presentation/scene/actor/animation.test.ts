@@ -510,7 +510,13 @@ describe('勝手に構えない', () => {
    */
   function allLocomotions(anim: CharacterAnimator): string[] {
     const lower = (anim as unknown as Record<string, Map<string, unknown>>).lower
-    return [...lower.keys()]
+    /*
+     * **@ を含む鍵は姿勢ではない。**
+     *
+     * 脱力中に流す別クリップの枝 (run_f@relaxed_run など)。姿勢として渡すと
+     * 表に無い名前になって、上半身が構えの型で埋められる。
+     */
+    return [...lower.keys()].filter((key) => !key.includes('@'))
   }
 
   test('**どの姿勢でも、構えていなければ構えの型が出ない**', () => {
@@ -521,6 +527,44 @@ describe('勝手に構えない', () => {
       if (playing(anim, 'upper').includes('aim')) guilty.push(locomotion)
     }
     expect(guilty).toEqual([])
+  })
+
+  /**
+   * **走っている間、構えていなければ上下が同じクリップから来る。**
+   *
+   * 素材は 2 つの家系に分かれている。8 方向の走りは腰を振って作られていて
+   * (run_f −39.3°、run_r −66.6°)、その振れを**自分の上半身が戻している。**
+   * 脱力の型 (relaxed_run −6.9° / run_unarmed −0.0°) は正面向き。
+   *
+   * 混ぜると戻しだけが消えて、上半身が振れた角度そのまま捻れる。**走ると
+   * 上半身が右へ 45° 向く**という形で出ていた。ライフルでも手榴弾でも同じ
+   * だったのは、振れているのが脚側だから。
+   */
+  test('**脱力して走る間は、上下が同じクリップ**', () => {
+    for (const pistol of [false, true]) {
+      const anim = animator()
+      anim.setPistol(pistol)
+      run(anim, 1.2, 'run_f')
+      const lower = playing(anim, 'lower')
+      const clips = (anim as unknown as Record<string, Map<string, string>>).lowerClipNames
+      const uppers = (anim as unknown as Record<string, Map<string, string>>).upperClipNames
+      const upper = playing(anim, 'upper')
+      expect(lower.length).toBe(1)
+      expect(upper.length).toBe(1)
+      expect(clips.get(lower[0]!)).toBe(uppers.get(upper[0]!)!)
+    }
+  })
+
+  /**
+   * **構えている間は 8 方向のまま。**
+   *
+   * 体が照準を向いたまま横へ動くので、方向ごとの型が要る。上下が別のクリップ
+   * になるが、そちらは家系が揃っている (どちらも振れた側)。
+   */
+  test('構えて走る間は、方向ごとの型を使う', () => {
+    const anim = animator()
+    run(anim, 1.2, 'run_r', true)
+    expect(playing(anim, 'lower')).toEqual(['run_r'])
   })
 
   test('構えれば構える', () => {
