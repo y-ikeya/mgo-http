@@ -279,16 +279,26 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   /*
    * 伏せている間。**8 方向には分けない。**
    *
-   * 這う型が前進の 1 本しかないので、向きの区別を作れない。動いているかだけ
-   * 見て、止まったら伏せたまま静止する (箱の sneak / sit と同じ形)。
-   * 前以外へ動けないことは、動かす側 (player.ts) が入力を捨てて作っている。
+   * 這う型は前 (crawl_f) と後ろ (crawl_b) の 2 本。**横は無い。**
+   * 止まったら伏せたまま静止する (箱の sneak / sit と同じ形)。
+   * 横へ動けないことは、動かす側 (soldier.ts) が前後へ丸めて作っている。
    */
   // 伏せへの出入り。**終わるまで他へ移らない** (全身の型)
   if (input.proneShift) return input.proneShift
 
   if (input.prone) {
-    const threshold = input.previous === 'crawl_f' ? IDLE_ENTER_SPEED : IDLE_EXIT_SPEED
-    return input.actualSpeed >= threshold ? 'crawl_f' : 'prone_idle'
+    const crawling = input.previous === 'crawl_f' || input.previous === 'crawl_b'
+    const threshold = crawling ? IDLE_ENTER_SPEED : IDLE_EXIT_SPEED
+    if (input.actualSpeed < threshold) return 'prone_idle'
+    /*
+     * 前か後ろか。**横は無い** — 動かす側が前後へ丸めている (soldier.ts)。
+     *
+     * 8 方向に分けないのは型が 2 本しか無いから。横へ這う型が来たら増やす。
+     */
+    const sin = Math.sin(input.yaw)
+    const cos = Math.cos(input.yaw)
+    const forward = input.dirX * -sin + input.dirZ * -cos
+    return forward >= 0 ? 'crawl_f' : 'crawl_b'
   }
 
   // ダンボールを被っている間は専用の姿勢。8 方向には分けず、動いているかだけ見る

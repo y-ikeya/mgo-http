@@ -1645,13 +1645,22 @@ export class Soldier {
      */
     if (this.hardLandTimer > 0) moveDir = ZERO_MOVE
 
+    /*
+     * 伏せている間は**前後だけ。** 横は捨てる。
+     *
+     * 這う型が前 (crawl_f) と後ろ (crawl_b) の 2 本しかないので、横へ動かすと
+     * 前を向いたまま横滑りする。**型の無い向きへは動かさない。**
+     *
+     * 後ろは長らく捨てていた (型が前しか無かった)。伏せたら前へ進むしかなく、
+     * **覗いた縁から下がれない**ので、伏せること自体が引き返せない選択に
+     * なっていた。
+     */
     if (this.proneStage === 'prone' && moveDir !== ZERO_MOVE) {
       const sin = Math.sin(facingYaw)
       const cos = Math.cos(facingYaw)
       // yaw = θ のとき前方は (-sinθ, -cosθ)
       const forward = moveDir.x * -sin + moveDir.z * -cos
-      if (forward <= 0) moveDir = ZERO_MOVE
-      else moveDir = this.crawlDir.set(-sin * forward, 0, -cos * forward)
+      moveDir = this.crawlDir.set(-sin * forward, 0, -cos * forward)
     }
 
     // 銃の重さはどの姿勢でも効く。担いでいる物が軽くなるわけではないので。

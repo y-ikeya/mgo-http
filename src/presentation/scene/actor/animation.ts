@@ -77,6 +77,10 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
    */
   prone_idle: 'crawl_f',
   crawl_f: 'crawl_f',
+  // 伏せたまま後ろへ。**前と対で 2 本だけ** (横は無い)
+  crawl_b: 'crawl_b',
+  // 伏せたまま倒された。立ちの型で倒れると、一度立ち上がってから崩れる
+  prone_death: 'prone_death',
   // 伏せへの出入り。全身の型なので上半身も同じクリップから取る
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
@@ -154,6 +158,8 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   // 伏せ撃ちは爆風で倒れている間と同じ仕組みに乗る
   prone_idle: 'crawl_f',
   crawl_f: 'crawl_f',
+  crawl_b: 'crawl_b',
+  prone_death: 'prone_death',
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
   salute: 'salute',
@@ -215,7 +221,7 @@ const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
  * 効きすぎて暴れる。出入りの繋ぎ (prone_down / prone_rise) は全身の型として
  * 最後まで流れるので、ここには含めない。
  */
-const PRONE_LOCOMOTIONS = new Set<Locomotion>(['prone_idle', 'crawl_f'])
+const PRONE_LOCOMOTIONS = new Set<Locomotion>(['prone_idle', 'crawl_f', 'crawl_b'])
 
 /** 落下ループの再生速度の上限。これ以上速くすると脚が忙しなく見える */
 const JUMP_LOOP_MAX_SPEED = 3
@@ -461,6 +467,8 @@ const HARD_LAND_KEY = 'hard_land'
 const DEATH_KEY = 'death'
 /** 倒れる向き。撃たれた側から見て前か後ろか */
 const DEATH_FRONT_KEY = 'death_front'
+/** 伏せたまま倒された型。**向きは無い** — 既にその向きで寝ている */
+const PRONE_DEATH_KEY = 'prone_death'
 const DEATH_BACK_KEY = 'death_back'
 /**
  * 麻酔で眠っている型。**上半身も要る。**
@@ -522,6 +530,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   BUMP_KEY,
   DEATH_FRONT_KEY,
   DEATH_BACK_KEY,
+  PRONE_DEATH_KEY,
   PRONE_DOWN_KEY,
   PRONE_RISE_KEY,
   DEATH_KEY,
@@ -632,6 +641,8 @@ const RUN_CADENCE = 1.31
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
   sneak: SNEAK_CLIP_SPEED,
   crawl_f: CRAWL_CLIP_SPEED,
+  // 後退も同じ速さで作られている
+  crawl_b: CRAWL_CLIP_SPEED,
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, RUN_CLIP_SPEED],
@@ -1314,6 +1325,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [DEATH_FRONT_KEY, 'death_front'],
       [DEATH_BACK_KEY, 'death_back'],
+      // 伏せたまま倒された。**向きは無い** — 既にその向きで寝ている
+      [PRONE_DEATH_KEY, 'prone_death'],
       // 眠り。倒れる型と同じで、最後の姿勢のまま留める
       [SLEEP_KEY, 'sleep'],
     ] as const) {
@@ -1754,7 +1767,7 @@ export class CharacterAnimator {
       const rate =
         state === 'sneak'
           ? SNEAK_RATE
-          : state === 'crawl_f'
+          : state === 'crawl_f' || state === 'crawl_b'
             ? CRAWL_RATE
             : RUN_STATES.has(state as Locomotion)
               ? this.runCadence
@@ -1979,6 +1992,26 @@ export class CharacterAnimator {
    * @param fromBehind 背後から撃たれたか。分からなければ省く
    */
   playDeath(fromBehind?: boolean): void {
+    /*
+     * **伏せたまま倒されたら、伏せたまま崩れる。**
+     *
+     * 立ちの型で倒れると、伏せていた体が一度立ち上がってから崩れる。撃たれた
+     * 瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
+     *
+     * 向きは見ない。**うつ伏せから前も後ろも無い** — 既にその向きで寝ている。
+     */
+    if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_DEATH_KEY)) {
+      const upper = this.upper.get(PRONE_DEATH_KEY)
+      const lower = this.lower.get('prone_death')
+      if (upper && lower) {
+        upper.reset().play()
+        lower.reset().play()
+        this.upperState = 'death'
+        this.locomotion = 'prone_death'
+        return
+      }
+    }
+
     const state: Locomotion =
       fromBehind === undefined ? 'death' : fromBehind ? 'death_front' : 'death_back'
     const key =

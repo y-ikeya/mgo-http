@@ -36,7 +36,10 @@ export function stanceOf(locomotion: Locomotion): Stance {
   // ダンボールが落ちた直後。棒立ちなので、頭は立ちの高さに戻っている
   if (locomotion === 'bump') return 'stand'
   // 伏せている。爆風で倒れているのと同じ高さで扱う
-  if (locomotion === 'prone_idle' || locomotion === 'crawl_f') return 'prone'
+  if (locomotion === 'prone_idle' || locomotion === 'crawl_f' || locomotion === 'crawl_b')
+    return 'prone'
+  // 伏せたまま倒れた。**倒れているので down** (頭の高さは死体のもの)
+  if (locomotion === 'prone_death') return 'down'
   /*
    * 伏せへの出入り。**高いほうで採る。**
    *

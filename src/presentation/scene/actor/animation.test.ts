@@ -587,6 +587,42 @@ describe('勝手に構えない', () => {
     expect(playing(anim, 'lower')).toEqual(['run_r'])
   })
 
+  /**
+   * **伏せたまま倒されたら、伏せたまま崩れる。**
+   *
+   * 立ちの型で倒れると、伏せていた体が一度立ち上がってから崩れる。撃たれた
+   * 瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
+   */
+  test('伏せたまま倒されたら、伏せたまま崩れる', () => {
+    for (const from of ['prone_idle', 'crawl_f', 'crawl_b']) {
+      const anim = animator()
+      run(anim, 1.2, from)
+      anim.playDeath(true)
+      run(anim, 0.6, from)
+      expect(playing(anim, 'lower')).toEqual(['prone_death'])
+    }
+  })
+
+  test('立っていれば、いままでどおり向きで倒れる', () => {
+    const anim = animator()
+    run(anim, 1.2, 'idle')
+    anim.playDeath(true)
+    run(anim, 0.6, 'idle')
+    expect(playing(anim, 'lower')).toEqual(['death_front'])
+  })
+
+  /**
+   * **伏せたまま後ろへ下がれる。**
+   *
+   * 這う型が前しか無かった頃は、伏せたら前へ進むしかなかった。覗いた縁から
+   * 下がれないので、**伏せること自体が引き返せない選択**になっていた。
+   */
+  test('伏せたまま後ろへ下がる型が出る', () => {
+    const anim = animator()
+    run(anim, 1.2, 'crawl_b')
+    expect(playing(anim, 'lower')).toEqual(['crawl_b'])
+  })
+
   test('構えれば構える', () => {
     const anim = animator()
     run(anim, 1.2, 'idle', true)

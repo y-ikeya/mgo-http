@@ -70,6 +70,9 @@ export const LOCOMOTIONS: Locomotion[] = [
   // 倒れる向き。**末尾に足す**
   'death_front',
   'death_back',
+  // 伏せたまま倒れる / 下がる。**末尾に足す**
+  'prone_death',
+  'crawl_b',
   // 麻酔で眠っている。**末尾に足す**
   'sleep',
 ]
