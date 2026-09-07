@@ -145,6 +145,16 @@ const DOWN_LOCK = 0.35
 /** 照準方向へ向き直る速さ */
 const TURN_LAMBDA = 14
 
+/**
+ * 這い出すための寝返りで、腰の向きを打ち消すのにかける時間 (秒)。
+ *
+ * 転ぶ型と這う型は**頭の向きが逆**なので、渡すときに腰の向きを 180 度回して
+ * 打ち消している (crawlFromDown)。型のほうは重みの補間で入れ替わるので
+ * (animation.ts の LOWER_BLEND_LAMBDA = 12)、**その速さに合わせないと噛み合わ
+ * ない** — 一息に回すと逆向きに入れ替わって見える。12 で 95% までおよそ 0.25 秒。
+ */
+const PRONE_TURN_BLEND = 0.25
+
 /** 銃口のオフセット (m)。構えた右手あたりを想定した固定値 */
 const MUZZLE_HEIGHT = 1.35
 const MUZZLE_FORWARD = 0.35
@@ -285,6 +295,17 @@ export class Soldier {
   private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' | 'prone_turn' = 'none'
   /** 繋ぎのモーションの残り時間 (秒) */
   private proneShiftLeft = 0
+  /**
+   * 寝返りの間に回す向き。**回している間だけ 0 より大きい。**
+   *
+   * 2 通りの使い方がある。半回転のボタン (turnProne) は型の尺いっぱいで
+   * 180 度回して、本当に後ろを向く。這い出すための寝返り (crawlFromDown) は
+   * **型が頭の向きを入れ替える分を打ち消す**ために、混ざる速さと同じ速さで
+   * 180 度回す — 世界から見た体は動かず、寝返るだけになる。
+   */
+  private proneTurnFrom = 0
+  private proneTurnOver = 0
+  private proneTurnLeft = 0
 
   private weaponStance = 0
   /** 姿勢が変わっている速さ。散布に効かせる */
@@ -837,6 +858,8 @@ export class Soldier {
     this.animator?.wakeFromSleep()
     this.proneStage = 'none'
     this.proneShiftLeft = 0
+    this.proneTurnOver = 0
+    this.proneTurnLeft = 0
     this.velocityY = 0
     this.downed_ = false
     this.downElapsed = 0
@@ -865,6 +888,8 @@ export class Soldier {
     this.animator?.wakeFromSleep()
     this.proneStage = 'none'
     this.proneShiftLeft = 0
+    this.proneTurnOver = 0
+    this.proneTurnLeft = 0
     this.velocityY = 0
     // 爆風で転んだまま倒された場合、ここで戻さないと復帰しても転んだまま。
     // 姿勢は毎フレーム downed から引き直しているので、他の人の画面では
@@ -1358,6 +1383,48 @@ export class Soldier {
     this.animator?.playProneRise()
   }
 
+  /**
+   * 伏せたまま半回転する。**寝返って後ろを向く。**
+   *
+   * --- なぜ要るか ---
+   * 伏せている間、体は**進む向き**にしか回らない (止まっていれば向きは動か
+   * ない — update の targetYaw)。カメラを回しても寝ている体は付いてこないので、
+   * **寝たまま後ろを向くには一度立つしかなかった。** 覗いた縁から下がるのに
+   * crawl_b を足したのと同じで、伏せたまま体勢を変える手を増やす。
+   *
+   * 這って向き直るより速く、立って向き直るより安全。代わりに 1.1 秒のあいだ
+   * 動けず、途中で仰向けになる — **その間に撃たれるのが代償**。
+   */
+  turnProne(): void {
+    if (this.proneStage !== 'prone' || this.down) return
+    /*
+     * 構えている間は要らない。**構えていれば体は照準に付いてくる** (targetYaw)
+     * ので、寝たまま後ろを向くのに寝返る必要が無い。回している最中に構えられて
+     * も向きは競らない (寝返りのほうが腰を直に置く) が、**回り終わった瞬間に
+     * 照準へ戻る**ので、回したことが無かったことになる。
+     */
+    if (this.aiming) return
+    const span = this.animator?.proneTurnDuration ?? 0
+    if (span <= 0) return
+    // 型の尺いっぱいで回す。**転がりながら向きが変わる**
+    this.beginProneTurn(span, span)
+  }
+
+  /**
+   * 寝返りを始める。
+   *
+   * @param span 動けない時間 (秒)。型の尺
+   * @param over 180 度を何秒かけて回すか
+   */
+  private beginProneTurn(span: number, over: number): void {
+    this.proneStage = 'prone_turn'
+    this.proneShiftLeft = span
+    this.proneTurnFrom = this.yaw
+    this.proneTurnOver = over
+    this.proneTurnLeft = over
+    this.animator?.playProneTurn()
+  }
+
   /** ローリングの尺 (秒)。モデル未着なら 0 */
   get rollDuration(): number {
     return this.animator?.rollDuration ?? 0
@@ -1538,9 +1605,20 @@ export class Soldier {
       this.proneShiftLeft = 0
       return
     }
-    this.proneStage = 'prone_turn'
-    this.proneShiftLeft = span
-    this.animator?.playProneTurn()
+    /*
+     * **型が頭と足を入れ替える分を、腰の向きで打ち消す。**
+     *
+     * 転ぶ型 (sweep) は足から飛ばされて背中で着くので、終わりの姿勢は
+     * **頭が後ろ側**。這う型は頭が前なので、そのまま渡すと頭と足が入れ替わる
+     * — 寝返りではなく、体がその場でくるりと入れ替わって見える。
+     *
+     * 打ち消しは**混ざるのと同じ速さ**で回す。型は重みの補間で入れ替わる
+     * (LOWER_BLEND_LAMBDA) ので、こちらだけ一息に回すと逆向きに入れ替わる。
+     * 揃えれば世界から見た体は動かず、寝返るだけになる。
+     *
+     * 向き直りたければ半回転のボタン (turnProne)。
+     */
+    this.beginProneTurn(span, PRONE_TURN_BLEND)
   }
 
   /**
@@ -1934,6 +2012,15 @@ export class Soldier {
         if (this.proneStage === 'none') this.crouching = true
       }
     }
+    // 回している最中。**回り切ったら手を離す** (以後は普通の向きの決め方へ戻る)
+    if (this.proneTurnOver > 0) {
+      this.proneTurnLeft -= dt
+      if (this.proneTurnLeft <= 0) {
+        this.proneTurnLeft = 0
+        this.yaw = this.proneTurnFrom + Math.PI
+        this.proneTurnOver = 0
+      }
+    }
     /*
      * 最後に地面へ触れていた高さ。**判定を通したあとで控える。**
      *
@@ -1968,7 +2055,18 @@ export class Soldier {
       targetYaw =
         moveDir.lengthSq() > 1e-6 ? Math.atan2(-moveDir.x, -moveDir.z) : this.yaw
     }
-    this.yaw = dampAngle(this.yaw, targetYaw, TURN_LAMBDA, dt)
+    /*
+     * 寝返っている間は**追わずに置く。**
+     *
+     * 追従 (dampAngle) に任せると、短い打ち消し (PRONE_TURN_BLEND) では
+     * 回り切らずに残る。型と噛み合わせる回転なので、遅れがそのままずれになる。
+     */
+    if (this.proneTurnOver > 0) {
+      const done = 1 - this.proneTurnLeft / this.proneTurnOver
+      this.yaw = this.proneTurnFrom + Math.PI * done
+    } else {
+      this.yaw = dampAngle(this.yaw, targetYaw, TURN_LAMBDA, dt)
+    }
     this.object.rotation.y = this.yaw
 
     if (this.animator) {

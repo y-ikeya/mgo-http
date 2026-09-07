@@ -3044,6 +3044,14 @@ export class Game {
     // 短く押して離した = しゃがみの切り替え
     if (this.input.tapped("stance")) this.player.toggleCrouch();
 
+    /*
+     * 伏せたまま半回転する。**伏せている間しか効かない** (turnProne が見る)。
+     *
+     * 伏せていると体は進む向きにしか回らないので、寝たまま後ろを向くには
+     * 一度立つしかなかった。這って向き直るより速く、立って向き直るより安全。
+     */
+    if (this.input.tapped("proneTurn")) this.player.turnProne();
+
     if (this.input.holding("stance")) {
       // 長押しが成立した。**1 回の押下につき 1 度だけ転がる**
       if (!this.rolledThisHold) {
