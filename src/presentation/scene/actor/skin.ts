@@ -38,6 +38,16 @@ const SKINS: Record<string, string> = {
   pepa1404: 'soldier_raiden',
 }
 
+/**
+ * 使っているモデルの一覧。**型が揃っているかを見張るのに要る** (skin.test.ts)。
+ *
+ * 表から出す。**別に並べると必ず片方が古くなる** — モデルを足したのに
+ * 見張りに載せ忘れる、が起きる。
+ */
+export const SKIN_FILES: readonly string[] = [
+  ...new Set([DEFAULT_SKIN, ...Object.values(SKINS)]),
+]
+
 export function skinFor(name: string | undefined): string {
   return (name && SKINS[name]) || DEFAULT_SKIN
 }

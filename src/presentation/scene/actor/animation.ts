@@ -708,6 +708,27 @@ const RELAXED_LEAN = THREE.MathUtils.degToRad(17)
  */
 const BOX_LEAN = THREE.MathUtils.degToRad(34)
 
+/**
+ * その glb に無い型を並べる。**代用に落ちても黙っているのを見張る。**
+ *
+ * 型が欠けていると、その状態のときだけ別の型が流れる。**警告が出ないので、
+ * 見た目で気づくまで分からない** — 雷電に knee_relaxed / knee_ready が無く、
+ * しゃがむと古い crouch_idle が流れて、そこに合わせていない握りで銃口が
+ * 上を向いた。試写は別のモデルを読んでいたので、突き合わせるまで出なかった。
+ *
+ * 見るのは**表に書いてある名前**だけ。表を直せばここも一緒に動くので、
+ * 別に一覧を持たない (持つと必ず片方が古くなる)。
+ */
+export function missingClips(animations: THREE.AnimationClip[]): string[] {
+  const have = new Set(animations.map((clip) => clip.name))
+  const want = new Set<string>([
+    ...Object.values(LOWER_CLIPS),
+    ...Object.values(RELAXED_CLIPS),
+    ...Object.values(PISTOL_RELAXED),
+  ])
+  return [...want].filter((name) => !have.has(name)).sort()
+}
+
 /** 走りの 8 方向 */
 const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as Locomotion))
 
