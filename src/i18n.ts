@@ -93,6 +93,12 @@ const JA = {
   'lag.vpn': 'VPN やプロキシを通していたら、外して試してください。',
   'lag.recheck': 'このページを開き直すと入り直せます。',
 
+  // --- 試合中に離れようとした ---
+  'leave.title': '部屋を出ますか',
+  'leave.lede':
+    '試合の最中です。出ると、残った人は数の合わない試合を続けることになります。' +
+    '席が畳まれるまでの間、あなたは「居るのに動かない人」として映ります。',
+
   // --- 成績表 ---
   'score.blue': '青',
   'score.red': '赤',
@@ -156,6 +162,12 @@ const EN: Record<Key, string> = {
     'Stop it and rejoin.',
   'lag.vpn': 'If you are behind a VPN or proxy, try without it.',
   'lag.recheck': 'Reload this page to rejoin.',
+
+  'leave.title': 'LEAVE THE ROOM?',
+  'leave.lede':
+    'A match is in progress. If you leave, everyone else keeps playing a match that no ' +
+    'longer has even sides — and until your seat is folded away you show up as someone ' +
+    'who is there but never moves.',
 
   'score.blue': 'BLUE',
   'score.red': 'RED',

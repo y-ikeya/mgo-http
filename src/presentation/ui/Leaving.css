@@ -1,0 +1,80 @@
+/*
+ * 尋ねる板。**戦場は透けたまま。**
+ *
+ * Blocked (断りの画面) は下地を塗り潰すが、こちらは出るかどうかを選ぶだけで、
+ * 選ばなければ試合は続いている。塗り潰すと「もう抜けた」ように見える。
+ */
+.leaving {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 12, 8, 0.55);
+  z-index: 40;
+}
+
+.leaving-panel {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 26px;
+  color: rgba(214, 226, 200, 0.9);
+  background: rgba(18, 24, 16, 0.94);
+  border: 1px solid rgba(160, 190, 140, 0.24);
+  border-left: 3px solid rgba(255, 190, 120, 0.8);
+  border-radius: 3px;
+}
+
+.leaving-title {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 206, 150, 0.95);
+}
+
+.leaving-lede {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* 出るほうを左、留まるほうを右。成績表の並び (Leave / 戻る) と揃える */
+.leaving-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.leaving-go,
+.leaving-stay {
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  background: none;
+  border: 1px solid rgba(160, 190, 140, 0.3);
+  color: rgba(190, 206, 176, 0.85);
+}
+
+.leaving-stay {
+  background: rgba(120, 156, 96, 0.24);
+  border-color: rgba(180, 214, 150, 0.45);
+  color: rgba(226, 236, 214, 0.95);
+}
+
+.leaving-go:hover,
+.leaving-stay:hover {
+  border-color: rgba(180, 214, 150, 0.7);
+  color: rgba(230, 240, 220, 0.98);
+}
+
+.leaving-key {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  color: rgba(150, 166, 140, 0.6);
+  margin-left: 4px;
+}

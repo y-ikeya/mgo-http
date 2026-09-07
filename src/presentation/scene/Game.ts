@@ -832,7 +832,9 @@ export class Game {
   private readonly links: { name: string; at: number }[] = []
   /** 成績表を開いているか */
   private menuOpen = false
-  
+  /** 部屋を出るか尋ねているか (試合中に戻るを押した) */
+  private leavingOpen = false
+
   /**
    * いま持っている武器の性能。
    *
@@ -3739,10 +3741,32 @@ export class Game {
    */
   setMenu(open: boolean): void {
     this.menuOpen = open;
-    // 開いている間は掴まない。裏で押したキーで掴み直すと、
+    this.holdPointer();
+  }
+
+  /**
+   * 部屋を出るか尋ねている間 (presentation/ui/Leaving.tsx)。
+   *
+   * 成績表と同じくポインタを離す。**掴んだままだと板のボタンを押せない。**
+   */
+  setLeaving(open: boolean): void {
+    this.leavingOpen = open;
+    this.holdPointer();
+  }
+
+  /**
+   * 板が出ている間はポインタを離す。
+   *
+   * **開いている板を数える。** 成績表と退出の確認は重なりうる (Tab を開いた
+   * まま戻るを押す) ので、片方を閉じただけで掴み直すと、もう一方のボタンを
+   * 押そうとした瞬間に画面が飛ぶ。
+   */
+  private holdPointer(): void {
+    const held = this.menuOpen || this.leavingOpen;
+    // 掴んでいる間は掴まない。裏で押したキーで掴み直すと、
     // ボタンを押そうとした瞬間に画面が飛ぶ
-    this.input.wantsLock = !open;
-    if (open) document.exitPointerLock();
+    this.input.wantsLock = !held;
+    if (held) document.exitPointerLock();
     // ボタンで閉じた場合。押した操作の最中なので、ここで掴み直せる
     else this.input.grab();
   }
