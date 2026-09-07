@@ -241,7 +241,7 @@ const JUMP_LOOP_MAX_SPEED = 3
  * **着地は入れない。** 転がる型だった頃は 3m 進む必要があったが、いまの
  * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
  */
-const ROOT_MOTION_CLIPS = new Set(['roll'])
+const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_turn'])
 
 /** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
 const ROLL_TIME_SCALE = 1.32
@@ -261,6 +261,10 @@ const ROLL_TIME_SCALE = 1.32
  * 受け身は 1.0 = **クリップに焼かれた通り**で 3.1m。倍率を掛けないので
  * 足が滑らない (回避ローリングは 0.8 なので 2 割ぶん滑っている)。
  * 落ちた勢いが前へ流れて消える、という絵がそのまま出る。
+ *
+ * --- 伏せたまま横へ転がるのも同じ ---
+ * prone_turn は**横へ 0.91m** 焼き込まれている。倍率を掛けないのは受け身と
+ * 同じ理由で、寝た体が地面を擦って進む型なので、少しでも滑ると気づく。
  */
 const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 /**

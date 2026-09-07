@@ -682,6 +682,29 @@ describe('勝手に構えない', () => {
     expect(anim.proneThrowReleaseDuration).not.toBeCloseTo(anim.throwReleaseDuration, 2)
   })
 
+  /**
+   * **伏せたまま横へ転がると、実際に横へ動く。**
+   *
+   * 焼かれた移動を誰も読まないと、その場で 1 回転して同じ姿勢に戻るだけに
+   * なる。**転がった意味が絵から抜ける** — 受け身が長らくそうなっていたのと
+   * 同じ穴なので、こちらは試験で押さえる。
+   */
+  test('伏せたまま転がると、焼かれた移動を辿る', () => {
+    const anim = animator()
+    run(anim, 2, 'prone_idle')
+    anim.playProneTurn()
+    const step = new THREE.Vector3()
+    const total = new THREE.Vector3()
+    for (let i = 0; i < Math.round(1.2 * 60); i++) {
+      anim.setLocomotion('prone_turn' as never)
+      anim.update(1 / 60)
+      if (anim.consumeRootMotion(step)) total.add(step)
+    }
+    // 横 (X) へ 0.9m ほど。前後 (Z) はほとんど動かない
+    expect(total.length()).toBeGreaterThan(0.7)
+    expect(Math.abs(total.z)).toBeLessThan(0.2)
+  })
+
   test('立っていればボルトの型はそのまま出る', () => {
     const anim = animator()
     run(anim, 1.2, 'idle', true)

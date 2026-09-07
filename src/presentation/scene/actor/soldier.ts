@@ -1856,15 +1856,21 @@ export class Soldier {
       overrideZ = this.knockZ * speed
     }
 
-    // 転がっている間だけ、焼かれた移動を辿る。**着地は動かない**
-    const tumbling = overrideX === undefined && this.rolling
+    /*
+     * 転がっている間だけ、焼かれた移動を辿る。**着地は動かない**
+     *
+     * 伏せたまま横へ転がる型 (prone_turn) も同じ道を通す。**辿らないと
+     * その場で 1 回転して終わる** — 転がった意味が絵から抜ける。
+     */
+    const proneRolling = this.proneStage === 'prone_turn'
+    const tumbling = overrideX === undefined && (this.rolling || proneRolling)
     if (tumbling) {
       overrideX = 0
       overrideZ = 0
       if (dt > 0 && this.animator?.consumeRootMotion(this.scratchVelocity)) {
         // モデル空間 (正面 +Z) の移動をワールドへ写す。
         // モデルは 180° 回してあるので yaw + π の回転になる。
-        const yaw = this.rolling ? this.rollYaw : this.hardLandYaw
+        const yaw = proneRolling ? this.yaw : this.rolling ? this.rollYaw : this.hardLandYaw
         const sin = Math.sin(yaw)
         const cos = Math.cos(yaw)
         const dx = this.scratchVelocity.x
