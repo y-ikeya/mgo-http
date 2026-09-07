@@ -1807,7 +1807,18 @@ export class CharacterAnimator {
       }
       return best
     }
-    return `${top(this.lower)} / ${top(this.upper)}`
+    /*
+     * **鍵ではなくクリップの名前で出す。**
+     *
+     * 鍵は状態の名前 (relaxed:crouch_idle) で、流れているクリップ
+     * (knee_relaxed) とは別物。鍵を出していたら「crouch のままでは？」と
+     * 読み違えさせた。**見たいのはどのクリップが流れているか。**
+     */
+    const lowerKey = top(this.lower)
+    const upperKey = top(this.upper)
+    const lower = this.lowerClipNames.get(lowerKey) ?? lowerKey
+    const upper = this.upperClipNames.get(upperKey) ?? upperKey
+    return `${lower} / ${upper}`
   }
 
   setLocomotion(next: Locomotion): void {
