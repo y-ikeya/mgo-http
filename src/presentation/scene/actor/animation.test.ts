@@ -690,19 +690,37 @@ describe('勝手に構えない', () => {
    * 同じ穴なので、こちらは試験で押さえる。
    */
   test('伏せたまま転がると、焼かれた移動を辿る', () => {
-    const anim = animator()
-    run(anim, 2, 'prone_idle')
-    anim.playProneTurn()
-    const step = new THREE.Vector3()
-    const total = new THREE.Vector3()
-    for (let i = 0; i < Math.round(1.2 * 60); i++) {
-      anim.setLocomotion('prone_turn' as never)
-      anim.update(1 / 60)
-      if (anim.consumeRootMotion(step)) total.add(step)
+    const rolled = (play: 'up' | 'down') => {
+      const anim = animator()
+      run(anim, 2, 'prone_idle')
+      const state = `prone_roll_${play}` as const
+      if (play === 'up') anim.playProneRollUp()
+      else anim.playProneRollDown()
+      const step = new THREE.Vector3()
+      const total = new THREE.Vector3()
+      for (let i = 0; i < Math.round(0.8 * 60); i++) {
+        anim.setLocomotion(state as never)
+        anim.update(1 / 60)
+        if (anim.consumeRootMotion(step)) total.add(step)
+      }
+      return total
     }
-    // 横 (X) へ 0.9m ほど。前後 (Z) はほとんど動かない
-    expect(total.length()).toBeGreaterThan(0.7)
-    expect(Math.abs(total.z)).toBeLessThan(0.2)
+    // 横 (X) へ動く。前後 (Z) はほとんど動かない
+    for (const half of ['up', 'down'] as const) {
+      const total = rolled(half)
+      expect(total.length()).toBeGreaterThan(0.2)
+      expect(Math.abs(total.z)).toBeLessThan(0.2)
+    }
+  })
+
+  /**
+   * **半分で止める。** 1 回転させると同じ姿勢に戻るので、押しても何も起きない。
+   */
+  test('半回転は 2 本に割ってある。合わせても 1 回転より短い', () => {
+    const anim = animator()
+    expect(anim.proneRollUpDuration).toBeGreaterThan(0)
+    expect(anim.proneRollDownDuration).toBeGreaterThan(0)
+    expect(anim.proneRollUpDuration + anim.proneRollDownDuration).toBeLessThan(1.1)
   })
 
   test('立っていればボルトの型はそのまま出る', () => {

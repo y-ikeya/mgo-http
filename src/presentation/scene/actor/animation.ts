@@ -84,7 +84,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 伏せへの出入り。全身の型なので上半身も同じクリップから取る
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
-  prone_turn: 'prone_turn',
+  prone_roll_up: 'prone_roll_up',
+  prone_roll_down: 'prone_roll_down',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
   // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
@@ -163,7 +164,8 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   prone_death: 'prone_death',
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
-  prone_turn: 'prone_turn',
+  prone_roll_up: 'prone_roll_up',
+  prone_roll_down: 'prone_roll_down',
   salute: 'salute',
   away: 'away',
   claymore_windup: 'claymore_windup',
@@ -241,7 +243,7 @@ const JUMP_LOOP_MAX_SPEED = 3
  * **着地は入れない。** 転がる型だった頃は 3m 進む必要があったが、いまの
  * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
  */
-const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_turn'])
+const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_roll_up', 'prone_roll_down'])
 
 /** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
 const ROLL_TIME_SCALE = 1.32
@@ -263,8 +265,9 @@ const ROLL_TIME_SCALE = 1.32
  * 落ちた勢いが前へ流れて消える、という絵がそのまま出る。
  *
  * --- 伏せたまま横へ転がるのも同じ ---
- * prone_turn は**横へ 0.91m** 焼き込まれている。倍率を掛けないのは受け身と
- * 同じ理由で、寝た体が地面を擦って進む型なので、少しでも滑ると気づく。
+ * 半回転で**横へ 0.32m (上り) / 0.56m (下り)** 焼き込まれている。倍率を
+ * 掛けないのは受け身と同じ理由で、寝た体が地面を擦って進む型なので、
+ * 少しでも滑ると気づく。
  */
 const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 /**
@@ -298,7 +301,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   // 伏せへの出入り。留めないと、伏せた瞬間にまた膝立ちから伏せ直す
   'prone_down',
   'prone_rise',
-  'prone_turn',
+  'prone_roll_up',
+  'prone_roll_down',
   // 倒れる / 起き上がる。留めておかないと、倒れた姿勢を保てず
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
@@ -512,13 +516,19 @@ const BUMP_KEY = 'bump'
 const PRONE_DOWN_KEY = 'prone_down'
 const PRONE_RISE_KEY = 'prone_rise'
 /**
- * 仰向けから腹這いへ寝返る型。
+ * 伏せたまま横へ転がる型。**半回転ずつ、2 本に割ってある。**
  *
- * 転ぶ型 (sweep) は仰向けで終わる。そこから這う型へ渡すと 1 フレームで
- * 裏返るので、**寝返る間を見せる** — 伏せに入るのに prone_down を挟むのと
- * 同じ形で、全身の型として流す。
+ *   prone_roll_up    うつ伏せ → 仰向け (0.30 秒、横へ 0.32m)
+ *   prone_roll_down  仰向け → うつ伏せ (0.50 秒、横へ 0.56m)
+ *
+ * 1 本のまま流すと 1 回転して**同じ姿勢に戻る**ので、押しても何も起きない。
+ * 半分で止めれば仰向けが姿勢として残り、もう一度押すと戻る。
+ *
+ * 下 (仰向け → うつ伏せ) は吹き飛ばされた所から這い出すのにも使う。転ぶ型
+ * (sweep) は仰向けで終わるので、そのまま這う型へ渡すと 1 フレームで裏返る。
  */
-const PRONE_TURN_KEY = 'prone_turn'
+const PRONE_ROLL_UP_KEY = 'prone_roll_up'
+const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
 /**
  * 伏せ撃ち。**構えと発砲を同じクリップから作る。**
  *
@@ -563,7 +573,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   PRONE_DEATH_KEY,
   PRONE_DOWN_KEY,
   PRONE_RISE_KEY,
-  PRONE_TURN_KEY,
+  PRONE_ROLL_UP_KEY,
+  PRONE_ROLL_DOWN_KEY,
   DEATH_KEY,
   HIT_KEY,
   SALUTE_KEY,
@@ -863,8 +874,9 @@ export class CharacterAnimator {
   /** 伏せへの出入りの尺 (秒)。0 ならクリップが無い */
   readonly proneDownDuration: number = 0
   readonly proneRiseDuration: number = 0
-  /** 仰向けから寝返る尺 (秒)。0 ならクリップが無い */
-  readonly proneTurnDuration: number = 0
+  /** 横へ転がる尺 (秒)。上りがうつ伏せ→仰向け、下りが仰向け→うつ伏せ */
+  readonly proneRollUpDuration: number = 0
+  readonly proneRollDownDuration: number = 0
   /** 敬礼の尺 (秒)。0 ならクリップが無い */
   readonly saluteDuration: number
 
@@ -1025,7 +1037,8 @@ export class CharacterAnimator {
       finished === this.upper.get(BUMP_KEY) ||
       finished === this.upper.get(PRONE_DOWN_KEY) ||
       finished === this.upper.get(PRONE_RISE_KEY) ||
-      finished === this.upper.get(PRONE_TURN_KEY) ||
+      finished === this.upper.get(PRONE_ROLL_UP_KEY) ||
+      finished === this.upper.get(PRONE_ROLL_DOWN_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
@@ -1350,7 +1363,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [PRONE_DOWN_KEY, 'prone_down'],
       [PRONE_RISE_KEY, 'prone_rise'],
-      [PRONE_TURN_KEY, 'prone_turn'],
+      [PRONE_ROLL_UP_KEY, 'prone_roll_up'],
+      [PRONE_ROLL_DOWN_KEY, 'prone_roll_down'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -1359,7 +1373,8 @@ export class CharacterAnimator {
       action.clampWhenFinished = true
       // **流す速さで割った尺**を持つ。動けない時間を絵と一致させるため
       if (key === PRONE_DOWN_KEY) this.proneDownDuration = clip.duration
-      else if (key === PRONE_TURN_KEY) this.proneTurnDuration = clip.duration
+      else if (key === PRONE_ROLL_UP_KEY) this.proneRollUpDuration = clip.duration
+      else if (key === PRONE_ROLL_DOWN_KEY) this.proneRollDownDuration = clip.duration
       else this.proneRiseDuration = clip.duration / PRONE_RISE_RATE
     }
 
@@ -1492,7 +1507,8 @@ export class CharacterAnimator {
     const prone =
       PRONE_LOCOMOTIONS.has(this.locomotion) ||
       this.upperState === 'prone_down' ||
-      this.upperState === 'prone_turn' ||
+      this.upperState === 'prone_roll_up' ||
+      this.upperState === 'prone_roll_down' ||
       this.upperState === 'prone_rise'
     /*
      * 麻酔で眠っている。**倒れているのと同じ扱い。**
@@ -2237,7 +2253,12 @@ export class CharacterAnimator {
     // 伏せへの出入りも同じ。上だけ構えに戻ると、寝ながら銃を構える形になる
     if (this.upperState === 'prone_down' && this.upper.has(PRONE_DOWN_KEY)) return PRONE_DOWN_KEY
     if (this.upperState === 'prone_rise' && this.upper.has(PRONE_RISE_KEY)) return PRONE_RISE_KEY
-    if (this.upperState === 'prone_turn' && this.upper.has(PRONE_TURN_KEY)) return PRONE_TURN_KEY
+    if (this.upperState === 'prone_roll_up' && this.upper.has(PRONE_ROLL_UP_KEY)) {
+      return PRONE_ROLL_UP_KEY
+    }
+    if (this.upperState === 'prone_roll_down' && this.upper.has(PRONE_ROLL_DOWN_KEY)) {
+      return PRONE_ROLL_DOWN_KEY
+    }
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
     //
@@ -2246,6 +2267,17 @@ export class CharacterAnimator {
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
     if (!this.aiming && this.locomotion === 'sweep' && this.upper.has(SWEEP_KEY)) {
       return SWEEP_KEY
+    }
+
+    /*
+     * 仰向けで止まっている間。**上半身も転がった型のまま留める。**
+     *
+     * 型が終わると upperState は構えへ戻るので、ここで押さえないと
+     * **仰向けの体の上に銃を構えた上半身**が乗る。倒れた直後と同じ形の穴で、
+     * 吹き飛ばされた姿勢 (sweep) がそうなっていたのと同じ手当て。
+     */
+    if (this.locomotion === 'prone_roll_up' && this.upper.has(PRONE_ROLL_UP_KEY)) {
+      return PRONE_ROLL_UP_KEY
     }
 
     /*
@@ -2374,14 +2406,19 @@ export class CharacterAnimator {
     this.playWholeBody(PRONE_RISE_KEY, 'prone_rise', PRONE_RISE_RATE)
   }
 
+  /** うつ伏せから仰向けへ、横へ半回転する */
+  playProneRollUp(): void {
+    this.playWholeBody(PRONE_ROLL_UP_KEY, 'prone_roll_up')
+  }
+
   /**
-   * 仰向けから腹這いへ寝返る。**吹き飛ばされた所から這い出す繋ぎ。**
+   * 仰向けからうつ伏せへ、横へ半回転する。
    *
-   * 転ぶ型 (sweep) は仰向けで終わるので、そのまま這う型へ渡すと 1 フレームで
-   * 裏返る。伏せに入るのに prone_down を挟むのと同じで、間を見せる。
+   * 吹き飛ばされた所から這い出す繋ぎにも使う。転ぶ型 (sweep) は仰向けで
+   * 終わるので、そのまま這う型へ渡すと 1 フレームで裏返る。
    */
-  playProneTurn(): void {
-    this.playWholeBody(PRONE_TURN_KEY, 'prone_turn')
+  playProneRollDown(): void {
+    this.playWholeBody(PRONE_ROLL_DOWN_KEY, 'prone_roll_down')
   }
 
   private playWholeBody(key: string, state: Locomotion, rate = 1): void {

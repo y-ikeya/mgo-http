@@ -292,7 +292,15 @@ export class Soldier {
    * 出ている最中はもう伏せていない。旗 1 つにすると、繋ぎのモーションが
    * 流れている間の頭の高さも動けるかどうかも決められなくなる。
    */
-  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' | 'prone_turn' = 'none'
+  private proneStage:
+    | 'none'
+    | 'prone_down'
+    | 'prone'
+    /** 仰向けで止まっている。**姿勢として残る** — もう一度転がるまで戻らない */
+    | 'prone_up'
+    | 'prone_rise'
+    | 'prone_roll_up'
+    | 'prone_roll_down' = 'none'
   /** 繋ぎのモーションの残り時間 (秒) */
   private proneShiftLeft = 0
   /**
@@ -1191,8 +1199,15 @@ export class Soldier {
      * ここで掛け金を見ないと、**這い始めた瞬間に構え直す**。構え直すこと自体は
      * よいが、それは押し直した結果であってほしい。
      */
+    /*
+     * 仰向けでは構えられない。**その姿勢の構えの型が無い。**
+     *
+     * 出せば仰向けの体の上に立ちの構えが乗る。撃ちたければ転がって戻る、
+     * というのが仰向けで居ることの代償になる。
+     */
+    const supine = this.proneStage === 'prone_up'
     this.aiming =
-      this.down || this.boxed || this.standing || this.aimLatched ? false : aiming
+      this.down || this.boxed || this.standing || this.aimLatched || supine ? false : aiming
   }
 
   /**
@@ -1284,6 +1299,15 @@ export class Soldier {
     }
     // 出入りの最中は受け付けない。**繋ぎを途中で切らない**
     if (this.proneShifting) return
+    /*
+     * 仰向けで止まっているなら、まず転がって戻る。**そこからは起きられない** —
+     * 起き上がる型 (prone_rise) はうつ伏せから始まるので、仰向けに載せると
+     * 一度裏返ってから立つ。押した指はそのままでよい (もう一度押せば起きる)。
+     */
+    if (this.proneStage === 'prone_up') {
+      this.turnProne()
+      return
+    }
     // 伏せているなら、まず起き上がる。**戻る先はしゃがみ** (型がそこで終わる)
     if (this.proneStage === 'prone') {
       this.riseFromProne()
@@ -1292,9 +1316,9 @@ export class Soldier {
     this.crouching = !this.crouching
   }
 
-  /** 伏せ切っているか。入り / 出の最中は false */
+  /** 伏せ切っているか。入り / 出 / 転がりの最中は false。仰向けも含む */
   get isProne(): boolean {
-    return this.proneStage === 'prone'
+    return this.proneStage === 'prone' || this.proneStage === 'prone_up'
   }
 
   /**
@@ -1325,10 +1349,11 @@ export class Soldier {
   }
 
   /** 伏せへ出入りしている最中か。**この間は動けない** */
-  get proneShifting(): 'prone_down' | 'prone_rise' | 'prone_turn' | null {
+  get proneShifting(): 'prone_down' | 'prone_rise' | 'prone_roll_up' | 'prone_roll_down' | null {
     return this.proneStage === 'prone_down' ||
       this.proneStage === 'prone_rise' ||
-      this.proneStage === 'prone_turn'
+      this.proneStage === 'prone_roll_up' ||
+      this.proneStage === 'prone_roll_down'
       ? this.proneStage
       : null
   }
@@ -1384,38 +1409,52 @@ export class Soldier {
   }
 
   /**
-   * 伏せたまま寝返る。
+   * 伏せたまま横へ半回転する。**押すたびに表と裏が入れ替わる。**
+   *
+   * --- なぜ半分で止めるか ---
+   * 1 回転させると同じ姿勢に戻るので、**押しても何も起きない。** 半分で
+   * 止めれば仰向けが姿勢として残り、もう一度押すと戻る。転がる先へ 0.3〜0.6m
+   * 動くので、寝たまま物陰へ入る / 縁から身を外す、という手になる。
    *
    * --- 回すのは型のほう ---
-   * **体の長い軸まわりに転がる。** 縦軸で回して向きを変えるのではない —
-   * 型 (prone_turn) が転がる絵をしているので、そこに縦軸の回転を重ねると
-   * **斜めの軸で回っているように見える。** 一度そうしていて、押すと後ろを
-   * 向くだけになっていた。
-   *
-   * 向きを変えたいなら這って向き直る (伏せている間、体は進む向きを向く)。
-   * こちらは姿勢を変える手。
+   * 体の長い軸まわりに転がる。**縦軸で回して向きを変えるのではない** —
+   * そこへ縦軸の回転を重ねると斜めの軸で回って見える (一度そうしていた)。
+   * 向きを変えたいなら這って向き直る。
    */
   turnProne(): void {
-    if (this.proneStage !== 'prone' || this.down) return
-    const span = this.animator?.proneTurnDuration ?? 0
-    if (span <= 0) return
-    // 向きは変えない (over = 0)。転がるのは型の仕事
-    this.beginProneTurn(span, 0)
+    if (this.down) return
+    if (this.proneStage === 'prone') {
+      const span = this.animator?.proneRollUpDuration ?? 0
+      if (span <= 0) return
+      this.beginProneRoll('prone_roll_up', span, 0)
+      this.animator?.playProneRollUp()
+      return
+    }
+    if (this.proneStage === 'prone_up') {
+      const span = this.animator?.proneRollDownDuration ?? 0
+      if (span <= 0) return
+      this.beginProneRoll('prone_roll_down', span, 0)
+      this.animator?.playProneRollDown()
+    }
   }
 
   /**
-   * 寝返りを始める。
+   * 転がりを始める。**型を流すのは呼ぶ側** (打ち消しの有無で呼び分ける)。
    *
+   * @param stage 上りか下りか
    * @param span 動けない時間 (秒)。型の尺
-   * @param over 180 度を何秒かけて回すか
+   * @param over 腰の向きを 180 度回すのに何秒かけるか (0 = 回さない)
    */
-  private beginProneTurn(span: number, over: number): void {
-    this.proneStage = 'prone_turn'
+  private beginProneRoll(
+    stage: 'prone_roll_up' | 'prone_roll_down',
+    span: number,
+    over: number,
+  ): void {
+    this.proneStage = stage
     this.proneShiftLeft = span
     this.proneTurnFrom = this.yaw
     this.proneTurnOver = over
     this.proneTurnLeft = over
-    this.animator?.playProneTurn()
   }
 
   /** ローリングの尺 (秒)。モデル未着なら 0 */
@@ -1592,7 +1631,7 @@ export class Soldier {
   private crawlFromDown(): void {
     if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
     this.downed_ = false
-    const span = this.animator?.proneTurnDuration ?? 0
+    const span = this.animator?.proneRollDownDuration ?? 0
     if (span <= 0) {
       this.proneStage = 'prone'
       this.proneShiftLeft = 0
@@ -1611,7 +1650,8 @@ export class Soldier {
      *
      * 向き直りたければ半回転のボタン (turnProne)。
      */
-    this.beginProneTurn(span, PRONE_TURN_BLEND)
+    this.beginProneRoll('prone_roll_down', span, PRONE_TURN_BLEND)
+    this.animator?.playProneRollDown()
   }
 
   /**
@@ -1778,6 +1818,17 @@ export class Soldier {
     // 伏せて装填している間は這えない。**替えるか進むかのどちらか**
     if (this.reloadHold && this.proneStage === 'prone') moveDir = ZERO_MOVE
     /*
+     * 仰向けで止まっている間は動けない。**動こうとしたら転がって戻る。**
+     *
+     * 這う型はうつ伏せなので、仰向けのまま進ませると裏返って滑る。転がって
+     * 戻る一手を挟めば、仰向けで居ることに「動けない」という代償が付く。
+     * 吹き飛ばされた所から這い出すのと同じ形 (crawlFromDown)。
+     */
+    if (this.proneStage === 'prone_up') {
+      if (moveDir.lengthSq() > 1e-6) this.turnProne()
+      moveDir = ZERO_MOVE
+    }
+    /*
      * 堪える着地の間も動けない。
      *
      * 転がる型だった頃は焼かれた移動を辿る仕掛けが入力ごと押さえていた
@@ -1812,6 +1863,8 @@ export class Soldier {
     // 伏せは一番遅い。**担いでいる物は効かない** — 腕で這うので、
     // 背中の銃の重さが進みに出る形になっていない
     if (this.proneStage === 'prone') targetSpeed = this.moveSpeed * PRONE_SPEED_SCALE
+    // 仰向けは動けない。転がって戻るまで止まる
+    if (this.proneStage === 'prone_up') targetSpeed = 0
     // 出入りの最中は動けない。倒れる / 起き上がるのと同じ
     if (this.proneShifting) targetSpeed = 0
     if (this.down) targetSpeed = 0
@@ -1859,10 +1912,11 @@ export class Soldier {
     /*
      * 転がっている間だけ、焼かれた移動を辿る。**着地は動かない**
      *
-     * 伏せたまま横へ転がる型 (prone_turn) も同じ道を通す。**辿らないと
-     * その場で 1 回転して終わる** — 転がった意味が絵から抜ける。
+     * 伏せたまま横へ転がる型も同じ道を通す。**辿らないとその場で回って
+     * 終わる** — 転がった意味が絵から抜ける。
      */
-    const proneRolling = this.proneStage === 'prone_turn'
+    const proneRolling =
+      this.proneStage === 'prone_roll_up' || this.proneStage === 'prone_roll_down'
     const tumbling = overrideX === undefined && (this.rolling || proneRolling)
     if (tumbling) {
       overrideX = 0
@@ -1999,15 +2053,20 @@ export class Soldier {
     /*
      * 繋ぎが終わったら次の段へ。
      *
-     *   prone_down  伏せに入る    → 伏せ
-     *   prone_turn  仰向けから寝返る → 伏せ
-     *   prone_rise  伏せから起きる  → しゃがみ
+     *   prone_down       伏せに入る      → うつ伏せ
+     *   prone_roll_down  仰向けから転がる → うつ伏せ
+     *   prone_roll_up    うつ伏せから転がる → 仰向け
+     *   prone_rise       伏せから起きる  → しゃがみ
      */
     if (this.proneShiftLeft > 0) {
       this.proneShiftLeft -= dt
       if (this.proneShiftLeft <= 0) {
-        const toProne = this.proneStage === 'prone_down' || this.proneStage === 'prone_turn'
-        this.proneStage = toProne ? 'prone' : 'none'
+        this.proneStage =
+          this.proneStage === 'prone_roll_up'
+            ? 'prone_up'
+            : this.proneStage === 'prone_down' || this.proneStage === 'prone_roll_down'
+              ? 'prone'
+              : 'none'
         if (this.proneStage === 'none') this.crouching = true
       }
     }
@@ -2373,6 +2432,7 @@ export class Soldier {
       bumped: this.bumpLeft,
       asleep: this.sleepLeft > 0,
       prone: this.proneStage === 'prone',
+      proneUp: this.proneStage === 'prone_up',
       proneShift: this.proneShifting,
       stabbing: this.stabbing,
       setting: this.animator?.setupLocomotion ?? null,
