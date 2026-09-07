@@ -302,6 +302,13 @@ export interface GameStats {
    * 0 ならまだ測れていない。回数 (FPS / TX / RX) とは別物で、あちらは
    * 「何回」、こちらは「どれだけ待つか」。
    */
+  /**
+   * いま流している型と銃の持ち方の段。**?stats=on にだけ出す。**
+   *
+   * 試写と本番で銃の位置が違ったときに、どちらの型を使っているかを目で
+   * 突き合わせるため。
+   */
+  pose: string;
   latency: number;
   /**
    * 断られた理由。**入っていればもう戻らない。**
@@ -4065,6 +4072,7 @@ export class Game {
       team: this.replica.team,
       match: this.replica.match,
       players: this.remotes.count,
+      pose: this.player.poseDebug,
       latency: this.latency,
       rejected: this.net.rejected ?? null,
       sendRate: this.sendGap > 0 ? 1000 / this.sendGap : 0,

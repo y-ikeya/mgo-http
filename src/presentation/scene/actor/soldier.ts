@@ -1518,6 +1518,16 @@ export class Soldier {
     if (this.animator) this.animator.crouchTorsoYaw = (degrees * Math.PI) / 180
   }
 
+  /**
+   * いま流している型と、銃の持ち方の段。**?stats=on に出す。**
+   *
+   * 0 = 立ち / 1 = しゃがみ / 2 = 伏せ。試写と本番で銃の位置が違ったときに、
+   * **どちらの型を使っているか**をその場で突き合わせられる。
+   */
+  get poseDebug(): string {
+    return `${this.animator?.playingKeys ?? '—'} @${this.weaponStance.toFixed(2)}`
+  }
+
   /** 走りの足の回転の底上げ (倍率)。調整用 */
   setRunCadence(rate: number): void {
     if (this.animator) {

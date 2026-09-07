@@ -1788,6 +1788,28 @@ export class CharacterAnimator {
     return this.lower.has(key) ? key : this.locomotion
   }
 
+  /**
+   * いま流している型。**画面に出して確かめるため** (?stats=on の POSE)。
+   *
+   * 試写と本番で見え方が違うときに、**どこが違うのかを目で読めない。**
+   * 上下それぞれ何を流しているかが出れば、その場で突き合わせられる。
+   */
+  get playingKeys(): string {
+    const top = (map: Map<string, THREE.AnimationAction>) => {
+      let best = ''
+      let weight = 0
+      for (const [key, action] of map) {
+        const w = action.getEffectiveWeight()
+        if (w > weight) {
+          weight = w
+          best = key
+        }
+      }
+      return best
+    }
+    return `${top(this.lower)} / ${top(this.upper)}`
+  }
+
   setLocomotion(next: Locomotion): void {
     // 倒れたら他の状態を一切受け付けない。死体が走り出さないため。
     if (this.dead) return

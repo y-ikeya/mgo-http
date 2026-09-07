@@ -54,3 +54,10 @@
 .stats-idle {
   color: rgba(150, 166, 140, 0.5);
 }
+
+/* 型の名前は長い。**折り返してでも全部出す** — 切れると突き合わせられない */
+.stats-pose {
+  font-size: 10px;
+  text-align: right;
+  word-break: break-all;
+}

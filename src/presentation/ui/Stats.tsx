@@ -39,6 +39,16 @@ export default function Stats(props: { stats: GameStats | null }) {
         </span>
       </div>
       {/*
+        いま流している型。**試写と本番の突き合わせ用。**
+
+        下半身 / 上半身 / 銃の持ち方の段 (0 立ち · 1 しゃがみ · 2 伏せ)。
+      */}
+      <div class="stats-row">
+        <span class="stats-key">POSE</span>
+        <span class="stats-val stats-pose">{props.stats?.pose ?? '—'}</span>
+      </div>
+
+      {/*
         往復の時間。**回数 (FPS / TX / RX) とは別物。**
 
         あちらは「何回」、こちらは「どれだけ待つか」。64 通/秒 届いていても
