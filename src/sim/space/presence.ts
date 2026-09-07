@@ -67,7 +67,7 @@ const DELAY_SLACK = 1.5
  * それより古いと、当てたと申告しても照合の窓から外れて却下される —
  * 「当てたのに何も起きない」になる。滑らかさより、当たることを採る。
  */
-const DELAY_LIMIT = 0.25
+export const DELAY_LIMIT = 0.25
 
 /**
  * 届く間隔の目安を下げる速さ (1 通あたりの割合)。
@@ -179,6 +179,7 @@ export class Presence {
 
     // 位置が来たということは、また見えている
     this.hiddenByServer = false
+    this.hiddenAt = null
     this.lastSeen = arrivedAt
     return sentAt + this.clockOffset
   }
@@ -191,24 +192,41 @@ export class Presence {
     if (!onField) this.hiddenByServer = true
   }
 
-  /** サーバーから「もう見えない」と届いた。次の位置が来るまで隠す */
-  hide(): void {
-    this.hiddenByServer = true
+  /**
+   * サーバーから「もう見えない」と届いた。次の位置が来るまで隠す。
+   *
+   * **すぐには消さない。** 相手の体は少し過去を描いている (renderDelay) ので、
+   * 知らせだけ今の時刻で効かせると**物陰に入る前に消える** — 木箱の手前を
+   * 走っている最中に、ふっと居なくなったように見えていた。
+   *
+   * 描いている時刻がその瞬間に追いついてから消す。**知らせは出来事であって、
+   * 出来事には起きた時刻がある。**
+   */
+  hide(now: number): void {
+    if (this.hiddenAt === null) this.hiddenAt = now
   }
+
+  /** 遮蔽に入ったと知らされた時刻。描いている時刻が追いつくまで持つ */
+  private hiddenAt: number | null = null
 
   /**
    * 画面に出してよいか。
    *
-   * 判断は 2 つある。**サーバーの知らせ**が本筋で、遮蔽に入った瞬間に消える。
+   * 判断は 2 つある。**サーバーの知らせ**が本筋で、遮蔽に入ったところで消える。
    * **沈黙の長さ**はその保険で、相手が丸ごと落ちた (タブを閉じた、回線が
    * 切れた) ときに立ち尽くしたまま残るのを防ぐ。
    *
    * 沈黙だけで決めていた頃は、この 2 つが混ざっていた。遅れて届いているだけの
    * 相手と、隠れた相手の区別が付かず、送るのが遅い機械が相手だと明滅した。
+   *
+   * 知らせは**描いている時刻が追いつくまで効かせない** (hide のコメント)。
+   * 保険のほうは今の時刻で数える — あちらは相手が落ちたかどうかの話で、
+   * 描いている位置とは関係が無い。
    */
   visibleAt(now: number): boolean {
     const silence = this.lastSeen > 0 ? now - this.lastSeen : 0
-    return this.onField && !this.hiddenByServer && silence < this.hideAfter
+    const occluded = this.hiddenAt !== null && now - this.hiddenAt >= this.renderDelay
+    return this.onField && !this.hiddenByServer && !occluded && silence < this.hideAfter
   }
 
   /**

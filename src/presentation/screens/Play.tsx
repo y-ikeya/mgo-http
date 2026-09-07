@@ -11,6 +11,8 @@ import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
 import { CHOICES } from '../../domain/item/weapons'
 import Loadout from '../ui/Loadout'
+import Blocked from '../ui/Blocked'
+import Leaving from '../ui/Leaving'
 import Stats from '../ui/Stats'
 
 /**
@@ -57,7 +59,26 @@ export default function Play(props: { identity: Identity }) {
   const [primary, setPrimary] = createSignal<WeaponId | null>('rifle')
   const [support, setSupport] = createSignal<SupportId>('grenade')
   const [game, setGame] = createSignal<Game | null>(null)
+  /** 部屋を出るか尋ねている最中か。戻るを押した時だけ立つ */
+  const [leaving, setLeaving] = createSignal(false)
   let container!: HTMLDivElement
+
+  /**
+   * 試合が動いているか。**引き止めるのはこの間だけ。**
+   *
+   * 待っている間や結果を見ている間に抜けても、誰の試合も壊れない。
+   * そこまで引き止めると、ただ邪魔なだけになる。
+   */
+  const inMatch = () => {
+    const phase = stats()?.match?.phase
+    return phase === 'countdown' || phase === 'playing'
+  }
+
+  /** 出ることを伝えてから離れる。伝えないと、残った人は席が畳まれるまで待つ */
+  const leaveRoom = () => {
+    game()?.leaveRoom()
+    navigate('/rooms')
+  }
 
   onMount(() => {
     const instance = new Game(container, props.identity, params.room)
@@ -68,6 +89,60 @@ export default function Play(props: { identity: Identity }) {
     }
     void instance.start(setStats)
     setGame(instance)
+  })
+
+  /**
+   * 試合中に画面を離れさせない。
+   *
+   * --- 戻るは 1 回で試合を抜ける ---
+   * 押した本人は入り直せるが、**残った人は数の合わない試合を続ける**ことに
+   * なる。しかも席が畳まれるまでの間、抜けた人は「居るのに動かない人」として
+   * 映るので、待っているのか抜けたのかも分からない。
+   *
+   * --- 2 通りの離れ方があり、止め方が違う ---
+   * 頁ごと離れる (再読み込み・タブを閉じる・URL を打ち直す) のはブラウザが
+   * 尋ねてくれる (beforeunload)。文面はブラウザが決めるので、こちらからは
+   * 「尋ねるかどうか」しか言えない。
+   *
+   * 戻るで /rooms へ移るのは**同じ頁の中の移動**なので beforeunload は出ない。
+   * こちらは控えの履歴を 1 つ積んでおいて、戻られたら積み直す — URL が動か
+   * ないので画面は残り、代わりに自前の板 (Leaving) で尋ねる。
+   *
+   * 積み直すのは試合中でなくても同じ。**戻るの意味は変えない**ので、試合中
+   * でなければ尋ねずにそのまま出る (出ることをサーバーへ伝える口を通る点が、
+   * 素通しの戻ると違う)。
+   */
+  onMount(() => {
+    /*
+     * 戻る 1 回ぶんの控え。これが在るので、戻っても URL は変わらない。
+     *
+     * 印を付けておく。**同じ URL の履歴が 2 つ並ぶ**ので、控えが積まれて
+     * いるかどうかを外から見分ける手立てが他に無い (確かめるときに要る)。
+     */
+    history.pushState({ hold: true }, '')
+
+    const onPop = () => {
+      history.pushState({ hold: true }, '')
+      if (!inMatch()) {
+        leaveRoom()
+        return
+      }
+      setLeaving(true)
+      game()?.setLeaving(true)
+    }
+
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!inMatch()) return
+      // 尋ねてもらう合図。**文面はブラウザが決める**ので何も渡せない
+      e.preventDefault()
+    }
+
+    window.addEventListener('popstate', onPop)
+    window.addEventListener('beforeunload', onBeforeUnload)
+    onCleanup(() => {
+      window.removeEventListener('popstate', onPop)
+      window.removeEventListener('beforeunload', onBeforeUnload)
+    })
   })
 
   onCleanup(() => {
@@ -126,6 +201,22 @@ export default function Play(props: { identity: Identity }) {
         />
       </Show>
 
+      {/*
+        遅れで席を空けてもらった。**描けない機械と同じ出方。**
+
+        落ちただけなら勝手に繋ぎ直すので、ここは出ない。出るのは**もう
+        戻らない**ときだけ — 黙って止まると、固まったのか繋がらないのかが
+        分からず、待ち続けることになる。
+      */}
+      <Show when={stats()?.rejected}>
+        <Blocked
+          title={t('lag.title')}
+          lede={t('lag.lede')}
+          steps={[t('lag.wifi'), t('lag.other'), t('lag.vpn')]}
+          note={t('lag.recheck')}
+        />
+      </Show>
+
       {/* 成績表。Tab で開く。部屋を出るのもここから */}
       <Show when={stats()?.menuOpen}>
         <Scoreboard
@@ -136,12 +227,21 @@ export default function Play(props: { identity: Identity }) {
           skillsOpen={stats()?.skillsOpen ?? false}
           onSkill={(id, level) => game()?.setSkill(id, level)}
           onClose={() => game()?.setMenu(false)}
-          onLeave={() => {
-            // 出ることを伝えてから離れる。伝えないと、残った人は
-            // 席が畳まれるまで居ない相手を待つことになる
-            game()?.leaveRoom()
-            navigate('/rooms')
+          onLeave={leaveRoom}
+        />
+      </Show>
+
+      {/*
+        戻るを押した。**押し間違いと、出る意思を分ける**だけの板なので、
+        戦場は透けたまま (試合は続いている)。
+      */}
+      <Show when={leaving()}>
+        <Leaving
+          onStay={() => {
+            setLeaving(false)
+            game()?.setLeaving(false)
           }}
+          onLeave={leaveRoom}
         />
       </Show>
 

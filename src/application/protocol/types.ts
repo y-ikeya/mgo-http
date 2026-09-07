@@ -155,8 +155,6 @@ export interface DamageEvent {
   /** 弾のとき。部位と距離からダメージが決まる */
   zone?: HitZone
   distance?: number
-  /** ナイフのとき。背後からなら即死 */
-  fromBehind?: boolean
 }
 
 /**
@@ -507,6 +505,46 @@ export interface SpawnRequest {
  */
 export interface RefetchRoster {
   type: 'refetchRoster'
+}
+
+/**
+ * 往復の時間を測る。**サーバーが投げて、クライアントが打ち返す。**
+ *
+ * --- なぜサーバーから投げるか ---
+ * 測った値で**席を空けてもらう**ので、測るのはサーバーでなければならない。
+ * クライアントが測って申告する形にすると、遅い人が「速い」と名乗れる。
+ *
+ * --- なぜ測った値を一緒に載せるか ---
+ * 打ち返した側は自分の遅れを知りようがない (往路も復路も片道しか見えない)。
+ * 次に投げるときへ**前回の答え**を載せておけば、画面に出せる。1 秒遅れの
+ * 値だが、出すのは診断のためなので困らない。
+ */
+export interface PingMessage {
+  type: 'ping'
+  /** サーバーの時計。**打ち返す側はこれをそのまま返す** */
+  at: number
+  /** 前回測れた往復の時間 (ms)。まだ測れていなければ 0 */
+  rtt: number
+}
+
+/**
+ * 遅れで席を空けてもらうときの閉じ符号。
+ *
+ * **約束の側に置く。** 遅れの限界そのものは遊びの規則 (domain/match/lag.ts)
+ * だが、**どう閉じたかを伝える手段**は線の上の取り決めで、繋ぎ直す側
+ * (infra/link) が読む。
+ *
+ * サーバーとクライアントが同じ数字を見る。落ちたのか断られたのかを受け取る
+ * 側で見分けられないと、断られた人が繋ぎ直しては切られる輪に入る。
+ *
+ * 4000-4999 は私用に空けてある範囲。
+ */
+export const LAG_CLOSE_CODE = 4001
+
+/** ping を打ち返す。**中身は預かった値をそのまま返すだけ** */
+export interface PongMessage {
+  type: 'pong'
+  at: number
 }
 
 /**
@@ -902,6 +940,7 @@ export type ClientMessage =
   | ShotEvent
   | KnockEvent
   | ThrowEvent
+  | PongMessage
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =
@@ -924,6 +963,7 @@ export type ServerMessage =
   | HiddenEvent
   | ExposedEvent
   | SelfMessage
+  | PingMessage
   | ExplosionEvent
   | KnockDownEvent
   | GrenadeSpawn
@@ -949,6 +989,13 @@ export type NetMessage = ClientMessage | ServerMessage
  * 見た目を確かめる用と割り切る。
  */
 export interface NetTransport {
+  /**
+   * 断られた理由。**入っていれば繋ぎ直しを諦めている。**
+   *
+   * 落ちた (回線が切れた) のと区別する。あちらは繋ぎ直すので、画面に出す
+   * ことは無い — 出すのは**もう戻らない**ときだけ。
+   */
+  readonly rejected?: string | null
   /** 自分の ID。通信路を変えても変わらない */
   readonly id: string
   /** 送れるのはクライアント側の物だけ。体力や得点を名乗ることはできない */

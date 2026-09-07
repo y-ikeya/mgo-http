@@ -4,14 +4,17 @@ import { flagsOf } from '../../../domain/stage'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
   clamp,
+  color,
   dot,
   float,
   floor,
+  fog,
   fract,
   max,
   mix,
   normalize,
   positionLocal,
+  positionView,
   positionWorld,
   cameraPosition,
   pow,
@@ -25,6 +28,8 @@ import {
   vec3,
 } from 'three/tsl'
 import type { Obstacle } from '../../../sim/space/collision'
+import { TriangleBvh } from '../../../sim/space/bvh'
+import type { SolidWorld } from '../../../sim/space/vision'
 import { isPathClear, sightBlockers } from '../../../sim/space/vision'
 import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
@@ -248,9 +253,69 @@ function frameGeometry(half: number, width: number): THREE.BufferGeometry {
 /** 差し替えで中身が入れ替わる部分。配列そのものは作り直さない */
 type StageParts = Pick<Stage, 'collidables' | 'cameraBlockers' | 'obstacles'>
 
+/**
+ * 描いているメッシュから、三角の網をそのまま取り出す。
+ *
+ * **クライアントは形を落とさなくていい。** サーバーは three を積んでいないので
+ * 書き出しの時に三角を別ファイルへ出しているが (public/models/*.mesh.bin)、
+ * こちらは glb を既に読んでいる。同じ形が手元にあるのに落とし直すのは無駄。
+ *
+ * 世界の位置に置いた形で取る (matrixWorld を掛ける)。
+ */
+/**
+ * いま描いている形をそのまま当たり判定にする世界。
+ *
+ * **形は途中で入れ替わる。** 最初はコード側のブロックアウトで、glb が届いたら
+ * そちらへ差し替わる。木を組み直すのはそのときだけなので、外から見える顔は
+ * ずっと同じ物にしておく (呼ぶ側が持ち直さなくていい)。
+ */
+class MeshWorld implements SolidWorld {
+  private bvh: TriangleBvh | null = null
+
+  /** 形が入れ替わった。**木を組み直す** */
+  rebuild(objects: THREE.Object3D[]): void {
+    this.bvh = new TriangleBvh({ positions: meshTriangles(objects) })
+  }
+
+  hit(ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
+    return this.bvh?.hit(ax, ay, az, bx, by, bz) ?? null
+  }
+}
+
+export function meshTriangles(objects: THREE.Object3D[]): Float32Array {
+  const out: number[] = []
+  const corner = new THREE.Vector3()
+  for (const object of objects) {
+    object.updateWorldMatrix(true, false)
+    object.traverse((node) => {
+      if (!isMesh(node)) return
+      const position = node.geometry.getAttribute('position')
+      if (!position) return
+      const index = node.geometry.getIndex()
+      const count = index ? index.count : position.count
+      for (let i = 0; i < count; i++) {
+        const at = index ? index.getX(i) : i
+        corner.fromBufferAttribute(position, at).applyMatrix4(node.matrixWorld)
+        out.push(corner.x, corner.y, corner.z)
+      }
+    })
+  }
+  return new Float32Array(out)
+}
+
 export interface Stage {
   /** 弾が当たる物。撃った先を決めるのに使う */
   readonly collidables: THREE.Object3D[]
+  /**
+   * 投げた物がぶつかる形。**三角の網。**
+   *
+   * 箱で見ていた頃は、メッシュを包む直方体で跳ねていた — **手すりの無い側の
+   * 空中で跳ね返る。** 弾が当たる物と同じ集合を使う (手すりを弾がすり抜ける
+   * なら、投げた物もすり抜けるほうが揃う)。
+   *
+   * サーバーも同じ集合で回している (書き出しの BULLET_BIT)。
+   */
+  readonly thrownWorld: SolidWorld
   /** カメラが寄る物。壁抜けを防ぐ */
   readonly cameraBlockers: THREE.Object3D[]
   /** 移動判定用の XZ 平面 AABB */
@@ -266,7 +331,7 @@ export interface Stage {
    * 地形 (glb) が届いて、当たり判定が入れ替わったか。
    *
    * **届くまでは足場が無い。** buildStage はブロックアウトの箱だけ持って
-   * すぐ返り、本物は後から差し替わる。庭園は足場が水の 10m 上にあるので、
+   * すぐ返り、本物は後から差し替わる。筏は足場が水の 10m 上にあるので、
    * 届く前に湧くと**そのまま落ちて溺れる** (ブロックアウトの箱は y=0 に
    * 立っていて、10m の高さには何も無い)。
    *
@@ -633,7 +698,7 @@ const SUN_DIRECTION = new THREE.Vector3(18, 30, 12)
  * 知らない**ので、水の上に立っている物が 1 つも映らない。止まった水面ほど
  * 鏡に見えるので、そこに何も映らないのは余計に目に付く。
  *
- * 代償は場面を 2 度描くこと。この庭園は箱が 30 個しかなく、映り込みは半分の
+ * 代償は場面を 2 度描くこと。この筏は箱が 30 個しかなく、映り込みは半分の
  * 大きさで描くので (WATER_MIRROR_SCALE) 釣り合う。
  *
  * 空と太陽も**同じ絵に入っている** — 空は背景の球として実際に立っているので、
@@ -742,7 +807,7 @@ async function applySlopes(name: StageName, obstacles: Obstacle[]): Promise<void
    * sanitizeNodeName)。書き出した json は Blender の名前をそのまま持っている
    * ので、`Stair_0.001` と `Stair_0001` で照合が外れる。
    *
-   * **坂が付かないと 2m の壁になる。** 庭園の階段が登れなかったのはこれで、
+   * **坂が付かないと 2m の壁になる。** 筏の階段が登れなかったのはこれで、
    * 枝番の付いた物 (Blender が複製に付ける .001 …) が全部外れていた。
    * 同じ関数を通せば、three が流儀を変えても一緒に動く。
    */
@@ -884,11 +949,36 @@ function createGlassMaterial(): THREE.MeshStandardMaterial {
  * glb の読み込みは非同期なので、先にブロックアウトを出しておいて、
  * 届いた時点で差し替える。Game 側は Stage の配列を都度読むので入れ替えが効く。
  */
+/**
+ * 霧の始まりと終わり (m)。
+ *
+ * 近すぎると中距離の遮蔽物まで白んで、索敵の判断材料が減る。
+ */
+const FOG_NEAR = 55
+const FOG_FAR = 135
+
 export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   scene.add(buildSky())
   // フォグは空の地平線側と同じ色にする。違うと遠景が地平線で不自然に切れる。
   // 開始距離を遠くしてあるのは、近すぎると中距離の遮蔽物まで白んで索敵の判断材料が減るため。
-  scene.fog = new THREE.Fog(new THREE.Color(SKY_HORIZON), 55, 135)
+  scene.fog = new THREE.Fog(new THREE.Color(SKY_HORIZON), FOG_NEAR, FOG_FAR)
+  /*
+   * 濃さを**カメラからの本当の距離**で測り直す。
+   *
+   * three の既定は視線方向の深さ (positionView.z) で数える。画面の端に映る
+   * 物は斜めに遠いので、**同じ深さでも本当の距離は長い** — なのに霧が薄い。
+   *
+   * 索敵に直に効いた。**画面の端に相手の陣地が映るように向くと、霧が晴れて
+   * 遠くの様子が読める。** 正面に捉えると白む。向きを変えるだけで見える物が
+   * 変わるので、覗き方の技になってしまっていた。
+   *
+   * 長さ (positionView.length) で数えれば、画面のどこに映っていても
+   * 同じ距離なら同じ濃さになる。
+   */
+  scene.fogNode = fog(
+    color(SKY_HORIZON),
+    smoothstep(float(FOG_NEAR), float(FOG_FAR), positionView.length()),
+  )
 
   const collidables: THREE.Object3D[] = []
   const cameraBlockers: THREE.Object3D[] = []
@@ -962,7 +1052,20 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    * 待てるように、その約束をそのまま ready として返す。
    */
   const parts = { collidables, cameraBlockers, obstacles }
-  return { ...parts, water, ready: replaceWithModel(scene, name, parts, blockout) }
+  /*
+   * 投げた物がぶつかる形。**いま描いている物から組む。**
+   *
+   * ブロックアウトの間はその形、glb が届いたらそちらで組み直す。差し替えは
+   * replaceWithModel の中。
+   */
+  const thrownWorld = new MeshWorld()
+  thrownWorld.rebuild(collidables)
+  return {
+    ...parts,
+    thrownWorld,
+    water,
+    ready: replaceWithModel(scene, name, parts, blockout, thrownWorld),
+  }
 }
 
 /**
@@ -978,6 +1081,8 @@ async function replaceWithModel(
   stageName: StageName,
   stage: StageParts,
   blockout: THREE.Group,
+  /** 投げた物の世界。**形が入れ替わったら組み直す** */
+  thrownWorld: MeshWorld,
 ): Promise<void> {
   let gltf
   try {
@@ -1069,6 +1174,13 @@ async function replaceWithModel(
   })
 
   await applySlopes(stageName, obstacles)
+
+  /*
+   * 投げた物の世界を組み直す。**ここでしか形は入れ替わらない。**
+   *
+   * 57000 枚で 100ms 前後。地形が差し替わる瞬間なので、そこに乗せてよい。
+   */
+  thrownWorld.rebuild(collidables)
 
   let meshCount = 0
   model.traverse((obj) => {

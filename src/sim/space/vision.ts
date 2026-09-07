@@ -9,6 +9,9 @@
  * 同じ判定を 2 か所に書くと、必ずどちらかがずれる。
  */
 
+import type { SurfaceHit } from './bvh'
+export type { SurfaceHit } from './bvh'
+
 import type { SurfaceFlags } from '../../domain/stage'
 
 /** 遮蔽になる箱。ステージの書き出しが作る stage.json の中身 */
@@ -160,6 +163,56 @@ export function segmentHitsBox(
  *   1 回あたり 53 箱で、まず線分の AABB で弾くので実測 0.01ms 以下だった。
  *   人数が増えて足りなくなったら、そのとき空間分割を入れる。
  */
+/**
+ * 線が通るか答えられる物。**世界の形を問わない。**
+ *
+ * 判定する側 (verifyHit / hasLineOfSight) が箱の一覧を直に受け取っていた頃は、
+ * **世界が箱でできていることを知っていた。** 三角の網へ移すのに、判定の側まで
+ * 書き換えることになる。
+ *
+ * 問いは 1 つで足りる。箱の一覧でも、三角の木 (bvh.ts の TriangleBvh) でも、
+ * 高さマップでも差し込める。**移行の間は両方を動かして、答えを突き合わせられる。**
+ */
+export interface SightBlocker {
+  /** a から b へ線が通るか */
+  clear(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean
+}
+
+/**
+ * 線分で掃いて、**最初に当たった面**を返せる物。
+ *
+ * SightBlocker (通るかどうか) では足りない場面のため。跳ね返りには面の向きが
+ * 要るし、カメラを壁の手前へ寄せるには距離が要る。
+ *
+ * TriangleBvh がそのまま満たす。箱の側は包みを作る (ballistic.ts の boxSolid)。
+ */
+export interface SolidWorld {
+  hit(
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+  ): SurfaceHit | null
+}
+
+/**
+ * 何も遮らない世界。
+ *
+ * 地形が読めなかったときに使う。**null を配り歩かない** — 受け取る側が
+ * 「地形が無いなら判定を飛ばす」を毎回書くと、書き忘れた所だけ落ちる。
+ * 全部素通しの世界を 1 つ渡せば、判定はいつもどおり走って全部通る。
+ */
+export const OPEN_SIGHT: SightBlocker = { clear: () => true }
+
+/** 箱の一覧を SightBlocker として見せる。**古い形をそのまま包むだけ** */
+export function boxSight(boxes: StageBox[]): SightBlocker {
+  return {
+    clear: (ax, ay, az, bx, by, bz) => isPathClear(ax, ay, az, bx, by, bz, boxes),
+  }
+}
+
 export function hasLineOfSight(
   eyeX: number,
   eyeY: number,
@@ -168,7 +221,7 @@ export function hasLineOfSight(
   targetFeetY: number,
   targetZ: number,
   targetHead: number,
-  boxes: StageBox[],
+  world: SightBlocker,
 ): boolean {
   // 見る方向に対して横向きの単位ベクトル。肩の位置を出すのに使う
   const dx = targetX - eyeX
@@ -181,14 +234,14 @@ export function hasLineOfSight(
   // 増えた点の費用を払うのは、隠れている相手を確かめるときだけ
   for (const ratio of SAMPLE_RATIOS) {
     const ty = targetFeetY + targetHead * ratio
-    if (isPathClear(eyeX, eyeY, eyeZ, targetX, ty, targetZ, boxes)) return true
+    if (world.clear(eyeX, eyeY, eyeZ, targetX, ty, targetZ)) return true
   }
 
   // 左右の肩。頭と胸の高さだけ見る (足は幅が無い)
   for (const ratio of [1, 0.55]) {
     const ty = targetFeetY + targetHead * ratio
-    if (isPathClear(eyeX, eyeY, eyeZ, targetX + sideX, ty, targetZ + sideZ, boxes)) return true
-    if (isPathClear(eyeX, eyeY, eyeZ, targetX - sideX, ty, targetZ - sideZ, boxes)) return true
+    if (world.clear(eyeX, eyeY, eyeZ, targetX + sideX, ty, targetZ + sideZ)) return true
+    if (world.clear(eyeX, eyeY, eyeZ, targetX - sideX, ty, targetZ - sideZ)) return true
   }
   return false
 }
@@ -286,6 +339,19 @@ export function sightBlockers(boxes: StageBox[]): StageBox[] {
  *
  * 片方で済ませると、手榴弾が床を突き抜けて地面の下で爆発する。
  */
+/**
+ * カメラが入れない箱だけを残す。
+ *
+ * 遮蔽 (sightBlockers) とも、物がぶつかる面 (solidBlockers) とも別の集合。
+ * 飾りはカメラを通すし、見えない壁 (vis_) はカメラも止める。
+ *
+ * **箱のまま。** カメラを壁の手前へ寄せるには「どこで当たったか」が要るので、
+ * 通るかどうかしか答えない SightBlocker では足りない。
+ */
+export function cameraBlockers(boxes: StageBox[]): StageBox[] {
+  return boxes.filter((box) => box.flags?.camera !== false)
+}
+
 export function solidBlockers(boxes: StageBox[]): StageBox[] {
   return boxes.filter((box) => box.flags?.player !== false)
 }

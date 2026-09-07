@@ -57,6 +57,16 @@ const cases: Record<string, Partial<GameStats>> = {
     match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 6, required: 2, players: [] },
     team: 'blue',
   },
+  /*
+   * 数えている間。**数字は上、指令は真ん中。**
+   *
+   * 重なっていないかを見る頁。指令 (Orders) は段階が countdown になった
+   * ときに出るので、この 1 枚で両方が出る。
+   */
+  countdown: {
+    match: { phase: 'countdown', mode: 'TDM', blue: 0, red: 0, endsAt: Date.now() + 4000, present: 2, required: 2, players: [] },
+    team: 'red',
+  },
   // 点の増減
   points: {
     points: [

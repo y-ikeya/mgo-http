@@ -172,19 +172,36 @@ describe('状態', () => {
 })
 
 describe('サーバーからの知らせ', () => {
-  test('hidden で即座に消える', () => {
+  /**
+   * **知らせは出来事であって、出来事には起きた時刻がある。**
+   *
+   * 相手の体は少し過去を描いている (renderDelay)。知らせだけ今の時刻で
+   * 効かせると、**画面の中ではまだ物陰の手前を走っているのに消える** —
+   * 木箱に隠れる少し前に、ふっと居なくなったように見えていた。
+   */
+  test('**すぐには消えない。** 描いている時刻が追いつくまで残る', () => {
     const p = new Presence(DELAY)
     p.setOnField(true)
     const last = feed(p, { gap: 16, count: 60 })
-    p.hide()
-    expect(p.visibleAt(last + 16)).toBe(false)
+    p.hide(last)
+    // 描いているのはまだ物陰の手前
+    expect(p.visibleAt(last + 1)).toBe(true)
+    expect(p.visibleAt(last + p.renderDelay - 1)).toBe(true)
+  })
+
+  test('追いついたら消える', () => {
+    const p = new Presence(DELAY)
+    p.setOnField(true)
+    const last = feed(p, { gap: 16, count: 60 })
+    p.hide(last)
+    expect(p.visibleAt(last + p.renderDelay)).toBe(false)
   })
 
   test('位置が来たらまた出る', () => {
     const p = new Presence(DELAY)
     p.setOnField(true)
-    feed(p, { gap: 16, count: 60 })
-    p.hide()
+    const hid = feed(p, { gap: 16, count: 60 })
+    p.hide(hid)
     const last = feed(p, { gap: 16, count: 3, from: 200_000 })
     expect(p.visibleAt(last + 16)).toBe(true)
   })
@@ -195,7 +212,7 @@ describe('サーバーからの知らせ', () => {
     p.setOnField(true)
     feed(p, { gap: 16, count: 60 })
     const before = p.hideAfter
-    p.hide()
+    p.hide(200_000)
     feed(p, { gap: 16, count: 5, from: 200_000 })
     expect(p.hideAfter).toBe(before)
   })

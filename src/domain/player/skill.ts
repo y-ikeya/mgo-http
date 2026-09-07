@@ -175,11 +175,25 @@ function maxLevelOf(_id: SkillId): SkillLevel {
  * 逆に空にすると、抜けて入り直しただけの人が丸腰になる。**持ち越すのが、
  * どちらにも寄らない形。**
  */
-export function canChooseSkills(phase: Phase, mode?: ModeSpec): boolean {
+export function canChooseSkills(phase: Phase, mode?: ModeSpec, ready = false): boolean {
   // **練習部屋はいつでも組み替えられる。** 相手が棒立ちの的なので、後出しに
   // なる相手が居ない。ここは効き目を試す場所で、試すたびに試合の切れ目を
   // 待たせると**確かめられない**
   if (mode?.id === 'PRACTICE') return true
+  /*
+   * **READY を押している間は固まる。**
+   *
+   * 押すのは「自分はもう待たせていない」という表明で、**全員が押した瞬間に
+   * 始まる**。押した後も触れると、最後の 1 人が押した瞬間に自分が段を触って
+   * いた場合、どちらで始まったのかが誰にも分からない。
+   *
+   * 直せなくはしない。**取り消してから直す** — 取り消せば他の人を待たせる
+   * ことになるので、押した重みと釣り合う。
+   *
+   * ready を見るのは支度の段階だけ。他の段階では押しようが無いので、
+   * 席に残った古い値で固めてしまわないようにする。
+   */
+  if (phase === 'ready' && ready) return false
   return phase !== 'playing'
 }
 

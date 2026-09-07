@@ -76,6 +76,8 @@ export interface Match {
   lastBroadcast: number
   /** 自分の本当の値を最後に配った時刻。**全員へ配る便とは別の時計** */
   lastSelfAt: number
+  /** 最後に往復の時間を測りに行った時刻 (Date.now) */
+  lastPingAt: number
   /** 最後に「切れた人の体」を配り直した時刻 */
   lastLimbo: number
   /**
@@ -98,6 +100,7 @@ export function newMatch(mode: Mode): Match {
     phase: 'waiting',
     lastBroadcast: 0,
     lastSelfAt: 0,
+    lastPingAt: 0,
     lastLimbo: 0,
     matchId: null,
     startedAt: 0,

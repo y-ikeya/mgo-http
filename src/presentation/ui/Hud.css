@@ -403,6 +403,17 @@
   pointer-events: none;
 }
 
+/*
+ * 指令の帯の下へ置く。**帯が上、数字が下。**
+ *
+ * 「何をするか」を先に読ませて、「あと何秒か」を目の高さに残す。数字のほうが
+ * 動くので、そちらを中央寄りに置く。
+ */
+.hud-standby-under {
+  justify-content: center;
+  padding-top: 56px;
+}
+
 .hud-standby-title {
   font-size: 30px;
   letter-spacing: 0.32em;

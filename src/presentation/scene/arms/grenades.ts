@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { loadGrenade } from '../assets'
 import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
-import type { StageBox } from '../../../sim/space/vision'
+import type { SolidWorld } from '../../../sim/space/vision'
 import { THROW_LOFT } from '../../../domain/item/grenade'
 
 /**
@@ -152,7 +152,7 @@ export class Grenades {
    */
   update(
     dt: number,
-    boxes: StageBox[],
+    world: SolidWorld,
     water: Water | null,
     onBounce: (bounce: Bounce) => void,
   ): void {
@@ -163,7 +163,7 @@ export class Grenades {
       for (const item of this.live) {
         if (item.body.resting) continue
         const before = Math.hypot(item.body.vx, item.body.vy, item.body.vz)
-        stepProjectile(item.body, boxes, undefined, water)
+        stepProjectile(item.body, world, undefined, water)
         if (item.body.bounces > item.bounces) {
           item.bounces = item.body.bounces
           this.bounce.position.set(item.body.x, item.body.y, item.body.z)
@@ -216,7 +216,7 @@ export class Grenades {
   showPreview(
     origin: THREE.Vector3,
     direction: THREE.Vector3,
-    boxes: StageBox[],
+    world: SolidWorld,
     water: Water | null,
     /** 投げ出す速さ。**スキルを掛けた後の値を渡す** (domain の throwSpeedOf) */
     speed: number,
@@ -250,7 +250,7 @@ export class Grenades {
       count = i + 1
       // 最初に当たるところまで。跳ねた先まで見せると線が読めなくなる
       if (p.bounces > 0) break
-      stepProjectile(p, boxes, undefined, water)
+      stepProjectile(p, world, undefined, water)
     }
     // 使わなかった残りは最後の点に畳む (別の場所へ線が伸びないように)
     for (let i = count; i < PREVIEW_STEPS; i++) {

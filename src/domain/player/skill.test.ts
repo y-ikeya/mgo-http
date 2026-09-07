@@ -231,6 +231,44 @@ describe('選び直せる窓', () => {
   })
 
   /**
+   * **READY を押している間は固まる。**
+   *
+   * 押すのは「自分はもう待たせていない」という表明で、全員が押した瞬間に
+   * 始まる。押した後も触れると、最後の 1 人が押した瞬間に自分が段を触って
+   * いた場合、**どちらで始まったのかが誰にも分からない。**
+   */
+  test('READY を押している間は組み替えられない', () => {
+    expect(canChooseSkills('ready', MODES.TDM, false)).toBe(true)
+    expect(canChooseSkills('ready', MODES.TDM, true)).toBe(false)
+  })
+
+  /**
+   * **取り消せば直せる。** 固めるのは押している間だけ。
+   *
+   * 取り消せば他の人を待たせることになるので、押した重みと釣り合う。
+   */
+  test('READY を取り消せば、また組み替えられる', () => {
+    expect(canChooseSkills('ready', MODES.TDM, true)).toBe(false)
+    expect(canChooseSkills('ready', MODES.TDM, false)).toBe(true)
+  })
+
+  /**
+   * **支度の段階の外では ready を見ない。**
+   *
+   * 席の ready は次の支度に入るところで倒れる (server/match.ts の enterReady)
+   * が、倒れる前の一瞬でも古い値で固めると**決着後に組み替えられない**。
+   * 見るのは押しようがある段階だけにする。
+   */
+  test('支度の段階の外では、READY が立っていても関係ない', () => {
+    expect(canChooseSkills('over', MODES.TDM, true)).toBe(true)
+    expect(canChooseSkills('waiting', MODES.TDM, true)).toBe(true)
+  })
+
+  test('練習部屋は READY を押していても組み替えられる', () => {
+    expect(canChooseSkills('ready', MODES.PRACTICE, true)).toBe(true)
+  })
+
+  /**
    * **途中参加は前の選択のまま戦う。**
    *
    * 選ばせると「劣勢の側を見てから強い組み合わせで入り直す」ができ、空にすると

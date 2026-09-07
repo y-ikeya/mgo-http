@@ -6,16 +6,15 @@
  */
 
 import { connected, isLeaking } from '../src/domain/match/match'
+import { recordPose } from './history'
 import { isFriendly } from '../src/domain/match/room'
 import { canSee, isDowned, isJoining, onBattlefield } from '../src/domain/player/lifecycle'
 import { isLeakedTo } from '../src/domain/player/player'
 import { STEP_UP } from '../src/domain/player/moving'
 import { type MatchPlayer, headHeightOf, isProtected, lifeElapsed } from '../src/domain/player/player'
-import { stanceOf } from '../src/domain/player/stance'
-import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { surfaceOf } from '../src/domain/stage'
 import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/infra/codec/snapshot'
-import { SNAPSHOT_INTERVAL, type ServerMessage } from '../src/application/protocol/types'
+import type { ServerMessage } from '../src/application/protocol/types'
 import { checkMove } from '../src/sim/judge/motioncheck'
 import { cameraPoint } from '../src/sim/space/eyepoint'
 import { groundUnder, hasLineOfSight } from '../src/sim/space/vision'
@@ -195,10 +194,15 @@ export function emitNoise(
     noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
   const head = headHeightOf(from)
 
-  // 何の上を踏んだかは地形から出す。申告させるものではない
+  /*
+   * 何の上を踏んだかは地形から出す。申告させるものではない。
+   *
+   * **立てる面 (solid) から引く。** 視線を止める面 (sight) は三角の網になって
+   * 材質を持たないし、そもそも「乗っている面」は物がぶつかる側の話。
+   */
   const surface =
     noise.kind === 'step'
-      ? surfaceOf(groundUnder(from.x, from.z, from.y, room.stage.sight, STEP_UP).name)
+      ? surfaceOf(groundUnder(from.x, from.z, from.y, room.stage.solid, STEP_UP).name)
       : undefined
 
   for (const listener of connected(room)) {
@@ -210,7 +214,6 @@ export function emitNoise(
     const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
-      room.stage.sight.length === 0 ||
       hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
     if (!isHeard(distance, reach, visible)) continue
 
@@ -242,7 +245,6 @@ export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMes
     const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
-      room.stage.sight.length === 0 ||
       !canSee(listener.life) ||
       hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
 
@@ -266,35 +268,6 @@ export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMes
  * それ自体が「さっきまで見ていた」という情報になる。受け取る側は最後に
  * 届いた位置のまま置いておく。
  */
-/**
- * 履歴に残す数。遡れる長さを覆えるだけ持つ。
- *
- * **送る間隔から出す。** 20Hz の頃に 12 個 (= 0.6 秒) と決め打ちしていたのを、
- * 64Hz へ上げたときに直し忘れていた。12 個では 0.19 秒しか遡れず、
- * LAG_WINDOW_MS が 0.4 秒あっても半分より前は届かない — 回線の遠い人ほど
- * 「当てたのに通らない」が増える、という形で静かに効いていた。
- */
-export const HISTORY_SIZE = Math.ceil(LAG_WINDOW_MS / (SNAPSHOT_INTERVAL * 1000)) + 2
-
-export function recordPose(player: MatchPlayer): void {
-  player.history.push({
-    time: Date.now(),
-    x: player.x,
-    y: player.y,
-    z: player.z,
-    yaw: player.yaw,
-    // 見下ろしていれば倒れている相手にも刃が通る。刺した瞬間の向きが要るので履歴に持つ
-    pitch: player.pitch,
-    crouching: player.crouching,
-    boxed: player.boxed,
-    // ナイフが刺さる姿勢かの判定に要る。**遡って照合するので履歴に持つ** —
-    // 「いまの姿勢」で見ると、刺した瞬間は立っていた相手が
-    // 爆風で転んだ直後に届いた申告を弾いてしまう
-    stance: stanceOf(player.locomotion),
-  })
-  if (player.history.length > HISTORY_SIZE) player.history.shift()
-}
-
 /** カメラ位置の置き場。毎フレーム作らないよう使い回す */
 export const viewEye = { x: 0, y: 0, z: 0 }
 
@@ -313,8 +286,8 @@ export function viewOf(room: RoomWorld, player: MatchPlayer): { x: number; y: nu
     player.pitch,
     player.aiming,
     // 壁に寄せる。省くと壁を背にした瞬間にカメラが壁の中へ入り、
-    // その人だけ全方位が見えなくなる
-    room.stage.sight,
+    // その人だけ全方位が見えなくなる。**どこで当たったかが要るので箱**
+    room.stage.camera,
     viewEye,
   )
 }
@@ -371,8 +344,7 @@ export function relayState(room: RoomWorld, from: MatchPlayer, payload: Uint8Arr
       !killCam &&
       !glowing &&
       !exposed &&
-      !isFriendly(room.mode, viewer, from) &&
-      room.stage.sight.length > 0
+      !isFriendly(room.mode, viewer, from)
     ) {
       // **目ではなくカメラから**線を引く。三人称なので、画面に映るものを
       // 決めているのはカメラの位置。目で見ると、遮蔽の裏にしゃがんだ相手が

@@ -10,7 +10,7 @@
 // 粗く測って「跳んでいない」と読み違える。
 import { groundHeight } from '../../src/sim/space/collision'
 // json を直に読む。loadStageBoxes は fetch を使うので端末では動かない
-const raw = JSON.parse(await Bun.file('public/models/stage_garden.json').text())
+const raw = JSON.parse(await Bun.file('public/models/stage_raft.json').text())
 const boxes = raw.boxes
   .filter((b: any) => b.flags?.player)
   .map((b: any) => ({

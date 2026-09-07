@@ -133,16 +133,27 @@ const SELF_RENDER_ORDER = 1000
  *
  * 転んだら**自分で起きるまで転んだまま**。時間で勝手に立たない。
  *
- * 伏せたまま撃つか、起きて動くかを選ばせたい。自動で立つと、その選択が
- * 時計に奪われる — 撃とうとした瞬間に立ち上がり始めて、無防備な時間だけが残る。
+ * 伏せたまま撃つか、這って逃げるか、起きて動くかを選ばせたい。自動で立つと、
+ * その選択が時計に奪われる — 撃とうとした瞬間に立ち上がり始めて、無防備な
+ * 時間だけが残る。
  *
  * ここで置いているのは吹き飛ばされる型が終わるまでの分だけ。倒れ切る前に
- * 移動キーで起き上がれてしまうと、爆風を受けた事実がほぼ無かったことになる。
+ * 動けてしまうと、爆風を受けた事実がほぼ無かったことになる。
  */
 const DOWN_LOCK = 0.35
 
 /** 照準方向へ向き直る速さ */
 const TURN_LAMBDA = 14
+
+/**
+ * 這い出すための寝返りで、腰の向きを打ち消すのにかける時間 (秒)。
+ *
+ * 転ぶ型と這う型は**頭の向きが逆**なので、渡すときに腰の向きを 180 度回して
+ * 打ち消している (crawlFromDown)。型のほうは重みの補間で入れ替わるので
+ * (animation.ts の LOWER_BLEND_LAMBDA = 12)、**その速さに合わせないと噛み合わ
+ * ない** — 一息に回すと逆向きに入れ替わって見える。12 で 95% までおよそ 0.25 秒。
+ */
+const PRONE_TURN_BLEND = 0.25
 
 /** 銃口のオフセット (m)。構えた右手あたりを想定した固定値 */
 const MUZZLE_HEIGHT = 1.35
@@ -269,6 +280,32 @@ export class Soldier {
   /** 現在の移動アニメの状態。切り替えのヒステリシス判定に使う */
   private locomotion: Locomotion = 'idle'
   /** 銃の持ち方が姿勢へ寄っている度合い (0 = 立ち, 1 = しゃがみ) */
+  /**
+   * 伏せの段取り。
+   *
+   *     none        伏せていない
+   *     prone_down  伏せに入っている最中 (0.9 秒)
+   *     prone       伏せている
+   *     prone_rise  起き上がっている最中 (1.8 秒)
+   *
+   * **入り / 出を旗 1 つで表せない。** 入っている最中はまだ伏せていないし、
+   * 出ている最中はもう伏せていない。旗 1 つにすると、繋ぎのモーションが
+   * 流れている間の頭の高さも動けるかどうかも決められなくなる。
+   */
+  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' | 'prone_roll_down' = 'none'
+  /** 繋ぎのモーションの残り時間 (秒) */
+  private proneShiftLeft = 0
+  /**
+   * 寝返りの間に回す向き。**回している間だけ 0 より大きい。**
+   *
+   * 這い出すための転がり (crawlFromDown) で、**型が頭の向きを入れ替える分を
+   * 打ち消す**ために回す。混ざる速さと同じ速さで 180 度回すので、世界から
+   * 見た体は動かず、転がるだけになる。
+   */
+  private proneTurnFrom = 0
+  private proneTurnOver = 0
+  private proneTurnLeft = 0
+
   private weaponStance = 0
   /** 姿勢が変わっている速さ。散布に効かせる */
   private stanceRateValue = 0
@@ -820,6 +857,8 @@ export class Soldier {
     this.animator?.wakeFromSleep()
     this.proneStage = 'none'
     this.proneShiftLeft = 0
+    this.proneTurnOver = 0
+    this.proneTurnLeft = 0
     this.velocityY = 0
     this.downed_ = false
     this.downElapsed = 0
@@ -848,6 +887,8 @@ export class Soldier {
     this.animator?.wakeFromSleep()
     this.proneStage = 'none'
     this.proneShiftLeft = 0
+    this.proneTurnOver = 0
+    this.proneTurnLeft = 0
     this.velocityY = 0
     // 爆風で転んだまま倒された場合、ここで戻さないと復帰しても転んだまま。
     // 姿勢は毎フレーム downed から引き直しているので、他の人の画面では
@@ -1005,9 +1046,22 @@ export class Soldier {
     return this.animator?.throwWindupLeft ?? 0
   }
 
-  /** 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る */
+  /**
+   * 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る。
+   *
+   * **いま流している型のもの。** 伏せの投擲は立ちと尺が違う (1.73 / 0.83) ので、
+   * 立ちの尺で測ると伏せて投げたときだけ手を離れる所がずれる。
+   */
   get throwReleaseDuration(): number {
-    return this.animator?.throwReleaseDuration ?? 0
+    if (!this.animator) return 0
+    return this.animator.proneThrowing
+      ? this.animator.proneThrowReleaseDuration
+      : this.animator.throwReleaseDuration
+  }
+
+  /** いま流しているのが伏せの投擲か。放す割合を選び分けるのに要る */
+  get proneThrowing(): boolean {
+    return this.animator?.proneThrowing ?? false
   }
 
   /** 振りかぶり切ったか。投げられる状態になったかの判定に使う */
@@ -1123,13 +1177,21 @@ export class Soldier {
     // 押しっぱなしも受け付けない。倒される前から構えていた場合、
     // 着地した瞬間に何もしていないのに構え直してしまう。一度離してから
     // 押し直させることで、伏せて撃つのが**選んだ結果**になる。
+    if (!aiming) this.aimLatched = false
     if (this.downed) {
-      if (!aiming) this.aimLatched = false
       const landed = this.downElapsed >= (this.animator?.sweepDuration ?? 1.5)
       this.aiming = landed && aiming && !this.aimLatched
       return
     }
-    this.aiming = this.down || this.boxed || this.standing ? false : aiming
+    /*
+     * 押しっぱなしの掛け金は**倒れ終わった後まで持ち越す。**
+     *
+     * 倒れたまま這い出すと downed が下りて伏せに移る (crawlFromDown) ので、
+     * ここで掛け金を見ないと、**這い始めた瞬間に構え直す**。構え直すこと自体は
+     * よいが、それは押し直した結果であってほしい。
+     */
+    this.aiming =
+      this.down || this.boxed || this.standing || this.aimLatched ? false : aiming
   }
 
   /**
@@ -1201,7 +1263,19 @@ export class Soldier {
   /** しゃがみの切り替え。空中では姿勢を変えない */
   toggleCrouch(): void {
     if (!this.onGround || this.down || this.saluting) return
-    if (this.downed || this.standing) return
+    // 立ち上がりの最中は受け付けない。**繋ぎを途中で切らない**
+    if (this.standing) return
+    /*
+     * 吹き飛ばされて倒れている間。**Space が起き上がる合図。**
+     *
+     * 動くと這い出すようにしたので (crawlFromDown)、起きる操作がここへ移った。
+     * 伏せから起きるのと同じ指なので、**倒された後も覚えることが増えない** —
+     * 這うか起きるかの選び方が、自分で伏せたときと同じになる。
+     */
+    if (this.downed) {
+      this.standUp()
+      return
+    }
     // 箱を被ったまま立ち上がることはできない。脱いでから立つ。
     if (this.boxed) {
       this.dropBox()
@@ -1217,25 +1291,7 @@ export class Soldier {
     this.crouching = !this.crouching
   }
 
-  /**
-   * 伏せの段取り。
-   *
-   *     none        伏せていない
-   *     prone_down  伏せに入っている最中 (0.9 秒)
-   *     prone       伏せている
-   *     prone_rise  起き上がっている最中 (1.8 秒)
-   *
-   * **入り / 出を旗 1 つで表せない。** 入っている最中はまだ伏せていないし、
-   * 出ている最中はもう伏せていない。旗 1 つにすると、繋ぎのモーションが
-   * 流れている間の頭の高さも動けるかどうかも決められなくなる。
-   */
-  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' = 'none'
-  /** 繋ぎのモーションの残り時間 (秒) */
-  private proneShiftLeft = 0
-  /** 這う向きの置き場。毎フレーム作らない */
-  private readonly crawlDir = new THREE.Vector3()
-
-  /** 伏せ切っているか。入り / 出の最中は false */
+  /** 伏せ切っているか。入り / 出 / 転がりの最中は false */
   get isProne(): boolean {
     return this.proneStage === 'prone'
   }
@@ -1268,8 +1324,10 @@ export class Soldier {
   }
 
   /** 伏せへ出入りしている最中か。**この間は動けない** */
-  get proneShifting(): 'prone_down' | 'prone_rise' | null {
-    return this.proneStage === 'prone_down' || this.proneStage === 'prone_rise'
+  get proneShifting(): 'prone_down' | 'prone_rise' | 'prone_roll_down' | null {
+    return this.proneStage === 'prone_down' ||
+      this.proneStage === 'prone_rise' ||
+      this.proneStage === 'prone_roll_down'
       ? this.proneStage
       : null
   }
@@ -1322,6 +1380,20 @@ export class Soldier {
     this.proneStage = 'prone_rise'
     this.proneShiftLeft = this.animator?.proneRiseDuration ?? 0
     this.animator?.playProneRise()
+  }
+
+  /**
+   * 転がりを始める。**型を流すのは呼ぶ側。**
+   *
+   * @param span 動けない時間 (秒)。型の尺
+   * @param over 腰の向きを 180 度回すのに何秒かけるか (0 = 回さない)
+   */
+  private beginProneRoll(span: number, over: number): void {
+    this.proneStage = 'prone_roll_down'
+    this.proneShiftLeft = span
+    this.proneTurnFrom = this.yaw
+    this.proneTurnOver = over
+    this.proneTurnLeft = over
   }
 
   /** ローリングの尺 (秒)。モデル未着なら 0 */
@@ -1481,10 +1553,50 @@ export class Soldier {
   }
 
   /**
+   * 倒れたまま這い出す。**仰向けから腹這いへ寝返る。**
+   *
+   * 吹き飛ばされて着いた姿勢 (sweep) と、伏せている姿勢は**着いた後は同じ扱い**。
+   * ここで伏せの側へ渡してしまえば、這う・伏せ撃ち・伏せ装填が全部そのまま
+   * 効く。倒れている側にもう一組同じものを書かずに済む。
+   *
+   * **寝返る間を挟む。** 転ぶ型 (sweep) は仰向けで終わるので、そのまま這う型へ
+   * 渡すと 1 フレームで裏返る。伏せに入るのに prone_down を挟むのと同じ形
+   * (prone_turn)。型が無ければ間を置かずに伏せへ渡す — 裏返って見えるが、
+   * **這えなくなるよりはよい。**
+   *
+   * 倒れた直後 (DOWN_LOCK) は受け付けない。飛ばされている最中に這い出せると、
+   * 吹き飛ばされたこと自体が無くなる。
+   */
+  private crawlFromDown(): void {
+    if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
+    this.downed_ = false
+    const span = this.animator?.proneRollDownDuration ?? 0
+    if (span <= 0) {
+      this.proneStage = 'prone'
+      this.proneShiftLeft = 0
+      return
+    }
+    /*
+     * **型が頭と足を入れ替える分を、腰の向きで打ち消す。**
+     *
+     * 転ぶ型 (sweep) は足から飛ばされて背中で着くので、終わりの姿勢は
+     * **頭が後ろ側**。這う型は頭が前なので、そのまま渡すと頭と足が入れ替わる
+     * — 寝返りではなく、体がその場でくるりと入れ替わって見える。
+     *
+     * 打ち消しは**混ざるのと同じ速さ**で回す。型は重みの補間で入れ替わる
+     * (LOWER_BLEND_LAMBDA) ので、こちらだけ一息に回すと逆向きに入れ替わる。
+     * 揃えれば世界から見た体は動かず、寝返るだけになる。
+     *
+     */
+    this.beginProneRoll(span, PRONE_TURN_BLEND)
+    this.animator?.playProneRollDown()
+  }
+
+  /**
    * 起き上がる。
    *
-   * 移動入力で呼ばれる。**倒れたまま構えている間は呼ばれない** —
-   * 撃つか起きるかを選ぶのが倒れている間の中身なので、
+   * Space で呼ばれる (toggleCrouch)。**倒れたまま構えている間は呼ばれない** —
+   * 撃つか、這うか、起きるかを選ぶのが倒れている間の中身なので、
    * 撃とうとしただけで勝手に起き上がってはいけない。
    */
   standUp(): void {
@@ -1516,6 +1628,36 @@ export class Soldier {
   /** しゃがみ時に上半身を右へ旋回させる角度 (度、調整用) */
   setCrouchTorsoYaw(degrees: number): void {
     if (this.animator) this.animator.crouchTorsoYaw = (degrees * Math.PI) / 180
+  }
+
+  /**
+   * 銃が手に付いたか。**姿勢を変えてよいかの合図。**
+   *
+   * 銃は最初に付いた瞬間の手の向きを基準にして、以後ずっとそれを使う
+   * (attachRef)。読み込みは非同期なので、**付く前に姿勢を変えると、その姿勢を
+   * 基準にした握りになる。** 本番は立って湧くので必ず立ち姿が基準になるが、
+   * 試写のように姿勢を直に立てる側は待たないとずれる。
+   */
+  get weaponAttached(): boolean {
+    return this.weapon !== null
+  }
+
+  /**
+   * いま流している型と、銃の持ち方の段。**?stats=on に出す。**
+   *
+   * 0 = 立ち / 1 = しゃがみ / 2 = 伏せ。試写と本番で銃の位置が違ったときに、
+   * **どちらの型を使っているか**をその場で突き合わせられる。
+   */
+  get poseDebug(): string {
+    return `${this.animator?.playingKeys ?? '—'} @${this.weaponStance.toFixed(2)}`
+  }
+
+  /** 走りの足の回転の底上げ (倍率)。調整用 */
+  setRunCadence(rate: number): void {
+    if (this.animator) {
+      this.animator.runCadence = rate
+      this.animator.setMoveSpeed(this.currentSpeed)
+    }
   }
 
   /** 非構え時の上半身の向き補正 (0..1)。調整用 */
@@ -1571,13 +1713,20 @@ export class Soldier {
     // 倒れている間は入力を捨てる。重力と接地だけは回して、体が宙に浮かないようにする。
     if (this.down) moveDir = ZERO_MOVE
 
-    // 倒れている間と立ち上がりの最中は動けない。
-    // 撃つことはできる (上半身は構えに戻っている)。
-    //
-    // 移動しようとしたことが起き上がる合図になる。動きたいと思った時点で
-    // 起きるのが素直で、そのためのキーを別に覚えさせる理由が無い
+    /*
+     * 倒れている間と立ち上がりの最中は動けない。
+     * 撃つことはできる (上半身は構えに戻っている)。
+     *
+     * **動こうとしたら這い出す。** 吹き飛ばされて着いた先は伏せているのと
+     * 同じ姿勢なので、そこから動けるのは匍匐だけ。起き上がるのは Space で、
+     * 伏せから起きるのと同じ指になる (toggleCrouch)。
+     *
+     * 以前は動いた時点で立ち上がっていた。**倒された代償が、立つまでの
+     * 1.5 秒だけ**になっていて、伏せたまま体勢を変える (物陰へ這って逃げる /
+     * 這って撃ち返す) という選択がそもそも取れなかった。
+     */
     if (this.downed || this.standing) {
-      if (this.downed && moveDir.lengthSq() > 1e-6) this.standUp()
+      if (this.downed && moveDir.lengthSq() > 1e-6) this.crawlFromDown()
       moveDir = ZERO_MOVE
     }
 
@@ -1615,14 +1764,6 @@ export class Soldier {
      */
     if (this.hardLandTimer > 0) moveDir = ZERO_MOVE
 
-    if (this.proneStage === 'prone' && moveDir !== ZERO_MOVE) {
-      const sin = Math.sin(facingYaw)
-      const cos = Math.cos(facingYaw)
-      // yaw = θ のとき前方は (-sinθ, -cosθ)
-      const forward = moveDir.x * -sin + moveDir.z * -cos
-      if (forward <= 0) moveDir = ZERO_MOVE
-      else moveDir = this.crawlDir.set(-sin * forward, 0, -cos * forward)
-    }
 
     // 銃の重さはどの姿勢でも効く。担いでいる物が軽くなるわけではないので。
     //
@@ -1693,15 +1834,21 @@ export class Soldier {
       overrideZ = this.knockZ * speed
     }
 
-    // 転がっている間だけ、焼かれた移動を辿る。**着地は動かない**
-    const tumbling = overrideX === undefined && this.rolling
+    /*
+     * 転がっている間だけ、焼かれた移動を辿る。**着地は動かない**
+     *
+     * 伏せたまま横へ転がる型も同じ道を通す。**辿らないとその場で回って
+     * 終わる** — 転がった意味が絵から抜ける。
+     */
+    const proneRolling = this.proneStage === 'prone_roll_down'
+    const tumbling = overrideX === undefined && (this.rolling || proneRolling)
     if (tumbling) {
       overrideX = 0
       overrideZ = 0
       if (dt > 0 && this.animator?.consumeRootMotion(this.scratchVelocity)) {
         // モデル空間 (正面 +Z) の移動をワールドへ写す。
         // モデルは 180° 回してあるので yaw + π の回転になる。
-        const yaw = this.rolling ? this.rollYaw : this.hardLandYaw
+        const yaw = proneRolling ? this.yaw : this.rolling ? this.rollYaw : this.hardLandYaw
         const sin = Math.sin(yaw)
         const cos = Math.cos(yaw)
         const dx = this.scratchVelocity.x
@@ -1827,12 +1974,29 @@ export class Soldier {
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
-    // 繋ぎが終わったら次の段へ。起き上がりの先はしゃがみ
+    /*
+     * 繋ぎが終わったら次の段へ。
+     *
+     *   prone_down       伏せに入る      → うつ伏せ
+     *   prone_roll_down  仰向けから転がる → うつ伏せ
+     *   prone_rise       伏せから起きる  → しゃがみ
+     */
     if (this.proneShiftLeft > 0) {
       this.proneShiftLeft -= dt
       if (this.proneShiftLeft <= 0) {
-        this.proneStage = this.proneStage === 'prone_down' ? 'prone' : 'none'
+        const toProne =
+          this.proneStage === 'prone_down' || this.proneStage === 'prone_roll_down'
+        this.proneStage = toProne ? 'prone' : 'none'
         if (this.proneStage === 'none') this.crouching = true
+      }
+    }
+    // 回している最中。**回り切ったら手を離す** (以後は普通の向きの決め方へ戻る)
+    if (this.proneTurnOver > 0) {
+      this.proneTurnLeft -= dt
+      if (this.proneTurnLeft <= 0) {
+        this.proneTurnLeft = 0
+        this.yaw = this.proneTurnFrom + Math.PI
+        this.proneTurnOver = 0
       }
     }
     /*
@@ -1869,7 +2033,18 @@ export class Soldier {
       targetYaw =
         moveDir.lengthSq() > 1e-6 ? Math.atan2(-moveDir.x, -moveDir.z) : this.yaw
     }
-    this.yaw = dampAngle(this.yaw, targetYaw, TURN_LAMBDA, dt)
+    /*
+     * 寝返っている間は**追わずに置く。**
+     *
+     * 追従 (dampAngle) に任せると、短い打ち消し (PRONE_TURN_BLEND) では
+     * 回り切らずに残る。型と噛み合わせる回転なので、遅れがそのままずれになる。
+     */
+    if (this.proneTurnOver > 0) {
+      const done = 1 - this.proneTurnLeft / this.proneTurnOver
+      this.yaw = this.proneTurnFrom + Math.PI * done
+    } else {
+      this.yaw = dampAngle(this.yaw, targetYaw, TURN_LAMBDA, dt)
+    }
     this.object.rotation.y = this.yaw
 
     if (this.animator) {

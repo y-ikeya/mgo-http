@@ -1,0 +1,147 @@
+diff --git a/server/damage.ts b/server/damage.ts
+index a758878..8d911da 100644
+--- a/server/damage.ts
++++ b/server/damage.ts
+@@ -29,6 +29,17 @@ import { exposeSeconds } from '../src/domain/player/skill'
+ import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
+ import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
+ import { verifyHit } from '../src/sim/judge/hitcheck'
++import { poseHistory } from './relay'
++import type { Pose } from '../src/domain/player/player'
++
++/**
++ * 履歴を並べ直す先。**2 本持つ。**
++ *
++ * verifyHit は撃った側と撃たれた側を同時に見るので、1 本を使い回すと
++ * 2 度目が 1 度目を潰す。申告のたびに作らないよう、ここに置いて使い回す。
++ */
++const attackerPoses: Pose[] = []
++const victimPoses: Pose[] = []
+ import { bulletSag } from '../src/sim/judge/bullet'
+ import { matchState } from './match'
+ import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
+@@ -332,8 +343,8 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
+ 
+   const spec = weaponOf(attacker.weapon)
+   const verdict = verifyHit(
+-    attacker.history,
+-    victim.history,
++    poseHistory(attacker, attackerPoses),
++    poseHistory(victim, victimPoses),
+     {
+       kind: event.kind,
+       zone: event.zone,
+diff --git a/server/relay.ts b/server/relay.ts
+index 2558606..a48c5d0 100644
+--- a/server/relay.ts
++++ b/server/relay.ts
+@@ -11,6 +11,7 @@ import { canSee, isDowned, isJoining, onBattlefield } from '../src/domain/player
+ import { isLeakedTo } from '../src/domain/player/player'
+ import { STEP_UP } from '../src/domain/player/moving'
+ import { type MatchPlayer, headHeightOf, isProtected, lifeElapsed } from '../src/domain/player/player'
++import type { Pose } from '../src/domain/player/player'
+ import { stanceOf } from '../src/domain/player/stance'
+ import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
+ import { surfaceOf } from '../src/domain/stage'
+@@ -277,30 +278,56 @@ export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMes
+ export const HISTORY_SIZE = Math.ceil(LAG_WINDOW_MS / (SNAPSHOT_INTERVAL * 1000)) + 2
+ 
+ /**
+- * 履歴を 1 コマ書く。
++ * 履歴を 1 コマ書く。**枠を使い回す (リングバッファ)。**
+  *
+- * **毎 tick に人数ぶんの Pose を作って捨てている。** リングバッファにすれば
+- * 確保も shift も消えるが、測ったら上限の 0.19% が 0.13% になるだけだった。
+- * 動く実装と数字を docs/notes/history-ring-buffer.md に取ってある —
+- * 定員を増やすときはそこから戻す。
++ * 毎 tick に人数ぶんの Pose を作って捨てていた。作るのをやめて、最初に
++ * 確保した HISTORY_SIZE 個を上書きする。先頭を抜く shift も要らなくなる。
+  */
+ export function recordPose(player: MatchPlayer): void {
+-  player.history.push({
+-    time: Date.now(),
+-    x: player.x,
+-    y: player.y,
+-    z: player.z,
+-    yaw: player.yaw,
+-    // 見下ろしていれば倒れている相手にも刃が通る。刺した瞬間の向きが要るので履歴に持つ
+-    pitch: player.pitch,
+-    crouching: player.crouching,
+-    boxed: player.boxed,
+-    // ナイフが刺さる姿勢かの判定に要る。**遡って照合するので履歴に持つ** —
+-    // 「いまの姿勢」で見ると、刺した瞬間は立っていた相手が
+-    // 爆風で転んだ直後に届いた申告を弾いてしまう
+-    stance: stanceOf(player.locomotion),
+-  })
+-  if (player.history.length > HISTORY_SIZE) player.history.shift()
++  // 最初の 1 回だけ枠を用意する
++  if (player.history.length === 0) {
++    for (let i = 0; i < HISTORY_SIZE; i++) {
++      player.history.push({
++        time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0,
++        crouching: false, boxed: false, stance: stanceOf('idle'),
++      })
++    }
++  }
++  const slot = player.history[player.historyWrite]!
++  slot.time = Date.now()
++  slot.x = player.x
++  slot.y = player.y
++  slot.z = player.z
++  slot.yaw = player.yaw
++  // 見下ろしていれば倒れている相手にも刃が通る。刺した瞬間の向きが要るので履歴に持つ
++  slot.pitch = player.pitch
++  slot.crouching = player.crouching
++  slot.boxed = player.boxed
++  // ナイフが刺さる姿勢かの判定に要る。**遡って照合するので履歴に持つ** —
++  // 「いまの姿勢」で見ると、刺した瞬間は立っていた相手が
++  // 爆風で転んだ直後に届いた申告を弾いてしまう
++  slot.stance = stanceOf(player.locomotion)
++
++  player.historyWrite = (player.historyWrite + 1) % HISTORY_SIZE
++  if (player.historyCount < HISTORY_SIZE) player.historyCount++
++}
++
++/**
++ * 古い順に並べ直した眺め。**申告が来たときだけ作る。**
++ *
++ * verifyHit は「新しいものが末尾」の配列を期待している。リングは書き込み
++ * 位置で折り返しているので、そこから 1 周ぶん写す。
++ *
++ * **器は呼ぶ側が持つ。** ここで 1 本を使い回すと、撃った側と撃たれた側を
++ * 続けて求めたときに 2 度目が 1 度目を潰す — verifyHit は 2 本を同時に見る。
++ */
++export function poseHistory(player: MatchPlayer, out: Pose[]): Pose[] {
++  out.length = 0
++  const from = player.historyCount < HISTORY_SIZE ? 0 : player.historyWrite
++  for (let i = 0; i < player.historyCount; i++) {
++    out.push(player.history[(from + i) % HISTORY_SIZE]!)
++  }
++  return out
+ }
+ 
+ /** カメラ位置の置き場。毎フレーム作らないよう使い回す */
+diff --git a/src/domain/player/player.ts b/src/domain/player/player.ts
+index 248a3bc..a4ce73c 100644
+--- a/src/domain/player/player.ts
++++ b/src/domain/player/player.ts
+@@ -280,6 +280,10 @@ export interface MatchPlayer extends Player {
+    * 照合の相手にはなる。長さは呼ぶ側が決める (送る間隔から出す)。
+    */
+   history: Pose[]
++  /** 次に書き込む枠 (リングバッファ) */
++  historyWrite: number
++  /** 埋まっている数。HISTORY_SIZE で頭打ち */
++  historyCount: number
+   /**
+    * 爆風で飛んでいる向きと、残り時間 (秒)。0 なら飛んでいない。
+    *
+@@ -427,6 +431,8 @@ export function newMatchPlayer(seed: {
+     holdingGrenade: false,
+     wasAlive: false,
+     history: [],
++    historyWrite: 0,
++    historyCount: 0,
+     bot: false,
+     kills: 0,
+     deaths: 0,

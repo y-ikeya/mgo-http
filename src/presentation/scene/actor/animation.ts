@@ -77,9 +77,14 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
    */
   prone_idle: 'crawl_f',
   crawl_f: 'crawl_f',
+  // 伏せたまま後ろへ。**前と対で 2 本だけ** (横は無い)
+  crawl_b: 'crawl_b',
+  // 伏せたまま倒された。立ちの型で倒れると、一度立ち上がってから崩れる
+  prone_death: 'prone_death',
   // 伏せへの出入り。全身の型なので上半身も同じクリップから取る
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
+  prone_roll_down: 'prone_roll_down',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
   // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
@@ -120,6 +125,8 @@ type UpperState =
   // 伏せへの出入り
   | 'prone_down'
   | 'prone_rise'
+  // 仰向けからうつ伏せへ、横へ半回転する
+  | 'prone_roll_down'
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
   | 'death'
@@ -154,8 +161,11 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   // 伏せ撃ちは爆風で倒れている間と同じ仕組みに乗る
   prone_idle: 'crawl_f',
   crawl_f: 'crawl_f',
+  crawl_b: 'crawl_b',
+  prone_death: 'prone_death',
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
+  prone_roll_down: 'prone_roll_down',
   salute: 'salute',
   away: 'away',
   claymore_windup: 'claymore_windup',
@@ -215,7 +225,7 @@ const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
  * 効きすぎて暴れる。出入りの繋ぎ (prone_down / prone_rise) は全身の型として
  * 最後まで流れるので、ここには含めない。
  */
-const PRONE_LOCOMOTIONS = new Set<Locomotion>(['prone_idle', 'crawl_f'])
+const PRONE_LOCOMOTIONS = new Set<Locomotion>(['prone_idle', 'crawl_f', 'crawl_b'])
 
 /** 落下ループの再生速度の上限。これ以上速くすると脚が忙しなく見える */
 const JUMP_LOOP_MAX_SPEED = 3
@@ -233,7 +243,7 @@ const JUMP_LOOP_MAX_SPEED = 3
  * **着地は入れない。** 転がる型だった頃は 3m 進む必要があったが、いまの
  * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
  */
-const ROOT_MOTION_CLIPS = new Set(['roll'])
+const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_roll_down'])
 
 /** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
 const ROLL_TIME_SCALE = 1.32
@@ -253,6 +263,10 @@ const ROLL_TIME_SCALE = 1.32
  * 受け身は 1.0 = **クリップに焼かれた通り**で 3.1m。倍率を掛けないので
  * 足が滑らない (回避ローリングは 0.8 なので 2 割ぶん滑っている)。
  * 落ちた勢いが前へ流れて消える、という絵がそのまま出る。
+ *
+ * --- 伏せたまま横へ転がるのも同じ ---
+ * 半回転で**横へ 0.56m** 焼き込まれている。倍率を掛けないのは受け身と同じ
+ * 理由で、寝た体が地面を擦って進む型なので、少しでも滑ると気づく。
  */
 const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 /**
@@ -286,6 +300,7 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   // 伏せへの出入り。留めないと、伏せた瞬間にまた膝立ちから伏せ直す
   'prone_down',
   'prone_rise',
+  'prone_roll_down',
   // 倒れる / 起き上がる。留めておかないと、倒れた姿勢を保てず
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
@@ -427,6 +442,19 @@ const THROW_WINDUP_KEY = 'throw_windup'
 const THROW_RELEASE_KEY = 'throw_release'
 
 /**
+ * 伏せたまま投げる型。**同じ 2 段を、寝た体でやる。**
+ *
+ * 立ちの投擲を腹這いの腰に載せると、腕だけが立ち上がって振りかぶる
+ * (伏せ撃ちや伏せ装填と同じ話)。手榴弾は物陰から覗いて投げる道具なので、
+ * **伏せたまま投げられないと使い所が半分になる。**
+ *
+ * 尺は 0.97 + 1.73 秒。立ち (1.50 + 0.83) と比べて振りかぶりが短く、
+ * 振り切りが長い — 寝たまま腕を回すので、投げ終わって腕を戻すまでが長い。
+ */
+const PRONE_THROW_WINDUP_KEY = 'prone_throw_windup'
+const PRONE_THROW_RELEASE_KEY = 'prone_throw_release'
+
+/**
  * クレイモアを置く型。投擲と**同じ 2 段**で、押している間は構えたまま止まる。
  *
  * 尺は 1.77 秒 + 3.60 秒。投擲 (1.50 + 0.83) よりずっと長い — 置いて離れる道具は
@@ -461,6 +489,8 @@ const HARD_LAND_KEY = 'hard_land'
 const DEATH_KEY = 'death'
 /** 倒れる向き。撃たれた側から見て前か後ろか */
 const DEATH_FRONT_KEY = 'death_front'
+/** 伏せたまま倒された型。**向きは無い** — 既にその向きで寝ている */
+const PRONE_DEATH_KEY = 'prone_death'
 const DEATH_BACK_KEY = 'death_back'
 /**
  * 麻酔で眠っている型。**上半身も要る。**
@@ -483,6 +513,18 @@ const BUMP_KEY = 'bump'
 /** 伏せへの出入り。全身の型 */
 const PRONE_DOWN_KEY = 'prone_down'
 const PRONE_RISE_KEY = 'prone_rise'
+/**
+ * 仰向けからうつ伏せへ、横へ半回転する型 (0.50 秒、横へ 0.56m)。
+ *
+ * 転ぶ型 (sweep) は**仰向けで終わる**ので、そのまま這う型へ渡すと 1 フレーム
+ * で裏返る。這い出すのに転がる間を挟むのは、伏せに入るのに prone_down を
+ * 挟むのと同じ話。
+ *
+ * 素材は 1 回転 (うつ伏せ → 仰向け → うつ伏せ) の型で、その後半だけを使う。
+ * 前半 (うつ伏せ → 仰向け) は取り込んでいない — 仰向けで止まれる姿勢を
+ * 足すなら、そこから割り直す (tools/README.md)。
+ */
+const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
 /**
  * 伏せ撃ち。**構えと発砲を同じクリップから作る。**
  *
@@ -515,6 +557,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   STAND_KEY,
   THROW_WINDUP_KEY,
   THROW_RELEASE_KEY,
+  PRONE_THROW_WINDUP_KEY,
+  PRONE_THROW_RELEASE_KEY,
   SETUP_WINDUP_KEY,
   SETUP_RELEASE_KEY,
   ROLL_KEY,
@@ -522,8 +566,10 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   BUMP_KEY,
   DEATH_FRONT_KEY,
   DEATH_BACK_KEY,
+  PRONE_DEATH_KEY,
   PRONE_DOWN_KEY,
   PRONE_RISE_KEY,
+  PRONE_ROLL_DOWN_KEY,
   DEATH_KEY,
   HIT_KEY,
   SALUTE_KEY,
@@ -608,9 +654,32 @@ const CRAWL_RATE = 0.75
  */
 const PRONE_RISE_RATE = 1.5
 
+/**
+ * 走りの足の回転の底上げ (倍率)。**1 で滑りゼロ、大きいほど速く回る。**
+ *
+ * 再生速度は「実速度 ÷ クリップ本来の速度」で決めていて、そのままなら足は
+ * 地面と同じ速さで後ろへ流れる — 滑りが原理的に出ない。ただしクリップは
+ * 4.76 m/s で作られていて、この遊びの走りは 3.04 m/s しかない。**素のままだと
+ * 本来の 64% でしか足が回らず、間延びして見える。**
+ *
+ * 上げたぶんは滑りとして出る。1.31 で足が地面より 31% 速く送られる — 走りの
+ * 型は接地時間が短いので、この程度なら目で追えない。
+ *
+ * 素の 0.64 が 0.84 になる。**目で見て決めた値** (0.80 と 0.82 では足りなかった)。
+ *
+ * FAST MOVE (runner) は実速度のほうを上げるので、こことは別に効く
+ * (Lv3 で 1.16 倍)。**あれは速く動くから速く回る**で、こちらは**同じ速さでも
+ * 足を速く送る**。
+ *
+ * ?cadence=1.4 のように URL から触れる (Game.ts)。
+ */
+const RUN_CADENCE = 1.31
+
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
   sneak: SNEAK_CLIP_SPEED,
   crawl_f: CRAWL_CLIP_SPEED,
+  // 後退も同じ速さで作られている
+  crawl_b: CRAWL_CLIP_SPEED,
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, RUN_CLIP_SPEED],
@@ -687,6 +756,51 @@ const RELAXED_LEAN = THREE.MathUtils.degToRad(17)
  */
 const BOX_LEAN = THREE.MathUtils.degToRad(34)
 
+/**
+ * その glb に無い型を並べる。**代用に落ちても黙っているのを見張る。**
+ *
+ * 型が欠けていると、その状態のときだけ別の型が流れる。**警告が出ないので、
+ * 見た目で気づくまで分からない** — 雷電に knee_relaxed / knee_ready が無く、
+ * しゃがむと古い crouch_idle が流れて、そこに合わせていない握りで銃口が
+ * 上を向いた。試写は別のモデルを読んでいたので、突き合わせるまで出なかった。
+ *
+ * 見るのは**表に書いてある名前**だけ。表を直せばここも一緒に動くので、
+ * 別に一覧を持たない (持つと必ず片方が古くなる)。
+ */
+export function missingClips(animations: THREE.AnimationClip[]): string[] {
+  const have = new Set(animations.map((clip) => clip.name))
+  const want = new Set<string>([
+    ...Object.values(LOWER_CLIPS),
+    ...Object.values(RELAXED_CLIPS),
+    ...Object.values(PISTOL_RELAXED),
+  ])
+  return [...want].filter((name) => !have.has(name)).sort()
+}
+
+/** 走りの 8 方向 */
+const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as Locomotion))
+
+/**
+ * 構えていない間、**上下を同じクリップに揃える姿勢。**
+ *
+ * 素材が 2 つの家系に分かれていて、腰の向きも傾きも違う。混ぜると差がそのまま
+ * 上半身に出る (登録の所に測った値がある)。
+ *
+ *                 X       Y      Z
+ *   idle       -103.1    1.4   39.9   ← 手榴弾のときの下半身
+ *   pistol_relaxed -94.5 0.1   43.1   ← そのときの上半身
+ *
+ * 打ち消し (alignSpineToUpperClip) は**縦軸まわりの捻れだけ**を消して、傾きは
+ * 本来の姿勢として残す。なので X の差 8.6° が上体の傾きとして残り、**立って
+ * いるだけで右へ 15° ほど傾いて**見えた。上下を同じクリップにすれば差が無くなる。
+ */
+const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle'])
+
+/** 脱力中の下半身を引く鍵。**元の状態と、流すクリップの組** */
+function relaxedLowerKey(state: Locomotion, clip: string): string {
+  return `${state}@${clip}`
+}
+
 const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
   // yaw は、しゃがみのときに半身へ構えるための左右の配分。
   // 首から上を負にしてあるのは、子が親の回転を継ぐため。背骨を 0.7 回した
@@ -724,6 +838,8 @@ export class CharacterAnimator {
   throwDuration = 0
   /** 投げ (後半) の尺 (秒)。手を離れる瞬間をこれに対する割合で測る */
   throwReleaseDuration = 0
+  /** 伏せて投げる (後半) の尺 (秒)。型が違うので、放す割合も別に持つ */
+  proneThrowReleaseDuration = 0
   /** 振りかぶりで止めているか */
   /**
    * いま流している 2 段の型。振りかぶって止まり、放すと振り切る物。
@@ -753,6 +869,8 @@ export class CharacterAnimator {
   /** 伏せへの出入りの尺 (秒)。0 ならクリップが無い */
   readonly proneDownDuration: number = 0
   readonly proneRiseDuration: number = 0
+  /** 仰向けからうつ伏せへ転がる尺 (秒)。0 ならクリップが無い */
+  readonly proneRollDownDuration: number = 0
   /** 敬礼の尺 (秒)。0 ならクリップが無い */
   readonly saluteDuration: number
 
@@ -776,7 +894,7 @@ export class CharacterAnimator {
 
   private readonly root: THREE.Object3D
   private readonly mixer: THREE.AnimationMixer
-  private readonly lower = new Map<Locomotion, THREE.AnimationAction>()
+  private readonly lower = new Map<string, THREE.AnimationAction>()
   private readonly upper = new Map<string, THREE.AnimationAction>()
 
   private locomotion: Locomotion = 'idle'
@@ -790,7 +908,9 @@ export class CharacterAnimator {
   /** 現在の移動速度 (m/s)。クリップの再生速度補正の分母になる */
   private moveSpeed: number
   /** 各レイヤーの現在の重み。合計が必ず 1 になるよう正規化してから action に流す */
-  private readonly lowerWeights = new Map<Locomotion, number>()
+  private readonly lowerWeights = new Map<string, number>()
+  /** 下半身に実際に流しているクリップの名前。上下が同じかを見るのに使う */
+  private readonly lowerClipNames = new Map<string, string>()
   private readonly upperWeights = new Map<string, number>()
 
   /** 照準の上下 (rad)。構えを解いた瞬間に体が跳ねないよう、目標へ補間して追う */
@@ -911,6 +1031,7 @@ export class CharacterAnimator {
       finished === this.upper.get(BUMP_KEY) ||
       finished === this.upper.get(PRONE_DOWN_KEY) ||
       finished === this.upper.get(PRONE_RISE_KEY) ||
+      finished === this.upper.get(PRONE_ROLL_DOWN_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
@@ -999,6 +1120,36 @@ export class CharacterAnimator {
       if (state === 'jump_up') this.jumpUpDuration = clip.duration
       if (state === 'jump_loop') this.jumpLoopDuration = clip.duration
       this.lower.set(state, action)
+      this.lowerClipNames.set(state, clip.name)
+    }
+
+    /*
+     * **構えていない間の下半身。上半身と同じクリップから取る。**
+     *
+     * 素材は 2 つの家系に分かれている。8 方向の走り (run_f …) と idle は腰を
+     * 振って作られていて (run_f −39.3°、run_r −66.6°、idle −48.2°)、その振れを
+     * **自分の上半身が戻している。** 脱力の型 (relaxed_run −6.9° / run_unarmed
+     * −0.0°) は正面向きで作られている。
+     *
+     * 混ぜると戻しだけが消えて、上半身が振れた角度そのまま捻れる — 走ると
+     * 上半身が右へ 45° 向く、という形で出ていた。
+     *
+     * **構えている間は 8 方向が要る** (体は照準を向いたまま横へ動く) が、
+     * 脱力中は体が進行方向を向くので前走りしか使わない。だから脱力の間だけ
+     * 上下を同じクリップにする。上下が同じなら向きの補正も要らなくなる。
+     */
+    for (const [state, name] of [
+      ...Object.entries(RELAXED_CLIPS).map(([k, v]) => [k, v] as const),
+      ...Object.entries(PISTOL_RELAXED).map(([k, v]) => [k, v] as const),
+    ]) {
+      if (!RELAXED_LOWER_STATES.has(state as Locomotion)) continue
+      const clip = byName.get(name)
+      const key = relaxedLowerKey(state as Locomotion, name)
+      if (!clip || this.lower.has(key)) continue
+      const action = this.mixer.clipAction(splitClip(clip, 'lower', key))
+      action.play()
+      this.lower.set(key, action)
+      this.lowerClipNames.set(key, clip.name)
     }
 
     // --- 上半身レイヤー ---
@@ -1128,6 +1279,17 @@ export class CharacterAnimator {
     this.throwDuration = (windup?.duration ?? 0) + (release?.duration ?? 0)
     this.throwReleaseDuration = release?.duration ?? 0
 
+    // 伏せたまま投げる型。**立ちと同じ 2 段**なので同じ扱いで登録する。
+    // 無ければ立ちの型へ落ちる (playThrow が持っているかを見る)
+    for (const key of [PRONE_THROW_WINDUP_KEY, PRONE_THROW_RELEASE_KEY]) {
+      const clip = byName.get(key)
+      if (!clip) continue
+      const action = registerUpper(key, clip)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+    this.proneThrowReleaseDuration = byName.get(PRONE_THROW_RELEASE_KEY)?.duration ?? 0
+
     // クレイモアも同じ 2 段。**同じ仕組みを通す** — 別々に書くと、
     // 片方だけ直したときに静かにずれる
     for (const key of [SETUP_WINDUP_KEY, SETUP_RELEASE_KEY]) {
@@ -1194,6 +1356,7 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [PRONE_DOWN_KEY, 'prone_down'],
       [PRONE_RISE_KEY, 'prone_rise'],
+      [PRONE_ROLL_DOWN_KEY, 'prone_roll_down'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -1202,6 +1365,7 @@ export class CharacterAnimator {
       action.clampWhenFinished = true
       // **流す速さで割った尺**を持つ。動けない時間を絵と一致させるため
       if (key === PRONE_DOWN_KEY) this.proneDownDuration = clip.duration
+      else if (key === PRONE_ROLL_DOWN_KEY) this.proneRollDownDuration = clip.duration
       else this.proneRiseDuration = clip.duration / PRONE_RISE_RATE
     }
 
@@ -1216,6 +1380,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [DEATH_FRONT_KEY, 'death_front'],
       [DEATH_BACK_KEY, 'death_back'],
+      // 伏せたまま倒された。**向きは無い** — 既にその向きで寝ている
+      [PRONE_DEATH_KEY, 'prone_death'],
       // 眠り。倒れる型と同じで、最後の姿勢のまま留める
       [SLEEP_KEY, 'sleep'],
     ] as const) {
@@ -1277,7 +1443,7 @@ export class CharacterAnimator {
     // (reload はワンショットなので playReload() の中で始める)
     for (const [state, action] of this.lower) {
       // ワンショットは再生を始める側で play する
-      if (!ONE_SHOT_LOWER.has(state)) action.play()
+      if (!ONE_SHOT_LOWER.has(state as Locomotion)) action.play()
       this.lowerWeights.set(state, state === 'idle' ? 1 : 0)
     }
     for (const [key, action] of this.upper) {
@@ -1308,7 +1474,7 @@ export class CharacterAnimator {
       JUMP_STATES.has(this.locomotion) || JUMP_STATES.has(this.previousLocomotion)
         ? JUMP_BLEND_LAMBDA
         : LOWER_BLEND_LAMBDA
-    this.blend(this.lower, this.lowerWeights, this.locomotion, lowerLambda, dt)
+    this.blend(this.lower, this.lowerWeights, this.resolveLowerKey(), lowerLambda, dt)
     this.previousLocomotion = this.locomotion
     this.blend(this.upper, this.upperWeights, this.resolveUpperKey(), UPPER_BLEND_LAMBDA, dt)
     /*
@@ -1332,6 +1498,7 @@ export class CharacterAnimator {
     const prone =
       PRONE_LOCOMOTIONS.has(this.locomotion) ||
       this.upperState === 'prone_down' ||
+      this.upperState === 'prone_roll_down' ||
       this.upperState === 'prone_rise'
     /*
      * 麻酔で眠っている。**倒れているのと同じ扱い。**
@@ -1504,7 +1671,8 @@ export class CharacterAnimator {
     const key = this.resolveUpperKey()
 
     // 上下が同じクリップなら食い違いようがない。補正は掛けない。
-    if (this.upperClipNames.get(key) === LOWER_CLIPS[this.locomotion]) return
+    // **実際に流している下半身**と見比べる。脱力中は別のクリップを流している
+    if (this.upperClipNames.get(key) === this.lowerClipNames.get(this.resolveLowerKey())) return
     /*
      * 伏せている間も掛けない。
      *
@@ -1646,11 +1814,32 @@ export class CharacterAnimator {
   private applyLocomotionTimeScales(): void {
     for (const [state, clipSpeed] of Object.entries(CLIP_SPEED)) {
       if (!clipSpeed) continue
-      // 箱と匍匐は意図して遅くしてある。それ以外は実測どおり
-      const rate = state === 'sneak' ? SNEAK_RATE : state === 'crawl_f' ? CRAWL_RATE : 1
+      /*
+       * 箱と匍匐は意図して遅くしてある。走りは底上げする (RUN_CADENCE)。
+       *
+       * しゃがみ移動は上げない。**あれは音を立てずに寄る動き**で、足が速く
+       * 回ると忍んで見えない。
+       */
+      const rate =
+        state === 'sneak'
+          ? SNEAK_RATE
+          : state === 'crawl_f' || state === 'crawl_b'
+            ? CRAWL_RATE
+            : RUN_STATES.has(state as Locomotion)
+              ? this.runCadence
+              : 1
       const scale = (this.moveSpeed / clipSpeed) * rate
       const locomotion = state as Locomotion
       this.lower.get(locomotion)?.setEffectiveTimeScale(scale)
+      /*
+       * 脱力中の下半身にも同じ速さを掛ける。**掛け忘れると足だけ滑る** —
+       * クリップ本来の速さで割って歩幅と移動速度を合わせているので、
+       * 別のクリップを流す枝にも同じ計算が要る。
+       */
+      for (const table of [RELAXED_CLIPS, PISTOL_RELAXED]) {
+        const name = table[locomotion]
+        if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scale)
+      }
       /*
        * **上下が同じクリップなら、速さも同じにする。**
        *
@@ -1671,11 +1860,68 @@ export class CharacterAnimator {
     }
   }
 
+  /**
+   * いま流す下半身。**構えていない走りだけ、上半身と同じクリップを使う。**
+   *
+   * 8 方向の走りは腰を振って作られていて、その振れを自分の上半身が戻している
+   * (登録の所に測った値がある)。脱力の型は正面向きで作られているので、混ぜると
+   * 戻しだけが消えて上半身が捻れる。
+   *
+   * **構えている間は 8 方向のまま。** 体が照準を向いたまま横へ動くので、方向
+   * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
+   */
+  private resolveLowerKey(): string {
+    if (this.aiming || !RELAXED_LOWER_STATES.has(this.locomotion)) return this.locomotion
+    const name = this.pistol ? PISTOL_RELAXED[this.locomotion] : RELAXED_CLIPS[this.locomotion]
+    if (!name) return this.locomotion
+    const key = relaxedLowerKey(this.locomotion, name)
+    return this.lower.has(key) ? key : this.locomotion
+  }
+
+  /**
+   * いま流している型。**画面に出して確かめるため** (?stats=on の POSE)。
+   *
+   * 試写と本番で見え方が違うときに、**どこが違うのかを目で読めない。**
+   * 上下それぞれ何を流しているかが出れば、その場で突き合わせられる。
+   */
+  get playingKeys(): string {
+    const top = (map: Map<string, THREE.AnimationAction>) => {
+      let best = ''
+      let weight = 0
+      for (const [key, action] of map) {
+        const w = action.getEffectiveWeight()
+        if (w > weight) {
+          weight = w
+          best = key
+        }
+      }
+      return best
+    }
+    /*
+     * **鍵ではなくクリップの名前で出す。**
+     *
+     * 鍵は状態の名前 (relaxed:crouch_idle) で、流れているクリップ
+     * (knee_relaxed) とは別物。鍵を出していたら「crouch のままでは？」と
+     * 読み違えさせた。**見たいのはどのクリップが流れているか。**
+     */
+    const lowerKey = top(this.lower)
+    const upperKey = top(this.upper)
+    const lower = this.lowerClipNames.get(lowerKey) ?? lowerKey
+    const upper = this.upperClipNames.get(upperKey) ?? upperKey
+    return `${lower} / ${upper}`
+  }
+
   setLocomotion(next: Locomotion): void {
     // 倒れたら他の状態を一切受け付けない。死体が走り出さないため。
     if (this.dead) return
-    // 実際の切り替えは重みの補間に任せる。ここは目標を記録するだけ。
-    if (this.lower.has(next)) this.locomotion = next
+    /*
+     * 実際の切り替えは重みの補間に任せる。ここは目標を記録するだけ。
+     *
+     * **表に在る姿勢だけを受ける。** 下半身には脱力用の枝も入っている
+     * (run_f@relaxed_run など) が、あれは姿勢ではなく「その姿勢のときに流す
+     * 別のクリップ」なので、姿勢として渡されては困る。
+     */
+    if (LOWER_CLIPS[next] !== undefined) this.locomotion = next
   }
 
   /**
@@ -1684,6 +1930,9 @@ export class CharacterAnimator {
    * 銃の種類そのものではなく「片手で構える銃か」を持たせている。
    * 麻酔銃を足すときも同じ型を使うはずなので、そこで分けたくない。
    */
+  /** 走りの足の回転の底上げ。**URL から触れる** (RUN_CADENCE の注) */
+  runCadence = RUN_CADENCE
+
   private pistol = false
 
   /**
@@ -1799,6 +2048,26 @@ export class CharacterAnimator {
    * @param fromBehind 背後から撃たれたか。分からなければ省く
    */
   playDeath(fromBehind?: boolean): void {
+    /*
+     * **伏せたまま倒されたら、伏せたまま崩れる。**
+     *
+     * 立ちの型で倒れると、伏せていた体が一度立ち上がってから崩れる。撃たれた
+     * 瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
+     *
+     * 向きは見ない。**うつ伏せから前も後ろも無い** — 既にその向きで寝ている。
+     */
+    if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_DEATH_KEY)) {
+      const upper = this.upper.get(PRONE_DEATH_KEY)
+      const lower = this.lower.get('prone_death')
+      if (upper && lower) {
+        upper.reset().play()
+        lower.reset().play()
+        this.upperState = 'death'
+        this.locomotion = 'prone_death'
+        return
+      }
+    }
+
     const state: Locomotion =
       fromBehind === undefined ? 'death' : fromBehind ? 'death_front' : 'death_back'
     const key =
@@ -1939,9 +2208,18 @@ export class CharacterAnimator {
     if (this.upperState === 'hit' && this.upper.has(HIT_KEY)) return HIT_KEY
     if (this.upperState === 'salute' && this.upper.has(SALUTE_KEY)) return SALUTE_KEY
     if (this.upperState === 'stab' && this.upper.has(STAB_KEY)) return STAB_KEY
-    // ボルト操作は構えを解いても最後まで流す。1 発ごとに必ず起きる動作なので、
-    // 途中で切れると「撃ったのに動作していない」が頻繁に見える
-    if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) return BOLT_KEY
+    /*
+     * ボルト操作は構えを解いても最後まで流す。1 発ごとに必ず起きる動作なので、
+     * 途中で切れると「撃ったのに動作していない」が頻繁に見える。
+     *
+     * ただし**伏せている間は出さない**。ボルトの型は立ち姿で、腹這いの腰に
+     * 載せると銃口が下を向いて地面に埋まる (伏せ撃ちの直後に必ず起きる)。
+     * 伏せ用のボルトの型はまだ無いので、操作の間は伏せ撃ちの構えのまま
+     * 通す。撃てない時間は変わらない (fireCooldown は絵と別で数えている)。
+     */
+    if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) {
+      if (!PRONE_LOCOMOTIONS.has(this.locomotion)) return BOLT_KEY
+    }
     if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
     if (this.upperState === 'throw' && this.pair) {
       // **振りかぶりが残っている間は前半のまま。** 放した瞬間に後半へ渡すと、
@@ -1965,6 +2243,9 @@ export class CharacterAnimator {
     // 伏せへの出入りも同じ。上だけ構えに戻ると、寝ながら銃を構える形になる
     if (this.upperState === 'prone_down' && this.upper.has(PRONE_DOWN_KEY)) return PRONE_DOWN_KEY
     if (this.upperState === 'prone_rise' && this.upper.has(PRONE_RISE_KEY)) return PRONE_RISE_KEY
+    if (this.upperState === 'prone_roll_down' && this.upper.has(PRONE_ROLL_DOWN_KEY)) {
+      return PRONE_ROLL_DOWN_KEY
+    }
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
     //
@@ -2101,6 +2382,16 @@ export class CharacterAnimator {
     this.playWholeBody(PRONE_RISE_KEY, 'prone_rise', PRONE_RISE_RATE)
   }
 
+  /**
+   * 仰向けからうつ伏せへ、横へ半回転する。
+   *
+   * 吹き飛ばされた所から這い出す繋ぎ。転ぶ型 (sweep) は仰向けで終わるので、
+   * そのまま這う型へ渡すと 1 フレームで裏返る。
+   */
+  playProneRollDown(): void {
+    this.playWholeBody(PRONE_ROLL_DOWN_KEY, 'prone_roll_down')
+  }
+
   private playWholeBody(key: string, state: Locomotion, rate = 1): void {
     if (this.dead) return
     const upper = this.upper.get(key)
@@ -2189,9 +2480,29 @@ export class CharacterAnimator {
     this.pair = { windup, release, held: true, whole }
   }
 
-  /** 投げ始める */
+  /**
+   * 投げ始める。**伏せていれば伏せの型。**
+   *
+   * 立ちの型を腹這いに載せると腕だけが起き上がって振りかぶる (伏せ撃ちや
+   * ボルトと同じ)。型を持っていなければ立ちへ落ちるので、伏せ用が入って
+   * いないモデルでも投げられなくはならない。
+   */
   playThrow(): void {
+    if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_THROW_WINDUP_KEY)) {
+      this.playPair(PRONE_THROW_WINDUP_KEY, PRONE_THROW_RELEASE_KEY)
+      return
+    }
     this.playPair(THROW_WINDUP_KEY, THROW_RELEASE_KEY)
+  }
+
+  /**
+   * いま流しているのが伏せの投擲か。
+   *
+   * **手を離れる割合が型ごとに違う** ので、呼ぶ側 (Game) がどちらの尺で
+   * 測るかを選ぶのに要る。立ちは振り切る所が 30%、伏せは 36%。
+   */
+  get proneThrowing(): boolean {
+    return this.pair?.windup === PRONE_THROW_WINDUP_KEY
   }
 
   /** クレイモアを構え始める。**かがむので全身** */

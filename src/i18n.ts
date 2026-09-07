@@ -54,9 +54,8 @@ const JA = {
 
   // --- 試合中 ---
   'hud.waitingForOpponent': '対戦相手を待っています',
-  'hud.startingSoon': 'まもなく開始',
   'hud.scopeHint': 'Z / ホイールで覗く',
-  'hud.standUpHint': '移動で起き上がる',
+  'hud.standUpHint': '移動で匍匐 · Space で起き上がる',
   // --- 装備 ---
   'loadout.note': '装備を選んでください',
   'loadout.deployIn': '出撃まで {n}',
@@ -75,6 +74,30 @@ const JA = {
     'デバイスマネージャーの「ディスプレイ アダプター」が「Microsoft 基本ディスプレイ アダプター」' +
     'になっていたら、GPU のドライバを入れてください。',
   'gpu.recheck': '直したらこのページを開き直してください。',
+
+  // --- 試合が始まった瞬間の指令 ---
+  'orders.tdm.red': 'レッドチームを倒せ!',
+  'orders.tdm.blue': 'ブルーチームを倒せ!',
+  'orders.dm': '全員が敵だ。生き残れ!',
+
+  // --- 遅れが直らない人 ---
+  'lag.title': '通信の遅れが大きすぎます',
+  'lag.lede':
+    'サーバーとの往復に 1 秒以上かかる状態が続いたため、接続を切りました。' +
+    'この状態では、あなたの姿が相手の画面で飛び、撃っても当たらなくなります。' +
+    '下のどれかで直ることがあります。',
+  'lag.wifi': '無線なら有線に繋ぎ替えるか、ルーターの近くへ移ってください。',
+  'lag.other':
+    '同じ回線で大きな通信をしていませんか (動画・更新・バックアップ)。' +
+    '止めてから入り直してください。',
+  'lag.vpn': 'VPN やプロキシを通していたら、外して試してください。',
+  'lag.recheck': 'このページを開き直すと入り直せます。',
+
+  // --- 試合中に離れようとした ---
+  'leave.title': '部屋を出ますか',
+  'leave.lede':
+    '試合の最中です。出ると、残った人は数の合わない試合を続けることになります。' +
+    '席が畳まれるまでの間、あなたは「居るのに動かない人」として映ります。',
 
   // --- 成績表 ---
   'score.blue': '青',
@@ -105,9 +128,8 @@ const EN: Record<Key, string> = {
   'lobby.loading': 'Loading…',
 
   'hud.waitingForOpponent': 'Waiting for an opponent',
-  'hud.startingSoon': 'Starting soon',
   'hud.scopeHint': 'Z / wheel to scope',
-  'hud.standUpHint': 'MOVE TO GET UP',
+  'hud.standUpHint': 'MOVE TO CRAWL · SPACE TO GET UP',
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',
 
@@ -124,6 +146,28 @@ const EN: Record<Key, string> = {
     'If Device Manager shows "Microsoft Basic Display Adapter" under Display adapters, ' +
     'install your GPU driver.',
   'gpu.recheck': 'Reload this page once it is fixed.',
+
+  'orders.tdm.red': 'ELIMINATE THE RED TEAM!',
+  'orders.tdm.blue': 'ELIMINATE THE BLUE TEAM!',
+  'orders.dm': 'EVERYONE IS HOSTILE. SURVIVE!',
+
+  'lag.title': 'YOUR CONNECTION IS TOO SLOW',
+  'lag.lede':
+    'The round trip to the server stayed above one second, so you were disconnected. ' +
+    'At that latency you jump around on everyone else\'s screen and your shots stop landing. ' +
+    'One of the steps below may fix it.',
+  'lag.wifi': 'On Wi-Fi? Switch to a wired connection, or move closer to the router.',
+  'lag.other':
+    'Is something else on the same line using bandwidth (video, updates, backups)? ' +
+    'Stop it and rejoin.',
+  'lag.vpn': 'If you are behind a VPN or proxy, try without it.',
+  'lag.recheck': 'Reload this page to rejoin.',
+
+  'leave.title': 'LEAVE THE ROOM?',
+  'leave.lede':
+    'A match is in progress. If you leave, everyone else keeps playing a match that no ' +
+    'longer has even sides — and until your seat is folded away you show up as someone ' +
+    'who is there but never moves.',
 
   'score.blue': 'BLUE',
   'score.red': 'RED',

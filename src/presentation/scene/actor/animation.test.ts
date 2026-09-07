@@ -510,7 +510,13 @@ describe('勝手に構えない', () => {
    */
   function allLocomotions(anim: CharacterAnimator): string[] {
     const lower = (anim as unknown as Record<string, Map<string, unknown>>).lower
-    return [...lower.keys()]
+    /*
+     * **@ を含む鍵は姿勢ではない。**
+     *
+     * 脱力中に流す別クリップの枝 (run_f@relaxed_run など)。姿勢として渡すと
+     * 表に無い名前になって、上半身が構えの型で埋められる。
+     */
+    return [...lower.keys()].filter((key) => !key.includes('@'))
   }
 
   test('**どの姿勢でも、構えていなければ構えの型が出ない**', () => {
@@ -523,10 +529,188 @@ describe('勝手に構えない', () => {
     expect(guilty).toEqual([])
   })
 
+  /**
+   * **走っている間、構えていなければ上下が同じクリップから来る。**
+   *
+   * 素材は 2 つの家系に分かれている。8 方向の走りは腰を振って作られていて
+   * (run_f −39.3°、run_r −66.6°)、その振れを**自分の上半身が戻している。**
+   * 脱力の型 (relaxed_run −6.9° / run_unarmed −0.0°) は正面向き。
+   *
+   * 混ぜると戻しだけが消えて、上半身が振れた角度そのまま捻れる。**走ると
+   * 上半身が右へ 45° 向く**という形で出ていた。ライフルでも手榴弾でも同じ
+   * だったのは、振れているのが脚側だから。
+   */
+  test('**脱力して走る間は、上下が同じクリップ**', () => {
+    for (const pistol of [false, true]) {
+      const anim = animator()
+      anim.setPistol(pistol)
+      run(anim, 1.2, 'run_f')
+      const lower = playing(anim, 'lower')
+      const clips = (anim as unknown as Record<string, Map<string, string>>).lowerClipNames
+      const uppers = (anim as unknown as Record<string, Map<string, string>>).upperClipNames
+      const upper = playing(anim, 'upper')
+      expect(lower.length).toBe(1)
+      expect(upper.length).toBe(1)
+      expect(clips.get(lower[0]!)).toBe(uppers.get(upper[0]!)!)
+    }
+  })
+
+  /**
+   * **構えている間は 8 方向のまま。**
+   *
+   * 体が照準を向いたまま横へ動くので、方向ごとの型が要る。上下が別のクリップ
+   * になるが、そちらは家系が揃っている (どちらも振れた側)。
+   */
+  /**
+   * **立っている間も上下を揃える。**
+   *
+   * 腰の傾きが家系で違う (idle X −103.1 / pistol_relaxed X −94.5)。打ち消しは
+   * 縦軸まわりの捻れだけを消して傾きは残すので、差の 8.6° がそのまま上体の
+   * 傾きになる — **立っているだけで右へ傾いて**見えた。
+   */
+  test('**脱力して立つ間も、上下が同じクリップ**', () => {
+    for (const pistol of [false, true]) {
+      const anim = animator()
+      anim.setPistol(pistol)
+      run(anim, 1.2, 'idle')
+      const lower = playing(anim, 'lower')
+      const upper = playing(anim, 'upper')
+      const clips = (anim as unknown as Record<string, Map<string, string>>).lowerClipNames
+      const uppers = (anim as unknown as Record<string, Map<string, string>>).upperClipNames
+      expect(clips.get(lower[0]!)).toBe(uppers.get(upper[0]!)!)
+    }
+  })
+
+  test('構えて走る間は、方向ごとの型を使う', () => {
+    const anim = animator()
+    run(anim, 1.2, 'run_r', true)
+    expect(playing(anim, 'lower')).toEqual(['run_r'])
+  })
+
+  /**
+   * **伏せたまま倒されたら、伏せたまま崩れる。**
+   *
+   * 立ちの型で倒れると、伏せていた体が一度立ち上がってから崩れる。撃たれた
+   * 瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
+   */
+  test('伏せたまま倒されたら、伏せたまま崩れる', () => {
+    for (const from of ['prone_idle', 'crawl_f', 'crawl_b']) {
+      const anim = animator()
+      run(anim, 1.2, from)
+      anim.playDeath(true)
+      run(anim, 0.6, from)
+      expect(playing(anim, 'lower')).toEqual(['prone_death'])
+    }
+  })
+
+  test('立っていれば、いままでどおり向きで倒れる', () => {
+    const anim = animator()
+    run(anim, 1.2, 'idle')
+    anim.playDeath(true)
+    run(anim, 0.6, 'idle')
+    expect(playing(anim, 'lower')).toEqual(['death_front'])
+  })
+
+  /**
+   * **伏せたまま後ろへ下がれる。**
+   *
+   * 這う型が前しか無かった頃は、伏せたら前へ進むしかなかった。覗いた縁から
+   * 下がれないので、**伏せること自体が引き返せない選択**になっていた。
+   */
+  test('伏せたまま後ろへ下がる型が出る', () => {
+    const anim = animator()
+    run(anim, 1.2, 'crawl_b')
+    expect(playing(anim, 'lower')).toEqual(['crawl_b'])
+  })
+
   test('構えれば構える', () => {
     const anim = animator()
     run(anim, 1.2, 'idle', true)
     expect(playing(anim, 'upper')).toEqual(['aim'])
+  })
+
+  /**
+   * **伏せている間はボルトを引く型を出さない。**
+   *
+   * ボルトの型は立ち姿で、腹這いの腰に載せると銃口が下を向いて地面に埋まる。
+   * 狙撃銃は 1 発ごとに必ずボルトを引くので、**伏せて撃つたびに**銃が地面へ
+   * 潜った。伏せ用のボルトの型はまだ無いので、その間は伏せ撃ちの構えのまま。
+   *
+   * 撃てない時間 (Game の fireCooldown) は絵と別に数えているので、型を
+   * 出さなくても連射にはならない。
+   */
+  test('伏せている間はボルトの型を出さない', () => {
+    const anim = animator()
+    run(anim, 1.2, 'prone_idle', true)
+    anim.playBolt()
+    run(anim, 0.3, 'prone_idle', true)
+    expect(playing(anim, 'upper')).not.toContain('bolt')
+  })
+
+  /**
+   * **伏せたまま投げる型を出す。**
+   *
+   * 立ちの投擲を腹這いの腰に載せると、腕だけが起き上がって振りかぶる。
+   * 手榴弾は物陰から覗いて投げる道具なので、そこが崩れると使い所が半分になる。
+   */
+  test('伏せている間は、伏せの投擲の型を出す', () => {
+    const anim = animator()
+    run(anim, 1.2, 'prone_idle')
+    anim.playThrow()
+    run(anim, 0.3, 'prone_idle')
+    expect(playing(anim, 'upper')).toEqual(['prone_throw_windup'])
+    expect(anim.proneThrowing).toBe(true)
+  })
+
+  test('立っていれば立ちの投擲のまま', () => {
+    const anim = animator()
+    run(anim, 1.2, 'idle')
+    anim.playThrow()
+    run(anim, 0.3, 'idle')
+    expect(playing(anim, 'upper')).toEqual(['throw_windup'])
+    expect(anim.proneThrowing).toBe(false)
+  })
+
+  /**
+   * **放す割合は後半の尺に対して測る。** 型ごとに尺が違うので、
+   * 立ちの尺で伏せの投擲を測ると手を離れる所がずれる。
+   */
+  test('伏せと立ちで、投げ (後半) の尺が別に取れる', () => {
+    const anim = animator()
+    expect(anim.throwReleaseDuration).toBeGreaterThan(0)
+    expect(anim.proneThrowReleaseDuration).toBeGreaterThan(0)
+    expect(anim.proneThrowReleaseDuration).not.toBeCloseTo(anim.throwReleaseDuration, 2)
+  })
+
+  /**
+   * **伏せたまま横へ転がると、実際に横へ動く。**
+   *
+   * 焼かれた移動を誰も読まないと、その場で 1 回転して同じ姿勢に戻るだけに
+   * なる。**転がった意味が絵から抜ける** — 受け身が長らくそうなっていたのと
+   * 同じ穴なので、こちらは試験で押さえる。
+   */
+  test('仰向けから転がると、焼かれた移動を辿る', () => {
+    const anim = animator()
+    run(anim, 2, 'prone_idle')
+    anim.playProneRollDown()
+    const step = new THREE.Vector3()
+    const total = new THREE.Vector3()
+    for (let i = 0; i < Math.round(0.8 * 60); i++) {
+      anim.setLocomotion('prone_roll_down' as never)
+      anim.update(1 / 60)
+      if (anim.consumeRootMotion(step)) total.add(step)
+    }
+    // 横 (X) へ 0.5m ほど。前後 (Z) はほとんど動かない
+    expect(total.length()).toBeGreaterThan(0.3)
+    expect(Math.abs(total.z)).toBeLessThan(0.2)
+  })
+
+  test('立っていればボルトの型はそのまま出る', () => {
+    const anim = animator()
+    run(anim, 1.2, 'idle', true)
+    anim.playBolt()
+    run(anim, 0.3, 'idle', true)
+    expect(playing(anim, 'upper')).toEqual(['bolt'])
   })
 })
 

@@ -151,6 +151,23 @@ describe('スキルを選び直す', () => {
     expect(p.skills).toEqual({ runner: 2 })
   })
 
+  /**
+   * **READY を押している間は、申告が届いても受け付けない。**
+   *
+   * 画面のボタンを止めるだけでは足りない。押せない物を押せる形にして送るのが
+   * いちばん簡単な誤魔化しになるので、**受ける側で断る。**
+   */
+  test('READY を押している間は弾く。取り消せば通る', () => {
+    const p = fresh()
+    chooseSkills(p, { runner: 2 }, 'ready')
+    p.ready = true
+    expect(chooseSkills(p, { sniperMastery: 3 }, 'ready')).toBe(false)
+    expect(p.skills).toEqual({ runner: 2 })
+
+    p.ready = false
+    expect(chooseSkills(p, { sniperMastery: 3 }, 'ready')).toBe(true)
+  })
+
   test('決着したら開く。試合をまたげば組み替えてよい', () => {
     const p = fresh()
     expect(chooseSkills(p, { boxMove: 3 }, 'over')).toBe(true)

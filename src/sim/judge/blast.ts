@@ -11,7 +11,7 @@
  * three.js に依存しない。
  */
 
-import { isPathClear, SAMPLE_RATIOS, type StageBox } from '../space/vision'
+import { SAMPLE_RATIOS, type SightBlocker } from '../space/vision'
 
 /** 爆心から見た相手の姿。**量はここで決めない** (domain/item/grenade.ts) */
 export interface Exposure {
@@ -45,7 +45,7 @@ export function blastExposure(
   target: { x: number; y: number; z: number },
   head: number,
   radius: number,
-  boxes: StageBox[],
+  world: SightBlocker,
 ): Exposure | null {
   // 体の中ほどまでの距離で測る。足元で測ると、真上で爆ぜたときに遠く見える
   const distance = Math.hypot(target.x - cx, target.y + head / 2 - cy, target.z - cz)
@@ -53,7 +53,7 @@ export function blastExposure(
 
   let exposed = 0
   for (const ratio of SAMPLE_RATIOS) {
-    if (isPathClear(cx, cy, cz, target.x, target.y + head * ratio, target.z, boxes)) exposed++
+    if (world.clear(cx, cy, cz, target.x, target.y + head * ratio, target.z)) exposed++
   }
   return { distance, cover: exposed / SAMPLE_RATIOS.length }
 }

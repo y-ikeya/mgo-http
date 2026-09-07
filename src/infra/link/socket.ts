@@ -1,4 +1,5 @@
 import { decodeSnapshot, encodeSnapshot, isSnapshot, readSlot } from '../codec/snapshot'
+import { LAG_CLOSE_CODE } from '../../application/protocol/types'
 import type { ClientMessage, NetTransport, ServerMessage } from '../../application/protocol/types'
 
 /**
@@ -17,6 +18,13 @@ export class NetSocket implements NetTransport {
 
   private readonly url: string
   private readonly listeners = new Set<(message: ServerMessage) => void>()
+  /**
+   * 断られた理由。**入っていれば繋ぎ直しを諦めている。**
+   *
+   * 画面が読んで人に見せる。黙って止まると、繋がらないのか固まったのかが
+   * 分からない。
+   */
+  rejected: string | null = null
   private readonly name: string
   private socket: WebSocket | null = null
   /**
@@ -143,11 +151,25 @@ export class NetSocket implements NetTransport {
       for (const listener of this.listeners) listener(message)
     }
 
-    socket.onclose = () => {
+    socket.onclose = (event: CloseEvent) => {
       if (this.disposed || this.socket !== socket) return
       this.socket = null
       // 繋ぎ直すと席番号は割り当て直される。古い対応を残すと他人の位置になる
       this.slots.clear()
+      /*
+       * **断られたなら繋ぎ直さない。**
+       *
+       * 遅れで席を空けてもらった人が繋ぎ直すと、また測られてまた切られる。
+       * 5 秒おきに入り直しては切られる輪になって、その間ずっと部屋の他の人の
+       * 画面で明滅する。**断りは受け取る。**
+       *
+       * 落ちた (回線が切れた・サーバーが再起動した) 場合は今までどおり繋ぎ
+       * 直す。あちらは誰も断っていない。
+       */
+      if (event.code === LAG_CLOSE_CODE) {
+        this.rejected = event.reason || '接続を切られました'
+        return
+      }
       // 落ちたら繋ぎ直す。サーバーを再起動しても対戦が終わらないように。
       this.reconnectTimer = setTimeout(() => this.connect(), RECONNECT_DELAY)
     }

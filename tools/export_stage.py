@@ -29,7 +29,7 @@ FLAG_WORDS = ('nodraw', 'noplayer', 'nobullet', 'noeye', 'nocamera')
 
 # 触れる物の名前に入る語。**これが入っていなければ飾り。**
 #
-# 庭園を入れたときに要った。植え込みの葉が 1 枚ずつ判定を持っていて、草むらが
+# 筏を入れたときに要った。植え込みの葉が 1 枚ずつ判定を持っていて、草むらが
 # 壁になっていた。名前を 2600 個付け直すより、**触れる物のほうを名指しする**
 # ほうが少ない — 建物と地面は polySurface、それ以外は札で分かる。
 #
@@ -50,7 +50,7 @@ def stair_plane(pts, lo, hi):
     """段を追う坂を作る。**平らさは見ない。**
 
     階段の天面は段ごとに水平で、高さが揃っていない。平面に乗るかを見ると必ず
-    外れて、**高さ 2m の壁**になる (庭園の階段が登れなかった)。飾りの多い
+    外れて、**高さ 2m の壁**になる (筏の階段が登れなかった)。飾りの多い
     モデルだと上向きの面が 2 万枚あって、そもそも「1 枚の天面」が無い。
 
     進む向きに帯を切って、帯ごとの一番高い所を拾い、そこへ直線を通す。
@@ -97,7 +97,7 @@ def stair_plane(pts, lo, hi):
 
 # 名前で飾りと分かる物。**細かさに関わらず素通り。**
 #
-# 庭園の草木がこれ。pCube は元のモデルの作り手が植え込みに付けた名前で、
+# 筏の草木がこれ。pCube は元のモデルの作り手が植え込みに付けた名前で、
 # 頂点の数は物によって違う (低い草は数百しか無い)。細かさだけで分けると
 # 半分が壁に残る。
 DECORATION_WORDS = ('pcube',)
@@ -354,7 +354,7 @@ def top_plane(obj, lo, hi):
     #
     # **階段だけは段のままで受ける。** 段の天面は水平で、高さが段ごとに違う。
     # 平らさを見ると必ず外れるので、坂が付かず**高さ 2m の壁**になっていた
-    # (庭園の階段が登れなかった)。段の真ん中を通る平面がそのまま歩く面になる
+    # (筏の階段が登れなかった)。段の真ん中を通る平面がそのまま歩く面になる
     # ので、許す幅を段 1 つぶんまで広げる。
     #
     # 見た目は段のまま。**足だけが坂を登る** — 段差 0.25m 以下を勝手に上がる
@@ -417,9 +417,94 @@ for obj in bpy.context.scene.objects:
         'flags': flags_of(obj),
     })
 
+
+# --- 三角の網 -----------------------------------------------------------------
+#
+# **箱では見えている形と当たる形が違う。** メッシュを包む直方体を判定に使って
+# いるので、斜めの手すりを包む箱は手すりの無い側の空間まで含む。手すりの上を
+# 撃っているのに止められる、が起きる。
+#
+# 三角をそのまま吐く。読む側は木 (BVH) を組んで引く (src/sim/space/bvh.ts)。
+#
+# **視線を止める面だけ。** 移動の当たり判定はまだ箱なので (あちらは XZ の四角と
+# 上面の高さという別の形)、ここで出すのは遮蔽と射線に使う分だけにする。
+#
+# 平らな配列で持つ。三角 1 枚につき 9 個 (x,y,z を 3 つ)。オブジェクトの配列に
+# すると、読む側で数千個の入れ物ができる。
+
+
+def triangles_of(obj):
+    """そのメッシュの三角を、glTF の座標で返す。**世界の位置に置いた形。**"""
+    mesh = obj.to_mesh()
+    try:
+        mesh.calc_loop_triangles()
+        matrix = obj.matrix_world
+        out = []
+        for tri in mesh.loop_triangles:
+            for i in tri.vertices:
+                v = to_gltf(matrix @ mesh.vertices[i].co)
+                out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
+        return out
+    finally:
+        obj.to_mesh_clear()
+
+
+# 面ごとに何を止めるか。**視線と物で別々の木を組む**ので、印を持たせる。
+#
+# 物のほうは弾と同じ集合を使う。**手すりは「人は止めるが弾は通す」**設定に
+# なっていて、あれを物の側に入れると三角が 8 倍になる (47 万枚)。手すりを
+# 弾がすり抜けるなら、投げた物もすり抜けるほうが揃う。
+#
+# 人が壁で止まるのは別の話 (箱のまま)。あちらは線ではなく円柱の押し戻し。
+#
+# 別々のファイルに出すと、両方を止める面 (ほとんどの壁) の頂点が 2 度書かれる。
+# 1 枚に印を添えて、読む側が振り分ける。
+EYE_BIT = 1
+BULLET_BIT = 2
+
+positions = []
+marks = []
+mesh_objects = 0
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
+        continue
+    flags = flags_of(obj)
+    mark = (EYE_BIT if flags['eye'] else 0) | (BULLET_BIT if flags['bullet'] else 0)
+    # どちらも止めないなら出さない。飾りはここで落ちる
+    if mark == 0:
+        continue
+    tris = triangles_of(obj)
+    if not tris:
+        continue
+    positions.extend(tris)
+    marks.extend([mark] * (len(tris) // 9))
+    mesh_objects += 1
+
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
 with open(json_path, 'w') as f:
     json.dump({'boxes': boxes}, f, ensure_ascii=False, indent=0)
+
+# 三角は別の口へ、しかも生の数値で。
+#
+# **クライアントはこの json を落とす** (坂の傾きを引くため)。三角を混ぜると
+# 4MB になって、遊ぶ人全員が毎回落とすことになる。
+#
+# 読むのはサーバーだけ。クライアントは glb のメッシュを既に持っているので、
+# 木は手元の形から組める。
+#
+# json ではなく生の数値で書く。57000 枚で 4.3MB が 2.1MB になり、読む側は
+# 解析せずに Float32Array へ載せるだけで済む。
+#
+#   [uint32 枚数][float32 頂点 × 枚数×9][uint8 印 × 枚数]
+#
+# 印は「何を止めるか」。読む側が視線用と物用に振り分けて、別々の木を組む。
+import struct
+
+bin_path = os.path.join(root, 'public', 'models', stage_name + '.mesh.bin')
+with open(bin_path, 'wb') as f:
+    f.write(struct.pack('<I', len(marks)))
+    f.write(struct.pack('<%df' % len(positions), *positions))
+    f.write(struct.pack('<%dB' % len(marks), *marks))
 
 
 # --- テクスチャを伸ばさない ---------------------------------------------------
@@ -493,7 +578,7 @@ print(f'  UV を張り直した: {reprojected} 個 (1 タイル = {TEXEL}m)')
 # --- 形を間引く -----------------------------------------------------------
 #
 # **配れる大きさに収める。** 頂点 1 つがおよそ 32 バイトなので、そのまま出すと
-# 庭園は 688 万頂点 = 235MB になった (モールは 15 万頂点 = 9.3MB)。読み込みで
+# 筏は 688 万頂点 = 235MB になった (モールは 15 万頂点 = 9.3MB)。読み込みで
 # 数分待たされるし、Pages にも載らない。
 #
 # 予算を決めて、**越えた分だけ**縮める。箱しか無いステージは予算に届かないので
@@ -614,6 +699,10 @@ for name in exported:
 
 print(f'\n書き出し: {glb_path}')
 print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個)')
+eyes = sum(1 for m in marks if m & EYE_BIT)
+bullets = sum(1 for m in marks if m & BULLET_BIT)
+print(f'          {bin_path} (三角 {len(marks)} 枚 / {mesh_objects} メッシュ)')
+print(f'          視線を止める {eyes} 枚 / 物を止める {bullets} 枚')
 print(f'メッシュ {len(exported)} 個' + (f' / 物差し {len(skipped)} 個は除外' if skipped else ''))
 print('材質: ' + ' / '.join(f'{k} {v}' for k, v in sorted(counts.items())))
 

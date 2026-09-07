@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { loadCasing } from '../assets'
 import { FIXED_STEP, stepProjectile, type Projectile } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
-import type { StageBox } from '../../../sim/space/vision'
+import type { SolidWorld } from '../../../sim/space/vision'
 
 /**
  * 排莢。
@@ -107,7 +107,7 @@ export class Casings {
    */
   update(
     dt: number,
-    boxes: StageBox[],
+    world: SolidWorld,
     water: Water | null,
     onDrop: (at: THREE.Vector3) => boolean,
   ): void {
@@ -117,7 +117,7 @@ export class Casings {
       this.accumulator -= FIXED_STEP
       for (const shell of this.shells) {
         if (!shell.live || shell.body.resting) continue
-        stepProjectile(shell.body, boxes, TUNING, water)
+        stepProjectile(shell.body, world, TUNING, water)
         // 最初に当たった 1 回だけ。跳ねるたびに鳴らすと鳴りっぱなしになる
         if (!shell.dropped && shell.body.bounces > 0) {
           shell.dropped = true

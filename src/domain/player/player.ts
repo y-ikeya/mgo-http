@@ -63,14 +63,12 @@ export interface Pose {
    * 遡って照合しないと分からないので、履歴に載せる。
    */
   pitch: number
-  crouching: boolean
-  boxed: boolean
   /**
-   * そのときの構え。**ナイフが刺さる姿勢かどうか**に使う。
+   * そのときの構え。**頭の高さと、ナイフが刺さる姿勢かどうか**がこれで決まる。
    *
-   * crouching / boxed とは別に持つ。あれは「しゃがんでいるか / 箱を被っているか」
-   * という操作の状態で、**吹っ飛んで倒れているかは表せない** (本人は何も
-   * 押していない)。倒れているかを知っているのはモーションのほう。
+   * しゃがみ (crouching) と箱 (boxed) を真偽で並べて持っていた頃があるが、
+   * **吹っ飛んで倒れているかを表せなかった** — 本人は何も押していないので、
+   * どちらの真偽も立たない。構えを 1 つ持てば全部言える (stance.ts)。
    */
   stance: Stance
 }
@@ -273,14 +271,7 @@ export interface MatchPlayer extends Player {
    * レプリカなので、そちらも順に寄せる。
    */
   inventory: Inventory
-  /**
-   * 過去の姿。当てたという申告を遡って照合するのに使う。
-   *
-   * **接続ではなく人が持つ。** 練習部屋の的は接続を持たないが、撃たれる以上
-   * 照合の相手にはなる。長さは呼ぶ側が決める (送る間隔から出す)。
-   */
-  history: Pose[]
-  /**
+    /**
    * 爆風で飛んでいる向きと、残り時間 (秒)。0 なら飛んでいない。
    *
    * **的だけが使う。** 人は自分の画面で自分を動かすので (位置を持っているのが
@@ -426,7 +417,6 @@ export function newMatchPlayer(seed: {
     grenades: SUPPORT_SPECS.grenade.count,
     holdingGrenade: false,
     wasAlive: false,
-    history: [],
     bot: false,
     kills: 0,
     deaths: 0,

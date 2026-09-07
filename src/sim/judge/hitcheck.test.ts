@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { verifyHit, type Pose } from './hitcheck'
+import { isBackstab, verifyHit, type Pose } from './hitcheck'
+import { OPEN_SIGHT, boxSight } from '../space/vision'
 import type { Stance } from '../../domain/player/stance'
 import type { StageBox } from '../space/vision'
 
@@ -22,8 +23,6 @@ function history(at: [number, number], stance: Stance, yaw = 0, pitch = 0): Pose
     z,
     yaw,
     pitch,
-    crouching: stance === 'crouch',
-    boxed: stance === 'box',
     stance,
   }))
 }
@@ -52,7 +51,7 @@ const RULES = {
 
 /** 刺せる間合いに並べて刺す */
 function stab(targetStance: Stance) {
-  return verifyHit(history([0, 0], 'stand'), history([0, 1], targetStance), { kind: 'melee' }, [], WINDOW, RULES)
+  return verifyHit(history([0, 0], 'stand'), history([0, 1], targetStance), { kind: 'melee' }, OPEN_SIGHT, WINDOW, RULES)
 }
 
 describe('ナイフの刺さる姿勢', () => {
@@ -75,7 +74,7 @@ describe('ナイフの刺さる姿勢', () => {
       history([0, 0], 'stand'),
       history([0, 1], 'prone'),
       { kind: 'bullet', zone: 'BODY', distance: 1 },
-      [],
+      OPEN_SIGHT,
       WINDOW, RULES)
     expect(verdict.ok).toBe(true)
   })
@@ -87,14 +86,51 @@ describe('ナイフの刺さる姿勢', () => {
       ...history([0, 1], 'stand').slice(0, 2),
       { ...history([0, 1], 'prone')[2], time: 100_032 },
     ]
-    expect(verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW, RULES).ok).toBe(true)
+    expect(verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, OPEN_SIGHT, WINDOW, RULES).ok).toBe(true)
   })
 
   test('ずっと倒れていれば、遡っても通らない', () => {
     const target = history([0, 1], 'prone')
-    const verdict = verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, [], WINDOW, RULES)
+    const verdict = verifyHit(history([0, 0], 'stand'), target, { kind: 'melee' }, OPEN_SIGHT, WINDOW, RULES)
     expect(verdict.ok).toBe(false)
     if (!verdict.ok) expect(verdict.reason).toContain('姿勢')
+  })
+})
+
+/**
+ * 背後から刺したか。
+ *
+ * **申告で受け取っていた頃がある。** 位置と向きから分かるので受け取る理由が
+ * 無く、通ったコマから出すようにした。判じるのが**通ったコマ**であることが
+ * 肝で、別のコマの向きで数えると「間合いに居るのは A のコマ、背後なのは
+ * B のコマ」という食い違いが起きる。
+ */
+describe('背後から刺したか', () => {
+  /** その向きで立っている 1 コマ */
+  const facing = (yaw: number): Pose =>
+    ({ time: 0, x: 0, y: 0, z: 0, yaw, pitch: 0, stance: 'stand' }) as Pose
+
+  test('**同じ向きを向いていれば背後。** 追いかけて刺した形', () => {
+    expect(isBackstab(facing(0), facing(0), RULES.backstabDot)).toBe(true)
+  })
+
+  test('向かい合っていれば背後ではない', () => {
+    expect(isBackstab(facing(0), facing(Math.PI), RULES.backstabDot)).toBe(false)
+  })
+
+  test('真横は背後ではない', () => {
+    expect(isBackstab(facing(0), facing(Math.PI / 2), RULES.backstabDot)).toBe(false)
+  })
+
+  /**
+   * **どこまでを背後と認めるかは渡された値で決まる。**
+   *
+   * 幾何の側で数字を持たない。緩めれば横からでも背後になる。
+   */
+  test('認める幅は渡された値で決まる', () => {
+    const oblique = Math.PI / 3
+    expect(isBackstab(facing(0), facing(oblique), 0.9)).toBe(false)
+    expect(isBackstab(facing(0), facing(oblique), 0.2)).toBe(true)
   })
 })
 
@@ -105,7 +141,7 @@ describe('倒れている相手を刺す', () => {
       history([0, 0], 'stand', 0, pitch),
       history([0, 1], targetStance),
       { kind: 'melee' },
-      [],
+      OPEN_SIGHT,
       WINDOW, RULES)
 
   test('真っ直ぐ前を刺しても、倒れている相手には届かない', () => {
@@ -153,7 +189,7 @@ describe('伏せている相手の高さ', () => {
       history([0, 0], 'stand'),
       history([0, 3], stance),
       { kind: 'bullet', zone: 'HEAD', distance: 3 },
-      LOW_WALL,
+      boxSight(LOW_WALL),
       WINDOW,
       RULES,
     )
@@ -172,7 +208,7 @@ describe('伏せている相手の高さ', () => {
       history([0, 0], 'stand'),
       history([0, 3], 'prone'),
       { kind: 'bullet', zone: 'HEAD', distance: 3 },
-      [],
+      OPEN_SIGHT,
       WINDOW,
       RULES,
     )
@@ -207,7 +243,7 @@ describe('低い遮蔽を越えた弾', () => {
       history([0, -10], 'stand'),
       history([0, 10], 'stand'),
       { kind: 'bullet', zone: 'HEAD', distance: 20, sag },
-      WALL,
+      boxSight(WALL),
       WINDOW,
       RULES,
     )

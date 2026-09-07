@@ -85,6 +85,7 @@ export type WholeBodyLocomotion =
   | 'bump'
   | 'prone_down'
   | 'prone_rise'
+  | 'prone_roll_down'
   | 'claymore_windup'
   | 'claymore_place'
 
@@ -108,6 +109,8 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   // 伏せへの出入り。上だけ構えに戻ると、寝ながら銃を構える形になる
   'prone_down',
   'prone_rise',
+  // 横への半回転。上だけ構えに戻ると、裏返りながら銃を構える
+  'prone_roll_down',
   // クレイモアを置く。かがむので上下を分けられない
   'claymore_windup',
   'claymore_place',
@@ -219,7 +222,7 @@ export interface StanceInput {
    * **伏せているかとは別に持つ。** 入っている最中はまだ伏せていないし、
    * 起き上がっている最中はもう伏せていない — 旗 1 つでは表せない。
    */
-  proneShift: 'prone_down' | 'prone_rise' | null
+  proneShift: 'prone_down' | 'prone_rise' | 'prone_roll_down' | null
   rolling: boolean
   onGround: boolean
   /** 着地モーションの残り時間 (秒) */
@@ -279,16 +282,30 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   /*
    * 伏せている間。**8 方向には分けない。**
    *
-   * 這う型が前進の 1 本しかないので、向きの区別を作れない。動いているかだけ
-   * 見て、止まったら伏せたまま静止する (箱の sneak / sit と同じ形)。
-   * 前以外へ動けないことは、動かす側 (player.ts) が入力を捨てて作っている。
+   * 這う型は前 (crawl_f) と後ろ (crawl_b) の 2 本。**8 方向には分けない。**
+   *
+   * 構えていなければ体が進行方向を向くので、どちらへ入力しても向き直って
+   * 前へ這う。後ろの型が出るのは**構えたまま下がるとき** — 体は照準を向いた
+   * まま動くので、そこだけ前後の区別が要る。
+   *
+   * 止まったら伏せたまま静止する (箱の sneak / sit と同じ形)。
    */
   // 伏せへの出入り。**終わるまで他へ移らない** (全身の型)
   if (input.proneShift) return input.proneShift
 
   if (input.prone) {
-    const threshold = input.previous === 'crawl_f' ? IDLE_ENTER_SPEED : IDLE_EXIT_SPEED
-    return input.actualSpeed >= threshold ? 'crawl_f' : 'prone_idle'
+    const crawling = input.previous === 'crawl_f' || input.previous === 'crawl_b'
+    const threshold = crawling ? IDLE_ENTER_SPEED : IDLE_EXIT_SPEED
+    if (input.actualSpeed < threshold) return 'prone_idle'
+    /*
+     * 前か後ろか。**横は無い** — 動かす側が前後へ丸めている (soldier.ts)。
+     *
+     * 8 方向に分けないのは型が 2 本しか無いから。横へ這う型が来たら増やす。
+     */
+    const sin = Math.sin(input.yaw)
+    const cos = Math.cos(input.yaw)
+    const forward = input.dirX * -sin + input.dirZ * -cos
+    return forward >= 0 ? 'crawl_f' : 'crawl_b'
   }
 
   // ダンボールを被っている間は専用の姿勢。8 方向には分けず、動いているかだけ見る

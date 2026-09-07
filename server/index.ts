@@ -17,6 +17,8 @@
  */
 
 import { dropWeapon, pickUp } from './arms/drops'
+import { recordLag } from '../src/domain/match/lag'
+import { LAG_CLOSE_CODE } from '../src/application/protocol/types'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
@@ -26,6 +28,7 @@ import {
   matchState,
   recordSeat,
   rosterMessage,
+  sendPing,
   sendSelf,
   spawn,
   updateMatch,
@@ -96,12 +99,26 @@ const LIMBO_MS = 100
  *
  * 握り潰さずに大きく出す。落ちなくなったぶん、気づけるのはログだけになる。
  */
+/**
+ * 刻みの重さ。**追いつけているかを /health で読むため。**
+ *
+ * 平均だけでは足りない。**詰まるのは一瞬**で、平均に埋もれる — 64Hz なので
+ * 1 回 15.6ms を超えたら、その刻みは次を押している。最悪も一緒に持つ。
+ *
+ * 窓を切り直すのは 1 秒ごと。ずっと持つと、起動直後の重い 1 回が最悪として
+ * 居座って、いま詰まっているかが読めなくなる。
+ */
+const tickCost = { total: 0, count: 0, worst: 0, windowFrom: 0, average: 0, lastWorst: 0 }
+
 setInterval(() => {
+  const startedAt = performance.now()
   try {
     const now = Date.now()
     for (const room of rooms.values()) {
       // 自分の本当の値を 1 人ずつ配る。**予測を直すため**で、普段は一致している
       sendSelf(room, now)
+      // 往復の時間を測る。**遅れすぎている人には席を空けてもらう** (pong の枝)
+      sendPing(room, now)
       // 切れた人の体をその場に残す。
       //
       // 位置は「届いたときに配る」形なので、送ってこなくなれば自然に止まり、
@@ -217,7 +234,7 @@ setInterval(() => {
         /*
          * --- 溺れる ---
          *
-         * **水の上は歩けない。** 庭園は水がアリーナ全体を覆っていて、歩ける
+         * **水の上は歩けない。** 筏は水がアリーナ全体を覆っていて、歩ける
          * のは水に浮いている板の上だけ。落ちたら助からない。
          *
          * 縁で見えない壁に止めるより、落ちられて死ぬほうが「板の上だけが
@@ -266,7 +283,7 @@ setInterval(() => {
         const steps = Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP))
         // 水に落ちた手榴弾は沈む。**水面を跳ねて渡らない**
         for (let k = 0; k < steps; k++)
-          stepProjectile(nade.body, room.stage.solid, undefined, water)
+          stepProjectile(nade.body, room.stage.thrown, undefined, water)
         nade.fuse -= TICK_MS / 1000
         if (nade.fuse <= 0) {
           detonate(room, nade)
@@ -293,6 +310,24 @@ setInterval(() => {
     }
   } catch (error) {
     console.error('[刻み] 例外。この刻みは捨てる', error)
+  }
+  /*
+   * 重さを控える。**例外で抜けた刻みも数える** — 落ちた刻みだけ軽く見えると、
+   * 詰まっているのに平均が下がる。
+   */
+  const cost = performance.now() - startedAt
+  tickCost.total += cost
+  tickCost.count += 1
+  if (cost > tickCost.worst) tickCost.worst = cost
+  const at = Date.now()
+  if (tickCost.windowFrom === 0) tickCost.windowFrom = at
+  else if (at - tickCost.windowFrom >= 1000) {
+    tickCost.average = tickCost.total / tickCost.count
+    tickCost.lastWorst = tickCost.worst
+    tickCost.total = 0
+    tickCost.count = 0
+    tickCost.worst = 0
+    tickCost.windowFrom = at
   }
 }, TICK_MS)
 
@@ -624,6 +659,33 @@ function handleMessage(
       broadcast(room, rosterMessage(room))
       break
 
+    /*
+     * ping の打ち返し。**中継しない。**
+     *
+     * 測るのはこの接続の遅れだけで、他の人には関係が無い。既定の枝へ落ちると
+     * 全員へ流れる (型がそれを教えてくれた)。
+     */
+    case 'pong': {
+      const session = sessionOf(player)
+      // 投げていない ping への返事は捨てる。時刻を差し替えて短く見せられる
+      if (session.pingAt === 0 || message.at !== session.pingAt) break
+      session.pingAt = 0
+      if (recordLag(session.lag, Date.now() - message.at)) {
+        /*
+         * **続けて遅れている人には席を空けてもらう。**
+         *
+         * その人の回線が悪いという話では済まない — 遅れている人が居ると、
+         * 撃ち合いが読み合いとして成立しなくなる (domain/match/lag.ts)。
+         *
+         * 理由を添えて閉じる。黙って切ると、繋ぎ直しては切られるを
+         * 繰り返すことになる。
+         */
+        console.warn(`[遅延] ${player.name} を切る rtt=${Math.round(session.lag.rtt)}ms`)
+        session.socket.close(LAG_CLOSE_CODE, '通信の遅れが大きすぎます')
+      }
+      break
+    }
+
     default:
       // 見た目のもの (knock) は中身を見ずに流す
       broadcast(room, message, player.id)
@@ -669,7 +731,17 @@ const server = Bun.serve<Client>({
             )
             .join('\n'),
       )
-      return new Response(`ok\n${lines.join('\n')}\n`, {
+      /*
+       * 刻みの重さと持ち物。**追いついているかはここでしか見えない。**
+       *
+       * 1 回 15.6ms を超えたら次を押している。人数を増やしたときに、どこで
+       * 詰まり始めるかを読むために出す。heap は履歴の作り直しが効くところ。
+       */
+      const heap = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+      const cost =
+        `刻み 平均 ${tickCost.average.toFixed(2)}ms / 最悪 ${tickCost.lastWorst.toFixed(2)}ms ` +
+        `(上限 ${TICK_MS.toFixed(1)}ms)  heap ${heap}MB\n`
+      return new Response(`ok\n${cost}${lines.join('\n')}\n`, {
         headers: { 'content-type': 'text/plain; charset=utf-8' },
       })
     }
@@ -740,6 +812,28 @@ const server = Bun.serve<Client>({
 
   websocket: {
     open(socket) {
+      /*
+       * 別の部屋に席が残っていたら畳む。**1 人が持てる接続は 1 本。**
+       *
+       * 接続の帳簿は**人の id で引く** (sessions)。別の部屋に席が残っていると、
+       * そちらの席から引いた接続が**いま遊んでいる部屋の接続**になる — つまり
+       * 前の部屋の試合状況が、いまの画面へ配られる。
+       *
+       * 実際に出た形: 商店街を抜けて筏へ入った人の画面で、STANDBY (前の部屋は
+       * まだ人待ち) と試合中が交互に出た。位置も点数も正しいのに、試合の段階
+       * だけが 2 つの部屋から届いていた。
+       *
+       * 猶予 (30 秒) は「うっかり切れた人が戻ってこられるように」であって、
+       * **別の部屋へ移った人の席を取っておくためではない。**
+       */
+      for (const [name, other] of rooms) {
+        if (name === socket.data.room) continue
+        const stale = other.players.get(socket.data.id)
+        if (!stale) continue
+        console.info(`[入室] ${stale.name} の席を ${name} から畳む (${socket.data.room} へ移った)`)
+        leaveRoom(other, stale)
+      }
+
       const room = roomOf(socket.data.room)
       const seat = room.players.get(socket.data.id)
       /** 続きへ戻す人。名簿を送ったあとに渡す */

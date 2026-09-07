@@ -1,4 +1,5 @@
 import type * as THREE from 'three'
+import { missingClips } from './actor/animation'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DEFAULT_SKIN } from './actor/skin'
 import type { StageName } from '../../domain/stage'
@@ -77,7 +78,27 @@ function load(url: string): Promise<GLTF> {
  * 種類ごとに Promise を分けて持つので、同じ物を 2 回解析しない。
  */
 export function loadSoldier(skin: string = DEFAULT_SKIN): Promise<GLTF> {
-  return load(asset.model(`${skin}.glb`))
+  const pending = load(asset.model(`${skin}.glb`))
+  /*
+   * **無い型をここで言う。** 読んだ時点で分かるのに、黙って代用に落ちていた。
+   *
+   * 欠けていると、その状態のときだけ別の型が流れる。握りはその型に合わせて
+   * 詰めてあるので銃がずれるが、**警告が無いので見た目で気づくしかない** —
+   * 雷電の knee_relaxed / knee_ready がそれで、試写が別のモデルを読んでいた
+   * ぶん、突き合わせるまで出なかった。
+   *
+   * モデルごとに 1 度だけ (load が Promise を使い回すので自然にそうなる)。
+   */
+  void pending.then((gltf) => {
+    const missing = missingClips(gltf.animations)
+    if (missing.length > 0) {
+      console.warn(
+        `[モデル] ${skin}.glb に無い型 (${missing.length}): ${missing.join(', ')}\n` +
+          '代わりの型で出るので、その姿勢だけ見た目と握りがずれる',
+      )
+    }
+  })
+  return pending
 }
 
 export function loadSmg(): Promise<GLTF> {

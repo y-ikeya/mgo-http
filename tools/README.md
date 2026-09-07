@@ -102,15 +102,39 @@ bun tools/merge_clip.js public/models/soldier.glb new.glb sneak out.glb
 
 ### 作り直したら投擲を割り直すこと
 
-`convert_character.py` で全部作り直すと `throw` が 1 本に戻る。**割り直さないと
-手榴弾が投げられない** (コードは `throw_windup` / `throw_release` を探す)。
+`convert_character.py` で全部作り直すと `throw` と `prone_throw` が 1 本ずつに
+戻る。**割り直さないと手榴弾が投げられない** (コードは `throw_windup` /
+`throw_release` を探す。伏せのほうは無ければ立ちへ落ちるので、投げられなくは
+ならないが伏せの型が出ない)。
 
 ```
 bun tools/split_clip.js public/models/soldier.glb throw 1.5 throw_windup throw_release
+bun tools/split_clip.js public/models/soldier.glb prone_throw 0.95 prone_throw_windup prone_throw_release
 ```
 
 1.5 秒は手が一番後ろ (腰から -0.48m) かつ高い (1.57m) 位置の実測値。ここで割ると
 腕を引き切った形が前半の最後になり、`clampWhenFinished` がそのまま保持になる。
+
+伏せの 0.95 秒も同じで、腕を上げたまま止まる所。**放す割合は型ごとに違う** —
+手が一番高くなるのが立ちは後半の 23%、伏せは 38% (`knobs.ts` の
+`GRENADE_RELEASE_RATIO` / `PRONE_GRENADE_RELEASE_RATIO`)。
+
+### 横への転がりは後半だけ使う
+
+`proneTurn.fbx` は**1 回転**する型 (うつ伏せ → 仰向け → うつ伏せ、1.13 秒)。
+使うのは仰向けから戻る後半だけで、そこが吹き飛ばされた所から這い出す繋ぎになる
+(転ぶ型 `sweep` は仰向けで終わる)。
+
+```
+bun tools/split_clip.js proneturn.glb prone_turn 0.30 prone_roll_up   prone_roll_rest
+bun tools/split_clip.js proneturn.glb prone_roll_rest 0.50 prone_roll_down prone_roll_tail
+bun tools/merge_clip.js public/models/soldier.glb proneturn.glb prone_roll_down public/models/soldier.glb
+```
+
+0.30 秒が仰向けになり切る所 (腹が真上を向く)、そこから 0.50 秒でうつ伏せへ戻る。
+残り 0.33 秒は寝たまま動かない尾なので捨てる。**取り込むのは
+`prone_roll_down` の 1 本だけ** — 前半 (`prone_roll_up`) は、仰向けで止まれる
+姿勢を足すときに要る。
 
 ### 姿勢だけが欲しいときは両端を切り出す
 
@@ -198,8 +222,14 @@ Poly Haven の素材は `diff` (sRGB) / `nor_gl` / `rough` を使い、`disp` �
 | | |
 |---|---|
 | `lobby` / `loadout` / `score` / `hud` | 画面の部品。対戦の状態は作り物を渡す |
-| `water` | 庭園の水面と水しぶき。`?eye=near` で寄る、`?t=0.2` で叩いてからの秒数、`?fx=blood` で血 |
+| `water` | 筏の水面と水しぶき。`?eye=near` で寄る、`?t=0.2` で叩いてからの秒数、`?fx=blood` で血 |
 | `weapon` | **武器の構え。** 6 通り (立ち / しゃがみ / 伏せ × 脱力 / 構え) を同時に出す |
+| `shots` | **銃口の煙と着弾。** 金属 (火花) と木 (煙) を撃ち分ける。`?only=metal` / `?only=wood` |
+| `leaving` | 試合中に戻るを押したときの板。`?lang=en` |
+
+`shots` の下地は**明暗が半分ずつ**。煙は灰色なので、暗い壁だけだと「出ていない」
+のか「見えていない」のかが分からない。撃った絵は 0.2〜0.5 秒で消えるので、
+同じ場所へ撃ち続けて止めずに見る。
 
 `water` は**時を止めて 1 枚描く**。柱 (0.4 秒) と波紋 (1.2 秒) は寿命が 3 倍
 違うので、動かして見ると速すぎて比べられない。

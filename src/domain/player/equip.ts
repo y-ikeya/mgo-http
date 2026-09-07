@@ -175,7 +175,7 @@ export function chooseLoadout(
  *
  * --- 2 つとも弾く ---
  *
- *     窓が閉じている        走っている試合の最中
+ *     窓が閉じている        走っている試合の最中 / READY を押している間
  *     予算を超えている      知らない名前・段の外れた値も含む
  *
  * どちらも**黙って一部だけ通さない**。半分だけ効いた状態を本人に説明できない。
@@ -186,7 +186,8 @@ export function chooseSkills(
   phase: Phase,
   mode?: ModeSpec,
 ): boolean {
-  if (!canChooseSkills(phase, mode)) return false
+  // READY を押している間は受け付けない。**取り消してから直す**
+  if (!canChooseSkills(phase, mode, player.ready)) return false
   if (skills === null || typeof skills !== 'object') return false
   if (!isAffordable(skills as Skills)) return false
   player.skills = skills as Skills

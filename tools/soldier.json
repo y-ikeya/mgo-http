@@ -44,6 +44,8 @@
     "proneToCrouch.fbx": "prone_rise",
     "proneFiring.fbx": "prone_fire",
     "proneReload.fbx": "prone_reload",
+    "Prone Throw.fbx": "prone_throw",
+    "proneTurn.fbx": "prone_turn",
     "dieFront.fbx": "death_front",
     "dieBack.fbx": "death_back"
   },

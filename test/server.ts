@@ -148,9 +148,22 @@ export class Client {
    */
   readonly messages: ServerMessage[] = []
 
+  /**
+   * 閉じられたときの符号。**誰が閉じたかではなく、なぜ閉じたか。**
+   *
+   * 遅れで切られたのか (4001)、こちらが閉じたのかを見分けるのに要る。
+   */
+  closedWith: number | null = null
+
   private readonly socket: WebSocket
   private timer: ReturnType<typeof setInterval> | null = null
   private position: [number, number, number]
+  /**
+   * ping を打ち返すまで待つ時間 (ms)。**遅い回線を作るのに使う。**
+   *
+   * 0 なら本物のクライアントと同じで、届いた瞬間に打ち返す。
+   */
+  private readonly pongDelay: number
 
   constructor(
     server: Server,
@@ -158,9 +171,11 @@ export class Client {
     at: [number, number, number] = [0, 0, 0],
     /** 入る部屋。既定はチーム戦 (bravo) — 陣営の規則を見る試験が多いので */
     room = 'bravo',
+    options: { pongDelay?: number } = {},
   ) {
     this.id = id
     this.position = at
+    this.pongDelay = options.pongDelay ?? 0
     this.socket = new WebSocket(`ws://localhost:${server.port}/?room=${room}&id=${id}`)
     this.socket.binaryType = 'arraybuffer'
     this.socket.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
@@ -184,6 +199,20 @@ export class Client {
       this.last.set(message.type, message)
       this.count.set(message.type, (this.count.get(message.type) ?? 0) + 1)
       if (message.type === 'life' && message.id === id) this.life = message.state
+      /*
+       * 往復の時間を測られている。**本物と同じように打ち返す。**
+       *
+       * 打ち返さないと、サーバーは次の便を投げない (未処理を溜めない作り)
+       * ので、測られないまま試験が終わる。
+       */
+      if (message.type === 'ping') {
+        const at = message.at
+        if (this.pongDelay > 0) setTimeout(() => this.send({ type: 'pong', at }), this.pongDelay)
+        else this.send({ type: 'pong', at })
+      }
+    }
+    this.socket.onclose = (event: CloseEvent) => {
+      this.closedWith = event.code
     }
   }
 

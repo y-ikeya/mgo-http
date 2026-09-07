@@ -18,7 +18,7 @@
  */
 
 import type { Water } from '../../domain/stage'
-import type { StageBox } from '../space/vision'
+import type { SolidWorld, StageBox } from '../space/vision'
 import { segmentHitsBox } from '../space/vision'
 
 /** 物理を進める刻み (秒)。誰が解いても同じ道を通るよう固定する */
@@ -152,13 +152,13 @@ export const WATER_DRAG = 0.12
  */
 export function stepProjectile(
   p: Projectile,
-  boxes: StageBox[],
+  world: SolidWorld,
   tuning: ThrowTuning = DEFAULT_THROW,
   water: Water | null = null,
 ): void {
   if (p.resting) return
   if (p.sunk) {
-    sink(p, boxes)
+    sink(p, world)
     return
   }
 
@@ -167,7 +167,7 @@ export function stepProjectile(
   const ny = p.y + p.vy * FIXED_STEP
   const nz = p.z + p.vz * FIXED_STEP
 
-  let hit = sweep(p.x, p.y, p.z, nx, ny, nz, boxes)
+  let hit = hitAlong(world, p.x, p.y, p.z, nx, ny, nz)
 
   // 地面。箱より手前で跨ぐならそちらを採る
   if (ny < GROUND_Y && p.y >= GROUND_Y) {
@@ -275,13 +275,13 @@ export function stepProjectile(
  * 跳ね返りも転がりも要らない。底に触れたらそこで終わり — 水中で転がる物の
  * 動きまで作っても、水面が不透明なので誰にも見えない。
  */
-function sink(p: Projectile, boxes: StageBox[]): void {
+function sink(p: Projectile, world: SolidWorld): void {
   p.vy = -SINK_SPEED
   const nx = p.x + p.vx * FIXED_STEP
   const ny = p.y + p.vy * FIXED_STEP
   const nz = p.z + p.vz * FIXED_STEP
 
-  let hit = sweep(p.x, p.y, p.z, nx, ny, nz, boxes)
+  let hit = hitAlong(world, p.x, p.y, p.z, nx, ny, nz)
   if (ny < GROUND_Y && p.y >= GROUND_Y) {
     const t = (GROUND_Y - p.y) / (ny - p.y)
     if (!hit || t < hit.t) {
@@ -303,6 +303,46 @@ function sink(p: Projectile, boxes: StageBox[]): void {
   p.vy = 0
   p.vz = 0
   p.resting = true
+}
+
+/**
+ * 世界に線分を投げて、当たった所を**位置まで含めて**返す。
+ *
+ * 世界が返すのは割合と面の向きだけ (SurfaceHit)。どこで当たったかは線分から
+ * 出せるので、世界には持たせない。
+ */
+function hitAlong(
+  world: SolidWorld,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+): Hit | null {
+  const found = world.hit(ax, ay, az, bx, by, bz)
+  if (!found) return null
+  return {
+    t: found.t,
+    x: ax + (bx - ax) * found.t,
+    y: ay + (by - ay) * found.t,
+    z: az + (bz - az) * found.t,
+    nx: found.nx,
+    ny: found.ny,
+    nz: found.nz,
+  }
+}
+
+/**
+ * 箱の一覧を世界として見せる。**古い形をそのまま包むだけ。**
+ *
+ * 三角の網 (TriangleBvh) は素で SolidWorld を満たすので、包みが要るのは
+ * こちらだけ。三角が用意できていないステージはこれで動く。
+ */
+export function boxSolid(boxes: StageBox[]): SolidWorld {
+  return {
+    hit: (ax, ay, az, bx, by, bz) => sweep(ax, ay, az, bx, by, bz, boxes),
+  }
 }
 
 interface Hit {

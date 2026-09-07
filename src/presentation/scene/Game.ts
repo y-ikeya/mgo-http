@@ -17,7 +17,7 @@ import {
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
-import { throwSpeedOf } from "../../domain/item/grenade";
+import { BLAST_RADIUS, RELEASE_HEIGHT, throwSpeedOf } from "../../domain/item/grenade";
 import { pelletsOf } from "../../domain/item/weapons";
 import type { Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
@@ -27,10 +27,8 @@ import {
   buildBases,
   buildStage,
   STAGE_CODE,
-  loadStageBoxes,
   type Stage,
 } from "./world/stage";
-import { solidBlockers, type StageBox } from "../../sim/space/vision";
 import {
   ceilingHeight,
   clampToArena,
@@ -98,6 +96,7 @@ import {
   type Calibration,
   type Knobs,
 } from "./calibration";
+import { PRONE_GRENADE_RELEASE_RATIO } from "./knobs";
 import type { NetTransport } from "../../application/protocol/types";
 import type { Identity } from "../../infra/auth/session";
 import { selfSkin } from "./actor/skin";
@@ -298,6 +297,26 @@ export interface GameStats {
    * 名目は 64。**下回っていたら、描画が重くて setInterval が発火できていない。**
    * 相手の画面ではその分だけ自分がカクつく
    */
+  /**
+   * 往復の時間 (ms)。**サーバーが測ってくれた値。**
+   *
+   * 0 ならまだ測れていない。回数 (FPS / TX / RX) とは別物で、あちらは
+   * 「何回」、こちらは「どれだけ待つか」。
+   */
+  /**
+   * いま流している型と銃の持ち方の段。**?stats=on にだけ出す。**
+   *
+   * 試写と本番で銃の位置が違ったときに、どちらの型を使っているかを目で
+   * 突き合わせるため。
+   */
+  pose: string;
+  latency: number;
+  /**
+   * 断られた理由。**入っていればもう戻らない。**
+   *
+   * 落ちただけなら勝手に繋ぎ直すので、ここには入らない。
+   */
+  rejected: string | null;
   sendRate: number;
   /** 相手ごとに、位置が届いている回数 (通/秒) */
   peerRates: { name: string; rate: number }[];
@@ -379,6 +398,23 @@ const BODY_SPLASH = 3.4;
 const BLOOM_STRENGTH = 0.6;
 const BLOOM_RADIUS = 0.5;
 const BLOOM_THRESHOLD = 0.9;
+/**
+ * 爆風で目をやられる距離 (m)。**ここより遠いと何も起きない。**
+ *
+ * 傷が届くのは BLAST_RADIUS (7m) まで。その外でも近ければ効くが、**傷の
+ * 届く範囲の倍**で切る。爆心で最大、そこから真っ直ぐ薄くなる。
+ *
+ * 音の届く距離 (160m) とは桁が違ってよい。**聞こえることと、頭を殴られる
+ * ことは別。** 揃えていた頃は 100m 先の爆発で 4 割ぼやけていた。
+ */
+const SHOCK_RANGE = BLAST_RADIUS * 2;
+
+/** 爆心からの距離を、目のやられ具合 (0..1) に直す */
+function shockPower(distance: number): number {
+  if (distance >= SHOCK_RANGE) return 0;
+  return 1 - distance / SHOCK_RANGE;
+}
+
 /** この速さで落ちたらしぶきが最大になる (m/s)。板の縁から落ちて 2 秒ぶん */
 const FALL_SPLASH_SPEED = 14;
 /** 水中で爆ぜたときの水柱。**投げ込んだときより大きい** */
@@ -394,13 +430,6 @@ const SURFACE_TOLERANCE = 0.03;
 
 
 
-/**
- * 手を離れる高さ (m)。server の RELEASE_HEIGHT と揃える。
- *
- * 投擲モーションで手が振り切る所の実測が 1.74m (1.65 秒の時点)。
- * そこに合わせてある。低くすると、腕は上にあるのに物が腰から出る。
- */
-const GRENADE_RELEASE_HEIGHT = 1.7;
 
 /**
  * 手を離れる位置を、投げる向きへどれだけ前に出すか (m)。
@@ -506,6 +535,9 @@ export class Game {
    */
   private shock: { seq: number; power: number } | null = null;
 
+  /** 往復の時間 (ms)。サーバーの ping に乗って届く */
+  private latency = 0;
+
   private readonly renderer: WebGPURenderer;
   /**
    * 発光 (ブルーム)。**明るい所を周りへ滲ませる。**
@@ -535,7 +567,6 @@ export class Game {
   /** 地面に落ちている武器。浮かせて回している */
   private readonly drops: Drops;
   /** 地形の箱。サーバーと同じ stage.json を読む。読めるまでは空 */
-  private stageBoxes: StageBox[] = [];
   /**
    * 一覧を開いている最中。
    *
@@ -795,7 +826,9 @@ export class Game {
   private readonly links: { name: string; at: number }[] = []
   /** 成績表を開いているか */
   private menuOpen = false
-  
+  /** 部屋を出るか尋ねているか (試合中に戻るを押した) */
+  private leavingOpen = false
+
   /**
    * いま持っている武器の性能。
    *
@@ -968,7 +1001,7 @@ export class Game {
      * **地形が届くまで人を落とさない。**
      *
      * buildStage はブロックアウトの箱だけ持ってすぐ返り、本物の地形は後から
-     * 差し替わる。庭園は足場が水面の 10m 上にあるので、届く前に湧くと**立つ
+     * 差し替わる。筏は足場が水面の 10m 上にあるので、届く前に湧くと**立つ
      * 床が無いまま重力が効いて、そのまま落ちて溺れる** — 「たまに試合開始で
      * 下に落ちる」の正体がこれ。
      *
@@ -1000,10 +1033,6 @@ export class Game {
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
-    void loadStageBoxes(this.stageName).then((boxes) => {
-      // 跳ねる面と遮蔽は別の集合。手榴弾は当たり判定のほうを見る
-      this.stageBoxes = solidBlockers(boxes);
-    });
     this.shots = new Shots(this.scene);
     this.net.onMessage((message) => this.receive(message));
 
@@ -1027,7 +1056,7 @@ export class Game {
     this.follow = new FollowCamera(1);
     if (water) this.follow.minY = water.y + Game.WATER_CLEARANCE;
     this.follow.snapTo(this.player, this.cameraWorld);
-    // 環境音はステージが決める。庭園は波、屋内は街の音 (domain/stage の ambience)
+    // 環境音はステージが決める。筏は波、屋内は街の音 (domain/stage の ambience)
     this.audio = new GameAudio(this.follow.camera, this.scene, STAGES[this.stageName].ambience);
 
     this.calibration = createCalibration({
@@ -1038,6 +1067,29 @@ export class Game {
       sun: this.sun,
       renderer: this.renderer,
     });
+
+    /*
+     * 上半身の向き補正を URL から触れるようにする。**?twistfix=0 で切れる。**
+     *
+     * 走ると上半身だけ右へ 45° 捻れる、という症状を追っている。下半身の
+     * クリップ (run_f) は腰を 33° 振って作られていて、その振れを戻すのが
+     * この補正 (animation.ts の alignSpineToUpperClip)。効いていないのか、
+     * 効きすぎているのかを**実物で切り分けるため**に出す。
+     *
+     * 素の値は 1。0 で「作られた向きの差の打ち消し」だけが外れる。
+     */
+    const twistFix = new URLSearchParams(location.search).get("twistfix");
+    if (twistFix !== null) {
+      const amount = Number(twistFix);
+      if (Number.isFinite(amount)) this.player.setUpperTwistFix(amount);
+    }
+
+    // 走りの足の回転。**?cadence=1.4 で速く**、1 で滑りゼロ (間延びする)
+    const cadence = new URLSearchParams(location.search).get("cadence");
+    if (cadence !== null) {
+      const rate = Number(cadence);
+      if (Number.isFinite(rate) && rate > 0) this.player.setRunCadence(rate);
+    }
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -1265,7 +1317,7 @@ export class Game {
      * **地形が届くまで人を進めない。**
      *
      * buildStage はブロックアウトの箱だけ持ってすぐ返り、本物の地形は後から
-     * 差し替わる。庭園は足場が水面の 10m 上にあるので、届く前に進めると
+     * 差し替わる。筏は足場が水面の 10m 上にあるので、届く前に進めると
      * **立つ床が無いまま重力だけが効いて、落ちて溺れる**。
      *
      * 止めるのは人の歩みだけで、描画も HUD も回し続ける — ここで tick ごと
@@ -1335,7 +1387,7 @@ export class Game {
     this.remotes.update(dt, Date.now());
     this.drops.update(dt);
     this.updateFootsteps();
-    this.grenades.update(dt, this.stageBoxes, this.stage.water, (bounce) => {
+    this.grenades.update(dt, this.stage.thrownWorld, this.stage.water, (bounce) => {
       /*
        * 水に落ちたら輪を出す。**跳ねる音は鳴らさない** — 水面で金属が跳ねる
        * 音がすると、そこに硬い床があるように聞こえる。
@@ -1369,7 +1421,7 @@ export class Game {
     );
     this.shots.update(dt);
     this.blast.update(dt);
-    this.casings.update(dt, this.stageBoxes, this.stage.water, (at) => {
+    this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
       // 水に落ちたら輪だけ出して沈める。**金属の音は鳴らさない**
       // 薬莢は軽い。小さく叩く
       if (this.splashAt(at, CASING_SPLASH)) return true;
@@ -1577,6 +1629,18 @@ export class Game {
           this.remoteTo,
           this.impactFacing,
           IMPACT_WORLD,
+          /*
+           * 面は**着弾点から地形を引き直す。** 届くのは着弾点だけで、何に
+           * 当たったかは載っていない (載せると送る量が増える)。地形は全員が
+           * 同じ物を持っているので、撃った側と同じ答えが出る (playImpactAt)。
+           */
+          surfaceAt(
+            this.remoteTo,
+            IMPACT_PROBE,
+            this.stage.obstacles,
+            this.remoteTo.y,
+            IMPACT_PROBE,
+          ),
         );
         /*
          * 他人の弾の着弾音。**当たった面はこちらで引き直す。**
@@ -1821,8 +1885,22 @@ export class Game {
 
       // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
       // 待つと、遅れて届いているだけの相手と区別が付かない
+      /*
+       * 往復の時間を測られている。**そのまま打ち返す。**
+       *
+       * 測るのはサーバー。こちらで測って申告する形にすると、遅い人が
+       * 「速い」と名乗れる (protocol/types.ts の PingMessage)。
+       *
+       * 一緒に届く rtt は前回の答え。1 秒遅れの値だが、出すのは診断のため
+       * なので困らない。
+       */
+      case "ping":
+        this.latency = message.rtt;
+        this.net.send({ type: "pong", at: message.at });
+        break;
+
       case "hidden":
-        this.remotes.hide(message.id);
+        this.remotes.hide(message.id, Date.now());
         break;
 
 
@@ -2026,6 +2104,20 @@ export class Game {
     return rows;
   }
 
+  /**
+   * いまスキルを組み替えてよいか。**画面もパッドも同じ答えを見る。**
+   *
+   * 画面のボタンだけ止めても、パッドの左右は別の道を通って setSkill へ
+   * 行き着く — **押せないはずの物が、指では押せる**という形で抜ける。
+   */
+  private get canChooseSkillsNow(): boolean {
+    return canChooseSkills(
+      this.replica.match?.phase ?? "waiting",
+      MODES[this.replica.mode],
+      this.selfReady,
+    );
+  }
+
   /** いま指している枠。窓が切り替わって番号が余ったら先頭へ戻す */
   private get loadoutFocus(): LoadoutFocus {
     const rows = this.loadoutRows;
@@ -2071,6 +2163,7 @@ export class Game {
      * 予算を超える段はサーバーが弾くので、こちらでは数えない
      * (setSkill のコメント)。
      */
+    if (!this.canChooseSkillsNow) return;
     const level = (this.skills[focus] ?? 0) + step;
     this.setSkill(focus, Math.max(0, Math.min(3, level)));
   }
@@ -2558,6 +2651,14 @@ export class Game {
       return;
     }
 
+    /*
+     * 手元の表示。**削る量を決めるのはサーバー。**
+     *
+     * 背後かどうかは申告に載せない — 位置と向きから分かるので、サーバーが
+     * 通ったコマから出す (sim/judge/hitcheck.ts の isBackstab)。ここに残って
+     * いるのは、刺した瞬間に何か出さないと手応えが無いから。**巻き戻しの
+     * 結果と食い違うことはあり得る**が、数字が動くわけではない。
+     */
     this.lastHitZone = result.fromBehind ? "BACKSTAB" : "KNIFE";
     this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
     // 刺さった音。**空振りでは鳴らさない** — 当てたかどうかで結果が全部決まる
@@ -2567,7 +2668,6 @@ export class Game {
       id: this.net.id,
       target: result.id,
       kind: "melee",
-      fromBehind: result.fromBehind,
     });
   }
 
@@ -2852,6 +2952,8 @@ export class Game {
       // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
       hitPlayer || splashed ? null : hitTerrain ? this.hitNormal : null,
       IMPACT_WORLD,
+      // **当たった物の名前から引く。** 音を鳴らすのと同じ引き方 (playImpact)
+      hitTerrain ? surfaceOf(hitTerrain.object.name) : undefined,
     );
     // 金属に当たった音。**材質は当たった面の名前から引く** (地形と同じ決めごと)
     if (!hitPlayer && !splashed && hitTerrain) this.playImpact(hitTerrain, this.hitPoint);
@@ -3147,15 +3249,16 @@ export class Game {
       // 前へ出す量は水平方向だけで測る。見上げているときに近く、
       // 見下ろしているときに遠く、では手の位置が動いて見える
       const flat = Math.hypot(this.aimDir.x, this.aimDir.z) || 1;
+      // 手を離れる高さは構えで変わる。**伏せていれば腕も低い所を通る**
       this.grenadeOrigin.set(
         this.player.position.x + (this.aimDir.x / flat) * GRENADE_RELEASE_FORWARD,
-        this.player.position.y + GRENADE_RELEASE_HEIGHT,
+        this.player.position.y + RELEASE_HEIGHT[this.player.stance],
         this.player.position.z + (this.aimDir.z / flat) * GRENADE_RELEASE_FORWARD,
       );
       this.grenades.showPreview(
         this.grenadeOrigin,
         this.aimDir,
-        this.stageBoxes,
+        this.stage.thrownWorld,
         this.stage.water,
         throwSpeedOf(this.skills),
       );
@@ -3220,9 +3323,13 @@ export class Game {
     // 進んでいるので差は 0.16 秒、叩いただけならほぼ丸ごと残る。
     // **振りかぶりの残りを待ってから**、投げの型の途中で手を離れる。
     // 軽く叩いただけなら振りかぶりが残っているぶん遅れて出る
+    // 放す割合は型ごと。**伏せの投擲は弧の頂点** (knobs.ts の注)
+    const ratio = this.player.proneThrowing
+      ? PRONE_GRENADE_RELEASE_RATIO
+      : this.knobs.grenadeRelease;
     this.grenadeRelease = Math.max(
       0.01,
-      this.player.throwWindupLeft + this.knobs.grenadeRelease * this.player.throwReleaseDuration,
+      this.player.throwWindupLeft + ratio * this.player.throwReleaseDuration,
     );
   }
 
@@ -3517,16 +3624,18 @@ export class Game {
     const gain = this.audio.play(inWater ? "explosionWater" : "explosion", position, 1);
     this.addPing("shot", position, gain);
     /*
-     * 頭を殴られた感じを出す。**近さは音の強さをそのまま使う。**
+     * 頭を殴られた感じを出す。**近さは距離で測る。音の強さでは測らない。**
      *
-     * 遠いほど薄い、が音と同じ式で揃う。距離の閾値をもう 1 つ持つと、
-     * 「聞こえるのに効かない」「効くのに聞こえない」がどこかで出る。
+     * 音と同じ式で揃えていたが、爆発音は 160m まで届く (聞かせるための距離)。
+     * **100m 先で爆ぜても 4 割ぼやけていた** — 音は聞こえてよいが、頭は
+     * 殴られていない。聞こえることと衝撃を受けることは別。
      *
      * **カメラは動かさない。** このゲームは軸がそのまま弾道なので
      * (aimDirection が viewDir を返す)、揺らすと狙いまで動く。それ以前に、
      * 回すと画面が斜めに傾いて見えて、衝撃ではなく「傾いた」に読める。
      */
-    this.shock = { seq: this.shock ? this.shock.seq + 1 : 1, power: gain };
+    const near = shockPower(this.player.position.distanceTo(position));
+    if (near > 0) this.shock = { seq: this.shock ? this.shock.seq + 1 : 1, power: near };
     if (inWater) return;
     this.blast.explode(position);
   }
@@ -3631,10 +3740,32 @@ export class Game {
    */
   setMenu(open: boolean): void {
     this.menuOpen = open;
-    // 開いている間は掴まない。裏で押したキーで掴み直すと、
+    this.holdPointer();
+  }
+
+  /**
+   * 部屋を出るか尋ねている間 (presentation/ui/Leaving.tsx)。
+   *
+   * 成績表と同じくポインタを離す。**掴んだままだと板のボタンを押せない。**
+   */
+  setLeaving(open: boolean): void {
+    this.leavingOpen = open;
+    this.holdPointer();
+  }
+
+  /**
+   * 板が出ている間はポインタを離す。
+   *
+   * **開いている板を数える。** 成績表と退出の確認は重なりうる (Tab を開いた
+   * まま戻るを押す) ので、片方を閉じただけで掴み直すと、もう一方のボタンを
+   * 押そうとした瞬間に画面が飛ぶ。
+   */
+  private holdPointer(): void {
+    const held = this.menuOpen || this.leavingOpen;
+    // 掴んでいる間は掴まない。裏で押したキーで掴み直すと、
     // ボタンを押そうとした瞬間に画面が飛ぶ
-    this.input.wantsLock = !open;
-    if (open) document.exitPointerLock();
+    this.input.wantsLock = !held;
+    if (held) document.exitPointerLock();
     // ボタンで閉じた場合。押した操作の最中なので、ここで掴み直せる
     else this.input.grab();
   }
@@ -3913,10 +4044,7 @@ export class Game {
       skills: this.skills,
       // 窓が開いているかは試合の段階で決まる。ドメインルールは domain が持つ
       loadoutFocus: this.loadoutFocus,
-      skillsOpen: canChooseSkills(
-        this.replica.match?.phase ?? "waiting",
-        MODES[this.replica.mode],
-      ),
+      skillsOpen: this.canChooseSkillsNow,
       scoped: this.scoped,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
@@ -3981,6 +4109,9 @@ export class Game {
       team: this.replica.team,
       match: this.replica.match,
       players: this.remotes.count,
+      pose: this.player.poseDebug,
+      latency: this.latency,
+      rejected: this.net.rejected ?? null,
       sendRate: this.sendGap > 0 ? 1000 / this.sendGap : 0,
       peerRates: this.remotes.rates(),
     });

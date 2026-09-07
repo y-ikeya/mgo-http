@@ -12,7 +12,7 @@
  */
 
 import type { HitZone } from '../../domain/rule/damage'
-import { isPathClear, type StageBox } from '../space/vision'
+import type { SightBlocker } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
 import type { Stance } from '../../domain/player/stance'
 
@@ -56,7 +56,6 @@ export interface HitClaim {
   kind: 'bullet' | 'melee'
   zone?: HitZone
   distance?: number
-  fromBehind?: boolean
   /**
    * 弾道の膨らみ (m)。**弦から見て、どれだけ上を通ったか。**
    *
@@ -73,7 +72,21 @@ export interface HitClaim {
   sag?: number
 }
 
-export type Verdict = { ok: true } | { ok: false; reason: string }
+/**
+ * 判定の答え。
+ *
+ * **通ったときは、通った瞬間の姿も返す。** 巻き戻しは 28 コマを舐めて 1 つでも
+ * 成立したら確定するので、**どのコマで通ったかは呼ぶ側から見えない。** 返さない
+ * と、削る量を決める側が別のコマの向きで背後刺しを判じることになる。
+ *
+ *     コマ A   間合いに居るが、正面
+ *     コマ B   背後だが、間合いの外
+ *
+ * A で成立させたのに B の向きで数えてしまう、という食い違いが起きる。
+ */
+export type Verdict =
+  | { ok: true; attacker: Pose; target: Pose }
+  | { ok: false; reason: string }
 
 /**
  * 部位の高さ。足元からの比率で持つ。
@@ -129,10 +142,10 @@ function isArcClear(
   toX: number,
   toY: number,
   toZ: number,
-  boxes: StageBox[],
+  world: SightBlocker,
   sag: number,
 ): boolean {
-  if (sag < ARC_IGNORE) return isPathClear(fromX, fromY, fromZ, toX, toY, toZ, boxes)
+  if (sag < ARC_IGNORE) return world.clear(fromX, fromY, fromZ, toX, toY, toZ)
 
   let px = fromX
   let py = fromY
@@ -142,7 +155,7 @@ function isArcClear(
     const qx = fromX + (toX - fromX) * t
     const qy = fromY + (toY - fromY) * t + 4 * sag * t * (1 - t)
     const qz = fromZ + (toZ - fromZ) * t
-    if (!isPathClear(px, py, pz, qx, qy, qz, boxes)) return false
+    if (!world.clear(px, py, pz, qx, qy, qz)) return false
     px = qx
     py = qy
     pz = qz
@@ -171,11 +184,10 @@ function zoneExposed(
   attacker: Pose,
   target: Pose,
   zone: HitZone,
-  boxes: StageBox[],
+  world: SightBlocker,
   rules: HitRules,
   sag: number,
 ): boolean {
-  if (boxes.length === 0) return true
 
   const eyeY = attacker.y + rules.headHeight(attacker.stance)
   const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
@@ -190,7 +202,7 @@ function zoneExposed(
   for (const side of [0, 1, -1]) {
     const ox = attacker.x + px * SHOULDER_OFFSET * side
     const oz = attacker.z + pz * SHOULDER_OFFSET * side
-    if (isArcClear(ox, eyeY, oz, tx, ty, tz, boxes, sag)) return true
+    if (isArcClear(ox, eyeY, oz, tx, ty, tz, world, sag)) return true
   }
   return false
 }
@@ -205,7 +217,7 @@ function verifyPose(
   attacker: Pose,
   target: Pose,
   claim: HitClaim,
-  boxes: StageBox[],
+  world: SightBlocker,
   rules: HitRules,
 ): Verdict {
   const zone: HitZone = claim.zone ?? 'BODY'
@@ -225,15 +237,13 @@ function verifyPose(
       return { ok: false, reason: `ナイフの間合いの外 (${flat.toFixed(1)}m)` }
     }
 
-    // 背後からかどうかは、位置と向きから分かる。申告を信じる理由が無い
-    if (claim.fromBehind) {
-      const [vfx, vfz] = forwardOf(target.yaw)
-      const [afx, afz] = forwardOf(attacker.yaw)
-      if (vfx * afx + vfz * afz <= rules.backstabDot) {
-        return { ok: false, reason: '背後ではない' }
-      }
-    }
-    return { ok: true }
+    /*
+     * **背後かどうかはここで判じない。**
+     *
+     * 位置と向きから分かるので、申告を受け取る理由が無い。通ったコマを返すので、
+     * 削る量を決める側がそこから出す (isBackstab)。
+     */
+    return { ok: true, attacker, target }
   }
 
   // 弾。申告された距離が実際と合っているか
@@ -247,11 +257,24 @@ function verifyPose(
   }
 
   // その部位が見えていたか。頭を隠して脚だけ出している相手の頭は撃てない
-  if (!zoneExposed(attacker, target, zone, boxes, rules, claim.sag ?? 0)) {
+  if (!zoneExposed(attacker, target, zone, world, rules, claim.sag ?? 0)) {
     return { ok: false, reason: `${zone} は遮蔽の裏` }
   }
 
-  return { ok: true }
+  return { ok: true, attacker, target }
+}
+
+/**
+ * 背後から刺したか。**通ったコマから出す。**
+ *
+ * 申告で受け取っていた頃があるが、位置と向きから分かるので受け取る理由が無い。
+ * **通ったコマで判じる**のが肝で、別のコマの向きで数えると「間合いに居るのは
+ * A のコマ、背後なのは B のコマ」という食い違いが起きる。
+ */
+export function isBackstab(attacker: Pose, target: Pose, backstabDot: number): boolean {
+  const [vfx, vfz] = forwardOf(target.yaw)
+  const [afx, afz] = forwardOf(attacker.yaw)
+  return vfx * afx + vfz * afz > backstabDot
 }
 
 /**
@@ -268,10 +291,10 @@ function verifyPose(
  * @param targetHistory 同上
  */
 export function verifyHit(
-  attackerHistory: Pose[],
-  targetHistory: Pose[],
+  attackerHistory: readonly Pose[],
+  targetHistory: readonly Pose[],
   claim: HitClaim,
-  boxes: StageBox[],
+  world: SightBlocker,
   window: number,
   rules: HitRules,
 ): Verdict {
@@ -296,7 +319,7 @@ export function verifyHit(
       best = gap
     }
 
-    last = verifyPose(attacker, target, claim, boxes, rules)
+    last = verifyPose(attacker, target, claim, world, rules)
     if (last.ok) return last
   }
 

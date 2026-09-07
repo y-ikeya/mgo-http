@@ -120,34 +120,34 @@ describe('ステージの点', () => {
 /**
  * 溺れる。**人が死ぬ判定なので、境目を数字で押さえる。**
  *
- * 庭園は水がアリーナ全体を覆っていて、歩けるのは水に浮いている板の上だけ。
+ * 筏は水がアリーナ全体を覆っていて、歩けるのは水に浮いている板の上だけ。
  * 板の縁で 1cm の差が生死を分けるので、**立っているだけで死なない**ことと、
  * **落ちたら必ず死ぬ**ことの両方を見る。
  */
 describe('水に沈んでいるか', () => {
-  const garden = waterOf('garden')
+  const raft = waterOf('raft')
 
   test('**湧き地点はどれも水の上ではない。** 湧いた瞬間に溺れない', () => {
-    expect(garden).not.toBeNull()
-    const spots = [...Object.values(STAGES.garden.bases), ...STAGES.garden.solo]
+    expect(raft).not.toBeNull()
+    const spots = [...Object.values(STAGES.raft.bases), ...STAGES.raft.solo]
     for (const spot of spots) {
-      expect(inWater(spot.x, spot.y ?? 0, spot.z, garden)).toBe(false)
+      expect(inWater(spot.x, spot.y ?? 0, spot.z, raft)).toBe(false)
     }
   })
 
   test('水面と同じ高さでは沈まない。数え落ちで死なせない', () => {
-    expect(inWater(0, garden!.y, 0, garden)).toBe(false)
+    expect(inWater(0, raft!.y, 0, raft)).toBe(false)
   })
 
   test('**板から落ちたら沈む。** 水の下の地面は歩く床ではない', () => {
     // 底は y=0 (コードが敷いている地面)。底上げしたぶんがそのまま水深になる
-    expect(inWater(0, 0, 0, garden)).toBe(true)
-    expect(garden!.y).toBeGreaterThan(5)
+    expect(inWater(0, 0, 0, raft)).toBe(true)
+    expect(raft!.y).toBeGreaterThan(5)
   })
 
   test('水の外は沈まない。塀の向こうまで水にしない', () => {
-    expect(inWater(garden!.half + 1, 0, 0, garden)).toBe(false)
-    expect(inWater(0, 0, -garden!.half - 1, garden)).toBe(false)
+    expect(inWater(raft!.half + 1, 0, 0, raft)).toBe(false)
+    expect(inWater(0, 0, -raft!.half - 1, raft)).toBe(false)
   })
 
   test('水の無いステージでは沈まない', () => {

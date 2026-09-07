@@ -36,7 +36,10 @@ export function stanceOf(locomotion: Locomotion): Stance {
   // ダンボールが落ちた直後。棒立ちなので、頭は立ちの高さに戻っている
   if (locomotion === 'bump') return 'stand'
   // 伏せている。爆風で倒れているのと同じ高さで扱う
-  if (locomotion === 'prone_idle' || locomotion === 'crawl_f') return 'prone'
+  if (locomotion === 'prone_idle' || locomotion === 'crawl_f' || locomotion === 'crawl_b')
+    return 'prone'
+  // 伏せたまま倒れた。**倒れているので down** (頭の高さは死体のもの)
+  if (locomotion === 'prone_death') return 'down'
   /*
    * 伏せへの出入り。**高いほうで採る。**
    *
@@ -45,6 +48,8 @@ export function stanceOf(locomotion: Locomotion): Stance {
    * 迷ったら送る側に倒す、はこのファイルの他の判断と同じ。
    */
   if (locomotion === 'prone_down' || locomotion === 'prone_rise') return 'crouch'
+  // 横への半回転は**寝たまま**。伏せへの出入りと違って腰が上がらない
+  if (locomotion === 'prone_roll_down') return 'prone'
   // クレイモアはかがんで置く。頭が下がるので、見つかりにくさもしゃがみと同じ
   if (locomotion === 'claymore_windup' || locomotion === 'claymore_place') return 'crouch'
   if (locomotion === 'crouch_idle' || locomotion.startsWith('crouch_')) return 'crouch'
