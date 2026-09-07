@@ -2152,9 +2152,18 @@ export class CharacterAnimator {
     if (this.upperState === 'hit' && this.upper.has(HIT_KEY)) return HIT_KEY
     if (this.upperState === 'salute' && this.upper.has(SALUTE_KEY)) return SALUTE_KEY
     if (this.upperState === 'stab' && this.upper.has(STAB_KEY)) return STAB_KEY
-    // ボルト操作は構えを解いても最後まで流す。1 発ごとに必ず起きる動作なので、
-    // 途中で切れると「撃ったのに動作していない」が頻繁に見える
-    if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) return BOLT_KEY
+    /*
+     * ボルト操作は構えを解いても最後まで流す。1 発ごとに必ず起きる動作なので、
+     * 途中で切れると「撃ったのに動作していない」が頻繁に見える。
+     *
+     * ただし**伏せている間は出さない**。ボルトの型は立ち姿で、腹這いの腰に
+     * 載せると銃口が下を向いて地面に埋まる (伏せ撃ちの直後に必ず起きる)。
+     * 伏せ用のボルトの型はまだ無いので、操作の間は伏せ撃ちの構えのまま
+     * 通す。撃てない時間は変わらない (fireCooldown は絵と別で数えている)。
+     */
+    if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) {
+      if (!PRONE_LOCOMOTIONS.has(this.locomotion)) return BOLT_KEY
+    }
     if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
     if (this.upperState === 'throw' && this.pair) {
       // **振りかぶりが残っている間は前半のまま。** 放した瞬間に後半へ渡すと、

@@ -628,6 +628,32 @@ describe('勝手に構えない', () => {
     run(anim, 1.2, 'idle', true)
     expect(playing(anim, 'upper')).toEqual(['aim'])
   })
+
+  /**
+   * **伏せている間はボルトを引く型を出さない。**
+   *
+   * ボルトの型は立ち姿で、腹這いの腰に載せると銃口が下を向いて地面に埋まる。
+   * 狙撃銃は 1 発ごとに必ずボルトを引くので、**伏せて撃つたびに**銃が地面へ
+   * 潜った。伏せ用のボルトの型はまだ無いので、その間は伏せ撃ちの構えのまま。
+   *
+   * 撃てない時間 (Game の fireCooldown) は絵と別に数えているので、型を
+   * 出さなくても連射にはならない。
+   */
+  test('伏せている間はボルトの型を出さない', () => {
+    const anim = animator()
+    run(anim, 1.2, 'prone_idle', true)
+    anim.playBolt()
+    run(anim, 0.3, 'prone_idle', true)
+    expect(playing(anim, 'upper')).not.toContain('bolt')
+  })
+
+  test('立っていればボルトの型はそのまま出る', () => {
+    const anim = animator()
+    run(anim, 1.2, 'idle', true)
+    anim.playBolt()
+    run(anim, 0.3, 'idle', true)
+    expect(playing(anim, 'upper')).toEqual(['bolt'])
+  })
 })
 
 describe('片手の物を持っている姿', () => {

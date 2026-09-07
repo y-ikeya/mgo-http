@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { asset } from '../assets'
+import type { Surface } from '../../../domain/stage'
 
 /** トレーサーの表示時間 (秒)。弾道を目で追える最低限だけ残す */
 const TRACER_LIFE = 0.05
@@ -96,6 +98,64 @@ const POOL_SIZE = 24
  * よい (古いのは既に読まれているか、もう関係ない)。
  */
 const IMPACT_POOL = 256
+
+/*
+ * 煙。**銃口と着弾の両方で同じ物を使う。**
+ *
+ * 弾そのものは見えない (曳光は 1 フレームの線)。**撃った跡が残らない**ので、
+ * 撃ったかどうかも当たったかどうかも音でしか分からなかった。
+ *
+ * 粒の絵は爆発と同じ 1 枚 (public/textures/particles.png)。行 0 が煙。
+ */
+const SMOKE_POOL = 48
+/** 粒の絵の格子。blastfx.ts と同じ物を見ているので、割り方を変えたら両方直す */
+const SMOKE_COLS = 4
+const SMOKE_ROWS = 4
+const SMOKE_ROW = 0
+
+/** 銃口の煙。**短い。** 残ると連射で銃口が煙に埋まる */
+const MUZZLE_LIFE = 0.22
+const MUZZLE_SIZE = 0.18
+const MUZZLE_GROW = 2.6
+/** 銃口から前へ流れる速さ (m/s)。撃った方向へ薄く伸びる */
+const MUZZLE_DRIFT = 1.4
+/** 濃さ。**手元なので薄くてよい** — 濃いと自分の照準が煙で埋まる */
+const MUZZLE_DENSE = 0.55
+
+/*
+ * 着弾の煙。**銃口より長く、大きい。** 当たった場所を目で追えるように。
+ *
+ * 撃ち合う間合い (5〜20m) で見えないと意味がない。小さく出して大きく広げる
+ * より、**出た瞬間から読める大きさで出す**。広がりきる頃には薄くなっていて、
+ * どのみち形は残らない。
+ */
+const IMPACT_SMOKE_LIFE = 0.5
+const IMPACT_SMOKE_SIZE = 0.3
+const IMPACT_SMOKE_GROW = 3.0
+/** 面から立ち上がる速さ (m/s) */
+const IMPACT_SMOKE_DRIFT = 0.9
+/** 濃さ。**銃口より濃い** — 10m 先の 20cm を見せるのに薄い煙では足りない */
+const IMPACT_SMOKE_DENSE = 0.95
+
+/*
+ * 火花。**金属に当たったときだけ。**
+ *
+ * 当たった物で見え方が変わらないと、**何に当たったかは音でしか分からない。**
+ * 音は既に面で分けてある (hitMetal) ので、目のほうも揃える。
+ *
+ * 木や石は削れて粉が出る (煙)。金属は削れずに弾ける (火花)。
+ */
+const SPARK_POOL = 160
+/** 1 発で散る数 */
+const SPARK_BURST = 9
+const SPARK_LIFE = 0.28
+/** 弾ける速さ (m/s)。面の法線を中心に散らす */
+const SPARK_SPEED = 4.5
+/** どれだけ広がるか (0 = 法線どおり、1 = 半球いっぱい) */
+const SPARK_SPREAD = 0.65
+/** 落ちる速さ (m/s²)。短命なので効きは僅かだが、真っ直ぐ飛ぶと線香花火に見えない */
+const SPARK_GRAVITY = 9.8
+const SPARK_SIZE = 0.055
 
 /**
  * 水しぶき。**弾や物が水面を叩いたときだけ。**
@@ -254,6 +314,25 @@ export class Shots {
 
   private readonly impacts: THREE.Mesh[] = []
   private readonly impactLife: number[] = []
+  /** 煙の粒。銃口と着弾で共用する */
+  private readonly smoke: THREE.Sprite[] = []
+  private readonly smokeLife: number[] = []
+  private readonly smokeSpan: number[] = []
+  private readonly smokeSize: number[] = []
+  private readonly smokeGrow: number[] = []
+  /** 出た瞬間の濃さ。銃口は薄く、着弾は濃く */
+  private readonly smokeDense: number[] = []
+  private readonly smokeVelocity: THREE.Vector3[] = []
+  private smokeNext = 0
+  /** 散らす向きの置き場。毎フレーム作らない */
+  private readonly scatter = new THREE.Vector3()
+  /** 銃口から着弾へ向かう向きの置き場 */
+  private readonly muzzleDir = new THREE.Vector3()
+  /** 火花。金属に当たったときだけ散る */
+  private readonly sparks: THREE.Sprite[] = []
+  private readonly sparkLife: number[] = []
+  private readonly sparkVelocity: THREE.Vector3[] = []
+  private sparkNext = 0
   /** 水の柱。1 回に 1 本 */
   private readonly columns: THREE.Mesh[] = []
   private readonly columnLife: number[] = []
@@ -360,6 +439,56 @@ export class Shots {
       this.bloods.push(blood)
       this.bloodLife.push(0)
       this.bloodAlpha.push(1)
+    }
+
+    /*
+     * 煙と火花。**弾が飛んだ跡と、当たった跡。**
+     *
+     * 粒の絵は爆発と同じ 1 枚を使い回す (blastfx.ts と同じ格子)。粒ごとに
+     * テクスチャを複製するのは、格子のどのコマを出すかを offset で決めるため
+     * (共有すると全部が同じコマになる)。画像は共有されるので中身は増えない。
+     */
+    const loader = new THREE.TextureLoader()
+    for (let i = 0; i < SMOKE_POOL; i++) {
+      const texture = loader.load(asset.texture('particles.png'))
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.repeat.set(1 / SMOKE_COLS, 1 / SMOKE_ROWS)
+      texture.offset.set((i % SMOKE_COLS) / SMOKE_COLS, 1 - (SMOKE_ROW + 1) / SMOKE_ROWS)
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+        }),
+      )
+      sprite.visible = false
+      this.group.add(sprite)
+      this.smoke.push(sprite)
+      this.smokeLife.push(0)
+      this.smokeSpan.push(1)
+      this.smokeSize.push(1)
+      this.smokeGrow.push(1)
+      this.smokeDense.push(1)
+      this.smokeVelocity.push(new THREE.Vector3())
+    }
+
+    for (let i = 0; i < SPARK_POOL; i++) {
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          color: 0xffd08a,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          // 露出に左右されない。**火花が明るく見えないと弾けて見えない**
+          toneMapped: false,
+        }),
+      )
+      sprite.visible = false
+      this.group.add(sprite)
+      this.sparks.push(sprite)
+      this.sparkLife.push(0)
+      this.sparkVelocity.push(new THREE.Vector3())
     }
 
     // 弾痕は別のプール。**30 秒残るので線より遥かに多く要る**
@@ -502,11 +631,18 @@ export class Shots {
  *   飛び去ったときと、**人に当たったとき**。人の痕はワールドに置くことに
  *   なるので、当たった相手が動いた後もその場に浮いてしまう
    */
+  /**
+   * 1 発ぶんの絵。曳光・弾痕・銃口の煙・着弾の跡。
+   *
+   * @param surface 当たった面。**金属は火花、それ以外は粉。** 音は既に面で
+   *   分けてある (hitMetal) ので、目のほうも揃える。分からなければ省く
+   */
   fire(
     from: THREE.Vector3,
     to: THREE.Vector3,
     normal: THREE.Vector3 | null,
     impactColor = 0xffd9a0,
+    surface?: Surface,
   ): void {
     const line = this.tracers[this.tracerNext]
     const position = line.geometry.getAttribute('position') as THREE.BufferAttribute
@@ -516,6 +652,9 @@ export class Shots {
     line.visible = true
     this.tracerLife[this.tracerNext] = TRACER_LIFE
     this.tracerNext = (this.tracerNext + 1) % POOL_SIZE
+
+    // 銃口の煙。**当たったかどうかに関わらず出る** — 撃った事実の絵
+    this.muzzle(from, this.muzzleDir.subVectors(to, from))
 
     if (!normal) return
 
@@ -527,6 +666,106 @@ export class Shots {
     impact.visible = true
     this.impactLife[this.impactNext] = IMPACT_LIFE
     this.impactNext = (this.impactNext + 1) % IMPACT_POOL
+
+    /*
+     * 当たった跡。**金属は弾け、それ以外は削れる。**
+     *
+     * 既定は粉。**面が分からないときに火花を出すと、土や木でも弾けて見える** —
+     * 出しすぎるより出さないほうが誤解が少ない。
+     */
+    if (surface === 'metal') this.sparkBurst(to, normal)
+    else {
+      this.puff(
+        to,
+        normal,
+        IMPACT_SMOKE_SIZE,
+        IMPACT_SMOKE_GROW,
+        IMPACT_SMOKE_LIFE,
+        IMPACT_SMOKE_DRIFT,
+        IMPACT_SMOKE_DENSE,
+      )
+    }
+  }
+
+  /**
+   * 煙を 1 粒。**銃口と着弾で共用する。**
+   *
+   * @param at どこから
+   * @param dir どちらへ流れるか (長さは無視して向きだけ使う)
+   * @param size 出始めの大きさ (m)
+   * @param grow 消えるまでに何倍になるか
+   * @param span 生きている時間 (秒)
+   * @param drift 流れる速さ (m/s)
+   * @param dense 出た瞬間の濃さ (0〜1)。**遠くの物ほど濃くないと見えない** —
+   *   銃口は手元なので薄くてよいが、着弾は 10m 先にある
+   */
+  private puff(
+    at: THREE.Vector3,
+    dir: THREE.Vector3,
+    size: number,
+    grow: number,
+    span: number,
+    drift: number,
+    dense: number,
+  ): void {
+    const i = this.smokeNext
+    this.smokeNext = (this.smokeNext + 1) % SMOKE_POOL
+    const sprite = this.smoke[i]
+    if (!sprite) return
+    sprite.position.copy(at)
+    sprite.scale.setScalar(size)
+    sprite.visible = true
+    // 向きは揃えず、少し散らす。同じ向きへ並ぶと 1 枚の板に見える
+    this.smokeVelocity[i]!.copy(dir)
+      .normalize()
+      .multiplyScalar(drift)
+      .addScaledVector(
+        this.scatter.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5),
+        drift * 0.5,
+      )
+    this.smokeLife[i] = span
+    this.smokeSpan[i] = span
+    this.smokeSize[i] = size
+    this.smokeGrow[i] = grow
+    this.smokeDense[i] = dense
+  }
+
+  /**
+   * 銃口の煙。**撃った本人にも、見ている側にも出す。**
+   *
+   * 弾そのものは見えない (曳光は 1 フレームの線) ので、**撃ったことが絵に
+   * 残らなかった。** 短くしてあるのは、連射で銃口が煙に埋まらないようにするため。
+   */
+  muzzle(at: THREE.Vector3, dir: THREE.Vector3): void {
+    this.puff(at, dir, MUZZLE_SIZE, MUZZLE_GROW, MUZZLE_LIFE, MUZZLE_DRIFT, MUZZLE_DENSE)
+  }
+
+  /**
+   * 金属を弾いた火花。**面の法線を中心に散らす。**
+   *
+   * 木や石は削れて粉が出る (煙) が、金属は削れずに弾ける。音は既に面で
+   * 分けてあるので (hitMetal)、目のほうも揃える。
+   */
+  private sparkBurst(at: THREE.Vector3, normal: THREE.Vector3): void {
+    for (let n = 0; n < SPARK_BURST; n++) {
+      const i = this.sparkNext
+      this.sparkNext = (this.sparkNext + 1) % SPARK_POOL
+      const sprite = this.sparks[i]
+      if (!sprite) continue
+      sprite.position.copy(at)
+      sprite.scale.setScalar(SPARK_SIZE)
+      sprite.visible = true
+      this.sparkVelocity[i]!.copy(normal)
+        .normalize()
+        .addScaledVector(
+          this.scatter.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5),
+          SPARK_SPREAD * 2,
+        )
+        .normalize()
+        // 勢いを揃えない。**同じ速さだと輪になって広がる**
+        .multiplyScalar(SPARK_SPEED * (0.5 + Math.random()))
+      this.sparkLife[i] = SPARK_LIFE * (0.6 + Math.random() * 0.4)
+    }
   }
 
   /**
@@ -702,6 +941,56 @@ export class Shots {
         }
       }
 
+    }
+
+    /*
+     * 煙。**膨らみながら薄れる。**
+     *
+     * 出た瞬間が一番濃い。実際の煙は少し遅れて濃くなるが、**銃口のものは
+     * 0.2 秒で消える**ので立ち上がりを作る余地がない。
+     */
+    for (let i = 0; i < SMOKE_POOL; i++) {
+      if (this.smokeLife[i]! <= 0) continue
+      this.smokeLife[i]! -= dt
+      const sprite = this.smoke[i]!
+      const material = sprite.material as THREE.SpriteMaterial
+      if (this.smokeLife[i]! <= 0) {
+        sprite.visible = false
+        material.opacity = 0
+        continue
+      }
+      const left = this.smokeLife[i]! / this.smokeSpan[i]!
+      sprite.position.addScaledVector(this.smokeVelocity[i]!, dt)
+      // 広がるほど遅くなる。空気に押し返される感じ
+      this.smokeVelocity[i]!.multiplyScalar(1 - Math.min(1, dt * 3))
+      sprite.scale.setScalar(this.smokeSize[i]! * (1 + (this.smokeGrow[i]! - 1) * (1 - left)))
+      // 二乗で落とす。**線形だと最後まで見えていて、消えた瞬間が分かる**
+      material.opacity = left * left * this.smokeDense[i]!
+    }
+
+    /*
+     * 火花。**落ちながら消える。**
+     *
+     * 真っ直ぐ飛ばすと線香花火にならない。短命なので重力の効きは僅かだが、
+     * 曲がっているかどうかで弾けて見えるかが変わる。
+     */
+    for (let i = 0; i < SPARK_POOL; i++) {
+      if (this.sparkLife[i]! <= 0) continue
+      this.sparkLife[i]! -= dt
+      const sprite = this.sparks[i]!
+      const material = sprite.material as THREE.SpriteMaterial
+      if (this.sparkLife[i]! <= 0) {
+        sprite.visible = false
+        material.opacity = 0
+        continue
+      }
+      const velocity = this.sparkVelocity[i]!
+      velocity.y -= SPARK_GRAVITY * dt
+      sprite.position.addScaledVector(velocity, dt)
+      const left = this.sparkLife[i]! / SPARK_LIFE
+      // 消え際に細くする。**大きさが変わらないと、消えるのが唐突に見える**
+      sprite.scale.setScalar(SPARK_SIZE * (0.35 + left * 0.65))
+      material.opacity = Math.min(1, left * 1.6)
     }
 
     for (let i = 0; i < IMPACT_POOL; i++) {

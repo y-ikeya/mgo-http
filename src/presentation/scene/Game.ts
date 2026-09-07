@@ -1633,6 +1633,18 @@ export class Game {
           this.remoteTo,
           this.impactFacing,
           IMPACT_WORLD,
+          /*
+           * 面は**着弾点から地形を引き直す。** 届くのは着弾点だけで、何に
+           * 当たったかは載っていない (載せると送る量が増える)。地形は全員が
+           * 同じ物を持っているので、撃った側と同じ答えが出る (playImpactAt)。
+           */
+          surfaceAt(
+            this.remoteTo,
+            IMPACT_PROBE,
+            this.stage.obstacles,
+            this.remoteTo.y,
+            IMPACT_PROBE,
+          ),
         );
         /*
          * 他人の弾の着弾音。**当たった面はこちらで引き直す。**
@@ -2944,6 +2956,8 @@ export class Game {
       // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
       hitPlayer || splashed ? null : hitTerrain ? this.hitNormal : null,
       IMPACT_WORLD,
+      // **当たった物の名前から引く。** 音を鳴らすのと同じ引き方 (playImpact)
+      hitTerrain ? surfaceOf(hitTerrain.object.name) : undefined,
     );
     // 金属に当たった音。**材質は当たった面の名前から引く** (地形と同じ決めごと)
     if (!hitPlayer && !splashed && hitTerrain) this.playImpact(hitTerrain, this.hitPoint);
