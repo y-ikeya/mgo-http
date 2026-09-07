@@ -133,11 +133,12 @@ const SELF_RENDER_ORDER = 1000
  *
  * 転んだら**自分で起きるまで転んだまま**。時間で勝手に立たない。
  *
- * 伏せたまま撃つか、起きて動くかを選ばせたい。自動で立つと、その選択が
- * 時計に奪われる — 撃とうとした瞬間に立ち上がり始めて、無防備な時間だけが残る。
+ * 伏せたまま撃つか、這って逃げるか、起きて動くかを選ばせたい。自動で立つと、
+ * その選択が時計に奪われる — 撃とうとした瞬間に立ち上がり始めて、無防備な
+ * 時間だけが残る。
  *
  * ここで置いているのは吹き飛ばされる型が終わるまでの分だけ。倒れ切る前に
- * 移動キーで起き上がれてしまうと、爆風を受けた事実がほぼ無かったことになる。
+ * 動けてしまうと、爆風を受けた事実がほぼ無かったことになる。
  */
 const DOWN_LOCK = 0.35
 
@@ -1139,13 +1140,21 @@ export class Soldier {
     // 押しっぱなしも受け付けない。倒される前から構えていた場合、
     // 着地した瞬間に何もしていないのに構え直してしまう。一度離してから
     // 押し直させることで、伏せて撃つのが**選んだ結果**になる。
+    if (!aiming) this.aimLatched = false
     if (this.downed) {
-      if (!aiming) this.aimLatched = false
       const landed = this.downElapsed >= (this.animator?.sweepDuration ?? 1.5)
       this.aiming = landed && aiming && !this.aimLatched
       return
     }
-    this.aiming = this.down || this.boxed || this.standing ? false : aiming
+    /*
+     * 押しっぱなしの掛け金は**倒れ終わった後まで持ち越す。**
+     *
+     * 倒れたまま這い出すと downed が下りて伏せに移る (crawlFromDown) ので、
+     * ここで掛け金を見ないと、**這い始めた瞬間に構え直す**。構え直すこと自体は
+     * よいが、それは押し直した結果であってほしい。
+     */
+    this.aiming =
+      this.down || this.boxed || this.standing || this.aimLatched ? false : aiming
   }
 
   /**
@@ -1217,7 +1226,19 @@ export class Soldier {
   /** しゃがみの切り替え。空中では姿勢を変えない */
   toggleCrouch(): void {
     if (!this.onGround || this.down || this.saluting) return
-    if (this.downed || this.standing) return
+    // 立ち上がりの最中は受け付けない。**繋ぎを途中で切らない**
+    if (this.standing) return
+    /*
+     * 吹き飛ばされて倒れている間。**Space が起き上がる合図。**
+     *
+     * 動くと這い出すようにしたので (crawlFromDown)、起きる操作がここへ移った。
+     * 伏せから起きるのと同じ指なので、**倒された後も覚えることが増えない** —
+     * 這うか起きるかの選び方が、自分で伏せたときと同じになる。
+     */
+    if (this.downed) {
+      this.standUp()
+      return
+    }
     // 箱を被ったまま立ち上がることはできない。脱いでから立つ。
     if (this.boxed) {
       this.dropBox()
@@ -1479,10 +1500,27 @@ export class Soldier {
   }
 
   /**
+   * 倒れたまま這い出す。**仰向けから腹這いへ寝返る。**
+   *
+   * 吹き飛ばされて着いた姿勢 (sweep) と、伏せている姿勢は**着いた後は同じ扱い**。
+   * ここで伏せの側へ渡してしまえば、這う・伏せ撃ち・伏せ装填が全部そのまま
+   * 効く。倒れている側にもう一組同じものを書かずに済む。
+   *
+   * 倒れた直後 (DOWN_LOCK) は受け付けない。飛ばされている最中に這い出せると、
+   * 吹き飛ばされたこと自体が無くなる。
+   */
+  private crawlFromDown(): void {
+    if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
+    this.downed_ = false
+    this.proneStage = 'prone'
+    this.proneShiftLeft = 0
+  }
+
+  /**
    * 起き上がる。
    *
-   * 移動入力で呼ばれる。**倒れたまま構えている間は呼ばれない** —
-   * 撃つか起きるかを選ぶのが倒れている間の中身なので、
+   * Space で呼ばれる (toggleCrouch)。**倒れたまま構えている間は呼ばれない** —
+   * 撃つか、這うか、起きるかを選ぶのが倒れている間の中身なので、
    * 撃とうとしただけで勝手に起き上がってはいけない。
    */
   standUp(): void {
@@ -1599,13 +1637,20 @@ export class Soldier {
     // 倒れている間は入力を捨てる。重力と接地だけは回して、体が宙に浮かないようにする。
     if (this.down) moveDir = ZERO_MOVE
 
-    // 倒れている間と立ち上がりの最中は動けない。
-    // 撃つことはできる (上半身は構えに戻っている)。
-    //
-    // 移動しようとしたことが起き上がる合図になる。動きたいと思った時点で
-    // 起きるのが素直で、そのためのキーを別に覚えさせる理由が無い
+    /*
+     * 倒れている間と立ち上がりの最中は動けない。
+     * 撃つことはできる (上半身は構えに戻っている)。
+     *
+     * **動こうとしたら這い出す。** 吹き飛ばされて着いた先は伏せているのと
+     * 同じ姿勢なので、そこから動けるのは匍匐だけ。起き上がるのは Space で、
+     * 伏せから起きるのと同じ指になる (toggleCrouch)。
+     *
+     * 以前は動いた時点で立ち上がっていた。**倒された代償が、立つまでの
+     * 1.5 秒だけ**になっていて、伏せたまま体勢を変える (物陰へ這って逃げる /
+     * 這って撃ち返す) という選択がそもそも取れなかった。
+     */
     if (this.downed || this.standing) {
-      if (this.downed && moveDir.lengthSq() > 1e-6) this.standUp()
+      if (this.downed && moveDir.lengthSq() > 1e-6) this.crawlFromDown()
       moveDir = ZERO_MOVE
     }
 
