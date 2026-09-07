@@ -279,9 +279,13 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   /*
    * 伏せている間。**8 方向には分けない。**
    *
-   * 這う型は前 (crawl_f) と後ろ (crawl_b) の 2 本。**横は無い。**
+   * 這う型は前 (crawl_f) と後ろ (crawl_b) の 2 本。**8 方向には分けない。**
+   *
+   * 構えていなければ体が進行方向を向くので、どちらへ入力しても向き直って
+   * 前へ這う。後ろの型が出るのは**構えたまま下がるとき** — 体は照準を向いた
+   * まま動くので、そこだけ前後の区別が要る。
+   *
    * 止まったら伏せたまま静止する (箱の sneak / sit と同じ形)。
-   * 横へ動けないことは、動かす側 (soldier.ts) が前後へ丸めて作っている。
    */
   // 伏せへの出入り。**終わるまで他へ移らない** (全身の型)
   if (input.proneShift) return input.proneShift

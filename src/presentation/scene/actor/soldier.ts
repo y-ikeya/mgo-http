@@ -269,6 +269,22 @@ export class Soldier {
   /** 現在の移動アニメの状態。切り替えのヒステリシス判定に使う */
   private locomotion: Locomotion = 'idle'
   /** 銃の持ち方が姿勢へ寄っている度合い (0 = 立ち, 1 = しゃがみ) */
+  /**
+   * 伏せの段取り。
+   *
+   *     none        伏せていない
+   *     prone_down  伏せに入っている最中 (0.9 秒)
+   *     prone       伏せている
+   *     prone_rise  起き上がっている最中 (1.8 秒)
+   *
+   * **入り / 出を旗 1 つで表せない。** 入っている最中はまだ伏せていないし、
+   * 出ている最中はもう伏せていない。旗 1 つにすると、繋ぎのモーションが
+   * 流れている間の頭の高さも動けるかどうかも決められなくなる。
+   */
+  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' = 'none'
+  /** 繋ぎのモーションの残り時間 (秒) */
+  private proneShiftLeft = 0
+
   private weaponStance = 0
   /** 姿勢が変わっている速さ。散布に効かせる */
   private stanceRateValue = 0
@@ -1217,24 +1233,6 @@ export class Soldier {
     this.crouching = !this.crouching
   }
 
-  /**
-   * 伏せの段取り。
-   *
-   *     none        伏せていない
-   *     prone_down  伏せに入っている最中 (0.9 秒)
-   *     prone       伏せている
-   *     prone_rise  起き上がっている最中 (1.8 秒)
-   *
-   * **入り / 出を旗 1 つで表せない。** 入っている最中はまだ伏せていないし、
-   * 出ている最中はもう伏せていない。旗 1 つにすると、繋ぎのモーションが
-   * 流れている間の頭の高さも動けるかどうかも決められなくなる。
-   */
-  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' = 'none'
-  /** 繋ぎのモーションの残り時間 (秒) */
-  private proneShiftLeft = 0
-  /** 這う向きの置き場。毎フレーム作らない */
-  private readonly crawlDir = new THREE.Vector3()
-
   /** 伏せ切っているか。入り / 出の最中は false */
   get isProne(): boolean {
     return this.proneStage === 'prone'
@@ -1645,23 +1643,6 @@ export class Soldier {
      */
     if (this.hardLandTimer > 0) moveDir = ZERO_MOVE
 
-    /*
-     * 伏せている間は**前後だけ。** 横は捨てる。
-     *
-     * 這う型が前 (crawl_f) と後ろ (crawl_b) の 2 本しかないので、横へ動かすと
-     * 前を向いたまま横滑りする。**型の無い向きへは動かさない。**
-     *
-     * 後ろは長らく捨てていた (型が前しか無かった)。伏せたら前へ進むしかなく、
-     * **覗いた縁から下がれない**ので、伏せること自体が引き返せない選択に
-     * なっていた。
-     */
-    if (this.proneStage === 'prone' && moveDir !== ZERO_MOVE) {
-      const sin = Math.sin(facingYaw)
-      const cos = Math.cos(facingYaw)
-      // yaw = θ のとき前方は (-sinθ, -cosθ)
-      const forward = moveDir.x * -sin + moveDir.z * -cos
-      moveDir = this.crawlDir.set(-sin * forward, 0, -cos * forward)
-    }
 
     // 銃の重さはどの姿勢でも効く。担いでいる物が軽くなるわけではないので。
     //
