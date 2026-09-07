@@ -561,6 +561,26 @@ describe('勝手に構えない', () => {
    * 体が照準を向いたまま横へ動くので、方向ごとの型が要る。上下が別のクリップ
    * になるが、そちらは家系が揃っている (どちらも振れた側)。
    */
+  /**
+   * **立っている間も上下を揃える。**
+   *
+   * 腰の傾きが家系で違う (idle X −103.1 / pistol_relaxed X −94.5)。打ち消しは
+   * 縦軸まわりの捻れだけを消して傾きは残すので、差の 8.6° がそのまま上体の
+   * 傾きになる — **立っているだけで右へ傾いて**見えた。
+   */
+  test('**脱力して立つ間も、上下が同じクリップ**', () => {
+    for (const pistol of [false, true]) {
+      const anim = animator()
+      anim.setPistol(pistol)
+      run(anim, 1.2, 'idle')
+      const lower = playing(anim, 'lower')
+      const upper = playing(anim, 'upper')
+      const clips = (anim as unknown as Record<string, Map<string, string>>).lowerClipNames
+      const uppers = (anim as unknown as Record<string, Map<string, string>>).upperClipNames
+      expect(clips.get(lower[0]!)).toBe(uppers.get(upper[0]!)!)
+    }
+  })
+
   test('構えて走る間は、方向ごとの型を使う', () => {
     const anim = animator()
     run(anim, 1.2, 'run_r', true)

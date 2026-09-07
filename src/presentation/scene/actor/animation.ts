@@ -708,8 +708,24 @@ const RELAXED_LEAN = THREE.MathUtils.degToRad(17)
  */
 const BOX_LEAN = THREE.MathUtils.degToRad(34)
 
-/** 走りの 8 方向。**構えていない間はここだけ家系を揃える** */
+/** 走りの 8 方向 */
 const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as Locomotion))
+
+/**
+ * 構えていない間、**上下を同じクリップに揃える姿勢。**
+ *
+ * 素材が 2 つの家系に分かれていて、腰の向きも傾きも違う。混ぜると差がそのまま
+ * 上半身に出る (登録の所に測った値がある)。
+ *
+ *                 X       Y      Z
+ *   idle       -103.1    1.4   39.9   ← 手榴弾のときの下半身
+ *   pistol_relaxed -94.5 0.1   43.1   ← そのときの上半身
+ *
+ * 打ち消し (alignSpineToUpperClip) は**縦軸まわりの捻れだけ**を消して、傾きは
+ * 本来の姿勢として残す。なので X の差 8.6° が上体の傾きとして残り、**立って
+ * いるだけで右へ 15° ほど傾いて**見えた。上下を同じクリップにすれば差が無くなる。
+ */
+const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle'])
 
 /** 脱力中の下半身を引く鍵。**元の状態と、流すクリップの組** */
 function relaxedLowerKey(state: Locomotion, clip: string): string {
@@ -1052,7 +1068,7 @@ export class CharacterAnimator {
       ...Object.entries(RELAXED_CLIPS).map(([k, v]) => [k, v] as const),
       ...Object.entries(PISTOL_RELAXED).map(([k, v]) => [k, v] as const),
     ]) {
-      if (!RUN_STATES.has(state as Locomotion)) continue
+      if (!RELAXED_LOWER_STATES.has(state as Locomotion)) continue
       const clip = byName.get(name)
       const key = relaxedLowerKey(state as Locomotion, name)
       if (!clip || this.lower.has(key)) continue
@@ -1765,7 +1781,7 @@ export class CharacterAnimator {
    * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
    */
   private resolveLowerKey(): string {
-    if (this.aiming || !RUN_STATES.has(this.locomotion)) return this.locomotion
+    if (this.aiming || !RELAXED_LOWER_STATES.has(this.locomotion)) return this.locomotion
     const name = this.pistol ? PISTOL_RELAXED[this.locomotion] : RELAXED_CLIPS[this.locomotion]
     if (!name) return this.locomotion
     const key = relaxedLowerKey(this.locomotion, name)
