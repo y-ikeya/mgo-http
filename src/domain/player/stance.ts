@@ -49,7 +49,7 @@ export function stanceOf(locomotion: Locomotion): Stance {
    */
   if (locomotion === 'prone_down' || locomotion === 'prone_rise') return 'crouch'
   // 横への半回転は**寝たまま**。伏せへの出入りと違って腰が上がらない
-  if (locomotion === 'prone_roll_up' || locomotion === 'prone_roll_down') return 'prone'
+  if (locomotion === 'prone_roll_down') return 'prone'
   // クレイモアはかがんで置く。頭が下がるので、見つかりにくさもしゃがみと同じ
   if (locomotion === 'claymore_windup' || locomotion === 'claymore_place') return 'crouch'
   if (locomotion === 'crouch_idle' || locomotion.startsWith('crouch_')) return 'crouch'

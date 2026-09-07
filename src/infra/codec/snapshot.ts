@@ -75,8 +75,7 @@ export const LOCOMOTIONS: Locomotion[] = [
   'crawl_b',
   // 麻酔で眠っている。**末尾に足す**
   'sleep',
-  // 伏せたまま横へ半回転する。**末尾に足す**
-  'prone_roll_up',
+  // 仰向けからうつ伏せへ転がる。**末尾に足す**
   'prone_roll_down',
 ]
 

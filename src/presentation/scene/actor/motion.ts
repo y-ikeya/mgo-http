@@ -85,7 +85,6 @@ export type WholeBodyLocomotion =
   | 'bump'
   | 'prone_down'
   | 'prone_rise'
-  | 'prone_roll_up'
   | 'prone_roll_down'
   | 'claymore_windup'
   | 'claymore_place'
@@ -111,7 +110,6 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'prone_down',
   'prone_rise',
   // 横への半回転。上だけ構えに戻ると、裏返りながら銃を構える
-  'prone_roll_up',
   'prone_roll_down',
   // クレイモアを置く。かがむので上下を分けられない
   'claymore_windup',
@@ -224,14 +222,7 @@ export interface StanceInput {
    * **伏せているかとは別に持つ。** 入っている最中はまだ伏せていないし、
    * 起き上がっている最中はもう伏せていない — 旗 1 つでは表せない。
    */
-  proneShift: 'prone_down' | 'prone_rise' | 'prone_roll_up' | 'prone_roll_down' | null
-  /**
-   * 仰向けで止まっているか。**伏せているが、うつ伏せではない。**
-   *
-   * 這う型はうつ伏せなので流せない。転がり切った型が最後の姿勢で留まって
-   * いるので、そのまま出し続ける。
-   */
-  proneUp: boolean
+  proneShift: 'prone_down' | 'prone_rise' | 'prone_roll_down' | null
   rolling: boolean
   onGround: boolean
   /** 着地モーションの残り時間 (秒) */
@@ -301,14 +292,6 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
    */
   // 伏せへの出入り。**終わるまで他へ移らない** (全身の型)
   if (input.proneShift) return input.proneShift
-
-  /*
-   * 仰向けで止まっている。**転がり切った型の最後の姿勢のまま。**
-   *
-   * 這う型はうつ伏せなので流せない (流すと寝返らずに裏返る)。動くにも
-   * 撃つにも、まず転がって戻ることになる — それが仰向けで居ることの代償。
-   */
-  if (input.proneUp) return 'prone_roll_up'
 
   if (input.prone) {
     const crawling = input.previous === 'crawl_f' || input.previous === 'crawl_b'

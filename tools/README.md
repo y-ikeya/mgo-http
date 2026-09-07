@@ -119,6 +119,23 @@ bun tools/split_clip.js public/models/soldier.glb prone_throw 0.95 prone_throw_w
 手が一番高くなるのが立ちは後半の 23%、伏せは 38% (`knobs.ts` の
 `GRENADE_RELEASE_RATIO` / `PRONE_GRENADE_RELEASE_RATIO`)。
 
+### 横への転がりは後半だけ使う
+
+`proneTurn.fbx` は**1 回転**する型 (うつ伏せ → 仰向け → うつ伏せ、1.13 秒)。
+使うのは仰向けから戻る後半だけで、そこが吹き飛ばされた所から這い出す繋ぎになる
+(転ぶ型 `sweep` は仰向けで終わる)。
+
+```
+bun tools/split_clip.js proneturn.glb prone_turn 0.30 prone_roll_up   prone_roll_rest
+bun tools/split_clip.js proneturn.glb prone_roll_rest 0.50 prone_roll_down prone_roll_tail
+bun tools/merge_clip.js public/models/soldier.glb proneturn.glb prone_roll_down public/models/soldier.glb
+```
+
+0.30 秒が仰向けになり切る所 (腹が真上を向く)、そこから 0.50 秒でうつ伏せへ戻る。
+残り 0.33 秒は寝たまま動かない尾なので捨てる。**取り込むのは
+`prone_roll_down` の 1 本だけ** — 前半 (`prone_roll_up`) は、仰向けで止まれる
+姿勢を足すときに要る。
+
 ### 姿勢だけが欲しいときは両端を切り出す
 
 しゃがみの脱力と構えは `kneeAim.fbx` 1 本の**両端**を使っている。始まりが銃を

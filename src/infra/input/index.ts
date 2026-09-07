@@ -88,13 +88,6 @@ const PAD_BUTTONS = {
   zoom: [4, 15],
   /** △ / Y。置く / 拾う */
   drop: [3],
-  /**
-   * ○ / B。**伏せたまま半回転する。**
-   *
-   * 伏せている間しか効かないので、他と取り合いにならない。丸は一度ナイフに
-   * 割り当てて外した経緯があり、そこから空いていた。
-   */
-  turn: [1],
 } as const
 
 type PadAction = keyof typeof PAD_BUTTONS
@@ -141,14 +134,6 @@ const BINDINGS = {
    */
   swapTool: { keys: ['KeyC'], pad: 'box', yieldsWhenAiming: true },
   drop: { keys: ['KeyG'], pad: 'drop' },
-  /**
-   * 伏せたまま半回転する。**伏せている間だけ効く。**
-   *
-   * 伏せていると体は進む向きにしか回らない (止まっていれば向きは動かない)
-   * ので、寝たまま後ろを向くには一度立つしかなかった。覗いた縁から下がる
-   * のに crawl_b を足したのと同じ話で、**伏せたまま体勢を変える**手を増やす。
-   */
-  proneTurn: { keys: ['KeyF'], pad: 'turn' },
   toSupport: { keys: ['KeyE'], pad: 'grenade' },
   /**
    * 戦場へ出る / READY。**3 つ受ける** — 右手が置き場所によって違う。
