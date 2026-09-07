@@ -85,6 +85,7 @@ export type WholeBodyLocomotion =
   | 'bump'
   | 'prone_down'
   | 'prone_rise'
+  | 'prone_turn'
   | 'claymore_windup'
   | 'claymore_place'
 
@@ -108,6 +109,8 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   // 伏せへの出入り。上だけ構えに戻ると、寝ながら銃を構える形になる
   'prone_down',
   'prone_rise',
+  // 仰向けから腹這いへの寝返り。上だけ構えに戻ると、裏返りながら銃を構える
+  'prone_turn',
   // クレイモアを置く。かがむので上下を分けられない
   'claymore_windup',
   'claymore_place',
@@ -219,7 +222,7 @@ export interface StanceInput {
    * **伏せているかとは別に持つ。** 入っている最中はまだ伏せていないし、
    * 起き上がっている最中はもう伏せていない — 旗 1 つでは表せない。
    */
-  proneShift: 'prone_down' | 'prone_rise' | null
+  proneShift: 'prone_down' | 'prone_rise' | 'prone_turn' | null
   rolling: boolean
   onGround: boolean
   /** 着地モーションの残り時間 (秒) */

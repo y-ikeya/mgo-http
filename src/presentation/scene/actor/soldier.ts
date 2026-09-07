@@ -282,7 +282,7 @@ export class Soldier {
    * 出ている最中はもう伏せていない。旗 1 つにすると、繋ぎのモーションが
    * 流れている間の頭の高さも動けるかどうかも決められなくなる。
    */
-  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' = 'none'
+  private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' | 'prone_turn' = 'none'
   /** 繋ぎのモーションの残り時間 (秒) */
   private proneShiftLeft = 0
 
@@ -1300,8 +1300,10 @@ export class Soldier {
   }
 
   /** 伏せへ出入りしている最中か。**この間は動けない** */
-  get proneShifting(): 'prone_down' | 'prone_rise' | null {
-    return this.proneStage === 'prone_down' || this.proneStage === 'prone_rise'
+  get proneShifting(): 'prone_down' | 'prone_rise' | 'prone_turn' | null {
+    return this.proneStage === 'prone_down' ||
+      this.proneStage === 'prone_rise' ||
+      this.proneStage === 'prone_turn'
       ? this.proneStage
       : null
   }
@@ -1519,14 +1521,26 @@ export class Soldier {
    * ここで伏せの側へ渡してしまえば、這う・伏せ撃ち・伏せ装填が全部そのまま
    * 効く。倒れている側にもう一組同じものを書かずに済む。
    *
+   * **寝返る間を挟む。** 転ぶ型 (sweep) は仰向けで終わるので、そのまま這う型へ
+   * 渡すと 1 フレームで裏返る。伏せに入るのに prone_down を挟むのと同じ形
+   * (prone_turn)。型が無ければ間を置かずに伏せへ渡す — 裏返って見えるが、
+   * **這えなくなるよりはよい。**
+   *
    * 倒れた直後 (DOWN_LOCK) は受け付けない。飛ばされている最中に這い出せると、
    * 吹き飛ばされたこと自体が無くなる。
    */
   private crawlFromDown(): void {
     if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
     this.downed_ = false
-    this.proneStage = 'prone'
-    this.proneShiftLeft = 0
+    const span = this.animator?.proneTurnDuration ?? 0
+    if (span <= 0) {
+      this.proneStage = 'prone'
+      this.proneShiftLeft = 0
+      return
+    }
+    this.proneStage = 'prone_turn'
+    this.proneShiftLeft = span
+    this.animator?.playProneTurn()
   }
 
   /**
@@ -1905,11 +1919,18 @@ export class Soldier {
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
-    // 繋ぎが終わったら次の段へ。起き上がりの先はしゃがみ
+    /*
+     * 繋ぎが終わったら次の段へ。
+     *
+     *   prone_down  伏せに入る    → 伏せ
+     *   prone_turn  仰向けから寝返る → 伏せ
+     *   prone_rise  伏せから起きる  → しゃがみ
+     */
     if (this.proneShiftLeft > 0) {
       this.proneShiftLeft -= dt
       if (this.proneShiftLeft <= 0) {
-        this.proneStage = this.proneStage === 'prone_down' ? 'prone' : 'none'
+        const toProne = this.proneStage === 'prone_down' || this.proneStage === 'prone_turn'
+        this.proneStage = toProne ? 'prone' : 'none'
         if (this.proneStage === 'none') this.crouching = true
       }
     }
