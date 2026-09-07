@@ -125,6 +125,8 @@ type UpperState =
   // 伏せへの出入り
   | 'prone_down'
   | 'prone_rise'
+  // 仰向けからうつ伏せへ、横へ半回転する
+  | 'prone_roll_down'
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
   | 'death'

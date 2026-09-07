@@ -135,6 +135,8 @@ const PLAY_WHOLE_BODY: Record<
   // 伏せへの出入り
   prone_down: (a) => a.playProneDown(),
   prone_rise: (a) => a.playProneRise(),
+  // 吹き飛ばされた所から這い出す寝返り。**他人の画面でも転がる**
+  prone_roll_down: (a) => a.playProneRollDown(),
   // 着地。ここだけは「全身だが専用の入口がある」ではなく元からこれ
   jump_down: (a) => a.playLanding(),
   // クレイモア。構え始めと、置き切る所。**置く型から見え始めることがある**ので、
