@@ -32,6 +32,23 @@
 export interface TriangleMesh {
   /** 頂点。三角 1 枚につき 9 個 (x,y,z を 3 つ) */
   positions: Float32Array
+  /**
+   * 三角 1 枚ごとの材質の番号。**足音と着弾に要る。**
+   *
+   * 箱で持っていた頃は Obstacle.surface が持っていた。三角へ移すときに
+   * 一緒に連れて来ないと、**木の床から石の音**が鳴る。
+   */
+  surfaces?: Uint8Array
+}
+
+/** 押し出す向きと深さ。**球が食い込んだときに返る** */
+export interface Contact {
+  /** 押し出す向き (正規化済み) */
+  nx: number
+  ny: number
+  nz: number
+  /** どれだけ食い込んでいるか (m) */
+  depth: number
 }
 
 /** 当たった所。**跳ね返りに要る** */
@@ -42,6 +59,8 @@ export interface SurfaceHit {
   nx: number
   ny: number
   nz: number
+  /** 当たった三角の番号。材質を引くのに使う (TriangleMesh.surfaces) */
+  tri: number
 }
 
 /** 木の節点。葉なら三角を持ち、そうでなければ子を 2 つ持つ */
@@ -73,12 +92,14 @@ const PARALLEL = 1e-9
 
 export class TriangleBvh {
   private readonly positions: Float32Array
+  private readonly surfaces: Uint8Array | null
   /** 三角の索引。木を組むときに並べ替える (positions は動かさない) */
   private readonly tris: Uint32Array
   private readonly nodes: Node[] = []
 
   constructor(mesh: TriangleMesh) {
     this.positions = mesh.positions
+    this.surfaces = mesh.surfaces ?? null
     const count = Math.floor(mesh.positions.length / 9)
     this.tris = new Uint32Array(count)
     for (let i = 0; i < count; i++) this.tris[i] = i
@@ -136,7 +157,7 @@ export class TriangleBvh {
       for (let i = node.from; i < node.from + node.count; i++) {
         const t = this.triangleDistance(this.tris[i]!, ax, ay, az, dx, dy, dz)
         if (t === null || (best && t >= best.t)) continue
-        best = { t, ...this.normalOf(this.tris[i]!, dx, dy, dz) }
+        best = { t, tri: this.tris[i]!, ...this.normalOf(this.tris[i]!, dx, dy, dz) }
       }
       return best
     }
@@ -173,6 +194,100 @@ export class TriangleBvh {
       nz = -nz
     }
     return { nx, ny, nz }
+  }
+
+  /** その三角の材質の番号。持っていなければ null */
+  surfaceOf(tri: number): number | null {
+    return this.surfaces ? (this.surfaces[tri] ?? null) : null
+  }
+
+  /**
+   * 球に食い込んでいる三角を訪ねる。
+   *
+   * --- なぜ線では足りないか ---
+   * 線は**点が通るか**しか答えない。人は太さを持っていて、壁に埋まったら
+   * 外へ押し出す必要がある。押し出す向きと深さは「球の中心に一番近い面の点」
+   * から出るので、面までの距離が要る。
+   *
+   * 箱でやっていた頃 (resolveCircle) は、四角の一番近い辺へ押していた。
+   * 同じことを三角に対してやる。
+   *
+   * @param visit 食い込むたびに呼ばれる。**押し出す量は呼ぶ側が決める** —
+   *   壁と床で扱いが違う (床に押し戻されると坂を登れない)
+   */
+  touching(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    visit: (contact: Contact, tri: number) => void,
+  ): void {
+    if (this.nodes.length === 0) return
+    this.sphere(0, x, y, z, radius, radius * radius, visit)
+  }
+
+  private sphere(
+    at: number,
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    radiusSq: number,
+    visit: (contact: Contact, tri: number) => void,
+  ): void {
+    const node = this.nodes[at]!
+    if (!sphereHitsBounds(node, x, y, z, radius)) return
+    if (node.count > 0) {
+      for (let i = node.from; i < node.from + node.count; i++) {
+        const tri = this.tris[i]!
+        const contact = this.contactWith(tri, x, y, z, radiusSq)
+        if (contact) visit(contact, tri)
+      }
+      return
+    }
+    this.sphere(node.left, x, y, z, radius, radiusSq, visit)
+    this.sphere(node.right, x, y, z, radius, radiusSq, visit)
+  }
+
+  /**
+   * 球とその三角の当たり。**面の上の一番近い点から向きを出す。**
+   *
+   * 面の向き (法線) をそのまま使わないのは、角や辺に触れたときに嘘になるから。
+   * 面の内側で触れていれば法線と一致し、辺に触れていれば辺から外向きになる —
+   * どちらも「一番近い点から中心へ」で表せる。
+   */
+  private contactWith(
+    tri: number,
+    x: number,
+    y: number,
+    z: number,
+    radiusSq: number,
+  ): Contact | null {
+    const p = this.positions
+    const o = tri * 9
+    const [cx, cy, cz] = closestOnTriangle(
+      x, y, z,
+      p[o]!, p[o + 1]!, p[o + 2]!,
+      p[o + 3]!, p[o + 4]!, p[o + 5]!,
+      p[o + 6]!, p[o + 7]!, p[o + 8]!,
+    )
+    const dx = x - cx
+    const dy = y - cy
+    const dz = z - cz
+    const distSq = dx * dx + dy * dy + dz * dz
+    if (distSq >= radiusSq) return null
+    const dist = Math.sqrt(distSq)
+    // 面の上にちょうど乗っている。**向きが出せないので面の法線へ逃がす**
+    if (dist < PARALLEL) {
+      const n = this.normalOf(tri, 0, -1, 0)
+      return { nx: n.nx, ny: n.ny, nz: n.nz, depth: Math.sqrt(radiusSq) }
+    }
+    return {
+      nx: dx / dist,
+      ny: dy / dist,
+      nz: dz / dist,
+      depth: Math.sqrt(radiusSq) - dist,
+    }
   }
 
   /**
@@ -393,4 +508,79 @@ function segmentHitsBounds(
   if (t1 > near) near = t1
   if (t2 < far) far = t2
   return near <= far
+}
+
+/** 球がその箱に届くか。**枝を捨てるためだけ** (近似ではなく保証) */
+function sphereHitsBounds(
+  node: Node,
+  x: number,
+  y: number,
+  z: number,
+  radius: number,
+): boolean {
+  const dx = x - clampTo(x, node.minX, node.maxX)
+  const dy = y - clampTo(y, node.minY, node.maxY)
+  const dz = z - clampTo(z, node.minZ, node.maxZ)
+  return dx * dx + dy * dy + dz * dz < radius * radius
+}
+
+function clampTo(value: number, low: number, high: number): number {
+  return value < low ? low : value > high ? high : value
+}
+
+/**
+ * 三角の上で、その点に一番近い所。
+ *
+ * 面の内側なら垂線の足、辺の外なら辺の上、角の外なら角そのもの。
+ * 重心座標の符号で 7 つの領域に分けて決める (Ericson の手順)。
+ *
+ * **押し出す向きはここから出る。** 面の法線をそのまま使うと、角に触れた
+ * ときに面の裏側へ押し出してしまう。
+ */
+function closestOnTriangle(
+  px: number, py: number, pz: number,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  cx: number, cy: number, cz: number,
+): [number, number, number] {
+  const abx = bx - ax, aby = by - ay, abz = bz - az
+  const acx = cx - ax, acy = cy - ay, acz = cz - az
+  const apx = px - ax, apy = py - ay, apz = pz - az
+
+  const d1 = abx * apx + aby * apy + abz * apz
+  const d2 = acx * apx + acy * apy + acz * apz
+  if (d1 <= 0 && d2 <= 0) return [ax, ay, az]
+
+  const bpx = px - bx, bpy = py - by, bpz = pz - bz
+  const d3 = abx * bpx + aby * bpy + abz * bpz
+  const d4 = acx * bpx + acy * bpy + acz * bpz
+  if (d3 >= 0 && d4 <= d3) return [bx, by, bz]
+
+  const vc = d1 * d4 - d3 * d2
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+    const v = d1 / (d1 - d3)
+    return [ax + abx * v, ay + aby * v, az + abz * v]
+  }
+
+  const cpx = px - cx, cpy = py - cy, cpz = pz - cz
+  const d5 = abx * cpx + aby * cpy + abz * cpz
+  const d6 = acx * cpx + acy * cpy + acz * cpz
+  if (d6 >= 0 && d5 <= d6) return [cx, cy, cz]
+
+  const vb = d5 * d2 - d1 * d6
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+    const w = d2 / (d2 - d6)
+    return [ax + acx * w, ay + acy * w, az + acz * w]
+  }
+
+  const va = d3 * d6 - d5 * d4
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+    const w = (d4 - d3) / (d4 - d3 + (d5 - d6))
+    return [bx + (cx - bx) * w, by + (cy - by) * w, bz + (cz - bz) * w]
+  }
+
+  const denom = 1 / (va + vb + vc)
+  const v = vb * denom
+  const w = vc * denom
+  return [ax + abx * v + acx * w, ay + aby * v + acy * w, az + abz * v + acz * w]
 }
