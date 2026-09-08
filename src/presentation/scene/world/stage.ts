@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../../domain/stage'
+import { decodeStageMesh, meshSubset, MESH_PLAYER } from '../../../sim/space/stagemesh'
+import { MeshMoveWorld } from '../../../sim/space/meshworld'
+import { PLAYER_HEIGHT, STEP_UP } from '../../../domain/player/moving'
 import { flagsOf } from '../../../domain/stage'
 import { MeshBasicNodeMaterial, type Node } from 'three/webgpu'
 import {
@@ -318,8 +321,15 @@ export interface Stage {
   readonly thrownWorld: SolidWorld
   /** カメラが寄る物。壁抜けを防ぐ */
   readonly cameraBlockers: THREE.Object3D[]
-  /** 移動判定用の XZ 平面 AABB */
+  /** 移動判定用の XZ 平面 AABB。**三角が届いていないステージで使う** */
   readonly obstacles: Obstacle[]
+  /**
+   * 人が止まる面。**三角の網。** 届いていなければ null (箱で歩く)。
+   *
+   * 箱は軸に沿った物しか表せないので、斜めの壁は回す前の箱になり、坂は
+   * 0.25m 刻みの段だった。面で持てばその縛りが消える。
+   */
+  readonly moveWorld: MeshMoveWorld | null
   /**
    * 水面。敷いていなければ null。
    *
@@ -771,6 +781,41 @@ export function setCloudCoverage(coverage: number): void {
  */
 const stageBoxes = new Map<StageName, Promise<StageBox[]>>()
 
+/**
+ * 三角の網。**人が止まる面を、箱ではなく面で持つ。**
+ *
+ * サーバーは前から読んでいた (視線と弾)。人の当たり判定を面へ移すので、
+ * **クライアントも同じ物を読む** — 動かしているのはこちらで、サーバーは
+ * 速さを検算するだけなので、形が食い違うと押し戻される場所がずれる。
+ *
+ * 人の層は書き出しの側で薄くしてある (手すりのように絵が細かい物は
+ * 向き付きの箱 12 枚に置き換わる)。筏で 6,768 枚。
+ */
+const stageMoveWorlds = new Map<StageName, Promise<MeshMoveWorld | null>>()
+
+export function loadStageMoveWorld(name: StageName): Promise<MeshMoveWorld | null> {
+  const cached = stageMoveWorlds.get(name)
+  if (cached) return cached
+  const url = asset.model(`stage_${name}.mesh.bin`)
+  const pending = fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error(String(res.status))
+      return res.arrayBuffer()
+    })
+    .then((buffer) => {
+      const mesh = decodeStageMesh(buffer)
+      const solid = new TriangleBvh(meshSubset(mesh, MESH_PLAYER))
+      if (solid.size === 0) return null
+      return new MeshMoveWorld(solid, { height: PLAYER_HEIGHT, stepUp: STEP_UP })
+    })
+    .catch(() => {
+      // 三角がまだ無いステージ。**箱のまま遊べる**
+      return null
+    })
+  stageMoveWorlds.set(name, pending)
+  return pending
+}
+
 export function loadStageBoxes(name: StageName): Promise<StageBox[]> {
   const cached = stageBoxes.get(name)
   if (cached) return cached
@@ -1060,11 +1105,29 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    */
   const thrownWorld = new MeshWorld()
   thrownWorld.rebuild(collidables)
+
+  /*
+   * 人が止まる面。**届くまでは箱で歩く。**
+   *
+   * glb と同じで後から差し替わる。届かないステージ (三角をまだ出していない)
+   * はずっと null で、箱のまま遊べる。
+   */
+  const moving: { world: MeshMoveWorld | null } = { world: null }
+  const meshReady = loadStageMoveWorld(name).then((world) => {
+    moving.world = world
+  })
+
   return {
     ...parts,
     thrownWorld,
     water,
-    ready: replaceWithModel(scene, name, parts, blockout, thrownWorld),
+    get moveWorld() {
+      return moving.world
+    },
+    ready: Promise.all([
+      replaceWithModel(scene, name, parts, blockout, thrownWorld),
+      meshReady,
+    ]).then(() => undefined),
   }
 }
 

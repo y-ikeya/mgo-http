@@ -1463,15 +1463,25 @@ export class Game {
     },
   };
 
-  /** Soldier から見た世界。地形の表現を Soldier 側に漏らさないための薄い層 */
+  /**
+   * Soldier から見た世界。地形の表現を Soldier 側に漏らさないための薄い層。
+   *
+   * **三角の網が届いていればそちらを引く。** 箱は軸に沿った物しか表せない
+   * ので、斜めの壁は回す前の箱になり、坂は 0.25m 刻みの段だった。面で持てば
+   * その縛りが消える。まだ三角を出していないステージは箱のまま動く。
+   */
   private readonly world: PlayerWorld = {
     resolveHorizontal: (position, radius, feetY) => {
-      resolveCircle(position, radius, this.stage.obstacles, feetY, PLAYER_HEIGHT, STEP_UP);
+      const mesh = this.stage.moveWorld;
+      if (mesh) mesh.resolveHorizontal(position, radius, feetY);
+      else resolveCircle(position, radius, this.stage.obstacles, feetY, PLAYER_HEIGHT, STEP_UP);
       clampToArena(position, radius, ARENA_HALF_SIZE);
     },
     groundHeight: (position, radius, feetY) =>
+      this.stage.moveWorld?.groundHeight(position, radius, feetY) ??
       groundHeight(position, radius, this.stage.obstacles, feetY, STEP_UP),
     ceilingHeight: (position, radius, feetY) =>
+      this.stage.moveWorld?.ceilingHeight(position, radius, feetY) ??
       ceilingHeight(position, radius, this.stage.obstacles, feetY),
   };
 
