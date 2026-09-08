@@ -23,6 +23,11 @@ function wall(x0: number, x1: number, z: number, y0: number, y1: number): number
   return [x0, y0, z, x1, y0, z, x1, y1, z, x0, y0, z, x1, y1, z, x0, y1, z]
 }
 
+/** 縦の壁。z0..z1 の間に、x の所へ立てる (wall の向きを変えたもの) */
+function wallAtX(x: number, z0: number, z1: number, y0: number, y1: number): number[] {
+  return [x, y0, z0, x, y0, z1, x, y1, z1, x, y0, z0, x, y1, z1, x, y1, z0]
+}
+
 function world(triangles: number[], options = { height: 1.7, stepUp: 0.25 }) {
   return new MeshMoveWorld(new TriangleBvh({ positions: Float32Array.from(triangles) }), options)
 }
@@ -113,6 +118,39 @@ describe('壁の押し戻し', () => {
     w.resolveHorizontal(position, 0.35, 1)
     expect(position.x).toBeCloseTo(0, 3)
     expect(position.z).toBeCloseTo(0, 3)
+  })
+
+  /**
+   * **坂を上り切る所で止まらない。**
+   *
+   * 坂の上に床が待っていると、足がまだ低いうちに体の縁が床の側面へ触れる。
+   * いまの足元で判じると「乗り越えられない高さ」= 壁になり、坂の一番上から
+   * 出られない。箱でも同じことが起きて、同じ手当てが入っている
+   * (collision.ts の slopeUnder)。
+   */
+  test('坂の上り切りで、待っている床に押し返されない', () => {
+    // x -4..0 が坂 (y 0 → 1)、x 0..4 が高さ 1 の床。継ぎ目に床の側面が立つ
+    const ramp = [
+      -4, 0, -3, 0, 1, -3, 0, 1, 3,
+      -4, 0, -3, 0, 1, 3, -4, 0, 3,
+    ]
+    const scene = [...ramp, ...slab(0, -3, 4, 3, 1), ...wallAtX(0, -3, 3, 0, 1)]
+    const w = world(scene)
+
+    // 坂を上り切る手前。足は 0.94 で、待っている床は 1.0 (段差 0.25 の内)
+    const onRamp = { x: -0.25, y: 0.94, z: 0 }
+    w.resolveHorizontal(onRamp, 0.35, 0.94)
+    expect(onRamp.x).toBeCloseTo(-0.25, 2)
+
+    /*
+     * **その側面は、ちゃんと壁として在る。**
+     *
+     * 上が通ったのが「壁を見落としているから」ではないことを押さえる。
+     * 同じ場所でも足が下 (地面) に在れば、1m の段は登れないので押し返る。
+     */
+    const onGround = { x: -0.25, y: 0, z: 0 }
+    w.resolveHorizontal(onGround, 0.35, 0)
+    expect(onGround.x).toBeLessThan(-0.3)
   })
 
   test('低い段は押し返さない。**またぐ物であって壁ではない**', () => {

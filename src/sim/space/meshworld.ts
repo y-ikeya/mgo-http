@@ -48,14 +48,15 @@ const WALKABLE_Y = 0.5
  * 1 つだと、腰の高さの手すりをまたいだり、頭の高さの梁をすり抜けたりする。
  * 足元・腰・胸の 3 段で、円柱を粗く近似する。**段を増やすほど正しいが、
  * そのぶん引く回数が増える** — 3 段で毎フレーム 3 回。
- *
- * 足元は段差 (STEP_UP) より上から始める。低い段は乗り越える物であって、
- * 押し返す物ではない。
  */
-const BODY_RATIOS = [0.0, 0.45, 0.9] as const
+const BODY_SLICES: number = 3
 
-/** 足元の球を置く高さ。段差より上 (これ以下の出っ張りは乗り越える) */
-const FOOT_LIFT = 0.3
+/**
+ * 坂の急さを測る点の数。**上り切る所で引っかからないために要る。**
+ *
+ * 体の周りをなぞって、中心より高い所を探す。詳しくは resolveHorizontal。
+ */
+const SLOPE_SAMPLES = 4
 
 /** 足元を探すときに、どれだけ上から線を下ろすか (m) */
 const PROBE_UP = 0.6
@@ -97,12 +98,34 @@ export class MeshMoveWorld implements MoveWorld {
    * 瞬間に体が浮く。
    */
   resolveHorizontal(position: Vec3, radius: number, feetY: number): void {
+    /*
+     * **体の下端を段差の上に置く。**
+     *
+     * 足元から見ている球が低いと、乗り越えられるはずの縁を壁として押し返す。
+     * 下端をちょうど段差 (STEP_UP) に置けば、それ以下の出っ張りには触れない
+     * — 乗り越える判断は movement 側の仕事なので、ここでは邪魔をしない。
+     *
+     * **さらに、坂の上では進むぶん足が上がることを見込む。**
+     *
+     * 坂を上り切る所で床が待っていると、足がまだ低いうちに体の縁が床へ触れる。
+     * いまの足元で判じると「乗り越えられない高さ」= 壁になり、**坂の一番上
+     * から出られない。** 箱でも同じことが起きて、同じ手当てが入っている
+     * (collision.ts の slopeUnder) — 三角へ移すときに写し忘れていた。
+     *
+     * 見込む量は「体の周りで一番高い所と足元の差」。実際にそこへ着いたときの
+     * 高さそのものなので、届かない高さまで許すことにはならない。
+     */
+    const rise = this.riseAhead(position, radius, feetY)
+    const bottom = feetY + this.stepUp + rise + radius
+    const top = feetY + this.height - radius
+
     for (let round = 0; round < ITERATIONS; round++) {
       let pushX = 0
       let pushZ = 0
       let touched = false
-      for (const ratio of BODY_RATIOS) {
-        const y = feetY + FOOT_LIFT + (this.height - FOOT_LIFT) * ratio
+      for (let slice = 0; slice < BODY_SLICES; slice++) {
+        const ratio = BODY_SLICES === 1 ? 0 : slice / (BODY_SLICES - 1)
+        const y = bottom + Math.max(0, top - bottom) * ratio
         this.solid.touching(position.x, y, position.z, radius, (contact) => {
           // 登れる面は押し返さない。坂の上で水平に押されると進めなくなる
           if (Math.abs(contact.ny) >= WALKABLE_Y) return
@@ -171,6 +194,25 @@ export class MeshMoveWorld implements MoveWorld {
       if (y !== null && y > best) best = y
     }
     return best
+  }
+
+  /**
+   * 体の周りで、足元よりどれだけ高い所があるか。**坂の上りを見込むのに使う。**
+   *
+   * 段差より高い所は見ない — あれは壁であって坂ではない。
+   */
+  private riseAhead(position: Vec3, radius: number, feetY: number): number {
+    const from = feetY + Math.max(PROBE_UP, this.stepUp + 0.05)
+    const limit = feetY + this.stepUp
+    let rise = 0
+    for (let i = 0; i < SLOPE_SAMPLES; i++) {
+      const angle = (i / SLOPE_SAMPLES) * Math.PI * 2
+      const x = position.x + Math.cos(angle) * radius
+      const z = position.z + Math.sin(angle) * radius
+      const y = this.probe(x, z, from, limit)
+      if (y !== null && y - feetY > rise) rise = y - feetY
+    }
+    return rise
   }
 
   /** その 1 点で足が着く高さ。段差より上にしか無ければ null */
