@@ -6,7 +6,7 @@ import { PRONE_SPEED_SCALE, stanceOf, type Stance } from '../../../domain/player
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
-import type { Locomotion } from '../../../domain/player/locomotion'
+import { emptyHanded, type Locomotion } from '../../../domain/player/locomotion'
 import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
@@ -2100,13 +2100,18 @@ export class Soldier {
       //
       // 銃を隠す場面:
       //   銃以外を手にしている … 持ち替えたので背中・腰に納まっている
-      //   敬礼中               … 銃を握った手で敬礼はできない。手が空いている型
+      //   手が空いている型     … 敬礼・転がり・受け身など。**指定が無ければ
+      //                          隠す** (domain の emptyHanded)。素材の多くは
+      //                          何も持っていない人の動きなので、銃を出すと
+      //                          握っていない手の傍に浮く
       //   拳銃を構えていない   … ホルスターに納まっている扱い。副武器なので
       //                          持っていること自体を見せなくてよく、相手からも
       //                          「今どちらを持っているか」が読みにくくなる。
       //                          ただしリロード中は抜いている (納めたまま弾倉は
       //                          替えられないし、見えない銃をリロードして見える)
-      const saluting = this.animator.saluting
+      // **姿勢に聞く。** 敬礼だけを名指ししていたので、転がりも受け身も
+      // 銃が浮いていた。型が増えるたびにここへ足すことにもなる
+      const barehanded = emptyHanded(this.locomotion)
       // **表に聞く。** id を並べると、銃が増えたときにここだけ古くなる
       const gun = isGun(this.held)
       /*
@@ -2122,13 +2127,13 @@ export class Soldier {
        */
       const holstered =
         !gun ||
-        saluting ||
+        barehanded ||
         (!isTwoHanded(this.held) &&
           !this.aiming &&
           !this.animator.reloading &&
           !this.animator.bolting)
       // ナイフは持ち替えて出す。刺突中の一瞬だけではなくなった
-      const knifeOut = (this.held === 'knife' || this.knifePreview) && !saluting && !this.boxed
+      const knifeOut = (this.held === 'knife' || this.knifePreview) && !barehanded && !this.boxed
       if (this.knife) this.knife.visible = knifeOut
       if (this.weapon) this.weapon.visible = !holstered
     }

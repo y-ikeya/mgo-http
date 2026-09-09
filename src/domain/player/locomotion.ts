@@ -163,6 +163,39 @@ export type Locomotion =
   | `crouch_${MoveDirection}`
 
 /** 立ち / しゃがみ、それぞれの 8 方向の状態を引く */
+/**
+ * 手が空いている型か。**武器を出さない。**
+ *
+ * --- なぜ要るか ---
+ * 型は素材から取ってきた物で、多くは**手に何も持っていない人の動き**。
+ * その上に銃を出すと、握っていない手の傍に浮く。敬礼だけ隠していたが、
+ * 転がりも受け身も同じことが起きていた。**指定が無ければ隠す**を既定にする。
+ *
+ * --- 出したままにする型 ---
+ * 撃つ・構える・投げる・置く・装填は当然として、次の 2 つも出したまま:
+ *
+ *   伏せへの出入り  伏せ撃ちへ入る道。**撃つ動作の一部**なので、
+ *                   入るたびに銃が消えると狙いが途切れる
+ *   爆風で倒れる    倒れている間も撃てる (下半身だけ倒れた姿勢で留める)
+ *
+ * 両方とも「手が空いている」ように見える型だが、**次に撃つための姿勢**
+ * なので隠さない。
+ */
+export function emptyHanded(locomotion: Locomotion): boolean {
+  return (
+    locomotion === 'salute' ||
+    locomotion === 'roll' ||
+    locomotion === 'hard_land' ||
+    locomotion === 'bump' ||
+    locomotion === 'sleep' ||
+    locomotion === 'away' ||
+    locomotion === 'death' ||
+    locomotion === 'death_front' ||
+    locomotion === 'death_back' ||
+    locomotion === 'prone_death'
+  )
+}
+
 export function locomotionFor(crouching: boolean, direction: MoveDirection): Locomotion {
   return crouching ? `crouch_${direction}` : `run_${direction}`
 }

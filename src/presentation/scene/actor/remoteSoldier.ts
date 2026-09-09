@@ -13,7 +13,7 @@ import {
 } from "three/tsl";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
-import type { Locomotion } from "../../../domain/player/locomotion";
+import { emptyHanded, type Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
@@ -464,11 +464,12 @@ export class RemoteSoldier {
 
     // 銃を隠す場面は自機と同じドメインルールで当てる。片方だけだと、自分では納めているのに
     // 相手の画面には出たままになる。
-    //   敬礼中 / ダンボール … 手が塞がっている
-    //   拳銃を構えていない  … ホルスターに納まっている
+    //   ダンボール         … 手が塞がっている
+    //   手が空いている型   … 敬礼・転がり・受け身など (domain の emptyHanded)
+    //   拳銃を構えていない … ホルスターに納まっている
     const holstered =
       this.boxed ||
-      locomotion === 'salute' ||
+      emptyHanded(locomotion) ||
       (state.weapon === 'm9' && !state.aiming && !state.reloading)
     if (this.weapon) this.weapon.visible = !holstered
 
