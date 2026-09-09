@@ -156,6 +156,15 @@ const SPARK_SPREAD = 0.65
 /** 落ちる速さ (m/s²)。短命なので効きは僅かだが、真っ直ぐ飛ぶと線香花火に見えない */
 const SPARK_GRAVITY = 9.8
 const SPARK_SIZE = 0.055
+/**
+ * 飛んでいる間に冷める。**出た所は熱く、先へ行くほど赤い。**
+ *
+ * 1 色で塗ると、黄色寄りだと線香花火、赤寄りだと血に見える。実際の鉄の火花は
+ * 削れた瞬間が一番熱くて、飛ぶ間に温度が落ちて赤くなる — その移り変わりが
+ * 「弾けた」に見える所なので、寿命で色を送る。
+ */
+const SPARK_HOT = 0xffa445
+const SPARK_COOL = 0xd42a06
 
 /**
  * 水しぶき。**弾や物が水面を叩いたときだけ。**
@@ -324,6 +333,8 @@ export class Shots {
   private readonly smokeDense: number[] = []
   private readonly smokeVelocity: THREE.Vector3[] = []
   private smokeNext = 0
+  /** 冷めた側の色。毎フレーム作らない */
+  private readonly sparkCool = new THREE.Color(SPARK_COOL)
   /** 散らす向きの置き場。毎フレーム作らない */
   private readonly scatter = new THREE.Vector3()
   /** 銃口から着弾へ向かう向きの置き場 */
@@ -476,7 +487,7 @@ export class Shots {
     for (let i = 0; i < SPARK_POOL; i++) {
       const sprite = new THREE.Sprite(
         new THREE.SpriteMaterial({
-          color: 0xffd08a,
+          color: SPARK_HOT,
           transparent: true,
           opacity: 0,
           depthWrite: false,
@@ -991,6 +1002,8 @@ export class Shots {
       // 消え際に細くする。**大きさが変わらないと、消えるのが唐突に見える**
       sprite.scale.setScalar(SPARK_SIZE * (0.35 + left * 0.65))
       material.opacity = Math.min(1, left * 1.6)
+      // 冷めていく。残りが少ないほど赤い
+      material.color.setHex(SPARK_HOT).lerp(this.sparkCool, 1 - left)
     }
 
     for (let i = 0; i < IMPACT_POOL; i++) {

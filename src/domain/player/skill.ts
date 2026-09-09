@@ -48,6 +48,15 @@ interface SkillSpec {
   id: SkillId
   label: string
   hint: string
+  /**
+   * 取れる段の数。**段がそのまま値段なので、これがそのまま上限の値段**。
+   *
+   * 段が意味を持つのは、**段に値段が付いているとき**だけ。本家で Lv3 でも
+   * 1 枠しか使わなかったスキル (ENEMY EXPOSURE) は、値段を 1 に固定した
+   * 途端に Lv1 と Lv2 を選ぶ理由が消える — 段が飾りになる。そういう物は
+   * 最初から 1 段で持つ。
+   */
+  levels: 1 | 3
 }
 
 /**
@@ -58,46 +67,61 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
     id: 'runner',
     label: 'FAST MOVE',
     hint: '走るのが速くなる。**持っている物の重さと掛け合わさる**',
+    levels: 3,
   },
   boxMove: {
     id: 'boxMove',
     label: 'CBOX MOVE',
     hint: 'ダンボールを被ったまま動ける。**頭の高さは下がったまま**',
+    levels: 3,
   },
   smgMastery: {
     id: 'smgMastery',
     label: 'SMG MASTERY',
     hint: 'P90 の散布が締まり、装填が速い',
+    levels: 3,
   },
   rifleMastery: {
     id: 'rifleMastery',
     label: 'AR MASTERY',
     hint: 'AK47 の散布が締まり、装填が速い',
+    levels: 3,
   },
   sniperMastery: {
     id: 'sniperMastery',
     label: 'SNIPER MASTERY',
     hint: 'XM2010 の散布が締まり、装填が速い',
+    levels: 3,
   },
   shotgunMastery: {
     id: 'shotgunMastery',
     label: 'SG MASTERY',
     hint: 'M870 の**ポンプと装填が速い**。粒の散りは変わらない',
+    levels: 3,
   },
   pistolMastery: {
     id: 'pistolMastery',
     label: 'HANDGUN MASTERY',
     hint: 'M9 の散布が締まり、装填が速い。**拳銃は全員が持っている**',
+    levels: 3,
   },
   throwing: {
     id: 'throwing',
     label: 'THROWING MASTERY',
     hint: '遠くへ投げられる',
+    levels: 3,
   },
   exposure: {
     id: 'exposure',
     label: 'ENEMY EXPOSURE',
-    hint: '当てた相手が数秒光る。**倒さなくても情報になる**',
+    hint: '当てた相手が 5 秒光る。**倒さなくても情報になる**',
+    /*
+     * **段が無い。取るか取らないかだけ。**
+     *
+     * 本家は Lv3 でも 1 枠だった。値段が段で変わらないなら上の段しか
+     * 選ばれないので、段を持つ意味が無い。
+     */
+    levels: 1,
   },
 }
 
@@ -147,8 +171,8 @@ export function costOf(skills: Skills): number {
  * **いまは全部解放。** 習熟度 (戦闘中の行動で上がる) を入れるまでの素通し。
  * ここを通しておくと、締めるときに書き換えるのがこの 1 か所で済む。
  */
-function maxLevelOf(_id: SkillId): SkillLevel {
-  return 3
+function maxLevelOf(id: SkillId): SkillLevel {
+  return SKILLS[id].levels
 }
 
 /**
@@ -323,6 +347,9 @@ export function throwScale(skills: Skills): number {
  *
  * **短くしてある。** 長いと「当てさえすれば追える」になって、撃ち合いを迂回する
  * 手のほうが安くなる。あくまで**次の一手を選ぶ材料**で、追跡の道具にはしない。
+ *
+ * 値段が 1 で固定になったぶん、ここは短いほうへ寄せている。予算 4 のうち 1 で
+ * 付くので、**取らない理由がほぼ無い**常備品になる。
  */
 export function exposeSeconds(skills: Skills): number {
   return EXPOSE_SECONDS[levelOf(skills, 'exposure')]
@@ -342,4 +369,5 @@ const MASTERY_RECOIL = [1, 0.96, 0.92, 0.88] as const
 // 戻る速さ。**指を離した人だけが得をする**ので、こちらは強めでよい
 const MASTERY_RECOVERY = [1, 1.1, 1.2, 1.35] as const
 const THROW_SCALE = [1, 1.1, 1.2, 1.35] as const
-const EXPOSE_SECONDS = [0, 3, 5, 8] as const
+// **1 段だけ。** 添字 0 は「取っていない」
+const EXPOSE_SECONDS = [0, 5] as const

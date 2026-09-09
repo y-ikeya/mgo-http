@@ -41,8 +41,13 @@ export function SkillList(props: {
             classList={{ 'skill-on': level() > 0, 'skill-focus': props.focus === spec.id }}
           >
             <span class="skill-name">{spec.label}</span>
-            <div class="skill-levels">
-              <For each={[1, 2, 3] as const}>
+            {/*
+              段の数はスキルが持っている。**1 段の物は段を出さない** —
+              値段が段で変わらないなら上の段しか選ばれないので、選ぶ物が
+              「取るか取らないか」しか無い (domain の levels)。
+            */}
+            <div class="skill-levels" classList={{ 'skill-single': spec.levels === 1 }}>
+              <For each={Array.from({ length: spec.levels }, (_, i) => i + 1)}>
                 {(n) => (
                   <button
                     class="skill-level"
@@ -55,7 +60,7 @@ export function SkillList(props: {
                     title={spec.hint}
                     onClick={() => props.onSkill(spec.id, level() === n ? 0 : n)}
                   >
-                    {n}
+                    {spec.levels === 1 ? '' : n}
                   </button>
                 )}
               </For>
