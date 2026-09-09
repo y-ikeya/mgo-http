@@ -225,12 +225,20 @@ const SOUNDS = {
    */
   balloonInflate: { file: "balloon_inflate1.mp3", reference: 2, max: 14 },
   /**
-   * 手榴弾が跳ねた音。
+   * 手榴弾が跳ねた音。**踏んだ材質と同じ物で分ける。**
    *
    * 弾倉 (clink) より低く、少し遠くまで届く。足元へ転がってきたことに
    * 気付けないと、逃げるという手が最初から無い。
+   *
+   * 材質を見ずに金属で鳴らしていて、**木の甲板 (raft) でも金属の音が出て
+   * いた**。跳ねる音は「どこに落ちたか」を伝える物なので、床の材質が
+   * 食い違うと落ちた場所の読みがずれる (水の底から鳴らさないのと同じ理由)。
    */
-  bounce: { file: "step_metal1.mp3", reference: 4, max: 38, rate: 0.82 },
+  bounce: { file: "step_concrete1.mp3", reference: 4, max: 38, rate: 0.82 },
+  /** 金属の上で跳ねた */
+  metalBounce: { file: "step_metal1.mp3", reference: 4, max: 38, rate: 0.82 },
+  /** 木の上で跳ねた。足音と同じで、専用の音源が無いので低く落として代用 */
+  woodBounce: { file: "step_concrete1.mp3", reference: 4, max: 38, rate: 0.66 },
   /**
    * 拳銃の銃声。
    *

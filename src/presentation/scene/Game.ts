@@ -1410,7 +1410,14 @@ export class Game {
       if (this.splashAt(bounce.position, GRENADE_SPLASH)) return;
       // 跳ねた音は全員の輪に出す。自分が投げたものも例外にしない。
       // 手榴弾は隠すものではなく、転がってきたことに気付かせるためのもの
-      const gain = this.audio.play("bounce", bounce.position, bounce.strength);
+      //
+      // **床の材質で分ける** (足音と同じ引き方)。跳ねる音は「どこに落ちたか」
+      // を伝える物なので、材質が食い違うと落ちた場所の読みがずれる
+      const gain = this.audio.play(
+        this.bounceSound(bounce.position),
+        bounce.position,
+        bounce.strength,
+      );
       this.addPing("shot", bounce.position, gain);
     });
     this.updateGrenadeAim();
@@ -3795,6 +3802,21 @@ export class Game {
    * それは「地面は y=0 の平面ひとつ」という前提に寄りかかっていて、
    * 高い位置にコンクリートを置いた瞬間に破綻する。
    */
+  /**
+   * 跳ねた所の材質。**足音と同じ物を引く。**
+   *
+   * 半径を持たない — 手榴弾は点で当たるので、人の足のように太さで探すと
+   * 隣の材質を拾う。
+   */
+  private bounceSound(at: THREE.Vector3): "bounce" | "metalBounce" | "woodBounce" {
+    const surface = surfaceAt(at, 0, this.stage.obstacles, at.y, STEP_UP);
+    return surface === "metal"
+      ? "metalBounce"
+      : surface === "wood"
+        ? "woodBounce"
+        : "bounce";
+  }
+
   private playStep(step: Step, position: THREE.Vector3, ping: boolean): void {
     const surface = surfaceAt(position, PLAYER_RADIUS, this.stage.obstacles, position.y, STEP_UP);
     const sound =
