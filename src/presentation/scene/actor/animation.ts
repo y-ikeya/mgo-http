@@ -2229,8 +2229,7 @@ export class CharacterAnimator {
       //
       // 軽く叩いたときだけ出る。押し続けて投げるぶんには振りかぶりが
       // 終わっているので、放した時点で後半がすぐ流れる。
-      const waiting = this.pair.held || this.throwWindupLeft > 0
-      const key = waiting ? this.pair.windup : this.pair.release
+      const key = this.waitingForWindup ? this.pair.windup : this.pair.release
       if (this.upper.has(key)) return key
     }
     // 起き上がりは中断できない。撃つ操作より優先する
@@ -2804,7 +2803,28 @@ export class CharacterAnimator {
    */
   get setupLocomotion(): 'claymore_windup' | 'claymore_place' | null {
     if (this.upperState !== 'throw' || !this.pair?.whole) return null
-    return this.pair.held ? 'claymore_windup' : 'claymore_place'
+    /*
+     * **上半身と同じ条件で見る** (resolveUpperKey)。
+     *
+     * 引き金を引いた瞬間に後半へ切り替えていた。かがみ切る前に引くと、
+     * 後半のクリップはまだ流れていない (updateThrow が振りかぶりの終わりを
+     * 待っている) ので、**重みの行き先が止まったアクションになる**。合計が
+     * 1 を下回って**バインドポーズ = 立ち姿が透ける** (blend の注)。
+     *
+     * 画面では「しゃがむのが取り消されて、立ったまま置こうとする」に見えた。
+     */
+    return this.waitingForWindup ? 'claymore_windup' : 'claymore_place'
+  }
+
+  /**
+   * まだ振りかぶりを流している最中か。**上下で同じ物を見る。**
+   *
+   * 押し続けている間 (held) はもちろん、軽く叩いて放した後も**振りかぶりが
+   * 終わるまでは前半**。放した瞬間に後半へ渡すと、後半はまだ流れていない
+   * ので重みが行き場を失う。
+   */
+  private get waitingForWindup(): boolean {
+    return !this.pair || this.pair.held || this.throwWindupLeft > 0
   }
 
   /** リロードモーションを頭から再生する。終わると自動で構えに戻る */

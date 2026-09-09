@@ -883,6 +883,43 @@ describe('置く動作へ移る継ぎ目', () => {
     // かがんだ高さから 10cm 以上跳ねない (直す前は 0.41 → 0.90 だった)
     expect(highest).toBeLessThan(crouched + 0.1)
   })
+
+  /**
+   * **かがみ切る前に引き金を引いても、立ち上がらない。**
+   *
+   * 下りている途中でクリックすると、**しゃがむのが取り消されて立ったまま
+   * 置こうとする**形になっていた。
+   *
+   * 上下で見ている条件が食い違っていたのが元。上半身は「振りかぶりが残って
+   * いる間は前半のまま」を守っていたのに、下半身へ渡す姿勢 (setupLocomotion)
+   * だけが**引き金を引いた瞬間に後半へ切り替わる**。後半のクリップはまだ
+   * 流れていない (updateThrow が振りかぶりの終わりを待っている) ので、重みの
+   * 行き先が止まったアクションになり、合計が 1 を下回って**バインドポーズ
+   * (立ち姿) が透ける**。blend の注に書いてある罠そのもの。
+   */
+  test('**かがみ切る前に引いても、立ち上がらない**', () => {
+    const anim = animator()
+    anim.playSetup()
+
+    // 下りている途中で引く。**振りかぶりは 1.77 秒**、その 4 分の 3 あたり
+    run(anim, 1.3, 'claymore_windup')
+    const midway = hipsHeight(anim)
+    anim.releaseSetup()
+
+    /*
+     * 継ぎ目を跨ぐまで。**腰は下がり続けるだけ。**
+     *
+     * 置き切った後は立ち上がるのが正しいので、そこまでは見ない。見たいのは
+     * **引いた瞬間から後半のクリップが流れ始めるまで**の間。
+     */
+    let highest = 0
+    for (let i = 0; i < Math.round(0.7 * 60); i++) {
+      anim.setLocomotion((anim.setupLocomotion ?? 'idle') as never)
+      anim.update(1 / 60)
+      highest = Math.max(highest, hipsHeight(anim))
+    }
+    expect(highest).toBeLessThan(midway + 0.05)
+  })
 })
 
 describe('置き切るまで構え直さない', () => {
