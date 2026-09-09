@@ -36,6 +36,20 @@ const BASE_HEIGHT = 0.04
 const START_SCALE = 0.12
 
 /**
+ * 膨らむ間の揺れ。**空気が入って首が振られる感じ。**
+ *
+ * 台に足が留められた物へ空気を押し込むと、上のほうほど大きく振れる。
+ * 体ごと台の上で傾ける — **頭は根元から一番遠い**ので、傾けるだけで
+ * 頭が一番大きく動く。頭の骨だけ回すと、体が固まったまま首だけ振れて
+ * 人形というより壊れた玩具になる。
+ *
+ * 振れは膨らむにつれて収まる。張ってくれば揺れなくなる、という順。
+ */
+const WOBBLE_RAD = 0.22
+/** 1 秒に何往復するか */
+const WOBBLE_HZ = 2.6
+
+/**
  * 静止させる型。**拳銃を提げて立っている姿。**
  *
  * 切れた人の姿 (away) は腕を開いた形で、描いてみると人形にしか見えなかった。
@@ -63,6 +77,8 @@ export class Decoys {
       skin: string
       /** 膨らみ切るまでの残り (秒)。0 で立ち切る */
       inflating: number
+      /** 揺れの位相。**物ごとにずらす** — 揃って揺れると仕掛けに見える */
+      phase: number
     }
   >()
 
@@ -110,7 +126,16 @@ export class Decoys {
     body.position.y = BASE_HEIGHT
     group.add(body)
 
-    const entry = { group, body, at: [...at], yaw, skin: skinFor(owner), inflating: readyIn }
+    // 位相は id から。並べても揃わず、同じ物は何度描いても同じ形になる
+    const entry = {
+      group,
+      body,
+      at: [...at],
+      yaw,
+      skin: skinFor(owner),
+      inflating: readyIn,
+      phase: (id * 0.37) % 1,
+    }
     this.applyScale(entry)
     this.live.set(id, entry)
     this.scene.add(group)
@@ -174,12 +199,22 @@ export class Decoys {
     }
   }
 
-  private applyScale(entry: { body: THREE.Object3D; inflating: number }): void {
+  private applyScale(entry: { body: THREE.Object3D; inflating: number; phase: number }): void {
     const done = 1 - Math.min(1, entry.inflating / DEPLOY_SECONDS)
     const grown = START_SCALE + (1 - START_SCALE) * done
     // 横は少し遅れて追いつく。**縦に立ってから太る**
     const wide = START_SCALE + (1 - START_SCALE) * done * done
     entry.body.scale.set(wide, grown, wide)
+
+    /*
+     * 空気が入って揺れる。**張ってくるほど収まる。**
+     *
+     * 位相を物ごとにずらす。並べて置いたときに揃って揺れると、風船ではなく
+     * 仕掛けに見える。
+     */
+    const elapsed = DEPLOY_SECONDS - entry.inflating
+    entry.body.rotation.z =
+      Math.sin((elapsed * WOBBLE_HZ + entry.phase) * Math.PI * 2) * WOBBLE_RAD * (1 - done)
   }
 
   remove(id: number): void {
