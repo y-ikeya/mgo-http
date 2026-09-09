@@ -138,7 +138,12 @@ AR は 20 で 5 発 (0.36 秒)。**近くでは AR がわずかに速い。** SM
 |---|---|---:|
 | grenade | GRENADE | 3 |
 | claymore | CLAYMORE | 2 |
+| decoy | DECOY | 2 |
 <!-- /検査 -->
+
+三者で**効く相手が割れる**。手榴弾は相手を動かす (止まっている相手に効く)、
+クレイモアは置いて待つ (動いている相手)、囮は撃たせる (**見ている相手**)。
+どれが強いかではなく、相手が何をしてくるかの読みになる。
 
 弾倉 (`magazine`) は枠で選ばない。撃った弾が 1 弾倉ぶん溜まるごとに増える。
 
@@ -174,6 +179,7 @@ AR は 20 で 5 発 (0.36 秒)。**近くでは AR がわずかに速い。** SM
 | grenade | GRENADE | weapon | 0.4 | × |
 | claymore | CLAYMORE | weapon | 1.6 | × |
 | magazine | MAG | weapon | 0.3 | × |
+| decoy | DECOY | weapon | 0.5 | × |
 | knife | KNIFE | weapon | 0.3 | × |
 | box | C.BOX | tool | 2 | × |
 | none | NONE | tool | 0 | × |

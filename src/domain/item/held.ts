@@ -33,7 +33,7 @@ import type { WeaponId } from './weapons'
 export type { WeaponId }
 
 /** 投げる物・置く物。support の枠に入る */
-type ThrowId = 'grenade' | 'claymore' | 'magazine'
+type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy'
 
 /**
  * 手に持てる物すべて。
@@ -126,6 +126,8 @@ export const HELD: Record<HeldId, HeldSpec> = {
   grenade: { id: 'grenade', label: 'GRENADE', family: 'weapon', slot: 'support', weight: 0.4, shoots: false, twoHanded: false },
   claymore: { id: 'claymore', label: 'CLAYMORE', family: 'weapon', slot: 'support', weight: 1.6, shoots: false, twoHanded: false },
   magazine: { id: 'magazine', label: 'MAG', family: 'weapon', slot: 'support', weight: 0.3, shoots: false, twoHanded: false },
+  // 空気を入れる前の人形。**畳んであるので軽い**
+  decoy: { id: 'decoy', label: 'DECOY', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
 
   // 刺されば即死。代償は**銃をしまってから近づく**こと (docs/weapons.md)
   knife: { id: 'knife', label: 'KNIFE', family: 'weapon', slot: 'knife', weight: 0.3, shoots: false, twoHanded: false },
@@ -292,14 +294,26 @@ export interface Loadout {
    * 間合いを詰める側と詰められる側の読み合いが、そこで初めて成立する。
    */
   secondary: WeaponId | null
-  support: 'grenade' | 'claymore'
+  support: SupportKind
 }
 
+/**
+ * support の枠に入る物。
+ *
+ * **weapons.ts の SupportId と同じ並び。** あちらは `held.ts` を読んでいる
+ * ので、値をこちらへ持ってくると輪になる。型だけ写して、食い違ったら
+ * 数の表 (SUPPORT_COUNT) が型検査で落ちるようにしてある。
+ */
+type SupportKind = 'grenade' | 'claymore' | 'decoy'
+
 /** 1 つの命で持てる投げ物の数 */
-const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
+const SUPPORT_COUNT: Record<SupportKind, number> = {
   grenade: 3,
   // 置きっぱなしで効き続けるので、手榴弾と同じ数を配ると通り道を全部塞げる
   claymore: 2,
+  // クレイモアと同じ。置くのに時間がかかり、しかも**見ていないと回収
+  // できない** (割れる音が届かないと気づけない)
+  decoy: 2,
 }
 
 /**

@@ -65,9 +65,9 @@ function gunsIn(slot: 'primary' | 'secondary'): WeaponId[] {
  * 相手を騙す道具。交換になっているのが肝」と理屈まで書いていたが、**作り話だった**。
  * 本家では弾倉は選ぶものではない。
  */
-export type SupportId = 'grenade' | 'claymore'
+export type SupportId = 'grenade' | 'claymore' | 'decoy'
 
-export const SUPPORTS: SupportId[] = ['grenade', 'claymore']
+export const SUPPORTS: SupportId[] = ['grenade', 'claymore', 'decoy']
 
 interface SupportSpec {
   id: SupportId
@@ -98,6 +98,25 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
     // 「通り道を全部塞ぐ」ができてしまう
     count: 2,
     hint: '置いて離れる。前を通った敵で起爆',
+  },
+  /*
+   * **撃たせる道具。** 三者で効く相手が割れる:
+   *
+   *     GRENADE   相手を動かす  → 止まっている相手
+   *     CLAYMORE  置いて待つ    → 動いている相手
+   *     DECOY     撃たせる      → **見ている相手**
+   *
+   * どれが強いかではなく「相手が何をしてくるか」の読みになる。
+   */
+  decoy: {
+    id: 'decoy',
+    label: 'DECOY',
+    // クレイモアと同じ数。置くのに時間がかかり、しかも**見ていないと
+    // 回収できない** (割れる音が届かないと気づけない) ので、1 個だと
+    // 大事にしすぎて使わなくなる
+    count: 2,
+    // 装備画面はそのまま出す。**強調の記法は効かない** (他の 2 つも素の文)
+    hint: '自分そっくりの人形。撃った相手の位置が漏れる',
   },
 }
 

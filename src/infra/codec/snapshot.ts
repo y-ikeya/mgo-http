@@ -161,6 +161,8 @@ const HELD_BITS: HeldId[] = [
   'shotgun',
   // 殺傷の拳銃。**末尾に足す** (M9 は麻酔になったので別物)
   'm1911',
+  // 囮の人形。**末尾に足す**
+  'decoy',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 
