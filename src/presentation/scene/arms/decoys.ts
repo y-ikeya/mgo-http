@@ -50,6 +50,22 @@ const WOBBLE_RAD = 0.22
 const WOBBLE_HZ = 2.6
 
 /**
+ * ぶつかられた時の揺れ。**押された向きの逆へ傾く。**
+ *
+ * 風船なので人は止めない (止めると盾になる)。代わりに**押しのけられて揺れる**
+ * — 触れた人には「これは人ではない」が伝わる。台と膨らみに続く 3 つ目の
+ * 手掛かりで、しかも**近づいた人にしか分からない**。
+ */
+const BUMP_RAD = 0.3
+/** 揺れが収まるまで (秒) */
+const BUMP_SETTLE = 1.1
+/** 1 秒に何往復するか。膨らむ時より速い — 叩かれた振れ方 */
+const BUMP_HZ = 3.4
+
+/** ぶつかったと見なす近さ (m)。人の半径 + 人形の半分 */
+export const BUMP_RANGE = 0.65
+
+/**
  * 静止させる型。**拳銃を提げて立っている姿。**
  *
  * 切れた人の姿 (away) は腕を開いた形で、描いてみると人形にしか見えなかった。
@@ -79,6 +95,11 @@ export class Decoys {
       inflating: number
       /** 揺れの位相。**物ごとにずらす** — 揃って揺れると仕掛けに見える */
       phase: number
+      /** ぶつかられた向き (人形から見て押された先)。人形の向きに直したもの */
+      swayX: number
+      swayZ: number
+      /** 揺れが収まるまでの残り (秒) */
+      swayLeft: number
     }
   >()
 
@@ -135,6 +156,9 @@ export class Decoys {
       skin: skinFor(owner),
       inflating: readyIn,
       phase: (id * 0.37) % 1,
+      swayX: 0,
+      swayZ: 0,
+      swayLeft: 0,
     }
     this.applyScale(entry)
     this.live.set(id, entry)
@@ -191,15 +215,68 @@ export class Decoys {
    * 起き上がる形になる。横は縦より遅らせて、風船が立ち上がってから
    * 太る順にする。
    */
+  /**
+   * ぶつかられた。**押された向きの逆へ傾く。**
+   *
+   * @param dirX 人形から見て、押された先の向き (世界)。ぶつかった人から
+   *   人形へ向かう向きと同じ
+   */
+  bump(id: number, dirX: number, dirZ: number): void {
+    const entry = this.live.get(id)
+    if (!entry) return
+    const reach = Math.hypot(dirX, dirZ) || 1
+    /*
+     * 世界の向きを人形の向きへ直す。**人形は yaw で回してある**ので、
+     * そのまま傾けると向きによって別の方向へ倒れる。
+     */
+    const sin = Math.sin(-entry.yaw)
+    const cos = Math.cos(-entry.yaw)
+    const x = dirX / reach
+    const z = dirZ / reach
+    entry.swayX = x * cos - z * sin
+    entry.swayZ = x * sin + z * cos
+    entry.swayLeft = BUMP_SETTLE
+  }
+
+  /**
+   * 触れている人形を探して、押しのける。
+   *
+   * **人は止めない。** 風船なので通り抜けられる — 止めると盾になって、
+   * 「撃たせる道具」が「隠れる道具」に変わる。代わりに揺れる。
+   *
+   * @param at 触った人の位置
+   */
+  nudge(at: THREE.Vector3, range: number): void {
+    for (const [id, entry] of this.live) {
+      // 膨らみ切る前は触れても揺れない。当たりがまだ立っていない
+      if (entry.inflating > 0) continue
+      const dx = entry.group.position.x - at.x
+      const dz = entry.group.position.z - at.z
+      const gap = Math.hypot(dx, dz)
+      if (gap > range) continue
+      // 既に揺れているなら押し直さない。歩き続ける間ずっと叩かれ続ける
+      if (entry.swayLeft > BUMP_SETTLE * 0.5) continue
+      this.bump(id, dx || 0.001, dz)
+    }
+  }
+
   update(dt: number): void {
     for (const entry of this.live.values()) {
-      if (entry.inflating <= 0) continue
-      entry.inflating = Math.max(0, entry.inflating - dt)
+      if (entry.inflating <= 0 && entry.swayLeft <= 0) continue
+      if (entry.inflating > 0) entry.inflating = Math.max(0, entry.inflating - dt)
+      if (entry.swayLeft > 0) entry.swayLeft = Math.max(0, entry.swayLeft - dt)
       this.applyScale(entry)
     }
   }
 
-  private applyScale(entry: { body: THREE.Object3D; inflating: number; phase: number }): void {
+  private applyScale(entry: {
+    body: THREE.Object3D
+    inflating: number
+    phase: number
+    swayX: number
+    swayZ: number
+    swayLeft: number
+  }): void {
     const done = 1 - Math.min(1, entry.inflating / DEPLOY_SECONDS)
     const grown = START_SCALE + (1 - START_SCALE) * done
     // 横は少し遅れて追いつく。**縦に立ってから太る**
@@ -213,8 +290,25 @@ export class Decoys {
      * 仕掛けに見える。
      */
     const elapsed = DEPLOY_SECONDS - entry.inflating
-    entry.body.rotation.z =
-      Math.sin((elapsed * WOBBLE_HZ + entry.phase) * Math.PI * 2) * WOBBLE_RAD * (1 - done)
+    const wobble = Math.sin((elapsed * WOBBLE_HZ + entry.phase) * Math.PI * 2) * WOBBLE_RAD * (1 - done)
+
+    /*
+     * ぶつかられた揺れ。**押された向きへ傾いて、戻りながら収まる。**
+     *
+     * 膨らむ揺れと足し合わせる。膨らんでいる最中に触られることもあるので、
+     * どちらかを捨てると片方の動きが消える。
+     */
+    const settling = entry.swayLeft / BUMP_SETTLE
+    const swing = Math.sin(entry.swayLeft * BUMP_HZ * Math.PI * 2) * BUMP_RAD * settling
+
+    /*
+     * 押された向きへ倒す。**傾ける軸は押された向きと直角。**
+     *
+     * 前 (+Z) へ押されたら X 軸まわりに、右 (+X) へ押されたら Z 軸まわりの
+     * 逆へ。頭は根元から一番遠いので、傾けるだけで頭が一番大きく動く。
+     */
+    entry.body.rotation.z = wobble - entry.swayX * swing
+    entry.body.rotation.x = entry.swayZ * swing
   }
 
   remove(id: number): void {

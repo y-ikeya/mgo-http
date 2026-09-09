@@ -42,7 +42,7 @@ import { SoundRing, type PingKind } from "./sense/soundRing";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
-import { Decoys } from "./arms/decoys";
+import { BUMP_RANGE, Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
@@ -1433,7 +1433,14 @@ export class Game {
       this.listeningLevel(),
     );
     this.shots.update(dt);
-    // 人形が膨らむ。**下から立ち上がる** (原点が腰なので袋を挟んである)
+    /*
+     * 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの。
+     *
+     * **触った判定はこちらで持つ。** 人形は止まっていて自分の位置は手元に
+     * あるので、サーバーに聞く必要が無い。申告させると、**触っていないのに
+     * 揺らして「そこに誰か居る」という嘘の合図**を作れる。
+     */
+    this.decoys.nudge(this.player.position, BUMP_RANGE);
     this.decoys.update(dt);
     this.blast.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
