@@ -127,10 +127,10 @@ const KNIFE: WeaponConfig = {
  * 実際の見え方は調整パネルで詰める。ここは出発点。
  */
 const SNIPER: WeaponConfig = {
-  grip: new THREE.Vector3(0, 0.24, 0.135),
-  rotation: new THREE.Euler(degrees(-3), degrees(-11), degrees(-180)),
-  crouchGrip: new THREE.Vector3(-0.02, 0.195, 0.165),
-  crouchRotation: new THREE.Euler(degrees(1), degrees(-14), degrees(-180)),
+  grip: new THREE.Vector3(0.01, 0.28, 0.135),
+  rotation: new THREE.Euler(degrees(-20), degrees(-9), degrees(-180)),
+  crouchGrip: new THREE.Vector3(-0.055, 0.195, 0.12),
+  crouchRotation: new THREE.Euler(degrees(-19), degrees(-7), degrees(-180)),
   proneGrip: new THREE.Vector3(-0.03, 0.235, 0.14),
   proneRotation: new THREE.Euler(degrees(-2), degrees(-14), degrees(147)),
   tip: new THREE.Vector3(0, 0.177, -0.845),
