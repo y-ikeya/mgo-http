@@ -6,7 +6,7 @@ import { PRONE_SPEED_SCALE, stanceOf, type Stance } from '../../../domain/player
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
-import { emptyHanded, type Locomotion } from '../../../domain/player/locomotion'
+import type { Locomotion } from '../../../domain/player/locomotion'
 import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
@@ -2111,7 +2111,7 @@ export class Soldier {
       //                          替えられないし、見えない銃をリロードして見える)
       // **姿勢に聞く。** 敬礼だけを名指ししていたので、転がりも受け身も
       // 銃が浮いていた。型が増えるたびにここへ足すことにもなる
-      const barehanded = emptyHanded(this.locomotion)
+      const barehanded = this.animator.barehanded
       // **表に聞く。** id を並べると、銃が増えたときにここだけ古くなる
       const gun = isGun(this.held)
       /*

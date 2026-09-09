@@ -3,7 +3,12 @@ import { isBone } from '../util/guards'
 import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
-import { MOVE_DIRECTIONS, type Locomotion, type MoveDirection } from '../../../domain/player/locomotion'
+import {
+  MOVE_DIRECTIONS,
+  emptyHanded,
+  type Locomotion,
+  type MoveDirection,
+} from '../../../domain/player/locomotion'
 
 
 /**
@@ -281,6 +286,18 @@ const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
  * クロスフェードさせると繋ぎが滑らかになる。
  */
 const ROLL_EXIT_PHASE = 0.78
+
+/**
+ * 転がりの終わり際、**操作が返る何秒前から銃を戻すか。**
+ *
+ * ロックが解けた瞬間に出すと、撃てるようになったのと同時に銃が現れる。
+ * 手にする所が見えないので、**押した時にはもう構えている**という手応えに
+ * ならない。先に戻して、構え直す動きを挟ませる。
+ *
+ * 銃が見えているのに撃てない間ができるが、そちらのほうが軽い —
+ * 見えてから撃てるまでの遅れは、見えないまま撃つより読める。
+ */
+const ROLL_WEAPON_LEAD = 0.2
 
 /** 一度だけ流す下半身の状態。始めるときに reset して play する */
 const ONE_SHOT_LOWER = new Set<Locomotion>([
@@ -2777,6 +2794,34 @@ export class CharacterAnimator {
     if (!action || !action.isRunning()) return false
     const duration = action.getClip().duration
     return duration > 0 && action.time < duration
+  }
+
+  /**
+   * 転がりのロックが解けるまであと何秒か。転がっていなければ 0。
+   *
+   * **銃を先に戻す**のに使う (ROLL_WEAPON_LEAD)。
+   */
+  private get rollLockLeft(): number {
+    if (this.upperState !== 'roll') return 0
+    const action = this.lower.get('roll')
+    if (!action) return 0
+    const until = action.getClip().duration * ROLL_EXIT_PHASE
+    const rate = action.getEffectiveTimeScale() || 1
+    return Math.max(0, (until - action.time) / rate)
+  }
+
+  /**
+   * 手が空いている型を流しているか。**武器を出さない間。**
+   *
+   * 規則そのものは domain (emptyHanded)。ここが足すのは転がりの終わり際
+   * だけ — **操作が返る 0.2 秒前から銃を戻す**ので、構え直す動きが挟まる。
+   *
+   * 自機と他人で同じ物を読む。別々に書くと、自分では納めているのに相手の
+   * 画面には出たまま、が起きる。
+   */
+  get barehanded(): boolean {
+    if (this.upperState === 'roll') return this.rollLockLeft > ROLL_WEAPON_LEAD
+    return emptyHanded(this.locomotion)
   }
 
   /** 終盤に入ったらロックを解く。クリップ自体は流れ続け、重みで抜けていく */

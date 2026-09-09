@@ -922,6 +922,46 @@ describe('置く動作へ移る継ぎ目', () => {
   })
 })
 
+describe('転がりの終わり際', () => {
+  /**
+   * **銃は操作が返る 0.2 秒前に戻る。**
+   *
+   * ロックが解けた瞬間に出すと、撃てるようになったのと同時に銃が現れる。
+   * 手にする所が見えないので、押した時にはもう構えている、という手応えに
+   * ならない。先に戻して構え直す動きを挟ませる。
+   *
+   * 逆はやらない — **銃が見えないまま撃てる**状態のほうが重い。
+   */
+  test('**銃は操作より先に戻る**', () => {
+    const anim = animator()
+    anim.playRoll()
+    let gunBack = -1
+    let unlocked = -1
+    for (let i = 0; i < 200; i++) {
+      anim.setLocomotion(anim.rolling ? 'roll' : 'idle')
+      anim.setAiming(true)
+      anim.update(1 / 60)
+      const at = (i + 1) / 60
+      if (gunBack < 0 && !anim.barehanded) gunBack = at
+      if (unlocked < 0 && !anim.rolling) unlocked = at
+      if (gunBack > 0 && unlocked > 0) break
+    }
+    expect(gunBack).toBeGreaterThan(0)
+    expect(unlocked).toBeGreaterThan(gunBack)
+    // 0.2 秒。刻みの分だけずれる
+    expect(unlocked - gunBack).toBeGreaterThan(0.18)
+    expect(unlocked - gunBack).toBeLessThan(0.25)
+  })
+
+  /** 転がっている間は隠す。**素材が手を広げた型** */
+  test('転がっている最中は隠す', () => {
+    const anim = animator()
+    anim.playRoll()
+    run(anim, 0.3, 'roll', true)
+    expect(anim.barehanded).toBe(true)
+  })
+})
+
 describe('置き切るまで構え直さない', () => {
   /**
    * **振りかぶりを流し直すと、立ち姿から始まる。**

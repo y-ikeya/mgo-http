@@ -13,7 +13,7 @@ import {
 } from "three/tsl";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
-import { emptyHanded, type Locomotion } from "../../../domain/player/locomotion";
+import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
@@ -469,7 +469,7 @@ export class RemoteSoldier {
     //   拳銃を構えていない … ホルスターに納まっている
     const holstered =
       this.boxed ||
-      emptyHanded(locomotion) ||
+      animator.barehanded ||
       (state.weapon === 'm9' && !state.aiming && !state.reloading)
     if (this.weapon) this.weapon.visible = !holstered
 
