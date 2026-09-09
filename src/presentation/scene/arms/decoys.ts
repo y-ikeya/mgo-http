@@ -54,16 +54,18 @@ const WOBBLE_HZ = 2.6
  *
  * 風船なので人は止めない (止めると盾になる)。代わりに**押しのけられて揺れる**
  * — 触れた人には「これは人ではない」が伝わる。台と膨らみに続く 3 つ目の
- * 手掛かりで、しかも**近づいた人にしか分からない**。
+ * 手掛かり。
+ *
+ * **触った判定はサーバーが持つ** (位置は毎秒 64 通届いている)。揺れは見えて
+ * いる全員へ配られるので、離れた所から自分の囮が揺れるのが見えたら
+ * 「誰かがそこを通った」と読める。**申告させると、触っていないのに揺らして
+ * 「そこに誰か居る」という嘘の合図**を作れるので、こちらは受け取るだけ。
  */
 const BUMP_RAD = 0.3
 /** 揺れが収まるまで (秒) */
 const BUMP_SETTLE = 1.1
 /** 1 秒に何往復するか。膨らむ時より速い — 叩かれた振れ方 */
 const BUMP_HZ = 3.4
-
-/** ぶつかったと見なす近さ (m)。人の半径 + 人形の半分 */
-export const BUMP_RANGE = 0.65
 
 /**
  * 静止させる型。**拳銃を提げて立っている姿。**
@@ -236,28 +238,6 @@ export class Decoys {
     entry.swayX = x * cos - z * sin
     entry.swayZ = x * sin + z * cos
     entry.swayLeft = BUMP_SETTLE
-  }
-
-  /**
-   * 触れている人形を探して、押しのける。
-   *
-   * **人は止めない。** 風船なので通り抜けられる — 止めると盾になって、
-   * 「撃たせる道具」が「隠れる道具」に変わる。代わりに揺れる。
-   *
-   * @param at 触った人の位置
-   */
-  nudge(at: THREE.Vector3, range: number): void {
-    for (const [id, entry] of this.live) {
-      // 膨らみ切る前は触れても揺れない。当たりがまだ立っていない
-      if (entry.inflating > 0) continue
-      const dx = entry.group.position.x - at.x
-      const dz = entry.group.position.z - at.z
-      const gap = Math.hypot(dx, dz)
-      if (gap > range) continue
-      // 既に揺れているなら押し直さない。歩き続ける間ずっと叩かれ続ける
-      if (entry.swayLeft > BUMP_SETTLE * 0.5) continue
-      this.bump(id, dx || 0.001, dz)
-    }
   }
 
   update(dt: number): void {

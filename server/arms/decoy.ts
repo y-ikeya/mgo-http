@@ -18,6 +18,8 @@ import type { MatchPlayer, Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
 import { type Placed, canPlaceAt } from '../../src/sim/judge/claymore'
 import {
+  BUMP_COOLDOWN,
+  BUMP_RANGE,
   DEPLOY_SECONDS,
   PLACE_FORWARD,
   SHOT_HALF,
@@ -48,6 +50,8 @@ export interface Decoy extends Placed {
   skin: string
   /** 膨らみ切る時刻 (ms)。これを過ぎるまでは半分の大きさ */
   readyAt: number
+  /** 次に揺れてよい時刻 (ms)。傍に立ち続けている人で揺れっぱなしにしない */
+  bumpAt: number
 }
 
 export let nextDecoyId = 1
@@ -96,6 +100,7 @@ export function placeDecoy(room: RoomWorld, from: MatchPlayer, now: number): voi
      */
     yaw: from.yaw + Math.PI,
     readyAt: now + DEPLOY_SECONDS * 1000,
+    bumpAt: 0,
   })
 
   // ここでは配らない。**見えている人にだけ**、tick が配る (relayDecoys)
@@ -143,6 +148,53 @@ export function relayDecoys(room: RoomWorld): void {
           readyIn: Math.max(0, decoy.readyAt - Date.now()) / 1000,
         } satisfies ServerMessage),
       )
+    }
+  }
+}
+
+/**
+ * 触られた人形を揺らす。**申告は受けない。**
+ *
+ * --- なぜサーバーが持つか ---
+ * 人形は止まっていて、人の位置は毎刻み届いている。判定に要る物が両方
+ * こちらに在るので、聞く必要が無い。**「ぶつかった」と言わせると、触って
+ * いないのに揺らして「そこに誰か居る」という嘘の合図を作れる。**
+ *
+ * --- 揺れは誰に届くか ---
+ * **見えている全員。** 遮蔽の裏なら届かない (人形と同じ配り方)。だから
+ * 離れた所から自分の囮が揺れるのが見えたら「誰かがそこを通った」と読める
+ * — 撃たせる道具であると同時に、**見張る道具**でもある。
+ *
+ * ただし**見ていないと分からない**。音も印も出ないので、置いて忘れた囮は
+ * 何も知らせない。見張るには見張る手間が要る、という形にしてある。
+ *
+ * **人は止めない。** 風船なので通り抜けられる — 止めると盾になって、
+ * 「撃たせる道具」が「隠れる道具」に変わる。
+ */
+export function bumpDecoys(room: RoomWorld, now: number): void {
+  for (const decoy of room.decoys) {
+    // 膨らみ切る前は触れても揺れない。まだ人の形をしていない
+    if (now < decoy.readyAt || now < decoy.bumpAt) continue
+    for (const player of connected(room)) {
+      if (!canAct(player.life)) continue
+      const dx = decoy.x - player.x
+      const dz = decoy.z - player.z
+      if (Math.hypot(dx, dz) > BUMP_RANGE) continue
+      // 高さも見る。真上の階を歩いている人で揺れると意味が反転する
+      if (Math.abs(player.y - decoy.y) > SHOT_TOP) continue
+      decoy.bumpAt = now + BUMP_COOLDOWN * 1000
+      /*
+       * **押しのけられた向き** (触った人から人形へ)。真上から重なった時だけ
+       * 向きが決まらないので、その時は適当な向きへ倒す。
+       */
+      const reach = Math.hypot(dx, dz) || 1
+      broadcast(room, {
+        type: 'decoyBumped',
+        id: decoy.id,
+        dirX: dx / reach,
+        dirZ: dz / reach,
+      })
+      break
     }
   }
 }

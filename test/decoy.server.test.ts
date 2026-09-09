@@ -136,6 +136,71 @@ describe('囮の人形', () => {
   }, 30000)
 })
 
+/**
+ * **触られた人形は揺れる。**
+ *
+ * 台と膨らみに続く 3 つ目の「よく見れば分かる」手掛かり。同時に、揺れは
+ * 見えている全員へ届くので**見張る道具**にもなる。
+ *
+ * 判定はサーバーが持つ。**申告は受けない** — 触っていないのに揺らせると、
+ * 「そこに誰か居る」という嘘の合図を作り放題になる。
+ */
+describe('触られた人形', () => {
+  test('近づくと揺れて、全員に届く', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'decoy', ['dec-a8', 'dec-b8'])
+    await placed(a)
+    const at = (a.last.get('decoyPlaced') as { at: [number, number, number] }).at
+
+    b.moveTo(at[0], at[1], at[2])
+    b.sendState('walk')
+    await Bun.sleep(300)
+
+    // 置いた本人にも届く。**離れた所から見ていれば「誰かが通った」と読める**
+    expect(a.got('decoyBumped')).toBe(1)
+    expect(b.got('decoyBumped')).toBe(1)
+  }, 30000)
+
+  /**
+   * **傍に立ち続けても揺れ続けない。**
+   *
+   * 揺れっぱなしだと「そこに誰か居る」が漏れ続ける。通ったことは伝わるが、
+   * 留まっていることまでは伝えない。
+   */
+  test('傍に立ち続けても、続けて揺れない', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'decoy', ['dec-a9', 'dec-b9'])
+    await placed(a)
+    const at = (a.last.get('decoyPlaced') as { at: [number, number, number] }).at
+
+    b.moveTo(at[0], at[1], at[2])
+    for (let i = 0; i < 8; i++) {
+      b.sendState('walk')
+      await Bun.sleep(100)
+    }
+    expect(a.got('decoyBumped')).toBe(1)
+  }, 30000)
+
+  /**
+   * **膨らみ切る前は揺れない。** まだ人の形をしていない。
+   */
+  test('膨らむ前は触れても揺れない', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'decoy', ['dec-a10', 'dec-b10'])
+    a.holdDecoy(true)
+    a.sendState()
+    await Bun.sleep(120)
+    a.send({ type: 'decoy' })
+    await Bun.sleep(200)
+    const at = (a.last.get('decoyPlaced') as { at: [number, number, number] }).at
+
+    b.moveTo(at[0], at[1], at[2])
+    b.sendState('walk')
+    await Bun.sleep(300)
+    expect(a.got('decoyBumped')).toBe(0)
+  }, 30000)
+})
+
 describe('置けるかどうか', () => {
   /**
    * **手にしていなければ置けない。**

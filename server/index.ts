@@ -21,7 +21,7 @@ import { recordLag } from '../src/domain/match/lag'
 import { LAG_CLOSE_CODE } from '../src/application/protocol/types'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
-import { placeDecoy, relayDecoys, shotHitsDecoy } from './arms/decoy'
+import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy } from './arms/decoy'
 import { EXPOSE_SECONDS as DECOY_EXPOSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
 import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, exposeTo, reject} from './damage'
@@ -170,6 +170,8 @@ setInterval(() => {
       const water = waterOf(room.stage.name)
       relayClaymores(room)
       relayDecoys(room)
+      // 誰かが囮に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
+      bumpDecoys(room, now)
       for (const player of connected(room)) {
         /*
          * --- 時間で進む遷移 ---

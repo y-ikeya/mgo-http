@@ -42,7 +42,7 @@ import { SoundRing, type PingKind } from "./sense/soundRing";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
-import { BUMP_RANGE, Decoys } from "./arms/decoys";
+import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
@@ -1433,14 +1433,7 @@ export class Game {
       this.listeningLevel(),
     );
     this.shots.update(dt);
-    /*
-     * 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの。
-     *
-     * **触った判定はこちらで持つ。** 人形は止まっていて自分の位置は手元に
-     * あるので、サーバーに聞く必要が無い。申告させると、**触っていないのに
-     * 揺らして「そこに誰か居る」という嘘の合図**を作れる。
-     */
-    this.decoys.nudge(this.player.position, BUMP_RANGE);
+    // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
     this.decoys.update(dt);
     this.blast.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
@@ -1904,6 +1897,16 @@ export class Game {
         this.addPing("shot", this.popAt, gain);
         break;
       }
+
+      /*
+       * 人形が押しのけられた。**見えている全員に届く。**
+       *
+       * 離れた所から自分の囮が揺れるのが見えたら「誰かがそこを通った」。
+       * 撃たせる道具であると同時に、**見張る道具**でもある。
+       */
+      case "decoyBumped":
+        this.decoys.bump(message.id, message.dirX, message.dirZ);
+        break;
 
       case "claymoreGone": {
         // 位置を先に取る。消してから爆発を出すと出す場所が分からない

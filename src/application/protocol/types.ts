@@ -427,6 +427,24 @@ export interface DecoyPlaced {
   readyIn: number
 }
 
+/**
+ * 人形が押しのけられた。**誰かが触った。**
+ *
+ * 見えている全員へ配る。離れた所から自分の囮が揺れるのが見えたら
+ * 「誰かがそこを通った」と読める — 撃たせる道具であると同時に、
+ * **見張る道具**でもある。
+ *
+ * **申告は受けない。** 触っていないのに揺らせると、「そこに誰か居る」という
+ * 嘘の合図を作り放題になる。判定はサーバーが持っている位置から出す。
+ */
+export interface DecoyBumped {
+  type: 'decoyBumped'
+  id: number
+  /** 押された先の向き (世界)。触った人から人形へ向かう向き */
+  dirX: number
+  dirZ: number
+}
+
 /** 割れた / 消えた */
 export interface DecoyGone {
   type: 'decoyGone'
@@ -1027,6 +1045,7 @@ export type ServerMessage =
   | ClaymorePlaced
   | ClaymoreGone
   | DecoyPlaced
+  | DecoyBumped
   | DecoyGone
 
 /** 通信路の上を流れうる全部。符号化のように向きを問わない所だけが使う */
