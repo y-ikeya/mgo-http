@@ -81,6 +81,17 @@ export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
 }
 
 /**
+ * 支援の枠から出た物か。**残りの数を数える対象。**
+ *
+ * 銃は弾数を持つが、こちらは「あと何個」で数える。並べて書くと 4 つ目を
+ * 足したときに数え漏れて、**持っているのに残数が出ない**になる (囮でそう
+ * なった)。述語で聞く。
+ */
+export function isSupport(id: HeldId): id is SupportKind {
+  return id === 'grenade' || id === 'claymore' || id === 'decoy'
+}
+
+/**
  * 1 人が場に置いておける数。**持てる数 (3) とは別。**
  *
  * --- なぜ要るか ---
@@ -358,7 +369,7 @@ export interface Loadout {
  * ので、値をこちらへ持ってくると輪になる。型だけ写して、食い違ったら
  * 数の表 (SUPPORT_COUNT) が型検査で落ちるようにしてある。
  */
-type SupportKind = 'grenade' | 'claymore' | 'decoy'
+export type SupportKind = 'grenade' | 'claymore' | 'decoy'
 
 /** 1 つの命で持てる投げ物の数 */
 const SUPPORT_COUNT: Record<SupportKind, number> = {
