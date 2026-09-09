@@ -60,7 +60,7 @@ import {
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
-import { isGun, isPlaceable, type HeldId } from "../../domain/item/held";
+import { isGun, isPlaceable, isThrowable, type HeldId } from "../../domain/item/held";
 import {
   MODES,
   ROOMS,
@@ -1293,10 +1293,8 @@ export class Game {
      * 立ったまま前を刺しても届かず、しゃがんで見下ろして初めて刃が通る
      * (domain/rule/damage.ts の STAB_DOWN_PITCH)。
      */
-    const throwing =
-      this.inv.held === "grenade" ||
-      this.inv.held === "claymore" ||
-      this.inv.held === "magazine";
+    // **述語で聞く。** 並べて書いていたので囮を足したときに漏れた
+    const throwing = isThrowable(this.inv.held);
     this.player.setAiming(
       this.input.aiming && this.input.engaged && !this.loadoutBlocking && !throwing,
     );

@@ -33,7 +33,7 @@ import type { WeaponId } from './weapons'
 export type { WeaponId }
 
 /** 投げる物・置く物。support の枠に入る */
-type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy'
+export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy'
 
 /**
  * 手に持てる物すべて。
@@ -78,6 +78,17 @@ export function isGun(id: HeldId): id is WeaponId {
  */
 export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
   return id === 'claymore' || id === 'decoy'
+}
+
+/**
+ * 投げる物・置く物か。**銃のように構えない。**
+ *
+ * 構えの型 (照準へ体を向け、背骨を上下へ曲げる) は銃のためのもので、投げ物に
+ * 載せると腕が二重に動く。並べて書いていたので**囮を足したときに漏れて**、
+ * 置く動作の上に構えが乗った。
+ */
+export function isThrowable(id: HeldId): id is ThrowId {
+  return id === 'grenade' || id === 'claymore' || id === 'magazine' || id === 'decoy'
 }
 
 /**
