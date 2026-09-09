@@ -56,6 +56,13 @@ export interface Session {
    */
   seenClaymores: Set<number>
   /**
+   * 見せた囮の人形。
+   *
+   * クレイモアと違って**敵にも見せる**が、遮蔽で隠すのは同じ。一度見せた
+   * 物をもう一度送らないために覚える。
+   */
+  seenDecoys: Set<number>
+  /**
    * 最後に届いた位置のパケット。**そのまま配り直す**ために取っておく。
    *
    * 接続が切れた人の体をその場に残すのに要る。位置は「届いたときに配る」形なので、
@@ -141,6 +148,7 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     socket,
     seen: new Set(),
     seenClaymores: new Set(),
+    seenDecoys: new Set(),
     lastPayload: null,
     packetGap: 0,
     lastPacketAt: 0,

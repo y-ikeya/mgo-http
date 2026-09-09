@@ -11,6 +11,7 @@ import type { Life } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, enterLife, newBot } from '../src/domain/player/player'
 import type { ServerMessage } from '../src/application/protocol/types'
 import type { Claymore } from './arms/claymore'
+import type { Decoy } from './arms/decoy'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
 import { sessionOf } from './session'
@@ -46,6 +47,8 @@ export interface RoomWorld extends Match {
   grenades: Grenade[]
   /** 置かれたクレイモア */
   claymores: Claymore[]
+  /** 置かれた囮の人形。**割れるまでそこに在る** */
+  decoys: Decoy[]
   /** 落ちている武器 */
   dropped: Dropped[]
   /**
@@ -94,6 +97,7 @@ export function roomOf(name: RoomName): RoomWorld {
       name,
       grenades: [],
       claymores: [],
+      decoys: [],
       dropped: [],
       stage: terrainOf(stage),
     }

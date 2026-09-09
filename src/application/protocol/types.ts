@@ -356,6 +356,17 @@ export interface SkillsEvent {
  * **位置も向きも送らない。** サーバーが持っている位置と向きから決める —
  * 送らせると、壁の中や相手の足元へ置ける。置くのは「自分の前」だけでよい。
  */
+export interface PlaceDecoyEvent {
+  /**
+   * 囮の人形を置く。
+   *
+   * クレイモアと同じで**位置も向きも送らない。** サーバーが持っている位置から
+   * 決める。人形は見せる物なので、置ける場所の判定はあちらと同じで足りる。
+   */
+  type: 'decoy'
+  id: string
+}
+
 export interface PlaceClaymoreEvent {
   type: 'claymore'
 }
@@ -384,6 +395,47 @@ export interface ClaymoreGone {
   id: number
   /** 起爆したなら爆発を見せる。試合の仕切り直しで消えただけなら false */
   blast: boolean
+}
+
+/**
+ * 囮の人形が置かれた。
+ *
+ * **クレイモアと逆で、敵にも配る。** 見えないと撃たせられない — 見せることが
+ * 仕事の道具なので、遮蔽で隠す以上のことはしない。
+ */
+export interface DecoyPlaced {
+  type: 'decoyPlaced'
+  id: number
+  /** 置いた人。**本人が「置けた」ことを知るのに要る** (claymorePlaced と同じ) */
+  owner: string
+  at: [number, number, number]
+  /** 正面の向き (rad) */
+  yaw: number
+  team: Team
+  /**
+   * 見た目。**置いた本人と同じ姿。**
+   *
+   * 「その人が居る」と読ませるのが仕事なので、別の姿だと誰か分からない
+   * 人形になって撃つ理由が薄れる。
+   */
+  skin: string
+  /**
+   * 膨らみ切るまであと何秒か。**0 なら既に立っている。**
+   *
+   * 途中から見えるようになった人にも、残りだけ渡せば同じ形が出る。
+   * サーバーの時刻で終わりを渡すと、時計のずれがそのまま大きさのずれになる。
+   */
+  readyIn: number
+}
+
+/** 割れた / 消えた */
+export interface DecoyGone {
+  type: 'decoyGone'
+  id: number
+  /** 割れた場所。**破裂音をそこで鳴らす** */
+  at: [number, number, number]
+  /** 撃たれて割れたなら音と破片を出す。仕切り直しで消えただけなら false */
+  popped: boolean
 }
 
 /**
@@ -929,6 +981,7 @@ export type ClientMessage =
   | LoadoutEvent
   | SkillsEvent
   | PlaceClaymoreEvent
+  | PlaceDecoyEvent
   | DropWeaponEvent
   | PickUpEvent
   | FallEvent
@@ -974,6 +1027,8 @@ export type ServerMessage =
   | ThrowEvent
   | ClaymorePlaced
   | ClaymoreGone
+  | DecoyPlaced
+  | DecoyGone
 
 /** 通信路の上を流れうる全部。符号化のように向きを問わない所だけが使う */
 export type NetMessage = ClientMessage | ServerMessage
