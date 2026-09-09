@@ -9,6 +9,7 @@ import type { MatchPlayer, Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
 import { PLACE_FORWARD, type Placed, SHOT_HALF, SHOT_TOP, blastReach, canPlaceAt } from '../../src/sim/judge/claymore'
 import { blastEffect } from '../../src/domain/item/claymore'
+import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, groundUnder, hasLineOfSight, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
 import { dropGrenade } from './grenade'
@@ -53,6 +54,19 @@ export function placeClaymore(room: RoomWorld, from: MatchPlayer): void {
   if (!canPlaceAt(x, z, from.y, ground, room.stage.solid)) return
 
   from.grenades--
+  /*
+   * **場に置ける数には上限がある** (PLACED_LIMIT)。
+   *
+   * 湧き直すと手元は満タンに戻る (refill) が、置いた物は残る。数えないと
+   * 死ぬたびに増えて、通り道を全部塞げる。新しい数字は足さない —
+   * 「持てるだけ置ける」なら覚えることが増えない。
+   *
+   * **溢れたら黙って消す。起爆させない。** 置いた瞬間にマップの反対側で
+   * 誰かが死ぬのは理不尽だし、**遠隔起爆装置**として使える (相手の近くに
+   * 置いてきた物を、遠くで 1 個置いて起爆させる)。
+   */
+  evictOldest(room, from.id)
+
   const claymore: Claymore = {
     id: nextClaymoreId++,
     owner: from.id,
@@ -129,6 +143,21 @@ export function relayClaymores(room: RoomWorld): void {
  * 見つけて壊せることが、置く側への答えになる — 通り道を塞がれたら、
  * 迂回するか壊すかを選べる。
  */
+/**
+ * その人の物が上限を超えていたら、古いほうから黙って消す。
+ *
+ * 消えたことは見えている人へ届く (claymoreGone の blast: false)。
+ * **爆発は出さない** — 出すと置くことが遠隔起爆になる。
+ */
+function evictOldest(room: RoomWorld, owner: string): void {
+  for (const old of overflowing(room.claymores, owner)) {
+    const at = room.claymores.indexOf(old)
+    if (at >= 0) room.claymores.splice(at, 1)
+    broadcast(room, { type: 'claymoreGone', id: old.id, blast: false })
+    for (const viewer of connected(room)) sessionOf(viewer).seenClaymores.delete(old.id)
+  }
+}
+
 export function shotHitsClaymore(room: RoomWorld, from: readonly number[], to: readonly number[]): void {
   for (let i = room.claymores.length - 1; i >= 0; i--) {
     const claymore = room.claymores[i]
@@ -141,6 +170,19 @@ export function shotHitsClaymore(room: RoomWorld, from: readonly number[], to: r
     detonateClaymore(room, claymore)
     room.claymores.splice(i, 1)
   }
+}
+
+/**
+ * 全部片付ける。**試合の切れ目に呼ぶ。**
+ *
+ * 起爆はさせない。仕切り直しで爆発が湧くのは理屈が通らない。
+ */
+export function clearClaymores(room: RoomWorld): void {
+  for (const claymore of room.claymores) {
+    broadcast(room, { type: 'claymoreGone', id: claymore.id, blast: false })
+  }
+  room.claymores.length = 0
+  for (const viewer of connected(room)) sessionOf(viewer).seenClaymores.clear()
 }
 
 /** 起爆。前に居た敵だけを巻き込む */

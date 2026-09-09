@@ -22,6 +22,8 @@ import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
+import { clearClaymores } from './arms/claymore'
+import { clearDecoys } from './arms/decoy'
 import { relayState, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
@@ -266,8 +268,16 @@ export function matchState(room: Match): ServerMessage {
 
 /** 全員を湧き地点へ戻して立たせる。段階が変わるたびに呼ぶ */
 export function resetPlayers(room: RoomWorld): void {
-  // 前の試合の手榴弾が残っていると、始まった直後に爆発する
+  /*
+   * 前の試合の手榴弾が残っていると、始まった直後に爆発する。
+   *
+   * **置いた物も片付ける。** 残すと次の試合が前の試合の罠だらけで始まるし、
+   * 陣営は切り直される (下の shuffleTeams) ので、**前の試合の自分の罠が
+   * 今の試合では味方の罠**になる。誰の物として数えるかが決まらない。
+   */
   room.grenades.length = 0
+  clearClaymores(room)
+  clearDecoys(room)
   /*
    * **陣営を切り直す。** 入室で 1 回決めたきりだと、同じ面子が同じ側で
    * 何試合も続く。強い側が勝ち続け、負けている側から抜けていく。

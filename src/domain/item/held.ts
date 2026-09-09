@@ -80,6 +80,49 @@ export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
   return id === 'claymore' || id === 'decoy'
 }
 
+/**
+ * 1 人が場に置いておける数。**持てる数 (3) とは別。**
+ *
+ * --- なぜ要るか ---
+ * 置いた物は**本人が死んでも残る** (置いて離れる道具なので)。一方、湧き直すと
+ * 手元は満タンに戻る (refill)。数えないと死ぬたびに増えて、通り道を全部
+ * 塞げるし、人形を並べ放題になる。
+ *
+ * --- なぜ持てる数より多いか ---
+ * 同じにすると「置き切ったら死ぬまで増やせない」で終わってしまう。1 つ多い
+ * だけで、**死んで湧いた後にもう 1 つ足せる**余地が残る — 置いて離れる道具の
+ * 性格を消さずに、無限には増えない。
+ *
+ * --- 溢れたらどうするか ---
+ * **古いほうから黙って消す。起爆も破裂もさせない。** 置いた瞬間にマップの
+ * 反対側で誰かが死ぬのは理不尽だし、**遠隔起爆装置**として使える (相手の
+ * 近くに置いてきた物を、遠くで 1 つ置いて起爆させる)。囮なら破裂音が
+ * 「誰かが撃った」という**嘘の情報**になる。
+ */
+export const PLACED_LIMIT = 4
+
+/**
+ * 置いた物のうち、押し出される物。**古いほうから。**
+ *
+ * 新しく 1 つ置く前に呼ぶ。返ってきた物を場から外してから足すと、上限を
+ * 超えない。クレイモアも囮も同じ規則を通す — 別々に書くと、片方だけ
+ * 「起爆させてしまう」ような穴が開く。
+ *
+ * **押し出す物は黙って消すこと。** ここは何を消すかだけを決める。
+ *
+ * @param placed 場に在る物。**置いた順** (古い物が先)
+ */
+export function overflowing<T extends { owner: string }>(
+  placed: readonly T[],
+  owner: string,
+  limit = PLACED_LIMIT,
+): T[] {
+  const mine = placed.filter((item) => item.owner === owner)
+  // これから 1 つ足すので、いま limit 個在るなら 1 つ押し出す
+  const over = mine.length - limit + 1
+  return over > 0 ? mine.slice(0, over) : []
+}
+
 /** 湧くときに選ぶ枠。並びの順もこれで決まる */
 type Slot = 'primary' | 'secondary' | 'support' | 'knife' | 'tool'
 
@@ -320,11 +363,8 @@ type SupportKind = 'grenade' | 'claymore' | 'decoy'
 /** 1 つの命で持てる投げ物の数 */
 const SUPPORT_COUNT: Record<SupportKind, number> = {
   grenade: 3,
-  // 置きっぱなしで効き続けるので、手榴弾と同じ数を配ると通り道を全部塞げる
-  claymore: 2,
-  // クレイモアと同じ。置くのに時間がかかり、しかも**見ていないと回収
-  // できない** (割れる音が届かないと気づけない)
-  decoy: 2,
+  claymore: 3,
+  decoy: 3,
 }
 
 /**

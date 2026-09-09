@@ -23,6 +23,7 @@ import {
   SHOT_HALF,
   SHOT_TOP,
 } from '../../src/domain/item/decoy'
+import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, groundUnder, segmentHitsBox } from '../../src/sim/space/vision'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast } from '../world'
@@ -69,6 +70,14 @@ export function placeDecoy(room: RoomWorld, from: MatchPlayer, now: number): voi
   if (!canPlaceAt(x, z, from.y, ground, room.stage.solid)) return
 
   from.grenades--
+  /*
+   * **場に置ける数には上限がある** (クレイモアと同じ規則、PLACED_LIMIT)。
+   *
+   * 溢れたら古いほうから黙って消す。**破裂音を鳴らしてはいけない** —
+   * 置いた本人には「誰かが撃った」と読めてしまう。**嘘の情報**になる。
+   */
+  evictOldest(room, from.id)
+
   room.decoys.push({
     id: nextDecoyId++,
     owner: from.id,
@@ -90,6 +99,21 @@ export function placeDecoy(room: RoomWorld, from: MatchPlayer, now: number): voi
   })
 
   // ここでは配らない。**見えている人にだけ**、tick が配る (relayDecoys)
+}
+
+/**
+ * その人の物が上限を超えていたら、古いほうから黙って消す。
+ *
+ * **音も破片も出さない。** 破裂音は「撃たれた」という意味を持っているので、
+ * 自分で押し出した物に鳴らすと、置いた本人が「誰かが撃った」と読む。
+ */
+function evictOldest(room: RoomWorld, owner: string): void {
+  for (const old of overflowing(room.decoys, owner)) {
+    const at = room.decoys.indexOf(old)
+    if (at >= 0) room.decoys.splice(at, 1)
+    broadcast(room, { type: 'decoyGone', id: old.id, at: [old.x, old.y, old.z], popped: false })
+    for (const viewer of connected(room)) sessionOf(viewer).seenDecoys.delete(old.id)
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { Client, spot, startServer, twoPlayers, type Server } from './server'
 import { DEPLOY_SECONDS } from '../src/domain/item/decoy'
+import { SUPPORT_SPECS } from '../src/domain/item/weapons'
 
 /**
  * 囮の人形。**撃つことに代償を付ける道具。**
@@ -152,7 +153,7 @@ describe('置けるかどうか', () => {
   }, 30000)
 
   /**
-   * **数は有限。** 2 つ置いたら 3 つ目は置けない。
+   * **数は有限。** 持っている数 (3) を超えては置けない。
    */
   test('持っている数より多くは置けない', async () => {
     server = await startServer()
@@ -173,8 +174,8 @@ describe('置けるかどうか', () => {
       await Bun.sleep(150)
     }
     await Bun.sleep(400)
-    // SUPPORT_SPECS.decoy.count = 2
-    expect(client.got('decoyPlaced')).toBe(2)
+    expect(client.got('decoyPlaced')).toBe(SUPPORT_SPECS.decoy.count)
     client.close()
   }, 30000)
+
 })

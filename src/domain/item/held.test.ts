@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import { SUPPORT_SPECS } from './weapons'
 import {
   HELD, buildCarried, carrySpeed, cycle, dropEmpty, find, firstOf, isTwoHanded, listOf, pickUp, toggle,
   type Carried, type HeldId,
+  overflowing,
+  PLACED_LIMIT,
 } from './held'
 
 /**
@@ -124,12 +127,24 @@ describe('湧いたときの持ち物', () => {
     expect(carried.map((c) => c.id)).not.toContain('magazine')
   })
 
-  test('投げ物の数は選んだ物で決まる。クレイモアは手榴弾より少ない', () => {
-    const withClaymore = buildCarried(
-      { primary: 'rifle', secondary: 'm9', support: 'claymore' }, ammo)
-    const g = carried.find((c) => c.id === 'grenade') as { count: number }
-    const c = withClaymore.find((c) => c.id === 'claymore') as { count: number }
-    expect(g.count).toBeGreaterThan(c.count)
+  /**
+   * **選んだ枠の物だけを、その数だけ持つ。**
+   *
+   * 「クレイモアは手榴弾より少ない」で押さえていたが、置く物は場に出せる数の
+   * ほうで抑えるようにしたので (PLACED_LIMIT)、持つ数は揃った。数そのものより
+   * **選んだ物しか入っていないこと**のほうが大事なので、そちらを見る。
+   */
+  test('選んだ支援だけを、その数だけ持つ', () => {
+    for (const support of ['grenade', 'claymore', 'decoy'] as const) {
+      const built = buildCarried({ primary: 'rifle', secondary: 'm9', support }, ammo)
+      const mine = built.find((c) => c.id === support) as { count: number }
+      expect(mine.count).toBe(SUPPORT_SPECS[support].count)
+      // 選ばなかった支援は入っていない
+      for (const other of ['grenade', 'claymore', 'decoy'] as const) {
+        if (other === support) continue
+        expect(built.map((c) => c.id)).not.toContain(other)
+      }
+    }
   })
 })
 
@@ -259,5 +274,47 @@ describe('副武器なし', () => {
     expect(find(carried, 'sniper')).toBeDefined()
     expect(find(carried, 'grenade')).toBeDefined()
     expect(find(carried, 'box')).toBeDefined()
+  })
+})
+
+/**
+ * 置いた物は**本人が死んでも場に残る**のに、湧き直すと手元は満タンに戻る。
+ * 数えないと死ぬたびに増えて、通り道を全部塞げる / 人形を並べ放題になる。
+ *
+ * **死ななければ効かない規則**なので、端から端まで試すと重い割に脆い
+ * (倒れて・支度して・湧いてから、もう一度置く)。決めているのは規則なので
+ * ここで直に見る。
+ */
+describe('場に置ける数', () => {
+  const of = (owner: string, n: number) =>
+    Array.from({ length: n }, (_, i) => ({ owner, id: `${owner}${i}` }))
+
+  test('上限に届いていなければ、何も押し出さない', () => {
+    expect(overflowing(of('a', PLACED_LIMIT - 1), 'a')).toEqual([])
+  })
+
+  /** これから 1 つ足すので、いま上限ぶん在るなら 1 つ押し出す */
+  test('上限ぶん在れば、古いほうを 1 つ押し出す', () => {
+    const mine = of('a', PLACED_LIMIT)
+    expect(overflowing(mine, 'a')).toEqual([mine[0]!])
+  })
+
+  test('溢れているぶんだけ押し出す', () => {
+    const mine = of('a', PLACED_LIMIT + 2)
+    expect(overflowing(mine, 'a')).toEqual(mine.slice(0, 3))
+  })
+
+  /**
+   * **数えるのは自分の物だけ。** 全体で数えると、味方が置いた物のせいで
+   * 自分の罠が消える。
+   */
+  test('他人の物は数えない', () => {
+    const field = [...of('b', PLACED_LIMIT), ...of('a', 1)]
+    expect(overflowing(field, 'a')).toEqual([])
+  })
+
+  test('持てる数より場の上限のほうが多い。**死んで湧いた後に 1 つ足せる**', () => {
+    expect(PLACED_LIMIT).toBeGreaterThan(SUPPORT_SPECS.claymore.count)
+    expect(PLACED_LIMIT).toBeGreaterThan(SUPPORT_SPECS.decoy.count)
   })
 })

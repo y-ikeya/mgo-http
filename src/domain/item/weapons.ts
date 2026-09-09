@@ -94,9 +94,9 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
   claymore: {
     id: 'claymore',
     label: 'CLAYMORE',
-    // 手榴弾より少ない。置きっぱなしで効き続けるので、数を配ると
-    // 「通り道を全部塞ぐ」ができてしまう
-    count: 2,
+    // 置きっぱなしで効き続けるが、**場に出せる数は別に上限がある**
+    // (domain/item/held.ts の PLACED_LIMIT)。持てる数はそこで抑えなくてよい
+    count: 3,
     hint: '置いて離れる。前を通った敵で起爆',
   },
   /*
@@ -111,10 +111,8 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
   decoy: {
     id: 'decoy',
     label: 'DECOY',
-    // クレイモアと同じ数。置くのに時間がかかり、しかも**見ていないと
-    // 回収できない** (割れる音が届かないと気づけない) ので、1 個だと
-    // 大事にしすぎて使わなくなる
-    count: 2,
+    // クレイモアと同じ数。場に出せる数の上限も同じ (PLACED_LIMIT)
+    count: 3,
     // 装備画面はそのまま出す。**強調の記法は効かない** (他の 2 つも素の文)
     hint: '自分そっくりの人形。撃った相手の位置が漏れる',
   },
