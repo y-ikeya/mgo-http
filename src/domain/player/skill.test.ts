@@ -173,17 +173,29 @@ describe('ENEMY EXPOSURE', () => {
     expect(exposeSeconds({})).toBe(0)
   })
 
-  test('段が上がるほど長い', () => {
-    expect(exposeSeconds({ exposure: 1 })).toBeLessThan(exposeSeconds({ exposure: 2 }))
-    expect(exposeSeconds({ exposure: 2 })).toBeLessThan(exposeSeconds({ exposure: 3 }))
+  test('取れば光る', () => {
+    expect(exposeSeconds({ exposure: 1 })).toBeGreaterThan(0)
+  })
+
+  /**
+   * **段が無い。取るか取らないかだけ。**
+   *
+   * 本家は Lv3 でも 1 枠だった。値段が段で変わらないなら上の段しか選ばれない
+   * ので、段を持つ意味が無い — 持たせると画面に飾りの升目が並ぶ。
+   */
+  test('段を持たない', () => {
+    expect(SKILLS.exposure.levels).toBe(1)
+    // 上限を見るのは isAffordable。**申告された段はサーバーもここを通す**
+    expect(isAffordable({ exposure: 1 })).toBe(true)
+    expect(isAffordable({ exposure: 2 })).toBe(false)
   })
 
   /**
    * **追跡の道具にしない。** 長いと「当てさえすれば追える」になって、
-   * 撃ち合いを迂回する手より安くなる。
+   * 撃ち合いを迂回する手より安くなる。値段が 1 で固定なので、なおさら。
    */
-  test('一番長くても追い切れる長さにしない', () => {
-    expect(exposeSeconds({ exposure: 3 })).toBeLessThanOrEqual(10)
+  test('追い切れる長さにしない', () => {
+    expect(exposeSeconds({ exposure: 1 })).toBeLessThanOrEqual(6)
   })
 })
 
