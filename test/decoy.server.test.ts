@@ -25,7 +25,7 @@ async function placed(client: Client): Promise<void> {
   // 手にある物は位置に乗って届く。置く前に 1 通は行き渡らせる
   client.sendState()
   await Bun.sleep(120)
-  client.send({ type: 'decoy', id: client.id })
+  client.send({ type: 'decoy' })
   await Bun.sleep(DEPLOY_SECONDS * 1000 + 300)
 }
 
@@ -69,7 +69,7 @@ describe('囮の人形', () => {
     a.holdDecoy(true)
     a.sendState()
     await Bun.sleep(120)
-    a.send({ type: 'decoy', id: a.id })
+    a.send({ type: 'decoy' })
     // 膨らみ切る前に撃つ
     await Bun.sleep(200)
     const at = a.last.get('decoyPlaced') as { at: [number, number, number] } | undefined
@@ -146,7 +146,7 @@ describe('置けるかどうか', () => {
     server = await startServer()
     const { a } = await twoPlayers(server, 'decoy', ['dec-a7', 'dec-b7'])
     // holdDecoy を呼ばないまま置こうとする
-    a.send({ type: 'decoy', id: a.id })
+    a.send({ type: 'decoy' })
     await Bun.sleep(300)
     expect(a.got('decoyPlaced')).toBe(0)
   }, 30000)
@@ -169,7 +169,7 @@ describe('置けるかどうか', () => {
     client.sendState()
     await Bun.sleep(120)
     for (let i = 0; i < 4; i++) {
-      client.send({ type: 'decoy', id: client.id })
+      client.send({ type: 'decoy' })
       await Bun.sleep(150)
     }
     await Bun.sleep(400)

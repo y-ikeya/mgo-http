@@ -69,6 +69,17 @@ export function isGun(id: HeldId): id is WeaponId {
   return HELD[id].shoots
 }
 
+/**
+ * かがんで地面に置く物か。**投げる物とは手順が違う。**
+ *
+ * 投げる物は振りかぶって放す。置く物はかがんで置く — 型も、置ける場所の
+ * 判定も、置き切るまで動けないことも共通なので、**そこを分けない**ために
+ * 述語で聞く。並べて書くと、3 つ目を足したときに直し漏れる。
+ */
+export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
+  return id === 'claymore' || id === 'decoy'
+}
+
 /** 湧くときに選ぶ枠。並びの順もこれで決まる */
 type Slot = 'primary' | 'secondary' | 'support' | 'knife' | 'tool'
 
