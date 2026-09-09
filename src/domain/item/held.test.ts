@@ -123,7 +123,7 @@ describe('湧いたときの持ち物', () => {
     expect(carried.map((c) => c.id)).toContain('box')
   })
 
-  test('弾倉 (囮) は持っていない。撃って初めて増える', () => {
+  test('弾倉は持っていない。撃って初めて増える', () => {
     expect(carried.map((c) => c.id)).not.toContain('magazine')
   })
 

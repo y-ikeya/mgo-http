@@ -897,7 +897,7 @@ export interface Ammo {
  *
  * **その銃の弾倉 1 つぶん。** リロードの回数ではなく撃った発数で数える —
  * 回数で数えると、半分残ったまま替えても増えてしまい、篭って替え続けるのが
- * 最適になる。撃った弾で数えれば、実弾を使わないと囮は増えない。
+ * 最適になる。撃った弾で数えれば、実弾を使わないと弾倉は増えない。
  */
 export function roundsPerDecoy(id: WeaponId): number {
   return WEAPONS[id].magazine

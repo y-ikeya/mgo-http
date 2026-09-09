@@ -263,7 +263,7 @@ export class Client {
   private holdingGrenade = false
   /** クレイモアを手にしているか */
   private holdingClaymore = false
-  /** 囮の人形を手にしているか */
+  /** decoy を手にしているか */
   private holdingDecoy = false
 
   holdGrenade(holding: boolean): void {
@@ -281,7 +281,7 @@ export class Client {
     this.holdingClaymore = holding
   }
 
-  /** 囮の人形を手にする。**支度で選んでいなければ持てない** (クレイモアと同じ) */
+  /** decoy を手にする。**支度で選んでいなければ持てない** (クレイモアと同じ) */
   holdDecoy(holding: boolean): void {
     this.holdingDecoy = holding
   }

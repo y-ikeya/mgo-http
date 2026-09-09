@@ -4,7 +4,7 @@ import { DEPLOY_SECONDS } from '../src/domain/item/decoy'
 import { SUPPORT_SPECS } from '../src/domain/item/weapons'
 
 /**
- * 囮の人形。**撃つことに代償を付ける道具。**
+ * decoy。**撃つことに代償を付ける道具。**
  *
  * ここで押さえるのは 2 つ。**割った人の位置が漏れること**と、
  * **漏れてはいけない場合に漏れないこと。**
@@ -40,7 +40,7 @@ function shootAt(client: Client, at: [number, number, number]): void {
   })
 }
 
-describe('囮の人形', () => {
+describe('decoy', () => {
   test('置いた人へ配られる', async () => {
     server = await startServer()
     const { a } = await twoPlayers(server, 'decoy', ['dec-a1', 'dec-b1'])

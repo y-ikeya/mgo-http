@@ -170,7 +170,7 @@ setInterval(() => {
       const water = waterOf(room.stage.name)
       relayClaymores(room)
       relayDecoys(room)
-      // 誰かが囮に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
+      // 誰かが decoy に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
       bumpDecoys(room, now)
       for (const player of connected(room)) {
         /*
@@ -628,7 +628,7 @@ function handleMessage(
       // 弾道の上にクレイモアがあれば起爆する
       shotHitsClaymore(room, message.from, message.to)
       /*
-       * 弾道の上に囮の人形があれば割れる。**割った本人の位置が漏れる。**
+       * 弾道の上に decoy があれば割れる。**割った本人の位置が漏れる。**
        *
        * 晒す先は置いた人 (の陣営)。置いた人が抜けていても、置いた物は
        * 残っている — その場合は晒す相手が居ないので何も起きない。

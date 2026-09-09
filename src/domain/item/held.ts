@@ -84,7 +84,7 @@ export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
  * 投げる物・置く物か。**銃のように構えない。**
  *
  * 構えの型 (照準へ体を向け、背骨を上下へ曲げる) は銃のためのもので、投げ物に
- * 載せると腕が二重に動く。並べて書いていたので**囮を足したときに漏れて**、
+ * 載せると腕が二重に動く。並べて書いていたので**decoy を足したときに漏れて**、
  * 置く動作の上に構えが乗った。
  */
 export function isThrowable(id: HeldId): id is ThrowId {
@@ -95,7 +95,7 @@ export function isThrowable(id: HeldId): id is ThrowId {
  * 支援の枠から出た物か。**残りの数を数える対象。**
  *
  * 銃は弾数を持つが、こちらは「あと何個」で数える。並べて書くと 4 つ目を
- * 足したときに数え漏れて、**持っているのに残数が出ない**になる (囮でそう
+ * 足したときに数え漏れて、**持っているのに残数が出ない**になる (decoy でそう
  * なった)。述語で聞く。
  */
 export function isSupport(id: HeldId): id is SupportKind {
@@ -118,7 +118,7 @@ export function isSupport(id: HeldId): id is SupportKind {
  * --- 溢れたらどうするか ---
  * **古いほうから黙って消す。起爆も破裂もさせない。** 置いた瞬間にマップの
  * 反対側で誰かが死ぬのは理不尽だし、**遠隔起爆装置**として使える (相手の
- * 近くに置いてきた物を、遠くで 1 つ置いて起爆させる)。囮なら破裂音が
+ * 近くに置いてきた物を、遠くで 1 つ置いて起爆させる)。decoy なら破裂音が
  * 「誰かが撃った」という**嘘の情報**になる。
  */
 export const PLACED_LIMIT = 4
@@ -127,7 +127,7 @@ export const PLACED_LIMIT = 4
  * 置いた物のうち、押し出される物。**古いほうから。**
  *
  * 新しく 1 つ置く前に呼ぶ。返ってきた物を場から外してから足すと、上限を
- * 超えない。クレイモアも囮も同じ規則を通す — 別々に書くと、片方だけ
+ * 超えない。クレイモアも decoy も同じ規則を通す — 別々に書くと、片方だけ
  * 「起爆させてしまう」ような穴が開く。
  *
  * **押し出す物は黙って消すこと。** ここは何を消すかだけを決める。
@@ -177,7 +177,7 @@ interface HeldSpec {
  * 並びの順。武器系は 主 → 副 → support → ナイフ。
  *
  * **support は 1 枠だが中身は 1 つとは限らない。** 湧くときに選ぶのは手榴弾か
- * クレイモアのどちらかだが、弾倉 (囮) は撃った弾が溜まって増えるので、持って
+ * クレイモアのどちらかだが、弾倉は撃った弾が溜まって増えるので、持って
  * いれば並びに現れる。だから武器系は 4 つのときも 5 つのときもある。
  */
 const TOOL_ORDER: Partial<Record<HeldId, number>> = { box: 0, none: 1 }
@@ -394,7 +394,7 @@ const SUPPORT_COUNT: Record<SupportKind, number> = {
  *
  * ナイフとダンボールは選ばない。**最初から持っている**。
  *
- * 弾倉 (囮) は入れない。撃った弾が 1 弾倉ぶん溜まって初めて増える物なので、
+ * 弾倉は入れない。撃った弾が 1 弾倉ぶん溜まって初めて増える物なので、
  * 湧いた時点では持っていない。
  */
 export function buildCarried(loadout: Loadout, ammoOf: (id: WeaponId) => { ammo: number; reserve: number }): Carried[] {

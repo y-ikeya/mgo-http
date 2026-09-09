@@ -113,7 +113,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     const stats = props.stats
     if (!stats || heldIsGun()) return null
     if (held() === 'magazine') return stats.throwables
-    // **述語で聞く。** 並べて書いていたので囮を足したときに数え漏れた
+    // **述語で聞く。** 並べて書いていたので decoy を足したときに数え漏れた
     if (isSupport(held())) return stats.grenades
     return null
   }

@@ -56,7 +56,7 @@ export interface Session {
    */
   seenClaymores: Set<number>
   /**
-   * 見せた囮の人形。
+   * 見せた decoy。
    *
    * クレイモアと違って**敵にも見せる**が、遮蔽で隠すのは同じ。一度見せた
    * 物をもう一度送らないために覚える。

@@ -43,7 +43,7 @@ export function isSupportChoice(id: string): id is SupportId {
  * 地面に置いても「持っている」ままだった** — 置いた銃を他人に拾わせながら、
  * 自分もその銃として撃てる (複製)。捨てる = 一覧から外れる、を一様にする。
  *
- * 手ぶら (none) と弾倉の囮 (magazine) だけは通す。囮は撃っているうちに増える
+ * 手ぶら (none) と弾倉 (magazine) だけは通す。弾倉は撃っているうちに増える
  * 物で、数はクライアントが数えている。
  */
 export function canHold(player: MatchPlayer, id: HeldId): boolean {

@@ -598,7 +598,7 @@ export class Game {
   private pendingThrow = false;
   /** クレイモア側の同じもの */
   private pendingSetup = false;
-  /** 弾倉 (囮) 側の同じもの */
+  /** 弾倉側の同じもの */
   private pendingDecoy = false;
   /**
    * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
@@ -1293,7 +1293,7 @@ export class Game {
      * 立ったまま前を刺しても届かず、しゃがんで見下ろして初めて刃が通る
      * (domain/rule/damage.ts の STAB_DOWN_PITCH)。
      */
-    // **述語で聞く。** 並べて書いていたので囮を足したときに漏れた
+    // **述語で聞く。** 並べて書いていたので decoy を足したときに漏れた
     const throwing = isThrowable(this.inv.held);
     this.player.setAiming(
       this.input.aiming && this.input.engaged && !this.loadoutBlocking && !throwing,
@@ -1417,7 +1417,7 @@ export class Game {
     this.updateClaymoreRelease(dt);
     this.updateGrenadeRelease(dt);
     this.thrown.update(dt, this.stage.collidables, this.stage.water, (impact) => {
-      // 水に落ちたら輪だけ。囮の音が水面から鳴ると、そこが床に聞こえる
+      // 水に落ちたら輪だけ。弾倉の音が水面から鳴ると、そこが床に聞こえる
       if (this.splashAt(impact.position, THROWN_SPLASH)) return;
       // 跳ねるたびに鳴る。自分が投げたものは輪に出さない
       // (どこへ落ちるかは分かっているので、映しても情報にならない)。
@@ -1860,7 +1860,7 @@ export class Game {
       }
 
       /*
-       * 囮の人形が置かれた。**敵にも届く** — 見えないと撃たせられない。
+       * decoy が置かれた。**敵にも届く** — 見えないと撃たせられない。
        *
        * 膨らむ残り (readyIn) を受け取るのは、途中から見えるようになった人にも
        * 同じ形を出すため。サーバーの時刻で終わりを渡すと、時計のずれが
@@ -1899,7 +1899,7 @@ export class Game {
       /*
        * 人形が押しのけられた。**見えている全員に届く。**
        *
-       * 離れた所から自分の囮が揺れるのが見えたら「誰かがそこを通った」。
+       * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
        * 撃たせる道具であると同時に、**見張る道具**でもある。
        */
       case "decoyBumped":
@@ -2611,7 +2611,7 @@ export class Game {
   /**
    * そこは水面か。**水なら輪を出して true を返す。**
    *
-   * 弾も薬莢も手榴弾も囮も、水に落ちたときの見え方は同じ — 輪が広がって
+   * 弾も薬莢も手榴弾も弾倉も、水に落ちたときの見え方は同じ — 輪が広がって
    * 消える。判じ方を 1 か所に置いて、落ちる物ごとに書かない。
    */
   private splashAt(at: THREE.Vector3, strength = 1, sound = true): boolean {
@@ -3135,7 +3135,7 @@ export class Game {
   /**
    * 投げる構えと、離したときの投擲。
    *
-   * 押している間は落下点を見せ、離した瞬間に投げる。囮として使う道具なので、
+   * 押している間は落下点を見せ、離した瞬間に投げる。音で釣る道具なので、
    * どこへ落ちるかを見てから決められないと「そこへ落とす」判断にならない。
    * 押した瞬間に飛ぶ形だと、狙った場所へ落とすのが運になる。
    *
@@ -3189,7 +3189,7 @@ export class Game {
   /**
    * 手榴弾の構えと投擲。
    *
-   * 弾倉の囮と同じで、押している間に落下点を見せ、離した瞬間に投げる。
+   * 弾倉と同じで、押している間に落下点を見せ、離した瞬間に投げる。
    * どこへ落ちるかを見てから決められないと「そこへ落とす」判断にならない。
    *
    * 信管は**手を離れてから**動き出す。握ったまま溜める手 (cooking) は入れていない。
@@ -3248,7 +3248,7 @@ export class Game {
       this.player.setThrowing(false);
     }
     /*
-     * 置く物は同じ型を通す。**クレイモアも囮も「かがんで置く」。**
+     * 置く物は同じ型を通す。**クレイモアも decoy も「かがんで置く」。**
      *
      * 違うのは置いた後だけなので、構えと置き切りの手順は分けない。
      * どちらを置いたかは setupHeld が覚えていて、知らせるときに分かれる。

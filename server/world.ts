@@ -47,7 +47,7 @@ export interface RoomWorld extends Match {
   grenades: Grenade[]
   /** 置かれたクレイモア */
   claymores: Claymore[]
-  /** 置かれた囮の人形。**割れるまでそこに在る** */
+  /** 置かれた decoy。**割れるまでそこに在る** */
   decoys: Decoy[]
   /** 落ちている武器 */
   dropped: Dropped[]
