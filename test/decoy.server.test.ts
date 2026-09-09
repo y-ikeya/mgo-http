@@ -145,6 +145,71 @@ describe('decoy', () => {
  * 判定はサーバーが持つ。**申告は受けない** — 触っていないのに揺らせると、
  * 「そこに誰か居る」という嘘の合図を作り放題になる。
  */
+/**
+ * **風船なので刃でも割れる。**
+ *
+ * 撃つより確実に見分けられる手だが、**代償は同じ** — 歩いて確かめに行った
+ * 分だけ位置が漏れる。近づけば安全に処理できる、にはしない。
+ */
+describe('ナイフで割る', () => {
+  test('間合いで振ると割れて、刺した人の位置が漏れる', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'decoy', ['dec-k1', 'dec-k2'])
+    await placed(a)
+    const at = (a.last.get('decoyPlaced') as { at: [number, number, number] }).at
+
+    // 人形の手前に立つ。**向きは 0 = -Z を向いている**ので、+Z 側から
+    b.moveTo(at[0], at[1], at[2] + 1)
+    b.sendState()
+    await Bun.sleep(150)
+    b.send({ type: 'stab' })
+    await Bun.sleep(300)
+
+    expect(b.got('decoyGone')).toBe(1)
+    expect(a.got('exposed')).toBe(1)
+    expect((a.last.get('exposed') as { id: string }).id).toBe(b.id)
+  }, 30000)
+
+  /**
+   * **間合いの外では届かない。** 銃と違って、近づかなければ割れない。
+   */
+  test('間合いの外で振っても割れない', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'decoy', ['dec-k3', 'dec-k4'])
+    await placed(a)
+    const at = (a.last.get('decoyPlaced') as { at: [number, number, number] }).at
+
+    b.moveTo(at[0], at[1], at[2] + 5)
+    b.sendState()
+    await Bun.sleep(150)
+    b.send({ type: 'stab' })
+    await Bun.sleep(300)
+
+    expect(b.got('decoyGone')).toBe(0)
+    expect(a.got('exposed')).toBe(0)
+  }, 30000)
+
+  /**
+   * **背を向けていては割れない。** 人へ刺すのと同じ角度で見る
+   * (MELEE_CONE_COS)。目で見て当たっている所と食い違わせない。
+   */
+  test('背を向けて振っても割れない', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'decoy', ['dec-k5', 'dec-k6'])
+    await placed(a)
+    const at = (a.last.get('decoyPlaced') as { at: [number, number, number] }).at
+
+    // 人形の**向こう側**に立つ。向きは -Z のままなので、人形は背中に在る
+    b.moveTo(at[0], at[1], at[2] - 1)
+    b.sendState()
+    await Bun.sleep(150)
+    b.send({ type: 'stab' })
+    await Bun.sleep(300)
+
+    expect(b.got('decoyGone')).toBe(0)
+  }, 30000)
+})
+
 describe('触られた人形', () => {
   test('近づくと揺れて、全員に届く', async () => {
     server = await startServer()

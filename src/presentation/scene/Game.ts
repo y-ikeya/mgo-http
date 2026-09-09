@@ -2700,6 +2700,18 @@ export class Game {
     // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ)
     const yaw = this.player.yaw;
     this.meleeForward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    /*
+     * 振ったことだけ知らせる。**当たったかどうかは言わない。**
+     *
+     * decoy は風船なので刃でも割れるが、割るのはサーバー。位置も向きも
+     * あちらが持っているので、「刺した」と言わせない — 言えるようにすると、
+     * **刺していないのに割ったことにして相手を晒せる**。
+     *
+     * 空振りでも送る。手元では割れたかどうかが分からない (decoy かどうかを
+     * 手元で決めると、そこが嘘の入り口になる)。
+     */
+    this.net.send({ type: "stab" });
+
     const result = this.remotes.hitMelee(
       this.player.position,
       this.meleeForward,

@@ -12,6 +12,7 @@
  */
 
 import { connected } from '../../src/domain/match/match'
+import { MELEE_CONE_COS, MELEE_RANGE } from '../../src/domain/rule/damage'
 import { canAct } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
 import type { MatchPlayer, Team } from '../../src/domain/player/player'
@@ -228,6 +229,42 @@ export function shotHitsDecoy(
       max: [decoy.x + SHOT_HALF, decoy.y + SHOT_TOP, decoy.z + SHOT_HALF],
     }
     if (!segmentHitsBox(from[0]!, from[1]!, from[2]!, to[0]!, to[1]!, to[2]!, box)) continue
+    popDecoy(room, decoy)
+    room.decoys.splice(i, 1)
+    broken.push(decoy)
+  }
+  return broken
+}
+
+/**
+ * 刺された decoy を割る。**申告を増やさない。**
+ *
+ * 送られてくるのは「振った」だけ (StabEvent)。**どこで振ったかはこちらが
+ * 持っている** — 位置も向きも毎刻み届いているので、聞く必要が無い。
+ * 「刺した」と言わせると、刺していないのに割ったことにして相手を晒せる。
+ *
+ * 弾と同じ間合い・同じ角度で見る (MELEE_RANGE / MELEE_CONE_COS)。人に
+ * 刺さる所と風船が割れる所が食い違うと、**目で見て当たっているのに
+ * 割れない**が起きる。
+ *
+ * @returns 割れた decoy の持ち主。刺した相手を晒すのは呼ぶ側
+ */
+export function stabHitsDecoy(room: RoomWorld, from: MatchPlayer, now: number): Decoy[] {
+  if (!canAct(from.life)) return []
+  // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ)
+  const forward = [-Math.sin(from.yaw), -Math.cos(from.yaw)]
+  const broken: Decoy[] = []
+  for (let i = room.decoys.length - 1; i >= 0; i--) {
+    const decoy = room.decoys[i]!
+    // 膨らみ切る前は割れない。撃たれたときと同じ (当たりがまだ立っていない)
+    if (now < decoy.readyAt) continue
+    const dx = decoy.x - from.x
+    const dz = decoy.z - from.z
+    const reach = Math.hypot(dx, dz)
+    if (reach > MELEE_RANGE || reach < 1e-4) continue
+    if ((dx / reach) * forward[0]! + (dz / reach) * forward[1]! < MELEE_CONE_COS) continue
+    // 高さも見る。真上や真下の階に在る物へ刃が届いては困る
+    if (from.y - decoy.y > SHOT_TOP || decoy.y - from.y > SHOT_TOP) continue
     popDecoy(room, decoy)
     room.decoys.splice(i, 1)
     broken.push(decoy)

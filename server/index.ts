@@ -21,7 +21,7 @@ import { recordLag } from '../src/domain/match/lag'
 import { LAG_CLOSE_CODE } from '../src/application/protocol/types'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
-import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy } from './arms/decoy'
+import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
 import { EXPOSE_SECONDS as DECOY_EXPOSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
 import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, exposeTo, reject} from './damage'
@@ -552,6 +552,24 @@ function handleMessage(
 
     case 'decoy':
       placeDecoy(room, player, Date.now())
+      break
+
+    /*
+     * ナイフを振った。**風船なので刃でも割れる。**
+     *
+     * 送られてくるのは「振った」だけ。**どこで振ったかはこちらが持っている**
+     * ので、位置も向きも聞かない (server/arms/decoy.ts の stabHitsDecoy)。
+     *
+     * 撃って割ったときと同じに晒す。**歩いて確かめに行っても代償は同じ** —
+     * 近づいた分だけ確実に見分けられるので、そこは腕前として残す。
+     */
+    case 'stab':
+      for (const decoy of stabHitsDecoy(room, player, Date.now())) {
+        const owner = room.players.get(decoy.owner)
+        if (!owner || owner.id === player.id) continue
+        if (!hostileToOwner(room, decoy.team, player)) continue
+        exposeTo(room, player, owner, DECOY_EXPOSE_SECONDS)
+      }
       break
 
     /*
