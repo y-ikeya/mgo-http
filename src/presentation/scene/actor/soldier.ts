@@ -11,6 +11,7 @@ import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
 import { stepMovement, type Mover } from '../../../sim/space/movement'
+import { PLAYER_HEIGHT as BODY_HEIGHT } from '../../../domain/player/moving'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
 import {
@@ -31,9 +32,19 @@ import type { WeaponTarget } from '../arms/weapon'
 /** カプセルの円柱部分の長さ (m)。全高 = LENGTH + RADIUS * 2 */
 const CAPSULE_LENGTH = 1.1
 const CAPSULE_RADIUS = 0.35
+// 寸法とドメインの数字が食い違ったら、どちらかを直すこと
+if (CAPSULE_LENGTH + CAPSULE_RADIUS * 2 !== BODY_HEIGHT) {
+  console.warn('[Soldier] カプセルの寸法と PLAYER_HEIGHT が食い違っている')
+}
 
-/** 立ち姿勢の全高 (m)。カメラの注視点高さの基準でもある */
-export const PLAYER_HEIGHT = CAPSULE_LENGTH + CAPSULE_RADIUS * 2
+/**
+ * 立ち姿勢の全高 (m)。カメラの注視点高さの基準でもある。
+ *
+ * **数字はドメインに置いてある** (domain/player/moving.ts)。梁をくぐれるか
+ * どうかが遊びに効くし、地形の側も同じ数字を要る。ここでは寸法が食い違って
+ * いないかだけ確かめて、そのまま流す。
+ */
+export const PLAYER_HEIGHT = BODY_HEIGHT
 /** 移動判定に使う半径 (m)。XZ 平面では円として扱う */
 export const PLAYER_RADIUS = CAPSULE_RADIUS
 
