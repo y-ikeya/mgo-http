@@ -69,6 +69,16 @@ import type { ClientMessage, RoomSummary, ServerMessage } from '../src/applicati
 import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/equip'
 
 
+/**
+ * 待ち受けるポート。**環境変数で変えられる** (package.json の serve:alt)。
+ *
+ * 2 つ立てて繋ぎ合わせるときに要る。画面側は `?server=localhost:6001` で
+ * 行き先を上書きできる (src/infra/link/index.ts)。
+ *
+ * **ブラウザが拒む番号がある。** Chrome は X11 の 6000 番や IRC の 6665-6669
+ * などを ERR_UNSAFE_PORT で塞いでいて、**サーバーは起動するのに繋がらない**。
+ * 起動して静かに繋がらないので、原因を探すのに時間が要る。
+ */
 const PORT = Number(process.env.PORT ?? 8787)
 
 /**
