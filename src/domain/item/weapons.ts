@@ -65,9 +65,9 @@ function gunsIn(slot: 'primary' | 'secondary'): WeaponId[] {
  * 相手を騙す道具。交換になっているのが肝」と理屈まで書いていたが、**作り話だった**。
  * 本家では弾倉は選ぶものではない。
  */
-export type SupportId = 'grenade' | 'claymore'
+export type SupportId = 'grenade' | 'claymore' | 'decoy'
 
-export const SUPPORTS: SupportId[] = ['grenade', 'claymore']
+export const SUPPORTS: SupportId[] = ['grenade', 'claymore', 'decoy']
 
 interface SupportSpec {
   id: SupportId
@@ -94,10 +94,27 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
   claymore: {
     id: 'claymore',
     label: 'CLAYMORE',
-    // 手榴弾より少ない。置きっぱなしで効き続けるので、数を配ると
-    // 「通り道を全部塞ぐ」ができてしまう
-    count: 2,
+    // 置きっぱなしで効き続けるが、**場に出せる数は別に上限がある**
+    // (domain/item/held.ts の PLACED_LIMIT)。持てる数はそこで抑えなくてよい
+    count: 3,
     hint: '置いて離れる。前を通った敵で起爆',
+  },
+  /*
+   * **撃たせる道具。** 三者で効く相手が割れる:
+   *
+   *     GRENADE   相手を動かす  → 止まっている相手
+   *     CLAYMORE  置いて待つ    → 動いている相手
+   *     DECOY     撃たせる      → **見ている相手**
+   *
+   * どれが強いかではなく「相手が何をしてくるか」の読みになる。
+   */
+  decoy: {
+    id: 'decoy',
+    label: 'DECOY',
+    // クレイモアと同じ数。場に出せる数の上限も同じ (PLACED_LIMIT)
+    count: 3,
+    // 装備画面はそのまま出す。**強調の記法は効かない** (他の 2 つも素の文)
+    hint: '自分そっくりの人形。撃った相手の位置が漏れる',
   },
 }
 
@@ -880,7 +897,7 @@ export interface Ammo {
  *
  * **その銃の弾倉 1 つぶん。** リロードの回数ではなく撃った発数で数える —
  * 回数で数えると、半分残ったまま替えても増えてしまい、篭って替え続けるのが
- * 最適になる。撃った弾で数えれば、実弾を使わないと囮は増えない。
+ * 最適になる。撃った弾で数えれば、実弾を使わないと弾倉は増えない。
  */
 export function roundsPerDecoy(id: WeaponId): number {
   return WEAPONS[id].magazine

@@ -17,7 +17,7 @@ PAGES_PROJECT := mgohttp
 
 SSH := ssh -i $(SERVER_KEY) $(SERVER_USER)@$(SERVER_HOST)
 
-.PHONY: help dev serve build test check docs deploy deploy-web deploy-server setup-server push-env logs status ssh restart
+.PHONY: help dev serve serve-alt build test check docs deploy deploy-web deploy-server setup-server push-env logs status ssh restart
 
 help:
 	@echo '手元で動かす'
@@ -25,7 +25,8 @@ help:
 	@echo '  make docs           武器の表を書き出し直す (docs/weapons.md)'
 	@echo '  make test           試験だけ (50 秒ほどかかる)'
 	@echo '  make dev            画面 (vite)。サーバーは同じホストの 8787 を見る'
-	@echo '  make serve          対戦サーバー。保存すると勝手に読み直す'
+	@echo '  make serve          対戦サーバー (8787)。保存すると勝手に読み直す'
+	@echo '  make serve-alt      もう 1 台 (6001)。画面は ?server=localhost:6001'
 	@echo ''
 	@echo '配置する'
 	@echo '  make deploy         クライアントとサーバーを両方'
@@ -50,6 +51,16 @@ dev:
 # --watch 付き。server/index.ts を保存すると読み直す
 serve:
 	bun run server
+
+# 2 台目。**繋ぎ合わせを試すとき**に、1 台目を止めずに立てる。
+#
+# 画面の行き先は `?server=localhost:6001` で上書きする。
+#
+# **6000 番は使わない。** Chrome が X11 のポートとして ERR_UNSAFE_PORT で
+# 塞いでいて、**サーバーは起動するのに繋がらない**。6665-6669 (IRC) も同じ。
+# 番号を変えたいときは PORT=6500 make serve-alt
+serve-alt:
+	bun run server:alt
 
 build:
 	bun run build

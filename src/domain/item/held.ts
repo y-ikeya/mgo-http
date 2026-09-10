@@ -33,7 +33,7 @@ import type { WeaponId } from './weapons'
 export type { WeaponId }
 
 /** 投げる物・置く物。support の枠に入る */
-type ThrowId = 'grenade' | 'claymore' | 'magazine'
+export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy'
 
 /**
  * 手に持てる物すべて。
@@ -69,6 +69,82 @@ export function isGun(id: HeldId): id is WeaponId {
   return HELD[id].shoots
 }
 
+/**
+ * かがんで地面に置く物か。**投げる物とは手順が違う。**
+ *
+ * 投げる物は振りかぶって放す。置く物はかがんで置く — 型も、置ける場所の
+ * 判定も、置き切るまで動けないことも共通なので、**そこを分けない**ために
+ * 述語で聞く。並べて書くと、3 つ目を足したときに直し漏れる。
+ */
+export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
+  return id === 'claymore' || id === 'decoy'
+}
+
+/**
+ * 投げる物・置く物か。**銃のように構えない。**
+ *
+ * 構えの型 (照準へ体を向け、背骨を上下へ曲げる) は銃のためのもので、投げ物に
+ * 載せると腕が二重に動く。並べて書いていたので**decoy を足したときに漏れて**、
+ * 置く動作の上に構えが乗った。
+ */
+export function isThrowable(id: HeldId): id is ThrowId {
+  return id === 'grenade' || id === 'claymore' || id === 'magazine' || id === 'decoy'
+}
+
+/**
+ * 支援の枠から出た物か。**残りの数を数える対象。**
+ *
+ * 銃は弾数を持つが、こちらは「あと何個」で数える。並べて書くと 4 つ目を
+ * 足したときに数え漏れて、**持っているのに残数が出ない**になる (decoy でそう
+ * なった)。述語で聞く。
+ */
+export function isSupport(id: HeldId): id is SupportKind {
+  return id === 'grenade' || id === 'claymore' || id === 'decoy'
+}
+
+/**
+ * 1 人が場に置いておける数。**持てる数 (3) とは別。**
+ *
+ * --- なぜ要るか ---
+ * 置いた物は**本人が死んでも残る** (置いて離れる道具なので)。一方、湧き直すと
+ * 手元は満タンに戻る (refill)。数えないと死ぬたびに増えて、通り道を全部
+ * 塞げるし、人形を並べ放題になる。
+ *
+ * --- なぜ持てる数より多いか ---
+ * 同じにすると「置き切ったら死ぬまで増やせない」で終わってしまう。1 つ多い
+ * だけで、**死んで湧いた後にもう 1 つ足せる**余地が残る — 置いて離れる道具の
+ * 性格を消さずに、無限には増えない。
+ *
+ * --- 溢れたらどうするか ---
+ * **古いほうから黙って消す。起爆も破裂もさせない。** 置いた瞬間にマップの
+ * 反対側で誰かが死ぬのは理不尽だし、**遠隔起爆装置**として使える (相手の
+ * 近くに置いてきた物を、遠くで 1 つ置いて起爆させる)。decoy なら破裂音が
+ * 「誰かが撃った」という**嘘の情報**になる。
+ */
+export const PLACED_LIMIT = 4
+
+/**
+ * 置いた物のうち、押し出される物。**古いほうから。**
+ *
+ * 新しく 1 つ置く前に呼ぶ。返ってきた物を場から外してから足すと、上限を
+ * 超えない。クレイモアも decoy も同じ規則を通す — 別々に書くと、片方だけ
+ * 「起爆させてしまう」ような穴が開く。
+ *
+ * **押し出す物は黙って消すこと。** ここは何を消すかだけを決める。
+ *
+ * @param placed 場に在る物。**置いた順** (古い物が先)
+ */
+export function overflowing<T extends { owner: string }>(
+  placed: readonly T[],
+  owner: string,
+  limit = PLACED_LIMIT,
+): T[] {
+  const mine = placed.filter((item) => item.owner === owner)
+  // これから 1 つ足すので、いま limit 個在るなら 1 つ押し出す
+  const over = mine.length - limit + 1
+  return over > 0 ? mine.slice(0, over) : []
+}
+
 /** 湧くときに選ぶ枠。並びの順もこれで決まる */
 type Slot = 'primary' | 'secondary' | 'support' | 'knife' | 'tool'
 
@@ -101,7 +177,7 @@ interface HeldSpec {
  * 並びの順。武器系は 主 → 副 → support → ナイフ。
  *
  * **support は 1 枠だが中身は 1 つとは限らない。** 湧くときに選ぶのは手榴弾か
- * クレイモアのどちらかだが、弾倉 (囮) は撃った弾が溜まって増えるので、持って
+ * クレイモアのどちらかだが、弾倉は撃った弾が溜まって増えるので、持って
  * いれば並びに現れる。だから武器系は 4 つのときも 5 つのときもある。
  */
 const TOOL_ORDER: Partial<Record<HeldId, number>> = { box: 0, none: 1 }
@@ -126,6 +202,8 @@ export const HELD: Record<HeldId, HeldSpec> = {
   grenade: { id: 'grenade', label: 'GRENADE', family: 'weapon', slot: 'support', weight: 0.4, shoots: false, twoHanded: false },
   claymore: { id: 'claymore', label: 'CLAYMORE', family: 'weapon', slot: 'support', weight: 1.6, shoots: false, twoHanded: false },
   magazine: { id: 'magazine', label: 'MAG', family: 'weapon', slot: 'support', weight: 0.3, shoots: false, twoHanded: false },
+  // 空気を入れる前の人形。**畳んであるので軽い**
+  decoy: { id: 'decoy', label: 'DECOY', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
 
   // 刺されば即死。代償は**銃をしまってから近づく**こと (docs/weapons.md)
   knife: { id: 'knife', label: 'KNIFE', family: 'weapon', slot: 'knife', weight: 0.3, shoots: false, twoHanded: false },
@@ -292,14 +370,23 @@ export interface Loadout {
    * 間合いを詰める側と詰められる側の読み合いが、そこで初めて成立する。
    */
   secondary: WeaponId | null
-  support: 'grenade' | 'claymore'
+  support: SupportKind
 }
 
+/**
+ * support の枠に入る物。
+ *
+ * **weapons.ts の SupportId と同じ並び。** あちらは `held.ts` を読んでいる
+ * ので、値をこちらへ持ってくると輪になる。型だけ写して、食い違ったら
+ * 数の表 (SUPPORT_COUNT) が型検査で落ちるようにしてある。
+ */
+export type SupportKind = 'grenade' | 'claymore' | 'decoy'
+
 /** 1 つの命で持てる投げ物の数 */
-const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
+const SUPPORT_COUNT: Record<SupportKind, number> = {
   grenade: 3,
-  // 置きっぱなしで効き続けるので、手榴弾と同じ数を配ると通り道を全部塞げる
-  claymore: 2,
+  claymore: 3,
+  decoy: 3,
 }
 
 /**
@@ -307,7 +394,7 @@ const SUPPORT_COUNT: Record<'grenade' | 'claymore', number> = {
  *
  * ナイフとダンボールは選ばない。**最初から持っている**。
  *
- * 弾倉 (囮) は入れない。撃った弾が 1 弾倉ぶん溜まって初めて増える物なので、
+ * 弾倉は入れない。撃った弾が 1 弾倉ぶん溜まって初めて増える物なので、
  * 湧いた時点では持っていない。
  */
 export function buildCarried(loadout: Loadout, ammoOf: (id: WeaponId) => { ammo: number; reserve: number }): Carried[] {

@@ -158,6 +158,21 @@ export interface DamageEvent {
 }
 
 /**
+ * ナイフを振った。**それだけを言う。**
+ *
+ * 位置も向きも載せない — 両方サーバーが持っている (毎刻み届いている)。
+ * 「decoy を刺した」と言わせると、**刺していないのに割ったことにして
+ * 相手を晒せる**。振ったこと自体は言うしかないが、それは嘘をついても
+ * 何も得られない (実際に傍に立っていなければ何も割れない)。
+ *
+ * 人へのダメージはこれとは別に送る (DamageEvent の melee)。あちらは
+ * 巻き戻して確かめる物なので、当てた相手を名指しする必要がある。
+ */
+export interface StabEvent {
+  type: 'stab'
+}
+
+/**
  * ローリングの体当たり。位置をずらすだけでダメージは無いので、
  * サーバーは中身を見ずに相手へ流す。
  */
@@ -177,7 +192,7 @@ export interface KnockEvent {
  * 受け取った側が同じ物理を同じ地形に対して解くので、結果は一致する。
  *
  * 落下点を直接送る形にすると、壁の中でも地図の反対側でも好きな場所で
- * 音を鳴らせてしまう。囮は嘘をつくための道具だが、**嘘のつき方は地形に
+ * 音を鳴らせてしまう。弾倉は嘘をつくための道具だが、**嘘のつき方は地形に
  * 縛られていてほしい**。初速だけ渡せば、受け取った側が実際の地形で解くので、
  * 物理的に届かない場所で音は鳴らない。
  *
@@ -356,6 +371,16 @@ export interface SkillsEvent {
  * **位置も向きも送らない。** サーバーが持っている位置と向きから決める —
  * 送らせると、壁の中や相手の足元へ置ける。置くのは「自分の前」だけでよい。
  */
+/**
+ * decoy を置く。
+ *
+ * クレイモアと同じで**位置も向きも送らない。** サーバーが持っている位置から
+ * 決める。人形は見せる物なので、置ける場所の判定はあちらと同じで足りる。
+ */
+export interface PlaceDecoyEvent {
+  type: 'decoy'
+}
+
 export interface PlaceClaymoreEvent {
   type: 'claymore'
 }
@@ -384,6 +409,65 @@ export interface ClaymoreGone {
   id: number
   /** 起爆したなら爆発を見せる。試合の仕切り直しで消えただけなら false */
   blast: boolean
+}
+
+/**
+ * decoy が置かれた。
+ *
+ * **クレイモアと逆で、敵にも配る。** 見えないと撃たせられない — 見せることが
+ * 仕事の道具なので、遮蔽で隠す以上のことはしない。
+ */
+export interface DecoyPlaced {
+  type: 'decoyPlaced'
+  id: number
+  /** 置いた人。**本人が「置けた」ことを知るのに要る** (claymorePlaced と同じ) */
+  owner: string
+  at: [number, number, number]
+  /** 正面の向き (rad) */
+  yaw: number
+  team: Team
+  /**
+   * 見た目。**置いた本人と同じ姿。**
+   *
+   * 「その人が居る」と読ませるのが仕事なので、別の姿だと誰か分からない
+   * 人形になって撃つ理由が薄れる。
+   */
+  skin: string
+  /**
+   * 膨らみ切るまであと何秒か。**0 なら既に立っている。**
+   *
+   * 途中から見えるようになった人にも、残りだけ渡せば同じ形が出る。
+   * サーバーの時刻で終わりを渡すと、時計のずれがそのまま大きさのずれになる。
+   */
+  readyIn: number
+}
+
+/**
+ * 人形が押しのけられた。**誰かが触った。**
+ *
+ * 見えている全員へ配る。離れた所から自分の decoy が揺れるのが見えたら
+ * 「誰かがそこを通った」と読める — 撃たせる道具であると同時に、
+ * **見張る道具**でもある。
+ *
+ * **申告は受けない。** 触っていないのに揺らせると、「そこに誰か居る」という
+ * 嘘の合図を作り放題になる。判定はサーバーが持っている位置から出す。
+ */
+export interface DecoyBumped {
+  type: 'decoyBumped'
+  id: number
+  /** 押された先の向き (世界)。触った人から人形へ向かう向き */
+  dirX: number
+  dirZ: number
+}
+
+/** 割れた / 消えた */
+export interface DecoyGone {
+  type: 'decoyGone'
+  id: number
+  /** 割れた場所。**破裂音をそこで鳴らす** */
+  at: [number, number, number]
+  /** 撃たれて割れたなら音と破片を出す。仕切り直しで消えただけなら false */
+  popped: boolean
 }
 
 /**
@@ -929,6 +1013,7 @@ export type ClientMessage =
   | LoadoutEvent
   | SkillsEvent
   | PlaceClaymoreEvent
+  | PlaceDecoyEvent
   | DropWeaponEvent
   | PickUpEvent
   | FallEvent
@@ -940,6 +1025,7 @@ export type ClientMessage =
   | ShotEvent
   | KnockEvent
   | ThrowEvent
+  | StabEvent
   | PongMessage
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
@@ -974,6 +1060,9 @@ export type ServerMessage =
   | ThrowEvent
   | ClaymorePlaced
   | ClaymoreGone
+  | DecoyPlaced
+  | DecoyBumped
+  | DecoyGone
 
 /** 通信路の上を流れうる全部。符号化のように向きを問わない所だけが使う */
 export type NetMessage = ClientMessage | ServerMessage

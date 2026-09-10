@@ -883,6 +883,83 @@ describe('置く動作へ移る継ぎ目', () => {
     // かがんだ高さから 10cm 以上跳ねない (直す前は 0.41 → 0.90 だった)
     expect(highest).toBeLessThan(crouched + 0.1)
   })
+
+  /**
+   * **かがみ切る前に引き金を引いても、立ち上がらない。**
+   *
+   * 下りている途中でクリックすると、**しゃがむのが取り消されて立ったまま
+   * 置こうとする**形になっていた。
+   *
+   * 上下で見ている条件が食い違っていたのが元。上半身は「振りかぶりが残って
+   * いる間は前半のまま」を守っていたのに、下半身へ渡す姿勢 (setupLocomotion)
+   * だけが**引き金を引いた瞬間に後半へ切り替わる**。後半のクリップはまだ
+   * 流れていない (updateThrow が振りかぶりの終わりを待っている) ので、重みの
+   * 行き先が止まったアクションになり、合計が 1 を下回って**バインドポーズ
+   * (立ち姿) が透ける**。blend の注に書いてある罠そのもの。
+   */
+  test('**かがみ切る前に引いても、立ち上がらない**', () => {
+    const anim = animator()
+    anim.playSetup()
+
+    // 下りている途中で引く。**振りかぶりは 1.77 秒**、その 4 分の 3 あたり
+    run(anim, 1.3, 'claymore_windup')
+    const midway = hipsHeight(anim)
+    anim.releaseSetup()
+
+    /*
+     * 継ぎ目を跨ぐまで。**腰は下がり続けるだけ。**
+     *
+     * 置き切った後は立ち上がるのが正しいので、そこまでは見ない。見たいのは
+     * **引いた瞬間から後半のクリップが流れ始めるまで**の間。
+     */
+    let highest = 0
+    for (let i = 0; i < Math.round(0.7 * 60); i++) {
+      anim.setLocomotion((anim.setupLocomotion ?? 'idle') as never)
+      anim.update(1 / 60)
+      highest = Math.max(highest, hipsHeight(anim))
+    }
+    expect(highest).toBeLessThan(midway + 0.05)
+  })
+})
+
+describe('転がりの終わり際', () => {
+  /**
+   * **銃は操作が返る 0.2 秒前に戻る。**
+   *
+   * ロックが解けた瞬間に出すと、撃てるようになったのと同時に銃が現れる。
+   * 手にする所が見えないので、押した時にはもう構えている、という手応えに
+   * ならない。先に戻して構え直す動きを挟ませる。
+   *
+   * 逆はやらない — **銃が見えないまま撃てる**状態のほうが重い。
+   */
+  test('**銃は操作より先に戻る**', () => {
+    const anim = animator()
+    anim.playRoll()
+    let gunBack = -1
+    let unlocked = -1
+    for (let i = 0; i < 200; i++) {
+      anim.setLocomotion(anim.rolling ? 'roll' : 'idle')
+      anim.setAiming(true)
+      anim.update(1 / 60)
+      const at = (i + 1) / 60
+      if (gunBack < 0 && !anim.barehanded) gunBack = at
+      if (unlocked < 0 && !anim.rolling) unlocked = at
+      if (gunBack > 0 && unlocked > 0) break
+    }
+    expect(gunBack).toBeGreaterThan(0)
+    expect(unlocked).toBeGreaterThan(gunBack)
+    // 0.2 秒。刻みの分だけずれる
+    expect(unlocked - gunBack).toBeGreaterThan(0.18)
+    expect(unlocked - gunBack).toBeLessThan(0.25)
+  })
+
+  /** 転がっている間は隠す。**素材が手を広げた型** */
+  test('転がっている最中は隠す', () => {
+    const anim = animator()
+    anim.playRoll()
+    run(anim, 0.3, 'roll', true)
+    expect(anim.barehanded).toBe(true)
+  })
 })
 
 describe('置き切るまで構え直さない', () => {

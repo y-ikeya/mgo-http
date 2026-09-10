@@ -8,8 +8,10 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "server": "bun --env-file=.env --watch server/index.ts",
+    "server:alt": "PORT=${PORT:-6001} bun --env-file=.env --watch server/index.ts",
     "stage": "bun run tools/watch_stage.ts",
     "serve": "bun --env-file=.env server/index.ts",
+    "serve:alt": "PORT=${PORT:-6001} bun --env-file=.env server/index.ts",
     "serve:test": "MGO2_TEST_AUTH=1 bun --env-file=.env server/index.ts",
     "test": "bun test"
   },

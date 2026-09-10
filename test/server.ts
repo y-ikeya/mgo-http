@@ -251,6 +251,7 @@ export class Client {
           this.holdingGrenade,
           this.holdingClaymore,
           this.claimedWeapon,
+          this.holdingDecoy,
         ),
       ),
     )
@@ -262,6 +263,8 @@ export class Client {
   private holdingGrenade = false
   /** クレイモアを手にしているか */
   private holdingClaymore = false
+  /** decoy を手にしているか */
+  private holdingDecoy = false
 
   holdGrenade(holding: boolean): void {
     this.holdingGrenade = holding
@@ -276,6 +279,11 @@ export class Client {
    */
   holdClaymore(holding: boolean): void {
     this.holdingClaymore = holding
+  }
+
+  /** decoy を手にする。**支度で選んでいなければ持てない** (クレイモアと同じ) */
+  holdDecoy(holding: boolean): void {
+    this.holdingDecoy = holding
   }
 
   send(message: ClientMessage): void {
@@ -312,6 +320,7 @@ function snapshotOf(
   holdingClaymore = false,
   /** 名乗る銃。**選んでいない物を名乗る試験**に使う */
   claimed: WeaponId = 'rifle',
+  holdingDecoy = false,
 ): PlayerSnapshot {
   return {
     id,
@@ -330,7 +339,9 @@ function snapshotOf(
       ? ('grenade' as const)
       : holdingClaymore
         ? ('claymore' as const)
-        : ('rifle' as const),
+        : holdingDecoy
+          ? ('decoy' as const)
+          : ('rifle' as const),
     locomotion,
     concentrating: false,
     saluteHeld: false,
@@ -354,7 +365,7 @@ export function spot(dx: number, dz: number): [number, number, number] {
 export async function twoPlayers(
   server: Server,
   /** 支度で選ぶ支援。**湧く前にしか選べない** (domain/player/equip.ts) */
-  support: 'grenade' | 'claymore' = 'grenade',
+  support: 'grenade' | 'claymore' | 'decoy' = 'grenade',
   /**
    * 名乗る id。
    *

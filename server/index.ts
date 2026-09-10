@@ -21,8 +21,10 @@ import { recordLag } from '../src/domain/match/lag'
 import { LAG_CLOSE_CODE } from '../src/application/protocol/types'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
+import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
+import { EXPOSE_SECONDS as DECOY_EXPOSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
-import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
+import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, exposeTo, reject} from './damage'
 import {
   leaveRoom,
   matchState,
@@ -36,7 +38,7 @@ import {
 } from './match'
 import { receiveSnapshot, relayShot, relayState, sendHealth, sendStamina} from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
-import { type Client, ROOM_CAPACITY, broadcast, roomOf, rooms, setLife } from './world'
+import { type Client, ROOM_CAPACITY, broadcast, hostileToOwner, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
 import { lifeElapsed, newMatchPlayer, type MatchPlayer } from '../src/domain/player/player'
@@ -67,6 +69,16 @@ import type { ClientMessage, RoomSummary, ServerMessage } from '../src/applicati
 import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/equip'
 
 
+/**
+ * 待ち受けるポート。**環境変数で変えられる** (package.json の serve:alt)。
+ *
+ * 2 つ立てて繋ぎ合わせるときに要る。画面側は `?server=localhost:6001` で
+ * 行き先を上書きできる (src/infra/link/index.ts)。
+ *
+ * **ブラウザが拒む番号がある。** Chrome は X11 の 6000 番や IRC の 6665-6669
+ * などを ERR_UNSAFE_PORT で塞いでいて、**サーバーは起動するのに繋がらない**。
+ * 起動して静かに繋がらないので、原因を探すのに時間が要る。
+ */
 const PORT = Number(process.env.PORT ?? 8787)
 
 /**
@@ -167,6 +179,9 @@ setInterval(() => {
       // その部屋の水面。溺れの判定と手榴弾の沈みで同じ物を見る
       const water = waterOf(room.stage.name)
       relayClaymores(room)
+      relayDecoys(room)
+      // 誰かが decoy に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
+      bumpDecoys(room, now)
       for (const player of connected(room)) {
         /*
          * --- 時間で進む遷移 ---
@@ -545,6 +560,28 @@ function handleMessage(
       placeClaymore(room, player)
       break
 
+    case 'decoy':
+      placeDecoy(room, player, Date.now())
+      break
+
+    /*
+     * ナイフを振った。**風船なので刃でも割れる。**
+     *
+     * 送られてくるのは「振った」だけ。**どこで振ったかはこちらが持っている**
+     * ので、位置も向きも聞かない (server/arms/decoy.ts の stabHitsDecoy)。
+     *
+     * 撃って割ったときと同じに晒す。**歩いて確かめに行っても代償は同じ** —
+     * 近づいた分だけ確実に見分けられるので、そこは腕前として残す。
+     */
+    case 'stab':
+      for (const decoy of stabHitsDecoy(room, player, Date.now())) {
+        const owner = room.players.get(decoy.owner)
+        if (!owner || owner.id === player.id) continue
+        if (!hostileToOwner(room, decoy.team, player)) continue
+        exposeTo(room, player, owner, DECOY_EXPOSE_SECONDS)
+      }
+      break
+
     /*
      * 落ちた。**量はこちらで決める** — 速さだけ受け取って共有の式に通す。
      * 量を送らせると好きな値を申告できる。
@@ -618,6 +655,20 @@ function handleMessage(
       player.inventory.spendGun(player.weapon)
       // 弾道の上にクレイモアがあれば起爆する
       shotHitsClaymore(room, message.from, message.to)
+      /*
+       * 弾道の上に decoy があれば割れる。**割った本人の位置が漏れる。**
+       *
+       * 晒す先は置いた人 (の陣営)。置いた人が抜けていても、置いた物は
+       * 残っている — その場合は晒す相手が居ないので何も起きない。
+       *
+       * **自分の物と味方の物では晒さない。** 味方を晒す道具にはしない。
+       */
+      for (const decoy of shotHitsDecoy(room, message.from, message.to, Date.now())) {
+        const owner = room.players.get(decoy.owner)
+        if (!owner || owner.id === player.id) continue
+        if (!hostileToOwner(room, decoy.team, player)) continue
+        exposeTo(room, player, owner, DECOY_EXPOSE_SECONDS)
+      }
       // 銃声だけは扱いが違う。
       //
       // 曳光を描くには銃口の座標が要るが、それは「どこに居るか」そのもの。

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { SUPPORT_SPECS } from '../item/weapons'
 import {
   canHold,
   chooseLoadout,
@@ -110,7 +111,7 @@ describe('装備を選ぶ', () => {
   test('支度中なら投げ物もすぐ配り直す', () => {
     const p = fresh()
     chooseLoadout(p, 'rifle', 'claymore', true)
-    expect(p.grenades).toBe(2)
+    expect(p.grenades).toBe(SUPPORT_SPECS.claymore.count)
   })
 
   test('**生きている間に選び直しても、いま手にある数は変わらない。** 次の湧きから', () => {

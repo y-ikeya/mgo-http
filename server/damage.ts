@@ -94,10 +94,28 @@ const NOT_HURT: Hurt = { downed: false, letGo: false }
  */
 function expose(room: RoomWorld, victim: MatchPlayer, attacker: MatchPlayer | undefined): void {
   if (!attacker || attacker.id === victim.id) return
-  const seconds = exposeSeconds(attacker.skills)
+  exposeTo(room, victim, attacker, exposeSeconds(attacker.skills))
+}
+
+/**
+ * 誰かに向けて晒す。**光らせる仕掛けそのもの。**
+ *
+ * 当てた相手を晒す (スキル) のと、decoy を撃った相手を晒すのは、宛先と長さが
+ * 違うだけで**同じ仕掛け**。別々に書くと、片方だけ「本人に送ってしまう」
+ * ような穴が開く。
+ *
+ * @param toward 誰に見せるか。その人の陣営ぜんぶ (個人戦なら本人だけ)
+ */
+export function exposeTo(
+  room: RoomWorld,
+  victim: MatchPlayer,
+  toward: MatchPlayer,
+  seconds: number,
+): void {
   if (seconds <= 0) return
 
   const now = Date.now()
+  const attacker = toward
   const until = now + seconds * 1000
   const tag = leakTag(attacker, room.mode.teams)
   // 同じ宛先で、いまより短くなるなら何もしない

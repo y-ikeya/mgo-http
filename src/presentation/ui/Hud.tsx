@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { CRITICAL_HEALTH } from '../../domain/rule/damage'
 import { t } from '../../i18n'
-import { HELD, type HeldId } from '../../domain/item/held'
+import { HELD, type HeldId, isSupport } from '../../domain/item/held'
 import { MODES } from '../../domain/match/room'
 import { isTranquilizer } from '../../domain/item/weapons'
 import type { GameStats } from '../scene/Game'
@@ -113,7 +113,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     const stats = props.stats
     if (!stats || heldIsGun()) return null
     if (held() === 'magazine') return stats.throwables
-    if (held() === 'grenade' || held() === 'claymore') return stats.grenades
+    // **述語で聞く。** 並べて書いていたので decoy を足したときに数え漏れた
+    if (isSupport(held())) return stats.grenades
     return null
   }
 

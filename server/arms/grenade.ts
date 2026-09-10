@@ -104,7 +104,7 @@ export function throwGrenade(room: RoomWorld, from: MatchPlayer, event: ClientMe
 
   // 初速だけ配る。受け取った側が同じ物理を解いて同じ軌道を描く。
   //
-  // 弾倉の囮と違って、**全員に見せる**。落ちてきたのに気付けないと、
+  // 弾倉と違って、**全員に見せる**。落ちてきたのに気付けないと、
   // 逃げるという手が最初から無い。避けられるからこそ投げる場所に意味が出る。
   broadcast(room, {
     type: 'grenade',

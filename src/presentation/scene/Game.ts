@@ -42,6 +42,7 @@ import { SoundRing, type PingKind } from "./sense/soundRing";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
+import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
@@ -59,7 +60,7 @@ import {
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
-import { isGun, type HeldId } from "../../domain/item/held";
+import { isGun, isPlaceable, isThrowable, type HeldId } from "../../domain/item/held";
 import {
   MODES,
   ROOMS,
@@ -451,6 +452,14 @@ const GRENADE_RELEASE_FORWARD = 0.45;
  */
 const CLAYMORE_PLACE_RATIO = 0.38;
 
+/**
+ * 破裂音を鳴らす高さ (m)。人形の胸のあたり。
+ *
+ * 足元から鳴らすと、音の輪が床に貼り付いて見える。**そこに立っていた物が
+ * 割れた**という絵なので、体の高さから出す。
+ */
+const DECOY_POP_HEIGHT = 1.1;
+
 
 /**
  * 空撃ちの音を鳴らす間隔 (秒)。
@@ -562,6 +571,9 @@ export class Game {
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
   private readonly claymores: Claymores;
+  private readonly decoys: Decoys;
+  /** 割れた場所の置き場。毎回作らない */
+  private readonly popAt = new THREE.Vector3();
   private readonly blast: BlastFx;
   private readonly casings: Casings;
   /** 地面に落ちている武器。浮かせて回している */
@@ -586,7 +598,7 @@ export class Game {
   private pendingThrow = false;
   /** クレイモア側の同じもの */
   private pendingSetup = false;
-  /** 弾倉 (囮) 側の同じもの */
+  /** 弾倉側の同じもの */
   private pendingDecoy = false;
   /**
    * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
@@ -1030,6 +1042,7 @@ export class Game {
     this.thrown = new ThrownItems(this.scene);
     this.grenades = new Grenades(this.scene);
     this.claymores = new Claymores(this.scene);
+    this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
@@ -1280,10 +1293,8 @@ export class Game {
      * 立ったまま前を刺しても届かず、しゃがんで見下ろして初めて刃が通る
      * (domain/rule/damage.ts の STAB_DOWN_PITCH)。
      */
-    const throwing =
-      this.inv.held === "grenade" ||
-      this.inv.held === "claymore" ||
-      this.inv.held === "magazine";
+    // **述語で聞く。** 並べて書いていたので decoy を足したときに漏れた
+    const throwing = isThrowable(this.inv.held);
     this.player.setAiming(
       this.input.aiming && this.input.engaged && !this.loadoutBlocking && !throwing,
     );
@@ -1399,14 +1410,21 @@ export class Game {
       if (this.splashAt(bounce.position, GRENADE_SPLASH)) return;
       // 跳ねた音は全員の輪に出す。自分が投げたものも例外にしない。
       // 手榴弾は隠すものではなく、転がってきたことに気付かせるためのもの
-      const gain = this.audio.play("bounce", bounce.position, bounce.strength);
+      //
+      // **床の材質で分ける** (足音と同じ引き方)。跳ねる音は「どこに落ちたか」
+      // を伝える物なので、材質が食い違うと落ちた場所の読みがずれる
+      const gain = this.audio.play(
+        this.bounceSound(bounce.position),
+        bounce.position,
+        bounce.strength,
+      );
       this.addPing("shot", bounce.position, gain);
     });
     this.updateGrenadeAim();
     this.updateClaymoreRelease(dt);
     this.updateGrenadeRelease(dt);
     this.thrown.update(dt, this.stage.collidables, this.stage.water, (impact) => {
-      // 水に落ちたら輪だけ。囮の音が水面から鳴ると、そこが床に聞こえる
+      // 水に落ちたら輪だけ。弾倉の音が水面から鳴ると、そこが床に聞こえる
       if (this.splashAt(impact.position, THROWN_SPLASH)) return;
       // 跳ねるたびに鳴る。自分が投げたものは輪に出さない
       // (どこへ落ちるかは分かっているので、映しても情報にならない)。
@@ -1420,6 +1438,8 @@ export class Game {
       this.listeningLevel(),
     );
     this.shots.update(dt);
+    // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
+    this.decoys.update(dt);
     this.blast.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
       // 水に落ちたら輪だけ出して沈める。**金属の音は鳴らさない**
@@ -1538,6 +1558,7 @@ export class Game {
         if (effect.to !== "playing") {
           this.grenades.clear();
           this.claymores.clear();
+          this.decoys.clear();
         }
         /*
          * 決着したら成績表を開く。
@@ -1854,6 +1875,53 @@ export class Game {
         if (mine) this.inv.spendOf("claymore");
         break;
       }
+
+      /*
+       * decoy が置かれた。**敵にも届く** — 見えないと撃たせられない。
+       *
+       * 膨らむ残り (readyIn) を受け取るのは、途中から見えるようになった人にも
+       * 同じ形を出すため。サーバーの時刻で終わりを渡すと、時計のずれが
+       * そのまま大きさのずれになる。
+       */
+      case "decoyPlaced": {
+        const mine = message.owner === this.net.id && !this.decoys.has(message.id);
+        this.decoys.place(message.id, message.at, message.yaw, message.skin, message.readyIn);
+        if (mine) this.inv.spendOf("decoy");
+        // 膨らむ音は**近くを通った人だけ**に届く (14m)。置いたこと自体は
+        // 漏らさない — 膨らむ 2 秒は罠が一番弱い所なので
+        if (message.readyIn > 0) {
+          this.popAt.fromArray(message.at);
+          this.audio.play("balloonInflate", this.popAt);
+        }
+        break;
+      }
+
+      /*
+       * 割れた / 消えた。
+       *
+       * **破裂音は普通の位置音。** 近ければ聞こえ、遠ければ聞こえない —
+       * 特別扱いしないだけで、両側に過不足のない情報が渡る。遠くから
+       * 安全に撃った人ほど、自分が晒されたことに気づけない。
+       */
+      case "decoyGone": {
+        this.decoys.remove(message.id);
+        if (!message.popped) break;
+        this.popAt.fromArray(message.at);
+        this.popAt.y += DECOY_POP_HEIGHT;
+        const gain = this.audio.play("balloon", this.popAt, 1);
+        this.addPing("shot", this.popAt, gain);
+        break;
+      }
+
+      /*
+       * 人形が押しのけられた。**見えている全員に届く。**
+       *
+       * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
+       * 撃たせる道具であると同時に、**見張る道具**でもある。
+       */
+      case "decoyBumped":
+        this.decoys.bump(message.id, message.dirX, message.dirZ);
+        break;
 
       case "claymoreGone": {
         // 位置を先に取る。消してから爆発を出すと出す場所が分からない
@@ -2560,7 +2628,7 @@ export class Game {
   /**
    * そこは水面か。**水なら輪を出して true を返す。**
    *
-   * 弾も薬莢も手榴弾も囮も、水に落ちたときの見え方は同じ — 輪が広がって
+   * 弾も薬莢も手榴弾も弾倉も、水に落ちたときの見え方は同じ — 輪が広がって
    * 消える。判じ方を 1 か所に置いて、落ちる物ごとに書かない。
    */
   private splashAt(at: THREE.Vector3, strength = 1, sound = true): boolean {
@@ -2642,6 +2710,18 @@ export class Game {
     // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ)
     const yaw = this.player.yaw;
     this.meleeForward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    /*
+     * 振ったことだけ知らせる。**当たったかどうかは言わない。**
+     *
+     * decoy は風船なので刃でも割れるが、割るのはサーバー。位置も向きも
+     * あちらが持っているので、「刺した」と言わせない — 言えるようにすると、
+     * **刺していないのに割ったことにして相手を晒せる**。
+     *
+     * 空振りでも送る。手元では割れたかどうかが分からない (decoy かどうかを
+     * 手元で決めると、そこが嘘の入り口になる)。
+     */
+    this.net.send({ type: "stab" });
+
     const result = this.remotes.hitMelee(
       this.player.position,
       this.meleeForward,
@@ -3084,7 +3164,7 @@ export class Game {
   /**
    * 投げる構えと、離したときの投擲。
    *
-   * 押している間は落下点を見せ、離した瞬間に投げる。囮として使う道具なので、
+   * 押している間は落下点を見せ、離した瞬間に投げる。音で釣る道具なので、
    * どこへ落ちるかを見てから決められないと「そこへ落とす」判断にならない。
    * 押した瞬間に飛ぶ形だと、狙った場所へ落とすのが運になる。
    *
@@ -3138,7 +3218,7 @@ export class Game {
   /**
    * 手榴弾の構えと投擲。
    *
-   * 弾倉の囮と同じで、押している間に落下点を見せ、離した瞬間に投げる。
+   * 弾倉と同じで、押している間に落下点を見せ、離した瞬間に投げる。
    * どこへ落ちるかを見てから決められないと「そこへ落とす」判断にならない。
    *
    * 信管は**手を離れてから**動き出す。握ったまま溜める手 (cooking) は入れていない。
@@ -3191,12 +3271,19 @@ export class Game {
       this.player.setThrowing(false);
     }
     // クレイモアから離れたときも同じ。**構えっぱなしで腕が上がったまま**になる
-    if (this.inv.held !== "claymore" && this.setupAiming && this.setupRelease <= 0) {
+    if (!isPlaceable(this.inv.held) && this.setupAiming && this.setupRelease <= 0) {
       this.setupAiming = false;
       this.player.cancelThrow();
       this.player.setThrowing(false);
     }
-    if (this.inv.held === "claymore") {
+    /*
+     * 置く物は同じ型を通す。**クレイモアも decoy も「かがんで置く」。**
+     *
+     * 違うのは置いた後だけなので、構えと置き切りの手順は分けない。
+     * どちらを置いたかは setupHeld が覚えていて、知らせるときに分かれる。
+     */
+    if (isPlaceable(this.inv.held)) {
+      this.setupHeld = this.inv.held;
       this.updateClaymoreSetup();
       return;
     }
@@ -3345,6 +3432,8 @@ export class Game {
 
   /** クレイモアを構えているか */
   private setupAiming = false;
+  /** いま置こうとしている物。**置き切ったときに知らせる先が変わる** */
+  private setupHeld: HeldId = "claymore";
   /** 置き切るまでの残り (秒)。0 になった瞬間にサーバーへ知らせる */
   private setupRelease = 0;
 
@@ -3438,7 +3527,9 @@ export class Game {
     this.player.setThrowing(false);
     // **数を減らすのはサーバーが置けたと言ってから** (claymorePlaced)。
     // 壁の中や縁の外は断られるので、送った時点で減らすと置けずに減る
-    this.net.send({ type: "claymore" });
+    // **どちらを置いたかは構え始めに覚えてある。** 置き切るまでの間に
+    // 持ち替えられても、流れていた型と知らせる先が食い違わない
+    this.net.send(this.setupHeld === "decoy" ? { type: "decoy" } : { type: "claymore" });
   }
 
   /**
@@ -3733,6 +3824,21 @@ export class Game {
    * それは「地面は y=0 の平面ひとつ」という前提に寄りかかっていて、
    * 高い位置にコンクリートを置いた瞬間に破綻する。
    */
+  /**
+   * 跳ねた所の材質。**足音と同じ物を引く。**
+   *
+   * 半径を持たない — 手榴弾は点で当たるので、人の足のように太さで探すと
+   * 隣の材質を拾う。
+   */
+  private bounceSound(at: THREE.Vector3): "bounce" | "metalBounce" | "woodBounce" {
+    const surface = surfaceAt(at, 0, this.stage.obstacles, at.y, STEP_UP);
+    return surface === "metal"
+      ? "metalBounce"
+      : surface === "wood"
+        ? "woodBounce"
+        : "bounce";
+  }
+
   private playStep(step: Step, position: THREE.Vector3, ping: boolean): void {
     const surface = surfaceAt(position, PLAYER_RADIUS, this.stage.obstacles, position.y, STEP_UP);
     const sound =
