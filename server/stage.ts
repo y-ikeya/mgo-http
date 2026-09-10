@@ -27,6 +27,7 @@ import {
   type SolidWorld,
   type StageBox,
 } from '../src/sim/space/vision'
+import { decodeStageMesh, meshSubset, MESH_EYE, MESH_BULLET } from '../src/sim/space/stagemesh'
 import { TriangleBvh } from '../src/sim/space/bvh'
 
 /**
@@ -146,36 +147,15 @@ async function loadMesh(
 ): Promise<{ sight: SightBlocker; thrown: SolidWorld } | null> {
   const path = new URL(`../public/models/stage_${name}.mesh.bin`, import.meta.url)
   try {
-    const buffer = await Bun.file(path).arrayBuffer()
-    const count = new Uint32Array(buffer, 0, 1)[0]!
-    const positions = new Float32Array(buffer, 4, count * 9)
-    const marks = new Uint8Array(buffer, 4 + count * 9 * 4, count)
+    const mesh = decodeStageMesh(await Bun.file(path).arrayBuffer())
     return {
-      sight: new TriangleBvh({ positions: subsetOf(positions, marks, EYE_BIT) }),
-      thrown: new TriangleBvh({ positions: subsetOf(positions, marks, BULLET_BIT) }),
+      sight: new TriangleBvh(meshSubset(mesh, MESH_EYE)),
+      thrown: new TriangleBvh(meshSubset(mesh, MESH_BULLET)),
     }
   } catch {
     return null
   }
 }
-
-/** 印の付いた三角だけを抜き出す */
-function subsetOf(positions: Float32Array, marks: Uint8Array, bit: number): Float32Array {
-  let count = 0
-  for (const mark of marks) if (mark & bit) count++
-  const out = new Float32Array(count * 9)
-  let at = 0
-  for (let i = 0; i < marks.length; i++) {
-    if (!(marks[i]! & bit)) continue
-    out.set(positions.subarray(i * 9, i * 9 + 9), at)
-    at += 9
-  }
-  return out
-}
-
-/** 何を止めるか。**書き出し (tools/export_stage.py) と揃えること** */
-const EYE_BIT = 1
-const BULLET_BIT = 2
 
 /**
  * 全部のステージ。起動時に 1 回だけ読む。

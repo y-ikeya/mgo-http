@@ -25,6 +25,15 @@ const SURFACE_TAGS: Record<string, Surface> = {
   glass_: 'glass',
 }
 
+/**
+ * 番号との対応。**tools/export_stage.py の SURFACE_IDS と揃えること。**
+ *
+ * 三角の網は材質を 1 枚ごとに 2 ビットで持つ (infra/codec/stagemesh.ts)。
+ * 名前から引くのはこのファイルの仕事なので、番号の並びもここに置く —
+ * 別々に持つと、書き出しが木と言った面が石の音で鳴る。
+ */
+export const SURFACE_ORDER: readonly Surface[] = ['concrete', 'metal', 'wood', 'glass']
+
 /** タグが無いときの材質。構造物は金属を既定にする */
 export const DEFAULT_SURFACE: Surface = 'metal'
 

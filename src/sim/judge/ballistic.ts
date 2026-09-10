@@ -341,7 +341,11 @@ function hitAlong(
  */
 export function boxSolid(boxes: StageBox[]): SolidWorld {
   return {
-    hit: (ax, ay, az, bx, by, bz) => sweep(ax, ay, az, bx, by, bz, boxes),
+    hit: (ax, ay, az, bx, by, bz) => {
+      const found = sweep(ax, ay, az, bx, by, bz, boxes)
+      // 箱には三角の番号が無い。材質を引く口 (surfaces) は三角の側だけ
+      return found ? { ...found, tri: -1 } : null
+    },
   }
 }
 

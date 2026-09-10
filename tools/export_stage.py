@@ -15,6 +15,7 @@ import bpy
 import os
 import math
 import json
+from mathutils import Vector
 
 # 物差しの接頭辞。ゲームには持ち込まない
 REF_PREFIX = 'ref_'
@@ -449,35 +450,128 @@ def triangles_of(obj):
         obj.to_mesh_clear()
 
 
-# 面ごとに何を止めるか。**視線と物で別々の木を組む**ので、印を持たせる。
+def box_triangles_of(obj):
+    """**その物を包む向き付きの箱**を三角 12 枚で返す。glTF の座標。
+
+    軸に沿った箱ではなく、物の回転を掛けた箱。斜めに置いた物が斜めのまま
+    止まる — 三角へ移した目的そのものなので、代用する側でも崩さない。
+    """
+    lo = [min(c[i] for c in obj.bound_box) for i in range(3)]
+    hi = [max(c[i] for c in obj.bound_box) for i in range(3)]
+    corners = [
+        to_gltf(obj.matrix_world @ Vector((x, y, z)))
+        for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])
+    ]
+    # bound_box の並びに合わせた 6 面 (各 2 枚)。添字は x*4 + y*2 + z
+    faces = (
+        (0, 1, 3, 2), (4, 6, 7, 5),   # -X, +X
+        (0, 4, 5, 1), (2, 3, 7, 6),   # -Y, +Y
+        (0, 2, 6, 4), (1, 5, 7, 3),   # -Z, +Z
+    )
+    out = []
+    for a, b, c, d in faces:
+        for tri in ((a, b, c), (a, c, d)):
+            for i in tri:
+                v = corners[i]
+                out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
+    return out
+
+
+# 面ごとに何を止めるか。**用途ごとに別の木を組む**ので、印を持たせる。
 #
-# 物のほうは弾と同じ集合を使う。**手すりは「人は止めるが弾は通す」**設定に
-# なっていて、あれを物の側に入れると三角が 8 倍になる (47 万枚)。手すりを
-# 弾がすり抜けるなら、投げた物もすり抜けるほうが揃う。
-#
-# 人が壁で止まるのは別の話 (箱のまま)。あちらは線ではなく円柱の押し戻し。
+# 物 (投擲) のほうは弾と同じ集合を使う。**手すりは「人は止めるが弾は通す」**
+# 設定になっていて、あれを弾の側に入れると三角が 8 倍になる。手すりを弾が
+# すり抜けるなら、投げた物もすり抜けるほうが揃う。
 #
 # 別々のファイルに出すと、両方を止める面 (ほとんどの壁) の頂点が 2 度書かれる。
 # 1 枚に印を添えて、読む側が振り分ける。
+#
+# --- 人とカメラと材質も 1 バイトに入れる ---
+#
+# 人が止まるのを箱で持っていた頃は、**軸に沿った箱しか置けなかった** —
+# 斜めの壁は回す前の箱になり、アーチはくぐれず、坂は 0.25m 刻みの段だった。
+# 面を三角で持てばその縛りが消える。移動の口 (sim/space/movement.ts の
+# MoveWorld) は最初から三角に差し替えられる形になっている。
+#
+# 材質は足音と着弾に要る。箱では Obstacle.surface が持っていたので、
+# 三角へ移すときに一緒に連れて行かないと**木の床から石の音**が鳴る。
+#
+#   bit0 視線  bit1 弾/投擲  bit2 人  bit3 カメラ  bit4-5 材質
 EYE_BIT = 1
 BULLET_BIT = 2
+PLAYER_BIT = 4
+CAMERA_BIT = 8
+SURFACE_SHIFT = 4
+#
+# --- 人が当たる形は、細かい物では代用する ---
+#
+# **見た目の細かさと、ぶつかる形の細かさは別。** 手すり 1 本は絵として 2,670 枚
+# あるが、ぶつかる形としては板 1 枚で足りる。そのまま人の層へ入れると手すり
+# だけで 72 万枚、ファイルが 30MB になってクライアントへ配れない。
+#
+# ここを超える物は、人とカメラの層でだけ**向き付きの箱 12 枚**に置き換える。
+# 視線と弾は本物の三角のまま — あちらは隙間を抜けるかどうかが遊びに効く。
+#
+# 64 枚は「板・坂・壁は本物のまま、飾りは箱」で切れる線。斜めに置いた板
+# (12 枚) や階段の段は下に入るので、**三角へ移した目的は損なわれない。**
+PLAYER_TRI_LIMIT = 64
+#
+# **src/domain/stage/surface.ts と揃えること。** あちらが名前から材質を引く
+# 唯一の場所で、こちらはその結果を番号にして持ち出すだけ。既定は金属。
+SURFACE_IDS = {'concrete': 0, 'metal': 1, 'wood': 2, 'glass': 3}
+SURFACE_TAGS = (('metal_', 'metal'), ('concrete_', 'concrete'),
+                ('wood_', 'wood'), ('glass_', 'glass'))
+
+
+def surface_of(name):
+    lower = name.lower()
+    for tag, surface in SURFACE_TAGS:
+        if tag in lower:
+            return surface
+    return 'metal'
+
 
 positions = []
 marks = []
 mesh_objects = 0
+# 人の層で箱に置き換えた数。**黙って代用しない** — 数を出す
+boxed_bodies = 0
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
         continue
     flags = flags_of(obj)
-    mark = (EYE_BIT if flags['eye'] else 0) | (BULLET_BIT if flags['bullet'] else 0)
-    # どちらも止めないなら出さない。飾りはここで落ちる
-    if mark == 0:
+    mark = (
+        (EYE_BIT if flags['eye'] else 0)
+        | (BULLET_BIT if flags['bullet'] else 0)
+        | (PLAYER_BIT if flags['player'] else 0)
+        | (CAMERA_BIT if flags['camera'] else 0)
+        | (SURFACE_IDS[surface_of(obj.name)] << SURFACE_SHIFT)
+    )
+    # 何も止めないなら出さない。飾りはここで落ちる
+    if mark & (EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT) == 0:
         continue
     tris = triangles_of(obj)
     if not tris:
         continue
-    positions.extend(tris)
-    marks.extend([mark] * (len(tris) // 9))
+    hit_mark = mark & (EYE_BIT | BULLET_BIT)
+    body_mark = mark & (PLAYER_BIT | CAMERA_BIT)
+    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT)
+    count = len(tris) // 9
+
+    # 細かくない物は 1 組で足りる。**印を分けると同じ頂点が 2 度書かれる**
+    if count <= PLAYER_TRI_LIMIT or not body_mark:
+        positions.extend(tris)
+        marks.extend([mark] * count)
+        mesh_objects += 1
+        continue
+
+    if hit_mark:
+        positions.extend(tris)
+        marks.extend([hit_mark | surface_mark] * count)
+    box = box_triangles_of(obj)
+    positions.extend(box)
+    marks.extend([body_mark | surface_mark] * (len(box) // 9))
+    boxed_bodies += 1
     mesh_objects += 1
 
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
@@ -497,7 +591,8 @@ with open(json_path, 'w') as f:
 #
 #   [uint32 枚数][float32 頂点 × 枚数×9][uint8 印 × 枚数]
 #
-# 印は「何を止めるか」。読む側が視線用と物用に振り分けて、別々の木を組む。
+# 印は「何を止めるか」と「何でできているか」。読む側が用途ごとに振り分けて、
+# 別々の木を組む。1 バイトに詰めてあるので、印を増やしても大きさは変わらない。
 import struct
 
 bin_path = os.path.join(root, 'public', 'models', stage_name + '.mesh.bin')
@@ -702,7 +797,9 @@ print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個)')
 eyes = sum(1 for m in marks if m & EYE_BIT)
 bullets = sum(1 for m in marks if m & BULLET_BIT)
 print(f'          {bin_path} (三角 {len(marks)} 枚 / {mesh_objects} メッシュ)')
-print(f'          視線を止める {eyes} 枚 / 物を止める {bullets} 枚')
+bodies = sum(1 for m in marks if m & PLAYER_BIT)
+print(f'          視線 {eyes} 枚 / 弾 {bullets} 枚 / 人 {bodies} 枚'
+      + (f' (うち {boxed_bodies} 個は箱で代用)' if boxed_bodies else ''))
 print(f'メッシュ {len(exported)} 個' + (f' / 物差し {len(skipped)} 個は除外' if skipped else ''))
 print('材質: ' + ' / '.join(f'{k} {v}' for k, v in sorted(counts.items())))
 
