@@ -285,6 +285,26 @@ const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
  * 立ち上がりに入った時点で移動側へ渡し、ローリングの尾を残したまま
  * クロスフェードさせると繋ぎが滑らかになる。
  */
+/**
+ * 胸の揺れ。**骨がある体にだけ効く** (Mixamo の 65 本には無い)。
+ *
+ * --- なぜ骨で持つか ---
+ * 頂点を直に揺らすと、揺れる範囲を材質ごとに持つことになる。骨なら
+ * **重みが範囲を持っている**ので、どこがどれだけ動くかは体を作った側が決める。
+ *
+ * --- 何で駆動するか ---
+ * **付け根 (Spine2) の加速度**。速度ではなく加速度で見るのは、等速で走って
+ * いる間は揺れず、**踏み出しと着地で揺れる**のが本当だから。上下に揺すられた
+ * 分だけ遅れて付いてくる、というばねにする。
+ */
+const BUST_STIFF = 110
+/** 減衰。大きいほど早く収まる */
+const BUST_DAMP = 11
+/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** */
+const BUST_GAIN = 0.0055
+/** 振れ幅の上限 (rad)。これを超えると体を突き抜ける */
+const BUST_MAX = 0.30
+
 const ROLL_EXIT_PHASE = 0.78
 
 /**
@@ -1557,6 +1577,61 @@ export class CharacterAnimator {
     this.alignSpineToUpperClip()
     this.applyAimPitch()
     this.turnTorso(dt)
+    this.swayBust(dt)
+  }
+
+  /**
+   * 胸を揺らす。**骨を持っている体だけ。**
+   *
+   * 付け根の加速度を親の空間で見て、その逆へ振れるばねを回す。世界の向きで
+   * 見ると、**その場で振り向いただけで揺れる** — 体は動いていないのに。
+   */
+  private swayBust(dt: number): void {
+    if (!this.bustResolved) {
+      this.bustResolved = true
+      for (const suffix of ['Bust_L', 'Bust_R']) {
+        const bone = findBoneBySuffix(this.root, suffix)
+        if (!bone) continue
+        this.bust.push({
+          bone,
+          rest: bone.quaternion.clone(),
+          angle: new THREE.Vector2(),
+          speed: new THREE.Vector2(),
+        })
+      }
+    }
+    if (!this.bust.length || dt <= 0) return
+
+    const anchor = this.bust[0]!.bone.parent
+    if (!anchor) return
+    anchor.getWorldPosition(this.bustAt)
+    if (!this.bustStarted) {
+      this.bustStarted = true
+      this.bustWas.copy(this.bustAt)
+      return
+    }
+    // 速度 → 加速度。**前の速度との差**で見る
+    this.bustNow.subVectors(this.bustAt, this.bustWas).divideScalar(dt)
+    this.bustWas.copy(this.bustAt)
+    this.bustAcc.subVectors(this.bustNow, this.bustVel).divideScalar(dt)
+    this.bustVel.copy(this.bustNow)
+    // 親の空間へ。Spine2 は Y が上、X が横
+    anchor.getWorldQuaternion(this.bustSpin)
+    this.bustAcc.applyQuaternion(this.bustSpin.invert())
+
+    // **加速度の逆へ遅れる。** 上へ持ち上げられたら下がる
+    const hold = (v: number) => Math.max(-BUST_MAX, Math.min(BUST_MAX, v))
+    const wantX = hold(-this.bustAcc.y * BUST_GAIN)
+    const wantZ = hold(-this.bustAcc.x * BUST_GAIN)
+
+    for (const entry of this.bust) {
+      entry.speed.x += ((wantX - entry.angle.x) * BUST_STIFF - entry.speed.x * BUST_DAMP) * dt
+      entry.speed.y += ((wantZ - entry.angle.y) * BUST_STIFF - entry.speed.y * BUST_DAMP) * dt
+      entry.angle.x = hold(entry.angle.x + entry.speed.x * dt)
+      entry.angle.y = hold(entry.angle.y + entry.speed.y * dt)
+      this.bustEuler.set(entry.angle.x, 0, entry.angle.y)
+      entry.bone.quaternion.copy(entry.rest).multiply(this.bustSpin.setFromEuler(this.bustEuler))
+    }
   }
 
   /**
@@ -1951,6 +2026,24 @@ export class CharacterAnimator {
   runCadence = RUN_CADENCE
 
   private pistol = false
+
+  /** 胸の骨。**無い体では空のまま** (soldier / raiden には無い) */
+  private readonly bust: {
+    bone: THREE.Bone
+    rest: THREE.Quaternion
+    /** x: 前後 (骨の X まわり) / y: 左右 (骨の Z まわり) */
+    angle: THREE.Vector2
+    speed: THREE.Vector2
+  }[] = []
+  private bustResolved = false
+  private bustStarted = false
+  private readonly bustAt = new THREE.Vector3()
+  private readonly bustWas = new THREE.Vector3()
+  private readonly bustVel = new THREE.Vector3()
+  private readonly bustNow = new THREE.Vector3()
+  private readonly bustAcc = new THREE.Vector3()
+  private readonly bustSpin = new THREE.Quaternion()
+  private readonly bustEuler = new THREE.Euler()
 
   /**
    * 片手で持っているか。**走り方と構えの型が変わる。**

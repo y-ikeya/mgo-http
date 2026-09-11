@@ -922,6 +922,105 @@ describe('置く動作へ移る継ぎ目', () => {
   })
 })
 
+const nanashi = await new GLTFLoader().parseAsync(
+  await Bun.file('public/models/soldier_nanashi.glb').arrayBuffer(),
+  '',
+)
+
+/**
+ * 胸の揺れ。**骨を持っている体だけ。**
+ *
+ * 向きと手応えは目で見るしかないので、ここで押さえるのは
+ * **暴れないこと**と**無い体で何も起きないこと**の 2 つ。
+ */
+/** animation.ts の BUST_MAX (0.30) を 2 軸ぶん見込んだ上限 */
+const BUST_MAX_TEST = 0.45
+
+describe('胸の揺れ', () => {
+  function shake(
+    anim: CharacterAnimator,
+    root: THREE.Object3D,
+    seconds: number,
+    amp: number,
+    locomotion = 'run_f',
+  ) {
+    const step = 1 / 60
+    for (let i = 0; i < Math.round(seconds / step); i++) {
+      // 走っているときの上下動を真似る。**位置で揺する** — 中は加速度で見る
+      root.position.y = Math.sin(i * step * 2 * Math.PI * 2.2) * amp
+      root.updateMatrixWorld(true)
+      anim.setLocomotion(locomotion as never)
+      anim.setAiming(true)
+      anim.update(step)
+    }
+  }
+
+  function bustBone(root: THREE.Object3D): THREE.Bone | null {
+    let bone: THREE.Object3D | null = null
+    root.traverse((o) => {
+      if (o.name.endsWith('Bust_L')) bone = o
+    })
+    return bone as THREE.Bone | null
+  }
+
+  /**
+   * 素の姿勢からの**振れ幅**。
+   *
+   * 骨そのものの回転を読むと、元の向き (1.69 rad) が混ざる。上乗せした分だけを
+   * 見たいので、控えておいた素の姿勢で割る。
+   */
+  function sway(root: THREE.Object3D, rest: THREE.Quaternion): number {
+    const bone = bustBone(root)
+    if (!bone) return NaN
+    return rest.angleTo(bone.quaternion)
+  }
+
+  /** **骨の無い体では何も起きない。** soldier と raiden には胸の骨が無い */
+  test('骨の無い体では何も起きない', () => {
+    const anim = animator()
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    expect(() => shake(anim, root, 1, 0.05)).not.toThrow()
+    expect(bustBone(root)).toBeNull()
+  })
+
+  /**
+   * **揺すれば振れて、止めれば収まる。**
+   *
+   * 収まらないと、立ち止まっているのに胸だけ動き続ける。ばねの減衰が
+   * 効いているかをここで見る。
+   */
+  test('揺すれば振れて、止めれば収まる', () => {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+
+    const rest = bustBone(root)!.quaternion.clone()
+    shake(anim, root, 1.5, 0.06)
+    const moving = sway(root, rest)
+    expect(moving).toBeGreaterThan(0.01)
+
+    /*
+     * 止まる。**型も止める。**
+     *
+     * 位置を止めても走りの型が回っていれば胸は揺れ続ける — それは正しい
+     * (走っていれば揺れる) ので、収まりを見るときは立ち止まらせる。
+     */
+    shake(anim, root, 2, 0, 'idle')
+    expect(sway(root, rest)).toBeLessThan(moving * 0.25)
+  })
+
+  /** **上限を超えない。** 超えると体を突き抜ける */
+  test('どれだけ揺すっても上限を超えない', () => {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    const rest = bustBone(root)!.quaternion.clone()
+    shake(anim, root, 2, 0.6)
+    const a = sway(root, rest)
+    expect(Number.isFinite(a)).toBe(true)
+    // 2 軸の合成なので上限の 1.5 倍まで見る
+    expect(a).toBeLessThanOrEqual(BUST_MAX_TEST)
+  })
+})
+
 describe('転がりの終わり際', () => {
   /**
    * **銃は操作が返る 0.2 秒前に戻る。**

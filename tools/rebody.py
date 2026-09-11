@@ -40,6 +40,9 @@ UV も保たれているので、貼り直せば元通りになる。
 import bpy, sys, os, math, mathutils
 
 argv = sys.argv[sys.argv.index('--') + 1:]
+# 胸の骨を足すか。**Mixamo の 65 本には無い**ので、要る体にだけ作る
+BUST = '--bust' in argv
+argv = [a for a in argv if a != '--bust']
 SRC, OUT = argv[0], argv[1]
 # 宿主 (soldier.glb) の腰の高さ。合わせる先
 HOST_HIPS = float(argv[2]) if len(argv) > 2 else 1.009
@@ -127,6 +130,113 @@ def harden_head():
 
 
 harden_head()
+
+"""
+--- 胸の骨を作る ---
+
+**Mixamo の 65 本には胸の骨が無い。** 揺らすには揺らす対象が要るので、
+Spine2 の子として左右に 1 本ずつ足す。クリップはこの骨を知らないので
+(宿主に無い)、動かすのは走っている側 (animation.ts)。
+
+当たり判定には触れない。あちらは Head / Neck / Hips / LeftFoot を接尾辞で
+引いているだけで、骨が増えても拾わない (skin.ts の「見た目は幾何を変えない」)。
+
+--- どこに置くか ---
+胸は「脊椎より前へ出ている所」なので、**前へ出た量で探す**。Spine1/Spine2 が
+主の頂点のうち、胸の高さにあって前へ出ているものを左右に分け、その塊の
+重心へ骨の先を置く。根元は脊椎側へ引く — 根元と先が同じ点だと向きが決まらない。
+"""
+BUST_REACH = 0.085   # 骨が持つ範囲 (m)。これより遠い頂点は触らない
+BUST_NAMES = ('mixamorig:Bust_L', 'mixamorig:Bust_R')
+
+
+def add_bust():
+    spine2 = at('mixamorig:Spine2')
+    neck = at('mixamorig:Neck')
+    """
+    横は**肩から取る**。爪先から前を出すと、足の開きがそのまま傾きになって
+    左右の骨が斜めに並んだ (実測で 38° ずれた)。肩は体の軸そのものなので素直。
+    """
+    side = at('mixamorig:LeftShoulder') - at('mixamorig:RightShoulder')
+    side = (side - up * side.dot(up)).normalized()
+    forward = side.cross(up).normalized()
+
+    mesh = max(meshes, key=lambda m: len(m.data.vertices))
+    groups = {g.name: g.index for g in mesh.vertex_groups}
+    spine_ids = {groups[n] for n in ('mixamorig:Spine1', 'mixamorig:Spine2') if n in groups}
+    if not spine_ids:
+        print('  胸: 脊椎の頂点群が無いので作らない')
+        return
+
+    low = (spine2 - foot).dot(up)
+    high = (neck - foot).dot(up)
+    picked = {1: [], -1: []}
+    for v in mesh.data.vertices:
+        if not any(e.group in spine_ids and e.weight > 0.4 for e in v.groups):
+            continue
+        world = mesh.matrix_world @ v.co
+        height = (world - foot).dot(up)
+        if not (low < height < high):
+            continue
+        ahead = (world - spine2).dot(forward)
+        if ahead <= 0:
+            continue
+        picked[1 if (world - spine2).dot(side) > 0 else -1].append((ahead, world))
+
+    """
+    **左右は鏡にする。** それぞれの塊から別々に重心を出すと、頂点の偏りが
+    そのまま非対称になる。高さと前への出方は平均、横だけ符号を変える。
+    """
+    centres = {}
+    for sign in (1, -1):
+        group = picked[sign]
+        if len(group) < 20:
+            print(f'  胸: 片側の頂点が足りない ({len(group)})')
+            return
+        # **一番前へ出ている 2 割**の重心。全部の重心だと脇腹に寄る
+        group.sort(key=lambda t: -t[0])
+        core = group[: max(10, len(group) // 5)]
+        centres[sign] = sum((w for _, w in core), mathutils.Vector()) / len(core)
+
+    mid = (centres[1] + centres[-1]) / 2
+    lateral = (centres[1] - centres[-1]).dot(side) / 2
+    # 脊椎の面へ戻してから、横だけ左右へ振り直す
+    base = spine2 + up * (mid - spine2).dot(up) + forward * (mid - spine2).dot(forward)
+
+    made = []
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    for name, sign in zip(BUST_NAMES, (1, -1)):
+        centre = base + side * (lateral * sign)
+        bone = arm.data.edit_bones.new(name)
+        bone.head = arm.matrix_world.inverted() @ (centre - forward * BUST_REACH)
+        bone.tail = arm.matrix_world.inverted() @ centre
+        bone.parent = arm.data.edit_bones['mixamorig:Spine2']
+        bone.use_connect = False
+        made.append((name, centre))
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # 重みを移す。中心ほど胸、遠いほど元のまま
+    for name, centre in made:
+        group = mesh.vertex_groups.get(name) or mesh.vertex_groups.new(name=name)
+        moved = 0
+        for v in mesh.data.vertices:
+            world = mesh.matrix_world @ v.co
+            gap = (world - centre).length
+            if gap >= BUST_REACH:
+                continue
+            t = 1.0 - gap / BUST_REACH
+            t *= t          # 縁をなだらかに。線形だと境目が見える
+            for e in v.groups:
+                e.weight *= 1 - t
+            group.add([v.index], t, 'ADD')
+            moved += 1
+        print(f'  胸: {name} を作った ({moved} 頂点)')
+
+
+if BUST:
+    add_bust()
+
 
 """
 --- 宿主と同じ単位で焼く ---
