@@ -90,6 +90,45 @@ if before <= 0:
     raise SystemExit(f'腰が足より下にある ({before:.3f})。骨の名前か向きが違う')
 
 """
+--- 顎から上は頭の骨だけに握らせる ---
+
+**自動リグは頭と首の境目をなだらかに塗る。** 頭が主の頂点の 8 割に首の重みが
+乗っていて、280 個はほぼ半分首のものだった (手で組んだ宿主は 57 個)。
+首を基準に頭が回ると、その分だけ顎と頭蓋が横へ引きずられる — 画面では
+**顔が剪断される**ように見える。
+
+頭の骨の付け根 (頭蓋の底) から上は、頭だけが握る。付け根の少し下に細い帯を
+置いて、そこで 0 から 1 へ渡す — 帯を置かないと境目で皮が折れる。
+"""
+HEAD_BAND = 0.04
+
+
+def harden_head():
+    head_h = (at('mixamorig:Head') - foot).dot(up)
+    moved = 0
+    for mesh in meshes:
+        group = mesh.vertex_groups.get('mixamorig:Head')
+        if not group:
+            continue
+        for v in mesh.data.vertices:
+            height = ((mesh.matrix_world @ v.co) - foot).dot(up)
+            t = (height - (head_h - HEAD_BAND)) / HEAD_BAND
+            if t <= 0:
+                continue
+            t = min(1.0, t)
+            entries = {e.group: e for e in v.groups}
+            # 頭を t まで引き上げ、残りを (1-t) 倍に潰す。合計は 1 のまま
+            for e in v.groups:
+                e.weight = e.weight * (1 - t) + (t if e.group == group.index else 0)
+            if group.index not in entries:
+                group.add([v.index], t, 'REPLACE')
+            moved += 1
+    print(f'  顎から上を頭の骨へ寄せた {moved} 頂点')
+
+
+harden_head()
+
+"""
 --- 宿主と同じ単位で焼く ---
 
 拡大は**オブジェクトの scale に置かない**。移してくるクリップは腰の位置を
