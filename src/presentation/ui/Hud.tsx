@@ -531,7 +531,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             輪なら「この中のどこか」しか言わない。撃つ前に**分からないまま
             決める**ことになるので、詰めるか待つかの読み合いが残る。
           */}
-          <span class="crosshair-ring" />
+          <span
+            class="crosshair-ring"
+            // **散弾だけ点線。** 1 発が 8 粒に割れて散らばる、という
+            // 銃そのものの性質。輪の大きさは据え置きなので、粒の話は
+            // 線の切れ方で言う
+            classList={{ 'crosshair-ring-scatter': (props.stats?.pelletSpread ?? 0) > 0 }}
+          />
         </div>
       </Show>
 

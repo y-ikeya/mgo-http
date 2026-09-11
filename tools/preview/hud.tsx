@@ -40,6 +40,11 @@ const cases: Record<string, Partial<GameStats>> = {
   downed: { ammo: 12, downed: true },
   // 拾える物が近くにある
   pickup: { canPickUp: true },
+  // 散弾を構えている。**輪が点線になる**のを見る
+  shotgun: {
+    aiming: true, equipped: 'shotgun', held: 'shotgun', weaponHeld: 'shotgun',
+    ammo: 8, magazine: 8, reserve: 24, spread: 0, pelletSpread: 2.4,
+  },
   // 狙撃眼鏡を覗いている。**網目だけを見る**ので他は普段どおり
   scoped: { scoped: true, equipped: 'sniper', held: 'sniper', weaponHeld: 'sniper', zoom: 'x6', ammo: 5, magazine: 5, reserve: 20 },
   // 個人戦。残機は 1 つ、上に DM
