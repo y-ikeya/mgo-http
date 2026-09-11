@@ -55,9 +55,11 @@
 /*
  * 散弾の輪。**粒がこの中に散る。**
  *
- * 十字と同じ --crosshair-gap から半径を取るので、散布界が開けば輪も広がる。
- * 十字が「その一点へ 1 発」を言っているのに対して、こちらは「この範囲へ
- * 撒く」を言っている。
+ * --crosshair-gap から半径を取るので、散布界が開けば輪も広がる。
+ *
+ * **十字は使わない。** 十字は「その一点へ 1 発飛ぶ」の形で、**どこへ飛ぶかを
+ * 答えてしまう**。実際には散布の円錐のどこかへ飛ぶので、答えられないはずの
+ * ものを答えている。輪なら「この中のどこか」しか言わない。
  */
 .crosshair-ring {
   position: absolute;
@@ -79,48 +81,8 @@
   left: 50%;
   width: 0;
   height: 0;
-  /* 中心から各アームまでの距離。散布界に応じて Hud.tsx が上書きする */
-  --crosshair-gap: 9px;
-  --crosshair-arm: 7px;
-}
-
-.crosshair-dot,
-.crosshair-arm {
-  position: absolute;
-  background: rgba(230, 240, 220, 0.85);
-  /* 暗い背景でも明るい壁でも視認できるよう縁取りする */
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
-}
-
-.crosshair-dot {
-  width: 2px;
-  height: 2px;
-  transform: translate(-1px, -1px);
-}
-
-.crosshair-arm {
-  width: 2px;
-  height: 7px;
-}
-
-.crosshair-arm-up {
-  transform: translate(-1px, calc(-1 * (var(--crosshair-gap) + var(--crosshair-arm))));
-}
-
-.crosshair-arm-down {
-  transform: translate(-1px, var(--crosshair-gap));
-}
-
-.crosshair-arm-left {
-  width: var(--crosshair-arm);
-  height: 2px;
-  transform: translate(calc(-1 * (var(--crosshair-gap) + var(--crosshair-arm))), -1px);
-}
-
-.crosshair-arm-right {
-  width: var(--crosshair-arm);
-  height: 2px;
-  transform: translate(var(--crosshair-gap), -1px);
+  /* 輪の半径。散布界に応じて Hud.tsx が上書きする (CROSSHAIR_BASE) */
+  --crosshair-gap: 20px;
 }
 
 /* --- 命中表示 --- */

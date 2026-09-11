@@ -34,6 +34,14 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
 /** 1 段送ったときに滑る距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
 const BROWSE_SLIDE = 26
 
+/**
+ * 輪の一番小さいときの半径 (px)。**点まで縮ませない。**
+ *
+ * 止まって構え切ると散布はほぼ 0 になるが、そこで輪が消えると
+ * 「一点へ飛ぶ」に戻ってしまう。小さくても円のままでいる。
+ */
+const CROSSHAIR_BASE = 20
+
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
   // 残り時間の表示だけは秒ごとに動かす。stats は 0.1 秒ごとに来るが、
@@ -519,27 +527,20 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           // **位置は動かさない。** 手ブレは画面ごと揺れる (カメラの向きに
           // 差し込んである) ので、クロスヘアは中央に固定されたまま
           style={{
-            '--crosshair-gap': `${9 + ((props.stats?.spread ?? 0) + (props.stats?.pelletSpread ?? 0)) * 11}px`,
+            '--crosshair-gap': `${CROSSHAIR_BASE + ((props.stats?.spread ?? 0) + (props.stats?.pelletSpread ?? 0)) * 11}px`,
           }}
         >
-          <span class="crosshair-dot" />
           {/*
-            散弾は輪。**粒がその中に散る**という形をそのまま出す。
-            十字は「その一点へ 1 発飛ぶ」の形なので、8 粒に分かれる銃には嘘になる。
+            **輪。十字にしない。**
+
+            十字は「その一点へ 1 発飛ぶ」の形で、**どこへ飛ぶかを答えて
+            しまう**。実際には散布の円錐のどこかへ飛ぶので、答えられない
+            はずのものを答えている。中心の点も同じ理由で置かない。
+
+            輪なら「この中のどこか」しか言わない。撃つ前に**分からないまま
+            決める**ことになるので、詰めるか待つかの読み合いが残る。
           */}
-          <Show
-            when={(props.stats?.pelletSpread ?? 0) > 0}
-            fallback={
-              <>
-                <span class="crosshair-arm crosshair-arm-up" />
-                <span class="crosshair-arm crosshair-arm-down" />
-                <span class="crosshair-arm crosshair-arm-left" />
-                <span class="crosshair-arm crosshair-arm-right" />
-              </>
-            }
-          >
-            <span class="crosshair-ring" />
-          </Show>
+          <span class="crosshair-ring" />
         </div>
       </Show>
 
