@@ -103,10 +103,68 @@ if before <= 0:
 頭の骨の付け根 (頭蓋の底) から上は、頭だけが握る。付け根の少し下に細い帯を
 置いて、そこで 0 から 1 へ渡す — 帯を置かないと境目で皮が折れる。
 """
+"""
+--- 宿主と同じ単位で焼く ---
+
+拡大は**オブジェクトの scale に置かない**。移してくるクリップは腰の位置を
+**宿主の単位**で持っていて (骨の回転と違い、移動は長さそのもの)、掛かるのは
+Armature の scale。宿主と違う値が入っていると、その比のぶん腰が上下する
+(Raiden で 6.9cm 沈んだ)。
+
+「見た目を宿主に合わせる倍率」を骨と頂点へ焼き込んでから、Armature の scale は
+宿主と同じ値にする。**回転は焼かない** — scale だけ。
+"""
+arm.scale = [HOST_HIPS / before] * 3
+bpy.ops.object.select_all(action='DESELECT')
+for o in [arm] + meshes:
+    o.select_set(True)
+bpy.context.view_layer.objects.active = arm
+bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+arm.scale = [HOST_SCALE] * 3
+bpy.context.view_layer.update()
+
+after = (at('mixamorig:Hips') - (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2).dot(up)
+print(f'  腰の高さ {before:.3f} -> {after:.3f} m (宿主 {HOST_HIPS})')
+
+"""
+--- ここから先は**実寸**で測れる ---
+
+重みを触る工程 (顎・髪・胸) は、**焼いた後に回す。** 焼く前は FBX の単位の
+ままで、この体は宿主の半分の大きさだった — 0.55m のつもりの範囲が実質 1.1m
+になって、**迷彩のズボンまで「髪」と判定していた** (腿の 465 頂点が頭の骨に
+握られて、走ると破裂した)。
+
+足元は縮尺で動くので測り直す。上の向きは変わらない。
+"""
+foot = (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2
+
 HEAD_BAND = 0.04
+"""
+--- 髪も頭に握らせる ---
+
+**髪が裂ける。** 1 本の房の中で頂点が別々の骨に割り振られていて (肩・首・
+脊椎)、頭が動くと房が長い棘に伸びて砕ける。自動リグは「一番近い骨」で
+決めるので、肩に垂れた髪は肩のものになる。
+
+髪は体と地続きで、材質も 1 つ。切り離せないので**色で見分ける**。基本色が
+暗ければ髪、明るければ肌か服。頭の周りに限れば、暗いのは髪しかない
+(ベルトや靴も暗いが遠い)。
+"""
+HAIR_SEED = 0.16    # 頭皮とみなす範囲 (m)。ここから辿り始める
+HAIR_DARK = 0.12    # これより暗ければ髪 (0..1)
 
 
 def harden_head():
+    """顎から上は頭の骨だけに握らせる。
+
+    **自動リグは頭と首の境目をなだらかに塗る。** 頭が主の頂点の 8 割に首の
+    重みが乗っていて、280 個はほぼ半分首のものだった (手で組んだ宿主は 57 個)。
+    首を基準に頭が回ると、その分だけ顎と頭蓋が横へ引きずられる — 画面では
+    **顔が剪断される**ように見える。
+
+    頭の骨の付け根 (頭蓋の底) から上は、頭だけが握る。付け根の少し下に細い帯を
+    置いて、そこで 0 から 1 へ渡す — 帯を置かないと境目で皮が折れる。
+    """
     head_h = (at('mixamorig:Head') - foot).dot(up)
     moved = 0
     for mesh in meshes:
@@ -129,7 +187,92 @@ def harden_head():
     print(f'  顎から上を頭の骨へ寄せた {moved} 頂点')
 
 
-harden_head()
+def base_colour_image(mesh):
+    """基本色のテクスチャ。**無ければ None** (色で見分けられない)"""
+    for slot in mesh.material_slots:
+        tree = slot.material and slot.material.node_tree
+        if not tree:
+            continue
+        for node in tree.nodes:
+            if node.type != 'BSDF_PRINCIPLED':
+                continue
+            link = node.inputs['Base Color'].links
+            if link and link[0].from_node.type == 'TEX_IMAGE':
+                return link[0].from_node.image
+    return None
+
+
+def take_hair():
+    """髪をまるごと頭の骨へ。
+
+    **頭皮から、暗い頂点だけを辿る。** 「暗ければ髪」だけで拾うと、背中の
+    黒いベルトまで頭に括り付けてしまい、頭が動くたびにベルトが棘に伸びた。
+
+    髪は頭皮から房まで暗い頂点で繋がっている。ベルトは間に肌や白い服を挟むので、
+    辿っても届かない。**地続きの一塊であること**が効く。
+    """
+    mesh = max(meshes, key=lambda m: len(m.data.vertices))
+    image = base_colour_image(mesh)
+    if not image:
+        print('  髪: 基本色のテクスチャが無いので色で見分けられない')
+        return
+    group = mesh.vertex_groups.get('mixamorig:Head')
+    uv = mesh.data.uv_layers.active
+    if not group or not uv:
+        print('  髪: 頂点群か UV が無い')
+        return
+
+    w, h = image.size
+    pixels = list(image.pixels)
+    at_uv = {}
+    for poly in mesh.data.polygons:
+        for vi, li in zip(poly.vertices, poly.loop_indices):
+            at_uv.setdefault(vi, uv.data[li].uv)
+
+    def dark(index):
+        co = at_uv.get(index)
+        if not co:
+            return False
+        x = min(w - 1, max(0, int(co.x % 1.0 * w)))
+        y = min(h - 1, max(0, int(co.y % 1.0 * h)))
+        i = (y * w + x) * 4
+        return (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3 < HAIR_DARK
+
+    # 隣り合わせ
+    near = {}
+    for e in mesh.data.edges:
+        a, b = e.vertices
+        near.setdefault(a, []).append(b)
+        near.setdefault(b, []).append(a)
+
+    # 種は頭皮。**頭の骨の近くで、暗い所**
+    head_at = at('mixamorig:Head')
+    seeds = [
+        v.index
+        for v in mesh.data.vertices
+        if ((mesh.matrix_world @ v.co) - head_at).length < HAIR_SEED and dark(v.index)
+    ]
+    if not seeds:
+        print('  髪: 頭皮に暗い所が無い')
+        return
+
+    seen = set(seeds)
+    stack = list(seeds)
+    while stack:
+        i = stack.pop()
+        for j in near.get(i, ()):
+            if j in seen or not dark(j):
+                continue
+            seen.add(j)
+            stack.append(j)
+
+    for i in seen:
+        for e in mesh.data.vertices[i].groups:
+            e.weight = 0.0
+        group.add([i], 1.0, 'REPLACE')
+    print(f'  髪: 頭へ寄せた {len(seen)} 頂点 (種 {len(seeds)})')
+
+
 
 """
 --- 胸の骨を作る ---
@@ -234,32 +377,8 @@ def add_bust():
         print(f'  胸: {name} を作った ({moved} 頂点)')
 
 
-if BUST:
-    add_bust()
 
 
-"""
---- 宿主と同じ単位で焼く ---
-
-拡大は**オブジェクトの scale に置かない**。移してくるクリップは腰の位置を
-**宿主の単位**で持っていて (骨の回転と違い、移動は長さそのもの)、掛かるのは
-Armature の scale。宿主と違う値が入っていると、その比のぶん腰が上下する
-(Raiden で 6.9cm 沈んだ)。
-
-「見た目を宿主に合わせる倍率」を骨と頂点へ焼き込んでから、Armature の scale は
-宿主と同じ値にする。**回転は焼かない** — scale だけ。
-"""
-arm.scale = [HOST_HIPS / before] * 3
-bpy.ops.object.select_all(action='DESELECT')
-for o in [arm] + meshes:
-    o.select_set(True)
-bpy.context.view_layer.objects.active = arm
-bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-arm.scale = [HOST_SCALE] * 3
-bpy.context.view_layer.update()
-
-after = (at('mixamorig:Hips') - (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2).dot(up)
-print(f'  腰の高さ {before:.3f} -> {after:.3f} m (宿主 {HOST_HIPS})')
 print(f'  骨 {len(arm.data.bones)} / メッシュ {len(meshes)} / 頂点 {sum(len(m.data.vertices) for m in meshes)}')
 
 if MATERIALS_FROM:
@@ -288,6 +407,97 @@ if MATERIALS_FROM:
 # 提供側に付いてきた動き (Mixamo の見本) は要らない
 for action in list(bpy.data.actions):
     bpy.data.actions.remove(action)
+
+"""
+--- 遠すぎる骨から取り上げる ---
+
+**手から 1.17m 離れた頂点を指の骨が握っていた** (713 個)。腰やズボンの布が
+手の骨に付いているので、手を動かすたびに飛んで、長い棘になる。自動リグが
+「一番近い骨」で決めた副作用で、宿主 (手で組んだ soldier) には 1 つも無い。
+
+手の骨だけを見る。胴や腰の骨は遠くの頂点を持っていて当たり前なので、
+同じ物差しは当てられない。
+"""
+HAND_REACH = 0.30
+
+
+def drop_far_hands():
+    dropped = 0
+    for mesh in meshes:
+        bones = {}
+        for group in mesh.vertex_groups:
+            bone = arm.data.bones.get(group.name)
+            if bone and 'Hand' in group.name:
+                bones[group.index] = arm.matrix_world @ bone.head_local
+        if not bones:
+            continue
+        for v in mesh.data.vertices:
+            world = mesh.matrix_world @ v.co
+            hit = False
+            for e in v.groups:
+                where = bones.get(e.group)
+                if where is None or e.weight <= 0:
+                    continue
+                if (world - where).length > HAND_REACH:
+                    e.weight = 0.0
+                    hit = True
+            if not hit:
+                continue
+            dropped += 1
+            # 残りで割り直す。全部落ちたら一番近い骨へ 1 を置く
+            total = sum(e.weight for e in v.groups)
+            if total > 1e-6:
+                for e in v.groups:
+                    e.weight /= total
+            else:
+                near = min(
+                    ((mesh.matrix_world @ v.co - (arm.matrix_world @ b.head_local)).length, g.index)
+                    for g in mesh.vertex_groups
+                    for b in [arm.data.bones.get(g.name)]
+                    if b
+                )[1]
+                for e in v.groups:
+                    e.weight = 1.0 if e.group == near else 0.0
+    print(f'  遠すぎる手の骨から取り上げた {dropped} 頂点')
+
+
+drop_far_hands()
+harden_head()
+take_hair()
+if BUST:
+    add_bust()
+
+"""
+--- 体は透けない ---
+
+Tripo から来た材質が**半透明扱い**になっていた (glTF の alphaMode BLEND)。
+半透明は**深度を書かない**ので、三角が描かれた順に手前と奥が入れ替わり、
+裏面まで透ける。画面では**顔が黒い破片に砕けて**見えた — 重みの問題に
+見えるが、動かす前の素の姿勢でも出る。
+
+体に透ける所は無いので、不透明に倒す。Alpha の繋ぎを切って 1.0 にする —
+書き出しはそこを見て alphaMode を決める。
+"""
+opaque = 0
+for mat in bpy.data.materials:
+    if getattr(mat, 'blend_method', None) is not None:
+        mat.blend_method = 'OPAQUE'
+    tree = mat.node_tree
+    if not tree:
+        continue
+    for node in tree.nodes:
+        if node.type != 'BSDF_PRINCIPLED':
+            continue
+        alpha = node.inputs.get('Alpha')
+        if not alpha:
+            continue
+        for link in list(alpha.links):
+            tree.links.remove(link)
+            opaque += 1
+        if alpha.default_value < 1.0:
+            opaque += 1
+        alpha.default_value = 1.0
+print(f'  材質を不透明にした ({opaque} 箇所を直した / 材質 {len(bpy.data.materials)})')
 
 for im in bpy.data.images:
     if max(im.size) > SIDE:
