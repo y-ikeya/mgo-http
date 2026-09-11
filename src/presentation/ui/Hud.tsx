@@ -34,14 +34,6 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
 /** 1 段送ったときに滑る距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
 const BROWSE_SLIDE = 26
 
-/**
- * 輪の一番小さいときの半径 (px)。**点まで縮ませない。**
- *
- * 止まって構え切ると散布はほぼ 0 になるが、そこで輪が消えると
- * 「一点へ飛ぶ」に戻ってしまう。小さくても円のままでいる。
- */
-const CROSSHAIR_BASE = 20
-
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
   // 残り時間の表示だけは秒ごとに動かす。stats は 0.1 秒ごとに来るが、
@@ -517,19 +509,18 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           props.stats?.weaponHeld !== 'knife'
         }
       >
-        <div
-          class="crosshair"
-          // 散布界に応じて開く。数字で見せずに「今どれだけ散るか」を伝える。
-          //
-          // **散弾は粒の散りも足す。** 狙いの散布だけだと、止まって構えた
-          // 瞬間に輪が点まで縮んで「一点へ飛ぶ」に見える
-          //
-          // **位置は動かさない。** 手ブレは画面ごと揺れる (カメラの向きに
-          // 差し込んである) ので、クロスヘアは中央に固定されたまま
-          style={{
-            '--crosshair-gap': `${CROSSHAIR_BASE + ((props.stats?.spread ?? 0) + (props.stats?.pelletSpread ?? 0)) * 11}px`,
-          }}
-        >
+        {/*
+          **大きさも位置も動かさない。**
+
+          散布界に応じて開いたり閉じたりしていたが、**動く輪は読みにくい** —
+          見ている先の景色が変わらないのに枠だけ呼吸するので、目がそちらへ
+          持っていかれる。散らばり具合は当たらなかったことで分かるので、
+          常時わざわざ出す必要がない。
+
+          手ブレも同じ理由でここには出ない。あれは**画面ごと揺れる** (カメラの
+          向きに差し込んである) ので、輪は中央に据わったまま。
+        */}
+        <div class="crosshair">
           {/*
             **輪。十字にしない。**
 
