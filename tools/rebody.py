@@ -37,7 +37,7 @@ UV も保たれているので、貼り直せば元通りになる。
 1.47m は 1 体を実測した値で、背の高い体を入れるとその人だけ見つかりやすい。
 """
 
-import bpy, sys, os, mathutils
+import bpy, sys, os, math, mathutils
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, OUT = argv[0], argv[1]
@@ -45,6 +45,8 @@ SRC, OUT = argv[0], argv[1]
 HOST_HIPS = float(argv[2]) if len(argv) > 2 else 1.009
 # 材質を引いてくる元。Mixamo を通すと簡略化されるので、元のファイルから戻す
 MATERIALS_FROM = argv[3] if len(argv) > 3 else ''
+# 宿主の Armature に乗っている scale。**ここへ揃える** (fit_height.js と同じ値)
+HOST_SCALE = 0.01
 SIDE = 1024
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -59,11 +61,55 @@ hips = arm.data.bones.get('mixamorig:Hips')
 if not hips:
     raise SystemExit('mixamorig:Hips が無い。Mixamo の auto-rig を通してから使う')
 
-before = (arm.matrix_world @ hips.head_local).z
-scale = HOST_HIPS / before
-arm.scale = (arm.scale.x * scale, arm.scale.y * scale, arm.scale.z * scale)
+
+def at(name):
+    """その骨の根元の世界座標"""
+    return arm.matrix_world @ arm.data.bones[name].head_local
+
+
+"""
+--- 上がどちらかを測る ---
+
+**読み込んだ姿が世界 Z 上に立っているとは限らない。** FBX の軸の取り替えは
+オブジェクトの回転として乗ってくることがある。Mixamo 生まれの体では起きないが、
+外から持ち込んだ体 (Tripo → Mixamo) で出た — 上が -Y を向いていて、腰の高さを
+z で測ると -0.023m になり、そこから 44 倍を掛けていた。
+
+**回さない。測るだけ。** 世界ごと回して焼くと、根の骨の素の姿勢が変わる。
+移してくるクリップは骨ごとの**回転**で、宿主の素の姿勢を前提にしているので、
+そこがずれると同じ回転が別の結果になる (爪先が頭より上に来た)。宿主も回転は
+オブジェクトに乗せたままなので、こちらもそのままにする。
+"""
+foot = (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2
+up = (at('mixamorig:Head') - foot).normalized()
+if abs(up.z) < 0.9:
+    print(f'  上が {tuple(round(v, 2) for v in up)} を向いている。その向きで測る')
+
+before = (at('mixamorig:Hips') - foot).dot(up)
+if before <= 0:
+    raise SystemExit(f'腰が足より下にある ({before:.3f})。骨の名前か向きが違う')
+
+"""
+--- 宿主と同じ単位で焼く ---
+
+拡大は**オブジェクトの scale に置かない**。移してくるクリップは腰の位置を
+**宿主の単位**で持っていて (骨の回転と違い、移動は長さそのもの)、掛かるのは
+Armature の scale。宿主と違う値が入っていると、その比のぶん腰が上下する
+(Raiden で 6.9cm 沈んだ)。
+
+「見た目を宿主に合わせる倍率」を骨と頂点へ焼き込んでから、Armature の scale は
+宿主と同じ値にする。**回転は焼かない** — scale だけ。
+"""
+arm.scale = [HOST_HIPS / before] * 3
+bpy.ops.object.select_all(action='DESELECT')
+for o in [arm] + meshes:
+    o.select_set(True)
+bpy.context.view_layer.objects.active = arm
+bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+arm.scale = [HOST_SCALE] * 3
 bpy.context.view_layer.update()
-after = (arm.matrix_world @ arm.data.bones['mixamorig:Hips'].head_local).z
+
+after = (at('mixamorig:Hips') - (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2).dot(up)
 print(f'  腰の高さ {before:.3f} -> {after:.3f} m (宿主 {HOST_HIPS})')
 print(f'  骨 {len(arm.data.bones)} / メッシュ {len(meshes)} / 頂点 {sum(len(m.data.vertices) for m in meshes)}')
 

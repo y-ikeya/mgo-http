@@ -36,6 +36,15 @@ const SKINS: Record<string, string> = {
    * その比のぶん腰が沈む — 素の姿勢では合っているのに動かすと低い、という形で出る。
    */
   pepa1404: 'soldier_raiden',
+  /*
+   * nanashi。Raiden と同じ道で入れた体 (rebody → merge_all_clips → fit_height)。
+   *
+   * **出どころが違う。** Raiden は Mixamo の既製キャラだが、こちらは外で作った
+   * 体を Mixamo の auto-rig に通したもの。骨の名前は揃うが、**単位系と向きが
+   * 揃わない** — 上が -Y を向いていて、腰を z で測ると負の値が出た。
+   * rebody.py が向きを測ってから合わせるようにしてある。
+   */
+  nanashi: 'soldier_nanashi',
 }
 
 /**
