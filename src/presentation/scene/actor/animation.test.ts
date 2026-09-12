@@ -955,6 +955,16 @@ describe('胸の揺れ', () => {
     }
   }
 
+  function hairBone(root: THREE.Object3D): THREE.Bone | null {
+    let bone: THREE.Object3D | null = null
+    root.traverse((o) => {
+      if (!bone && (o as THREE.Bone).isBone && !o.name.startsWith('mixamorig') && !o.name.endsWith('_end')) {
+        bone = o
+      }
+    })
+    return bone as THREE.Bone | null
+  }
+
   function bustBone(root: THREE.Object3D): THREE.Bone | null {
     let bone: THREE.Object3D | null = null
     root.traverse((o) => {
@@ -1006,6 +1016,29 @@ describe('胸の揺れ', () => {
      */
     shake(anim, root, 2, 0, 'idle')
     expect(sway(root, rest)).toBeLessThan(moving * 0.25)
+  })
+
+  /**
+   * **髪の鎖も揺れて、止まれば落ち着く。**
+   *
+   * Blender の制約や物理は書き出しに出ないので、揺れは走らせる側で出す。
+   * 手で足した骨 (mixamorig で始まらない骨) を鎖として拾っている。
+   */
+  test('**髪の鎖も揺れて、止まれば落ち着く**', () => {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    const bone = hairBone(root)
+    if (!bone) return
+
+    shake(anim, root, 1.5, 0, 'idle')
+    const calm = bone.quaternion.clone()
+
+    shake(anim, root, 1.0, 0.06)
+    expect(calm.angleTo(bone.quaternion)).toBeGreaterThan(0.01)
+
+    // 止めれば落ち着く。**同じ所へ戻る**
+    shake(anim, root, 2.5, 0, 'idle')
+    expect(calm.angleTo(bone.quaternion)).toBeLessThan(0.05)
   })
 
   /** **上限を超えない。** 超えると体を突き抜ける */

@@ -305,6 +305,39 @@ const BUST_GAIN = 0.0055
 /** 振れ幅の上限 (rad)。これを超えると体を突き抜ける */
 const BUST_MAX = 0.30
 
+/**
+ * 髪の揺れ。**手で足した骨 (mixamorig で始まらない骨) を鎖として拾う。**
+ *
+ * --- なぜ走らせる側で計算するか ---
+ * Blender の制約や物理は**書き出しに出ない**。焼けば出るが、こちらは 71 本の
+ * クリップで動かしているので、**走り・伏せ・転がり…全部に焼く**ことになる。
+ * 付け根の動きから毎フレーム出すほうが、型が増えても勝手に付いてくる。
+ *
+ * 胸と同じばね。違うのは 2 つ — **柔らかい** (髪は肉より自由に振れる) のと、
+ * **先へ行くほど大きく振れる** (鞭のようにしなる)。
+ */
+const HAIR_STIFF = 55
+const HAIR_DAMP = 6
+/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここ** */
+const HAIR_GAIN = 0.013
+const HAIR_MAX = 0.45
+/** 鎖の 1 つ先へ行くごとに掛ける。先端ほど大きく振れる */
+const HAIR_WHIP = 1.25
+
+/*
+ * --- 背中へ刺さるのを止める手は、まだ入っていない ---
+ *
+ * 2 つ試して 2 つとも外した:
+ *
+ *   世界の下へ引き寄せる  **走っている間まで垂れた。** ポニーテールは頭に
+ *                         付いて靡く物で、紐で吊った重りではない
+ *   前へ回り込むのを禁じる **暴れた。** 押し戻した結果をばねの状態へ返して
+ *                         いないので、次のコマでばねが押し返して発振する
+ *
+ * 次にやるなら、押し戻した分を entry.angle へ書き戻すこと。さもなければ
+ * 背中に円柱を置いて骨を外へ逃がす (当たり判定を持つ) 形になる。
+ */
+
 const ROLL_EXIT_PHASE = 0.78
 
 /**
@@ -775,9 +808,13 @@ const AIM_PITCH_LAMBDA = 12
  *
  * 銃を下ろした姿勢は直立に近く、そのままだと的のように棒立ちに見える。
  * 少し前のめりにすると重心が前に乗って、警戒しながら移動している兵士らしくなる。
- * 見た目の好みなので実機で決める値。
+ *
+ * **17° から 12° へ落とした。** 前へ倒したぶんは釣り合いで尻が後ろへ出る。
+ * 骨盤の細い体だとそこが際立って、走りが前のめりすぎて見えた。
+ *
+ * ?lean=17 のように URL から触れる (Game.ts)。
  */
-const RELAXED_LEAN = THREE.MathUtils.degToRad(17)
+const RELAXED_LEAN = THREE.MathUtils.degToRad(12)
 
 /**
  * ダンボールを被って移動する間の追加の前傾。
@@ -1577,60 +1614,108 @@ export class CharacterAnimator {
     this.alignSpineToUpperClip()
     this.applyAimPitch()
     this.turnTorso(dt)
-    this.swayBust(dt)
+    this.updateSways(dt)
   }
 
   /**
-   * 胸を揺らす。**骨を持っている体だけ。**
+   * 遅れて揺れる骨を探す。**1 度だけ。**
+   *
+   * 胸は名前で (Bust_L/R)、髪は**mixamorig で始まらない骨**で拾う。後者に
+   * したのは、手で足した骨の名前を決め打ちしないため — 体を作った人が
+   * Bone でも Hair でも好きに付けられる。
+   */
+  private findSways(): void {
+    const add = (
+      bone: THREE.Bone | null,
+      depth: number,
+      stiff: number,
+      damp: number,
+      gain: number,
+      max: number,
+    ) => {
+      if (!bone || !bone.parent) return
+      this.sways.push({
+        bone,
+        anchor: bone.parent,
+        rest: bone.quaternion.clone(),
+        angle: new THREE.Vector2(),
+        speed: new THREE.Vector2(),
+        stiff,
+        damp,
+        gain: gain * Math.pow(HAIR_WHIP, depth),
+        max,
+      })
+    }
+
+    for (const suffix of ['Bust_L', 'Bust_R']) {
+      add(findBoneBySuffix(this.root, suffix), 0, BUST_STIFF, BUST_DAMP, BUST_GAIN, BUST_MAX)
+    }
+
+    /*
+     * 髪の鎖。**頭の下にぶら下がった、mixamorig でない骨**を辿る。
+     *
+     * 先端 (_end) は重みを持たないので飛ばす — 回しても何も動かないのに
+     * ばねだけ回ることになる。
+     */
+    const head = findBoneBySuffix(this.root, 'Head')
+    const walk = (bone: THREE.Object3D, depth: number) => {
+      for (const kid of bone.children) {
+        if (!isBone(kid) || kid.name.startsWith('mixamorig')) continue
+        if (!kid.name.endsWith('_end')) {
+          add(kid, depth, HAIR_STIFF, HAIR_DAMP, HAIR_GAIN, HAIR_MAX)
+        }
+        walk(kid, depth + 1)
+      }
+    }
+    if (head) walk(head, 0)
+  }
+
+  /**
+   * 遅れて揺れる骨を回す。**骨を持っている体だけ。**
    *
    * 付け根の加速度を親の空間で見て、その逆へ振れるばねを回す。世界の向きで
    * 見ると、**その場で振り向いただけで揺れる** — 体は動いていないのに。
    */
-  private swayBust(dt: number): void {
-    if (!this.bustResolved) {
-      this.bustResolved = true
-      for (const suffix of ['Bust_L', 'Bust_R']) {
-        const bone = findBoneBySuffix(this.root, suffix)
-        if (!bone) continue
-        this.bust.push({
-          bone,
-          rest: bone.quaternion.clone(),
-          angle: new THREE.Vector2(),
-          speed: new THREE.Vector2(),
-        })
+  private updateSways(dt: number): void {
+    if (!this.swayResolved) {
+      this.swayResolved = true
+      this.findSways()
+    }
+    if (!this.sways.length || dt <= 0) return
+
+    for (const entry of this.sways) {
+      const anchor = entry.anchor
+      anchor.getWorldPosition(this.swayAt)
+      const was = this.swayWas.get(anchor)
+      if (!was) {
+        this.swayWas.set(anchor, { at: this.swayAt.clone(), vel: new THREE.Vector3() })
+        continue
       }
-    }
-    if (!this.bust.length || dt <= 0) return
+      // 速度 → 加速度。**前の速度との差**で見る
+      this.swayNow.subVectors(this.swayAt, was.at).divideScalar(dt)
+      was.at.copy(this.swayAt)
+      this.swayAcc.subVectors(this.swayNow, was.vel).divideScalar(dt)
+      was.vel.copy(this.swayNow)
+      // 親の空間へ。Y が上、X が横
+      anchor.getWorldQuaternion(this.swaySpin)
+      this.swayAcc.applyQuaternion(this.swaySpin.invert())
 
-    const anchor = this.bust[0]!.bone.parent
-    if (!anchor) return
-    anchor.getWorldPosition(this.bustAt)
-    if (!this.bustStarted) {
-      this.bustStarted = true
-      this.bustWas.copy(this.bustAt)
-      return
-    }
-    // 速度 → 加速度。**前の速度との差**で見る
-    this.bustNow.subVectors(this.bustAt, this.bustWas).divideScalar(dt)
-    this.bustWas.copy(this.bustAt)
-    this.bustAcc.subVectors(this.bustNow, this.bustVel).divideScalar(dt)
-    this.bustVel.copy(this.bustNow)
-    // 親の空間へ。Spine2 は Y が上、X が横
-    anchor.getWorldQuaternion(this.bustSpin)
-    this.bustAcc.applyQuaternion(this.bustSpin.invert())
+      const hold = (v: number) => Math.max(-entry.max, Math.min(entry.max, v))
+      // **加速度の逆へ遅れる。** 上へ持ち上げられたら下がる
+      const wantX = hold(-this.swayAcc.y * entry.gain)
+      const wantZ = hold(-this.swayAcc.x * entry.gain)
 
-    // **加速度の逆へ遅れる。** 上へ持ち上げられたら下がる
-    const hold = (v: number) => Math.max(-BUST_MAX, Math.min(BUST_MAX, v))
-    const wantX = hold(-this.bustAcc.y * BUST_GAIN)
-    const wantZ = hold(-this.bustAcc.x * BUST_GAIN)
-
-    for (const entry of this.bust) {
-      entry.speed.x += ((wantX - entry.angle.x) * BUST_STIFF - entry.speed.x * BUST_DAMP) * dt
-      entry.speed.y += ((wantZ - entry.angle.y) * BUST_STIFF - entry.speed.y * BUST_DAMP) * dt
+      entry.speed.x += ((wantX - entry.angle.x) * entry.stiff - entry.speed.x * entry.damp) * dt
+      entry.speed.y += ((wantZ - entry.angle.y) * entry.stiff - entry.speed.y * entry.damp) * dt
       entry.angle.x = hold(entry.angle.x + entry.speed.x * dt)
       entry.angle.y = hold(entry.angle.y + entry.speed.y * dt)
-      this.bustEuler.set(entry.angle.x, 0, entry.angle.y)
-      entry.bone.quaternion.copy(entry.rest).multiply(this.bustSpin.setFromEuler(this.bustEuler))
+      this.swayEuler.set(entry.angle.x, 0, entry.angle.y)
+      entry.bone.quaternion.copy(entry.rest).multiply(this.swaySpin.setFromEuler(this.swayEuler))
+      /*
+       * **鎖は親から順に確かめる。** 子の付け根の位置は親の回転で動くので、
+       * ここで世界行列を更新しておかないと、次の骨が 1 フレーム古い位置を見る。
+       */
+      entry.bone.updateMatrixWorld(true)
     }
   }
 
@@ -2027,23 +2112,33 @@ export class CharacterAnimator {
 
   private pistol = false
 
-  /** 胸の骨。**無い体では空のまま** (soldier / raiden には無い) */
-  private readonly bust: {
+  /**
+   * 遅れて揺れる骨。**無い体では空のまま** (soldier / raiden には無い)。
+   *
+   * 胸 (Bust_L/R) と髪の鎖を同じ形で持つ。どちらも「付け根の加速度の逆へ
+   * 振れて、ばねで戻る」だけなので、分ける理由がない。
+   */
+  private readonly sways: {
     bone: THREE.Bone
+    /** 付け根。加速度をここで測る */
+    anchor: THREE.Object3D
     rest: THREE.Quaternion
     /** x: 前後 (骨の X まわり) / y: 左右 (骨の Z まわり) */
     angle: THREE.Vector2
     speed: THREE.Vector2
+    stiff: number
+    damp: number
+    gain: number
+    max: number
   }[] = []
-  private bustResolved = false
-  private bustStarted = false
-  private readonly bustAt = new THREE.Vector3()
-  private readonly bustWas = new THREE.Vector3()
-  private readonly bustVel = new THREE.Vector3()
-  private readonly bustNow = new THREE.Vector3()
-  private readonly bustAcc = new THREE.Vector3()
-  private readonly bustSpin = new THREE.Quaternion()
-  private readonly bustEuler = new THREE.Euler()
+  private swayResolved = false
+  /** 付け根ごとの前フレームの位置と速度 */
+  private readonly swayWas = new Map<THREE.Object3D, { at: THREE.Vector3; vel: THREE.Vector3 }>()
+  private readonly swayAt = new THREE.Vector3()
+  private readonly swayNow = new THREE.Vector3()
+  private readonly swayAcc = new THREE.Vector3()
+  private readonly swaySpin = new THREE.Quaternion()
+  private readonly swayEuler = new THREE.Euler()
 
   /**
    * 片手で持っているか。**走り方と構えの型が変わる。**

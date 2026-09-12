@@ -16,6 +16,7 @@ import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { buildLights } from '../../src/presentation/scene/world/stage'
 import { loadSoldier } from '../../src/presentation/scene/assets'
+import { CharacterAnimator } from '../../src/presentation/scene/actor/animation'
 
 const WIDTH = 1280
 const HEIGHT = 900
@@ -50,16 +51,49 @@ const model = gltf.scene
 model.rotation.y = turn
 scene.add(model)
 
-const clip = gltf.animations.find((c: THREE.AnimationClip) => c.name === clipName)
-const mixer = new THREE.AnimationMixer(model)
-if (clip) mixer.clipAction(clip).play()
-else console.warn(`[body] ${clipName} が無い`)
+/*
+ * ?nomip … ミップマップを切って見る。**UV の島がにじんでいるか**の切り分け。
+ *
+ * 島の境で隣の島の色を拾うと、四角い継ぎ目が出る。切って消えるならそれ。
+ */
+if (query.has('nomip')) {
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    for (const m of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]) {
+      for (const map of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap]) {
+        if (!map) continue
+        map.generateMipmaps = false
+        map.minFilter = THREE.LinearFilter
+        map.needsUpdate = true
+      }
+    }
+  })
+}
+
+/*
+ * **本物の animator で回す。**
+ *
+ * 素の AnimationMixer で流すと、本番が掛けている補正 (照準の上下・背骨の
+ * 揃え・胸のばね) が**一切入らない**。それで出る崩れは試写に映らないので、
+ * 2 度掴み損ねた。ここは走っているのと同じ物を通す。
+ *
+ *     ?pitch=25   照準の上下 (度)。**背骨へ差し込まれる**
+ *     ?aim        構えているか
+ */
+const pitch = (Number(query.get('pitch') ?? '0') * Math.PI) / 180
+const anim = new CharacterAnimator(model, gltf.animations, 4.5)
+anim.setAiming(query.has('aim'))
+anim.setAimPitch(pitch)
 
 /*
  * **刻んで進める。** 一気に進めると、骨の追従 (ばね) が 1 歩で終わってしまう。
  * 実機と同じ 60 分の 1 で回して、その時刻の形を描く。
  */
-for (let t = 0; t < stopAt; t += 1 / 60) mixer.update(1 / 60)
+for (let t = 0; t < stopAt; t += 1 / 60) {
+  anim.setLocomotion(clipName as never)
+  anim.update(1 / 60)
+}
 model.updateMatrixWorld(true)
 
 const bone = (name: string) => {

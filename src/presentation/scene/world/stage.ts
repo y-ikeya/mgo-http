@@ -69,12 +69,32 @@ const GROUND_SKY_FLOOR = 0.3
  * 直射 (SUN_INTENSITY) との比が、日向と日陰の差になる。比が大きいほど
  * コントラストが強く「らしく」見えるが、日陰の中の人影や遮蔽物の形が読めなくなる。
  * 索敵が成立する範囲でだけコントラストを付ける。
+ *
+ * **2.6 / 2.4 (比 1.08) から 1.2 / 3.6 (比 3.0) へ。** 日陰が日向とほぼ同じ
+ * 明るさで、影が暗くなりようがなかった — 絵がぺたっと平らに見えていた。
+ *
+ * 濃くしたのは絵のためだけではない。**影が暗ければ、影に隠れることに値打ちが
+ * 出る。** 接敵までは互いに透明でいようとする遊びなので、隠れる場所が増える
+ * ほうが筋が通る。
  */
-const AMBIENT_INTENSITY = 2.6
+const AMBIENT_INTENSITY = 1.2
 /** 直射日光の強さ */
-const SUN_INTENSITY = 2.4
+const SUN_INTENSITY = 3.6
 /** 影の濃さ (0..1)。1 で完全に直射を遮る */
 const SHADOW_INTENSITY = 0.88
+
+/**
+ * URL から明るさを触る。**?ambient=1.4&sun=3.2&shadow=0.95**
+ *
+ * 日向と日陰の差は**遊びの判断**なので、実機で見ながら決めたい。天空光を
+ * 下げるほど影が濃くなり、**影に隠れることに値打ちが出る**。下げすぎると
+ * 日陰の中の人影が読めなくなって、索敵が成立しなくなる。
+ */
+function tuned(name: string, fallback: number): number {
+  const raw = new URLSearchParams(globalThis.location?.search ?? '').get(name)
+  const value = Number(raw)
+  return raw !== null && Number.isFinite(value) && value >= 0 ? value : fallback
+}
 
 /**
  * 雲の量。しきい値なので、小さいほど広く覆う。
@@ -1324,11 +1344,11 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   // これが日陰の明るさそのものになる。日陰は「光が無い場所」ではなく
   // 「直射が無く、空全体からの光だけが届く場所」なので、暗くはあっても黒くはならない。
   // 空の色と揃えてあるのは、青空の下の日陰が青みを帯びるのと同じ理屈。
-  const sky = new THREE.HemisphereLight(SKY_HORIZON, 0x6b6055, AMBIENT_INTENSITY)
+  const sky = new THREE.HemisphereLight(SKY_HORIZON, 0x6b6055, tuned('ambient', AMBIENT_INTENSITY))
   scene.add(sky)
   ambient = sky
 
-  const sun = new THREE.DirectionalLight(0xfff4e6, SUN_INTENSITY)
+  const sun = new THREE.DirectionalLight(0xfff4e6, tuned('sun', SUN_INTENSITY))
   // 闘技場の真ん中に固定する。動かさない。
   //
   // 追従させると、**エリア中の影が一斉にプレイヤーへ付いてくる**。
@@ -1357,7 +1377,7 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   sun.shadow.mapSize.set(4096, 4096)
   // 影の濃さ。1 で完全に直射を遮る。
   // わずかに緩めてあるのは、現実の影も周囲からの反射で少し起きているため。
-  sun.shadow.intensity = SHADOW_INTENSITY
+  sun.shadow.intensity = tuned('shadow', SHADOW_INTENSITY)
 
   // 影のカバー範囲。広すぎると解像度が落ちるので地面全体ではなくプレイエリア相当に絞る。
   const cam = sun.shadow.camera
