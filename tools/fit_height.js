@@ -24,6 +24,9 @@
 // 当たり判定の頭の位置もそこから決まる。頭がずれた体を入れると、その人だけ見た目と
 // 判定が食い違う — 見えている頭を撃つと胴に当たり、頭の上の空を撃つと頭に当たる。
 
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+
 const [hostPath, targetPath] = process.argv.slice(2)
 if (!targetPath) {
   console.error('引数: <宿主.glb> <合わせる.glb>')
@@ -67,14 +70,81 @@ function armature(json) {
 const host = parseGlb(new Uint8Array(await Bun.file(hostPath).arrayBuffer()))
 const target = parseGlb(new Uint8Array(await Bun.file(targetPath).arrayBuffer()))
 
-const want = armature(host.json).scale ?? [1, 1, 1]
-const node = armature(target.json)
-const have = node.scale ?? [1, 1, 1]
+/**
+ * 素の姿勢での頭の高さ。**節を root から辿って足し上げる。**
+ *
+ * 回転は骨の並びに沿っているので、素の姿勢なら足し算で届く。ここで見たいのは
+ * 絶対の高さではなく**宿主との比**なので、これで足りる。
+ */
+/**
+ * 素の型 (idle) を流したときの、頭の骨の高さ (m)。
+ *
+ * **骨の translation を足し算しない。** 骨のローカル軸は Y 上とは限らず
+ * (この骨格は Z が上)、しかも節ごとに回転が挟まる。実際に読み込んで
+ * 世界座標を読むのが確実。
+ */
+async function measure(path) {
+  const gltf = await new GLTFLoader().parseAsync(await Bun.file(path).arrayBuffer(), '')
+  const clip = gltf.animations.find((a) => a.name === 'idle') ?? gltf.animations[0]
+  if (!clip) throw new Error(`${path} にクリップが無い`)
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.update(0.5)
+  gltf.scene.updateMatrixWorld(true)
+  const at = (suffix) => {
+    let found = null
+    gltf.scene.traverse((o) => {
+      if (found === null && o.name.endsWith(suffix)) found = o.getWorldPosition(new THREE.Vector3()).y
+    })
+    if (found === null) throw new Error(`${path} に ${suffix} の骨が無い`)
+    return found
+  }
+  const toe = Math.min(at('LeftToeBase'), at('RightToeBase'))
+  return { head: at('mixamorigHead'), toe }
+}
 
-console.log(`宿主 ${want[0]}`)
-console.log(`前   ${have[0]}  (倍率 ${(want[0] / have[0]).toFixed(6)})`)
-node.scale = [...want]
-console.log(`後   ${node.scale[0]}`)
+/*
+ * --- 合わせるのは腰ではなく**頭** ---
+ *
+ * 遮蔽も当たり判定も頭の高さ (sim の HEAD_HEIGHT = 1.47) から決まる。頭が
+ * ずれた体を入れると、その人だけ**見えている頭を撃つと胴に当たる**。
+ *
+ * 腰を揃えても頭は合わない。骨の長さが体ごとに違うので、胴が長い体は腰を
+ * 揃えたぶん頭が上へ出る (実測で 11.8cm)。全体を均一に縮めれば、頭が合って
+ * 足も地面に着く — 腰が宿主より少し低い体になるだけ。
+ *
+ * **クリップが骨の位置を持っていた頃は要らなかった。** あの頃は骨格ごと
+ * 宿主に上書きされていたので、何を入れても頭は揃った — 代わりにメッシュが
+ * 裂けていた (merge_all_clips.js の注)。
+ */
+const host_ = await measure(hostPath)
+const mine = await measure(targetPath)
+const node = armature(target.json)
+const have = (node.scale ?? [1, 1, 1])[0]
+
+/*
+ * --- 背丈 (足→頭) を合わせて、足元で置き直す ---
+ *
+ * 頭だけ合わせると、脚の長い体は**爪先が地面を突き抜ける** (実測 7.5cm)。
+ * 腰だけ合わせると頭が上へ出る (11.8cm)。どちらも片手落ち。
+ *
+ * **足から頭までの長さ**で縮めてから、爪先が宿主と同じ高さに来るよう全体を
+ * 持ち上げる。足が地面に着いて、頭も揃う。腰の高さは体つきのぶんだけずれるが、
+ * そこは見た目の話で、判定はどれも頭と足から決まる。
+ */
+const want = have * ((host_.head - host_.toe) / (mine.head - mine.toe))
+node.scale = [want, want, want]
+// 縮めたぶん爪先も動くので、そのあとで持ち上げる量を出す
+const lift = host_.toe - mine.toe * (want / have)
+node.translation = [
+  (node.translation?.[0] ?? 0),
+  (node.translation?.[1] ?? 0) + lift,
+  (node.translation?.[2] ?? 0),
+]
+
+console.log(`宿主 頭 ${host_.head.toFixed(4)} 爪先 ${host_.toe.toFixed(4)}`)
+console.log(`こちら 頭 ${mine.head.toFixed(4)} 爪先 ${mine.toe.toFixed(4)}`)
+console.log(`scale ${have.toFixed(6)} -> ${want.toFixed(6)} / 持ち上げ ${lift.toFixed(4)}m`)
 
 await Bun.write(targetPath, writeGlb(target.json, target.bin))
 console.log(`書いた ${targetPath}`)

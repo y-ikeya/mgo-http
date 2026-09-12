@@ -71,6 +71,31 @@ function copyAccessor(index) {
 dest.json.animations = dest.json.animations ?? []
 let moved = 0
 let dropped = 0
+let skipped = 0
+
+/**
+ * 骨の**位置と拡大**は移さない。**回転だけ移す。**
+ *
+ * --- なぜ ---
+ * 取り込み元のクリップは全部の骨の位置を持っていて、その値は**宿主の骨の
+ * 長さそのもの** (Neck [0, 14.31, 0] / Head [0, 4.94, 2.50] のように 2 コマとも
+ * 同じ)。そのまま流すと、**取り込み先の骨格が宿主の骨格に上書きされる。**
+ *
+ * 体つきの違う体に移すと、頭が前へ出て、肩と背骨が引き伸ばされ、首で皮が
+ * 裂ける。**素の姿勢は無傷で、クリップを流した途端に壊れる**のが目印。
+ *
+ * 回転は体つきに依らないので、腕が長かろうが同じ角度で曲がる。
+ *
+ * --- 腰だけは残す ---
+ * 腰の位置は**骨の長さではなく動き**そのもの (上下動・踏み込み)。落とすと
+ * 走っても沈まない棒立ちになる。宿主の単位で入っているので、Armature の
+ * scale を宿主と揃えておくこと (fit_height.js)。
+ */
+function carries(path, name) {
+  if (path === 'rotation') return true
+  if (path === 'translation') return name.endsWith('Hips')
+  return false
+}
 
 for (const clip of src.json.animations ?? []) {
   const samplers = []
@@ -80,6 +105,10 @@ for (const clip of src.json.animations ?? []) {
     const to = destNodeByName.get(name)
     if (to === undefined) {
       dropped++
+      continue
+    }
+    if (!carries(channel.target.path, name)) {
+      skipped++
       continue
     }
     const sampler = clip.samplers[channel.sampler]
@@ -126,6 +155,7 @@ for (const data of added) {
 await Bun.write(outPath, out)
 console.log(
   `  クリップ ${moved} 本を移した` +
-    (dropped ? ` / **対応する骨が無くて落ちたチャンネル ${dropped} 本**` : ' / 落ちたチャンネル なし'),
+    (dropped ? ` / **対応する骨が無くて落ちたチャンネル ${dropped} 本**` : ' / 落ちたチャンネル なし') +
+    ` / 回転以外を外した ${skipped} 本`,
 )
 console.log(`  ${outPath} (${(total / 1024 / 1024).toFixed(1)} MB)`)
