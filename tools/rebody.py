@@ -42,7 +42,13 @@ import bpy, sys, os, math, mathutils
 argv = sys.argv[sys.argv.index('--') + 1:]
 # 胸の骨を足すか。**Mixamo の 65 本には無い**ので、要る体にだけ作る
 BUST = '--bust' in argv
-argv = [a for a in argv if a != '--bust']
+# 髪を丸ごと頭の骨へ寄せるか。**垂れた房がある体では固まりすぎる**
+HAIR = '--hair' in argv
+# 房に骨を通して揺らせるようにするか
+HAIR_BONES = '--hairbones' in argv
+# 顎から上を頭の骨だけに握らせるか
+HARD_HEAD = '--nohead' not in argv
+argv = [a for a in argv if a not in ('--bust', '--hair', '--nohead', '--hairbones')]
 SRC, OUT = argv[0], argv[1]
 # 宿主 (soldier.glb) の腰の高さ。合わせる先
 HOST_HIPS = float(argv[2]) if len(argv) > 2 else 1.009
@@ -50,16 +56,42 @@ HOST_HIPS = float(argv[2]) if len(argv) > 2 else 1.009
 MATERIALS_FROM = argv[3] if len(argv) > 3 else ''
 # 宿主の Armature に乗っている scale。**ここへ揃える** (fit_height.js と同じ値)
 HOST_SCALE = 0.01
-SIDE = 1024
+SIDE = int(os.environ.get('REBODY_TEXTURE', '1024'))
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 # **読み込む前に fps を立てる。** あとで変えても遅い (投擲で踏んだ穴)
 bpy.context.scene.render.fps = 30
 bpy.context.scene.render.fps_base = 1
 
-bpy.ops.import_scene.fbx(filepath=SRC)
-arm = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
-meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+"""
+--- .blend も読む ---
+
+**FBX を経由しない道を残す。** 骨格が 2 つある .blend を FBX へ出すと、
+メッシュと骨格の対応が壊れて Blender が読み戻せなくなる (ponyWoman.fbx で
+踏んだ)。手で骨を足した体はそうなりがちなので、元のファイルを直に読む。
+"""
+if SRC.endswith('.blend'):
+    bpy.ops.wm.open_mainfile(filepath=SRC)
+else:
+    bpy.ops.import_scene.fbx(filepath=SRC)
+"""
+--- 骨格が 2 つあることがある ---
+
+手で髪の骨を足すと、**別の骨格として置かれる**ことが多い (Blender で骨を
+足すと新しい Armature ができる)。mixamorig を持っているほうを体として、
+もう一方の骨をそこへ移す。
+
+移す先は `mixamorig:Head` の下。**世界での位置を保つ** — 骨格ごとに scale が
+違う (体 0.01 / 手で足したほう 0.2) ので、そのまま数値を写すと桁がずれる。
+"""
+arms = [o for o in bpy.data.objects if o.type == 'ARMATURE']
+arm = next(a for a in arms if any(b.name.startswith('mixamorig') for b in a.data.bones))
+spare = [a for a in arms if a is not arm]
+
+# 体のメッシュ。**曲線や下書きは混ぜない**
+meshes = [o for o in bpy.data.objects if o.type == 'MESH' and o.find_armature() is arm]
+if not meshes:
+    meshes = [o for o in bpy.data.objects if o.type == 'MESH']
 hips = arm.data.bones.get('mixamorig:Hips')
 if not hips:
     raise SystemExit('mixamorig:Hips が無い。Mixamo の auto-rig を通してから使う')
@@ -138,7 +170,15 @@ print(f'  腰の高さ {before:.3f} -> {after:.3f} m (宿主 {HOST_HIPS})')
 """
 foot = (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2
 
-HEAD_BAND = 0.04
+HEAD_BAND = float(os.environ.get('REBODY_BAND', '0.04'))
+"""
+頭の骨より**どれだけ下まで**頭として扱うか (m)。
+
+**頭の骨は耳の高さにある。** 顎はそれより下なので、骨の高さで切ると
+顎が blend に残る。頭が首より前に乗っている体では、そのぶん顎だけ
+置いていかれて**顔が前へ剪断される**。顎の下まで下げて切る。
+"""
+HEAD_DROP = float(os.environ.get('REBODY_DROP', '0.07'))
 """
 --- 髪も頭に握らせる ---
 
@@ -152,6 +192,29 @@ HEAD_BAND = 0.04
 """
 HAIR_SEED = 0.16    # 頭皮とみなす範囲 (m)。ここから辿り始める
 HAIR_DARK = 0.12    # これより暗ければ髪 (0..1)
+
+
+def hand_rigged(mesh):
+    """**手で足した骨に預けてある頂点。** ここは触らない。
+
+    mixamorig 以外の骨 (髪の鎖など) は、作った本人が重みまで塗っている。
+    こちらの手当て (顎を寄せる・遠い手の骨を外す・胸へ移す) がそれを
+    上書きすると、せっかく通した骨が効かなくなる。
+    """
+    mine = {
+        g.index
+        for g in mesh.vertex_groups
+        if not g.name.startswith('mixamorig') and arm.data.bones.get(g.name)
+    }
+    if not mine:
+        return set()
+    kept = {
+        v.index
+        for v in mesh.data.vertices
+        if any(e.group in mine and e.weight > 0.01 for e in v.groups)
+    }
+    print(f'  手で足した骨に預けてある頂点 {len(kept)}。ここは触らない')
+    return kept
 
 
 def harden_head():
@@ -171,9 +234,12 @@ def harden_head():
         group = mesh.vertex_groups.get('mixamorig:Head')
         if not group:
             continue
+        keep = hand_rigged(mesh)
         for v in mesh.data.vertices:
+            if v.index in keep:
+                continue
             height = ((mesh.matrix_world @ v.co) - foot).dot(up)
-            t = (height - (head_h - HEAD_BAND)) / HEAD_BAND
+            t = (height - (head_h - HEAD_DROP - HEAD_BAND)) / HEAD_BAND
             if t <= 0:
                 continue
             t = min(1.0, t)
@@ -202,25 +268,148 @@ def base_colour_image(mesh):
     return None
 
 
-def take_hair():
-    """髪をまるごと頭の骨へ。
+"""
+--- 房に骨を通す ---
 
-    **頭皮から、暗い頂点だけを辿る。** 「暗ければ髪」だけで拾うと、背中の
-    黒いベルトまで頭に括り付けてしまい、頭が動くたびにベルトが棘に伸びた。
+**垂れた髪は頭の骨では足りない。** 頭に固めると房ごと振り回されて背中へ
+めり込み、元の重み (首や肩に散らばっている) のままだと房が裂ける。
+房の芯に骨を通して、後から揺らす。
 
-    髪は頭皮から房まで暗い頂点で繋がっている。ベルトは間に肌や白い服を挟むので、
-    辿っても届かない。**地続きの一塊であること**が効く。
+置き場所は目分量にしない。**房の頂点を拾って、その塊の芯に沿って並べる。**
+胸の骨 (add_bust) と同じ手。
+"""
+HAIR_CHAIN = 3
+HAIR_BONE_NAMES = tuple(f'mixamorig:Hair{i + 1}' for i in range(HAIR_CHAIN))
+
+
+def hanging_hair(mesh):
+    """垂れている髪の頂点。**前髪と頭皮は入れない**
+
+    頭の骨より下で、かつ頭より後ろにあるものだけ。前髪は顔の前に垂れるので
+    「後ろ」で落ちる。頭皮は「下」で落ちる。
+    """
+    head_at = at('mixamorig:Head')
+    head_h = (head_at - foot).dot(up)
+    side = at('mixamorig:LeftShoulder') - at('mixamorig:RightShoulder')
+    side = (side - up * side.dot(up)).normalized()
+    forward = side.cross(up).normalized()
+    out = []
+    for i in scalp_hair(mesh):
+        world = mesh.matrix_world @ mesh.data.vertices[i].co
+        if (world - foot).dot(up) >= head_h:
+            continue
+        if (world - head_at).dot(forward) > 0:
+            continue
+        out.append((i, world))
+    return out
+
+
+def weigh_chain(mesh, names):
+    """鎖に沿って髪の重みを塗る。**骨は既に在るものを使う。**
+
+    房の頂点を鎖へ落として、どこにいるか (0 = 結び目 / n = 先端) を出し、
+    その前後の骨へ分ける。継ぎ目で切らずに渡すので、房が裂けない。
+    """
+    bones = [arm.data.bones.get(n) for n in names]
+    if any(b is None for b in bones):
+        print(f'  房の重み: 骨が見つからない ({names})')
+        return
+    knots = [arm.matrix_world @ bones[0].head_local]
+    knots += [arm.matrix_world @ b.tail_local for b in bones]
+
+    hair = hanging_hair(mesh)
+    if len(hair) < 50:
+        print(f'  房の重み: 垂れている髪が足りない ({len(hair)})')
+        return
+
+    groups = [mesh.vertex_groups.get(n) or mesh.vertex_groups.new(name=n) for n in names]
+    head_group = mesh.vertex_groups.get('mixamorig:Head')
+    span = len(names)
+
+    def along(world):
+        best, at_u = 1e9, 0.0
+        for k in range(span):
+            a, b = knots[k], knots[k + 1]
+            ab = b - a
+            length = ab.length_squared
+            t = 0.0 if length < 1e-9 else max(0.0, min(1.0, (world - a).dot(ab) / length))
+            gap = (world - (a + ab * t)).length
+            if gap < best:
+                best, at_u = gap, k + t
+        return at_u
+
+    for i, world in hair:
+        u = along(world)
+        for e in mesh.data.vertices[i].groups:
+            e.weight = 0.0
+        # **結び目は頭に預ける。** 骨だけにすると、頭を振ったときに付け根が裂ける
+        hold = min(1.0, u * 2) if u < 0.5 else 1.0
+        if head_group and hold < 1.0:
+            head_group.add([i], 1.0 - hold, 'REPLACE')
+        low = min(span - 1, int(u))
+        frac = u - low
+        groups[low].add([i], hold * (1.0 - frac), 'REPLACE')
+        if low + 1 < span:
+            groups[low + 1].add([i], hold * frac, 'ADD')
+    print(f'  房の重み: {span} 本へ塗った ({len(hair)} 頂点)')
+
+
+def add_hair_bones():
+    """房に骨を通す。**手で置いた骨があるならそちらを使う。**
+
+    置き場所は目分量にしない。房の頂点を拾って、その塊の芯に沿って並べる
+    (add_bust と同じ手)。
     """
     mesh = max(meshes, key=lambda m: len(m.data.vertices))
+    hair = hanging_hair(mesh)
+    if len(hair) < 100:
+        print(f'  房の骨: 垂れている髪が足りない ({len(hair)})')
+        return
+
+    heights = [(w - foot).dot(up) for _, w in hair]
+    top, bottom = max(heights), min(heights)
+    if top - bottom < 0.05:
+        print('  房の骨: 垂れていない ({:.3f}m)'.format(top - bottom))
+        return
+
+    """
+    **芯を出す。** 高さで区切って、その帯にある頂点の重心を結ぶ。塊全体の
+    重心を 1 点取るやり方では、曲がった房が直線になる。
+    """
+    knots = []
+    for k in range(HAIR_CHAIN + 1):
+        want = top - (top - bottom) * k / HAIR_CHAIN
+        band = [w for (_, w), h in zip(hair, heights) if abs(h - want) < (top - bottom) / HAIR_CHAIN / 2]
+        if not band:
+            band = [w for _, w in hair]
+        knots.append(sum(band, mathutils.Vector()) / len(band))
+
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    parent = arm.data.edit_bones['mixamorig:Head']
+    for k, name in enumerate(HAIR_BONE_NAMES):
+        bone = arm.data.edit_bones.new(name)
+        bone.head = arm.matrix_world.inverted() @ knots[k]
+        bone.tail = arm.matrix_world.inverted() @ knots[k + 1]
+        bone.parent = parent
+        bone.use_connect = k > 0
+        parent = bone
+    bpy.ops.object.mode_set(mode='OBJECT')
+    weigh_chain(mesh, list(HAIR_BONE_NAMES))
+
+
+def scalp_hair(mesh):
+    """髪の頂点。**頭皮から、暗い頂点だけを辿る。**
+
+    「暗ければ髪」だけで拾うと、背中の黒いベルトまで入る。髪は頭皮から房まで
+    暗い頂点で繋がっているが、ベルトは間に肌や白い服を挟むので辿っても届かない。
+    **地続きの一塊であること**が効く。
+    """
     image = base_colour_image(mesh)
-    if not image:
-        print('  髪: 基本色のテクスチャが無いので色で見分けられない')
-        return
-    group = mesh.vertex_groups.get('mixamorig:Head')
     uv = mesh.data.uv_layers.active
-    if not group or not uv:
-        print('  髪: 頂点群か UV が無い')
-        return
+    if not image or not uv:
+        print('  髪: 基本色か UV が無いので色で見分けられない')
+        return set()
 
     w, h = image.size
     pixels = list(image.pixels)
@@ -238,24 +427,18 @@ def take_hair():
         i = (y * w + x) * 4
         return (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3 < HAIR_DARK
 
-    # 隣り合わせ
     near = {}
     for e in mesh.data.edges:
         a, b = e.vertices
         near.setdefault(a, []).append(b)
         near.setdefault(b, []).append(a)
 
-    # 種は頭皮。**頭の骨の近くで、暗い所**
     head_at = at('mixamorig:Head')
     seeds = [
         v.index
         for v in mesh.data.vertices
         if ((mesh.matrix_world @ v.co) - head_at).length < HAIR_SEED and dark(v.index)
     ]
-    if not seeds:
-        print('  髪: 頭皮に暗い所が無い')
-        return
-
     seen = set(seeds)
     stack = list(seeds)
     while stack:
@@ -265,12 +448,26 @@ def take_hair():
                 continue
             seen.add(j)
             stack.append(j)
+    return seen
 
+
+def take_hair():
+    """髪をまるごと頭の骨へ。**垂れた房がある体には使わない** (--hair)。
+
+    頭の骨で固めると、垂れたポニーテールが頭と一緒に振り回されて背中へ
+    めり込む。房に骨を通す (--hairbones) ほうが本筋。短い髪や、房が頭に
+    貼り付いている体でだけ使う。
+    """
+    mesh = max(meshes, key=lambda m: len(m.data.vertices))
+    group = mesh.vertex_groups.get('mixamorig:Head')
+    if not group:
+        return
+    seen = scalp_hair(mesh)
     for i in seen:
         for e in mesh.data.vertices[i].groups:
             e.weight = 0.0
         group.add([i], 1.0, 'REPLACE')
-    print(f'  髪: 頭へ寄せた {len(seen)} 頂点 (種 {len(seeds)})')
+    print(f'  髪: 頭へ寄せた {len(seen)} 頂点')
 
 
 
@@ -360,10 +557,13 @@ def add_bust():
     bpy.ops.object.mode_set(mode='OBJECT')
 
     # 重みを移す。中心ほど胸、遠いほど元のまま
+    keep = hand_rigged(mesh)
     for name, centre in made:
         group = mesh.vertex_groups.get(name) or mesh.vertex_groups.new(name=name)
         moved = 0
         for v in mesh.data.vertices:
+            if v.index in keep:
+                continue
             world = mesh.matrix_world @ v.co
             gap = (world - centre).length
             if gap >= BUST_REACH:
@@ -378,6 +578,31 @@ def add_bust():
 
 
 
+
+def absorb(extra):
+    """別の骨格の骨を、体の骨格へ移す。**世界での位置のまま。**"""
+    moved = []
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    order = sorted(extra.data.bones, key=lambda b: len(b.parent_recursive))
+    made = {}
+    for b in order:
+        bone = arm.data.edit_bones.new(b.name)
+        bone.head = arm.matrix_world.inverted() @ (extra.matrix_world @ b.head_local)
+        bone.tail = arm.matrix_world.inverted() @ (extra.matrix_world @ b.tail_local)
+        bone.use_connect = False
+        bone.parent = made.get(b.parent.name if b.parent else None) or arm.data.edit_bones['mixamorig:Head']
+        made[b.name] = bone
+        moved.append(b.name)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    return moved
+
+
+hair_chain = []
+for extra in spare:
+    hair_chain += absorb(extra)
+    print(f'  骨格を 1 つ合流させた: {", ".join(b.name for b in extra.data.bones)}')
+    bpy.data.objects.remove(extra, do_unlink=True)
 
 print(f'  骨 {len(arm.data.bones)} / メッシュ {len(meshes)} / 頂点 {sum(len(m.data.vertices) for m in meshes)}')
 
@@ -418,7 +643,7 @@ for action in list(bpy.data.actions):
 手の骨だけを見る。胴や腰の骨は遠くの頂点を持っていて当たり前なので、
 同じ物差しは当てられない。
 """
-HAND_REACH = 0.30
+HAND_REACH = float(os.environ.get('REBODY_HAND', '0.30'))
 
 
 def drop_far_hands():
@@ -431,7 +656,10 @@ def drop_far_hands():
                 bones[group.index] = arm.matrix_world @ bone.head_local
         if not bones:
             continue
+        keep = hand_rigged(mesh)
         for v in mesh.data.vertices:
+            if v.index in keep:
+                continue
             world = mesh.matrix_world @ v.co
             hit = False
             for e in v.groups:
@@ -462,8 +690,15 @@ def drop_far_hands():
 
 
 drop_far_hands()
-harden_head()
-take_hair()
+if HARD_HEAD:
+    harden_head()
+if hair_chain:
+    # **手で置いた骨を使う。** こちらで置き直さない
+    weigh_chain(max(meshes, key=lambda m: len(m.data.vertices)), hair_chain)
+elif HAIR_BONES:
+    add_hair_bones()
+if HAIR:
+    take_hair()
 if BUST:
     add_bust()
 
@@ -478,6 +713,7 @@ Tripo から来た材質が**半透明扱い**になっていた (glTF の alpha
 体に透ける所は無いので、不透明に倒す。Alpha の繋ぎを切って 1.0 にする —
 書き出しはそこを見て alphaMode を決める。
 """
+DROP_NORMAL = os.environ.get('REBODY_NONORMAL') == '1'
 opaque = 0
 for mat in bpy.data.materials:
     if getattr(mat, 'blend_method', None) is not None:
@@ -488,6 +724,10 @@ for mat in bpy.data.materials:
     for node in tree.nodes:
         if node.type != 'BSDF_PRINCIPLED':
             continue
+        if DROP_NORMAL:
+            normal = node.inputs.get('Normal')
+            for link in list(normal.links if normal else []):
+                tree.links.remove(link)
         alpha = node.inputs.get('Alpha')
         if not alpha:
             continue
