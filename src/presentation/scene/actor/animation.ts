@@ -606,6 +606,13 @@ const PRONE_AIM_KEY = 'prone_aim'
 const PRONE_FIRE_KEY = 'prone_fire'
 /** 伏せたままの装填。立ちの型を腹這いに載せると上体だけ起き上がる */
 const PRONE_RELOAD_KEY = 'prone_reload'
+/**
+ * 伏せたままのボルト操作。**立ちの型を腹這いに載せると銃口が地面に埋まる。**
+ *
+ * この型が無かった間は、伏せている間だけボルトの絵を出さずに通していた
+ * (撃てない時間は絵と別に数えているので、遊びとしては変わらない)。
+ */
+const PRONE_BOLT_KEY = 'prone_bolt'
 const SALUTE_KEY = 'salute'
 /**
  * 敬礼を止めておく位置 (クリップ尺に対する割合)。
@@ -735,7 +742,8 @@ const PRONE_RISE_RATE = 1.5
  * 上げたぶんは滑りとして出る。1.31 で足が地面より 31% 速く送られる — 走りの
  * 型は接地時間が短いので、この程度なら目で追えない。
  *
- * 素の 0.64 が 0.84 になる。**目で見て決めた値** (0.80 と 0.82 では足りなかった)。
+ * 素の 0.64 が 0.90 になる。**目で見て決めた値** (0.80 / 0.82 / 0.84 では
+ * 足りなかった)。1.31 から 1.41 へ、さらに 1.08 倍。
  *
  * FAST MOVE (runner) は実速度のほうを上げるので、こことは別に効く
  * (Lv3 で 1.16 倍)。**あれは速く動くから速く回る**で、こちらは**同じ速さでも
@@ -743,7 +751,7 @@ const PRONE_RISE_RATE = 1.5
  *
  * ?cadence=1.4 のように URL から触れる (Game.ts)。
  */
-const RUN_CADENCE = 1.31
+const RUN_CADENCE = 1.41
 
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
   sneak: SNEAK_CLIP_SPEED,
@@ -1426,6 +1434,9 @@ export class CharacterAnimator {
       registerUpper(PRONE_AIM_KEY, proneFire).setEffectiveTimeScale(0)
       registerUpper(PRONE_FIRE_KEY, proneFire)
     }
+
+    const proneBolt = byName.get('prone_bolt')
+    if (proneBolt) registerUpper(PRONE_BOLT_KEY, proneBolt)
 
     for (const [key, name] of [
       [PRONE_DOWN_KEY, 'prone_down'],
@@ -2417,13 +2428,17 @@ export class CharacterAnimator {
      * ボルト操作は構えを解いても最後まで流す。1 発ごとに必ず起きる動作なので、
      * 途中で切れると「撃ったのに動作していない」が頻繁に見える。
      *
-     * ただし**伏せている間は出さない**。ボルトの型は立ち姿で、腹這いの腰に
-     * 載せると銃口が下を向いて地面に埋まる (伏せ撃ちの直後に必ず起きる)。
-     * 伏せ用のボルトの型はまだ無いので、操作の間は伏せ撃ちの構えのまま
-     * 通す。撃てない時間は変わらない (fireCooldown は絵と別で数えている)。
+     * **伏せには伏せの型を使う。** 立ちの型を腹這いの腰に載せると銃口が下を
+     * 向いて地面に埋まる (伏せ撃ちの直後に必ず起きる)。
+     *
+     * 伏せ用が入っていないモデルでは**何も出さない** — 立ちの型へ落とすと
+     * 埋まるので、伏せ撃ちの構えのまま通す。撃てない時間は変わらない
+     * (fireCooldown は絵と別で数えている)。
      */
-    if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) {
-      if (!PRONE_LOCOMOTIONS.has(this.locomotion)) return BOLT_KEY
+    if (this.upperState === 'bolt') {
+      const prone = PRONE_LOCOMOTIONS.has(this.locomotion)
+      if (prone && this.upper.has(PRONE_BOLT_KEY)) return PRONE_BOLT_KEY
+      if (!prone && this.upper.has(BOLT_KEY)) return BOLT_KEY
     }
     if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
     if (this.upperState === 'throw' && this.pair) {
@@ -2828,7 +2843,12 @@ export class CharacterAnimator {
    */
   playBolt(rate = 1): void {
     if (this.dead) return
-    const upper = this.upper.get(BOLT_KEY)
+    /*
+     * **姿勢が先、銃が後。** 伏せているなら伏せの型を流す。腹這いに立ちの型を
+     * 載せると銃口が下を向いて地面に埋まる (装填やボルトと同じ理由)。
+     */
+    const prone = PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_BOLT_KEY)
+    const upper = this.upper.get(prone ? PRONE_BOLT_KEY : BOLT_KEY)
     if (!upper) return
     upper.reset().setEffectiveTimeScale(rate).play()
     this.upperState = 'bolt'

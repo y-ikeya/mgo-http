@@ -80,6 +80,7 @@ if (query.has('nomip')) {
  *
  *     ?pitch=25   照準の上下 (度)。**背骨へ差し込まれる**
  *     ?aim        構えているか
+ *     ?fire       撃っている。**上半身の型** (prone_fire などはこれで出る)
  */
 const pitch = (Number(query.get('pitch') ?? '0') * Math.PI) / 180
 const anim = new CharacterAnimator(model, gltf.animations, 4.5)
@@ -90,8 +91,14 @@ anim.setAimPitch(pitch)
  * **刻んで進める。** 一気に進めると、骨の追従 (ばね) が 1 歩で終わってしまう。
  * 実機と同じ 60 分の 1 で回して、その時刻の形を描く。
  */
+/*
+ * 上半身の型は locomotion では出ない。**撃っているかどうかで決まる** ので、
+ * 伏せ撃ち (prone_fire) を見たいときは ?fire を付けて姿勢を prone_idle にする。
+ */
+const firing = query.has('fire')
 for (let t = 0; t < stopAt; t += 1 / 60) {
   anim.setLocomotion(clipName as never)
+  anim.setFiring(firing)
   anim.update(1 / 60)
 }
 model.updateMatrixWorld(true)
