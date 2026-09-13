@@ -304,6 +304,8 @@ export class Soldier {
    * 流れている間の頭の高さも動けるかどうかも決められなくなる。
    */
   private proneStage: 'none' | 'prone_down' | 'prone' | 'prone_rise' | 'prone_roll_down' = 'none'
+  /** 左手の骨。**伏せてボルトを引く間だけ銃を預ける先** */
+  private leftHandBone: THREE.Bone | null = null
   /** 繋ぎのモーションの残り時間 (秒) */
   private proneShiftLeft = 0
   /**
@@ -2099,6 +2101,17 @@ export class Soldier {
       const target = this.proneStage === 'none' ? (this.crouching ? 1 : 0) : 2
       this.weaponStance = damp(this.weaponStance, target, WEAPON_STANCE_LAMBDA, dt)
       this.weapon?.applyStance(this.weaponStance)
+      /*
+       * 伏せてボルトを引く間は、銃を**左手へ預ける**。
+       *
+       * 銃は右手に付いている (attachTo) が、伏せのボルトの型は**右手でボルトを
+       * 引く**。付けたままだと引く動きがそのまま銃の動きになって、銃ごと
+       * 後ろへ滑る。実際に支えているのは左手なので、そちらへ渡す。
+       *
+       * 握りの数字は取り直さない。預けた瞬間の持ち方がそのまま移る。
+       */
+      const lend = this.proneStage === 'prone' && this.animator.bolting
+      this.weapon?.holdWith(lend ? this.leftHandBone : null)
       // 姿勢がどれだけ速く変わっているか。散布に効かせる
       this.stanceRateValue = dt > 0 ? Math.abs(this.weaponStance - before) / dt : 0
 
@@ -2292,6 +2305,8 @@ export class Soldier {
 
     const rightHand = findBoneBySuffix(model, 'RightHand')
     const leftHand = findBoneBySuffix(model, 'LeftHand')
+    // 伏せてボルトを引く間だけ銃を預ける先。**あの型は右手でボルトを引く**
+    this.leftHandBone = leftHand
     if (!rightHand || !leftHand) {
       console.warn('[Soldier] 手ボーンが見つからない。武器を取り付けられない')
       weapon.dispose()

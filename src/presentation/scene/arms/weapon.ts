@@ -225,6 +225,15 @@ export class Weapon {
    * 隣どうしを繋いだ 1 本の軸で足りる。
    */
   private stance = -1
+  /**
+   * 取り付けた手。**預けた後に戻す先**。
+   *
+   * 伏せてボルトを引く間だけ、銃を反対の手へ預ける — あの型は**銃を持つ手で
+   * ボルトを引く**ので、付けたままだと銃ごと動いてしまう。
+   */
+  private home: THREE.Object3D | null = null
+  /** いま預けている手。預けている間は握りを作り直さない */
+  private lent: THREE.Object3D | null = null
   private readonly blendGrip = new THREE.Vector3()
   private readonly blendRotation = new THREE.Quaternion()
   private readonly fromRotation = new THREE.Quaternion()
@@ -331,6 +340,8 @@ export class Weapon {
     }
 
     hand.add(this.object)
+    this.home = hand
+    this.lent = null
     this.stance = -1
     this.applyStance(0)
   }
@@ -344,10 +355,44 @@ export class Weapon {
    * @param blend 0 = 立ち、1 = しゃがみ、2 = 伏せ
    */
   applyStance(blend: number): void {
+    // 預けている間は作り直さない。作り直すと預け先の手を基準に組み直して跳ねる
+    if (this.lent) {
+      this.stance = blend
+      return
+    }
     // 変化が無ければ作り直さない。毎フレーム呼ばれる想定なので
     if (Math.abs(blend - this.stance) < 0.002) return
     this.stance = blend
     this.rebuild(blend)
+  }
+
+  /**
+   * 銃を別の手へ預ける。**世界での位置を保ったまま。**
+   *
+   * 伏せてボルトを引く型は、**銃を持つ右手でボルトを引く**。付けたままだと
+   * 銃が右手に付いていくので、引く動きがそのまま銃の動きになる。
+   *
+   * 握りの数字は取り直さない。`attach` は**世界での姿勢を保って**親を
+   * 付け替えるので、預けた瞬間の持ち方がそのまま左手に移る。左手用の
+   * 握り (grip / rotation) を姿勢ごとに詰め直す必要が無い。
+   *
+   * @param hand 預け先。null で元の手へ戻す
+   */
+  holdWith(hand: THREE.Object3D | null): void {
+    const to = hand ?? this.home
+    if (!to || to === (this.lent ?? this.home)) return
+    if (hand) {
+      hand.updateWorldMatrix(true, false)
+      hand.attach(this.object)
+      this.lent = hand
+      return
+    }
+    // 戻す。**握りは組み直す** — 預けている間に手が動いているので
+    this.lent = null
+    this.home?.add(this.object)
+    const blend = this.stance
+    this.stance = -1
+    this.applyStance(blend)
   }
 
   /** 調整用に、姿勢ごとの値を差し替える。今の姿勢のまま反映する */
