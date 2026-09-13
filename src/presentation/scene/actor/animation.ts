@@ -341,6 +341,15 @@ const HAIR_WHIP = 1.25
 const ROLL_EXIT_PHASE = 0.78
 
 /**
+ * 手が空のとき、転がりの型から腕を引き上げる位置 (尺に対する割合)。
+ *
+ * あの型は**折り返しで銃を構える形に入る** — 実測で 0.54 あたりから手が顔の
+ * 横へ上がる。銃があれば戻ってくる銃と噛み合うが、投げ物を持っていると空の手で
+ * 構える絵になる。構えに入る手前で腕だけ渡す。下半身は最後まで転がる。
+ */
+const ROLL_EMPTY_ARMS_PHASE = 0.5
+
+/**
  * 転がりの終わり際、**操作が返る何秒前から銃を戻すか。**
  *
  * ロックが解けた瞬間に出すと、撃てるようになったのと同時に銃が現れる。
@@ -2515,7 +2524,11 @@ export class CharacterAnimator {
     }
     // 起き上がりは中断できない。撃つ操作より優先する
     if (this.upperState === 'stand' && this.upper.has(STAND_KEY)) return STAND_KEY
-    if (this.upperState === 'roll' && this.upper.has(ROLL_KEY)) return ROLL_KEY
+    // 手が空なら、構えに入る手前で腕だけ降りる。**ロックは続く** —
+    // 操作を返す時期 (ROLL_EXIT_PHASE) とは別の話
+    if (this.upperState === 'roll' && this.rollArmsShowing && this.upper.has(ROLL_KEY)) {
+      return ROLL_KEY
+    }
     // 落下の受け身も中断させない。**上半身だけ構えに戻ると、脚だけ転がる**
     if (this.upperState === 'hard_land' && this.upper.has(HARD_LAND_KEY)) return HARD_LAND_KEY
     // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
@@ -2582,9 +2595,7 @@ export class CharacterAnimator {
      * 銃があるときは 0.2 秒前に戻ってくる (ROLL_WEAPON_LEAD) ので、
      * 構え直す動きとして噛み合う。
      */
-    if (this.rollShowing && this.upper.has(ROLL_KEY)) {
-      if (!this.handsEmpty || this.upperState === 'roll') return ROLL_KEY
-    }
+    if (this.rollShowing && this.rollArmsShowing && this.upper.has(ROLL_KEY)) return ROLL_KEY
 
     if (this.aiming) {
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
@@ -3067,6 +3078,20 @@ export class CharacterAnimator {
    *
    * 一度だけ流す型 (ONE_SHOT_LOWER) なので、終われば time が尺で止まる。
    */
+  /**
+   * 転がりの型で腕をまだ使うか。**手が空なら構えに入る手前で降りる。**
+   *
+   * 型の折り返しで手が顔の横へ上がる (銃を構える形)。銃があれば戻ってくる
+   * 銃と噛み合うが、投げ物では空の手で構える絵になる。
+   */
+  private get rollArmsShowing(): boolean {
+    if (!this.handsEmpty) return true
+    const action = this.lower.get('roll')
+    const duration = action?.getClip().duration ?? 0
+    if (!action || duration === 0) return true
+    return action.time < duration * ROLL_EMPTY_ARMS_PHASE
+  }
+
   get rollShowing(): boolean {
     if (this.upperState === 'roll') return true
     const action = this.lower.get('roll')
