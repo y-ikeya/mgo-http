@@ -630,6 +630,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   PRONE_RELOAD_KEY,
   STAB_KEY,
   BOLT_KEY,
+  PRONE_BOLT_KEY,
   SWEEP_KEY,
   STAND_KEY,
   THROW_WINDUP_KEY,
@@ -1117,6 +1118,7 @@ export class CharacterAnimator {
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
+      finished === this.upper.get(PRONE_BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
       finished === this.upper.get(THROW_RELEASE_KEY) ||
