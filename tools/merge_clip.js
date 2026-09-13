@@ -7,8 +7,19 @@
 // エクスポートのたびにノード順が変わった場合に静かに壊れる。
 //
 // 使い方: bun merge_clip.js <取り込み先.glb> <取り込み元.glb> <クリップ名> <出力.glb>
+//         [--rotation-only]  … 体つきが違う相手へ移すとき (腰の移動だけ残す)
 
-const [destPath, srcPath, clipName, outPath] = process.argv.slice(2)
+const args = process.argv.slice(2)
+/*
+ * --rotation-only … 回転の軌道だけ取り込む (腰の移動は残す)。
+ *
+ * **別の体つきへ移すときに要る。** クリップは骨ごとに位置と大きさも持って
+ * いて、そこには**焼いた側の骨の長さ**が入っている。そのまま載せると相手の
+ * 骨格を上書きして、首から上がずれる・上半身が膨らむ (名無しでそうなった)。
+ * 同じ骨格へ足すだけなら要らない。
+ */
+const rotationOnly = args.includes('--rotation-only')
+const [destPath, srcPath, clipName, outPath] = args.filter((a) => !a.startsWith('--'))
 
 function parseGlb(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -66,11 +77,20 @@ const samplers = animation.samplers.map((s) => ({
 
 let dropped = 0
 const channels = []
+let filtered = 0
 for (const channel of animation.channels) {
   const name = src.json.nodes[channel.target.node].name
   const target = destNodeByName.get(name)
   if (target === undefined) {
     dropped++
+    continue
+  }
+  if (rotationOnly && channel.target.path !== 'rotation' && !name.endsWith('Hips')) {
+    filtered++
+    continue
+  }
+  if (rotationOnly && channel.target.path === 'scale') {
+    filtered++
     continue
   }
   channels.push({ sampler: channel.sampler, target: { node: target, path: channel.target.path } })
@@ -120,6 +140,7 @@ out.set(bin, 28 + jsonPadded.length)
 await Bun.write(outPath, out)
 console.log(
   `${clipName}: チャンネル ${channels.length} 本を取り込み` +
-    (dropped ? ` (対応するノードが無く ${dropped} 本は捨てた)` : ''),
+    (dropped ? ` (対応するノードが無く ${dropped} 本は捨てた)` : '') +
+    (filtered ? ` (回転だけにして ${filtered} 本は捨てた)` : ''),
 )
 console.log(`${outPath} (${(out.length / 1024 / 1024).toFixed(1)} MB)`)

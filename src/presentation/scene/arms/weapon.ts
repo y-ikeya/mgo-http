@@ -47,7 +47,7 @@ export interface WeaponConfig {
    *
    * 型を作る側が銃を骨に付けて目で合わせているので、**その位置がいちばん
    * 正しい**。こちらで握りを詰め直さず、測った値をそのまま置く
-   * (tools/fit_gun_to_clip.py が出す)。
+   * (tools/fit_gun_to_clip.js が出す)。
    *
    * 無ければ、預けた瞬間の持ち方を保ったまま移す。
    */
@@ -139,15 +139,22 @@ const KNIFE: WeaponConfig = {
 const SNIPER: WeaponConfig = {
   grip: new THREE.Vector3(0.01, 0.28, 0.135),
   rotation: new THREE.Euler(degrees(-20), degrees(-9), degrees(-180)),
-  crouchGrip: new THREE.Vector3(-0.055, 0.195, 0.12),
-  crouchRotation: new THREE.Euler(degrees(-19), degrees(-7), degrees(-180)),
+  /*
+   * しゃがみ。**型 (crouchFire) の中の置き場所そのまま。**
+   *
+   * 姿勢もその型から切ってある (knee_relaxed / knee_ready) ので、作った側が
+   * 銃を右手の骨へ直付けして合わせた形がそのまま出る。目で詰めた値との差は
+   * 12.8cm / 11.6° だった (tools/fit_gun_to_clip.js)。
+   */
+  crouchGrip: new THREE.Vector3(-0.0153, 0.2849, 0.1370),
+  crouchRotation: new THREE.Euler(degrees(-4.4), degrees(-7.2), degrees(178.1)),
   proneGrip: new THREE.Vector3(-0.03, 0.235, 0.14),
   proneRotation: new THREE.Euler(degrees(-2), degrees(-14), degrees(147)),
   /*
    * 伏せてボルトを引く間。**型の中で銃が置かれている所へ揃えてある。**
    *
    * 動きを作る側が銃を左手の骨に付けて詰めた位置を、同じ銃どうしの形を
-   * 突き合わせて写したもの (tools/fit_gun_to_clip.py)。頂点が 53,646 で
+   * 突き合わせて写したもの (tools/fit_gun_to_clip.js)。頂点が 53,646 で
    * 一致するので、合わせは一意に決まる。
    */
   boltHold: {

@@ -9,6 +9,9 @@
     "maxTexture": 1024
   }
 
+型が何本も入った FBX は "ファイル名#2" と書くと 2 本目を使う。書き出す側が
+前の take を残したまま出すことがある。
+
 character に指定したファイルが clips にも含まれる場合、二度読みせず
 そのファイルの action をそのまま使う。With Skin の FBX は 1 本 35MB 以上あるので
 読み込み回数がそのまま所要時間になる。
@@ -53,7 +56,10 @@ for action in list(bpy.data.actions):
         bpy.data.actions.remove(action)
 
 # --- 残りのモーション ---
-for filename, clip_name in clips.items():
+for entry, clip_name in clips.items():
+    # "file.fbx#2" … 2 本目の型を使う。付けなければ FBX が選んだものをそのまま
+    filename, _, take_text = entry.partition('#')
+    take = int(take_text) if take_text else None
     if filename == character_file:
         continue
     path = os.path.join(pack_dir, filename)
@@ -62,14 +68,24 @@ for filename, clip_name in clips.items():
         continue
 
     before = set(bpy.context.scene.objects)
+    before_actions = set(bpy.data.actions)
     bpy.ops.import_scene.fbx(filepath=path)
     imported = [o for o in bpy.context.scene.objects if o not in before]
+    added = [a for a in bpy.data.actions if a not in before_actions]
 
     action = None
     for obj in imported:
         if obj.type == 'ARMATURE' and obj.animation_data and obj.animation_data.action:
             action = obj.animation_data.action
             break
+
+    # 1 つの FBX に型が何本も入っていることがある (書き出す側が前の take を
+    # 残したまま出すため)。**何本目かを名前で指せる** — "file.fbx#2" と書く
+    if take is not None:
+        if take < 1 or take > len(added):
+            print(f'[warn] {filename} に {take} 本目の型が無い (全 {len(added)} 本)')
+        else:
+            action = added[take - 1]
 
     if action is None:
         print(f'[warn] {filename} に action が無い')
