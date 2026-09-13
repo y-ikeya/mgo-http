@@ -1,8 +1,8 @@
 /**
  * ステージの .blend を見張って、保存されたら glb を書き出す。
  *
- *   bun run stage         (tools/stage_*.blend が 1 つならそれ)
- *   bun run stage mall    (tools/stage_mall.blend)
+ *   bun run stage         (tools/raw/stage_*.blend が 1 つならそれ)
+ *   bun run stage mall    (tools/raw/stage_mall.blend)
  *
  * Blender で Ctrl+S を押すだけで、ゲームの画面が作り直したステージに切り替わる
  * (glb が変わると Vite がページを読み直す)。
@@ -18,20 +18,21 @@
 import { readdirSync, watch } from 'node:fs'
 
 const BLENDER = '/Applications/Blender.app/Contents/MacOS/Blender'
-const DIR = 'tools'
+// 元データは tools/raw/ (追跡しない置き場) へ移した
+const DIR = 'tools/raw'
 const SCRIPT = 'tools/export_stage.py'
 
 /**
  * ステージの元データの名前。**`stage_` で始まる .blend。**
  *
- * 名前で見分けるのは、`tools/` に他の .blend (props の変換元など) が混ざるため。
+ * 名前で見分けるのは、`tools/raw/` に他の .blend (props の変換元など) が混ざるため。
  * 札で宣言する、という他の決めごとと同じ形にしてある。
  *
  * どれを書き出すかは引数で選ぶ。省いたら 1 つしか無いときだけ黙って選び、
  * 複数あるなら**選ばせる** — 「どれが乗っているか分からない」が一番困る。
  *
  *     bun run stage           1 つしか無ければそれ
- *     bun run stage mall      tools/stage_mall.blend
+ *     bun run stage mall      tools/raw/stage_mall.blend
  */
 const PREFIX = 'stage_'
 

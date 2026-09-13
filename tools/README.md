@@ -144,7 +144,7 @@ bun tools/merge_clip.js public/models/soldier.glb proneturn.glb prone_roll_down 
 
 ```sh
 # 単体の glb にしてから、両端 3 標本ずつを切り出して 2 本だけ取り込む
-$BLENDER -b --factory-startup --python tools/convert_character.py -- kneeaim.json
+$BLENDER -b --factory-startup --python tools/convert_character.py -- tools/raw/kneeaim.json
 bun tools/split_clip.js kneeaim.glb knee_aim 0.067 knee_relaxed knee_rest
 bun tools/split_clip.js kneeaim.glb knee_rest 0.700 knee_swing knee_ready
 bun tools/merge_clip.js public/models/soldier.glb kneeaim.glb knee_relaxed public/models/soldier.glb

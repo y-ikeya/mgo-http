@@ -1,6 +1,6 @@
 # ステージに「空がどれだけ見えるか」を焼き込む。
 #
-#   $BLENDER -b tools/stage_mall.blend --python tools/bake_stage.py -- [試行回数]
+#   $BLENDER -b tools/raw/stage_mall.blend --python tools/bake_stage.py -- [試行回数]
 #
 # ステージの元データは tools/stage_*.blend (make_stage.py に名前の決めごと)。
 #

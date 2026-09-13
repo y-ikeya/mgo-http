@@ -212,7 +212,7 @@ root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 潰すことになる — しかも潰れたことに気づけるのは、そのステージの部屋に
 # 入った時なので遠い。
 #
-#     tools/stage_mall.blend  →  public/models/stage_mall.glb / .json
+#     tools/raw/stage_mall.blend  →  public/models/stage_mall.glb / .json
 #
 # 名前は札と同じ考え方で、**ファイル名がそのまま宣言**。どのステージが
 # 乗っているかを、中身を開かずに知れる状態を保つ。
