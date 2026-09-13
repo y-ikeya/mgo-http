@@ -46,7 +46,14 @@ function statsRequested(): boolean {
  * 残しておく理由が無い。戻ってきたら作り直す (WebGPU の初期化で 1 テンポ待つ)。
  */
 export default function Play(props: { identity: Identity }) {
-  const params = useParams<{ room: string }>()
+  const params = useParams<{ room: string; match?: string }>()
+  /*
+   * 入ってきたときに指していた試合。**一度だけ見る。**
+   *
+   * 後から書き換わる URL (試合が変わるたび) と混ぜない。混ぜると、居残って
+   * いる人が次の試合に移った瞬間に「終わった試合だ」と言われて弾かれる。
+   */
+  const asked = params.match
   const navigate = useNavigate()
 
   const [stats, setStats] = createSignal<GameStats | null>(null)
@@ -68,11 +75,32 @@ export default function Play(props: { identity: Identity }) {
    *
    * まだ始まっていない部屋では札が無いので、部屋までの URL に戻す。
    */
+  /*
+   * 履歴から終わった試合を開いた場合。**一覧へ戻して、理由を言う。**
+   *
+   * 観戦も再生も無いので、その試合を出す手立てが無い。黙って今の試合へ
+   * 寄せると「押した覚えのない試合に入っている」になるので、戻して言う。
+   */
+  let checked = false
+
   createEffect(() => {
-    const id = stats()?.match?.matchId
+    const current = stats()?.match
+    // まだ何も届いていない。**ここで弾かない** — 届く前に判断すると全部弾く
+    if (!current) return
+    const id = current.matchId
+    const label = id?.slice(0, 6)
+
+    if (!checked) {
+      checked = true
+      if (asked && asked !== label) {
+        navigate(`/rooms${location.search}`, { state: { notice: 'lobby.matchGone' } })
+        return
+      }
+    }
+
     const room = params.room
     // 長い札をそのまま貼ると読めない。頭だけで十分に見分けられる
-    const path = id ? `/rooms/${room}/match/${id.slice(0, 6)}` : `/rooms/${room}`
+    const path = label ? `/rooms/${room}/match/${label}` : `/rooms/${room}`
     if (location.pathname === path) return
     history.replaceState(history.state, '', `${path}${location.search}`)
   })

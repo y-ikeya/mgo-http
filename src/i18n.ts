@@ -51,6 +51,7 @@ const JA = {
   'lobby.over': '結果表示',
   'lobby.unreachable': 'サーバーに繋がらない',
   'lobby.loading': '読み込み中…',
+  'lobby.matchGone': 'すでに終了したか、存在しない試合です',
 
   // --- 試合中 ---
   'hud.waitingForOpponent': '対戦相手を待っています',
@@ -126,6 +127,7 @@ const EN: Record<Key, string> = {
   'lobby.over': 'Results',
   'lobby.unreachable': 'Cannot reach the server',
   'lobby.loading': 'Loading…',
+  'lobby.matchGone': 'That match is over, or never existed',
 
   'hud.waitingForOpponent': 'Waiting for an opponent',
   'hud.scopeHint': 'Z / wheel to scope',
