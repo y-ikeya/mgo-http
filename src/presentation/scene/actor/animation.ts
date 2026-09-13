@@ -826,6 +826,26 @@ const AIM_PITCH_LAMBDA = 12
 const RELAXED_LEAN = THREE.MathUtils.degToRad(12)
 
 /**
+ * 構えている間、上体を起こして**銃身を水平に戻す**量 (rad)。姿勢ごと。
+ *
+ * 構えの型はどれも銃口が少し下を向いている (立ち 3.4° / しゃがみ 6.6° 実測)。
+ * 弾はカメラの照準線で決まるので当たりには効かないが、**狙った所より下を
+ * 指した絵**になる。しゃがみの型を作り直したときに 2° から 6.6° へ増えて、
+ * 「余計に下を向いた」と分かるところまで来た。
+ *
+ * 銃を手の中で回して直してはいけない。**持ち方は型に合わせてある**ので、
+ * そこを触ると握りが崩れる。体ごと起こせば、手も銃も一緒に上がる。
+ *
+ * 値は背骨の曲げに足す量。銃まで届くのは背骨の 3 本ぶん (0.7) なので、
+ * 銃身を 1° 上げるには 1.43° 起こす。前傾 (RELAXED_LEAN) と同じ経路を通るので、
+ * 構えの入り抜けで跳ねない。
+ */
+const AIM_LEVEL = {
+  stand: THREE.MathUtils.degToRad(-4.9),
+  crouch: THREE.MathUtils.degToRad(-9.4),
+}
+
+/**
  * ダンボールを被って移動する間の追加の前傾。
  *
  * sneak クリップの頭は 1.17m あって箱に収まらない。箱を大きくすれば収まるが、
@@ -1625,9 +1645,14 @@ export class CharacterAnimator {
     // 座りとの行き来でも跳ねない。
     const leanTarget = this.boxed
       ? this.relaxedLean + (this.locomotion === 'sneak' ? BOX_LEAN : 0)
-      : this.aiming || committed
+      : committed
         ? 0
-        : this.relaxedLean
+        : this.aiming
+          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す
+            CROUCH_LOCOMOTIONS.has(this.locomotion)
+            ? AIM_LEVEL.crouch
+            : AIM_LEVEL.stand
+          : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
     this.mixer.update(dt)
 
