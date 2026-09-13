@@ -151,8 +151,8 @@ const SNIPER: WeaponConfig = {
    * 一致するので、合わせは一意に決まる。
    */
   boltHold: {
-    position: new THREE.Vector3(19.7203, -8.0802, 22.0969),
-    quaternion: new THREE.Quaternion(-0.43213, 0.89719, 0.05253, 0.07444),
+    position: new THREE.Vector3(19.7198, -8.0809, 22.0967),
+    quaternion: new THREE.Quaternion(-0.25291, 0.67157, -0.59726, 0.35822),
     scale: 100.0,
   },
   tip: new THREE.Vector3(0, 0.177, -0.845),
