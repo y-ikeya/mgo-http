@@ -76,11 +76,15 @@ export default function Play(props: { identity: Identity }) {
    * まだ始まっていない部屋では札が無いので、部屋までの URL に戻す。
    */
   /*
-   * 履歴から終わった試合を開いた場合。**一覧へ戻して、理由を言う。**
+   * 履歴から終わった試合を開いた場合。**部屋には入れて、一言出す。**
    *
-   * 観戦も再生も無いので、その試合を出す手立てが無い。黙って今の試合へ
-   * 寄せると「押した覚えのない試合に入っている」になるので、戻して言う。
+   * /rooms/delta (札なし) は部屋の待合室にあたる住所で、部屋そのものは
+   * 生きている。指した試合がもう無いだけなので、一覧まで戻す理由が無い。
+   *
+   * 次の試合が始まればその札の URL になり、走っている最中に開いたのなら
+   * その試合の URL になる。**どの試合に居るかは URL がいつも正しく指す。**
    */
+  const [gone, setGone] = createSignal(false)
   let checked = false
 
   createEffect(() => {
@@ -92,10 +96,8 @@ export default function Play(props: { identity: Identity }) {
 
     if (!checked) {
       checked = true
-      if (asked && asked !== label) {
-        navigate(`/rooms${location.search}`, { state: { notice: 'lobby.matchGone' } })
-        return
-      }
+      // 指した試合はもう無い。**入れはするので、言うだけ**
+      if (asked && asked !== label) setGone(true)
     }
 
     const room = params.room
@@ -213,6 +215,13 @@ export default function Play(props: { identity: Identity }) {
     <div class="app">
       <div class="viewport" ref={container} />
       <Hud stats={stats()} selfId={game()?.selfId ?? ''} />
+
+      {/* 指した試合がもう無かった。押せば消える */}
+      <Show when={gone()}>
+        <div class="play-notice" onClick={() => setGone(false)}>
+          {t('hud.matchGone')}
+        </div>
+      </Show>
 
       {/* 診断。?stats=on のときだけ。読むだけなので本番でも出す */}
       <Show when={statsRequested()}>

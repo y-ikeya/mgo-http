@@ -3,7 +3,7 @@ import Profile from "../ui/Profile";
 import { profilesAvailable } from "../../infra/api/profile";
 import { useLevels } from "../../infra/api/levels";
 import { t } from "../../i18n";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import { MODES } from "../../domain/match/room";
 import { fetchRooms } from "../../infra/api/rooms";
 import type { MatchPhase, RoomSummary } from "../../application/protocol/types";
@@ -35,19 +35,6 @@ const PHASE_LABEL: Record<MatchPhase, () => string> = {
 
 export default function Lobby(props: { identity: Identity }) {
   const navigate = useNavigate();
-  /*
-   * 一覧へ戻された理由。**対戦の画面から渡ってくる。**
-   *
-   * 終わった試合の URL (履歴やブックマーク) を開くと、部屋には入れるが
-   * その試合はもう無い。黙って今の試合へ寄せると「押した覚えのない試合に
-   * 入っている」になるので、戻して理由を出す。
-   *
-   * URL には載せない (state で渡す) — 貼り直したときに理由まで付いてくる
-   * のはおかしいし、読み込み直せば消えるのが正しい。
-   */
-  // 名前は routed に。この画面は window.location.reload() も使っている
-  const routed = useLocation<{ notice?: string }>();
-  const [notice, setNotice] = createSignal(routed.state?.notice ?? "");
   const [rooms, setRooms] = createSignal<RoomSummary[]>([]);
   const [error, setError] = createSignal("");
   /** 戦績を開いている相手。null なら閉じている */
@@ -104,12 +91,6 @@ export default function Lobby(props: { identity: Identity }) {
           </button>
         </div>
       </header>
-
-      <Show when={notice()}>
-        <div class="lobby-notice" onClick={() => setNotice("")}>
-          {t(notice() as Parameters<typeof t>[0])}
-        </div>
-      </Show>
 
       <Show when={error()}>
         <div class="lobby-error">{error()}</div>

@@ -54,3 +54,25 @@
   text-align: center;
   padding: 24px;
 }
+
+/*
+ * 対戦の画面に出す一言。**咎めではない**ので、警告の赤ではなく地の色で。
+ *
+ * いまは「指した試合はもう終わっている」だけが使う。押せば消える。
+ * 上に置くのは、真ん中は STANDBY が使い、下は弾や体力が並ぶため。
+ */
+.play-notice {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 8px 14px;
+  background: rgba(12, 16, 10, 0.82);
+  border: 1px solid rgba(150, 166, 140, 0.35);
+  color: rgba(214, 226, 200, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}

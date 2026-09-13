@@ -2,7 +2,6 @@
  * 部屋の一覧を**本物のまま**描く。fetch だけ作り物に差し替える。
  *
  *     bunx vite  →  http://localhost:5173/tools/preview/lobby.html
- *     ?notice=lobby.matchGone   戻された理由の板を出す
  */
 import { render } from 'solid-js/web'
 import { Router, Route } from '@solidjs/router'
@@ -20,13 +19,6 @@ const ROOMS: RoomSummary[] = [
 window.fetch = (async () => new Response(JSON.stringify(ROOMS), {
   headers: { 'content-type': 'application/json' },
 })) as typeof fetch
-
-/*
- * 戻された理由の板。**本番では画面から state で渡ってくる**ので、ここでは
- * 履歴に直に積んで同じ形を作る (Router が state を読む口はこれ)。
- */
-const notice = new URLSearchParams(location.search).get('notice')
-if (notice) history.replaceState({ notice }, '', location.href)
 
 render(
   () => (

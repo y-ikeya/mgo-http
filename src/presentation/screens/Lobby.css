@@ -53,7 +53,6 @@
 }
 
 .lobby-error,
-.lobby-notice,
 .lobby-empty {
   max-width: 620px;
   margin: 0 auto 14px;
@@ -69,14 +68,6 @@
 
 .lobby-empty {
   color: rgba(150, 166, 140, 0.6);
-}
-
-/* 戻された理由。**咎めではない**ので、警告の赤ではなく地の色で出す */
-.lobby-notice {
-  background: rgba(30, 38, 26, 0.7);
-  border: 1px solid rgba(150, 166, 140, 0.35);
-  color: rgba(214, 226, 200, 0.9);
-  cursor: pointer;
 }
 
 .lobby-rooms {
