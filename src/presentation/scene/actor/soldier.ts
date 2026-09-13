@@ -1683,6 +1683,11 @@ export class Soldier {
     if (this.animator) this.animator.relaxedLean = lean
   }
 
+  /** 構えたときに上体を起こす量 (rad、調整用)。銃身の上下がこれで動く */
+  setAimLevel(stand: number, crouch: number): void {
+    if (this.animator) this.animator.aimLevel = { stand, crouch }
+  }
+
   /**
    * 銃口位置 = トレーサーの始点。弾道の判定そのものはカメラ側の照準線で行うので、
    * これは純粋に見た目用。武器モデルを持たせたら右手ボーンのワールド座標に置き換える。

@@ -1139,6 +1139,22 @@ export class Game {
       if (Number.isFinite(degrees)) this.player.setRelaxedLean((degrees * Math.PI) / 180);
     }
 
+    /*
+     * 構えたときに上体を起こす量。**銃口の上下がこれで動く。**
+     *
+     *     ?aimlevel=-9.4        立ち・しゃがみとも同じ値
+     *     ?aimlevel=-4.9,-9.4   立ち, しゃがみ
+     *     ?aimlevel=0           補正なし (型のまま = 少し下を向く)
+     */
+    const level = new URLSearchParams(location.search).get("aimlevel");
+    if (level !== null) {
+      const parts = level.split(",").map(Number);
+      const [stand, crouch = stand] = parts;
+      if (Number.isFinite(stand) && Number.isFinite(crouch)) {
+        this.player.setAimLevel((stand * Math.PI) / 180, (crouch * Math.PI) / 180);
+      }
+    }
+
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();

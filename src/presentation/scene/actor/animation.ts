@@ -1084,6 +1084,8 @@ export class CharacterAnimator {
   private hipSquare = 0
   /** 非構え時の前傾。切り替わりで跳ねないよう補間して追う */
   relaxedLean = RELAXED_LEAN
+  /** 構えたときに上体を起こす量 (rad)。姿勢ごと。?aimlevel= で触れる */
+  aimLevel = { ...AIM_LEVEL }
   private lean = 0
   /** ダンボールを被っているか。前傾を深くして頭を下げる */
   private boxed = false
@@ -1650,8 +1652,8 @@ export class CharacterAnimator {
         : this.aiming
           ? // 構えている間は逆に起こす。型が下を向いているぶんを返す
             CROUCH_LOCOMOTIONS.has(this.locomotion)
-            ? AIM_LEVEL.crouch
-            : AIM_LEVEL.stand
+            ? this.aimLevel.crouch
+            : this.aimLevel.stand
           : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
     this.mixer.update(dt)
