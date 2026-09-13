@@ -1438,7 +1438,17 @@ export class CharacterAnimator {
     }
 
     const proneBolt = byName.get('prone_bolt')
-    if (proneBolt) registerUpper(PRONE_BOLT_KEY, proneBolt)
+    if (proneBolt) {
+      const action = registerUpper(PRONE_BOLT_KEY, proneBolt)
+      /*
+       * **一度きり。** 付け忘れると回り続ける (永遠にコッキングする)。
+       *
+       * UPPER_ONE_SHOT は「起動時に play するか」を決めているだけで、
+       * ループの設定はここで個別に書く決まりになっている。
+       */
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
 
     for (const [key, name] of [
       [PRONE_DOWN_KEY, 'prone_down'],
