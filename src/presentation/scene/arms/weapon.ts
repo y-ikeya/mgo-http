@@ -42,6 +42,16 @@ export interface WeaponConfig {
    * そのまま使われていた**。腹這いでは肘の付き方も上半身の向きも違うので、
    * しゃがみの握りだと銃が体に埋まるか浮く。
    */
+  /**
+   * 伏せてボルトを引く間の持ち方。**骨 (LeftHand) の空間そのまま。**
+   *
+   * 型を作る側が銃を骨に付けて目で合わせているので、**その位置がいちばん
+   * 正しい**。こちらで握りを詰め直さず、測った値をそのまま置く
+   * (tools/fit_gun_to_clip.py が出す)。
+   *
+   * 無ければ、預けた瞬間の持ち方を保ったまま移す。
+   */
+  boltHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
   proneGrip?: THREE.Vector3
   proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
@@ -133,6 +143,18 @@ const SNIPER: WeaponConfig = {
   crouchRotation: new THREE.Euler(degrees(-19), degrees(-7), degrees(-180)),
   proneGrip: new THREE.Vector3(-0.03, 0.235, 0.14),
   proneRotation: new THREE.Euler(degrees(-2), degrees(-14), degrees(147)),
+  /*
+   * 伏せてボルトを引く間。**型の中で銃が置かれている所へ揃えてある。**
+   *
+   * 動きを作る側が銃を左手の骨に付けて詰めた位置を、同じ銃どうしの形を
+   * 突き合わせて写したもの (tools/fit_gun_to_clip.py)。頂点が 53,646 で
+   * 一致するので、合わせは一意に決まる。
+   */
+  boltHold: {
+    position: new THREE.Vector3(19.7203, -8.0802, 22.0969),
+    quaternion: new THREE.Quaternion(-0.43213, 0.89719, 0.05253, 0.07444),
+    scale: 100.0,
+  },
   tip: new THREE.Vector3(0, 0.177, -0.845),
 }
 
@@ -383,7 +405,16 @@ export class Weapon {
     if (!to || to === (this.lent ?? this.home)) return
     if (hand) {
       hand.updateWorldMatrix(true, false)
-      hand.attach(this.object)
+      const hold = this.config.boltHold
+      if (hold) {
+        // 型に合わせて置く。**世界での位置は保たない** — 型のほうが正しい
+        hand.add(this.object)
+        this.object.position.copy(hold.position)
+        this.object.quaternion.copy(hold.quaternion)
+        this.object.scale.setScalar(hold.scale)
+      } else {
+        hand.attach(this.object)
+      }
       this.lent = hand
       return
     }
