@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
-import { pass } from "three/tsl";
+import { mrt, normalView, output, pass, vec3, vec4 } from "three/tsl";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
+import { ao } from "three/examples/jsm/tsl/display/GTAONode.js";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
 import { Input } from "../../infra/input";
@@ -419,6 +420,24 @@ const BODY_SPLASH = 3.4;
  * 下げると昼の空や水面まで滲んで眠い絵になる。強さを上げると暗い所での
  * 索敵が効かなくなる (光る物が全部にじんで輪郭が溶ける)。
  */
+/**
+ * 隙間と接地の暗がり (GTAO)。**綺麗すぎる絵に「置かれている感じ」を出す。**
+ *
+ * 太陽から落ちる影とは別物。あれは物の向こう側を暗くするが、こちらは
+ * **物と物が接する所**を暗くする。手すりと床の継ぎ目、箱と地面の間、
+ * 服の皺の奥 — そこが暗くならないと、全部が貼り付いたように見える。
+ *
+ * **色は触らない。** 明かりの話なので、材質の色づけとは別。
+ *
+ * 半径は世界の長さ (m)。大きいほど広く回り込むが、遠くの物まで暗くして
+ * 汚れて見える。人ひとりより小さい所を狙う。
+ */
+const AO_RADIUS = 0.35;
+/** 濃さ。1 で素のまま、上げるほど暗がりが濃い */
+const AO_SCALE = 1.2;
+/** 1 画素あたりの試行数。上げるほど滑らかで重い */
+const AO_SAMPLES = 16;
+
 const BLOOM_STRENGTH = 0.6;
 const BLOOM_RADIUS = 0.5;
 const BLOOM_THRESHOLD = 0.9;
@@ -1178,8 +1197,34 @@ export class Game {
        */
       const scenePass = pass(this.scene, this.follow.camera);
       this.post = new RenderPipeline(this.renderer);
-      this.post.outputNode = scenePass.add(
-        bloom(scenePass, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD),
+
+      /*
+       * 隙間の暗がりを掛けてから、滲みを足す。**順番が要る。**
+       *
+       * 暗がりは絵そのものを暗くする物なので、滲みより先。逆にすると、
+       * せっかく足した光まで暗がりが食う。
+       *
+       * 深さと法線が要るので、scenePass に出してもらう (MRT)。既定は色だけ。
+       */
+      const query = new URLSearchParams(location.search);
+      // 暗がりを掛けると型が PassNode から素の節へ変わるので、緩く受ける
+      let lit: Parameters<typeof bloom>[0] = scenePass;
+      if (query.get("ao") !== "off") {
+        scenePass.setMRT(mrt({ output, normal: normalView }));
+        const shade = ao(
+          scenePass.getTextureNode("depth"),
+          scenePass.getTextureNode("normal"),
+          this.follow.camera,
+        );
+        shade.radius.value = Number(query.get("aoRadius")) || AO_RADIUS;
+        shade.scale.value = Number(query.get("aoScale")) || AO_SCALE;
+        shade.samples.value = Number(query.get("aoSamples")) || AO_SAMPLES;
+        lit = scenePass
+          .getTextureNode("output")
+          .mul(vec4(vec3(shade.getTextureNode().r), 1));
+      }
+      this.post.outputNode = lit.add(
+        bloom(lit, BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD),
       );
     }
     this.renderer.setAnimationLoop((time) => this.tick(time));
