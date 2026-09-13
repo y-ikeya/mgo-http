@@ -58,21 +58,41 @@
 /*
  * 対戦の画面に出す一言。**咎めではない**ので、警告の赤ではなく地の色で。
  *
- * いまは「指した試合はもう終わっている」だけが使う。押せば消える。
- * 上に置くのは、真ん中は STANDBY が使い、下は弾や体力が並ぶため。
+ * いまは「指した試合はもう終わっている」だけが使う。押せば消えるし、
+ * 放っておいても消える (NOTICE_MS)。上に置くのは、真ん中は STANDBY が
+ * 使い、下は弾や体力が並ぶため。
+ *
+ * 終わりは**薄れて消す。** ぱっと消えると、見る前に消えたのか元から
+ * 無かったのかが分からない。
  */
 .play-notice {
   position: fixed;
-  top: 56px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
-  padding: 8px 14px;
-  background: rgba(12, 16, 10, 0.82);
-  border: 1px solid rgba(150, 166, 140, 0.35);
-  color: rgba(214, 226, 200, 0.92);
+  padding: 14px 26px;
+  background: rgba(12, 16, 10, 0.86);
+  border: 1px solid rgba(150, 166, 140, 0.4);
+  color: rgba(222, 234, 208, 0.96);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  font-size: 16px;
+  letter-spacing: 0.06em;
   cursor: pointer;
+  animation: play-notice-fade 6s ease-out forwards;
+}
+
+@keyframes play-notice-fade {
+  0% {
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }

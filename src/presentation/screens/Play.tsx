@@ -45,6 +45,9 @@ function statsRequested(): boolean {
  * ここを離れると描画器も通信路も畳まれる。部屋を出るというのはそういうことなので、
  * 残しておく理由が無い。戻ってきたら作り直す (WebGPU の初期化で 1 テンポ待つ)。
  */
+/** 一言を出しておく時間 (ms)。App.css の play-notice の薄れ方と揃える */
+const NOTICE_MS = 6000
+
 export default function Play(props: { identity: Identity }) {
   const params = useParams<{ room: string; match?: string }>()
   /*
@@ -86,6 +89,7 @@ export default function Play(props: { identity: Identity }) {
    */
   const [gone, setGone] = createSignal(false)
   let checked = false
+  let goneTimer: ReturnType<typeof setTimeout> | null = null
 
   createEffect(() => {
     const current = stats()?.match
@@ -97,7 +101,11 @@ export default function Play(props: { identity: Identity }) {
     if (!checked) {
       checked = true
       // 指した試合はもう無い。**入れはするので、言うだけ**
-      if (asked && asked !== label) setGone(true)
+      if (asked && asked !== label) {
+        setGone(true)
+        // 放っておいても消える。読み終わる頃に薄れて落ちる (App.css の keyframes と揃える)
+        goneTimer = setTimeout(() => setGone(false), NOTICE_MS)
+      }
     }
 
     const room = params.room
@@ -205,6 +213,7 @@ export default function Play(props: { identity: Identity }) {
   onCleanup(() => {
     game()?.dispose()
     setGame(null)
+    if (goneTimer) clearTimeout(goneTimer)
   })
 
   const calibrate = (target: WeaponTarget, grip: THREE.Vector3, rotation: THREE.Euler) => {
