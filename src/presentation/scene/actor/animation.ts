@@ -836,13 +836,15 @@ const RELAXED_LEAN = THREE.MathUtils.degToRad(12)
  * 銃を手の中で回して直してはいけない。**持ち方は型に合わせてある**ので、
  * そこを触ると握りが崩れる。体ごと起こせば、手も銃も一緒に上がる。
  *
- * 値は背骨の曲げに足す量。銃まで届くのは背骨の 3 本ぶん (0.7) なので、
- * 銃身を 1° 上げるには 1.43° 起こす。前傾 (RELAXED_LEAN) と同じ経路を通るので、
- * 構えの入り抜けで跳ねない。
+ * 値は目で決めた。**試写の数字を見ながら回す** — weapon.html が枠ごとに
+ * 銃口の角度を出すので、構えの 2 枚が 0 度付近に来る所を探す。
+ * ?aimlevel=1,10 のように URL からも触れる (Game.ts / weapon.html)。
+ *
+ * 前傾 (RELAXED_LEAN) と同じ経路を通るので、構えの入り抜けで跳ねない。
  */
 const AIM_LEVEL = {
-  stand: THREE.MathUtils.degToRad(-4.9),
-  crouch: THREE.MathUtils.degToRad(-9.4),
+  stand: THREE.MathUtils.degToRad(1),
+  crouch: THREE.MathUtils.degToRad(10),
 }
 
 /**
