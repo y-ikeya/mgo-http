@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../../i18n'
 import { useNavigate, useParams } from '@solidjs/router'
 import type * as THREE from 'three'
@@ -48,7 +48,34 @@ function statsRequested(): boolean {
 export default function Play(props: { identity: Identity }) {
   const params = useParams<{ room: string }>()
   const navigate = useNavigate()
+
   const [stats, setStats] = createSignal<GameStats | null>(null)
+
+  /*
+   * いま走っている試合を URL に出す。
+   *
+   *     /rooms/delta/match/a3f9c2
+   *
+   * 試合が変われば URL も変わるので、貼った先が「どの試合の話か」を指せる。
+   * 戦績の表と同じ札なので、後から引ける。
+   *
+   * **繋ぎ直さない。** 部屋は同じで、試合だけが入れ替わる — 札を書き換える
+   * だけにして、通信路も描画器もそのままにする (Game が見るのは部屋の名前)。
+   *
+   * 履歴は積まずに**今の 1 つを書き換える** (replaceState)。積むと、戻るが
+   * 「前の試合」を指してしまう。戻るの控え (onMount の hold) も壊さないよう、
+   * state はそのまま渡す。
+   *
+   * まだ始まっていない部屋では札が無いので、部屋までの URL に戻す。
+   */
+  createEffect(() => {
+    const id = stats()?.match?.matchId
+    const room = params.room
+    // 長い札をそのまま貼ると読めない。頭だけで十分に見分けられる
+    const path = id ? `/rooms/${room}/match/${id.slice(0, 6)}` : `/rooms/${room}`
+    if (location.pathname === path) return
+    history.replaceState(history.state, '', `${path}${location.search}`)
+  })
   /**
    * 選んでいる主武器。
    *

@@ -768,6 +768,16 @@ export interface RoomSummary {
 
 export interface MatchMessage {
   type: 'match'
+  /**
+   * いま走っている試合の札。**試合が変われば変わる。**
+   *
+   * 始まった時に発番され (countdown -> playing)、終わっても次が始まるまでは
+   * 残る。まだ一度も始まっていない部屋では無い。戦績の表の鍵と同じ物なので、
+   * 後から「あの試合」を引ける。
+   *
+   * 見せる側 (URL) は頭 6 文字だけ使う。長い札をそのまま貼ると読めない。
+   */
+  matchId?: string
   /** その部屋のルール。陣営で分かれるか、何を表示するかがこれで決まる */
   mode: Mode
   /**

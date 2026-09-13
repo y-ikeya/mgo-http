@@ -232,6 +232,8 @@ export function matchState(room: Match): ServerMessage {
   const leader = leakingOf(room)
   return {
     type: 'match',
+    // いま走っている試合の札。URL と戦績の表で同じ物を指す
+    matchId: room.matchId ?? undefined,
     mode: room.mode.id,
     leader: leader?.id,
     blue: room.blue,

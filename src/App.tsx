@@ -59,6 +59,15 @@ export default function App() {
             <Route path="/rooms" component={() => <Lobby identity={who()} />} />
             <Route path="/rooms/:room" component={() => <Play identity={who()} />} />
             {/*
+              試合の札を付けた形。**画面は同じ** — 部屋に入って、いま走って
+              いる試合の札が届いたらそちらへ書き換わる。古い札で入っても
+              部屋へは入れる (その試合はもう無いので、今の札に置き換わる)。
+            */}
+            <Route
+              path="/rooms/:room/match/:match"
+              component={() => <Play identity={who()} />}
+            />
+            {/*
               クエリを持ったまま飛ばす。`?server=` や `?panel=open` は
               この先で読まれるので、ここで落とすと効かない
               (手元の画面から本番のサーバーへ繋ぐ、ができなくなる)。
