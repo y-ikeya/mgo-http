@@ -85,6 +85,10 @@ if (query.has('nomip')) {
  */
 const pitch = (Number(query.get('pitch') ?? '0') * Math.PI) / 180
 const anim = new CharacterAnimator(model, gltf.animations, 4.5)
+// ?onehand … 片手の持ち物 (拳銃・手榴弾・設置物) の姿勢を見る
+// ?empty   … 手に何も出ていない (投げ物・設置物)。転がりの尻尾が変わる
+anim.setPistol(query.has('onehand') || query.has('empty'))
+anim.setHandsEmpty(query.has('empty'))
 anim.setAiming(query.has('aim'))
 anim.setAimPitch(pitch)
 
@@ -123,9 +127,14 @@ if (gunName) {
  * 上半身の型は locomotion では出ない。**撃っているかどうかで決まる** ので、
  * 伏せ撃ち (prone_fire) を見たいときは ?fire を付けて姿勢を prone_idle にする。
  */
+/*
+ * ?roll … 転がりを頭から流す。**locomotion では出ない** — 転がりは上下を
+ * 同時に流す全身動作で、playRoll が入口。尻尾で何の姿勢に渡るかを見るのに使う。
+ */
 const firing = query.has('fire')
+if (query.has('roll')) anim.playRoll()
 for (let t = 0; t < stopAt; t += 1 / 60) {
-  anim.setLocomotion(clipName as never)
+  if (!query.has('roll')) anim.setLocomotion(clipName as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
 }

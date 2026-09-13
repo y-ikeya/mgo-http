@@ -440,6 +440,14 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   jump_up: 'run_unarmed',
   jump_loop: 'run_unarmed',
   jump_down: 'run_unarmed',
+  /*
+   * 転がりの尻尾。**あの型は銃を構える形で終わる。**
+   *
+   * ここに無いと「移動状態と同じクリップ」で埋められた転がりの型へ落ちて、
+   * 手に何も無いのに構える絵が残る。腕を下ろした姿勢へ渡す。
+   * ロックが解けるまでは転がりの型のままで、ここへは来ない。
+   */
+  roll: 'pistol_relaxed',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       // 手ぶらの走り。拳銃は納めているので、腕を振って走るのが正しい
