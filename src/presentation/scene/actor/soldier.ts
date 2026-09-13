@@ -1,6 +1,6 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/skill'
-import { isGun, isTwoHanded, type HeldId } from '../../../domain/item/held'
+import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import { BOX_BUMP_STUN, KNOCK_TIME, fallDamage, knockSpeed } from '../../../domain/rule/damage'
 import { PRONE_SPEED_SCALE, stanceOf, type Stance } from '../../../domain/player/stance'
 import * as THREE from 'three'
@@ -509,6 +509,8 @@ export class Soldier {
   private hardLandYaw = 0
   /** 転がり始めたか。音を鳴らす側が 1 回だけ拾う */
   private rollStarted = false
+  /** しゃがみから転がったか。転がり終わりでしゃがみへ戻す */
+  private rollFromCrouch = false
   private moveSpeed = MOVE_SPEED
   private aimSpeedScale = AIM_SPEED_SCALE
   /** 実際に使う速度。構えの入り抜けで目標へ寄せる */
@@ -1012,6 +1014,8 @@ export class Soldier {
      * 動くのがこの遊びの手なのに、それが見た目に出ていなかった。
      */
     this.animator?.setPistol(!isTwoHanded(id))
+    // 投げ物と設置物は手に何も出ない。転がりの尻尾 (銃を構える形) を出さない
+    this.animator?.setHandsEmpty(isThrowable(id) || isPlaceable(id))
   }
 
   get heldItem(): HeldId {
@@ -1446,6 +1450,14 @@ export class Soldier {
     if (this.bumping) return
     // 伏せからは転がれない。**起き上がる一手を挟ませる**
     if (this.proneStage !== 'none') return
+    /*
+     * **しゃがみは解くが、覚えておく。**
+     *
+     * 転がりの型は立った姿勢で終わるので、踏み切りでしゃがみを解く。
+     * 解きっぱなしだと、しゃがんで撃っていた人が転がるたびに立ち上がる。
+     * 転がり終わりでしゃがみへ戻す (update)。
+     */
+    this.rollFromCrouch = this.crouching
     this.crouching = false
     // 向きは踏み切った時点で固定する。転がっている間は舵が効かない。
     this.rollYaw = this.yaw
@@ -2095,6 +2107,18 @@ export class Soldier {
         if (this.box) placeBox(this.box, this.boxLift)
       }
 
+      /*
+       * しゃがみから転がったら、しゃがみへ戻す。**転がっている間だけ立つ。**
+       *
+       * ロックが解けた時点で戻すので、立ち上がる動きがそのまま「しゃがみへ
+       * 収まる」動きになる。転がっている間はしゃがみを押せない (toggleCrouch)
+       * ので、本人の操作と競合しない。
+       */
+      if (this.rollFromCrouch && !this.rolling && !this.down) {
+        this.rollFromCrouch = false
+        this.crouching = true
+      }
+
       // 銃の持ち方を姿勢に合わせる。切り替わりで跳ねないよう補間して追う
       const before = this.weaponStance
       /*
@@ -2212,6 +2236,7 @@ export class Soldier {
     // 呼ばれた時点では animator がまだ無く、素通りしている
     // 読み込み前に持ち替えている場合があるので、いま手にある物から決める
     this.animator.setPistol(!isTwoHanded(this.held))
+    this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
 
     disposeTree(this.placeholder)
     this.placeholder = null

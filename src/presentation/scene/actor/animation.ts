@@ -2163,6 +2163,13 @@ export class CharacterAnimator {
   runCadence = RUN_CADENCE
 
   private pistol = false
+  /**
+   * 手に何も出ていないか (投げ物・設置物を持っている間)。
+   *
+   * 転がりの型は**銃を構える形で終わる**ので、出す物が無いと空の手で構えた
+   * 絵になる。手榴弾を持って転がったときにそれが見えた。
+   */
+  private handsEmpty = false
 
   /**
    * 遅れて揺れる骨。**無い体では空のまま** (soldier / raiden には無い)。
@@ -2198,6 +2205,11 @@ export class CharacterAnimator {
    * 名前は拳銃から来ているが、決めているのは「片手か両手か」。手榴弾や
    * ナイフを持っているときも片手で、身軽に走る (domain の twoHanded)。
    */
+  /** 手に何も出ていない持ち物か (投げ物・設置物) */
+  setHandsEmpty(empty: boolean): void {
+    this.handsEmpty = empty
+  }
+
   setPistol(oneHanded: boolean): void {
     this.pistol = oneHanded
   }
@@ -2554,7 +2566,17 @@ export class CharacterAnimator {
      * 噛み合わない — あちらは常時繰り返し再生で、下半身が終わりで止まっている
      * 間に頭へ戻り、立ち上がりながら腕だけ転がり始めの形 (手を挙げた姿) になる。
      */
-    if (this.rollShowing && this.upper.has(ROLL_KEY)) return ROLL_KEY
+    /*
+     * 手に何も無いなら、**尻尾は出さない。**
+     *
+     * 型の終わりは銃を構える形なので、出す物が無いと空の手で構える絵になる
+     * (手榴弾を持って転がったとき)。ロックが解けた時点で提げた姿勢へ渡す。
+     * 銃があるときは 0.2 秒前に戻ってくる (ROLL_WEAPON_LEAD) ので、
+     * 構え直す動きとして噛み合う。
+     */
+    if (this.rollShowing && this.upper.has(ROLL_KEY)) {
+      if (!this.handsEmpty || this.upperState === 'roll') return ROLL_KEY
+    }
 
     if (this.aiming) {
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
