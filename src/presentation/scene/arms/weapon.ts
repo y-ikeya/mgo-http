@@ -52,6 +52,16 @@ export interface WeaponConfig {
    * 無ければ、預けた瞬間の持ち方を保ったまま移す。
    */
   boltHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  /**
+   * しゃがみでの持ち方。**骨 (RightHand) の空間そのまま。**
+   *
+   * 握り (crouchGrip) からの逆算を通さない。逆算は「取り付けた瞬間の手の向き」を
+   * 基準にしていて、その基準を外から作り直せない — 型から測った置き場所を
+   * 握りの値へ写すと **6.3° ずれた** (銃口が下を向いた)。測った物をそのまま置く。
+   *
+   * 無ければ crouchGrip / crouchRotation を使う。
+   */
+  crouchHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
   proneGrip?: THREE.Vector3
   proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
@@ -140,13 +150,20 @@ const SNIPER: WeaponConfig = {
   grip: new THREE.Vector3(0.01, 0.28, 0.135),
   rotation: new THREE.Euler(degrees(-20), degrees(-9), degrees(-180)),
   /*
-   * しゃがみ。**型 (crouchFire) の中の置き場所そのまま。**
+   * しゃがみ。**型 (crouchFire) の中で銃が置かれている所そのまま。**
    *
    * 姿勢もその型から切ってある (knee_relaxed / knee_ready) ので、作った側が
-   * 銃を右手の骨へ直付けして合わせた形がそのまま出る。目で詰めた値との差は
-   * 12.8cm / 11.6° だった (tools/fit_gun_to_clip.js)。
+   * 右手の骨へ直付けして合わせた形がそのまま出る。
+   * tools/fit_gun_to_clip.js が出した値。
+   *
+   * 握りの値 (crouchGrip) は**調整パネルを回したときの受け皿**として残す。
    */
-  crouchGrip: new THREE.Vector3(-0.0153, 0.2849, 0.1370),
+  crouchHold: {
+    position: new THREE.Vector3(27.0692, 15.78, 4.4352),
+    quaternion: new THREE.Quaternion(0.50893, -0.51028, 0.52889, 0.4482),
+    scale: 100.0,
+  },
+  crouchGrip: new THREE.Vector3(-0.0153, 0.2849, 0.137),
   crouchRotation: new THREE.Euler(degrees(-4.4), degrees(-7.2), degrees(178.1)),
   proneGrip: new THREE.Vector3(-0.03, 0.235, 0.14),
   proneRotation: new THREE.Euler(degrees(-2), degrees(-14), degrees(147)),
@@ -242,6 +259,12 @@ export class Weapon {
   /** 実機調整で上書きできるよう、設定は複製して持つ */
   private readonly grip: THREE.Vector3
   private readonly rotation: THREE.Euler
+  private readonly holdScale = new THREE.Vector3()
+  /**
+   * しゃがみの置き場所 (測った物)。**調整パネルを回したら手放す** —
+   * 回しても動かない滑りがあると、壊れているのか効いていないのか分からない
+   */
+  private crouchHold: WeaponConfig['crouchHold'] | null
   private readonly crouchGrip: THREE.Vector3
   private readonly crouchRotation: THREE.Euler
   private readonly proneGrip: THREE.Vector3
@@ -287,6 +310,14 @@ export class Weapon {
     this.grip = config.grip.clone()
     this.rotation = config.rotation.clone()
     this.crouchGrip = (config.crouchGrip ?? config.grip).clone()
+    // 設定は共有物なので複製して持つ。パネルで手放すのは自分の分だけ
+    this.crouchHold = config.crouchHold
+      ? {
+          position: config.crouchHold.position.clone(),
+          quaternion: config.crouchHold.quaternion.clone(),
+          scale: config.crouchHold.scale,
+        }
+      : null
     this.crouchRotation = (config.crouchRotation ?? config.rotation).clone()
     // 伏せは書いていなければしゃがみと同じ。**書くまでは今までの見え方のまま**
     this.proneGrip = (config.proneGrip ?? this.crouchGrip).clone()
@@ -445,6 +476,8 @@ export class Weapon {
     } else if (stance === 'crouch') {
       this.crouchGrip.copy(grip)
       this.crouchRotation.copy(rotation)
+      // 手で回し始めたら、測った置き場所は退く
+      this.crouchHold = null
     } else {
       this.grip.copy(grip)
       this.rotation.copy(rotation)
@@ -482,6 +515,24 @@ export class Weapon {
       t,
     )
     this.calibrateWith(this.blendGrip, this.blendRotation)
+
+    /*
+     * 型から測った置き場所がある姿勢は、**そちらで上書きする。**
+     *
+     * 握りの値は「取り付けた瞬間の手の向き」を基準に逆算する仕組みで、その
+     * 基準を外から作り直せない。型で測った置き場所を握りへ写すと 6.3° ずれた
+     * (銃口が下を向いた)。測った物は測ったまま置く。
+     *
+     * 隣の姿勢との間は**置き場所どうしを混ぜる**。握りを混ぜてから組むのとは
+     * 途中が変わるが、両端は変わらないので切り替わりで跳ねない。
+     */
+    const hold = this.crouchHold
+    if (!hold) return
+    const toHold = blend <= 1 ? t : 1 - t
+    if (toHold <= 0) return
+    this.object.position.lerp(hold.position, toHold)
+    this.object.quaternion.slerp(hold.quaternion, toHold)
+    this.object.scale.lerp(this.holdScale.setScalar(hold.scale), toHold)
   }
 
   /**

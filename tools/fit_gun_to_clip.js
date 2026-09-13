@@ -45,7 +45,7 @@ const withDocument = (run) => {
 }
 
 const [clipPath, boneName, rawPath, gunPath, bodyPath = 'public/models/soldier.glb'] =
-  process.argv.slice(2)
+  process.argv.slice(2).filter((a) => !a.startsWith('--'))
 if (!gunPath) {
   console.error('引数: <型.fbx> <骨の名前> <型の銃の形.json> <ゲームの銃.glb> [キャラ.glb]')
   process.exit(1)
@@ -128,6 +128,25 @@ console.log(`  M 重ね合わせのずれ ${m.worst.toFixed(5)}`)
 // --- L: 型の銃 -> 型の骨 ---
 const clipBuffer = await Bun.file(clipPath).arrayBuffer()
 const clip = withDocument(() => new FBXLoader().parse(clipBuffer, ''))
+/*
+ * 型を流した**途中の姿勢**で測りたいときは take と秒を渡す。
+ *
+ *     bun tools/fit_gun_to_clip.js ... --at=2,0.83
+ *
+ * 渡さなければファイルに入っている姿勢のまま。銃と手の関係は姿勢に依らないので
+ * 置き場所の答えは変わらないが、銃身の角度は姿勢で変わる。
+ */
+const askedAt = process.argv.find((a) => a.startsWith('--at='))
+if (askedAt) {
+  const [take, second] = askedAt.slice(5).split(',').map(Number)
+  const action = clip.animations[take - 1]
+  if (action) {
+    const mixer = new THREE.AnimationMixer(clip)
+    mixer.clipAction(action).play()
+    mixer.update(Math.min(second, action.duration - 0.001))
+    console.log(`  ${take} 本目を ${second} 秒で止めて測る`)
+  }
+}
 clip.updateMatrixWorld(true)
 const clipBone = clip.getObjectByName(boneName)
 // **骨に直付けされているメッシュが銃。** 体のメッシュが一緒に焼いてある型も
@@ -198,6 +217,18 @@ const position = new THREE.Vector3()
 const quaternion = new THREE.Quaternion()
 const scale = new THREE.Vector3()
 a.decompose(position, quaternion, scale)
+
+/*
+ * 型の中で銃身がどこを向いているか。**作った側が水平に置いたかどうか**が
+ * これで分かる。ゲーム側は試写 (weapon.html) が同じ数字を出すので、突き合わせる。
+ */
+{
+  const inClip = new THREE.Matrix4().multiplyMatrices(clipGun.matrixWorld, m.matrix)
+  const q = new THREE.Quaternion()
+  inClip.decompose(new THREE.Vector3(), q, new THREE.Vector3())
+  const barrel = new THREE.Vector3(0, 0, -1).applyQuaternion(q)
+  console.log(`  型の中の銃身 ${((Math.asin(barrel.y / barrel.length()) * 180) / Math.PI).toFixed(1)} 度 (0 が水平)`)
+}
 
 const turn = new THREE.Euler().setFromQuaternion(quaternion)
 const deg = (r) => ((r * 180) / Math.PI).toFixed(1)
