@@ -16,7 +16,8 @@ import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { buildLights } from '../../src/presentation/scene/world/stage'
 import { loadSoldier } from '../../src/presentation/scene/assets'
-import { CharacterAnimator } from '../../src/presentation/scene/actor/animation'
+import { CharacterAnimator, findBoneBySuffix } from '../../src/presentation/scene/actor/animation'
+import { Weapon, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
 
 const WIDTH = 1280
 const HEIGHT = 900
@@ -88,6 +89,33 @@ anim.setAiming(query.has('aim'))
 anim.setAimPitch(pitch)
 
 /*
+ * 銃を持たせる。**取り付けはゲームと同じ順で** — 型を流す前の姿勢で基準を
+ * 取る (Soldier は生まれた直後に 1 フレーム進めてから付ける)。ここを後ろへ
+ * ずらすと、その時の手の向きが基準になって銃が下を向く。
+ *
+ *     ?gun=sniper    銃 (sniper / rifle / smg / shotgun / m9 / m1911)
+ *     ?stance=1      握り 0 = 立ち / 1 = しゃがみ / 2 = 伏せ
+ */
+const gunName = query.get('gun')
+let weapon: Weapon | null = null
+if (gunName) {
+  anim.update(0)
+  model.updateMatrixWorld(true)
+  const right = findBoneBySuffix(model, 'RightHand')
+  const left = findBoneBySuffix(model, 'LeftHand')
+  if (right && left) {
+    weapon = await Weapon.load(gunName as WeaponKind)
+    scene.add(weapon.object)
+    weapon.attachTo(
+      right,
+      new THREE.Vector3().setFromMatrixPosition(right.matrixWorld),
+      new THREE.Vector3().setFromMatrixPosition(left.matrixWorld),
+      right.matrixWorld.clone(),
+    )
+  }
+}
+
+/*
  * **刻んで進める。** 一気に進めると、骨の追従 (ばね) が 1 歩で終わってしまう。
  * 実機と同じ 60 分の 1 で回して、その時刻の形を描く。
  */
@@ -102,6 +130,8 @@ for (let t = 0; t < stopAt; t += 1 / 60) {
   anim.update(1 / 60)
 }
 model.updateMatrixWorld(true)
+// 姿勢ごとに握りが違う。しゃがみの型を見るときは stance=1 を付ける
+weapon?.applyStance(Number(query.get('stance') ?? '0'))
 
 const bone = (name: string) => {
   let found: THREE.Object3D | null = null
