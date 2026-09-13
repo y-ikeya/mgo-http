@@ -285,7 +285,69 @@ const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
  * 立ち上がりに入った時点で移動側へ渡し、ローリングの尾を残したまま
  * クロスフェードさせると繋ぎが滑らかになる。
  */
+/**
+ * 胸の揺れ。**骨がある体にだけ効く** (Mixamo の 65 本には無い)。
+ *
+ * --- なぜ骨で持つか ---
+ * 頂点を直に揺らすと、揺れる範囲を材質ごとに持つことになる。骨なら
+ * **重みが範囲を持っている**ので、どこがどれだけ動くかは体を作った側が決める。
+ *
+ * --- 何で駆動するか ---
+ * **付け根 (Spine2) の加速度**。速度ではなく加速度で見るのは、等速で走って
+ * いる間は揺れず、**踏み出しと着地で揺れる**のが本当だから。上下に揺すられた
+ * 分だけ遅れて付いてくる、というばねにする。
+ */
+const BUST_STIFF = 110
+/** 減衰。大きいほど早く収まる */
+const BUST_DAMP = 11
+/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** */
+const BUST_GAIN = 0.0055
+/** 振れ幅の上限 (rad)。これを超えると体を突き抜ける */
+const BUST_MAX = 0.30
+
+/**
+ * 髪の揺れ。**手で足した骨 (mixamorig で始まらない骨) を鎖として拾う。**
+ *
+ * --- なぜ走らせる側で計算するか ---
+ * Blender の制約や物理は**書き出しに出ない**。焼けば出るが、こちらは 71 本の
+ * クリップで動かしているので、**走り・伏せ・転がり…全部に焼く**ことになる。
+ * 付け根の動きから毎フレーム出すほうが、型が増えても勝手に付いてくる。
+ *
+ * 胸と同じばね。違うのは 2 つ — **柔らかい** (髪は肉より自由に振れる) のと、
+ * **先へ行くほど大きく振れる** (鞭のようにしなる)。
+ */
+const HAIR_STIFF = 55
+const HAIR_DAMP = 6
+/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここ** */
+const HAIR_GAIN = 0.013
+const HAIR_MAX = 0.45
+/** 鎖の 1 つ先へ行くごとに掛ける。先端ほど大きく振れる */
+const HAIR_WHIP = 1.25
+
+/*
+ * --- 背中へ刺さるのを止める手は、まだ入っていない ---
+ *
+ * 2 つ試して 2 つとも外した:
+ *
+ *   世界の下へ引き寄せる  **走っている間まで垂れた。** ポニーテールは頭に
+ *                         付いて靡く物で、紐で吊った重りではない
+ *   前へ回り込むのを禁じる **暴れた。** 押し戻した結果をばねの状態へ返して
+ *                         いないので、次のコマでばねが押し返して発振する
+ *
+ * 次にやるなら、押し戻した分を entry.angle へ書き戻すこと。さもなければ
+ * 背中に円柱を置いて骨を外へ逃がす (当たり判定を持つ) 形になる。
+ */
+
 const ROLL_EXIT_PHASE = 0.78
+
+/**
+ * 手が空のとき、転がりの型から腕を引き上げる位置 (尺に対する割合)。
+ *
+ * あの型は**折り返しで銃を構える形に入る** — 実測で 0.54 あたりから手が顔の
+ * 横へ上がる。銃があれば戻ってくる銃と噛み合うが、投げ物を持っていると空の手で
+ * 構える絵になる。構えに入る手前で腕だけ渡す。下半身は最後まで転がる。
+ */
+const ROLL_EMPTY_ARMS_PHASE = 0.5
 
 /**
  * 転がりの終わり際、**操作が返る何秒前から銃を戻すか。**
@@ -387,6 +449,14 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   jump_up: 'run_unarmed',
   jump_loop: 'run_unarmed',
   jump_down: 'run_unarmed',
+  /*
+   * 転がりの尻尾。**あの型は銃を構える形で終わる。**
+   *
+   * ここに無いと「移動状態と同じクリップ」で埋められた転がりの型へ落ちて、
+   * 手に何も無いのに構える絵が残る。腕を下ろした姿勢へ渡す。
+   * ロックが解けるまでは転がりの型のままで、ここへは来ない。
+   */
+  roll: 'pistol_relaxed',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       // 手ぶらの走り。拳銃は納めているので、腕を振って走るのが正しい
@@ -553,6 +623,13 @@ const PRONE_AIM_KEY = 'prone_aim'
 const PRONE_FIRE_KEY = 'prone_fire'
 /** 伏せたままの装填。立ちの型を腹這いに載せると上体だけ起き上がる */
 const PRONE_RELOAD_KEY = 'prone_reload'
+/**
+ * 伏せたままのボルト操作。**立ちの型を腹這いに載せると銃口が地面に埋まる。**
+ *
+ * この型が無かった間は、伏せている間だけボルトの絵を出さずに通していた
+ * (撃てない時間は絵と別に数えているので、遊びとしては変わらない)。
+ */
+const PRONE_BOLT_KEY = 'prone_bolt'
 const SALUTE_KEY = 'salute'
 /**
  * 敬礼を止めておく位置 (クリップ尺に対する割合)。
@@ -570,6 +647,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   PRONE_RELOAD_KEY,
   STAB_KEY,
   BOLT_KEY,
+  PRONE_BOLT_KEY,
   SWEEP_KEY,
   STAND_KEY,
   THROW_WINDUP_KEY,
@@ -682,7 +760,8 @@ const PRONE_RISE_RATE = 1.5
  * 上げたぶんは滑りとして出る。1.31 で足が地面より 31% 速く送られる — 走りの
  * 型は接地時間が短いので、この程度なら目で追えない。
  *
- * 素の 0.64 が 0.84 になる。**目で見て決めた値** (0.80 と 0.82 では足りなかった)。
+ * 素の 0.64 が 0.90 になる。**目で見て決めた値** (0.80 / 0.82 / 0.84 では
+ * 足りなかった)。1.31 から 1.41 へ、さらに 1.08 倍。
  *
  * FAST MOVE (runner) は実速度のほうを上げるので、こことは別に効く
  * (Lv3 で 1.16 倍)。**あれは速く動くから速く回る**で、こちらは**同じ速さでも
@@ -690,7 +769,7 @@ const PRONE_RISE_RATE = 1.5
  *
  * ?cadence=1.4 のように URL から触れる (Game.ts)。
  */
-const RUN_CADENCE = 1.31
+const RUN_CADENCE = 1.41
 
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
   sneak: SNEAK_CLIP_SPEED,
@@ -755,9 +834,35 @@ const AIM_PITCH_LAMBDA = 12
  *
  * 銃を下ろした姿勢は直立に近く、そのままだと的のように棒立ちに見える。
  * 少し前のめりにすると重心が前に乗って、警戒しながら移動している兵士らしくなる。
- * 見た目の好みなので実機で決める値。
+ *
+ * **17° から 12° へ落とした。** 前へ倒したぶんは釣り合いで尻が後ろへ出る。
+ * 骨盤の細い体だとそこが際立って、走りが前のめりすぎて見えた。
+ *
+ * ?lean=17 のように URL から触れる (Game.ts)。
  */
-const RELAXED_LEAN = THREE.MathUtils.degToRad(17)
+const RELAXED_LEAN = THREE.MathUtils.degToRad(12)
+
+/**
+ * 構えている間、上体を起こして**銃身を水平に戻す**量 (rad)。姿勢ごと。
+ *
+ * 構えの型はどれも銃口が少し下を向いている (立ち 3.4° / しゃがみ 6.6° 実測)。
+ * 弾はカメラの照準線で決まるので当たりには効かないが、**狙った所より下を
+ * 指した絵**になる。しゃがみの型を作り直したときに 2° から 6.6° へ増えて、
+ * 「余計に下を向いた」と分かるところまで来た。
+ *
+ * 銃を手の中で回して直してはいけない。**持ち方は型に合わせてある**ので、
+ * そこを触ると握りが崩れる。体ごと起こせば、手も銃も一緒に上がる。
+ *
+ * 値は目で決めた。**試写の数字を見ながら回す** — weapon.html が枠ごとに
+ * 銃口の角度を出すので、構えの 2 枚が 0 度付近に来る所を探す。
+ * ?aimlevel=1,10 のように URL からも触れる (Game.ts / weapon.html)。
+ *
+ * 前傾 (RELAXED_LEAN) と同じ経路を通るので、構えの入り抜けで跳ねない。
+ */
+const AIM_LEVEL = {
+  stand: THREE.MathUtils.degToRad(1),
+  crouch: THREE.MathUtils.degToRad(10),
+}
 
 /**
  * ダンボールを被って移動する間の追加の前傾。
@@ -998,6 +1103,8 @@ export class CharacterAnimator {
   private hipSquare = 0
   /** 非構え時の前傾。切り替わりで跳ねないよう補間して追う */
   relaxedLean = RELAXED_LEAN
+  /** 構えたときに上体を起こす量 (rad)。姿勢ごと。?aimlevel= で触れる */
+  aimLevel = { ...AIM_LEVEL }
   private lean = 0
   /** ダンボールを被っているか。前傾を深くして頭を下げる */
   private boxed = false
@@ -1052,6 +1159,7 @@ export class CharacterAnimator {
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
+      finished === this.upper.get(PRONE_BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
       finished === this.upper.get(THROW_RELEASE_KEY) ||
@@ -1370,6 +1478,19 @@ export class CharacterAnimator {
       registerUpper(PRONE_FIRE_KEY, proneFire)
     }
 
+    const proneBolt = byName.get('prone_bolt')
+    if (proneBolt) {
+      const action = registerUpper(PRONE_BOLT_KEY, proneBolt)
+      /*
+       * **一度きり。** 付け忘れると回り続ける (永遠にコッキングする)。
+       *
+       * UPPER_ONE_SHOT は「起動時に play するか」を決めているだけで、
+       * ループの設定はここで個別に書く決まりになっている。
+       */
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+
     for (const [key, name] of [
       [PRONE_DOWN_KEY, 'prone_down'],
       [PRONE_RISE_KEY, 'prone_rise'],
@@ -1545,9 +1666,14 @@ export class CharacterAnimator {
     // 座りとの行き来でも跳ねない。
     const leanTarget = this.boxed
       ? this.relaxedLean + (this.locomotion === 'sneak' ? BOX_LEAN : 0)
-      : this.aiming || committed
+      : committed
         ? 0
-        : this.relaxedLean
+        : this.aiming
+          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す
+            CROUCH_LOCOMOTIONS.has(this.locomotion)
+            ? this.aimLevel.crouch
+            : this.aimLevel.stand
+          : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
     this.mixer.update(dt)
 
@@ -1557,6 +1683,109 @@ export class CharacterAnimator {
     this.alignSpineToUpperClip()
     this.applyAimPitch()
     this.turnTorso(dt)
+    this.updateSways(dt)
+  }
+
+  /**
+   * 遅れて揺れる骨を探す。**1 度だけ。**
+   *
+   * 胸は名前で (Bust_L/R)、髪は**mixamorig で始まらない骨**で拾う。後者に
+   * したのは、手で足した骨の名前を決め打ちしないため — 体を作った人が
+   * Bone でも Hair でも好きに付けられる。
+   */
+  private findSways(): void {
+    const add = (
+      bone: THREE.Bone | null,
+      depth: number,
+      stiff: number,
+      damp: number,
+      gain: number,
+      max: number,
+    ) => {
+      if (!bone || !bone.parent) return
+      this.sways.push({
+        bone,
+        anchor: bone.parent,
+        rest: bone.quaternion.clone(),
+        angle: new THREE.Vector2(),
+        speed: new THREE.Vector2(),
+        stiff,
+        damp,
+        gain: gain * Math.pow(HAIR_WHIP, depth),
+        max,
+      })
+    }
+
+    for (const suffix of ['Bust_L', 'Bust_R']) {
+      add(findBoneBySuffix(this.root, suffix), 0, BUST_STIFF, BUST_DAMP, BUST_GAIN, BUST_MAX)
+    }
+
+    /*
+     * 髪の鎖。**頭の下にぶら下がった、mixamorig でない骨**を辿る。
+     *
+     * 先端 (_end) は重みを持たないので飛ばす — 回しても何も動かないのに
+     * ばねだけ回ることになる。
+     */
+    const head = findBoneBySuffix(this.root, 'Head')
+    const walk = (bone: THREE.Object3D, depth: number) => {
+      for (const kid of bone.children) {
+        if (!isBone(kid) || kid.name.startsWith('mixamorig')) continue
+        if (!kid.name.endsWith('_end')) {
+          add(kid, depth, HAIR_STIFF, HAIR_DAMP, HAIR_GAIN, HAIR_MAX)
+        }
+        walk(kid, depth + 1)
+      }
+    }
+    if (head) walk(head, 0)
+  }
+
+  /**
+   * 遅れて揺れる骨を回す。**骨を持っている体だけ。**
+   *
+   * 付け根の加速度を親の空間で見て、その逆へ振れるばねを回す。世界の向きで
+   * 見ると、**その場で振り向いただけで揺れる** — 体は動いていないのに。
+   */
+  private updateSways(dt: number): void {
+    if (!this.swayResolved) {
+      this.swayResolved = true
+      this.findSways()
+    }
+    if (!this.sways.length || dt <= 0) return
+
+    for (const entry of this.sways) {
+      const anchor = entry.anchor
+      anchor.getWorldPosition(this.swayAt)
+      const was = this.swayWas.get(anchor)
+      if (!was) {
+        this.swayWas.set(anchor, { at: this.swayAt.clone(), vel: new THREE.Vector3() })
+        continue
+      }
+      // 速度 → 加速度。**前の速度との差**で見る
+      this.swayNow.subVectors(this.swayAt, was.at).divideScalar(dt)
+      was.at.copy(this.swayAt)
+      this.swayAcc.subVectors(this.swayNow, was.vel).divideScalar(dt)
+      was.vel.copy(this.swayNow)
+      // 親の空間へ。Y が上、X が横
+      anchor.getWorldQuaternion(this.swaySpin)
+      this.swayAcc.applyQuaternion(this.swaySpin.invert())
+
+      const hold = (v: number) => Math.max(-entry.max, Math.min(entry.max, v))
+      // **加速度の逆へ遅れる。** 上へ持ち上げられたら下がる
+      const wantX = hold(-this.swayAcc.y * entry.gain)
+      const wantZ = hold(-this.swayAcc.x * entry.gain)
+
+      entry.speed.x += ((wantX - entry.angle.x) * entry.stiff - entry.speed.x * entry.damp) * dt
+      entry.speed.y += ((wantZ - entry.angle.y) * entry.stiff - entry.speed.y * entry.damp) * dt
+      entry.angle.x = hold(entry.angle.x + entry.speed.x * dt)
+      entry.angle.y = hold(entry.angle.y + entry.speed.y * dt)
+      this.swayEuler.set(entry.angle.x, 0, entry.angle.y)
+      entry.bone.quaternion.copy(entry.rest).multiply(this.swaySpin.setFromEuler(this.swayEuler))
+      /*
+       * **鎖は親から順に確かめる。** 子の付け根の位置は親の回転で動くので、
+       * ここで世界行列を更新しておかないと、次の骨が 1 フレーム古い位置を見る。
+       */
+      entry.bone.updateMatrixWorld(true)
+    }
   }
 
   /**
@@ -1951,6 +2180,41 @@ export class CharacterAnimator {
   runCadence = RUN_CADENCE
 
   private pistol = false
+  /**
+   * 手に何も出ていないか (投げ物・設置物を持っている間)。
+   *
+   * 転がりの型は**銃を構える形で終わる**ので、出す物が無いと空の手で構えた
+   * 絵になる。手榴弾を持って転がったときにそれが見えた。
+   */
+  private handsEmpty = false
+
+  /**
+   * 遅れて揺れる骨。**無い体では空のまま** (soldier / raiden には無い)。
+   *
+   * 胸 (Bust_L/R) と髪の鎖を同じ形で持つ。どちらも「付け根の加速度の逆へ
+   * 振れて、ばねで戻る」だけなので、分ける理由がない。
+   */
+  private readonly sways: {
+    bone: THREE.Bone
+    /** 付け根。加速度をここで測る */
+    anchor: THREE.Object3D
+    rest: THREE.Quaternion
+    /** x: 前後 (骨の X まわり) / y: 左右 (骨の Z まわり) */
+    angle: THREE.Vector2
+    speed: THREE.Vector2
+    stiff: number
+    damp: number
+    gain: number
+    max: number
+  }[] = []
+  private swayResolved = false
+  /** 付け根ごとの前フレームの位置と速度 */
+  private readonly swayWas = new Map<THREE.Object3D, { at: THREE.Vector3; vel: THREE.Vector3 }>()
+  private readonly swayAt = new THREE.Vector3()
+  private readonly swayNow = new THREE.Vector3()
+  private readonly swayAcc = new THREE.Vector3()
+  private readonly swaySpin = new THREE.Quaternion()
+  private readonly swayEuler = new THREE.Euler()
 
   /**
    * 片手で持っているか。**走り方と構えの型が変わる。**
@@ -1958,6 +2222,11 @@ export class CharacterAnimator {
    * 名前は拳銃から来ているが、決めているのは「片手か両手か」。手榴弾や
    * ナイフを持っているときも片手で、身軽に走る (domain の twoHanded)。
    */
+  /** 手に何も出ていない持ち物か (投げ物・設置物) */
+  setHandsEmpty(empty: boolean): void {
+    this.handsEmpty = empty
+  }
+
   setPistol(oneHanded: boolean): void {
     this.pistol = oneHanded
   }
@@ -2229,13 +2498,17 @@ export class CharacterAnimator {
      * ボルト操作は構えを解いても最後まで流す。1 発ごとに必ず起きる動作なので、
      * 途中で切れると「撃ったのに動作していない」が頻繁に見える。
      *
-     * ただし**伏せている間は出さない**。ボルトの型は立ち姿で、腹這いの腰に
-     * 載せると銃口が下を向いて地面に埋まる (伏せ撃ちの直後に必ず起きる)。
-     * 伏せ用のボルトの型はまだ無いので、操作の間は伏せ撃ちの構えのまま
-     * 通す。撃てない時間は変わらない (fireCooldown は絵と別で数えている)。
+     * **伏せには伏せの型を使う。** 立ちの型を腹這いの腰に載せると銃口が下を
+     * 向いて地面に埋まる (伏せ撃ちの直後に必ず起きる)。
+     *
+     * 伏せ用が入っていないモデルでは**何も出さない** — 立ちの型へ落とすと
+     * 埋まるので、伏せ撃ちの構えのまま通す。撃てない時間は変わらない
+     * (fireCooldown は絵と別で数えている)。
      */
-    if (this.upperState === 'bolt' && this.upper.has(BOLT_KEY)) {
-      if (!PRONE_LOCOMOTIONS.has(this.locomotion)) return BOLT_KEY
+    if (this.upperState === 'bolt') {
+      const prone = PRONE_LOCOMOTIONS.has(this.locomotion)
+      if (prone && this.upper.has(PRONE_BOLT_KEY)) return PRONE_BOLT_KEY
+      if (!prone && this.upper.has(BOLT_KEY)) return BOLT_KEY
     }
     if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
     if (this.upperState === 'throw' && this.pair) {
@@ -2251,7 +2524,11 @@ export class CharacterAnimator {
     }
     // 起き上がりは中断できない。撃つ操作より優先する
     if (this.upperState === 'stand' && this.upper.has(STAND_KEY)) return STAND_KEY
-    if (this.upperState === 'roll' && this.upper.has(ROLL_KEY)) return ROLL_KEY
+    // 手が空なら、構えに入る手前で腕だけ降りる。**ロックは続く** —
+    // 操作を返す時期 (ROLL_EXIT_PHASE) とは別の話
+    if (this.upperState === 'roll' && this.rollArmsShowing && this.upper.has(ROLL_KEY)) {
+      return ROLL_KEY
+    }
     // 落下の受け身も中断させない。**上半身だけ構えに戻ると、脚だけ転がる**
     if (this.upperState === 'hard_land' && this.upper.has(HARD_LAND_KEY)) return HARD_LAND_KEY
     // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
@@ -2310,7 +2587,15 @@ export class CharacterAnimator {
      * 噛み合わない — あちらは常時繰り返し再生で、下半身が終わりで止まっている
      * 間に頭へ戻り、立ち上がりながら腕だけ転がり始めの形 (手を挙げた姿) になる。
      */
-    if (this.rollShowing && this.upper.has(ROLL_KEY)) return ROLL_KEY
+    /*
+     * 手に何も無いなら、**尻尾は出さない。**
+     *
+     * 型の終わりは銃を構える形なので、出す物が無いと空の手で構える絵になる
+     * (手榴弾を持って転がったとき)。ロックが解けた時点で提げた姿勢へ渡す。
+     * 銃があるときは 0.2 秒前に戻ってくる (ROLL_WEAPON_LEAD) ので、
+     * 構え直す動きとして噛み合う。
+     */
+    if (this.rollShowing && this.rollArmsShowing && this.upper.has(ROLL_KEY)) return ROLL_KEY
 
     if (this.aiming) {
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
@@ -2640,7 +2925,12 @@ export class CharacterAnimator {
    */
   playBolt(rate = 1): void {
     if (this.dead) return
-    const upper = this.upper.get(BOLT_KEY)
+    /*
+     * **姿勢が先、銃が後。** 伏せているなら伏せの型を流す。腹這いに立ちの型を
+     * 載せると銃口が下を向いて地面に埋まる (装填やボルトと同じ理由)。
+     */
+    const prone = PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_BOLT_KEY)
+    const upper = this.upper.get(prone ? PRONE_BOLT_KEY : BOLT_KEY)
     if (!upper) return
     upper.reset().setEffectiveTimeScale(rate).play()
     this.upperState = 'bolt'
@@ -2788,6 +3078,20 @@ export class CharacterAnimator {
    *
    * 一度だけ流す型 (ONE_SHOT_LOWER) なので、終われば time が尺で止まる。
    */
+  /**
+   * 転がりの型で腕をまだ使うか。**手が空なら構えに入る手前で降りる。**
+   *
+   * 型の折り返しで手が顔の横へ上がる (銃を構える形)。銃があれば戻ってくる
+   * 銃と噛み合うが、投げ物では空の手で構える絵になる。
+   */
+  private get rollArmsShowing(): boolean {
+    if (!this.handsEmpty) return true
+    const action = this.lower.get('roll')
+    const duration = action?.getClip().duration ?? 0
+    if (!action || duration === 0) return true
+    return action.time < duration * ROLL_EMPTY_ARMS_PHASE
+  }
+
   get rollShowing(): boolean {
     if (this.upperState === 'roll') return true
     const action = this.lower.get('roll')

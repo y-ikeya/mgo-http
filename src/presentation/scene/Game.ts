@@ -361,6 +361,29 @@ const HIT_FEEDBACK_DURATION = 0.6;
 const DEFAULT_EXPOSURE = 3.0;
 
 /**
+ * 明るさの丸め方。**?tone=aces のように URL から切り替えられる。**
+ *
+ * 既定は Neutral (Khronos PBR Neutral)。ACES より色が転びにくく、**暗い迷彩色が
+ * 濁らない**のでこれにしてある。
+ *
+ * ただ「パリッとしすぎ」に見えるのもここなので、比べられるようにしてある:
+ *
+ *   neutral   既定。色は正直だが、明るい所が硬い
+ *   aces      映画のカーブ。**明るい所がなだらかに丸まる**が、色が転ぶ
+ *   agx       近年の折衷。ACES ほど転ばず、明るい所は丸まる
+ *   reinhard  一番素朴。全体が眠くなる
+ *   none      掛けない。白飛びが出る
+ */
+const TONE_CURVES: Record<string, THREE.ToneMapping> = {
+  neutral: THREE.NeutralToneMapping,
+  aces: THREE.ACESFilmicToneMapping,
+  agx: THREE.AgXToneMapping,
+  reinhard: THREE.ReinhardToneMapping,
+  cineon: THREE.CineonToneMapping,
+  none: THREE.NoToneMapping,
+};
+
+/**
  * 水面を叩く強さ。**弾を 1 とした比。**
  *
  * 落ちる物の重さがそのまま水しぶきの大きさになる。薬莢が手榴弾と同じ音・同じ
@@ -996,8 +1019,13 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // 露出という 1 つのつまみで明るさを動かせるようにする。
     // Neutral (Khronos PBR Neutral) は ACES より色が転びにくく、暗い迷彩色が濁らない。
-    this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = DEFAULT_EXPOSURE;
+    const query = new URLSearchParams(location.search);
+    this.renderer.toneMapping =
+      TONE_CURVES[query.get("tone") ?? ""] ?? THREE.NeutralToneMapping;
+    const exposure = Number(query.get("exposure"));
+    this.renderer.toneMappingExposure = Number.isFinite(exposure) && exposure > 0
+      ? exposure
+      : DEFAULT_EXPOSURE;
     container.appendChild(this.renderer.domElement);
 
     this.stage = buildStage(this.scene, this.stageName);
@@ -1102,6 +1130,29 @@ export class Game {
     if (cadence !== null) {
       const rate = Number(cadence);
       if (Number.isFinite(rate) && rate > 0) this.player.setRunCadence(rate);
+    }
+
+    // 構えていないときの前傾。**?lean=17 で深く**、0 で棒立ち
+    const lean = new URLSearchParams(location.search).get("lean");
+    if (lean !== null) {
+      const degrees = Number(lean);
+      if (Number.isFinite(degrees)) this.player.setRelaxedLean((degrees * Math.PI) / 180);
+    }
+
+    /*
+     * 構えたときに上体を起こす量。**銃口の上下がこれで動く。**
+     *
+     *     ?aimlevel=-9.4        立ち・しゃがみとも同じ値
+     *     ?aimlevel=-4.9,-9.4   立ち, しゃがみ
+     *     ?aimlevel=0           補正なし (型のまま = 少し下を向く)
+     */
+    const level = new URLSearchParams(location.search).get("aimlevel");
+    if (level !== null) {
+      const parts = level.split(",").map(Number);
+      const [stand, crouch = stand] = parts;
+      if (Number.isFinite(stand) && Number.isFinite(crouch)) {
+        this.player.setAimLevel((stand * Math.PI) / 180, (crouch * Math.PI) / 180);
+      }
     }
 
     this.resizeObserver = new ResizeObserver(() => this.resize());

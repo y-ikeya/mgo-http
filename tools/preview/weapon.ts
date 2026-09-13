@@ -118,6 +118,24 @@ interface Cell {
   orbit: { yaw: number; pitch: number; dist: number }
 }
 
+/*
+ * 構えたときに上体を起こす量 (度)。**銃口の上下がこれで動く。**
+ *
+ *     ?aimlevel=-15       立ち・しゃがみとも
+ *     ?aimlevel=-4.9,-9.4 立ち, しゃがみ
+ *     ?aimlevel=0         補正なし (型のまま)
+ *
+ * 対戦の中 (Game.ts) と同じ綴りにしてある。ここで決めて weapon.ts と
+ * animation.ts へ写す。
+ */
+const askedLevel = new URLSearchParams(location.search).get('aimlevel')
+const aimLevel = (() => {
+  if (askedLevel === null) return null
+  const [stand, crouch = stand] = askedLevel.split(',').map(Number)
+  if (!Number.isFinite(stand) || !Number.isFinite(crouch)) return null
+  return { stand: (stand * Math.PI) / 180, crouch: (crouch * Math.PI) / 180 }
+})()
+
 const cells: Cell[] = CELLS.map((spec, i) => {
   const player = new Soldier()
   player.start('soldier')
@@ -273,7 +291,7 @@ function dump(): void {
  * 前が 1 に近く、上は 0 付近になるはず。
  */
 function aimReport(): string {
-  const out: string[] = ['銃口 (前, 右, 上)']
+  const out: string[] = ['銃口 (前, 右, 上) と水平からの角度']
   for (const cell of cells) {
     cell.player.object.updateMatrixWorld(true)
     // 右手ボーンにぶら下がっている、ボーンでない子が銃。
@@ -293,9 +311,11 @@ function aimReport(): string {
       .applyQuaternion(gun.getWorldQuaternion(new THREE.Quaternion()))
       .normalize()
     // 並べた 6 体は yaw = 0。キャラの正面はワールドの -Z
+    // 上下は度でも出す。**0 が地面と平行。** 成分だけだと読み違える
     out.push(
       `${cell.spec.label.padEnd(9, '\u3000')} ` +
-        `${(-dir.z).toFixed(2)}, ${dir.x.toFixed(2)}, ${dir.y.toFixed(2)}`,
+        `${(-dir.z).toFixed(2)}, ${dir.x.toFixed(2)}, ${dir.y.toFixed(2)}` +
+        `  (${((Math.asin(dir.y) * 180) / Math.PI).toFixed(1)}度)`,
     )
   }
   return out.join('\n')
@@ -518,6 +538,8 @@ function frame(): void {
     if (!cell.spec.prone && cell.player.isCrouching !== cell.spec.crouch) {
       cell.player.toggleCrouch()
     }
+    // **毎フレーム当てる。** 読み込みが終わる前に呼んでも中身がまだ無い
+    if (aimLevel) cell.player.setAimLevel(aimLevel.stand, aimLevel.crouch)
     cell.player.setAiming(cell.spec.aim)
     cell.player.update(dt, ZERO, cell.player.yaw, 0, WORLD)
   }

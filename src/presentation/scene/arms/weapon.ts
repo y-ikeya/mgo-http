@@ -42,6 +42,26 @@ export interface WeaponConfig {
    * そのまま使われていた**。腹這いでは肘の付き方も上半身の向きも違うので、
    * しゃがみの握りだと銃が体に埋まるか浮く。
    */
+  /**
+   * 伏せてボルトを引く間の持ち方。**骨 (LeftHand) の空間そのまま。**
+   *
+   * 型を作る側が銃を骨に付けて目で合わせているので、**その位置がいちばん
+   * 正しい**。こちらで握りを詰め直さず、測った値をそのまま置く
+   * (tools/fit_gun_to_clip.js が出す)。
+   *
+   * 無ければ、預けた瞬間の持ち方を保ったまま移す。
+   */
+  boltHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  /**
+   * しゃがみでの持ち方。**骨 (RightHand) の空間そのまま。**
+   *
+   * 握り (crouchGrip) からの逆算を通さない。逆算は「取り付けた瞬間の手の向き」を
+   * 基準にしていて、その基準を外から作り直せない — 型から測った置き場所を
+   * 握りの値へ写すと **6.3° ずれた** (銃口が下を向いた)。測った物をそのまま置く。
+   *
+   * 無ければ crouchGrip / crouchRotation を使う。
+   */
+  crouchHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
   proneGrip?: THREE.Vector3
   proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
@@ -129,10 +149,36 @@ const KNIFE: WeaponConfig = {
 const SNIPER: WeaponConfig = {
   grip: new THREE.Vector3(0.01, 0.28, 0.135),
   rotation: new THREE.Euler(degrees(-20), degrees(-9), degrees(-180)),
-  crouchGrip: new THREE.Vector3(-0.055, 0.195, 0.12),
-  crouchRotation: new THREE.Euler(degrees(-19), degrees(-7), degrees(-180)),
+  /*
+   * しゃがみ。**型 (crouchFire) の中で銃が置かれている所そのまま。**
+   *
+   * 姿勢もその型から切ってある (knee_relaxed / knee_ready) ので、作った側が
+   * 右手の骨へ直付けして合わせた形がそのまま出る。
+   * tools/fit_gun_to_clip.js が出した値。
+   *
+   * 握りの値 (crouchGrip) は**調整パネルを回したときの受け皿**として残す。
+   */
+  crouchHold: {
+    position: new THREE.Vector3(27.0692, 15.78, 4.4352),
+    quaternion: new THREE.Quaternion(0.50893, -0.51028, 0.52889, 0.4482),
+    scale: 100.0,
+  },
+  crouchGrip: new THREE.Vector3(-0.0153, 0.2849, 0.137),
+  crouchRotation: new THREE.Euler(degrees(-4.4), degrees(-7.2), degrees(178.1)),
   proneGrip: new THREE.Vector3(-0.03, 0.235, 0.14),
   proneRotation: new THREE.Euler(degrees(-2), degrees(-14), degrees(147)),
+  /*
+   * 伏せてボルトを引く間。**型の中で銃が置かれている所へ揃えてある。**
+   *
+   * 動きを作る側が銃を左手の骨に付けて詰めた位置を、同じ銃どうしの形を
+   * 突き合わせて写したもの (tools/fit_gun_to_clip.js)。頂点が 53,646 で
+   * 一致するので、合わせは一意に決まる。
+   */
+  boltHold: {
+    position: new THREE.Vector3(19.7198, -8.0809, 22.0967),
+    quaternion: new THREE.Quaternion(-0.25291, 0.67157, -0.59726, 0.35822),
+    scale: 100.0,
+  },
   tip: new THREE.Vector3(0, 0.177, -0.845),
 }
 
@@ -213,6 +259,12 @@ export class Weapon {
   /** 実機調整で上書きできるよう、設定は複製して持つ */
   private readonly grip: THREE.Vector3
   private readonly rotation: THREE.Euler
+  private readonly holdScale = new THREE.Vector3()
+  /**
+   * しゃがみの置き場所 (測った物)。**調整パネルを回したら手放す** —
+   * 回しても動かない滑りがあると、壊れているのか効いていないのか分からない
+   */
+  private crouchHold: WeaponConfig['crouchHold'] | null
   private readonly crouchGrip: THREE.Vector3
   private readonly crouchRotation: THREE.Euler
   private readonly proneGrip: THREE.Vector3
@@ -225,6 +277,15 @@ export class Weapon {
    * 隣どうしを繋いだ 1 本の軸で足りる。
    */
   private stance = -1
+  /**
+   * 取り付けた手。**預けた後に戻す先**。
+   *
+   * 伏せてボルトを引く間だけ、銃を反対の手へ預ける — あの型は**銃を持つ手で
+   * ボルトを引く**ので、付けたままだと銃ごと動いてしまう。
+   */
+  private home: THREE.Object3D | null = null
+  /** いま預けている手。預けている間は握りを作り直さない */
+  private lent: THREE.Object3D | null = null
   private readonly blendGrip = new THREE.Vector3()
   private readonly blendRotation = new THREE.Quaternion()
   private readonly fromRotation = new THREE.Quaternion()
@@ -249,6 +310,14 @@ export class Weapon {
     this.grip = config.grip.clone()
     this.rotation = config.rotation.clone()
     this.crouchGrip = (config.crouchGrip ?? config.grip).clone()
+    // 設定は共有物なので複製して持つ。パネルで手放すのは自分の分だけ
+    this.crouchHold = config.crouchHold
+      ? {
+          position: config.crouchHold.position.clone(),
+          quaternion: config.crouchHold.quaternion.clone(),
+          scale: config.crouchHold.scale,
+        }
+      : null
     this.crouchRotation = (config.crouchRotation ?? config.rotation).clone()
     // 伏せは書いていなければしゃがみと同じ。**書くまでは今までの見え方のまま**
     this.proneGrip = (config.proneGrip ?? this.crouchGrip).clone()
@@ -331,6 +400,8 @@ export class Weapon {
     }
 
     hand.add(this.object)
+    this.home = hand
+    this.lent = null
     this.stance = -1
     this.applyStance(0)
   }
@@ -344,10 +415,53 @@ export class Weapon {
    * @param blend 0 = 立ち、1 = しゃがみ、2 = 伏せ
    */
   applyStance(blend: number): void {
+    // 預けている間は作り直さない。作り直すと預け先の手を基準に組み直して跳ねる
+    if (this.lent) {
+      this.stance = blend
+      return
+    }
     // 変化が無ければ作り直さない。毎フレーム呼ばれる想定なので
     if (Math.abs(blend - this.stance) < 0.002) return
     this.stance = blend
     this.rebuild(blend)
+  }
+
+  /**
+   * 銃を別の手へ預ける。**世界での位置を保ったまま。**
+   *
+   * 伏せてボルトを引く型は、**銃を持つ右手でボルトを引く**。付けたままだと
+   * 銃が右手に付いていくので、引く動きがそのまま銃の動きになる。
+   *
+   * 握りの数字は取り直さない。`attach` は**世界での姿勢を保って**親を
+   * 付け替えるので、預けた瞬間の持ち方がそのまま左手に移る。左手用の
+   * 握り (grip / rotation) を姿勢ごとに詰め直す必要が無い。
+   *
+   * @param hand 預け先。null で元の手へ戻す
+   */
+  holdWith(hand: THREE.Object3D | null): void {
+    const to = hand ?? this.home
+    if (!to || to === (this.lent ?? this.home)) return
+    if (hand) {
+      hand.updateWorldMatrix(true, false)
+      const hold = this.config.boltHold
+      if (hold) {
+        // 型に合わせて置く。**世界での位置は保たない** — 型のほうが正しい
+        hand.add(this.object)
+        this.object.position.copy(hold.position)
+        this.object.quaternion.copy(hold.quaternion)
+        this.object.scale.setScalar(hold.scale)
+      } else {
+        hand.attach(this.object)
+      }
+      this.lent = hand
+      return
+    }
+    // 戻す。**握りは組み直す** — 預けている間に手が動いているので
+    this.lent = null
+    this.home?.add(this.object)
+    const blend = this.stance
+    this.stance = -1
+    this.applyStance(blend)
   }
 
   /** 調整用に、姿勢ごとの値を差し替える。今の姿勢のまま反映する */
@@ -362,6 +476,8 @@ export class Weapon {
     } else if (stance === 'crouch') {
       this.crouchGrip.copy(grip)
       this.crouchRotation.copy(rotation)
+      // 手で回し始めたら、測った置き場所は退く
+      this.crouchHold = null
     } else {
       this.grip.copy(grip)
       this.rotation.copy(rotation)
@@ -399,6 +515,24 @@ export class Weapon {
       t,
     )
     this.calibrateWith(this.blendGrip, this.blendRotation)
+
+    /*
+     * 型から測った置き場所がある姿勢は、**そちらで上書きする。**
+     *
+     * 握りの値は「取り付けた瞬間の手の向き」を基準に逆算する仕組みで、その
+     * 基準を外から作り直せない。型で測った置き場所を握りへ写すと 6.3° ずれた
+     * (銃口が下を向いた)。測った物は測ったまま置く。
+     *
+     * 隣の姿勢との間は**置き場所どうしを混ぜる**。握りを混ぜてから組むのとは
+     * 途中が変わるが、両端は変わらないので切り替わりで跳ねない。
+     */
+    const hold = this.crouchHold
+    if (!hold) return
+    const toHold = blend <= 1 ? t : 1 - t
+    if (toHold <= 0) return
+    this.object.position.lerp(hold.position, toHold)
+    this.object.quaternion.slerp(hold.quaternion, toHold)
+    this.object.scale.lerp(this.holdScale.setScalar(hold.scale), toHold)
   }
 
   /**

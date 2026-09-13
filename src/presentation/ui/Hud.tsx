@@ -509,37 +509,35 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           props.stats?.weaponHeld !== 'knife'
         }
       >
-        <div
-          class="crosshair"
-          // 散布界に応じて開く。数字で見せずに「今どれだけ散るか」を伝える。
-          //
-          // **散弾は粒の散りも足す。** 狙いの散布だけだと、止まって構えた
-          // 瞬間に輪が点まで縮んで「一点へ飛ぶ」に見える
-          //
-          // **位置は動かさない。** 手ブレは画面ごと揺れる (カメラの向きに
-          // 差し込んである) ので、クロスヘアは中央に固定されたまま
-          style={{
-            '--crosshair-gap': `${9 + ((props.stats?.spread ?? 0) + (props.stats?.pelletSpread ?? 0)) * 11}px`,
-          }}
-        >
-          <span class="crosshair-dot" />
+        {/*
+          **大きさも位置も動かさない。**
+
+          散布界に応じて開いたり閉じたりしていたが、**動く輪は読みにくい** —
+          見ている先の景色が変わらないのに枠だけ呼吸するので、目がそちらへ
+          持っていかれる。散らばり具合は当たらなかったことで分かるので、
+          常時わざわざ出す必要がない。
+
+          手ブレも同じ理由でここには出ない。あれは**画面ごと揺れる** (カメラの
+          向きに差し込んである) ので、輪は中央に据わったまま。
+        */}
+        <div class="crosshair">
           {/*
-            散弾は輪。**粒がその中に散る**という形をそのまま出す。
-            十字は「その一点へ 1 発飛ぶ」の形なので、8 粒に分かれる銃には嘘になる。
+            **輪。十字にしない。**
+
+            十字は「その一点へ 1 発飛ぶ」の形で、**どこへ飛ぶかを答えて
+            しまう**。実際には散布の円錐のどこかへ飛ぶので、答えられない
+            はずのものを答えている。中心の点も同じ理由で置かない。
+
+            輪なら「この中のどこか」しか言わない。撃つ前に**分からないまま
+            決める**ことになるので、詰めるか待つかの読み合いが残る。
           */}
-          <Show
-            when={(props.stats?.pelletSpread ?? 0) > 0}
-            fallback={
-              <>
-                <span class="crosshair-arm crosshair-arm-up" />
-                <span class="crosshair-arm crosshair-arm-down" />
-                <span class="crosshair-arm crosshair-arm-left" />
-                <span class="crosshair-arm crosshair-arm-right" />
-              </>
-            }
-          >
-            <span class="crosshair-ring" />
-          </Show>
+          <span
+            class="crosshair-ring"
+            // **散弾だけ点線。** 1 発が 8 粒に割れて散らばる、という
+            // 銃そのものの性質。輪の大きさは据え置きなので、粒の話は
+            // 線の切れ方で言う
+            classList={{ 'crosshair-ring-scatter': (props.stats?.pelletSpread ?? 0) > 0 }}
+          />
         </div>
       </Show>
 

@@ -55,9 +55,12 @@
 /*
  * 散弾の輪。**粒がこの中に散る。**
  *
- * 十字と同じ --crosshair-gap から半径を取るので、散布界が開けば輪も広がる。
- * 十字が「その一点へ 1 発」を言っているのに対して、こちらは「この範囲へ
- * 撒く」を言っている。
+ * **大きさは変えない。** 散布界に応じて開いていたが、動く輪は読みにくい —
+ * 景色が変わらないのに枠だけ呼吸するので、目がそちらへ持っていかれる。
+ *
+ * **十字は使わない。** 十字は「その一点へ 1 発飛ぶ」の形で、**どこへ飛ぶかを
+ * 答えてしまう**。実際には散布の円錐のどこかへ飛ぶので、答えられないはずの
+ * ものを答えている。輪なら「この中のどこか」しか言わない。
  */
 .crosshair-ring {
   position: absolute;
@@ -66,11 +69,17 @@
   width: calc(var(--crosshair-gap) * 2);
   height: calc(var(--crosshair-gap) * 2);
   transform: translate(calc(-1 * var(--crosshair-gap)), calc(-1 * var(--crosshair-gap)));
-  border: 2px solid rgba(230, 240, 220, 0.85);
+  /*
+   * **細く、薄く。** 輪は「この中のどこか」を言うだけの物で、景色より
+   * 前に出る必要がない。太いと画面の真ん中に居座って、その先に居る相手を
+   * 覆ってしまう。
+   */
+  border: 1px solid rgba(230, 240, 220, 0.62);
   border-radius: 50%;
+  /* 暗い壁でも明るい壁でも見えるよう、内と外に細く影を敷く */
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.55),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
 .crosshair {
@@ -79,48 +88,21 @@
   left: 50%;
   width: 0;
   height: 0;
-  /* 中心から各アームまでの距離。散布界に応じて Hud.tsx が上書きする */
-  --crosshair-gap: 9px;
-  --crosshair-arm: 7px;
+  /* 輪の半径。**据え置き** — 撃つ側の状態では動かさない */
+  --crosshair-gap: 20px;
 }
 
-.crosshair-dot,
-.crosshair-arm {
-  position: absolute;
-  background: rgba(230, 240, 220, 0.85);
-  /* 暗い背景でも明るい壁でも視認できるよう縁取りする */
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
-}
-
-.crosshair-dot {
-  width: 2px;
-  height: 2px;
-  transform: translate(-1px, -1px);
-}
-
-.crosshair-arm {
-  width: 2px;
-  height: 7px;
-}
-
-.crosshair-arm-up {
-  transform: translate(-1px, calc(-1 * (var(--crosshair-gap) + var(--crosshair-arm))));
-}
-
-.crosshair-arm-down {
-  transform: translate(-1px, var(--crosshair-gap));
-}
-
-.crosshair-arm-left {
-  width: var(--crosshair-arm);
-  height: 2px;
-  transform: translate(calc(-1 * (var(--crosshair-gap) + var(--crosshair-arm))), -1px);
-}
-
-.crosshair-arm-right {
-  width: var(--crosshair-arm);
-  height: 2px;
-  transform: translate(var(--crosshair-gap), -1px);
+/*
+ * 散弾の輪。**線を切る。**
+ *
+ * 大きさは他の銃と同じ (据え置き) なので、粒に割れることは**線の切れ方**で
+ * 言う。繋がった輪は「この中のどこか」、切れた輪は「この中へ撒く」。
+ *
+ * 刻みは細かく。粗いと 8 つの点が「粒がここに来る」に読めてしまい、
+ * 一点を指す十字と同じ嘘になる。**数えられないくらい刻む。**
+ */
+.crosshair-ring-scatter {
+  border-style: dashed;
 }
 
 /* --- 命中表示 --- */

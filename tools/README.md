@@ -144,7 +144,7 @@ bun tools/merge_clip.js public/models/soldier.glb proneturn.glb prone_roll_down 
 
 ```sh
 # 単体の glb にしてから、両端 3 標本ずつを切り出して 2 本だけ取り込む
-$BLENDER -b --factory-startup --python tools/convert_character.py -- kneeaim.json
+$BLENDER -b --factory-startup --python tools/convert_character.py -- tools/raw/kneeaim.json
 bun tools/split_clip.js kneeaim.glb knee_aim 0.067 knee_relaxed knee_rest
 bun tools/split_clip.js kneeaim.glb knee_rest 0.700 knee_swing knee_ready
 bun tools/merge_clip.js public/models/soldier.glb kneeaim.glb knee_relaxed public/models/soldier.glb
@@ -275,7 +275,7 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
 `hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`
-`knee_relaxed` `knee_ready`) は
+`knee_relaxed` `knee_ready` `prone_bolt`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 

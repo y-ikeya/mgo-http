@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "crouchFire.fbx#2": "crouch_aim_raw" },
+  "out": "crouchfire.glb",
+  "maxTexture": 64
+}
