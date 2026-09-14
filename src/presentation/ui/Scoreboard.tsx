@@ -47,6 +47,16 @@ export default function Scoreboard(props: {
     props.identity,
   )
   const over = () => props.stats?.match?.phase === 'over'
+  /**
+   * 陣営の合計点。**決着の画面にだけ出す。**
+   *
+   * 勝敗は残機で決まる (上の数字) が、どちらがよく働いたかは点の合計に出る。
+   * 元の MGO2 も結果画面では残機と TOTAL SCORE を並べていた。
+   */
+  const teamPoints = (team: string) =>
+    (props.stats?.scores ?? [])
+      .filter((player) => player.team === team)
+      .reduce((sum, player) => sum + pointsOf(player), 0)
   const winner = () => props.stats?.match?.winner
   /** 自分の陣営。勝ったかどうかの言い方を変えるのに使う */
   const mine = () => props.stats?.scores?.find((p) => p.id === props.selfId)?.team
@@ -100,7 +110,8 @@ export default function Scoreboard(props: {
     )
 
   return (
-    <div class="score">
+    // 決着したら画面いっぱいに開く。**同じ板が結果画面を兼ねる**
+    <div class="score" classList={{ 'score-over': over() }}>
       <div class="score-panel">
         <Show when={over()}>
           <div
@@ -138,7 +149,7 @@ export default function Scoreboard(props: {
           板を選ぶ。**アイコンだけ。** 名前を書くほどの数ではないし、
           Tab で開いた直後に読ませたいのは中身のほう。
         */}
-        <nav class="score-tabs">
+        <nav class="score-tabs" classList={{ 'score-tabs-hidden': over() }}>
           <button
             class="score-tab"
             classList={{ 'score-tab-on': tab() === 'board' }}
@@ -222,7 +233,13 @@ export default function Scoreboard(props: {
             {(team) => (
               <div class="score-team">
                 <div class={`score-team-head score-${team}`}>
-                  {team === 'blue' ? t('score.blue') : t('score.red')}
+                  <span>
+                    {team === 'blue' ? t('score.blue') : t('score.red')}
+                    {/* 合計点。決着したときだけ。試合中は残機を読ませたい */}
+                    <Show when={over()}>
+                      <span class="score-team-points">{teamPoints(team)}</span>
+                    </Show>
+                  </span>
                   <span class="score-cols">
                     {/* 点。kill +3 / death -2 の合算 */}
                     <span class="score-col-points">P</span>

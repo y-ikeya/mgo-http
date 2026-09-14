@@ -482,3 +482,90 @@
 .score-skills-list .skill {
   min-width: 0;
 }
+
+/*
+ * --- 決着したとき。**画面いっぱいに開く** ---
+ *
+ * 同じ板が Tab の成績表と結果画面を兼ねている。試合中は邪魔にならないよう
+ * 小さく置くが、終わったら**見せる物がこれしかない**ので大きく出す。
+ * 元の MGO2 も、決着の 10 秒は画面をほぼ埋めて数字を大きく見せていた。
+ *
+ * 作りは変えず、寸法だけを差し替える。列の幅は変数で 1 か所に置いてあるので、
+ * 文字を大きくしても見出しと行が揃ったままになる。
+ */
+.score-over {
+  --score-col: 58px;
+  --score-col-points: 74px;
+  --score-col-rate: 70px;
+}
+
+.score-over .score-panel {
+  width: min(1280px, calc(100vw - 48px));
+  height: calc(100vh - 48px);
+}
+
+/* 勝ち負けの一言。**ここが一番大きい** */
+.score-over .score-verdict {
+  padding: 30px 16px 6px;
+  font-size: 58px;
+  letter-spacing: 0.24em;
+}
+
+/* 残機。陣営の数字は勝敗そのものなので、名前より数を大きく */
+.score-over .score-head {
+  padding: 10px 16px 26px;
+  font-size: 44px;
+  gap: 16px;
+}
+
+.score-over .score-team-head {
+  padding: 0 26px 14px;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+}
+
+.score-over .score-cols {
+  font-size: 13px;
+  padding-right: 10px;
+}
+
+.score-over .score-row {
+  padding: 9px 26px;
+  font-size: 21px;
+}
+
+.score-over .score-lv {
+  font-size: 14px;
+}
+
+.score-over .score-tag {
+  font-size: 13px;
+}
+
+/* 順位。**大きい画面では番号が要る** — 行が離れると何番目か数えにくい */
+.score-over .score-rank {
+  display: inline-block;
+  min-width: 34px;
+  color: rgba(150, 166, 140, 0.5);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.score-over .score-next {
+  font-size: 15px;
+}
+
+/* 陣営の合計点。名前の右に小さく添える (大きいのは残機のほう) */
+.score-team-points {
+  margin-left: 12px;
+  color: rgba(206, 214, 196, 0.72);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 決着の間は板を切り替えさせない。**見せる物は結果だけ。**
+ * 場所は空けたままにする (消すと表が上へ動いて、目が追い直しになる)
+ */
+.score-tabs-hidden {
+  visibility: hidden;
+}

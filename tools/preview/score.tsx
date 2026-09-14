@@ -2,6 +2,7 @@
  * 成績表を**本物のまま**描く。
  *
  *     bunx vite → http://localhost:5173/tools/preview/score.html?case=dm
+ *     ?over=win / lose / draw   決着したときの姿 (画面いっぱいの結果画面)
  */
 import { createSignal, onMount } from 'solid-js'
 import { render } from 'solid-js/web'
@@ -27,6 +28,18 @@ const tdm = {
   match: { type: 'match', mode: 'TDM', phase: 'playing', blue: 14, red: 11, endsAt: Date.now() + 90000, present: 4, required: 2, players: [] },
   team: 'blue',
 } as unknown as GameStats
+
+/*
+ * 決着した姿。**同じ板が結果画面を兼ねる**ので、段階と勝者を差し替えるだけで出る。
+ */
+const over = new URLSearchParams(location.search).get('over')
+if (over) {
+  for (const set of [dm, tdm]) {
+    const match = (set as unknown as { match: Record<string, unknown> }).match
+    match.phase = 'over'
+    match.winner = over === 'win' ? 'blue' : over === 'lose' ? 'red' : 'draw'
+  }
+}
 
 const which = new URLSearchParams(location.search).get('case') ?? 'dm'
 /** 練習部屋なら組み替えられる。?open=1 でその姿を見る */
