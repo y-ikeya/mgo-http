@@ -31,12 +31,17 @@ const stopAt = Number(query.get('t') ?? '1.2')
 const view = query.get('view') ?? 'side'
 const gun = query.get('gun') as WeaponId | null
 
-/** 筏の梯子と同じ形。厚みは z、幅 0.8m、高さ 12m。足元の床は y=0 */
+/**
+ * 筏の梯子と同じ形。**厚みは x、幅 0.82m (z)、高さ 11.7m。**
+ *
+ * 本物 (ladder_a) は 0.08 x 11.66 x 0.82。ここも同じ向きに立てておかないと、
+ * 幅の真ん中に乗れているかを確かめられない。
+ */
 const LADDER: Ladder = {
   name: 'ladder_preview',
-  min: [-0.4, 0, -0.05],
-  max: [0.4, 12, 0.05],
-  axis: 'z',
+  min: [-0.04, 0, -0.41],
+  max: [0.04, 11.7, 0.41],
+  axis: 'x',
 }
 
 const renderer = new WebGPURenderer({ antialias: true })
@@ -61,13 +66,13 @@ scene.add(floor)
  * 桟を並べるのは、足が段に乗っているかを見るため。
  */
 const rail = new THREE.MeshStandardMaterial({ color: 0x8a8f7a, roughness: 0.6 })
-for (const side of [-0.34, 0.34]) {
-  const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 12, 0.06), rail)
-  post.position.set(side, 6, 0)
+for (const side of [-0.35, 0.35]) {
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 11.7, 0.06), rail)
+  post.position.set(0, 5.85, side)
   scene.add(post)
 }
-for (let y = 0.3; y < 12; y += 0.32) {
-  const step = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.04, 0.05), rail)
+for (let y = 0.3; y < 11.7; y += 0.32) {
+  const step = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.76), rail)
   step.position.set(0, y, 0)
   scene.add(step)
 }
@@ -95,7 +100,7 @@ for (let i = 0; i < 8; i++) await new Promise((done) => setTimeout(done, 0))
 player.setLadders([LADDER])
 scene.add(player.object)
 // 梯子の手前に立たせる
-player.position.set(0, 0, 0.6)
+player.position.set(0.6, 0, 0)
 if (gun) await player.equip(gun)
 
 // **本物の口から掴む。** 押している量も本番と同じ setStickForward で渡す
@@ -114,9 +119,10 @@ player.object.updateMatrixWorld(true)
 const feet = player.position.clone()
 const camera = new THREE.PerspectiveCamera(38, WIDTH / HEIGHT, 0.05, 100)
 const eye = feet.y + 1.0
-if (view === 'front') camera.position.set(0, eye, feet.z + 3.2)
-else if (view === 'back') camera.position.set(0, eye, feet.z - 3.2)
-else camera.position.set(3.2, eye, feet.z + 0.4)
+// 厚みが x 向きになったので、見る所も 90 度回す
+if (view === 'front') camera.position.set(feet.x + 3.2, eye, 0)
+else if (view === 'back') camera.position.set(feet.x - 3.2, eye, 0)
+else camera.position.set(feet.x + 0.4, eye, 3.2)
 camera.lookAt(0, eye, 0)
 
 await renderer.init()
@@ -129,7 +135,7 @@ function handZ(): string {
     player.object.traverse((o) => {
       if (!bone && o.name.endsWith(suffix)) bone = o
     })
-    return bone ? (bone as THREE.Object3D).getWorldPosition(new THREE.Vector3()).z : NaN
+    return bone ? (bone as THREE.Object3D).getWorldPosition(new THREE.Vector3()).x : NaN
   }
   return ['LeftHand', 'RightHand', 'LeftFoot', 'RightFoot']
     .map((name) => `${name.slice(0, 5)} ${find(name).toFixed(2)}`)
@@ -144,7 +150,8 @@ const report = [
   `体の向き: ${forward.x.toFixed(2)}, ${forward.z.toFixed(2)} (梯子は -z 側)`,
   `梯子の上: ${player.onLadder}`,
   `いまの型: ${player.locomotion}`,
-  `手と足の z (梯子は 0): ${handZ()}`,
+  `手と足の x (梯子は 0): ${handZ()}`,
+  `幅の真ん中からのずれ (z): ${feet.z.toFixed(2)}`,
 ].join('\n')
 const box = document.createElement('pre')
 box.style.cssText =

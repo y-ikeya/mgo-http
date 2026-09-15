@@ -21,6 +21,7 @@ import { PLAYER_HEIGHT as BODY_HEIGHT } from '../../../domain/player/moving'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
 import {
+  climbSurge,
   crawlSurge,
   resolveLocomotion,
   STAIR_DROP_MAX,
@@ -1465,7 +1466,14 @@ export class Soldier {
      * 見ている間は「上」が体の前にならず、押しても登らない。
      */
     const forward = this.stickForward
-    this.velocityY = forward * LADDER_SPEED
+    /*
+     * **押すたびにぐいと上がる。** 均した速さは LADDER_SPEED のまま。
+     *
+     * 等速で滑り上がると、手足が動いているのに体は一定、という気持ち悪さが
+     * 出る。型の位相から波を作って、押し上げる瞬間だけ速くする (這うのと
+     * 同じ仕掛け)。
+     */
+    this.velocityY = forward * LADDER_SPEED * climbSurge(this.animator?.climbPhase ?? 0)
     /*
      * **押している分だけ絵が進む。** 手を止めれば絵も止まる。
      *

@@ -175,6 +175,36 @@ export function crawlSurge(phase: number): number {
 }
 
 /**
+ * 梯子を登る波。**1 周期に 2 回、手足で押し上げる。**
+ *
+ * **実測** (型の中で足が腰に対してどこまで伸びているかを 16 点で見た)。
+ * 0.80 秒の周期に山が 2 つあり、足が伸び切る (押し上げる) 位相は 0.31 と 0.81。
+ * 這うのと同じ形で、そこから少し前へ寄せる — 掴んだ所から体が上がり始める。
+ *
+ * 這うより山を鈍らせてある。梯子は腕と脚の両方で押すので、掻いて止まって、
+ * という間が這うほどはっきりしない。
+ */
+const CLIMB_PUSHES = 2
+const CLIMB_PUSH_PHASE = 0.25
+const CLIMB_SHARP = 1.6
+/** 押していない間も残る上がり (割合)。0 だと 1 周期に 2 回ぴたりと止まる */
+const CLIMB_FLOOR = 0.22
+
+/**
+ * その位相で、平均の何倍の速さで上がるか。**均すと 1。**
+ *
+ * 等速で滑り上がっていたのを、押すたびにぐいと上がる形にする。均した速さは
+ * 変わらないので、登り切るまでの時間は同じ。
+ */
+export function climbSurge(phase: number): number {
+  const wave = 0.5 + 0.5 * Math.cos(2 * Math.PI * CLIMB_PUSHES * (phase - CLIMB_PUSH_PHASE))
+  const shaped = CLIMB_FLOOR + (1 - CLIMB_FLOOR) * wave ** CLIMB_SHARP
+  // cos^1.6 の平均はおよそ 0.41。均して 1 になるよう割る
+  const mean = CLIMB_FLOOR + (1 - CLIMB_FLOOR) * 0.41
+  return shaped / mean
+}
+
+/**
  * 止まったと見なす速さ / 動き出したと見なす速さ (m/s)。
  *
  * 入りと出でしきい値を変える。1 つだと境目で毎フレーム切り替わって足踏みになる。

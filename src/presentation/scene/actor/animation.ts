@@ -2079,6 +2079,15 @@ export class CharacterAnimator {
     return (action.time % duration) / duration
   }
 
+  /** 梯子を登る型の再生位置 (0..1)。波を作るのに使う */
+  get climbPhase(): number {
+    const action = this.lower.get('climb')
+    if (!action) return 0
+    const duration = action.getClip().duration
+    if (duration <= 0) return 0
+    return (action.time % duration) / duration
+  }
+
   /** 移動速度が変わったら、足が滑らないよう再生速度を引き直す */
   setMoveSpeed(speed: number): void {
     this.moveSpeed = speed

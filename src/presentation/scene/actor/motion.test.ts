@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { WHOLE_BODY, crawlSurge, resolveLocomotion, type StanceInput } from './motion'
+import {
+  WHOLE_BODY,
+  climbSurge,
+  crawlSurge,
+  resolveLocomotion,
+  type StanceInput,
+} from './motion'
 import { stanceOf } from '../../../domain/player/stance'
 
 /**
@@ -289,5 +295,35 @@ describe('這う脈', () => {
   test('1 周期に 2 回。位相が 1 周れば元へ戻る', () => {
     expect(crawlSurge(0.19)).toBeCloseTo(crawlSurge(0.69), 5)
     expect(crawlSurge(0.2)).toBeCloseTo(crawlSurge(1.2), 5)
+  })
+})
+
+/**
+ * 梯子の波。**均すと 1** — 登り切るまでの時間は変えずに、進み方だけ変える。
+ */
+describe('梯子を登る波', () => {
+  test('均すと 1 になる', () => {
+    let sum = 0
+    const steps = 400
+    for (let i = 0; i < steps; i++) sum += climbSurge(i / steps)
+    expect(sum / steps).toBeCloseTo(1, 1)
+  })
+
+  test('**1 周期に 2 回**押し上げる', () => {
+    const peaks: number[] = []
+    const steps = 200
+    for (let i = 0; i < steps; i++) {
+      const before = climbSurge((i - 1 + steps) / steps)
+      const here = climbSurge(i / steps)
+      const after = climbSurge((i + 1) / steps)
+      if (here > before && here >= after) peaks.push(i / steps)
+    }
+    expect(peaks.length).toBe(2)
+  })
+
+  test('押していない間も止まり切らない。**引っ掛かって見える**', () => {
+    let low = 1
+    for (let i = 0; i < 200; i++) low = Math.min(low, climbSurge(i / 200))
+    expect(low).toBeGreaterThan(0.1)
   })
 })
