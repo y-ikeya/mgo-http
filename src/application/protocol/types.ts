@@ -916,8 +916,19 @@ export interface StunEvent {
   type: 'stun'
   by: string
   byName: string
+  /**
+   * 眠らせた側の陣営。**倒した知らせ (KillEvent) と揃える。**
+   *
+   * 無かった頃は受け取る側が「見ている本人の陣営」で代用していて、青の人が
+   * 眠らせても赤い名前で出ていた。誰が誰を、は色でも読ませるので、送る側が
+   * 知っていることは送る。
+   */
+  byTeam: Team
   target: string
   targetName: string
+  targetTeam: Team
+  /** 使った物。**麻酔銃は 2 挺ある** ので決め打ちにしない */
+  weapon: string
   /** 頭に当たって一発で眠らせたか */
   head: boolean
 }
