@@ -1473,7 +1473,13 @@ export class Soldier {
      * 出る。型の位相から波を作って、押し上げる瞬間だけ速くする (這うのと
      * 同じ仕掛け)。
      */
-    this.velocityY = forward * LADDER_SPEED * climbSurge(this.animator?.climbPhase ?? 0)
+    /*
+     * **FAST MOVE が効く。** 走る速さを上げる札は梯子にも効く。
+     *
+     * 重さは掛けない — 腕で登るので、背負った銃の重さで登る速さは変わらない。
+     */
+    this.velocityY =
+      forward * LADDER_SPEED * runnerScale(this.skills) * climbSurge(this.animator?.climbPhase ?? 0)
     /*
      * **押している分だけ絵が進む。** 手を止めれば絵も止まる。
      *
