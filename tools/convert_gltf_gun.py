@@ -34,6 +34,14 @@ SRC, OUT = argv[0], argv[1]
 LENGTH = float(argv[2]) if len(argv) > 2 else 0.0
 # 銃口がどちら側かを明示する ('min' / 'max')。省略すると形から判定する
 FORCE = argv[3].lower() if len(argv) > 3 else ''
+#
+# 使う物だけを名前で選ぶ。**同じ銃の作り分けが 1 つのファイルに入っている**
+# ことがある (Sketchfab の "4 variation" 物は、銃身は同じでスコープや負い紐
+# だけが違う 4 つが重なって入っていた)。そのまま変換すると 4 挺ぶんの頂点を
+# 抱えたまま、同じ場所に重なって光る。
+#
+#   $BLENDER ... -- scene.gltf public/models/mosin.glb 1.232 "" MNStock_Low.002
+ONLY = argv[4] if len(argv) > 4 else ''
 
 # 既存の rifle.glb の銃口位置 (weapon.ts の RIFLE.tip)
 TIP = mathutils.Vector((0.0, 0.171, -0.845))
@@ -57,6 +65,16 @@ for obj in list(bpy.context.scene.objects):
 for obj in list(bpy.context.scene.objects):
     if obj.type != 'MESH':
         bpy.data.objects.remove(obj, do_unlink=True)
+
+# 名前で選ぶ。**前方一致** — 作り分けは同じ名前に枝番が付く形で入っている
+if ONLY:
+    kept = []
+    for obj in list(bpy.context.scene.objects):
+        if obj.name.startswith(ONLY):
+            kept.append(obj.name)
+        else:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    print(f'[gun] 名前で選んだ: {", ".join(kept) or "(何も残らなかった)"}')
 
 meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
 if not meshes:

@@ -46,11 +46,16 @@ describe('音の届き方', () => {
     expect(widest.id).toBe('sniper')
   })
 
-  test('麻酔銃が一番静か。**気づかれずに撃つ道具**', () => {
+  test('麻酔が一番静か。**気づかれずに撃つ道具**', () => {
+    /*
+     * 一番静かな銃は麻酔である、という決まり。**id では縛らない** —
+     * 麻酔は 2 挺 (M9 / モシンナガン) あり、どちらも足音と同じ 20m なので、
+     * 「m9 が一番」と書くと並んだ時点で嘘になる。
+     */
     const quietest = Object.values(WEAPONS).reduce((a, b) =>
       a.noiseRange <= b.noiseRange ? a : b,
     )
-    expect(quietest.id).toBe('m9')
+    expect(quietest.tranquilizer).toBe(true)
   })
 
   test('届く距離の外では聞こえない', () => {

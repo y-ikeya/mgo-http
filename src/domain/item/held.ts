@@ -194,6 +194,8 @@ export const HELD: Record<HeldId, HeldSpec> = {
   smg: { id: 'smg', label: 'P90', family: 'weapon', slot: 'primary', weight: 2.6, shoots: true, twoHanded: true },
   rifle: { id: 'rifle', label: 'AK47', family: 'weapon', slot: 'primary', weight: 3.5, shoots: true, twoHanded: true },
   sniper: { id: 'sniper', label: 'XM2010', family: 'weapon', slot: 'primary', weight: 5.5, shoots: true, twoHanded: true },
+  // 麻酔の狙撃銃。殺さないが、眠らせれば同じだけ数を減らせる
+  mosin: { id: 'mosin', label: 'MOSIN', family: 'weapon', slot: 'primary', weight: 4.0, shoots: true, twoHanded: true },
   shotgun: { id: 'shotgun', label: 'M870', family: 'weapon', slot: 'primary', weight: 3.6, shoots: true, twoHanded: true },
   m9: { id: 'm9', label: 'M9', family: 'weapon', slot: 'secondary', weight: 0.95, shoots: true, twoHanded: false },
   m1911: { id: 'm1911', label: 'M1911', family: 'weapon', slot: 'secondary', weight: 1.05, shoots: true, twoHanded: false },

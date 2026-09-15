@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadM1911, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
+import { loadKnife, loadM1911, loadMosin, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
 import { isMesh } from '../util/guards'
 import type { Stance } from '../../../domain/player/stance'
 
@@ -212,7 +212,15 @@ const PISTOL: WeaponConfig = {
   tip: new THREE.Vector3(0, 0.067, -0.172),
 }
 
-export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, shotgun: SHOTGUN, sniper: SNIPER, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
+/**
+ * モシンナガン (麻酔の狙撃銃)。**持ち方は狙撃銃と同じ。**
+ *
+ * convert_gltf_gun.py が銃口を同じ座標へ揃えて書き出すので、握りの値も
+ * ボルトの置き場所もそのまま通る。合わなければここで分ける。
+ */
+const MOSIN: WeaponConfig = SNIPER
+
+export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, shotgun: SHOTGUN, sniper: SNIPER, mosin: MOSIN, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
 
 /**
@@ -229,6 +237,8 @@ export type WeaponTarget =
   | 'shotgunCrouch'
   | 'sniper'
   | 'sniperCrouch'
+  | 'mosin'
+  | 'mosinCrouch'
   | 'm9'
   | 'm9Crouch'
   | 'm1911'
@@ -239,6 +249,7 @@ export type WeaponTarget =
   | 'rifleProne'
   | 'shotgunProne'
   | 'sniperProne'
+  | 'mosinProne'
   | 'm9Prone'
   | 'm1911Prone'
 
@@ -338,6 +349,8 @@ export class Weapon {
             ? await loadPistol()
             : kind === 'm1911'
               ? await loadM1911()
+            : kind === 'mosin'
+              ? await loadMosin()
             : kind === 'smg'
               ? await loadSmg()
               : kind === 'shotgun'
