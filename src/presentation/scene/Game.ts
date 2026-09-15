@@ -1617,11 +1617,14 @@ export class Game {
          * 誰が何点取ったかは、終わった直後にしか意味を持たない。Tab を押した人
          * だけが見られる形だと、押さない人には勝ち負けの結果しか残らない。
          *
-         * 次の試合が始まったら畳む。開いたままだとポインタが離れていて、
-         * 始まった瞬間に動けない
+         * **結果を見せ終わったら畳む。** 結果の間だけ画面いっぱいに開く作りに
+         * したので (Scoreboard の score-over)、次の段階へ移った時点で開いた
+         * ままだと**小さい成績表に縮んで居座る** — 結果がもう一度出たように
+         * 見えていた。始まってから畳むのでは遅い (ポインタが離れていて、
+         * 始まった瞬間に動けない)。
          */
         if (effect.to === "over") this.setMenu(true);
-        else if (effect.to === "playing" && this.menuOpen) this.setMenu(false);
+        else if (this.menuOpen) this.setMenu(false);
         break;
 
       case "team":
