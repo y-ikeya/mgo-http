@@ -729,11 +729,34 @@ export class Soldier {
     this.animator?.playSleep()
   }
 
-  /** 眠りが明けた。**サーバーが決める** */
+  /**
+   * 眠りが明けた。**サーバーが決める。**
+   *
+   * **伏せた姿で起きる。** 眠っていた体は床にあるので、立った姿へ戻すと
+   * その場で跳ね起きて見える。伏せへ渡して、立ち上がるのは本人の操作に任せる
+   * — 起き抜けは狙われている場面でもあるので、**立つかどうかを選べる**
+   * ほうが遊びとして厚い。
+   *
+   * 出入りの型 (prone_down) は流さない。もう床に居るので、伏せる動きを
+   * 挟むと一度起き上がってから伏せ直すことになる。
+   */
   wake(): void {
+    /*
+     * **眠っていた時だけ。** スタミナの知らせは定期便で届き、眠っていなくても
+     * ここを通る (麻酔を 1 発受けただけの時など)。見ずに伏せさせると、撃たれる
+     * たびに床へ倒れることになる。
+     */
+    const wasAsleep = this.sleepLeft > 0
     this.sleepLeft = 0
     this.sleepSpan = 0
     this.animator?.wakeFromSleep()
+    if (!wasAsleep) return
+    if (this.down || this.downed || this.boxed || !this.onGround) return
+    this.proneStage = 'prone'
+    this.proneShiftLeft = 0
+    // 伏せは屈みの延長。頭の高さも音の届き方もそちら側で扱う (setProne と同じ)
+    this.crouching = true
+    this.aiming = false
   }
 
   /** 箱が落ちて棒立ちになっている残り時間 (秒)。0 なら動ける */
