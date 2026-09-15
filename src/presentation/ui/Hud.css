@@ -1205,13 +1205,18 @@
   pointer-events: none;
   /*
    * --sleep-open が「見えている円の半径」。深いほど小さい (Hud.tsx)。
-   * 縁をぼかすために、透明から黒へ 2 段で渡す。
+   *
+   * **黒へ渡す幅を決め打ちにする。** 前は円の外から画面の隅まで一息に
+   * 渡していたので、深く眠っても画面の大半が「薄暗い」どまりで、黒い縁に
+   * 見えなかった。16% で渡し切って、その外は真っ暗にする — 完全に眠れば
+   * 覗き穴だけが残る。
    */
   background: radial-gradient(
     circle at 50% 50%,
     transparent 0%,
     transparent var(--sleep-open, 100%),
-    rgba(2, 5, 12, 0.94) 100%
+    rgba(2, 5, 12, 0.985) calc(var(--sleep-open, 100%) + 16%),
+    rgba(2, 5, 12, 0.985) 100%
   );
   transition: background 0.25s linear;
 }
