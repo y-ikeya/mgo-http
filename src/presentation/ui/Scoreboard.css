@@ -24,8 +24,8 @@
  * (スキル 8 つ) が収まる高さに揃えて、余った分は下を空ける。
  */
 .score-panel {
-  width: min(640px, calc(100vw - 40px));
-  height: min(460px, calc(100vh - 48px));
+  width: min(860px, calc(100vw - 40px));
+  height: min(600px, calc(100vh - 48px));
   background: rgba(10, 15, 9, 0.9);
   border: 1px solid rgba(160, 190, 140, 0.24);
   display: flex;
@@ -174,17 +174,9 @@
  * 名前の前の Lv。通算から出る (その試合の成績ではない)。
  * 名前より小さく、色を落として置く — 読みたいのは名前が先で、Lv は添え物
  */
-.score-lv {
-  display: inline-block;
-  min-width: 1.6em;
-  margin-right: 6px;
-  padding: 0 4px;
-  border: 1px solid rgba(160, 190, 140, 0.28);
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  text-align: center;
-  color: rgba(180, 200, 165, 0.85);
+/* 通算の Lv。その試合の成績ではないので、点より落ち着いた色で */
+.score-num.score-level {
+  color: rgba(180, 200, 165, 0.7);
 }
 
 .score-name {
@@ -237,14 +229,27 @@
  * 色はここで決める (継ぐ先が名前の色になったので、陣営の赤青を拾わないよう
  * 自分で持つ)。線は胴、塗りは目盛り。
  */
+/*
+ * 色で具合を言う。**緑 = 足りている / 黄 = 怪しい / 赤 = 足りない。**
+ * 目盛りの数と同じことを色でも言うので、小さくても遠目で分かる。
+ */
 .score-signal {
   flex: 0 0 auto;
   margin-right: 8px;
-  color: rgba(150, 166, 140, 0.65);
+  color: rgba(126, 206, 108, 0.9);
+}
+
+.score-signal.score-rate-mid {
+  color: rgba(226, 198, 96, 0.95);
 }
 
 .score-signal.score-rate-low {
-  color: rgba(255, 150, 120, 0.95);
+  color: rgba(255, 120, 96, 0.95);
+}
+
+/* 途切れている。色で語る物が無いので地の色へ落とす */
+.score-signal.score-rate-out {
+  color: rgba(150, 166, 140, 0.5);
 }
 
 .score-battery {
@@ -566,10 +571,6 @@
 .score-over .score-row {
   padding: 9px 26px;
   font-size: 21px;
-}
-
-.score-over .score-lv {
-  font-size: 14px;
 }
 
 .score-over .score-tag {

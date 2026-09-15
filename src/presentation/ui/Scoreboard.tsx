@@ -70,7 +70,11 @@ export default function Scoreboard(props: {
     return (
       <span
         class="score-signal"
-        classList={{ 'score-rate-low': level() > 0 && level() <= 2, 'score-rate-out': level() === 0 }}
+        classList={{
+          'score-rate-mid': level() === 2,
+          'score-rate-low': level() === 1,
+          'score-rate-out': level() === 0,
+        }}
         title={`${cell.away === true ? 0 : (cell.rate ?? 0)} 通/秒`}
       >
         <svg class="score-battery" viewBox="0 0 22 12" aria-hidden="true">
@@ -228,11 +232,16 @@ export default function Scoreboard(props: {
             <div class="score-team-head">
               順位
               <span class="score-cols">
-                <span class="score-col-points">P</span>
+                {/* 通算の Lv。**その試合の成績ではない**ので、点の手前に置く */}
+                <span>Lv</span>
                 <span>K</span>
                 {/* 眠らせた数。**倒した数には入らない** — 残機が減っていない */}
                 <span class="score-col-stun">S</span>
                 <span>D</span>
+                {/* 自分で死んだ数。D に含まれるが、引かれ方が違う (-5) */}
+                <span>SU</span>
+                {/* 合計点。**読ませたい数なので最後** */}
+                <span class="score-col-points">P</span>
               </span>
             </div>
             <For each={ranking()}>
@@ -247,14 +256,15 @@ export default function Scoreboard(props: {
                   <span class="score-name">
                     <span class="score-rank">{index() + 1}</span>
                     <Battery rate={player.rate ?? 0} away={player.away} />
-                    <span class="score-lv">{levelFor(player.id)}</span>
                     {player.name}
                     {player.away === true && <span class="score-tag">{t('score.away')}</span>}
                   </span>
-                  <span class="score-num score-points">{pointsOf(player)}</span>
+                  <span class="score-num score-level">{levelFor(player.id)}</span>
                   <span class="score-num">{player.kills}</span>
                   <span class="score-num score-stuns">{player.stuns || ''}</span>
                   <span class="score-num score-deaths">{player.deaths}</span>
+                  <span class="score-num score-deaths">{player.suicides || ''}</span>
+                  <span class="score-num score-points">{pointsOf(player)}</span>
                 </div>
               )}
             </For>
@@ -278,12 +288,16 @@ export default function Scoreboard(props: {
                     </Show>
                   </span>
                   <span class="score-cols">
-                    {/* 点。kill +3 / death -2 の合算 */}
-                    <span class="score-col-points">P</span>
+                    {/* 通算の Lv。**その試合の成績ではない**ので、点の手前に置く */}
+                    <span>Lv</span>
                     <span>K</span>
                     {/* 眠らせた数。**倒した数には入らない** */}
                     <span class="score-col-stun">S</span>
                     <span>D</span>
+                    {/* 自分で死んだ数。D に含まれるが、引かれ方が違う (-5) */}
+                    <span>SU</span>
+                    {/* 点。kill +3 / stun +3 / death -2 / 自死 -5 の合算 */}
+                    <span class="score-col-points">P</span>
                     {/* 通信。名目 64 通/秒 */}
                       </span>
                 </div>
@@ -301,18 +315,16 @@ export default function Scoreboard(props: {
                     >
                       <span class={`score-name score-${team}`}>
                         <Battery rate={player.rate ?? 0} away={player.away} />
-                        <span class="score-lv">{levelFor(player.id)}</span>
                         {player.name}
                         {player.away === true && <span class="score-tag">{t('score.away')}</span>}
                       </span>
-                      {/*
-                        点。勝敗を決めているのはこれなので、K/D より先に置く。
-                        **負にもなる。**
-                      */}
-                      <span class="score-num score-points">{pointsOf(player)}</span>
+                      <span class="score-num score-level">{levelFor(player.id)}</span>
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-stuns">{player.stuns || ''}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
+                      <span class="score-num score-deaths">{player.suicides || ''}</span>
+                      {/* 合計点。**負にもなる**ので 1 桁ぶん広い */}
+                      <span class="score-num score-points">{pointsOf(player)}</span>
                     </div>
                   )}
                 </For>
