@@ -768,6 +768,16 @@ export interface RoomSummary {
 
 export interface MatchMessage {
   type: 'match'
+  /**
+   * いま走っている試合の札。**試合が変われば変わる。**
+   *
+   * 始まった時に発番され (countdown -> playing)、終わっても次が始まるまでは
+   * 残る。まだ一度も始まっていない部屋では無い。戦績の表の鍵と同じ物なので、
+   * 後から「あの試合」を引ける。
+   *
+   * 見せる側 (URL) は頭 6 文字だけ使う。長い札をそのまま貼ると読めない。
+   */
+  matchId?: string
   /** その部屋のルール。陣営で分かれるか、何を表示するかがこれで決まる */
   mode: Mode
   /**
@@ -906,8 +916,19 @@ export interface StunEvent {
   type: 'stun'
   by: string
   byName: string
+  /**
+   * 眠らせた側の陣営。**倒した知らせ (KillEvent) と揃える。**
+   *
+   * 無かった頃は受け取る側が「見ている本人の陣営」で代用していて、青の人が
+   * 眠らせても赤い名前で出ていた。誰が誰を、は色でも読ませるので、送る側が
+   * 知っていることは送る。
+   */
+  byTeam: Team
   target: string
   targetName: string
+  targetTeam: Team
+  /** 使った物。**麻酔銃は 2 挺ある** ので決め打ちにしない */
+  weapon: string
   /** 頭に当たって一発で眠らせたか */
   head: boolean
 }

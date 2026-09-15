@@ -146,7 +146,7 @@ const FLAG_SALUTE = 16
  *
  * 見た目 (相手が何を構えているか) と、サーバーの威力の計算に要る。
  */
-const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'm9', 'smg', 'shotgun', 'm1911']
+const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'm9', 'smg', 'shotgun', 'm1911', 'mosin']
 const WEAPON_INDEX = new Map(WEAPON_BITS.map((id, i) => [id, i]))
 
 /**
@@ -163,6 +163,8 @@ const HELD_BITS: HeldId[] = [
   'm1911',
   // decoy。**末尾に足す**
   'decoy',
+  // 麻酔の狙撃銃。**末尾に足す**
+  'mosin',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 

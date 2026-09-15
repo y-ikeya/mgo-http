@@ -52,8 +52,10 @@ const JA = {
   'lobby.unreachable': 'サーバーに繋がらない',
   'lobby.loading': '読み込み中…',
 
+
   // --- 試合中 ---
   'hud.waitingForOpponent': '対戦相手を待っています',
+  'hud.matchGone': 'その試合はすでに終了しています',
   'hud.scopeHint': 'Z / ホイールで覗く',
   'hud.standUpHint': '移動で匍匐 · Space で起き上がる',
   // --- 装備 ---
@@ -127,7 +129,9 @@ const EN: Record<Key, string> = {
   'lobby.unreachable': 'Cannot reach the server',
   'lobby.loading': 'Loading…',
 
+
   'hud.waitingForOpponent': 'Waiting for an opponent',
+  'hud.matchGone': 'That match is already over',
   'hud.scopeHint': 'Z / wheel to scope',
   'hud.standUpHint': 'MOVE TO CRAWL · SPACE TO GET UP',
   'loadout.note': 'Choose your loadout',

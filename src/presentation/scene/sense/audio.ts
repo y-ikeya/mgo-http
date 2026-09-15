@@ -49,6 +49,16 @@ const SOUNDS = {
    */
   snipe: { file: "xm2010_shot1.mp3", reference: 8, max: weaponOf("sniper").noiseRange },
   /**
+   * モシンナガン (麻酔の狙撃銃)。**狙撃銃より小さい音。**
+   *
+   * 消音されているので、耳元での大きさ (reference) を XM2010 の半分にしてある。
+   * 届く距離は武器の性能から引くので 20m で消える — 撃った本人にはしっかり
+   * 聞こえて、離れた相手には届かない、という差がこの 2 つの数で出る。
+   */
+  mosin: { file: "mosin_shot1.mp3", reference: 4, max: weaponOf("mosin").noiseRange },
+  /** ボルトを引く音。発砲音に入っていないので別に鳴らす */
+  mosinCock: { file: "mosin_cock1.mp3", reference: 3, max: 24 },
+  /**
    * ナイフが刺さった音。**当たった時だけ鳴る。**
    *
    * 空振りでは鳴らさない。刺突は当てたかどうかで結果が全部決まる (背後なら

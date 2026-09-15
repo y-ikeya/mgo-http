@@ -232,6 +232,8 @@ export function matchState(room: Match): ServerMessage {
   const leader = leakingOf(room)
   return {
     type: 'match',
+    // いま走っている試合の札。URL と戦績の表で同じ物を指す
+    matchId: room.matchId ?? undefined,
     mode: room.mode.id,
     leader: leader?.id,
     blue: room.blue,
@@ -391,6 +393,14 @@ export function finishMatch(room: RoomWorld): void {
  * 始まる。段階に入るたびに聞き直す。
  */
 function enterReady(room: RoomWorld, now: number): void {
+  /*
+   * 前の試合の札を落とす。**札は「走っている試合」だけを指す。**
+   *
+   * 結果を見せている間は残す (その URL を貼れば同じ結果が開く) が、次の支度に
+   * 入った時点でもう別の話。残したままだと、部屋で待っている人の URL が終わった
+   * 試合を指し続ける。
+   */
+  room.matchId = null
   room.phase = 'ready'
   room.endsAt = now + READY_SECONDS * 1000
   room.blue = TICKETS
@@ -459,6 +469,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
       room.phase = 'waiting'
       room.endsAt = 0
       room.winner = undefined
+      room.matchId = null
     }
   } else if (!enough && room.phase !== 'waiting') {
     // 相手が居なくなった。
@@ -477,6 +488,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
       room.phase = 'waiting'
       room.endsAt = 0
       room.winner = undefined
+      room.matchId = null
     }
   } else if (room.phase === 'waiting' && enough) {
     enterReady(room, now)

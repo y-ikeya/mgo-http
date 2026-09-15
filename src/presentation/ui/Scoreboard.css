@@ -24,8 +24,8 @@
  * (スキル 8 つ) が収まる高さに揃えて、余った分は下を空ける。
  */
 .score-panel {
-  width: min(640px, calc(100vw - 40px));
-  height: min(460px, calc(100vh - 48px));
+  width: min(860px, calc(100vw - 40px));
+  height: min(600px, calc(100vh - 48px));
   background: rgba(10, 15, 9, 0.9);
   border: 1px solid rgba(160, 190, 140, 0.24);
   display: flex;
@@ -84,6 +84,11 @@
   padding: 12px 0 16px;
   display: flex;
   flex-direction: column;
+  /*
+   * **縮んでよい。** 既定 (min-width: auto) だと中身の幅が下限になり、
+   * 列が枠からはみ出す。右の陣営の通信欄が切れていたのはこれ。
+   */
+  min-width: 0;
 }
 
 .score-team:first-child {
@@ -110,8 +115,6 @@
   --score-col: 34px;
   /* 点は負にもなる。符号のぶん広く取る */
   --score-col-points: 42px;
-  /* 通信は 2 桁 + 単位ぶん広い */
-  --score-col-rate: 42px;
 }
 
 /* K / D / 通信 の見出し。数字の列の真上に来る */
@@ -130,10 +133,6 @@
 
 .score-cols span.score-col-points {
   width: var(--score-col-points);
-}
-
-.score-col-rate {
-  width: var(--score-col-rate);
 }
 
 .score-row {
@@ -175,20 +174,16 @@
  * 名前の前の Lv。通算から出る (その試合の成績ではない)。
  * 名前より小さく、色を落として置く — 読みたいのは名前が先で、Lv は添え物
  */
-.score-lv {
-  display: inline-block;
-  min-width: 1.6em;
-  margin-right: 6px;
-  padding: 0 4px;
-  border: 1px solid rgba(160, 190, 140, 0.28);
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  text-align: center;
-  color: rgba(180, 200, 165, 0.85);
+/* 通算の Lv。その試合の成績ではないので、点より落ち着いた色で */
+.score-num.score-level {
+  color: rgba(180, 200, 165, 0.7);
 }
 
 .score-name {
+  /* 長い名前で数字を押し出さない。切って「…」にする */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -214,10 +209,6 @@
  * 幅は .score-num より優先させる必要があるので、両方を並べて指定する。
  * 片方だけだと同じ強さになり、**どちらが勝つかが書いた順に依存する**。
  */
-.score-num.score-rate {
-  width: var(--score-col-rate);
-}
-
 /*
  * 眠らせた数。**倒した数の隣、色は別。**
  *
@@ -232,12 +223,57 @@
   color: rgba(127, 196, 255, 0.85);
 }
 
-.score-rate {
-  color: rgba(150, 166, 140, 0.65);
+/*
+ * 通信の乾電池。**名前の左に置く。**
+ *
+ * 色はここで決める (継ぐ先が名前の色になったので、陣営の赤青を拾わないよう
+ * 自分で持つ)。線は胴、塗りは目盛り。
+ */
+/*
+ * 色で具合を言う。**緑 = 足りている / 黄 = 怪しい / 赤 = 足りない。**
+ * 目盛りの数と同じことを色でも言うので、小さくても遠目で分かる。
+ */
+.score-signal {
+  flex: 0 0 auto;
+  margin-right: 8px;
+  color: rgba(126, 206, 108, 0.9);
 }
 
-.score-rate-low {
-  color: rgba(255, 150, 120, 0.95);
+.score-signal.score-rate-mid {
+  color: rgba(226, 198, 96, 0.95);
+}
+
+.score-signal.score-rate-low {
+  color: rgba(255, 120, 96, 0.95);
+}
+
+/* 途切れている。色で語る物が無いので地の色へ落とす */
+.score-signal.score-rate-out {
+  color: rgba(150, 166, 140, 0.5);
+}
+
+.score-battery {
+  width: 22px;
+  height: 12px;
+  vertical-align: -1px;
+}
+
+.score-battery rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.75;
+}
+
+.score-battery-nub,
+.score-battery-bar {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* 目盛りが 1 つも無い (途切れている / まだ届いていない)。胴だけ薄く残す */
+.score-rate-out .score-battery rect {
+  opacity: 0.3;
 }
 
 /*
@@ -357,6 +393,10 @@
  * 色を当てないと下地に沈んで読めなかったので、明示しておく。
  */
 .score-solo .score-name {
+  /* 長い名前で数字を押し出さない。切って「…」にする */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #d8e6f2;
 }
 
@@ -481,4 +521,93 @@
 /* 対戦表の幅に収まればよいので、装備画面のような下限は要らない */
 .score-skills-list .skill {
   min-width: 0;
+}
+
+/*
+ * --- 決着したとき。**画面いっぱいに開く** ---
+ *
+ * 同じ板が Tab の成績表と結果画面を兼ねている。試合中は邪魔にならないよう
+ * 小さく置くが、終わったら**見せる物がこれしかない**ので大きく出す。
+ * 元の MGO2 も、決着の 10 秒は画面をほぼ埋めて数字を大きく見せていた。
+ *
+ * 作りは変えず、寸法だけを差し替える。列の幅は変数で 1 か所に置いてあるので、
+ * 文字を大きくしても見出しと行が揃ったままになる。
+ */
+.score-over {
+  --score-col: 58px;
+  --score-col-points: 74px;
+}
+
+.score-over .score-panel {
+  width: min(1280px, calc(100vw - 48px));
+  height: calc(100vh - 48px);
+}
+
+/* 勝ち負けの一言。**ここが一番大きい** */
+.score-over .score-verdict {
+  padding: 30px 16px 6px;
+  font-size: 58px;
+  letter-spacing: 0.24em;
+}
+
+/* 残機。陣営の数字は勝敗そのものなので、名前より数を大きく */
+.score-over .score-head {
+  padding: 10px 16px 26px;
+  font-size: 44px;
+  gap: 16px;
+}
+
+.score-over .score-team-head {
+  padding: 0 26px 14px;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+}
+
+.score-over .score-cols {
+  font-size: 13px;
+  padding-right: 10px;
+}
+
+.score-over .score-row {
+  padding: 9px 26px;
+  font-size: 21px;
+}
+
+.score-over .score-tag {
+  font-size: 13px;
+}
+
+/* 順位。**大きい画面では番号が要る** — 行が離れると何番目か数えにくい */
+.score-over .score-rank {
+  display: inline-block;
+  min-width: 34px;
+  color: rgba(150, 166, 140, 0.5);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.score-over .score-next {
+  font-size: 15px;
+}
+
+/* 陣営の合計点。名前の右に小さく添える (大きいのは残機のほう) */
+.score-team-points {
+  margin-left: 12px;
+  color: rgba(206, 214, 196, 0.72);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 決着の間は板を切り替えさせない。**見せる物は結果だけ。**
+ * 場所は空けたままにする (消すと表が上へ動いて、目が追い直しになる)
+ */
+.score-tabs-hidden {
+  visibility: hidden;
+}
+
+/* 結果画面では乾電池も大きく。行の文字に合わせる */
+.score-over .score-battery {
+  width: 34px;
+  height: 18px;
+  vertical-align: -3px;
 }

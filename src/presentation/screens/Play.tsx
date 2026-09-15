@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../../i18n'
 import { useNavigate, useParams } from '@solidjs/router'
 import type * as THREE from 'three'
@@ -45,10 +45,75 @@ function statsRequested(): boolean {
  * ここを離れると描画器も通信路も畳まれる。部屋を出るというのはそういうことなので、
  * 残しておく理由が無い。戻ってきたら作り直す (WebGPU の初期化で 1 テンポ待つ)。
  */
+/** 一言を出しておく時間 (ms)。App.css の play-notice の薄れ方と揃える */
+const NOTICE_MS = 6000
+
 export default function Play(props: { identity: Identity }) {
-  const params = useParams<{ room: string }>()
+  const params = useParams<{ room: string; match?: string }>()
+  /*
+   * 入ってきたときに指していた試合。**一度だけ見る。**
+   *
+   * 後から書き換わる URL (試合が変わるたび) と混ぜない。混ぜると、居残って
+   * いる人が次の試合に移った瞬間に「終わった試合だ」と言われて弾かれる。
+   */
+  const asked = params.match
   const navigate = useNavigate()
+
   const [stats, setStats] = createSignal<GameStats | null>(null)
+
+  /*
+   * いま走っている試合を URL に出す。
+   *
+   *     /rooms/delta/match/a3f9c2
+   *
+   * 試合が変われば URL も変わるので、貼った先が「どの試合の話か」を指せる。
+   * 戦績の表と同じ札なので、後から引ける。
+   *
+   * **繋ぎ直さない。** 部屋は同じで、試合だけが入れ替わる — 札を書き換える
+   * だけにして、通信路も描画器もそのままにする (Game が見るのは部屋の名前)。
+   *
+   * 履歴は積まずに**今の 1 つを書き換える** (replaceState)。積むと、戻るが
+   * 「前の試合」を指してしまう。戻るの控え (onMount の hold) も壊さないよう、
+   * state はそのまま渡す。
+   *
+   * まだ始まっていない部屋では札が無いので、部屋までの URL に戻す。
+   */
+  /*
+   * 履歴から終わった試合を開いた場合。**部屋には入れて、一言出す。**
+   *
+   * /rooms/delta (札なし) は部屋の待合室にあたる住所で、部屋そのものは
+   * 生きている。指した試合がもう無いだけなので、一覧まで戻す理由が無い。
+   *
+   * 次の試合が始まればその札の URL になり、走っている最中に開いたのなら
+   * その試合の URL になる。**どの試合に居るかは URL がいつも正しく指す。**
+   */
+  const [gone, setGone] = createSignal(false)
+  let checked = false
+  let goneTimer: ReturnType<typeof setTimeout> | null = null
+
+  createEffect(() => {
+    const current = stats()?.match
+    // まだ何も届いていない。**ここで弾かない** — 届く前に判断すると全部弾く
+    if (!current) return
+    const id = current.matchId
+    const label = id?.slice(0, 6)
+
+    if (!checked) {
+      checked = true
+      // 指した試合はもう無い。**入れはするので、言うだけ**
+      if (asked && asked !== label) {
+        setGone(true)
+        // 放っておいても消える。読み終わる頃に薄れて落ちる (App.css の keyframes と揃える)
+        goneTimer = setTimeout(() => setGone(false), NOTICE_MS)
+      }
+    }
+
+    const room = params.room
+    // 長い札をそのまま貼ると読めない。頭だけで十分に見分けられる
+    const path = label ? `/rooms/${room}/match/${label}` : `/rooms/${room}`
+    if (location.pathname === path) return
+    history.replaceState(history.state, '', `${path}${location.search}`)
+  })
   /**
    * 選んでいる主武器。
    *
@@ -148,6 +213,7 @@ export default function Play(props: { identity: Identity }) {
   onCleanup(() => {
     game()?.dispose()
     setGame(null)
+    if (goneTimer) clearTimeout(goneTimer)
   })
 
   const calibrate = (target: WeaponTarget, grip: THREE.Vector3, rotation: THREE.Euler) => {
@@ -158,6 +224,13 @@ export default function Play(props: { identity: Identity }) {
     <div class="app">
       <div class="viewport" ref={container} />
       <Hud stats={stats()} selfId={game()?.selfId ?? ''} />
+
+      {/* 指した試合がもう無かった。押せば消える */}
+      <Show when={gone()}>
+        <div class="play-notice" onClick={() => setGone(false)}>
+          {t('hud.matchGone')}
+        </div>
+      </Show>
 
       {/* 診断。?stats=on のときだけ。読むだけなので本番でも出す */}
       <Show when={statsRequested()}>

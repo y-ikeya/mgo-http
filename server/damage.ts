@@ -547,8 +547,12 @@ function applyTranquilizer(
     type: 'stun',
     by: attacker.id,
     byName: attacker.name,
+    byTeam: attacker.team,
     target: victim.id,
     targetName: victim.name,
+    targetTeam: victim.team,
+    // 使った物。表から引く (直書きすると武器を増やすたびに嘘になる)
+    weapon: weaponOf(attacker.weapon).kill,
     head: event.zone === 'HEAD',
   })
   broadcast(room, matchState(room))

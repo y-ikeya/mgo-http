@@ -46,7 +46,64 @@ export default function Scoreboard(props: {
     () => (props.stats?.scores ?? []).map((p) => p.id),
     props.identity,
   )
+  /**
+   * 通信の具合を**乾電池**で出す。
+   *
+   * 名目は 64 通/秒。数字そのものは読む人にとって意味が薄く (64 が満点だと
+   * 知らないと 40 の良し悪しが分からない)、列に並ぶと桁が目立つだけだった。
+   * 目盛りなら**満か欠けか**が一目で分かる。
+   *
+   * 4 目盛り。3 分の 2 を切ったら減らし始め、4 分の 1 で最後の 1 つになる。
+   * 途切れている人 (away) と、まだ届いていない人は空で出す。
+   *
+   * **置き場所は名前の左。** 数字の列に混ぜると「点・倒した数・通信」が同じ
+   * 並びに見えるが、通信は成績ではない。人に付く印なので名前側へ寄せる。
+   *
+   * 低い人は自分の機械が送れていない。相手の画面ではその人がカクつくので、
+   * **誰のせいかが全員に見える**ようにしておく。
+   */
+  const bars = (rate: number) =>
+    rate >= 55 ? 4 : rate >= 40 ? 3 : rate >= 24 ? 2 : rate > 0 ? 1 : 0
+
+  const Battery = (cell: { rate: number; away?: boolean }) => {
+    const level = () => (cell.away === true ? 0 : bars(cell.rate ?? 0))
+    return (
+      <span
+        class="score-signal"
+        classList={{
+          'score-rate-mid': level() === 2,
+          'score-rate-low': level() === 1,
+          'score-rate-out': level() === 0,
+        }}
+        title={`${cell.away === true ? 0 : (cell.rate ?? 0)} 通/秒`}
+      >
+        <svg class="score-battery" viewBox="0 0 22 12" aria-hidden="true">
+          {/* 胴と端子。線だけで描いて、中の目盛りで具合を出す */}
+          <rect x="0.5" y="0.5" width="18" height="11" rx="1.5" />
+          <rect class="score-battery-nub" x="19.5" y="3.5" width="2.5" height="5" rx="0.8" />
+          <For each={[0, 1, 2, 3]}>
+            {(i) => (
+              <Show when={i < level()}>
+                <rect class="score-battery-bar" x={2 + i * 4} y={2.5} width="3" height="7" />
+              </Show>
+            )}
+          </For>
+        </svg>
+      </span>
+    )
+  }
+
   const over = () => props.stats?.match?.phase === 'over'
+  /**
+   * 陣営の合計点。**決着の画面にだけ出す。**
+   *
+   * 勝敗は残機で決まる (上の数字) が、どちらがよく働いたかは点の合計に出る。
+   * 元の MGO2 も結果画面では残機と TOTAL SCORE を並べていた。
+   */
+  const teamPoints = (team: string) =>
+    (props.stats?.scores ?? [])
+      .filter((player) => player.team === team)
+      .reduce((sum, player) => sum + pointsOf(player), 0)
   const winner = () => props.stats?.match?.winner
   /** 自分の陣営。勝ったかどうかの言い方を変えるのに使う */
   const mine = () => props.stats?.scores?.find((p) => p.id === props.selfId)?.team
@@ -100,7 +157,8 @@ export default function Scoreboard(props: {
     )
 
   return (
-    <div class="score">
+    // 決着したら画面いっぱいに開く。**同じ板が結果画面を兼ねる**
+    <div class="score" classList={{ 'score-over': over() }}>
       <div class="score-panel">
         <Show when={over()}>
           <div
@@ -138,7 +196,7 @@ export default function Scoreboard(props: {
           板を選ぶ。**アイコンだけ。** 名前を書くほどの数ではないし、
           Tab で開いた直後に読ませたいのは中身のほう。
         */}
-        <nav class="score-tabs">
+        <nav class="score-tabs" classList={{ 'score-tabs-hidden': over() }}>
           <button
             class="score-tab"
             classList={{ 'score-tab-on': tab() === 'board' }}
@@ -174,12 +232,14 @@ export default function Scoreboard(props: {
             <div class="score-team-head">
               順位
               <span class="score-cols">
-                <span class="score-col-points">P</span>
+                {/* 通算の Lv。**その試合の成績ではない**ので、点の手前に置く */}
+                <span>Lv</span>
                 <span>K</span>
                 {/* 眠らせた数。**倒した数には入らない** — 残機が減っていない */}
                 <span class="score-col-stun">S</span>
                 <span>D</span>
-                <span class="score-col-rate">/s</span>
+                {/* 合計点。**読ませたい数なので最後** */}
+                <span class="score-col-points">P</span>
               </span>
             </div>
             <For each={ranking()}>
@@ -193,20 +253,15 @@ export default function Scoreboard(props: {
                 >
                   <span class="score-name">
                     <span class="score-rank">{index() + 1}</span>
-                    <span class="score-lv">{levelFor(player.id)}</span>
+                    <Battery rate={player.rate ?? 0} away={player.away} />
                     {player.name}
                     {player.away === true && <span class="score-tag">{t('score.away')}</span>}
                   </span>
-                  <span class="score-num score-points">{pointsOf(player)}</span>
+                  <span class="score-num score-level">{levelFor(player.id)}</span>
                   <span class="score-num">{player.kills}</span>
                   <span class="score-num score-stuns">{player.stuns || ''}</span>
                   <span class="score-num score-deaths">{player.deaths}</span>
-                  <span
-                    class="score-num score-rate"
-                    classList={{ 'score-rate-low': (player.rate ?? 0) > 0 && (player.rate ?? 0) < 40 }}
-                  >
-                    {player.away === true ? '—' : (player.rate ?? 0) || '—'}
-                  </span>
+                  <span class="score-num score-points">{pointsOf(player)}</span>
                 </div>
               )}
             </For>
@@ -222,17 +277,24 @@ export default function Scoreboard(props: {
             {(team) => (
               <div class="score-team">
                 <div class={`score-team-head score-${team}`}>
-                  {team === 'blue' ? t('score.blue') : t('score.red')}
+                  <span>
+                    {team === 'blue' ? t('score.blue') : t('score.red')}
+                    {/* 合計点。決着したときだけ。試合中は残機を読ませたい */}
+                    <Show when={over()}>
+                      <span class="score-team-points">{teamPoints(team)}</span>
+                    </Show>
+                  </span>
                   <span class="score-cols">
-                    {/* 点。kill +3 / death -2 の合算 */}
-                    <span class="score-col-points">P</span>
+                    {/* 通算の Lv。**その試合の成績ではない**ので、点の手前に置く */}
+                    <span>Lv</span>
                     <span>K</span>
                     {/* 眠らせた数。**倒した数には入らない** */}
                     <span class="score-col-stun">S</span>
                     <span>D</span>
+                    {/* 点。kill +3 / stun +3 / death -2 / 自死 -5 の合算 */}
+                    <span class="score-col-points">P</span>
                     {/* 通信。名目 64 通/秒 */}
-                    <span class="score-col-rate">/s</span>
-                  </span>
+                      </span>
                 </div>
 
                 <For each={side(team)}>
@@ -247,29 +309,16 @@ export default function Scoreboard(props: {
                       }}
                     >
                       <span class={`score-name score-${team}`}>
-                        <span class="score-lv">{levelFor(player.id)}</span>
+                        <Battery rate={player.rate ?? 0} away={player.away} />
                         {player.name}
                         {player.away === true && <span class="score-tag">{t('score.away')}</span>}
                       </span>
-                      {/*
-                        点。勝敗を決めているのはこれなので、K/D より先に置く。
-                        **負にもなる。**
-                      */}
-                      <span class="score-num score-points">{pointsOf(player)}</span>
+                      <span class="score-num score-level">{levelFor(player.id)}</span>
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-stuns">{player.stuns || ''}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
-                      {/*
-                        位置が届いている回数。低い人は自分の機械が送れていない。
-                        相手の画面ではその人がカクつくので、**誰のせいかが
-                        全員に見える**ようにしておく。
-                      */}
-                      <span
-                        class="score-num score-rate"
-                        classList={{ 'score-rate-low': (player.rate ?? 0) > 0 && (player.rate ?? 0) < 40 }}
-                      >
-                        {player.away === true ? '—' : (player.rate ?? 0) || '—'}
-                      </span>
+                      {/* 合計点。**負にもなる**ので 1 桁ぶん広い */}
+                      <span class="score-num score-points">{pointsOf(player)}</span>
                     </div>
                   )}
                 </For>

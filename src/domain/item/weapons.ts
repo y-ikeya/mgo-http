@@ -22,7 +22,7 @@
 import { MAX_HEALTH, type HitZone } from '../rule/damage'
 import { HELD } from './held'
 
-export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'm9' | 'm1911' | 'shotgun'
+export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'mosin' | 'm9' | 'm1911' | 'shotgun'
 
 /**
  * 装備の枠。
@@ -127,7 +127,7 @@ export interface WeaponSpec {
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
   reloadSound: 'reload' | 'pistolReload' | 'm1911Reload' | 'smgReload'
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe' | 'm9' | 'm1911' | 'smg' | 'shotgun'
+  shotSound: 'rifle' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
 
@@ -176,7 +176,7 @@ export interface WeaponSpec {
    */
   pelletSpread?: number
   /** ボルトを操作する音。無ければ鳴らさない (狙撃銃は発砲音に入っている) */
-  boltSound?: 'shotgunCock'
+  boltSound?: 'shotgunCock' | 'mosinCock'
   /**
    * ボルトを操作する型の再生速度。**1 より小さいほど遅い。**
    *
@@ -524,6 +524,106 @@ const SNIPER: WeaponSpec = {
   ],
 }
 
+
+/**
+ * モシンナガン。**麻酔の狙撃銃。**
+ *
+ * 狙撃銃と麻酔銃を 1 つにした物。頭に当てれば 1 発で眠り、胴なら 2 発。
+ * 殺さないので残機を削れないが、**眠っている相手は起こされるまで戦列に
+ * 戻らない** — 数の差を、殺さずに作る道具。
+ *
+ * --- 麻酔銃 (M9) との違い ---
+ * あちらは近くで詰め寄って眠らせる物で、こちらは遠くから 1 人ずつ抜く物。
+ * 弾は速く (320 m/s)、覗ける。そのぶん**次の 1 発まで 1.6 秒**かかるので、
+ * 外せば相手に「どこから撃たれたか」を考える時間を渡す。
+ *
+ * --- 静かさ ---
+ * 音の届く距離は 20m — 麻酔銃と同じで、走る足音と変わらない。狙撃銃 (170m)
+ * とは桁が違う。**遠くから抜いても、抜かれた側の仲間は気づかない。**
+ * これが選ぶ理由で、殺傷力を持たないことの見返りになっている。
+ */
+const MOSIN: WeaponSpec = {
+  id: 'mosin',
+  // **麻酔銃。** 当てても体力は減らず、スタミナが減る
+  tranquilizer: true,
+  label: '麻酔狙撃銃',
+  kill: 'MOSIN',
+  // 消音された銃声。**狙撃銃より小さい** (audio.ts の reference)
+  shotSound: 'mosin',
+  // ボルトの音は発砲音に入っていないので別に鳴らす
+  boltSound: 'mosinCock',
+  reloadSound: 'reload',
+  model: 'mosin',
+  cost: 0,
+  // モシンナガン M91/30。狙撃銃 (5.5) より軽いが、突撃銃よりは重い
+  weight: 4.0,
+  /*
+   * 頭 1 発 / 胴 2 発 / 脚 4 発。**削るのはスタミナ。**
+   *
+   * 狙撃銃と同じ「頭なら 1 発」を麻酔でも通す。当てた側が勝つ、を武器の
+   * 格で覆さない。
+   */
+  zone: { HEAD: 100, BODY: 50, LEGS: 25 },
+  // 麻酔は当たれば効く。距離で薄まる物ではない (M9 と同じ理由)
+  fullRange: 200,
+  minRange: 200,
+  minScale: 1,
+
+  fireInterval: 1.6,
+  auto: false,
+  bolt: true,
+  // 5 発。狙撃銃と同じ — 弾倉の数で差を付ける銃ではない
+  magazine: 5,
+  reserve: 15,
+  reload: 3.2,
+
+  /*
+   * **遅い。** 麻酔の針なので初速が出ない。ただし当てられる速さにする。
+   *
+   *          20m      40m      60m      80m
+   *   180    6cm     24cm     54cm     97cm    ← 最初に置いた値
+   *   320    2cm      8cm     17cm     31cm
+   *
+   * 180 では 60m で 54cm 落ちる。**この眼鏡には目盛りが無い**ので、
+   * どれだけ上へ置けばよいかを測る手立てが撃つ側に無い — 勘で 3 発外して
+   * ようやく当たる銃になってしまう。320 なら 60m で頭ひとつ (17cm) 上に
+   * 置けば届く。狙撃銃 (880) の 1/3 弱で、走る相手には先読みが要るまま。
+   */
+  bulletSpeed: 320,
+  bulletGravity: 9.8,
+  /*
+   * 消音。**麻酔銃と同じ 20m。**
+   *
+   * 走る足音と同じだけしか漏れない。遠くから抜いても、抜かれた側の仲間は
+   * 気づかない — 殺傷力を持たないことの見返りがここにある。
+   * (rule/noise.ts の STEP_RANGE と揃えてある。麻酔の決まりごと)
+   */
+  noiseRange: 20,
+
+  sway: 0.30,
+  spreadPerShot: 0.9,
+  spreadMax: 3.5,
+  spreadPerSpeed: 1.1,
+  spreadCrouchScale: 0.2,
+  spreadAirborne: 4,
+  spreadPerStance: 0.35,
+
+  aimFov: 38,
+  aimDistance: 1.35,
+  aimShoulder: 0.42,
+  aimSpeedScale: 0.35,
+  /*
+   * 覗ける。**倍率は狙撃銃より控えめ。**
+   *
+   * 弾が遅く落ちるので、16 倍で遠くを覗けても当たらない。届く間合いに
+   * 合わせて 2 段にしてある。
+   */
+  scope: [
+    { fov: 16, label: '4x' },
+    { fov: 8, label: '8x' },
+  ],
+}
+
 /**
  * 拳銃。副武器。
  *
@@ -780,6 +880,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   shotgun: SHOTGUN,
   rifle: RIFLE,
   sniper: SNIPER,
+  mosin: MOSIN,
   m9: PISTOL,
   m1911: M1911,
 }

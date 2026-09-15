@@ -120,9 +120,14 @@ describe('武器の mastery', () => {
      * 副武器 (M9 / M1911) だけは 1 つを分け合う。どちらも片手の拳銃で、
      * 持ち替えても手の内は変わらない — **別々にすると、拳銃を極めるのに
      * 予算 2 挺ぶん要る**ことになり、副武器に主武器と同じ値段が付く。
+     *
+     * **狙撃銃も同じ理由で 2 挺が 1 つを分け合う** (XM2010 / モシンナガン)。
+     * 構えも間合いも同じで、違うのは殺すか眠らせるかだけ。別にすると
+     * 「麻酔を持つ日は腕前を捨てる」になって、選ぶ理由が消える。
      */
     const primaries = CHOICES.primary.map((id) => MASTERY_OF[id])
-    expect(new Set(primaries).size).toBe(primaries.length)
+    expect(new Set(primaries).size).toBe(primaries.length - 1)
+    expect(MASTERY_OF.mosin).toBe(MASTERY_OF.sniper)
     expect(MASTERY_OF.m9).toBe(MASTERY_OF.m1911)
     expect(costOf({ smgMastery: 3, sniperMastery: 3 })).toBeGreaterThan(SKILL_BUDGET)
   })

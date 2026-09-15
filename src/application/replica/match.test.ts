@@ -23,6 +23,42 @@ function matchMessage(over: Partial<MatchMessage> = {}): ServerMessage {
   } as ServerMessage
 }
 
+
+/**
+ * 眠らせた知らせ。**色は送られてきた陣営で出す。**
+ *
+ * 見ている本人の陣営で代用していた頃は、青の人が眠らせても赤い名前で出て
+ * いた。誰が誰を、は色でも読ませている。
+ */
+describe('眠らせた知らせ', () => {
+  test('**両方の陣営が届いたまま**キルログに並ぶ', () => {
+    const replica = newMatchReplica()
+    replica.team = 'red'
+    applyMatch(
+      replica,
+      {
+        type: 'stun',
+        by: 'blueman',
+        byName: 'pepa',
+        byTeam: 'blue',
+        target: 'redman',
+        targetName: 'nanashi',
+        targetTeam: 'red',
+        weapon: 'MOSIN',
+        head: true,
+      },
+      'someone',
+      0,
+    )
+    const line = replica.killFeed[0]
+    expect(line.event.killerTeam).toBe('blue')
+    expect(line.event.victimTeam).toBe('red')
+    // 使った物も決め打ちにしない。麻酔銃は 2 挺ある
+    expect(line.event.weapon).toBe('MOSIN')
+    expect(line.stun).toBe(true)
+  })
+})
+
 describe('試合のレプリカ', () => {
   test('ルールは入った時点では分からない。**最初の報せで決まる**', () => {
     const replica = newMatchReplica()

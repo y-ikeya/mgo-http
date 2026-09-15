@@ -453,7 +453,12 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       {/* 照準は画面中央固定。カメラの視線軸がそのまま弾道になる */}
       {/* スコープ。覗いている間だけ */}
       <Show when={props.stats?.scoped}>
-        <div class="scope">
+        {/*
+          眼鏡の中身は銃ごとに違う。**モシンナガンは古い眼鏡** — 目盛りも
+          測距も無く、柱と横線だけ。XM2010 の目盛りを出すと、置き撃ちで
+          勘に頼る銃に「測れる」と嘘をつくことになる。
+        */}
+        <div class="scope" classList={{ 'scope-plain': props.stats?.weaponHeld === 'mosin' }}>
           <div class="scope-glass">
             {/*
               柱 (post)。**上・左・右の 3 本。**
@@ -487,6 +492,18 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
               <div><span /><span /></div>
               <div><span /><span /></div>
             </div>
+            {/*
+              古い眼鏡の照準。**下から伸びる柱と、中心を空けた横線。**
+
+              柱の先が尖っているのは、太いまま中心まで来ると的が隠れるため。
+              尖りの頂点が着弾点で、横線はその高さを示している。
+            */}
+            <Show when={props.stats?.weaponHeld === 'mosin'}>
+              <div class="scope-plain-bar scope-plain-bar-l" />
+              <div class="scope-plain-bar scope-plain-bar-r" />
+              <div class="scope-plain-post" />
+              <div class="scope-plain-tip" />
+            </Show>
             <div class="scope-zoom">{props.stats?.zoom}</div>
           </div>
         </div>

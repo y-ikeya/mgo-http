@@ -47,6 +47,11 @@ const cases: Record<string, Partial<GameStats>> = {
   },
   // 狙撃眼鏡を覗いている。**網目だけを見る**ので他は普段どおり
   scoped: { scoped: true, equipped: 'sniper', held: 'sniper', weaponHeld: 'sniper', zoom: 'x6', ammo: 5, magazine: 5, reserve: 20 },
+  // 眠っている。**縁が黒い** — 深さで覗き穴が狭まる
+  asleep: { asleep: true, sleepDepth: 1, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
+  dozing: { asleep: true, sleepDepth: 0.4, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
+  // 麻酔の狙撃銃。**眼鏡の中身が違う** (目盛りの無い古い眼鏡)
+  scopedMosin: { scoped: true, equipped: 'mosin', held: 'mosin', weaponHeld: 'mosin', zoom: '4x', ammo: 5, magazine: 5, reserve: 15 },
   // 個人戦。残機は 1 つ、上に DM
   dm: {
     match: { phase: 'playing', mode: 'DM', blue: 14, red: 0, endsAt: Date.now() + 212000, present: 5, required: 2, players: [] },

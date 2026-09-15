@@ -61,6 +61,24 @@ describe('個人戦', () => {
     b.close()
   }, 30000)
 
+  /*
+   * 試合の札。**URL がこれを指す** (/rooms/alpha/match/xxxxxx)。
+   *
+   * 戦績の表の鍵と同じ物なので、後から「あの試合」を引ける。始まるまでは
+   * 無い — 支度や待機の間に札を出すと、まだ無い試合を指すことになる。
+   */
+  test('試合には札が付く。**始まってから**', async () => {
+    const { a, b } = await twoInDM()
+    const id = match(a)?.matchId
+    expect(id).toBeTruthy()
+    // 戦績の表の鍵 (uuid) と同じ物
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/)
+    // 見ている人が違っても同じ試合
+    expect(match(b)?.matchId).toBe(id)
+    a.close()
+    b.close()
+  }, 30000)
+
   test('残機は部屋で 1 つ。**誰が死んでも同じ数が減る**', async () => {
     const { a, b } = await twoInDM()
     const before = match(a)?.blue ?? 0
