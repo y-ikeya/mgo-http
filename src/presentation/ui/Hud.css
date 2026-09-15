@@ -1250,3 +1250,73 @@
 .hud-browse-item-tranq .hud-browse-name {
   color: rgba(168, 216, 255, 0.8);
 }
+
+
+/*
+ * --- 古い眼鏡 (モシンナガン) ---
+ *
+ * 目盛りも測距も無い。**柱と横線だけ。** 置き撃ちで勘に頼る銃なので、
+ * 測れる目盛りを出すと嘘になる。
+ *
+ * XM2010 の部品は消して、こちらの 4 本だけを出す。筒の縁 (scope-glass) は
+ * 同じ物を使う — 覗いているのは同じ形の筒なので。
+ */
+.scope-plain .scope-post,
+.scope-plain .scope-fine,
+.scope-plain .scope-red,
+.scope-plain .scope-mils {
+  display: none;
+}
+
+.scope-plain-bar,
+.scope-plain-post,
+.scope-plain-tip {
+  position: absolute;
+  background: rgba(8, 10, 7, 0.92);
+}
+
+/* 横線。中心を空けて左右から伸びる */
+.scope-plain-bar {
+  top: 50%;
+  height: 9px;
+  width: 42%;
+  transform: translateY(-50%);
+}
+
+.scope-plain-bar-l { left: 2%; }
+.scope-plain-bar-r { right: 2%; }
+
+/* 柱。下の縁から中心の手前まで */
+.scope-plain-post {
+  left: 50%;
+  top: 50%;
+  bottom: 2%;
+  width: 11px;
+  transform: translateX(-50%);
+}
+
+/*
+ * 柱の先。**尖らせる。**
+ *
+ * 四角いまま止めると、狙っている所が柱の幅ぶん隠れる。三角にすると
+ * 頂点の 1 点が狙い所になり、的の輪郭も見える。
+ */
+.scope-plain-tip {
+  left: 50%;
+  top: calc(50% - 16px);
+  width: 0;
+  height: 0;
+  background: none;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 16px solid rgba(8, 10, 7, 0.92);
+  transform: translateX(-50%);
+}
+
+/* 倍率は柱に重ねない。**右下へ逃がす** */
+.scope-plain .scope-zoom {
+  left: auto;
+  right: 18%;
+  bottom: 16%;
+  transform: none;
+}

@@ -127,7 +127,7 @@ export interface WeaponSpec {
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
   reloadSound: 'reload' | 'pistolReload' | 'm1911Reload' | 'smgReload'
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe' | 'm9' | 'm1911' | 'smg' | 'shotgun'
+  shotSound: 'rifle' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
 
@@ -176,7 +176,7 @@ export interface WeaponSpec {
    */
   pelletSpread?: number
   /** ボルトを操作する音。無ければ鳴らさない (狙撃銃は発砲音に入っている) */
-  boltSound?: 'shotgunCock'
+  boltSound?: 'shotgunCock' | 'mosinCock'
   /**
    * ボルトを操作する型の再生速度。**1 より小さいほど遅い。**
    *
@@ -548,8 +548,10 @@ const MOSIN: WeaponSpec = {
   tranquilizer: true,
   label: '麻酔狙撃銃',
   kill: 'MOSIN',
-  // 消音された銃声。**専用の音が来たら差し替える** (いまは麻酔銃と同じ物)
-  shotSound: 'm9',
+  // 消音された銃声。**狙撃銃より小さい** (audio.ts の reference)
+  shotSound: 'mosin',
+  // ボルトの音は発砲音に入っていないので別に鳴らす
+  boltSound: 'mosinCock',
   reloadSound: 'reload',
   model: 'mosin',
   cost: 0,

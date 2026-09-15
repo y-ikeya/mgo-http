@@ -59,7 +59,8 @@ describe('部屋の設定', () => {
   test('delta は砂部屋。**狙撃銃だけの TDM**', () => {
     expect(ROOMS.delta.mode).toBe('TDM')
     expect(ROOMS.delta.note).toBe('砂部屋')
-    expect(primariesOf('delta')).toEqual(['sniper'])
+    // 殺す方と眠らせる方。**間合いは同じで、結果だけが違う** 2 挺
+    expect(primariesOf('delta')).toEqual(['sniper', 'mosin'])
   })
 
   test('**delta は副武器も無い。** 詰められたらナイフだけ', () => {
