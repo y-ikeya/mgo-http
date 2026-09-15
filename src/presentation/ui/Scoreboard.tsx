@@ -55,6 +55,12 @@ export default function Scoreboard(props: {
    *
    * 4 目盛り。3 分の 2 を切ったら減らし始め、4 分の 1 で最後の 1 つになる。
    * 途切れている人 (away) と、まだ届いていない人は空で出す。
+   *
+   * **置き場所は名前の左。** 数字の列に混ぜると「点・倒した数・通信」が同じ
+   * 並びに見えるが、通信は成績ではない。人に付く印なので名前側へ寄せる。
+   *
+   * 低い人は自分の機械が送れていない。相手の画面ではその人がカクつくので、
+   * **誰のせいかが全員に見える**ようにしておく。
    */
   const bars = (rate: number) =>
     rate >= 55 ? 4 : rate >= 40 ? 3 : rate >= 24 ? 2 : rate > 0 ? 1 : 0
@@ -63,7 +69,7 @@ export default function Scoreboard(props: {
     const level = () => (cell.away === true ? 0 : bars(cell.rate ?? 0))
     return (
       <span
-        class="score-num score-rate"
+        class="score-signal"
         classList={{ 'score-rate-low': level() > 0 && level() <= 2, 'score-rate-out': level() === 0 }}
         title={`${cell.away === true ? 0 : (cell.rate ?? 0)} 通/秒`}
       >
@@ -227,7 +233,6 @@ export default function Scoreboard(props: {
                 {/* 眠らせた数。**倒した数には入らない** — 残機が減っていない */}
                 <span class="score-col-stun">S</span>
                 <span>D</span>
-                <span class="score-col-rate">/s</span>
               </span>
             </div>
             <For each={ranking()}>
@@ -241,6 +246,7 @@ export default function Scoreboard(props: {
                 >
                   <span class="score-name">
                     <span class="score-rank">{index() + 1}</span>
+                    <Battery rate={player.rate ?? 0} away={player.away} />
                     <span class="score-lv">{levelFor(player.id)}</span>
                     {player.name}
                     {player.away === true && <span class="score-tag">{t('score.away')}</span>}
@@ -249,7 +255,6 @@ export default function Scoreboard(props: {
                   <span class="score-num">{player.kills}</span>
                   <span class="score-num score-stuns">{player.stuns || ''}</span>
                   <span class="score-num score-deaths">{player.deaths}</span>
-                  <Battery rate={player.rate ?? 0} away={player.away} />
                 </div>
               )}
             </For>
@@ -280,8 +285,7 @@ export default function Scoreboard(props: {
                     <span class="score-col-stun">S</span>
                     <span>D</span>
                     {/* 通信。名目 64 通/秒 */}
-                    <span class="score-col-rate">/s</span>
-                  </span>
+                      </span>
                 </div>
 
                 <For each={side(team)}>
@@ -296,6 +300,7 @@ export default function Scoreboard(props: {
                       }}
                     >
                       <span class={`score-name score-${team}`}>
+                        <Battery rate={player.rate ?? 0} away={player.away} />
                         <span class="score-lv">{levelFor(player.id)}</span>
                         {player.name}
                         {player.away === true && <span class="score-tag">{t('score.away')}</span>}
@@ -308,12 +313,6 @@ export default function Scoreboard(props: {
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-stuns">{player.stuns || ''}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
-                      {/*
-                        位置が届いている回数。低い人は自分の機械が送れていない。
-                        相手の画面ではその人がカクつくので、**誰のせいかが
-                        全員に見える**ようにしておく。
-                      */}
-                      <Battery rate={player.rate ?? 0} away={player.away} />
                     </div>
                   )}
                 </For>

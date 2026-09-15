@@ -115,8 +115,6 @@
   --score-col: 34px;
   /* 点は負にもなる。符号のぶん広く取る */
   --score-col-points: 42px;
-  /* 通信は乾電池 1 つぶん。数字を出していた頃より狭くて足りる */
-  --score-col-rate: 28px;
 }
 
 /* K / D / 通信 の見出し。数字の列の真上に来る */
@@ -135,10 +133,6 @@
 
 .score-cols span.score-col-points {
   width: var(--score-col-points);
-}
-
-.score-col-rate {
-  width: var(--score-col-rate);
 }
 
 .score-row {
@@ -223,10 +217,6 @@
  * 幅は .score-num より優先させる必要があるので、両方を並べて指定する。
  * 片方だけだと同じ強さになり、**どちらが勝つかが書いた順に依存する**。
  */
-.score-num.score-rate {
-  width: var(--score-col-rate);
-}
-
 /*
  * 眠らせた数。**倒した数の隣、色は別。**
  *
@@ -241,18 +231,22 @@
   color: rgba(127, 196, 255, 0.85);
 }
 
-.score-rate {
+/*
+ * 通信の乾電池。**名前の左に置く。**
+ *
+ * 色はここで決める (継ぐ先が名前の色になったので、陣営の赤青を拾わないよう
+ * 自分で持つ)。線は胴、塗りは目盛り。
+ */
+.score-signal {
+  flex: 0 0 auto;
+  margin-right: 8px;
   color: rgba(150, 166, 140, 0.65);
 }
 
-.score-rate-low {
+.score-signal.score-rate-low {
   color: rgba(255, 150, 120, 0.95);
 }
 
-/*
- * 通信の乾電池。**色は文字色を継ぐ** — 良いときは地の色、悪いときは赤へ
- * (score-rate-low が上で色を決めている)。線は胴、塗りは目盛り。
- */
 .score-battery {
   width: 22px;
   height: 12px;
@@ -537,7 +531,6 @@
 .score-over {
   --score-col: 58px;
   --score-col-points: 74px;
-  --score-col-rate: 42px;
 }
 
 .score-over .score-panel {
