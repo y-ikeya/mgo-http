@@ -2252,6 +2252,18 @@ export class CharacterAnimator {
    * ナイフを持っているときも片手で、身軽に走る (domain の twoHanded)。
    */
   /**
+   * 梯子を登る型の速さ。**手を止めたら絵も止まる。**
+   *
+   * 押していないのに流れ続けると、その場で登り続ける絵になる (掴んだまま
+   * 待つのは梯子の普通の使い方なので、必ず出る)。下りは**逆再生**で、
+   * 手を下ろす動きになる。
+   */
+  setClimbRate(rate: number): void {
+    this.upper.get(CLIMB_KEY)?.setEffectiveTimeScale(rate)
+    this.lower.get('climb')?.setEffectiveTimeScale(rate)
+  }
+
+  /**
    * 登り切る型の速さ。**素材は 4 秒あるので詰めて流す。**
    *
    * 位置を渡す側 (soldier.ts) と同じ倍率を使わないと、体が屋上に着く前に

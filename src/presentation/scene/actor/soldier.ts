@@ -1408,6 +1408,8 @@ export class Soldier {
     this.mover.airZ = 0
     this.crouching = false
     this.aiming = false
+    // 掴んだ瞬間は止まっている。押してから動き出す
+    this.animator?.setClimbRate(0)
     return true
   }
 
@@ -1449,6 +1451,13 @@ export class Soldier {
      */
     const forward = -(moveDir.x * Math.sin(this.yaw) + moveDir.z * Math.cos(this.yaw))
     this.velocityY = forward * LADDER_SPEED
+    /*
+     * **押している分だけ絵が進む。** 手を止めれば絵も止まる。
+     *
+     * 掴んだまま待つ (上から来る相手を見る / 撃たれない所で息を整える) のは
+     * 梯子の普通の使い方なので、流しっぱなしだとその場で登り続けて見える。
+     */
+    this.animator?.setClimbRate(Math.max(-1, Math.min(1, forward)))
 
     const feet = this.position.y
     // 上端まで来たら乗り越えに入る。**押していなければ待つ**
