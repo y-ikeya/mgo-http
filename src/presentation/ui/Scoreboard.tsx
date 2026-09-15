@@ -238,8 +238,6 @@ export default function Scoreboard(props: {
                 {/* 眠らせた数。**倒した数には入らない** — 残機が減っていない */}
                 <span class="score-col-stun">S</span>
                 <span>D</span>
-                {/* 自分で死んだ数。D に含まれるが、引かれ方が違う (-5) */}
-                <span>SU</span>
                 {/* 合計点。**読ませたい数なので最後** */}
                 <span class="score-col-points">P</span>
               </span>
@@ -263,7 +261,6 @@ export default function Scoreboard(props: {
                   <span class="score-num">{player.kills}</span>
                   <span class="score-num score-stuns">{player.stuns || ''}</span>
                   <span class="score-num score-deaths">{player.deaths}</span>
-                  <span class="score-num score-deaths">{player.suicides || ''}</span>
                   <span class="score-num score-points">{pointsOf(player)}</span>
                 </div>
               )}
@@ -294,8 +291,6 @@ export default function Scoreboard(props: {
                     {/* 眠らせた数。**倒した数には入らない** */}
                     <span class="score-col-stun">S</span>
                     <span>D</span>
-                    {/* 自分で死んだ数。D に含まれるが、引かれ方が違う (-5) */}
-                    <span>SU</span>
                     {/* 点。kill +3 / stun +3 / death -2 / 自死 -5 の合算 */}
                     <span class="score-col-points">P</span>
                     {/* 通信。名目 64 通/秒 */}
@@ -322,7 +317,6 @@ export default function Scoreboard(props: {
                       <span class="score-num">{player.kills}</span>
                       <span class="score-num score-stuns">{player.stuns || ''}</span>
                       <span class="score-num score-deaths">{player.deaths}</span>
-                      <span class="score-num score-deaths">{player.suicides || ''}</span>
                       {/* 合計点。**負にもなる**ので 1 桁ぶん広い */}
                       <span class="score-num score-points">{pointsOf(player)}</span>
                     </div>
