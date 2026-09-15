@@ -21,7 +21,7 @@ from mathutils import Vector
 REF_PREFIX = 'ref_'
 
 # 名前に付けられる札。これ以外の接頭辞は打ち間違いの可能性が高い
-KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_')
+KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_', 'ladder_')
 
 # 面が何を止めるか。既定は全部止めて、名前で個別に外す。
 # (src/domain/stage/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
@@ -574,9 +574,51 @@ for obj in bpy.context.scene.objects:
     boxed_bodies += 1
     mesh_objects += 1
 
+# --- 梯子 -------------------------------------------------------------------
+#
+# **札で宣言する** (`ladder_`)。形からは分からない — 板は壁にも床にもあるので、
+# 「細長い板は梯子」と決めると手すりまで登れてしまう。
+#
+# 積んであるものは 1 本に繋ぐ。作る側は継ぎ目で分けて置く (raft は 3 枚で
+# 12m) が、遊ぶ側にとっては 1 本の梯子で、繋ぎ目で掴み直すのはおかしい。
+#
+# **掴む面は決めない。** 薄いほうの軸 (厚み 0.07m) だけ出しておいて、どちら
+# 側から掴むかは遊ぶ側に任せる。裏から登れないと、追われて回り込んだときに
+# 登れない梯子ができる。
+def ladder_span(box):
+    lo, hi = box['min'], box['max']
+    return (round(hi[0] - lo[0], 3), round(hi[2] - lo[2], 3))
+
+
+ladders = []
+for box in [b for b in boxes if b['name'].startswith('ladder_')]:
+    lo, hi = list(box['min']), list(box['max'])
+    joined = None
+    for other in ladders:
+        # 同じ場所に立っていて、縦に続いているか (継ぎ目の隙間は 0.6m まで)
+        near = all(abs(lo[i] - other['min'][i]) < 0.5 for i in (0, 2))
+        stacked = lo[1] <= other['max'][1] + 0.6 and hi[1] >= other['min'][1] - 0.6
+        if near and stacked:
+            joined = other
+            break
+    if joined:
+        joined['min'] = [min(a, b) for a, b in zip(joined['min'], lo)]
+        joined['max'] = [max(a, b) for a, b in zip(joined['max'], hi)]
+        joined['parts'] += 1
+        continue
+    wide_x, wide_z = ladder_span(box)
+    ladders.append({
+        'name': box['name'],
+        'min': lo,
+        'max': hi,
+        # 厚みのある向き。**掴んで登る面の法線** (どちら側からでも掴める)
+        'axis': 'x' if wide_x < wide_z else 'z',
+        'parts': 1,
+    })
+
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
 with open(json_path, 'w') as f:
-    json.dump({'boxes': boxes}, f, ensure_ascii=False, indent=0)
+    json.dump({'boxes': boxes, 'ladders': ladders}, f, ensure_ascii=False, indent=0)
 
 # 三角は別の口へ、しかも生の数値で。
 #
@@ -793,7 +835,10 @@ for name in exported:
     counts[tag] = counts.get(tag, 0) + 1
 
 print(f'\n書き出し: {glb_path}')
-print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個)')
+print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個 / 梯子 {len(ladders)} 本)')
+for ladder in ladders:
+    height = ladder['max'][1] - ladder['min'][1]
+    print(f'          梯子 {ladder["name"]:16s} 高さ {height:.2f}m ({ladder["parts"]} 枚) 厚みの向き {ladder["axis"]}')
 eyes = sum(1 for m in marks if m & EYE_BIT)
 bullets = sum(1 for m in marks if m & BULLET_BIT)
 print(f'          {bin_path} (三角 {len(marks)} 枚 / {mesh_objects} メッシュ)')

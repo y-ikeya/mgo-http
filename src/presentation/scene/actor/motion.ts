@@ -189,6 +189,13 @@ export interface StanceInput {
   down: boolean
   /** 麻酔で眠っているか。**動けない** */
   asleep: boolean
+  /**
+   * 梯子。**掴んでいる間 / 登り切っている間。**
+   *
+   * 眠りの次に強い。掴んでいる間は歩きも伏せも無いし、登り切る型は途中で
+   * 止められない (掴む物が無い所を通るので、手を離せると宙に浮く)。
+   */
+  climbing: 'climb' | 'climb_top' | null
   boxed: boolean
   crouching: boolean
   aiming: boolean
@@ -272,6 +279,8 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
    * 移らないと「眠ったまま」に見える。それ以外の何をしていても眠りが勝つ。
    */
   if (input.asleep) return 'sleep'
+  // 梯子。上下にしか動けないので、方向も速さも見ない
+  if (input.climbing) return input.climbing
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
   if (input.downed) return 'sweep'

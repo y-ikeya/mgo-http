@@ -77,6 +77,9 @@ export const LOCOMOTIONS: Locomotion[] = [
   'sleep',
   // 仰向けからうつ伏せへ転がる。**末尾に足す**
   'prone_roll_down',
+  // 梯子。登る / 登り切る。**末尾に足す**
+  'climb',
+  'climb_top',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

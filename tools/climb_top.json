@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "ClimbingToTop.fbx": "climb_top" },
+  "out": "climb_top.glb",
+  "maxTexture": 64
+}

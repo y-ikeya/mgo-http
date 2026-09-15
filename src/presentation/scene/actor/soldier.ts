@@ -1,6 +1,12 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
+import {
+  LADDER_SPEED,
+  type Ladder,
+  ladderAt,
+  ladderGrip,
+} from '../../../domain/stage'
 import { BOX_BUMP_STUN, KNOCK_TIME, fallDamage, knockSpeed } from '../../../domain/rule/damage'
 import { PRONE_SPEED_SCALE, stanceOf, type Stance } from '../../../domain/player/stance'
 import * as THREE from 'three'
@@ -261,6 +267,11 @@ export interface PlayerWorld {
 const MODEL_YAW_OFFSET = Math.PI
 
 /** 倒れている間に渡す移動入力。毎フレーム作らないよう使い回す */
+/** 登り切る型の速さ。4 秒は長いので少し詰める */
+const CLIMB_TOP_RATE = 1.35
+/** 登り切った先、梯子の面からどれだけ前へ出るか (m) */
+const CLIMB_TOP_STEP = 0.8
+
 const ZERO_MOVE = new THREE.Vector3()
 
 /**
@@ -511,6 +522,20 @@ export class Soldier {
   private rollStarted = false
   /** しゃがみから転がったか。転がり終わりでしゃがみへ戻す */
   private rollFromCrouch = false
+
+  /**
+   * このステージの梯子。**Game が読み込んで渡す。**
+   *
+   * 無ければ登れないだけで、他は今までどおり動く。
+   */
+  private ladders: readonly Ladder[] = []
+  /** いま掴んでいる梯子。null なら登っていない */
+  private climbing: Ladder | null = null
+  /** 登り切る型の残り (秒)。0 より大きい間は動かせない */
+  private climbTopLeft = 0
+  /** 登り切る型の始めと終わりの足元。その間を渡す */
+  private readonly climbFrom = new THREE.Vector3()
+  private readonly climbTo = new THREE.Vector3()
   private moveSpeed = MOVE_SPEED
   private aimSpeedScale = AIM_SPEED_SCALE
   /** 実際に使う速度。構えの入り抜けで目標へ寄せる */
@@ -771,7 +796,12 @@ export class Soldier {
      * 条件は 4 か所ある)。**止まる理由が違っても、止まることは同じ**なので
      * ここで 1 本にする。
      */
-    return this.bumpLeft > 0 || this.sleepLeft > 0
+    /*
+     * **梯子も同じ扱い。** 両手が塞がっているので撃てないし持ち替えもしない。
+     * そこを渡るかどうかが賭けになるのが梯子の役目で、登りながら撃てると
+     * 渡る危険が消える。
+     */
+    return this.bumpLeft > 0 || this.sleepLeft > 0 || this.onLadder
   }
 
   /**
@@ -1329,6 +1359,147 @@ export class Soldier {
       return
     }
     this.crouching = !this.crouching
+  }
+
+  /** そのステージの梯子を渡す。**読み込みが済んでから** */
+  setLadders(ladders: readonly Ladder[]): void {
+    this.ladders = ladders
+  }
+
+  /**
+   * 梯子を掴んでいるか。**登り切る型の最中も含む。**
+   *
+   * 呼ぶ側はこれを見て、撃つ・投げる・持ち替えるを止める (両手が塞がる)。
+   */
+  get onLadder(): boolean {
+    return this.climbing !== null || this.climbTopLeft > 0
+  }
+
+  /** 目の前に掴める梯子があるか。案内を出すのに使う */
+  get ladderInReach(): boolean {
+    if (this.onLadder || !this.onGround || this.down || this.boxed) return false
+    const p = this.position
+    return ladderAt(this.ladders, p.x, p.y, p.z, PLAYER_HEIGHT) !== null
+  }
+
+  /**
+   * 梯子を掴む。**掴めなければ何もしない。**
+   *
+   * 掴むと体は梯子を向き、重力と横移動が止まる。
+   */
+  grabLadder(): boolean {
+    if (this.onLadder || this.down || this.downed || this.boxed || this.rolling) return false
+    if (this.proneStage !== 'none' || this.saluting) return false
+    const p = this.position
+    const ladder = ladderAt(this.ladders, p.x, p.y, p.z, PLAYER_HEIGHT)
+    if (!ladder) return false
+    const grip = ladderGrip(ladder, p.x, p.z)
+    this.climbing = ladder
+    this.position.x = grip.x
+    this.position.z = grip.z
+    this.yaw = grip.yaw
+    this.velocityY = 0
+    /*
+     * **走ってきた勢いを捨てる。** 空中の横移動は踏み切った時点の速さで
+     * 進み続けるので (sim/space/movement.ts の airX)、そのままだと掴んだ
+     * そばから梯子の横へ流れていく。
+     */
+    this.mover.airX = 0
+    this.mover.airZ = 0
+    this.crouching = false
+    this.aiming = false
+    return true
+  }
+
+  /** 手を離す。**そのまま落ちる** (Space / 下端で下がる) */
+  releaseLadder(): void {
+    if (!this.climbing) return
+    this.climbing = null
+    this.velocityY = 0
+  }
+
+
+  /**
+   * 梯子を登っている間の上下。**横へは動かない。**
+   *
+   * 入力の前後 (体の向きに対する前) をそのまま上下に使う。梯子を向いている
+   * ので、「前に押す = 登る」になる。
+   *
+   * 足元は毎フレーム掴んだ位置へ置き直す。押し続けると板へめり込もうとする
+   * ので、そこを直さないと当たり判定に押し返されて揺れる。
+   *
+   * @returns 移動の仕組みへ渡す向き。**横は殺す**
+   */
+  private steerClimb(dt: number, moveDir: THREE.Vector3): THREE.Vector3 {
+    const ladder = this.climbing
+    if (!ladder) {
+      // 登り切る型の最中。決めた道を渡り切るまで動かさない
+      this.advanceClimbTop(dt)
+      return ZERO_MOVE
+    }
+
+    const grip = ladderGrip(ladder, this.position.x, this.position.z)
+    this.position.x = grip.x
+    this.position.z = grip.z
+    this.yaw = grip.yaw
+
+    /*
+     * 押している向きを体の前後に直す。**カメラではなく体を基準にする** —
+     * 梯子を向いているので、前へ押せば登る。
+     */
+    const forward = -(moveDir.x * Math.sin(this.yaw) + moveDir.z * Math.cos(this.yaw))
+    this.velocityY = forward * LADDER_SPEED
+
+    const feet = this.position.y
+    // 上端まで来たら乗り越えに入る。**押していなければ待つ**
+    if (forward > 0.1 && feet >= ladder.max[1] - PLAYER_HEIGHT * 0.5) {
+      this.startClimbTop(ladder)
+      return ZERO_MOVE
+    }
+    // 下端。**足が着いたら手を離す** (そのまま歩ける)
+    if (forward < -0.1 && feet <= ladder.min[1] + 0.05) {
+      this.releaseLadder()
+      return ZERO_MOVE
+    }
+    return ZERO_MOVE
+  }
+
+  /**
+   * 登り切る型に入る。**掴んだ手は離す。**
+   *
+   * 型の間は足元を上端から屋上へ渡す。型そのものは足を掛けて体を起こす
+   * 動きなので、位置を動かさないと梯子の上で足踏みして見える。
+   */
+  private startClimbTop(ladder: Ladder): void {
+    const span = this.animator?.climbTopDuration ?? 0
+    if (span <= 0) {
+      // 型が読めていない。**上端へ置いて終わり** — 掴んだまま固まらせない
+      this.position.y = ladder.max[1]
+      this.releaseLadder()
+      return
+    }
+    this.climbFrom.copy(this.position)
+    const grip = ladderGrip(ladder, this.position.x, this.position.z)
+    // 屋上は梯子の面の向こう側。掴んでいた側から見て、板を越えた所へ渡す
+    const overX = ladder.axis === 'z' ? grip.x : grip.x + (grip.x < (ladder.min[0] + ladder.max[0]) / 2 ? 1 : -1) * CLIMB_TOP_STEP
+    const overZ = ladder.axis === 'z' ? grip.z + (grip.z < (ladder.min[2] + ladder.max[2]) / 2 ? 1 : -1) * CLIMB_TOP_STEP : grip.z
+    this.climbTo.set(overX, ladder.max[1], overZ)
+    this.climbTopLeft = span / CLIMB_TOP_RATE
+    this.climbing = null
+    this.velocityY = 0
+    this.animator?.setClimbTopRate(CLIMB_TOP_RATE)
+  }
+
+  /** 登り切る型の最中。決めた道を時間で渡る */
+  private advanceClimbTop(dt: number): void {
+    if (this.climbTopLeft <= 0) return
+    const span = (this.animator?.climbTopDuration ?? 0) / CLIMB_TOP_RATE
+    this.climbTopLeft = Math.max(0, this.climbTopLeft - dt)
+    const done = span > 0 ? 1 - this.climbTopLeft / span : 1
+    // 終わり際に一気に乗る。**手を掛けてから体が上がる**型に合わせる
+    const eased = done * done
+    this.position.lerpVectors(this.climbFrom, this.climbTo, eased)
+    this.velocityY = 0
   }
 
   /** 伏せ切っているか。入り / 出 / 転がりの最中は false */
@@ -1934,6 +2105,17 @@ export class Soldier {
       this.inWater = false
     }
 
+    /*
+     * 梯子。**掴んでいる間は重力を切って、上下の速さを自分で決める。**
+     *
+     * 移動の仕組みそのものは通す (壁や床との当たりはそのまま効かせたい)。
+     * 切るのは重力と横移動だけ — 掴んでいるのに落ちたり、板に押し戻されたり
+     * しないように、足元は毎フレーム掴んだ位置へ置き直す。
+     */
+    if (this.onLadder) {
+      moveDir = this.steerClimb(dt, moveDir)
+    }
+
     const moved = stepMovement(
       this.mover,
       {
@@ -1950,7 +2132,8 @@ export class Soldier {
       {
         radius: PLAYER_RADIUS,
         height: PLAYER_HEIGHT,
-        gravity: this.gravity,
+        // 梯子を掴んでいる間は落ちない。上下は自分で決めている
+        gravity: this.onLadder ? 0 : this.gravity,
         fallGravityScale: this.fallGravityScale,
         airControl: AIR_CONTROL,
       },
@@ -2435,6 +2618,8 @@ export class Soldier {
       standingUp: this.standing,
       bumped: this.bumpLeft,
       asleep: this.sleepLeft > 0,
+      // 梯子。掴んでいる間と、登り切る型の最中
+      climbing: this.climbing ? 'climb' : this.climbTopLeft > 0 ? 'climb_top' : null,
       prone: this.proneStage === 'prone',
       proneShift: this.proneShifting,
       stabbing: this.stabbing,

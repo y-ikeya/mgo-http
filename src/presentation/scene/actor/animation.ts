@@ -60,6 +60,9 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 階段を下りる。上りとは別のクリップ
   down_stair: 'down_stair',
   crouch_idle: 'crouch_idle',
+  // 梯子。全身の型なので上半身も同じクリップから取る
+  climb: 'climb',
+  climb_top: 'climb_top',
   sneak: 'sneak',
   sit: 'sit',
   salute: 'salute',
@@ -157,6 +160,9 @@ type UpperState =
  */
 const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
+  // 梯子は全身で 1 つの型。**構えていても同じ** — 両手が塞がっている
+  climb: 'climb',
+  climb_top: 'climb_top',
   crouch_idle: 'knee_relaxed',
   // 上半身も同じクリップから取る。全身で 1 つの型なので分けると腰で食い違う
   sneak: 'sneak',
@@ -376,6 +382,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'hard_land',
   // ダンボールが落ちた反応。留めないと 1.47 秒ごとに驚き直す
   'bump',
+  // 梯子を登り切る型。**一度きり** — 終わりで屋上に立ったまま留める
+  'climb_top',
   // 伏せへの出入り。留めないと、伏せた瞬間にまた膝立ちから伏せ直す
   'prone_down',
   'prone_rise',
@@ -597,6 +605,13 @@ const AWAY_KEY = 'away'
 const HIT_KEY = 'hit'
 /** ダンボールで敵にぶつかった反応。全身の型なので上下そろえて流す */
 const BUMP_KEY = 'bump'
+/**
+ * 梯子。**登り続ける輪** と **登り切る一度きりの型**。
+ *
+ * どちらも全身。両手が塞がっているので、構えていても上半身は差し替わらない。
+ */
+const CLIMB_KEY = 'climb'
+const CLIMB_TOP_KEY = 'climb_top'
 /** 伏せへの出入り。全身の型 */
 const PRONE_DOWN_KEY = 'prone_down'
 const PRONE_RISE_KEY = 'prone_rise'
@@ -659,6 +674,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   ROLL_KEY,
   HARD_LAND_KEY,
   BUMP_KEY,
+  CLIMB_TOP_KEY,
   DEATH_FRONT_KEY,
   DEATH_BACK_KEY,
   PRONE_DEATH_KEY,
@@ -952,6 +968,8 @@ export class CharacterAnimator {
   readonly stabDuration: number
   /** ボルト操作の尺 (秒)。モデル未着なら 0 */
   boltDuration = 0
+  /** 登り切る型の尺 (秒)。呼ぶ側が動きの長さに合わせるのに使う */
+  climbTopDuration = 0
   /** 吹き飛ばされる尺 (秒)。再生速度を掛けたあとの実際の長さ */
   sweepDuration = 0
   /** 起き上がる尺 (秒)。再生速度を掛けたあとの実際の長さ */
@@ -1514,6 +1532,17 @@ export class CharacterAnimator {
       action.clampWhenFinished = true
     }
     this.bumpDuration = bump?.duration ?? 0
+
+    // 梯子。登りは輪、登り切るのは一度きり
+    const climb = byName.get('climb')
+    if (climb) registerUpper(CLIMB_KEY, climb)
+    const climbTop = byName.get('climb_top')
+    if (climbTop) {
+      const action = registerUpper(CLIMB_TOP_KEY, climbTop)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
+    this.climbTopDuration = climbTop?.duration ?? 0
 
     for (const [key, name] of [
       [DEATH_FRONT_KEY, 'death_front'],
@@ -2222,6 +2251,17 @@ export class CharacterAnimator {
    * 名前は拳銃から来ているが、決めているのは「片手か両手か」。手榴弾や
    * ナイフを持っているときも片手で、身軽に走る (domain の twoHanded)。
    */
+  /**
+   * 登り切る型の速さ。**素材は 4 秒あるので詰めて流す。**
+   *
+   * 位置を渡す側 (soldier.ts) と同じ倍率を使わないと、体が屋上に着く前に
+   * 型が終わる / 型が終わっても宙に居る、のどちらかになる。
+   */
+  setClimbTopRate(rate: number): void {
+    this.upper.get(CLIMB_TOP_KEY)?.setEffectiveTimeScale(rate)
+    this.lower.get('climb_top')?.setEffectiveTimeScale(rate)
+  }
+
   /** 手に何も出ていない持ち物か (投げ物・設置物) */
   setHandsEmpty(empty: boolean): void {
     this.handsEmpty = empty
@@ -2533,6 +2573,9 @@ export class CharacterAnimator {
     if (this.upperState === 'hard_land' && this.upper.has(HARD_LAND_KEY)) return HARD_LAND_KEY
     // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
     if (this.upperState === 'bump' && this.upper.has(BUMP_KEY)) return BUMP_KEY
+    // 梯子。**構えていても差し替えない** — 両手が塞がっている
+    if (this.locomotion === 'climb_top' && this.upper.has(CLIMB_TOP_KEY)) return CLIMB_TOP_KEY
+    if (this.locomotion === 'climb' && this.upper.has(CLIMB_KEY)) return CLIMB_KEY
     // 伏せへの出入りも同じ。上だけ構えに戻ると、寝ながら銃を構える形になる
     if (this.upperState === 'prone_down' && this.upper.has(PRONE_DOWN_KEY)) return PRONE_DOWN_KEY
     if (this.upperState === 'prone_rise' && this.upper.has(PRONE_RISE_KEY)) return PRONE_RISE_KEY

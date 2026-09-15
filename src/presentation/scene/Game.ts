@@ -26,6 +26,7 @@ import {
   buildLights,
   buildBases,
   buildStage,
+  loadStageLadders,
   STAGE_CODE,
   type Stage,
 } from "./world/stage";
@@ -1038,6 +1039,15 @@ export class Game {
     const water = waterOf(this.stageName);
     this.player.setWater(water);
     /*
+     * 梯子。**地形と同じ json から読む。**
+     *
+     * 届くまでは登れないだけで、他は普通に動ける。届かなくても遊べる
+     * (梯子の無いステージと同じになる)。
+     */
+    void loadStageLadders(this.stageName).then((ladders) => {
+      this.player.setLadders(ladders);
+    });
+    /*
      * **地形が届くまで人を落とさない。**
      *
      * buildStage はブロックアウトの箱だけ持ってすぐ返り、本物の地形は後から
@@ -1324,6 +1334,21 @@ export class Game {
     // **手を離したあとも塞ぐ。** 押している間だけ止めていたら、離した瞬間から
     // 動けるのに足はかがんだままで、置く型が流れきるまで滑って見えた。
     if (this.setupAiming || this.player.placing) this.moveDir.set(0, 0, 0);
+
+    /*
+     * 梯子。**前へ押していれば掴む。**
+     *
+     * 別の指を用意しない。梯子の前で前へ進むという動きがそのまま「登る」で、
+     * 掴んだあとも同じ指 (前後) が上下になる。掴める所に居るかどうかは
+     * Soldier が持っている (ladderInReach)。
+     */
+    if (
+      !this.player.onLadder &&
+      this.moveDir.lengthSq() > 1e-6 &&
+      this.player.ladderInReach
+    ) {
+      this.player.grabLadder();
+    }
 
     // ブラウザはユーザー操作があるまで音を出せない。ロック取得やボタン押下がそれにあたる。
     if (this.input.engaged) this.audio.resume();
@@ -3185,6 +3210,17 @@ export class Game {
    * Space なのかパッドの × なのかも、こちらは知らない。
    */
   private updateStanceInput(): void {
+    /*
+     * 梯子から手を離す。**掴んでいる間は Space が「降りる」になる。**
+     *
+     * しゃがみも転がりも梯子の上では意味が無いので、同じ指を譲る。
+     * 離せばそのまま落ちる — 高さを選んで飛び降りられる。
+     */
+    if (this.player.onLadder) {
+      if (this.input.tapped("stance")) this.player.releaseLadder();
+      return;
+    }
+
     // 短く押して離した = しゃがみの切り替え
     if (this.input.tapped("stance")) this.player.toggleCrouch();
 

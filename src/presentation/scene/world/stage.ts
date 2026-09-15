@@ -34,6 +34,7 @@ import type { Obstacle } from '../../../sim/space/collision'
 import { TriangleBvh } from '../../../sim/space/bvh'
 import type { SolidWorld } from '../../../sim/space/vision'
 import { isPathClear, sightBlockers } from '../../../sim/space/vision'
+import type { Ladder } from '../../../domain/stage'
 import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
 import { STAGES, waterOf, type StageName } from '../../../domain/stage'
@@ -833,6 +834,28 @@ export function loadStageMoveWorld(name: StageName): Promise<MeshMoveWorld | nul
       return null
     })
   stageMoveWorlds.set(name, pending)
+  return pending
+}
+
+/**
+ * 梯子。**箱と同じ json から読む。**
+ *
+ * 落ちても遊べる (登れないだけ) ので、読めなければ空で返す。
+ */
+const stageLadders = new Map<StageName, Promise<Ladder[]>>()
+
+export function loadStageLadders(name: StageName): Promise<Ladder[]> {
+  const cached = stageLadders.get(name)
+  if (cached) return cached
+  const url = asset.model(`stage_${name}.json`)
+  const pending = fetch(url)
+    .then((res) => res.json() as Promise<{ ladders?: Ladder[] }>)
+    .then((data) => data.ladders ?? [])
+    .catch((error) => {
+      console.warn(`[Stage] stage_${name}.json が読めない (梯子)`, error)
+      return []
+    })
+  stageLadders.set(name, pending)
   return pending
 }
 
