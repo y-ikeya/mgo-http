@@ -1296,20 +1296,21 @@
 }
 
 /*
- * 柱の先。**尖らせる。**
+ * 柱の先。**柱がそのまま尖る。**
  *
- * 四角いまま止めると、狙っている所が柱の幅ぶん隠れる。三角にすると
- * 頂点の 1 点が狙い所になり、的の輪郭も見える。
+ * 柱より広い三角を載せると矢印になって、柱とは別の部品に見える。同じ幅で
+ * 尖らせれば、柱の先端が細くなって 1 点になる — 狙い所はその頂点で、
+ * 四角いまま止めるより的の輪郭が見える。
  */
 .scope-plain-tip {
   left: 50%;
-  top: calc(50% - 16px);
+  top: calc(50% - 13px);
   width: 0;
   height: 0;
   background: none;
-  border-left: 9px solid transparent;
-  border-right: 9px solid transparent;
-  border-bottom: 16px solid rgba(8, 10, 7, 0.92);
+  border-left: 5.5px solid transparent;
+  border-right: 5.5px solid transparent;
+  border-bottom: 13px solid rgba(8, 10, 7, 0.92);
   transform: translateX(-50%);
 }
 
