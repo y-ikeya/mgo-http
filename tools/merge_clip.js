@@ -19,6 +19,14 @@ const args = process.argv.slice(2)
  * 同じ骨格へ足すだけなら要らない。
  */
 const rotationOnly = args.includes('--rotation-only')
+/*
+ * --no-root … 腰の移動を捨てる。**その場で動く型にする。**
+ *
+ * 素材によっては、体が原点から離れた所に置かれたまま焼かれている
+ * (梯子の型は 0.55m 横にずれていた)。位置はこちらが決める型では、その
+ * ずれがそのまま「宙に浮いて登る」になる。
+ */
+const noRoot = args.includes('--no-root')
 const [destPath, srcPath, clipName, outPath] = args.filter((a) => !a.startsWith('--'))
 
 function parseGlb(bytes) {
@@ -90,6 +98,10 @@ for (const channel of animation.channels) {
     continue
   }
   if (rotationOnly && channel.target.path === 'scale') {
+    filtered++
+    continue
+  }
+  if (noRoot && channel.target.path === 'translation' && name.endsWith('Hips')) {
     filtered++
     continue
   }

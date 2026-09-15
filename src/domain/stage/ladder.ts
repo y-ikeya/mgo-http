@@ -26,8 +26,13 @@ export interface Ladder {
 /** 掴める距離 (m)。梯子の面から手が届く範囲 */
 export const LADDER_REACH = 0.85
 
-/** 掴んだときに面から離れて立つ距離 (m)。体が板に埋まらないところ */
-export const LADDER_STANDOFF = 0.42
+/**
+ * 掴んだときに面から離れて立つ距離 (m)。
+ *
+ * **型の手が届く所に置く。** 0.42 では手が桟の手前で空を掻いていた
+ * (試写 tools/preview/ladder.html で見た)。体が板に埋まらない範囲で寄せる。
+ */
+export const LADDER_STANDOFF = 0.26
 
 /** 登り降りの速さ (m/s)。走るより遅い — 渡っている間が危ないのが梯子 */
 export const LADDER_SPEED = 2.2

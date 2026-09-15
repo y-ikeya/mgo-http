@@ -533,6 +533,15 @@ export class Soldier {
   private climbing: Ladder | null = null
   /** 登り切る型の残り (秒)。0 より大きい間は動かせない */
   private climbTopLeft = 0
+  /** 梯子を向く角度。**掴んでいる間はカメラより優先する** */
+  private climbYaw = 0
+  /**
+   * 押している前後の量 (-1..1)。**カメラを通さない生の値。**
+   *
+   * 梯子の上下はこれで決める。カメラ基準の向き (moveDir) を使うと、梯子を
+   * 横から見ている間は「上」が体の前にならず、押しても登らない。
+   */
+  private stickForward = 0
   /** 登り切る型の始めと終わりの足元。その間を渡す */
   private readonly climbFrom = new THREE.Vector3()
   private readonly climbTo = new THREE.Vector3()
@@ -1361,6 +1370,11 @@ export class Soldier {
     this.crouching = !this.crouching
   }
 
+  /** 押している前後の量。**カメラを通さない** (梯子の上下に使う) */
+  setStickForward(value: number): void {
+    this.stickForward = value
+  }
+
   /** そのステージの梯子を渡す。**読み込みが済んでから** */
   setLadders(ladders: readonly Ladder[]): void {
     this.ladders = ladders
@@ -1398,6 +1412,7 @@ export class Soldier {
     this.position.x = grip.x
     this.position.z = grip.z
     this.yaw = grip.yaw
+    this.climbYaw = grip.yaw
     this.velocityY = 0
     /*
      * **走ってきた勢いを捨てる。** 空中の横移動は踏み切った時点の速さで
@@ -1432,7 +1447,7 @@ export class Soldier {
    *
    * @returns 移動の仕組みへ渡す向き。**横は殺す**
    */
-  private steerClimb(dt: number, moveDir: THREE.Vector3): THREE.Vector3 {
+  private steerClimb(dt: number): THREE.Vector3 {
     const ladder = this.climbing
     if (!ladder) {
       // 登り切る型の最中。決めた道を渡り切るまで動かさない
@@ -1443,13 +1458,13 @@ export class Soldier {
     const grip = ladderGrip(ladder, this.position.x, this.position.z)
     this.position.x = grip.x
     this.position.z = grip.z
-    this.yaw = grip.yaw
+    this.climbYaw = grip.yaw
 
     /*
-     * 押している向きを体の前後に直す。**カメラではなく体を基準にする** —
-     * 梯子を向いているので、前へ押せば登る。
+     * 上下は**押した量そのまま**。カメラ基準の向きを使うと、梯子を横から
+     * 見ている間は「上」が体の前にならず、押しても登らない。
      */
-    const forward = -(moveDir.x * Math.sin(this.yaw) + moveDir.z * Math.cos(this.yaw))
+    const forward = this.stickForward
     this.velocityY = forward * LADDER_SPEED
     /*
      * **押している分だけ絵が進む。** 手を止めれば絵も止まる。
@@ -2122,7 +2137,7 @@ export class Soldier {
      * しないように、足元は毎フレーム掴んだ位置へ置き直す。
      */
     if (this.onLadder) {
-      moveDir = this.steerClimb(dt, moveDir)
+      moveDir = this.steerClimb(dt)
     }
 
     const moved = stepMovement(
@@ -2271,6 +2286,14 @@ export class Soldier {
     if (this.down) {
       // 倒れた向きのまま。カメラを回しても死体は回らない。
       targetYaw = this.yaw
+    } else if (this.onLadder) {
+      /*
+       * 梯子を向いたまま。**カメラを回しても体は回らない。**
+       *
+       * ここを通していなかったので、掴んだ瞬間に付けた向きが次のフレームで
+       * カメラの向きへ引き戻され、横を向いたまま登っていた。
+       */
+      targetYaw = this.climbYaw
     } else if (this.rolling) {
       targetYaw = this.rollYaw
     } else if (!this.aiming && !this.throwing) {

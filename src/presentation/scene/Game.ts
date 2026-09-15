@@ -1312,6 +1312,8 @@ export class Game {
       .set(0, 0, 0)
       .addScaledVector(this.forwardVec, -axis.z)
       .addScaledVector(this.rightVec, axis.x);
+    // 梯子の上下は**カメラを通さない生の値**で決める (体の向きに依らない)
+    this.player.setStickForward(-axis.z);
 
     // 装備を組んでいる間は動けない。
     //
