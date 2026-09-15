@@ -498,10 +498,12 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
               柱の先が尖っているのは、太いまま中心まで来ると的が隠れるため。
               尖りの頂点が着弾点で、横線はその高さを示している。
             */}
-            <div class="scope-plain-bar scope-plain-bar-l" />
-            <div class="scope-plain-bar scope-plain-bar-r" />
-            <div class="scope-plain-post" />
-            <div class="scope-plain-tip" />
+            <Show when={props.stats?.weaponHeld === 'mosin'}>
+              <div class="scope-plain-bar scope-plain-bar-l" />
+              <div class="scope-plain-bar scope-plain-bar-r" />
+              <div class="scope-plain-post" />
+              <div class="scope-plain-tip" />
+            </Show>
             <div class="scope-zoom">{props.stats?.zoom}</div>
           </div>
         </div>

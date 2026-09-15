@@ -1268,26 +1268,26 @@
   display: none;
 }
 
-.scope-plain-bar,
-.scope-plain-post,
-.scope-plain-tip {
+.scope-plain .scope-plain-bar,
+.scope-plain .scope-plain-post,
+.scope-plain .scope-plain-tip {
   position: absolute;
   background: rgba(8, 10, 7, 0.92);
 }
 
 /* 横線。中心を空けて左右から伸びる */
-.scope-plain-bar {
+.scope-plain .scope-plain-bar {
   top: 50%;
   height: 9px;
   width: 42%;
   transform: translateY(-50%);
 }
 
-.scope-plain-bar-l { left: 2%; }
-.scope-plain-bar-r { right: 2%; }
+.scope-plain .scope-plain-bar-l { left: 2%; }
+.scope-plain .scope-plain-bar-r { right: 2%; }
 
 /* 柱。下の縁から中心の手前まで */
-.scope-plain-post {
+.scope-plain .scope-plain-post {
   left: 50%;
   top: 50%;
   bottom: 2%;
@@ -1302,7 +1302,7 @@
  * 尖らせれば、柱の先端が細くなって 1 点になる — 狙い所はその頂点で、
  * 四角いまま止めるより的の輪郭が見える。
  */
-.scope-plain-tip {
+.scope-plain .scope-plain-tip {
   left: 50%;
   top: calc(50% - 13px);
   width: 0;
