@@ -13,7 +13,11 @@ import { emptyHanded, type Locomotion } from './locomotion'
  */
 describe('手が空いている型', () => {
   test('素材に武器が無い型では隠す', () => {
-    const hidden: Locomotion[] = ['salute', 'roll', 'hard_land', 'bump', 'sleep', 'away']
+    const hidden: Locomotion[] = [
+      'salute', 'roll', 'hard_land', 'bump', 'sleep', 'away',
+      // 梯子。**両手で掴んでいる** — 銃を出すと握らずに登って見える
+      'climb', 'climb_top',
+    ]
     for (const locomotion of hidden) expect(emptyHanded(locomotion)).toBe(true)
   })
 

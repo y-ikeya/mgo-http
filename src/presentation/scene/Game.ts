@@ -222,6 +222,8 @@ export interface GameStats {
   zoom: string;
   /** ホイールで覗ける状態か。案内を出すのに使う */
   canZoom: boolean;
+  /** 目の前に梯子があるか。**掴めることを知らせる**のに使う */
+  canClimb: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
   /**
@@ -1334,21 +1336,6 @@ export class Game {
     // **手を離したあとも塞ぐ。** 押している間だけ止めていたら、離した瞬間から
     // 動けるのに足はかがんだままで、置く型が流れきるまで滑って見えた。
     if (this.setupAiming || this.player.placing) this.moveDir.set(0, 0, 0);
-
-    /*
-     * 梯子。**前へ押していれば掴む。**
-     *
-     * 別の指を用意しない。梯子の前で前へ進むという動きがそのまま「登る」で、
-     * 掴んだあとも同じ指 (前後) が上下になる。掴める所に居るかどうかは
-     * Soldier が持っている (ladderInReach)。
-     */
-    if (
-      !this.player.onLadder &&
-      this.moveDir.lengthSq() > 1e-6 &&
-      this.player.ladderInReach
-    ) {
-      this.player.grabLadder();
-    }
 
     // ブラウザはユーザー操作があるまで音を出せない。ロック取得やボタン押下がそれにあたる。
     if (this.input.engaged) this.audio.resume();
@@ -3693,6 +3680,22 @@ export class Game {
      * 右スティックのぶん (consumeListStep) は一覧専用なので倍率へは回さない。
      */
     const wheel = this.input.consumeWheel();
+
+    /*
+     * 梯子。**△ で掴む。**
+     *
+     * 「置く / 拾う」と同じ指に乗せる — その場の物へ手を出す、という意味では
+     * 同じ族で、梯子の前でだけ意味が増える。自動で掴む形にしていたが、
+     * 通り過ぎたいだけの時に掴んでしまうので、押した時だけにした。
+     *
+     * **持ち物の判断より先に食う。** 通してしまうと、梯子を掴みながら
+     * 手榴弾を置くことになる。
+     */
+    if (!this.player.onLadder && this.player.ladderInReach && this.input.tapped("drop")) {
+      this.player.grabLadder();
+      return;
+    }
+
     const intent: Intent = {
       browse: {
         weapon: this.input.down("swapWeapon"),
@@ -4255,6 +4258,7 @@ export class Game {
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
+      canClimb: this.player.ladderInReach,
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
       stamina: staminaBlur(this.stamina),

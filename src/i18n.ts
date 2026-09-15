@@ -57,6 +57,7 @@ const JA = {
   'hud.waitingForOpponent': '対戦相手を待っています',
   'hud.matchGone': 'その試合はすでに終了しています',
   'hud.scopeHint': 'Z / ホイールで覗く',
+  'hud.climbHint': 'G / △ で梯子を登る',
   'hud.standUpHint': '移動で匍匐 · Space で起き上がる',
   // --- 装備 ---
   'loadout.note': '装備を選んでください',
@@ -133,6 +134,7 @@ const EN: Record<Key, string> = {
   'hud.waitingForOpponent': 'Waiting for an opponent',
   'hud.matchGone': 'That match is already over',
   'hud.scopeHint': 'Z / wheel to scope',
+  'hud.climbHint': 'G / △ to climb',
   'hud.standUpHint': 'MOVE TO CRAWL · SPACE TO GET UP',
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',

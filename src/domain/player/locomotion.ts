@@ -201,6 +201,9 @@ export function emptyHanded(locomotion: Locomotion): boolean {
     locomotion === 'roll' ||
     locomotion === 'hard_land' ||
     locomotion === 'bump' ||
+    // 梯子。**両手が塞がっている** — 銃を出すと梯子を握らずに登って見える
+    locomotion === 'climb' ||
+    locomotion === 'climb_top' ||
     locomotion === 'sleep' ||
     locomotion === 'away' ||
     locomotion === 'death' ||

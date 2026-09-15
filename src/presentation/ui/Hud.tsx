@@ -514,6 +514,11 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <div class="scope-hint">{t('hud.scopeHint')}</div>
       </Show>
 
+      {/* 梯子の前。**押す物が別の指**なので、そこに在ることを言う */}
+      <Show when={props.stats?.canClimb}>
+        <div class="scope-hint">{t('hud.climbHint')}</div>
+      </Show>
+
       {/*
         刃物では出さない。**十字も輪も「そこへ飛ぶ」ための印**で、
         届く範囲が体の前 2m しかない刃物には言うことが無い。
