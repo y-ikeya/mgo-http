@@ -56,6 +56,7 @@ import {
   CHOOSE_TIMEOUT,
   isDowned,
   isSpawning,
+  onBattlefield,
   type Life,
 } from "../../domain/player/lifecycle";
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
@@ -1057,11 +1058,12 @@ export class Game {
      * 床が無いまま重力が効いて、そのまま落ちて溺れる** — 「たまに試合開始で
      * 下に落ちる」の正体がこれ。
      *
-     * 届いたら湧き直す。読み込みの間に流れた分の落下を無かったことにする。
+     * 届くまでは tick で人を進めない (stageReady)。**届いたときに湧き直さない** —
+     * 読み込み直した人には、地形より先にサーバーから続き (resume) が届いている。
+     * ここで湧き地点へ置くと、居た場所から基地へワープする。
      */
     void this.stage.ready.then(() => {
       this.stageReady = true;
-      this.placeAtSpawn();
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
@@ -1644,7 +1646,14 @@ export class Game {
       case "team":
         // 誰が味方かは自分の所属が分かって初めて決まる
         this.remotes.setSelfTeam(effect.team);
-        this.placeAtSpawn();
+        /*
+         * **戦場に居る間は湧き地点へ戻さない。**
+         *
+         * 名簿は試合の最中にも届く (取りこぼしを頼み直した返事 refetchRoster)。
+         * そのたびに置き直すと、走っている最中に基地へワープする。
+         * 仕切り直しは choosing を通るので、そちらで置き直される。
+         */
+        if (!onBattlefield(this.life)) this.placeAtSpawn();
         break;
     }
   }

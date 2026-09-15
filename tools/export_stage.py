@@ -21,7 +21,9 @@ from mathutils import Vector
 REF_PREFIX = 'ref_'
 
 # 名前に付けられる札。これ以外の接頭辞は打ち間違いの可能性が高い
-KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_', 'ladder_')
+# shield_ は**印だけ**。書き出しの上では普通の壁で、名前で役目が読めるようにしてある
+# (梯子の脇に立てて、登っている人を撃たれないようにする板)
+KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_', 'ladder_', 'shield_')
 
 # 面が何を止めるか。既定は全部止めて、名前で個別に外す。
 # (src/domain/stage/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
