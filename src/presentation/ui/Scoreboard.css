@@ -84,6 +84,11 @@
   padding: 12px 0 16px;
   display: flex;
   flex-direction: column;
+  /*
+   * **縮んでよい。** 既定 (min-width: auto) だと中身の幅が下限になり、
+   * 列が枠からはみ出す。右の陣営の通信欄が切れていたのはこれ。
+   */
+  min-width: 0;
 }
 
 .score-team:first-child {
@@ -110,8 +115,8 @@
   --score-col: 34px;
   /* 点は負にもなる。符号のぶん広く取る */
   --score-col-points: 42px;
-  /* 通信は 2 桁 + 単位ぶん広い */
-  --score-col-rate: 42px;
+  /* 通信は乾電池 1 つぶん。数字を出していた頃より狭くて足りる */
+  --score-col-rate: 28px;
 }
 
 /* K / D / 通信 の見出し。数字の列の真上に来る */
@@ -189,6 +194,10 @@
 }
 
 .score-name {
+  /* 長い名前で数字を押し出さない。切って「…」にする */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -238,6 +247,34 @@
 
 .score-rate-low {
   color: rgba(255, 150, 120, 0.95);
+}
+
+/*
+ * 通信の乾電池。**色は文字色を継ぐ** — 良いときは地の色、悪いときは赤へ
+ * (score-rate-low が上で色を決めている)。線は胴、塗りは目盛り。
+ */
+.score-battery {
+  width: 22px;
+  height: 12px;
+  vertical-align: -1px;
+}
+
+.score-battery rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.75;
+}
+
+.score-battery-nub,
+.score-battery-bar {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* 目盛りが 1 つも無い (途切れている / まだ届いていない)。胴だけ薄く残す */
+.score-rate-out .score-battery rect {
+  opacity: 0.3;
 }
 
 /*
@@ -357,6 +394,10 @@
  * 色を当てないと下地に沈んで読めなかったので、明示しておく。
  */
 .score-solo .score-name {
+  /* 長い名前で数字を押し出さない。切って「…」にする */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #d8e6f2;
 }
 
@@ -496,7 +537,7 @@
 .score-over {
   --score-col: 58px;
   --score-col-points: 74px;
-  --score-col-rate: 70px;
+  --score-col-rate: 42px;
 }
 
 .score-over .score-panel {
@@ -568,4 +609,11 @@
  */
 .score-tabs-hidden {
   visibility: hidden;
+}
+
+/* 結果画面では乾電池も大きく。行の文字に合わせる */
+.score-over .score-battery {
+  width: 34px;
+  height: 18px;
+  vertical-align: -3px;
 }
