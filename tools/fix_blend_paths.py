@@ -9,7 +9,8 @@
 別の場所へ動かすと、同じ道順が別の場所を指す。元データを tools/ から tools/raw/
 へ移したときにこれが起きて、床の板も手すりもドラム缶も一斉に落ちた。
 
-直した絵は**中へ詰める** (pack)。外を指したままだと、また動かしたときに落ちる。
+`--pack` を足すと直した絵を**中へ詰める**。動かしても落ちなくなるが、4K の絵を
+抱えると .blend が一気に太るので既定では詰めない (raft で 23MB -> 61MB)。
 
 --- どう直すか ---
 道順の**終わりの形**は変わっていないので、そこから探し直す:
@@ -28,6 +29,10 @@ import bpy, sys, os
 argv = sys.argv[sys.argv.index('--') + 1:]
 BLEND = argv[0]
 SAVE = '--save' in argv
+# 直した絵を中へ詰めるか。**既定は詰めない** — 4K の絵を抱え込むと .blend が
+# 一気に太り (raft で 23MB -> 61MB)、保存のたびにその重さを書くことになる。
+# 道順が同じ入れ物の中を指しているうちは、詰めなくても落ちない
+PACK = '--pack' in argv
 
 HOME = os.path.expanduser('~')
 RAW = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(BLEND))))
@@ -70,10 +75,9 @@ for image in bpy.data.images:
         continue
     image.filepath = bpy.path.relpath(found)
     image.reload()
-    # **中へ詰める。** この .blend の絵は 12 枚中 10 枚が既に詰めてあって、
-    # 落ちていたのは外を指していた 2 枚だけだった。同じ形にしておけば、
-    # 次にファイルを動かしても道順の話にならない
-    image.pack()
+    # --pack なら中へ詰める。動かしても落ちなくなるが、その分太る
+    if PACK:
+        image.pack()
     fixed += 1
     print(f'  直した {image.name:42s} -> {image.filepath}')
 
