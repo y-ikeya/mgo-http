@@ -3,6 +3,7 @@ import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/s
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
   LADDER_SPEED,
+  LADDER_STANDOFF,
   type Ladder,
   ladderAt,
   ladderGrip,
@@ -16,7 +17,7 @@ import type { Locomotion } from '../../../domain/player/locomotion'
 import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
-import { stepMovement, type Mover } from '../../../sim/space/movement'
+import { stepMovement, type MoveResult, type Mover } from '../../../sim/space/movement'
 import { PLAYER_HEIGHT as BODY_HEIGHT } from '../../../domain/player/moving'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
@@ -537,6 +538,13 @@ export class Soldier {
   /** 梯子を向く角度。**掴んでいる間はカメラより優先する** */
   private climbYaw = 0
   /**
+   * 梯子のどちら側に立っているか。**掴んだ時に決める。**
+   *
+   * 毎フレーム座標から決め直していたら、壁に押し戻された拍子に裏側へ
+   * 回り込んで、そちらの壁で頭がつかえて途中で止まっていた。
+   */
+  private climbSide: 1 | -1 = 1
+  /**
    * 押している前後の量 (-1..1)。**カメラを通さない生の値。**
    *
    * 梯子の上下はこれで決める。カメラ基準の向き (moveDir) を使うと、梯子を
@@ -546,6 +554,8 @@ export class Soldier {
   /** 登り切る型の始めと終わりの足元。その間を渡す */
   private readonly climbFrom = new THREE.Vector3()
   private readonly climbTo = new THREE.Vector3()
+  /** 掴む側を確かめるときの置き場。毎回作らない */
+  private readonly climbProbe = new THREE.Vector3()
   private moveSpeed = MOVE_SPEED
   private aimSpeedScale = AIM_SPEED_SCALE
   /** 実際に使う速度。構えの入り抜けで目標へ寄せる */
@@ -1376,6 +1386,14 @@ export class Soldier {
     this.stickForward = value
   }
 
+  /**
+   * 最後に受け取った地形。**掴む側を選ぶのに使う。**
+   *
+   * 梯子を掴むのは update の外 (押した瞬間) なので、そこで地形を見るには
+   * 持っておくしかない。
+   */
+  private lastWorld: PlayerWorld | null = null
+
   /** そのステージの梯子を渡す。**読み込みが済んでから** */
   setLadders(ladders: readonly Ladder[]): void {
     this.ladders = ladders
@@ -1408,7 +1426,17 @@ export class Soldier {
     const p = this.position
     const ladder = ladderAt(this.ladders, p.x, p.y, p.z, PLAYER_HEIGHT)
     if (!ladder) return false
+    /*
+     * **居る側から登る。** 回り込ませない。
+     *
+     * 地形を見て空いている側を選ぼうとしたことがあるが、梯子そのものが壁
+     * なので体の筒は必ず当たり、左右の差が読めなかった。登っている間は当たり
+     * を通さないので (climbMovement)、どちら側でも登り切れる。
+     */
     const grip = ladderGrip(ladder, p.x, p.z)
+    this.climbSide = ladder.axis === 'x'
+      ? (grip.x >= (ladder.min[0] + ladder.max[0]) / 2 ? 1 : -1)
+      : (grip.z >= (ladder.min[2] + ladder.max[2]) / 2 ? 1 : -1)
     this.climbing = ladder
     this.position.x = grip.x
     this.position.z = grip.z
@@ -1456,7 +1484,7 @@ export class Soldier {
       return ZERO_MOVE
     }
 
-    const grip = ladderGrip(ladder, this.position.x, this.position.z)
+    const grip = ladderGrip(ladder, this.position.x, this.position.z, this.climbSide)
     this.position.x = grip.x
     this.position.z = grip.z
     this.climbYaw = grip.yaw
@@ -1503,6 +1531,31 @@ export class Soldier {
   }
 
   /**
+   * 梯子の上の 1 フレーム。**地形の当たりを通さない。**
+   *
+   * 梯子は「ここを登れ」と作られた道なので、登っている間の上下は地形に
+   * 相談しない。相談させたら登れなかった: 梯子の脇には手すりも弾除けの板も
+   * あり、体の筒がそれを噛むと天井扱いで頭を押さえられる (足元 10.3m で
+   * 止まり、22.1m の上端まで行けなかった)。
+   *
+   * 横は掴んだ線に固定済み (steerClimb)、縦はここで積む。降りて手を離せば
+   * 普通の当たりへ戻る。
+   */
+  private climbMovement(dt: number): MoveResult {
+    const ladder = this.climbing
+    if (ladder) {
+      const y = this.position.y + this.velocityY * dt
+      // 梯子からはみ出さない。上端は乗り越えの型が引き取る
+      this.position.y = Math.max(ladder.min[1], Math.min(ladder.max[1], y))
+    }
+    // 掴んでいる間は立っていない。離した瞬間から落ちる
+    this.mover.onGround = false
+    this.mover.airX = 0
+    this.mover.airZ = 0
+    return { landed: false, impactSpeed: 0, actualSpeed: 0 }
+  }
+
+  /**
    * 登り切る型に入る。**掴んだ手は離す。**
    *
    * 型の間は足元を上端から屋上へ渡す。型そのものは足を掛けて体を起こす
@@ -1517,15 +1570,52 @@ export class Soldier {
       return
     }
     this.climbFrom.copy(this.position)
-    const grip = ladderGrip(ladder, this.position.x, this.position.z)
-    // 屋上は梯子の面の向こう側。掴んでいた側から見て、板を越えた所へ渡す
-    const overX = ladder.axis === 'z' ? grip.x : grip.x + (grip.x < (ladder.min[0] + ladder.max[0]) / 2 ? 1 : -1) * CLIMB_TOP_STEP
-    const overZ = ladder.axis === 'z' ? grip.z + (grip.z < (ladder.min[2] + ladder.max[2]) / 2 ? 1 : -1) * CLIMB_TOP_STEP : grip.z
-    this.climbTo.set(overX, ladder.max[1], overZ)
+    const grip = ladderGrip(ladder, this.position.x, this.position.z, this.climbSide)
+    /*
+     * 降り立つ側。**床のあるほうへ渡す。**
+     *
+     * 「梯子を越えて向こう側へ」で決め打ちしていたら、床が手前にある梯子で
+     * 宙へ踏み出して 12m 落ちた (筏の ladder_a)。上端の左右を踏んでみて、
+     * 足が乗る側を選ぶ。両方あるなら向こう側 — 梯子を塞がずに済む。
+     */
+    const step = this.pickTopSide(ladder)
+    const overX = ladder.axis === 'z' ? grip.x : grip.x + step.across
+    const overZ = ladder.axis === 'z' ? grip.z + step.across : grip.z
+    this.climbTo.set(overX, step.floor, overZ)
     this.climbTopLeft = span / CLIMB_TOP_RATE
     this.climbing = null
     this.velocityY = 0
-    this.animator?.setClimbTopRate(CLIMB_TOP_RATE)
+    this.animator?.playClimbTop(CLIMB_TOP_RATE)
+  }
+
+  /**
+   * 上端で降り立つ先。**足が乗る所を探す。**
+   *
+   * @returns across = 掴んだ線からの横のずれ、floor = 立つ高さ
+   */
+  private pickTopSide(ladder: Ladder): { across: number; floor: number } {
+    const top = ladder.max[1]
+    const midX = (ladder.min[0] + ladder.max[0]) / 2
+    const midZ = (ladder.min[2] + ladder.max[2]) / 2
+    // 掴んでいる側から見て、向こう側が先。**梯子の口を塞がない**
+    const order: (1 | -1)[] = this.climbSide === 1 ? [-1, 1] : [1, -1]
+    const world = this.lastWorld
+    if (world) {
+      for (const side of order) {
+        this.climbProbe.set(
+          ladder.axis === 'x' ? midX + side * CLIMB_TOP_STEP : midX,
+          top + 0.5,
+          ladder.axis === 'x' ? midZ : midZ + side * CLIMB_TOP_STEP,
+        )
+        const floor = world.groundHeight(this.climbProbe, PLAYER_RADIUS, top + 0.5)
+        // 上端の高さ辺りに床があるか。低すぎれば崖、無ければ海
+        if (floor > top - 1.0 && floor < top + 0.6) {
+          return { across: side * CLIMB_TOP_STEP - (this.climbSide * LADDER_STANDOFF), floor }
+        }
+      }
+    }
+    // 地形が読めない (試写など)。今まで通り向こう側へ、上端の高さで
+    return { across: -this.climbSide * (CLIMB_TOP_STEP + LADDER_STANDOFF), floor: top }
   }
 
   /** 登り切る型の最中。決めた道を時間で渡る */
@@ -1971,6 +2061,7 @@ export class Soldier {
     world: PlayerWorld,
   ): void {
     this.aimPitch = aimPitch
+    this.lastWorld = world
 
     // 倒れている間は入力を捨てる。重力と接地だけは回して、体が宙に浮かないようにする。
     if (this.down) moveDir = ZERO_MOVE
@@ -2144,39 +2235,38 @@ export class Soldier {
     }
 
     /*
-     * 梯子。**掴んでいる間は重力を切って、上下の速さを自分で決める。**
+     * 梯子。**掴んでいる間は地形の当たりから外れる。**
      *
-     * 移動の仕組みそのものは通す (壁や床との当たりはそのまま効かせたい)。
-     * 切るのは重力と横移動だけ — 掴んでいるのに落ちたり、板に押し戻されたり
-     * しないように、足元は毎フレーム掴んだ位置へ置き直す。
+     * 押している量から上下の速さを決めて (steerClimb)、その通りに動かす
+     * (climbMovement)。梯子は登れるように作られた道なので、脇の手すりや
+     * 弾除けの板と体の筒が噛むかどうかを毎フレーム相談させると登れない。
      */
-    if (this.onLadder) {
-      moveDir = this.steerClimb(dt)
-    }
+    if (this.onLadder) moveDir = this.steerClimb(dt)
 
-    const moved = stepMovement(
-      this.mover,
-      {
-        dirX: moveDir.x,
-        dirZ: moveDir.z,
-        // **蹴った瞬間だけ前へ出る。** 均せば今までと同じ速さ (crawlSurge)。
-        // currentSpeed のほうは動かさない — あれは型の再生速度も決めているので、
-        // 揺らすと足の運びまで速くなったり遅くなったりする
-        speed: this.currentSpeed * this.crawlSurge(),
-        overrideX,
-        overrideZ,
-      },
-      world,
-      {
-        radius: PLAYER_RADIUS,
-        height: PLAYER_HEIGHT,
-        // 梯子を掴んでいる間は落ちない。上下は自分で決めている
-        gravity: this.onLadder ? 0 : this.gravity,
-        fallGravityScale: this.fallGravityScale,
-        airControl: AIR_CONTROL,
-      },
-      dt,
-    )
+    const moved = this.onLadder
+      ? this.climbMovement(dt)
+      : stepMovement(
+          this.mover,
+          {
+            dirX: moveDir.x,
+            dirZ: moveDir.z,
+            // **蹴った瞬間だけ前へ出る。** 均せば今までと同じ速さ (crawlSurge)。
+            // currentSpeed のほうは動かさない — あれは型の再生速度も決めているので、
+            // 揺らすと足の運びまで速くなったり遅くなったりする
+            speed: this.currentSpeed * this.crawlSurge(),
+            overrideX,
+            overrideZ,
+          },
+          world,
+          {
+            radius: PLAYER_RADIUS,
+            height: PLAYER_HEIGHT,
+            gravity: this.gravity,
+            fallGravityScale: this.fallGravityScale,
+            airControl: AIR_CONTROL,
+          },
+          dt,
+        )
 
     /*
      * **段を上り下りしているか。落下の型より先に決める。**

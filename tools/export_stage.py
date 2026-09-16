@@ -518,6 +518,23 @@ SURFACE_SHIFT = 4
 # (12 枚) や階段の段は下に入るので、**三角へ移した目的は損なわれない。**
 PLAYER_TRI_LIMIT = 64
 #
+# 箱で代用してよいのは、**薄い物か、詰まっている物だけ。**
+#
+# 筏の縄 (BézierCurve, 1,152 枚) がこれで壊れた。梯子の脇を 12m 這う縄なので、
+# 外枠を取ると 3.8 x 12.4 x 4.6m の塊になる。**梯子の周り一帯が見えない壁**に
+# なって、登っているのに横の何も無い所でぶつかっていた。
+#
+# 分ける物差しは 2 つ:
+#
+#   - 薄いか (一番短い辺が SLAB_MAX 以下)。手すりや柵や板はこれ。**格子でも
+#     構わない** — 箱にしても、その板があった面が塞がるだけ
+#   - 詰まっているか (三角の面積が外枠の表面積に近い)。木箱やドラム缶はこれ
+#
+# どちらでも無い物 — 縄・蔓・骨組みのように、太い外枠の中を細い形が通る物 —
+# は三角のまま置く。箱にすると**その一帯が丸ごと壁**になる。
+SLAB_MAX = 0.5
+BOX_FILL_MIN = 0.25
+#
 # **src/domain/stage/surface.ts と揃えること。** あちらが名前から材質を引く
 # 唯一の場所で、こちらはその結果を番号にして持ち出すだけ。既定は金属。
 SURFACE_IDS = {'concrete': 0, 'metal': 1, 'wood': 2, 'glass': 3}
@@ -538,6 +555,26 @@ marks = []
 mesh_objects = 0
 # 人の層で箱に置き換えた数。**黙って代用しない** — 数を出す
 boxed_bodies = 0
+# 細かいが箱に写せないので三角のまま置いた物。こちらも数を出す
+kept_bodies = []
+
+
+def box_is_fair(obj, tris):
+    """外枠がその物の形を写しているか。**箱で代用してよいかの物差し**"""
+    lo, hi = gltf_bounds(obj)
+    dx, dy, dz = (hi[i] - lo[i] for i in range(3))
+    # 薄い物。箱にしても、その板があった面が塞がるだけ
+    if min(dx, dy, dz) <= SLAB_MAX:
+        return True
+    area = 0.0
+    for i in range(0, len(tris), 9):
+        a = mathutils.Vector(tris[i:i + 3])
+        b = mathutils.Vector(tris[i + 3:i + 6])
+        c = mathutils.Vector(tris[i + 6:i + 9])
+        area += (b - a).cross(c - a).length / 2
+    surface = 2 * (dx * dy + dy * dz + dz * dx)
+    # 詰まっている物。木箱やドラム缶は外枠の面に三角が乗っている
+    return surface <= 1e-6 or area / surface >= BOX_FILL_MIN
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
         continue
@@ -564,6 +601,14 @@ for obj in bpy.context.scene.objects:
     if count <= PLAYER_TRI_LIMIT or not body_mark:
         positions.extend(tris)
         marks.extend([mark] * count)
+        mesh_objects += 1
+        continue
+
+    # **外枠が形を写していない物は代用しない。** 縄を塊にすると壁になる
+    if not box_is_fair(obj, tris):
+        positions.extend(tris)
+        marks.extend([mark] * count)
+        kept_bodies.append((obj.name, count))
         mesh_objects += 1
         continue
 
@@ -847,6 +892,8 @@ print(f'          {bin_path} (三角 {len(marks)} 枚 / {mesh_objects} メッシ
 bodies = sum(1 for m in marks if m & PLAYER_BIT)
 print(f'          視線 {eyes} 枚 / 弾 {bullets} 枚 / 人 {bodies} 枚'
       + (f' (うち {boxed_bodies} 個は箱で代用)' if boxed_bodies else ''))
+for name, count in kept_bodies:
+    print(f'  箱に写せないので三角のまま: {name} ({count} 枚)')
 print(f'メッシュ {len(exported)} 個' + (f' / 物差し {len(skipped)} 個は除外' if skipped else ''))
 print('材質: ' + ' / '.join(f'{k} {v}' for k, v in sorted(counts.items())))
 

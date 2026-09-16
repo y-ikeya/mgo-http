@@ -2273,14 +2273,18 @@ export class CharacterAnimator {
   }
 
   /**
-   * 登り切る型の速さ。**素材は 4 秒あるので詰めて流す。**
+   * 登り切る型を頭から流す。**素材は 4 秒あるので詰めて流す。**
    *
    * 位置を渡す側 (soldier.ts) と同じ倍率を使わないと、体が屋上に着く前に
    * 型が終わる / 型が終わっても宙に居る、のどちらかになる。
+   *
+   * **速さを渡すだけでは足りない。** 一度きりの型は起動時に play しない
+   * (ONE_SHOT_LOWER) ので、流し始める者が居ないと重み 1 のまま止まった
+   * action に重みが集まり、**バインドポーズ = T ポーズ**が出る。登り切る所で
+   * 手を広げて棒立ちになっていたのはこれ。
    */
-  setClimbTopRate(rate: number): void {
-    this.upper.get(CLIMB_TOP_KEY)?.setEffectiveTimeScale(rate)
-    this.lower.get('climb_top')?.setEffectiveTimeScale(rate)
+  playClimbTop(rate: number): void {
+    this.playWholeBody(CLIMB_TOP_KEY, 'climb_top', rate)
   }
 
   /** 手に何も出ていない持ち物か (投げ物・設置物) */

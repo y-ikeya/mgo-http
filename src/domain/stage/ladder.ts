@@ -86,11 +86,18 @@ export function ladderAt(
   return null
 }
 
-/** 掴んだときに立つ場所。梯子の幅の中央、面から少し離れた所 */
+/**
+ * 掴んだときに立つ場所。梯子の幅の中央、面から少し離れた所。
+ *
+ * @param side どちら側に立つか。**掴んだ時に決めて、以後は渡し続ける** —
+ *   毎回その場の座標から決め直すと、何かの拍子に裏側へ回り込む。
+ *   省けばいまの位置から決める。
+ */
 export function ladderGrip(
   ladder: Ladder,
   x: number,
   z: number,
+  side?: 1 | -1,
 ): { x: number; z: number; yaw: number } {
   const alongIsX = ladder.axis === 'z'
   const middleAcross = alongIsX
@@ -101,8 +108,8 @@ export function ladderGrip(
     : (ladder.min[2] + ladder.max[2]) / 2
   const across = alongIsX ? z : x
   // 居る側へ立つ。**裏から掴んだら裏に立つ**
-  const side = across >= middleAcross ? 1 : -1
-  const standAcross = middleAcross + side * LADDER_STANDOFF
+  const stand = side ?? (across >= middleAcross ? 1 : -1)
+  const standAcross = middleAcross + stand * LADDER_STANDOFF
 
   /*
    * 向き。**梯子を向く。**
@@ -110,8 +117,8 @@ export function ladderGrip(
    * yaw = θ のとき体のローカル -Z が (-sinθ, 0, -cosθ) を向く (soldier.ts と
    * 同じ決めごと)。梯子へ向かう向きをその式から逆算する。
    */
-  const toX = alongIsX ? 0 : -side
-  const toZ = alongIsX ? -side : 0
+  const toX = alongIsX ? 0 : -stand
+  const toZ = alongIsX ? -stand : 0
   return {
     x: alongIsX ? middleAlong : standAcross,
     z: alongIsX ? standAcross : middleAlong,

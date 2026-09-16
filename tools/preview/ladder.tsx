@@ -5,6 +5,7 @@
  *     ?t=2.4     何秒登ったところを描くか (既定 1.2)
  *     ?view=side 横から / front 正面から / back 背中側
  *     ?gun=sniper 銃を持たせる (登っている間は隠れるはず)
+ *     ?real=ladder_a **本物のステージで登る** (地形の当たりもそのまま)
  *
  * --- なぜ試写が要るか ---
  * 掴む位置も体の向きも、**対戦部屋に入らないと見られない**所に居た。
@@ -20,7 +21,8 @@ import { WebGPURenderer } from 'three/webgpu'
 import { Soldier } from '../../src/presentation/scene/actor/soldier'
 import { buildLights } from '../../src/presentation/scene/world/stage'
 import { loadSoldier } from '../../src/presentation/scene/assets'
-import type { Ladder } from '../../src/domain/stage'
+import { type Ladder, ladderGrip } from '../../src/domain/stage'
+import { loadStageLadders, loadStageMoveWorld } from '../../src/presentation/scene/world/stage'
 import type { WeaponId } from '../../src/domain/item/weapons'
 
 const WIDTH = 1000
@@ -78,11 +80,23 @@ for (let y = 0.3; y < 11.7; y += 0.32) {
 }
 
 /** 何も邪魔しない世界。床は y=0 */
-const WORLD = {
+const EMPTY_WORLD = {
   resolveHorizontal: () => {},
   groundHeight: () => 0,
   ceilingHeight: () => Number.POSITIVE_INFINITY,
 }
+
+/*
+ * ?real=ladder_a … **本物のステージで登る。**
+ *
+ * 作り物の梯子では、地形に引っ掛かって登れないという話が再現しない。
+ * 当たりの形 (mesh.bin) ごと読んで、そこで掴ませる。
+ */
+const realName = query.get('real')
+const realLadders = realName ? await loadStageLadders('raft') : []
+const realLadder = realLadders.find((l) => l.name === realName) ?? null
+const realWorld = realName ? await loadStageMoveWorld('raft') : null
+const WORLD = realWorld ?? EMPTY_WORLD
 
 const player = new Soldier()
 player.start('soldier')
@@ -97,10 +111,16 @@ player.start('soldier')
 await loadSoldier('soldier')
 // 順番待ちを何回か譲る。Soldier 側の組み立ては同じ読み込みの続きで走る
 for (let i = 0; i < 8; i++) await new Promise((done) => setTimeout(done, 0))
-player.setLadders([LADDER])
+player.setLadders(realLadder ? [realLadder] : [LADDER])
 scene.add(player.object)
 // 梯子の手前に立たせる
-player.position.set(0.6, 0, 0)
+if (realLadder) {
+  // 梯子の足元、掴める所へ置く
+  const mid = (realLadder.min[2] + realLadder.max[2]) / 2
+  player.position.set(realLadder.max[0] + 0.5, realLadder.min[1] + 0.1, mid)
+} else {
+  player.position.set(0.6, 0, 0)
+}
 if (gun) await player.equip(gun)
 
 // **本物の口から掴む。** 押している量も本番と同じ setStickForward で渡す
@@ -111,8 +131,20 @@ player.setStickForward(1)
  * **刻んで進める。** 一気に進めると型のばねも当たりも 1 歩で終わる。
  * 実機と同じ 60 分の 1 で回す。
  */
+const track: string[] = []
+const frames: string[] = []
 for (let t = 0; t < stopAt; t += 1 / 60) {
   player.update(1 / 60, new THREE.Vector3(), player.yaw, 0, WORLD)
+  if (frames.length < 30 && realWorld) {
+    const p = player.position
+    frames.push(
+      `${p.y.toFixed(3)}/g${realWorld.groundHeight(p, 0.35, p.y).toFixed(2)}`,
+    )
+  }
+  // 1 秒ごとの高さ。**どこで止まったか**を数字で残す
+  if (Math.floor(t) !== Math.floor(t - 1 / 60)) {
+    track.push(`${Math.floor(t)}s ${player.position.y.toFixed(2)}`)
+  }
 }
 player.object.updateMatrixWorld(true)
 
@@ -120,13 +152,99 @@ const feet = player.position.clone()
 const camera = new THREE.PerspectiveCamera(38, WIDTH / HEIGHT, 0.05, 100)
 const eye = feet.y + 1.0
 // 厚みが x 向きになったので、見る所も 90 度回す
-if (view === 'front') camera.position.set(feet.x + 3.2, eye, 0)
-else if (view === 'back') camera.position.set(feet.x - 3.2, eye, 0)
-else camera.position.set(feet.x + 0.4, eye, 3.2)
-camera.lookAt(0, eye, 0)
+// 本物のステージでは、見る先も本人の足元に合わせる
+const look = realLadder ? new THREE.Vector3(feet.x, eye, feet.z) : new THREE.Vector3(0, eye, 0)
+if (view === 'front') camera.position.set(look.x + 3.2, eye, look.z)
+else if (view === 'back') camera.position.set(look.x - 3.2, eye, look.z)
+else camera.position.set(look.x + 0.4, eye, look.z + 3.2)
+camera.lookAt(look)
 
 await renderer.init()
 await renderer.renderAsync(scene, camera)
+
+/**
+ * 梯子の上下で**頭がどこでつかえるか**を並べる。
+ *
+ * 途中で登れなくなるのは、横にずれたか、上に何かあるかのどちらか。位置を
+ * 固定したうえでこれを見れば、どちらなのかが決まる。
+ */
+function ceilingScan(): string {
+  if (!realWorld || !realLadder) return '-'
+  const probe = new THREE.Vector3(feet.x, 0, feet.z)
+  const out: string[] = []
+  for (let y = Math.ceil(realLadder.min[1]); y < realLadder.max[1]; y += 2) {
+    probe.y = y
+    const ceiling = realWorld.ceilingHeight(probe, 0.35, y)
+    out.push(`${y}m:${Number.isFinite(ceiling) ? ceiling.toFixed(1) : '∞'}`)
+  }
+  return out.join(' ')
+}
+
+/**
+ * 梯子の上端で**どちら側に床があるか。**
+ *
+ * 登り切った先が床でなければ落ちる。掴む側を選ぶときはこれも見ないといけない。
+ */
+function topGround(): string {
+  if (!realWorld || !realLadder) return '-'
+  const top = realLadder.max[1]
+  const midX = (realLadder.min[0] + realLadder.max[0]) / 2
+  const midZ = (realLadder.min[2] + realLadder.max[2]) / 2
+  const out: string[] = []
+  for (const side of [1, -1]) {
+    for (const step of [0.3, 0.8, 1.4]) {
+      const probe =
+        realLadder.axis === 'x'
+          ? new THREE.Vector3(midX + side * step, top + 0.5, midZ)
+          : new THREE.Vector3(midX, top + 0.5, midZ + side * step)
+      const g = realWorld.groundHeight(probe, 0.35, top + 0.5)
+      out.push(`${side > 0 ? '+' : '-'}${step}m:${Number.isFinite(g) ? g.toFixed(1) : '無'}`)
+    }
+  }
+  return out.join(' ')
+}
+
+/** いま効いている型と重み。**T ポーズは「何も流れていない」の顔** */
+function playing(): string {
+  const animator = (player as unknown as { animator?: unknown }).animator as
+    | { upper: Map<string, THREE.AnimationAction>; lower: Map<string, THREE.AnimationAction> }
+    | undefined
+  if (!animator) return '型が読めていない'
+  const out: string[] = []
+  for (const [layer, map] of [
+    ['上', animator.upper],
+    ['下', animator.lower],
+  ] as const) {
+    const on = [...map.entries()]
+      .filter(([, a]) => a.getEffectiveWeight() > 0.001)
+      .map(
+        ([k, a]) =>
+          `${k} 重み${a.getEffectiveWeight().toFixed(2)} 速さ${a.getEffectiveTimeScale().toFixed(1)} ` +
+          `${a.isRunning() ? '流れてる' : '止まってる'} 位置${a.time.toFixed(2)}/${a.getClip().duration.toFixed(2)}`,
+      )
+    out.push(`${layer}: ${on.join(', ') || '無し'}`)
+  }
+  return out.join('  /  ')
+}
+
+/** 左右それぞれ、体が地形を噛む回数。**どちら側が空いているか** */
+function sideBlocks(): string {
+  if (!realWorld || !realLadder) return '-'
+  const out: string[] = []
+  for (const side of [1, -1] as (1 | -1)[]) {
+    const grip = ladderGrip(realLadder, 0, 0, side)
+    let count = 0
+    let total = 0
+    for (let y = realLadder.min[1]; y < realLadder.max[1]; y += 0.5) {
+      const probe = new THREE.Vector3(grip.x, y, grip.z)
+      realWorld.resolveHorizontal(probe, 0.35, y)
+      total++
+      if (Math.hypot(probe.x - grip.x, probe.z - grip.z) > 0.05) count++
+    }
+    out.push(`${side > 0 ? '+' : '-'}側 ${count}/${total}`)
+  }
+  return out.join('  ')
+}
 
 /** 手と足が梯子の面にどれだけ近いか。**絵だけでは読み取れない** */
 function handZ(): string {
@@ -152,6 +270,13 @@ const report = [
   `いまの型: ${player.locomotion}`,
   `手と足の x (梯子は 0): ${handZ()}`,
   `幅の真ん中からのずれ (z): ${feet.z.toFixed(2)}`,
+  realLadder ? `本物の梯子 ${realLadder.name} (${realLadder.min[1].toFixed(1)}→${realLadder.max[1].toFixed(1)})` : '作り物の梯子',
+  `高さの移り: ${track.join('  ')}`,
+  `最初の 30 コマ (足元/地面): ${frames.join(' ')}`,
+  realLadder ? `頭がつかえる高さ: ${ceilingScan()}` : '',
+  `流れている型: ${playing()}`,
+  realLadder ? `噛む回数: ${sideBlocks()}` : '',
+  realLadder ? `上端の床 (${realLadder.max[1].toFixed(1)}m 付近): ${topGround()}` : '',
 ].join('\n')
 const box = document.createElement('pre')
 box.style.cssText =
