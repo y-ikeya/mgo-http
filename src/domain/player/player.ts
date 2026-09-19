@@ -64,6 +64,14 @@ export interface Pose {
    */
   pitch: number
   /**
+   * 視点 (カメラ) の向き (rad) と、構えていたか。
+   *
+   * 撃った線を**カメラから**引き直すのに要る (sim/judge/hitcheck.ts の
+   * zoneExposed)。無ければ体の向きで、構えていたものとして扱う (古い姿)。
+   */
+  cameraYaw?: number
+  aiming?: boolean
+  /**
    * そのときの構え。**頭の高さと、ナイフが刺さる姿勢かどうか**がこれで決まる。
    *
    * しゃがみ (crouching) と箱 (boxed) を真偽で並べて持っていた頃があるが、
@@ -210,28 +218,29 @@ export interface MatchPlayer extends Player {
    */
   skills: Skills
   /**
-   * 光っているフラグが切れる時刻 (Date.now)。0 なら光っていない。
+   * 誰に、いつまで漏れているか。**宛先 → 切れる時刻 (Date.now)。**
    *
-   * ENEMY EXPOSURE を持つ相手に当てられると付く。**死ねば消える** — 死が
-   * 漏洩を止める手段になっている (docs/design.md の 3)。
-   *
-   * 見る側 × 見られる側の表は作らない。**見られる側に 2 つ持たせる** —
-   * いつまで (leakedUntil) と、誰に (leakedTo)。当人が光るので抜かれた本人にも
-   * 分かるし、配信のドメインルールは 1 行のままで済む。
-   */
-  leakedUntil: number
-  /**
-   * 誰に漏れているか。`team:blue` か `id:alice` の形 (leakTag)。
+   * 宛先は `team:blue` か `id:alice` の形 (leakTag)。ENEMY EXPOSURE を持つ相手に
+   * 当てられると付く。**死ねば消える** — 死が漏洩を止める手段になっている
+   * (docs/design.md の 3)。
    *
    * **1 位の光とはここが違う。** あちらは全員に公開されるフラグなので誰に、が要らない。
    * EE は当てた側の陣営だけが見えるので、宛先を持たないと「当てられた側の陣営にも
    * 自分が光って見える」ことになり、抜かれたことが相手に丸見えになる。
    *
-   * **後から当てた側が上書きする。** 個人戦で 2 人が同じ相手に当てると、
-   * 先に当てた人の側が消える。1 人ぶんしか持たないのは、複数を持つと
-   * 「誰に見えているか」の表が結局要るため — そこまでの価値は無いと見ている。
+   * --- 宛先は複数 ---
+   * 長らく 1 枠だった (いつまで・誰に、の 2 つ)。後から当てた側が上書きして、
+   * 先に当てた人の側は消えていた。個人戦で 2 人が同じ相手に当てる程度なら
+   * 割り切れたが、TARGET ALERT (撃ってきた相手が**撃たれた側**に光る) が入ると、
+   * 同じ人が EE で片方に、TA でもう片方に、同時に光るのが普通になる。
+   * 上書きすると、後から付いた光が先の光を**消す**ことになり、消された側から
+   * 見て理屈が通らない。
+   *
+   * 見る側 × 見られる側の表は作らない。**見られる側が宛先ごとの期限を持つ**。
+   * 当人が光るので抜かれた本人にも分かるし、配信のドメインルールは
+   * 「その人に届く宛先が 1 つでも生きているか」の 1 行で済む。
    */
-  leakedTo: string
+  leaks: Map<string, number>
   /**
    * いま手にある物。位置と一緒に届く。
    *
@@ -400,8 +409,7 @@ export function newMatchPlayer(seed: {
     concentratingSince: 0,
     inventory: new Inventory({ primary: 'rifle', secondary: 'm9', support: 'grenade' }),
     skills: {},
-    leakedUntil: 0,
-    leakedTo: '',
+    leaks: new Map(),
     knockX: 0,
     knockZ: 0,
     knockLeft: 0,
@@ -542,6 +550,27 @@ export function leakTag(attacker: MatchPlayer, teams: boolean): string {
   return teams ? `team:${attacker.team}` : `id:${attacker.id}`
 }
 
+/** その宛先は、その人に届くか */
+export function leakReaches(tag: string, viewer: MatchPlayer): boolean {
+  return tag === `team:${viewer.team}` || tag === `id:${viewer.id}`
+}
+
+/**
+ * 宛先に向けて光らせる。**伸ばすだけで縮めない。**
+ *
+ * 同じ宛先に既にもっと長い光が付いていれば何もしない。Lv1 の人が当てた
+ * せいで Lv3 の人の光が短くなるのは、当てた側から見て理屈が通らない。
+ * 別の宛先は互いに触らない — 表なので、上書きの取り合いは起きない。
+ *
+ * @returns 伸びたか。伸びていなければ知らせる物も無い
+ */
+export function leakTo(target: MatchPlayer, tag: string, until: number): boolean {
+  const current = target.leaks.get(tag) ?? 0
+  if (until <= current) return false
+  target.leaks.set(tag, until)
+  return true
+}
+
 /**
  * その人にとって、相手が光って見えるか。
  *
@@ -549,10 +578,20 @@ export function leakTag(attacker: MatchPlayer, teams: boolean): string {
  * 「どこかから撃たれた = いま位置が漏れている」まで確定してしまい、
  * 抜いた側の利が消える。当てられたこと自体は体力で分かるので、
  * そこから先を教えるかどうかがこの 1 行。
+ *
+ * 切れた宛先はここで落とす。表は宛先の数までしか育たない (陣営 2 + 人数) ので、
+ * 別の掃除は要らない。
  */
 export function isLeakedTo(target: MatchPlayer, viewer: MatchPlayer, now: number): boolean {
-  if (now >= target.leakedUntil) return false
-  return target.leakedTo === `team:${viewer.team}` || target.leakedTo === `id:${viewer.id}`
+  let seen = false
+  for (const [tag, until] of target.leaks) {
+    if (now >= until) {
+      target.leaks.delete(tag)
+      continue
+    }
+    if (leakReaches(tag, viewer)) seen = true
+  }
+  return seen
 }
 
 /**
@@ -561,11 +600,27 @@ export function isLeakedTo(target: MatchPlayer, viewer: MatchPlayer, now: number
  * **装備から詰め直す。** 式は共有なので、画面に出る数と必ず一致する。
  * 状態を spawning にするのと、それを知らせるのは呼ぶ側 (接続の話が要るため)。
  */
+/**
+ * 補給。**弾と支援だけを満タンに戻す。** 装備も体力も位置も触らない。
+ *
+ * 湧き直し (refill) と違って命は続いているので、拾った銃はそのまま — 弾も含めて
+ * 詰め直す (inventory.refill は装備から組み直すので、拾った物は装備に無い限り
+ * 消える。それでよい: 補給できるのは自分の装備の弾)。
+ */
+export function resupply(player: MatchPlayer): void {
+  player.inventory.refill({
+    primary: player.primary,
+    secondary: player.secondary,
+    support: player.support,
+  })
+  player.grenades = SUPPORT_SPECS[player.support].count
+  player.holdingGrenade = false
+}
+
 export function refill(player: MatchPlayer): void {
   player.killedBy = ''
   // **死ねば漏洩が止まる。** 死が情報を切る手段になっている
-  player.leakedUntil = 0
-  player.leakedTo = ''
+  player.leaks.clear()
   // **次の命は選んだ装備から始まる。** 拾った物は持ち越さない
   player.inventory.refill({
     primary: player.primary,
@@ -580,7 +635,7 @@ export function refill(player: MatchPlayer): void {
   player.holdingGrenade = false
   player.concentratingSince = 0
   // 湧き地点へ跳ぶ。歩いた距離として積むと、着いた先で足音が連打される
-  player.footsteps.warp(player.x, player.z)
+  player.footsteps.warp(player.x, player.y, player.z)
 }
 
 /**

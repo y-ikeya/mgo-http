@@ -65,9 +65,9 @@ function gunsIn(slot: 'primary' | 'secondary'): WeaponId[] {
  * 相手を騙す道具。交換になっているのが肝」と理屈まで書いていたが、**作り話だった**。
  * 本家では弾倉は選ぶものではない。
  */
-export type SupportId = 'grenade' | 'claymore' | 'decoy'
+export type SupportId = 'grenade' | 'claymore' | 'decoy' | 'locator'
 
-export const SUPPORTS: SupportId[] = ['grenade', 'claymore', 'decoy']
+export const SUPPORTS: SupportId[] = ['grenade', 'claymore', 'decoy', 'locator']
 
 interface SupportSpec {
   id: SupportId
@@ -85,6 +85,17 @@ interface SupportSpec {
 }
 
 export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
+  /*
+   * 数はこちらと held.ts の SUPPORT_COUNT の両方に在る (輪を作らないため
+   * 写してある)。**片方だけ変えない** — 画面の数だけ増えて実際には
+   * 投げられない、になる。
+   */
+  locator: {
+    id: 'locator',
+    label: 'E.LOCATOR',
+    count: 3,
+    hint: '投げた所の周りに居る敵が光る。**壁を抜ける**',
+  },
   grenade: {
     id: 'grenade',
     label: 'GRENADE',

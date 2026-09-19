@@ -80,6 +80,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   // 梯子。登る / 登り切る。**末尾に足す**
   'climb',
   'climb_top',
+  // 伏せたまま刺す。**末尾に足す**
+  'prone_stab',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -168,6 +170,14 @@ const HELD_BITS: HeldId[] = [
   'decoy',
   // 麻酔の狙撃銃。**末尾に足す**
   'mosin',
+  /*
+   * E LOCATOR。**末尾に足す**
+   *
+   * ここに無いと、手にしていることがサーバーへ届かない — 位置のパケットが
+   * 「手にある物」の唯一の出どころなので (server/relay.ts)。投げても
+   * `held !== 'locator'` で弾かれて、**何も起きない**。
+   */
+  'locator',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 

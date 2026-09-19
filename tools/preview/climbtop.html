@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>登り切りの試写</title>
+<style>
+  html, body { margin: 0; background: #111; color: #cfe0c0; font: 12px ui-monospace, Menlo, monospace; }
+  canvas { display: block; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 12px; background: rgba(10,14,9,.9); display: flex; gap: 12px; align-items: center; }
+  .bar input[type=range] { flex: 1; }
+  .panel { position: fixed; left: 12px; top: 12px; margin: 0; padding: 8px 10px; background: rgba(10,14,9,.85); white-space: pre; }
+  .knobs { position: fixed; right: 12px; top: 12px; width: 300px; padding: 8px 10px; background: rgba(10,14,9,.9); display: flex; flex-direction: column; gap: 6px; }
+  .knobs label { display: grid; grid-template-columns: 1fr 110px 44px; align-items: center; gap: 6px; }
+  .knobs b { text-align: right; color: #e8f0d8; }
+  .code { width: 100%; height: 110px; margin-top: 6px; background: #0b0f0a; color: #cfe0c0; border: 1px solid #2a3626; font: 11px ui-monospace, Menlo, monospace; }
+</style>
+<script type="module" src="./climbtop.tsx"></script>

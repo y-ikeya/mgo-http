@@ -18,14 +18,16 @@ import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
 import {
   downedBy,
   hurt,
-  isLeakedTo,
+  leakReaches,
   leakTag,
+  leakTo,
   type MatchPlayer,
   isProtected,
 } from '../src/domain/player/player'
 import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage } from '../src/domain/rule/damage'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
+import { alertHit } from './alert'
 import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
 import { isBackstab, verifyHit } from '../src/sim/judge/hitcheck'
@@ -87,14 +89,16 @@ const NOT_HURT: Hurt = { downed: false, letGo: false }
  * **抜かれた本人には送らない** — 光っていることを本人が知れると、
  * 「いま位置が漏れている」まで確定して抜いた側の利が消える。
  *
- * --- 上書きする ---
- * 既に光っていても、当て直せば伸びる。別の人が当てれば宛先ごと移る
- * (フラグは 1 人ぶんしか無い)。**短いほうへは縮めない** — Lv1 の人が当てたせいで
- * Lv3 の人の光が消えるのは、当てた側から見て理屈が通らない。
+ * --- 伸ばすだけ ---
+ * 既に光っていても、当て直せば伸びる。別の宛先の光とは干渉しない (宛先ごとの
+ * 表。domain/player/player.ts の leaks)。**短いほうへは縮めない** — Lv1 の人が
+ * 当てたせいで Lv3 の人の光が消えるのは、当てた側から見て理屈が通らない。
  */
 function expose(room: RoomWorld, victim: MatchPlayer, attacker: MatchPlayer | undefined): void {
   if (!attacker || attacker.id === victim.id) return
   exposeTo(room, victim, attacker, exposeSeconds(attacker.skills))
+  // 鏡。**当てられた側**が TARGET ALERT を持っていれば、当てた側が光る
+  alertHit(room, victim, attacker)
 }
 
 /**
@@ -118,11 +122,11 @@ export function exposeTo(
   const attacker = toward
   const until = now + seconds * 1000
   const tag = leakTag(attacker, room.mode.teams)
-  // 同じ宛先で、いまより短くなるなら何もしない
-  if (tag === victim.leakedTo && until <= victim.leakedUntil) return
-  victim.leakedUntil = until
-  victim.leakedTo = tag
+  // 同じ宛先で、いまより短くなるなら何もしない (伸ばすだけ。domain の leakTo)
+  if (!leakTo(victim, tag, until)) return
 
+  // **この宛先の人にだけ知らせる。** 別の宛先に光っている分は、その人たちが
+  // 既に受け取っている。全員に配り直すと、長さの違う光が二重に届く
   const notice = JSON.stringify({
     type: 'exposed',
     id: victim.id,
@@ -130,7 +134,7 @@ export function exposeTo(
   } satisfies ServerMessage)
   for (const viewer of room.players.values()) {
     if (viewer.id === victim.id) continue
-    if (!isLeakedTo(victim, viewer, now)) continue
+    if (!leakReaches(tag, viewer)) continue
     sessionFor(viewer)?.socket.send(notice)
   }
 }

@@ -97,6 +97,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   stab: 'stab',
   // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
   crouch_stab: 'crouch_idle',
+  // 伏せたまま刺す。全身の型
+  prone_stab: 'prone_stab',
   roll: 'roll',
   death: 'death',
   // 倒れる向き。**背後から撃たれたら前へ、正面からなら後ろへ**
@@ -128,6 +130,7 @@ type UpperState =
   | 'reload'
   | 'stab'
   | 'crouch_stab'
+  | 'prone_stab'
   | 'roll'
   | 'hard_land'
   // 伏せへの出入り
@@ -236,7 +239,7 @@ const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
  * 効きすぎて暴れる。出入りの繋ぎ (prone_down / prone_rise) は全身の型として
  * 最後まで流れるので、ここには含めない。
  */
-const PRONE_LOCOMOTIONS = new Set<Locomotion>(['prone_idle', 'crawl_f', 'crawl_b'])
+const PRONE_LOCOMOTIONS = new Set<Locomotion>(['prone_idle', 'crawl_f', 'crawl_b', 'prone_stab'])
 
 /** 落下ループの再生速度の上限。これ以上速くすると脚が忙しなく見える */
 const JUMP_LOOP_MAX_SPEED = 3
@@ -370,6 +373,7 @@ const ROLL_WEAPON_LEAD = 0.2
 /** 一度だけ流す下半身の状態。始めるときに reset して play する */
 const ONE_SHOT_LOWER = new Set<Locomotion>([
   'stab',
+  'prone_stab',
   'roll',
   /*
    * 落下の受け身。**ここに無くて、下半身だけループしていた。**
@@ -478,8 +482,19 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
 }
 
 const pistolKey = (state: Locomotion) => `pistol_relaxed:${state}`
+/**
+ * ナイフを構えた型。**構えたときだけ。**
+ *
+ * 構えていない間は前のまま (片手扱いで手ぶらの表)。構えると以前は拳銃の
+ * 構えに落ちていて、ナイフを拳銃のように突き出す形になっていた。
+ */
+const KNIFE_KEY = 'knife_idle'
 const RELOAD_KEY = 'reload'
 const STAB_KEY = 'stab'
+/** 伏せたまま刺す。全身の型 (tools/prone_knife.json) */
+const PRONE_STAB_KEY = 'prone_stab'
+/** 伏せてナイフを構えた姿。**prone_stab の頭の 1 枚** を止めて使う */
+const PRONE_KNIFE_KEY = 'prone_knife'
 /** ボルト操作。1 発ごとに薬室へ送る動作で、その間は撃てない */
 const BOLT_KEY = 'bolt'
 /** 爆風で吹き飛ばされる。倒れた姿勢で終わる */
@@ -966,6 +981,8 @@ export class CharacterAnimator {
   pistolReloadDuration = 0
   /** 刺突クリップの尺 (秒)。0 ならクリップが無い */
   readonly stabDuration: number
+  /** 伏せた刺突の尺 (秒)。無ければ 0 */
+  readonly proneStabDuration: number
   /** ボルト操作の尺 (秒)。モデル未着なら 0 */
   boltDuration = 0
   /** 登り切る型の尺 (秒)。呼ぶ側が動きの長さに合わせるのに使う */
@@ -1168,6 +1185,7 @@ export class CharacterAnimator {
       finished === this.upper.get(PISTOL_RELOAD_KEY) ||
       finished === this.upper.get(PRONE_RELOAD_KEY) ||
       finished === this.upper.get(STAB_KEY) ||
+      finished === this.upper.get(PRONE_STAB_KEY) ||
       finished === this.upper.get(ROLL_KEY) ||
       finished === this.upper.get(HARD_LAND_KEY) ||
       finished === this.upper.get(BUMP_KEY) ||
@@ -1294,6 +1312,20 @@ export class CharacterAnimator {
       this.lower.set(key, action)
       this.lowerClipNames.set(key, clip.name)
     }
+    /*
+     * **ナイフの構えは全身。** 立ち止まって構えた間だけ、下半身もこの型から
+     * 取る (resolveLowerKey)。半身の構えで腰が 90° 横を向いているので、
+     * 上半身だけ乗せると腰の基準合わせ (alignSpineToUpperClip) がその 90° を
+     * 捻れと読んで上体を回してしまう。全身なら上下が同じ型で補正が掛からない。
+     */
+    const knifeClip = byName.get('knife_idle')
+    if (knifeClip) {
+      const key = relaxedLowerKey('idle', knifeClip.name)
+      const action = this.mixer.clipAction(splitClip(knifeClip, 'lower', key))
+      action.play()
+      this.lower.set(key, action)
+      this.lowerClipNames.set(key, knifeClip.name)
+    }
 
     // --- 上半身レイヤー ---
     // 構えは idle の上半身。移動中も銃を構えた姿勢を保つ。
@@ -1315,6 +1347,8 @@ export class CharacterAnimator {
 
     const aim = byName.get('idle')
     if (aim) registerUpper(AIM_KEY, aim)
+    const knife = byName.get('knife_idle')
+    if (knife) registerUpper(KNIFE_KEY, knife)
 
     // しゃがみの構え。**脱力と同じ 1 本の両端から取る** (RELAXED_CLIPS の注)
     const crouchAim = byName.get('knee_ready') ?? byName.get('crouch_aim')
@@ -1466,6 +1500,27 @@ export class CharacterAnimator {
       action.clampWhenFinished = true
     }
     this.stabDuration = stab?.duration ?? 0
+
+    /*
+     * 伏せた刺突。**1 本の型を 2 通りに使う。**
+     * 刺すときは頭から流し、伏せてナイフを構えている間は頭の 1 枚で止める
+     * (prone_fire を構えと発砲に分けているのと同じ形)。構えは下半身も同じ
+     * 1 枚から取って全身にする (resolveLowerKey)。
+     */
+    const proneStab = byName.get('prone_stab')
+    if (proneStab) {
+      const action = registerUpper(PRONE_STAB_KEY, proneStab)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+      registerUpper(PRONE_KNIFE_KEY, proneStab).setEffectiveTimeScale(0)
+      const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
+      const lower = this.mixer.clipAction(splitClip(proneStab, 'lower', key))
+      lower.setEffectiveTimeScale(0)
+      lower.play()
+      this.lower.set(key, lower)
+      this.lowerClipNames.set(key, proneStab.name)
+    }
+    this.proneStabDuration = proneStab?.duration ?? 0
 
     const roll = byName.get('roll')
     if (roll) {
@@ -1685,9 +1740,16 @@ export class CharacterAnimator {
       asleep ||
       prone
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
+    /*
+     * **ナイフの構えでは腰を正面へ戻さない。** 半身の構えなので腰は 90° 横を
+     * 向いていて、それを正面へ寄せると全身が 75° 回って刃が横を向く
+     * (実測: 頭の向きが拳銃の構えと 70° ずれた)。刃と顔は素材のままで
+     * 照準の方を向いている。
+     */
+    const knifeStance = this.knife && this.aiming && this.locomotion === 'idle'
     this.hipSquare = damp(
       this.hipSquare,
-      this.aiming && !committed ? AIM_HIP_SQUARE : 0,
+      this.aiming && !committed && !knifeStance ? AIM_HIP_SQUARE : 0,
       AIM_HIP_LAMBDA,
       dt,
     )
@@ -1980,7 +2042,16 @@ export class CharacterAnimator {
     // ただし取り除くのは**縦軸まわりの捻れだけ**。差には前後の傾きも混ざって
     // いて、そちらは「作られた向き」ではなく本来のポーズなので、一緒に消すと
     // 上体がのけぞる (実測: 立ちの脱力で首が -6.8° → -15.5°。素材は -5.0°)。
-    const neutral = this.upperHipsNeutrals.get(key)
+    /*
+     * **ナイフの構えでは腰の向きを「座標系」として消さない。**
+     *
+     * 半身の構えなので腰は 90° 横を向いていて、上体はそこから前へ捻って
+     * 照準の方を向いている。この 90° を relaxed 系と同じ「作られた向きの差」
+     * として取り除くと、上体の捻りだけが残って**走ると上体が右を向く**
+     * (実際そうなった)。腰の差をそのまま背骨で打ち消せば、上体は素材と
+     * 同じく前を向く。
+     */
+    const neutral = key === KNIFE_KEY ? undefined : this.upperHipsNeutrals.get(key)
     if (neutral && this.uprightHipsKnown && this.upperTwistFix > 0) {
       this.rebaseScratch
         .copy(this.uprightHips)
@@ -2135,6 +2206,17 @@ export class CharacterAnimator {
       if (RELAXED_CLIPS[locomotion] === LOWER_CLIPS[locomotion]) {
         this.upper.get(relaxedKey(locomotion))?.setEffectiveTimeScale(scale)
       }
+      /*
+       * **脱力の走りも同じ。** 下半身は `run_f@relaxed_run` に差し替わっている
+       * (resolveLowerKey) ので、上の比較 (run_f と relaxed_run) では同じと出ない。
+       * 下だけ 1.33 倍で回り、上は素の速さのままだった — 腰の揺れと、それを
+       * 打ち消す背骨・首が別の拍で回るので、**頭の振れが素材の 3 倍** (yaw 9° →
+       * 27°) に膨らんでいた。拳銃の走り (run_f@pistol_run) も同じ。
+       */
+      if (RELAXED_LOWER_STATES.has(locomotion)) {
+        this.upper.get(relaxedKey(locomotion))?.setEffectiveTimeScale(scale)
+        this.upper.get(pistolKey(locomotion))?.setEffectiveTimeScale(scale)
+      }
     }
 
     // 止めておく型。**上下そろえて止める** — 下だけ止めると腕が動き続ける
@@ -2155,6 +2237,16 @@ export class CharacterAnimator {
    * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
    */
   private resolveLowerKey(): string {
+    // ナイフを立って構えている。上半身と同じ型で全身にする
+    if (this.knife && this.aiming && this.locomotion === 'idle') {
+      const key = relaxedLowerKey('idle', 'knife_idle')
+      if (this.lower.has(key)) return key
+    }
+    // 伏せてナイフを構えている。prone_stab の頭の 1 枚で全身
+    if (this.knife && this.aiming && this.locomotion === 'prone_idle') {
+      const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
+      if (this.lower.has(key)) return key
+    }
     if (this.aiming || !RELAXED_LOWER_STATES.has(this.locomotion)) return this.locomotion
     const name = this.pistol ? PISTOL_RELAXED[this.locomotion] : RELAXED_CLIPS[this.locomotion]
     if (!name) return this.locomotion
@@ -2294,6 +2386,13 @@ export class CharacterAnimator {
 
   setPistol(oneHanded: boolean): void {
     this.pistol = oneHanded
+  }
+
+  /** ナイフを持っているか。構えると専用の型 (KNIFE_KEY) */
+  private knife = false
+
+  setKnife(knife: boolean): void {
+    this.knife = knife
   }
 
 
@@ -2558,7 +2657,10 @@ export class CharacterAnimator {
     }
     if (this.upperState === 'hit' && this.upper.has(HIT_KEY)) return HIT_KEY
     if (this.upperState === 'salute' && this.upper.has(SALUTE_KEY)) return SALUTE_KEY
-    if (this.upperState === 'stab' && this.upper.has(STAB_KEY)) return STAB_KEY
+    if (this.upperState === 'stab') {
+      if (this.locomotion === 'prone_stab' && this.upper.has(PRONE_STAB_KEY)) return PRONE_STAB_KEY
+      if (this.upper.has(STAB_KEY)) return STAB_KEY
+    }
     /*
      * ボルト操作は構えを解いても最後まで流す。1 発ごとに必ず起きる動作なので、
      * 途中で切れると「撃ったのに動作していない」が頻繁に見える。
@@ -2634,6 +2736,10 @@ export class CharacterAnimator {
        * 這いながらは撃てない (domain/item/inventory.ts の canShoot)。撃てない
        * のに構えた型を出すと、狙えているように見えて弾が出ない。
        */
+      // ナイフなら伏せた刺突の頭の 1 枚。銃の構えより先に見る
+      if (this.aiming && this.locomotion === 'prone_idle' && this.knife && this.upper.has(PRONE_KNIFE_KEY)) {
+        return PRONE_KNIFE_KEY
+      }
       if (this.aiming && this.locomotion === 'prone_idle' && this.upper.has(PRONE_AIM_KEY)) {
         return PRONE_AIM_KEY
       }
@@ -2667,6 +2773,14 @@ export class CharacterAnimator {
 
     if (this.aiming) {
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
+      /*
+       * ナイフを構えた。立ち止まっていれば全身、動いていれば上半身だけを
+       * この型から取る。**しゃがみも上半身はこの型** — 拳銃のしゃがみ構えで
+       * 代用すると、しゃがんだ途端に銃を構える手になる。
+       * 上半身だけのときの腰の扱いは alignSpineToUpperClip に注がある
+       */
+      // 伏せは上の PRONE_LOCOMOTIONS の枝が先に受ける (prone_knife)
+      if (this.knife && this.upper.has(KNIFE_KEY)) return KNIFE_KEY
       if (this.pistol) {
         const key = crouching ? PISTOL_CROUCH_AIM_KEY : PISTOL_AIM_KEY
         if (this.upper.has(key)) return key
@@ -3042,14 +3156,19 @@ export class CharacterAnimator {
 
   playStab(): void {
     if (this.dead) return
-    const upper = this.upper.get(STAB_KEY)
-    const lower = this.lower.get('stab')
+    // 伏せていれば伏せた刺突。型が無ければ立ちの刺突へ落ちる
+    const prone =
+      PRONE_LOCOMOTIONS.has(this.locomotion) &&
+      this.upper.has(PRONE_STAB_KEY) &&
+      this.lower.has('prone_stab')
+    const upper = this.upper.get(prone ? PRONE_STAB_KEY : STAB_KEY)
+    const lower = this.lower.get(prone ? 'prone_stab' : 'stab')
     if (!upper || !lower) return
     // 上下を同時に頭から流す。同じクリップなので腰の向きが食い違わない。
     upper.reset().play()
     lower.reset().play()
     this.upperState = 'stab'
-    this.locomotion = 'stab'
+    this.locomotion = prone ? 'prone_stab' : 'stab'
   }
 
   /** ローリングを頭から再生する。全身動作なので上下を同時に流す */
@@ -3153,7 +3272,8 @@ export class CharacterAnimator {
    * 銃と噛み合うが、投げ物では空の手で構える絵になる。
    */
   private get rollArmsShowing(): boolean {
-    if (!this.handsEmpty) return true
+    // ナイフも同じ。刃を持った手で銃を構える形になるので、手前で降りる
+    if (!this.handsEmpty && !this.knife) return true
     const action = this.lower.get('roll')
     const duration = action?.getClip().duration ?? 0
     if (!action || duration === 0) return true

@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "proneKnife.fbx#4": "prone_stab" },
+  "out": "prone_stab.glb",
+  "maxTexture": 64
+}

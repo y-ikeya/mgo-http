@@ -40,11 +40,13 @@ import {
 import { GameAudio, type SoundToken } from "./sense/audio";
 import type { Step } from "../../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./sense/soundRing";
+import { Locators } from "./arms/locators";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
+import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
 import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH } from "../../domain/rule/damage";
@@ -62,7 +64,7 @@ import {
 import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
-import { isGun, isPlaceable, isThrowable, type HeldId } from "../../domain/item/held";
+import { isGun, isPlaceable, isThrowable, isThrownByHand, type HeldId } from "../../domain/item/held";
 import {
   MODES,
   ROOMS,
@@ -78,9 +80,13 @@ import { weaponOf } from "../../domain/item/weapons";
 import { STEP_UP } from "../../domain/player/moving";
 import {
   bulletOffset,
+  bulletSag,
   flightTime,
   TRAJECTORY_STEPS,
 } from "../../sim/judge/bullet";
+import { zoneExposed, zonePoint } from "../../sim/judge/hitcheck";
+import { HIT_RULES } from "../../domain/rule/damage";
+import { atBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
 import {
   applyMatch,
@@ -125,6 +131,14 @@ import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/
 export type LoadoutFocus = "primary" | "secondary" | "support" | SkillId;
 
 export interface GameStats {
+  /**
+   * 戦場を見せてよいか。**地形と自分の模型が揃うまで false。**
+   *
+   * 揃う前の画面は「まだ何も起きていない」ことを伝えられない。地形は
+   * ブロックアウトの箱だけ、模型は素の姿勢 (T ポーズ) で立っているので、
+   * **読み込み中ではなく壊れているように見える**。揃うまでは覆いを出す。
+   */
+  ready: boolean;
   stage: string;
   /**
    * いま描いている裏側。'WebGPU' か 'WebGL2'。
@@ -225,6 +239,8 @@ export interface GameStats {
   canZoom: boolean;
   /** 目の前に梯子があるか。**掴めることを知らせる**のに使う */
   canClimb: boolean;
+  /** 自分の基地の上に居る。G / △ で補給できる */
+  canResupply: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
   /**
@@ -238,8 +254,14 @@ export interface GameStats {
   canPickUp: boolean
   /** 自分が光っている (個人戦の 1 位)。位置が全員に漏れている */
   leaking: boolean
-  /** 直近のキル表示。新しいものが先頭 */
-  kills: KillEvent[]
+  /**
+   * 直近のキル表示。新しいものが先頭。
+   *
+   * **眠らせたかどうかも運ぶ。** 倒したのと眠らせたのは同じ行で出すが、
+   * 残機が減っていないので**同じ色で出してはいけない** (出す側が三角の色を
+   * 分ける)。レプリカは KillEntry として別に持っているので、ここで畳んで渡す。
+   */
+  kills: (KillEvent & { stun?: boolean })[]
   /** 残っている投げ物 */
   throwables: number
   /** 手榴弾の残り */
@@ -322,6 +344,8 @@ export interface GameStats {
    * 落ちただけなら勝手に繋ぎ直すので、ここには入らない。
    */
   rejected: string | null;
+  /** 認証が切れて断られた。画面は部屋の一覧へ戻す */
+  expired: boolean;
   sendRate: number;
   /** 相手ごとに、位置が届いている回数 (通/秒) */
   peerRates: { name: string; rate: number }[];
@@ -529,6 +553,7 @@ const POINT_FEED_DURATION = 2.5;
  */
 const SPAWN_SPREAD = 1.5;
 
+
 /**
  * 名簿を頼み直す間隔 (ms)。
  *
@@ -594,6 +619,10 @@ export class Game {
   private readonly remotes: RemoteSoldiers;
   /** 足元に出る音の輪。聞こえた方向に山が立つ */
   private readonly soundRing: SoundRing;
+  /** 血を落とす先の控え。**使い回す** — 渡された位置を書き換えないため */
+  private readonly bloodAt = new THREE.Vector3();
+  /** 投げられた E LOCATOR。**止まってからが本番** (そこで周りを暴く) */
+  private readonly locators: Locators;
   /** 投げた物。落ちた場所で音を出すためだけのもの */
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
@@ -602,6 +631,8 @@ export class Game {
   /** 割れた場所の置き場。毎回作らない */
   private readonly popAt = new THREE.Vector3();
   private readonly blast: BlastFx;
+  /** 気配 (AWARENESS)。**何が在るかは届かない**ので、霧を置くだけ */
+  private readonly sensed: Sensed;
   private readonly casings: Casings;
   /** 地面に落ちている武器。浮かせて回している */
   private readonly drops: Drops;
@@ -905,6 +936,24 @@ export class Game {
     return this.player.isAiming && this.zoomStep > 0;
   }
 
+  /** 自分の陣営。名簿で届くまでは青 */
+  private selfTeam: Team = "blue";
+  /** 陣営のある部屋か。基地 (補給) があるのはそのとき */
+  private teamsMode = false;
+
+  /**
+   * 補給できる場所に居るか。**自分の基地の上、生きている間。**
+   *
+   * 判定はサーバーも同じ問い (domain/rule/resupply.ts の atBase) で見るので、
+   * ここで出せば通る。案内 (HUD) と押した時の両方がこれを読む。
+   */
+  private get canResupply(): boolean {
+    if (!this.teamsMode || !canAct(this.life) || this.player.sleeping || this.player.downed) return false;
+    const base = STAGES[this.stageName].bases[this.selfTeam];
+    const p = this.player.position;
+    return atBase(p.x, p.y, p.z, base);
+  }
+
   /** いま覗いている段。0 なら肩越し */
   private zoomStep = 0;
 
@@ -1083,9 +1132,11 @@ export class Game {
     this.soundRing = new SoundRing(this.scene);
     this.thrown = new ThrownItems(this.scene);
     this.grenades = new Grenades(this.scene);
+    this.locators = new Locators(this.scene);
     this.claymores = new Claymores(this.scene);
     this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
+    this.sensed = new Sensed(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
     this.shots = new Shots(this.scene);
@@ -1269,9 +1320,11 @@ export class Game {
     this.shots.dispose();
     this.remotes.dispose();
     this.soundRing.dispose();
+    this.locators.clear();
     this.thrown.dispose();
     this.grenades.dispose();
     this.blast.dispose();
+    this.sensed.dispose();
     this.casings.dispose();
     this.drops.clear();
     this.player.dispose();
@@ -1507,7 +1560,20 @@ export class Game {
     this.shots.update(dt);
     // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
     this.decoys.update(dt);
+    // 手榴弾と同じ物理を同じ刻みで解く。止まったら点滅が始まる
+    this.locators.update(
+      dt,
+      this.stage.thrownWorld,
+      this.stage.water,
+      (at) => {
+        // 水に落ちたら輪を出す。**大きさは投げ物と同じ** — 手榴弾より小さい
+        this.splashAt(at, THROWN_SPLASH);
+      },
+      // 光る刻みに鳴る。輪 (ping) には出さない — 音で探すのが遊び
+      (at) => this.audio.play("locatorBeep", at),
+    );
     this.blast.update(dt);
+    this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
       // 水に落ちたら輪だけ出して沈める。**金属の音は鳴らさない**
       // 薬莢は軽い。小さく叩く
@@ -1620,12 +1686,15 @@ export class Game {
       case "phase":
         // 陣営が無い部屋には基地も無い
         if (this.bases) this.bases.visible = effect.teams;
+        this.teamsMode = effect.teams;
         // 試合が切り替わったら飛んでいる物を捨てる。サーバー側も同じ所で
         // 捨てるので、爆発が届かないまま残り続ける
         if (effect.to !== "playing") {
           this.grenades.clear();
           this.claymores.clear();
           this.decoys.clear();
+          this.locators.clear();
+          this.sensed.clear();
         }
         /*
          * 決着したら成績表を開く。
@@ -1646,6 +1715,9 @@ export class Game {
       case "team":
         // 誰が味方かは自分の所属が分かって初めて決まる
         this.remotes.setSelfTeam(effect.team);
+        this.selfTeam = effect.team;
+        // 波の色も陣営で決まる。仕切り直しで陣営が切り替わるので、置いてある分も塗り直す
+        this.locators.setSelfTeam(effect.team);
         /*
          * **戦場に居る間は湧き地点へ戻さない。**
          *
@@ -1869,6 +1941,22 @@ export class Game {
         this.remotes.expose(message.id, message.seconds);
         break;
 
+      // 気配 (AWARENESS)。誰に届くかはサーバーが決めている。こちらは霧を置くだけ
+      case "sensed":
+        this.sensed.show(message.key, message.at);
+        break;
+
+      case "sensedGone":
+        this.sensed.hide(message.key);
+        break;
+
+      // 補給できた。数は直前の self で入っている。ここは印だけ
+      case "resupplied":
+        this.lastHitZone = "RESUPPLY";
+        this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
+        this.audio.play("resupply", this.player.position);
+        break;
+
       case "throw":
         // 初速だけが届く。同じ物理を同じ地形に対して解くので、
         // 跳ねる場所も落ちる場所もこちらで求まる。
@@ -2000,6 +2088,40 @@ export class Game {
         this.decoys.bump(message.id, message.dirX, message.dirZ);
         break;
 
+      /*
+       * E LOCATOR が飛び始めた。**全員に届く。**
+       *
+       * 弧を描いて飛ぶ物なので、投げた場所が割れるのは避けられない。避けられる
+       * からこそ「どこから投げたか」を隠す動きに意味が出る (手榴弾と同じ)。
+       */
+      case "locatorThrown":
+        // **波を出すのは投げた本人の画面だけ。** 敵にも出すと、置いた場所を
+        // そのまま教えることになる
+        this.locators.spawn(
+          message.id,
+          message.from,
+          message.velocity,
+          message.owner === this.net.id,
+        );
+        break;
+
+      /*
+       * 既に置かれている E LOCATOR。**飛ぶところを見ていない人に届く。**
+       *
+       * 途中から入った人と、画面を読み直した人がここから受け取る。
+       * **見えないと壊せない**ので、見ていなかったことが「壊せない」に
+       * 化けてはいけない。
+       */
+      case "locatorPlaced":
+        this.locators.place(message.id, message.at, message.owner === this.net.id);
+        break;
+
+      // 壊れた / 寿命が尽きた。**寿命で消えた分は静かに消す** —
+      // 音を出すと「誰かが壊した」に読めて、嘘の情報になる
+      case "locatorGone":
+        this.locators.remove(message.id);
+        break;
+
       case "claymoreGone": {
         // 位置を先に取る。消してから爆発を出すと出す場所が分からない
         const mesh = this.claymores.at(message.id);
@@ -2115,6 +2237,30 @@ export class Game {
     }
   }
 
+  /**
+   * 足元の下の面へ血を落とす。**宙には残さない。**
+   *
+   * --- なぜ要るか ---
+   * 血は面に貼るのではなく、削られた人の**足元の座標にそのまま水平な板を撒く**
+   * (fx/shots.ts の splat)。地面に立っている人ならそれで地面の上に乗るが、
+   * **梯子を登っている人の足元は宙**なので、梯子の脇に血の板が浮いて残る。
+   *
+   * --- どこまで落とすか ---
+   * **真下の面まで落とし切る。** 梯子の途中で撃たれたなら、**登る前に立って
+   * いた地面**に落ちる。血は「そこで誰かが削られた」という報せなので、
+   * 12m 上で出たことより、**下を通る人に読めること**を取る。
+   *
+   * 下は 40m まで見る (sim/space/meshworld.ts の PROBE_DOWN) ので、この
+   * ステージの梯子 (11.7m) は届く。
+   */
+  private bleedAt(at: THREE.Vector3): void {
+    this.bloodAt.copy(at);
+    const floor = this.world.groundHeight(this.bloodAt, PLAYER_RADIUS, at.y);
+    // 足元より上には落とさない。足場が見つからなければ 0 が返る (地面の高さ)
+    if (floor < at.y) this.bloodAt.y = floor;
+    this.shots.blood(this.bloodAt);
+  }
+
   private applyHealth(message: HealthMessage): void {
     /*
      * 削られた人の足元に血を落とす。**弾も爆風もここを通る。**
@@ -2131,7 +2277,7 @@ export class Game {
         message.id === this.net.id
           ? this.player.position
           : this.remotes.positionOf(message.id);
-      if (at) this.shots.blood(at);
+      if (at) this.bleedAt(at);
     }
 
     if (message.id !== this.net.id) {
@@ -2199,7 +2345,11 @@ export class Game {
       base.z + Math.sin(spread) * SPAWN_SPREAD,
     );
     // 跳んだ距離を足音に積ませない。積むと着いた先で連打になる
-    this.player.warpTo(this.player.position.x, this.player.position.z);
+    this.player.warpTo(
+      this.player.position.x,
+      this.player.position.y,
+      this.player.position.z,
+    );
 
     this.faceCentre();
   }
@@ -3162,6 +3312,23 @@ export class Game {
     const distance = shot.distance;
     if (player) {
       /*
+       * **審判が通す線か。** 弾は照準 (カメラ) から飛ばしたが、審判は目から
+       * 相手の部位へ線を引く (sim/judge/hitcheck.ts の zoneExposed)。カメラは
+       * 体より高いので、縁の裏にしゃがんだまま覗いて撃つと、画面では当たるのに
+       * 審判は通さない。**当たらないと分かっている物は手元でも当てない** —
+       * その弾は遮蔽で止めて、申告も出さない。
+       *
+       * 同じ関数・同じ規則・同じ三角を読むので、ここで通した物を審判が弾く
+       * ことは無い (巻き戻しの姿勢のずれを除く)。三角が届いていなければ
+       * 確かめずに撃つ (今までどおり)。
+       */
+      if (this.stage.sightWorld && !this.eyeReaches(player.player, player.zone, distance)) {
+        this.pelletHit.player = null;
+        this.lastHitZone = "BLOCKED";
+        this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
+        return;
+      }
+      /*
        * 撃てる相手か。**陣営ではなくルールに聞く。**
        *
        * 個人戦では同じ色でも敵なので、陣営で見ていると自分の弾が当たらない
@@ -3191,6 +3358,61 @@ export class Game {
   }
 
   /**
+   * 目から相手の部位へ線が通るか。**審判と同じ問い。**
+   *
+   * 通らなければ、弾はその線が最初に当たる所で止める (hitPoint を差し替える)。
+   * 照準の線の先ではなく目の線の先に痕が出るので、「縁に当たった」と読める。
+   */
+  private readonly eyePose = {
+    time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, cameraYaw: 0, aiming: false,
+  };
+  private readonly targetPose = { time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance };
+
+  private eyeReaches(target: RemoteSoldier, zone: HitZone, distance: number): boolean {
+    const sight = this.stage.sightWorld;
+    if (!sight) return true;
+    const me = this.player.position;
+    this.eyePose.x = me.x;
+    this.eyePose.y = me.y;
+    this.eyePose.z = me.z;
+    this.eyePose.yaw = this.player.yaw;
+    this.eyePose.stance = this.player.stance;
+    // カメラの線も引く (審判と同じ)。向きと構えは審判が姿の記録から取るのと同じ値
+    this.eyePose.cameraYaw = this.follow.aimYaw;
+    this.eyePose.pitch = this.follow.aimPitch;
+    this.eyePose.aiming = this.player.isAiming;
+    const at = target.object.position;
+    this.targetPose.x = at.x;
+    this.targetPose.y = at.y;
+    this.targetPose.z = at.z;
+    this.targetPose.stance = target.stance;
+    // 弾道の膨らみ。審判は申告の距離と銃の性能から同じ式で出す (server/damage.ts)
+    const sag = bulletSag(distance, this.weapon.bulletSpeed, this.weapon.bulletGravity);
+    if (zoneExposed(this.eyePose, this.targetPose, zone, sight, HIT_RULES, sag)) return true;
+    // 止めた理由を残す。**画面の入力と審判の入力を突き合わせる**ため (?stats と同じ扱いの覗き窓)
+    console.info(
+      `[弾] BLOCKED ${zone} 距離 ${distance.toFixed(1)}m 膨らみ ${sag.toFixed(3)} ` +
+        `自分 (${me.x.toFixed(1)}, ${me.y.toFixed(1)}, ${me.z.toFixed(1)}) ${this.eyePose.stance} ` +
+        `向き ${((this.eyePose.cameraYaw * 180) / Math.PI).toFixed(0)}°/${((this.eyePose.pitch * 180) / Math.PI).toFixed(0)}° ` +
+        `相手 (${at.x.toFixed(1)}, ${at.y.toFixed(1)}, ${at.z.toFixed(1)}) ${this.targetPose.stance} 三角 ${sight.size}`,
+    );
+
+    // 止める場所。目から部位への中心線が最初に当たる所
+    const eyeY = me.y + HIT_RULES.headHeight(this.player.stance);
+    const [tx, ty, tz] = zonePoint(this.targetPose, zone, HIT_RULES.headHeight(target.stance));
+    const block = sight.hit(me.x, eyeY, me.z, tx, ty, tz);
+    if (block) {
+      this.hitPoint.set(
+        me.x + (tx - me.x) * block.t,
+        eyeY + (ty - eyeY) * block.t,
+        me.z + (tz - me.z) * block.t,
+      );
+      this.hitNormal.set(block.nx, block.ny, block.nz);
+    }
+    return false;
+  }
+
+  /**
    * しゃがみと回避を 1 つのキーに載せる。
    *
    *   短く押す … しゃがみの切り替え
@@ -3215,7 +3437,12 @@ export class Game {
      * 離せばそのまま落ちる — 高さを選んで飛び降りられる。
      */
     if (this.player.onLadder) {
-      if (this.input.tapped("stance")) this.player.releaseLadder();
+      /*
+       * **押した瞬間に離す。** `tapped` は離すまで立たず、長押しでは一度も
+       * 立たない (Space は転がりの長押しを持っているため)。掴んだ手を離すのに
+       * 「短く押す」を要求すると、慌てて押し込んだときに落ちられない。
+       */
+      if (this.input.pushed("stance")) this.player.releaseLadder();
       return;
     }
 
@@ -3334,6 +3561,9 @@ export class Game {
    * 振りかぶっていなければ何もしない — サーバーも同じ条件で見ている
    * (holdingGrenade)。
    */
+  /** いま投げようとしている物。**振り切ったときに知らせる先が変わる** */
+  private throwHeld: HeldId = "grenade";
+
   private loseHeldGrenade(): void {
     if (!this.grenadeAiming && this.grenadeRelease <= 0) return;
     if (this.inv.held === "grenade") this.inv.spend();
@@ -3352,7 +3582,7 @@ export class Game {
     //
     // **振り切っている最中は畳まない** (grenadeRelease > 0)。最後の 1 個を投げると
     // 持ち物から消えて次の武器へ移るので、投げの型がそこで中断されていた
-    if (this.inv.held !== "grenade" && this.grenadeAiming && this.grenadeRelease <= 0) {
+    if (!isThrownByHand(this.inv.held) && this.grenadeAiming && this.grenadeRelease <= 0) {
       this.grenadeAiming = false;
       this.grenades.hidePreview();
       this.player.cancelThrow();
@@ -3375,13 +3605,30 @@ export class Game {
       this.updateClaymoreSetup();
       return;
     }
-    if (this.inv.held !== "grenade") return;
+    /*
+     * **手榴弾と E LOCATOR は同じ型で投げる。**
+     *
+     * 違うのは手を離れた後だけ (爆ぜるか、置き続けるか) なので、構えと
+     * 振りかぶりの手順は分けない。どちらを投げたかは throwHeld が覚えていて、
+     * 知らせるときに分かれる (置く物で setupHeld がしているのと同じ形)。
+     */
+    if (!isThrownByHand(this.inv.held)) return;
+    this.throwHeld = this.inv.held;
     // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
     const canThrow =
       this.inv.countOf(this.inv.held) > 0 &&
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
+      /*
+       * **梯子の上では投げられない。** 両手が塞がっている (bumping と同じ理屈)。
+       *
+       * ここを見ていなかったので、振りかぶったまま G で掴むと構えを
+       * 畳まずに登り始めた — 型は登りに差し替わるのに throwing が立ったまま
+       * で、他の人の画面では手榴弾を持って登る姿になる。掴んだ次のフレームで
+       * held が倒れ、下の「構えを解かされた」道で腕を下ろす。
+       */
+      !this.player.onLadder &&
       // **転がりの絵が流れている間は振りかぶれない。**
       //
       // ローリングは全身の型なので、振りかぶりの型はそこで上書きされる。
@@ -3539,6 +3786,8 @@ export class Game {
       canAct(this.life) &&
       !this.player.isBoxed &&
       !this.player.downed &&
+      // 手榴弾と同じ。梯子の上では両手が塞がっている
+      !this.player.onLadder &&
       // 手榴弾と同じ。転がりは全身の型なので、構えを跨がせない。
       // **絵が終わるまで**待つ (rolling だと尻尾の中で始まって見えない)
       !this.player.rollShowing &&
@@ -3706,6 +3955,11 @@ export class Game {
       this.player.grabLadder();
       return;
     }
+    // 基地の上では同じ指が補給になる。**捨てる判断より先に食う** (梯子と同じ)
+    if (this.canResupply && this.input.tapped("drop")) {
+      this.net.send({ type: "resupply" });
+      return;
+    }
 
     const intent: Intent = {
       browse: {
@@ -3755,6 +4009,8 @@ export class Game {
           this.audio.playUi("browse");
           break;
         case "selected":
+          // 一覧の中で 1 段動いた。開いた音と同じく画面の音
+          this.audio.playUi("switch");
           break;
       }
     }
@@ -3799,8 +4055,11 @@ export class Game {
     this.follow.aimDirection(this.aimDir);
     // 向きだけ送る。位置も速さもサーバーが決める (捏造した初速で
     // 地図の反対側まで飛ばせないように)
+    //
+    // **どちらを投げたかは構え始めに覚えてある** (throwHeld)。振り切るまでの
+    // 間に持ち替えられても、流れていた型と知らせる先が食い違わない
     this.net.send({
-      type: "grenade",
+      type: this.throwHeld === "locator" ? "locator" : "grenade",
       dir: [this.aimDir.x, this.aimDir.y, this.aimDir.z],
     });
   }
@@ -3944,9 +4203,15 @@ export class Game {
   }
 
   private playStep(step: Step, position: THREE.Vector3, ping: boolean): void {
+    // 梯子の段は足の下の床ではなく梯子そのもの。専用の音で鳴らす
     const surface = surfaceAt(position, PLAYER_RADIUS, this.stage.obstacles, position.y, STEP_UP);
-    const sound =
-      surface === "metal" ? "metalStep" : surface === "wood" ? "woodStep" : "step";
+    const sound = step.climbing
+      ? "ladderStep"
+      : surface === "metal"
+        ? "metalStep"
+        : surface === "wood"
+          ? "woodStep"
+          : "step";
     const gain = this.audio.play(sound, position, step.volume, step.range);
     if (ping) this.addPing("step", position, gain);
   }
@@ -4045,8 +4310,9 @@ export class Game {
       return;
     }
 
-    const sound =
-      message.surface === "metal"
+    const sound = message.climbing
+      ? "ladderStep"
+      : message.surface === "metal"
         ? "metalStep"
         : message.surface === "wood"
           ? "woodStep"
@@ -4200,6 +4466,8 @@ export class Game {
       ? { magazine: chosen.magazine, reserve: chosen.reserve }
       : { magazine: this.inv.ammoOf(shownWeapon), reserve: this.inv.reserveOf(shownWeapon) };
     this.onStats({
+      // 地形と自分の模型が揃って初めて戦場を見せる。**どちらも後から届く**
+      ready: this.stageReady && this.player.dressed,
       stage: STAGE_CODE,
       backend: this.backend,
       fps: Math.round(this.fps),
@@ -4270,6 +4538,7 @@ export class Game {
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
       canClimb: this.player.ladderInReach,
+      canResupply: this.canResupply,
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
       stamina: staminaBlur(this.stamina),
@@ -4293,7 +4562,8 @@ export class Game {
       ),
       kills: this.replica.killFeed
         .filter((entry) => now - entry.at < KILL_FEED_DURATION * 1000)
-        .map((entry) => entry.event),
+        // **眠らせた印も一緒に渡す。** 捨てると、出す側が倒したのと区別できない
+        .map((entry) => ({ ...entry.event, stun: entry.stun })),
       throwables: this.inv.countOf('magazine'),
       grenades: this.inv.supportCount,
       /**
@@ -4333,6 +4603,7 @@ export class Game {
       pose: this.player.poseDebug,
       latency: this.latency,
       rejected: this.net.rejected ?? null,
+      expired: this.net.expired ?? false,
       sendRate: this.sendGap > 0 ? 1000 / this.sendGap : 0,
       peerRates: this.remotes.rates(),
     });

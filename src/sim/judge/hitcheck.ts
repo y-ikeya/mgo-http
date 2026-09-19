@@ -15,6 +15,8 @@ import type { HitZone } from '../../domain/rule/damage'
 import type { SightBlocker } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
 import type { Stance } from '../../domain/player/stance'
+import { cameraPoint } from '../space/eyepoint'
+import { hasLineOfSight } from '../space/vision'
 
 // 姿の形は domain (人の過去の姿そのものなので)。ここからも出す
 export type { Pose }
@@ -39,6 +41,12 @@ export interface HitRules {
    * 通らなかった。姿勢が増えるたびに増える引数ではなく、**姿勢を 1 つ**渡す。
    */
   headHeight(stance: Stance): number
+  /** その構えのカメラの注視点の高さ (m)。撃った線をカメラから引き直すのに要る */
+  viewHeight(stance: Stance): number
+  /** その部位の大きさ (半径 m)。中心の 1 点ではなく球の中のどこかが見えていれば通す */
+  zoneRadius(zone: HitZone): number
+  /** その部位の縦の幅 (頭の高さに対する比率、下端と上端)。胴と脚は筒なので球では足りない */
+  zoneSpan(zone: HitZone): readonly [number, number]
   /** その構えに刃が通るか */
   canBeStabbed(stance: string, aimPitch: number): boolean
   /** ナイフの間合い (m) と、そこに許す余裕 */
@@ -175,12 +183,34 @@ export function forwardOf(yaw: number): [number, number] {
 }
 
 /**
- * その部位が攻撃者から見えていたか。
+ * 撃つ側の、体のどこから線を引くか。頭・胸・腹 (頭の高さに対する比率)。
  *
- * 肩の幅だけ左右にずらした線も試して、1 本でも通れば見えていたとする。
- * 見えているものを撃てないほうが、見えないものを撃たれるより困る。
+ * 頭 1 本だった頃、梯子の脇の板の 28cm の隙間から撃つと、頭がちょうど隙間に
+ * 無い限り通らなかった。銃は胸のあたりにあるので、胸と腹からも引く。
  */
-function zoneExposed(
+const EYE_RATIOS = [1, 0.72, 0.5] as const
+
+/**
+ * その部位が攻撃者から撃てたか。**2 つの筋のどちらかで通す。**
+ *
+ *   1. 体からの線。頭・胸・腹から、肩の幅ぶん左右にもずらして、1 本でも通れば
+ *   2. **カメラの線が通り、かつ相手の目から攻撃者の体が見える**
+ *
+ * --- なぜ 2 が要るか ---
+ * 客の弾は照準 (カメラ) から飛ぶ。カメラは体の後ろ上に在るので、狭い隙間を
+ * 通す線は体からの線と一致しない。1 だけだと「画面では当たるのに通らない」が
+ * 隙間で残る。
+ *
+ * --- なぜカメラの線だけでは駄目か ---
+ * カメラは体より高い。塔の縁の裏にしゃがんだままカメラだけで縁を越えて
+ * 撃てると、**相手からは体が見えないのに撃たれる**。だから 2 には
+ * 「相手の目から自分の体が見える」を付ける — **撃てるなら見える**。
+ * 隙間越しなら体の一部が隙間に在るので通り、覗きは通らない。
+ *
+ * **客も撃つ前にこれを呼ぶ。** 同じ問いを両側が呼ぶので、手元で通した物を
+ * 審判が弾くことは無い (巻き戻しの姿のずれを除く)。通らない弾は手元でも当てない。
+ */
+export function zoneExposed(
   attacker: Pose,
   target: Pose,
   zone: HitZone,
@@ -188,8 +218,7 @@ function zoneExposed(
   rules: HitRules,
   sag: number,
 ): boolean {
-
-  const eyeY = attacker.y + rules.headHeight(attacker.stance)
+  const head = rules.headHeight(attacker.stance)
   const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
 
   // 攻撃者から相手へ向かう線に直交する向き。ここへ肩の幅だけずらす
@@ -199,12 +228,65 @@ function zoneExposed(
   const px = length > 1e-4 ? -dz / length : 1
   const pz = length > 1e-4 ? dx / length : 0
 
-  for (const side of [0, 1, -1]) {
-    const ox = attacker.x + px * SHOULDER_OFFSET * side
-    const oz = attacker.z + pz * SHOULDER_OFFSET * side
-    if (isArcClear(ox, eyeY, oz, tx, ty, tz, world, sag)) return true
+  /*
+   * 狙う先は部位の中心 1 点ではなく、**筒の中の何点か**。
+   *
+   * 画面の当たりは骨に沿った球の列 (筒) なので、縁に掠っても当たる。中心だけ
+   * 見ると、板の縁のそばで「縁は見えているのに中心は裏」の帯ができて、画面で
+   * 当たった弾が通らない。中心を先に見て、通れば 1 本で返る。
+   *
+   * 縦は筒の下端から上端 (zoneSpan) に半径ぶん足した幅、横は中心と左右。
+   * 胴は腰から首まで在るので、中心の球 1 つだと**上胸に当たった弾が板の裏**
+   * になった (梯子の脇の看板の隙間で実測)。
+   */
+  const r = rules.zoneRadius(zone)
+  const targetHead = rules.headHeight(target.stance)
+  const [low, high] = rules.zoneSpan(zone)
+  const bottom = target.y + targetHead * low - r
+  const top = target.y + targetHead * high + r
+  const targets: [number, number, number][] = [
+    [tx, ty, tz],
+    [tx, top, tz],
+    [tx, bottom, tz],
+    [tx, (top + bottom) / 2, tz],
+    [tx + px * r, ty, tz + pz * r],
+    [tx - px * r, ty, tz - pz * r],
+    [tx + px * r, top, tz + pz * r],
+    [tx - px * r, top, tz - pz * r],
+  ]
+  const reaches = (fx: number, fy: number, fz: number): boolean => {
+    for (const [qx, qy, qz] of targets) if (isArcClear(fx, fy, fz, qx, qy, qz, world, sag)) return true
+    return false
   }
-  return false
+
+  for (const ratio of EYE_RATIOS) {
+    const eyeY = attacker.y + head * ratio
+    for (const side of [0, 1, -1]) {
+      const ox = attacker.x + px * SHOULDER_OFFSET * side
+      const oz = attacker.z + pz * SHOULDER_OFFSET * side
+      if (reaches(ox, eyeY, oz)) return true
+    }
+  }
+
+  /*
+   * 覗いているときのカメラ。**注視点そのもの** (引きも肩のずれも 0)。
+   *
+   * スコープを覗くと画面のカメラは体の中 (注視点) に来る。覗いているかは
+   * 送られてこないので、この線も常に試す — 体の中から引く線なので、縁の裏から
+   * 覗く抜け道にはならない。狙撃銃で板の隙間を通すとき、頭の線 (0.1m 下) は
+   * 下の板に当たるのに画面の照準は通っている、が起きていた。
+   */
+  if (reaches(attacker.x, attacker.y + rules.viewHeight(attacker.stance), attacker.z)) return true
+
+  // 2. カメラの線。**相手から体が見えるときだけ**
+  const cam = cameraPoint(
+    attacker.x, attacker.y, attacker.z,
+    attacker.cameraYaw ?? attacker.yaw, attacker.pitch, attacker.aiming ?? true,
+    rules.viewHeight(attacker.stance),
+  )
+  if (!reaches(cam.x, cam.y, cam.z)) return false
+  const targetEyeY = target.y + rules.headHeight(target.stance)
+  return hasLineOfSight(target.x, targetEyeY, target.z, attacker.x, attacker.y, attacker.z, head, world)
 }
 
 /**

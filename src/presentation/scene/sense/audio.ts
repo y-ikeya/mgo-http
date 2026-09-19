@@ -97,6 +97,8 @@ const SOUNDS = {
   step: { file: "step_concrete1.mp3", reference: 2, max: STEP_RANGE },
   /** 金属の上を歩いたとき。届く距離はコンクリートと同じにして、材質の差だけ出す */
   metalStep: { file: "step_metal1.mp3", reference: 2, max: STEP_RANGE },
+  /** 梯子を 1 段登った。届く距離は足音と同じ (domain/rule/footsteps.ts の CLIMB) */
+  ladderStep: { file: "step_ladder1.mp3", reference: 2, max: STEP_RANGE },
   /**
    * 木の上を歩いたとき。
    *
@@ -148,6 +150,11 @@ const SOUNDS = {
    */
   drop: { file: "weapon_drop1.mp3", reference: 4, max: 20 },
   pick: { file: "weapon_pick1.mp3", reference: 4, max: 20 },
+  /**
+   * 基地で弾薬を補給した。**拾う音と同じ族だが別の音** — 補給は基地でしか
+   * 起きないので、聞こえたら「相手が基地へ戻った」と読める。
+   */
+  resupply: { file: "ammo_pick1.mp3", reference: 4, max: 20 },
   /**
    * 倒れたときの叫び。
    *
@@ -207,6 +214,14 @@ const SOUNDS = {
    * 届く距離は手榴弾と同じ。壁で遮っても聞こえる。
    */
   claymore: { file: "claymore1.mp3", reference: 12, max: 160 },
+  /**
+   * E LOCATOR が光る刻みの電子音。**光と同じ拍で鳴る。**
+   *
+   * 暴かれる側への手がかり。**暴く端 (15m) より少し内側まで**しか届かない —
+   * 端で聞こえると、置いた物が見つかりすぎて置く意味が薄れる。近づけば
+   * 音で場所を探せる、くらいに留める。
+   */
+  locatorBeep: { file: "locator_beep1.mp3", reference: 2, max: 12 },
   /*
    * decoy が割れた音。**普通の位置音として鳴らす。**
    *
@@ -303,6 +318,22 @@ const SOUNDS = {
 
 export type SoundName = keyof typeof SOUNDS;
 
+/** 1 つの音の 1 つの録り。高さは録りごとに変えられる (代用の音を落とすため) */
+interface Take {
+  file: string;
+  rate?: number;
+}
+
+/**
+ * 音の録りを並べる。**1 つ (file) でも複数 (takes) でも同じ形で扱う。**
+ *
+ * 表は読みやすさを優先して、ほとんどの音を file 1 つで書いている。
+ */
+function takesOf(profile: { file?: string; takes?: readonly Take[]; rate?: number }): Take[] {
+  if (profile.takes) return [...profile.takes];
+  return [{ file: profile.file!, rate: profile.rate }];
+}
+
 /** 同時に鳴らせる数。使い回しなので撃ち続けても増えない */
 const POOL_SIZE = 12;
 
@@ -366,6 +397,8 @@ const AMBIENCE_VOLUME = 0.12;
 const UI_SOUNDS = {
   /** 持ち物の一覧が出た。**押さえ続けて出るので、出た瞬間が要る** */
   browse: { file: "clang1.mp3", volume: 0.55 },
+  /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
+  switch: { file: "list_switch1.mp3", volume: 0.55 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;
@@ -380,7 +413,10 @@ export class GameAudio {
   /** どの音を流すか。ステージが決める (domain/stage の ambience) */
   private ambienceFile = 'city_loop1.mp3';
 
-  private readonly buffers = new Map<SoundName, AudioBuffer>();
+  /** 音ごとの録り。表と同じ並びで、読めなかった所は空く */
+  private readonly buffers = new Map<SoundName, ({ buffer: AudioBuffer; rate: number } | undefined)[]>();
+  /** 前回どの録りを鳴らしたか。**表の並びで巡る**ため */
+  private readonly lastTake = new Map<SoundName, number>();
   /** 画面の音。世界の音とは別の棚に置く — 同じ名前が両方に居てよい */
   private readonly uiBuffers = new Map<UiSoundName, AudioBuffer>();
   private readonly uiPool: THREE.Audio[] = [];
@@ -475,8 +511,19 @@ export class GameAudio {
    *   判断すると、耳とレーダーが食い違う。
    */
   play(name: SoundName, position: THREE.Vector3, volume = 1, range = 1): number {
-    const buffer = this.buffers.get(name);
-    if (!buffer) return 0;
+    const takes = this.buffers.get(name);
+    if (!takes || takes.length === 0) return 0;
+    /*
+     * 録りが複数あれば、**表の並びで巡る。** 同じ物を 2 つ並べれば
+     * その分だけ多く鳴る (木の足音は 古・古・新)。読めなかった録りは飛ばす。
+     */
+    let pick = ((this.lastTake.get(name) ?? -1) + 1) % takes.length;
+    for (let tried = 0; tried < takes.length && !takes[pick]; tried++) {
+      pick = (pick + 1) % takes.length;
+    }
+    const take = takes[pick];
+    if (!take) return 0;
+    this.lastTake.set(name, pick);
 
     const sound = this.pool[this.next];
     const anchor = this.anchors[this.next];
@@ -490,10 +537,10 @@ export class GameAudio {
     const profile = SOUNDS[name];
     sound.setRefDistance(profile.reference * range);
     sound.setMaxDistance(profile.max * range);
-    sound.setBuffer(buffer);
+    sound.setBuffer(take.buffer);
     sound.setVolume(volume);
-    // 音ごとの基準の高さに、毎回のゆらぎを掛ける
-    sound.setPlaybackRate(("rate" in profile ? profile.rate : 1) * jitter());
+    // 録りごとの基準の高さに、毎回のゆらぎを掛ける
+    sound.setPlaybackRate(take.rate * jitter());
     /*
      * こもらせる音だけ低い所を残す。
      *
@@ -613,18 +660,21 @@ export class GameAudio {
       ),
     );
     await Promise.all(
-      (Object.entries(SOUNDS) as [SoundName, (typeof SOUNDS)[SoundName]][]).map(
-        async ([name, profile]) => {
-          try {
-            const buffer = await loader.loadAsync(
-              asset.audio(profile.file),
-            );
-            if (!this.disposed) this.buffers.set(name, buffer);
-          } catch (error) {
-            // 音が無くてもゲームは成立する
-            console.error(`[Audio] 読み込みに失敗: ${profile.file}`, error);
-          }
-        },
+      (Object.entries(SOUNDS) as [SoundName, (typeof SOUNDS)[SoundName]][]).flatMap(
+        ([name, profile]) =>
+          takesOf(profile).map(async (take, index) => {
+            try {
+              const buffer = await loader.loadAsync(asset.audio(take.file));
+              if (this.disposed) return;
+              // **表の並びの位置に置く。** 読めた順に積むと巡る順が変わる
+              const takes = this.buffers.get(name) ?? [];
+              takes[index] = { buffer, rate: take.rate ?? 1 };
+              this.buffers.set(name, takes);
+            } catch (error) {
+              // 音が無くてもゲームは成立する
+              console.error(`[Audio] 読み込みに失敗: ${take.file}`, error);
+            }
+          }),
       ),
     );
   }

@@ -27,7 +27,7 @@ KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_', 
 
 # 面が何を止めるか。既定は全部止めて、名前で個別に外す。
 # (src/domain/stage/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
-FLAG_WORDS = ('nodraw', 'noplayer', 'nobullet', 'noeye', 'nocamera')
+FLAG_WORDS = ('nodraw', 'noplayer', 'nobullet', 'noeye', 'nocamera', 'notexture')
 
 
 # 触れる物の名前に入る語。**これが入っていなければ飾り。**
@@ -514,9 +514,14 @@ SURFACE_SHIFT = 4
 # ここを超える物は、人とカメラの層でだけ**向き付きの箱 12 枚**に置き換える。
 # 視線と弾は本物の三角のまま — あちらは隙間を抜けるかどうかが遊びに効く。
 #
-# 64 枚は「板・坂・壁は本物のまま、飾りは箱」で切れる線。斜めに置いた板
-# (12 枚) や階段の段は下に入るので、**三角へ移した目的は損なわれない。**
-PLAYER_TRI_LIMIT = 64
+# 400 枚は「柱・塔・板・坂は本物のまま、格子の飾りは箱」で切れる線。
+#
+# 64 枚にしていた頃、筏の丸い塔 (348 枚) が四角い塊に化けていた。梯子はその
+# 塔の面に付いているので、**角が張り出して梯子に近づけない** — 1.09m 手前で
+# 止まり、掴める距離 (0.85m) に入れなかった。丸い物の外枠は嘘をつく。
+#
+# 手すり 1 本は 2,670 枚あるので、上げてもあちらは箱のまま。
+PLAYER_TRI_LIMIT = 400
 #
 # 箱で代用してよいのは、**薄い物か、詰まっている物だけ。**
 #
@@ -527,12 +532,21 @@ PLAYER_TRI_LIMIT = 64
 # 分ける物差しは 2 つ:
 #
 #   - 薄いか (一番短い辺が SLAB_MAX 以下)。手すりや柵や板はこれ。**格子でも
-#     構わない** — 箱にしても、その板があった面が塞がるだけ
+#     構わない** — 箱にしても、その板があった面が塞がるだけ。**ただし輪は別**
+#     (下記)
 #   - 詰まっているか (三角の面積が外枠の表面積に近い)。木箱やドラム缶はこれ
 #
 # どちらでも無い物 — 縄・蔓・骨組みのように、太い外枠の中を細い形が通る物 —
 # は三角のまま置く。箱にすると**その一帯が丸ごと壁**になる。
+#
+# --- 薄くても輪は板にしない ---
+# 梯子の落下防止の輪 (BézierCircle、管の網 576 枚、高さ 1cm) は「薄い」に
+# 当てはまって 1.26m 四方の板になっていた。**輪の中は空なのに床ができる** —
+# 梯子の途中で眠らされた体が、落ちずにその板の上で寝た。薄い物でも、三角の
+# 面積が外枠に対して SLAB_FILL_MIN に満たなければ (輪・輪郭だけの枠) 三角のまま
+# 置く。柵や格子は棒が詰まっているのでこれより多く、今までどおり板になる。
 SLAB_MAX = 0.5
+SLAB_FILL_MIN = 0.15
 BOX_FILL_MIN = 0.25
 #
 # **src/domain/stage/surface.ts と揃えること。** あちらが名前から材質を引く
@@ -563,9 +577,6 @@ def box_is_fair(obj, tris):
     """外枠がその物の形を写しているか。**箱で代用してよいかの物差し**"""
     lo, hi = gltf_bounds(obj)
     dx, dy, dz = (hi[i] - lo[i] for i in range(3))
-    # 薄い物。箱にしても、その板があった面が塞がるだけ
-    if min(dx, dy, dz) <= SLAB_MAX:
-        return True
     area = 0.0
     for i in range(0, len(tris), 9):
         a = mathutils.Vector(tris[i:i + 3])
@@ -573,8 +584,13 @@ def box_is_fair(obj, tris):
         c = mathutils.Vector(tris[i + 6:i + 9])
         area += (b - a).cross(c - a).length / 2
     surface = 2 * (dx * dy + dy * dz + dz * dx)
+    if surface <= 1e-6:
+        return True
+    # 薄い物。箱にしても、その板があった面が塞がるだけ — **輪郭だけの輪は除く**
+    if min(dx, dy, dz) <= SLAB_MAX:
+        return area / surface >= SLAB_FILL_MIN
     # 詰まっている物。木箱やドラム缶は外枠の面に三角が乗っている
-    return surface <= 1e-6 or area / surface >= BOX_FILL_MIN
+    return area / surface >= BOX_FILL_MIN
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
         continue
@@ -604,8 +620,19 @@ for obj in bpy.context.scene.objects:
         mesh_objects += 1
         continue
 
-    # **外枠が形を写していない物は代用しない。** 縄を塊にすると壁になる
-    if not box_is_fair(obj, tris):
+    # **外枠が形を写していない物は代用しない。** 縄を塊にすると壁になる。
+    #
+    # `nobox` の札があれば、形が箱に収まっていても代用しない。
+    #
+    # --- なぜ札が要るか ---
+    # 筏の塔 (円柱) は箱の当てはまりが良いので代用に回るが、**梯子の窪みが
+    # 埋まらず、箱の内側に人が入れる**。押し出しは食い込みの深さで働くので、
+    # 大きな箱の中に深く入った体は押し返せない — 高台の中に立てる、という
+    # 形で出た。当たりの三角は増えるが、遊びが壊れるよりよい。
+    #
+    # **別に当たり用の物を足させない。** 同じ形を 2 つ置くと、片方だけ動かした
+    # ときに見た目と当たりがずれる。1 つの物に札を付けて済ませる。
+    if 'nobox' in obj.name or not box_is_fair(obj, tris):
         positions.extend(tris)
         marks.extend([mark] * count)
         kept_bodies.append((obj.name, count))

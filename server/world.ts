@@ -14,6 +14,7 @@ import type { Claymore } from './arms/claymore'
 import type { Decoy } from './arms/decoy'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
+import type { Locator } from './arms/locator'
 import { sessionOf } from './session'
 import { terrainOf, type Terrain } from './stage'
 
@@ -24,6 +25,13 @@ export interface Client {
   name?: string
   /** 繋ぐ前に確かめてある (isRoomName)。以後は部屋の名前として扱ってよい */
   room: RoomName
+  /**
+   * 断る理由。**付いていれば open で閉じる。**
+   *
+   * 認証の切れた token で来た接続に、符号付きの close を返すために一度受ける
+   * (protocol の AUTH_CLOSE_CODE)。席は作らない。
+   */
+  reject?: 'auth'
 }
 
 /**
@@ -49,6 +57,14 @@ export interface RoomWorld extends Match {
   claymores: Claymore[]
   /** 置かれた decoy。**割れるまでそこに在る** */
   decoys: Decoy[]
+  /**
+   * 投げられた E LOCATOR。**飛んでいる間もここに在る。**
+   *
+   * 手榴弾と違って、止まってからが本番 (そこで周りを暴く)。飛ぶ間と
+   * 置かれた後を別の入れ物に分けると、**転がっている最中の 1 つが
+   * どちらにも居ない瞬間**ができる。
+   */
+  locators: Locator[]
   /** 落ちている武器 */
   dropped: Dropped[]
   /**
@@ -98,6 +114,7 @@ export function roomOf(name: RoomName): RoomWorld {
       grenades: [],
       claymores: [],
       decoys: [],
+      locators: [],
       dropped: [],
       stage: terrainOf(stage),
     }

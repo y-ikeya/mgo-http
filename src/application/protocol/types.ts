@@ -173,6 +173,21 @@ export interface StabEvent {
 }
 
 /**
+ * 補給したい。**自分の基地の上で押す。**
+ *
+ * 位置は載せない。届いている位置と基地の距離をサーバーが見る。
+ * 通れば弾と支援が満タンに戻って self が届く。
+ */
+export interface ResupplyEvent {
+  type: 'resupply'
+}
+
+/** 補給できた。画面はその印を出す (数は self で届く) */
+export interface ResuppliedEvent {
+  type: 'resupplied'
+}
+
+/**
  * ローリングの体当たり。位置をずらすだけでダメージは無いので、
  * サーバーは中身を見ずに相手へ流す。
  */
@@ -240,6 +255,8 @@ export interface NoiseEvent {
   distance: number
   /** 足音のとき、踏んだ面。耳で分かることなので渡してよい */
   surface?: Surface
+  /** 足音のとき、梯子の段か。梯子は専用の音で鳴る */
+  climbing?: boolean
   /** 銃声のとき、撃った銃。耳で聞き分けられることなので渡してよい */
   weapon?: WeaponId
   /** 足音の届く距離の倍率。しゃがみやダンボールは小さい */
@@ -471,6 +488,66 @@ export interface DecoyGone {
 }
 
 /**
+ * E LOCATOR を投げる (クライアント → サーバー)。
+ *
+ * **向きしか送らない。** 手榴弾と同じ理由 (GrenadeThrow の注) — 位置は控えて
+ * あるものを使い、初速は共有の式で作り直す。
+ */
+export interface LocatorThrow {
+  type: 'locator'
+  /** 投げる向き (正規化は問わない)。長さは無視される */
+  dir: [number, number, number]
+}
+
+/**
+ * 飛び始めた E LOCATOR (サーバー → クライアント)。
+ *
+ * **手榴弾と同じで全員に配る。** 弧を描いて飛ぶ物なので、投げた場所が割れる
+ * のは避けられない。避けられるからこそ「どこから投げたか」を隠す動きに
+ * 意味が出る。受け取った側が同じ物理を解いて、同じ場所へ落とす。
+ */
+export interface LocatorThrown {
+  type: 'locatorThrown'
+  /** サーバーが振る番号。壊れたことを同じ装置に結びつけるのに使う */
+  id: number
+  owner: string
+  team: Team
+  from: [number, number, number]
+  /** 初速 (m/s)。向きと強さを兼ねる */
+  velocity: [number, number, number]
+}
+
+/**
+ * 既に置かれている E LOCATOR (サーバー → クライアント)。
+ *
+ * **飛ぶところを見ていない人に配る。** 途中から入った人や、繋ぎ直した人は
+ * locatorThrown を受け取っていない。届かないと、光っているのに何処に在るか
+ * 分からない装置ができて、壊しようが無くなる。
+ */
+export interface LocatorPlaced {
+  type: 'locatorPlaced'
+  id: number
+  owner: string
+  team: Team
+  at: [number, number, number]
+}
+
+/** 壊れた / 寿命が尽きた */
+export interface LocatorGone {
+  type: 'locatorGone'
+  id: number
+  /** 壊れた場所。**そこで音を鳴らす** */
+  at: [number, number, number]
+  /**
+   * 撃たれて壊れたなら音を出す。
+   *
+   * 寿命で消えただけなら鳴らさない。鳴らすと「誰かが壊した」に読めて、
+   * **嘘の情報**になる (decoy を押し出すときと同じ理屈)。
+   */
+  broken: boolean
+}
+
+/**
  * 落ちた。
  *
  * **速さだけ送る。** 受ける量を送らせると、好きな値を申告できる。式は共有 (damage.ts)
@@ -625,6 +702,16 @@ export interface PingMessage {
  */
 export const LAG_CLOSE_CODE = 4001
 
+/**
+ * 認証が通らなかったので閉じた。**繋ぎ直しても通らない。**
+ *
+ * token は 1 時間で切れる。切れたまま繋ぎに来る (長く放置した / 取り直しに
+ * 失敗した) のは「遊んでいる」ではないので、画面は部屋の一覧へ戻す。
+ * HTTP の 401 で断ると WebSocket の close には理由が乗らず、落ちたのと
+ * 区別が付かない (繋ぎ直しの輪になる)。一度受けてから符号を付けて閉じる。
+ */
+export const AUTH_CLOSE_CODE = 4002
+
 /** ping を打ち返す。**中身は預かった値をそのまま返すだけ** */
 export interface PongMessage {
   type: 'pong'
@@ -678,6 +765,25 @@ export interface HiddenEvent {
  * そのまま光る長さのずれになる (ずれは実測で ±数百 ms ある)。
  * 受け取った側が自分の時計で数える。
  */
+/**
+ * 気配。**AWARENESS を持つ人にだけ届く。**
+ *
+ * 近く (AWARENESS_RADIUS) に敵の置き物・投げ物がある。物の種類も向きも
+ * 送らない — 「その辺に何かある」だけ。id は種類と番号を繋いだ札で、
+ * 消えたとき (sensedGone) に同じ札で指す。
+ */
+export interface SensedEvent {
+  type: 'sensed'
+  key: string
+  at: [number, number, number]
+}
+
+/** 気配が消えた。壊れた / 爆ぜた / 離れた、のどれでも同じ */
+export interface SensedGoneEvent {
+  type: 'sensedGone'
+  key: string
+}
+
 export interface ExposedEvent {
   type: 'exposed'
   id: string
@@ -1035,6 +1141,7 @@ export type ClientMessage =
   | SkillsEvent
   | PlaceClaymoreEvent
   | PlaceDecoyEvent
+  | LocatorThrow
   | DropWeaponEvent
   | PickUpEvent
   | FallEvent
@@ -1047,6 +1154,7 @@ export type ClientMessage =
   | KnockEvent
   | ThrowEvent
   | StabEvent
+  | ResupplyEvent
   | PongMessage
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
@@ -1069,6 +1177,9 @@ export type ServerMessage =
   | SkillsEvent
   | HiddenEvent
   | ExposedEvent
+  | SensedEvent
+  | SensedGoneEvent
+  | ResuppliedEvent
   | SelfMessage
   | PingMessage
   | ExplosionEvent
@@ -1084,6 +1195,9 @@ export type ServerMessage =
   | DecoyPlaced
   | DecoyBumped
   | DecoyGone
+  | LocatorThrown
+  | LocatorPlaced
+  | LocatorGone
 
 /** 通信路の上を流れうる全部。符号化のように向きを問わない所だけが使う */
 export type NetMessage = ClientMessage | ServerMessage
@@ -1106,6 +1220,8 @@ export interface NetTransport {
    * ことは無い — 出すのは**もう戻らない**ときだけ。
    */
   readonly rejected?: string | null
+  /** 認証が切れて断られた。**繋ぎ直さない。** 画面は部屋の一覧へ戻す */
+  readonly expired?: boolean
   /** 自分の ID。通信路を変えても変わらない */
   readonly id: string
   /** 送れるのはクライアント側の物だけ。体力や得点を名乗ることはできない */

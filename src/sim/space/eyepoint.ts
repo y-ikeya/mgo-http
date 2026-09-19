@@ -38,9 +38,6 @@ const HIP = { distance: 4.2, shoulder: 0.75 }
 /** 構えたときのカメラ。camera.ts の AIM_VIEW と揃える */
 const AIM = { distance: 1.35, shoulder: 0.42 }
 
-/** 注視点の高さ。camera.ts の viewHeight (PLAYER_HEIGHT * 0.85) と揃える */
-const VIEW_HEIGHT = 1.53
-
 /** カメラが地面へ潜らない下限 (m)。camera.ts の MIN_CAMERA_Y と揃える */
 const MIN_Y = 0.4
 
@@ -57,6 +54,16 @@ const PADDING = 0.28
  * 見る点が頭まで戻るだけなので、寄せ切って困ることはない。
  */
 
+/**
+ * 視線の向き (単位ベクトル)。camera.ts は euler(pitch, yaw, 0) を (0,0,-1) に
+ * 掛けている。**カメラの位置を出すのにも、照準が誰を捉えているかを見るのにも**
+ * 同じ向きを使う。
+ */
+export function viewDirection(yaw: number, pitch: number): [number, number, number] {
+  const cosPitch = Math.cos(pitch)
+  return [-Math.sin(yaw) * cosPitch, Math.sin(pitch), -Math.cos(yaw) * cosPitch]
+}
+
 export interface ViewPoint {
   x: number
   y: number
@@ -69,6 +76,8 @@ export interface ViewPoint {
  * @param feetY 足元の高さ
  * @param pitch 見上げ / 見下ろし (rad)
  * @param yaw 体ではなく視点の向き (rad)
+ * @param viewHeight 注視点の高さ (足元から)。**姿勢で変わる**ので呼ぶ側が渡す
+ *   (domain/player/stance.ts の VIEW_HEIGHT)。camera.ts は頭の実測 + 0.1m
  */
 export function cameraPoint(
   x: number,
@@ -77,20 +86,17 @@ export function cameraPoint(
   yaw: number,
   pitch: number,
   aiming: boolean,
+  viewHeight: number,
   boxes: StageBox[] = [],
   out: ViewPoint = { x: 0, y: 0, z: 0 },
 ): ViewPoint {
   const view = aiming ? AIM : HIP
 
-  // 視線の向き。camera.ts は euler(pitch, yaw, 0) を (0,0,-1) に掛けている
-  const cosPitch = Math.cos(pitch)
-  const dirX = -Math.sin(yaw) * cosPitch
-  const dirY = Math.sin(pitch)
-  const dirZ = -Math.cos(yaw) * cosPitch
+  const [dirX, dirY, dirZ] = viewDirection(yaw, pitch)
 
   // 肩へのずれは水平だけ (pitch で肩越しの左右がブレないように)
   const pivotX = x + Math.cos(yaw) * view.shoulder
-  const pivotY = feetY + VIEW_HEIGHT
+  const pivotY = feetY + viewHeight
   const pivotZ = z + -Math.sin(yaw) * view.shoulder
 
   // 視線の逆へ引く。途中に壁があればそこまで
@@ -119,10 +125,70 @@ export function cameraPoint(
   // 壁にめり込む。そこから引いた線は何も通らない。
   if (insideAny(out.x, out.y, out.z, boxes)) {
     out.x = x
-    out.y = feetY + VIEW_HEIGHT
+    out.y = feetY + viewHeight
     out.z = z
   }
   return out
+}
+
+/** 見る人。位置と向きと構え。MatchPlayer がそのまま当てはまる */
+export interface Viewer {
+  x: number
+  y: number
+  z: number
+  cameraYaw: number
+  pitch: number
+  aiming: boolean
+}
+
+/**
+ * その人の画面に、相手が映るか。**注視点の高さの幅の両端で引く。**
+ *
+ * 画面のカメラの高さは骨の実測で決まっていて、サーバーには分からない。
+ * 幅 (domain/player/stance.ts の VIEW_HEIGHT) の低いほうと高いほうにカメラを
+ * 置き、どちらかから見えれば映っているとする — 迷ったら送る側に倒す。
+ *
+ * 何が見えるかは呼ぶ側が渡す (visibleFrom)。人なら体の箱の辺 (vision.ts の
+ * bodyVisible)、置き物なら 1 本の柱。2 度目を試すのは 1 度目が通らなかったときだけ。
+ */
+export function seesFromCamera(
+  viewer: Viewer,
+  viewHeights: readonly [number, number],
+  cameraBoxes: StageBox[],
+  visibleFrom: (eyeX: number, eyeY: number, eyeZ: number) => boolean,
+  scratch: ViewPoint = { x: 0, y: 0, z: 0 },
+): boolean {
+  const [low, high] = viewHeights
+  for (const height of low === high ? [low] : [low, high]) {
+    const eye = cameraPoint(
+      viewer.x, viewer.y, viewer.z,
+      viewer.cameraYaw, viewer.pitch, viewer.aiming,
+      height, cameraBoxes, scratch,
+    )
+    if (visibleFrom(eye.x, eye.y, eye.z)) return true
+
+    /*
+     * 構えている間は**注視点そのもの**の線も試す (引きも肩のずれも 0)。
+     *
+     * --- なぜ要るか ---
+     * スコープを覗くと、画面のカメラは体の位置へ寄る (Game.ts の
+     * applyWeaponView が `{distance: 0, shoulder: 0}` を渡す)。ところが
+     * **覗いているかは送られてこない**ので、ここは肩越しの構え (AIM) のまま
+     * 線を引いていた。狭い穴から狙撃すると、**画面では相手が見えているのに
+     * 判定は穴の縁に当たって「見えない」**になる。
+     *
+     * 実測 (筏、81m の狙撃): 同じ立ち位置で腰だめと覗きで答えが変わり、
+     * 俯角 5° と 10° でも切り替わっていた。カメラは覗くと前へ寄り、
+     * 見下ろすと持ち上がるので、**目が 10cm 動くだけで線が切れる**。
+     *
+     * --- 抜け道にならない理由 ---
+     * 注視点は**体の中**にある。角の裏に隠れたまま覗ける線ではないので、
+     * 体が出ていない相手が見えるようにはならない。撃つ側の判定
+     * (sim/judge/hitcheck.ts) が同じ理屈で既にこの線を試している。
+     */
+    if (viewer.aiming && visibleFrom(viewer.x, viewer.y + height, viewer.z)) return true
+  }
+  return false
 }
 
 /** その点が箱の中にあるか */

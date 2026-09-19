@@ -37,6 +37,8 @@ export type SkillId =
   | 'pistolMastery'
   | 'throwing'
   | 'exposure'
+  | 'targetAlert'
+  | 'awareness'
 
 /** 取れるレベル。0 は「取っていない」 */
 type SkillLevel = 1 | 2 | 3
@@ -109,7 +111,13 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
     id: 'throwing',
     label: 'THROWING MASTERY',
     hint: '遠くへ投げられる',
-    levels: 3,
+    /*
+     * **段が無い。取るか取らないかだけ** (ENEMY EXPOSURE と同じ扱い)。
+     *
+     * 本家は Lv3 でも 1 枠だった。値段が段で変わらないなら上の段しか選ばれない
+     * ので、段を持つ意味が無い — 段がそのまま値段、という決め事の裏返し。
+     */
+    levels: 1,
   },
   exposure: {
     id: 'exposure',
@@ -120,6 +128,26 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
      *
      * 本家は Lv3 でも 1 枠だった。値段が段で変わらないなら上の段しか
      * 選ばれないので、段を持つ意味が無い。
+     */
+    levels: 1,
+  },
+  targetAlert: {
+    id: 'targetAlert',
+    label: 'TARGET ALERT',
+    hint: '自分を攻撃してきた相手の気配が分かる。**段が上がるほど、早い段階で分かる**',
+    /*
+     * **段に意味がある。** 値段が変わるだけでなく、気配が出る**条件**が段で緩む
+     * (alertTriggeredBy)。Lv1 は当てられてから、Lv3 は狙われた時点で分かる。
+     */
+    levels: 3,
+  },
+  awareness: {
+    id: 'awareness',
+    label: 'AWARENESS',
+    hint: '近くに置かれた敵の物 (クレイモア / DECOY / E LOCATOR / 手榴弾) の気配が壁越しに分かる',
+    /*
+     * **段が無い。** 本家は段で届く距離が伸びた (8 / 15 / 20.5m) が、
+     * 値段が 1 のままなら上の段しか選ばれない (EE と同じ理由)。距離を 1 つに決める。
      */
     levels: 1,
   },
@@ -340,9 +368,16 @@ export function masteryReloadScale(skills: Skills, weapon: WeaponId): number {
   return MASTERY_RELOAD[levelOf(skills, MASTERY_OF[weapon])]
 }
 
-/** 投げる強さの倍率。遠くへ届く */
+/**
+ * 投げる強さの倍率。遠くへ届く。
+ *
+ * **段を越えた値は上限へ丸める。** 段を 3 つから 1 つへ畳んだので、古い保存に
+ * `throwing: 3` が残っていることがある。素直に引くと表の外 (undefined) を
+ * 掴んで、投げる速さが NaN になって**手榴弾が飛ばなくなる**。
+ */
 export function throwScale(skills: Skills): number {
-  return THROW_SCALE[levelOf(skills, 'throwing')]
+  const level = Math.min(levelOf(skills, 'throwing'), THROW_SCALE.length - 1)
+  return THROW_SCALE[level]!
 }
 
 /**
@@ -358,6 +393,84 @@ export function exposeSeconds(skills: Skills): number {
   return EXPOSE_SECONDS[levelOf(skills, 'exposure')]
 }
 
+/**
+ * TARGET ALERT。**ENEMY EXPOSURE の鏡。** EE が当てた相手を光らせるなら、
+ * こちらは**自分を攻撃してきた相手**の気配を出す。
+ *
+ * --- 輪郭ではなく気配 ---
+ * 輪郭 (壁越しの発光) が残るのは EE と個人戦の 1 位だけ。自分で見つけて
+ * 撃ち抜いた実りだから輪郭でよい。撃たれた側 (TA) や罠に掛けた側 (decoy) が
+ * 得るのは「どの辺に居るか」の霧まで — 輪郭は分かりやすい分だけ強く、
+ * 守る側に渡すと撃った側の位置取りの意味が消える。
+ *
+ * --- 段は「攻撃」の読み方 ---
+ * 本家は Lv1 が「ロックされて当てられた」、Lv2 が「ロックされた」、Lv3 が
+ * 「銃口を向けられた」。この遊びにはロックオンが無いので、読み替える:
+ *
+ *     Lv1  hit   当てられた。EE の鏡そのもの
+ *     Lv2  shot  撃たれた。外れても、弾道が体のすぐ近くを通ったら
+ *     Lv3  aim   構えて狙われた。照準が自分を捉えている間。**撃たれる前に分かる**
+ *
+ * 上の段は下の段を含む。Lv3 なら撃たれても当てられても気配が出る。
+ *
+ * 気配の長さは段で変えない。段で買うのは**早さ**であって長さではない —
+ * 長さまで伸ばすと Lv3 が追跡の道具になる (EE を短くしたのと同じ理由)。
+ */
+export type AlertTrigger = 'hit' | 'shot' | 'aim'
+
+const ALERT_TRIGGER_LEVEL: Record<AlertTrigger, number> = { hit: 1, shot: 2, aim: 3 }
+
+/** その段で、その攻撃は気配を出すか */
+export function alertTriggeredBy(skills: Skills, trigger: AlertTrigger): boolean {
+  const level = levelOf(skills, 'targetAlert')
+  return level > 0 && level >= ALERT_TRIGGER_LEVEL[trigger]
+}
+
+/** 攻撃してきた相手の気配が残る長さ (秒)。EE (exposeSeconds) と同じ */
+export const ALERT_SECONDS = 5
+
+/**
+ * 「撃たれた」と読む距離 (m)。弾道と体の中心線がこれより近ければ、
+ * 外れていても撃たれたことになる。
+ *
+ * 肩幅の外側に少し余裕を持たせた程度。広げるほど「向こうを撃った弾」でも
+ * 光るようになり、撃った側から見て理屈が通らなくなる。
+ */
+export const ALERT_SHOT_RADIUS = 1.2
+
+/**
+ * 「狙われた」と読む幅 (m) と距離 (m)。
+ *
+ * 照準の中心が胸から**この幅の中**に在れば、狙われたと読む。**距離に依らない幅**
+ * にしてある — 角度 (3 度) で持っていた頃は、80m 先だと幅が 4.2m になって、
+ * 自分から 2m ずれた所を構えただけで光った。「照準を重ねられた」ではなく
+ * 「こっちを見た」になっていた。幅で持てば、どの距離でも「体に照準が重なった」
+ * と同じ意味になる (10m で 5.7 度、80m で 0.7 度)。
+ *
+ * 1m は肩幅 (0.44) と頭の球に余裕を足した程度。腰だめでは構えていないので数えない。
+ * 距離は狙撃銃の頭 1 発の間合いを少し超える所で切る。
+ */
+export const ALERT_AIM_WIDTH = 1
+export const ALERT_AIM_RANGE = 80
+
+/**
+ * AWARENESS。**近くの敵の置き物・投げ物の気配が分かる。**
+ *
+ * --- 見えるのは「何かある」まで ---
+ * 物そのものを壁越しに描くのではなく、**その辺に何かある**と読める霧を出す。
+ * くっきり光らせると、隠して置く道具 (クレイモア) の仕事が丸ごと消える。
+ * 気配だけなら「そこを避ける / 探しに行く」の判断は残り、置いた側にも
+ * 「霧を読める人が居る」前提で置き場所を選ぶ余地が残る。
+ *
+ * --- 距離 ---
+ * 本家の Lv2 の値 (15m)。E LOCATOR の半径と同じで、1 区画ぶん。
+ */
+export function hasAwareness(skills: Skills): boolean {
+  return levelOf(skills, 'awareness') > 0
+}
+
+export const AWARENESS_RADIUS = 15
+
 // --- 段ごとの値。添字が Lv で、0 は「取っていない」 ---
 
 const RUNNER_SCALE = [1, 1.05, 1.1, 1.16] as const
@@ -371,6 +484,16 @@ const MASTERY_JITTER = [1, 0.8, 0.6, 0.4] as const
 const MASTERY_RECOIL = [1, 0.96, 0.92, 0.88] as const
 // 戻る速さ。**指を離した人だけが得をする**ので、こちらは強めでよい
 const MASTERY_RECOVERY = [1, 1.1, 1.2, 1.35] as const
-const THROW_SCALE = [1, 1.1, 1.2, 1.35] as const
+/**
+ * 投げる強さ。**段が無いので 2 つだけ** (取っていない / 取った)。
+ *
+ * 段を持っていた頃は 1.1 / 1.2 / 1.35 で、極めるのに 3 枠払っていた。1 枠に
+ * 畳んだので、**旧 Lv2 と同じ飛距離**を 1 枠の値にしてある。
+ *
+ * 飛距離は速さの 2 乗で伸びる (放物線なので) ので、1.2 倍の速さは
+ * **1.44 倍の距離**。極めた頃 (1.35 → 1.82 倍) には届かないが、齧った頃
+ * (1.1 → 1.21 倍) よりは明確に遠い、という位置に置いた。
+ */
+const THROW_SCALE = [1, 1.2] as const
 // **1 段だけ。** 添字 0 は「取っていない」
 const EXPOSE_SECONDS = [0, 5] as const

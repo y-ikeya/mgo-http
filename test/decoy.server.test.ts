@@ -95,8 +95,9 @@ describe('decoy', () => {
   /**
    * **割った人の位置が、置いた人に漏れる。**
    *
-   * これが道具の効き目そのもの。撃った側には届かない (exposed は本人へ
-   * 送らない) ので、置いた側にだけ来る。
+   * これが道具の効き目そのもの。撃った側には届かない (sensed は本人へ
+   * 送らない) ので、置いた側にだけ来る。**輪郭ではなく気配** — 罠に掛けた
+   * だけで撃つ準備まで済ませない。
    */
   test('割った人の位置が、置いた人へ漏れる', async () => {
     server = await startServer()
@@ -106,10 +107,12 @@ describe('decoy', () => {
     shootAt(b, placedAt.at)
     await Bun.sleep(300)
 
-    expect(a.got('exposed')).toBe(1)
-    expect((a.last.get('exposed') as { id: string }).id).toBe(b.id)
-    // **撃った本人には届かない。** 光っていると分かると逃げる一択になる
-    expect(b.got('exposed')).toBe(0)
+    expect(a.got('sensed')).toBe(1)
+    expect((a.last.get('sensed') as { key: string }).key).toBe(`player:${b.id}`)
+    // 輪郭は出さない
+    expect(a.got('exposed')).toBe(0)
+    // **撃った本人には届かない。** 気配が出ていると分かると逃げる一択になる
+    expect(b.got('sensed')).toBe(0)
   }, 30000)
 
   /**
@@ -131,8 +134,8 @@ describe('decoy', () => {
     await Bun.sleep(300)
 
     expect(a.got('decoyGone')).toBe(1)
-    expect(a.got('exposed')).toBe(0)
-    expect(b.got('exposed')).toBe(0)
+    expect(a.got('sensed')).toBe(0)
+    expect(b.got('sensed')).toBe(0)
   }, 30000)
 })
 
@@ -166,8 +169,8 @@ describe('ナイフで割る', () => {
     await Bun.sleep(300)
 
     expect(b.got('decoyGone')).toBe(1)
-    expect(a.got('exposed')).toBe(1)
-    expect((a.last.get('exposed') as { id: string }).id).toBe(b.id)
+    expect(a.got('sensed')).toBe(1)
+    expect((a.last.get('sensed') as { key: string }).key).toBe(`player:${b.id}`)
   }, 30000)
 
   /**
@@ -186,7 +189,7 @@ describe('ナイフで割る', () => {
     await Bun.sleep(300)
 
     expect(b.got('decoyGone')).toBe(0)
-    expect(a.got('exposed')).toBe(0)
+    expect(a.got('sensed')).toBe(0)
   }, 30000)
 
   /**

@@ -3,7 +3,7 @@ import Profile from "../ui/Profile";
 import { profilesAvailable } from "../../infra/api/profile";
 import { useLevels } from "../../infra/api/levels";
 import { t } from "../../i18n";
-import { useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { MODES } from "../../domain/match/room";
 import { fetchRooms } from "../../infra/api/rooms";
 import type { MatchPhase, RoomSummary } from "../../application/protocol/types";
@@ -35,6 +35,24 @@ const PHASE_LABEL: Record<MatchPhase, () => string> = {
 
 export default function Lobby(props: { identity: Identity }) {
   const navigate = useNavigate();
+  /*
+   * 部屋から戻された理由。**遷移に乗せて来る** (URL に付けない)。
+   *
+   * クエリに付けると、部屋へ入るときにそのまま持って行かれる (enter は
+   * location.search を引き継ぐ) ので、部屋の中まで「退出しました」が付いて回る。
+   */
+  const route = useLocation<{ notice?: string }>();
+  /*
+   * **一度だけ出す。** 遷移の状態はブラウザの履歴 (history.state) に残るので、
+   * そのまま読み続けるとリロードのたびに同じ知らせが出る。読んだら履歴から
+   * 消して、押しても消せるようにする。
+   */
+  const [notice, setNotice] = createSignal(
+    route.state?.notice === "expired" ? t("lobby.expired") : "",
+  );
+  onMount(() => {
+    if (route.state?.notice) window.history.replaceState(null, "");
+  });
   const [rooms, setRooms] = createSignal<RoomSummary[]>([]);
   const [error, setError] = createSignal("");
   /** 戦績を開いている相手。null なら閉じている */
@@ -92,6 +110,11 @@ export default function Lobby(props: { identity: Identity }) {
         </div>
       </header>
 
+      <Show when={notice()}>
+        <div class="lobby-error" onClick={() => setNotice("")} title="OK">
+          {notice()}
+        </div>
+      </Show>
       <Show when={error()}>
         <div class="lobby-error">{error()}</div>
       </Show>

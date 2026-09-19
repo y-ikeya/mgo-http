@@ -3,7 +3,6 @@ import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/s
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
   LADDER_SPEED,
-  LADDER_STANDOFF,
   type Ladder,
   ladderAt,
   ladderGrip,
@@ -269,10 +268,60 @@ export interface PlayerWorld {
 const MODEL_YAW_OFFSET = Math.PI
 
 /** 倒れている間に渡す移動入力。毎フレーム作らないよう使い回す */
-/** 登り切る型の速さ。4 秒は長いので少し詰める */
-const CLIMB_TOP_RATE = 1.35
-/** 登り切った先、梯子の面からどれだけ前へ出るか (m) */
-const CLIMB_TOP_STEP = 0.8
+/**
+ * 登り切りの詰め物。**試写から触れるように表に出してある。**
+ *
+ * tools/preview/climbtop.html のつまみがここを書き換える。数字を決めるのは
+ * 絵を見ながらでないと無理で、直すたびに読み込み直していたら埒が明かない。
+ *
+ * 素材 (ClimbingToTop) はこう動く。合わせる相手はこれ (尺 2.99 秒):
+ *
+ *   〜1.0 秒  梯子を登り続けている
+ *   1.0〜1.5 秒  **よいしょ、と体を引き上げる**
+ *   1.5 秒〜  足を抜いて屋上へ乗せる。体はもう上がらない
+ *
+ * 素材の腰の移動は捨てて取り込んである (merge_clip の --no-root) ので、体を
+ * 動かしているのはこちらの補間だけ。**素材が止めている所で動かすと、掴んだ
+ * 手が滑る。**
+ */
+export const CLIMB_TOP_TUNING = {
+  /** 型を流す速さ。素材 4.03 秒は長いので詰める (尺 2.99 秒) */
+  rate: 1.35,
+  /**
+   * 上端の何 m 手前で乗り越えに入るか。
+   *
+   * 1.2 (手が一番上の桟に掛かる高さ) にしていたが、登りの型が 1 回多く回って
+   * から乗り越えに入るのが待ちに見えた。**掴む 1 回分 (0.8m = 登りの型 1 周)
+   * 早く入る。** 乗り越えの型の頭は登りの動きなので、そこで残りを登る。
+   */
+  lead: 2.0,
+  /** よいしょの始まり (型の 0〜1)。0.33 ＝ 1.0 秒 */
+  heaveFrom: 0.33,
+  /** よいしょの終わり。0.5 ＝ 1.5 秒 */
+  heaveTo: 0.5,
+  /**
+   * よいしょまでに上げておく分 (m)。**型の頭の登りで進む高さ。**
+   *
+   * 割合ではなく m で持つ。上端までの残り (lead + 屋上との差) は梯子ごとに
+   * 違うので、割合だと梯子が変わるたびによいしょの高さが変わる。
+   * 0.35m (手が桟に掛かってから) + 0.8m (早めた掴む 1 回分)。1.0 秒で
+   * 登るので 1.15 m/s。梯子の登る速さ (1.0 m/s) とほぼ同じ
+   */
+  riseClimb: 1.15,
+  /**
+   * よいしょで上げる分 (m)。**残りは足を抜きながら上がる。**
+   *
+   * ここで上げ切ると、引き上げ切った所で体が高く来すぎる。素材の引き上げは
+   * 「胸まで上げる」動きで、屋上の高さまで一息に上がるわけではない。
+   */
+  riseHeave: 0.35,
+  /** 前へ踏み出し始める所 (型の 0〜1)。上がり切る前に出すと壁にめり込む */
+  stepPhase: 0.55,
+  /** 踏み出す量 (m)。掴んでいた所から屋上の上へ */
+  step: 0.5,
+  /** 床があるかを踏んでみる距離 (m)。梯子の際では屋上か空かを読み違える */
+  probe: 0.8,
+}
 
 const ZERO_MOVE = new THREE.Vector3()
 
@@ -623,7 +672,7 @@ export class Soldier {
   consumeFootstep(): Step | null {
     if (this.down) return null
     const p = this.object.position
-    return this.footsteps.update(p.x, p.z, this.locomotion, this.onGround)
+    return this.footsteps.update(p.x, p.y, p.z, this.locomotion, this.onGround)
   }
 
   /**
@@ -765,6 +814,15 @@ export class Soldier {
    */
   sleep(seconds: number): void {
     if (this.down || this.downed) return
+    /*
+     * **梯子からは手が離れる。** 眠った人が梯子に貼り付いたままなのはおかしい。
+     *
+     * 落ちたぶんの damage は普通の落下と同じ道を通る (releaseLadder の註)。
+     * 高さ次第で死ぬこともあるが、**必ず死ぬわけではない** — 麻酔が当たった
+     * 場所の高さが、そのまま代償になる。梯子を渡っている間が危ない、という
+     * 梯子の値打ちがここで効く。
+     */
+    this.releaseLadder()
     this.sleepLeft = seconds
     this.sleepSpan = seconds
     this.dropBox()
@@ -879,6 +937,8 @@ export class Soldier {
     this.locomotion =
       fromBehind === undefined ? 'death' : fromBehind ? 'death_front' : 'death_back'
     // 構えも発砲も解いてから倒す。解かないと倒れた姿勢に構えの補正が乗る。
+    // **梯子からも手が離れる。** 死体が梯子に貼り付いて宙に留まらない
+    this.releaseLadder()
     this.dropBox()
     this.aiming = false
     this.crouching = false
@@ -889,13 +949,34 @@ export class Soldier {
   }
 
   /**
-   * 瞬間移動した。足音の積算を捨てる。
+   * 瞬間移動した。**跳ぶ前の高さの控えを、跳んだ先で取り直す。**
    *
-   * 位置を直に書き換える側 (湧き地点への配置) が呼ぶ。呼ばないと、跳んだ距離が
-   * 歩いた距離として積まれて、着いた先で何歩ぶんも連続して鳴る。
+   * 位置を直に書き換える側 (湧き地点への配置・繋ぎ直し) が呼ぶ。
+   *
+   * --- 足音 ---
+   * 呼ばないと、跳んだ距離が歩いた距離として積まれて、着いた先で何歩ぶんも
+   * 連続して鳴る。
+   *
+   * --- 高さ ---
+   * 段差も落下も**前のフレームの高さとの差**で読んでいる (lastFeetY / airFromY)。
+   * 控えを置いたままにすると、**跳んだ距離がまるごと「1 フレームで上がった /
+   * 落ちた」ことになる**。
+   *
+   * 実際に出た形: 画面を読み直すと、湧き地点へ仮置きされた高さが控えに残った
+   * まま、サーバーの位置 (resume) が書き込まれる。その差が段差と読まれて、
+   * **一瞬 up_stair の型が流れて体が浮き、0.45 秒 (STAIR_HOLD) で戻る**。
    */
-  warpTo(x: number, z: number): void {
-    this.footsteps.warp(x, z)
+  warpTo(x: number, y: number, z: number): void {
+    this.footsteps.warp(x, y, z)
+    // 跳んだ先を「さっきも居た高さ」にする。差が 0 なら段差にも落下にもならない
+    this.lastFeetY = y
+    this.airFromY = y
+    // 流れかけていた型も畳む。跳ぶ前の段差や落下は、跳んだ先には無い
+    this.stairFor = 0
+    this.stairDown = false
+    this.airborneFor = 0
+    this.landingTimer = 0
+    this.hardLandTimer = 0
   }
 
   /**
@@ -952,12 +1033,14 @@ export class Soldier {
     this.downElapsed = 0
     this.standing = false
     this.standTimer = 0
-    // 跳んだ距離を足音に積ませない
-    this.warpTo(x, z)
+    // 跳んだ距離を足音に積ませない。高さの控えも取り直す (段差と読まれるため)
+    this.warpTo(x, y, z)
   }
 
   /** 復帰。位置は呼び出し側が決める */
   respawn(): void {
+    // 掴んだままにしない。**湧き地点で梯子を登っている**ことになる
+    this.releaseLadder()
     this.health = MAX_HEALTH
     this.down = false
     this.boxed = false
@@ -1087,8 +1170,21 @@ export class Soldier {
      * 動くのがこの遊びの手なのに、それが見た目に出ていなかった。
      */
     this.animator?.setPistol(!isTwoHanded(id))
+    this.animator?.setKnife(id === 'knife')
     // 投げ物と設置物は手に何も出ない。転がりの尻尾 (銃を構える形) を出さない
     this.animator?.setHandsEmpty(isThrowable(id) || isPlaceable(id))
+  }
+
+  /**
+   * 模型と型が届いたか。**届くまでは見せない。**
+   *
+   * 模型は後から読み込むので、それまでは仮の形 (placeholder) が立っている。
+   * 型 (animator) も模型と一緒に来るため、模型だけ在って型が無い間は**素の
+   * 姿勢 (T ポーズ)** になる。どちらも「読み込み中」ではなく壊れて見えるので、
+   * 揃うまで覆いを出す側が見る (GameStats の ready)。
+   */
+  get dressed(): boolean {
+    return this.model !== null && this.animator !== null
   }
 
   get heldItem(): HeldId {
@@ -1168,9 +1264,12 @@ export class Soldier {
     return this.animator?.boltDuration ?? 0
   }
 
-  /** 刺突モーションの尺 (秒)。モデル未着なら 0 */
+  /** 刺突モーションの尺 (秒)。伏せていれば伏せた刺突の尺。モデル未着なら 0 */
   get stabDuration(): number {
-    return this.animator?.stabDuration ?? 0
+    if (!this.animator) return 0
+    return this.isProne && this.animator.proneStabDuration > 0
+      ? this.animator.proneStabDuration
+      : this.animator.stabDuration
   }
 
   /** 刺突中か。この間は発砲できない */
@@ -1411,6 +1510,11 @@ export class Soldier {
   /** 目の前に掴める梯子があるか。案内を出すのに使う */
   get ladderInReach(): boolean {
     if (this.onLadder || !this.onGround || this.down || this.boxed) return false
+    // 眠っている・驚いている間は掴めない (grabLadder と同じ)。案内も出さない
+    if (this.sleepLeft > 0 || this.bumpLeft > 0) return false
+    // 受け身の最中は掴めない (grabLadder と同じ条件)。**案内も出さない** —
+    // 出すと、押しても何も起きない案内になる
+    if (this.landing) return false
     const p = this.position
     return ladderAt(this.ladders, p.x, p.y, p.z, PLAYER_HEIGHT) !== null
   }
@@ -1423,6 +1527,23 @@ export class Soldier {
   grabLadder(): boolean {
     if (this.onLadder || this.down || this.downed || this.boxed || this.rolling) return false
     if (this.proneStage !== 'none' || this.saluting) return false
+    /*
+     * **眠っている間は掴めない。** 麻酔で倒れた体が G で梯子を登り始めていた —
+     * 入力は捨てているのに (moveDir)、掴む口だけが眠りを見ていなかった。
+     * 箱を落とされて驚いている間も同じ。
+     */
+    if (this.sleepLeft > 0 || this.bumpLeft > 0) return false
+    /*
+     * **受け身の最中は掴めない。**
+     *
+     * 削られる高さから落ちると、堪える型が流れて動けなくなる (moveDir を
+     * 捨てている)。ところが梯子だけはそこを見ていなかったので、落ちた先に
+     * 梯子があると**怯みを踏み倒して登り始められた** — 落下の代償が消える。
+     *
+     * 止めるのは受け身だけで、ただの着地 (landingTimer) は通す。あちらは
+     * 0.2 秒ほどの短い型で、軽く降りただけで操作が効かないほうが理不尽になる。
+     */
+    if (this.landing) return false
     const p = this.position
     const ladder = ladderAt(this.ladders, p.x, p.y, p.z, PLAYER_HEIGHT)
     if (!ladder) return false
@@ -1457,10 +1578,21 @@ export class Soldier {
     return true
   }
 
-  /** 手を離す。**そのまま落ちる** (Space / 下端で下がる) */
+  /**
+   * 手を離す。**そのまま落ちる** (Space / 下端で下がる / 眠り・転倒・死)。
+   *
+   * **登り切る型の最中も畳む。** 掴んでいる状態 (climbing) だけ消しても、
+   * 上端を乗り越える型が流れている間は `onLadder` が立ったままで、
+   * 眠らされた体が上端へ滑り上がり続ける。
+   *
+   * 畳んだ位置がそのまま落ち始める場所になる。乗り越えの途中なら宙に居るので、
+   * そこから落ちる — 重力も落下ダメージも、普通に足を踏み外したときと同じ道
+   * (stepMovement → landedSpeed → reportFall) を通る。
+   */
   releaseLadder(): void {
-    if (!this.climbing) return
+    if (!this.climbing && this.climbTopLeft <= 0) return
     this.climbing = null
+    this.climbTopLeft = 0
     this.velocityY = 0
   }
 
@@ -1518,7 +1650,7 @@ export class Soldier {
 
     const feet = this.position.y
     // 上端まで来たら乗り越えに入る。**押していなければ待つ**
-    if (forward > 0.1 && feet >= ladder.max[1] - PLAYER_HEIGHT * 0.5) {
+    if (forward > 0.1 && feet >= ladder.max[1] - CLIMB_TOP_TUNING.lead) {
       this.startClimbTop(ladder)
       return ZERO_MOVE
     }
@@ -1582,10 +1714,10 @@ export class Soldier {
     const overX = ladder.axis === 'z' ? grip.x : grip.x + step.across
     const overZ = ladder.axis === 'z' ? grip.z + step.across : grip.z
     this.climbTo.set(overX, step.floor, overZ)
-    this.climbTopLeft = span / CLIMB_TOP_RATE
+    this.climbTopLeft = span / CLIMB_TOP_TUNING.rate
     this.climbing = null
     this.velocityY = 0
-    this.animator?.playClimbTop(CLIMB_TOP_RATE)
+    this.animator?.playClimbTop(CLIMB_TOP_TUNING.rate)
   }
 
   /**
@@ -1603,30 +1735,64 @@ export class Soldier {
     if (world) {
       for (const side of order) {
         this.climbProbe.set(
-          ladder.axis === 'x' ? midX + side * CLIMB_TOP_STEP : midX,
+          ladder.axis === 'x' ? midX + side * CLIMB_TOP_TUNING.probe : midX,
           top + 0.5,
-          ladder.axis === 'x' ? midZ : midZ + side * CLIMB_TOP_STEP,
+          ladder.axis === 'x' ? midZ : midZ + side * CLIMB_TOP_TUNING.probe,
         )
         const floor = world.groundHeight(this.climbProbe, PLAYER_RADIUS, top + 0.5)
         // 上端の高さ辺りに床があるか。低すぎれば崖、無ければ海
         if (floor > top - 1.0 && floor < top + 0.6) {
-          return { across: side * CLIMB_TOP_STEP - (this.climbSide * LADDER_STANDOFF), floor }
+          // 掴んでいた所からのずれ。**渡るなら梯子を跨いだ先、同じ側なら離れる**
+          return { across: side * CLIMB_TOP_TUNING.step, floor }
         }
       }
     }
     // 地形が読めない (試写など)。今まで通り向こう側へ、上端の高さで
-    return { across: -this.climbSide * (CLIMB_TOP_STEP + LADDER_STANDOFF), floor: top }
+    return { across: -this.climbSide * CLIMB_TOP_TUNING.step, floor: top }
   }
 
   /** 登り切る型の最中。決めた道を時間で渡る */
   private advanceClimbTop(dt: number): void {
     if (this.climbTopLeft <= 0) return
-    const span = (this.animator?.climbTopDuration ?? 0) / CLIMB_TOP_RATE
+    const span = (this.animator?.climbTopDuration ?? 0) / CLIMB_TOP_TUNING.rate
     this.climbTopLeft = Math.max(0, this.climbTopLeft - dt)
     const done = span > 0 ? 1 - this.climbTopLeft / span : 1
-    // 終わり際に一気に乗る。**手を掛けてから体が上がる**型に合わせる
-    const eased = done * done
-    this.position.lerpVectors(this.climbFrom, this.climbTo, eased)
+    /*
+     * **登る → よいしょ → 足を抜く → 一歩出る。**
+     *
+     * 素材が体を引き上げている間 (1.0〜1.5 秒) に合わせて上げる。そこを外して
+     * 動かすと、手すりを掴んだ手が上へ流れる。残りは足を抜きながら上げて、
+     * 最後に床の上へ一歩出る。上がり切る前に前へ寄せると、梯子を吊っている
+     * コンクリートに足がめり込む。
+     */
+    const at = (from: number, to: number) =>
+      Math.min(1, Math.max(0, (done - from) / (to - from)))
+    const smooth = (t: number) => t * t * (3 - 2 * t)
+    // **出だしで一気に、終わりで収める。** よいしょはここが遅いと重く見える
+    const heaveEase = (t: number) => 1 - (1 - t) * (1 - t) * (1 - t)
+
+    /*
+     * 縦は**登る → よいしょ → もう上がらない**。素材の動きに合わせる。
+     */
+    /*
+     * 縦は 3 つに分ける。**登る → よいしょ → 足を抜きながら残りを上げる。**
+     *
+     * よいしょで上げ切ると、引き上げた所で体が高く来すぎる (素材は胸まで
+     * 上げる動きで、屋上の高さまで一息には上がらない)。
+     */
+    // m で持っている登りとよいしょを、この梯子の残りの高さに対する割合へ
+    const total = Math.max(1e-3, this.climbTo.y - this.climbFrom.y)
+    const riseClimb = Math.min(1, CLIMB_TOP_TUNING.riseClimb / total)
+    const riseHeave = Math.min(1 - riseClimb, CLIMB_TOP_TUNING.riseHeave / total)
+    const rest = Math.max(0, 1 - riseClimb - riseHeave)
+    const up =
+      riseClimb * at(0, CLIMB_TOP_TUNING.heaveFrom) +
+      riseHeave * heaveEase(at(CLIMB_TOP_TUNING.heaveFrom, CLIMB_TOP_TUNING.heaveTo)) +
+      rest * smooth(at(CLIMB_TOP_TUNING.heaveTo, CLIMB_TOP_TUNING.stepPhase))
+    this.position.y = this.climbFrom.y + (this.climbTo.y - this.climbFrom.y) * up
+    const step = smooth(at(CLIMB_TOP_TUNING.stepPhase, 1))
+    this.position.x = this.climbFrom.x + (this.climbTo.x - this.climbFrom.x) * step
+    this.position.z = this.climbFrom.z + (this.climbTo.z - this.climbFrom.z) * step
     this.velocityY = 0
   }
 
@@ -1692,6 +1858,12 @@ export class Soldier {
     if (this.proneStage !== 'none') return
     if (this.down || this.downed || this.standing || this.boxed) return
     if (!this.onGround) return
+    /*
+     * **刺している間は伏せない。** 刺突は全身の型で、伏せに入る型と同時には
+     * 流せない (脚だけ伏せて腕が刺す)。しゃがみと立ちの行き来は上半身が
+     * 別なので通る。
+     */
+    if (this.stabbing) return
     /*
      * **型が読めるまで伏せない。**
      *
@@ -1887,6 +2059,8 @@ export class Soldier {
    */
   knockDown(): void {
     if (this.down || this.downed) return
+    // 吹き飛ばされたら手も離れる。爆風で梯子に貼り付いたままにはならない
+    this.releaseLadder()
     this.crouching = false
     this.boxed = false
     this.animator?.setBoxed(false)
@@ -2578,6 +2752,7 @@ export class Soldier {
     // 呼ばれた時点では animator がまだ無く、素通りしている
     // 読み込み前に持ち替えている場合があるので、いま手にある物から決める
     this.animator.setPistol(!isTwoHanded(this.held))
+    this.animator.setKnife(this.held === 'knife')
     this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
 
     disposeTree(this.placeholder)
@@ -2704,14 +2879,15 @@ export class Soldier {
     // 持ち替えたときは、いまの姿勢に合わせ直す (立ち / しゃがみで握りが違う)
     weapon.applyStance(this.weaponStance)
 
-    // ナイフを付けるのは最初の 1 回だけ。銃を差し替えても左手はそのまま
+    // ナイフを付けるのは最初の 1 回だけ。銃を差し替えても手はそのまま
     if (this.knife) return
 
-    // ナイフは左手。刺突クリップは左手が 0.40m 突き出す (右手は 0.06m) ので、
-    // 刃を持っているのは左手側。向きは肘から手首への線を刃の方向とする。
-    const foreArm = findBoneBySuffix(model, 'LeftForeArm')
+    // ナイフは右手。構え (knife_idle) も刺突 (stab) も右手で握る型に
+    // 差し替えた (以前の刺突は左手が突き出す型だったので左手に付けていた)。
+    // 向きは肘から手首への線を刃の方向とする。
+    const foreArm = findBoneBySuffix(model, 'RightForeArm')
     if (!foreArm) {
-      console.warn('[Soldier] 左前腕のボーンが無い。ナイフを付けられない')
+      console.warn('[Soldier] 右前腕のボーンが無い。ナイフを付けられない')
       return
     }
     try {
@@ -2723,9 +2899,9 @@ export class Soldier {
       this.drawLast(knife.object)
       // ナイフは最初の 1 回しか付けないので、その場の姿勢を基準にしてよい
       knife.attachTo(
-        leftHand,
+        rightHand,
         new THREE.Vector3().setFromMatrixPosition(foreArm.matrixWorld),
-        new THREE.Vector3().setFromMatrixPosition(leftHand.matrixWorld),
+        new THREE.Vector3().setFromMatrixPosition(rightHand.matrixWorld),
       )
       knife.visible = false
       this.knife = knife

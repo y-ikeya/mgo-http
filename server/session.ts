@@ -63,6 +63,27 @@ export interface Session {
    */
   seenDecoys: Set<number>
   /**
+   * 見せた E LOCATOR。
+   *
+   * 飛ぶところを見ていない人 (途中参加・繋ぎ直し) にも、止まっている装置は
+   * 見せる。**見えないと壊せない。** 一度見せた物をもう一度送らないために覚える。
+   */
+  seenLocators: Set<number>
+  /**
+   * 気配を知らせた物 (AWARENESS)。札 → 知らせた位置。
+   *
+   * 位置を持つのは、動く物 (手榴弾) が離れたときに送り直すため。
+   * 離れた / 消えたら sensedGone を送って外す。
+   */
+  sensed: Map<string, [number, number, number]>
+  /**
+   * 暴かれた人の気配 (E LOCATOR)。札 → 消える時刻 (ms)。
+   *
+   * 物の気配 (sensed) と違って**時間で消える**。走査のたびに伸びるので、
+   * 半径の中に居る間は続く。
+   */
+  revealed: Map<string, number>
+  /**
    * 最後に届いた位置のパケット。**そのまま配り直す**ために取っておく。
    *
    * 接続が切れた人の体をその場に残すのに要る。位置は「届いたときに配る」形なので、
@@ -80,6 +101,10 @@ export interface Session {
   healthShown: number
   /** 却下した申告の数。/health に出す (当たり判定が疑わしい人が分かる) */
   rejected: number
+  /** 最後に却下した理由。**端末を見なくても /health で分かる**ように */
+  lastReject: string
+  /** 最後に補給した時刻 (ms)。連打を間引く */
+  resuppliedAt: number
   /** 最後に撃った時刻 (Date.now)。連射の速さの上限を見るのに使う */
   lastShotAt: number
   /**
@@ -149,6 +174,9 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     seen: new Set(),
     seenClaymores: new Set(),
     seenDecoys: new Set(),
+    seenLocators: new Set(),
+    sensed: new Map(),
+    revealed: new Map(),
     lastPayload: null,
     packetGap: 0,
     lastPacketAt: 0,
@@ -158,6 +186,8 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     healthShown: player.health,
     staminaShown: player.stamina,
     rejected: 0,
+    lastReject: '',
+    resuppliedAt: 0,
     badPacketAt: 0,
     badMoveAt: 0,
     lastShotAt: 0,

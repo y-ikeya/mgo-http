@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../../domain/stage'
-import { decodeStageMesh, meshSubset, MESH_PLAYER } from '../../../sim/space/stagemesh'
+import { decodeStageMesh, meshSubset, MESH_EYE, MESH_PLAYER, type StageMesh } from '../../../sim/space/stagemesh'
 import { MeshMoveWorld } from '../../../sim/space/meshworld'
 import { PLAYER_HEIGHT, STEP_UP } from '../../../domain/player/moving'
 import { flagsOf } from '../../../domain/stage'
@@ -33,7 +33,7 @@ import {
 import type { Obstacle } from '../../../sim/space/collision'
 import { TriangleBvh } from '../../../sim/space/bvh'
 import type { SolidWorld } from '../../../sim/space/vision'
-import { isPathClear, sightBlockers } from '../../../sim/space/vision'
+import { isPathClear, SANE_HEIGHT, sightBlockers } from '../../../sim/space/vision'
 import type { Ladder } from '../../../domain/stage'
 import type { StageBox } from '../../../sim/space/vision'
 import { asset, loadStage } from '../assets'
@@ -211,8 +211,13 @@ const BASE_LINE = 0.2
 /** 枠を描く高さ (m)。地面と z 争いしない程度に浮かせる */
 const BASE_Y = 0.03
 
-/** 陣営の色。HUD の得点と揃える — 同じ物を指す色は同じにする */
-const BASE_COLOR = { blue: 0x7ea6ff, red: 0xff8a72 } as const
+/**
+ * 陣営の色。HUD の得点と揃える — 同じ物を指す色は同じにする。
+ *
+ * **外にも配る。** 陣営を色で示す物は基地の枠だけではない (E LOCATOR の波)。
+ * 写すと、片方だけ直したときに**同じ陣営が場所によって違う色**になる。
+ */
+export const TEAM_COLOR = { blue: 0x7ea6ff, red: 0xff8a72 } as const
 
 /**
  * 陣営の基地を示す枠。
@@ -230,7 +235,7 @@ export function buildBases(stage: StageName): THREE.Object3D {
       frameGeometry(BASE_HALF, BASE_LINE),
       // 露出に左右されない。位置を示すための印なので、明るさが変わっても読めてほしい
       new THREE.MeshBasicMaterial({
-        color: BASE_COLOR[team as keyof typeof BASE_COLOR],
+        color: TEAM_COLOR[team as keyof typeof TEAM_COLOR],
         transparent: true,
         opacity: 0.55,
         toneMapped: false,
@@ -351,6 +356,14 @@ export interface Stage {
    * 0.25m 刻みの段だった。面で持てばその縛りが消える。
    */
   readonly moveWorld: MeshMoveWorld | null
+  /**
+   * 視線を止める面。**審判と同じ三角** (書き出しの EYE_BIT)。届いていなければ null。
+   *
+   * 撃つ前に「審判が通す線か」を確かめるのに使う。客の弾は照準 (カメラ) から
+   * 飛ぶが、審判は目から線を引く。縁の裏にしゃがんだまま覗いて撃つと、画面には
+   * 当たるのに審判は通さない — その弾は手元でも遮蔽で止める。
+   */
+  readonly sightWorld: TriangleBvh | null
   /**
    * 水面。敷いていなければ null。
    *
@@ -812,10 +825,11 @@ const stageBoxes = new Map<StageName, Promise<StageBox[]>>()
  * 人の層は書き出しの側で薄くしてある (手すりのように絵が細かい物は
  * 向き付きの箱 12 枚に置き換わる)。筏で 6,768 枚。
  */
-const stageMoveWorlds = new Map<StageName, Promise<MeshMoveWorld | null>>()
+const stageMeshes = new Map<StageName, Promise<StageMesh | null>>()
 
-export function loadStageMoveWorld(name: StageName): Promise<MeshMoveWorld | null> {
-  const cached = stageMoveWorlds.get(name)
+/** 三角の網 (mesh.bin)。**1 度だけ落として**、用途ごとに木を組む */
+function loadStageMesh(name: StageName): Promise<StageMesh | null> {
+  const cached = stageMeshes.get(name)
   if (cached) return cached
   const url = asset.model(`stage_${name}.mesh.bin`)
   const pending = fetch(url)
@@ -823,17 +837,46 @@ export function loadStageMoveWorld(name: StageName): Promise<MeshMoveWorld | nul
       if (!res.ok) throw new Error(String(res.status))
       return res.arrayBuffer()
     })
-    .then((buffer) => {
-      const mesh = decodeStageMesh(buffer)
-      const solid = new TriangleBvh(meshSubset(mesh, MESH_PLAYER))
-      if (solid.size === 0) return null
-      return new MeshMoveWorld(solid, { height: PLAYER_HEIGHT, stepUp: STEP_UP })
-    })
+    .then((buffer) => decodeStageMesh(buffer))
     .catch(() => {
       // 三角がまだ無いステージ。**箱のまま遊べる**
       return null
     })
+  stageMeshes.set(name, pending)
+  return pending
+}
+
+const stageMoveWorlds = new Map<StageName, Promise<MeshMoveWorld | null>>()
+
+export function loadStageMoveWorld(name: StageName): Promise<MeshMoveWorld | null> {
+  const cached = stageMoveWorlds.get(name)
+  if (cached) return cached
+  const pending = loadStageMesh(name).then((mesh) => {
+    if (!mesh) return null
+    const solid = new TriangleBvh(meshSubset(mesh, MESH_PLAYER))
+    if (solid.size === 0) return null
+    return new MeshMoveWorld(solid, { height: PLAYER_HEIGHT, stepUp: STEP_UP })
+  })
   stageMoveWorlds.set(name, pending)
+  return pending
+}
+
+const stageSightWorlds = new Map<StageName, Promise<TriangleBvh | null>>()
+
+/**
+ * 視線を止める三角。**審判と同じ集合** (server/stage.ts が MESH_EYE から組む物)。
+ *
+ * 撃つ前の確かめに使う。無ければ null で、確かめずに撃つ (今までどおり)。
+ */
+export function loadStageSightWorld(name: StageName): Promise<TriangleBvh | null> {
+  const cached = stageSightWorlds.get(name)
+  if (cached) return cached
+  const pending = loadStageMesh(name).then((mesh) => {
+    if (!mesh) return null
+    const sight = new TriangleBvh(meshSubset(mesh, MESH_EYE))
+    return sight.size > 0 ? sight : null
+  })
+  stageSightWorlds.set(name, pending)
   return pending
 }
 
@@ -1155,10 +1198,15 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    * glb と同じで後から差し替わる。届かないステージ (三角をまだ出していない)
    * はずっと null で、箱のまま遊べる。
    */
-  const moving: { world: MeshMoveWorld | null } = { world: null }
-  const meshReady = loadStageMoveWorld(name).then((world) => {
-    moving.world = world
-  })
+  const moving: { world: MeshMoveWorld | null; sight: TriangleBvh | null } = { world: null, sight: null }
+  const meshReady = Promise.all([
+    loadStageMoveWorld(name).then((world) => {
+      moving.world = world
+    }),
+    loadStageSightWorld(name).then((sight) => {
+      moving.sight = sight
+    }),
+  ])
 
   return {
     ...parts,
@@ -1166,6 +1214,9 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
     water,
     get moveWorld() {
       return moving.world
+    },
+    get sightWorld() {
+      return moving.sight
     },
     ready: Promise.all([
       replaceWithModel(scene, name, parts, blockout, thrownWorld),
@@ -1221,13 +1272,27 @@ async function replaceWithModel(
 
   model.traverse((obj) => {
     if (!isMesh(obj)) return
-    const name = obj.name
+    /*
+     * **札は親の名前からも読む。**
+     *
+     * 材質が 2 つある物 (浮き輪の赤白) は glTF で 2 つの primitive になり、
+     * three は「物の名前の Group」の下に「形の名前の Mesh」を 2 つ作る。
+     * Mesh の名前は Blender の**形** (Torus) で、札を付けた**物**の名前
+     * (Torus_notexture.001) は親にしか無い。Mesh だけ見ると札が消える —
+     * notexture を付けたのに錆びたままだったのはこれ。
+     */
+    let name = obj.name
+    for (let up = obj.parent; up && up !== model; up = up.parent) name = `${up.name}/${name}`
 
     // テクスチャを持たないメッシュはブロックアウトとみなしてマテリアルを差し替える。
     // glTF の既定マテリアル (metalness = 1) のままだと陰の面が真っ黒になる。
     // アートが入ったメッシュはテクスチャを持つので、そちらはそのまま残る。
+    //
+    // **`notexture` を付けた物は色をそのまま出す。** 絵を貼らずに Blender で
+    // 色だけ塗った物 (浮き輪の赤白) は、この規則だと錆に塗り潰される。
+    // 塗った色を残したい物は名前で断る (domain/stage/flags.ts の札の表)。
     const current = Array.isArray(obj.material) ? obj.material[0] : obj.material
-    if (!(current as THREE.MeshStandardMaterial)?.map) {
+    if (!(current as THREE.MeshStandardMaterial)?.map && !name.includes('notexture')) {
       const replaced = Array.isArray(obj.material) ? obj.material : [obj.material]
       const surface = surfaceOf(name)
       obj.material = materialFor(surface)
@@ -1253,6 +1318,23 @@ async function replaceWithModel(
       obj.receiveShadow = !glass
     } else {
       obj.visible = false
+    }
+
+    /*
+     * **壊れた形は止める側に入れない。**
+     *
+     * 梯子の落下防止の輪が、真上へ 3km 伸びた形で書き出されていた。見た目は
+     * 細い突起なので気づきにくいが、**梯子を登っている間ずっとカメラを遮り**、
+     * 弾も視線もそこで消える。直すのは元の形だが、黙って取り込むと次に同じ
+     * ことが起きても気づけない (sim/space/vision.ts の sane と同じ判断)。
+     */
+    bounds.setFromObject(obj)
+    if (bounds.max.y - bounds.min.y > SANE_HEIGHT) {
+      console.warn(
+        `[地形] ${name} は高さ ${(bounds.max.y - bounds.min.y).toFixed(0)}m。` +
+          '書き出しの事故として判定から外す',
+      )
+      return
     }
 
     // 止める対象ごとに別の一覧へ。1 つのタグで全部を決めない

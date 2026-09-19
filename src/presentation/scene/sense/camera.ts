@@ -94,6 +94,23 @@ const WATCH_LAMBDA = 3.5
 const OCCLUSION_RELEASE_LAMBDA = 6
 
 /**
+ * 梯子を登っている間の寄り引きの速さ。**寄るときも均す。**
+ *
+ * --- なぜ分けるか ---
+ * 普段は**寄るのは即座**でなければならない。遅らせると、遅れている間だけ壁を
+ * 突き抜けて向こう側が見える。
+ *
+ * 梯子は事情が違う。落下防止の輪が体を囲んでいるので、**桟が次々と光線を
+ * 横切る**。そのたびに即座に寄って、離れるとゆっくり戻る — 登っている間ずっと
+ * 寄り引きを繰り返す、という形で出た。
+ *
+ * 囲まれているのは分かっている場所なので、ここだけは**寄るのも均す**。
+ * 桟 1 本ぶんの遮りは、均されて動きにならない。輪の外の本物の壁 (塔の面) は
+ * 当たり続けるので、均しても最後にはちゃんと寄る。
+ */
+const OCCLUSION_LADDER_LAMBDA = 8
+
+/**
  * カメラから見た世界。地形の形は Game 側が握り、カメラは問い合わせるだけ。
  * PlayerWorld と同じ考え方で、カメラは障害物の表現を知らない。
  */
@@ -444,7 +461,8 @@ export class FollowCamera {
     // 視線の逆方向へ distance だけ引いた位置がカメラの定位置。
     // 途中に壁があればそこまでしか引かない。
     this.back.copy(this.viewDir).negate()
-    this.occludedDistance = this.resolveDistance(world, dt)
+    // 梯子の上では寄りも均す。輪の桟で寄り引きを繰り返さないため
+    this.occludedDistance = this.resolveDistance(world, dt, player.onLadder)
     this.desired.copy(this.pivot).addScaledVector(this.back, this.occludedDistance)
     if (this.desired.y < this.minY) this.desired.y = this.minY
   }
@@ -459,7 +477,12 @@ export class FollowCamera {
    * 壁の内側へ入り、面の裏からは当たらないので 1 本目がすり抜ける。
    * 中心から引けばその状況でも壁を捉えられる。
    */
-  private resolveDistance(world: CameraWorld | undefined, dt: number): number {
+  private resolveDistance(
+    world: CameraWorld | undefined,
+    dt: number,
+    /** 梯子を登っている最中か。**囲まれているので寄りも均す** */
+    onLadder: boolean,
+  ): number {
     if (!world) return this.distance
 
     const blocked = Math.min(
@@ -471,8 +494,19 @@ export class FollowCamera {
         ? this.distance
         : Math.max(MIN_OCCLUDED_DISTANCE, blocked - OCCLUSION_PADDING)
 
+    if (dt <= 0) return target
+
+    /*
+     * 梯子の上は**どちら向きにも均す。**
+     *
+     * 落下防止の輪の桟が次々と光線を横切るので、寄りを即座にすると
+     * 登っている間ずっと寄り引きを繰り返す。均せば桟 1 本ぶんの遮りは
+     * 動きにならず、塔の面のように当たり続ける物にはちゃんと寄る。
+     */
+    if (onLadder) return damp(this.occludedDistance, target, OCCLUSION_LADDER_LAMBDA, dt)
+
     // 寄るときは即座。遅らせると、遅れている間そのまま壁を突き抜けて見える。
     if (target <= this.occludedDistance) return target
-    return dt > 0 ? damp(this.occludedDistance, target, OCCLUSION_RELEASE_LAMBDA, dt) : target
+    return damp(this.occludedDistance, target, OCCLUSION_RELEASE_LAMBDA, dt)
   }
 }

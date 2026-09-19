@@ -1,4 +1,4 @@
-import { segmentHitsBox, type StageBox } from '../space/vision'
+import { segmentHitsBox, type SolidWorld, type StageBox } from '../space/vision'
 
 /**
  * 「そこへ動いた」という申告を確かめる。
@@ -64,8 +64,18 @@ export function arenaHalfOf(boxes: StageBox[]): number {
       Math.abs(box.max[2]),
     )
   }
-  return half > 0 ? half : Infinity
+  return half > 0 ? half + ARENA_MARGIN : Infinity
 }
+
+/**
+ * 外接に足す余白 (m)。
+ *
+ * 外接は**人を止める箱**の端で、床はその外まで敷いてあることがある (筏の甲板は
+ * 箱の外接 40.47m に対して床が 40.5m まで)。縁に伏せると数 cm はみ出して
+ * 場外になり、そこに居る間ずっと位置が据え置かれる。地図の反対側へ跳ぶのを
+ * 落とすのが目的なので、1m の余白は効き目を変えない。
+ */
+const ARENA_MARGIN = 1
 
 /**
  * 壁抜けを見る高さ (m)。**両端のうち高いほうから**この分だけ上。
@@ -73,7 +83,7 @@ export function arenaHalfOf(boxes: StageBox[]): number {
  * 足元で線を引くと、箱の上に登った / 坂を上ったときに箱の側面を跨いで
  * 誤検知する。高いほうを基準にすれば、登り切った先が箱の上でも線は箱より上を通る。
  */
-const PROBE_HEIGHT = 0.9
+export const PROBE_HEIGHT = 0.9
 
 /**
  * 壁抜けを見るのは、1 歩がこれ以下のときだけ (m)。
@@ -126,12 +136,8 @@ function topOfBox(box: StageBox, x: number, z: number): number {
   return top.h + top.dx * (x - box.min[0]) + top.dz * (z - box.min[2])
 }
 
-export function checkMove(
-  from: Point,
-  to: Point,
-  boxes: StageBox[],
-  arenaHalf: number,
-): MoveVerdict {
+/** 場外・跳び・数でない座標。箱でも三角でも同じ */
+function checkStep(from: Point, to: Point, arenaHalf: number): MoveVerdict | null {
   if (!Number.isFinite(to.x) || !Number.isFinite(to.y) || !Number.isFinite(to.z)) {
     return { ok: false, reason: '数でない座標' }
   }
@@ -144,6 +150,58 @@ export function checkMove(
   if (distance > MAX_STEP) {
     return { ok: false, reason: `跳んだ (1 通で ${distance.toFixed(0)}m)` }
   }
+  return null
+}
+
+/**
+ * その移動が成立するか。**人が止まる三角で見る。**
+ *
+ * --- 箱では嘘になる ---
+ * 長らく箱 (stage.json の外接) で見ていた。筏の塔は円柱で、mesh では本物の形
+ * (nobox) なのに、移動の検査だけが**外接の箱**を見ていた。円柱の外接の四隅は
+ * 円柱の外に 1.4m はみ出るので、塔の脇の甲板に伏せると角の中に体が入り、
+ * 「塔を抜けた」で毎パケット弾かれた — その間サーバー上の位置は据え置かれ、
+ * そこから見た可視判定になって「画面には映るのに配られない」が出た。
+ * 梯子の落下防止の輪 (中が空洞) も同じで、輪の中に立つと弾かれた。
+ *
+ * クライアントの押し戻しは同じ三角を読んでいる。**同じ形を見れば、客が通した
+ * 場所を審判が弾くことは無い。** 箱は三角が無いステージのための代用に残す。
+ *
+ * @param world 人が止まる三角 (server/stage.ts が MESH_PLAYER から組む)
+ * @param probeHeight 線を引く高さ (domain/player/stance.ts の MOVE_PROBE_HEIGHT)
+ */
+export function checkMoveOnMesh(
+  from: Point,
+  to: Point,
+  world: SolidWorld,
+  arenaHalf: number,
+  probeHeight: number,
+): MoveVerdict {
+  const early = checkStep(from, to, arenaHalf)
+  if (early) return early
+
+  const distance = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z)
+  if (distance > PROBE_MAX_STEP) return { ok: true }
+  // 線は水平に引く。**真上へ登る (梯子) 1 歩は水平の長さが 0** で、当たりようが無い
+  const flat = Math.hypot(to.x - from.x, to.z - from.z)
+  if (flat < 1e-4) return { ok: true }
+
+  const y = Math.max(from.y, to.y) + probeHeight
+  const hit = world.hit(from.x, y, from.z, to.x, y, to.z)
+  if (hit) return { ok: false, reason: `壁を抜けた (三角 ${hit.tri})` }
+  return { ok: true }
+}
+
+export function checkMove(
+  from: Point,
+  to: Point,
+  boxes: StageBox[],
+  arenaHalf: number,
+): MoveVerdict {
+  const early = checkStep(from, to, arenaHalf)
+  if (early) return early
+
+  const distance = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z)
 
   // 壁の中を通っていないか。両端のうち高いほうを基準に、胸の高さで引く
   if (distance <= PROBE_MAX_STEP) {

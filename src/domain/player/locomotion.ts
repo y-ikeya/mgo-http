@@ -111,6 +111,8 @@ export type Locomotion =
   | 'prone_death'
   /** 伏せたまま後ろへ下がる。前進 (crawl_f) と対 */
   | 'crawl_b'
+  /** 伏せたまま刺す。全身の型 (立ちの stab と同じ扱い) */
+  | 'prone_stab'
   // 敬礼。全身の型なので上下を分けない
   | 'salute'
   /**

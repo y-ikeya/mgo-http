@@ -123,6 +123,35 @@ if (realLadder) {
 }
 if (gun) await player.equip(gun)
 
+// **掴む前に**どこから掴めるかを調べる。掴んだ後では ladderInReach は必ず false
+const reachText = realLadder ? reachMap() : '-'
+
+/*
+ * ?walk … **歩いて近づく。**
+ *
+ * 判定の上では届いていても、柵に阻まれてそこまで行けなければ掴めない。
+ * デッキ側から梯子へ向かって歩かせて、どこで止まるかを見る。
+ */
+const walkText: string[] = []
+if (realLadder && query.has('walk')) {
+  const midX = (realLadder.min[0] + realLadder.max[0]) / 2
+  const midZ = (realLadder.min[2] + realLadder.max[2]) / 2
+  const from = Number(query.get('walk') || '-3')
+  player.position.set(midX + from, realLadder.min[1] + 0.5, midZ)
+  // 梯子へ向かって歩く。向きは x の正負で決める
+  const dir = new THREE.Vector3(from < 0 ? 1 : -1, 0, 0)
+  for (let t = 0; t < 4; t += 1 / 60) {
+    player.update(1 / 60, dir, Math.atan2(-dir.x, -dir.z), 0, WORLD)
+    if (Math.abs(t * 2 - Math.round(t * 2)) < 1 / 120) {
+      const p = player.position
+      walkText.push(
+        `${t.toFixed(1)}s x${p.x.toFixed(2)} y${p.y.toFixed(2)} ` +
+          `梯子まで${Math.abs(p.x - midX).toFixed(2)} ${player.ladderInReach ? '掴める' : '届かない'}`,
+      )
+    }
+  }
+}
+
 // **本物の口から掴む。** 押している量も本番と同じ setStickForward で渡す
 const grabbed = player.grabLadder()
 player.setStickForward(1)
@@ -131,9 +160,17 @@ player.setStickForward(1)
  * **刻んで進める。** 一気に進めると型のばねも当たりも 1 歩で終わる。
  * 実機と同じ 60 分の 1 で回す。
  */
+/*
+ * ?sleep=3 … **登っている途中で眠らせる。**
+ *
+ * 眠った体は梯子を離して落ちるはず (soldier.ts の sleep → releaseLadder)。
+ * 途中で横になって寝たままなら、離した後の落下が止まっている。
+ */
+const sleepAt = query.has('sleep') ? Number(query.get('sleep')) : null
 const track: string[] = []
 const frames: string[] = []
 for (let t = 0; t < stopAt; t += 1 / 60) {
+  if (sleepAt !== null && t >= sleepAt && t < sleepAt + 1 / 60) player.sleep(30)
   player.update(1 / 60, new THREE.Vector3(), player.yaw, 0, WORLD)
   if (frames.length < 30 && realWorld) {
     const p = player.position
@@ -143,10 +180,12 @@ for (let t = 0; t < stopAt; t += 1 / 60) {
   }
   // 1 秒ごとの高さ。**どこで止まったか**を数字で残す
   if (Math.floor(t) !== Math.floor(t - 1 / 60)) {
-    track.push(`${Math.floor(t)}s ${player.position.y.toFixed(2)}`)
+    track.push(`${Math.floor(t)}s ${player.position.y.toFixed(2)}${player.onLadder ? ' 梯子' : ''}${player.sleeping ? ' 眠り' : ''}`)
   }
 }
 player.object.updateMatrixWorld(true)
+// 数字は console にも出す。無頭の Chrome から読むため
+console.info('[ladder] ' + track.join(' | '))
 
 const feet = player.position.clone()
 const camera = new THREE.PerspectiveCamera(38, WIDTH / HEIGHT, 0.05, 100)
@@ -202,6 +241,35 @@ function topGround(): string {
     }
   }
   return out.join(' ')
+}
+
+/**
+ * 梯子の周りで**どこから掴めるか**を並べる。
+ *
+ * 「G を押しても掴めない」は、届いていないのか、そこに立てないのかの
+ * どちらか。本物の地形の高さと本物の判定 (ladderInReach) の両方を並べる。
+ */
+function reachMap(): string {
+  if (!realWorld || !realLadder) return '-'
+  const keep = player.position.clone()
+  const rows: string[] = []
+  const midX = (realLadder.min[0] + realLadder.max[0]) / 2
+  const midZ = (realLadder.min[2] + realLadder.max[2]) / 2
+  const probe = new THREE.Vector3()
+  for (let dz = -1.6; dz <= 1.61; dz += 0.4) {
+    let row = (midZ + dz).toFixed(1).padStart(7) + ' '
+    for (let dx = -1.6; dx <= 1.61; dx += 0.2) {
+      probe.set(midX + dx, realLadder.min[1] + 1, midZ + dz)
+      const ground = realWorld.groundHeight(probe, 0.35, probe.y)
+      player.position.set(midX + dx, ground, midZ + dz)
+      // 立てる高さか (梯子の下端の近く) と、そこから手が届くか
+      const standable = Math.abs(ground - realLadder.min[1]) < 1.2
+      row += standable ? (player.ladderInReach ? 'O' : '.') : '#'
+    }
+    rows.push(row)
+  }
+  player.position.copy(keep)
+  return `x ${(midX - 1.6).toFixed(1)}→${(midX + 1.6).toFixed(1)} (O=掴める #=立てない)\n` + rows.join('\n')
 }
 
 /** いま効いている型と重み。**T ポーズは「何も流れていない」の顔** */
@@ -275,6 +343,8 @@ const report = [
   `最初の 30 コマ (足元/地面): ${frames.join(' ')}`,
   realLadder ? `頭がつかえる高さ: ${ceilingScan()}` : '',
   `流れている型: ${playing()}`,
+  realLadder ? `掴める所:\n${reachText}` : '',
+  walkText.length ? `歩いて近づく:\n  ${walkText.join('\n  ')}` : '',
   realLadder ? `噛む回数: ${sideBlocks()}` : '',
   realLadder ? `上端の床 (${realLadder.max[1].toFixed(1)}m 付近): ${topGround()}` : '',
 ].join('\n')

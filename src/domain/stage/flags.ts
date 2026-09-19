@@ -66,6 +66,21 @@ export function flagsOf(name: string): SurfaceFlags {
     flags.camera = false
   }
 
+  /*
+   * `nobox` はここでは何も変えない。**書き出しだけが読む札。**
+   *
+   * 「人とカメラの当たりを外枠の箱で代用しない」という指示で、止める対象は
+   * 変わらないので旗も変わらない (tools/export_stage.py)。名前の決まりは
+   * この表が読める場所なので、効かない札も**在ることだけ**書いておく —
+   * 書いていないと、付けた人がここを見て「効いていない」と読む。
+   */
+  /*
+   * `notexture` も同じく、ここでは何も変えない。**描く側だけが読む札。**
+   *
+   * 絵を貼っていない物は錆・コンクリート・木の模様に差し替えられる
+   * (presentation/scene/world/stage.ts)。Blender で色だけ塗った物 (浮き輪の
+   * 赤白) をそのまま出したいときに付ける。止める対象は変わらない。
+   */
   if (name.includes('nodraw')) flags.draw = false
   if (name.includes('noplayer')) flags.player = false
   if (name.includes('nobullet')) flags.bullet = false

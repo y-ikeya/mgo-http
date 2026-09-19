@@ -17,7 +17,7 @@ import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { stanceOf } from "../../../domain/player/stance";
+import { stanceOf, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import {
@@ -42,6 +42,7 @@ import type { Life } from "../../../domain/player/lifecycle";
 import { BUFFER_SIZE, Presence } from "../../../sim/space/presence";
 import { Hitbox } from "./hitbox";
 import { damp, dampAngle } from "../util/math";
+import { LADDER_SPEED } from "../../../domain/stage";
 import { Weapon, WEAPON_STANCE_LAMBDA, weaponStanceOf } from "../arms/weapon";
 import { onBattlefield } from "../../../domain/player/lifecycle";
 import type { Player } from "../../../domain/player/player";
@@ -120,6 +121,8 @@ const PLAY_WHOLE_BODY: Record<
   // 落下の受け身。削られる高さから落ちた着地
   hard_land: (a) => a.playHardLand(),
   stab: (a) => a.playStab(),
+  // 伏せたまま刺す。playStab が伏せているのを見て伏せの型を選ぶ
+  prone_stab: (a) => a.playStab(),
   death: (a) => a.playDeath(),
   // 倒れる向き。**倒れた側が決める** — 位置と向きを持っているのがそこ
   death_front: (a) => a.playDeath(true),
@@ -228,6 +231,8 @@ export class RemoteSoldier {
   /** 箱の浮き上がり量 (m)。自機と同じ計算を同じアニメーションに対して行う */
   private lift = 0;
   private readonly buffer: PlayerSnapshot[] = [];
+  /** 梯子の絵を進める率 (-1..1)。位置の上下から出して均す */
+  private climbRate = 0;
   private locomotion: Locomotion = "idle";
 
   /**
@@ -278,8 +283,8 @@ export class RemoteSoldier {
   }
 
   /** 湧き直しで跳んだことを足音に伝える。積算を捨てないと着いた先で連打になる */
-  warp(x: number, z: number): void {
-    this.footsteps.warp(x, z);
+  warp(x: number, y: number, z: number): void {
+    this.footsteps.warp(x, y, z);
   }
   /** このフレームで踏んだ足音。Game が拾って鳴らす */
   step: Step | null = null;
@@ -349,10 +354,10 @@ export class RemoteSoldier {
      * 送るものを増やさずに済むよう、**跨いだかどうか**をここで見る。
      * しぶきの大きさは 1 刻みぶんの落ち方から出す (dt で割って m/s)。
      */
+    const wasY = this.object.position.y;
     if (this.waterY !== null && dt > 0) {
-      const was = this.object.position.y;
-      if (was > this.waterY && state.y <= this.waterY) {
-        this.splashSpeed = Math.max(0, (was - state.y) / dt);
+      if (wasY > this.waterY && state.y <= this.waterY) {
+        this.splashSpeed = Math.max(0, (wasY - state.y) / dt);
       }
     }
     this.object.position.set(state.x, state.y, state.z);
@@ -420,9 +425,24 @@ export class RemoteSoldier {
     // 足音は送られてこない。補間された位置と姿勢から、撃つ側と同じ式で出す。
     this.step = this.serverDead
       ? null
-      : this.footsteps.update(state.x, state.z, locomotion, true);
+      : this.footsteps.update(state.x, state.y, state.z, locomotion, true);
 
     animator.setLocomotion(locomotion);
+    /*
+     * 梯子。**登っている分だけ絵を進める。** 手を止めれば絵も止まる。
+     *
+     * 押している量は送られてこないので、**位置の上下から出す**。自分の側は
+     * 入力から同じ率を出している (soldier.ts の setClimbRate)。均さないと
+     * 補間の刻みで率が震えるので、少し追従させる。
+     */
+    if (locomotion === "climb") {
+      const vy = dt > 0 ? (state.y - wasY) / dt : 0;
+      const target = Math.max(-1, Math.min(1, vy / LADDER_SPEED));
+      this.climbRate = damp(this.climbRate, Math.abs(target) < 0.05 ? 0 : target, 14, dt);
+      animator.setClimbRate(this.climbRate);
+    } else {
+      this.climbRate = 0;
+    }
     // 敬礼を保っているかは送られてくる。再生位置は送らず、同じドメインルールで止める
     animator.setSaluteHeld(state.saluteHeld)
     this.saluting = locomotion === 'salute' && state.saluteHeld
@@ -450,6 +470,8 @@ export class RemoteSoldier {
 
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている
     void this.equip(state.weapon)
+    // ナイフを出している相手は専用の型。持ち物 (held) も位置と一緒に届く
+    animator.setKnife(state.held === 'knife')
 
     // リロードは始まった瞬間だけ型を流す。状態として届くので、
     // 途中から見え始めた相手にも「いま撃てない」が伝わる
@@ -467,9 +489,11 @@ export class RemoteSoldier {
     //   ダンボール         … 手が塞がっている
     //   手が空いている型   … 敬礼・転がり・受け身など (domain の emptyHanded)
     //   拳銃を構えていない … ホルスターに納まっている
+    //   ナイフを出している      … 銃は背中 (ナイフの型に銃を持たせない)
     const holstered =
       this.boxed ||
       animator.barehanded ||
+      state.held === 'knife' ||
       (state.weapon === 'm9' && !state.aiming && !state.reloading)
     if (this.weapon) this.weapon.visible = !holstered
 
@@ -516,6 +540,11 @@ export class RemoteSoldier {
 
   /** 同じ陣営か。撃つ前ではなく、当ててしまった後の表示に使う */
   /** 所属。**個人戦では色が同じでも敵**なので、判断は呼ぶ側がルールで行う */
+  /** いまの構え。**審判が照合に使うのと同じ導き方** (stanceOf) */
+  get stance(): Stance {
+    return stanceOf(this.locomotion);
+  }
+
   get side(): Team {
     return this.team
   }
@@ -1051,7 +1080,7 @@ export class RemoteSoldiers {
    */
   warp(id: string): void {
     const player = this.players.get(id);
-    if (player) player.warp(player.object.position.x, player.object.position.z);
+    if (player) player.warp(player.object.position.x, player.object.position.y, player.object.position.z);
   }
 
   /**

@@ -209,12 +209,19 @@
   color: #ff8a72;
 }
 
+/*
+ * 三角の色で**何が起きたか**を出す。**赤が殺傷、青が麻酔。**
+ *
+ * 眠らせた行は残機を削っていない。同じ色で並ぶと、点差が動いたように読めて
+ * 戦況を取り違える。名前の色 (陣営) とは別の軸なので、青も陣営の青
+ * (#7ea6ff) とは違う色にしてある。
+ */
 .hud-kill-arrow {
-  color: rgba(160, 190, 140, 0.8);
+  color: #e0533c;
 }
 
-.hud-kill-death .hud-kill-arrow {
-  color: #e0533c;
+.hud-kill-arrow-stun {
+  color: #6fc9ff;
 }
 
 .hud-kill-weapon {

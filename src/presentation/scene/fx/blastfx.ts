@@ -16,6 +16,24 @@ import { asset } from '../assets'
  * さらに、板ではない物を混ぜる。地面に寝かせた土埃の輪と点光源は実体があるので、
  * どの角度から見ても正しい。ここが「絵を貼っただけ」との差になる。
  *
+ * --- 板は光を受けない ---
+ * SpriteMaterial は無灯なので、日向でも日陰でも同じ明るさで浮く。煙が**塗った
+ * 綿**に見えていた理由はこれで、置いた場所の光と無関係な明るさをしていた。
+ *
+ * 面を持たない板に本当の陰影は付けられないので、**粒の散らばりで陰影を作る**。
+ * 爆心から見て太陽の側へ飛んだ粒は明るく、反対側へ飛んだ粒は暗くする。
+ * 1 粒ずつは平らでも、雲の**太陽側が明るく陰側が暗い**ので塊として読める。
+ * 色は場の光 (太陽と空) から借りる。ここで決めない。
+ *
+ * --- 破片 ---
+ * 煙と閃光だけだと「空中で光った」にしか見えない。**重さのある物が飛んで落ちる**
+ * ことで爆発に実体が付く。手榴弾の殻の破片を放物線で飛ばして、床で跳ねて
+ * 止まらせる。
+ *
+ * **床の物は飛ばさない。** 土を飛ばしていたが、筏の床は木で、ガレージは
+ * コンクリート。床から出る物は床の材質で変わるので、材質ごとに絵を持たないと
+ * 嘘になる。手榴弾の殻なら、どこで爆ぜても同じ物が飛ぶ。
+ *
  * 粒の絵は Kenney の Smoke Particle pack (CC0)。tools で 4x4 の 1 枚にまとめてある。
  */
 
@@ -46,6 +64,23 @@ interface Puff {
   peak: number
   /** 立ち上がるまでの遅れ (秒)。全部が同時に出ると 1 枚に見える */
   delay: number
+  /** 光を受けるか。閃光と炎は自分で光るので受けない */
+  lit: boolean
+}
+
+/** 破片 1 つ */
+interface Debris {
+  position: THREE.Vector3
+  velocity: THREE.Vector3
+  /** 回る軸と速さ (rad/s) */
+  axis: THREE.Vector3
+  spin: number
+  angle: number
+  /** 大きさ (m)。3 軸で違う (丸い玉ではなく欠片) */
+  size: THREE.Vector3
+  life: number
+  /** 床に落ち着いたか。落ち着いたら回さない */
+  resting: boolean
 }
 
 /**
@@ -76,6 +111,68 @@ const RECIPE = [
 /** 地面の輪が広がりきるまで (秒) */
 const RING_SPAN = 0.55
 
+/**
+ * 煙の明るさ。**太陽側と陰側。** 絵の明るさに掛ける倍率。
+ *
+ * 陰側を 0 に近づけるほど立体には見えるが、暗い床の上では雲の半分が消える。
+ * 0.35 で、日向の床の上でも陰が黒くならず、それでいて丸みが読める。
+ */
+const SHADE_LIT = 1.0
+const SHADE_DARK = 0.35
+
+/**
+ * 陰側の暗さを、太陽の側と反対側のどこで切り替えるか。
+ *
+ * 内積 (-1..1) をそのまま使うと、真横の粒が中間の明るさになって境が
+ * ぼやける。少し太陽側へ寄せると、陰が雲の半分より狭くなって光が
+ * 「当たっている」ように見える。
+ */
+const SHADE_BIAS = 0.1
+
+/** 太陽が見つからないときの向き。world/stage.ts の buildLights と同じ */
+const DEFAULT_SUN = new THREE.Vector3(72, 120, 48).normalize()
+
+/** 破片の数 */
+const DEBRIS_COUNT = 24
+/** 破片が飛び続けてから消えるまで (秒) */
+const DEBRIS_SPAN = 1.6
+/** 消える前に縮み始める (秒)。消えた瞬間が分からないように */
+const DEBRIS_FADE = 0.4
+/**
+ * 破片の大きさ (m)。この幅で散らす。
+ *
+ * 殻の欠片なので小さい。実物は 1〜3cm だが、それだと 20m 先で点にもならない
+ * (試写でそうなった)。2〜5cm。これより大きいと石や土に見える。
+ */
+const DEBRIS_MIN = 0.02
+const DEBRIS_MAX = 0.05
+/**
+ * 飛び出す速さ (m/s) と、上へ持ち上げる分。
+ *
+ * 本物の破片は音速に近く、目に映らない。見せるための速さにしてあるが、
+ * **煙より遠くへは飛ばさない。** 雲の外まで散ると紙吹雪に見える (実際そう
+ * 見えた)。雲の中から出て、雲の縁の少し先で落ちる速さ。
+ */
+const DEBRIS_SPEED = 5
+const DEBRIS_SPEED_SPREAD = 7
+const DEBRIS_RISE = 3
+/** 床に当たったときの跳ね返り。縦と横で別。金属なのでよく跳ねる */
+const DEBRIS_BOUNCE = 0.4
+const DEBRIS_FRICTION = 0.6
+/** これより遅く床に当たれば跳ねずに止まる (m/s) */
+const DEBRIS_REST_SPEED = 1.2
+/** 重力 (m/s²)。弾道と同じ実値 */
+const GRAVITY = 9.8
+/**
+ * 破片の材質。**手榴弾の殻**なので、床が何であっても同じ。
+ *
+ * 暗い金属。粗さを半分にして、太陽の下で欠片の面が光るようにしてある —
+ * 小さい物が見えるのは、動きと**面の光り**のおかげ。
+ */
+const DEBRIS_COLOR = 0x2b2c2e
+const DEBRIS_ROUGHNESS = 0.45
+const DEBRIS_METALNESS = 0.8
+
 export class BlastFx {
   private readonly group = new THREE.Group()
   private readonly puffs: Puff[] = []
@@ -85,8 +182,21 @@ export class BlastFx {
   private readonly light: THREE.PointLight
   private lightLife = 0
   private readonly at = new THREE.Vector3()
+  private readonly scene: THREE.Scene
+  private readonly debris: THREE.InstancedMesh
+  private readonly clods: Debris[] = []
+  /** 床の高さ (m)。爆ぜた所の高さ。破片はここで跳ねる */
+  private floorY = 0
+  /** 使い回す控え */
+  private readonly matrix = new THREE.Matrix4()
+  private readonly quaternion = new THREE.Quaternion()
+  private readonly scale = new THREE.Vector3()
+  private readonly sunDirection = new THREE.Vector3()
+  private readonly litColor = new THREE.Color()
+  private readonly darkColor = new THREE.Color()
 
   constructor(scene: THREE.Scene) {
+    this.scene = scene
     scene.add(this.group)
 
     // 粒ごとに別のマテリアルを持たせる。
@@ -139,8 +249,42 @@ export class BlastFx {
           to: kind.to,
           peak: kind.peak,
           delay: 0,
+          lit: kind.row === ROW_SMOKE || kind.row === ROW_DUST,
         })
       }
+    }
+
+    /*
+     * 破片。**1 つの網で全部を描く** (InstancedMesh)。
+     *
+     * 形は 12 面体を 3 軸で別々に潰した物。同じ形でも潰し方と向きが違えば
+     * 別の欠片に見える。影を落とす — 実体であることが、板との差になる。
+     */
+    this.debris = new THREE.InstancedMesh(
+      new THREE.DodecahedronGeometry(1, 0),
+      new THREE.MeshStandardMaterial({
+        color: DEBRIS_COLOR,
+        roughness: DEBRIS_ROUGHNESS,
+        metalness: DEBRIS_METALNESS,
+      }),
+      DEBRIS_COUNT,
+    )
+    this.debris.castShadow = true
+    this.debris.frustumCulled = false
+    this.debris.visible = false
+    this.debris.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    this.group.add(this.debris)
+    for (let i = 0; i < DEBRIS_COUNT; i++) {
+      this.clods.push({
+        position: new THREE.Vector3(),
+        velocity: new THREE.Vector3(),
+        axis: new THREE.Vector3(0, 1, 0),
+        spin: 0,
+        angle: 0,
+        size: new THREE.Vector3(),
+        life: 0,
+        resting: false,
+      })
     }
 
     // 地面に寝かせた輪。板ではないので、どの角度から見ても正しい
@@ -163,9 +307,36 @@ export class BlastFx {
     this.group.add(this.light)
   }
 
+  /**
+   * 場の光を読む。**太陽の向きと、太陽・空の色。**
+   *
+   * 毎回探す。光は場面に 1 組しか無く、爆発は秒に何度も起きない。
+   * 見つからなければ既定の向きと白で済ませる (試写など、光を置かない場)。
+   */
+  private readLighting(): void {
+    const sun = this.scene.getObjectByProperty('isDirectionalLight', true) as
+      | THREE.DirectionalLight
+      | undefined
+    const sky = this.scene.getObjectByProperty('isHemisphereLight', true) as
+      | THREE.HemisphereLight
+      | undefined
+    if (sun) {
+      this.sunDirection.copy(sun.position).sub(sun.target.position).normalize()
+      this.litColor.copy(sun.color)
+    } else {
+      this.sunDirection.copy(DEFAULT_SUN)
+      this.litColor.setScalar(1)
+    }
+    // 陰は空の光だけが届く場所。空の色で暗くする
+    if (sky) this.darkColor.copy(sky.color)
+    else this.darkColor.setScalar(1)
+  }
+
   /** 爆ぜる。ダメージはサーバーが決めるので、ここは見せるだけ */
   explode(at: THREE.Vector3): void {
     this.at.copy(at)
+    this.floorY = at.y
+    this.readLighting()
 
     let index = 0
     for (const kind of RECIPE) {
@@ -173,6 +344,24 @@ export class BlastFx {
         const puff = this.puffs[index]
         // 球状にばらまく。土埃だけは地面に沿わせたいので上下を潰す
         const dir = randomDirection(kind.row === ROW_DUST ? 0.25 : 1)
+        if (puff.lit) {
+          /*
+           * 太陽の側へ飛ぶ粒ほど明るい。**飛ぶ向きで決めて、以後変えない。**
+           *
+           * 雲は膨らみながら形を保つので、飛び出した向きがそのまま雲の中の
+           * 位置になる。毎フレーム測り直しても同じ答えになる。
+           */
+          const facing = THREE.MathUtils.clamp(
+            dir.dot(this.sunDirection) * 0.5 + 0.5 + SHADE_BIAS,
+            0,
+            1,
+          )
+          const shade = SHADE_DARK + (SHADE_LIT - SHADE_DARK) * facing
+          puff.material.color
+            .copy(this.darkColor)
+            .lerp(this.litColor, facing)
+            .multiplyScalar(shade)
+        }
         puff.sprite.position
           .copy(at)
           .addScaledVector(dir, kind.spread * 0.35 * Math.random())
@@ -191,9 +380,35 @@ export class BlastFx {
       }
     }
 
-    this.ring.position.set(at.x, 0.03, at.z)
+    // 輪は爆ぜた高さに寝かせる。0 に置くと、台の上で爆ぜたとき床下に隠れる
+    this.ring.position.set(at.x, at.y + 0.03, at.z)
     this.ring.visible = true
     this.ringLife = RING_SPAN
+
+    for (const clod of this.clods) {
+      // 上半球に散らす。下へ飛んでもすぐ床に埋まる
+      const dir = randomDirection(1)
+      dir.y = Math.abs(dir.y)
+      clod.position.copy(at).addScaledVector(dir, 0.2)
+      clod.velocity
+        .copy(dir)
+        .multiplyScalar(DEBRIS_SPEED + Math.random() * DEBRIS_SPEED_SPREAD)
+      clod.velocity.y += DEBRIS_RISE * Math.random()
+      clod.axis.copy(randomDirection(1))
+      clod.spin = (Math.random() * 2 - 1) * 24
+      clod.angle = Math.random() * Math.PI * 2
+      const base = DEBRIS_MIN + Math.random() * (DEBRIS_MAX - DEBRIS_MIN)
+      // 殻の欠片。1 軸を薄く潰して板状にする
+      clod.size.set(
+        base * (0.7 + Math.random() * 0.8),
+        base * (0.25 + Math.random() * 0.3),
+        base * (0.7 + Math.random() * 0.8),
+      )
+      clod.life = DEBRIS_SPAN * (0.7 + Math.random() * 0.3)
+      clod.resting = false
+    }
+    this.debris.visible = true
+    this.placeDebris()
 
     this.light.position.copy(at)
     this.light.visible = true
@@ -245,6 +460,61 @@ export class BlastFx {
       if (left <= 0) this.light.visible = false
       else this.light.intensity = left * left * 70
     }
+
+    if (this.debris.visible) {
+      let alive = false
+      for (const clod of this.clods) {
+        if (clod.life <= 0) continue
+        clod.life -= dt
+        if (clod.life <= 0) continue
+        alive = true
+        if (clod.resting) continue
+
+        clod.velocity.y -= GRAVITY * dt
+        clod.position.addScaledVector(clod.velocity, dt)
+        clod.angle += clod.spin * dt
+
+        /*
+         * 床に当たった。**床は爆ぜた高さの平面。**
+         *
+         * 地形は見ていない。破片は 1.6 秒で消える上に小さいので、段差の
+         * 向こうへ飛んだ 1 つが空中で止まっていても目に付かない。
+         */
+        const bottom = this.floorY + clod.size.y * 0.5
+        if (clod.position.y < bottom && clod.velocity.y < 0) {
+          clod.position.y = bottom
+          if (-clod.velocity.y < DEBRIS_REST_SPEED) {
+            clod.velocity.set(0, 0, 0)
+            clod.resting = true
+          } else {
+            clod.velocity.y = -clod.velocity.y * DEBRIS_BOUNCE
+            clod.velocity.x *= DEBRIS_FRICTION
+            clod.velocity.z *= DEBRIS_FRICTION
+            clod.spin *= DEBRIS_FRICTION
+          }
+        }
+      }
+      if (alive) this.placeDebris()
+      else this.debris.visible = false
+    }
+  }
+
+  /** 破片の位置と向きを網へ書き込む */
+  private placeDebris(): void {
+    for (let i = 0; i < this.clods.length; i++) {
+      const clod = this.clods[i]!
+      // 消える前に縮める。消えた瞬間が分からないように
+      const fade = Math.min(1, Math.max(0, clod.life) / DEBRIS_FADE)
+      if (fade <= 0) {
+        this.scale.setScalar(0)
+      } else {
+        this.scale.copy(clod.size).multiplyScalar(fade)
+      }
+      this.quaternion.setFromAxisAngle(clod.axis, clod.angle)
+      this.matrix.compose(clod.position, this.quaternion, this.scale)
+      this.debris.setMatrixAt(i, this.matrix)
+    }
+    this.debris.instanceMatrix.needsUpdate = true
   }
 
   dispose(): void {
@@ -254,6 +524,9 @@ export class BlastFx {
     }
     this.ring.geometry.dispose()
     this.ringMaterial.dispose()
+    this.debris.geometry.dispose()
+    ;(this.debris.material as THREE.Material).dispose()
+    this.debris.dispose()
     this.group.removeFromParent()
   }
 }

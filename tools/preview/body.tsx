@@ -4,7 +4,9 @@
  *     bunx vite → http://localhost:5174/tools/preview/body.html
  *     ?skin=soldier_nanashi   見た目 (既定 soldier)
  *     ?clip=run_f             流す型 (既定 idle)
- *     ?at=head                寄る所 head / chest / all
+ *     ?at=head                寄る所 head / chest / all / prone (伏せた体を収める)
+ *     ?stab                   刺す。clip=prone_idle なら伏せた刺突 (prone_stab)
+ *     ?knife                  ナイフを持っている。?aim と組むとナイフの構え
  *     ?t=1.2                  何秒目で止めるか (既定 1.0)
  *     ?turn=40                体を回す角度
  *
@@ -90,6 +92,8 @@ const anim = new CharacterAnimator(model, gltf.animations, 4.5)
 anim.setPistol(query.has('onehand') || query.has('empty'))
 anim.setHandsEmpty(query.has('empty'))
 anim.setAiming(query.has('aim'))
+// ?knife … ナイフを持っている (構えると knife_idle)
+anim.setKnife(query.has('knife'))
 anim.setAimPitch(pitch)
 
 /*
@@ -107,15 +111,25 @@ if (gunName) {
   model.updateMatrixWorld(true)
   const right = findBoneBySuffix(model, 'RightHand')
   const left = findBoneBySuffix(model, 'LeftHand')
-  if (right && left) {
+  const foreArm = findBoneBySuffix(model, 'RightForeArm')
+  if (right && left && foreArm) {
     weapon = await Weapon.load(gunName as WeaponKind)
     scene.add(weapon.object)
-    weapon.attachTo(
-      right,
-      new THREE.Vector3().setFromMatrixPosition(right.matrixWorld),
-      new THREE.Vector3().setFromMatrixPosition(left.matrixWorld),
-      right.matrixWorld.clone(),
-    )
+    if (gunName === 'knife') {
+      // ナイフは本番と同じ付け方 (soldier.ts)。右手に、肘から手首の線を刃の向きに
+      weapon.attachTo(
+        right,
+        new THREE.Vector3().setFromMatrixPosition(foreArm.matrixWorld),
+        new THREE.Vector3().setFromMatrixPosition(right.matrixWorld),
+      )
+    } else {
+      weapon.attachTo(
+        right,
+        new THREE.Vector3().setFromMatrixPosition(right.matrixWorld),
+        new THREE.Vector3().setFromMatrixPosition(left.matrixWorld),
+        right.matrixWorld.clone(),
+      )
+    }
   }
 }
 
@@ -132,9 +146,14 @@ if (gunName) {
  * 同時に流す全身動作で、playRoll が入口。尻尾で何の姿勢に渡るかを見るのに使う。
  */
 const firing = query.has('fire')
+// 一度きりの全身の型は**姿勢を決めてから**頭から流す。伏せていれば伏せの刺突になる
+if (!query.has('roll')) anim.setLocomotion(clipName as never)
 if (query.has('roll')) anim.playRoll()
+// ?stab … 刺す。姿勢が伏せ (clip=prone_idle) なら伏せた刺突になる
+if (query.has('stab')) anim.playStab()
 for (let t = 0; t < stopAt; t += 1 / 60) {
-  if (!query.has('roll')) anim.setLocomotion(clipName as never)
+  // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
+  if (!query.has('roll') && !query.has('stab')) anim.setLocomotion(clipName as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
 }
@@ -162,6 +181,11 @@ if (at === 'head') {
 } else {
   camera.position.set(0.4, 1.2, 3.0)
   camera.lookAt(0, 0.95, 0)
+}
+// ?at=prone … 伏せた体を枠に収める。立ちの高さのままだと頭しか映らない
+if (at === 'prone') {
+  camera.position.set(1.4, 1.0, 2.2)
+  camera.lookAt(0, 0.25, 0)
 }
 
 await renderer.init()

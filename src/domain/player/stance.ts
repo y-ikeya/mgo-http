@@ -36,7 +36,12 @@ export function stanceOf(locomotion: Locomotion): Stance {
   // ダンボールが落ちた直後。棒立ちなので、頭は立ちの高さに戻っている
   if (locomotion === 'bump') return 'stand'
   // 伏せている。爆風で倒れているのと同じ高さで扱う
-  if (locomotion === 'prone_idle' || locomotion === 'crawl_f' || locomotion === 'crawl_b')
+  if (
+    locomotion === 'prone_idle' ||
+    locomotion === 'crawl_f' ||
+    locomotion === 'crawl_b' ||
+    locomotion === 'prone_stab'
+  )
     return 'prone'
   // 伏せたまま倒れた。**倒れているので down** (頭の高さは死体のもの)
   if (locomotion === 'prone_death') return 'down'
@@ -72,6 +77,85 @@ export const HEAD_HEIGHT: Record<Stance, number> = {
   // その中間を採る。低く採りすぎると「見えているのに映らない」が起きる
   prone: 0.5,
   down: 0.3,
+}
+
+/**
+ * 壁抜けを見る線の高さ (m)。**両端のうち高いほうの足元から。**
+ *
+ * 立っていれば胸 (0.9)。伏せている人は体が 0.3m しかないので、胸の高さで
+ * 引くと**潜れる物の下を這っただけで「抜けた」になる**。姿勢で下げる。
+ *
+ * 低くするほど検査は緩む (低い段差を跨いだ線が通る) が、それは客が既に
+ * 押し戻している範囲。ここが見るのは明らかに不可能な申告だけ。
+ */
+export const MOVE_PROBE_HEIGHT: Record<Stance, number> = {
+  stand: 0.9,
+  crouch: 0.6,
+  box: 0.6,
+  prone: 0.3,
+  down: 0.3,
+}
+
+/**
+ * 体を包む箱 (m)。**可視の判定はこの箱の 12 辺で見る。**
+ *
+ * 点 (頭・胸・足元…) で見ていた頃は、点の間隔より細い隙間から見えている体を
+ * 取りこぼして、相手が急に現れたり消えたりした。箱の辺を**線分**として見れば
+ * 間隔という物が無くなる (sim/space/bvh.ts の segmentVisible)。
+ *
+ * 箱は体より少し大きい (角が輪郭から 10〜20cm 出る) ので、**送る側に倒れる**。
+ * 迷ったら送る側、はこのファイルの他の判断と同じ。
+ *
+ * 前後は向き (yaw) に沿う。伏せた体は前に長い — 頭は中心の 0.53m 前、足は
+ * 0.9m 後ろ (prone_fire の骨の実測) — ので、そちらだけ前後が非対称。
+ * 高さは頭の中心 (HEAD_HEIGHT) に頭の球ぶんを足した所。
+ */
+export interface BodyBox {
+  /** 中心から左右へ (m) */
+  halfWidth: number
+  /** 中心から後ろへ / 前へ (m) */
+  back: number
+  front: number
+  /** 足元からの高さ (m) */
+  height: number
+}
+
+export const BODY_BOX: Record<Stance, BodyBox> = {
+  stand: { halfWidth: 0.22, back: 0.15, front: 0.15, height: 1.6 },
+  crouch: { halfWidth: 0.22, back: 0.25, front: 0.25, height: 1.07 },
+  box: { halfWidth: 0.22, back: 0.25, front: 0.25, height: 1.07 },
+  prone: { halfWidth: 0.22, back: 0.95, front: 0.65, height: 0.4 },
+  down: { halfWidth: 0.3, back: 0.9, front: 0.9, height: 0.45 },
+}
+
+/**
+ * 構えごとの、カメラの注視点の高さ (m) の幅。**足元から。**
+ *
+ * --- なぜ幅で持つか ---
+ * 画面のカメラは「頭の実測 + 0.1m」を注視点にしている (presentation の
+ * soldier.ts)。頭は姿勢だけでなく動きでも上下する — しゃがみ歩きは静止より
+ * 18cm 高い。サーバーは骨を持たないので実測は追えない。
+ *
+ * 1 つの値に決めると、隙間越しの視線で食い違う。筏の塔の縁の板は床から 12cm
+ * 浮いていて、そこを 40m 先まで通す線は数 cm の高さの差で通ったり塞がったり
+ * する。サーバーが 1.53m 固定だった頃、しゃがんで隙間から覗くと、画面には
+ * 通っているのにサーバーは板に遮られて相手を配らなかった。
+ *
+ * 幅の両端で線を引いて、**どちらかで通れば見えている**とする。迷ったら送る側に
+ * 倒す (HEAD_HEIGHT と同じ判断)。
+ *
+ *     stand   頭 1.47 + 0.1。走りの上下で数 cm 動く
+ *     crouch  静止 0.94 + 0.1 から、歩きの +0.18 まで
+ *     box     しゃがみと同じ体
+ *     prone   頭 0.11 + 0.1 から、起き上がりかけの 0.5 + 0.1 まで
+ *     down    倒れている。頭 0.3 のあたり
+ */
+export const VIEW_HEIGHT: Record<Stance, readonly [number, number]> = {
+  stand: [1.52, 1.62],
+  crouch: [1.04, 1.24],
+  box: [1.04, 1.24],
+  prone: [0.21, 0.6],
+  down: [0.3, 0.6],
 }
 
 /**

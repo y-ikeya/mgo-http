@@ -222,11 +222,14 @@ Poly Haven の素材は `diff` (sRGB) / `nor_gl` / `rough` を使い、`disp` �
 | | |
 |---|---|
 | `lobby` / `loadout` / `score` / `hud` | 画面の部品。対戦の状態は作り物を渡す |
-| `water` | 筏の水面と水しぶき。`?eye=near` で寄る、`?t=0.2` で叩いてからの秒数、`?fx=blood` で血 |
-| `weapon` | **武器の構え。** 6 通り (立ち / しゃがみ / 伏せ × 脱力 / 構え) を同時に出す |
+| `water` | 筏の水面と水しぶき。`?eye=near` で寄る、`?eye=drops` で粒に寄る、`?t=0.2` で叩いてからの秒数、`?fx=blood` で血 |
+| `weapon` | **武器の構え。** 6 通り (立ち / しゃがみ / 伏せ × 脱力 / 構え) を同時に出す。`?weapon=knife` でナイフ (握りは立ちの 1 組) |
 | `shots` | **銃口の煙と着弾。** 金属 (火花) と木 (煙) を撃ち分ける。`?only=metal` / `?only=wood` |
 | `leaving` | 試合中に戻るを押したときの板。`?lang=en` |
 | `decoy` | **decoy が膨らむ所。** 経過をずらして 4 体並ぶ。`?t=0.6` で全部同じ秒に、`?skin=` で見た目 |
+| `blast` | **手榴弾の爆発。** 0.12 / 0.5 / 1.3 秒を横に並べる。`?t=0.4` で全部同じ秒に、`?view=low` で床すれすれから (破片の跳ね) |
+| `sensed` | **AWARENESS の気配。** 壁の裏に 2 つ、手前に 1 つ霧を置く。壁越しに見えるか、物に見えないかを見る |
+| `locator` | **置かれた E LOCATOR。** 左が自分の物 (光の玉が出る)、右が敵の物。`?shade=1` で日陰 (灯の光が床に落ちるのを見る)、`?off=1` で灯が消えている瞬間 |
 
 `decoy` も**時を止めて 1 枚**。膨らむのは 2 秒しかないので、動かして見ると
 速すぎて形を比べられない。見るのは 2 つ — **下から膨らんでいるか** (模型の
@@ -275,9 +278,19 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
 `hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`
-`knee_relaxed` `knee_ready` `prone_bolt`) は
+`knee_relaxed` `knee_ready` `prone_bolt` `knife_idle`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 
     $BLENDER -b --factory-startup --python tools/convert_character.py -- <1本だけの設定.json>
     bun tools/merge_clip.js public/models/soldier.glb <単体.glb> <クリップ名> public/models/soldier.glb
+
+`knife_idle` (tools/knife_idle.json) と `stab` (tools/stab.json) は **Ch35 ではないキャラで落とした FBX** (背丈が半分、素の姿勢も違う) なので、`convert_character.py` で直に写すと腕が頭の上に上がる。`retarget_clip.py` で世界の向きから焼き直し、腰の高さが半分なので `--hips-from` で既存の型の高さに揃えて足す:
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/knife_idle.json
+    bun tools/merge_clip.js public/models/soldier.glb knife_idle.glb knife_idle public/models/soldier.glb --hips-from pistol_aim
+    bun tools/merge_clip.js public/models/soldier.glb stab.glb stab public/models/soldier.glb --hips-from idle
+
+`prone_stab` (tools/prone_knife.json) も同じ。FBX には立ちの刺突 2 本と伏せの 2 本が入っていて、使うのは 4 本目 (`#4`)。腰は `--hips-from prone_fire` で伏せ撃ちの高さに揃える (crawl_f に揃えると 10cm 浮く)。伏せてナイフを構えた姿はこの型の頭の 1 枚を止めて使う。
+
+雷電と名無しへは同じ物を `--rotation-only` を足して入れる。`knife_idle` は半身の構えで腰が 90° 横を向いているが、手と頭は他の構えと同じ方を向いているので回してはいけない。上半身だけ乗せると腰の基準合わせで捻れるため、ゲームでは立ち止まって構えた間だけ全身で使う。

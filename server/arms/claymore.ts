@@ -10,10 +10,10 @@ import type { ServerMessage } from '../../src/application/protocol/types'
 import { PLACE_FORWARD, type Placed, SHOT_HALF, SHOT_TOP, blastReach, canPlaceAt } from '../../src/sim/judge/claymore'
 import { blastEffect } from '../../src/domain/item/claymore'
 import { overflowing } from '../../src/domain/item/held'
-import { type StageBox, groundUnder, hasLineOfSight, segmentHitsBox } from '../../src/sim/space/vision'
+import { type StageBox, groundUnder, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
 import { dropGrenade } from './grenade'
-import { viewOf } from '../relay'
+import { sees } from '../relay'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast, friendlyTeam, hostileToOwner } from '../world'
 
@@ -93,21 +93,14 @@ export function placeClaymore(room: RoomWorld, from: MatchPlayer): void {
  * 本体は 26cm しかないので、体のように 3 点で見ずに 1 点で見る。
  */
 export function relayClaymores(room: RoomWorld): void {
+  const now = Date.now()
   for (const viewer of connected(room)) {
     for (const claymore of room.claymores) {
       // 味方の物は無条件。どこに置いたか分からないと自分が引っ掛かる
       let visible = friendlyTeam(room, viewer, claymore.team)
       if (!visible) {
-        const eye = viewOf(room, viewer)
-        visible = hasLineOfSight(
-          eye.x, eye.y, eye.z,
-          claymore.x, claymore.y, claymore.z,
-          // 本体の高さ。頭の高さと同じ引数の意味 (足元からどれだけ上か)
-          0.2,
-          room.stage.sight,
-        )
-      } else if (!visible) {
-        visible = true
+        // 本体の高さ 0.2。頭の高さと同じ引数の意味 (足元からどれだけ上か)
+        visible = sees(room, viewer, claymore.x, claymore.y, claymore.z, 0.2, now)
       }
 
       const known = sessionOf(viewer).seenClaymores.has(claymore.id)

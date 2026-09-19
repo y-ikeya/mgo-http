@@ -74,6 +74,8 @@ export type WholeBodyLocomotion =
   | 'roll'
   | 'hard_land'
   | 'stab'
+  // 伏せたまま刺す。全身の型 (入口は playStab、伏せていれば伏せの型を選ぶ)
+  | 'prone_stab'
   | 'death'
   | 'death_front'
   | 'death_back'
@@ -331,6 +333,9 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
    */
   // 伏せへの出入り。**終わるまで他へ移らない** (全身の型)
   if (input.proneShift) return input.proneShift
+
+  // 伏せたまま刺す。全身の型なので這いより先に見る
+  if (input.prone && input.stabbing) return 'prone_stab'
 
   if (input.prone) {
     const crawling = input.previous === 'crawl_f' || input.previous === 'crawl_b'

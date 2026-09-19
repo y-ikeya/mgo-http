@@ -27,7 +27,7 @@ import {
   type SolidWorld,
   type StageBox,
 } from '../src/sim/space/vision'
-import { decodeStageMesh, meshSubset, MESH_EYE, MESH_BULLET } from '../src/sim/space/stagemesh'
+import { decodeStageMesh, meshSubset, MESH_EYE, MESH_BULLET, MESH_PLAYER } from '../src/sim/space/stagemesh'
 import { TriangleBvh } from '../src/sim/space/bvh'
 
 /**
@@ -51,13 +51,19 @@ export interface Terrain {
    */
   sight: SightBlocker
   /**
-   * 人が止まる面。**箱のまま。**
+   * 人が止まる箱。**足音の材質と、三角が無いステージの移動の検査に。**
    *
-   * 移動は「線が通るか」ではなく「円柱を動かして押し戻す」なので、問いの形が
-   * 違う。三角でやるなら別の仕掛けが要るし、段差の乗り方や坂の滑り方という
-   * **遊びの手触りが乗っている**所なので、動かすと感触が変わる。
+   * 押し戻し (円柱を動かす) は客の仕事で、こちらは申告の検算だけ。
    */
   solid: StageBox[]
+  /**
+   * 人が止まる三角。**移動の検査 (壁を抜けたか) はこれで見る。**
+   *
+   * 客の押し戻しと同じ集合 (書き出しの PLAYER_BIT)。箱で見ていた頃は、
+   * 円柱の塔の外接の角に伏せた人が「塔を抜けた」で弾かれ続けた
+   * (sim/judge/motioncheck.ts の checkMoveOnMesh)。無ければ null で、箱に戻る。
+   */
+  body: SolidWorld | null
   /**
    * 投げた物がぶつかる形。**三角の網。**
    *
@@ -83,6 +89,7 @@ function bare(name: StageName): Terrain {
     name,
     sight: OPEN_SIGHT,
     solid: [],
+    body: null,
     thrown: boxSolid([]),
     camera: [],
     arenaHalf: Number.POSITIVE_INFINITY,
@@ -105,11 +112,12 @@ async function load(name: StageName): Promise<Terrain> {
     const mesh = await loadMesh(name)
     const sight = mesh ? mesh.sight : boxedSight(name, data.boxes)
     const thrown = mesh ? mesh.thrown : boxSolid(solid)
+    const body = mesh ? mesh.body : null
     console.info(
       `ステージ ${name}: 三角 視線 ${sizeOf(sight)} 枚 / 物 ${sizeOf(thrown)} 枚 / ` +
         `人が止まる箱 ${solid.length} 個 / 範囲 ±${half.toFixed(1)}m`,
     )
-    return { name, sight, thrown, solid, camera: cameraBlockers(data.boxes), arenaHalf: half }
+    return { name, sight, thrown, body, solid, camera: cameraBlockers(data.boxes), arenaHalf: half }
   } catch {
     console.warn(`stage_${name}.json が読めない。遮蔽の判定なしで動かす (位置は全員へ配られる)`)
     return bare(name)
@@ -144,13 +152,14 @@ function boxedSight(name: StageName, boxes: StageBox[]): SightBlocker {
  */
 async function loadMesh(
   name: StageName,
-): Promise<{ sight: SightBlocker; thrown: SolidWorld } | null> {
+): Promise<{ sight: SightBlocker; thrown: SolidWorld; body: SolidWorld } | null> {
   const path = new URL(`../public/models/stage_${name}.mesh.bin`, import.meta.url)
   try {
     const mesh = decodeStageMesh(await Bun.file(path).arrayBuffer())
     return {
       sight: new TriangleBvh(meshSubset(mesh, MESH_EYE)),
       thrown: new TriangleBvh(meshSubset(mesh, MESH_BULLET)),
+      body: new TriangleBvh(meshSubset(mesh, MESH_PLAYER)),
     }
   } catch {
     return null

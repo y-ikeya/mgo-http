@@ -9,7 +9,7 @@
  * 外部への依存を持たせない (これが sim/ の唯一のドメインルール)。
  */
 
-import { HEAD_HEIGHT, type Stance } from '../player/stance'
+import { HEAD_HEIGHT, VIEW_HEIGHT, type Stance } from '../player/stance'
 import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
@@ -234,8 +234,40 @@ export function creditOf(victimId: string, killerId: string | null): Credit {
  * **束ねてここに置くのは、重複を作らせないため。** サーバーとクライアントが
  * 別々に組み立てると、片方だけ古い数字を渡す余地が残る。
  */
+/**
+ * 部位の大きさ (半径 m)。**照合が「中心の 1 点」で見ないために要る。**
+ *
+ * 画面の当たりは球 (presentation の hitbox.ts: 頭 0.14 / 胴 0.20 / 脚 0.16) で、
+ * 縁に掠っても当たる。照合が中心の 1 点だけを見ると、板の縁のそばでは
+ * **頭の縁は見えているのに中心は板の裏**という帯ができて、画面で当たった弾が
+ * 通らない — 隙間越しの狙撃が針の穴を通すような手触りになった。
+ * 球の大きさを渡して、その中のどこかが見えていれば通す。
+ */
+export const ZONE_RADIUS: Record<HitZone, number> = { HEAD: 0.14, BODY: 0.2, LEGS: 0.16 }
+
+/**
+ * 部位の縦の幅 (頭の高さに対する比率、下端と上端)。
+ *
+ * 画面の当たりは胴が**腰から首までの筒**、脚が**足元から腰までの筒**
+ * (hitbox.ts: 骨の位置に球を並べる)。審判が中心の球 1 つで見ると、胴は
+ * 1.06m を中心に上下 0.2m しかなく、画面では上胸 (1.3m) に当たった弾が
+ * 審判では板の裏になった (梯子の脇の看板の隙間、実測)。
+ *
+ * 骨の実測 (idle): 腰 0.97 / 首 1.35 / 頭 1.47。比率で持つのは、しゃがみでも
+ * 伏せでも同じ形で縮むように。
+ */
+export const ZONE_SPAN: Record<HitZone, readonly [number, number]> = {
+  HEAD: [1, 1],
+  BODY: [0.66, 0.92],
+  LEGS: [0.09, 0.66],
+}
+
 export const HIT_RULES = {
   headHeight: (stance: Stance) => HEAD_HEIGHT[stance],
+  zoneRadius: (zone: HitZone) => ZONE_RADIUS[zone],
+  zoneSpan: (zone: HitZone) => ZONE_SPAN[zone],
+  // カメラの注視点。幅の真ん中 (可視の判定は幅の両端で引くが、ここは 1 点でよい)
+  viewHeight: (stance: Stance) => (VIEW_HEIGHT[stance][0] + VIEW_HEIGHT[stance][1]) / 2,
   canBeStabbed,
   meleeRange: MELEE_RANGE,
   meleeSlack: MELEE_SLACK,

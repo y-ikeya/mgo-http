@@ -1,0 +1,63 @@
+/*
+ * 読み込み中の覆い。**下地ごと塗る。**
+ *
+ * 透かすと、箱だけの地形と T ポーズが見えて覆う意味が無い。色は他の板
+ * (Leaving / Blocked) と同じ暗い緑寄りの黒に揃える。
+ */
+.loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: #0b0f0c;
+  /* 装備画面や成績表より上。**下に何があっても隠す** */
+  z-index: 60;
+}
+
+/*
+ * 回る印。**画像を使わない。**
+ *
+ * 読み込みを待たせている画面で、印のために更に 1 つ読み込むのは筋が通らない。
+ * 縁の一部だけ色を変えた円を回す。
+ */
+.loading-ring {
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(160, 190, 140, 0.18);
+  border-top-color: rgba(190, 220, 160, 0.85);
+  border-radius: 50%;
+  animation: loading-spin 0.9s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-note {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: rgba(150, 166, 140, 0.75);
+}
+
+/*
+ * 動きを減らす設定の人には回さない。
+ *
+ * 回転そのものが情報 (止まっていない) なので消しはせず、**点滅に替える**。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .loading-ring {
+    animation: loading-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes loading-pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
