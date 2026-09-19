@@ -1,31 +1,6 @@
 {
 "boxes": [
 {
-"name": "pasted__polySurface7634_pasted__pasted__pasted__rama2_0.003",
-"min": [
--39.009,
-9.921,
--34.061
-],
-"max": [
--38.387,
-16.099,
--32.276
-],
-"top": {
-"h": 16.0988,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "pasted__polySurface7634_pasted__pasted__pasted__rama2_0.002",
 "min": [
 38.831,
@@ -47,32 +22,6 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.026",
-"min": [
-34.697,
-11.054,
-35.315
-],
-"max": [
-40.105,
-11.119,
-35.38
-],
-"top": {
-"h": 11.1159,
-"dx": -0.00066,
-"dz": 0.15283,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
 "camera": true
 }
 },
@@ -177,132 +126,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.038",
-"min": [
-29.095,
-11.054,
-35.298
-],
-"max": [
-34.503,
-11.119,
-35.363
-],
-"top": {
-"h": 11.1159,
-"dx": -0.00066,
-"dz": 0.15283,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.034",
-"min": [
-30.168,
-10.252,
-35.304
-],
-"max": [
-31.611,
-11.069,
-35.347
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.035",
-"min": [
-29.113,
-10.252,
-35.298
-],
-"max": [
-30.556,
-11.069,
-35.341
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.036",
-"min": [
-31.578,
-10.252,
-35.312
-],
-"max": [
-33.021,
-11.069,
-35.355
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.037",
-"min": [
-32.98,
-10.252,
-35.325
-],
-"max": [
-34.424,
-11.069,
-35.367
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.041",
 "min": [
 29.08,
@@ -355,17 +178,17 @@
 {
 "name": "wood_rail_garden_noeye_nobullet.042",
 "min": [
-23.844,
-10.222,
+23.752,
+10.063,
 29.347
 ],
 "max": [
-23.973,
-11.094,
+23.919,
+10.934,
 34.728
 ],
 "top": {
-"h": 11.0938,
+"h": 10.934,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -504,32 +327,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.083",
-"min": [
-28.67,
-11.054,
-32.207
-],
-"max": [
-28.727,
-11.119,
-35.316
-],
-"top": {
-"h": 11.1245,
-"dx": -0.15283,
-"dz": -0.00071,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.088",
 "min": [
 28.639,
@@ -543,56 +340,6 @@
 ],
 "top": {
 "h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.053",
-"min": [
-28.665,
-10.252,
-33.747
-],
-"max": [
-28.708,
-11.069,
-35.191
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.054",
-"min": [
-28.678,
-10.252,
-32.345
-],
-"max": [
-28.721,
-11.069,
-33.788
-],
-"top": {
-"h": 11.0686,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -731,31 +478,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.057",
-"min": [
-35.375,
-13.118,
-29.486
-],
-"max": [
-36.819,
-13.935,
-29.546
-],
-"top": {
-"h": 13.9352,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.058",
 "min": [
 33.96,
@@ -821,32 +543,6 @@
 "h": 13.9573,
 "dx": -0.00261,
 "dz": 0.1529,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.101",
-"min": [
-33.826,
-13.896,
-40.295
-],
-"max": [
-38.324,
-13.96,
-40.414
-],
-"top": {
-"h": 13.9573,
-"dx": -0.00261,
-"dz": 0.15279,
 "thick": 0.0648
 },
 "flags": {
@@ -958,81 +654,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.067",
-"min": [
-31.347,
-12.104,
-29.397
-],
-"max": [
-33.001,
-13.58,
-29.458
-],
-"top": {
-"h": 13.58,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.072",
-"min": [
-30.165,
-11.326,
-29.375
-],
-"max": [
-31.82,
-12.802,
-29.436
-],
-"top": {
-"h": 12.8023,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.091",
-"min": [
-28.983,
-10.548,
-29.366
-],
-"max": [
-30.638,
-12.024,
-29.427
-],
-"top": {
-"h": 12.0242,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.103",
 "min": [
 28.782,
@@ -1084,32 +705,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.105",
-"min": [
-28.877,
-11.141,
-31.945
-],
-"max": [
-32.669,
-13.669,
-32.062
-],
-"top": {
-"h": 11.1915,
-"dx": 0.65474,
-"dz": 0.18474,
-"thick": 0.0775
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.106",
 "min": [
 28.774,
@@ -1135,107 +730,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.092",
-"min": [
-28.976,
-10.548,
-31.959
-],
-"max": [
-30.631,
-12.024,
-32.019
-],
-"top": {
-"h": 12.0242,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.093",
-"min": [
-30.158,
-11.326,
-31.967
-],
-"max": [
-31.813,
-12.802,
-32.028
-],
-"top": {
-"h": 12.8023,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.098",
-"min": [
-31.339,
-12.104,
-31.99
-],
-"max": [
-32.994,
-13.58,
-32.05
-],
-"top": {
-"h": 13.58,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.107",
-"min": [
-38.416,
-13.896,
-29.949
-],
-"max": [
-38.572,
-13.96,
-34.446
-],
-"top": {
-"h": 13.9811,
-"dx": -0.15288,
-"dz": -0.00387,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.108",
 "min": [
 38.393,
@@ -1249,56 +743,6 @@
 ],
 "top": {
 "h": 13.9605,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.099",
-"min": [
-38.486,
-13.118,
-30.051
-],
-"max": [
-38.558,
-13.935,
-31.495
-],
-"top": {
-"h": 13.9352,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.100",
-"min": [
-38.465,
-13.118,
-31.466
-],
-"max": [
-38.537,
-13.935,
-32.91
-],
-"top": {
-"h": 13.9352,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1546,31 +990,6 @@
 15.879,
 11.033,
 35.192
-],
-"top": {
-"h": 11.0326,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.115",
-"min": [
-15.85,
-10.216,
-35.155
-],
-"max": [
-17.293,
-11.033,
-35.215
 ],
 "top": {
 "h": 11.0326,
@@ -2287,31 +1706,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.154",
-"min": [
--5.326,
-10.222,
-18.547
-],
-"max": [
--5.212,
-11.094,
-23.261
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.155",
 "min": [
 1.167,
@@ -2362,31 +1756,6 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.156",
-"min": [
-70.968,
--3194.077,
--10.538
-],
-"max": [
-74.955,
--2925.918,
-0.213
-],
-"top": {
-"h": -2925.9182,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.157",
 "min": [
 23.622,
@@ -2433,31 +1802,6 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.158",
-"min": [
-12.241,
-10.222,
-13.603
-],
-"max": [
-17.623,
-11.094,
-13.722
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
 "camera": true
 }
 },
@@ -2533,31 +1877,6 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.160",
-"min": [
--5.325,
-10.222,
-13.621
-],
-"max": [
--5.211,
-11.094,
-18.335
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
 "camera": true
 }
 },
@@ -3289,42 +2608,66 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.032",
+"name": "metal_oildrum_low__0_nouv.005",
 "min": [
--39.605,
-11.054,
--35.084
+-5.328,
+10.316,
+13.932
 ],
 "max": [
--34.197,
-11.119,
--35.004
+-4.579,
+11.378,
+14.67
 ],
 "top": {
-"h": 11.1223,
-"dx": 0.00106,
-"dz": -0.15282,
-"thick": 0.0648
+"h": 11.3778,
+"dx": 0.0,
+"dz": 0.0
 },
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
-"eye": false,
+"bullet": true,
+"eye": true,
 "camera": true
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.039",
+"name": "pasted__polySurface7634_pasted__pasted__pasted__rama2_0.001",
 "min": [
--39.564,
-10.222,
--35.115
+-38.966,
+9.921,
+-34.16
 ],
 "max": [
--34.183,
+-38.345,
+16.099,
+-32.375
+],
+"top": {
+"h": 16.0988,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.002",
+"min": [
+-39.579,
+10.222,
+-35.211
+],
+"max": [
+-34.197,
 11.094,
--34.973
+-35.087
 ],
 "top": {
 "h": 11.0938,
@@ -3342,14 +2685,14 @@
 {
 "name": "wood_base.003",
 "min": [
--39.925,
+-39.939,
 10.095,
--39.951
+-40.046
 ],
 "max": [
--34.078,
+-34.108,
 10.197,
--34.912
+-35.026
 ],
 "top": {
 "h": 10.1971,
@@ -3365,145 +2708,19 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.040",
-"min": [
--39.796,
-10.222,
--39.901
-],
-"max": [
--39.68,
-11.094,
--35.187
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.043",
-"min": [
--34.023,
-10.222,
--39.895
-],
-"max": [
--28.642,
-11.094,
--39.753
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.044",
-"min": [
--34.003,
-11.054,
--35.053
-],
-"max": [
--28.595,
-11.119,
--34.973
-],
-"top": {
-"h": 11.1223,
-"dx": 0.00106,
-"dz": -0.15282,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.001",
-"min": [
--31.112,
-10.252,
--35.028
-],
-"max": [
--29.668,
-11.069,
--34.982
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.002",
-"min": [
--30.056,
-10.252,
--35.019
-],
-"max": [
--28.613,
-11.069,
--34.973
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.003",
 "min": [
--32.521,
-10.252,
--35.04
+-39.815,
+10.222,
+-39.997
 ],
 "max": [
--31.078,
-11.069,
--34.994
+-39.706,
+11.094,
+-35.283
 ],
 "top": {
-"h": 11.0686,
+"h": 11.0938,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3518,165 +2735,14 @@
 {
 "name": "wood_rail_garden_noeye_nobullet.004",
 "min": [
--33.924,
-10.252,
--35.056
-],
-"max": [
--32.48,
-11.069,
--35.01
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.045",
-"min": [
--33.962,
+-34.053,
 10.222,
--35.084
+-40.01
 ],
 "max": [
--28.58,
+-28.672,
 11.094,
--34.942
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_base.004",
-"min": [
--34.1,
-10.095,
--39.919
-],
-"max": [
--28.253,
-10.197,
--34.88
-],
-"top": {
-"h": 10.1971,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.047",
-"min": [
--23.489,
-10.222,
--34.39
-],
-"max": [
--23.346,
-11.094,
--29.008
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.050",
-"min": [
--23.29,
-10.222,
--34.863
-],
-"max": [
--17.908,
-11.094,
--34.715
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.051",
-"min": [
--27.987,
-11.029,
--39.859
-],
-"max": [
--23.49,
-11.094,
--39.729
-],
-"top": {
-"h": 11.097,
-"dx": 0.003,
-"dz": -0.15285,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.052",
-"min": [
--28.039,
-10.222,
--39.882
-],
-"max": [
--23.367,
-11.094,
--39.718
+-39.885
 ],
 "top": {
 "h": 11.0938,
@@ -3694,90 +2760,14 @@
 {
 "name": "wood_rail_garden_noeye_nobullet.005",
 "min": [
--25.036,
-10.252,
--39.806
-],
-"max": [
--23.592,
-11.069,
--39.742
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.006",
-"min": [
--26.451,
-10.252,
--39.819
-],
-"max": [
--25.007,
-11.069,
--39.755
-],
-"top": {
-"h": 11.0686,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.055",
-"min": [
--28.235,
-11.054,
--34.99
-],
-"max": [
--28.17,
-11.119,
--31.881
-],
-"top": {
-"h": 11.1125,
-"dx": 0.15286,
-"dz": 0.00111,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.056",
-"min": [
--28.266,
+-33.976,
 10.222,
--34.967
+-35.198
 ],
 "max": [
--28.139,
+-28.595,
 11.094,
--31.873
+-35.074
 ],
 "top": {
 "h": 11.0938,
@@ -3793,19 +2783,69 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.007",
+"name": "wood_base.004",
 "min": [
--28.212,
-10.252,
--34.865
+-34.115,
+10.095,
+-40.033
 ],
 "max": [
--28.165,
-11.069,
--33.421
+-28.284,
+10.197,
+-35.013
 ],
 "top": {
-"h": 11.0686,
+"h": 10.1971,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.006",
+"min": [
+-23.43,
+10.063,
+-34.539
+],
+"max": [
+-23.267,
+10.934,
+-29.157
+],
+"top": {
+"h": 10.934,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.007",
+"min": [
+-23.304,
+10.222,
+-35.013
+],
+"max": [
+-17.922,
+11.094,
+-34.882
+],
+"top": {
+"h": 11.0938,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3820,14 +2860,65 @@
 {
 "name": "wood_rail_garden_noeye_nobullet.008",
 "min": [
--28.229,
-10.252,
--33.462
+-28.017,
+11.029,
+-39.993
 ],
 "max": [
--28.182,
+-23.52,
+11.094,
+-39.878
+],
+"top": {
+"h": 11.097,
+"dx": 0.0025,
+"dz": -0.15279,
+"thick": 0.0648
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.009",
+"min": [
+-28.069,
+10.222,
+-40.016
+],
+"max": [
+-23.397,
+11.094,
+-39.867
+],
+"top": {
+"h": 11.0938,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.010",
+"min": [
+-25.066,
+10.252,
+-39.95
+],
+"max": [
+-23.622,
 11.069,
--32.019
+-39.891
 ],
 "top": {
 "h": 11.0686,
@@ -3843,16 +2934,66 @@
 }
 },
 {
-"name": "wood_base.005",
+"name": "wood_rail_garden_noeye_nobullet.011",
 "min": [
--28.318,
-10.095,
--39.896
+-26.481,
+10.252,
+-39.958
 ],
 "max": [
--23.099,
+-25.037,
+11.069,
+-39.899
+],
+"top": {
+"h": 11.0686,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.012",
+"min": [
+-28.271,
+10.222,
+-35.1
+],
+"max": [
+-28.154,
+11.094,
+-32.006
+],
+"top": {
+"h": 11.0938,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_base.005",
+"min": [
+-28.33,
+10.095,
+-40.029
+],
+"max": [
+-23.129,
 10.197,
--34.326
+-34.476
 ],
 "top": {
 "h": 10.1971,
@@ -3870,14 +3011,14 @@
 {
 "name": "wood_base.011",
 "min": [
--28.382,
+-28.377,
 10.095,
--34.373
+-34.507
 ],
 "max": [
--23.164,
+-23.176,
 10.197,
--28.803
+-28.953
 ],
 "top": {
 "h": 10.1971,
@@ -3895,19 +3036,19 @@
 {
 "name": "wood_base.012",
 "min": [
--32.984,
+-32.979,
 10.095,
--31.802
+-31.92
 ],
 "max": [
--28.316,
+-28.32,
 13.103,
--28.978
+-29.111
 ],
 "top": {
-"h": 13.1327,
+"h": 13.1269,
 "dx": -0.64055,
-"dz": -0.00356,
+"dz": -0.00148,
 "thick": 0.0667
 },
 "flags": {
@@ -3921,14 +3062,14 @@
 {
 "name": "wood_base.013",
 "min": [
--38.166,
+-38.161,
 12.994,
--34.645
+-34.747
 ],
 "max": [
--32.947,
+-32.961,
 13.096,
--29.075
+-29.193
 ],
 "top": {
 "h": 13.0958,
@@ -3946,14 +3087,14 @@
 {
 "name": "wood_base.014",
 "min": [
--38.101,
+-38.115,
 12.994,
--40.168
+-40.269
 ],
 "max": [
--32.883,
+-32.914,
 13.096,
--34.598
+-34.716
 ],
 "top": {
 "h": 13.0958,
@@ -3969,218 +3110,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.009",
-"min": [
--36.334,
-13.118,
--29.241
-],
-"max": [
--34.89,
-13.935,
--29.177
-],
-"top": {
-"h": 13.9352,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.010",
-"min": [
--34.919,
-13.118,
--29.228
-],
-"max": [
--33.475,
-13.935,
--29.164
-],
-"top": {
-"h": 13.9352,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.060",
-"min": [
--37.923,
-13.089,
--29.304
-],
-"max": [
--33.25,
-13.96,
--29.14
-],
-"top": {
-"h": 13.9605,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.061",
-"min": [
--37.871,
-13.896,
--29.281
-],
-"max": [
--33.373,
-13.96,
--29.151
-],
-"top": {
-"h": 13.9637,
-"dx": 0.003,
-"dz": -0.15285,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.062",
-"min": [
--37.811,
-13.896,
--40.112
-],
-"max": [
--33.313,
-13.96,
--39.982
-],
-"top": {
-"h": 13.9637,
-"dx": 0.003,
-"dz": -0.15285,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.063",
-"min": [
--37.862,
-13.089,
--40.135
-],
-"max": [
--33.19,
-13.96,
--39.972
-],
-"top": {
-"h": 13.9605,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.011",
-"min": [
--34.859,
-13.118,
--40.06
-],
-"max": [
--33.415,
-13.935,
--39.996
-],
-"top": {
-"h": 13.9352,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.012",
-"min": [
--36.274,
-13.118,
--40.073
-],
-"max": [
--34.83,
-13.935,
--40.009
-],
-"top": {
-"h": 13.9352,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
 "name": "wood_rail_garden_noeye_nobullet.013",
 "min": [
--37.688,
+-36.33,
 13.118,
--40.099
+-29.348
 ],
 "max": [
--36.244,
+-34.886,
 13.935,
--40.035
+-29.289
 ],
 "top": {
 "h": 13.9352,
@@ -4198,17 +3137,17 @@
 {
 "name": "wood_rail_garden_noeye_nobullet.014",
 "min": [
--32.517,
-12.104,
--29.143
+-34.915,
+13.118,
+-29.34
 ],
 "max": [
--30.862,
-13.58,
--29.078
+-33.471,
+13.935,
+-29.281
 ],
 "top": {
-"h": 13.58,
+"h": 13.9352,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4223,267 +3162,14 @@
 {
 "name": "wood_rail_garden_noeye_nobullet.015",
 "min": [
--31.336,
-11.326,
--29.118
-],
-"max": [
--29.681,
-12.802,
--29.053
-],
-"top": {
-"h": 12.8023,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.016",
-"min": [
--30.154,
-10.548,
--29.106
-],
-"max": [
--28.499,
-12.024,
--29.041
-],
-"top": {
-"h": 12.0242,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.065",
-"min": [
--32.679,
-10.4,
--29.179
-],
-"max": [
--28.297,
-13.697,
--29.017
-],
-"top": {
-"h": 13.697,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.068",
-"min": [
--32.192,
-11.141,
--29.154
-],
-"max": [
--28.4,
-13.669,
--29.028
-],
-"top": {
-"h": 13.6959,
-"dx": -0.65427,
-"dz": -0.18623,
-"thick": 0.0775
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.069",
-"min": [
--32.177,
-11.141,
--31.746
-],
-"max": [
--28.385,
-13.669,
--31.62
-],
-"top": {
-"h": 13.6959,
-"dx": -0.65427,
-"dz": -0.18623,
-"thick": 0.0775
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.070",
-"min": [
--32.664,
-10.4,
--31.771
-],
-"max": [
--28.283,
-13.697,
--31.609
-],
-"top": {
-"h": 13.697,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.017",
-"min": [
--30.139,
-10.548,
--31.698
-],
-"max": [
--28.485,
-12.024,
--31.633
-],
-"top": {
-"h": 12.0242,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.018",
-"min": [
--31.321,
-11.326,
--31.71
-],
-"max": [
--29.666,
-12.802,
--31.645
-],
-"top": {
-"h": 12.8023,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.019",
-"min": [
--32.502,
-12.104,
--31.736
-],
-"max": [
--30.847,
-13.58,
--31.67
-],
-"top": {
-"h": 13.58,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.074",
-"min": [
--38.086,
-13.896,
--34.146
-],
-"max": [
--37.919,
-13.96,
--29.649
-],
-"top": {
-"h": 13.9381,
-"dx": 0.15286,
-"dz": 0.00426,
-"thick": 0.0648
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.075",
-"min": [
--38.098,
+-37.918,
 13.089,
--34.198
+-29.406
 ],
 "max": [
--37.896,
+-33.246,
 13.96,
--29.525
+-29.257
 ],
 "top": {
 "h": 13.9605,
@@ -4499,19 +3185,45 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.020",
+"name": "wood_rail_garden_noeye_nobullet.016",
 "min": [
--38.072,
-13.118,
--31.194
+-37.866,
+13.896,
+-29.383
 ],
 "max": [
--37.996,
-13.935,
--29.751
+-33.369,
+13.96,
+-29.268
 ],
 "top": {
-"h": 13.9352,
+"h": 13.9637,
+"dx": 0.00251,
+"dz": -0.15286,
+"thick": 0.0648
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.018",
+"min": [
+-37.893,
+13.089,
+-40.171
+],
+"max": [
+-33.221,
+13.96,
+-40.023
+],
+"top": {
+"h": 13.9605,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4524,19 +3236,19 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.021",
+"name": "wood_rail_garden_noeye_nobullet.031",
 "min": [
--38.047,
-13.118,
--32.609
+-32.674,
+10.4,
+-29.298
 ],
 "max": [
--37.971,
-13.935,
--31.166
+-28.293,
+13.697,
+-29.15
 ],
 "top": {
-"h": 13.9352,
+"h": 13.697,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4549,16 +3261,91 @@
 }
 },
 {
-"name": "metal_oildrum_low__0_nouv.005",
+"name": "wood_rail_garden_noeye_nobullet.035",
 "min": [
--33.349,
+-32.668,
+10.4,
+-31.89
+],
+"max": [
+-28.287,
+13.697,
+-31.743
+],
+"top": {
+"h": 13.697,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.037",
+"min": [
+-31.325,
+11.326,
+-31.833
+],
+"max": [
+-29.67,
+12.802,
+-31.774
+],
+"top": {
+"h": 12.8023,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.040",
+"min": [
+-38.098,
+13.089,
+-34.3
+],
+"max": [
+-37.98,
+13.96,
+-29.626
+],
+"top": {
+"h": 13.9605,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "metal_oildrum_low__0_nouv.006",
+"min": [
+-33.344,
 13.078,
--29.758
+-29.875
 ],
 "max": [
--32.597,
+-32.595,
 14.14,
--29.018
+-29.137
 ],
 "top": {
 "h": 14.14,
@@ -4574,41 +3361,16 @@
 }
 },
 {
-"name": "metal_oildrum_low__0_nouv.006",
-"min": [
--33.561,
-13.09,
--32.649
-],
-"max": [
--32.81,
-14.152,
--31.909
-],
-"top": {
-"h": 14.1519,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "metal_oildrum_low__0_nouv.007",
 "min": [
--33.557,
+-33.566,
 13.09,
--33.355
+-32.765
 ],
 "max": [
--32.806,
+-32.817,
 14.152,
--32.615
+-32.027
 ],
 "top": {
 "h": 14.1519,
@@ -4626,14 +3388,14 @@
 {
 "name": "metal_oildrum_low__0_nouv.008",
 "min": [
--33.549,
+-33.564,
 13.09,
--34.781
+-33.471
 ],
 "max": [
--32.798,
+-32.815,
 14.152,
--34.041
+-32.734
 ],
 "top": {
 "h": 14.1519,
@@ -4651,14 +3413,39 @@
 {
 "name": "metal_oildrum_low__0_nouv.009",
 "min": [
--33.553,
+-33.561,
 13.09,
--34.074
+-34.897
 ],
 "max": [
--32.802,
+-32.812,
 14.152,
--33.334
+-34.159
+],
+"top": {
+"h": 14.1519,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_oildrum_low__0_nouv.011",
+"min": [
+-33.562,
+13.09,
+-34.19
+],
+"max": [
+-32.814,
+14.152,
+-33.453
 ],
 "top": {
 "h": 14.1519,
@@ -4676,14 +3463,14 @@
 {
 "name": "wood_base.017",
 "min": [
--23.172,
+-23.186,
 10.095,
--39.827
+-39.977
 ],
 "max": [
--17.643,
+-17.673,
 10.197,
--34.652
+-34.82
 ],
 "top": {
 "h": 10.1969,
@@ -4701,14 +3488,14 @@
 {
 "name": "wood_base.018",
 "min": [
--17.674,
+-17.687,
 10.095,
--39.81
+-39.978
 ],
 "max": [
--12.144,
+-12.175,
 10.197,
--34.635
+-34.821
 ],
 "top": {
 "h": 10.1969,
@@ -4724,16 +3511,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.076",
+"name": "wood_rail_garden_noeye_nobullet.045",
 "min": [
--12.248,
+-12.262,
 10.198,
--39.414
+-39.599
 ],
 "max": [
--12.199,
+-12.228,
 11.07,
--34.917
+-35.102
 ],
 "top": {
 "h": 11.0698,
@@ -4749,16 +3536,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.078",
+"name": "wood_rail_garden_noeye_nobullet.047",
 "min": [
--16.968,
+-16.982,
 10.186,
--34.895
+-35.065
 ],
 "max": [
--12.296,
+-12.31,
 11.058,
--34.732
+-34.917
 ],
 "top": {
 "h": 11.0579,
@@ -4774,16 +3561,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.022",
+"name": "wood_rail_garden_noeye_nobullet.050",
 "min": [
--15.38,
+-15.394,
 10.216,
--34.833
+-35.008
 ],
 "max": [
--13.936,
+-13.95,
 11.033,
--34.769
+-34.949
 ],
 "top": {
 "h": 11.0326,
@@ -4799,41 +3586,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.023",
+"name": "wood_rail_garden_noeye_nobullet.052",
 "min": [
--16.794,
-10.216,
--34.86
-],
-"max": [
--15.35,
-11.033,
--34.796
-],
-"top": {
-"h": 11.0326,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.079",
-"min": [
--23.267,
+-23.297,
 10.19,
--39.827
+-39.976
 ],
 "max": [
--17.885,
+-17.915,
 11.061,
--39.678
+-39.845
 ],
 "top": {
 "h": 11.0612,
@@ -4849,16 +3611,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.080",
+"name": "wood_rail_garden_noeye_nobullet.053",
 "min": [
--17.705,
+-17.735,
 10.184,
--39.797
+-39.964
 ],
 "max": [
--12.323,
+-12.353,
 11.056,
--39.648
+-39.833
 ],
 "top": {
 "h": 11.0555,
@@ -4874,16 +3636,16 @@
 }
 },
 {
-"name": "metal_oildrum_low__0_nouv.011",
+"name": "metal_oildrum_low__0_nouv.013",
 "min": [
--17.814,
+-17.827,
 10.202,
--35.24
+-35.408
 ],
 "max": [
--17.063,
+-17.079,
 11.263,
--34.501
+-34.67
 ],
 "top": {
 "h": 11.2634,
@@ -4901,19 +3663,19 @@
 {
 "name": "wood_base.022",
 "min": [
--32.931,
+-32.953,
 13.034,
--40.126
+-40.244
 ],
 "max": [
--28.243,
+-28.274,
 16.011,
--37.302
+-37.435
 ],
 "top": {
-"h": 13.0722,
-"dx": 0.63106,
-"dz": 0.00349,
+"h": 13.0779,
+"dx": 0.63107,
+"dz": 0.00144,
 "thick": 0.0664
 },
 "flags": {
@@ -4927,14 +3689,14 @@
 {
 "name": "wood_base.023",
 "min": [
--28.395,
+-28.39,
 15.919,
--34.479
+-34.613
 ],
 "max": [
--23.015,
+-23.027,
 16.021,
--28.907
+-29.058
 ],
 "top": {
 "h": 16.0214,
@@ -4952,14 +3714,14 @@
 {
 "name": "wood_base.024",
 "min": [
--28.329,
+-28.341,
 15.919,
--40.002
+-40.135
 ],
 "max": [
--22.948,
+-22.979,
 16.021,
--34.43
+-34.58
 ],
 "top": {
 "h": 16.0214,
@@ -4975,16 +3737,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.081",
+"name": "wood_rail_garden_noeye_nobullet.054",
 "min": [
--28.05,
+-28.081,
 16.015,
--39.959
+-40.093
 ],
 "max": [
--23.378,
+-23.409,
 16.887,
--39.796
+-39.945
 ],
 "top": {
 "h": 16.8868,
@@ -5000,16 +3762,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.084",
+"name": "wood_rail_garden_noeye_nobullet.055",
 "min": [
--39.626,
+-39.656,
 10.222,
--39.912
+-40.008
 ],
 "max": [
--34.116,
+-34.146,
 11.094,
--39.789
+-39.903
 ],
 "top": {
 "h": 11.0938,
@@ -5025,16 +3787,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.085",
+"name": "wood_rail_garden_noeye_nobullet.056",
 "min": [
--17.269,
+-17.261,
 10.222,
--28.28
+-28.449
 ],
 "max": [
--11.888,
+-11.88,
 11.094,
--28.148
+-28.334
 ],
 "top": {
 "h": 11.0938,
@@ -5052,14 +3814,14 @@
 {
 "name": "wood_base.025",
 "min": [
--17.455,
+-17.431,
 10.095,
--28.27
+-28.438
 ],
 "max": [
--11.616,
+-11.609,
 10.197,
--23.24
+-23.428
 ],
 "top": {
 "h": 10.1971,
@@ -5075,16 +3837,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.086",
+"name": "wood_rail_garden_noeye_nobullet.060",
 "min": [
--23.268,
+-23.241,
 10.222,
--23.127
+-23.277
 ],
 "max": [
--23.161,
+-23.124,
 11.094,
--18.413
+-18.563
 ],
 "top": {
 "h": 11.0938,
@@ -5100,16 +3862,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.087",
+"name": "wood_rail_garden_noeye_nobullet.061",
 "min": [
--23.005,
+-22.949,
 10.222,
--13.427
+-13.578
 ],
 "max": [
--17.624,
+-17.568,
 11.094,
--13.294
+-13.462
 ],
 "top": {
 "h": 11.0938,
@@ -5125,16 +3887,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.089",
+"name": "wood_rail_garden_noeye_nobullet.062",
 "min": [
--22.98,
+-22.973,
 10.222,
--28.342
+-28.492
 ],
 "max": [
--17.599,
+-17.592,
 11.094,
--28.209
+-28.377
 ],
 "top": {
 "h": 11.0938,
@@ -5152,14 +3914,14 @@
 {
 "name": "wood_base.026",
 "min": [
--23.28,
+-23.256,
 10.095,
--28.292
+-28.442
 ],
 "max": [
--17.441,
+-17.434,
 10.197,
--23.263
+-23.431
 ],
 "top": {
 "h": 10.1971,
@@ -5175,16 +3937,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.094",
+"name": "wood_rail_garden_noeye_nobullet.063",
 "min": [
--33.633,
+-33.626,
 10.222,
--28.48
+-28.596
 ],
 "max": [
--28.252,
+-28.245,
 11.094,
--28.341
+-28.474
 ],
 "top": {
 "h": 11.0938,
@@ -5200,16 +3962,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.095",
+"name": "wood_rail_garden_noeye_nobullet.065",
 "min": [
--27.917,
+-27.894,
 10.222,
--23.445
+-23.579
 ],
 "max": [
--23.245,
+-23.222,
 11.094,
--23.289
+-23.439
 ],
 "top": {
 "h": 11.0938,
@@ -5227,14 +3989,14 @@
 {
 "name": "wood_base.027",
 "min": [
--28.434,
+-28.41,
 10.095,
--28.837
+-28.97
 ],
 "max": [
--23.224,
+-23.219,
 10.197,
--23.276
+-23.425
 ],
 "top": {
 "h": 10.1971,
@@ -5252,14 +4014,14 @@
 {
 "name": "wood_base.028",
 "min": [
--33.89,
+-33.873,
 10.095,
--28.502
+-28.623
 ],
 "max": [
--28.369,
+-28.356,
 10.197,
--23.336
+-23.462
 ],
 "top": {
 "h": 10.1969,
@@ -5277,14 +4039,14 @@
 {
 "name": "wood_base.029",
 "min": [
--39.389,
+-39.371,
 10.095,
--28.509
+-28.613
 ],
 "max": [
--33.868,
+-33.855,
 10.197,
--23.343
+-23.452
 ],
 "top": {
 "h": 10.1969,
@@ -5300,16 +4062,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.097",
+"name": "wood_rail_garden_noeye_nobullet.068",
 "min": [
--39.245,
+-39.238,
 10.186,
--28.481
+-28.579
 ],
 "max": [
--34.573,
+-34.566,
 11.058,
--28.353
+-28.466
 ],
 "top": {
 "h": 11.0579,
@@ -5325,16 +4087,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.109",
+"name": "wood_rail_garden_noeye_nobullet.069",
 "min": [
--33.202,
+-33.178,
 10.205,
--23.468
+-23.586
 ],
 "max": [
--27.82,
+-27.797,
 11.076,
--23.329
+-23.464
 ],
 "top": {
 "h": 11.076,
@@ -5350,16 +4112,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.110",
+"name": "wood_rail_garden_noeye_nobullet.070",
 "min": [
--39.423,
+-39.367,
 13.116,
--18.758
+-18.855
 ],
 "max": [
--39.254,
+-39.215,
 13.988,
--13.376
+-13.473
 ],
 "top": {
 "h": 13.9876,
@@ -5375,16 +4137,16 @@
 }
 },
 {
-"name": "metal_oildrum_low__0_nouv.013",
+"name": "metal_oildrum_low__0_nouv.016",
 "min": [
--34.477,
+-34.469,
 10.202,
--28.714
+-28.827
 ],
 "max": [
--33.727,
+-33.722,
 11.263,
--27.975
+-28.091
 ],
 "top": {
 "h": 11.2634,
@@ -5402,14 +4164,14 @@
 {
 "name": "wood_base.030",
 "min": [
--11.641,
+-11.601,
 10.095,
--23.24
+-23.427
 ],
 "max": [
--5.802,
+-5.778,
 10.197,
--18.21
+-18.417
 ],
 "top": {
 "h": 10.1971,
@@ -5427,14 +4189,14 @@
 {
 "name": "wood_base.031",
 "min": [
--17.465,
+-17.425,
 10.095,
--23.262
+-23.431
 ],
 "max": [
--11.627,
+-11.603,
 10.197,
--18.233
+-18.42
 ],
 "top": {
 "h": 10.1971,
@@ -5450,16 +4212,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.111",
+"name": "wood_rail_garden_noeye_nobullet.074",
 "min": [
--11.627,
+-11.62,
 10.222,
--28.264
+-28.452
 ],
 "max": [
--6.246,
+-6.239,
 11.094,
--28.131
+-28.336
 ],
 "top": {
 "h": 11.0938,
@@ -5477,14 +4239,14 @@
 {
 "name": "wood_base.032",
 "min": [
--11.628,
+-11.604,
 10.095,
--28.253
+-28.441
 ],
 "max": [
--5.789,
+-5.781,
 10.197,
--23.224
+-23.43
 ],
 "top": {
 "h": 10.1971,
@@ -5502,14 +4264,14 @@
 {
 "name": "wood_base.033",
 "min": [
--5.811,
+-5.771,
 10.095,
--23.223
+-23.429
 ],
 "max": [
-0.028,
+0.052,
 10.197,
--18.194
+-18.419
 ],
 "top": {
 "h": 10.1971,
@@ -5525,41 +4287,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.112",
+"name": "wood_rail_garden_noeye_nobullet.075",
 "min": [
-5.678,
+-6.058,
 10.222,
--22.848
+-28.443
 ],
 "max": [
-5.785,
+-0.677,
 11.094,
--18.133
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.113",
-"min": [
--6.066,
-10.222,
--28.238
-],
-"max": [
--0.685,
-11.094,
--28.105
+-28.328
 ],
 "top": {
 "h": 11.0938,
@@ -5577,14 +4314,14 @@
 {
 "name": "wood_base.034",
 "min": [
--5.798,
+-5.774,
 10.095,
--28.236
+-28.443
 ],
 "max": [
-0.041,
+0.049,
 10.197,
--23.207
+-23.432
 ],
 "top": {
 "h": 10.1971,
@@ -5600,16 +4337,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.116",
+"name": "wood_rail_garden_noeye_nobullet.076",
 "min": [
--23.282,
+-23.239,
 10.222,
--18.106
+-18.255
 ],
 "max": [
--23.175,
+-23.122,
 11.094,
--13.392
+-13.542
 ],
 "top": {
 "h": 11.0938,
@@ -5627,14 +4364,14 @@
 {
 "name": "wood_base.035",
 "min": [
--11.655,
+-11.599,
 10.095,
--18.218
+-18.406
 ],
 "max": [
--5.816,
+-5.776,
 10.197,
--13.189
+-13.395
 ],
 "top": {
 "h": 10.1971,
@@ -5646,45 +4383,20 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.123",
-"min": [
--17.179,
-10.222,
--13.368
-],
-"max": [
--11.798,
-11.094,
--13.235
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
 "camera": true
 }
 },
 {
 "name": "wood_base.036",
 "min": [
--17.48,
+-17.423,
 10.095,
--18.241
+-18.409
 ],
 "max": [
--11.641,
+-11.601,
 10.197,
--13.211
+-13.399
 ],
 "top": {
 "h": 10.1971,
@@ -5700,16 +4412,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.129",
+"name": "wood_rail_garden_noeye_nobullet.078",
 "min": [
--11.617,
+-11.561,
 10.222,
--13.342
+-13.538
 ],
 "max": [
--6.107,
+-6.051,
 11.094,
--13.228
+-13.425
 ],
 "top": {
 "h": 11.0938,
@@ -5727,14 +4439,14 @@
 {
 "name": "wood_base.037",
 "min": [
--5.825,
+-5.769,
 10.095,
--18.202
+-18.408
 ],
 "max": [
-0.014,
+0.054,
 10.197,
--13.172
+-13.398
 ],
 "top": {
 "h": 10.1971,
@@ -5750,41 +4462,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.131",
+"name": "wood_rail_garden_noeye_nobullet.079",
 "min": [
-5.664,
+-5.731,
 10.222,
--17.921
+-13.54
 ],
 "max": [
-5.771,
+-0.221,
 11.094,
--13.207
-],
-"top": {
-"h": 11.0938,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true
-}
-},
-{
-"name": "wood_rail_garden_noeye_nobullet.133",
-"min": [
--5.787,
-10.222,
--13.325
-],
-"max": [
--0.277,
-11.094,
--13.211
+-13.427
 ],
 "top": {
 "h": 11.0938,
@@ -5802,14 +4489,14 @@
 {
 "name": "wood_base.066",
 "min": [
--0.029,
+0.011,
 10.095,
--23.213
+-23.438
 ],
 "max": [
-5.838,
+5.861,
 10.197,
--18.152
+-18.396
 ],
 "top": {
 "h": 10.1971,
@@ -5827,14 +4514,14 @@
 {
 "name": "wood_base.067",
 "min": [
-0.012,
+0.036,
 10.095,
--28.226
+-28.452
 ],
 "max": [
-5.878,
+5.886,
 10.197,
--23.165
+-23.409
 ],
 "top": {
 "h": 10.1971,
@@ -5852,14 +4539,14 @@
 {
 "name": "wood_base.068",
 "min": [
--0.071,
+-0.014,
 10.095,
--18.192
+-18.417
 ],
 "max": [
-5.796,
+5.836,
 10.197,
--13.131
+-13.375
 ],
 "top": {
 "h": 10.1971,
@@ -5875,16 +4562,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.134",
+"name": "wood_rail_garden_noeye_nobullet.080",
 "min": [
--39.382,
+-39.346,
 10.427,
--23.344
+-23.442
 ],
 "max": [
--39.246,
+-39.221,
 13.724,
--18.963
+-19.061
 ],
 "top": {
 "h": 13.7243,
@@ -5900,16 +4587,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.136",
+"name": "wood_rail_garden_noeye_nobullet.081",
 "min": [
--34.339,
+-34.303,
 10.427,
--23.331
+-23.445
 ],
 "max": [
--34.203,
+-34.178,
 13.724,
--18.95
+-19.064
 ],
 "top": {
 "h": 13.7243,
@@ -5925,16 +4612,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.137",
+"name": "wood_rail_garden_noeye_nobullet.083",
 "min": [
--39.383,
+-39.364,
 10.222,
--28.175
+-28.273
 ],
 "max": [
--39.268,
+-39.256,
 11.094,
--23.461
+-23.559
 ],
 "top": {
 "h": 11.0938,
@@ -5952,14 +4639,14 @@
 {
 "name": "wood_base.069",
 "min": [
--23.297,
+-23.257,
 10.095,
--23.277
+-23.427
 ],
 "max": [
--17.458,
+-17.434,
 10.197,
--18.248
+-18.416
 ],
 "top": {
 "h": 10.1971,
@@ -5977,14 +4664,14 @@
 {
 "name": "wood_base.070",
 "min": [
--23.311,
+-23.255,
 10.095,
--18.256
+-18.405
 ],
 "max": [
--17.472,
+-17.432,
 10.197,
--13.227
+-13.395
 ],
 "top": {
 "h": 10.1971,
@@ -6002,14 +4689,14 @@
 {
 "name": "wood_base.071",
 "min": [
--38.166,
+-38.161,
 12.994,
--34.645
+-34.747
 ],
 "max": [
--32.947,
+-32.961,
 13.096,
--29.075
+-29.193
 ],
 "top": {
 "h": 13.0958,
@@ -6027,14 +4714,14 @@
 {
 "name": "wood_base.072",
 "min": [
--38.101,
+-38.115,
 12.994,
--40.168
+-40.269
 ],
 "max": [
--32.883,
+-32.914,
 13.096,
--34.598
+-34.716
 ],
 "top": {
 "h": 13.0958,
@@ -6050,16 +4737,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.138",
+"name": "wood_rail_garden_noeye_nobullet.084",
 "min": [
--23.268,
+-23.241,
 10.222,
--23.127
+-23.277
 ],
 "max": [
--23.161,
+-23.124,
 11.094,
--18.413
+-18.563
 ],
 "top": {
 "h": 11.0938,
@@ -6075,16 +4762,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.139",
+"name": "wood_rail_garden_noeye_nobullet.085",
 "min": [
--23.282,
+-23.239,
 10.222,
--18.106
+-18.255
 ],
 "max": [
--23.175,
+-23.122,
 11.094,
--13.392
+-13.542
 ],
 "top": {
 "h": 11.0938,
@@ -6102,14 +4789,14 @@
 {
 "name": "wood_base.073",
 "min": [
--39.523,
+-39.449,
 12.994,
--13.243
+-13.34
 ],
 "max": [
--34.304,
+-34.248,
 13.096,
--7.673
+-7.786
 ],
 "top": {
 "h": 13.0958,
@@ -6127,14 +4814,14 @@
 {
 "name": "wood_base.074",
 "min": [
--39.458,
+-39.402,
 12.994,
--18.765
+-18.863
 ],
 "max": [
--34.239,
+-34.201,
 13.096,
--13.195
+-13.309
 ],
 "top": {
 "h": 13.0958,
@@ -6152,19 +4839,19 @@
 {
 "name": "wood_base.075",
 "min": [
--39.382,
+-39.344,
 10.091,
--23.359
+-23.457
 ],
 "max": [
--34.196,
+-34.172,
 13.107,
--18.697
+-18.811
 ],
 "top": {
 "h": 10.1387,
-"dx": 0.00026,
-"dz": 0.64056,
+"dx": 0.00234,
+"dz": 0.64055,
 "thick": 0.0667
 },
 "flags": {
@@ -6176,16 +4863,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.140",
+"name": "wood_rail_garden_noeye_nobullet.086",
 "min": [
--39.464,
+-39.39,
 13.116,
--13.211
+-13.309
 ],
 "max": [
--39.341,
+-39.285,
 13.988,
--7.83
+-7.928
 ],
 "top": {
 "h": 13.9876,
@@ -6201,16 +4888,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.141",
+"name": "wood_rail_garden_noeye_nobullet.087",
 "min": [
--33.928,
+-33.87,
 13.496,
--12.802
+-12.918
 ],
 "max": [
--28.746,
+-28.688,
 16.738,
--12.64
+-12.77
 ],
 "top": {
 "h": 16.738,
@@ -6226,16 +4913,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.142",
+"name": "wood_rail_garden_noeye_nobullet.089",
 "min": [
--34.444,
+-34.388,
 13.116,
--18.715
+-18.828
 ],
 "max": [
--34.322,
+-34.283,
 13.988,
--13.334
+-13.447
 ],
 "top": {
 "h": 13.9876,
@@ -6251,16 +4938,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.143",
+"name": "wood_rail_garden_noeye_nobullet.094",
 "min": [
--39.232,
+-39.158,
 13.066,
--7.921
+-8.019
 ],
 "max": [
--34.56,
+-34.486,
 13.937,
--7.757
+-7.87
 ],
 "top": {
 "h": 13.9373,
@@ -6278,14 +4965,14 @@
 {
 "name": "wood_base.076",
 "min": [
--28.516,
+-28.475,
 15.919,
--23.462
+-23.594
 ],
 "max": [
--23.136,
+-23.113,
 16.021,
--17.89
+-18.039
 ],
 "top": {
 "h": 16.0214,
@@ -6303,14 +4990,14 @@
 {
 "name": "wood_base.077",
 "min": [
--28.45,
+-28.427,
 15.919,
--28.984
+-29.117
 ],
 "max": [
--23.07,
+-23.065,
 16.021,
--23.412
+-23.562
 ],
 "top": {
 "h": 16.0214,
@@ -6328,14 +5015,14 @@
 {
 "name": "wood_base.078",
 "min": [
--28.661,
+-28.584,
 15.919,
--12.42
+-12.553
 ],
 "max": [
--23.281,
+-23.222,
 16.021,
--6.848
+-6.998
 ],
 "top": {
 "h": 16.0214,
@@ -6353,14 +5040,14 @@
 {
 "name": "wood_base.079",
 "min": [
--28.594,
+-28.536,
 15.919,
--17.943
+-18.075
 ],
 "max": [
--23.214,
+-23.173,
 16.021,
--12.371
+-12.52
 ],
 "top": {
 "h": 16.0214,
@@ -6378,19 +5065,19 @@
 {
 "name": "wood_base.080",
 "min": [
--34.359,
+-34.29,
 13.029,
--12.834
+-12.947
 ],
 "max": [
--28.593,
+-28.531,
 16.025,
--7.656
+-7.788
 ],
 "top": {
-"h": 13.093,
-"dx": 0.51084,
-"dz": -0.00224,
+"h": 13.0989,
+"dx": 0.51083,
+"dz": -0.0039,
 "thick": 0.0666
 },
 "flags": {
@@ -6402,16 +5089,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.144",
+"name": "wood_rail_garden_noeye_nobullet.095",
 "min": [
--33.904,
+-33.83,
 13.486,
--7.875
+-7.991
 ],
 "max": [
--28.722,
+-28.648,
 16.727,
--7.713
+-7.844
 ],
 "top": {
 "h": 16.7272,
@@ -6427,16 +5114,16 @@
 }
 },
 {
-"name": "metal_oildrum_low__0_nouv.016",
+"name": "metal_oildrum_low__0_nouv.017",
 "min": [
--34.773,
+-34.715,
 13.063,
--13.475
+-13.588
 ],
 "max": [
--33.51,
+-33.454,
 14.519,
--12.393
+-12.509
 ],
 "top": {
 "h": 14.5189,
@@ -6452,16 +5139,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.145",
+"name": "wood_rail_garden_noeye_nobullet.097",
 "min": [
--0.04,
+0.015,
 10.222,
--13.31
+-13.544
 ],
 "max": [
-5.469,
+5.525,
 11.094,
--13.196
+-13.431
 ],
 "top": {
 "h": 11.0938,
@@ -6477,16 +5164,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.146",
+"name": "wood_rail_garden_noeye_nobullet.109",
 "min": [
--0.002,
+0.006,
 10.222,
--28.233
+-28.466
 ],
 "max": [
-5.508,
+5.516,
 11.094,
--28.119
+-28.353
 ],
 "top": {
 "h": 11.0938,
@@ -6502,19 +5189,44 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.164",
+"name": "metal_oildrum_low__0_nouv.018",
 "min": [
--5.326,
-10.222,
-23.661
+5.078,
+10.316,
+-14.5
 ],
 "max": [
--5.212,
-11.094,
-28.375
+5.827,
+11.378,
+-13.762
 ],
 "top": {
-"h": 11.0938,
+"h": 11.3778,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_rail_garden_noeye_nobullet.039",
+"min": [
+-38.098,
+13.089,
+-39.048
+],
+"max": [
+-37.98,
+13.96,
+-34.374
+],
+"top": {
+"h": 13.9605,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -6527,19 +5239,19 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.165",
+"name": "wood_rail_garden_noeye_nobullet.043",
 "min": [
-5.678,
-10.222,
--27.797
+38.393,
+13.089,
+34.662
 ],
 "max": [
-5.785,
-11.094,
--23.083
+38.583,
+13.96,
+39.334
 ],
 "top": {
-"h": 11.0938,
+"h": 13.9605,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -6554,14 +5266,14 @@
 {
 "name": "Box001_Material #0_0",
 "min": [
--16.975,
+-20.275,
 4.295,
-1.722
+0.029
 ],
 "max": [
--4.65,
+-7.95,
 14.999,
-15.224
+13.53
 ],
 "top": {
 "h": 16.18,
@@ -6580,14 +5292,14 @@
 {
 "name": "Box001_Material #0_0.001",
 "min": [
-6.048,
+1.668,
 6.424,
--9.718
+-12.108
 ],
 "max": [
-23.28,
+18.899,
 14.361,
-3.414
+1.023
 ],
 "top": {
 "h": 13.8374,
@@ -7006,14 +5718,14 @@
 {
 "name": "wood_box_nouv.030",
 "min": [
--2.737,
+-5.295,
 10.207,
-14.315
+15.026
 ],
 "max": [
--1.615,
+-4.267,
 11.788,
-15.443
+16.089
 ],
 "top": {
 "h": 11.7875,
@@ -7031,14 +5743,14 @@
 {
 "name": "wood_box_nouv.031",
 "min": [
--3.445,
+-5.548,
 10.207,
-14.702
+15.792
 ],
 "max": [
--2.323,
+-4.519,
 11.788,
-15.83
+16.855
 ],
 "top": {
 "h": 11.7875,
@@ -7381,14 +6093,14 @@
 {
 "name": "wood_box2_nouv.012",
 "min": [
--2.933,
+-5.493,
 11.757,
-14.468
+15.339
 ],
 "max": [
--2.067,
+-4.425,
 12.448,
-15.463
+16.344
 ],
 "top": {
 "h": 12.4484,
@@ -7581,20 +6293,20 @@
 {
 "name": "BézierCurve.003",
 "min": [
-11.088,
-10.095,
-33.217
+10.872,
+10.011,
+33.215
 ],
 "max": [
-14.836,
+14.847,
 23.516,
-37.927
+38.223
 ],
 "top": {
-"h": 23.4552,
+"h": 23.4646,
 "dx": -0.0436,
 "dz": 0.00086,
-"thick": 13.2297
+"thick": 13.2393
 },
 "flags": {
 "draw": true,
@@ -7835,16 +6547,16 @@
 "name": "Cube.014",
 "min": [
 23.804,
-10.189,
+10.086,
 18.139
 ],
 "max": [
 23.968,
-15.909,
+15.954,
 18.304
 ],
 "top": {
-"h": 15.9094,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -7860,16 +6572,16 @@
 "name": "Cube.015",
 "min": [
 28.664,
-10.189,
+10.086,
 18.247
 ],
 "max": [
 28.828,
-15.909,
+15.954,
 18.412
 ],
 "top": {
-"h": 15.9094,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -7885,16 +6597,16 @@
 "name": "Cube.016",
 "min": [
 23.914,
-10.189,
+10.086,
 7.201
 ],
 "max": [
 24.078,
-15.909,
+15.954,
 7.366
 ],
 "top": {
-"h": 15.9094,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -7910,16 +6622,16 @@
 "name": "Cube.017",
 "min": [
 28.845,
-10.189,
+10.086,
 7.293
 ],
 "max": [
 29.009,
-15.909,
+15.954,
 7.458
 ],
 "top": {
-"h": 15.9094,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -8093,20 +6805,20 @@
 {
 "name": "BézierCurve.001",
 "min": [
-21.592,
-3.865,
-14.197
+21.581,
+3.781,
+13.91
 ],
 "max": [
-25.494,
+25.722,
 17.286,
-18.797
+18.799
 ],
 "top": {
-"h": 17.0587,
+"h": 17.0579,
 "dx": 0.0436,
 "dz": 0.00092,
-"thick": 13.2297
+"thick": 13.2393
 },
 "flags": {
 "draw": true,
@@ -8143,16 +6855,219 @@
 }
 },
 {
-"name": "Cube.001",
+"name": "cloth_old_military_crate_0",
 "min": [
--37.923,
-9.454,
--29.566
+36.589,
+10.29,
+36.361
 ],
 "max": [
--37.76,
+37.422,
+10.502,
+37.233
+],
+"top": {
+"h": 10.5018,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "crate_old_military_crate_0",
+"min": [
+36.563,
+10.244,
+36.259
+],
+"max": [
+37.412,
+10.503,
+37.169
+],
+"top": {
+"h": 10.503,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "latch_old_military_crate_0",
+"min": [
+37.036,
+10.368,
+36.688
+],
+"max": [
+37.307,
+10.479,
+37.027
+],
+"top": {
+"h": 10.6268,
+"dx": -0.5563,
+"dz": -0.4345,
+"thick": 0.1029
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "lid_old_military_crate_0",
+"min": [
+36.529,
+10.487,
+36.129
+],
+"max": [
+37.37,
+10.544,
+37.023
+],
+"top": {
+"h": 10.5444,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "loop_old_military_crate_0",
+"min": [
+37.031,
+10.451,
+36.68
+],
+"max": [
+37.304,
+10.513,
+37.028
+],
+"top": {
+"h": 10.5132,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Box001_Material #0_0.002",
+"min": [
+-12.87,
+6.438,
+16.926
+],
+"max": [
+-5.493,
+13.481,
+28.171
+],
+"top": {
+"h": 13.5198,
+"dx": 0.00244,
+"dz": -0.09287,
+"thick": 6.0939
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box2_nouv.001",
+"min": [
+4.451,
+10.195,
+20.69
+],
+"max": [
+5.4,
+10.887,
+21.488
+],
+"top": {
+"h": 10.887,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Torus_notexture.006",
+"min": [
+34.748,
+13.097,
+18.568
+],
+"max": [
+34.988,
+13.881,
+19.344
+],
+"top": {
+"h": 13.8812,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false
+}
+},
+{
+"name": "Cube.001",
+"min": [
+-37.92,
+9.454,
+-29.668
+],
+"max": [
+-37.757,
 13.004,
--29.402
+-29.504
 ],
 "top": {
 "h": 13.004,
@@ -8170,14 +7085,14 @@
 {
 "name": "Cube.002",
 "min": [
--33.136,
+-33.165,
 9.463,
--39.769
+-39.887
 ],
 "max": [
--32.971,
+-33.001,
 13.012,
--39.604
+-39.722
 ],
 "top": {
 "h": 13.0123,
@@ -8195,17 +7110,17 @@
 {
 "name": "Cube.006",
 "min": [
--23.42,
-10.206,
--28.984
+-23.415,
+10.189,
+-29.133
 ],
 "max": [
--23.256,
-15.926,
--28.819
+-23.251,
+15.909,
+-28.968
 ],
 "top": {
-"h": 15.9264,
+"h": 15.9094,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -8218,16 +7133,16 @@
 }
 },
 {
-"name": "wood_box2_nouv.001",
+"name": "wood_box2_nouv.002",
 "min": [
--28.46,
+-28.435,
 16.065,
--23.681
+-23.815
 ],
 "max": [
--27.61,
+-27.587,
 16.757,
--22.696
+-22.831
 ],
 "top": {
 "h": 16.7568,
@@ -8245,14 +7160,14 @@
 {
 "name": "wood_box_nouv.001",
 "min": [
--23.979,
+-23.978,
 15.954,
--32.04
+-32.187
 ],
 "max": [
--23.185,
+-23.19,
 16.843,
--30.452
+-30.602
 ],
 "top": {
 "h": 16.8432,
@@ -8270,14 +7185,14 @@
 {
 "name": "wood_box_nouv.002",
 "min": [
--24.012,
+-24.007,
 15.946,
--30.492
+-30.639
 ],
 "max": [
 -23.219,
 16.862,
--28.891
+-29.041
 ],
 "top": {
 "h": 16.8617,
@@ -8295,14 +7210,14 @@
 {
 "name": "wood_box_nouv.006",
 "min": [
--23.749,
+-23.747,
 16.749,
--31.497
+-31.645
 ],
 "max": [
--22.956,
+-22.959,
 17.664,
--29.896
+-30.047
 ],
 "top": {
 "h": 17.6641,
@@ -8318,16 +7233,16 @@
 }
 },
 {
-"name": "wood_box2_nouv.002",
+"name": "wood_box2_nouv.003",
 "min": [
--28.46,
+-28.435,
 16.716,
--23.681
+-23.815
 ],
 "max": [
--27.61,
+-27.587,
 17.407,
--22.696
+-22.831
 ],
 "top": {
 "h": 17.4071,
@@ -8343,16 +7258,16 @@
 }
 },
 {
-"name": "wood_box2_nouv.003",
+"name": "wood_box2_nouv.008",
 "min": [
--28.454,
+-28.429,
 17.349,
--23.684
+-23.818
 ],
 "max": [
--27.604,
+-27.581,
 18.04,
--22.699
+-22.834
 ],
 "top": {
 "h": 18.0403,
@@ -8368,16 +7283,16 @@
 }
 },
 {
-"name": "wood_box2_nouv.008",
+"name": "wood_box2_nouv.009",
 "min": [
--28.454,
+-28.429,
 17.999,
--23.684
+-23.818
 ],
 "max": [
--27.604,
+-27.581,
 18.691,
--22.699
+-22.834
 ],
 "top": {
 "h": 18.6905,
@@ -8395,14 +7310,14 @@
 {
 "name": "wood_box1_nouv.001",
 "min": [
--24.743,
+-24.764,
 15.988,
--36.912
+-37.059
 ],
 "max": [
--24.024,
+-24.043,
 16.697,
--36.237
+-36.382
 ],
 "top": {
 "h": 16.6968,
@@ -8418,16 +7333,16 @@
 }
 },
 {
-"name": "wood_rail_garden_noeye_nobullet.031",
+"name": "wood_rail_garden_noeye_nobullet.001",
 "min": [
--33.292,
+-33.322,
 13.133,
--40.04
+-40.158
 ],
 "max": [
--28.266,
+-28.297,
 16.723,
--39.899
+-40.031
 ],
 "top": {
 "h": 16.7233,
@@ -8445,14 +7360,14 @@
 {
 "name": "wood_box_nouv.007",
 "min": [
--17.321,
+-17.267,
 10.168,
--14.144
+-14.318
 ],
 "max": [
--15.719,
+-15.663,
 11.058,
--13.321
+-13.49
 ],
 "top": {
 "h": 11.0577,
@@ -8470,14 +7385,14 @@
 {
 "name": "wood_box_nouv.008",
 "min": [
--15.773,
+-15.72,
 10.161,
--14.166
+-14.345
 ],
 "max": [
--14.158,
+-14.102,
 11.076,
--13.342
+-13.516
 ],
 "top": {
 "h": 11.0762,
@@ -8495,14 +7410,14 @@
 {
 "name": "wood_box_nouv.009",
 "min": [
--16.348,
+-16.295,
 10.963,
--14.186
+-14.363
 ],
 "max": [
--14.733,
+-14.678,
 11.879,
--13.362
+-13.535
 ],
 "top": {
 "h": 11.8786,
@@ -8520,14 +7435,14 @@
 {
 "name": "wood_box_nouv.010",
 "min": [
--15.516,
+-15.46,
 11.792,
--14.081
+-14.256
 ],
 "max": [
--14.514,
+-14.46,
 13.372,
--13.116
+-13.294
 ],
 "top": {
 "h": 13.3724,
@@ -8545,14 +7460,14 @@
 {
 "name": "wood_box_nouv.011",
 "min": [
-2.062,
+4.765,
 10.207,
--15.037
+-15.918
 ],
 "max": [
-3.183,
+5.793,
 11.788,
--13.91
+-14.856
 ],
 "top": {
 "h": 11.7875,
@@ -8570,14 +7485,14 @@
 {
 "name": "wood_box_nouv.012",
 "min": [
-2.771,
+5.017,
 10.207,
--15.422
+-16.685
 ],
 "max": [
-3.892,
+6.045,
 11.788,
--14.295
+-15.622
 ],
 "top": {
 "h": 11.7875,
@@ -8595,14 +7510,14 @@
 {
 "name": "wood_box_nouv.013",
 "min": [
--8.135,
+-8.088,
 10.207,
--16.786
+-16.986
 ],
 "max": [
--7.0,
+-6.954,
 11.788,
--15.679
+-15.88
 ],
 "top": {
 "h": 11.7875,
@@ -8618,16 +7533,16 @@
 }
 },
 {
-"name": "wood_box2_nouv.009",
+"name": "wood_box2_nouv.010",
 "min": [
--7.031,
+-6.985,
 10.178,
--16.603
+-16.807
 ],
 "max": [
--6.167,
+-6.119,
 10.869,
--15.609
+-15.812
 ],
 "top": {
 "h": 10.8692,
@@ -8645,14 +7560,14 @@
 {
 "name": "wood_box_nouv.014",
 "min": [
--1.111,
+-1.102,
 10.182,
--27.886
+-28.11
 ],
 "max": [
--0.199,
+-0.188,
 11.762,
--27.007
+-27.228
 ],
 "top": {
 "h": 11.7623,
@@ -8670,14 +7585,14 @@
 {
 "name": "wood_box_nouv.015",
 "min": [
--4.648,
+-4.637,
 10.12,
--27.295
+-27.508
 ],
 "max": [
--3.635,
+-3.622,
 11.7,
--26.271
+-26.482
 ],
 "top": {
 "h": 11.6998,
@@ -8695,14 +7610,14 @@
 {
 "name": "wood_box_nouv.016",
 "min": [
--4.856,
+-4.847,
 10.12,
--28.075
+-28.287
 ],
 "max": [
--3.843,
+-3.832,
 11.7,
--27.051
+-27.261
 ],
 "top": {
 "h": 11.6998,
@@ -8720,14 +7635,14 @@
 {
 "name": "wood_box_nouv.017",
 "min": [
--13.964,
+-13.91,
 10.168,
--14.468
+-14.653
 ],
 "max": [
--12.244,
+-12.189,
 11.058,
--13.34
+-13.52
 ],
 "top": {
 "h": 11.0577,
@@ -8745,14 +7660,14 @@
 {
 "name": "wood_box_nouv.018",
 "min": [
--12.454,
+-12.402,
 10.161,
--14.813
+-15.003
 ],
 "max": [
--10.721,
+-10.668,
 11.076,
--13.682
+-13.867
 ],
 "top": {
 "h": 11.0762,
@@ -8770,14 +7685,14 @@
 {
 "name": "wood_box_nouv.019",
 "min": [
--14.049,
+-13.996,
 10.963,
--14.48
+-14.665
 ],
 "max": [
--12.317,
+-12.262,
 11.879,
--13.349
+-13.529
 ],
 "top": {
 "h": 11.8786,
@@ -8795,14 +7710,14 @@
 {
 "name": "wood_box_nouv.020",
 "min": [
--13.786,
+-13.733,
 11.792,
--14.658
+-14.841
 ],
 "max": [
--12.64,
+-12.586,
 13.372,
--13.502
+-13.684
 ],
 "top": {
 "h": 13.3724,
@@ -8820,14 +7735,14 @@
 {
 "name": "wood_box_nouv.021",
 "min": [
--2.04,
+-1.987,
 10.207,
--14.621
+-14.842
 ],
 "max": [
--0.919,
+-0.865,
 11.788,
--13.494
+-13.714
 ],
 "top": {
 "h": 11.7875,
@@ -8845,14 +7760,14 @@
 {
 "name": "wood_box_nouv.022",
 "min": [
--1.331,
+-1.28,
 10.207,
--15.006
+-15.229
 ],
 "max": [
--0.21,
+-0.157,
 11.788,
--13.879
+-14.101
 ],
 "top": {
 "h": 11.7875,
@@ -8870,14 +7785,14 @@
 {
 "name": "wood_box_nouv.023",
 "min": [
--2.04,
+-1.987,
 11.717,
--14.621
+-14.842
 ],
 "max": [
--0.919,
+-0.865,
 13.297,
--13.494
+-13.714
 ],
 "top": {
 "h": 13.2969,
@@ -8895,14 +7810,14 @@
 {
 "name": "wood_box_nouv.024",
 "min": [
--1.331,
+-1.28,
 11.717,
--15.006
+-15.229
 ],
 "max": [
--0.21,
+-0.157,
 13.297,
--13.879
+-14.101
 ],
 "top": {
 "h": 13.2969,
@@ -8918,19 +7833,19 @@
 }
 },
 {
-"name": "wood_box2_nouv.010",
+"name": "wood_box2_nouv.013",
 "min": [
-2.515,
+4.923,
 11.757,
--15.056
+-16.174
 ],
 "max": [
-3.379,
+5.991,
 12.448,
--14.062
+-15.169
 ],
 "top": {
-"h": 12.4484,
+"h": 12.4483,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -8945,14 +7860,14 @@
 {
 "name": "wood_box_nouv.025",
 "min": [
--14.99,
+-14.936,
 13.291,
--14.468
+-14.649
 ],
 "max": [
--13.234,
+-13.179,
 14.105,
--13.153
+-13.331
 ],
 "top": {
 "h": 14.1046,
@@ -8970,14 +7885,14 @@
 {
 "name": "Cube.007",
 "min": [
--13.032,
+-13.036,
 22.366,
--31.774
+-31.978
 ],
 "max": [
--6.68,
+-6.684,
 23.34,
--31.576
+-31.759
 ],
 "top": {
 "h": 23.3398,
@@ -8995,14 +7910,14 @@
 {
 "name": "concrete_nobox_tower2.002",
 "min": [
--13.214,
+-13.241,
 9.81,
--38.998
+-39.201
 ],
 "max": [
--6.601,
+-6.604,
 22.246,
--31.572
+-31.755
 ],
 "top": {
 "h": 22.2463,
@@ -9020,14 +7935,14 @@
 {
 "name": "Cylinder.001",
 "min": [
--13.05,
+-13.054,
 22.203,
--31.634
+-31.817
 ],
 "max": [
--13.005,
+-13.008,
 23.19,
--31.589
+-31.772
 ],
 "top": {
 "h": 23.1902,
@@ -9045,14 +7960,14 @@
 {
 "name": "Cylinder.002",
 "min": [
--6.708,
+-6.712,
 22.203,
--31.745
+-31.949
 ],
 "max": [
--6.663,
+-6.666,
 23.19,
--31.7
+-31.903
 ],
 "top": {
 "h": 23.1902,
@@ -9070,14 +7985,14 @@
 {
 "name": "shield_b_mid.001",
 "min": [
--13.126,
+-13.14,
 15.902,
--34.864
+-35.05
 ],
 "max": [
--12.083,
+-12.097,
 20.248,
--34.773
+-34.956
 ],
 "top": {
 "h": 20.2476,
@@ -9095,14 +8010,14 @@
 {
 "name": "shield_b_low.001",
 "min": [
--13.105,
+-13.12,
 11.25,
--34.865
+-35.051
 ],
 "max": [
--12.063,
+-12.076,
 15.596,
--34.774
+-34.957
 ],
 "top": {
 "h": 15.5959,
@@ -9120,20 +8035,20 @@
 {
 "name": "BézierCurve.002",
 "min": [
--14.341,
-10.095,
--37.557
+-14.361,
+10.011,
+-38.042
 ],
 "max": [
--10.583,
+-10.388,
 23.516,
--32.854
+-33.032
 ],
 "top": {
-"h": 23.2953,
+"h": 23.2957,
 "dx": 0.0436,
-"dz": -0.00074,
-"thick": 13.2297
+"dz": -0.00088,
+"thick": 13.2393
 },
 "flags": {
 "draw": true,
@@ -9146,19 +8061,19 @@
 {
 "name": "ladder_b.001",
 "min": [
--12.46,
+-12.477,
 10.461,
--35.807
+-35.992
 ],
 "max": [
--12.376,
+-12.391,
 22.122,
--34.984
+-35.168
 ],
 "top": {
 "h": 10.5121,
 "dx": -0.09608,
-"dz": -0.00034,
+"dz": -3e-05,
 "thick": 0.0447
 },
 "flags": {
@@ -9172,14 +8087,14 @@
 {
 "name": "shield_b_mid.002",
 "min": [
--12.2,
+-12.218,
 15.902,
--35.914
+-36.099
 ],
 "max": [
--12.085,
+-12.099,
 20.248,
--34.87
+-35.055
 ],
 "top": {
 "h": 20.2476,
@@ -9197,14 +8112,14 @@
 {
 "name": "shield_b_mid.003",
 "min": [
--12.2,
+-12.218,
 11.244,
--35.914
+-36.099
 ],
 "max": [
--12.085,
+-12.099,
 15.59,
--34.87
+-35.055
 ],
 "top": {
 "h": 15.5898,
@@ -9222,14 +8137,14 @@
 {
 "name": "Cube.018",
 "min": [
--39.462,
+-39.388,
 9.454,
--8.075
+-8.172
 ],
 "max": [
--39.298,
+-39.225,
 13.004,
--7.91
+-8.008
 ],
 "top": {
 "h": 13.004,
@@ -9247,14 +8162,14 @@
 {
 "name": "Cube.019",
 "min": [
--34.562,
+-34.488,
 9.454,
--7.912
+-8.025
 ],
 "max": [
--34.398,
+-34.325,
 13.004,
--7.748
+-7.862
 ],
 "top": {
 "h": 13.004,
@@ -9272,19 +8187,19 @@
 {
 "name": "wood_box_nouv.046",
 "min": [
--34.502,
+-34.478,
 10.149,
--23.799
+-23.912
 ],
 "max": [
--32.821,
+-32.799,
 11.818,
--22.909
+-23.027
 ],
 "top": {
-"h": 10.6522,
-"dx": 0.99629,
-"dz": 0.05106,
+"h": 10.6549,
+"dx": 0.99645,
+"dz": 0.04783,
 "thick": 1.0819
 },
 "flags": {
@@ -9298,17 +8213,17 @@
 {
 "name": "Cube.020",
 "min": [
--28.295,
-10.197,
--29.104
+-28.29,
+10.189,
+-29.237
 ],
 "max": [
--28.131,
-15.918,
--28.939
+-28.127,
+15.909,
+-29.073
 ],
 "top": {
-"h": 15.918,
+"h": 15.9094,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -9323,14 +8238,14 @@
 {
 "name": "Cube.021",
 "min": [
--39.434,
+-39.395,
 9.454,
--18.783
+-18.88
 ],
 "max": [
--39.27,
+-39.232,
 13.004,
--18.619
+-18.716
 ],
 "top": {
 "h": 13.004,
@@ -9348,14 +8263,14 @@
 {
 "name": "Cube.022",
 "min": [
--34.534,
+-34.495,
 9.454,
--18.621
+-18.734
 ],
 "max": [
--34.371,
+-34.332,
 13.004,
--18.456
+-18.57
 ],
 "top": {
 "h": 13.004,
@@ -9373,17 +8288,17 @@
 {
 "name": "Cube.023",
 "min": [
--23.513,
-10.211,
--17.966
+-23.471,
+10.086,
+-18.115
 ],
 "max": [
--23.349,
-15.932,
--17.801
+-23.308,
+15.954,
+-17.95
 ],
 "top": {
-"h": 15.9317,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -9398,17 +8313,17 @@
 {
 "name": "Cube.024",
 "min": [
--28.372,
-10.198,
--18.086
+-28.331,
+10.086,
+-18.219
 ],
 "max": [
--28.208,
-15.919,
--17.921
+-28.168,
+15.954,
+-18.055
 ],
 "top": {
-"h": 15.9188,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -9423,17 +8338,17 @@
 {
 "name": "Cube.025",
 "min": [
--23.651,
-10.188,
--7.028
+-23.574,
+10.086,
+-7.176
 ],
 "max": [
--23.486,
-15.908,
--6.863
+-23.41,
+15.954,
+-7.012
 ],
 "top": {
-"h": 15.9082,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -9448,17 +8363,17 @@
 {
 "name": "Cube.026",
 "min": [
--28.582,
-10.188,
--7.133
+-28.505,
+10.086,
+-7.265
 ],
 "max": [
--28.418,
-15.908,
--6.967
+-28.342,
+15.954,
+-7.1
 ],
 "top": {
-"h": 15.9082,
+"h": 15.9538,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -9471,16 +8386,16 @@
 }
 },
 {
-"name": "Torus_notexture.006",
+"name": "Torus_notexture.007",
 "min": [
--34.948,
+-34.874,
 13.097,
--7.969
+-8.081
 ],
 "max": [
--34.173,
+-34.099,
 13.881,
--7.734
+-7.848
 ],
 "top": {
 "h": 13.8812,
@@ -9497,47 +8412,20 @@
 }
 },
 {
-"name": "Torus_notexture.007",
+"name": "Torus_notexture.008",
 "min": [
--24.172,
+-24.095,
 15.993,
--7.457
+-7.604
 ],
 "max": [
--23.395,
+-23.32,
 16.192,
--6.678
+-6.827
 ],
 "top": {
 "h": 16.1797,
-"dx": -0.00011,
-"dz": 0.01108,
-"thick": 0.1866
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"texture": false
-}
-},
-{
-"name": "Torus_notexture.008",
-"min": [
--24.171,
-16.139,
--7.55
-],
-"max": [
--23.395,
-16.338,
--6.772
-],
-"top": {
-"h": 16.326,
-"dx": -0.00011,
+"dx": -7e-05,
 "dz": 0.01108,
 "thick": 0.1866
 },
@@ -9553,18 +8441,18 @@
 {
 "name": "Torus_notexture.009",
 "min": [
--24.172,
-16.316,
--7.457
+-24.095,
+16.139,
+-7.698
 ],
 "max": [
--23.395,
-16.515,
--6.678
+-23.32,
+16.338,
+-6.921
 ],
 "top": {
-"h": 16.5024,
-"dx": -0.00011,
+"h": 16.326,
+"dx": -7e-05,
 "dz": 0.01108,
 "thick": 0.1866
 },
@@ -9580,14 +8468,41 @@
 {
 "name": "Torus_notexture.010",
 "min": [
--24.439,
-15.869,
--8.186
+-24.095,
+16.316,
+-7.604
 ],
 "max": [
--23.341,
+-23.32,
+16.515,
+-6.827
+],
+"top": {
+"h": 16.5024,
+"dx": -7e-05,
+"dz": 0.01108,
+"thick": 0.1866
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false
+}
+},
+{
+"name": "Torus_notexture.011",
+"min": [
+-24.365,
+15.869,
+-8.334
+],
+"max": [
+-23.267,
 16.655,
--7.199
+-7.347
 ],
 "top": {
 "h": 16.6546,
@@ -9604,16 +8519,16 @@
 }
 },
 {
-"name": "Torus_notexture.011",
+"name": "Torus_notexture.012",
 "min": [
--28.782,
+-28.813,
 10.17,
--39.999
+-40.131
 ],
 "max": [
--28.007,
+-28.038,
 10.954,
--39.764
+-39.898
 ],
 "top": {
 "h": 10.9536,
@@ -9632,20 +8547,20 @@
 {
 "name": "BézierCurve.004",
 "min": [
--25.047,
-3.865,
--18.454
+-25.223,
+3.781,
+-18.61
 ],
 "max": [
--21.136,
+-21.084,
 17.286,
--13.861
+-13.719
 ],
 "top": {
-"h": 17.2335,
+"h": 17.2428,
 "dx": -0.0436,
-"dz": -0.00103,
-"thick": 13.2297
+"dz": -0.00089,
+"thick": 13.2393
 },
 "flags": {
 "draw": true,
@@ -9658,19 +8573,19 @@
 {
 "name": "ladder_b.004",
 "min": [
--23.162,
+-23.116,
 10.461,
--16.375
+-16.526
 ],
 "max": [
--23.1,
+-23.052,
 15.868,
--15.562
+-15.712
 ],
 "top": {
 "h": 10.5038,
-"dx": 0.09606,
-"dz": 0.00114,
+"dx": 0.09608,
+"dz": 0.00083,
 "thick": 0.0447
 },
 "flags": {
@@ -9682,120 +8597,19 @@
 }
 },
 {
-"name": "cloth_old_military_crate_0",
+"name": "cloth_old_military_crate_0.001",
 "min": [
-36.589,
+-36.938,
 10.29,
-36.361
+-37.035
 ],
 "max": [
-37.422,
+-36.105,
 10.502,
-37.232
+-36.163
 ],
 "top": {
-"h": 10.502,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "crate_old_military_crate_0",
-"min": [
-36.564,
-10.244,
-36.259
-],
-"max": [
-37.412,
-10.502,
-37.169
-],
-"top": {
-"h": 10.5017,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": false,
-"camera": false
-}
-},
-{
-"name": "latch_old_military_crate_0",
-"min": [
-37.036,
-10.369,
-36.688
-],
-"max": [
-37.307,
-10.479,
-37.027
-],
-"top": {
-"h": 9.5442,
-"dx": 3.47001,
-"dz": 2.71024,
-"thick": 0.1486
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "lid_old_military_crate_0",
-"min": [
-36.574,
-10.488,
-36.273
-],
-"max": [
-37.413,
-10.545,
-37.164
-],
-"top": {
-"h": 10.5447,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "loop_old_military_crate_0",
-"min": [
-37.031,
-10.45,
-36.68
-],
-"max": [
-37.304,
-10.513,
-37.028
-],
-"top": {
-"h": 10.5129,
+"h": 10.5018,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -9810,42 +8624,195 @@
 {
 "name": "crate_old_military_crate_0.001",
 "min": [
--36.777,
+-36.928,
 10.244,
--36.963
+-36.971
 ],
 "max": [
--35.906,
-10.502,
--36.065
+-36.079,
+10.503,
+-36.061
 ],
 "top": {
-"h": 10.5017,
+"h": 10.503,
 "dx": 0.0,
 "dz": 0.0
 },
 "flags": {
 "draw": true,
-"player": false,
-"bullet": false,
-"eye": false,
-"camera": false
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
 }
 },
 {
-"name": "lid_old_military_crate_0.002",
+"name": "latch_old_military_crate_0.001",
 "min": [
--36.736,
-10.488,
--36.873
+-36.822,
+10.368,
+-36.829
 ],
 "max": [
--35.877,
-10.545,
--35.992
+-36.552,
+10.479,
+-36.489
 ],
 "top": {
-"h": 10.5447,
+"h": 10.3285,
+"dx": 0.55675,
+"dz": 0.43425,
+"thick": 0.1029
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "lid_old_military_crate_0.001",
+"min": [
+-36.885,
+10.487,
+-36.826
+],
+"max": [
+-36.045,
+10.544,
+-35.931
+],
+"top": {
+"h": 10.5444,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "loop_old_military_crate_0.001",
+"min": [
+-36.819,
+10.451,
+-36.83
+],
+"max": [
+-36.546,
+10.513,
+-36.482
+],
+"top": {
+"h": 10.5132,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Box001_Material #0_0.003",
+"min": [
+5.99,
+6.438,
+-28.001
+],
+"max": [
+13.36,
+13.481,
+-16.761
+],
+"top": {
+"h": 12.4934,
+"dx": -0.00238,
+"dz": 0.09288,
+"thick": 6.0939
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box2_nouv.014",
+"min": [
+-38.33,
+13.062,
+-39.984
+],
+"max": [
+-37.655,
+13.753,
+-39.126
+],
+"top": {
+"h": 13.7531,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Torus_notexture.013",
+"min": [
+-34.491,
+13.097,
+-19.147
+],
+"max": [
+-34.252,
+13.881,
+-18.371
+],
+"top": {
+"h": 13.8812,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false
+}
+},
+{
+"name": "wood_box2_nouv.015",
+"min": [
+37.956,
+13.045,
+39.454
+],
+"max": [
+38.632,
+13.736,
+40.313
+],
+"top": {
+"h": 13.7364,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -9892,14 +8859,14 @@
 {
 "name": "ladder_b.001",
 "min": [
--12.46,
+-12.477,
 10.461,
--35.807
+-35.992
 ],
 "max": [
--12.376,
+-12.391,
 22.122,
--34.984
+-35.168
 ],
 "axis": "x",
 "parts": 1
@@ -9907,14 +8874,14 @@
 {
 "name": "ladder_b.004",
 "min": [
--23.162,
+-23.116,
 10.461,
--16.375
+-16.526
 ],
 "max": [
--23.1,
+-23.052,
 15.868,
--15.562
+-15.712
 ],
 "axis": "x",
 "parts": 1

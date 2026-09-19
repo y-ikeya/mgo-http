@@ -38,7 +38,14 @@ print(f'[character] {character_file} bones={len(armature.data.bones)} '
       f'verts={sum(len(m.data.vertices) for m in meshes)}')
 
 # このファイル自身がクリップも兼ねているなら、その action を残して名前を付ける
-own_clip = clips.get(character_file)
+#
+# "本体#2" と書いてあれば、本体に同梱された 2 本目を使う。本体の行は下の
+# ループで読み飛ばすので、ここで拾わないと **何本目も選べない**。
+own_entry = next((e for e in clips if e.partition('#')[0] == character_file), None)
+own_clip = clips.get(own_entry) if own_entry else None
+own_take = own_entry.partition('#')[2] if own_entry else ''
+if own_take and armature.animation_data:
+    armature.animation_data.action = list(bpy.data.actions)[int(own_take) - 1]
 kept = None
 if own_clip and armature.animation_data and armature.animation_data.action:
     kept = armature.animation_data.action

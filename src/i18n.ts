@@ -65,6 +65,7 @@ const JA = {
   // --- 装備 ---
   'loadout.note': '装備を選んでください',
   'loadout.deployIn': '出撃まで {n}',
+  'loadout.none': '持たない',
 
   // --- 描けない機械 ---
   'gpu.title': 'GPU が使われていません',
@@ -144,6 +145,7 @@ const EN: Record<Key, string> = {
   'hud.standUpHint': 'MOVE TO CRAWL · SPACE TO GET UP',
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',
+  'loadout.none': 'None',
 
   'gpu.title': 'GPU IS NOT BEING USED',
   'gpu.lede':

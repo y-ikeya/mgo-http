@@ -70,12 +70,13 @@ const INITIAL_WEAPONS = {
 
 /** box.ts の初期値と揃えること */
 const INITIAL_BOX: BoxTuning = {
-  width: 1.4,
-  height: 1.15,
-  clearance: 0.24,
-  liftScale: 1,
-  offsetForward: 0.2,
-  offsetRight: 0.03,
+  width: 0.9,
+  depth: 1.2,
+  height: 1,
+  clearance: 0.2,
+  liftScale: 1.1,
+  offsetForward: 0.32,
+  offsetRight: 0.05,
   opacity: 1,
 }
 
@@ -87,7 +88,8 @@ const BOX_AXES: {
   max: number
   step: number
 }[] = [
-  { key: 'width', label: '幅', hint: '腕の振りが 1.12m あるので、それ以上要る (m)', min: 0.8, max: 2, step: 0.01 },
+  { key: 'width', label: '幅', hint: '腕を畳んだ型で上半身は片側 0.37m (m)', min: 0.6, max: 2, step: 0.01 },
+  { key: 'depth', label: '奥行き', hint: '膝が前へ 0.67m 出る。幅より要る (m)', min: 0.6, max: 2, step: 0.01 },
   { key: 'height', label: '高さ', hint: '止まっている時に地面へ接する高さ (m)', min: 0.7, max: 2, step: 0.01 },
   { key: 'clearance', label: '頭の余裕', hint: '頭ボーンより上の頭頂部ぶん。足りないと頭が突き抜ける (m)', min: 0, max: 0.5, step: 0.01 },
   { key: 'liftScale', label: '浮きの強さ', hint: '1 = 頭が収まる最小限。上げると足がよく見えるが中も覗ける', min: 0, max: 2.5, step: 0.05 },

@@ -419,6 +419,8 @@ const TONE_CURVES: Record<string, THREE.ToneMapping> = {
  */
 const GRENADE_SPLASH = 2.2;
 const THROWN_SPLASH = 1.6;
+/** E LOCATOR が寿命で弾ける大きさ (手榴弾 = 1) */
+const LOCATOR_POP_SCALE = 0.2;
 const CASING_SPLASH = 0.45;
 /**
  * 着弾点から地形を探す幅 (m)。
@@ -2118,9 +2120,20 @@ export class Game {
 
       // 壊れた / 寿命が尽きた。**寿命で消えた分は静かに消す** —
       // 音を出すと「誰かが壊した」に読めて、嘘の情報になる
-      case "locatorGone":
-        this.locators.remove(message.id);
+      case "locatorGone": {
+        /*
+         * 寿命で消えるときは**小さく弾ける**。ダメージは無い (見せるだけ)。
+         *
+         * 壊された (broken) ときと片付け (cleared) では弾けない — 壊した側は
+         * 撃った手応えで分かるし、片付けは場の外の話。
+         */
+        const at = this.locators.remove(message.id) ?? this.remoteFrom.fromArray(message.at);
+        if (!message.broken && !message.cleared) {
+          this.blast.explode(at, LOCATOR_POP_SCALE);
+          this.audio.play("locatorPop", at);
+        }
         break;
+      }
 
       case "claymoreGone": {
         // 位置を先に取る。消してから爆発を出すと出す場所が分からない

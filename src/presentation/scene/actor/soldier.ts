@@ -29,7 +29,7 @@ import {
   STAIR_HOLD,
   STAIR_RISE_MIN,
 } from './motion'
-import { advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
+import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
 import { Weapon, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
@@ -482,6 +482,8 @@ export class Soldier {
   private box: THREE.Object3D | null = null
   /** 箱の浮き上がり量 (m)。姿勢に遅れて追う */
   private boxLift = 0
+  /** 箱の傾き。動いている向きへ倒す */
+  private readonly boxMotion = new BoxMotion()
   /** 鉛直方向の速度 (m/s)。接地中は 0 */
   /**
    * 移動のドメインルールへ渡す体。位置は object のものをそのまま指す。
@@ -2305,7 +2307,6 @@ export class Soldier {
     let targetSpeed = this.crouching
       ? this.moveSpeed * CROUCH_SPEED_SCALE * carrying
       : this.moveSpeed * (this.aiming ? this.aimSpeedScale : carrying)
-    if (this.stabbing) targetSpeed *= STAB_SPEED_SCALE
     // ダンボールを被っている間も担いでいる物は同じ。
     //
     // **CBOX MOVE と FAST MOVE は重なる** (carrying に FAST MOVE が入っている)。
@@ -2319,6 +2320,13 @@ export class Soldier {
     if (this.proneStage === 'prone') targetSpeed = this.moveSpeed * PRONE_SPEED_SCALE
     // 出入りの最中は動けない。倒れる / 起き上がるのと同じ
     if (this.proneShifting) targetSpeed = 0
+    /*
+     * **刺している間はどの姿勢でも動けない。**
+     *
+     * 立ち・しゃがみの速さに掛けていたが、伏せと箱はその後で速さを置き直す
+     * ので、**伏せて刺しながら這えた**。姿勢ごとの速さを決め切った後に止める
+     */
+    if (this.stabbing) targetSpeed *= STAB_SPEED_SCALE
     if (this.down) targetSpeed = 0
     // 箱を落とされた直後は動けない。**慣性も残さない** — 滑りながら驚くと、
     // 見つかったことが代償に見えない
@@ -2620,7 +2628,8 @@ export class Soldier {
         this.currentViewHeight = head + VIEW_CLEARANCE
         // 中の人が伸びたぶんだけ箱が浮く。歩けば隙間から足が見える。
         this.boxLift = advanceBoxLift(this.boxLift, this.boxed ? boxLift(head) : 0, dt)
-        if (this.box) placeBox(this.box, this.boxLift)
+        this.boxMotion.advance(this.object.position, this.yaw, dt, this.boxed)
+        if (this.box) placeBox(this.box, this.boxLift, this.boxMotion)
       }
 
       /*

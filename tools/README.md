@@ -222,12 +222,13 @@ Poly Haven の素材は `diff` (sRGB) / `nor_gl` / `rough` を使い、`disp` �
 | | |
 |---|---|
 | `lobby` / `loadout` / `score` / `hud` | 画面の部品。対戦の状態は作り物を渡す |
+| `icons` | **装備の画面の影絵を作る。** `?model=rifle` で glb を横から白一色に描く。絵 (テクスチャ) は読まない。`icons_sheet.html` で出来た物を並べて見る |
 | `water` | 筏の水面と水しぶき。`?eye=near` で寄る、`?eye=drops` で粒に寄る、`?t=0.2` で叩いてからの秒数、`?fx=blood` で血 |
 | `weapon` | **武器の構え。** 6 通り (立ち / しゃがみ / 伏せ × 脱力 / 構え) を同時に出す。`?weapon=knife` でナイフ (握りは立ちの 1 組) |
 | `shots` | **銃口の煙と着弾。** 金属 (火花) と木 (煙) を撃ち分ける。`?only=metal` / `?only=wood` |
 | `leaving` | 試合中に戻るを押したときの板。`?lang=en` |
 | `decoy` | **decoy が膨らむ所。** 経過をずらして 4 体並ぶ。`?t=0.6` で全部同じ秒に、`?skin=` で見た目 |
-| `blast` | **手榴弾の爆発。** 0.12 / 0.5 / 1.3 秒を横に並べる。`?t=0.4` で全部同じ秒に、`?view=low` で床すれすれから (破片の跳ね) |
+| `blast` | **手榴弾の爆発。** 0.12 / 0.5 / 1.3 秒を横に並べる。`?t=0.4` で全部同じ秒に、`?view=low` で床すれすれから (破片の跳ね)、`?scale=0.2` で E LOCATOR が弾ける大きさ |
 | `sensed` | **AWARENESS の気配。** 壁の裏に 2 つ、手前に 1 つ霧を置く。壁越しに見えるか、物に見えないかを見る |
 | `locator` | **置かれた E LOCATOR。** 左が自分の物 (光の玉が出る)、右が敵の物。`?shade=1` で日陰 (灯の光が床に落ちるのを見る)、`?off=1` で灯が消えている瞬間 |
 
@@ -257,6 +258,22 @@ Poly Haven の素材は `diff` (sRGB) / `nor_gl` / `rough` を使い、`disp` �
   "http://localhost:5199/tools/preview/water.html?eye=near&t=0.1"
 ```
 
+
+### 装備の影絵を作り直す
+
+`public/icons/<id>.png` は `icons` の試写を透明背景で撮った物。模型を差し替えたら撮り直す:
+
+```sh
+for m in rifle smg sniper mosin shotgun m9 grenade claymore locator soldier; do
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+    --default-background-color=00000000 --hide-scrollbars --window-size=240,120 \
+    --screenshot=public/icons/$m.png --virtual-time-budget=60000 \
+    "http://localhost:5199/tools/preview/icons.html?model=$m"
+done
+```
+
+`rifle` だけ `&flip` を付ける (模型が逆向きに寝ている)。`soldier` は `decoy.png` に名前を変えて置く (人形は兵士の模型そのもの)。`m1911.glb` は形が
+数 cm の欠片しか入っていないので、`m1911.png` は `m9.png` の写し。
 
 ## 元データの置き場
 

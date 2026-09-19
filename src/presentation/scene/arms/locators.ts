@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { MeshBasicNodeMaterial } from 'three/webgpu'
+import { materialOpacity, normalView, positionView } from 'three/tsl'
 
 import { loadLocator } from '../assets'
 import { TEAM_COLOR } from '../world/stage'
@@ -97,7 +99,15 @@ const GLOW_PIXELS = 128
 const FLARE_REACH = 0.95
 
 /** 十字の筋の太さ (px)。細いほど鋭い光に見える */
-const FLARE_WIDTH = 2.5
+const FLARE_WIDTH = 3.5
+
+/**
+ * 筋のぼかし (px)。
+ *
+ * 筋の縁が硬いと、光ではなく**貼った十字**に見える (実際そう見えた)。
+ * 太さの違う筋を重ねるだけでは縁が残るので、描いた後に全体を滲ませる。
+ */
+const FLARE_BLUR = 6
 
 /**
  * 倒れ込むのにかける時間 (秒)。
@@ -124,8 +134,18 @@ const WAVE_SECONDS = 5
  */
 const WAVE_GROW = 0.7
 
-/** 先端の濃さ。内側へ向かって薄くなり、時間でも薄れる */
-const WAVE_OPACITY = 0.2
+/** 一番濃い層の濃さ。前後へ薄くなり、時間でも薄れる */
+const WAVE_OPACITY = 0.14
+
+/**
+ * 球の縁の消し方。**輪郭を出さない。**
+ *
+ * 球面をそのまま描くと、面のどこも同じ濃さなので**輪郭が硬い円で切れる**。
+ * 光ではなく色を塗った玉に見えた (灯の光を球で描いたときと同じ失敗)。
+ * カメラへ正対する所を濃く、縁 (視線と面が平行になる所) へ向けて 0 まで
+ * 落とすと、輪郭が消えて滲んだ玉になる。指数が大きいほど縁が広く消える。
+ */
+const WAVE_EDGE = 4
 
 /** 出た瞬間の半径 (m)。0 から始めると点が弾けたように見える */
 const WAVE_START = 0.4
@@ -156,9 +176,23 @@ const WAVE_THICKNESS = 0.5
  * ので、面の中で「先端」と「後ろ」が分かれない。厚みのぶんだけ球を重ねて、
  * 先頭を濃く、内側ほど薄くする。
  *
- * 5 枚で 0.1m 刻み。増やすほど滑らかになるが、その分だけ描く回数が増える。
+ * 8 枚で 0.06m 刻み。増やすほど滑らかになるが、その分だけ描く回数が増える。
  */
-const WAVE_LAYERS = 5
+const WAVE_LAYERS = 8
+
+/**
+ * 層ごとの濃さの分布 (0..1)。**先端は薄く始めて、3 枚目で一番濃く、後ろへ
+ * 直線で薄れる。**
+ *
+ * 先頭を一番濃くしていた頃は、先端の球の輪郭がそのまま波の外縁になって
+ * 硬く見えた。外側へも 2 枚ぶん薄れさせると、外縁が溶ける。
+ *
+ * @param i 0 が一番外
+ */
+function waveProfile(i: number): number {
+  const peak = 2
+  return i < peak ? (i + 1) / (peak + 1) : 1 - (i - peak) / (WAVE_LAYERS - peak)
+}
 
 /** 倒す軸。**世界の X。** 向き (yaw) は後から掛ける */
 const TIP_AXIS = new THREE.Vector3(1, 0, 0)
@@ -193,7 +227,7 @@ interface Live {
   /** 波を入れる袋。自分の物でなければ null */
   wave: THREE.Group | null
   /** 波の層。先頭 (添字 0) が一番外で、一番濃い */
-  layers: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]
+  layers: THREE.Mesh<THREE.SphereGeometry, MeshBasicNodeMaterial>[]
   /**
    * 波が出てからの時間 (秒)。
    *
@@ -485,19 +519,21 @@ export class Locators {
   private buildWave(item: Live): void {
     const wave = new THREE.Group()
     for (let i = 0; i < WAVE_LAYERS; i++) {
-      const layer = new THREE.Mesh(
-        this.waveShape,
-        new THREE.MeshBasicMaterial({
-          color: this.teamColor,
-          transparent: true,
-          opacity: 0,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending,
-          // 露出に左右されない。位置を示すための印なので、明るさが変わっても読めてほしい
-          toneMapped: false,
-        }),
+      const material = new MeshBasicNodeMaterial({
+        color: this.teamColor,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        // 露出に左右されない。位置を示すための印なので、明るさが変わっても読めてほしい
+        toneMapped: false,
+      })
+      // 縁を消す (WAVE_EDGE)。濃さ (opacity) は毎フレーム外から入れるので掛け合わせる
+      material.opacityNode = materialOpacity.mul(
+        normalView.dot(positionView.normalize()).abs().pow(WAVE_EDGE),
       )
+      const layer = new THREE.Mesh(this.waveShape, material)
       layer.visible = false
       layer.frustumCulled = false
       wave.add(layer)
@@ -772,8 +808,7 @@ export class Locators {
         continue
       }
       layer.scale.setScalar(radius)
-      // 先頭が一番濃い。後ろへ向かって直線で薄れる
-      layer.material.opacity = WAVE_OPACITY * fading * (1 - i / WAVE_LAYERS)
+      layer.material.opacity = WAVE_OPACITY * fading * waveProfile(i)
       layer.visible = true
     }
   }
@@ -849,10 +884,11 @@ function glowTexture(): THREE.CanvasTexture {
    * ではなく細い棒になる。太く薄い物の上に細く濃い物を重ねる。
    */
   const passes = [
-    { width: FLARE_WIDTH * 3, alpha: 0.3 },
-    { width: FLARE_WIDTH * 1.6, alpha: 0.6 },
-    { width: FLARE_WIDTH * 0.7, alpha: 1 },
+    { width: FLARE_WIDTH * 3, alpha: 0.2 },
+    { width: FLARE_WIDTH * 1.6, alpha: 0.45 },
+    { width: FLARE_WIDTH * 0.7, alpha: 0.8 },
   ]
+  ctx.filter = `blur(${FLARE_BLUR}px)`
   for (const vertical of [false, true]) {
     for (const pass of passes) {
       const gradient = vertical
@@ -867,6 +903,8 @@ function glowTexture(): THREE.CanvasTexture {
       else ctx.fillRect(mid - reach, mid - pass.width, reach * 2, pass.width * 2)
     }
   }
+
+  ctx.filter = 'none'
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace

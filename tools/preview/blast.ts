@@ -77,7 +77,8 @@ await new Promise((done) => setTimeout(done, 2000))
 // **時を止めて 1 枚。** 固定刻みで進めてから描く (対戦と同じ dt の刻み)
 const STEP = 1 / 60
 blasts.forEach((blast, i) => {
-  blast.explode(new THREE.Vector3(AT[i]!, 0, 0))
+  // ?scale=0.2 … 小さい爆発 (E LOCATOR が寿命で弾けるときの大きさ)
+  blast.explode(new THREE.Vector3(AT[i]!, 0, 0), Number(query.get('scale') ?? '1'))
   for (let t = 0; t < ELAPSED[i]!; t += STEP) blast.update(STEP)
 })
 

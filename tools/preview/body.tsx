@@ -9,11 +9,14 @@
  *     ?knife                  ナイフを持っている。?aim と組むとナイフの構え
  *     ?t=1.2                  何秒目で止めるか (既定 1.0)
  *     ?turn=40                体を回す角度
+ *     ?boxed                  ダンボールを被る (clip=sneak と組む)。箱は半透明で、はみ出しを見る
+ *     ?tilt=fwd|right         箱を進行方向へ倒した姿 (fwd = 前へ、right = 右へ全開)
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
  * その途中で止めて描く。
  */
+import { BoxMotion, boxLift, createCardboardBox, placeBox, setBoxTuning } from '../../src/presentation/scene/actor/box'
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { buildLights } from '../../src/presentation/scene/world/stage'
@@ -51,8 +54,18 @@ scene.add(floor)
 
 const gltf = await loadSoldier(skin)
 const model = gltf.scene
-model.rotation.y = turn
-scene.add(model)
+/*
+ * 本番と同じ入れ子にする (soldier.ts)。根 (object) を向きで回し、模型はその中で
+ * MODEL_YAW_OFFSET だけ回っている。箱は根の子なので、模型に直に付けると
+ * 前後が逆になる。
+ */
+const MODEL_YAW_OFFSET = Math.PI // soldier.ts と同じ。模型の正面は +Z、根は -Z が前
+const root = new THREE.Group()
+// 根の前 (-Z) をカメラ (+Z) へ向けるぶんの 180° を足す。turn=0 で正面向き
+root.rotation.y = turn + Math.PI
+scene.add(root)
+model.rotation.y = MODEL_YAW_OFFSET
+root.add(model)
 
 /*
  * ?nomip … ミップマップを切って見る。**UV の島がにじんでいるか**の切り分け。
@@ -95,6 +108,16 @@ anim.setAiming(query.has('aim'))
 // ?knife … ナイフを持っている (構えると knife_idle)
 anim.setKnife(query.has('knife'))
 anim.setAimPitch(pitch)
+// ?boxed … 箱の中の姿勢。箱は本番と同じ物を半透明で重ねて、頭と腕の収まりを見る
+const boxed = query.has('boxed')
+anim.setBoxed(boxed)
+const box = boxed ? createCardboardBox() : null
+if (box) {
+  // ?boxalpha=1 … 箱を不透明で (既定は半透明で中を透かす)
+  setBoxTuning({ opacity: Number(query.get('boxalpha') ?? '0.45') })
+  box.visible = true
+  root.add(box)
+}
 
 /*
  * 銃を持たせる。**取り付けはゲームと同じ順で** — 型を流す前の姿勢で基準を
@@ -158,6 +181,27 @@ for (let t = 0; t < stopAt; t += 1 / 60) {
   anim.update(1 / 60)
 }
 model.updateMatrixWorld(true)
+if (box) {
+  const headBone = findBoneBySuffix(model, 'Head')
+  const headHeight = headBone ? headBone.getWorldPosition(new THREE.Vector3()).y : 1
+  const tilt = query.get('tilt')
+  const motion = new BoxMotion()
+  if (tilt === 'fwd') motion.z = -1
+  if (tilt === 'right') motion.x = 1
+  placeBox(box, boxLift(headHeight), tilt ? motion : undefined)
+  /*
+   * 箱の写真 (cardboard.jpg) が届くまで待つ。**届く前に描くと箱ごと写らない** —
+   * 撮る側は時計を進めるので、秒では待てない。画像の complete を見る。
+   */
+  const images: HTMLImageElement[] = []
+  box.traverse((o) => {
+    const map = ((o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined)?.map
+    if (map?.image) images.push(map.image as HTMLImageElement)
+  })
+  while (!images.every((image) => image.complete && image.naturalWidth > 0)) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
 // 姿勢ごとに握りが違う。しゃがみの型を見るときは stance=1 を付ける
 weapon?.applyStance(Number(query.get('stance') ?? '0'))
 

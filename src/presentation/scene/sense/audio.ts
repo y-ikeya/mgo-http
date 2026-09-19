@@ -222,6 +222,13 @@ const SOUNDS = {
    * 音で場所を探せる、くらいに留める。
    */
   locatorBeep: { file: "locator_beep1.mp3", reference: 2, max: 12 },
+  /**
+   * E LOCATOR が寿命で弾けた音。**近くに居た人だけが気づく** (10m)。
+   *
+   * 暴く端 (15m) より内側までしか届かない。遠くまで届くと「どこに置いて
+   * あったか」まで教えてしまう。
+   */
+  locatorPop: { file: "locator_pop1.mp3", reference: 2, max: 10 },
   /*
    * decoy が割れた音。**普通の位置音として鳴らす。**
    *

@@ -298,6 +298,7 @@ export function clearLocators(room: RoomWorld): void {
       id: locator.id,
       at: [locator.body.x, locator.body.y, locator.body.z],
       broken: false,
+      cleared: true,
     })
   }
   room.locators.length = 0

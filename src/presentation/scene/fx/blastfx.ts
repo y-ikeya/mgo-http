@@ -179,6 +179,8 @@ export class BlastFx {
   private readonly ring: THREE.Mesh
   private readonly ringMaterial: THREE.MeshBasicMaterial
   private ringLife = 0
+  /** 今回の爆発の大きさ (1 = 手榴弾)。輪と光に掛ける */
+  private size = 1
   private readonly light: THREE.PointLight
   private lightLife = 0
   private readonly at = new THREE.Vector3()
@@ -333,9 +335,16 @@ export class BlastFx {
   }
 
   /** 爆ぜる。ダメージはサーバーが決めるので、ここは見せるだけ */
-  explode(at: THREE.Vector3): void {
+  /**
+   * 爆ぜる。ダメージはサーバーが決めるので、ここは見せるだけ。
+   *
+   * @param scale 大きさ (1 = 手榴弾)。E LOCATOR が寿命で弾けるときは 0.2 —
+   *   雲も破片も輪も同じ比で縮め、破片の数もその分だけ減らす
+   */
+  explode(at: THREE.Vector3, scale = 1): void {
     this.at.copy(at)
     this.floorY = at.y
+    this.size = scale
     this.readLighting()
 
     let index = 0
@@ -364,14 +373,15 @@ export class BlastFx {
         }
         puff.sprite.position
           .copy(at)
-          .addScaledVector(dir, kind.spread * 0.35 * Math.random())
-        puff.velocity.copy(dir).multiplyScalar(kind.spread * (0.6 + Math.random() * 0.8))
-        puff.velocity.y += kind.rise * (0.5 + Math.random())
-        puff.span = kind.span * (0.8 + Math.random() * 0.4)
+          .addScaledVector(dir, kind.spread * scale * 0.35 * Math.random())
+        puff.velocity.copy(dir).multiplyScalar(kind.spread * scale * (0.6 + Math.random() * 0.8))
+        puff.velocity.y += kind.rise * scale * (0.5 + Math.random())
+        // 小さい爆発は早く消える。大きさの平方根で縮める (0.3 → 0.55)
+        puff.span = kind.span * Math.sqrt(scale) * (0.8 + Math.random() * 0.4)
         puff.life = puff.span
         puff.delay = kind.delay * Math.random()
-        puff.from = kind.from * (0.8 + Math.random() * 0.4)
-        puff.to = kind.to * (0.8 + Math.random() * 0.4)
+        puff.from = kind.from * scale * (0.8 + Math.random() * 0.4)
+        puff.to = kind.to * scale * (0.8 + Math.random() * 0.4)
         puff.peak = kind.peak
         // 板ごとに回しておく。同じ向きで並ぶと 1 枚の絵に見える
         puff.material.rotation = Math.random() * Math.PI * 2
@@ -385,15 +395,20 @@ export class BlastFx {
     this.ring.visible = true
     this.ringLife = RING_SPAN
 
-    for (const clod of this.clods) {
+    for (const [i, clod] of this.clods.entries()) {
+      // 小さい爆発は破片も少ない。余った分は出さない
+      if (i >= Math.round(this.clods.length * scale)) {
+        clod.life = 0
+        continue
+      }
       // 上半球に散らす。下へ飛んでもすぐ床に埋まる
       const dir = randomDirection(1)
       dir.y = Math.abs(dir.y)
       clod.position.copy(at).addScaledVector(dir, 0.2)
       clod.velocity
         .copy(dir)
-        .multiplyScalar(DEBRIS_SPEED + Math.random() * DEBRIS_SPEED_SPREAD)
-      clod.velocity.y += DEBRIS_RISE * Math.random()
+        .multiplyScalar((DEBRIS_SPEED + Math.random() * DEBRIS_SPEED_SPREAD) * Math.sqrt(scale))
+      clod.velocity.y += DEBRIS_RISE * Math.sqrt(scale) * Math.random()
       clod.axis.copy(randomDirection(1))
       clod.spin = (Math.random() * 2 - 1) * 24
       clod.angle = Math.random() * Math.PI * 2
@@ -448,7 +463,7 @@ export class BlastFx {
       const left = Math.max(0, this.ringLife) / RING_SPAN
       if (left <= 0) this.ring.visible = false
       else {
-        const size = RADIUS * (1 - left * left)
+        const size = RADIUS * this.size * (1 - left * left)
         this.ring.scale.setScalar(Math.max(0.01, size))
         this.ringMaterial.opacity = left * left * 0.55
       }
@@ -458,7 +473,7 @@ export class BlastFx {
       this.lightLife -= dt
       const left = Math.max(0, this.lightLife) / 0.45
       if (left <= 0) this.light.visible = false
-      else this.light.intensity = left * left * 70
+      else this.light.intensity = left * left * 70 * this.size
     }
 
     if (this.debris.visible) {

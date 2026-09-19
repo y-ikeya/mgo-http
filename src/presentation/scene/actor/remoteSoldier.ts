@@ -22,6 +22,7 @@ import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import {
   advanceBoxLift,
+  BoxMotion,
   boxLift,
   createCardboardBox,
   disposeBox,
@@ -218,6 +219,8 @@ export class RemoteSoldier {
   }
   private readonly box: THREE.Object3D;
   private boxed = false;
+  /** 箱の傾き。動いている向きへ倒す (位置の差分から。速度は受信していない) */
+  private readonly boxMotion = new BoxMotion();
   /**
    * サーバーが「倒れている」と言っているか。
    *
@@ -504,7 +507,8 @@ export class RemoteSoldier {
     const head = animator.headHeight();
     if (head !== null) {
       this.lift = advanceBoxLift(this.lift, this.boxed ? boxLift(head) : 0, dt);
-      placeBox(this.box, this.lift);
+      this.boxMotion.advance(this.object.position, this.yaw, dt, this.boxed);
+      placeBox(this.box, this.lift, this.boxMotion);
     }
   }
 

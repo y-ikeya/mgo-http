@@ -11,6 +11,8 @@ import type { SolidWorld } from '../../src/sim/space/vision'
  *     bunx vite → http://localhost:5174/tools/preview/locator.html
  *     ?shade=1     日陰に置く (太陽を弱めて、灯の光が床に落ちるのを見る)
  *     ?off=1       灯が消えている瞬間
+ *     ?wave=0.15   自分の物から出る波を、出てから何秒の所で止めるか (0.7 で消える)
+ *     ?eye=far     8m 離れて見る (波を丸ごと画面に入れる)
  *
  * 左が**自分の物** (光の玉が出る)、右が**敵の物** (装置と灯の点滅だけ)。
  * 見るのは 2 つ — 敵の物に光の玉が出ていないか、灯の光が床に落ちているか。
@@ -22,6 +24,8 @@ const EXPOSURE = 3.0
 const query = new URLSearchParams(location.search)
 const shade = query.has('shade')
 const off = query.has('off')
+const wave = query.get('wave')
+const far = query.get('eye') === 'far'
 
 const renderer = new WebGPURenderer({ antialias: true })
 renderer.setSize(WIDTH, HEIGHT)
@@ -54,8 +58,13 @@ wall.receiveShadow = true
 scene.add(wall)
 
 const camera = new THREE.PerspectiveCamera(35, WIDTH / HEIGHT, 0.05, 100)
-camera.position.set(0, 0.9, 2.6)
-camera.lookAt(0, 0.05, 0)
+if (far) {
+  camera.position.set(0, 2.5, 8)
+  camera.lookAt(-0.7, 0.8, 0)
+} else {
+  camera.position.set(0, 0.9, 2.6)
+  camera.lookAt(0, 0.05, 0)
+}
 
 const locators = new Locators(scene)
 locators.setSelfTeam('blue')
@@ -74,7 +83,8 @@ locators.place(2, [0.7, 0, 0], false)
  * 灯だけが点いている瞬間になる。
  */
 const STEP = 1 / 60
-const until = off ? 1.5 : 1.05
+// 波は置いた瞬間から数えるので、指定の秒でそのまま止めればその位相になる
+const until = wave !== null ? Number(wave) : off ? 1.5 : 1.05
 // 置いた物は止まっているので、地形は問われない。何も無い世界でよい
 const open: SolidWorld = { hit: () => null }
 for (let t = 0; t < until; t += STEP) locators.update(STEP, open, null)

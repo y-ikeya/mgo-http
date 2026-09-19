@@ -538,6 +538,8 @@ export interface LocatorGone {
   id: number
   /** 壊れた場所。**そこで音を鳴らす** */
   at: [number, number, number]
+  /** 試合の切れ目の片付けで消えた。**弾けない** (寿命で弾けるのと区別する) */
+  cleared?: boolean
   /**
    * 撃たれて壊れたなら音を出す。
    *
