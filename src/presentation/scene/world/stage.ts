@@ -656,8 +656,14 @@ function skyColorAt(
   )
   color = mix(color, lit, cloud.mul(0.88))
 
-  // 地平線より下。地面で隠れるが、高台から見下ろすと端が見える
-  color = mix(color, horizon.mul(0.82), float(1).sub(smoothstep(-0.12, 0, dir.y)))
+  /*
+   * 地平線より下は裾の色のまま。
+   *
+   * 水面は空の球まで敷いてあり、霧の果ては裾の色 (SKY_HORIZON) に沈む。
+   * ここを暗くすると、水の板の縁が空との継ぎ目として 1 本の線に出る。
+   * 同じ色にしておけば、水がどこで終わっているか分からない。
+   */
+  color = mix(color, horizon, float(1).sub(smoothstep(-0.12, 0, dir.y)))
 
   return color
 }
@@ -1144,7 +1150,14 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    */
   const water = waterOf(name)
   if (water) {
-    const surface = buildWater(water.half)
+    /*
+     * 描く広さは water.half ではなく空の球まで。**水平線が四角く切れない。**
+     *
+     * 溺れる範囲 (domain の water.half) はそのまま。ここは見た目だけで、
+     * 霧の向こう (FOG_FAR) は空の裾と同じ色に沈むので、板を伸ばしても
+     * 描く物は増えない。板は 1 枚、映り込みは大きさに依らず 1 回。
+     */
+    const surface = buildWater(SKY_RADIUS)
     surface.position.y = water.y
     scene.add(surface)
   }
