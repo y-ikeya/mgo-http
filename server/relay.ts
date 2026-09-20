@@ -16,13 +16,13 @@ import { surfaceOf } from '../src/domain/stage'
 import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { checkMove, checkMoveOnMesh } from '../src/sim/judge/motioncheck'
-import { cameraPoint, seesFromCamera } from '../src/sim/space/eyepoint'
+import { cameraPoint, seesFromCamera, type Viewer } from '../src/sim/space/eyepoint'
 import { bodyVisible, groundUnder, hasLineOfSight } from '../src/sim/space/vision'
 import { sessionOf } from './session'
 import { type RoomWorld, broadcast, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
-import { BODY_BOX, HEAD_HEIGHT, MOVE_PROBE_HEIGHT, VIEW_HEIGHT, stanceOf } from '../src/domain/player/stance'
+import { BODY_BOX, HEAD_HEIGHT, MOVE_PROBE_HEIGHT, VIEW_HEIGHT, leanOf, leanShift, stanceOf } from '../src/domain/player/stance'
 import { canHold } from '../src/domain/player/equip'
 import type { HitZone } from '../src/domain/rule/damage'
 import { isSeated } from '../src/domain/player/lifecycle'
@@ -244,13 +244,39 @@ export function sees(
 export function seesPlayer(room: RoomWorld, viewer: MatchPlayer, target: MatchPlayer, now: number): boolean {
   const settled = target.loweredAt > 0 && now - target.loweredAt >= LOWER_SETTLE_MS
   const box = BODY_BOX[settled ? stanceOf(target.locomotion) : 'stand']
+  // 傾いていれば体もその分横に居る
+  const shift = leanShift(leanOf(target.locomotion), stanceOf(target.locomotion), target.yaw, targetShift)
+  const tx = target.x + shift.x
+  const tz = target.z + shift.z
   return seesFromCamera(
-    viewer,
+    eyeOf(viewer),
     viewHeightsOf(viewer, now),
     room.stage.camera,
-    (ex, ey, ez) => bodyVisible(ex, ey, ez, target.x, target.y, target.z, target.yaw, box, room.stage.sight),
+    (ex, ey, ez) => bodyVisible(ex, ey, ez, tx, target.y, tz, target.yaw, box, room.stage.sight),
     viewEye,
   )
+}
+
+/** 作業場。seesPlayer / eyeOf は同期で、返した物はその場で使い切る */
+const targetShift = { x: 0, z: 0 }
+const viewerShift = { x: 0, z: 0 }
+const leanedViewer: Viewer = { x: 0, y: 0, z: 0, cameraYaw: 0, pitch: 0, aiming: false }
+
+/**
+ * 見ている側の目の置き場。**傾いていれば横へずらす。**
+ *
+ * ずらさないと、覗いた本人の画面では角の向こうが見えているのに、サーバーは
+ * 元の位置から見て「見えない」と言って配らない。
+ */
+function eyeOf(viewer: MatchPlayer): Viewer {
+  const shift = leanShift(leanOf(viewer.locomotion), stanceOf(viewer.locomotion), viewer.yaw, viewerShift)
+  leanedViewer.x = viewer.x + shift.x
+  leanedViewer.y = viewer.y
+  leanedViewer.z = viewer.z + shift.z
+  leanedViewer.cameraYaw = viewer.cameraYaw
+  leanedViewer.pitch = viewer.pitch
+  leanedViewer.aiming = viewer.aiming
+  return leanedViewer
 }
 
 /**
@@ -359,10 +385,11 @@ export const viewEye = { x: 0, y: 0, z: 0 }
  */
 export function viewOf(room: RoomWorld, player: MatchPlayer, now: number): { x: number; y: number; z: number } {
   const [low, high] = viewHeightsOf(player, now)
+  const eye = eyeOf(player)
   return cameraPoint(
-    player.x,
-    player.y,
-    player.z,
+    eye.x,
+    eye.y,
+    eye.z,
     player.cameraYaw,
     player.pitch,
     player.aiming,

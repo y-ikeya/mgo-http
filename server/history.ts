@@ -17,7 +17,7 @@
 
 import { framesFor, PoseTrack } from '../src/sim/judge/history'
 import type { MatchPlayer, Pose } from '../src/domain/player/player'
-import { stanceOf } from '../src/domain/player/stance'
+import { leanOf, stanceOf } from '../src/domain/player/stance'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { SNAPSHOT_INTERVAL } from '../src/application/protocol/types'
 
@@ -73,6 +73,7 @@ export function recordPose(player: MatchPlayer): void {
     // 撃った線をカメラから引き直すのに要る (hitcheck.ts の zoneExposed)
     slot.cameraYaw = player.cameraYaw
     slot.aiming = player.aiming
+    slot.lean = leanOf(player.locomotion)
   })
 }
 

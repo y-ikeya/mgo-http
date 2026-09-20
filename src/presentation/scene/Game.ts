@@ -19,7 +19,7 @@ import {
 } from "../../domain/player/skill";
 import { BLAST_RADIUS, RELEASE_HEIGHT, throwSpeedOf } from "../../domain/item/grenade";
 import { pelletsOf } from "../../domain/item/weapons";
-import type { Stance } from "../../domain/player/stance";
+import { leanMetres, type Lean, type Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
 import {
   ARENA_HALF_SIZE,
@@ -1361,8 +1361,22 @@ export class Game {
     // 読み捨てているのは、溜めておくと解けた瞬間に一気に飛ぶため。
     if (canAct(this.life)) this.follow.addLook(look.x, look.y);
 
+    /*
+     * 覗きながら傾く。**主観 (スコープ) のときだけ。**
+     *
+     * 立って止まっていることは姿勢の側 (motion.ts) が見る。傾いている間は
+     * 横移動を食う — 傾きながらの移動は作らない。カメラの目は実際に傾いた
+     * 分だけ横へ寄せる (姿勢から引く。押した瞬間ではなく、傾いた分)。
+     */
+    const lean = this.scoped && !this.player.isProne ? this.input.lean() : 0;
+    this.player.setLean(lean);
+    this.follow.setLean(leanMetres(this.player.leaning, this.player.stance));
     // 移動入力はカメラ基準。W で必ず「画面奥」へ進む。
     const axis = this.input.moveAxis();
+    if (lean !== 0) {
+      axis.x = 0;
+      axis.z = 0;
+    }
     this.follow.forward(this.forwardVec);
     this.follow.right(this.rightVec);
     this.moveDir
@@ -1881,8 +1895,11 @@ export class Game {
       //
       // 湧き地点へは戻さない。**その命の続き**なので、居た場所に居た体力で戻る。
       // 弾数もサーバーがレプリカを持っているので、そちらを正とする
-      case "resume":
+      case "resume": {
         this.player.resumeAt(message.x, message.y, message.z, message.health);
+        // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
+        const asleep = (message.sleepUntil - Date.now()) / 1000;
+        if (asleep > 0) this.player.sleep(asleep, true);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
@@ -1906,6 +1923,7 @@ export class Game {
         if (message.primary) void this.player.equip(message.primary);
         this.follow.snapTo(this.player, this.cameraWorld);
         break;
+      }
 
       /*
        * スキルが決まった。**送った物ではなく返ってきた物を持つ。**
@@ -3377,9 +3395,12 @@ export class Game {
    * 照準の線の先ではなく目の線の先に痕が出るので、「縁に当たった」と読める。
    */
   private readonly eyePose = {
-    time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, cameraYaw: 0, aiming: false,
+    time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance,
+    lean: 0 as Lean, cameraYaw: 0, aiming: false,
   };
-  private readonly targetPose = { time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance };
+  private readonly targetPose = {
+    time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
+  };
 
   private eyeReaches(target: RemoteSoldier, zone: HitZone, distance: number): boolean {
     const sight = this.stage.sightWorld;
@@ -3390,6 +3411,7 @@ export class Game {
     this.eyePose.z = me.z;
     this.eyePose.yaw = this.player.yaw;
     this.eyePose.stance = this.player.stance;
+    this.eyePose.lean = this.player.leaning;
     // カメラの線も引く (審判と同じ)。向きと構えは審判が姿の記録から取るのと同じ値
     this.eyePose.cameraYaw = this.follow.aimYaw;
     this.eyePose.pitch = this.follow.aimPitch;
@@ -3399,6 +3421,7 @@ export class Game {
     this.targetPose.y = at.y;
     this.targetPose.z = at.z;
     this.targetPose.stance = target.stance;
+    this.targetPose.lean = target.leaning;
     // 弾道の膨らみ。審判は申告の距離と銃の性能から同じ式で出す (server/damage.ts)
     const sag = bulletSag(distance, this.weapon.bulletSpeed, this.weapon.bulletGravity);
     if (zoneExposed(this.eyePose, this.targetPose, zone, sight, HIT_RULES, sag)) return true;

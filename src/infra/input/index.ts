@@ -460,6 +460,18 @@ export class Input {
   }
 
   /**
+   * 覗きながら体を横へ出す向き。**鍵盤は Shift + A / D、パッドは十字キーの左右。**
+   * -1 左 / 1 右 / 0 無し。両方なら無し。主観かどうかは呼ぶ側が見る
+   */
+  lean(): -1 | 0 | 1 {
+    const shift = this.isDown('ShiftLeft') || this.isDown('ShiftRight')
+    const left = (shift && this.isDown('KeyA')) || this.padDown('menuLeft')
+    const right = (shift && this.isDown('KeyD')) || this.padDown('menuRight')
+    if (left === right) return 0
+    return left ? -1 : 1
+  }
+
+  /**
    * パッドを読む。フレームの先頭で 1 回だけ呼ぶ。
    *
    * Gamepad API はスナップショットを返すので、保持した参照は更新されない。

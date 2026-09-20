@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "leanCrouchRifle.fbx": "lean_crouch" },
+  "out": "lean_crouch.glb",
+  "maxTexture": 64
+}

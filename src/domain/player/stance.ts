@@ -58,6 +58,8 @@ export function stanceOf(locomotion: Locomotion): Stance {
   // クレイモアはかがんで置く。頭が下がるので、見つかりにくさもしゃがみと同じ
   if (locomotion === 'claymore_windup' || locomotion === 'claymore_place') return 'crouch'
   if (locomotion === 'crouch_idle' || locomotion.startsWith('crouch_')) return 'crouch'
+  // しゃがんで傾く。名前が crouch_ で始まらないので別に書く
+  if (locomotion === 'lean_crouch_left' || locomotion === 'lean_crouch_right') return 'crouch'
   return 'stand'
 }
 
@@ -184,4 +186,52 @@ export const PRONE_SPEED_SCALE = 0.28
  */
 export function headHeightWhen(crouching: boolean, boxed: boolean): number {
   return HEAD_HEIGHT[boxed ? 'box' : crouching ? 'crouch' : 'stand']
+}
+
+/**
+ * 傾き (覗きながら体を横へ出す)。-1 左 / 1 右 / 0 無し。
+ *
+ * 姿勢 (locomotion) から引く。位置と一緒に届くので、サーバーも他人の画面も
+ * 同じ物を見る。
+ */
+export type Lean = -1 | 0 | 1
+
+export function leanOf(locomotion: Locomotion): Lean {
+  if (locomotion === 'lean_left' || locomotion === 'lean_crouch_left') return -1
+  if (locomotion === 'lean_right' || locomotion === 'lean_crouch_right') return 1
+  return 0
+}
+
+/**
+ * 傾いたときに頭 (目) が横へ出る量 (m)。素材 (lean / lean_crouch) の頭の実測。
+ * **左右で、そして立ちとしゃがみで違う** (腰は頭より 4〜6cm 内側)。
+ *
+ * 目も体もこれだけ横へ出る。サーバーの視線判定と当たり判定はこの分をずらす —
+ * ずらさないと、画面では角の向こうが見えるのに配られず、体は元の所に残る。
+ * 体の箱は幅 0.44m なので、腰との差は箱の中に収まる。
+ */
+export const LEAN_SHIFT: Record<'stand' | 'crouch', { left: number; right: number }> = {
+  stand: { left: 0.21, right: 0.13 },
+  // しゃがみは実機の animator で測った値 (しゃがみ構えの頭からの差)。素材の腰の
+  // 振れ (0.2) より小さいのは、しゃがみ構えの頭が元々 0.15m 左に寄っているため
+  crouch: { left: 0.13, right: 0.07 },
+}
+
+/** 傾きの横ずれ (m、右が正)。しゃがみ以外は立ちの値 */
+export function leanMetres(lean: Lean, stance: Stance): number {
+  const shift = LEAN_SHIFT[stance === 'crouch' ? 'crouch' : 'stand']
+  return lean < 0 ? -shift.left : lean > 0 ? shift.right : 0
+}
+
+/** 傾きの横ずれをワールド座標で。yaw 0 で -Z を向くので、右は +X */
+export function leanShift(
+  lean: Lean,
+  stance: Stance,
+  yaw: number,
+  out: { x: number; z: number } = { x: 0, z: 0 },
+): { x: number; z: number } {
+  const metres = leanMetres(lean, stance)
+  out.x = Math.cos(yaw) * metres
+  out.z = -Math.sin(yaw) * metres
+  return out
 }

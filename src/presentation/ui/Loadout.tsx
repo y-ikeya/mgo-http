@@ -37,7 +37,10 @@ import './Loadout.css'
  * 影絵の置き場。public/icons/<id>.png (tools/preview/icons.html で作る)。
  * 白一色なので、画面側が mask にして色を塗る。
  */
-const iconUrl = (id: WeaponId | SupportId) => `${import.meta.env.BASE_URL}icons/${id}.png`
+/** 絵を撮り直したら上げる。**同じ名前のままだと、ブラウザが前の絵を出し続ける** */
+const ICON_VERSION = 2
+const iconUrl = (id: WeaponId | SupportId) =>
+  `${import.meta.env.BASE_URL}icons/${id}.png?v=${ICON_VERSION}`
 
 /** 段の上に出す種別。**名前の上に小さく** (MGO2 の category) */
 const CATEGORY: Record<WeaponId | SupportId, string> = {

@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "leanRifle.fbx#3": "lean" },
+  "out": "lean.glb",
+  "maxTexture": 64
+}

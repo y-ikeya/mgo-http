@@ -635,6 +635,13 @@ export interface ResumeMessage {
   primary: WeaponId | null
   /** 副武器。持たせない部屋では null */
   secondary: WeaponId | null
+  /**
+   * 眠っているなら、いつまでか (Date.now 基準)。
+   *
+   * 返さないと、眠っている間に画面を読み直した人だけが**立って**戻る。
+   * サーバーは眠ったままなので撃てず動けず、本人には理由が見えない。
+   */
+  sleepUntil: number
 }
 
 /**

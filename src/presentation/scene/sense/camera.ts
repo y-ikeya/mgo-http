@@ -227,6 +227,9 @@ export class FollowCamera {
   private aiming = false
   private distance = HIP_VIEW.distance
   private shoulder = HIP_VIEW.shoulder
+  /** 覗きながら傾いた分の横ずれ (m、右が正)。肩のずれと同じ向きに足す */
+  private leanOffset = 0
+  private leanTarget = 0
   private fov = HIP_VIEW.fov
   /** 構え時の目標値。実機で詰められるよう定数ではなくインスタンスに持つ */
   private readonly aimView = { ...AIM_VIEW }
@@ -309,6 +312,11 @@ export class FollowCamera {
       MAX_PITCH,
       Math.max(MIN_PITCH, this.pitch + this.recoilPitch + this.swayPitch),
     )
+  }
+
+  /** 傾いた分だけ目を横へ寄せる (m、右が正)。姿勢から引いた実際の傾き */
+  setLean(metres: number): void {
+    this.leanTarget = metres
   }
 
   /** 構え時のカメラの寄り具合 (調整用。確定したら AIM_VIEW へ焼き込む) */
@@ -407,6 +415,7 @@ export class FollowCamera {
     const target = this.aiming ? this.aimView : HIP_VIEW
     this.distance = damp(this.distance, target.distance, AIM_LAMBDA, dt)
     this.shoulder = damp(this.shoulder, target.shoulder, AIM_LAMBDA, dt)
+    this.leanOffset = damp(this.leanOffset, this.leanTarget, AIM_LAMBDA, dt)
 
     const fov = damp(this.fov, target.fov, AIM_LAMBDA, dt)
     if (Math.abs(fov - this.fov) > 1e-4) {
@@ -453,9 +462,9 @@ export class FollowCamera {
     const footY = this.footY
     this.centerPivot.set(base.x, footY + this.currentViewHeight, base.z)
     this.pivot.set(
-      base.x + rightX * this.shoulder,
+      base.x + rightX * (this.shoulder + this.leanOffset),
       footY + this.currentViewHeight,
-      base.z + rightZ * this.shoulder,
+      base.z + rightZ * (this.shoulder + this.leanOffset),
     )
 
     // 視線の逆方向へ distance だけ引いた位置がカメラの定位置。

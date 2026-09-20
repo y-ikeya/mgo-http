@@ -25,6 +25,7 @@ help:
 	@echo '  make docs           武器の表を書き出し直す (docs/weapons.md)'
 	@echo '  make test           試験だけ (50 秒ほどかかる)'
 	@echo '  make dev            画面 (vite)。サーバーは同じホストの 8787 を見る'
+	@echo '  make up             画面とサーバーを一緒に。Ctrl+C で両方止まる'
 	@echo '  make serve          対戦サーバー (8787)。保存すると勝手に読み直す'
 	@echo '  make serve-alt      もう 1 台 (6001)。画面は ?server=localhost:6001'
 	@echo ''
@@ -47,6 +48,11 @@ help:
 
 dev:
 	bun run dev
+
+# 画面とサーバーを一緒に。**Ctrl+C で両方止まる** — 同じ殻の中で立てて、
+# 抜けるときに殻ごと落とす (trap で kill 0)。片方だけ残すと次に port が塞がる
+up:
+	@trap 'kill 0' INT TERM EXIT; bun run server & bun run dev
 
 # --watch 付き。server/index.ts を保存すると読み直す
 serve:

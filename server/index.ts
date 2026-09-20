@@ -1078,6 +1078,7 @@ const server = Bun.serve<Client>({
             support: resumed.support,
             primary: resumed.primary,
             secondary: resumed.secondary,
+            sleepUntil: resumed.sleepUntil,
           } satisfies ServerMessage),
         )
       }

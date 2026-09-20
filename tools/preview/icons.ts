@@ -118,8 +118,13 @@ else halfH = halfW / aspect
 const camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.01, 100)
 // 銃口 (-Z) が画面の右に来る側から見る
 if (view === 'x') {
-  camera.position.set(center.x + 10, center.y, center.z)
-  camera.up.set(0, 1, 0)
+  /*
+   * `?flip` は上下だけ返す (銃口は右のまま)。回すだけだと左右も返るので、
+   * 反対側 (-X) から見ることで左右を戻す
+   */
+  const flip = query.has('flip')
+  camera.position.set(center.x + (flip ? -10 : 10), center.y, center.z)
+  camera.up.set(0, flip ? -1 : 1, 0)
 } else {
   // 上から。**上は -X** — +X にすると絵が 180° 回って、銃口が左・弾倉が上になる
   // 模型ごとに寝ている向きが違う (突撃銃は逆)。`?flip` で上下を返す

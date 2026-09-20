@@ -14,7 +14,7 @@
 import type { HitZone } from '../../domain/rule/damage'
 import type { SightBlocker } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
-import type { Stance } from '../../domain/player/stance'
+import { leanShift, type Stance } from '../../domain/player/stance'
 import { cameraPoint } from '../space/eyepoint'
 import { hasLineOfSight } from '../space/vision'
 
@@ -210,6 +210,16 @@ const EYE_RATIOS = [1, 0.72, 0.5] as const
  * **客も撃つ前にこれを呼ぶ。** 同じ問いを両側が呼ぶので、手元で通した物を
  * 審判が弾くことは無い (巻き戻しの姿のずれを除く)。通らない弾は手元でも当てない。
  */
+/**
+ * 傾いている分だけ横へずらした姿勢。**ずらした物は lean を消して返す** —
+ * 二度通しても二度ずれない。傾いていなければそのまま。
+ */
+function leaned(pose: Pose): Pose {
+  if (!pose.lean) return pose
+  const shift = leanShift(pose.lean, pose.stance, pose.yaw)
+  return { ...pose, x: pose.x + shift.x, z: pose.z + shift.z, lean: 0 }
+}
+
 export function zoneExposed(
   attacker: Pose,
   target: Pose,
@@ -218,6 +228,8 @@ export function zoneExposed(
   rules: HitRules,
   sag: number,
 ): boolean {
+  attacker = leaned(attacker)
+  target = leaned(target)
   const head = rules.headHeight(attacker.stance)
   const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
 
@@ -302,6 +314,8 @@ function verifyPose(
   world: SightBlocker,
   rules: HitRules,
 ): Verdict {
+  attacker = leaned(attacker)
+  target = leaned(target)
   const zone: HitZone = claim.zone ?? 'BODY'
   const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
   const eyeY = attacker.y + rules.headHeight(attacker.stance)

@@ -233,6 +233,8 @@ export interface StanceInput {
   aiming: boolean
   saluting: boolean
   stabbing: boolean
+  /** 覗きながら体を横へ出す向き。-1 左 / 1 右 / 0 無し。主観のときだけ呼ぶ側が渡す */
+  lean: -1 | 0 | 1
   /** クレイモアを置いている最中の姿勢。置いていなければ null */
   setting: 'claymore_windup' | 'claymore_place' | null
   /** 爆風で倒れているか */
@@ -369,6 +371,13 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // しゃがんだままなら上半身だけ。立ちの刺突は全身の型なので立ち上がってしまう
   if (input.stabbing) return input.crouching ? 'crouch_stab' : 'stab'
   if (input.rolling) return 'roll'
+
+  // 覗きながら傾く。**止まっている間だけ。** 立ちとしゃがみで型が違う (伏せには無い)。
+  // 主観かどうかは呼ぶ側が見る。傾いたまましゃがみと立ちは行き来できる
+  if (input.lean !== 0 && !input.prone && input.onGround && !hasDirection(input)) {
+    if (input.crouching) return input.lean < 0 ? 'lean_crouch_left' : 'lean_crouch_right'
+    return input.lean < 0 ? 'lean_left' : 'lean_right'
+  }
 
   // 空中では上昇と下降でモーションを分ける。クリップの終了ではなく速度で
   // 切り替えるので、滞空時間が変わっても破綻しない

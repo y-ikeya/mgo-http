@@ -113,6 +113,15 @@ export type Locomotion =
   | 'crawl_b'
   /** 伏せたまま刺す。全身の型 (立ちの stab と同じ扱い) */
   | 'prone_stab'
+  /**
+   * 覗きながら体を横へ出す (lean)。**主観で立って構えて止まっている間だけ。**
+   * 1 本の型 (lean) を左右それぞれの所で止めて使う
+   */
+  | 'lean_left'
+  | 'lean_right'
+  /** しゃがんで傾く。立ちの lean と同じ扱いで、目の高さだけしゃがみ */
+  | 'lean_crouch_left'
+  | 'lean_crouch_right'
   // 敬礼。全身の型なので上下を分けない
   | 'salute'
   /**

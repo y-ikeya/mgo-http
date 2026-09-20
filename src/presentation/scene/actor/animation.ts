@@ -99,6 +99,11 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   crouch_stab: 'crouch_idle',
   // 伏せたまま刺す。全身の型
   prone_stab: 'prone_stab',
+  // 覗きながら傾く。1 本の型の左 (5 コマ目) と右 (13 コマ目) で止める (LEAN_POSE_AT)
+  lean_left: 'lean',
+  lean_right: 'lean',
+  lean_crouch_left: 'lean_crouch',
+  lean_crouch_right: 'lean_crouch',
   roll: 'roll',
   death: 'death',
   // 倒れる向き。**背後から撃たれたら前へ、正面からなら後ろへ**
@@ -131,6 +136,10 @@ type UpperState =
   | 'stab'
   | 'crouch_stab'
   | 'prone_stab'
+  | 'lean_left'
+  | 'lean_right'
+  | 'lean_crouch_left'
+  | 'lean_crouch_right'
   | 'roll'
   | 'hard_land'
   // 伏せへの出入り
@@ -180,6 +189,11 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
   prone_roll_down: 'prone_roll_down',
+  // 傾きは上半身も同じ止め絵。構えていても差し替えない (resolveUpperKey)
+  lean_left: 'lean',
+  lean_right: 'lean',
+  lean_crouch_left: 'lean_crouch',
+  lean_crouch_right: 'lean_crouch',
   salute: 'salute',
   away: 'away',
   claymore_windup: 'claymore_windup',
@@ -229,6 +243,8 @@ const POSE_ONLY_CLIPS = new Set(['knee_relaxed', 'knee_ready'])
 
 const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
   'crouch_idle',
+  'lean_crouch_left',
+  'lean_crouch_right',
   ...MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion),
 ])
 
@@ -258,6 +274,14 @@ const JUMP_LOOP_MAX_SPEED = 3
  * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
  */
 const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_roll_down'])
+/**
+ * 腰の**横**移動を残す型。
+ *
+ * 傾き (lean) は足を着けたまま腰を横へ出す動きで、その横移動が姿勢そのもの。
+ * 他の型と同じに潰すと脚だけ曲がって腰が動かない。模型ごと横へずらして
+ * 補っていたら、**足も一緒に滑って**見えた。前後は他と同じく潰す。
+ */
+const SIDEWAYS_CLIPS = new Set(['lean', 'lean_crouch'])
 
 /** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
 const ROLL_TIME_SCALE = 1.32
@@ -764,7 +788,21 @@ const CRAWL_CLIP_SPEED = 0.33
  * 止まって伏せている姿は這う型と同じクリップなので、頭で止めれば腹這いの
  * 姿勢になる。専用のクリップが手に入ったらここから外す。
  */
-const FROZEN_CLIPS: readonly Locomotion[] = ['prone_idle']
+const FROZEN_CLIPS: readonly Locomotion[] = ['prone_idle', 'lean_left', 'lean_right', 'lean_crouch_left', 'lean_crouch_right']
+
+/**
+ * 傾きを止める時刻 (秒)。素材 (lean、30fps) は 左へ → 戻る → 右へ → 戻る の 1 本で、
+ * 左が最も出るのが 5 コマ目、右が 13 コマ目。
+ */
+const LEAN_POSE_AT: Partial<Record<Locomotion, number>> = {
+  lean_left: 4 / 30,
+  lean_right: 12 / 30,
+  // しゃがみ (lean_crouch、13 コマ) は左が 4 コマ目、右が 10 コマ目
+  lean_crouch_left: 3 / 30,
+  lean_crouch_right: 9 / 30,
+}
+/** 傾いている姿勢。上下とも止め絵で、構えの型に差し替えない */
+const LEAN_STATES = new Set<Locomotion>(['lean_left', 'lean_right', 'lean_crouch_left', 'lean_crouch_right'])
 
 /**
  * 這う型の再生倍率。**1 より小さい = 進む速さより手足の運びを遅くする。**
@@ -1257,7 +1295,7 @@ export class CharacterAnimator {
         }
         if (stored) this.rootMotion.set(clip.name, stored)
       }
-      if (rootBone) stripRootMotion(clip, rootBone.name, restBase)
+      if (rootBone) stripRootMotion(clip, rootBone.name, restBase, SIDEWAYS_CLIPS.has(clip.name))
       byName.set(clip.name, clip)
     }
 
@@ -1394,6 +1432,15 @@ export class CharacterAnimator {
     for (const [state, clipName] of Object.entries(RELAXED_CLIPS) as [Locomotion, string][]) {
       const clip = byName.get(clipName)
       if (clip) registerUpper(relaxedKey(state), clip)
+    }
+
+    // 傾きは途中で止めた 1 枚。止めておく型 (FROZEN_CLIPS) なので、ここで置いた時刻から動かない
+    for (const [state, at] of Object.entries(LEAN_POSE_AT) as [Locomotion, number][]) {
+      for (const action of [this.lower.get(state), this.upper.get(relaxedKey(state))]) {
+        if (!action) continue
+        action.time = at
+        action.setEffectiveTimeScale(0)
+      }
     }
 
     /*
@@ -2556,12 +2603,23 @@ export class CharacterAnimator {
    *
    * 眠りは倒れるのと違って**醒める**ので、起きるときに元へ戻す (wake)。
    */
-  playSleep(): void {
+  /**
+   * 眠る。倒れる所から流す。
+   *
+   * @param settled もう床に居る (読み直しの続き)。倒れる所を飛ばして
+   *   型の終わり (寝ている姿) に置く。一度きりの型で終わりで留まるので、
+   *   時刻を末尾へ置けばそのまま寝た姿になる
+   */
+  playSleep(settled = false): void {
     const upper = this.upper.get(SLEEP_KEY)
     const lower = this.lower.get('sleep')
     if (!upper || !lower) return
     upper.reset().play()
     lower.reset().play()
+    if (settled) {
+      upper.time = upper.getClip().duration
+      lower.time = lower.getClip().duration
+    }
     this.upperState = 'sleep'
     this.locomotion = 'sleep'
   }
@@ -2780,6 +2838,12 @@ export class CharacterAnimator {
      * 構え直す動きとして噛み合う。
      */
     if (this.rollShowing && this.rollArmsShowing && this.upper.has(ROLL_KEY)) return ROLL_KEY
+
+    // 覗きながら傾いている。上も同じ止め絵 — 構えの型に差し替えると上体が起きる
+    if (LEAN_STATES.has(this.locomotion)) {
+      const key = relaxedKey(this.locomotion)
+      if (this.upper.has(key)) return key
+    }
 
     if (this.aiming) {
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
@@ -3496,6 +3560,8 @@ function stripRootMotion(
   clip: THREE.AnimationClip,
   rootBoneName: string,
   rest: { x: number; y: number } | null,
+  /** 横 (X) だけは残す (SIDEWAYS_CLIPS)。腰を横へ出す姿勢そのものなので */
+  keepSideways = false,
 ): void {
   const track = clip.tracks.find(
     (t) => t.name.endsWith('.position') && sameNode(t.name, rootBoneName),
@@ -3507,7 +3573,7 @@ function stripRootMotion(
   const restX = rest ? rest.x : values[0]
   const restY = rest ? rest.y : values[1]
   for (let i = 0; i < values.length; i += 3) {
-    values[i] = restX
+    if (!keepSideways) values[i] = restX
     values[i + 1] = restY
   }
 }

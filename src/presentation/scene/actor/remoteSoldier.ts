@@ -17,7 +17,7 @@ import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { stanceOf, type Stance } from "../../../domain/player/stance";
+import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import {
@@ -545,6 +545,11 @@ export class RemoteSoldier {
   /** 同じ陣営か。撃つ前ではなく、当ててしまった後の表示に使う */
   /** 所属。**個人戦では色が同じでも敵**なので、判断は呼ぶ側がルールで行う */
   /** いまの構え。**審判が照合に使うのと同じ導き方** (stanceOf) */
+  /** 傾いているか (姿勢から)。当たりの判定で体を横へずらすのに使う */
+  get leaning(): Lean {
+    return leanOf(this.locomotion)
+  }
+
   get stance(): Stance {
     return stanceOf(this.locomotion);
   }

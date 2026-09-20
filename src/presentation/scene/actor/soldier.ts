@@ -8,7 +8,7 @@ import {
   ladderGrip,
 } from '../../../domain/stage'
 import { BOX_BUMP_STUN, KNOCK_TIME, fallDamage, knockSpeed } from '../../../domain/rule/damage'
-import { PRONE_SPEED_SCALE, stanceOf, type Stance } from '../../../domain/player/stance'
+import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance } from '../../../domain/player/stance'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
@@ -814,7 +814,7 @@ export class Soldier {
    * 箱も構えも解く。眠った体が箱を被ったままなのも、銃を構えたままなのも
    * おかしい。倒れるのと違って**起きる**ので、持ち物は失わない。
    */
-  sleep(seconds: number): void {
+  sleep(seconds: number, settled = false): void {
     if (this.down || this.downed) return
     /*
      * **梯子からは手が離れる。** 眠った人が梯子に貼り付いたままなのはおかしい。
@@ -830,8 +830,9 @@ export class Soldier {
     this.dropBox()
     this.crouching = false
     this.aiming = false
-    // **姿勢の切り替えでは床に着かない。** 倒れる型と同じ道で流す
-    this.animator?.playSleep()
+    // **姿勢の切り替えでは床に着かない。** 倒れる型と同じ道で流す。
+    // 読み直しの続き (settled) なら倒れる所は飛ばして、寝ている姿から
+    this.animator?.playSleep(settled)
   }
 
   /**
@@ -1340,6 +1341,18 @@ export class Soldier {
   }
 
   /** 構えの切り替え。構えている間だけ照準方向を向き、上半身が照準の上下に追従する */
+  /** 覗きながら傾く向き。Game が主観のときだけ渡す */
+  private lean: Lean = 0
+
+  setLean(lean: Lean): void {
+    this.lean = lean
+  }
+
+  /** いま実際に傾いているか (姿勢から)。カメラと判定はこちらを見る */
+  get leaning(): Lean {
+    return leanOf(this.locomotion)
+  }
+
   setAiming(aiming: boolean): void {
     // 敬礼が終わるまでは構えられない。礼と戦闘は両立しないので、
     // 途中で打ち切るのではなく最後まで下ろさせる
@@ -2292,6 +2305,8 @@ export class Soldier {
      * 一緒に外れて**いた — 膝を突いたまま走り出せる形になっていた。
      */
     if (this.hardLandTimer > 0) moveDir = ZERO_MOVE
+    // 傾いている間は動けない。傾きながらの移動は作らない
+    if (this.lean !== 0) moveDir = ZERO_MOVE
 
 
     // 銃の重さはどの姿勢でも効く。担いでいる物が軽くなるわけではないので。
@@ -2763,6 +2778,8 @@ export class Soldier {
     this.animator.setPistol(!isTwoHanded(this.held))
     this.animator.setKnife(this.held === 'knife')
     this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
+    // 模型が届く前に眠らされていた (読み直しの続き)。寝ている姿から始める
+    if (this.sleepLeft > 0) this.animator.playSleep(true)
 
     disposeTree(this.placeholder)
     this.placeholder = null
@@ -2944,6 +2961,7 @@ export class Soldier {
       prone: this.proneStage === 'prone',
       proneShift: this.proneShifting,
       stabbing: this.stabbing,
+      lean: this.lean,
       setting: this.animator?.setupLocomotion ?? null,
       rolling: this.rolling,
       onGround: this.onGround,

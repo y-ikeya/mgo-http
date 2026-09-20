@@ -272,7 +272,7 @@ for m in rifle smg sniper mosin shotgun m9 grenade claymore locator soldier; do
 done
 ```
 
-`rifle` だけ `&flip` を付ける (模型が逆向きに寝ている)。`soldier` は `decoy.png` に名前を変えて置く (人形は兵士の模型そのもの)。`m1911.glb` は形が
+`rifle`・`mosin`・`sniper` は `&flip` を付ける (模型が逆向きに寝ている)。`soldier` は `decoy.png` に名前を変えて置く (人形は兵士の模型そのもの)。`m1911.glb` は形が
 数 cm の欠片しか入っていないので、`m1911.png` は `m9.png` の写し。
 
 ## 元データの置き場
@@ -308,6 +308,6 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
     bun tools/merge_clip.js public/models/soldier.glb knife_idle.glb knife_idle public/models/soldier.glb --hips-from pistol_aim
     bun tools/merge_clip.js public/models/soldier.glb stab.glb stab public/models/soldier.glb --hips-from idle
 
-`prone_stab` (tools/prone_knife.json) も同じ。FBX には立ちの刺突 2 本と伏せの 2 本が入っていて、使うのは 4 本目 (`#4`)。腰は `--hips-from prone_fire` で伏せ撃ちの高さに揃える (crawl_f に揃えると 10cm 浮く)。伏せてナイフを構えた姿はこの型の頭の 1 枚を止めて使う。
+`lean` (tools/lean.json、覗きながら傾く) も同じで、使うのは 3 本目 (`#3`)。1 本の中で左 (5 コマ目) と右 (13 コマ目) に傾くので、ゲームはその 2 点で止めて使う。しゃがみは `lean_crouch` (tools/lean_crouch.json、1 本、左 4 コマ目 / 右 10 コマ目) で、腰は `--hips-from crouch_idle`。`prone_stab` (tools/prone_knife.json) も同じ。FBX には立ちの刺突 2 本と伏せの 2 本が入っていて、使うのは 4 本目 (`#4`)。腰は `--hips-from prone_fire` で伏せ撃ちの高さに揃える (crawl_f に揃えると 10cm 浮く)。伏せてナイフを構えた姿はこの型の頭の 1 枚を止めて使う。
 
 雷電と名無しへは同じ物を `--rotation-only` を足して入れる。`knife_idle` は半身の構えで腰が 90° 横を向いているが、手と頭は他の構えと同じ方を向いているので回してはいけない。上半身だけ乗せると腰の基準合わせで捻れるため、ゲームでは立ち止まって構えた間だけ全身で使う。

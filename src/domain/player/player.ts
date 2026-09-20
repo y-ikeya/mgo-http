@@ -28,7 +28,7 @@
  */
 import { canTransition, isSpawning, type Life } from './lifecycle'
 import type { Locomotion } from './locomotion'
-import { HEAD_HEIGHT, stanceOf, type Stance } from './stance'
+import { HEAD_HEIGHT, stanceOf, type Stance, type Lean } from './stance'
 import { creditOf, takeDamage, type Credit, type Wound } from '../rule/damage'
 import type { HeldId } from '../item/held'
 import {
@@ -71,6 +71,8 @@ export interface Pose {
    */
   cameraYaw?: number
   aiming?: boolean
+  /** 傾き (lean_left / lean_right)。目と体を横へずらして判定する */
+  lean?: Lean
   /**
    * そのときの構え。**頭の高さと、ナイフが刺さる姿勢かどうか**がこれで決まる。
    *
