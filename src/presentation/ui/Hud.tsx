@@ -441,7 +441,16 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
                 }}
               >
                 <span class={`hud-kill-name hud-kill-${kill.killerTeam}`}>{kill.killerName}</span>
-                <span class="hud-kill-arrow">{kill.headshot ? '▶💀' : '▶'}</span>
+                {/*
+                  三角の色で**何が起きたか**を出す。赤が殺傷、青が麻酔。
+                  眠らせた側は残機を削っていないので、同じ色だと戦況を読み違える。
+                */}
+                <span
+                  class="hud-kill-arrow"
+                  classList={{ 'hud-kill-arrow-stun': kill.stun === true }}
+                >
+                  {kill.headshot ? '▶💀' : '▶'}
+                </span>
                 <span class={`hud-kill-name hud-kill-${kill.victimTeam}`}>{kill.victimName}</span>
                 <span class="hud-kill-weapon">({kill.weapon})</span>
               </div>
@@ -512,6 +521,16 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       {/* 覗ける状態のとき、肩越しのまま何もしていない人に操作を伝える */}
       <Show when={props.stats?.canZoom && !props.stats?.scoped}>
         <div class="scope-hint">{t('hud.scopeHint')}</div>
+      </Show>
+
+      {/* 梯子の前。**押す物が別の指**なので、そこに在ることを言う */}
+      <Show when={props.stats?.canClimb}>
+        <div class="scope-hint">{t('hud.climbHint')}</div>
+      </Show>
+
+      {/* 基地の上。同じ指が補給になる */}
+      <Show when={props.stats?.canResupply}>
+        <div class="scope-hint">{t('hud.resupplyHint')}</div>
       </Show>
 
       {/*

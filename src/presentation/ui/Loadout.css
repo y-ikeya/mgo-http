@@ -112,64 +112,127 @@
   color: rgba(190, 206, 176, 0.32);
 }
 
+/*
+ * 段の中身。**上に読み出し、下に影絵の列。**
+ *
+ * MGO2 の装備画面と同じ形。札に名前を書くと名前の長さで幅が変わって列が
+ * 崩れるので、名前は段の上に 1 つだけ出し、下は同じ大きさの絵を並べる。
+ */
+.loadout-rail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* いま選んでいる物。種別・名前・弾数を横に並べる */
+.loadout-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  min-height: 34px;
+  padding: 0 4px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.08em;
+  color: rgba(206, 224, 190, 0.9);
+}
+
+.loadout-readout small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: rgba(190, 206, 176, 0.38);
+}
+
+.loadout-readout-cat {
+  font-size: 13px;
+  color: rgba(190, 206, 176, 0.6);
+}
+
+.loadout-readout-name {
+  font-size: 22px;
+}
+
+.loadout-readout-detail {
+  font-size: 11px;
+  color: rgba(190, 206, 176, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
 .loadout-items {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  /*
-   * 空の枠でも行の高さを保つ。
-   *
-   * 部屋が副武器を外すと中身が無くなるが、**行が縮むと枠まで消えたように
-   * 見える**。名前 (1.05em) と弾数 (0.75em) を上下 12px の余白で挟んだ札 1 枚が
-   * 収まる高さ — 札を並べた行と同じ高さになる。
-   */
-  min-height: calc(12px * 2 + 1.05em + 4px + 0.75em);
+  /* 空の段 (副武器を外した部屋) でも札 1 枚ぶんの高さを保つ */
+  min-height: 72px;
 }
 
-.loadout-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 150px;
-  padding: 12px 16px;
-  font-family: inherit;
-  text-align: left;
+/*
+ * 絵の札。**全部同じ大きさ。**
+ *
+ * 中身は影絵と番号だけ。名前は上の読み出しに出る。
+ */
+.loadout-tile {
+  position: relative;
+  flex: none;
+  width: 124px;
+  height: 72px;
+  padding: 0;
   cursor: pointer;
-  background: none;
-  border: 1px solid rgba(160, 190, 140, 0.2);
-  color: rgba(190, 206, 176, 0.7);
+  background: rgba(150, 214, 132, 0.03);
+  border: 1px solid rgba(160, 190, 140, 0.16);
+  color: rgba(190, 206, 176, 0.62);
 }
 
-.loadout-item:hover:not(:disabled) {
-  border-color: rgba(160, 190, 140, 0.45);
-  color: rgba(210, 226, 196, 0.9);
+.loadout-tile:hover:not(:disabled) {
+  border-color: rgba(160, 190, 140, 0.4);
+  color: rgba(210, 226, 196, 0.95);
 }
 
-/* 選択中。角を強めるのではなく、面で示す */
-.loadout-item-on {
-  background: rgba(150, 214, 132, 0.12);
-  border-color: rgba(150, 214, 132, 0.5);
-  color: rgba(206, 232, 190, 0.95);
+/*
+ * 選んでいる札。**四隅の括弧で囲む** (MGO2 の印)。
+ *
+ * 面を塗るのではなく角だけ描く。8 本の線を背景で描いて、枠線は消す。
+ */
+.loadout-tile-on {
+  color: rgba(206, 232, 190, 1);
+  border-color: transparent;
+  background:
+    linear-gradient(currentColor, currentColor) left top / 14px 2px no-repeat,
+    linear-gradient(currentColor, currentColor) left top / 2px 14px no-repeat,
+    linear-gradient(currentColor, currentColor) right top / 14px 2px no-repeat,
+    linear-gradient(currentColor, currentColor) right top / 2px 14px no-repeat,
+    linear-gradient(currentColor, currentColor) left bottom / 14px 2px no-repeat,
+    linear-gradient(currentColor, currentColor) left bottom / 2px 14px no-repeat,
+    linear-gradient(currentColor, currentColor) right bottom / 14px 2px no-repeat,
+    linear-gradient(currentColor, currentColor) right bottom / 2px 14px no-repeat,
+    rgba(150, 214, 132, 0.08);
 }
 
 /* 選択肢が 1 つしか無い枠。押せないことを見た目でも示す */
-.loadout-item-only {
+.loadout-tile-only {
   cursor: default;
   opacity: 0.7;
 }
 
-.loadout-name {
-  display: flex;
-  align-items: center;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 16px;
-  letter-spacing: 0.06em;
+/* 影絵。白い絵を mask にして、札の文字色で塗る */
+.loadout-icon {
+  position: absolute;
+  inset: 8px 10px;
+  display: block;
+  background-color: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+  pointer-events: none;
 }
 
-.loadout-spec {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: rgba(190, 206, 176, 0.45);
+.loadout-tile .loadout-key {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  margin: 0;
+  z-index: 1;
 }
 
 /* 押すキー。名前の前に小さく添える */
@@ -253,38 +316,30 @@
  * **選択の印そのものを色ごと差し替える** — 緑の枠に赤い字だと、どちらが
  * 「選んでいる」なのか読めない。
  */
-.loadout-item-lethal {
-  border-color: rgba(214, 116, 96, 0.3);
+.loadout-tile-lethal {
+  border-color: rgba(214, 116, 96, 0.28);
+  color: rgba(226, 176, 162, 0.7);
 }
 
-.loadout-item-lethal .loadout-name {
-  color: rgba(226, 176, 162, 0.75);
-}
-
-.loadout-item-lethal.loadout-item-on {
-  background: rgba(214, 116, 96, 0.14);
-  border-color: rgba(224, 128, 106, 0.6);
-}
-
-.loadout-item-lethal.loadout-item-on .loadout-name {
+.loadout-tile-lethal:hover:not(:disabled) {
   color: rgba(255, 206, 192, 0.95);
 }
 
-.loadout-item-tranq {
-  border-color: rgba(96, 158, 214, 0.32);
+.loadout-tile-lethal.loadout-tile-on {
+  color: rgba(255, 206, 192, 1);
 }
 
-.loadout-item-tranq .loadout-name {
-  color: rgba(162, 200, 232, 0.78);
+.loadout-tile-tranq {
+  border-color: rgba(96, 158, 214, 0.3);
+  color: rgba(162, 200, 232, 0.72);
 }
 
-.loadout-item-tranq.loadout-item-on {
-  background: rgba(96, 158, 214, 0.16);
-  border-color: rgba(127, 196, 255, 0.65);
-}
-
-.loadout-item-tranq.loadout-item-on .loadout-name {
+.loadout-tile-tranq:hover:not(:disabled) {
   color: rgba(196, 226, 255, 0.98);
+}
+
+.loadout-tile-tranq.loadout-tile-on {
+  color: rgba(196, 226, 255, 1);
 }
 
 

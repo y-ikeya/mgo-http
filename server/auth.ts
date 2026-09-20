@@ -144,7 +144,11 @@ export async function verifyToken(token: string, baseUrl: string): Promise<Ident
   if (!ok) return null
 
   const expires = typeof payload.exp === 'number' ? payload.exp : 0
-  if (expires > 0 && Date.now() / 1000 > expires) return null
+  if (expires > 0 && Date.now() / 1000 > expires) {
+    // 断る理由のうち、遊んでいる最中に起きるのはこれだけ。区別が付くように出す
+    console.warn(`[認証] token の期限切れ (${Math.round(Date.now() / 1000 - expires)} 秒前)`)
+    return null
+  }
 
   const subject = typeof payload.sub === 'string' ? payload.sub : ''
   if (!subject) return null

@@ -87,6 +87,48 @@ interface Node {
  */
 const LEAF_SIZE = 4
 
+/** segmentVisible の作業場。扇 (目と線分) と、集めた隠れる区間 */
+interface Wedge {
+  ex: number; ey: number; ez: number
+  nX: number; nY: number; nZ: number
+  aX: number; aY: number; aZ: number
+  bX: number; bY: number; bZ: number
+  aa: number; ab: number; bb: number
+  minX: number; minY: number; minZ: number
+  maxX: number; maxY: number; maxZ: number
+  /**
+   * 扇の 3 辺の外側を向く面 (平面の中で辺に直交する法線と、その辺の上の 1 点)。
+   * 箱がどれか 1 つの面の外側に丸ごと在れば、扇に触れていない。
+   */
+  edges: { nx: number; ny: number; nz: number; px: number; py: number; pz: number }[]
+  /** 隠れる区間 [lo, hi] の並び (平坦に 2 つずつ) */
+  hidden: number[]
+}
+
+/**
+ * 線分 [0, 1] を覆い切っているか。
+ *
+ * これより細い見え方は「見えていない」と扱う (数値の縁で瞬かないように)。
+ * 立った体 1.6m なら 3mm。
+ */
+const VISIBLE_SLIVER = 0.002
+
+function covers(hidden: number[]): boolean {
+  const n = hidden.length / 2
+  if (n === 0) return false
+  const order: number[] = []
+  for (let i = 0; i < n; i++) order.push(i)
+  order.sort((i, j) => hidden[i * 2]! - hidden[j * 2]!)
+  let reach = 0
+  for (const i of order) {
+    const lo = hidden[i * 2]!
+    const hi = hidden[i * 2 + 1]!
+    if (lo > reach + VISIBLE_SLIVER) return false
+    if (hi > reach) reach = hi
+  }
+  return reach >= 1 - VISIBLE_SLIVER
+}
+
 /** 線が三角に当たらないと見なす平行の閾値。**0 割りを避けるためだけ** */
 const PARALLEL = 1e-9
 
@@ -296,6 +338,168 @@ export class TriangleBvh {
    * どこで当たったかは返さない。遮蔽の判定に要るのは通るかどうかだけで、
    * 位置が要る場面 (カメラを壁の手前へ寄せる) は別に用意する。
    */
+  /**
+   * 目 E から線分 AB の**どこかが見えているか**。
+   *
+   * --- 点ではなく線分で見る ---
+   * 体の上の何点かへ光線を引く形だと、点の間隔より細い隙間から見えている体を
+   * 取りこぼす — 相手が急に現れたり消えたりする。線分にすれば間隔という物が
+   * 無くなり、隙間の細さに関係なく厳密になる。
+   *
+   * --- どう解くか ---
+   * E と A と B の作る三角形 (扇) を遮る三角ごとに、**線分のどの区間を隠すか**
+   * を出して集める。区間の和が線分 [0, 1] を覆い切っていなければ見えている。
+   *
+   * 扇の平面で遮る三角を切ると線分 Q1Q2 になる。平面の中の点 Q は
+   * E + s·(A + t·(B−A) − E) と書けて、s < 1 なら AB より手前、t が AB の上の
+   * 位置。Q1Q2 を手前 (0 < s < 1) に切り詰めてから両端の t を取れば、その間が
+   * 隠れる区間 (透視の射影は線分の上で単調なので、両端だけで足りる)。
+   *
+   * 木の枝は扇の外接箱で捨てるので、費用は光線 1 本と同じ桁。
+   */
+  segmentVisible(
+    ex: number, ey: number, ez: number,
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+  ): boolean {
+    if (this.nodes.length === 0) return true
+    // 平面の基底: a = A − E, b = B − A。法線 n = a × (B − E)
+    const aX = ax - ex, aY = ay - ey, aZ = az - ez
+    const bX = bx - ax, bY = by - ay, bZ = bz - az
+    const vX = bx - ex, vY = by - ey, vZ = bz - ez
+    const nX = aY * vZ - aZ * vY
+    const nY = aZ * vX - aX * vZ
+    const nZ = aX * vY - aY * vX
+    const nLen = Math.hypot(nX, nY, nZ)
+    // 目が線分の延長線上に居る (扇が潰れている)。線 1 本で見る
+    if (nLen < 1e-9) return this.clear(ex, ey, ez, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2)
+    const wedge: Wedge = {
+      ex, ey, ez,
+      nX: nX / nLen, nY: nY / nLen, nZ: nZ / nLen,
+      aX, aY, aZ, bX, bY, bZ,
+      aa: aX * aX + aY * aY + aZ * aZ,
+      ab: aX * bX + aY * bY + aZ * bZ,
+      bb: bX * bX + bY * bY + bZ * bZ,
+      minX: Math.min(ex, ax, bx), minY: Math.min(ey, ay, by), minZ: Math.min(ez, az, bz),
+      maxX: Math.max(ex, ax, bx), maxY: Math.max(ey, ay, by), maxZ: Math.max(ez, az, bz),
+      edges: [],
+      hidden: [],
+    }
+    // 3 辺の外向きの面。辺 × 法線 が平面の中で辺に直交する向き。向きは 3 つ目の頂点で正す
+    const corners: [number, number, number][] = [[ex, ey, ez], [ax, ay, az], [bx, by, bz]]
+    for (let i = 0; i < 3; i++) {
+      const [px, py, pz] = corners[i]!
+      const [qx, qy, qz] = corners[(i + 1) % 3]!
+      const [ox, oy, oz] = corners[(i + 2) % 3]!
+      const eX = qx - px, eY = qy - py, eZ = qz - pz
+      let mx = eY * wedge.nZ - eZ * wedge.nY
+      let my = eZ * wedge.nX - eX * wedge.nZ
+      let mz = eX * wedge.nY - eY * wedge.nX
+      // 残りの頂点が内側 (負) になるように
+      if ((ox - px) * mx + (oy - py) * my + (oz - pz) * mz > 0) { mx = -mx; my = -my; mz = -mz }
+      wedge.edges.push({ nx: mx, ny: my, nz: mz, px, py, pz })
+    }
+    this.shade(0, wedge)
+    return !covers(wedge.hidden)
+  }
+
+  private shade(at: number, w: Wedge): void {
+    const node = this.nodes[at]!
+    if (
+      node.maxX < w.minX || node.minX > w.maxX ||
+      node.maxY < w.minY || node.minY > w.maxY ||
+      node.maxZ < w.minZ || node.minZ > w.maxZ
+    ) {
+      return
+    }
+    /*
+     * **扇の平面の片側に丸ごと在る枝は捨てる。**
+     *
+     * 扇は細長いので外接箱だけで刈ると、遠くの相手へ引いた扇が地図の大半の枝に
+     * 触れて、1 組 0.8ms かかった。平面は薄いので、箱の中心の平面からの距離が
+     * 箱の半径 (法線方向の射影) を超えていれば、その枝の三角は平面と交わらない。
+     */
+    const cx = (node.minX + node.maxX) / 2 - w.ex
+    const cy = (node.minY + node.maxY) / 2 - w.ey
+    const cz = (node.minZ + node.maxZ) / 2 - w.ez
+    const reach =
+      Math.abs(w.nX) * (node.maxX - node.minX) / 2 +
+      Math.abs(w.nY) * (node.maxY - node.minY) / 2 +
+      Math.abs(w.nZ) * (node.maxZ - node.minZ) / 2
+    if (Math.abs(cx * w.nX + cy * w.nY + cz * w.nZ) > reach) return
+    // 扇の 3 辺の外側に丸ごと在る枝も捨てる。細長い扇の帯の大半はここで落ちる
+    for (const e of w.edges) {
+      const dc = ((node.minX + node.maxX) / 2 - e.px) * e.nx + ((node.minY + node.maxY) / 2 - e.py) * e.ny + ((node.minZ + node.maxZ) / 2 - e.pz) * e.nz
+      const r =
+        Math.abs(e.nx) * (node.maxX - node.minX) / 2 +
+        Math.abs(e.ny) * (node.maxY - node.minY) / 2 +
+        Math.abs(e.nz) * (node.maxZ - node.minZ) / 2
+      if (dc > r) return
+    }
+    if (node.count > 0) {
+      for (let i = node.from; i < node.from + node.count; i++) this.shadeTriangle(this.tris[i]!, w)
+      return
+    }
+    this.shade(node.left, w)
+    this.shade(node.right, w)
+  }
+
+  /** 三角 1 枚が扇の平面と交わる線分を取り、線分 AB の隠れる区間を足す */
+  private shadeTriangle(tri: number, w: Wedge): void {
+    const p = this.positions
+    const o = tri * 9
+    // 各頂点の、平面からの符号付き距離
+    const d0 = (p[o]! - w.ex) * w.nX + (p[o + 1]! - w.ey) * w.nY + (p[o + 2]! - w.ez) * w.nZ
+    const d1 = (p[o + 3]! - w.ex) * w.nX + (p[o + 4]! - w.ey) * w.nY + (p[o + 5]! - w.ez) * w.nZ
+    const d2 = (p[o + 6]! - w.ex) * w.nX + (p[o + 7]! - w.ey) * w.nY + (p[o + 8]! - w.ez) * w.nZ
+    const s0 = d0 > 0, s1 = d1 > 0, s2 = d2 > 0
+    if (s0 === s1 && s1 === s2) return
+    // 符号の変わる辺 2 本で、平面との交点を取る
+    const q: number[] = []
+    const cross = (i: number, j: number, di: number, dj: number) => {
+      const f = di / (di - dj)
+      q.push(
+        p[o + i * 3]! + (p[o + j * 3]! - p[o + i * 3]!) * f,
+        p[o + i * 3 + 1]! + (p[o + j * 3 + 1]! - p[o + i * 3 + 1]!) * f,
+        p[o + i * 3 + 2]! + (p[o + j * 3 + 2]! - p[o + i * 3 + 2]!) * f,
+      )
+    }
+    if (s0 !== s1) cross(0, 1, d0, d1)
+    if (s1 !== s2) cross(1, 2, d1, d2)
+    if (s2 !== s0) cross(2, 0, d2, d0)
+    if (q.length < 6) return
+
+    // 平面の中の座標 (s, st) へ。d = s·a + st·b を a·, b· との内積で解く
+    const det = w.aa * w.bb - w.ab * w.ab
+    if (Math.abs(det) < 1e-12) return
+    const solve = (x: number, y: number, z: number): [number, number] => {
+      const dx = x - w.ex, dy = y - w.ey, dz = z - w.ez
+      const da = dx * w.aX + dy * w.aY + dz * w.aZ
+      const db = dx * w.bX + dy * w.bY + dz * w.bZ
+      return [(da * w.bb - db * w.ab) / det, (w.aa * db - w.ab * da) / det]
+    }
+    let [sA, tA] = solve(q[0]!, q[1]!, q[2]!)
+    let [sB, tB] = solve(q[3]!, q[4]!, q[5]!)
+    // 手前 (0 < s < 1) に切り詰める。s は線分の上で線形
+    const LOW = 1e-4, HIGH = 1 - 1e-4
+    if ((sA <= LOW && sB <= LOW) || (sA >= HIGH && sB >= HIGH)) return
+    const clip = (sFrom: number, tFrom: number, sTo: number, tTo: number, bound: number): [number, number] => {
+      const f = (bound - sFrom) / (sTo - sFrom)
+      return [bound, tFrom + (tTo - tFrom) * f]
+    }
+    if (sA < LOW) [sA, tA] = clip(sA, tA, sB, tB, LOW)
+    else if (sA > HIGH) [sA, tA] = clip(sA, tA, sB, tB, HIGH)
+    if (sB < LOW) [sB, tB] = clip(sB, tB, sA, tA, LOW)
+    else if (sB > HIGH) [sB, tB] = clip(sB, tB, sA, tA, HIGH)
+    // t = st / s。両端の間が隠れる
+    const t0 = tA / sA
+    const t1 = tB / sB
+    const lo = Math.max(0, Math.min(t0, t1))
+    const hi = Math.min(1, Math.max(t0, t1))
+    if (hi <= lo) return
+    w.hidden.push(lo, hi)
+  }
+
   clear(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean {
     if (this.nodes.length === 0) return true
     const dx = bx - ax

@@ -7,6 +7,7 @@
 // エクスポートのたびにノード順が変わった場合に静かに壊れる。
 //
 // 使い方: bun merge_clip.js <取り込み先.glb> <取り込み元.glb> <クリップ名> <出力.glb>
+//         [--hips-from <既存の型>] … 腰の高さをその型の先頭に揃える (揺れは残す)
 //         [--rotation-only]  … 体つきが違う相手へ移すとき (腰の移動だけ残す)
 
 const args = process.argv.slice(2)
@@ -19,7 +20,27 @@ const args = process.argv.slice(2)
  * 同じ骨格へ足すだけなら要らない。
  */
 const rotationOnly = args.includes('--rotation-only')
-const [destPath, srcPath, clipName, outPath] = args.filter((a) => !a.startsWith('--'))
+/*
+ * --no-root … 腰の移動を捨てる。**その場で動く型にする。**
+ *
+ * 素材によっては、体が原点から離れた所に置かれたまま焼かれている
+ * (梯子の型は 0.55m 横にずれていた)。位置はこちらが決める型では、その
+ * ずれがそのまま「宙に浮いて登る」になる。
+ */
+const noRoot = args.includes('--no-root')
+/*
+ * --hips-from <既存の型> … 腰の高さをその型に揃える。**上下の揺れは残す。**
+ *
+ * 別のキャラで落とした型を焼き直すと、腰の高さがそのキャラのもの (半分) に
+ * なる。捨てる (--no-root) とバインドポーズの高さに置かれて、構えの型より
+ * 4cm 高い所に立つ — そこから刺す型へ渡ると落差が目立った。既存の型の
+ * 先頭の腰の高さに合わせて平行移動する。
+ */
+const hipsFromAt = args.indexOf('--hips-from')
+const hipsFrom = hipsFromAt >= 0 ? args[hipsFromAt + 1] : null
+const [destPath, srcPath, clipName, outPath] = args.filter(
+  (a, i) => !a.startsWith('--') && !(hipsFromAt >= 0 && i === hipsFromAt + 1),
+)
 
 function parseGlb(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -42,12 +63,37 @@ const destNodeByName = new Map(dest.json.nodes.map((n, i) => [n.name, i]))
 const appended = []
 let appendedLength = 0
 
-function copyAccessor(index) {
-  const accessor = src.json.accessors[index]
-  const view = src.json.bufferViews[accessor.bufferView]
+function accessorBytes(glb, index) {
+  const accessor = glb.json.accessors[index]
+  const view = glb.json.bufferViews[accessor.bufferView]
   const start = (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0)
   const size = { SCALAR: 1, VEC3: 3, VEC4: 4 }[accessor.type] * 4
-  const bytes = src.bin.subarray(start, start + accessor.count * size)
+  return glb.bin.subarray(start, start + accessor.count * size)
+}
+
+/** 取り込み先の型から、腰の位置の先頭の値を読む (--hips-from) */
+function hipsFirstFrame(glb, name) {
+  const animation = glb.json.animations?.find((a) => a.name === name)
+  if (!animation) throw new Error(`${name} が取り込み先に無い (--hips-from)`)
+  const channel = animation.channels.find(
+    (c) => c.target.path === 'translation' && glb.json.nodes[c.target.node].name.endsWith('Hips'),
+  )
+  if (!channel) throw new Error(`${name} に腰の位置が無い (--hips-from)`)
+  const bytes = accessorBytes(glb, animation.samplers[channel.sampler].output)
+  return new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + 12))
+}
+
+function copyAccessor(index, transform) {
+  const accessor = src.json.accessors[index]
+  let bytes = accessorBytes(src, index)
+  if (transform) {
+    const floats = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))
+    transform(floats)
+    bytes = new Uint8Array(floats.buffer)
+    // 値を動かしたので範囲は当てにならない。任意の欄なので落とす
+    delete accessor.min
+    delete accessor.max
+  }
 
   // 4 バイト境界を守る
   const padding = (4 - (appendedLength % 4)) % 4
@@ -93,7 +139,29 @@ for (const channel of animation.channels) {
     filtered++
     continue
   }
-  channels.push({ sampler: channel.sampler, target: { node: target, path: channel.target.path } })
+  if (noRoot && channel.target.path === 'translation' && name.endsWith('Hips')) {
+    filtered++
+    continue
+  }
+  let sampler = channel.sampler
+  if (hipsFrom && channel.target.path === 'translation' && name.endsWith('Hips')) {
+    // 先頭の腰を既存の型の先頭に重ねる。以後の揺れはそのまま
+    const ref = hipsFirstFrame(dest, hipsFrom)
+    const source = animation.samplers[channel.sampler]
+    let shift = null
+    const output = copyAccessor(source.output, (floats) => {
+      shift = [ref[0] - floats[0], ref[1] - floats[1], ref[2] - floats[2]]
+      for (let i = 0; i < floats.length; i += 3) {
+        floats[i] += shift[0]
+        floats[i + 1] += shift[1]
+        floats[i + 2] += shift[2]
+      }
+    })
+    samplers.push({ input: samplers[channel.sampler].input, output, interpolation: source.interpolation })
+    sampler = samplers.length - 1
+    console.log(`${clipName}: 腰を ${hipsFrom} の高さへ (${shift.map((v) => v.toFixed(2)).join(', ')})`)
+  }
+  channels.push({ sampler, target: { node: target, path: channel.target.path } })
 }
 
 dest.json.animations = dest.json.animations ?? []

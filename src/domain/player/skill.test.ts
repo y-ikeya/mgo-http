@@ -1,7 +1,7 @@
 import { MODES } from '../match/room'
 import { describe, expect, test } from 'bun:test'
 import {
-  MASTERY_OF, SKILLS, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
+  MASTERY_OF, SKILLS, alertTriggeredBy, hasAwareness, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
   isAffordable, levelOf, masteryJitterScale, masteryReloadScale, masterySpreadScale,
   runnerScale, throwScale,
   type Skills,
@@ -49,8 +49,8 @@ describe('4 コストの予算', () => {
     expect(isAffordable({ runner: 9 } as never)).toBe(false)
   })
 
-  test('**9 つある。** 2 つだと全員が両方取って選択が生まれない', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(9)
+  test('**11 ある。** 2 つだと全員が両方取って選択が生まれない', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(11)
   })
 })
 
@@ -169,7 +169,18 @@ describe('武器の mastery', () => {
 describe('THROWING MASTERY', () => {
   test('遠くへ投げられる', () => {
     expect(throwScale({})).toBe(1)
-    expect(throwScale({ throwing: 3 })).toBeGreaterThan(throwScale({ throwing: 1 }))
+    expect(throwScale({ throwing: 1 })).toBeGreaterThan(1)
+  })
+
+  /**
+   * **段が無い。取るか取らないかだけ** (ENEMY EXPOSURE と同じ)。
+   *
+   * 本家は Lv3 でも 1 枠だった。値段が段で変わらないなら上の段しか選ばれない。
+   */
+  test('段は 1 つだけ', () => {
+    expect(SKILLS.throwing.levels).toBe(1)
+    expect(isAffordable({ throwing: 1 })).toBe(true)
+    expect(isAffordable({ throwing: 2 })).toBe(false)
   })
 })
 
@@ -303,8 +314,56 @@ describe('選び直せる窓', () => {
 
   test('**光っているフラグのほうは湧き直しで消える。** 死が漏洩を止める', () => {
     const player = newMatchPlayer({ id: 'a', name: 'a', team: 'blue', slot: 0, now: 0 })
-    player.leakedUntil = Date.now() + 5000
+    player.leaks.set('team:red', Date.now() + 5000)
     refill(player)
-    expect(player.leakedUntil).toBe(0)
+    expect(player.leaks.size).toBe(0)
+  })
+})
+
+describe('TARGET ALERT', () => {
+  /** 段で「攻撃」の読み方が緩む。上の段は下の段を含む */
+  test('Lv1 は当てられたときだけ', () => {
+    expect(alertTriggeredBy({ targetAlert: 1 }, 'hit')).toBe(true)
+    expect(alertTriggeredBy({ targetAlert: 1 }, 'shot')).toBe(false)
+    expect(alertTriggeredBy({ targetAlert: 1 }, 'aim')).toBe(false)
+  })
+
+  test('Lv2 は撃たれたら (外れても)', () => {
+    expect(alertTriggeredBy({ targetAlert: 2 }, 'hit')).toBe(true)
+    expect(alertTriggeredBy({ targetAlert: 2 }, 'shot')).toBe(true)
+    expect(alertTriggeredBy({ targetAlert: 2 }, 'aim')).toBe(false)
+  })
+
+  test('Lv3 は狙われた時点で', () => {
+    expect(alertTriggeredBy({ targetAlert: 3 }, 'aim')).toBe(true)
+  })
+
+  test('取っていなければ何にも反応しない', () => {
+    expect(alertTriggeredBy({}, 'hit')).toBe(false)
+  })
+
+  /** 段がそのまま値段。Lv3 は 3 コストで、残り 1 */
+  test('Lv3 を取ると残りは 1', () => {
+    expect(isAffordable({ targetAlert: 3, exposure: 1 })).toBe(true)
+    expect(isAffordable({ targetAlert: 3, runner: 2 })).toBe(false)
+  })
+})
+
+describe('AWARENESS', () => {
+  /** 段が無い。取るか取らないかだけ (EE と同じ) */
+  test('1 段だけ。2 は買えない', () => {
+    expect(SKILLS.awareness.levels).toBe(1)
+    expect(isAffordable({ awareness: 1 })).toBe(true)
+    expect(isAffordable({ awareness: 2 })).toBe(false)
+  })
+
+  test('取っていれば気配が分かる', () => {
+    expect(hasAwareness({ awareness: 1 })).toBe(true)
+    expect(hasAwareness({})).toBe(false)
+  })
+
+  /** 情報系 2 つで 2 コスト。火力に 2 残る */
+  test('EE と一緒に取っても 2 コスト', () => {
+    expect(costOf({ exposure: 1, awareness: 1 })).toBe(2)
   })
 })

@@ -18,13 +18,22 @@
 
 import { dropWeapon, pickUp } from './arms/drops'
 import { recordLag } from '../src/domain/match/lag'
-import { LAG_CLOSE_CODE } from '../src/application/protocol/types'
+import { AUTH_CLOSE_CODE, LAG_CLOSE_CODE } from '../src/application/protocol/types'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
-import { EXPOSE_SECONDS as DECOY_EXPOSE_SECONDS } from '../src/domain/item/decoy'
+import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
-import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, exposeTo, reject} from './damage'
+import {
+  relayLocators,
+  shotHitsLocator,
+  stabHitsLocator,
+  stepLocators,
+  throwLocator,
+} from './arms/locator'
+import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
+import { alertAims, alertShot } from './alert'
+import { relayAwareness, revealTo } from './aware'
 import {
   leaveRoom,
   matchState,
@@ -36,16 +45,17 @@ import {
   updateMatch,
   updateTargets,
 } from './match'
-import { receiveSnapshot, relayShot, relayState, sendHealth, sendStamina} from './relay'
+import { receiveSnapshot, relayShot, relayState, seesPlayer, sendHealth, sendStamina} from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { type Client, ROOM_CAPACITY, broadcast, hostileToOwner, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
-import { lifeElapsed, newMatchPlayer, type MatchPlayer } from '../src/domain/player/player'
+import { lifeElapsed, newMatchPlayer, resupply, type MatchPlayer } from '../src/domain/player/player'
 import {
   MODES,
   ROOMS,
   ROOM_NAMES,
+  isHostile,
   isRoomName,
   modeOf,
   primariesOf,
@@ -61,10 +71,11 @@ import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
-import { inWater, waterOf } from '../src/domain/stage'
+import { STAGES, inWater, waterOf } from '../src/domain/stage'
+import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { MAX_STAMINA, recoverStamina } from '../src/domain/player/stamina'
-import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn } from '../src/domain/player/lifecycle'
+import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/equip'
 
@@ -180,8 +191,14 @@ setInterval(() => {
       const water = waterOf(room.stage.name)
       relayClaymores(room)
       relayDecoys(room)
+      // 置かれた E LOCATOR。**飛ぶところを見ていない人にも見せる** (壊せるように)
+      relayLocators(room)
+      // 近くの敵の置き物・投げ物の気配 (AWARENESS)。**位置だけ、持つ人だけ**
+      relayAwareness(room, now)
       // 誰かが decoy に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
       bumpDecoys(room, now)
+      // 構えて狙われている人が居れば、狙っている側を光らせる (TARGET ALERT Lv3)
+      alertAims(room, now)
       for (const player of connected(room)) {
         /*
          * --- 時間で進む遷移 ---
@@ -305,6 +322,18 @@ setInterval(() => {
           room.grenades.splice(i, 1)
         }
       }
+
+      /*
+       * --- E LOCATOR ---
+       * 手榴弾と同じ刻みで飛ばす (クライアントも同じ刻みで解く)。止まったら
+       * そこに居座って、1 秒ごとに周りの敵を暴く。爆ぜないので信管は無い。
+       */
+      stepLocators(
+        room,
+        now,
+        (body) => stepProjectile(body, room.stage.thrown, undefined, water),
+        Math.max(1, Math.round(TICK_MS / 1000 / FIXED_STEP)),
+      )
 
       // クレイモア。前を敵が通ったら起爆する
       if (room.phase === 'playing') {
@@ -490,6 +519,14 @@ function handleMessage(
       throwGrenade(room, player, message)
       break
 
+    /*
+     * E LOCATOR を投げた。**手榴弾と同じ扱い** — 向きだけ受け取って、
+     * 位置も初速もこちらで作る (捏造した初速で地図の反対側へ置けないように)。
+     */
+    case 'locator':
+      throwLocator(room, player, message)
+      break
+
     case 'loadout':
       // **選んだ物をそのまま書き込まない。** 表に無い名前を名乗られたら弾く
       // (弾いた先で weaponOf が undefined を返し、判定ごと壊れる)
@@ -574,11 +611,14 @@ function handleMessage(
      * 近づいた分だけ確実に見分けられるので、そこは腕前として残す。
      */
     case 'stab':
+      // 刃でも壊せる。**歩いて壊しに行けることが、この道具の裏側**
+      stabHitsLocator(room, player)
       for (const decoy of stabHitsDecoy(room, player, Date.now())) {
         const owner = room.players.get(decoy.owner)
         if (!owner || owner.id === player.id) continue
         if (!hostileToOwner(room, decoy.team, player)) continue
-        exposeTo(room, player, owner, DECOY_EXPOSE_SECONDS)
+        // 輪郭ではなく気配。罠に掛けただけで撃つ準備まで済ませない
+        revealTo(room, player, owner, DECOY_SENSE_SECONDS)
       }
       break
 
@@ -656,6 +696,16 @@ function handleMessage(
       // 弾道の上にクレイモアがあれば起爆する
       shotHitsClaymore(room, message.from, message.to)
       /*
+       * 弾道の上に E LOCATOR があれば壊れる。**晒しはしない。**
+       *
+       * decoy と違って、壊した側に代償は無い。あちらは「撃たせる」のが仕事
+       * なので撃った人が晒されるが、こちらは**壊されるのが仕事の裏側**で、
+       * 壊しに行くこと自体が既に位置を晒す動き (近づく・音を出す) になる。
+       */
+      shotHitsLocator(room, message.from, message.to)
+      // 弾道のそばに TARGET ALERT (Lv2 以上) の人が居れば、撃った側が光る
+      alertShot(room, player, message.from, message.to, Date.now())
+      /*
        * 弾道の上に decoy があれば割れる。**割った本人の位置が漏れる。**
        *
        * 晒す先は置いた人 (の陣営)。置いた人が抜けていても、置いた物は
@@ -667,7 +717,8 @@ function handleMessage(
         const owner = room.players.get(decoy.owner)
         if (!owner || owner.id === player.id) continue
         if (!hostileToOwner(room, decoy.team, player)) continue
-        exposeTo(room, player, owner, DECOY_EXPOSE_SECONDS)
+        // 輪郭ではなく気配。罠に掛けただけで撃つ準備まで済ませない
+        revealTo(room, player, owner, DECOY_SENSE_SECONDS)
       }
       // 銃声だけは扱いが違う。
       //
@@ -703,6 +754,34 @@ function handleMessage(
      *
      * 名簿を配り直すのは、**誰を待っているかが全員に見える**必要があるから。
      */
+    /*
+     * 補給。**自分の陣営の基地の上で、生きている間だけ。**
+     *
+     * 位置は届いている物 (検算済み) を見る。陣営の無い部屋には基地が無いので
+     * 補給も無い。通ったら self をすぐ返す (次の定期便を待たせない)。
+     */
+    case 'resupply': {
+      if (!room.mode.teams || !canAct(player.life)) break
+      const now = Date.now()
+      if (now - sessionOf(player).resuppliedAt < RESUPPLY_COOLDOWN_MS) break
+      if (!atBase(player.x, player.y, player.z, STAGES[room.stage.name].bases[player.team])) break
+      sessionOf(player).resuppliedAt = now
+      resupply(player)
+      const ammo = player.inventory.ammoTable()
+      const session = sessionOf(player)
+      session.socket.send(
+        JSON.stringify({
+          type: 'self',
+          health: player.health,
+          magazine: ammo.magazine,
+          reserve: ammo.reserve,
+          grenades: player.grenades,
+        } satisfies ServerMessage),
+      )
+      session.socket.send(JSON.stringify({ type: 'resupplied' } satisfies ServerMessage))
+      break
+    }
+
     case 'ready':
       if (room.phase !== 'ready') break
       if (player.ready === message.ready) break
@@ -777,8 +856,32 @@ const server = Bun.serve<Client>({
                       .map(([id, n]) => `${id}:${n}`)
                       .join(' ')}]`
                   : '') +
-                ((sessionFor(p)?.rejected ?? 0) > 0 ? ` 却下 ${sessionFor(p)?.rejected}` : '') +
-                ` [${p.life}]`,
+                ((sessionFor(p)?.rejected ?? 0) > 0
+                  ? ` 却下 ${sessionFor(p)?.rejected} (${sessionFor(p)?.lastReject})`
+                  : '') +
+                ` [${p.life}]` +
+                /*
+                 * 位置と姿勢。**「見えない」を突き合わせるのに要る。**
+                 *
+                 * 画面に映らない相手が居るとき、サーバーがその人をどこに
+                 * 居ると思っているかが分からないと、判定を疑うしかない。
+                 */
+                ` @(${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}) ${p.locomotion}` +
+                // 視点の向き (度)。狙っている線を手元で引き直すのに要る
+                ` 向き ${((p.cameraYaw * 180) / Math.PI).toFixed(0)}°/${((p.pitch * 180) / Math.PI).toFixed(0)}°` +
+                (p.aiming ? ' 構え' : '') +
+                /*
+                 * 誰が見えているか (サーバーの判定)。敵だけ。
+                 *
+                 * 光っている (exposed / glowing) 分は含めない — ここは
+                 * **遮蔽の判定そのもの**を読むための行。
+                 */
+                (onBattlefield(p.life)
+                  ? [...room.players.values()]
+                      .filter((q) => q.id !== p.id && isHostile(room.mode, p, q) && onBattlefield(q.life))
+                      .map((q) => ` 見${seesPlayer(room, p, q, Date.now()) ? '○' : '×'}${q.name}`)
+                      .join('')
+                  : ''),
             )
             .join('\n'),
       )
@@ -832,11 +935,24 @@ const server = Bun.serve<Client>({
     // 認証を設定していない環境 (LAN で遊ぶだけ) では今までどおり名乗らせる。
     // 遊ぶのに外部サービスが要る状態にはしない。
     const identity = await resolveIdentity(url)
-    if (!identity) return new Response('誰なのか分からない', { status: 401 })
 
     // 部屋は決まったものだけ。知らない名前で新しく作らせない
     const name = url.searchParams.get('room') ?? ROOM_NAMES[0]
     if (!isRoomName(name)) return new Response('そんな部屋は無い', { status: 404 })
+
+    /*
+     * token を出してきたのに確かめられない (切れている)。**一度受けて、符号を
+     * 付けて閉じる。** 401 で断ると WebSocket には理由が乗らず、画面は「落ちた」
+     * と同じ扱いで繋ぎ直し続ける — 部屋に居るつもりで、サーバーには居ない。
+     * 符号 (AUTH_CLOSE_CODE) を受けた画面は部屋の一覧へ戻る。
+     */
+    if (!identity && url.searchParams.get('token')) {
+      const upgraded = server.upgrade(request, {
+        data: { id: '', room: name, reject: 'auth' } satisfies Client,
+      })
+      return upgraded ? undefined : new Response('誰なのか分からない', { status: 401 })
+    }
+    if (!identity) return new Response('誰なのか分からない', { status: 401 })
 
     // まだ開けていないルール。**一覧には出すが繋がせない** —
     // 何を作れば開くかが見える形にしておきたい (TSNE は非殺傷武器が要る)
@@ -863,6 +979,11 @@ const server = Bun.serve<Client>({
 
   websocket: {
     open(socket) {
+      // 認証の切れた接続。席は作らず、符号を付けて閉じる (fetch の註釈)
+      if (socket.data.reject === 'auth') {
+        socket.close(AUTH_CLOSE_CODE, '認証の期限切れ')
+        return
+      }
       /*
        * 別の部屋に席が残っていたら畳む。**1 人が持てる接続は 1 本。**
        *

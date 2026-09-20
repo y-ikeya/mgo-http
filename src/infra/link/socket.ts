@@ -1,5 +1,5 @@
 import { decodeSnapshot, encodeSnapshot, isSnapshot, readSlot } from '../codec/snapshot'
-import { LAG_CLOSE_CODE } from '../../application/protocol/types'
+import { AUTH_CLOSE_CODE, LAG_CLOSE_CODE } from '../../application/protocol/types'
 import type { ClientMessage, NetTransport, ServerMessage } from '../../application/protocol/types'
 
 /**
@@ -16,7 +16,9 @@ const RECONNECT_DELAY = 1500
 export class NetSocket implements NetTransport {
   readonly id: string
 
-  private readonly url: string
+  private readonly base: string
+  private readonly room: string
+  private readonly tokenOf: () => string | undefined
   private readonly listeners = new Set<(message: ServerMessage) => void>()
   /**
    * 断られた理由。**入っていれば繋ぎ直しを諦めている。**
@@ -25,6 +27,8 @@ export class NetSocket implements NetTransport {
    * 分からない。
    */
   rejected: string | null = null
+  /** 認証が切れて断られた。繋ぎ直さない (画面が部屋の一覧へ戻す) */
+  expired = false
   private readonly name: string
   private socket: WebSocket | null = null
   /**
@@ -45,20 +49,42 @@ export class NetSocket implements NetTransport {
   /**
    * @param token 発行元が署名したもの。渡すとサーバーが署名から ID を導く。
    *   省略すると名乗った ID がそのまま使われる (認証を設定していない環境用)。
+   *
+   *   **関数で渡す。** token は 1 時間で切れ、認証の側が裏で取り直している。
+   *   文字列で受けて使い回すと、切れてからの繋ぎ直し (サーバーの再起動・回線の
+   *   途切れ) が**全部断られる** — 画面は部屋に居るつもりで、サーバーには居ない。
+   *   繋ぐたびにその時点の token を訊きに行く。
    */
-  constructor(id: string, name: string, url: string, room = 'default', token?: string) {
+  constructor(
+    id: string,
+    name: string,
+    url: string,
+    room = 'default',
+    token?: string | (() => string | undefined),
+  ) {
     this.id = id
     this.name = name
-    // 部屋はクエリで渡す。サーバーは最初のメッセージを待たずに
-    // 誰がどこに居るか分かるので、切断時に leave を代わりに配れる。
-    //
-    // token をクエリに載せるのは、ブラウザが WebSocket にヘッダを付けられないため。
-    // ログに残る場所なので、寿命の短いものを使う (1 時間で失効し、自動で取り直す)。
+    this.base = url
+    this.room = room
+    this.tokenOf = typeof token === 'function' ? token : () => token
+    this.connect()
+  }
+
+  /**
+   * 繋ぐ先。**毎回組み直す** (token がその時点の物になるように)。
+   *
+   * 部屋はクエリで渡す。サーバーは最初のメッセージを待たずに
+   * 誰がどこに居るか分かるので、切断時に leave を代わりに配れる。
+   *
+   * token をクエリに載せるのは、ブラウザが WebSocket にヘッダを付けられないため。
+   * ログに残る場所なので、寿命の短いものを使う (1 時間で失効し、自動で取り直す)。
+   */
+  private urlNow(): string {
+    const token = this.tokenOf()
     const who = token
       ? `token=${encodeURIComponent(token)}`
-      : `id=${encodeURIComponent(id)}`
-    this.url = `${url}?${who}&room=${encodeURIComponent(room)}`
-    this.connect()
+      : `id=${encodeURIComponent(this.id)}`
+    return `${this.base}?${who}&room=${encodeURIComponent(this.room)}`
   }
 
   send(message: ClientMessage): void {
@@ -108,7 +134,7 @@ export class NetSocket implements NetTransport {
   private connect(): void {
     if (this.disposed) return
 
-    const socket = new WebSocket(this.url)
+    const socket = new WebSocket(this.urlNow())
     this.socket = socket
 
     socket.onopen = () => {
@@ -168,6 +194,11 @@ export class NetSocket implements NetTransport {
        */
       if (event.code === LAG_CLOSE_CODE) {
         this.rejected = event.reason || '接続を切られました'
+        return
+      }
+      // 認証が切れている。**繋ぎ直しても通らない**ので止める。長く放置した印
+      if (event.code === AUTH_CLOSE_CODE) {
+        this.expired = true
         return
       }
       // 落ちたら繋ぎ直す。サーバーを再起動しても対戦が終わらないように。

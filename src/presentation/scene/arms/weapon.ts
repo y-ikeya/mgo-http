@@ -133,10 +133,17 @@ const SMG: WeaponConfig = {
  * ナイフ (銃剣) は全長 0.3m の片手武器。
  * 柄は原点付近なので握り位置はほぼ原点。
  */
+/*
+ * ナイフ。**Blender で手に持たせた置き方をそのまま写した値。**
+ *
+ * 刺突の素材 (tools/raw/Stabbing.fbx) には、右手の骨に親付けした同じナイフ
+ * (Bayonet) が入っている。その骨内の行列を測り、本番の取り付け (肘→手首の線を
+ * 基準にする attachTo) を逆算してこの 2 つにした。目で合わせた値ではない。
+ * 測り直すときは Blender で骨からの相対行列を出して、同じ逆算を通す。
+ */
 const KNIFE: WeaponConfig = {
-  grip: new THREE.Vector3(0.02, -0.07, 0.025),
-  // 向きは肘から手首への線から導くので、補正は刃の傾き (roll) が主になる
-  rotation: new THREE.Euler(0, 0, 0),
+  grip: new THREE.Vector3(0.015, 0.08, 0.025),
+  rotation: new THREE.Euler(degrees(59.1), degrees(5.8), degrees(-26.8)),
   tip: new THREE.Vector3(0, 0, -0.24),
 }
 

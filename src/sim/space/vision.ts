@@ -49,12 +49,23 @@ export interface StageBox {
 }
 
 /**
- * 体のどこを見るか。足元からの高さの比率。
+ * 体のどこを見るか。足元からの高さの比率。**頭から順。**
  *
  * 頭だけで判定すると、頭を隠して足を出している相手が完全に消える。
  * 見えている部分があるのに映らないのは、隠れられるより困る。
+ *
+ * --- 3 段では隙間を取りこぼす ---
+ * 長らく頭・胸・足元の 3 段だった。筏の塔の縁の板 (床から 12cm の隙間) の裏に
+ * しゃがんだ相手を地面から見上げると、隙間を抜ける線が届くのは**脛から腿**
+ * (高さ 0.25〜0.35m) だけで、足元 0.14 と胸 0.52 の間に落ちる。画面には脚が
+ * 映っているのにサーバーは配らなかった。
+ *
+ * 0.15 刻み (立ちで 0.22m、しゃがみで 0.14m) にすると、板の裏にしゃがむ相手が
+ * 見える組が 93 通り中 0〜2 から 14〜20 になった (手元の筏で総当たり)。
+ *
+ * 費用は隠れている相手にしか掛からない (通った瞬間に返る)。見えている相手は 1 本のまま。
  */
-export const SAMPLE_RATIOS = [1, 0.55, 0.15]
+export const SAMPLE_RATIOS = [1, 0.85, 0.7, 0.55, 0.4, 0.25, 0.1]
 
 /**
  * 体の幅の半分 (m)。中心線から左右へこれだけ離した点も見る。
@@ -176,6 +187,92 @@ export function segmentHitsBox(
 export interface SightBlocker {
   /** a から b へ線が通るか */
   clear(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean
+  /**
+   * 目 e から線分 ab の**どこかが見えているか**。三角の網は厳密に解く
+   * (bvh.ts の segmentVisible)。無ければ線分の上を何点か刻んで clear で見る。
+   */
+  segmentVisible?(
+    ex: number, ey: number, ez: number,
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+  ): boolean
+}
+
+/** 線分の上を刻む数 (segmentVisible を持たない世界の代用)。立った体で 10cm 刻み */
+const SEGMENT_SAMPLES = 16
+
+/** 目から線分のどこかが見えているか。厳密に解ける世界ならそちら、無ければ刻む */
+export function segmentVisibleIn(
+  world: SightBlocker,
+  ex: number, ey: number, ez: number,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+): boolean {
+  if (world.segmentVisible) return world.segmentVisible(ex, ey, ez, ax, ay, az, bx, by, bz)
+  for (let i = 0; i <= SEGMENT_SAMPLES; i++) {
+    const t = i / SEGMENT_SAMPLES
+    if (world.clear(ex, ey, ez, ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t)) return true
+  }
+  return false
+}
+
+/** 体を包む箱の寸法。domain/player/stance.ts の BodyBox と同じ形 (値は受け取る) */
+export interface BodyExtent {
+  halfWidth: number
+  back: number
+  front: number
+  height: number
+}
+
+/**
+ * 体が見えているか。**箱の 12 辺を線分として見る。**
+ *
+ * 点 (頭・胸・足元 …) で見ると、点の間隔より細い隙間から見えている体を
+ * 取りこぼして、相手が急に現れたり消えたりする。箱の辺なら間隔が無い。
+ * 箱は体より少し大きいので送る側に倒れる (迷ったら送る側)。
+ *
+ * 縦の辺 4 本を先に見る (立った体はたいていそこで通る)。1 本でも通れば返す。
+ *
+ * @param yaw 体の向き (rad)。前は forwardOf と同じ (-sin, -cos)
+ */
+export function bodyVisible(
+  eyeX: number,
+  eyeY: number,
+  eyeZ: number,
+  x: number,
+  feetY: number,
+  z: number,
+  yaw: number,
+  box: BodyExtent,
+  world: SightBlocker,
+): boolean {
+  const fx = -Math.sin(yaw)
+  const fz = -Math.cos(yaw)
+  // 右向き。前 × 上
+  const rx = -fz
+  const rz = fx
+  // 底面の 4 隅: 前右・前左・後右・後左
+  const corners: [number, number][] = [
+    [x + fx * box.front + rx * box.halfWidth, z + fz * box.front + rz * box.halfWidth],
+    [x + fx * box.front - rx * box.halfWidth, z + fz * box.front - rz * box.halfWidth],
+    [x - fx * box.back + rx * box.halfWidth, z - fz * box.back + rz * box.halfWidth],
+    [x - fx * box.back - rx * box.halfWidth, z - fz * box.back - rz * box.halfWidth],
+  ]
+  const top = feetY + box.height
+  // 縦の辺
+  for (const [cx, cz] of corners) {
+    if (segmentVisibleIn(world, eyeX, eyeY, eyeZ, cx, feetY, cz, cx, top, cz)) return true
+  }
+  // 上面と底面の辺 (前・後・右・左)
+  const rings: [number, number][] = [[0, 1], [2, 3], [0, 2], [1, 3]]
+  for (const y of [top, feetY]) {
+    for (const [i, j] of rings) {
+      const [ax, az] = corners[i]!
+      const [bx, bz] = corners[j]!
+      if (segmentVisibleIn(world, eyeX, eyeY, eyeZ, ax, y, az, bx, y, bz)) return true
+    }
+  }
+  return false
 }
 
 /**
@@ -210,6 +307,7 @@ export const OPEN_SIGHT: SightBlocker = { clear: () => true }
 export function boxSight(boxes: StageBox[]): SightBlocker {
   return {
     clear: (ax, ay, az, bx, by, bz) => isPathClear(ax, ay, az, bx, by, bz, boxes),
+    // 箱の世界は線分を刻んで見る (segmentVisibleIn の代用の道)
   }
 }
 
@@ -327,7 +425,45 @@ export function isPathClear(
 
 /** 視線を止める面だけを残す。金網も茂みも見通せる面は数に入れない */
 export function sightBlockers(boxes: StageBox[]): StageBox[] {
-  return boxes.filter((box) => box.flags?.eye !== false)
+  return boxes.filter((box) => box.flags?.eye !== false && sane(box))
+}
+
+/**
+ * 正気でない高さ (m)。**これを超えた箱は書き出しの事故として捨てる。**
+ *
+ * 遊べる範囲は ±40m ほどで、一番高い塔でも 22m しかない。60m を超える箱は
+ * 地形ではなく、**壊れた形が 1 つ紛れ込んだ**ことを意味する。
+ */
+export const SANE_HEIGHT = 60
+
+/** 一度警告した名前。毎フレームではないが、読み込みのたびに出ると埋もれる */
+const warned = new Set<string>()
+
+/**
+ * 壊れた形を取り込まない。
+ *
+ * --- なぜ要るか ---
+ * 筏の梯子に付いている落下防止の輪 (BézierCircle) が、**真上へ 3km 伸びた箱**
+ * として書き出されていた。名前に印が無いので全部を止める扱いになり、
+ *
+ *   - 梯子を登っている間ずっとカメラが遮られて、寄り引きを繰り返す
+ *   - 梯子の周りで弾が消え、視線も切れる (そこに居る敵が見えない)
+ *
+ * という形で出た。**1 つの壊れた形が、その一帯の遊びを壊す。**
+ *
+ * 直すのは書き出し側 (元の形) だが、黙って取り込むと次に同じことが起きても
+ * 気づけない。ここで落として名前を出す。
+ */
+function sane(box: StageBox): boolean {
+  const height = box.max[1] - box.min[1]
+  if (height <= SANE_HEIGHT) return true
+  if (!warned.has(box.name)) {
+    warned.add(box.name)
+    console.warn(
+      `[地形] ${box.name} は高さ ${height.toFixed(0)}m。書き出しの事故として判定から外す`,
+    )
+  }
+  return false
 }
 
 /**
@@ -349,11 +485,11 @@ export function sightBlockers(boxes: StageBox[]): StageBox[] {
  * 通るかどうかしか答えない SightBlocker では足りない。
  */
 export function cameraBlockers(boxes: StageBox[]): StageBox[] {
-  return boxes.filter((box) => box.flags?.camera !== false)
+  return boxes.filter((box) => box.flags?.camera !== false && sane(box))
 }
 
 export function solidBlockers(boxes: StageBox[]): StageBox[] {
-  return boxes.filter((box) => box.flags?.player !== false)
+  return boxes.filter((box) => box.flags?.player !== false && sane(box))
 }
 
 /**

@@ -33,7 +33,7 @@ import type { WeaponId } from './weapons'
 export type { WeaponId }
 
 /** 投げる物・置く物。support の枠に入る */
-export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy'
+export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator'
 
 /**
  * 手に持てる物すべて。
@@ -88,7 +88,30 @@ export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
  * 置く動作の上に構えが乗った。
  */
 export function isThrowable(id: HeldId): id is ThrowId {
-  return id === 'grenade' || id === 'claymore' || id === 'magazine' || id === 'decoy'
+  return (
+    id === 'grenade' ||
+    id === 'claymore' ||
+    id === 'magazine' ||
+    id === 'decoy' ||
+    id === 'locator'
+  )
+}
+
+/**
+ * 手で投げる物か。**振りかぶって放す物だけ。**
+ *
+ * 同じ「投げる物」(isThrowable) でも、手順は 3 つに分かれる:
+ *
+ *     grenade / locator   振りかぶって放す。落下点を見せる
+ *     claymore / decoy    かがんで置く (isPlaceable)
+ *     magazine            音で釣る道具。別の通で送る (ThrowEvent)
+ *
+ * 手榴弾と E LOCATOR は**手を離れた後だけが違う**ので、構えも振りかぶりも
+ * 分けない。並べて書くと 3 つ目を足したときに漏れる (decoy でそうなった)
+ * ので述語で聞く。
+ */
+export function isThrownByHand(id: HeldId): id is 'grenade' | 'locator' {
+  return id === 'grenade' || id === 'locator'
 }
 
 /**
@@ -99,7 +122,7 @@ export function isThrowable(id: HeldId): id is ThrowId {
  * なった)。述語で聞く。
  */
 export function isSupport(id: HeldId): id is SupportKind {
-  return id === 'grenade' || id === 'claymore' || id === 'decoy'
+  return id === 'grenade' || id === 'claymore' || id === 'decoy' || id === 'locator'
 }
 
 /**
@@ -206,6 +229,8 @@ export const HELD: Record<HeldId, HeldSpec> = {
   magazine: { id: 'magazine', label: 'MAG', family: 'weapon', slot: 'support', weight: 0.3, shoots: false, twoHanded: false },
   // 空気を入れる前の人形。**畳んであるので軽い**
   decoy: { id: 'decoy', label: 'DECOY', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
+  // 投げて置く走査装置。手榴弾ほどの大きさ
+  locator: { id: 'locator', label: 'E.LOCATOR', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
 
   // 刺されば即死。代償は**銃をしまってから近づく**こと (docs/weapons.md)
   knife: { id: 'knife', label: 'KNIFE', family: 'weapon', slot: 'knife', weight: 0.3, shoots: false, twoHanded: false },
@@ -382,13 +407,21 @@ export interface Loadout {
  * ので、値をこちらへ持ってくると輪になる。型だけ写して、食い違ったら
  * 数の表 (SUPPORT_COUNT) が型検査で落ちるようにしてある。
  */
-export type SupportKind = 'grenade' | 'claymore' | 'decoy'
+export type SupportKind = 'grenade' | 'claymore' | 'decoy' | 'locator'
 
 /** 1 つの命で持てる投げ物の数 */
 const SUPPORT_COUNT: Record<SupportKind, number> = {
   grenade: 3,
   claymore: 3,
   decoy: 3,
+  /*
+   * **他と揃えて 3 つ。**
+   *
+   * 1 つだけにすると、壊された時点でその命の間は二度と覗けない。
+   * **壊せる道具**なので、壊された後に置き直せる数が要る — 壊す側の手
+   * (探して壊す) と、投げる側の手 (置き直す) が両方残る。
+   */
+  locator: 3,
 }
 
 /**

@@ -39,6 +39,14 @@ const RULES = {
   // 伏せだけ低い。**本物の数字は持ち込まない** — 判定の形だけを見る
   headHeight: (stance: string) =>
     stance === 'prone' ? 0.4 : stance === 'crouch' || stance === 'box' ? 0.94 : 1.47,
+  // カメラの注視点。頭の少し上
+  viewHeight: (stance: string) =>
+    (stance === 'prone' ? 0.4 : stance === 'crouch' || stance === 'box' ? 0.94 : 1.47) + 0.1,
+  // 部位の大きさ。頭は小さく、胴は大きい
+  zoneRadius: (zone: string) => (zone === 'HEAD' ? 0.14 : zone === 'BODY' ? 0.2 : 0.16),
+  // 縦の幅。頭は点、胴は腰から首、脚は足元から腰
+  zoneSpan: (zone: string): readonly [number, number] =>
+    zone === 'HEAD' ? [1, 1] : zone === 'BODY' ? [0.66, 0.92] : [0.09, 0.66],
   // 立ち・しゃがみ・箱は刺さる。倒れている相手は見下ろしたときだけ
   canBeStabbed: (stance: string, aimPitch: number) =>
     stance === 'stand' || stance === 'crouch' || stance === 'box' || aimPitch <= DOWN_PITCH,
@@ -262,5 +270,74 @@ describe('低い遮蔽を越えた弾', () => {
     // 20m で 3.5cm しか膨らまないので、これは「もっと遠くから撃った」想定の値。
     // 見たいのは幾何であって、麻酔銃の実際の数字ではない
     expect(shoot(1.2).ok).toBe(true)
+  })
+})
+
+describe('部位は中心の 1 点ではなく球で見る', () => {
+  /*
+   * 相手は壁の端のすぐ裏。頭の中心 (x = 0) は壁の裏だが、頭の球 (半径 0.14) の
+   * 端は壁の端 (x = 0.1) から出ている。画面では縁に当たる弾なので、通す。
+   */
+  const wall: StageBox = { name: 'edge', min: [-10, 0, 1.4], max: [0.1, 3, 1.6] }
+  const sight = boxSight([wall])
+
+  test('頭の縁だけ見えていれば通る', () => {
+    const verdict = verifyHit(
+      history([0, 0], 'stand'),
+      history([0, 3], 'stand'),
+      { kind: 'bullet', zone: 'HEAD', distance: 3 },
+      sight,
+      WINDOW,
+      RULES,
+    )
+    expect(verdict.ok).toBe(true)
+  })
+
+  test('球ごと壁の裏なら通らない', () => {
+    // 壁の端を x = 0.5 まで伸ばす。頭の球 (0.14) は全部裏
+    const wide: StageBox = { name: 'edge', min: [-10, 0, 1.4], max: [0.5, 3, 1.6] }
+    const verdict = verifyHit(
+      history([0, 0], 'stand'),
+      history([0, 3], 'stand'),
+      { kind: 'bullet', zone: 'HEAD', distance: 3 },
+      boxSight([wide]),
+      WINDOW,
+      RULES,
+    )
+    expect(verdict.ok).toBe(false)
+  })
+})
+
+describe('胴は球ではなく筒で見る', () => {
+  /*
+   * 胸の高さに 28cm の隙間が開いた壁。相手は壁のすぐ裏。
+   * 胴の中心 (1.06m) は壁の裏だが、筒の上端 (首 1.35 + 0.2) は隙間に掛かる。
+   */
+  const lower: StageBox = { name: 'low', min: [-10, 0, 1.4], max: [10, 1.3, 1.6] }
+  const upper: StageBox = { name: 'mid', min: [-10, 1.58, 1.4], max: [10, 4, 1.6] }
+  const sight = boxSight([lower, upper])
+
+  test('上胸が隙間に掛かっていれば BODY が通る', () => {
+    const verdict = verifyHit(
+      history([0, -20], 'stand'),
+      history([0, 3], 'stand'),
+      { kind: 'bullet', zone: 'BODY', distance: 23 },
+      sight,
+      WINDOW,
+      RULES,
+    )
+    expect(verdict.ok).toBe(true)
+  })
+
+  test('隙間が脚の高さに無ければ LEGS は通らない', () => {
+    const verdict = verifyHit(
+      history([0, -20], 'stand'),
+      history([0, 3], 'stand'),
+      { kind: 'bullet', zone: 'LEGS', distance: 23 },
+      sight,
+      WINDOW,
+      RULES,
+    )
+    expect(verdict.ok).toBe(false)
   })
 })

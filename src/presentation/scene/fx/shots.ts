@@ -228,12 +228,40 @@ const FOAM_RADIUS = 0.3
  *
  * 描く負担は増えない — 1 つの塊にまとめてあるので、増えるのは姿勢の数だけ。
  */
-const DROPS_PER_SPLASH = 18
+const DROPS_PER_SPLASH = 30
 const DROP_POOL = SPLASH_POOL * DROPS_PER_SPLASH
 const DROP_RADIUS = 0.013
 /** 粒ごとの大きさのばらつき (倍)。揃うと粒に見えない */
 const DROP_SIZE_MIN = 0.55
 const DROP_SIZE_MAX = 1.8
+/**
+ * 粒の材質。**手榴弾の破片と同じで、光を受ける。**
+ *
+ * 塗りつぶし (MeshBasicMaterial) だと粒が全部同じ白で、紙の切れ端が舞って
+ * いるように見えた。小さい物が水に見えるのは**面の光り**があるからで、太陽の
+ * 側が光って反対側が空の色に沈む、を材質に任せる。水滴なので粗さは低く、
+ * 金属ではない。
+ */
+const DROP_ROUGHNESS = 0.1
+/**
+ * 透け具合。**玉に見えない所まで下げる。**
+ *
+ * 0.85 だと陰の側が灰色に沈んで、発泡スチロールの玉が舞って見えた (試写)。
+ * 水滴は向こうが透けるので、陰の側は後ろの水と空に溶ける。光る面だけが
+ * 残るくらいでいい。
+ */
+const DROP_OPACITY = 0.55
+/**
+ * 霧。**大きい粒の間を埋める細かい粒。**
+ *
+ * 1 回のうちこの割合を細かい粒にする。速く上がってすぐ消える。大きい粒だけ
+ * だと 1 つずつ数えられてしまい、間が埋まると液体に見える (血と同じ)。
+ */
+const MIST_SHARE = 0.4
+const MIST_SIZE = 0.35
+const MIST_LIFE = 0.32
+/** 消える前に縮め始める (秒)。空中で消える粒の、消えた瞬間を隠す */
+const DROP_FADE = 0.12
 /** 上へ跳ねる速さと、外へ散る速さ (m/s) */
 const DROP_RISE = 3.3
 const DROP_SPREAD = 1.9
@@ -586,8 +614,16 @@ export class Shots {
      * 玉は 5 面。粒は 1cm ほどで、しかも動いているので、丸さは要らない。
      */
     this.drops = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(DROP_RADIUS, 5, 3),
-      new THREE.MeshBasicMaterial({ color: DROP_COLOR, transparent: true, opacity: 0.8, depthWrite: false }),
+      // 光を受けるので面を少し増やす。5 面だと光る面が角張って見える
+      new THREE.SphereGeometry(DROP_RADIUS, 7, 5),
+      new THREE.MeshStandardMaterial({
+        color: DROP_COLOR,
+        roughness: DROP_ROUGHNESS,
+        metalness: 0,
+        transparent: true,
+        opacity: DROP_OPACITY,
+        depthWrite: false,
+      }),
       DROP_POOL,
     )
     this.drops.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -828,9 +864,11 @@ export class Shots {
        * 半端な角を足して回すと、続けて撃っても同じ形が並ばない。
        */
       const angle = (n / DROPS_PER_SPLASH + i * 0.137) * Math.PI * 2 + Math.random() * 0.35
+      // 後ろの何割かは霧。細かく、速く上がって、空中で消える
+      const mist = n >= DROPS_PER_SPLASH * (1 - MIST_SHARE)
       // 中心ほど高く、外ほど低く飛ぶ。柱から剥がれて散る形になる
-      const outward = (0.35 + Math.random() * 0.65) * DROP_SPREAD * push
-      const up = (0.6 + Math.random() * 0.7) * DROP_RISE * push
+      const outward = (0.35 + Math.random() * 0.65) * DROP_SPREAD * push * (mist ? 0.7 : 1)
+      const up = (0.6 + Math.random() * 0.7) * DROP_RISE * push * (mist ? 1.25 : 1)
       this.dropAt[i * 3] = at.x
       this.dropAt[i * 3 + 1] = surfaceY + 0.03
       this.dropAt[i * 3 + 2] = at.z
@@ -838,9 +876,11 @@ export class Shots {
       this.dropVelocity[i * 3 + 1] = up
       this.dropVelocity[i * 3 + 2] = Math.sin(angle) * outward
       this.dropFloor[i] = surfaceY
-      this.dropSize[i] = DROP_SIZE_MIN + Math.random() * (DROP_SIZE_MAX - DROP_SIZE_MIN)
-      // 上がって落ちるまで。落ちた所で消えるので、これは切り上げの保険
-      this.dropLife[i] = 0.9
+      this.dropSize[i] = mist
+        ? MIST_SIZE * (0.7 + Math.random() * 0.6)
+        : DROP_SIZE_MIN + Math.random() * (DROP_SIZE_MAX - DROP_SIZE_MIN)
+      // 上がって落ちるまで。落ちた所で消えるので、粒のほうは切り上げの保険
+      this.dropLife[i] = mist ? MIST_LIFE * (0.7 + Math.random() * 0.6) : 0.9
     }
 
     // --- 波紋 ---
@@ -1095,7 +1135,8 @@ export class Shots {
        * 粒は小さすぎて向きが読めないので、伸びだけが速さとして伝わる。
        */
       const stretch = 1 + Math.min(0.9, Math.abs(this.dropVelocity[p + 1]) * 0.13)
-      const size = this.dropSize[i]
+      // 空中で尽きる粒 (霧) は縮めて消す。**消えた瞬間が分からないように** (破片と同じ)
+      const size = this.dropSize[i] * Math.min(1, this.dropLife[i] / DROP_FADE)
       this.dropScale.set((size / Math.sqrt(stretch)), size * stretch, (size / Math.sqrt(stretch)))
       this.dropMatrix.makeScale(this.dropScale.x, this.dropScale.y, this.dropScale.z)
       this.dropMatrix.setPosition(this.dropAt[p], this.dropAt[p + 1], this.dropAt[p + 2])

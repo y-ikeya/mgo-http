@@ -50,17 +50,22 @@ const JA = {
   'lobby.playing': '対戦中',
   'lobby.over': '結果表示',
   'lobby.unreachable': 'サーバーに繋がらない',
+  'lobby.expired': '長時間操作がなかったため部屋から退出しました',
   'lobby.loading': '読み込み中…',
 
 
   // --- 試合中 ---
+  'hud.loading': '戦場を読み込んでいます',
   'hud.waitingForOpponent': '対戦相手を待っています',
   'hud.matchGone': 'その試合はすでに終了しています',
   'hud.scopeHint': 'Z / ホイールで覗く',
+  'hud.climbHint': 'G / △ で梯子を登る',
+  'hud.resupplyHint': 'G / △ で補給',
   'hud.standUpHint': '移動で匍匐 · Space で起き上がる',
   // --- 装備 ---
   'loadout.note': '装備を選んでください',
   'loadout.deployIn': '出撃まで {n}',
+  'loadout.none': '持たない',
 
   // --- 描けない機械 ---
   'gpu.title': 'GPU が使われていません',
@@ -127,15 +132,20 @@ const EN: Record<Key, string> = {
   'lobby.playing': 'In progress',
   'lobby.over': 'Results',
   'lobby.unreachable': 'Cannot reach the server',
+  'lobby.expired': 'You were removed from the room after a long period of inactivity',
   'lobby.loading': 'Loading…',
 
 
+  'hud.loading': 'Loading the battlefield',
   'hud.waitingForOpponent': 'Waiting for an opponent',
   'hud.matchGone': 'That match is already over',
   'hud.scopeHint': 'Z / wheel to scope',
+  'hud.climbHint': 'G / △ to climb',
+  'hud.resupplyHint': 'G / △ to resupply',
   'hud.standUpHint': 'MOVE TO CRAWL · SPACE TO GET UP',
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',
+  'loadout.none': 'None',
 
   'gpu.title': 'GPU IS NOT BEING USED',
   'gpu.lede':

@@ -64,6 +64,20 @@ export type Locomotion =
    */
   | 'hard_land'
   /**
+   * 梯子を登っている。**上下にしか動けない。**
+   *
+   * 掴んでいる間は重力も横移動も止まる。撃てないし持ち替えもできない —
+   * 両手が塞がっているので、**登っている間は無防備**という取り決め。
+   */
+  | 'climb'
+  /**
+   * 梯子を登り切って乗り越える。**一度きりの型。**
+   *
+   * 上端で流し、終わりで屋上に立つ。途中で止められない (掴む物が無い所を
+   * 通るので、途中で手を離せる形にすると宙に浮く)。
+   */
+  | 'climb_top'
+  /**
    * 麻酔で眠っている。
    *
    * 倒れている (death) とは別物。**体はそこに在り続け、30 秒で起きる。**
@@ -97,6 +111,8 @@ export type Locomotion =
   | 'prone_death'
   /** 伏せたまま後ろへ下がる。前進 (crawl_f) と対 */
   | 'crawl_b'
+  /** 伏せたまま刺す。全身の型 (立ちの stab と同じ扱い) */
+  | 'prone_stab'
   // 敬礼。全身の型なので上下を分けない
   | 'salute'
   /**
@@ -187,6 +203,9 @@ export function emptyHanded(locomotion: Locomotion): boolean {
     locomotion === 'roll' ||
     locomotion === 'hard_land' ||
     locomotion === 'bump' ||
+    // 梯子。**両手が塞がっている** — 銃を出すと梯子を握らずに登って見える
+    locomotion === 'climb' ||
+    locomotion === 'climb_top' ||
     locomotion === 'sleep' ||
     locomotion === 'away' ||
     locomotion === 'death' ||

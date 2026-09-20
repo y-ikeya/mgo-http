@@ -164,20 +164,27 @@ const cells: Cell[] = CELLS.map((spec, i) => {
  */
 ;(window as unknown as Record<string, unknown>).preview = { cells, scene }
 
-/** いま調整している銃と姿勢。`?weapon=sniper` で開いた銃から始められる */
-const ALL_WEAPONS: WeaponId[] = [...CHOICES.primary, ...CHOICES.secondary]
-const asked = new URLSearchParams(location.search).get('weapon') as WeaponId | null
-let weapon: WeaponId = asked && ALL_WEAPONS.includes(asked) ? asked : 'rifle'
+/**
+ * いま調整している銃と姿勢。`?weapon=sniper` で開いた銃から始められる。
+ *
+ * **ナイフも選べる** (`?weapon=knife`)。握りは立ちの 1 組だけで、構えた枠に
+ * ナイフの構え (knife_idle) が出る。銃は隠れるだけで持たせたままにする —
+ * ナイフの模型は銃を付けるときに一緒に付くので、銃が無いとナイフも無い。
+ */
+type Pick = WeaponId | 'knife'
+const ALL_WEAPONS: Pick[] = [...CHOICES.primary, ...CHOICES.secondary, 'knife']
+const asked = new URLSearchParams(location.search).get('weapon') as Pick | null
+let weapon: Pick = asked && ALL_WEAPONS.includes(asked) ? asked : 'rifle'
 let editing: (typeof STANCES)[number] = STANCES[0]
 
 /** 編集中の値。**コードの定数を出発点に読む** */
 const values = new Map<string, { grip: THREE.Vector3; rotation: THREE.Euler }>()
 
-function keyOf(id: WeaponId, stance: (typeof STANCES)[number]): string {
+function keyOf(id: Pick, stance: (typeof STANCES)[number]): string {
   return `${id}${stance.suffix}`
 }
 
-function load(id: WeaponId): void {
+function load(id: Pick): void {
   const config = WEAPON_CONFIGS[id as keyof typeof WEAPON_CONFIGS]
   for (const stance of STANCES) {
     const key = keyOf(id, stance)
@@ -203,17 +210,27 @@ function load(id: WeaponId): void {
 function apply(): void {
   for (const stance of STANCES) {
     const v = values.get(keyOf(weapon, stance))!
-    const target = `${weapon}${stance.suffix}` as WeaponTarget
+    // ナイフは 1 組だけ。立ちの値を当てる (calibrateWeapon の 'knife')
+    if (weapon === 'knife' && stance.key !== 'stand') continue
+    const target = (weapon === 'knife' ? 'knife' : `${weapon}${stance.suffix}`) as WeaponTarget
     for (const cell of cells) cell.player.calibrateWeapon(target, v.grip, v.rotation)
   }
 }
 
-async function equipAll(id: WeaponId): Promise<void> {
+async function equipAll(id: Pick): Promise<void> {
   weapon = id
+  if (id === 'knife') editing = STANCES[0]
   load(id)
   for (const cell of cells) {
-    cell.player.setHeld(id)
-    await cell.player.equip(id)
+    if (id === 'knife') {
+      // 銃を付けてからナイフへ持ち替える。ナイフの模型は銃と一緒に付く
+      cell.player.setHeld('rifle')
+      await cell.player.equip('rifle')
+      cell.player.setHeld('knife')
+    } else {
+      cell.player.setHeld(id)
+      await cell.player.equip(id)
+    }
   }
   apply()
   drawPanel()
@@ -254,11 +271,19 @@ function slider(
 }
 
 const code = document.createElement('pre')
+/*
+ * 銃口の向きは別の欄に出す。**貼る欄は値を触ったときしか書き換えない。**
+ *
+ * 同じ欄に一緒に出していたら、向きの数字が 15 フレームごとに揺れて欄ごと
+ * 書き換わり、選択した文字が消えて貼れなかった。
+ */
+const report = document.createElement('pre')
 
 /** そのまま weapon.ts へ貼れる形。**手で書き写す所を作らない** */
 function dump(): void {
   const lines: string[] = []
   for (const stance of STANCES) {
+    if (weapon === 'knife' && stance.key !== 'stand') continue
     const v = values.get(keyOf(weapon, stance))!
     const d = (r: number) => Math.round(THREE.MathUtils.radToDeg(r))
     const g = `${v.grip.x.toFixed(3)}, ${v.grip.y.toFixed(3)}, ${v.grip.z.toFixed(3)}`
@@ -270,7 +295,9 @@ function dump(): void {
       `${rot}: new THREE.Euler(degrees(${d(v.rotation.x)}), degrees(${d(v.rotation.y)}), degrees(${d(v.rotation.z)})),`,
     )
   }
-  code.textContent = lines.join('\n') + '\n\n' + aimReport()
+  const text = lines.join('\n')
+  if (code.textContent !== text) code.textContent = text
+  report.textContent = aimReport()
 }
 
 /**
@@ -300,8 +327,9 @@ function aimReport(): string {
     cell.player.object.traverse((o) => {
       if (!hand && o.name.endsWith('RightHand') && !o.name.includes('End')) hand = o
     })
+    // 銃とナイフが両方ぶら下がっている。**見えているほう**が持っている物
     const gun = hand
-      ? ((hand as THREE.Object3D).children.find((c) => !(c as THREE.Bone).isBone) ?? null)
+      ? ((hand as THREE.Object3D).children.find((c) => !(c as THREE.Bone).isBone && c.visible) ?? null)
       : null
     if (!gun) {
       out.push(`${cell.spec.label} まだ読み込み中`)
@@ -336,12 +364,14 @@ function drawPanel(): void {
     option.selected = id === weapon
     pick.append(option)
   }
-  pick.addEventListener('change', () => void equipAll(pick.value as WeaponId))
+  pick.addEventListener('change', () => void equipAll(pick.value as Pick))
   panel.append(pick)
 
   const tabs = document.createElement('div')
   tabs.className = 'tabs'
   for (const stance of STANCES) {
+    // ナイフは立ちの 1 組だけ
+    if (weapon === 'knife' && stance.key !== 'stand') continue
     const button = document.createElement('button')
     button.textContent = stance.label
     button.dataset.on = String(stance.key === editing.key)
@@ -390,6 +420,7 @@ function drawPanel(): void {
   panel.append(how)
 
   panel.append(code)
+  panel.append(report)
   dump()
 }
 

@@ -29,3 +29,4 @@ tools/props/
 # プロジェクトごとに違うので追跡しない
 .env
 .env.local
+tools/__pycache__/

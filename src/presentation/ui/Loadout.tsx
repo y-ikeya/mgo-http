@@ -33,6 +33,48 @@ import './Loadout.css'
  * 枠は主・副・投擲の 3 段。今は副と投擲に選択肢が無いので、選べるのは主だけ。
  * それでも 3 段を出しているのは、持ち物の全体が一目で分かる形にしたいため。
  */
+/**
+ * 影絵の置き場。public/icons/<id>.png (tools/preview/icons.html で作る)。
+ * 白一色なので、画面側が mask にして色を塗る。
+ */
+const iconUrl = (id: WeaponId | SupportId) => `${import.meta.env.BASE_URL}icons/${id}.png`
+
+/** 段の上に出す種別。**名前の上に小さく** (MGO2 の category) */
+const CATEGORY: Record<WeaponId | SupportId, string> = {
+  smg: 'SMG',
+  rifle: 'ASSLT.R',
+  shotgun: 'SHOTGUN',
+  sniper: 'SNIPER.R',
+  mosin: 'SNIPER.R',
+  m9: 'HAND.GUN',
+  m1911: 'HAND.GUN',
+  grenade: 'PROJECTILE',
+  locator: 'PROJECTILE',
+  claymore: 'TRAP',
+  decoy: 'TRAP',
+}
+
+/**
+ * 段の上の読み出し。**いま選んでいる物の名前だけ。**
+ *
+ * 札に名前を書かないので、ここが唯一の文字。種別・名前・弾数を横に並べる。
+ */
+function Readout(props: { category: string | null; name: string | null; detail: string }) {
+  return (
+    <div class="loadout-readout">
+      <span class="loadout-readout-cat">
+        <small>category</small>
+        {props.category ?? '—'}
+      </span>
+      <span class="loadout-readout-name">
+        <small>weapon</small>
+        {props.name ?? '—'}
+      </span>
+      <span class="loadout-readout-detail">{props.detail}</span>
+    </div>
+  )
+}
+
 export default function Loadout(props: {
   /** 選んでいる主武器。**銃を外した部屋では null** (一覧も空になる) */
   primary: WeaponId | null
@@ -196,82 +238,92 @@ export default function Loadout(props: {
           スキルはその逆で、支度の段階にしか出ない。**窓が違うから場所も分ける。**
         */}
         <Show when={!preparing()}>
-        <For each={rows}>
-          {(row) => (
-            <div class="loadout-row" classList={{ 'loadout-row-focus': props.focus === row.focus }}>
-              <div class="loadout-slot">{row.key}</div>
+          {/*
+            武器の段。**絵で選ぶ。**
+
+            名前と弾数を並べた札だと、名前の長さで札の幅が変わって列が崩れる。
+            MGO2 と同じく、段の上に「いま選んでいる物」の名前を 1 つだけ出して、
+            下には影絵を同じ大きさで並べる。選んでいる物は四隅の括弧で囲む。
+          */}
+          <For each={rows}>
+            {(row) => (
+              <div class="loadout-row" classList={{ 'loadout-row-focus': props.focus === row.focus }}>
+                <div class="loadout-slot">{row.key}</div>
+                <div class="loadout-rail">
+                  <Readout
+                    category={row.current() ? CATEGORY[row.current()!] : null}
+                    name={row.current() ? WEAPONS[row.current()!].kill : null}
+                    detail={
+                      row.current()
+                        ? `${WEAPONS[row.current()!].magazine} + ${reserveOf(row.current()!)}`
+                        : t('loadout.none')
+                    }
+                  />
+                  <div class="loadout-items">
+                    <For each={row.ids()}>
+                      {(id) => (
+                        <button
+                          class="loadout-tile"
+                          /*
+                            殺傷か麻酔かで色を変える。**持ち替えの札 (HUD) と
+                            同じ色**にしてあるので、選んだ物と手にある物が
+                            同じ物だと色で繋がる。
+                          */
+                          classList={{
+                            'loadout-tile-on': id === row.current(),
+                            'loadout-tile-only': row.ids().length === 1,
+                            'loadout-tile-lethal': WEAPONS[id].tranquilizer !== true,
+                            'loadout-tile-tranq': WEAPONS[id].tranquilizer === true,
+                          }}
+                          disabled={row.ids().length === 1}
+                          title={WEAPONS[id].kill}
+                          onClick={() => row.pick(id)}
+                        >
+                          {row.ids().length > 1 && (
+                            <span class="loadout-key">{keyBase(row) + row.ids().indexOf(id)}</span>
+                          )}
+                          <i class="loadout-icon" style={{ '--icon': `url(${iconUrl(id)})` }} />
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </div>
+            )}
+          </For>
+
+          {/* 投擲。**どちらか一方**しか持てない */}
+          <div class="loadout-row" classList={{ 'loadout-row-focus': props.focus === 'support' }}>
+            <div class="loadout-slot">SUPPORT</div>
+            <div class="loadout-rail">
+              <Readout
+                category={CATEGORY[props.support]}
+                name={SUPPORT_SPECS[props.support].label}
+                detail={`× ${SUPPORT_SPECS[props.support].count} · ${SUPPORT_SPECS[props.support].hint}`}
+              />
               <div class="loadout-items">
-                <For each={row.ids()}>
-                  {(id) => (
+                <For each={SUPPORTS}>
+                  {(id, i) => (
                     <button
-                      class="loadout-item"
-                      /*
-                        殺傷か麻酔かで色を変える。**持ち替えの札 (HUD) と
-                        同じ色**にしてあるので、選んだ物と手にある物が
-                        同じ物だと色で繋がる。
-                      */
-                      classList={{
-                        'loadout-item-on': id === row.current(),
-                        'loadout-item-only': row.ids().length === 1,
-                        'loadout-item-lethal': WEAPONS[id].tranquilizer !== true,
-                        'loadout-item-tranq': WEAPONS[id].tranquilizer === true,
-                      }}
-                      disabled={row.ids().length === 1}
-                      onClick={() => row.pick(id)}
+                      class="loadout-tile"
+                      classList={{ 'loadout-tile-on': id === props.support }}
+                      title={SUPPORT_SPECS[id].label}
+                      onClick={() => props.onSupport(id)}
                     >
-                      <span class="loadout-name">
-                        {row.ids().length > 1 && (
-                          <span class="loadout-key">
-                            {keyBase(row) + row.ids().indexOf(id)}
-                          </span>
-                        )}
-                        {WEAPONS[id].kill}
+                      {/* 投擲は武器の続き番号。**副武器が無い部屋では前へ詰まる** */}
+                      <span class="loadout-key">
+                        {props.primaries.length +
+                          (props.secondary === null ? 0 : CHOICES.secondary.length) +
+                          1 +
+                          i()}
                       </span>
-                      {/*
-                        予備弾は投擲の枠で変わる。表の値をそのまま出すと、
-                        MAG を選んでも数字が動かず、増えていないように見える。
-                      */}
-                      <span class="loadout-spec">
-                        {WEAPONS[id].magazine} + {reserveOf(id)}
-                      </span>
+                      <i class="loadout-icon" style={{ '--icon': `url(${iconUrl(id)})` }} />
                     </button>
                   )}
                 </For>
               </div>
             </div>
-          )}
-        </For>
-
-        {/* 投擲。**どちらか一方**しか持てない */}
-        <div class="loadout-row" classList={{ 'loadout-row-focus': props.focus === 'support' }}>
-          <div class="loadout-slot">SUPPORT</div>
-          <div class="loadout-items">
-            <For each={SUPPORTS}>
-              {(id, i) => (
-                <button
-                  class="loadout-item"
-                  classList={{ 'loadout-item-on': id === props.support }}
-                  onClick={() => props.onSupport(id)}
-                >
-                  <span class="loadout-name">
-                    {/* 主武器の続きの番号。挺数から出す (直に書くと重なる) */}
-                    {/* 投擲は武器の続き番号。**副武器が無い部屋では前へ詰まる** */}
-                    <span class="loadout-key">
-                      {props.primaries.length +
-                        (props.secondary === null ? 0 : CHOICES.secondary.length) +
-                        1 +
-                        i()}
-                    </span>
-                    {SUPPORT_SPECS[id].label}
-                  </span>
-                  <span class="loadout-spec">
-                    × {SUPPORT_SPECS[id].count} · {SUPPORT_SPECS[id].hint}
-                  </span>
-                </button>
-              )}
-            </For>
           </div>
-        </div>
         </Show>
 
         {/*

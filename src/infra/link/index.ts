@@ -1,7 +1,7 @@
 import { NetChannel } from './channel'
 import { NetSocket } from './socket'
 import type { NetTransport } from '../../application/protocol/types'
-import type { Identity } from '../auth/session'
+import { currentIdentity, type Identity } from '../auth/session'
 
 /**
  * 通信路を選ぶ。
@@ -43,7 +43,8 @@ export function createTransport(identity: Identity, room: string): NetTransport 
 
   const url = resolveServerUrl(params.get('server') ?? BUILT_IN_SERVER ?? '1')
   console.info(`[Net] WebSocket で接続: ${url} (room: ${room}, name: ${name})`)
-  return new NetSocket(id, name, url, room, identity.token)
+  // 繋ぐたびにその時点の token を渡す。開いた時の物を使い回すと 1 時間で切れる
+  return new NetSocket(id, name, url, room, () => currentIdentity()?.token ?? identity.token)
 }
 
 /** 短い書き方を URL に展開する */

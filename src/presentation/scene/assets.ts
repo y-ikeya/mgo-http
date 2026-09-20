@@ -39,6 +39,7 @@ const CASING_URL = asset.model('casing_rifle.glb')
 const KNIFE_URL = asset.model('knife.glb')
 const CLAYMORE_URL = asset.model('claymore.glb')
 const GRENADE_URL = asset.model('grenade.glb')
+const LOCATOR_URL = asset.model('locator.glb')
 
 const cache = new Map<string, Promise<GLTF>>()
 
@@ -148,6 +149,10 @@ export function loadClaymore(): Promise<GLTF> {
 
 export function loadGrenade(): Promise<GLTF> {
   return load(GRENADE_URL)
+}
+
+export function loadLocator(): Promise<GLTF> {
+  return load(LOCATOR_URL)
 }
 
 /**

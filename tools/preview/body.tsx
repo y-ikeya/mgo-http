@@ -4,14 +4,19 @@
  *     bunx vite → http://localhost:5174/tools/preview/body.html
  *     ?skin=soldier_nanashi   見た目 (既定 soldier)
  *     ?clip=run_f             流す型 (既定 idle)
- *     ?at=head                寄る所 head / chest / all
+ *     ?at=head                寄る所 head / chest / all / prone (伏せた体を収める)
+ *     ?stab                   刺す。clip=prone_idle なら伏せた刺突 (prone_stab)
+ *     ?knife                  ナイフを持っている。?aim と組むとナイフの構え
  *     ?t=1.2                  何秒目で止めるか (既定 1.0)
  *     ?turn=40                体を回す角度
+ *     ?boxed                  ダンボールを被る (clip=sneak と組む)。箱は半透明で、はみ出しを見る
+ *     ?tilt=fwd|right         箱を進行方向へ倒した姿 (fwd = 前へ、right = 右へ全開)
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
  * その途中で止めて描く。
  */
+import { BoxMotion, boxLift, createCardboardBox, placeBox, setBoxTuning } from '../../src/presentation/scene/actor/box'
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { buildLights } from '../../src/presentation/scene/world/stage'
@@ -49,8 +54,18 @@ scene.add(floor)
 
 const gltf = await loadSoldier(skin)
 const model = gltf.scene
-model.rotation.y = turn
-scene.add(model)
+/*
+ * 本番と同じ入れ子にする (soldier.ts)。根 (object) を向きで回し、模型はその中で
+ * MODEL_YAW_OFFSET だけ回っている。箱は根の子なので、模型に直に付けると
+ * 前後が逆になる。
+ */
+const MODEL_YAW_OFFSET = Math.PI // soldier.ts と同じ。模型の正面は +Z、根は -Z が前
+const root = new THREE.Group()
+// 根の前 (-Z) をカメラ (+Z) へ向けるぶんの 180° を足す。turn=0 で正面向き
+root.rotation.y = turn + Math.PI
+scene.add(root)
+model.rotation.y = MODEL_YAW_OFFSET
+root.add(model)
 
 /*
  * ?nomip … ミップマップを切って見る。**UV の島がにじんでいるか**の切り分け。
@@ -90,7 +105,19 @@ const anim = new CharacterAnimator(model, gltf.animations, 4.5)
 anim.setPistol(query.has('onehand') || query.has('empty'))
 anim.setHandsEmpty(query.has('empty'))
 anim.setAiming(query.has('aim'))
+// ?knife … ナイフを持っている (構えると knife_idle)
+anim.setKnife(query.has('knife'))
 anim.setAimPitch(pitch)
+// ?boxed … 箱の中の姿勢。箱は本番と同じ物を半透明で重ねて、頭と腕の収まりを見る
+const boxed = query.has('boxed')
+anim.setBoxed(boxed)
+const box = boxed ? createCardboardBox() : null
+if (box) {
+  // ?boxalpha=1 … 箱を不透明で (既定は半透明で中を透かす)
+  setBoxTuning({ opacity: Number(query.get('boxalpha') ?? '0.45') })
+  box.visible = true
+  root.add(box)
+}
 
 /*
  * 銃を持たせる。**取り付けはゲームと同じ順で** — 型を流す前の姿勢で基準を
@@ -107,15 +134,25 @@ if (gunName) {
   model.updateMatrixWorld(true)
   const right = findBoneBySuffix(model, 'RightHand')
   const left = findBoneBySuffix(model, 'LeftHand')
-  if (right && left) {
+  const foreArm = findBoneBySuffix(model, 'RightForeArm')
+  if (right && left && foreArm) {
     weapon = await Weapon.load(gunName as WeaponKind)
     scene.add(weapon.object)
-    weapon.attachTo(
-      right,
-      new THREE.Vector3().setFromMatrixPosition(right.matrixWorld),
-      new THREE.Vector3().setFromMatrixPosition(left.matrixWorld),
-      right.matrixWorld.clone(),
-    )
+    if (gunName === 'knife') {
+      // ナイフは本番と同じ付け方 (soldier.ts)。右手に、肘から手首の線を刃の向きに
+      weapon.attachTo(
+        right,
+        new THREE.Vector3().setFromMatrixPosition(foreArm.matrixWorld),
+        new THREE.Vector3().setFromMatrixPosition(right.matrixWorld),
+      )
+    } else {
+      weapon.attachTo(
+        right,
+        new THREE.Vector3().setFromMatrixPosition(right.matrixWorld),
+        new THREE.Vector3().setFromMatrixPosition(left.matrixWorld),
+        right.matrixWorld.clone(),
+      )
+    }
   }
 }
 
@@ -132,13 +169,39 @@ if (gunName) {
  * 同時に流す全身動作で、playRoll が入口。尻尾で何の姿勢に渡るかを見るのに使う。
  */
 const firing = query.has('fire')
+// 一度きりの全身の型は**姿勢を決めてから**頭から流す。伏せていれば伏せの刺突になる
+if (!query.has('roll')) anim.setLocomotion(clipName as never)
 if (query.has('roll')) anim.playRoll()
+// ?stab … 刺す。姿勢が伏せ (clip=prone_idle) なら伏せた刺突になる
+if (query.has('stab')) anim.playStab()
 for (let t = 0; t < stopAt; t += 1 / 60) {
-  if (!query.has('roll')) anim.setLocomotion(clipName as never)
+  // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
+  if (!query.has('roll') && !query.has('stab')) anim.setLocomotion(clipName as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
 }
 model.updateMatrixWorld(true)
+if (box) {
+  const headBone = findBoneBySuffix(model, 'Head')
+  const headHeight = headBone ? headBone.getWorldPosition(new THREE.Vector3()).y : 1
+  const tilt = query.get('tilt')
+  const motion = new BoxMotion()
+  if (tilt === 'fwd') motion.z = -1
+  if (tilt === 'right') motion.x = 1
+  placeBox(box, boxLift(headHeight), tilt ? motion : undefined)
+  /*
+   * 箱の写真 (cardboard.jpg) が届くまで待つ。**届く前に描くと箱ごと写らない** —
+   * 撮る側は時計を進めるので、秒では待てない。画像の complete を見る。
+   */
+  const images: HTMLImageElement[] = []
+  box.traverse((o) => {
+    const map = ((o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined)?.map
+    if (map?.image) images.push(map.image as HTMLImageElement)
+  })
+  while (!images.every((image) => image.complete && image.naturalWidth > 0)) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
 // 姿勢ごとに握りが違う。しゃがみの型を見るときは stance=1 を付ける
 weapon?.applyStance(Number(query.get('stance') ?? '0'))
 
@@ -162,6 +225,11 @@ if (at === 'head') {
 } else {
   camera.position.set(0.4, 1.2, 3.0)
   camera.lookAt(0, 0.95, 0)
+}
+// ?at=prone … 伏せた体を枠に収める。立ちの高さのままだと頭しか映らない
+if (at === 'prone') {
+  camera.position.set(1.4, 1.0, 2.2)
+  camera.lookAt(0, 0.25, 0)
 }
 
 await renderer.init()

@@ -43,6 +43,14 @@ import type { Team } from '../player/player'
 // --- 面の宣言。棚の中から取り次ぐ ---
 export { DEFAULT_SURFACE, SURFACE_ORDER, surfaceOf, type Surface } from './surface'
 export { flagsOf, type SurfaceFlags } from './flags'
+export {
+  LADDER_REACH,
+  LADDER_SPEED,
+  LADDER_STANDOFF,
+  type Ladder,
+  ladderAt,
+  ladderGrip,
+} from './ladder'
 
 export type StageName = 'mall' | 'training' | 'raft'
 

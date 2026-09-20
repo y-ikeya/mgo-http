@@ -18,9 +18,17 @@ T ポーズなので、同じ T ポーズのキャラへそのまま載る。と
 (visual keying)、繋ぎを外せば、ゲームの骨格の型になる。
 """
 
-import bpy, sys, os, json
+import bpy, sys, os, json, math
 
-config = json.load(open(sys.argv[sys.argv.index('--') + 1]))
+argv = sys.argv[sys.argv.index('--') + 1:]
+config = json.load(open(argv[0]))
+
+# 焼く前に元を回す。**向きが逆に作られている素材**がある — 梯子の型は
+# 体の前後が反対で、そのまま入れると手足が梯子の裏側を掻いていた。
+TURN = 0.0
+for i, arg in enumerate(argv):
+    if arg == '--turn' and i + 1 < len(argv):
+        TURN = math.radians(float(argv[i + 1]))
 pack_dir = config['dir']
 character_file = config['character']
 entry, clip_name = next(iter(config['clips'].items()))
@@ -50,6 +58,11 @@ if take > len(added):
 source.animation_data.action = added[take - 1]
 start, end = (int(v) for v in added[take - 1].frame_range)
 print(f'[clip] {clip_name} frames=({start}, {end})  骨 元 {len(source.data.bones)} / 先 {len(target.data.bones)}')
+
+if TURN:
+    source.rotation_mode = 'XYZ'
+    source.rotation_euler.z += TURN
+    print(f'[turn] 元を {math.degrees(TURN):.0f} 度回してから焼く')
 
 # --- 繋ぐ ---
 linked = 0

@@ -14,6 +14,7 @@ import Loadout from '../ui/Loadout'
 import Blocked from '../ui/Blocked'
 import Leaving from '../ui/Leaving'
 import Stats from '../ui/Stats'
+import Loading from '../ui/Loading'
 
 /**
  * 調整パネルを出すか。
@@ -145,6 +146,18 @@ export default function Play(props: { identity: Identity }) {
     navigate('/rooms')
   }
 
+  /*
+   * 認証が切れて断られた。**部屋の一覧へ戻して、そう伝える。**
+   *
+   * token は 1 時間で切れ、普段は裏で取り直している。切れたまま断られるのは
+   * 長く放置したか、取り直しに失敗したかで、どちらも「遊んでいる」ではない。
+   * 部屋に居る顔のまま止まるより、戻して理由を出すほうが分かる。
+   */
+  createEffect(() => {
+    if (!stats()?.expired) return
+    navigate('/rooms', { state: { notice: 'expired' } })
+  })
+
   onMount(() => {
     const instance = new Game(container, props.identity, params.room)
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
@@ -224,6 +237,17 @@ export default function Play(props: { identity: Identity }) {
     <div class="app">
       <div class="viewport" ref={container} />
       <Hud stats={stats()} selfId={game()?.selfId ?? ''} />
+
+      {/*
+        読み込み中の覆い。**地形と自分の模型が揃うまで戦場を見せない。**
+
+        揃う前は、箱だけの地形と素の姿勢 (T ポーズ) が映る — 読み込み中では
+        なく壊れているように見える。状態がまだ 1 通も届いていない間 (stats が
+        null) も同じ扱いにする。
+      */}
+      <Show when={!stats()?.ready && !stats()?.rejected}>
+        <Loading />
+      </Show>
 
       {/* 指した試合がもう無かった。押せば消える */}
       <Show when={gone()}>

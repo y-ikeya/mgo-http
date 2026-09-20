@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "Stabbing.fbx#2": "stab" },
+  "out": "stab.glb",
+  "maxTexture": 64
+}

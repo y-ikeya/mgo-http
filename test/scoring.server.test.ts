@@ -23,7 +23,8 @@ afterEach(() => {
 async function waitAlive(server: Server, client: Client, limit = 25_000): Promise<void> {
   const until = Date.now() + limit
   for (;;) {
-    const line = ((await server.health()).match(new RegExp(`${client.id}[^\n]*`)) ?? [''])[0]
+    // **その人の行**を取る。名前だけで探すと、他人の行の「見○bob」に先に当たる
+    const line = ((await server.health()).match(new RegExp(`[青赤] ${client.id} \\([^\n]*`)) ?? [''])[0]
     if (line.includes('[alive]')) return
     if (line.includes('[choosing]')) client.send({ type: 'spawn' })
     if (Date.now() > until) throw new Error(`${client.id} が alive にならない`)

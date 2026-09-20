@@ -70,6 +70,9 @@ export function recordPose(player: MatchPlayer): void {
     // 「いまの姿勢」で見ると、刺した瞬間は立っていた相手が
     // 爆風で転んだ直後に届いた申告を弾いてしまう
     slot.stance = stanceOf(player.locomotion)
+    // 撃った線をカメラから引き直すのに要る (hitcheck.ts の zoneExposed)
+    slot.cameraYaw = player.cameraYaw
+    slot.aiming = player.aiming
   })
 }
 

@@ -8,21 +8,21 @@
 import { connected, isLeaking } from '../src/domain/match/match'
 import { recordPose } from './history'
 import { isFriendly } from '../src/domain/match/room'
-import { canSee, isDowned, isJoining, onBattlefield } from '../src/domain/player/lifecycle'
+import { canChoose, canSee, isDowned, isJoining, onBattlefield } from '../src/domain/player/lifecycle'
 import { isLeakedTo } from '../src/domain/player/player'
 import { STEP_UP } from '../src/domain/player/moving'
 import { type MatchPlayer, headHeightOf, isProtected, lifeElapsed } from '../src/domain/player/player'
 import { surfaceOf } from '../src/domain/stage'
 import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
-import { checkMove } from '../src/sim/judge/motioncheck'
-import { cameraPoint } from '../src/sim/space/eyepoint'
-import { groundUnder, hasLineOfSight } from '../src/sim/space/vision'
+import { checkMove, checkMoveOnMesh } from '../src/sim/judge/motioncheck'
+import { cameraPoint, seesFromCamera } from '../src/sim/space/eyepoint'
+import { bodyVisible, groundUnder, hasLineOfSight } from '../src/sim/space/vision'
 import { sessionOf } from './session'
 import { type RoomWorld, broadcast, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
-import { HEAD_HEIGHT } from '../src/domain/player/stance'
+import { BODY_BOX, HEAD_HEIGHT, MOVE_PROBE_HEIGHT, VIEW_HEIGHT, stanceOf } from '../src/domain/player/stance'
 import { canHold } from '../src/domain/player/equip'
 import type { HitZone } from '../src/domain/rule/damage'
 import { isSeated } from '../src/domain/player/lifecycle'
@@ -92,9 +92,20 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   // 繋ぎ直した直後も前の位置とは繋がっていない
   const settled = onBattlefield(player.life) && lifeElapsed(player, arrived) > WARP_GRACE
   if (settled) {
-    const verdict = checkMove(player, snapshot, room.stage.solid, room.stage.arenaHalf)
+    /*
+     * 線を引く高さは姿勢で下げる。**伏せている人を胸の高さで見ると、潜れる物の
+     * 下を這っただけで弾かれる。** 前後どちらかが低ければ低いほう。
+     */
+    const probe = Math.min(
+      MOVE_PROBE_HEIGHT[stanceOf(player.locomotion)],
+      MOVE_PROBE_HEIGHT[stanceOf(snapshot.locomotion)],
+    )
+    const verdict = room.stage.body
+      ? checkMoveOnMesh(player, snapshot, room.stage.body, room.stage.arenaHalf, probe)
+      : checkMove(player, snapshot, room.stage.solid, room.stage.arenaHalf)
     if (!verdict.ok) {
       sessionOf(player).rejected++
+      sessionOf(player).lastReject = verdict.reason ?? ''
       if (arrived - sessionOf(player).badMoveAt > 5000) {
         sessionOf(player).badMoveAt = arrived
         console.warn(`[位置] ${player.name}: ${verdict.reason}`)
@@ -142,7 +153,7 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   // 足音は位置が動いた分から出す。見えない相手にも音だけは届ける。
   // 戦場に居ないうち (支度中) は鳴らさない — 湧き地点で選んでいるだけなので
   if (onBattlefield(player.life)) {
-    const step = player.footsteps.update(player.x, player.z, player.locomotion, true)
+    const step = player.footsteps.update(player.x, player.y, player.z, player.locomotion, true)
     if (step) emitNoise(room, player, { kind: 'step', ...step })
   }
 
@@ -176,6 +187,73 @@ export function visibleHead(player: MatchPlayer, now: number): number {
 }
 
 /**
+ * その人のカメラの注視点の高さの幅 (足元から)。
+ *
+ * 姿勢の表 (domain/player/stance.ts の VIEW_HEIGHT) を引く。沈み切るまでの間は
+ * 画面のカメラも立った高さから下りてくる途中なので、**立ちとその姿勢の両方を
+ * 覆う幅**にする (visibleHead と同じ判断)。
+ */
+export function viewHeightsOf(player: MatchPlayer, now: number): readonly [number, number] {
+  const own = VIEW_HEIGHT[stanceOf(player.locomotion)]
+  const settled = player.loweredAt > 0 && now - player.loweredAt >= LOWER_SETTLE_MS
+  if (settled) return own
+  const stand = VIEW_HEIGHT.stand
+  return [Math.min(own[0], stand[0]), Math.max(own[1], stand[1])]
+}
+
+/**
+ * その人の画面に、その点に立つ相手が映るか。
+ *
+ * 可視を問うところは全部これを通す。位置を配るとき・銃声を配るとき・
+ * 足音を配るとき・置き物を見せるときで別々に出すと、定義がずれて
+ * 「姿も音も無い敵」が生まれる。
+ *
+ * **カメラの高さの幅の両端で引く** (sim の seesFromCamera)。1 つの高さで
+ * 決めていた頃、しゃがんで隙間から覗くと画面には映っているのに配られなかった。
+ */
+export function sees(
+  room: RoomWorld,
+  viewer: MatchPlayer,
+  targetX: number,
+  targetFeetY: number,
+  targetZ: number,
+  targetHead: number,
+  now: number,
+): boolean {
+  return seesFromCamera(
+    viewer,
+    viewHeightsOf(viewer, now),
+    // 壁に寄せる。省くと壁を背にした瞬間にカメラが壁の中へ入り、
+    // その人だけ全方位が見えなくなる。**どこで当たったかが要るので箱**
+    room.stage.camera,
+    (ex, ey, ez) => hasLineOfSight(ex, ey, ez, targetX, targetFeetY, targetZ, targetHead, room.stage.sight),
+    viewEye,
+  )
+}
+
+/**
+ * その人の画面に、相手 (人) が映るか。**体の箱の 12 辺で見る。**
+ *
+ * 点 (頭・胸・足元 …) で見ていた頃は、点の間隔より細い隙間から見えている体を
+ * 取りこぼして、相手が急に現れたり消えたりした。箱の辺を線分として見れば
+ * 間隔が無い (vision.ts の bodyVisible、bvh.ts の segmentVisible)。
+ *
+ * 箱の寸法は構えごと (domain/player/stance.ts の BODY_BOX)。伏せは向きに沿って
+ * 前に長い。沈み切る前は立ちの箱で見る (visibleHead と同じ判断)。
+ */
+export function seesPlayer(room: RoomWorld, viewer: MatchPlayer, target: MatchPlayer, now: number): boolean {
+  const settled = target.loweredAt > 0 && now - target.loweredAt >= LOWER_SETTLE_MS
+  const box = BODY_BOX[settled ? stanceOf(target.locomotion) : 'stand']
+  return seesFromCamera(
+    viewer,
+    viewHeightsOf(viewer, now),
+    room.stage.camera,
+    (ex, ey, ez) => bodyVisible(ex, ey, ez, target.x, target.y, target.z, target.yaw, box, room.stage.sight),
+    viewEye,
+  )
+}
+
+/**
  * 音を配る。
  *
  * **見えている相手には送らない。** 見えていれば位置が届いているので、
@@ -186,13 +264,13 @@ export function visibleHead(player: MatchPlayer, now: number): number {
 export function emitNoise(
   room: RoomWorld,
   from: MatchPlayer,
-  noise: { kind: 'step' | 'shot'; volume?: number; range?: number },
+  noise: { kind: 'step' | 'shot'; volume?: number; range?: number; climbing?: boolean },
 ): void {
 
   // どこまで届くかはドメインルール (domain/rule/noise.ts)。銃声は武器ごとに違う
   const reach =
     noise.kind === 'shot' ? shotReach(weaponOf(from.weapon)) : stepReach(noise.range ?? 1)
-  const head = headHeightOf(from)
+  const now = Date.now()
 
   /*
    * 何の上を踏んだかは地形から出す。申告させるものではない。
@@ -200,10 +278,13 @@ export function emitNoise(
    * **立てる面 (solid) から引く。** 視線を止める面 (sight) は三角の網になって
    * 材質を持たないし、そもそも「乗っている面」は物がぶつかる側の話。
    */
+  // 梯子の段は足の下の床ではなく梯子そのもの。**梯子は金属**
   const surface =
-    noise.kind === 'step'
-      ? surfaceOf(groundUnder(from.x, from.z, from.y, room.stage.solid, STEP_UP).name)
-      : undefined
+    noise.kind !== 'step'
+      ? undefined
+      : noise.climbing
+        ? 'metal'
+        : surfaceOf(groundUnder(from.x, from.z, from.y, room.stage.solid, STEP_UP).name)
 
   for (const listener of connected(room)) {
     if (listener.id === from.id) continue
@@ -211,10 +292,9 @@ export function emitNoise(
 
     // 距離と、見えているかは幾何 (sim)。聞こえるかを決めるのはドメインルール (domain)
     const distance = Math.hypot(from.x - listener.x, from.z - listener.z)
-    const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
-      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
+      seesPlayer(room, listener, from, now)
     if (!isHeard(distance, reach, visible)) continue
 
     sessionOf(listener).socket.send(
@@ -224,6 +304,7 @@ export function emitNoise(
         bearing: Math.atan2(from.x - listener.x, -(from.z - listener.z)),
         distance,
         surface,
+        climbing: noise.climbing || undefined,
         weapon: noise.kind === 'shot' ? from.weapon : undefined,
         range: noise.range,
         volume: noise.volume,
@@ -237,16 +318,15 @@ export function emitNoise(
  */
 export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMessage): void {
   const payload = JSON.stringify(message)
-  const head = headHeightOf(from)
+  const now = Date.now()
 
   for (const listener of connected(room)) {
     if (listener.id === from.id) continue
 
-    const eye = viewOf(room, listener)
     const visible =
       isFriendly(room.mode, listener, from) ||
       !canSee(listener.life) ||
-      hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
+      seesPlayer(room, listener, from, now)
 
     if (visible) sessionOf(listener).socket.send(payload)
   }
@@ -272,12 +352,13 @@ export function relayShot(room: RoomWorld, from: MatchPlayer, message: ServerMes
 export const viewEye = { x: 0, y: 0, z: 0 }
 
 /**
- * その人の画面がどこから見ているか。
+ * その人の画面がどこから見ているか。**1 点が要るとき用** (照準の向きなど)。
  *
- * 可視を問うところは全部これを通す。位置を配るとき・銃声を配るとき・
- * 足音を配るときで別々に出すと、定義がずれて「姿も音も無い敵」が生まれる。
+ * 可視を問うのはこれではなく sees / seesPlayer。あちらは高さの幅の両端で引く。
+ * ここは幅の真ん中 1 点。
  */
-export function viewOf(room: RoomWorld, player: MatchPlayer): { x: number; y: number; z: number } {
+export function viewOf(room: RoomWorld, player: MatchPlayer, now: number): { x: number; y: number; z: number } {
+  const [low, high] = viewHeightsOf(player, now)
   return cameraPoint(
     player.x,
     player.y,
@@ -285,8 +366,7 @@ export function viewOf(room: RoomWorld, player: MatchPlayer): { x: number; y: nu
     player.cameraYaw,
     player.pitch,
     player.aiming,
-    // 壁に寄せる。省くと壁を背にした瞬間にカメラが壁の中へ入り、
-    // その人だけ全方位が見えなくなる。**どこで当たったかが要るので箱**
+    (low + high) / 2,
     room.stage.camera,
     viewEye,
   )
@@ -295,7 +375,6 @@ export function viewOf(room: RoomWorld, player: MatchPlayer): { x: number; y: nu
 export function relayState(room: RoomWorld, from: MatchPlayer, payload: Uint8Array): void {
 
   const now = Date.now()
-  const head = visibleHead(from, now)
   /*
    * **光っている人は遮蔽を無視して配る。**
    *
@@ -337,6 +416,23 @@ export function relayState(room: RoomWorld, from: MatchPlayer, payload: Uint8Arr
     // 当てたことが次の一手を選ぶ材料になる。
     const exposed = isLeakedTo(from, viewer, now)
 
+    /*
+     * **支度中にも、既に公になっている位置だけは届ける。**
+     *
+     * `canSee` は「戦場に居るか」なので、倒れて支度に移った人はここから外れる
+     * — どこから見ているか分からない相手に遮蔽の判定はできない、という理屈で、
+     * それ自体は正しい。
+     *
+     * ただし**遮蔽を問わない位置**は別。光っている相手 (exposed: EE / TA /
+     * decoy を撃った人) と、1 位の光 (glowing) は、見る人の目とは関係なく
+     * 公になっている。当てた実りが、死んだ瞬間から見えなくなるのは理屈が通らない。
+     * (E LOCATOR はここを通らない — 暴いた相手は位置ではなく気配 (sensed) で届く)
+     *
+     * 目で見る分 (遮蔽越し) は増やさない。支度中の人はまだ戦場に居ないので、
+     * そこまで配ると「死んでいる間の偵察」になる。
+     */
+    if (!visible && present && canChoose(viewer.life) && (exposed || glowing)) visible = true
+
     // 味方は無条件。TDM で味方の位置が分からないと連携のしようがないし、
     // 隠すべき情報は敵に対するものだけ。判定の回数も半分以下になる
     if (
@@ -352,8 +448,7 @@ export function relayState(room: RoomWorld, from: MatchPlayer, payload: Uint8Arr
       //
       // カメラのほうが後ろ上から見下ろすぶん、目より広く見える。そこは許す —
       // 描いている物と送る物がずれているほうが困る
-      const eye = viewOf(room, viewer)
-      visible = hasLineOfSight(eye.x, eye.y, eye.z, from.x, from.y, from.z, head, room.stage.sight)
+      visible = seesPlayer(room, viewer, from, now)
     }
 
     if (!visible) {

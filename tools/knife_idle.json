@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "KnifeIdle.fbx": "knife_idle" },
+  "out": "knife_idle.glb",
+  "maxTexture": 64
+}

@@ -30,8 +30,13 @@ buildLights(scene)
  */
 const query = new URLSearchParams(location.search)
 const near = query.get('eye') === 'near'
+// ?eye=drops  最初のしぶきに 1.5m まで寄る (粒の形と光り方を見る)
+const drops = query.get('eye') === 'drops'
 const camera = new THREE.PerspectiveCamera(60, WIDTH / HEIGHT, 0.1, 500)
-if (near) {
+if (drops) {
+  camera.position.set(-29.0, 10.5, -28.9)
+  camera.lookAt(-30, 10.3, -30)
+} else if (near) {
   camera.position.set(-27.6, 10.65, -25.4)
   camera.lookAt(-30, 10.25, -28)
 } else {

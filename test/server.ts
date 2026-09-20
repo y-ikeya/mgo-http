@@ -252,10 +252,21 @@ export class Client {
           this.holdingClaymore,
           this.claimedWeapon,
           this.holdingDecoy,
+          this.aiming,
+          this.cameraYaw,
+          this.pitch,
+          this.holdingLocator,
         ),
       ),
     )
   }
+
+  /** 構えているか。位置に乗せて送る (TARGET ALERT Lv3 を試すのに使う) */
+  aiming = false
+  /** 視点の向き (rad)。yaw 0 で -Z を向く。π で +Z */
+  cameraYaw = 0
+  /** 視点の上下 (rad)。負で見下ろす */
+  pitch = 0
 
   /** 振りかぶって持っているか。位置に乗せて送る */
   /** 位置と一緒に名乗る銃。**選んでいない物を名乗れるか**を試すのに使う */
@@ -285,6 +296,12 @@ export class Client {
   holdDecoy(holding: boolean): void {
     this.holdingDecoy = holding
   }
+
+  /** E LOCATOR を手にする。**支度で選んでいなければ持てない** */
+  holdLocator(holding: boolean): void {
+    this.holdingLocator = holding
+  }
+  private holdingLocator = false
 
   send(message: ClientMessage): void {
     if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message))
@@ -321,6 +338,10 @@ function snapshotOf(
   /** 名乗る銃。**選んでいない物を名乗る試験**に使う */
   claimed: WeaponId = 'rifle',
   holdingDecoy = false,
+  aiming = false,
+  cameraYaw = 0,
+  pitch = 0,
+  holdingLocator = false,
 ): PlayerSnapshot {
   return {
     id,
@@ -328,10 +349,10 @@ function snapshotOf(
     x,
     y,
     z,
-    yaw: 0,
-    pitch: 0,
-    cameraYaw: 0,
-    aiming: false,
+    yaw: cameraYaw,
+    pitch,
+    cameraYaw,
+    aiming,
     crouching: false,
     boxed: false,
     // 振りかぶっているなら手にあるのも手榴弾。**両方そろって初めて落ちる**
@@ -341,7 +362,9 @@ function snapshotOf(
         ? ('claymore' as const)
         : holdingDecoy
           ? ('decoy' as const)
-          : ('rifle' as const),
+          : holdingLocator
+            ? ('locator' as const)
+            : ('rifle' as const),
     locomotion,
     concentrating: false,
     saluteHeld: false,

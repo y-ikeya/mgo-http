@@ -23,6 +23,13 @@ export interface Step {
   volume: number;
   /** 届く距離の倍率 */
   range: number;
+  /**
+   * 梯子を登った 1 段か。
+   *
+   * 材質は含めない決まりだが、これは材質ではなく「足の下に床が無い」という
+   * 移動の事実。鳴らす側はこれを見て梯子の材質 (金属) で鳴らす。
+   */
+  climbing?: boolean;
 }
 
 
@@ -59,6 +66,14 @@ const CROUCH: StepProfile = { distance: 1.0, volume: 0.7, range: 0.45 };
 /** ダンボールで移動しているとき。歩幅 0.81m。5m まで近づかないと分からない */
 const SNEAK: StepProfile = { distance: 0.81, volume: 0.5, range: 0.25 };
 /**
+ * 梯子。**縦の移動を段として数える。** 1 段 0.35m。
+ *
+ * 届く距離は走りと同じ。梯子は渡るかどうかが賭けになる場所で、登る音が
+ * 聞こえる (= 塔へ向かっている) と読めることがその賭けを成り立たせる。
+ * しゃがみのように静かに登る手は無い。
+ */
+const CLIMB: StepProfile = { distance: 0.35, volume: 0.8, range: 1 };
+/**
  * 転がり。足音は鳴らさない。
  *
  * 2〜3m を一息で進むので歩幅で数えると 2〜3 回続けて鳴り、走っているより
@@ -82,6 +97,8 @@ const ROLL: StepProfile = { distance: 1.26, volume: 0, range: 1, silent: true };
 function profileFor(locomotion: Locomotion): StepProfile | null {
   // 倒れている間と起き上がりは足で歩いていない
   if (locomotion === "death" || locomotion === "sweep" || locomotion === "stand") return null;
+  // 梯子。上端を乗り越える型 (climb_top) は段を踏んでいないので数えない
+  if (locomotion === "climb") return CLIMB;
   if (locomotion.startsWith("jump_")) return null;
   if (locomotion === "roll") return ROLL;
   // 構えは 1 か所の表から引く (stance.ts)。ここで名前を見比べ直すと、
@@ -114,6 +131,7 @@ const TELEPORT = 3;
 export class Footsteps {
   private travelled = 0;
   private lastX = 0;
+  private lastY = 0;
   private lastZ = 0;
   private started = false;
 
@@ -123,9 +141,10 @@ export class Footsteps {
    * 湧き直しや繋ぎ直しで呼ぶ。update 側でも距離で弾いているが、
    * 呼べる場面では呼んだほうが確実 (跳んだ距離が短いときも取りこぼさない)。
    */
-  warp(x: number, z: number): void {
+  warp(x: number, y: number, z: number): void {
     this.started = true;
     this.lastX = x;
+    this.lastY = y;
     this.lastZ = z;
     this.travelled = 0;
   }
@@ -133,16 +152,26 @@ export class Footsteps {
   /**
    * @returns この呼び出しで踏んだなら鳴らし方、鳴らないなら null
    */
-  update(x: number, z: number, locomotion: Locomotion, grounded: boolean): Step | null {
+  update(x: number, y: number, z: number, locomotion: Locomotion, grounded: boolean): Step | null {
     if (!this.started) {
       this.started = true;
       this.lastX = x;
+      this.lastY = y;
       this.lastZ = z;
       return null;
     }
 
-    const moved = Math.hypot(x - this.lastX, z - this.lastZ);
+    /*
+     * 梯子の上では**縦に進んだ分**を数える。横は動かないので、床の式のままだと
+     * 登っても 1 度も鳴らない (実際そうなっていた)。足は床に着いていないので
+     * grounded も見ない。
+     */
+    const climbing = locomotion === "climb";
+    const moved = climbing
+      ? Math.abs(y - this.lastY)
+      : Math.hypot(x - this.lastX, z - this.lastZ);
     this.lastX = x;
+    this.lastY = y;
     this.lastZ = z;
 
     // 歩いて着いた距離ではない。積まずに捨てる
@@ -151,7 +180,7 @@ export class Footsteps {
       return null;
     }
 
-    const profile = grounded ? profileFor(locomotion) : null;
+    const profile = grounded || climbing ? profileFor(locomotion) : null;
     if (!profile) return null;
 
     // 止まっても積んだ距離は捨てない。捨てると、止まる直前までの移動が
@@ -163,6 +192,8 @@ export class Footsteps {
     if (profile.silent) return null;
     // 材質は含めない。足の下に何があるかを知っているのは世界の側で、
     // ここは「何歩進んだか」だけを数える
-    return { volume: profile.volume, range: profile.range };
+    return climbing
+      ? { volume: profile.volume, range: profile.range, climbing: true }
+      : { volume: profile.volume, range: profile.range };
   }
 }

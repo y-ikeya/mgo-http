@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { Spread } from '../item/spread'
 import { carrySpeedScale, WEAPONS } from '../item/weapons'
 import { THROW_SPEED, throwSpeedOf } from '../item/grenade'
-import { isLeakedTo, leakTag, newMatchPlayer, refill, type MatchPlayer } from './player'
+import { isLeakedTo, leakTag, leakTo, newMatchPlayer, refill, type MatchPlayer } from './player'
 import { masteryRecoveryScale, masteryReloadScale, runnerScale, type Skills } from './skill'
 
 /**
@@ -190,9 +190,20 @@ describe('THROWING MASTERY が投擲に効く', () => {
     expect(throwSpeedOf(NONE)).toBe(THROW_SPEED)
   })
 
-  test('段が上がるほど速く出る', () => {
+  /**
+   * **段は 1 つだけ** (ENEMY EXPOSURE と同じ)。本家は Lv3 でも 1 枠だったので、
+   * 値段が段で変わらない = 上の段しか選ばれない。取るか取らないかにしてある。
+   */
+  test('取れば速く出る', () => {
     expect(throwSpeedOf({ throwing: 1 })).toBeGreaterThan(THROW_SPEED)
-    expect(throwSpeedOf({ throwing: 3 })).toBeGreaterThan(throwSpeedOf({ throwing: 1 }))
+  })
+
+  /**
+   * 古い保存に残った段は**上限へ丸める**。素直に引くと表の外を掴んで、
+   * 投げる速さが NaN になり手榴弾が飛ばなくなる。
+   */
+  test('段を越えた値でも壊れない', () => {
+    expect(throwSpeedOf({ throwing: 3 })).toBe(throwSpeedOf({ throwing: 1 }))
   })
 
   /**
@@ -201,7 +212,7 @@ describe('THROWING MASTERY が投擲に効く', () => {
    * ずれた時点で武器が壊れる。
    */
   test('同じスキルなら必ず同じ速さ', () => {
-    const skills: Skills = { throwing: 2 }
+    const skills: Skills = { throwing: 1 }
     expect(throwSpeedOf(skills)).toBe(throwSpeedOf({ ...skills }))
   })
 })
@@ -235,8 +246,7 @@ describe('ENEMY EXPOSURE の宛先', () => {
     const alice = player('alice', 'blue')
     const mate = player('mate', 'blue')
     const bob = player('bob', 'red')
-    bob.leakedUntil = now + 5000
-    bob.leakedTo = leakTag(alice, true)
+    leakTo(bob, leakTag(alice, true), now + 5000)
 
     expect(isLeakedTo(bob, alice, now)).toBe(true)
     expect(isLeakedTo(bob, mate, now)).toBe(true)
@@ -250,8 +260,7 @@ describe('ENEMY EXPOSURE の宛先', () => {
     const alice = player('alice', 'blue')
     const bob = player('bob', 'red')
     const bobMate = player('bobMate', 'red')
-    bob.leakedUntil = now + 5000
-    bob.leakedTo = leakTag(alice, true)
+    leakTo(bob, leakTag(alice, true), now + 5000)
 
     expect(isLeakedTo(bob, bobMate, now)).toBe(false)
   })
@@ -261,8 +270,7 @@ describe('ENEMY EXPOSURE の宛先', () => {
     const alice = player('alice', 'blue')
     const carol = player('carol', 'blue')
     const bob = player('bob', 'blue')
-    bob.leakedUntil = now + 5000
-    bob.leakedTo = leakTag(alice, false)
+    leakTo(bob, leakTag(alice, false), now + 5000)
 
     expect(isLeakedTo(bob, alice, now)).toBe(true)
     // **同じ色でも見えない。** 個人戦では陣営が味方を意味しない
@@ -272,8 +280,7 @@ describe('ENEMY EXPOSURE の宛先', () => {
   test('時間で切れる', () => {
     const alice = player('alice', 'blue')
     const bob = player('bob', 'red')
-    bob.leakedUntil = now + 5000
-    bob.leakedTo = leakTag(alice, true)
+    leakTo(bob, leakTag(alice, true), now + 5000)
 
     expect(isLeakedTo(bob, alice, now + 4999)).toBe(true)
     expect(isLeakedTo(bob, alice, now + 5000)).toBe(false)
@@ -289,11 +296,42 @@ describe('ENEMY EXPOSURE の宛先', () => {
   test('湧き直すと宛先ごと消える', () => {
     const alice = player('alice', 'blue')
     const bob = player('bob', 'red')
-    bob.leakedUntil = now + 5000
-    bob.leakedTo = leakTag(alice, true)
+    leakTo(bob, leakTag(alice, true), now + 5000)
 
     refill(bob)
-    expect(bob.leakedTo).toBe('')
+    expect(bob.leaks.size).toBe(0)
     expect(isLeakedTo(bob, alice, now)).toBe(false)
+  })
+
+  /**
+   * **宛先は複数。** 同じ人が EE で片方に、TARGET ALERT でもう片方に光る。
+   * 1 枠だった頃は後から付いた光が先の光を消していた。
+   */
+  test('別の宛先に光っても、先の光は消えない', () => {
+    const alice = player('alice', 'blue')
+    const carol = player('carol', 'blue')
+    const bob = player('bob', 'red')
+    // 個人戦 (宛先は本人)。alice が当てたあと carol も当てた
+    leakTo(bob, leakTag(alice, false), now + 5000)
+    leakTo(bob, leakTag(carol, false), now + 3000)
+
+    expect(isLeakedTo(bob, alice, now)).toBe(true)
+    expect(isLeakedTo(bob, carol, now)).toBe(true)
+    // それぞれの期限で切れる
+    expect(isLeakedTo(bob, carol, now + 3000)).toBe(false)
+    expect(isLeakedTo(bob, alice, now + 3000)).toBe(true)
+  })
+
+  /** **伸ばすだけで縮めない。** Lv1 の人が当てて Lv3 の光が短くなるのは理屈が通らない */
+  test('同じ宛先に短い光を重ねても縮まない', () => {
+    const alice = player('alice', 'blue')
+    const bob = player('bob', 'red')
+    const tag = leakTag(alice, true)
+    expect(leakTo(bob, tag, now + 5000)).toBe(true)
+    expect(leakTo(bob, tag, now + 2000)).toBe(false)
+    expect(isLeakedTo(bob, alice, now + 4999)).toBe(true)
+    // 長いほうは伸びる
+    expect(leakTo(bob, tag, now + 8000)).toBe(true)
+    expect(isLeakedTo(bob, alice, now + 7999)).toBe(true)
   })
 })

@@ -18,8 +18,8 @@ import { createHandleAlpha } from './cardboard'
 /**
  * 箱の寸法 (m)。
  *
- * 素の姿勢は しゃがみ静止 0.94m / sneak 1.17m だが、被っている間は
- * 背骨を追加で 34° 丸めて頭を下げている (animation.ts の BOX_LEAN)。
+ * 素の姿勢は 座り 0.59m / sneak 0.97m (頭ボーン) で、被っている間は
+ * 背骨を追加で 15° 丸めて頭を下げている (animation.ts の BOX_LEAN)。
  * 箱の大きさに姿勢を合わせる形にしてあるのは、「人が入れる最小の箱」
  * という見た目を保ちたいため。箱を大きくすれば収まるが、それでは
  * ただの大きな箱になる。
@@ -29,9 +29,17 @@ import { createHandleAlpha } from './cardboard'
  * そこに肉と髪の厚みが乗るので、実測値から机上で決めると必ずはみ出る。
  */
 export interface BoxTuning {
+  /** 左右 (m) */
   width: number
+  /** 前後 (m)。**幅より要る** — しゃがみ歩きは膝が前へ出る */
+  depth: number
   height: number
-  /** 頭の上に取る余裕 (m)。頭ボーンより上に頭頂部があるぶん */
+  /**
+   * 頭の上に取る余裕 (m)。頭ボーンより上に頭頂部があるぶん。
+   *
+   * 0.3 だと動いている間に箱が浮きすぎた (腕を畳んだ型は前傾で頭が
+   * 下がるので、素の頭の高さから取ると余る)。0.2 で 1 割ほど低く浮く。
+   */
   clearance: number
   /**
    * 浮きの強さ。1 = 頭が収まる最小限だけ浮く。
@@ -52,13 +60,24 @@ export interface BoxTuning {
   opacity: number
 }
 
+/*
+ * 腕を畳んだ sneak (SneakingForward.fbx の 2 本目) に合わせた寸法。
+ * 実測 (肉込み、原点から。soldier / raiden とも同じ):
+ *   sneak  横 0.36 / 0.39m、前 0.67m (膝)、上半身の後ろ 0.28m
+ *   sit    前 0.89m (**足先**)、後ろ 0.20m、横 0.31 / 0.37m
+ * 前の型は横 0.66m あって、幅 1.3m が要った。
+ *
+ * **奥行きは座りの足先が決める。** 止まると箱は地面に着くので、足は隠れず
+ * 前面を突き抜ける。前へ 0.32 寄せて前面を 0.92m に置く。
+ */
 const tuning: BoxTuning = {
-  width: 1.3,
+  width: 0.9,
+  depth: 1.2,
   height: 1,
-  clearance: 0.3,
+  clearance: 0.2,
   liftScale: 1.1,
-  offsetForward: 0.24,
-  offsetRight: 0.1,
+  offsetForward: 0.32,
+  offsetRight: 0.05,
   opacity: 1,
 }
 
@@ -109,14 +128,98 @@ export function boxLift(headHeight: number): number {
  *
  * キャラの正面はローカル -Z。
  */
-export function placeBox(box: THREE.Object3D, lift: number): void {
+export function placeBox(box: THREE.Object3D, lift: number, motion?: BoxMotion): void {
   applyOpacity(box)
-  box.scale.set(tuning.width, tuning.height, tuning.width)
+  box.scale.set(tuning.width, tuning.height, tuning.depth)
   box.position.set(
     tuning.offsetRight,
     tuning.height / 2 + lift,
     -tuning.offsetForward,
   )
+  box.quaternion.identity()
+  if (motion) tiltBox(box, motion)
+}
+
+/**
+ * 動いている向きへ倒す角度。**進行方向の前縁を支点に、上が前へ出る。**
+ *
+ * 中の人が箱を押して進んでいる、と読めるように。止まっていれば水平。
+ * 支点を前縁にするのは、中心で回すと前の縁が地面へめり込み、後ろの縁が
+ * 浮いて見えるため。前縁を地面に置いたまま、後ろが持ち上がる。
+ */
+const BOX_TILT = THREE.MathUtils.degToRad(15)
+
+/** この速さ (m/s) で BOX_TILT まで倒れ切る。箱の移動は 3 m/s ほど */
+const BOX_TILT_SPEED = 2
+
+/** 倒れ方・戻り方のなめらかさ */
+const BOX_TILT_LAMBDA = 8
+
+/**
+ * 箱の傾きの元になる、**キャラのローカル座標で見た動き**。
+ *
+ * 速度は受け取らず**位置の差分から出す**。自分の側も相手の側も同じ式で
+ * 済み、相手は速度を配っていない (位置を補間しているだけ) ので、これしか
+ * 拾える物が無い。
+ *
+ * x / z は 0..1 に潰した向き (1 = 倒れ切り)。ローカル -Z が前。
+ */
+export class BoxMotion {
+  x = 0
+  z = 0
+  private prev: THREE.Vector3 | null = null
+  private readonly scratch = new THREE.Vector3()
+
+  /**
+   * @param position キャラのワールド位置
+   * @param yaw 向き (object.rotation.y)
+   * @param active 被っているか。外している間は倒さない (戻す)
+   */
+  advance(position: THREE.Vector3, yaw: number, dt: number, active: boolean): void {
+    let targetX = 0
+    let targetZ = 0
+    if (this.prev && dt > 0 && active) {
+      const world = this.scratch.subVectors(position, this.prev).divideScalar(dt)
+      // ワールド → ローカル (yaw の逆回転)。上下は捨てる
+      const cos = Math.cos(yaw)
+      const sin = Math.sin(yaw)
+      const localX = world.x * cos - world.z * sin
+      const localZ = world.x * sin + world.z * cos
+      const speed = Math.hypot(localX, localZ)
+      if (speed > 1e-3) {
+        const strength = Math.min(1, speed / BOX_TILT_SPEED)
+        targetX = (localX / speed) * strength
+        targetZ = (localZ / speed) * strength
+      }
+    }
+    this.prev = (this.prev ?? new THREE.Vector3()).copy(position)
+    this.x = damp(this.x, targetX, BOX_TILT_LAMBDA, dt)
+    this.z = damp(this.z, targetZ, BOX_TILT_LAMBDA, dt)
+  }
+}
+
+const UP = new THREE.Vector3(0, 1, 0)
+const tiltAxis = new THREE.Vector3()
+const tiltDir = new THREE.Vector3()
+const tiltPivot = new THREE.Vector3()
+const tiltArm = new THREE.Vector3()
+
+/** placeBox で水平に置いた箱を、motion の向きへ倒す */
+function tiltBox(box: THREE.Object3D, motion: BoxMotion): void {
+  const strength = Math.hypot(motion.x, motion.z)
+  if (strength < 1e-3) return
+  tiltDir.set(motion.x / strength, 0, motion.z / strength)
+  // 上 × 進行方向 のまわりに正で回すと、上が進行方向へ倒れる
+  tiltAxis.crossVectors(UP, tiltDir).normalize()
+  box.quaternion.setFromAxisAngle(tiltAxis, BOX_TILT * strength)
+
+  // 支点 = 進行方向の縁の、底の真ん中。箱の中心からそこまでの腕を回して置き直す
+  const reach =
+    (Math.abs(tiltDir.x) * tuning.width + Math.abs(tiltDir.z) * tuning.depth) / 2
+  tiltPivot.copy(box.position).addScaledVector(tiltDir, reach)
+  tiltPivot.y -= tuning.height / 2
+  tiltArm.subVectors(box.position, tiltPivot).applyQuaternion(box.quaternion)
+  box.position.copy(tiltPivot).add(tiltArm)
 }
 
 /** 側面の色。彩度を落とした段ボール色 */
