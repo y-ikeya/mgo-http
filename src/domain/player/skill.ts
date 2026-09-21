@@ -473,7 +473,9 @@ export const AWARENESS_RADIUS = 15
 
 // --- 段ごとの値。添字が Lv で、0 は「取っていない」 ---
 
-const RUNNER_SCALE = [1, 1.05, 1.1, 1.16] as const
+// Lv3 が 1.16 だった頃は Lv2 (1.1) の時点で「速すぎる」と実機で出た (2026-09-21)。
+// その Lv2 の速さを上限にして、下の段はその間を等分する
+const RUNNER_SCALE = [1, 1.03, 1.06, 1.1] as const
 const BOX_MOVE_SCALE = [1, 1.25, 1.5, 1.8] as const
 const MASTERY_SPREAD = [1, 0.92, 0.85, 0.78] as const
 // **Lv3 で 0。** 極めた銃は構えれば止まる

@@ -97,6 +97,8 @@ const SOUNDS = {
   step: { file: "step_concrete1.mp3", reference: 2, max: STEP_RANGE },
   /** 金属の上を歩いたとき。届く距離はコンクリートと同じにして、材質の差だけ出す */
   metalStep: { file: "step_metal1.mp3", reference: 2, max: STEP_RANGE },
+  /** 砂の上を歩いたとき。届く距離は他と同じ */
+  sandStep: { file: "step_sand1.mp3", reference: 2, max: STEP_RANGE },
   /** 梯子を 1 段登った。届く距離は足音と同じ (domain/rule/footsteps.ts の CLIMB) */
   ladderStep: { file: "step_ladder1.mp3", reference: 2, max: STEP_RANGE },
   /**
@@ -406,6 +408,8 @@ const UI_SOUNDS = {
   browse: { file: "clang1.mp3", volume: 0.55 },
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
   switch: { file: "list_switch1.mp3", volume: 0.55 },
+  /** 自分の弾が頭に入って倒した / 眠らせた。位置は持たない (自分への応え) */
+  headshot: { file: "headshot1.mp3", volume: 0.7 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;

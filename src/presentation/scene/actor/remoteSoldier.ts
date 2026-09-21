@@ -119,6 +119,12 @@ const PLAY_WHOLE_BODY: Record<
   (animator: CharacterAnimator) => void
 > = {
   roll: (a) => a.playRoll(),
+  // 窓枠を跳び越える。転がりと同じ全身の型
+  vault: (a) => a.playVault(),
+  vault_up: (a) => a.playVault(true),
+  // 縁にぶら下がる / 登る。ぶら下がりは型の最後で止まったまま (上半身も戻さない)
+  hang_drop: (a) => a.playHang(),
+  hang_climb: (a) => a.playHangClimb(),
   // 落下の受け身。削られる高さから落ちた着地
   hard_land: (a) => a.playHardLand(),
   stab: (a) => a.playStab(),
@@ -396,6 +402,11 @@ export class RemoteSoldier {
     this.rollStarted = false;
     this.sweptThisFrame = false;
     this.reloadStarted = false;
+    // ぶら下がりの上半身は型が終わっても戻さない (掴んだまま)。抜けたときにここで戻す
+    if (locomotion !== this.locomotion && locomotion !== 'hang_drop' && locomotion !== 'hang_climb') {
+      // 'hang' (待つ姿) もここを通る。落ちる型の上半身を止め絵へ渡すため
+      animator.endHang();
+    }
     if (locomotion !== this.locomotion && isWholeBody(locomotion)) {
       PLAY_WHOLE_BODY[locomotion](animator);
       // 叫んだこと・回り始めたことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
@@ -497,6 +508,10 @@ export class RemoteSoldier {
       this.boxed ||
       animator.barehanded ||
       state.held === 'knife' ||
+      // ぶら下がっている間は両手が縁に掛かっている
+      state.locomotion === 'hang_drop' ||
+      state.locomotion === 'hang' ||
+      state.locomotion === 'hang_climb' ||
       (state.weapon === 'm9' && !state.aiming && !state.reloading)
     if (this.weapon) this.weapon.visible = !holstered
 

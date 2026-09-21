@@ -99,6 +99,15 @@ export const MOVE_PROBE_HEIGHT: Record<Stance, number> = {
 }
 
 /**
+ * 跳び越え (vault) の間だけ線を引く高さ (m)。
+ *
+ * 窓枠は 0.9〜1.2m にあり、立ちの高さ (0.9) で引くと枠を貫いて「壁を抜けた」に
+ * なる。跳べる高さの上限 (soldier.ts の VAULT_MAX = 1.2) より上、鴨居 (2m 前後)
+ * より下で引く。
+ */
+export const VAULT_PROBE_HEIGHT = 1.3
+
+/**
  * 体を包む箱 (m)。**可視の判定はこの箱の 12 辺で見る。**
  *
  * 点 (頭・胸・足元…) で見ていた頃は、点の間隔より細い隙間から見えている体を
@@ -231,7 +240,8 @@ export function leanShift(
   out: { x: number; z: number } = { x: 0, z: 0 },
 ): { x: number; z: number } {
   const metres = leanMetres(lean, stance)
-  out.x = Math.cos(yaw) * metres
-  out.z = -Math.sin(yaw) * metres
+  // + 0 は -0 を 0 に揃えるため (傾いていないときに z が -0 になって toEqual が落ちた)
+  out.x = Math.cos(yaw) * metres + 0
+  out.z = -Math.sin(yaw) * metres + 0
   return out
 }

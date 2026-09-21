@@ -23,7 +23,7 @@ REF_PREFIX = 'ref_'
 # 名前に付けられる札。これ以外の接頭辞は打ち間違いの可能性が高い
 # shield_ は**印だけ**。書き出しの上では普通の壁で、名前で役目が読めるようにしてある
 # (梯子の脇に立てて、登っている人を撃たれないようにする板)
-KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'ref_', 'ladder_', 'shield_')
+KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'sand_', 'ref_', 'ladder_', 'shield_')
 
 # 面が何を止めるか。既定は全部止めて、名前で個別に外す。
 # (src/domain/stage/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
@@ -253,6 +253,28 @@ for obj in bpy.context.scene.objects:
 
 if not exported:
     raise SystemExit('書き出すメッシュが無い')
+
+# --- モディファイアを先に確定させる ------------------------------------------
+#
+# glb はモディファイアを確定させて出す (export_apply) のに、箱・坂・三角の網は
+# obj.data (確定前の形) を読んでいた。Array で組んだ階段は**絵は 12 段、判定は
+# 1 段**になって登れない。ここで全部の形を確定させ、以降は 1 つの形だけを見る。
+#
+# 読み込んだ複製に対してやるので (-b で保存しない)、.blend は変わらない。
+# 形を共有している物 (Alt+D の複製) は、その物だけ新しい形に付け替える。
+baked = 0
+depsgraph = bpy.context.evaluated_depsgraph_get()
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or not obj.select_get() or not obj.modifiers:
+        continue
+    evaluated = obj.evaluated_get(depsgraph)
+    mesh = bpy.data.meshes.new_from_object(evaluated)
+    mesh.name = obj.data.name + '_baked'
+    obj.modifiers.clear()
+    obj.data = mesh
+    baked += 1
+if baked:
+    print(f'  モディファイアを確定させた: {baked} 個')
 
 problems = check([o for o in bpy.context.scene.objects if o.select_get()])
 if problems:
@@ -552,8 +574,9 @@ BOX_FILL_MIN = 0.25
 # **src/domain/stage/surface.ts と揃えること。** あちらが名前から材質を引く
 # 唯一の場所で、こちらはその結果を番号にして持ち出すだけ。既定は金属。
 SURFACE_IDS = {'concrete': 0, 'metal': 1, 'wood': 2, 'glass': 3}
+# sand_ は網の番号としてはコンクリート (2 ビットに 5 つ目は入らない)。足音と絵は箱の名前から砂として引く
 SURFACE_TAGS = (('metal_', 'metal'), ('concrete_', 'concrete'),
-                ('wood_', 'wood'), ('glass_', 'glass'))
+                ('wood_', 'wood'), ('glass_', 'glass'), ('sand_', 'concrete'))
 
 
 def surface_of(name):
@@ -690,9 +713,43 @@ for box in [b for b in boxes if b['name'].startswith('ladder_')]:
         'parts': 1,
     })
 
+# --- 基地 -------------------------------------------------------------------
+#
+# **`meta_` で始まり `base` を含む空 (Empty) が基地。** 名前に blue / red で陣営。
+# 位置は空の所で、高さは**その真下の床の天面**に落とす (空は床から浮かせて
+# 置かれるので、そのまま使うと湧いた瞬間に落ちる)。
+#
+# 書いた基地は domain/stage/index.ts の bases より優先される (無ければそちら)。
+def floor_under(x, y, z):
+    """真下の床の天面。坂 (top が平面) は平らな高さ h で見る (基地は平らな所に置く前提)"""
+    best = None
+    for box in boxes:
+        lo, hi = box['min'], box['max']
+        top = box['top']['h'] if isinstance(box['top'], dict) else box['top']
+        if lo[0] <= x <= hi[0] and lo[2] <= z <= hi[2] and top <= y + 0.5:
+            if best is None or top > best:
+                best = top
+    return best
+
+
+bases = {}
+for obj in bpy.context.scene.objects:
+    lower = obj.name.lower()
+    if obj.type != 'EMPTY' or not lower.startswith('meta_') or 'base' not in lower:
+        continue
+    team = 'blue' if 'blue' in lower else 'red' if 'red' in lower else None
+    if team is None:
+        print(f'  {obj.name}: 陣営が読めない (blue / red を名前に入れる)')
+        continue
+    x, y, z = to_gltf(obj.matrix_world.translation)
+    floor = floor_under(x, y, z)
+    if floor is None:
+        print(f'  {obj.name}: 真下に床が無い。空の高さのまま')
+    bases[team] = {'x': round(x, 2), 'y': round(floor if floor is not None else y, 2), 'z': round(z, 2)}
+
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
 with open(json_path, 'w') as f:
-    json.dump({'boxes': boxes, 'ladders': ladders}, f, ensure_ascii=False, indent=0)
+    json.dump({'boxes': boxes, 'ladders': ladders, 'bases': bases}, f, ensure_ascii=False, indent=0)
 
 # 三角は別の口へ、しかも生の数値で。
 #
@@ -746,6 +803,9 @@ PROJECT_AXES = ((1, 2), (0, 2), (0, 1))
 # ガラスは絵を貼らないので UV を作り直す意味が無い (透けることが見た目)
 SURFACE_TAGS = ('metal_', 'concrete_', 'wood_')
 
+# 砂は絵を Blender で貼る (本人の UV をそのまま使う)。UV は触らず、法線だけ揃える
+NORMAL_TAGS = SURFACE_TAGS + ('sand_',)
+
 # **焼き込んだ絵を持っている物の札。** UV を触らない。
 #
 # 立方投影で貼り直せるのは**繰り返しの絵**だけ (板・金属・コンクリート)。
@@ -756,14 +816,22 @@ SURFACE_TAGS = ('metal_', 'concrete_', 'wood_')
 KEEP_UV = 'nouv'
 
 
-def reproject(obj):
-    """ワールド座標の立方投影で UV を張り直す。**scale がいくつでも伸びない**"""
+def reproject(obj, uv=True):
+    """ワールド座標の立方投影で UV を張り直す。**scale がいくつでも伸びない**
+
+    ついでに法線を外向きに揃える。Plane を E で押し出した箱は面が全部内を向き、
+    上面が裏 (描かれない) になって底の絵が透けて見える。札を持つ物は中身の無い
+    箱なので、外向きが唯一の正解。直した面の数を返す。
+    """
     mesh = obj.data
     bm = bmesh.new()
     bm.from_mesh(mesh)
+    before = [f.normal.copy() for f in bm.faces]
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    flipped = sum(1 for f, n in zip(bm.faces, before) if f.normal.dot(n) < 0)
     layer = bm.loops.layers.uv.verify()
     mw = obj.matrix_world
-    for face in bm.faces:
+    for face in bm.faces if uv else ():
         n = (mw.to_3x3() @ face.normal)
         axis = max(range(3), key=lambda i: abs(n[i]))
         u_axis, v_axis = PROJECT_AXES[axis]
@@ -772,18 +840,22 @@ def reproject(obj):
             loop[layer].uv = (world[u_axis] / TEXEL, world[v_axis] / TEXEL)
     bm.to_mesh(mesh)
     bm.free()
+    return flipped
 
 
 reprojected = 0
+flipped_faces = 0
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or not obj.select_get():
         continue
-    if not any(tag in obj.name for tag in SURFACE_TAGS):
+    if not any(tag in obj.name for tag in NORMAL_TAGS):
         continue
-    if KEEP_UV in obj.name:
-        continue
-    reproject(obj)
-    reprojected += 1
+    uv = any(tag in obj.name for tag in SURFACE_TAGS) and KEEP_UV not in obj.name
+    flipped = reproject(obj, uv)
+    reprojected += uv
+    if flipped:
+        flipped_faces += flipped
+        print(f'  {obj.name}: 内向きの面 {flipped} 枚を外向きに直した (Blender では Shift+N)')
 print(f'  UV を張り直した: {reprojected} 個 (1 タイル = {TEXEL}m)')
 
 # --- 形を間引く -----------------------------------------------------------
@@ -905,11 +977,13 @@ bpy.ops.export_scene.gltf(
 # 材質の内訳も出す。札の付け忘れは数を見ると気づける
 counts = {}
 for name in exported:
-    tag = next((t for t in ('metal_', 'concrete_', 'wood_', 'glass_') if t in name), '(既定=金属)')
+    tag = next((t for t in ('metal_', 'concrete_', 'wood_', 'glass_', 'sand_') if t in name), '(既定=金属)')
     counts[tag] = counts.get(tag, 0) + 1
 
 print(f'\n書き出し: {glb_path}')
 print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個 / 梯子 {len(ladders)} 本)')
+for team, base in bases.items():
+    print(f'          基地 {team:5s} ({base["x"]}, {base["y"]}, {base["z"]})')
 for ladder in ladders:
     height = ladder['max'][1] - ladder['min'][1]
     print(f'          梯子 {ladder["name"]:16s} 高さ {height:.2f}m ({ladder["parts"]} 枚) 厚みの向き {ladder["axis"]}')

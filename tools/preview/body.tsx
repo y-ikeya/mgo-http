@@ -170,17 +170,61 @@ if (gunName) {
  */
 const firing = query.has('fire')
 // 一度きりの全身の型は**姿勢を決めてから**頭から流す。伏せていれば伏せの刺突になる
-if (!query.has('roll')) anim.setLocomotion(clipName as never)
+const oneShot =
+  query.has('roll') || query.has('vault') || query.has('vaultup') || query.has('hang') || query.has('hangclimb')
+if (!oneShot) anim.setLocomotion(clipName as never)
 if (query.has('roll')) anim.playRoll()
+// ?vault … 窓枠を跳び越える。転がりと同じ全身の型で、playVault が入口
+if (query.has('vault')) anim.playVault()
+// ?vaultup … 一段上へ乗る (上下は型から抜いてあるので、その場で足だけ動く)
+if (query.has('vaultup')) anim.playVault(true)
+// ?hang … 縁から落ちてぶら下がる (最後のコマで止まる)。?hangclimb … そこから登る
+if (query.has('hang')) anim.playHang()
+if (query.has('hangclimb')) anim.playHangClimb()
 // ?stab … 刺す。姿勢が伏せ (clip=prone_idle) なら伏せた刺突になる
 if (query.has('stab')) anim.playStab()
 for (let t = 0; t < stopAt; t += 1 / 60) {
   // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
-  if (!query.has('roll') && !query.has('stab')) anim.setLocomotion(clipName as never)
+  if (!oneShot && !query.has('stab')) anim.setLocomotion(clipName as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
 }
 model.updateMatrixWorld(true)
+// ?bones … 手と腰の高さを出す (ぶら下がりで足元を縁からどれだけ下げるかを測る)
+if (query.has('bones')) {
+  const v = new THREE.Vector3()
+  for (const suffix of ['Hips', 'RightHand', 'LeftHand', 'Head', 'RightFoot']) {
+    const bone = findBoneBySuffix(model, suffix)
+    if (bone) {
+      bone.getWorldPosition(v)
+      console.log('[bones]', suffix, v.y.toFixed(3), 'x', v.x.toFixed(3), 'z', v.z.toFixed(3))
+    }
+  }
+  // 胸の向き = 上 × (左肩→右肩)。骨の軸より確か (ぶら下がりでは腰も頭も傾く)
+  {
+    const l = findBoneBySuffix(model, 'LeftArm')
+    const r = findBoneBySuffix(model, 'RightArm')
+    if (l && r) {
+      const lp = l.getWorldPosition(new THREE.Vector3())
+      const rp = r.getWorldPosition(new THREE.Vector3())
+      const right = rp.sub(lp).setY(0).normalize()
+      const forward = new THREE.Vector3(0, 1, 0).cross(right)
+      console.log('[bones] chest forward', forward.x.toFixed(2), forward.z.toFixed(2))
+    }
+  }
+  // 腰と頭の向き (Y 軸回り、度)。型が体を回している量を見る
+  const q = new THREE.Quaternion()
+  const dir = new THREE.Vector3()
+  for (const suffix of ['Hips', 'Head']) {
+    const bone = findBoneBySuffix(model, suffix)
+    if (!bone) continue
+    bone.getWorldQuaternion(q)
+    // 腰の骨の +Y が体の前 (Mixamo)。それをワールドへ写して水平の向きを取る
+    // 腰の骨は +Y が背骨 (上)。体の前は +Z
+    dir.set(0, 0, 1).applyQuaternion(q)
+    console.log('[bones]', suffix, 'yaw', ((Math.atan2(-dir.x, -dir.z) * 180) / Math.PI).toFixed(1), 'dir', dir.x.toFixed(2), dir.y.toFixed(2), dir.z.toFixed(2))
+  }
+}
 if (box) {
   const headBone = findBoneBySuffix(model, 'Head')
   const headHeight = headBone ? headBone.getWorldPosition(new THREE.Vector3()).y : 1

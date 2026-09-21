@@ -88,6 +88,11 @@ export const LOCOMOTIONS: Locomotion[] = [
   // しゃがんで傾く。**末尾に足す**
   'lean_crouch_left',
   'lean_crouch_right',
+  'vault',
+  'vault_up',
+  'hang_drop',
+  'hang_climb',
+  'hang',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

@@ -8,7 +8,7 @@ import { Input } from "../../infra/input";
 import { Soldier, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/soldier";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
-import { STAGES, surfaceOf, waterOf, type StageName } from "../../domain/stage";
+import { STAGES, type Spot, surfaceOf, waterOf, type StageName } from "../../domain/stage";
 import {
   SKILLS,
   canChooseSkills,
@@ -22,14 +22,13 @@ import { pelletsOf } from "../../domain/item/weapons";
 import { leanMetres, type Lean, type Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
 import {
-  ARENA_HALF_SIZE,
   buildLights,
   buildBases,
   buildStage,
+  fitShadowToStage,
   loadStageLadders,
   STAGE_CODE,
-  type Stage,
-} from "./world/stage";
+  type Stage, loadStageBases } from "./world/stage";
 import {
   ceilingHeight,
   clampToArena,
@@ -1084,6 +1083,9 @@ export class Game {
     container.appendChild(this.renderer.domElement);
 
     this.stage = buildStage(this.scene, this.stageName);
+    void loadStageBases(this.stageName).then((bases) => {
+      this.stageBases = bases;
+    });
     /*
      * 水面をこの 2 つへ配る。**溺れた体は沈み、見ている側は水の上に残る。**
      *
@@ -1115,6 +1117,8 @@ export class Game {
      */
     void this.stage.ready.then(() => {
       this.stageReady = true;
+      // 影の枠をステージの広さに合わせる。原点 ±65m のままだと city で縁が斜めの線に出る
+      fitShadowToStage(this.sun, this.stage);
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
@@ -1640,11 +1644,11 @@ export class Game {
    * その縛りが消える。まだ三角を出していないステージは箱のまま動く。
    */
   private readonly world: PlayerWorld = {
-    resolveHorizontal: (position, radius, feetY) => {
+    resolveHorizontal: (position, radius, feetY, height = PLAYER_HEIGHT) => {
       const mesh = this.stage.moveWorld;
-      if (mesh) mesh.resolveHorizontal(position, radius, feetY);
-      else resolveCircle(position, radius, this.stage.obstacles, feetY, PLAYER_HEIGHT, STEP_UP);
-      clampToArena(position, radius, ARENA_HALF_SIZE);
+      if (mesh) mesh.resolveHorizontal(position, radius, feetY, height);
+      else resolveCircle(position, radius, this.stage.obstacles, feetY, height, STEP_UP);
+      clampToArena(position, radius, this.stage.arenaHalf);
     },
     groundHeight: (position, radius, feetY) =>
       this.stage.moveWorld?.groundHeight(position, radius, feetY) ??
@@ -1699,6 +1703,9 @@ export class Game {
    */
   private perform(effect: MatchEffect): void {
     switch (effect.kind) {
+      case "headshot":
+        this.audio.playUi("headshot");
+        break;
       case "phase":
         // 陣営が無い部屋には基地も無い
         if (this.bases) this.bases.visible = effect.teams;
@@ -2354,6 +2361,9 @@ export class Game {
    * 位置を決めるのはクライアント。地形を知っているのがこちらだけなので。
    * サーバーは「復帰してよい」とだけ言う。
    */
+  /** json から読んだ基地。届くまでは空で、表 (STAGES) の値へ落ちる */
+  private stageBases: Partial<Record<Team, Spot>> = {};
+
   private placeAtSpawn(): void {
     /*
      * 湧く場所。**陣営で分かれない部屋は散らす。**
@@ -2363,8 +2373,9 @@ export class Game {
      */
     const spawns = STAGES[this.stageName];
     const solo = spawns.solo;
+    // 基地は書き出した json (blend の meta_*base*) を優先。無ければ表の値
     const base = MODES[this.replica.mode].teams
-      ? spawns.bases[this.replica.team]
+      ? (this.stageBases[this.replica.team] ?? spawns.bases[this.replica.team])
       : solo[Math.floor(Math.random() * solo.length)];
     // 同じ点に重なると互いが見えないので、ID から決まる向きへ散らす
     const spread = spawnAngle(this.net.id + this.shotCount);
@@ -3481,11 +3492,30 @@ export class Game {
       if (this.input.pushed("stance")) this.player.releaseLadder();
       return;
     }
+    // 縁にぶら下がっている間も同じ指を譲る。**Space で手を離す。** 登るのは前 (W)
+    if (this.player.hanging) {
+      if (this.input.pushed("stance")) this.player.releaseHang();
+      return;
+    }
+
+    /*
+     * **押した瞬間、目の前に窓枠や塀があれば跳び越える。**
+     *
+     * しゃがみ (離してから) や転がり (0.17 秒) を待たない。跳ぶかどうかは
+     * 目の前の形で決まっていて、押した人はもう決めている。跳んだ押下は
+     * 離してもしゃがまず、押し続けても転がらない (vaultedThisPress)。
+     */
+    if (this.input.pushed("stance") && !this.cocking && this.player.vault()) {
+      this.vaultedThisPress = true;
+    }
+    if (!this.input.down("stance")) this.vaultedThisPress = false;
 
     // 短く押して離した = しゃがみの切り替え
-    if (this.input.tapped("stance")) this.player.toggleCrouch();
+    if (this.input.tapped("stance") && !this.vaultedThisPress) this.player.toggleCrouch();
 
     if (this.input.holding("stance")) {
+      // 跳んだ押下では転がらない (押したまま伏せるのも無し)
+      if (this.vaultedThisPress) return;
       // 長押しが成立した。**1 回の押下につき 1 度だけ転がる**
       if (!this.rolledThisHold) {
         this.rolledThisHold = true;
@@ -3511,6 +3541,8 @@ export class Game {
 
   /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */
   private rolledThisHold = false;
+  /** この押下で跳び越えたか。離してもしゃがまず、押し続けても転がらない */
+  private vaultedThisPress = false;
 
   /**
    * 投げる構えと、離したときの投擲。
@@ -4247,7 +4279,9 @@ export class Game {
         ? "metalStep"
         : surface === "wood"
           ? "woodStep"
-          : "step";
+          : surface === "sand"
+            ? "sandStep"
+            : "step";
     const gain = this.audio.play(sound, position, step.volume, step.range);
     if (ping) this.addPing("step", position, gain);
   }
@@ -4352,7 +4386,9 @@ export class Game {
         ? "metalStep"
         : message.surface === "wood"
           ? "woodStep"
-          : "step";
+          : message.surface === "sand"
+            ? "sandStep"
+            : "step";
     const gain = this.audio.play(sound, at, message.volume ?? 1, message.range ?? 1);
     this.addPing("step", at, gain);
   }

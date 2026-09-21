@@ -764,7 +764,9 @@ function handleMessage(
       if (!room.mode.teams || !canAct(player.life)) break
       const now = Date.now()
       if (now - sessionOf(player).resuppliedAt < RESUPPLY_COOLDOWN_MS) break
-      if (!atBase(player.x, player.y, player.z, STAGES[room.stage.name].bases[player.team])) break
+      // 基地は書き出した json を優先。無ければ表の値
+      const base = room.stage.bases[player.team] ?? STAGES[room.stage.name].bases[player.team]
+      if (!atBase(player.x, player.y, player.z, base)) break
       sessionOf(player).resuppliedAt = now
       resupply(player)
       const ammo = player.inventory.ammoTable()
@@ -1036,6 +1038,13 @@ const server = Bun.serve<Client>({
         resumed = resuming ? seat : null
         seat.concentratingSince = 0
         seat.holdingGrenade = false
+        /*
+         * **スキルも返す。** 席と一緒にサーバーが持ったままなのに、読み直した
+         * クライアントは空から始まる — 画面では全部外れて見え、効きは残って
+         * いる、という食い違いになっていた。新しく入る人は restoreSkills が
+         * 返すが、席が残っていた人はここでしか返せない。
+         */
+        sendSkills(seat)
       } else {
         // 名前は発行元が持っていればそれ、無ければ join で名乗るまで仮のもの
         const joined = newMatchPlayer({

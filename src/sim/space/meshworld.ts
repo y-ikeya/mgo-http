@@ -97,7 +97,7 @@ export class MeshMoveWorld implements MoveWorld {
    * 高さを決めるのは groundHeight の仕事で、ここで持ち上げると壁に触れた
    * 瞬間に体が浮く。
    */
-  resolveHorizontal(position: Vec3, radius: number, feetY: number): void {
+  resolveHorizontal(position: Vec3, radius: number, feetY: number, height = this.height): void {
     /*
      * **体の下端を段差の上に置く。**
      *
@@ -117,7 +117,7 @@ export class MeshMoveWorld implements MoveWorld {
      */
     const rise = this.riseAhead(position, radius, feetY)
     const bottom = feetY + this.stepUp + rise + radius
-    const top = feetY + this.height - radius
+    const top = feetY + height - radius
 
     for (let round = 0; round < ITERATIONS; round++) {
       let pushX = 0

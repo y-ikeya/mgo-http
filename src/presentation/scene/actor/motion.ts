@@ -76,6 +76,10 @@ export type WholeBodyLocomotion =
   | 'stab'
   // 伏せたまま刺す。全身の型 (入口は playStab、伏せていれば伏せの型を選ぶ)
   | 'prone_stab'
+  | 'vault'
+  | 'vault_up'
+  | 'hang_drop'
+  | 'hang_climb'
   | 'death'
   | 'death_front'
   | 'death_back'
@@ -92,6 +96,10 @@ export type WholeBodyLocomotion =
   | 'claymore_place'
 
 export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>([
+  'vault',
+  'vault_up',
+  'hang_drop',
+  'hang_climb',
   'roll',
   // 受け身。転がるので上半身だけ別の型は重ねられない
   'hard_land',
@@ -265,6 +273,16 @@ export interface StanceInput {
    */
   proneShift: 'prone_down' | 'prone_rise' | 'prone_roll_down' | null
   rolling: boolean
+  /** 窓枠を跳び越えている。転がりと同じく操作は効かない */
+  vaulting: boolean
+  /** 一段上へ乗る跳び越え。vaulting と一緒に true で来る */
+  vaultingUp: boolean
+  /** 縁にぶら下がっている (落ちる途中も含む) */
+  hanging: boolean
+  /** ぶら下がりから登っている。hanging と一緒に true で来る */
+  hangClimbing: boolean
+  /** 縁に手を掛けて待っている (落ち切った後)。hanging と一緒に true で来る */
+  hangHolding: boolean
   onGround: boolean
   /** 着地モーションの残り時間 (秒) */
   landing: number
@@ -370,11 +388,17 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.setting) return input.setting
   // しゃがんだままなら上半身だけ。立ちの刺突は全身の型なので立ち上がってしまう
   if (input.stabbing) return input.crouching ? 'crouch_stab' : 'stab'
+  if (input.hangClimbing) return 'hang_climb'
+  if (input.hangHolding) return 'hang'
+  if (input.hanging) return 'hang_drop'
+  if (input.vaultingUp) return 'vault_up'
+  if (input.vaulting) return 'vault'
   if (input.rolling) return 'roll'
 
   // 覗きながら傾く。**止まっている間だけ。** 立ちとしゃがみで型が違う (伏せには無い)。
   // 主観かどうかは呼ぶ側が見る。傾いたまましゃがみと立ちは行き来できる
-  if (input.lean !== 0 && !input.prone && input.onGround && !hasDirection(input)) {
+  // lean は無い入力 (古い呼び出し・試験) も来るので、値があるときだけ
+  if (input.lean && !input.prone && input.onGround && !hasDirection(input)) {
     if (input.crouching) return input.lean < 0 ? 'lean_crouch_left' : 'lean_crouch_right'
     return input.lean < 0 ? 'lean_left' : 'lean_right'
   }

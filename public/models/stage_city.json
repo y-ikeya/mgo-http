@@ -1,0 +1,2948 @@
+{
+"boxes": [
+{
+"name": "sand_ground",
+"min": [
+-56.292,
+0.0,
+-99.054
+],
+"max": [
+43.708,
+10.0,
+86.328
+],
+"top": {
+"h": 10.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building1",
+"min": [
+-24.029,
+9.379,
+28.807
+],
+"max": [
+-13.612,
+15.774,
+39.358
+],
+"top": {
+"h": 15.7744,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building2",
+"min": [
+-44.565,
+8.907,
+29.891
+],
+"max": [
+-26.297,
+13.042,
+44.705
+],
+"top": {
+"h": 13.0418,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building4",
+"min": [
+-56.632,
+9.16,
+-12.783
+],
+"max": [
+-43.775,
+15.836,
+11.356
+],
+"top": {
+"h": 15.8362,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building5",
+"min": [
+-35.515,
+9.034,
+-12.882
+],
+"max": [
+-18.746,
+20.717,
+2.626
+],
+"top": {
+"h": 20.7172,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building7",
+"min": [
+-28.572,
+8.505,
+-50.304
+],
+"max": [
+-12.058,
+16.181,
+-40.39
+],
+"top": {
+"h": 16.1815,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building8",
+"min": [
+-15.487,
+8.887,
+57.528
+],
+"max": [
+-5.935,
+13.022,
+75.385
+],
+"top": {
+"h": 13.0217,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building10",
+"min": [
+-26.839,
+8.937,
+-72.171
+],
+"max": [
+-13.63,
+17.377,
+-56.239
+],
+"top": {
+"h": 17.3766,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building9",
+"min": [
+-3.625,
+8.703,
+-73.565
+],
+"max": [
+9.807,
+17.143,
+-58.417
+],
+"top": {
+"h": 17.1431,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building11",
+"min": [
+-9.889,
+9.235,
+-53.076
+],
+"max": [
+-3.048,
+15.024,
+-45.358
+],
+"top": {
+"h": 15.0239,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building12",
+"min": [
+-15.546,
+8.727,
+-90.735
+],
+"max": [
+23.417,
+17.356,
+-79.487
+],
+"top": {
+"h": 17.3556,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building13",
+"min": [
+-49.492,
+9.24,
+-54.258
+],
+"max": [
+-43.255,
+15.917,
+-34.719
+],
+"top": {
+"h": 15.917,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building21",
+"min": [
+-22.612,
+10.126,
+70.25
+],
+"max": [
+-2.604,
+14.26,
+87.777
+],
+"top": {
+"h": 14.2605,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building20",
+"min": [
+-4.707,
+9.034,
+18.661
+],
+"max": [
+3.9,
+13.168,
+27.535
+],
+"top": {
+"h": 13.1681,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building19",
+"min": [
+-4.609,
+8.025,
+17.176
+],
+"max": [
+8.323,
+12.16,
+20.789
+],
+"top": {
+"h": 12.1597,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building18",
+"min": [
+-7.067,
+9.034,
+-4.815
+],
+"max": [
+3.546,
+13.168,
+8.502
+],
+"top": {
+"h": 13.1681,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building17",
+"min": [
+5.816,
+8.559,
+-15.363
+],
+"max": [
+18.251,
+12.693,
+18.124
+],
+"top": {
+"h": 12.6931,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building16",
+"min": [
+-3.79,
+8.991,
+-26.127
+],
+"max": [
+4.722,
+13.126,
+-21.886
+],
+"top": {
+"h": 13.126,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building15",
+"min": [
+38.816,
+9.232,
+-96.958
+],
+"max": [
+43.487,
+13.366,
+-43.23
+],
+"top": {
+"h": 13.3663,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building14",
+"min": [
+27.274,
+9.232,
+-97.947
+],
+"max": [
+41.126,
+17.672,
+-95.258
+],
+"top": {
+"h": 17.6716,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building26",
+"min": [
+-56.473,
+9.215,
+14.864
+],
+"max": [
+-43.616,
+15.892,
+56.632
+],
+"top": {
+"h": 15.8918,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building27",
+"min": [
+-53.278,
+9.006,
+10.505
+],
+"max": [
+-45.853,
+15.682,
+17.095
+],
+"top": {
+"h": 15.682,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building24",
+"min": [
+8.976,
+9.103,
+59.179
+],
+"max": [
+25.984,
+13.237,
+87.209
+],
+"top": {
+"h": 13.2371,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building23",
+"min": [
+17.189,
+8.893,
+32.991
+],
+"max": [
+24.969,
+13.028,
+64.411
+],
+"top": {
+"h": 13.0279,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building22",
+"min": [
+-4.36,
+8.983,
+-19.347
+],
+"max": [
+2.988,
+13.117,
+-8.252
+],
+"top": {
+"h": 13.1171,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building25",
+"min": [
+14.849,
+9.642,
+-21.127
+],
+"max": [
+24.158,
+13.776,
+-11.32
+],
+"top": {
+"h": 13.776,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building28",
+"min": [
+-53.814,
+9.038,
+-28.078
+],
+"max": [
+-49.36,
+18.056,
+-6.683
+],
+"top": {
+"h": 18.0557,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building29",
+"min": [
+-49.41,
+9.693,
+-26.784
+],
+"max": [
+-45.518,
+14.544,
+-17.238
+],
+"top": {
+"h": 14.5441,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32",
+"min": [
+-3.768,
+9.308,
+-36.991
+],
+"max": [
+9.473,
+13.442,
+-24.011
+],
+"top": {
+"h": 13.4425,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building33",
+"min": [
+9.204,
+9.822,
+-67.333
+],
+"max": [
+48.192,
+13.956,
+-29.021
+],
+"top": {
+"h": 13.9562,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building34",
+"min": [
+6.095,
+10.3,
+-35.879
+],
+"max": [
+12.883,
+14.434,
+-29.182
+],
+"top": {
+"h": 14.4341,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building31",
+"min": [
+-19.022,
+9.03,
+28.452
+],
+"max": [
+-4.719,
+13.165,
+42.742
+],
+"top": {
+"h": 13.1649,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building36",
+"min": [
+-23.845,
+9.411,
+37.453
+],
+"max": [
+-4.554,
+15.807,
+44.205
+],
+"top": {
+"h": 15.8065,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.001",
+"min": [
+-4.372,
+8.928,
+-49.95
+],
+"max": [
+0.76,
+13.063,
+-44.908
+],
+"top": {
+"h": 13.0628,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.002",
+"min": [
+-4.222,
+9.101,
+-53.549
+],
+"max": [
+0.789,
+13.236,
+-48.099
+],
+"top": {
+"h": 13.2359,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.003",
+"min": [
+-45.078,
+9.218,
+-61.382
+],
+"max": [
+-37.458,
+13.352,
+-47.096
+],
+"top": {
+"h": 13.3521,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.004",
+"min": [
+-40.225,
+9.254,
+-78.485
+],
+"max": [
+-37.549,
+13.388,
+-60.291
+],
+"top": {
+"h": 13.3883,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building18.001",
+"min": [
+-4.383,
+8.981,
+7.677
+],
+"max": [
+0.651,
+13.115,
+13.993
+],
+"top": {
+"h": 13.115,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.005",
+"min": [
+7.858,
+9.227,
+-67.223
+],
+"max": [
+16.659,
+13.362,
+-58.705
+],
+"top": {
+"h": 13.3617,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.006",
+"min": [
+8.354,
+9.237,
+-72.559
+],
+"max": [
+16.722,
+13.372,
+-65.425
+],
+"top": {
+"h": 13.3716,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building12.001",
+"min": [
+-40.951,
+9.343,
+-86.532
+],
+"max": [
+-1.988,
+17.972,
+-77.866
+],
+"top": {
+"h": 17.9718,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.007",
+"min": [
+-13.084,
+9.113,
+-62.052
+],
+"max": [
+-5.841,
+13.247,
+-57.77
+],
+"top": {
+"h": 13.2471,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.008",
+"min": [
+-11.122,
+9.295,
+-73.635
+],
+"max": [
+-5.927,
+13.43,
+-64.763
+],
+"top": {
+"h": 13.43,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.009",
+"min": [
+2.71,
+9.237,
+-32.608
+],
+"max": [
+13.783,
+13.372,
+-21.739
+],
+"top": {
+"h": 13.3719,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building35",
+"min": [
+-45.596,
+8.99,
+43.138
+],
+"max": [
+-27.329,
+13.124,
+57.952
+],
+"top": {
+"h": 13.1242,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building8.001",
+"min": [
+-35.13,
+9.387,
+48.365
+],
+"max": [
+-9.126,
+13.522,
+68.417
+],
+"top": {
+"h": 13.5219,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building24.001",
+"min": [
+-5.24,
+8.981,
+85.43
+],
+"max": [
+11.768,
+13.115,
+89.803
+],
+"top": {
+"h": 13.1152,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building24.002",
+"min": [
+1.795,
+8.855,
+22.982
+],
+"max": [
+18.803,
+12.99,
+27.355
+],
+"top": {
+"h": 12.99,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building24.003",
+"min": [
+5.271,
+8.732,
+26.497
+],
+"max": [
+22.279,
+12.867,
+30.87
+],
+"top": {
+"h": 12.867,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building24.004",
+"min": [
+6.884,
+8.601,
+29.757
+],
+"max": [
+23.892,
+12.735,
+41.008
+],
+"top": {
+"h": 12.7351,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building24.005",
+"min": [
+-15.181,
+9.166,
+32.387
+],
+"max": [
+-10.607,
+13.301,
+36.76
+],
+"top": {
+"h": 13.3006,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building25.001",
+"min": [
+11.434,
+9.329,
+-22.778
+],
+"max": [
+20.742,
+13.463,
+-18.72
+],
+"top": {
+"h": 13.4632,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.010",
+"min": [
+11.323,
+9.06,
+-31.845
+],
+"max": [
+22.395,
+13.194,
+-20.976
+],
+"top": {
+"h": 13.1943,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.011",
+"min": [
+17.254,
+9.057,
+-98.136
+],
+"max": [
+25.622,
+13.192,
+-91.002
+],
+"top": {
+"h": 13.1915,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building32.012",
+"min": [
+23.784,
+8.588,
+-101.238
+],
+"max": [
+32.152,
+12.722,
+-94.104
+],
+"top": {
+"h": 12.7223,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building11.001",
+"min": [
+-24.149,
+9.012,
+-51.654
+],
+"max": [
+-16.584,
+14.743,
+-43.937
+],
+"top": {
+"h": 14.7435,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building19.001",
+"min": [
+3.542,
+8.025,
+13.117
+],
+"max": [
+16.474,
+12.16,
+18.989
+],
+"top": {
+"h": 12.1597,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building3.001",
+"min": [
+-35.438,
+9.146,
+5.17
+],
+"max": [
+-34.76,
+15.742,
+23.128
+],
+"top": {
+"h": 15.7416,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building3.002",
+"min": [
+-29.461,
+9.146,
+7.329
+],
+"max": [
+-28.783,
+15.742,
+23.187
+],
+"top": {
+"h": 15.7416,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building3.003",
+"min": [
+-22.894,
+9.146,
+5.287
+],
+"max": [
+-22.215,
+15.742,
+23.245
+],
+"top": {
+"h": 15.7416,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building36.001",
+"min": [
+-35.323,
+9.411,
+16.996
+],
+"max": [
+-22.755,
+15.807,
+23.116
+],
+"top": {
+"h": 15.8065,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.001",
+"min": [
+-38.868,
+18.869,
+-32.702
+],
+"max": [
+-17.565,
+19.131,
+-18.793
+],
+"top": {
+"h": 19.1308,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.002",
+"min": [
+-22.358,
+12.869,
+-32.717
+],
+"max": [
+-17.546,
+13.131,
+-18.808
+],
+"top": {
+"h": 13.1308,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.003",
+"min": [
+-38.868,
+9.769,
+-32.702
+],
+"max": [
+-17.565,
+10.031,
+-18.793
+],
+"top": {
+"h": 10.0308,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.005",
+"min": [
+-17.648,
+12.342,
+-32.702
+],
+"max": [
+-17.405,
+19.179,
+-18.793
+],
+"top": {
+"h": 19.1786,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.006",
+"min": [
+-17.648,
+9.702,
+-30.516
+],
+"max": [
+-17.405,
+12.643,
+-18.787
+],
+"top": {
+"h": 12.6432,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.007",
+"min": [
+-17.648,
+9.429,
+-32.698
+],
+"max": [
+-17.405,
+12.37,
+-32.123
+],
+"top": {
+"h": 12.3697,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.008",
+"min": [
+-38.657,
+9.847,
+-32.709
+],
+"max": [
+-17.456,
+10.752,
+-32.453
+],
+"top": {
+"h": 10.752,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.010",
+"min": [
+-38.782,
+12.198,
+-32.708
+],
+"max": [
+-17.606,
+15.968,
+-32.452
+],
+"top": {
+"h": 15.9685,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.011",
+"min": [
+-33.514,
+10.313,
+-32.703
+],
+"max": [
+-17.482,
+12.249,
+-32.459
+],
+"top": {
+"h": 12.2489,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.012",
+"min": [
+-38.639,
+10.313,
+-32.703
+],
+"max": [
+-35.395,
+12.249,
+-32.459
+],
+"top": {
+"h": 12.2489,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.013",
+"min": [
+-38.904,
+9.268,
+-32.702
+],
+"max": [
+-38.66,
+16.001,
+-18.793
+],
+"top": {
+"h": 16.0009,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.014",
+"min": [
+-38.657,
+9.847,
+-19.045
+],
+"max": [
+-17.456,
+10.752,
+-18.789
+],
+"top": {
+"h": 10.752,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.015",
+"min": [
+-38.695,
+11.926,
+-19.038
+],
+"max": [
+-17.496,
+19.127,
+-18.795
+],
+"top": {
+"h": 19.1266,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.016",
+"min": [
+-27.593,
+10.293,
+-19.041
+],
+"max": [
+-17.413,
+12.269,
+-18.792
+],
+"top": {
+"h": 12.2688,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.017",
+"min": [
+-38.809,
+10.313,
+-19.038
+],
+"max": [
+-29.785,
+12.249,
+-18.795
+],
+"top": {
+"h": 12.2489,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.018",
+"min": [
+-30.612,
+12.307,
+-32.702
+],
+"max": [
+-30.369,
+12.834,
+-18.793
+],
+"top": {
+"h": 12.8342,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.019",
+"min": [
+-30.612,
+8.958,
+-28.754
+],
+"max": [
+-30.369,
+18.969,
+-18.922
+],
+"top": {
+"h": 18.969,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.020",
+"min": [
+-30.612,
+9.429,
+-32.57
+],
+"max": [
+-30.369,
+12.37,
+-31.067
+],
+"top": {
+"h": 12.3697,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.021",
+"min": [
+-27.012,
+9.709,
+-29.985
+],
+"max": [
+-26.768,
+18.98,
+-19.022
+],
+"top": {
+"h": 18.9799,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.022",
+"min": [
+-22.337,
+9.709,
+-30.007
+],
+"max": [
+-22.094,
+18.98,
+-19.052
+],
+"top": {
+"h": 18.9799,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.023",
+"min": [
+-22.223,
+9.986,
+-30.002
+],
+"max": [
+-17.567,
+12.929,
+-29.758
+],
+"top": {
+"h": 12.9288,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.024",
+"min": [
+-26.837,
+9.709,
+-24.237
+],
+"max": [
+-22.2,
+18.98,
+-23.993
+],
+"top": {
+"h": 18.9799,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.025",
+"min": [
+-38.832,
+12.869,
+-32.717
+],
+"max": [
+-26.909,
+13.131,
+-18.808
+],
+"top": {
+"h": 13.1308,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.026",
+"min": [
+-26.919,
+12.886,
+-32.443
+],
+"max": [
+-22.239,
+13.112,
+-29.848
+],
+"top": {
+"h": 13.1121,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.027",
+"min": [
+-24.64,
+9.709,
+-29.972
+],
+"max": [
+-24.397,
+18.98,
+-25.894
+],
+"top": {
+"h": 18.9799,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.028",
+"min": [
+-24.542,
+9.063,
+-30.001
+],
+"max": [
+-21.952,
+12.981,
+-29.758
+],
+"top": {
+"h": 12.9809,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair1",
+"min": [
+-26.842,
+9.993,
+-30.001
+],
+"max": [
+-24.637,
+11.543,
+-25.67
+],
+"top": {
+"h": 10.1934,
+"dx": 0.0,
+"dz": 0.35746
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair1.001",
+"min": [
+-24.49,
+11.545,
+-30.228
+],
+"max": [
+-22.285,
+13.095,
+-25.897
+],
+"top": {
+"h": 13.2942,
+"dx": 0.0,
+"dz": -0.35746
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.029",
+"min": [
+-26.919,
+11.645,
+-25.941
+],
+"max": [
+-22.239,
+11.739,
+-23.346
+],
+"top": {
+"h": 11.7391,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.004",
+"min": [
+-22.358,
+15.742,
+-32.717
+],
+"max": [
+-17.546,
+16.004,
+-18.808
+],
+"top": {
+"h": 16.0038,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.030",
+"min": [
+-38.832,
+15.742,
+-32.717
+],
+"max": [
+-26.909,
+16.004,
+-18.808
+],
+"top": {
+"h": 16.0038,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.031",
+"min": [
+-26.919,
+15.756,
+-32.443
+],
+"max": [
+-22.239,
+15.994,
+-29.848
+],
+"top": {
+"h": 15.9936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair1.002",
+"min": [
+-26.791,
+13.049,
+-30.001
+],
+"max": [
+-24.587,
+14.599,
+-25.67
+],
+"top": {
+"h": 13.2504,
+"dx": 0.0,
+"dz": 0.35746
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair1.003",
+"min": [
+-24.48,
+14.418,
+-30.228
+],
+"max": [
+-22.275,
+15.968,
+-25.897
+],
+"top": {
+"h": 16.1672,
+"dx": 0.0,
+"dz": -0.35746
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.032",
+"min": [
+-26.919,
+14.518,
+-25.941
+],
+"max": [
+-22.239,
+14.612,
+-23.346
+],
+"top": {
+"h": 14.6122,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.009",
+"min": [
+-38.657,
+15.929,
+-32.709
+],
+"max": [
+-17.456,
+16.834,
+-32.453
+],
+"top": {
+"h": 16.8335,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.033",
+"min": [
+-38.782,
+18.275,
+-32.708
+],
+"max": [
+-17.606,
+18.981,
+-32.452
+],
+"top": {
+"h": 18.9812,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.034",
+"min": [
+-33.514,
+16.394,
+-32.703
+],
+"max": [
+-17.482,
+18.33,
+-32.459
+],
+"top": {
+"h": 18.3305,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.035",
+"min": [
+-38.639,
+16.394,
+-32.703
+],
+"max": [
+-35.395,
+18.33,
+-32.459
+],
+"top": {
+"h": 18.3305,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building11.002",
+"min": [
+-27.413,
+9.963,
+-36.599
+],
+"max": [
+-26.828,
+13.147,
+-36.003
+],
+"top": {
+"h": 13.1469,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building11.003",
+"min": [
+-24.643,
+9.963,
+-36.599
+],
+"max": [
+-24.058,
+13.147,
+-36.003
+],
+"top": {
+"h": 13.1469,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building11.004",
+"min": [
+-21.749,
+9.963,
+-36.599
+],
+"max": [
+-21.164,
+13.147,
+-36.003
+],
+"top": {
+"h": 13.1469,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building11.005",
+"min": [
+-18.311,
+9.963,
+-36.599
+],
+"max": [
+-17.726,
+13.147,
+-36.003
+],
+"top": {
+"h": 13.1469,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building11.006",
+"min": [
+-15.384,
+9.963,
+-36.599
+],
+"max": [
+-14.799,
+13.147,
+-36.003
+],
+"top": {
+"h": 13.1469,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.036",
+"min": [
+-27.412,
+12.916,
+-40.681
+],
+"max": [
+-14.791,
+13.177,
+-35.997
+],
+"top": {
+"h": 13.1775,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.037",
+"min": [
+-27.077,
+15.922,
+-30.001
+],
+"max": [
+-24.487,
+19.004,
+-29.758
+],
+"top": {
+"h": 19.0039,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.038",
+"min": [
+-38.825,
+15.929,
+-32.716
+],
+"max": [
+-38.578,
+16.834,
+-18.779
+],
+"top": {
+"h": 16.8335,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.039",
+"min": [
+-38.824,
+18.275,
+-32.713
+],
+"max": [
+-38.577,
+18.981,
+-18.765
+],
+"top": {
+"h": 18.9812,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.040",
+"min": [
+-38.825,
+16.394,
+-32.698
+],
+"max": [
+-38.58,
+18.33,
+-26.354
+],
+"top": {
+"h": 18.3305,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.041",
+"min": [
+-38.821,
+16.394,
+-24.367
+],
+"max": [
+-38.576,
+18.33,
+-18.761
+],
+"top": {
+"h": 18.3305,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building6.042",
+"min": [
+-49.504,
+14.504,
+-26.645
+],
+"max": [
+-38.871,
+15.95,
+-23.965
+],
+"top": {
+"h": 15.9496,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "ladder_1",
+"min": [
+-48.391,
+7.753,
+-17.149
+],
+"max": [
+-47.672,
+14.756,
+-17.109
+],
+"top": {
+"h": 14.7563,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building29.001",
+"min": [
+-49.396,
+14.523,
+-24.196
+],
+"max": [
+-47.065,
+15.266,
+-19.553
+],
+"top": {
+"h": 15.266,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building29.002",
+"min": [
+-49.443,
+9.834,
+-37.022
+],
+"max": [
+-45.551,
+17.19,
+-26.504
+],
+"top": {
+"h": 17.1901,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "ladder_2",
+"min": [
+-6.098,
+8.705,
+-53.13
+],
+"max": [
+-5.379,
+15.709,
+-53.09
+],
+"top": {
+"h": 15.7086,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+}
+],
+"ladders": [
+{
+"name": "ladder_1",
+"min": [
+-48.391,
+7.753,
+-17.149
+],
+"max": [
+-47.672,
+14.756,
+-17.109
+],
+"axis": "z",
+"parts": 1
+},
+{
+"name": "ladder_2",
+"min": [
+-6.098,
+8.705,
+-53.13
+],
+"max": [
+-5.379,
+15.709,
+-53.09
+],
+"axis": "z",
+"parts": 1
+}
+],
+"bases": {
+"blue": {
+"x": -18.41,
+"y": 10.0,
+"z": 49.09
+},
+"red": {
+"x": 1.33,
+"y": 10.0,
+"z": -76.6
+}
+}
+}

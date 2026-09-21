@@ -22,7 +22,7 @@ import { sessionOf } from './session'
 import { type RoomWorld, broadcast, setLife } from './world'
 import { weaponOf } from '../src/domain/item/weapons'
 import { isHeard, shotReach, stepReach } from '../src/domain/rule/noise'
-import { BODY_BOX, HEAD_HEIGHT, MOVE_PROBE_HEIGHT, VIEW_HEIGHT, leanOf, leanShift, stanceOf } from '../src/domain/player/stance'
+import { BODY_BOX, HEAD_HEIGHT, MOVE_PROBE_HEIGHT, VAULT_PROBE_HEIGHT, VIEW_HEIGHT, leanOf, leanShift, stanceOf } from '../src/domain/player/stance'
 import { canHold } from '../src/domain/player/equip'
 import type { HitZone } from '../src/domain/rule/damage'
 import { isSeated } from '../src/domain/player/lifecycle'
@@ -96,10 +96,14 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
      * 線を引く高さは姿勢で下げる。**伏せている人を胸の高さで見ると、潜れる物の
      * 下を這っただけで弾かれる。** 前後どちらかが低ければ低いほう。
      */
-    const probe = Math.min(
-      MOVE_PROBE_HEIGHT[stanceOf(player.locomotion)],
-      MOVE_PROBE_HEIGHT[stanceOf(snapshot.locomotion)],
-    )
+    // 跳び越えている間は枠の上で引く。立ちの高さだと窓枠そのものを貫く
+    const vaulting = [player.locomotion, snapshot.locomotion].some((l) => l === 'vault' || l === 'vault_up')
+    const probe = vaulting
+      ? VAULT_PROBE_HEIGHT
+      : Math.min(
+          MOVE_PROBE_HEIGHT[stanceOf(player.locomotion)],
+          MOVE_PROBE_HEIGHT[stanceOf(snapshot.locomotion)],
+        )
     const verdict = room.stage.body
       ? checkMoveOnMesh(player, snapshot, room.stage.body, room.stage.arenaHalf, probe)
       : checkMove(player, snapshot, room.stage.solid, room.stage.arenaHalf)

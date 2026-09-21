@@ -83,6 +83,13 @@ describe('堪える着地', () => {
   })
 })
 
+describe('跳び越え', () => {
+  test('転がりより先に決まる。**転がりの縛りは共有している**ので両方 true で来る', () => {
+    expect(resolveLocomotion({ ...base, rolling: true, vaulting: true } as StanceInput)).toBe('vault')
+    expect(resolveLocomotion({ ...base, rolling: true } as StanceInput)).toBe('roll')
+  })
+})
+
 describe('階段', () => {
   test('段差を上がっている間は専用の型', () => {
     expect(resolveLocomotion({ ...base, stairFor: 0.3 } as StanceInput)).toBe('up_stair')

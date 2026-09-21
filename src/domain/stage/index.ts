@@ -52,7 +52,7 @@ export {
   ladderGrip,
 } from './ladder'
 
-export type StageName = 'mall' | 'training' | 'raft'
+export type StageName = 'mall' | 'training' | 'raft' | 'city'
 
 /**
  * 地面の上の 1 点。
@@ -275,10 +275,39 @@ const RAFT: StageSpec = {
   targets: [],
 }
 
+/**
+ * 街。**仮の置き場** (tools/raw/stage_city.blend、2026-09-21、全体を 0.4 倍に縮めた物)。
+ *
+ * 100m × 180m の砂地にコンクリートの建物が 113 棟。地面は y=10.0。基地は blend の空 (meta_baseBlue / meta_baseRed) で、書き出しが
+ * json に写す (`bases`)。**ここの値はその控え** — json が読めないときだけ使う。
+ * 個人戦の湧き (solo) は基地のまわりに置いてある。
+ */
+const CITY: StageSpec = {
+  name: 'city',
+  label: 'CITY',
+  ambience: 'city_loop1.mp3',
+  bases: {
+    blue: { x: -18.41, z: 49.09, y: 10.0 },
+    red: { x: 1.33, z: -76.6, y: 10.0 },
+  },
+  solo: [
+    { x: -18.41, z: 49.09, y: 10.0 },
+    { x: -21.41, z: 46.09, y: 10.0 },
+    { x: -15.41, z: 46.09, y: 10.0 },
+    { x: -18.41, z: 52.09, y: 10.0 },
+    { x: 1.33, z: -76.60, y: 10.0 },
+    { x: -1.67, z: -79.60, y: 10.0 },
+    { x: 4.33, z: -79.60, y: 10.0 },
+    { x: 1.33, z: -73.60, y: 10.0 },
+  ],
+  targets: [],
+}
+
 export const STAGES: Record<StageName, StageSpec> = {
   mall: MALL,
   training: TRAINING,
   raft: RAFT,
+  city: CITY,
 }
 
 /**
