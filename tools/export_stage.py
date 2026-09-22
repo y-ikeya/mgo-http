@@ -276,6 +276,48 @@ for obj in bpy.context.scene.objects:
 if baked:
     print(f'  モディファイアを確定させた: {baked} 個')
 
+# --- 置き物の三角を落とす ----------------------------------------------------
+#
+# 木箱のような持ち込みの形は 1 つ 1,600 枚ほどある。壁や床は 12 枚。**置き物 1 つに
+# これ以上は要らない** — 人・視線・弾の判定は三角の網 (mesh.bin) を引くので、
+# 細かいほど毎コマ重くなる。上の予算 (VERTEX_BUDGET) は全体の大きさの話で、
+# 1 つ 1 つの細かさは見ていなかった (木箱 5 つで 2,120 枚 → 10,110 枚)。
+#
+# 形のデータ (mesh) ごとに 1 回だけ間引き、共有している物には同じ形を付け直す。
+# ここで確定させるので、glb も mesh.bin も同じ形になる。
+PROP_TRI_CAP = 400
+# 平らと見なす角度 (度)。板の反りは残し、同一面の分割だけ溶かす
+PROP_PLANAR_ANGLE = 8
+thinned = {}
+for obj in list(bpy.context.scene.objects):
+    if obj.type != 'MESH' or not obj.select_get():
+        continue
+    mesh = obj.data
+    if mesh.name in thinned:
+        obj.data = thinned[mesh.name]
+        continue
+    mesh.calc_loop_triangles()
+    tris = len(mesh.loop_triangles)
+    if tris <= PROP_TRI_CAP:
+        continue
+    # **平らな面をまとめる (PLANAR)。** 辺を潰す (COLLAPSE) と UV の島をまたいで
+    # 頂点が寄り、絵の外 (黒) を拾う所ができた (木箱の面に黒い抜け)。平らな面を
+    # 溶かすだけなら UV の境目 (delimit UV) を守れる。板のような物は面の大半が
+    # 平らなので、これで十分に減る。上限 (PROP_TRI_CAP) は目安で、届かなくてもよい
+    mod = obj.modifiers.new(name='prop_cap', type='DECIMATE')
+    mod.decimate_type = 'DISSOLVE'
+    mod.angle_limit = math.radians(PROP_PLANAR_ANGLE)
+    mod.delimit = {'UV', 'SHARP', 'MATERIAL'}
+    mod.use_dissolve_boundaries = False
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    slim = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
+    slim.name = mesh.name + '_slim'
+    obj.modifiers.remove(mod)
+    obj.data = slim
+    thinned[mesh.name] = slim
+    slim.calc_loop_triangles()
+    print(f'  {obj.name}: 三角 {tris:,} → {len(slim.loop_triangles):,} に間引いた (上限 {PROP_TRI_CAP})')
+
 problems = check([o for o in bpy.context.scene.objects if o.select_get()])
 if problems:
     print('\n--- 直したほうがよい点 ---')
@@ -816,6 +858,18 @@ NORMAL_TAGS = SURFACE_TAGS + ('sand_',)
 KEEP_UV = 'nouv'
 
 
+def has_image(obj):
+    """材質のどれかに絵 (画像テクスチャ) が繋がっているか"""
+    for slot in obj.material_slots:
+        mat = slot.material
+        if not mat or not mat.use_nodes:
+            continue
+        for node in mat.node_tree.nodes:
+            if node.type == 'TEX_IMAGE' and node.image:
+                return True
+    return False
+
+
 def reproject(obj, uv=True):
     """ワールド座標の立方投影で UV を張り直す。**scale がいくつでも伸びない**
 
@@ -850,7 +904,10 @@ for obj in bpy.context.scene.objects:
         continue
     if not any(tag in obj.name for tag in NORMAL_TAGS):
         continue
-    uv = any(tag in obj.name for tag in SURFACE_TAGS) and KEEP_UV not in obj.name
+    # **絵を持ち込んだ物の UV は触らない。** 焼き込んだ絵 (1 枚の地図) は立方投影で
+    # 貼り直すと崩れ、絵の外 (黒) を拾う (木箱の面に黒い抜け)。_nouv を付け忘れても
+    # 材質に絵があればそれで分かる。ゲーム側も「絵がある材質はそのまま」で揃っている
+    uv = any(tag in obj.name for tag in SURFACE_TAGS) and KEEP_UV not in obj.name and not has_image(obj)
     flipped = reproject(obj, uv)
     reprojected += uv
     if flipped:
@@ -918,6 +975,9 @@ else:
 # 縮めるのは**書き出す時だけ**。blend の中の絵はそのままなので、原寸で作り続けて
 # よいし、上限を上げれば元の細かさで出し直せる。
 MAX_TEXTURE = 2048
+# 置き物 (壁や床でない、三角の多い形) の絵はさらに小さく。木箱は 1m 角で、2K を
+# 貼っても遊ぶ距離では見分けられない
+PROP_MAX_TEXTURE = 1024
 
 def shrink_textures():
     seen = set()
@@ -925,6 +985,8 @@ def shrink_textures():
     for obj in bpy.context.scene.objects:
         if obj.type != 'MESH' or not obj.select_get():
             continue
+        # 置き物か (間引きの対象になった形)。壁・床・地面の絵は 2K のまま
+        is_prop = obj.data.name.endswith('_slim')
         for slot in obj.material_slots:
             mat = slot.material
             if not mat or not mat.use_nodes:
@@ -937,13 +999,14 @@ def shrink_textures():
                     continue
                 seen.add(image.name)
                 w, h = image.size
-                if max(w, h) <= MAX_TEXTURE:
+                cap = PROP_MAX_TEXTURE if is_prop else MAX_TEXTURE
+                if max(w, h) <= cap:
                     continue
-                scale = MAX_TEXTURE / max(w, h)
+                scale = cap / max(w, h)
                 image.scale(max(1, int(w * scale)), max(1, int(h * scale)))
                 shrunk.append((image.name, w, h, image.size[0], image.size[1]))
     if shrunk:
-        print(f'  絵を縮めた: {len(shrunk)} 枚 (上限 {MAX_TEXTURE})')
+        print(f'  絵を縮めた: {len(shrunk)} 枚 (上限 {MAX_TEXTURE}、置き物は {PROP_MAX_TEXTURE})')
         for name, w, h, nw, nh in shrunk:
             print(f'    {name[:38]:40} {w}x{h} → {nw}x{nh}')
     else:
@@ -966,8 +1029,12 @@ bpy.ops.export_scene.gltf(
     use_selection=True,
     export_apply=True,      # モディファイアを確定させてから出す
     export_materials='EXPORT',
-    export_image_format='AUTO',
-    export_jpeg_quality=85,
+    # **絵は WebP で出す。** AUTO だと持ち込みの PNG がそのまま乗り、木箱 1 種類
+    # (2048 の PNG 3 枚) で 16MB になった。JPEG は小さいが透明を捨てる — 木箱の
+    # 板の隙間 (透明) が黒く塗り潰された。WebP は透明を持ったまま JPEG 並みに小さい。
+    # three の GLTFLoader は EXT_texture_webp を読む (Chrome / Safari 16+)
+    export_image_format='WEBP',
+    export_image_quality=85,
     # **頂点色も出す。** bake_stage.py が焼いた「空の見え方」がここに乗る。
     # 既定 (MATERIAL) だと材質が使っていない色は落とされるので、明示する
     export_vertex_color='ACTIVE',

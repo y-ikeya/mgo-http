@@ -105,15 +105,15 @@
 "min": [
 -35.515,
 9.034,
--12.882
+-13.275
 ],
 "max": [
 -18.746,
 20.717,
-2.626
+2.746
 ],
 "top": {
-"h": 20.7172,
+"h": 20.7171,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -2889,6 +2889,206 @@
 ],
 "top": {
 "h": 15.7086,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box",
+"min": [
+-18.818,
+9.946,
+-13.25
+],
+"max": [
+-17.714,
+11.1,
+-11.834
+],
+"top": {
+"h": 11.0997,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box.001",
+"min": [
+-17.437,
+9.973,
+-29.964
+],
+"max": [
+-16.114,
+12.132,
+-28.535
+],
+"top": {
+"h": 12.1323,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building5.001",
+"min": [
+-27.46,
+8.864,
+-14.069
+],
+"max": [
+-23.06,
+20.547,
+-12.404
+],
+"top": {
+"h": 20.5472,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box.002",
+"min": [
+-18.819,
+11.057,
+-13.25
+],
+"max": [
+-17.714,
+12.212,
+-11.834
+],
+"top": {
+"h": 12.2121,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box.003",
+"min": [
+10.335,
+9.946,
+-22.236
+],
+"max": [
+11.44,
+11.101,
+-20.82
+],
+"top": {
+"h": 11.1015,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box.004",
+"min": [
+10.335,
+11.057,
+-22.236
+],
+"max": [
+11.44,
+12.212,
+-20.82
+],
+"top": {
+"h": 12.2121,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box.005",
+"min": [
+-39.919,
+15.917,
+-25.315
+],
+"max": [
+-38.814,
+17.007,
+-24.046
+],
+"top": {
+"h": 17.0071,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_box.006",
+"min": [
+-39.919,
+15.934,
+-26.524
+],
+"max": [
+-38.814,
+17.024,
+-25.255
+],
+"top": {
+"h": 17.0237,
 "dx": 0.0,
 "dz": 0.0
 },

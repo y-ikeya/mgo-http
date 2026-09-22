@@ -278,7 +278,7 @@ const RAFT: StageSpec = {
 /**
  * 街。**仮の置き場** (tools/raw/stage_city.blend、2026-09-21、全体を 0.4 倍に縮めた物)。
  *
- * 100m × 180m の砂地にコンクリートの建物が 113 棟。地面は y=10.0。基地は blend の空 (meta_baseBlue / meta_baseRed) で、書き出しが
+ * 100m × 180m の砂地にコンクリートの建物が 114 棟。地面は y=10.0。基地は blend の空 (meta_baseBlue / meta_baseRed) で、書き出しが
  * json に写す (`bases`)。**ここの値はその控え** — json が読めないときだけ使う。
  * 個人戦の湧き (solo) は基地のまわりに置いてある。
  */

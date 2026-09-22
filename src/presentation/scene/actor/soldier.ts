@@ -243,8 +243,12 @@ const VAULT_MIN = 0.45
 const VAULT_MAX = 1.2
 /** 障害を探す距離 (m)。近い順。体を付けて立つ (0.4) から一歩手前 (1.0) まで */
 const VAULT_REACHES = [0.4, 0.55, 0.7, 0.85, 1.0] as const
-/** 着地を探す距離 (m)。**枠から先**の長さ。型は 2.06m 進む */
-const VAULT_LANDING = 1.3
+/**
+ * 着地を探す距離 (m)。**枠から先**の長さ。近いほうは「枠のすぐ先の箱」(乗る)、
+ * 遠いほうは「越えた先の床」(越える)。型は越えるときに 2.06m、乗るときに 1.13m 進む
+ */
+const VAULT_LANDING_NEAR = 0.8
+const VAULT_LANDING_FAR = 1.3
 /** 障害の上に要る隙間 (m)。屈んで越えるので身長より低くてよい */
 const VAULT_HEADROOM = 1.0
 /** 跳び越えの間、当たりの足元をこれだけ上げる (m)。枠 (VAULT_MAX) を跨ぐぶん */
@@ -2388,16 +2392,30 @@ export class Soldier {
      *   その間・それより高い  → 跳ばない (着地する所が無い)
      */
     const yaw = Math.atan2(-fx, -fz)
-    const landAt = reachAt + VAULT_LANDING
-    probe.set(this.position.x + fx * landAt, feetY, this.position.z + fz * landAt)
-    const landing = world.groundHeight(probe, PLAYER_RADIUS, allow)
-    if (landing <= feetY + STEP_UP) {
-      if (world.ceilingHeight(probe, PLAYER_RADIUS, feetY) < feetY + PLAYER_HEIGHT) return null
-      return { kind: 'over', landing, yaw }
+    /*
+     * 天井は**点で**見る。体の輪で見ると、着地点が箱の縁に掛かったときに輪が
+     * 箱の中から箱の上面を「天井」として拾い、越えられる窓が越えられなくなった
+     * (窓の外に木箱を置いた 3 階)。
+     */
+    // 枠のすぐ先に同じ高さの物 (箱・続く床) があれば乗る
+    const nearAt = reachAt + VAULT_LANDING_NEAR
+    probe.set(this.position.x + fx * nearAt, feetY, this.position.z + fz * nearAt)
+    const near = world.groundHeight(probe, PLAYER_RADIUS, allow)
+    if (Math.abs(near - top) <= VAULT_SAME_LEVEL) {
+      if (world.ceilingHeight(probe, 0, near) < near + PLAYER_HEIGHT) return null
+      return { kind: 'up', landing: near, yaw }
     }
-    if (Math.abs(landing - top) > VAULT_SAME_LEVEL) return null
-    if (world.ceilingHeight(probe, PLAYER_RADIUS, landing) < landing + PLAYER_HEIGHT) return null
-    return { kind: 'up', landing, yaw }
+    // 無ければ越えた先の床。**低いのは構わない** (外へ跳び出すのも跳び越え)
+    const farAt = reachAt + VAULT_LANDING_FAR
+    probe.set(this.position.x + fx * farAt, feetY, this.position.z + fz * farAt)
+    const far = world.groundHeight(probe, PLAYER_RADIUS, allow)
+    if (far <= feetY + STEP_UP) {
+      if (world.ceilingHeight(probe, 0, feetY) < feetY + PLAYER_HEIGHT) return null
+      return { kind: 'over', landing: far, yaw }
+    }
+    if (Math.abs(far - top) > VAULT_SAME_LEVEL) return null
+    if (world.ceilingHeight(probe, 0, far) < far + PLAYER_HEIGHT) return null
+    return { kind: 'up', landing: far, yaw }
   }
 
   /**

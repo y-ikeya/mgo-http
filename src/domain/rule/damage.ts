@@ -9,7 +9,7 @@
  * 外部への依存を持たせない (これが sim/ の唯一のドメインルール)。
  */
 
-import { HEAD_HEIGHT, VIEW_HEIGHT, type Stance } from '../player/stance'
+import { HEAD_HEIGHT, VIEW_HEIGHT, leanShift, type Stance } from '../player/stance'
 import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
@@ -268,6 +268,8 @@ export const HIT_RULES = {
   zoneSpan: (zone: HitZone) => ZONE_SPAN[zone],
   // カメラの注視点。幅の真ん中 (可視の判定は幅の両端で引くが、ここは 1 点でよい)
   viewHeight: (stance: Stance) => (VIEW_HEIGHT[stance][0] + VIEW_HEIGHT[stance][1]) / 2,
+  // 傾きの横ずれ。sim (hitcheck) は domain の値を直に引かないので、ここから渡す
+  leanShift,
   canBeStabbed,
   meleeRange: MELEE_RANGE,
   meleeSlack: MELEE_SLACK,
