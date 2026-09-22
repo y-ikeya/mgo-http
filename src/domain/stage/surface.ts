@@ -15,7 +15,7 @@
  * (stage/flags.ts の noeye / nobullet)。**材質と、何を止めるかは別の軸。**
  * 見通せるガラスにしたいなら glass_wall_noeye と書く。
  */
-export type Surface = 'concrete' | 'metal' | 'wood' | 'glass'
+export type Surface = 'concrete' | 'metal' | 'wood' | 'glass' | 'sand'
 
 /** 名前のタグから材質を引く。組み合わせられる (col_metal_wall) */
 const SURFACE_TAGS: Record<string, Surface> = {
@@ -23,6 +23,15 @@ const SURFACE_TAGS: Record<string, Surface> = {
   concrete_: 'concrete',
   wood_: 'wood',
   glass_: 'glass',
+  /*
+   * 砂地。足音は砂。絵は Blender で貼る (コードからは貼らない)。
+   *
+   * **三角の網には乗らない。** 網は材質を 2 ビット (4 種、SURFACE_ORDER) で
+   * 持つので、書き出し (tools/export_stage.py) は砂をコンクリートの番号で
+   * 出す。網から引く材質は弾の着弾の見た目にしか使わないので、それで足りる。
+   * 足音と絵は箱の名前から引くので、こちらは砂として分かれる。
+   */
+  sand_: 'sand',
 }
 
 /**

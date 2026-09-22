@@ -104,6 +104,36 @@ describe('繋ぎ直し', () => {
     a.close()
   }, 20_000)
 
+  test('スキルも席と一緒に戻る (読み直すと全部外れて見えていた)', async () => {
+    // サーバーは席にスキルを持ったままなのに、読み直したクライアントには
+    // 返していなかった。画面では未選択、効きは残っている、という食い違い
+    const a = await new Client(server, 'alice', spot(0, -6)).ready()
+    const b = await new Client(server, 'bob', spot(0, 6)).ready()
+    a.live()
+    b.live()
+    b.send({ type: 'skills', skills: { runner: 1 } })
+    await Bun.sleep(400)
+    a.send({ type: 'ready', ready: true })
+    b.send({ type: 'ready', ready: true })
+    await Bun.sleep(3400)
+    a.send({ type: 'spawn' })
+    b.send({ type: 'spawn' })
+    await Bun.sleep(1000)
+
+    b.close()
+    await Bun.sleep(800)
+    const back = await new Client(server, 'bob', spot(0, 6)).ready()
+    back.live()
+    await Bun.sleep(1200)
+
+    const skills = back.last.get('skills')
+    if (skills?.type !== 'skills') throw new Error('skills が来ていない')
+    expect(skills.skills).toEqual({ runner: 1 })
+
+    back.close()
+    a.close()
+  }, 30_000)
+
   test('その命の続きから始まる (装備画面に戻らない)', async () => {
     // 支度からやり直させていた頃は、瀕死でリロードすれば全快して装備も
     // 選び直せた。撃ち合いで不利になったらリロードするのが最適解になる

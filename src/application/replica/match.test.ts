@@ -135,6 +135,35 @@ describe('キル', () => {
     expect(replica.pointFeed).toEqual([])
   })
 
+  test('頭に入れて倒したら音で報いる。**自分の弾のときだけ**', () => {
+    const replica = newMatchReplica()
+    const hs = (killer: string, victim: string) =>
+      ({ ...(kill(killer, victim) as object), headshot: true }) as ServerMessage
+    expect(applyMatch(replica, hs(SELF, 'bob'), SELF, 100)).toEqual([{ kind: 'headshot' }])
+    expect(applyMatch(replica, hs('bob', 'carol'), SELF, 100)).toEqual([])
+    expect(applyMatch(replica, hs('bob', SELF), SELF, 100)).toEqual([])
+    expect(applyMatch(replica, kill(SELF, 'bob'), SELF, 100)).toEqual([])
+  })
+
+  test('頭に入れて眠らせたときも同じ音', () => {
+    const replica = newMatchReplica()
+    const stun = (by: string, head: boolean) =>
+      ({
+        type: 'stun',
+        by,
+        byName: by,
+        byTeam: 'blue',
+        target: 'bob',
+        targetName: 'bob',
+        targetTeam: 'red',
+        weapon: 'MOSIN',
+        head,
+      }) as ServerMessage
+    expect(applyMatch(replica, stun(SELF, true), SELF, 100)).toEqual([{ kind: 'headshot' }])
+    expect(applyMatch(replica, stun(SELF, false), SELF, 100)).toEqual([])
+    expect(applyMatch(replica, stun('carol', true), SELF, 100)).toEqual([])
+  })
+
   test('倒せば加点、倒されれば減点', () => {
     const replica = newMatchReplica()
     applyMatch(replica, kill(SELF, 'bob'), SELF, 100)

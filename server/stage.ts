@@ -14,7 +14,8 @@
  * 読むのは起動時に 1 回だけで、切り替わっても読み直さない。
  */
 
-import { STAGES, type StageName } from '../src/domain/stage'
+import { STAGES, type Spot, type StageName } from '../src/domain/stage'
+import type { Team } from '../src/domain/player/player'
 import { arenaHalfOf } from '../src/sim/judge/motioncheck'
 import { boxSolid } from '../src/sim/judge/ballistic'
 import {
@@ -81,6 +82,8 @@ export interface Terrain {
   camera: StageBox[]
   /** 遊べる範囲の半分 (m)。**箱の外接から出す** — 広げた分が場外にならないように */
   arenaHalf: number
+  /** 基地。書き出しが blend の meta_*base* から写した物。無ければ表 (STAGES) へ落ちる */
+  bases: Partial<Record<Team, Spot>>
 }
 
 /** 地形が読めなかったときの姿。**対戦は成立する** (全員が全員を見られる) */
@@ -93,6 +96,7 @@ function bare(name: StageName): Terrain {
     thrown: boxSolid([]),
     camera: [],
     arenaHalf: Number.POSITIVE_INFINITY,
+    bases: {},
   }
 }
 
@@ -106,7 +110,10 @@ async function load(name: StageName): Promise<Terrain> {
 
   const path = new URL(`../public/models/stage_${name}.json`, import.meta.url)
   try {
-    const data = (await Bun.file(path).json()) as { boxes: StageBox[] }
+    const data = (await Bun.file(path).json()) as {
+      boxes: StageBox[]
+      bases?: Partial<Record<Team, Spot>>
+    }
     const solid = solidBlockers(data.boxes)
     const half = arenaHalfOf(solid)
     const mesh = await loadMesh(name)
@@ -117,7 +124,16 @@ async function load(name: StageName): Promise<Terrain> {
       `ステージ ${name}: 三角 視線 ${sizeOf(sight)} 枚 / 物 ${sizeOf(thrown)} 枚 / ` +
         `人が止まる箱 ${solid.length} 個 / 範囲 ±${half.toFixed(1)}m`,
     )
-    return { name, sight, thrown, body, solid, camera: cameraBlockers(data.boxes), arenaHalf: half }
+    return {
+      name,
+      sight,
+      thrown,
+      body,
+      solid,
+      camera: cameraBlockers(data.boxes),
+      arenaHalf: half,
+      bases: data.bases ?? {},
+    }
   } catch {
     console.warn(`stage_${name}.json が読めない。遮蔽の判定なしで動かす (位置は全員へ配られる)`)
     return bare(name)

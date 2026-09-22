@@ -2,14 +2,54 @@ import * as THREE from 'three'
 import { damp } from '../util/math'
 import type { Soldier } from '../actor/soldier'
 import { PLAYER_HEIGHT } from '../actor/soldier'
+import { AIM_CAMERA, HIP_CAMERA } from '../../../sim/space/eyepoint'
 
 /**
  * 構えていないとき / 構えているときのカメラ。
  * 構えると寄って画角も狭くなるぶん狙いやすくなるが、周辺視野を失う。
  * 「構えれば狙えるが索敵しづらくなる」という交換条件をカメラで表現している。
  */
-const HIP_VIEW = { distance: 4.2, shoulder: 0.75, fov: 60 }
-const AIM_VIEW = { distance: 1.35, shoulder: 0.42, fov: 38 }
+/**
+ * 腰だめの構図。
+ *
+ * MGO2 の腰だめ (2026-09-21 に本人の切り抜きで測った): キャラは**真横は真ん中**、
+ * 頭が画面の高さの 52%、足が 93%、身長が画面の 41%。カメラは頭より高い所から
+ * 水平に見ていて、キャラは中心より下に居る。
+ *
+ * 引きと肩と lift の値は sim/space/eyepoint.ts の HIP_CAMERA が元。**審判が
+ * 「その人の画面に映るか」を同じ位置から判定する**ので、こちらだけ変えると
+ * 画面に映っているのに送られてこない (またはその逆) が起きる。URL の窓は
+ * 手元で合わせるためだけで、決まったらあちらを直す。
+ *
+ * lift は注視点 (画面の中心に来る点) を目の高さからどれだけ上げるか (m)。
+ * **上げるほどカメラも上がり、キャラは画面の下へ寄る。** 目の高さ 1.6m に
+ * 0.25 足すと、頭 (1.75m) が中心の少し下、足が 88% あたりに来る。
+ * 構えは照準の線が目から出るので 0。
+ *
+ * 手元で試すときは URL に付ける。組み合わせてよい:
+ *
+ *     ?camy=0.4    注視点の上下 (m)。正でキャラが下がる、負で上がる
+ *     ?camd=3.5    引く距離 (m)。小さいほど寄る
+ *     ?cams=0.6    肩越しのずらし (m)。0 で真後ろ
+ *     ?camf=55     画角 (度)
+ *
+ * 構えは武器ごとの値 (domain/item/weapons.ts の aimDistance 等) で、同じ形の
+ * ?aimd= ?aims= ?aimf= ?aimy= で上書きできる (setAimView)。
+ */
+const HIP_VIEW = {
+  distance: tunedSigned('camd', HIP_CAMERA.distance),
+  shoulder: tunedSigned('cams', HIP_CAMERA.shoulder),
+  fov: tunedSigned('camf', 60),
+  lift: tunedSigned('camy', HIP_CAMERA.lift),
+}
+const AIM_VIEW = { ...AIM_CAMERA, fov: 38 }
+
+/** URL の数値。負も通す (world/stage.ts の tuned は明るさ用で負を弾く) */
+function tunedSigned(name: string, fallback: number): number {
+  const raw = new URLSearchParams(globalThis.location?.search ?? '').get(name)
+  const value = Number(raw)
+  return raw !== null && Number.isFinite(value) ? value : fallback
+}
 /** 構えの切り替わりの速さ */
 const AIM_LAMBDA = 11
 /** 構えている間のマウス感度の倍率。寄っている分だけ手元を落ち着かせる */
@@ -227,6 +267,8 @@ export class FollowCamera {
   private aiming = false
   private distance = HIP_VIEW.distance
   private shoulder = HIP_VIEW.shoulder
+  /** 注視点の上下のずらし (m)。腰だめと構えで違うので均しながら動く */
+  private lift = HIP_VIEW.lift
   /** 覗きながら傾いた分の横ずれ (m、右が正)。肩のずれと同じ向きに足す */
   private leanOffset = 0
   private leanTarget = 0
@@ -319,9 +361,28 @@ export class FollowCamera {
     this.leanTarget = metres
   }
 
-  /** 構え時のカメラの寄り具合 (調整用。確定したら AIM_VIEW へ焼き込む) */
-  setAimView(view: { distance: number; shoulder: number; fov: number }): void {
-    Object.assign(this.aimView, view)
+  /**
+   * 構え時のカメラの寄り具合。武器ごとの値 (domain/item/weapons.ts) を受ける。
+   *
+   * URL の ?aimd= ?aims= ?aimf= ?aimy= が付いていればそれで上書きする
+   * (腰だめの ?camd 等と同じ、手元で合わせるための窓)。覗き (スコープ) は
+   * 引きも肩も 0 で決まっているので触らない。
+   */
+  setAimView(view: { distance: number; shoulder: number; fov: number; lift?: number }): void {
+    const scoped = view.distance === 0 && view.shoulder === 0
+    // 覗きは注視点そのものに寄るので上下のずらしは持たない (0)
+    const lift = view.lift ?? (scoped ? 0 : AIM_CAMERA.lift)
+    Object.assign(this.aimView, view, {
+      lift,
+      ...(scoped
+        ? {}
+        : {
+            distance: tunedSigned('aimd', view.distance),
+            shoulder: tunedSigned('aims', view.shoulder),
+            fov: tunedSigned('aimf', view.fov),
+            lift: tunedSigned('aimy', lift),
+          }),
+    })
   }
 
   /** カメラ基準の前方向 (XZ 平面、正規化済み) */
@@ -415,6 +476,7 @@ export class FollowCamera {
     const target = this.aiming ? this.aimView : HIP_VIEW
     this.distance = damp(this.distance, target.distance, AIM_LAMBDA, dt)
     this.shoulder = damp(this.shoulder, target.shoulder, AIM_LAMBDA, dt)
+    this.lift = damp(this.lift, target.lift, AIM_LAMBDA, dt)
     this.leanOffset = damp(this.leanOffset, this.leanTarget, AIM_LAMBDA, dt)
 
     const fov = damp(this.fov, target.fov, AIM_LAMBDA, dt)
@@ -460,10 +522,11 @@ export class FollowCamera {
     if (Math.abs(base.y - this.footY) > STEP_SNAP) this.footY = base.y
     else this.footY = damp(this.footY, base.y, STEP_LAMBDA, dt)
     const footY = this.footY
-    this.centerPivot.set(base.x, footY + this.currentViewHeight, base.z)
+    const pivotY = footY + this.currentViewHeight + this.lift
+    this.centerPivot.set(base.x, pivotY, base.z)
     this.pivot.set(
       base.x + rightX * (this.shoulder + this.leanOffset),
-      footY + this.currentViewHeight,
+      pivotY,
       base.z + rightZ * (this.shoulder + this.leanOffset),
     )
 

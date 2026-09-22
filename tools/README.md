@@ -45,6 +45,8 @@ Blender の中では問題なく見えるのに、ゲームに入れて初めて
 - **90 度の倍数でない回転** — 判定は回す前の箱になるので、斜めの壁は思った形にならない
 - **厚みの無い箱** — 判定が消える
 - **知らない札** — `metall_` のような打ち間違いは、黙って既定の材質になる
+- **置き物の細かさ** — 1 つ 400 枚を超える形は間引く (木箱は 1,600 → 400)。壁や床 (12 枚) は触らない
+- **内向きの法線** — Plane を E で押し出した箱は面が内を向き、上面が透けて底の絵が見える。札を持つ箱は外向きに直して書き出す (Blender で直すなら Shift+N)
 
 材質ごとの個数も出る。札の付け忘れは数を見ると気づける。
 
@@ -55,6 +57,7 @@ Blender の中では問題なく見えるのに、ゲームに入れて初めて
 - 軸に沿った箱だけ。回した壁は回す前の箱として判定される
 - アーチやトンネルの下はくぐれない。屋根は架けられない (壁で囲った中庭にする)
 - 斜面は段の積み重ね。**ジャンプが無い**ので 1 段は 0.25m 以下 (`domain/player/moving.ts` の `STEP_UP`)
+- 跳び越えられる物 (窓枠・塀・木箱) は上面を足元から **0.45〜1.2m** に。目の前で Space を押すと跳び越える (`soldier.ts` の `vault`)。その上に 1m の隙間と、2m 先に床が要る
 
 オブジェクト名の接頭辞で役割を宣言する:
 
@@ -66,7 +69,7 @@ Blender の中では問題なく見えるのに、ゲームに入れて初めて
 | `concrete_◯◯` | コンクリート |
 | `wood_◯◯` | 木。テクスチャの繰り返しが細かい (板の幅が見えるため) |
 | `ref_◯◯` | 書き出しから除外 (寸法の物差し) |
-| `◯◯_nouv` | **UV を触らない。**焼き込んだ絵を持つ物に付ける (後置き) |
+| `◯◯_nouv` | **UV を触らない。**焼き込んだ絵を持つ物に付ける (後置き)。材質に絵が繋がっていれば付けなくても触らない |
 | 札なし | 描画も判定もする / 材質は金属 |
 
 **繰り返しの絵と焼き込んだ絵は別。** 書き出しは材質の札が付いた物の UV を
@@ -295,7 +298,7 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
 `hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`
-`knee_relaxed` `knee_ready` `prone_bolt` `knife_idle`) は
+`knee_relaxed` `knee_ready` `prone_bolt` `knife_idle` `vault` `vault_up` `hang_drop` `hang_climb`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 
@@ -309,5 +312,35 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
     bun tools/merge_clip.js public/models/soldier.glb stab.glb stab public/models/soldier.glb --hips-from idle
 
 `lean` (tools/lean.json、覗きながら傾く) も同じで、使うのは 3 本目 (`#3`)。1 本の中で左 (5 コマ目) と右 (13 コマ目) に傾くので、ゲームはその 2 点で止めて使う。しゃがみは `lean_crouch` (tools/lean_crouch.json、1 本、左 4 コマ目 / 右 10 コマ目) で、腰は `--hips-from crouch_idle`。`prone_stab` (tools/prone_knife.json) も同じ。FBX には立ちの刺突 2 本と伏せの 2 本が入っていて、使うのは 4 本目 (`#4`)。腰は `--hips-from prone_fire` で伏せ撃ちの高さに揃える (crawl_f に揃えると 10cm 浮く)。伏せてナイフを構えた姿はこの型の頭の 1 枚を止めて使う。
+
+`vault` (tools/vault.json、窓枠を跳び越える) は Ch35 と同じ体つきの FBX (JumpingOver.fbx、
+Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰の移動 (前へ 2.06m、
+上へ 0.5m) を辿る型 (animation.ts の ROOT_MOTION_CLIPS) なので、3 体とも
+`--rotation-only` を**付けずに**入れる (腰の高さは 3 体とも同じ 0.97m):
+
+    $BLENDER -b --factory-startup --python tools/convert_character.py -- tools/vault.json
+    for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb vault.glb vault public/models/$g.glb; done
+
+ゲームでは目の前に低い物 (上面が足元から 0.45〜1.2m、上に 1m の隙間、2m 先に
+立てる床) がある状態で Space (パッドは転がりのボタン) を押すとこれが出る
+(soldier.ts の vault / canVaultAhead)。押した瞬間に跳ぶので、しゃがみにも転がりにもならない。
+札は要らない。**窓枠は 1.2m より低く置く。** それより高いと壁。
+
+`vault_up` (tools/vault_up.json、RunningJumpUp.fbx、1.0 秒) は同じ入れ方で、枠の先の床が
+枠の上面と同じ高さ (差 0.35m 以内) のときに出る — 箱の上や続いている床へ**一段上へ
+乗る**。型は 0.9m の段に合わせて焼かれているが乗る物の高さは物ごとに違うので、
+腰の上下は型から抜き (animation.ts の VERTICAL_STRIP_CLIPS)、位置のほうを型の
+上がり方 (vaultRise) に沿って乗る先まで上げる。
+
+`hang_drop` / `hang_climb` (tools/hang.json、BracedHang.fbx 1.13 秒 / BracedHangToCrouch.fbx
+1.17 秒) は縁にぶら下がる。歩いて縁から出て下が 1.6m 以上深ければ、落ちずに `hang_drop` で
+縁に手を掛ける (武器は消える)。型は始めから壁向きで回転を持たないので、出た向きから壁向きへ
+型の頭 (27%) で 180° 回す (soldier.ts の HANG_TURN_PHASE)。落ち切ったら、その型の最後の 1 枚を
+止め絵 (locomotion `hang`) にして待つ。前 (W) で `hang_climb` を流して縁の上に
+しゃがみで戻り、Space で手を離して落ちる。位置は型の腰の曲線に沿って動かし、ぶら下がって
+いる間は地形の当たりを取らない。壁との距離は tools/preview/hang.html で測れる
+(`?clip=hang_drop&yaw=0&out=0.17&below=1.78`、シークバー付き)。上下は 2 本とも型から抜き、位置を型の腰の
+曲線に沿って動かす (soldier.ts の hangMovement)。ぶら下がっている間は地形の当たりを
+取らない (梯子と同じ)。
 
 雷電と名無しへは同じ物を `--rotation-only` を足して入れる。`knife_idle` は半身の構えで腰が 90° 横を向いているが、手と頭は他の構えと同じ方を向いているので回してはいけない。上半身だけ乗せると腰の基準合わせで捻れるため、ゲームでは立ち止まって構えた間だけ全身で使う。

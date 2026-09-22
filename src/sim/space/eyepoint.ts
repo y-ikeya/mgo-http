@@ -3,14 +3,14 @@
  *
  * --- なぜ目の位置ではないのか ---
  * 三人称なので、画面に映るものを決めているのは**カメラの位置**であって
- * キャラの目ではない。カメラは腰だめで 4.2m 後ろ・肩へ 0.75m ずれた所にある。
+ * キャラの目ではない。カメラは腰だめで 3.8m 後ろ、注視点は目より 0.25m 上にある (HIP_CAMERA)。
  *
  * 目から線を引いて可視を決めていると、遮蔽の裏にしゃがんだ相手が
  * 「カメラからは見えているのに送られてこない」ことになる。実際にそうなっていた:
  * 物陰でしゃがんだ相手が画面から消え、立つと戻る。
  *
  * 目で見える範囲を含むわけではない。**狭くなる場合もある** — 近くの低い遮蔽を
- * 覗き込むとき、カメラは 4.2m 後ろにあるぶん角度が浅くなって越えられない
+ * 覗き込むとき、カメラは 3.8m 後ろにあるぶん角度が浅くなって越えられない
  * (実測: 高さ 1.0m の遮蔽ごしに 3m 先のしゃがみを見ると、目は越えるがカメラは越えない)。
  *
  * それでよい。カメラから見えないなら画面上でも遮蔽の裏に隠れて描かれないので、
@@ -27,16 +27,29 @@
  * 箱のほうが粗い = 少し手前で止まる = カメラが近くなる = 見える範囲が狭くなる。
  * 送り忘れる側なので、そこは箱と描画の差が開かないよう見ておく必要がある。
  *
- * three.js に依存しない。camera.ts の値をここへ持ってきているので、
- * あちらを変えたらここも変える。
+ * three.js に依存しない。腰だめの値は**ここが元**で、camera.ts が読みに来る。
  */
 
 import { firstBlockedAt, type StageBox } from './vision'
 
-/** 腰だめのカメラ。camera.ts の HIP_VIEW と揃える */
-const HIP = { distance: 4.2, shoulder: 0.75 }
-/** 構えたときのカメラ。camera.ts の AIM_VIEW と揃える */
-const AIM = { distance: 1.35, shoulder: 0.42 }
+/**
+ * 腰だめのカメラ。**camera.ts の HIP_VIEW はここから読む** (値を 2 か所に置かない)。
+ *
+ * MGO2 の構図 (2026-09-21 に本人の切り抜きで測った): 真後ろから 3.8m、注視点は
+ * 目より 0.25m 上。キャラは画面の真ん中の少し下に居る。lift は注視点を目の
+ * 高さからどれだけ上げるか (m) で、上げるほどカメラも上がる。
+ */
+export const HIP_CAMERA = { distance: 3.8, shoulder: 0, lift: 0.25 }
+/**
+ * 構えたときのカメラ。camera.ts の AIM_VIEW と揃える。
+ *
+ * 実際は武器ごとに少し違う (domain/item/weapons.ts の aimDistance 等、1.3〜1.5m)。
+ * ここは小銃の値で代表させている。差は 0.15m で、見える範囲の差は誤差の側
+ * (迷ったら送る側に倒す方針と同じ向き)。
+ */
+// lift は負 = カメラが目より下 (2026-09-21 に本人が「構えのカメラはもう少し下」)。
+// 照準の線は画面の中心から出るので、下げたぶん相手を少し見上げる形になる
+export const AIM_CAMERA = { distance: 1.35, shoulder: 0.42, lift: -0.1 }
 
 /** カメラが地面へ潜らない下限 (m)。camera.ts の MIN_CAMERA_Y と揃える */
 const MIN_Y = 0.4
@@ -90,13 +103,13 @@ export function cameraPoint(
   boxes: StageBox[] = [],
   out: ViewPoint = { x: 0, y: 0, z: 0 },
 ): ViewPoint {
-  const view = aiming ? AIM : HIP
+  const view = aiming ? AIM_CAMERA : HIP_CAMERA
 
   const [dirX, dirY, dirZ] = viewDirection(yaw, pitch)
 
   // 肩へのずれは水平だけ (pitch で肩越しの左右がブレないように)
   const pivotX = x + Math.cos(yaw) * view.shoulder
-  const pivotY = feetY + viewHeight
+  const pivotY = feetY + viewHeight + view.lift
   const pivotZ = z + -Math.sin(yaw) * view.shoulder
 
   // 視線の逆へ引く。途中に壁があればそこまで
@@ -121,7 +134,7 @@ export function cameraPoint(
 
   // それでも壁の中なら、肩のずれを捨てて頭へ戻す。
   //
-  // 肩へのずれは 0.75m あるので、壁に体の側面を付けると**注視点そのもの**が
+  // 構えの肩へのずれ (0.42m) があるので、壁に体の側面を付けると**注視点そのもの**が
   // 壁にめり込む。そこから引いた線は何も通らない。
   if (insideAny(out.x, out.y, out.z, boxes)) {
     out.x = x

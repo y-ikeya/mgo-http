@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { DEFAULT_SURFACE, surfaceOf, type Surface } from '../../../domain/stage'
+import type { Team } from '../../../domain/player/player'
+import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
 import { decodeStageMesh, meshSubset, MESH_EYE, MESH_PLAYER, type StageMesh } from '../../../sim/space/stagemesh'
 import { MeshMoveWorld } from '../../../sim/space/meshworld'
 import { PLAYER_HEIGHT, STEP_UP } from '../../../domain/player/moving'
@@ -36,6 +37,7 @@ import type { SolidWorld } from '../../../sim/space/vision'
 import { isPathClear, SANE_HEIGHT, sightBlockers } from '../../../sim/space/vision'
 import type { Ladder } from '../../../domain/stage'
 import type { StageBox } from '../../../sim/space/vision'
+import { arenaHalfOf } from '../../../sim/judge/motioncheck'
 import { asset, loadStage } from '../assets'
 import { STAGES, waterOf, type StageName } from '../../../domain/stage'
 import { isMesh } from '../util/guards'
@@ -372,6 +374,16 @@ export interface Stage {
    */
   readonly water: { half: number; y: number } | null
   /**
+   * 遊べる範囲の半分 (m)。**審判と同じ式でステージの箱から出す。**
+   *
+   * ここは長らくコード側の地面 (120m 四方) に合わせた ±60 の直書きだった。
+   * city は z が -99〜86 まであり、赤の基地へ向かう途中 z=-60 で**見えない壁**に
+   * 当たった。審判は箱の外接から出しているので通すのに、手元だけが止めていた。
+   *
+   * glb が届くまではブロックアウトの ±60。届いたら箱の外接 + 余白に置き換わる。
+   */
+  readonly arenaHalf: number
+  /**
    * 地形 (glb) が届いて、当たり判定が入れ替わったか。
    *
    * **届くまでは足場が無い。** buildStage はブロックアウトの箱だけ持って
@@ -471,8 +483,9 @@ async function applyStructureTexture(
   material: THREE.MeshStandardMaterial,
   surface: Surface,
 ): Promise<void> {
-  const loader = new THREE.TextureLoader()
   const prefix = SURFACE_TEXTURES[surface]
+  if (!prefix) return
+  const loader = new THREE.TextureLoader()
 
   const setup = (texture: THREE.Texture, srgb: boolean) => {
     texture.wrapS = THREE.RepeatWrapping
@@ -893,6 +906,28 @@ export function loadStageSightWorld(name: StageName): Promise<TriangleBvh | null
  */
 const stageLadders = new Map<StageName, Promise<Ladder[]>>()
 
+/**
+ * 基地。**箱と同じ json から読む。**
+ *
+ * blend の `meta_*base*` の空を書き出しが写している。無ければ空で返し、
+ * 呼ぶ側が domain/stage の表 (bases) へ落ちる。
+ */
+const stageBases = new Map<StageName, Promise<Partial<Record<Team, Spot>>>>()
+
+export function loadStageBases(name: StageName): Promise<Partial<Record<Team, Spot>>> {
+  const cached = stageBases.get(name)
+  if (cached) return cached
+  const pending = fetch(asset.model(`stage_${name}.json`))
+    .then((res) => res.json() as Promise<{ bases?: Partial<Record<Team, Spot>> }>)
+    .then((data) => data.bases ?? {})
+    .catch((error) => {
+      console.warn(`[Stage] stage_${name}.json が読めない (基地)`, error)
+      return {}
+    })
+  stageBases.set(name, pending)
+  return pending
+}
+
 export function loadStageLadders(name: StageName): Promise<Ladder[]> {
   const cached = stageLadders.get(name)
   if (cached) return cached
@@ -1022,6 +1057,9 @@ const SURFACE_TEXTURES: Record<Surface, string> = {
   metal: 'rust',
   concrete: 'ground',
   wood: 'wood',
+  // 砂は Blender で貼る (本人が glb に絵を持ち込む)。コードからは貼らない。
+  // 絵を持たない sand_ が来たらブロックアウトの色のまま出る
+  sand: '',
   // ガラスは絵を貼らない。**透けることそのものが見た目**なので、模様を乗せると
   // 向こうが読めなくなる。materialFor が手前で分岐して、ここには来ない
   glass: '',
@@ -1037,6 +1075,7 @@ const SURFACE_TILE: Record<Surface, number> = {
   metal: 2.5,
   concrete: 2.5,
   wood: 1.2,
+  sand: 2.5,
   // 貼らないので効かないが、Record を埋めるために置く
   glass: 2.5,
 }
@@ -1221,6 +1260,8 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
     }),
   ])
 
+  const arena = { half: ARENA_HALF_SIZE }
+
   return {
     ...parts,
     thrownWorld,
@@ -1231,8 +1272,13 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
     get sightWorld() {
       return moving.sight
     },
+    get arenaHalf() {
+      return arena.half
+    },
     ready: Promise.all([
-      replaceWithModel(scene, name, parts, blockout, thrownWorld),
+      replaceWithModel(scene, name, parts, blockout, thrownWorld).then((replaced) => {
+        if (replaced) arena.half = arenaHalfOf(parts.obstacles.map(boxOf))
+      }),
       meshReady,
     ]).then(() => undefined),
   }
@@ -1253,13 +1299,13 @@ async function replaceWithModel(
   blockout: THREE.Group,
   /** 投げた物の世界。**形が入れ替わったら組み直す** */
   thrownWorld: MeshWorld,
-): Promise<void> {
+): Promise<boolean> {
   let gltf
   try {
     gltf = await loadStage(stageName)
   } catch {
     // stage.glb が無いのは異常ではない。コード側のブロックアウトで動く。
-    return
+    return false
   }
 
   const model = gltf.scene
@@ -1389,7 +1435,7 @@ async function replaceWithModel(
   })
   if (meshCount === 0) {
     console.warn('[Stage] stage.glb にメッシュが無い。ブロックアウトのまま続行する')
-    return
+    return false
   }
 
   // 描画だけのモデル (vis_ ばかりの環境など) でも表示はする。
@@ -1411,6 +1457,16 @@ async function replaceWithModel(
     `[Stage] stage.glb を読み込み: メッシュ ${meshCount} 個 / 判定 ${collidables.length} 個` +
       (collidables.length === 0 ? ' (描画のみ。col_ の箱を置くまで素通りする)' : ''),
   )
+  return true
+}
+
+/** 場外の式 (arenaHalfOf) は審判の箱を取る。手元の箱を同じ形に写す */
+function boxOf(obstacle: Obstacle): StageBox {
+  return {
+    name: obstacle.name ?? '',
+    min: [obstacle.minX, obstacle.bottom, obstacle.minZ],
+    max: [obstacle.maxX, obstacle.top, obstacle.maxZ],
+  }
 }
 
 function isBlockoutChild(obj: THREE.Object3D, blockout: THREE.Group): boolean {
@@ -1511,5 +1567,51 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   scene.add(sun)
   scene.add(sun.target)
   return sun
+}
+
+/**
+ * 影の範囲をステージに合わせる。**glb が届いてから 1 回。**
+ *
+ * 影の枠は ±65m で原点中心に固定していた (筏はそれで全域が入る)。city は
+ * 100 × 185m で中心も原点からずれているので、枠の外に出た地面が半分ある。
+ * 枠の縁は光の向きに沿った直線で、地面の上では**斜めの線**として見えた
+ * (縁の内側は影マップの丸めで僅かに暗く、外側は影が無い)。
+ *
+ * 枠を広げると 1m あたりの画素は落ちる (4096 / 幅)。city で 20 画素前後。
+ * これ以上広いステージになったら分割 (カスケード) を考える。
+ */
+export function fitShadowToStage(sun: THREE.DirectionalLight, stage: Stage): void {
+  if (stage.obstacles.length === 0) return
+  let minX = Infinity
+  let maxX = -Infinity
+  let minZ = Infinity
+  let maxZ = -Infinity
+  let top = -Infinity
+  for (const box of stage.obstacles) {
+    minX = Math.min(minX, box.minX)
+    maxX = Math.max(maxX, box.maxX)
+    minZ = Math.min(minZ, box.minZ)
+    maxZ = Math.max(maxZ, box.maxZ)
+    top = Math.max(top, box.top)
+  }
+  const centreX = (minX + maxX) / 2
+  const centreZ = (minZ + maxZ) / 2
+  // 光の向きに対して枠は回るので、半径は角までの距離で取る (対角の半分)
+  const radius = Math.max(SHADOW_RADIUS, Math.hypot(maxX - minX, maxZ - minZ) / 2 + 2)
+
+  // 光の向きはそのまま、ステージの真ん中へ平行移動する
+  const offset = sun.position.clone().sub(sun.target.position)
+  sun.target.position.set(centreX, 0, centreZ)
+  sun.position.copy(sun.target.position).add(offset)
+
+  const cam = sun.shadow.camera
+  cam.left = -radius
+  cam.right = radius
+  cam.top = radius
+  cam.bottom = -radius
+  // 光から見て一番奥の角まで。光の距離 + 半径 + 高さ分の余裕
+  cam.far = offset.length() + radius + Math.max(0, top) + 10
+  cam.updateProjectionMatrix()
+  sun.shadow.needsUpdate = true
 }
 

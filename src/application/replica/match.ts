@@ -80,6 +80,13 @@ export type MatchEffect =
   | { kind: 'phase'; to: MatchMessage['phase']; teams: boolean }
   /** 自分の所属が分かった。湧き地点がこれで決まる */
   | { kind: 'team'; team: Team }
+  /**
+   * 自分の弾が頭に入って、倒した / 眠らせた。**音で報いる。**
+   *
+   * キルログの 💀 だけだと視線を外さないと分からない。撃った瞬間に耳で
+   * 分かる (熱中の条件 1: 行動に応えが返る)。他人の HS には出さない。
+   */
+  | { kind: 'headshot' }
 
 /**
  * 報せを 1 つ受けて、レプリカを進める。
@@ -136,6 +143,7 @@ export function applyMatch(
       if (message.by === selfId) {
         replica.pointFeed.unshift({ label: 'STUN', delta: STUN_POINTS, at: now })
         replica.pointFeed.length = Math.min(replica.pointFeed.length, POINT_FEED_MAX)
+        if (message.head) return [{ kind: 'headshot' }]
       }
       return []
     }
@@ -148,6 +156,10 @@ export function applyMatch(
         replica.killedBy = message.killer === selfId ? '' : message.killer
       }
       score(replica, message, selfId, now)
+      // 自爆は頭に入らない。倒したのが自分で、相手が別人のときだけ
+      if (message.headshot && message.killer === selfId && message.victim !== selfId) {
+        return [{ kind: 'headshot' }]
+      }
       return []
     }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { cameraPoint, seesFromCamera } from './eyepoint'
+import { cameraPoint, seesFromCamera, AIM_CAMERA, HIP_CAMERA } from './eyepoint'
 import { bodyVisible, boxSight, hasLineOfSight, type StageBox } from './vision'
 import { BODY_BOX } from '../../domain/player/stance'
 
@@ -11,11 +11,14 @@ import { BODY_BOX } from '../../domain/player/stance'
  */
 
 describe('cameraPoint', () => {
-  test('注視点の高さがそのままカメラの高さになる (水平に見ているとき)', () => {
+  test('注視点の高さ + 構図のずらし (lift) がカメラの高さになる (水平に見ているとき)', () => {
     const low = cameraPoint(0, 0, 0, 0, 0, true, 0.6)
     const high = cameraPoint(0, 0, 0, 0, 0, true, 1.57)
-    expect(low.y).toBeCloseTo(0.6, 5)
-    expect(high.y).toBeCloseTo(1.57, 5)
+    expect(low.y).toBeCloseTo(0.6 + AIM_CAMERA.lift, 5)
+    expect(high.y).toBeCloseTo(1.57 + AIM_CAMERA.lift, 5)
+    // 腰だめは注視点が目より上 (キャラが画面の下に居る構図)
+    const hip = cameraPoint(0, 0, 0, 0, 0, false, 1.57)
+    expect(hip.y).toBeCloseTo(1.57 + HIP_CAMERA.lift, 5)
   })
 })
 

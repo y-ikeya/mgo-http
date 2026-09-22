@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "BracedHang.fbx": "hang_drop", "BracedHangToCrouch.fbx": "hang_climb" },
+  "out": "hang.glb",
+  "maxTexture": 64
+}

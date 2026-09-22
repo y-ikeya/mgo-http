@@ -42,6 +42,11 @@ const RULES = {
   // カメラの注視点。頭の少し上
   viewHeight: (stance: string) =>
     (stance === 'prone' ? 0.4 : stance === 'crouch' || stance === 'box' ? 0.94 : 1.47) + 0.1,
+  // 傾きの横ずれ。**形だけ** — 右 (正) で +X へ 0.2m、左で -X へ
+  leanShift: (lean: number, _stance: string, yaw: number) => ({
+    x: Math.cos(yaw) * 0.2 * lean,
+    z: -Math.sin(yaw) * 0.2 * lean,
+  }),
   // 部位の大きさ。頭は小さく、胴は大きい
   zoneRadius: (zone: string) => (zone === 'HEAD' ? 0.14 : zone === 'BODY' ? 0.2 : 0.16),
   // 縦の幅。頭は点、胴は腰から首、脚は足元から腰

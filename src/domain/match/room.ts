@@ -130,7 +130,7 @@ interface RoomSpec {
 
 export const ROOMS: Record<RoomName, RoomSpec> = {
   alpha: { mode: 'DM', stages: only('mall') },
-  bravo: { mode: 'TDM', stages: only('mall') },
+  bravo: { mode: 'TDM', stages: only('city') },
   charlie: { mode: 'TSNE', stages: only('mall') },
   delta: {
     mode: 'TDM',

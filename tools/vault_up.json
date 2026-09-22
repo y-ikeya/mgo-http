@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "RunningJumpUp.fbx": "vault_up" },
+  "out": "vault_up.glb",
+  "maxTexture": 64
+}

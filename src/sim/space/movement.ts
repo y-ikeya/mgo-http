@@ -23,7 +23,8 @@ import type { Vec3 } from './collision'
  */
 export interface MoveWorld {
   /** 位置を障害物の外へ押し戻す */
-  resolveHorizontal(position: Vec3, radius: number, feetY: number): void
+  /** @param height 体の高さ (m)。省くと通常の身長。跳び越えの間は足元を上げるぶん縮める */
+  resolveHorizontal(position: Vec3, radius: number, feetY: number, height?: number): void
   /** その位置で足が着く高さ */
   groundHeight(position: Vec3, radius: number, feetY: number): number
   /**
@@ -62,6 +63,14 @@ export interface MoveCommand {
    */
   overrideX?: number
   overrideZ?: number
+  /**
+   * 足元をこれだけ上げて壁に当てる (m)。**跳び越えの間だけ。**
+   *
+   * 窓枠 (1.2m まで) を体の筒が跨げるように、当たりの下端を枠の上へ置く。
+   * 上下は動かさない — 跳ぶ絵は型が持っていて、位置まで上げると二重に浮く。
+   * 着地の判定は跳び越えが終わってから普通に戻る。
+   */
+  stepOver?: number
 }
 
 export interface MoveTuning {
@@ -132,6 +141,18 @@ export function stepMovement(
 
   position.x += vx * dt
   position.z += vz * dt
+  const stepOver = command.stepOver ?? 0
+  if (stepOver > 0) {
+    // 足元を上げたぶん背を縮めて、頭の高さは変えない (鴨居に当たらないように)
+    world.resolveHorizontal(position, tuning.radius, feetY + stepOver, tuning.height - stepOver)
+    mover.velocityY = 0
+    mover.onGround = true
+    return {
+      landed: false,
+      impactSpeed: 0,
+      actualSpeed: dt > 0 ? Math.hypot(position.x - startX, position.z - startZ) / dt : 0,
+    }
+  }
   world.resolveHorizontal(position, tuning.radius, feetY)
 
   // --- 上下 ---
