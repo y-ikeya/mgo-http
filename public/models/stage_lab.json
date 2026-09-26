@@ -1,0 +1,961 @@
+{
+"boxes": [
+{
+"name": "concrete_ground",
+"min": [
+-30.0,
+-1.9,
+-30.0
+],
+"max": [
+30.0,
+0.1,
+30.0
+],
+"top": {
+"h": 0.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_step_025",
+"min": [
+-26.0,
+0.0,
+17.0
+],
+"max": [
+-22.0,
+0.25,
+20.0
+],
+"top": {
+"h": 0.25,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_step_045",
+"min": [
+-26.0,
+0.0,
+13.0
+],
+"max": [
+-22.0,
+0.45,
+16.0
+],
+"top": {
+"h": 0.45,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_step_090",
+"min": [
+-26.0,
+0.0,
+9.0
+],
+"max": [
+-22.0,
+0.9,
+12.0
+],
+"top": {
+"h": 0.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_step_120",
+"min": [
+-26.0,
+0.0,
+5.0
+],
+"max": [
+-22.0,
+1.2,
+8.0
+],
+"top": {
+"h": 1.2,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_step_150",
+"min": [
+-26.0,
+0.0,
+1.0
+],
+"max": [
+-22.0,
+1.5,
+4.0
+],
+"top": {
+"h": 1.5,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_window_sill",
+"min": [
+-21.0,
+0.0,
+-10.12
+],
+"max": [
+-18.8,
+0.9,
+-9.88
+],
+"top": {
+"h": 0.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_window_lintel",
+"min": [
+-21.0,
+2.0,
+-10.12
+],
+"max": [
+-18.8,
+3.0,
+-9.88
+],
+"top": {
+"h": 3.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_window_left",
+"min": [
+-26.0,
+0.0,
+-10.12
+],
+"max": [
+-21.0,
+3.0,
+-9.88
+],
+"top": {
+"h": 3.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_window_right",
+"min": [
+-18.8,
+0.0,
+-10.12
+],
+"max": [
+-14.0,
+3.0,
+-9.88
+],
+"top": {
+"h": 3.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_tunnel_wall_a",
+"min": [
+-10.0,
+0.0,
+-12.12
+],
+"max": [
+-6.0,
+2.0,
+-11.88
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_tunnel_wall_b",
+"min": [
+-10.0,
+0.0,
+-13.96
+],
+"max": [
+-6.0,
+2.0,
+-13.72
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_tunnel_roof",
+"min": [
+-10.0,
+1.4,
+-13.96
+],
+"max": [
+-6.0,
+1.64,
+-11.88
+],
+"top": {
+"h": 1.64,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_crawl_wall_a",
+"min": [
+-4.0,
+0.0,
+-12.12
+],
+"max": [
+0.0,
+2.0,
+-11.88
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_crawl_wall_b",
+"min": [
+-4.0,
+0.0,
+-13.96
+],
+"max": [
+0.0,
+2.0,
+-13.72
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_crawl_roof",
+"min": [
+-4.0,
+1.0,
+-13.96
+],
+"max": [
+0.0,
+1.24,
+-11.88
+],
+"top": {
+"h": 1.24,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair1",
+"min": [
+-3.102,
+0.1,
+5.834
+],
+"max": [
+-0.898,
+1.65,
+10.166
+],
+"top": {
+"h": 0.3009,
+"dx": 0.0,
+"dz": 0.35746,
+"riser": 0.15,
+"foot": 0.15,
+"head": 1.8
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_top",
+"min": [
+-3.1,
+1.48,
+10.166
+],
+"max": [
+-0.9,
+1.78,
+14.166
+],
+"top": {
+"h": 1.78,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_01",
+"min": [
+4.0,
+0.0,
+-1.0
+],
+"max": [
+4.3,
+0.25,
+1.0
+],
+"top": {
+"h": 0.25,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_02",
+"min": [
+4.3,
+0.0,
+-1.0
+],
+"max": [
+4.6,
+0.5,
+1.0
+],
+"top": {
+"h": 0.5,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_03",
+"min": [
+4.6,
+0.0,
+-1.0
+],
+"max": [
+4.9,
+0.75,
+1.0
+],
+"top": {
+"h": 0.75,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_04",
+"min": [
+4.9,
+0.0,
+-1.0
+],
+"max": [
+5.2,
+1.0,
+1.0
+],
+"top": {
+"h": 1.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_05",
+"min": [
+5.2,
+0.0,
+-1.0
+],
+"max": [
+5.5,
+1.25,
+1.0
+],
+"top": {
+"h": 1.25,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_06",
+"min": [
+5.5,
+0.0,
+-1.0
+],
+"max": [
+5.8,
+1.5,
+1.0
+],
+"top": {
+"h": 1.5,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_07",
+"min": [
+5.8,
+0.0,
+-1.0
+],
+"max": [
+6.1,
+1.75,
+1.0
+],
+"top": {
+"h": 1.75,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_08",
+"min": [
+6.1,
+0.0,
+-1.0
+],
+"max": [
+6.4,
+2.0,
+1.0
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_09",
+"min": [
+6.4,
+0.0,
+-1.0
+],
+"max": [
+6.7,
+2.25,
+1.0
+],
+"top": {
+"h": 2.25,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_10",
+"min": [
+6.7,
+0.0,
+-1.0
+],
+"max": [
+7.0,
+2.5,
+1.0
+],
+"top": {
+"h": 2.5,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_11",
+"min": [
+7.0,
+0.0,
+-1.0
+],
+"max": [
+7.3,
+2.75,
+1.0
+],
+"top": {
+"h": 2.75,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair_12",
+"min": [
+7.3,
+0.0,
+-1.0
+],
+"max": [
+7.6,
+3.0,
+1.0
+],
+"top": {
+"h": 3.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_deck",
+"min": [
+7.6,
+2.7,
+-4.0
+],
+"max": [
+15.6,
+3.0,
+4.0
+],
+"top": {
+"h": 3.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "ladder_a",
+"min": [
+11.25,
+0.0,
+4.02
+],
+"max": [
+11.95,
+3.0,
+4.08
+],
+"top": {
+"h": 3.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_plateau_w",
+"min": [
+-10.0,
+0.0,
+18.0
+],
+"max": [
+-2.0,
+1.0,
+26.0
+],
+"top": {
+"h": 1.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_plateau_e",
+"min": [
+0.0,
+0.0,
+18.0
+],
+"max": [
+8.0,
+1.0,
+26.0
+],
+"top": {
+"h": 1.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_cover",
+"min": [
+-0.6,
+0.0,
+-0.6
+],
+"max": [
+0.6,
+1.0,
+0.6
+],
+"top": {
+"h": 1.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_toolbox_blue",
+"min": [
+-10.429,
+0.1,
+-0.542
+],
+"max": [
+-9.571,
+0.4,
+0.542
+],
+"top": {
+"h": 0.4004,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_toolbox_red",
+"min": [
+11.571,
+0.1,
+-8.542
+],
+"max": [
+12.429,
+0.4,
+-7.458
+],
+"top": {
+"h": 0.4004,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+}
+],
+"ladders": [
+{
+"name": "ladder_a",
+"min": [
+11.25,
+0.0,
+4.02
+],
+"max": [
+11.95,
+3.0,
+4.08
+],
+"axis": "z",
+"parts": 1
+}
+],
+"bases": {
+"blue": {
+"x": -10.0,
+"y": 0.1,
+"z": -0.0
+},
+"red": {
+"x": 12.0,
+"y": 0.1,
+"z": -8.0
+}
+}
+}

@@ -961,6 +961,18 @@ const MAX_AIM_BEND = 1.0
 /** 照準角が目標へ寄る速さ。構えの入り抜けの滑らかさを決める */
 const AIM_PITCH_LAMBDA = 12
 
+/*
+ * 首の向き (見ている方向)。**構えていないとき、TPS のカメラが向いている方へ首を回す。**
+ *
+ * 相手のカメラがどこを見ているかは、これまで体の向きからしか読めなかった (体は
+ * 進行方向を向く)。首が回れば「あいつは右の路地を見ている」が絵で分かる —
+ * 情報が核の遊びなので、これは相手に**渡す**情報。範囲は体の正面から左右 75°。
+ * それ以上は体ごと回るので、首だけが後ろを向く絵にはならない。首と頭で分ける。
+ */
+const LOOK_YAW_MAX = (75 * Math.PI) / 180
+const LOOK_YAW_LAMBDA = 10
+const LOOK_CHAIN: Record<string, number> = { Neck: 0.4, Head: 0.6 }
+
 /**
  * 構えていないときに上体を前へ倒す角度 (rad)。
  *
@@ -1180,6 +1192,9 @@ export class CharacterAnimator {
   /** 照準の上下 (rad)。構えを解いた瞬間に体が跳ねないよう、目標へ補間して追う */
   private aimPitchTarget = 0
   private aimPitch = 0
+  /** 首の向き (体の正面からの差、rad)。目標と均した値 */
+  private lookYawTarget = 0
+  private lookYaw = 0
   /**
    * 背骨の各ボーンにおける「キャラの右方向」を、そのボーンのローカル座標で表したもの。
    * 曲げる軸そのもの。ボーンの向きは骨格ごとに違うので、決め打ちせず構えのポーズから求める。
@@ -1896,6 +1911,7 @@ export class CharacterAnimator {
       asleep ||
       prone
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
+    this.lookYaw = damp(this.lookYaw, this.lookYawTarget, LOOK_YAW_LAMBDA, dt)
     /*
      * **ナイフの構えでは腰を正面へ戻さない。** 半身の構えなので腰は 90° 横を
      * 向いていて、それを正面へ寄せると全身が 75° 回って刃が横を向く
@@ -2130,6 +2146,14 @@ export class CharacterAnimator {
   }
 
   /** 照準の上下 (rad)。カメラの pitch を渡す。構えていないときは 0 */
+  /**
+   * 首をどちらへ向けるか (体の正面からの差、rad、左が正)。**構えていないときの
+   * カメラの向き。** 範囲外は端で止める。呼ぶ側は構え中や全身の型の間は 0 を渡す
+   */
+  setLookYaw(delta: number): void {
+    this.lookYawTarget = THREE.MathUtils.clamp(delta, -LOOK_YAW_MAX, LOOK_YAW_MAX)
+  }
+
   setAimPitch(pitch: number): void {
     this.aimPitchTarget = pitch
   }
@@ -2250,11 +2274,20 @@ export class CharacterAnimator {
     const total =
       THREE.MathUtils.clamp(this.aimPitch * this.aimPitchGain, -MAX_AIM_BEND, MAX_AIM_BEND) +
       this.lean
-    if (total === 0) return
-
-    for (const entry of axes) {
-      this.scratchRotation.setFromAxisAngle(entry.axis, total * entry.weight)
-      entry.bone.quaternion.multiply(this.scratchRotation)
+    if (total !== 0) {
+      for (const entry of axes) {
+        this.scratchRotation.setFromAxisAngle(entry.axis, total * entry.weight)
+        entry.bone.quaternion.multiply(this.scratchRotation)
+      }
+    }
+    // 首の向き。上下の曲げの後に、首と頭だけを上向きの軸で回す (LOOK_CHAIN)
+    if (Math.abs(this.lookYaw) > 1e-4) {
+      for (const entry of axes) {
+        const share = LOOK_CHAIN[entry.suffix]
+        if (!share) continue
+        this.scratchRotation.setFromAxisAngle(entry.yawAxis, this.lookYaw * share)
+        entry.bone.quaternion.multiply(this.scratchRotation)
+      }
     }
   }
 
@@ -2280,6 +2313,7 @@ export class CharacterAnimator {
       if (suffix === 'Spine') this.spineBone = bone
       resolved.push({
         bone,
+        suffix,
         weight,
         axis,
         yawAxis,
@@ -3041,6 +3075,11 @@ export class CharacterAnimator {
     if (this.upperState === 'vault' || this.upperState === 'vault_up') this.upperState = 'stance'
   }
 
+  /** 上半身が普段の状態か (一度きりの全身の型・刺突・投げなどを流していない) */
+  get upperFree(): boolean {
+    return this.upperState === 'stance'
+  }
+
   /** 跳び越え (越える / 乗る) の最中か。型が終わるまで操作は効かない */
   get vaulting(): boolean {
     return this.upperState === 'vault' || this.upperState === 'vault_up'
@@ -3745,6 +3784,8 @@ function nodeNameOf(trackName: string): string {
 
 interface AimAxis {
   bone: THREE.Bone
+  /** 骨の名前の末尾 (Spine / Neck / Head …)。首の向きの配分を引くのに使う */
+  suffix: string
   weight: number
   /** ボーンのローカル座標で表した回転軸 (上下の曲げ用 = キャラの右方向) */
   axis: THREE.Vector3

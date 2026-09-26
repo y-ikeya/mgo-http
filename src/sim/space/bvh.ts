@@ -317,11 +317,18 @@ export class TriangleBvh {
     const dy = y - cy
     const dz = z - cz
     const distSq = dx * dx + dy * dy + dz * dz
-    if (distSq >= radiusSq) return null
+    /*
+     * **数でなければ触れていない。** 面積の無い三角 (3 点が一直線) は最寄り点の
+     * 計算が 0 で割って NaN になる。`>=` で見ると NaN が素通りして、押し戻す量が
+     * NaN になり位置ごと壊れた (画面が真っ暗、サーバーは「数でない座標」で却下)。
+     * 書き出しでも捨てているが、ここでも通さない
+     */
+    if (!(distSq < radiusSq)) return null
     const dist = Math.sqrt(distSq)
     // 面の上にちょうど乗っている。**向きが出せないので面の法線へ逃がす**
     if (dist < PARALLEL) {
       const n = this.normalOf(tri, 0, -1, 0)
+      if (!Number.isFinite(n.nx) || !Number.isFinite(n.ny) || !Number.isFinite(n.nz)) return null
       return { nx: n.nx, ny: n.ny, nz: n.nz, depth: Math.sqrt(radiusSq) }
     }
     return {

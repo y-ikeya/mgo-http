@@ -12,6 +12,7 @@
 # 何も問題なく見えるのに、ゲームに入れて初めて壊れているのが分かる、を減らす。
 
 import bpy
+import sys
 import os
 import math
 import json
@@ -23,7 +24,11 @@ REF_PREFIX = 'ref_'
 # 名前に付けられる札。これ以外の接頭辞は打ち間違いの可能性が高い
 # shield_ は**印だけ**。書き出しの上では普通の壁で、名前で役目が読めるようにしてある
 # (梯子の脇に立てて、登っている人を撃たれないようにする板)
-KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'wood_', 'glass_', 'sand_', 'ref_', 'ladder_', 'shield_')
+# 厚みがこれ未満 (m) の板は、判定の箱を下へ THIN_FILL (m) 埋める (板 1 枚の地面が抜けないように)
+THIN_MIN = 0.05
+THIN_FILL = 1.0
+
+KNOWN_TAGS = ('col_', 'vis_', 'metal_', 'concrete_', 'brick_', 'wood_', 'glass_', 'sand_', 'ref_', 'ladder_', 'shield_')
 
 # 面が何を止めるか。既定は全部止めて、名前で個別に外す。
 # (src/domain/stage/flags.ts と同じ規則。MGO2 が面ごとのビットで持っていたのを借りている)
@@ -91,10 +96,18 @@ def stair_plane(pts, lo, hi):
         return None
 
     h = mean_y + grad * (lo[axis] - mean_c)
+    # 1 段の高さ。帯の上端を高さで並べ、隣との差の真ん中を取る (坂の板を下げる量に使う)
+    levels = sorted(set(round(y, 2) for y in ys))
+    diffs = sorted(b - a for a, b in zip(levels, levels[1:]) if b - a > 0.03)
+    riser = diffs[len(diffs) // 2] if diffs else 0.0
     return {
         'h': round(h, 4),
         'dx': round(grad if axis == 0 else 0.0, 5),
         'dz': round(0.0 if axis == 0 else grad, 5),
+        'riser': round(riser, 3),
+        # 下の床 (1 段目の天面 − 1 段) と上の床 (最上段の天面 + 1 段)。坂の板の両端
+        'foot': round(levels[0] - riser, 3),
+        'head': round(levels[-1] + riser, 3),
     }
 
 
@@ -240,6 +253,79 @@ if bpy.context.object is not None and bpy.context.object.mode != 'OBJECT':
 
 bpy.ops.object.select_all(action='DESELECT')
 
+# --- 基地の工具箱 -------------------------------------------------------------
+#
+# **基地には工具箱を置く。** 筏の基地にある古い軍用の箱 (tools/props/crate.blend
+# の wood_toolbox、0.86 × 1.08 × 0.30m) を、基地の印 (meta_*base*) の真下の床へ
+# 置いてから書き出す。ステージを作る側は印を置くだけでよく、箱を毎回持ち込まない。
+#
+# 置くのは印の真ん中。湧く位置は印から半径 1.5m の輪の上 (Game.ts の SPAWN_SPREAD)
+# なので、箱 (半径 0.7m 以内) の上には湧かない。
+#
+# 筏のように**自分の .blend に箱を持っているステージには置かない** (二重になる)。
+# 名前に toolbox か old_military_crate を含む物があれば、それが箱。
+TOOLBOX_PREFIX = 'wood_toolbox'
+TOOLBOX_BLEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'props', 'crate.blend')
+
+
+def is_base_marker(obj):
+    lower = obj.name.lower()
+    return obj.type == 'EMPTY' and lower.startswith('meta_') and 'base' in lower
+
+
+def place_toolboxes():
+    if any('toolbox' in o.name.lower() or 'old_military_crate' in o.name.lower() for o in bpy.data.objects):
+        print('  工具箱: .blend に入っているので置かない')
+        return
+    markers = [o for o in bpy.context.scene.objects if is_base_marker(o)]
+    if not markers:
+        return
+    with bpy.data.libraries.load(TOOLBOX_BLEND, link=False) as (src, dst):
+        dst.objects = ['wood_toolbox']
+    template = dst.objects[0]
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for marker in markers:
+        at = marker.matrix_world.translation.copy()
+        # 印は床から浮かせて (ときに床に埋めて) 置かれる。1m 上から真下へ線を引いて床の天面を取る
+        hit, where, *_ = bpy.context.scene.ray_cast(depsgraph, at + Vector((0, 0, 1.0)), Vector((0, 0, -1.0)))
+        box = template if marker is markers[0] else template.copy()
+        box.name = TOOLBOX_PREFIX + '_' + marker.name.lower().replace('meta_', '').replace('base', '').strip('_') or TOOLBOX_PREFIX
+        box.location = Vector((at.x, at.y, where.z if hit else at.z))
+        bpy.context.scene.collection.objects.link(box)
+        print(f'  工具箱: {marker.name} の下 ({box.location.x:.1f}, {box.location.y:.1f}, {box.location.z:.2f}) に {box.name} を置いた' + ('' if hit else ' (床が見つからず印の高さ)'))
+
+
+place_toolboxes()
+
+# --- 親の札を子に配る -----------------------------------------------------------
+#
+# 持ち込みのモデル (Sketchfab) は空 (Empty) の根の下にメッシュがぶら下がっていて、
+# 札を付けるのは根の名前 (`metal_rustCar1`)。メッシュは元の名前 (`Plane_Details_0`) の
+# ままなので、札無し + 頂点が多い = 飾り、と読まれて**人も弾も素通り**した (錆びた車を
+# すり抜けた)。札は名前で読む決まりなので、親の札を子の名前の頭に写しておく。
+# 読み込んだ複製に対してやるので .blend は変わらない。
+TAG_WORDS = KNOWN_TAGS + ('col_', 'vis_')
+
+
+def has_tag(name):
+    lower = name.lower()
+    return any(tag in lower for tag in TAG_WORDS)
+
+
+_inherited = 0
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or has_tag(obj.name):
+        continue
+    parent = obj.parent
+    while parent is not None and not has_tag(parent.name):
+        parent = parent.parent
+    if parent is None:
+        continue
+    obj.name = parent.name + '_' + obj.name
+    _inherited += 1
+if _inherited:
+    print(f'  親の札を子に写した: {_inherited} 個')
+
 exported = []
 skipped = []
 for obj in bpy.context.scene.objects:
@@ -262,19 +348,32 @@ if not exported:
 #
 # 読み込んだ複製に対してやるので (-b で保存しない)、.blend は変わらない。
 # 形を共有している物 (Alt+D の複製) は、その物だけ新しい形に付け替える。
-baked = 0
+#
+# **先に全部を評価してから、付け替える。** 1 個付け替えるたびに評価し直すと、
+# 残りの物のモディファイアが毎回計算し直される (土嚢 97 個の Decimate で 97 × 97 回、
+# 何十分も終わらなかった)。評価は 1 度で済ませ、付け替えはその後にまとめてやる。
+#
+# **同じ形に同じモディファイアなら、確定した形も共有する。** 土嚢 97 個は 14 種の形を
+# 共有していて、そこに同じ Decimate が付く。1 個ずつ確定させると 97 個の別々の形に
+# なり、glb が 97 倍膨らむし、空の焼き込みも (共有していない物として) 97 個ぶん焼く。
+baked = []
+baked_by_key = {}
 depsgraph = bpy.context.evaluated_depsgraph_get()
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or not obj.select_get() or not obj.modifiers:
         continue
-    evaluated = obj.evaluated_get(depsgraph)
-    mesh = bpy.data.meshes.new_from_object(evaluated)
-    mesh.name = obj.data.name + '_baked'
+    key = (obj.data.name, tuple((m.type, getattr(m, 'ratio', None), getattr(m, 'decimate_type', None)) for m in obj.modifiers))
+    mesh = baked_by_key.get(key)
+    if mesh is None:
+        mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
+        mesh.name = obj.data.name + '_baked'
+        baked_by_key[key] = mesh
+    baked.append((obj, mesh))
+for obj, mesh in baked:
     obj.modifiers.clear()
     obj.data = mesh
-    baked += 1
 if baked:
-    print(f'  モディファイアを確定させた: {baked} 個')
+    print(f'  モディファイアを確定させた: {len(baked)} 個 (形 {len(baked_by_key)} 種類)')
 
 # --- 置き物の三角を落とす ----------------------------------------------------
 #
@@ -288,6 +387,9 @@ if baked:
 PROP_TRI_CAP = 400
 # 平らと見なす角度 (度)。板の反りは残し、同一面の分割だけ溶かす
 PROP_PLANAR_ANGLE = 8
+# 溶かしてもこれを超える曲面の置き物は、辺を潰して PROP_COLLAPSE_TO まで落とす
+PROP_COLLAPSE_ABOVE = 6000
+PROP_COLLAPSE_TO = 4000
 thinned = {}
 for obj in list(bpy.context.scene.objects):
     if obj.type != 'MESH' or not obj.select_get():
@@ -313,10 +415,69 @@ for obj in list(bpy.context.scene.objects):
     slim = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
     slim.name = mesh.name + '_slim'
     obj.modifiers.remove(mod)
+    # 曲面の置き物 (車) は平らな面が無いので、溶かしても 11,000 枚残る。**そこから先は
+    # 辺を潰して (COLLAPSE) 落とす。** UV の島をまたいで潰れる (木箱の黒い抜け) ので
+    # 平らな物には使わず、溶かしても PROP_COLLAPSE_ABOVE を超える物にだけ掛ける
+    slim.calc_loop_triangles()
+    if len(slim.loop_triangles) > PROP_COLLAPSE_ABOVE:
+        obj.data = slim
+        mod = obj.modifiers.new(name='prop_collapse', type='DECIMATE')
+        mod.decimate_type = 'COLLAPSE'
+        mod.ratio = PROP_COLLAPSE_TO / len(slim.loop_triangles)
+        mod.use_collapse_triangulate = True
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        collapsed = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
+        collapsed.name = mesh.name + '_slim'
+        obj.modifiers.remove(mod)
+        slim = collapsed
     obj.data = slim
     thinned[mesh.name] = slim
     slim.calc_loop_triangles()
     print(f'  {obj.name}: 三角 {tris:,} → {len(slim.loop_triangles):,} に間引いた (上限 {PROP_TRI_CAP})')
+
+# --- 空の見え方を焼く (任意) ---------------------------------------------------
+#
+#   $BLENDER -b tools/raw/stage_city.blend --python tools/export_stage.py -- --bake [試行回数]
+#
+# bake_stage.py を**読み込んだ複製に対して**掛ける。あちらは .blend に保存する作りだが、
+# 開いている .blend を書き換えない (本人が編集中) し、面を割った形を元に残さない。
+# 毎回焼くと 1 分ほど掛かるので、豆腐を動かしている間は付けず、形が落ち着いたら付ける。
+#
+# **間引いた後に焼く。** 焼くのは頂点ごとの光線なので、置き物を間引く前に掛けると
+# 土嚢 74 個 (1 つ 8,900 面) で終わらなくなった (10 分で打ち切り)。間引きは形を作り直す
+# (new_from_object) ので、先に焼いても置き物の分は捨てられていた。
+# **箱は共有を解いてから焼く。** bake_stage は形を共有している物を焼かない (車 10 台で
+# 1 つの形を使い回す物に、最後の 1 台の明るさを乗せないため)。豆腐の建物は Alt+D の
+# 複製で 1 つの形を 130 個で使い回しているので、そのままだと全部が「空が全部見える」
+# (1.0) のまま — 床 (sand_ground) だけ暗くなって壁は明るい、部屋の中が明るすぎる正体。
+# 面の少ない箱だけ自分の形にする。置き物 (土嚢・車) は共有のまま (数が多く、形も細かい)
+BAKE_UNSHARE_MAX_FACES = 60
+# **焼く前の形。判定 (mesh.bin) はこちらから取る。** 焼きは頂点に明るさを持たせる
+# ために面を 2m 刻みに割る。割った形をそのまま判定に出すと、当たる形は同じなのに
+# 三角が 4 倍 (7 万 → 30 万枚、mesh.bin 2.7MB → 11MB) になる。割る前の形を控える
+PRE_BAKE = {}
+_argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+if '--bake' in _argv:
+    _unshared = 0
+    for obj in bpy.context.scene.objects:
+        if obj.type != 'MESH' or not obj.select_get() or obj.data.users <= 1:
+            continue
+        if len(obj.data.polygons) > BAKE_UNSHARE_MAX_FACES:
+            continue
+        obj.data = obj.data.copy()
+        _unshared += 1
+    if _unshared:
+        print(f'  焼くために形の共有を解いた: {_unshared} 個')
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'MESH' and obj.select_get():
+            PRE_BAKE[obj.name] = obj.data.copy()
+    import importlib.util
+    _spec = importlib.util.spec_from_file_location('bake_stage', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bake_stage.py'))
+    _bake = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_bake)
+    _at = _argv.index('--bake')
+    _samples = int(_argv[_at + 1]) if len(_argv) > _at + 1 and _argv[_at + 1].isdigit() else 24
+    _bake.run(_samples, save=False)
 
 problems = check([o for o in bpy.context.scene.objects if o.select_get()])
 if problems:
@@ -473,6 +634,9 @@ for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
         continue
     lo, hi = gltf_bounds(obj)
+    # 厚みの無い板は下へ埋める (box_triangles_of と同じ)。上下が同じ高さの箱は判定が消える
+    if hi[1] - lo[1] < THIN_MIN:
+        lo = [lo[0], hi[1] - THIN_FILL, lo[2]]
     top = top_plane(obj, lo, hi)
     if top['dx'] or top['dz']:
         slopes += 1
@@ -500,18 +664,31 @@ for obj in bpy.context.scene.objects:
 # すると、読む側で数千個の入れ物ができる。
 
 
+def mesh_triangles(mesh, matrix):
+    mesh.calc_loop_triangles()
+    out = []
+    for tri in mesh.loop_triangles:
+        # **面積の無い三角 (3 点が一直線) は出さない。** 間引きの副産物で 235 枚あり、
+        # 法線が出せないので当たりの計算が NaN になって位置が壊れた (画面が真っ暗)
+        if tri.area < 1e-8:
+            continue
+        for i in tri.vertices:
+            v = to_gltf(matrix @ mesh.vertices[i].co)
+            out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
+    return out
+
+
 def triangles_of(obj):
-    """そのメッシュの三角を、glTF の座標で返す。**世界の位置に置いた形。**"""
+    """そのメッシュの三角を、glTF の座標で返す。**世界の位置に置いた形。**
+
+    空の見え方を焼いた物は、焼く前 (面を割る前) の形から取る (PRE_BAKE)。
+    """
+    source = PRE_BAKE.get(obj.name)
+    if source is not None:
+        return mesh_triangles(source, obj.matrix_world)
     mesh = obj.to_mesh()
     try:
-        mesh.calc_loop_triangles()
-        matrix = obj.matrix_world
-        out = []
-        for tri in mesh.loop_triangles:
-            for i in tri.vertices:
-                v = to_gltf(matrix @ mesh.vertices[i].co)
-                out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
-        return out
+        return mesh_triangles(mesh, obj.matrix_world)
     finally:
         obj.to_mesh_clear()
 
@@ -524,6 +701,13 @@ def box_triangles_of(obj):
     """
     lo = [min(c[i] for c in obj.bound_box) for i in range(3)]
     hi = [max(c[i] for c in obj.bound_box) for i in range(3)]
+    # **厚みの無い板は下へ THIN_FILL ぶん埋める。** 板 1 枚の地面 (S Z 0 で潰した物) を
+    # そのまま箱にすると、上下の面が重なって人の層から抜け落ちた (地面の下に湧く)。
+    # 局所座標なので、物の縮尺で割って 1m にする
+    for axis in range(3):
+        if hi[axis] - lo[axis] < THIN_MIN:
+            scale = abs(obj.matrix_world.to_scale()[axis]) or 1.0
+            lo[axis] -= THIN_FILL / scale
     corners = [
         to_gltf(obj.matrix_world @ Vector((x, y, z)))
         for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])
@@ -617,7 +801,8 @@ BOX_FILL_MIN = 0.25
 # 唯一の場所で、こちらはその結果を番号にして持ち出すだけ。既定は金属。
 SURFACE_IDS = {'concrete': 0, 'metal': 1, 'wood': 2, 'glass': 3}
 # sand_ は網の番号としてはコンクリート (2 ビットに 5 つ目は入らない)。足音と絵は箱の名前から砂として引く
-SURFACE_TAGS = (('metal_', 'metal'), ('concrete_', 'concrete'),
+# 煉瓦 (brick_) は音も当たりもコンクリートと同じ。絵は自前 (材質に絵が繋がっている前提)
+SURFACE_TAGS = (('metal_', 'metal'), ('concrete_', 'concrete'), ('brick_', 'concrete'),
                 ('wood_', 'wood'), ('glass_', 'glass'), ('sand_', 'concrete'))
 
 
@@ -636,6 +821,73 @@ mesh_objects = 0
 boxed_bodies = 0
 # 細かいが箱に写せないので三角のまま置いた物。こちらも数を出す
 kept_bodies = []
+
+
+# 坂の板を敷いた階段。**黙って置き換えない** — 名前を出す
+ramped_stairs = []
+# 坂の板の厚み (m)。薄すぎると斜めから抜ける
+RAMP_THICK = 0.3
+
+
+def ramp_triangles_of(box):
+    """階段の人の層。**下の床から上の床へ一直線に張った板**。傾きが無ければ None
+
+    段の角 (天面の前縁) を結んだ線は、床から 1 段上で始まって上の床の 1 段上で
+    終わる。その線に板を張ると、乗る瞬間に 1 段ぶん跳ねる (「1 段目で頭が上がる」)。
+    床と上の床を直接結べば両端に段差は出ない。その線は段の角より 1 段低いので、
+    踏面の奥では足が段の高さに合い、角では 1 段沈む。真ん中では半段上げて沈みを
+    半分にし、両端の 1 段ぶんは床へ滑らかに戻す (板を何枚かに割って曲げる)。
+    """
+    top = box['top']
+    if not isinstance(top, dict) or not (top['dx'] or top['dz']) or 'foot' not in top:
+        return None
+    lo, hi = box['min'], box['max']
+    axis = 0 if top['dx'] else 2
+    grad = top['dx'] if axis == 0 else top['dz']
+    span = hi[axis] - lo[axis]
+    rise = top['head'] - top['foot']
+    riser = top['riser']
+    # 両端の 1 段ぶん (進む向きの割合) で半段の持ち上げを 0 に戻す
+    taper = min(0.5, riser / rise) if rise > 0 else 0.5
+
+    def height(t):
+        if grad < 0:
+            t = 1 - t
+        lift = riser / 2 * min(1.0, t / taper, (1 - t) / taper) if taper > 0 else 0.0
+        return max(lo[1], top['foot'] + rise * t + lift)
+
+    # 0.5m ごとの駅に割って、駅ごとの高さで板を折る
+    stations = max(3, int(round(span / 0.5)))
+    other = 2 if axis == 0 else 0
+    rows = []
+    for i in range(stations + 1):
+        t = i / stations
+        along = lo[axis] + span * t
+        y = height(t)
+        row = []
+        for side in (lo[other], hi[other]):
+            p = [0.0, 0.0, 0.0]
+            p[axis] = along
+            p[other] = side
+            row.append((p[0], y - RAMP_THICK, p[2]))   # 下
+            row.append((p[0], y, p[2]))                # 上
+        rows.append(row)   # [左下, 左上, 右下, 右上]
+
+    out = []
+
+    def quad(a, b, c, d):
+        for tri in ((a, b, c), (a, c, d)):
+            for v in tri:
+                out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
+
+    for r0, r1 in zip(rows, rows[1:]):
+        quad(r0[1], r1[1], r1[3], r0[3])   # 上面
+        quad(r0[0], r0[2], r1[2], r1[0])   # 下面
+        quad(r0[0], r1[0], r1[1], r0[1])   # 片側
+        quad(r0[2], r0[3], r1[3], r1[2])   # 反対側
+    quad(*rows[0])                          # 端
+    quad(*rows[-1])
+    return out
 
 
 def box_is_fair(obj, tris):
@@ -667,6 +919,29 @@ for obj in bpy.context.scene.objects:
         | (CAMERA_BIT if flags['camera'] else 0)
         | (SURFACE_IDS[surface_of(obj.name)] << SURFACE_SHIFT)
     )
+    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT)
+
+    # --- 階段は人の層だけ坂で受ける ---
+    #
+    # 段そのものを人の層に入れると、人は 1 段ごとに 0.25m ずつ「乗る」ので、
+    # 頭 (カメラ) が段ごとにガクガク上がる。見た目の段はそのまま (弾・視線・
+    # カメラは段に当たる) で、人が歩く面だけ**段の角を結んだ坂の板**にする。
+    # 坂は json の箱に付けた物 (stair_plane) と同じ平面。
+    #
+    # Blender で col_ を別に作らなくてよい — 名前に stair が入っていれば書き出しが
+    # 敷く。**vis_ を付けた階段にも敷く** (見た目だけにしておいて、歩く面はこちら)。
+    # 自分で col_ を置いた物には敷かない (二重になる)。
+    if is_stair(obj.name) and 'col_' not in obj.name.lower():
+        box = next((b for b in boxes if b['name'] == obj.name), None)
+        ramp = ramp_triangles_of(box) if box else None
+        if ramp:
+            positions.extend(ramp)
+            marks.extend([PLAYER_BIT | surface_mark] * (len(ramp) // 9))
+            mark &= ~PLAYER_BIT
+            # 箱の側 (サーバー・三角が届く前の客) も歩ける物にしておく
+            box['flags']['player'] = True
+            ramped_stairs.append(obj.name)
+
     # 何も止めないなら出さない。飾りはここで落ちる
     if mark & (EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT) == 0:
         continue
@@ -675,7 +950,6 @@ for obj in bpy.context.scene.objects:
         continue
     hit_mark = mark & (EYE_BIT | BULLET_BIT)
     body_mark = mark & (PLAYER_BIT | CAMERA_BIT)
-    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT)
     count = len(tris) // 9
 
     # 細かくない物は 1 組で足りる。**印を分けると同じ頂点が 2 度書かれる**
@@ -730,7 +1004,9 @@ def ladder_span(box):
 
 
 ladders = []
-for box in [b for b in boxes if b['name'].startswith('ladder_')]:
+# 他の札 (col_ / vis_) と同じく**名前のどこにあってもよい** (`metal_ladder_1` も梯子)。
+# 先頭だけ見ていた頃、材質を前に付けた梯子が壁になって登れなかった
+for box in [b for b in boxes if 'ladder_' in b['name']]:
     lo, hi = list(box['min']), list(box['max'])
     joined = None
     for other in ladders:
@@ -766,19 +1042,27 @@ def floor_under(x, y, z):
     """真下の床の天面。坂 (top が平面) は平らな高さ h で見る (基地は平らな所に置く前提)"""
     best = None
     for box in boxes:
+        # 工具箱は印の真ん中に置いてあるので、床として拾うと箱の上に湧く
+        if box['name'].startswith(TOOLBOX_PREFIX):
+            continue
         lo, hi = box['min'], box['max']
         top = box['top']['h'] if isinstance(box['top'], dict) else box['top']
-        if lo[0] <= x <= hi[0] and lo[2] <= z <= hi[2] and top <= y + 0.5:
-            if best is None or top > best:
-                best = top
+        if lo[0] <= x <= hi[0] and lo[2] <= z <= hi[2]:
+            # 空より下の天面か、**空がその箱の上面のすぐ下に埋まっている** (1m 以内) なら、
+            # その上面に乗せる (地面の厚みを変えたときに基地の空が中に残って、砂の中に湧いた)。
+            # 深く埋まっている物 (建物の中) には乗せない — 屋上に湧かせる意図ではない
+            inside = lo[1] <= y <= hi[1] and top - y <= 1.0
+            if top <= y + 0.5 or inside:
+                if best is None or top > best:
+                    best = top
     return best
 
 
 bases = {}
 for obj in bpy.context.scene.objects:
-    lower = obj.name.lower()
-    if obj.type != 'EMPTY' or not lower.startswith('meta_') or 'base' not in lower:
+    if not is_base_marker(obj):
         continue
+    lower = obj.name.lower()
     team = 'blue' if 'blue' in lower else 'red' if 'red' in lower else None
     if team is None:
         print(f'  {obj.name}: 陣営が読めない (blue / red を名前に入れる)')
@@ -856,6 +1140,8 @@ NORMAL_TAGS = SURFACE_TAGS + ('sand_',)
 # 材質の札とは別の軸なので、後置きで組み合わせる (noeye / nobullet と同じ形)。
 # `wood_box_nouv` = 木の音と足音を持つが、絵は自前。
 KEEP_UV = 'nouv'
+# これより面が多い物は「細かい形」。絵を持っていれば UV を触らない (木箱は 1,500 面、箱は 6〜30)
+SIMPLE_MAX_FACES = 60
 
 
 def has_image(obj):
@@ -877,6 +1163,11 @@ def reproject(obj, uv=True):
     上面が裏 (描かれない) になって底の絵が透けて見える。札を持つ物は中身の無い
     箱なので、外向きが唯一の正解。直した面の数を返す。
     """
+    # ワールド座標で貼るので UV は物ごとに違う。**絵を持つ箱が形を共有していたら
+    # 自分の複製に書く** (共有のままだと最後の 1 つの UV が全部に乗る)。絵を持たない
+    # 箱 (concrete_ の豆腐) はゲーム側が貼り直すので、ここの UV は使われない — 共有のまま
+    if uv and obj.data.users > 1 and has_image(obj):
+        obj.data = obj.data.copy()
     mesh = obj.data
     bm = bmesh.new()
     bm.from_mesh(mesh)
@@ -904,10 +1195,15 @@ for obj in bpy.context.scene.objects:
         continue
     if not any(tag in obj.name for tag in NORMAL_TAGS):
         continue
-    # **絵を持ち込んだ物の UV は触らない。** 焼き込んだ絵 (1 枚の地図) は立方投影で
-    # 貼り直すと崩れ、絵の外 (黒) を拾う (木箱の面に黒い抜け)。_nouv を付け忘れても
-    # 材質に絵があればそれで分かる。ゲーム側も「絵がある材質はそのまま」で揃っている
-    uv = any(tag in obj.name for tag in SURFACE_TAGS) and KEEP_UV not in obj.name and not has_image(obj)
+    # **絵を持ち込んだ細かい物の UV は触らない。** 焼き込んだ絵 (1 枚の地図) は立方投影で
+    # 貼り直すと崩れ、絵の外 (黒) を拾う (木箱の面に黒い抜け)。一方、箱に繰り返しの絵
+    # (煉瓦・外壁) を貼った物は貼り直さないと 1 枚が面いっぱいに伸びる。細かさで分ける:
+    # 箱 (面が少ない) は貼り直す、細かい形は自前の UV。迷う物は _nouv で断る
+    uv = (
+        any(tag in obj.name for tag in SURFACE_TAGS)
+        and KEEP_UV not in obj.name
+        and not (has_image(obj) and len(obj.data.polygons) > SIMPLE_MAX_FACES)
+    )
     flipped = reproject(obj, uv)
     reprojected += uv
     if flipped:
@@ -1049,6 +1345,8 @@ for name in exported:
 
 print(f'\n書き出し: {glb_path}')
 print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個 / 梯子 {len(ladders)} 本)')
+for name in ramped_stairs:
+    print(f'          階段 {name}: 人の層は段の角を結んだ坂の板 (見た目・弾・視線は段のまま)')
 for team, base in bases.items():
     print(f'          基地 {team:5s} ({base["x"]}, {base["y"]}, {base["z"]})')
 for ladder in ladders:

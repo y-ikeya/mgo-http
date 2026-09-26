@@ -153,7 +153,7 @@ export function stepMovement(
       actualSpeed: dt > 0 ? Math.hypot(position.x - startX, position.z - startZ) / dt : 0,
     }
   }
-  world.resolveHorizontal(position, tuning.radius, feetY)
+  world.resolveHorizontal(position, tuning.radius, feetY, tuning.height)
 
   // --- 上下 ---
   // 上昇中は素の重力、下降中は倍率を掛ける
