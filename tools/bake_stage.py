@@ -29,10 +29,12 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-SAMPLES = int(argv[0]) if argv else 24
+# 書き出しから読み込まれたときは引数が書き出しの物 (--bake) なので、数字のときだけ採る
+SAMPLES = int(argv[0]) if argv and argv[0].isdigit() else 24
 
 # 面を割る間隔 (m)。細かいほど滑らかだが頂点が増える
-CELL = 2.0
+CELL = 4.0
+# ↑ 2.0 にしていた頃、40m の建物 1 棟が 12,000 枚 (glb の形が 8MB) になった。環境光は緩やかにしか変わらないので 4m で足りる
 # 一番暗い所の明るさ。0 にすると奥が真っ黒になる — 実際は跳ね返りで少しは明るい
 FLOOR = 0.3
 # 光線を飛ばす距離 (m)。ステージの対角より長ければ十分
@@ -77,11 +79,15 @@ def subdivide(obj):
     変わらないので、3m 間隔でも段には見えない。
     """
     mesh = obj.data
+    # **世界での長さで測る。** obj.scale は自分の分だけで、親の縮尺が乗らない。持ち込みの
+    # 置き物 (Sketchfab) は「親 0.01 × 自分 100」の入れ子で来るので、自分の 100 だけを見ると
+    # 1cm の辺が 1m に見えて、土嚢 1 個を 6 回割った (97 個で 110 万頂点、glb 28MB)
+    scale = max(obj.matrix_world.to_scale())
     bm = bmesh.new()
     bm.from_mesh(mesh)
     for _ in range(6):
         long_edges = [e for e in bm.edges
-                      if (e.verts[0].co - e.verts[1].co).length * max(obj.scale) > CELL]
+                      if (e.verts[0].co - e.verts[1].co).length * scale > CELL]
         if not long_edges:
             break
         bmesh.ops.subdivide_edges(bm, edges=long_edges, cuts=1, use_grid_fill=True)
@@ -136,7 +142,7 @@ def flat(mesh, value=1.0):
         entry.color = (value, value, value, 1.0)
 
 
-def bake():
+def bake(samples=SAMPLES):
     tree = build_tree()
     up = Vector((0.0, 0.0, 1.0))
     total = 0
@@ -150,14 +156,19 @@ def bake():
         layer = mesh.color_attributes.new(name=LAYER, type=COLOR_TYPE, domain='POINT')
         matrix = obj.matrix_world
         normal_matrix = matrix.inverted_safe().transposed().to_3x3()
+        # **法線は先に全部読む。** 頂点ごとに vertex.normal を引くと、色を 1 つ書くたびに
+        # メッシュが「変わった」扱いになって法線を全部計算し直す (頂点数の 2 乗)。
+        # 土嚢 97 個を足したら書き出しが終わらなくなった。読んでから書く
+        normals = [v.normal.copy() for v in mesh.vertices]
+        colors = []
         for i, vertex in enumerate(mesh.vertices):
             world = matrix @ vertex.co
-            normal = (normal_matrix @ vertex.normal).normalized()
+            normal = (normal_matrix @ normals[i]).normalized()
             if normal.length < 1e-6:
                 normal = up
             origin = world + normal * EPS
             open_rays = 0
-            rays = directions(normal, SAMPLES)
+            rays = directions(normal, samples)
             for d in rays:
                 hit = tree.ray_cast(origin, d, REACH)
                 # 何にも当たらなければ空。**上を向いた光線ほど価値がある**ので
@@ -167,18 +178,26 @@ def bake():
             weight = sum(max(0.0, d.dot(up)) + 0.35 for d in rays)
             sky = open_rays / weight if weight > 0 else 1.0
             value = FLOOR + (1.0 - FLOOR) * sky
-            layer.data[i].color = (value, value, value, 1.0)
+            colors.extend((value, value, value, 1.0))
             total += 1
+        # まとめて 1 度で書く
+        layer.data.foreach_set('color', colors)
     return total
 
 
-for obj in meshes():
-    if shared(obj):
-        continue
-    subdivide(obj)
-print(f'[bake] 割った。頂点 {sum(len(o.data.vertices) for o in meshes())} 個')
-count = bake()
-print(f'[bake] 焼いた。{count} 頂点 / 試行 {SAMPLES} 本')
+def run(samples=SAMPLES, save=True):
+    """割って焼く。save=False なら .blend に書かない (書き出しの中で使う: export_stage.py -- --bake)"""
+    for obj in meshes():
+        if shared(obj):
+            continue
+        subdivide(obj)
+    print(f'[bake] 割った。頂点 {sum(len(o.data.vertices) for o in meshes())} 個')
+    count = bake(samples)
+    print(f'[bake] 焼いた。{count} 頂点 / 試行 {samples} 本')
+    if save:
+        bpy.ops.wm.save_mainfile()
+        print('[bake] 保存した。次: export_stage.py で書き出す')
 
-bpy.ops.wm.save_mainfile()
-print('[bake] 保存した。次: export_stage.py で書き出す')
+
+if __name__ == '__main__':
+    run(SAMPLES, save=True)

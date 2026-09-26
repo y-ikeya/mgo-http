@@ -108,6 +108,11 @@ function profileFor(locomotion: Locomotion): StepProfile | null {
       return SNEAK;
     case "crouch":
       return CROUCH;
+    // 這っている間は足で踏んでいない。**鳴らさない** (レーダーにも映らない)。
+    // 表に無かった頃は既定 (走り) に落ちて、這うと走りの足音が鳴っていた
+    case "prone":
+    case "down":
+      return null;
     default:
       return RUN;
   }

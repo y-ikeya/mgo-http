@@ -524,6 +524,16 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/* 梯子の前。**押す物が別の指**なので、そこに在ることを言う */}
+      <Show when={props.stats?.debug}>
+        {(debug) => (
+          <div class="hud-debug">
+            <div>{debug().locomotion}</div>
+            <div>{debug().flags}</div>
+            <div>{debug().blocked}</div>
+            <div>{debug().where}</div>
+          </div>
+        )}
+      </Show>
       <Show when={props.stats?.canClimb}>
         <div class="scope-hint">{t('hud.climbHint')}</div>
       </Show>

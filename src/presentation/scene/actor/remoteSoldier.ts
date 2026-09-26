@@ -1,3 +1,4 @@
+import { SkyLight } from '../world/skylight';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import {
@@ -184,6 +185,13 @@ export class RemoteSoldier {
   private team: Team = "red";
   /** 色を掛ける対象。所属が変わっても掛け直せるよう控えておく */
   private readonly tinted: THREE.MeshStandardMaterial[] = [];
+  /** 居る場所の空の見え方を材質に掛ける (屋内で暗くなる) */
+  private readonly skyLight = new SkyLight();
+
+  /** 居る場所の空の見え方 (SKY_FLOOR〜1) を体の明るさに。dt は秒 */
+  setSkyLight(target: number, dt: number): void {
+    this.skyLight.follow(target, dt);
+  }
   /** 壁越しに見せる身体。敬礼を交わした味方にだけ出す */
   private readonly glow: THREE.SkinnedMesh[] = [];
   private ally = false;
@@ -465,6 +473,11 @@ export class RemoteSoldier {
     // 同じ角度を当てると体が起き上がって見える (player.ts に理由)
     const prone = state.locomotion === "prone_idle" || state.locomotion === "crawl_f";
     animator.setAimPitch(state.aiming && !this.serverDead && !prone ? state.pitch : 0);
+    // 首はカメラの向きへ。**相手がどこを見ているかを渡す**。構え中は体が向いている
+    {
+      const delta = state.cameraYaw - this.yaw;
+      animator.setLookYaw(!state.aiming && !this.serverDead && !prone && animator.upperFree ? Math.atan2(Math.sin(delta), Math.cos(delta)) : 0);
+    }
     animator.update(dt);
 
     /*
@@ -807,10 +820,13 @@ export class RemoteSoldier {
     model.traverse((obj) => {
       if (!isMesh(obj)) return;
       obj.castShadow = true;
+      // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
+      obj.receiveShadow = true;
       // スキニング後の姿勢はバウンディングボックスに出ないので視錐台カリングを切る
       obj.frustumCulled = false;
       obj.material = cloneMaterial(obj.material, cloned, this.tinted);
     });
+    for (const material of this.tinted) this.skyLight.add(material);
     this.buildGlow(model);
 
     this.object.add(model);

@@ -1,3 +1,4 @@
+import { SKY_FLOOR } from './skylight'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
 import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
@@ -64,7 +65,7 @@ const GROUND_SKY_EPS = 0.05
 /** 光線を飛ばす距離 (m) */
 const GROUND_SKY_REACH = 60
 /** 一番暗い所の明るさ。0 にすると建物の奥が真っ黒になる (tools/bake_stage.py と同じ) */
-const GROUND_SKY_FLOOR = 0.3
+const GROUND_SKY_FLOOR = SKY_FLOOR
 
 /**
  * 天空光の強さ。日陰の明るさはこれで決まる。
@@ -529,8 +530,22 @@ async function applyStructureTexture(
  *
  * @param tile テクスチャ 1 枚が覆う実寸 (m)
  */
+/** UV を書き込んだ形。**共有している形は、2 つ目からは自分の複製に書く** */
+const PROJECTED_GEOMETRIES = new WeakSet<THREE.BufferGeometry>()
+
 function projectWorldUv(mesh: THREE.Mesh, tile: number): void {
-  const geometry = mesh.geometry
+  /*
+   * ワールド座標で貼るので、UV は物ごとに違う。Blender で Alt+D した豆腐 133 棟は
+   * 1 つの形を共有していて、共有のまま書くと**最後に処理した 1 棟の UV が全部に
+   * 乗る** — 大きさの違う棟では絵が引き伸ばされて縞になった。2 つ目からは複製に書く
+   * (箱は 8 頂点なので増えても軽い)
+   */
+  let geometry = mesh.geometry
+  if (PROJECTED_GEOMETRIES.has(geometry)) {
+    geometry = geometry.clone()
+    mesh.geometry = geometry
+  }
+  PROJECTED_GEOMETRIES.add(geometry)
   const position = geometry.getAttribute('position')
   const normal = geometry.getAttribute('normal')
   if (!position || !normal) return
@@ -1549,6 +1564,16 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
    * 1 枚だけなので、増えるのは 16MB ほど。
    */
   sun.shadow.mapSize.set(4096, 4096)
+  /*
+   * 影の自己遮蔽 (アクネ) を避ける。**設定していなかった。**
+   *
+   * 影マップの 1 画素が地面の数 cm を覆うので、面がその画素の深さと自分を
+   * 比べると、光の向きに沿った縞 (斜めの線) が出る。筏 (±65m、1 画素 3.2cm) では
+   * 薄かったが、city (±107m、5.2cm) で「絵に斜めの線がめっちゃ入る」と出た。
+   * 法線方向に画素 1.5 個ぶん浮かせて比べる (normalBias)。枠の大きさで画素の
+   * 大きさが変わるので、枠を合わせる所 (fitShadowToStage) でも掛け直す
+   */
+  applyShadowBias(sun, SHADOW_RADIUS)
   // 影の濃さ。1 で完全に直射を遮る。
   // わずかに緩めてあるのは、現実の影も周囲からの反射で少し起きているため。
   sun.shadow.intensity = tuned('shadow', SHADOW_INTENSITY)
@@ -1612,6 +1637,14 @@ export function fitShadowToStage(sun: THREE.DirectionalLight, stage: Stage): voi
   // 光から見て一番奥の角まで。光の距離 + 半径 + 高さ分の余裕
   cam.far = offset.length() + radius + Math.max(0, top) + 10
   cam.updateProjectionMatrix()
+  applyShadowBias(sun, radius)
   sun.shadow.needsUpdate = true
+}
+
+/** 影の枠の半径から、自己遮蔽を避ける浮かせ量を決める。画素 1.5 個ぶん */
+function applyShadowBias(sun: THREE.DirectionalLight, radius: number): void {
+  const texel = (radius * 2) / sun.shadow.mapSize.width
+  sun.shadow.normalBias = texel * 1.5
+  sun.shadow.bias = -0.0001
 }
 

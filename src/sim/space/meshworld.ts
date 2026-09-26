@@ -41,6 +41,15 @@ const ITERATIONS = 4
  * 進めないので、押し戻しからは外して足元 (groundHeight) に任せる。
  */
 const WALKABLE_Y = 0.5
+/** これより緩い面 (32° まで) は触れた高さを問わず登れる面。それより急なら、触れた点の高さで見る */
+const GENTLE_Y = 0.85
+/** 段差に足す許し (m)。段差ちょうどの角に触れても壁にしない */
+const STEP_TOUCH = 0.1
+/** 輪の縁で高い床を探す本数 (keepOffHighFloors) */
+const STEP_SAMPLES = 8
+/** 中心まで入ったとき、空いた所を探す刻みと届く距離 (m) */
+const STEP_ESCAPE_STEP = 0.05
+const STEP_ESCAPE_REACH = 1.0
 
 /**
  * 体を何段の球で見るか。
@@ -127,8 +136,19 @@ export class MeshMoveWorld implements MoveWorld {
         const ratio = BODY_SLICES === 1 ? 0 : slice / (BODY_SLICES - 1)
         const y = bottom + Math.max(0, top - bottom) * ratio
         this.solid.touching(position.x, y, position.z, radius, (contact) => {
-          // 登れる面は押し返さない。坂の上で水平に押されると進めなくなる
-          if (Math.abs(contact.ny) >= WALKABLE_Y) return
+          /*
+           * 登れる面は押し返さない。坂の上で水平に押されると進めなくなる。
+           *
+           * **ただし、触れた点が段差より高ければ壁。** 段差 (0.25) より少し高い
+           * 箱 (0.4) の上の角に、一番下の球が斜めに乗り上げると、法線が 45° に
+           * なって「登れる面」に見え、押されずに箱の中へ入った。緩い坂 (32° まで) は
+           * 触れた高さを問わない — 一番下の球は 54° までの坂に触れないので、
+           * ここに来る「登れる面」は箱や壁の角しか無い
+           */
+          if (Math.abs(contact.ny) >= WALKABLE_Y) {
+            const pointY = y - contact.ny * (radius - contact.depth)
+            if (contact.ny >= GENTLE_Y || pointY <= feetY + this.stepUp + STEP_TOUCH) return
+          }
           // 水平だけ取り出して押す。**上下は足元の仕事**
           const flat = Math.hypot(contact.nx, contact.nz)
           if (flat < 1e-6) return
@@ -152,9 +172,79 @@ export class MeshMoveWorld implements MoveWorld {
           pushZ += nz * need
         })
       }
-      if (!touched) return
+      if (!touched) break
       position.x += pushX
       position.z += pushZ
+    }
+    this.keepOffHighFloors(position, radius, feetY, height)
+  }
+
+  /**
+   * **段差より高い床の上に体の輪が掛かっていたら、輪の外へ出す。**
+   *
+   * 球で押す上の方法は面の向きで決める。段差より少し高い箱 (0.4m) の角に
+   * 球が乗り上げると、上面 (上向き = 登れる面) しか触れなくなって押せず、
+   * 1 コマの移動が大きい転がりで角の帯を飛び越えて箱の中へ入った。
+   *
+   * ここは向きを見ない。輪の縁の何点かで「頭より下で一番高い面」を取り、
+   * それが段差 (+STEP_TOUCH) より高ければ塞がっている。塞がる境目を二分で
+   * 探して、輪がそこに触れる所まで戻す。緩い坂 (45° まで) は縁の点でも
+   * 段差に収まるので掛からない。
+   */
+  private keepOffHighFloors(position: Vec3, radius: number, feetY: number, height: number): void {
+    const limit = feetY + this.stepUp + STEP_TOUCH
+    const from = feetY + height - 0.05
+    const blockedAt = (x: number, z: number) => {
+      const y = this.probe(x, z, from, from)
+      return y !== null && y > limit
+    }
+    /*
+     * 中心まで入ってしまっていたら (1 コマで輪ごと跳び込んだ)、一番近い空いた
+     * 向きへ出してから縁を見る。空いた向きが無ければ諦める (囲まれている)
+     */
+    if (blockedAt(position.x, position.z)) {
+      let bestT = Infinity
+      let bestX = 0
+      let bestZ = 0
+      for (let i = 0; i < STEP_SAMPLES; i++) {
+        const angle = (i / STEP_SAMPLES) * Math.PI * 2
+        const dx = Math.cos(angle)
+        const dz = Math.sin(angle)
+        for (let t = STEP_ESCAPE_STEP; t <= STEP_ESCAPE_REACH; t += STEP_ESCAPE_STEP) {
+          if (blockedAt(position.x + dx * t, position.z + dz * t)) continue
+          if (t < bestT) {
+            bestT = t
+            bestX = dx
+            bestZ = dz
+          }
+          break
+        }
+      }
+      if (!Number.isFinite(bestT)) return
+      position.x += bestX * (bestT + radius)
+      position.z += bestZ * (bestT + radius)
+    }
+    for (let round = 0; round < 2; round++) {
+      let moved = false
+      for (let i = 0; i < STEP_SAMPLES; i++) {
+        const angle = (i / STEP_SAMPLES) * Math.PI * 2
+        const dx = Math.cos(angle)
+        const dz = Math.sin(angle)
+        if (!blockedAt(position.x + dx * radius, position.z + dz * radius)) continue
+        if (blockedAt(position.x, position.z)) continue
+        let lo = 0
+        let hi = radius
+        for (let k = 0; k < 6; k++) {
+          const mid = (lo + hi) / 2
+          if (blockedAt(position.x + dx * mid, position.z + dz * mid)) hi = mid
+          else lo = mid
+        }
+        const back = radius - lo
+        position.x -= dx * back
+        position.z -= dz * back
+        moved = true
+      }
+      if (!moved) return
     }
   }
 

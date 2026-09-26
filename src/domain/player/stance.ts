@@ -71,6 +71,22 @@ export function stanceOf(locomotion: Locomotion): Stance {
  * 見えない相手を送ってしまうのは覗き見の余地が少し残るだけで済む。
  * 迷ったら送る側に倒す。
  */
+/**
+ * 地形に当たる体の高さ (m)。**姿勢で変わる。**
+ *
+ * 立ちの 1.8m で固定していた頃、しゃがんでも低い開口 (窓の鴨居 1.26m) を
+ * くぐれなかった — 頭の当たりが鴨居に引っ掛かって押し戻される。審判は姿勢ごとの
+ * 高さ (MOVE_PROBE_HEIGHT) で線を引いているので、手元だけが通れなかった。
+ * 頭の高さ (HEAD_HEIGHT) に頭ひとつぶんを足した値。
+ */
+export const COLLISION_HEIGHT: Record<Stance, number> = {
+  stand: 1.8,
+  crouch: 1.25,
+  box: 1.25,
+  prone: 0.7,
+  down: 0.7,
+}
+
 export const HEAD_HEIGHT: Record<Stance, number> = {
   stand: 1.47,
   crouch: 0.94,

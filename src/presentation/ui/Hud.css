@@ -1333,3 +1333,17 @@
   bottom: 16%;
   transform: none;
 }
+
+/* ?debug の読み出し。検証場で旗と阻まれている理由を見る。遊びでは出ない */
+.hud-debug {
+  position: fixed;
+  left: 12px;
+  bottom: 120px;
+  font: 12px/1.4 monospace;
+  color: #cde;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  max-width: 60vw;
+  pointer-events: none;
+}

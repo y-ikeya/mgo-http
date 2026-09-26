@@ -1,3 +1,4 @@
+import { skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
 import * as THREE from "three";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
 import { pass } from "three/tsl";
@@ -85,6 +86,10 @@ import {
 } from "../../sim/judge/bullet";
 import { zoneExposed, zonePoint } from "../../sim/judge/hitcheck";
 import { HIT_RULES } from "../../domain/rule/damage";
+import { can, blocker } from "../../domain/player/moves";
+
+/** URL に ?debug が付いていれば、HUD に検証用の読み出しを出す */
+const DEBUG_HUD = new URLSearchParams(globalThis.location?.search ?? "").has("debug");
 import { atBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
 import {
@@ -238,6 +243,11 @@ export interface GameStats {
   canZoom: boolean;
   /** 目の前に梯子があるか。**掴めることを知らせる**のに使う */
   canClimb: boolean;
+  /**
+   * 検証用の読み出し (URL に ?debug を付けたときだけ)。今の型・立っている旗・
+   * 主な動作が何に阻まれているか・位置。「押したのに動かない」を追うため
+   */
+  debug: { locomotion: string; flags: string; blocked: string; where: string } | null;
   /** 自分の基地の上に居る。G / △ で補給できる */
   canResupply: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
@@ -1440,6 +1450,8 @@ export class Game {
     );
     this.follow.setAiming(this.player.isAiming);
     this.follow.setViewHeight(this.player.viewHeight);
+    // 首はカメラの向きへ (構えていないとき)。相手に「どこを見ているか」を渡す
+    this.player.setLookYaw(this.follow.aimYaw - this.player.yaw);
 
     this.updateSwitchKeys(dt);
     this.updateStanceInput();
@@ -1536,6 +1548,7 @@ export class Game {
     this.follow.setRecoilRecovery(masteryRecoveryScale(this.skills, this.weapon.id));
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
+    this.updateSkyLight(dt);
     this.drops.update(dt);
     this.updateFootsteps();
     this.grenades.update(dt, this.stage.thrownWorld, this.stage.water, (bounce) => {
@@ -1701,6 +1714,22 @@ export class Game {
    * **レプリカは three を知らない。** 段階が変わったことは向こうが決め、飛んでいる
    * 手榴弾を捨てるのはこちら、という分け方。
    */
+  /** ?debug の読み出し。旗と、主な動作が何に阻まれているか (domain/player/moves.ts) */
+  private debugReadout(): NonNullable<GameStats["debug"]> {
+    const body = this.player.body;
+    const flags = (Object.keys(body) as (keyof typeof body)[]).filter((k) => body[k]).join(" ");
+    const blocked = (["roll", "vault", "hang", "prone", "crouch", "stab", "ladder", "throw"] as const)
+      .map((move) => `${move}:${blocker(body, move) ?? "ok"}`)
+      .join(" ");
+    const p = this.player.position;
+    return {
+      locomotion: this.player.currentLocomotion,
+      flags,
+      blocked,
+      where: `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)} yaw ${((this.player.yaw * 180) / Math.PI).toFixed(0)}`,
+    };
+  }
+
   private perform(effect: MatchEffect): void {
     switch (effect.kind) {
       case "headshot":
@@ -3413,6 +3442,21 @@ export class Game {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
   };
 
+  /**
+   * 屋内に入ったら人も暗くする。地形は空の見え方を頂点に焼いてあるが、人は動くので
+   * 居る場所で毎コマ測る (9 本の光線 × 人数。三角の網なので一瞬)。
+   */
+  private updateSkyLight(dt: number): void {
+    const sight = this.stage.sightWorld;
+    if (!sight) return;
+    const me = this.player.position;
+    this.player.setSkyLight(skyAt(sight, me.x, me.y + SKY_PROBE_HEIGHT, me.z), dt);
+    for (const remote of this.remotes.all) {
+      const at = remote.object.position;
+      remote.setSkyLight(skyAt(sight, at.x, at.y + SKY_PROBE_HEIGHT, at.z), dt);
+    }
+  }
+
   private eyeReaches(target: RemoteSoldier, zone: HitZone, distance: number): boolean {
     const sight = this.stage.sightWorld;
     if (!sight) return true;
@@ -3499,13 +3543,22 @@ export class Game {
     }
 
     /*
-     * **押した瞬間、目の前に窓枠や塀があれば跳び越える。**
+     * **前へ押しながら押した瞬間、目の前に窓枠や塀があれば跳び越える。**
      *
      * しゃがみ (離してから) や転がり (0.17 秒) を待たない。跳ぶかどうかは
      * 目の前の形で決まっていて、押した人はもう決めている。跳んだ押下は
      * 離してもしゃがまず、押し続けても転がらない (vaultedThisPress)。
+     *
+     * **止まったままなら跳ばない。** 土嚢の前でしゃがみたいのに跳んでいた。
+     * 枠へ向かって歩いている (前を押している) ときだけ跳ぶ — 止まって押せば
+     * 今まで通りしゃがみ。
      */
-    if (this.input.pushed("stance") && !this.cocking && this.player.vault()) {
+    if (
+      this.input.pushed("stance") &&
+      !this.cocking &&
+      this.input.moveAxis().z < -0.5 &&
+      this.player.vault()
+    ) {
       this.vaultedThisPress = true;
     }
     if (!this.input.down("stance")) this.vaultedThisPress = false;
@@ -3559,7 +3612,7 @@ export class Game {
     // リロードと同じドメインルール。ここが抜けていて、撃った直後に投げるとコッキングを
     // 省略できた
     const canThrow =
-      this.inv.held === "magazine" && canAct(this.life) && !this.cocking;
+      this.inv.held === "magazine" && canAct(this.life) && can(this.player.body, 'throw') && !this.cocking;
     const held = canThrow && this.input.aiming;
     // 手榴弾・クレイモアと同じドメインルール。構え始めと同じフレームの分も覚えておく
     const pulled = this.triggerEdge || this.pendingDecoy;
@@ -3686,28 +3739,10 @@ export class Game {
     const canThrow =
       this.inv.countOf(this.inv.held) > 0 &&
       canAct(this.life) &&
-      !this.player.isBoxed &&
-      !this.player.downed &&
-      /*
-       * **梯子の上では投げられない。** 両手が塞がっている (bumping と同じ理屈)。
-       *
-       * ここを見ていなかったので、振りかぶったまま G で掴むと構えを
-       * 畳まずに登り始めた — 型は登りに差し替わるのに throwing が立ったまま
-       * で、他の人の画面では手榴弾を持って登る姿になる。掴んだ次のフレームで
-       * held が倒れ、下の「構えを解かされた」道で腕を下ろす。
-       */
-      !this.player.onLadder &&
-      // **転がりの絵が流れている間は振りかぶれない。**
-      //
-      // ローリングは全身の型なので、振りかぶりの型はそこで上書きされる。
-      // ここで畳まないと、構えたまま転がった人は転がり終わりに腕を引いた
-      // 状態で立ち上がる — 画面には振りかぶりが一度も映っていないのに、
-      // クリックすれば即座に飛ぶ。転がりが振りかぶりの時間を丸ごと踏み倒す。
-      //
-      // **見るのは rolling ではなく rollShowing。** ロック (rolling) は
-      // ROLL_EXIT_PHASE で先に解けるので、そこで再開すると振りかぶりが
-      // **転がりの尻尾の中で始まって終わる** — 畳んだのに、やはり一度も映らない。
-      // 絵が終わるまで待てば、立ち上がってから振りかぶり直すのが見える。
+      // 箱・倒れ・梯子・転がり・跳び越え・ぶら下がりは表 (domain/player/moves.ts) で弾く
+      can(this.player.body, 'throw') &&
+      // **転がりの絵が流れている間は振りかぶれない。** rolling より長い (尻尾の中で
+      // 始まって見えない) ので、表の rolling とは別にここで見る
       !this.player.rollShowing &&
       !this.cocking;
     const held = canThrow && this.input.aiming;
@@ -3852,12 +3887,9 @@ export class Game {
     const canPlace =
       this.inv.countOf(this.inv.held) > 0 &&
       canAct(this.life) &&
-      !this.player.isBoxed &&
-      !this.player.downed &&
-      // 手榴弾と同じ。梯子の上では両手が塞がっている
-      !this.player.onLadder &&
-      // 手榴弾と同じ。転がりは全身の型なので、構えを跨がせない。
-      // **絵が終わるまで**待つ (rolling だと尻尾の中で始まって見えない)
+      // 手榴弾と同じ。条件は表 (domain/player/moves.ts)
+      can(this.player.body, 'place') &&
+      // 手榴弾と同じ。絵が終わるまで待つ
       !this.player.rollShowing &&
       !this.cocking;
     const held = canPlace && this.input.aiming;
@@ -4610,6 +4642,7 @@ export class Game {
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
       canClimb: this.player.ladderInReach,
+      debug: DEBUG_HUD ? this.debugReadout() : null,
       canResupply: this.canResupply,
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**

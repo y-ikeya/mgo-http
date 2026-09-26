@@ -21,6 +21,8 @@ export type Surface = 'concrete' | 'metal' | 'wood' | 'glass' | 'sand'
 const SURFACE_TAGS: Record<string, Surface> = {
   metal_: 'metal',
   concrete_: 'concrete',
+  // 煉瓦。音も当たりもコンクリート。絵は Blender で貼る (材質に絵があればゲームはそのまま使う)
+  brick_: 'concrete',
   wood_: 'wood',
   glass_: 'glass',
   /*

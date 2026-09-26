@@ -9,8 +9,11 @@
  *     ?knife                  ナイフを持っている。?aim と組むとナイフの構え
  *     ?t=1.2                  何秒目で止めるか (既定 1.0)
  *     ?turn=40                体を回す角度
+ *     ?look=60                首をカメラの向きへ (度、左が正)
  *     ?boxed                  ダンボールを被る (clip=sneak と組む)。箱は半透明で、はみ出しを見る
  *     ?tilt=fwd|right         箱を進行方向へ倒した姿 (fwd = 前へ、right = 右へ全開)
+ *     ?shadow                 影を受ける体。頭上に板を吊って上半身に影を落とす
+ *     ?sky=0.4                屋内の暗さ (空の見え方 SKY_FLOOR〜1) を体に掛ける
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
@@ -20,6 +23,7 @@ import { BoxMotion, boxLift, createCardboardBox, placeBox, setBoxTuning } from '
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { buildLights } from '../../src/presentation/scene/world/stage'
+import { SkyLight } from '../../src/presentation/scene/world/skylight'
 import { loadSoldier } from '../../src/presentation/scene/assets'
 import { CharacterAnimator, findBoneBySuffix } from '../../src/presentation/scene/actor/animation'
 import { Weapon, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
@@ -42,7 +46,7 @@ renderer.toneMappingExposure = EXPOSURE
 document.body.appendChild(renderer.domElement)
 
 const scene = new THREE.Scene()
-buildLights(scene)
+const sun = buildLights(scene)
 
 // 床。**足が埋まっていないか**を見るのに要る
 const floor = new THREE.Mesh(
@@ -66,6 +70,44 @@ root.rotation.y = turn + Math.PI
 scene.add(root)
 model.rotation.y = MODEL_YAW_OFFSET
 root.add(model)
+
+/*
+ * ?shadow … 影を受ける体 (soldier.ts の receiveShadow)。屋内で日向の明るさに
+ * ならないための物だが、体が自分の影で斑になっていないかをここで見る。
+ * ?sky … 屋内の暗さ (world/skylight.ts)。材質の色に掛かるので、絵の色が沈むだけで
+ * 陰影の向きは変わらないはず。
+ */
+if (query.has('shadow')) {
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = THREE.PCFShadowMap
+  floor.receiveShadow = true
+  sun.castShadow = true
+  sun.shadow.mapSize.set(2048, 2048)
+  const frame = sun.shadow.camera as THREE.OrthographicCamera
+  frame.left = frame.bottom = -8
+  frame.right = frame.top = 8
+  frame.updateProjectionMatrix()
+  model.traverse((o) => {
+    if (!(o as THREE.Mesh).isMesh) return
+    o.castShadow = true
+    o.receiveShadow = true
+  })
+  // 日を遮る板。体の上半分に影を落として、境目の出方を見る
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 3), new THREE.MeshStandardMaterial({ color: 0x555555 }))
+  roof.position.set(0.8, 2.4, -1.0)
+  roof.castShadow = true
+  scene.add(roof)
+}
+const skyValue = Number(query.get('sky') ?? '1')
+if (skyValue < 1) {
+  const light = new SkyLight()
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) light.add(m)
+  })
+  light.follow(skyValue, 10)
+}
 
 /*
  * ?nomip … ミップマップを切って見る。**UV の島がにじんでいるか**の切り分け。
@@ -107,6 +149,8 @@ anim.setHandsEmpty(query.has('empty'))
 anim.setAiming(query.has('aim'))
 // ?knife … ナイフを持っている (構えると knife_idle)
 anim.setKnife(query.has('knife'))
+// ?look=60 … 首をカメラの向きへ (度、左が正)。構えていないときだけ効く
+anim.setLookYaw((Number(query.get('look') ?? '0') * Math.PI) / 180)
 anim.setAimPitch(pitch)
 // ?boxed … 箱の中の姿勢。箱は本番と同じ物を半透明で重ねて、頭と腕の収まりを見る
 const boxed = query.has('boxed')

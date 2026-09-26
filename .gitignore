@@ -22,7 +22,10 @@ tools/raw/
 # script から起こせない。
 # 配布モデルを変換した中間物。ステージに焼き込まれた分が public/ にあるので、
 # これ自体は成果物ではない。作り直す手順は tools/convert_car.py と CREDITS.md。
-tools/props/
+tools/props/*
+# 書き出しが毎回読む物 (基地の工具箱) だけは追跡する。無いとステージを書き出せない
+!tools/props/crate.blend
+!tools/props/textures/
 
 # --- 秘密 ---
 # Supabase の URL と鍵。anon key は公開前提のものだが、

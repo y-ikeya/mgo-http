@@ -11,7 +11,7 @@ import { CHOICES, type WeaponId } from '../item/weapons'
  *
  * 名前と割り当ては docs/design.md の 2。
  */
-export const ROOM_NAMES = ['alpha', 'bravo', 'charlie', 'delta', 'echo'] as const
+export const ROOM_NAMES = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot'] as const
 
 export type RoomName = (typeof ROOM_NAMES)[number]
 
@@ -148,6 +148,8 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
   },
   // 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**
   echo: { mode: 'PRACTICE', stages: only('training') },
+  // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある
+  foxtrot: { mode: 'PRACTICE', stages: only('lab') },
 }
 
 /** その部屋で持ち込める主武器。**省いてあれば全部** */

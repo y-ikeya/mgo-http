@@ -8,7 +8,8 @@ import {
   ladderGrip,
 } from '../../../domain/stage'
 import { BOX_BUMP_STUN, KNOCK_TIME, fallDamage, knockSpeed } from '../../../domain/rule/damage'
-import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance } from '../../../domain/player/stance'
+import { SkyLight } from '../world/skylight'
+import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance, COLLISION_HEIGHT, BODY_BOX } from '../../../domain/player/stance'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
@@ -18,6 +19,7 @@ import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
 import { stepMovement, type MoveResult, type Mover } from '../../../sim/space/movement'
 import { PLAYER_HEIGHT as BODY_HEIGHT, STEP_UP } from '../../../domain/player/moving'
+import { can, type BodyState } from '../../../domain/player/moves'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
 import {
@@ -239,6 +241,7 @@ const HARD_LAND_TIME = 2.03
  * 審判は跳び越えの間だけ線を高く引く (stance.ts の VAULT_PROBE_HEIGHT = 1.3)。
  * VAULT_MAX はそれより低くないと、跳べたのに「壁を抜けた」で戻される。
  */
+// 段差 (0.25) との間の高さ (0.26〜0.44) は上がれず跳べもしない。ステージ側でそこを避ける
 const VAULT_MIN = 0.45
 const VAULT_MAX = 1.2
 /** 障害を探す距離 (m)。近い順。体を付けて立つ (0.4) から一歩手前 (1.0) まで */
@@ -251,8 +254,17 @@ const VAULT_LANDING_NEAR = 0.8
 const VAULT_LANDING_FAR = 1.3
 /** 障害の上に要る隙間 (m)。屈んで越えるので身長より低くてよい */
 const VAULT_HEADROOM = 1.0
-/** 跳び越えの間、当たりの足元をこれだけ上げる (m)。枠 (VAULT_MAX) を跨ぐぶん */
-const VAULT_STEP_OVER = 1.0
+/**
+ * 跳んでいる間の体の当たり。**枠のすぐ上に置く球 1 つ。**
+ *
+ * 足元を 1.0m 上げた普通の筒で見ていた頃、球の上端 (1.95m) が低い鴨居 (1.93m) に
+ * 当たって、跳ぶ型は流れるのに窓の外で止められた (開口 1.18m の窓)。体は屈んで
+ * 枠を越えるので、当たりは枠の上面から VAULT_BODY_ABOVE の帯だけでよい。
+ * 足元の持ち上げは枠の高さから決める (stepOver = 枠の高さ - 段差 + VAULT_BODY_LIFT)。
+ */
+const VAULT_BODY_LIFT = 0.1
+/** 跳んでいる間の体の高さ (m)。球 1 つ = 段差 + 半径 × 2 */
+const VAULT_BODY_HEIGHT = 0.95
 /** 跳び越えの途中で真下がこれより深く抜けていたら、型を切って落ちる (m) */
 const VAULT_FALL_DROP = 0.5
 /** 型のここまでは切らずに流す (尺に対する割合)。手を掛けて体を回すまで */
@@ -273,7 +285,19 @@ const VAULT_MAX_ANGLE = Math.PI / 3
  * 型の上下は抜いてあって (VERTICAL_STRIP_CLIPS)、位置を型の腰の曲線に沿って
  * 動かす (vault_up と同じ)。
  */
-const HANG_MIN_DROP = 1.6
+/*
+ * ぶら下がる姿 (足元が縁の 1.88m 下) が下の床に埋まらない深さ。1.6 で始めていて、
+ * 木箱 (床から 1.64m) の縁で掴んだ体が下の建物の中に置かれた。それより浅い所は
+ * ただ落ちる (落下の傷は付かない高さ)
+ */
+const HANG_MIN_DROP = 2.3
+/** 縁の周りを測るとき、足元からどれだけ上まで見るか (m)。隣の高い物を「落ちている」と読まないため */
+const HANG_LOOK_UP = 20
+/** 這っていて頭か足が縁の外に出たとき、これより深ければ落ちずに止まって起き上がる (m) */
+const PRONE_EDGE_DROP = 0.6
+/** 伏せの頭と足に置く筒の半径と高さ (m)。壁に頭を入れない・縁から頭を出さないための当たり */
+const PRONE_END_RADIUS = 0.2
+const PRONE_END_HEIGHT = 0.45
 /** 縁から外へ体の中心をどれだけ出すか (m)。待つ姿で手は体の中心の 0.22m 前 (壁側、body.html?clip=hang&bones で実測)。5cm 縁に掛けて胸が壁に付く距離 */
 const HANG_OUT = 0.27 // 実機で「壁から 10cm 離す」(2026-09-22)
 /**
@@ -413,6 +437,8 @@ const ZERO_MOVE = new THREE.Vector3()
 export class Soldier {
   /** シーンに add するルート */
   readonly object = new THREE.Group()
+  /** 居る場所の空の見え方を材質に掛ける (屋内で暗くなる) */
+  private readonly skyLight = new SkyLight()
 
   /** Y 軸回りの向き (rad)。0 = -Z 方向を向く */
   yaw = 0
@@ -522,6 +548,8 @@ export class Soldier {
   private crouching = false
   /** 直近に受け取った照準の上下 (rad)。他プレイヤーへ送るのに控えておく */
   private aimPitch = 0
+  /** 首の向き (体の正面からの差、rad)。構えていないときのカメラの向き */
+  private lookYaw = 0
   /** 集中している時間 (秒)。姿勢を崩すか動いた瞬間に 0 へ戻る */
   private concentrateTime = 0
   /** 倒れているか。操作を一切受け付けなくなる */
@@ -658,6 +686,8 @@ export class Soldier {
   /** 一段上へ乗る跳び越えの、始めた床と乗る先の高さ */
   private vaultFromY = 0
   private vaultToY = 0
+  /** 跳び越える枠の上面の高さ (足元から)。跳んでいる間の当たりをそのすぐ上に置く */
+  private vaultSillRise = 0
   /** ぶら下がりの段階。drop = 落ちて掴む途中、hang = 掴んで待つ、climb = 登る途中 */
   private hangStage: 'none' | 'drop' | 'hang' | 'climb' = 'none'
   /** 縁から出た瞬間の向き。落ちる型の頭でここから壁向きへ回す */
@@ -895,13 +925,45 @@ export class Soldier {
    * 体は被らない** — HUD だけが被っていると言う状態になっていた。
    */
   get canWearBox(): boolean {
-    if (this.down || !this.onGround || this.rolling || this.stabbing) return false
-    if (this.downed || this.standing) return false
-    // 落とされた直後は被り直せない。**弾かれた意味が無くなる**
-    if (this.bumpLeft > 0) return false
-    // 伏せたまま被れない。箱はしゃがんだ体に被せてある
-    if (this.proneStage !== 'none') return false
-    return !this.saluting
+    return can(this.body, 'box')
+  }
+
+  /** 首をどちらへ向けるか (カメラの向き − 体の向き、rad、左が正)。呼ぶ側が毎フレーム渡す */
+  setLookYaw(delta: number): void {
+    this.lookYaw = Math.atan2(Math.sin(delta), Math.cos(delta))
+  }
+
+  /** いま流している型の名前。検証の読み出し (?debug) 用 */
+  get currentLocomotion(): Locomotion {
+    return this.locomotion
+  }
+
+  /**
+   * 体の状態を 1 つに。**できるかは domain の表 (player/moves.ts) で決める。**
+   *
+   * 動作の入口ごとに条件を手書きしない。ここで旗を集めて、入口は can() を引くだけ。
+   * rolling は転がりそのもの (跳び越え・ぶら下がりを混ぜた `rolling` getter ではない)
+   */
+  get body(): BodyState {
+    return {
+      onGround: this.onGround,
+      dead: this.down,
+      downed: this.downed,
+      standingUp: this.standing,
+      sleeping: this.sleepLeft > 0,
+      boxed: this.boxed,
+      bumping: this.bumping,
+      saluting: this.saluting,
+      stabbing: this.stabbing,
+      rolling: this.animator?.rolling ?? false,
+      vaulting: this.vaulting,
+      hanging: this.hanging,
+      onLadder: this.onLadder,
+      prone: this.proneStage !== 'none',
+      landing: this.landing,
+      inWater: this.inWater,
+      aiming: this.aiming,
+    }
   }
 
   /** 箱を脱ぐ。構える・撃つ・転がるなど、隠れるのをやめる操作から呼ぶ */
@@ -1418,8 +1480,7 @@ export class Soldier {
    * 妨げるものは何も置かない。動けば途中で解ける。
    */
   salute(): void {
-    if (this.down || this.boxed || this.rolling || this.stabbing || this.aiming) return
-    if (this.bumping) return
+    if (!can(this.body, 'salute')) return
     this.animator?.playSalute()
   }
 
@@ -1453,10 +1514,7 @@ export class Soldier {
 
   /** ナイフで刺す。モーションが終わるまで持ち替えたまま */
   stab(): void {
-    if (this.down || this.boxed || this.saluting) return
-    if (this.downed || this.standing) return
-    // 箱を落とされた直後は棒立ち。刺しに転じられない
-    if (this.bumping) return
+    if (!can(this.body, 'stab')) return
     this.animator?.playStab()
   }
 
@@ -1596,9 +1654,8 @@ export class Soldier {
 
   /** しゃがみの切り替え。空中では姿勢を変えない */
   toggleCrouch(): void {
-    if (!this.onGround || this.down || this.saluting) return
-    // 立ち上がりの最中は受け付けない。**繋ぎを途中で切らない**
-    if (this.standing) return
+    // 倒れ・箱・伏せは下で別の動作 (起きる・脱ぐ・起き上がる) に振るので、表には入れていない
+    if (!can(this.body, 'crouch')) return
     /*
      * 吹き飛ばされて倒れている間。**Space が起き上がる合図。**
      *
@@ -1617,12 +1674,27 @@ export class Soldier {
     }
     // 出入りの最中は受け付けない。**繋ぎを途中で切らない**
     if (this.proneShifting) return
-    // 伏せているなら、まず起き上がる。**戻る先はしゃがみ** (型がそこで終わる)
+    /*
+     * **頭上に余裕が無ければ起き上がらない。** 伏せでしか通れない隙間で Space を
+     * 押すと、しゃがみの高さ (1.25m) の筒が天井に埋まったまま起き上がり、そこから
+     * 天井を抜けた。「できるか」は表 (moves.ts) だが、「そこに余裕があるか」は地形に聞く
+     */
     if (this.proneStage === 'prone') {
+      if (this.headroom() < COLLISION_HEIGHT.crouch) return
+      // 伏せているなら、まず起き上がる。**戻る先はしゃがみ** (型がそこで終わる)
       this.riseFromProne()
       return
     }
+    // しゃがみから立つのも同じ。低い天井の下では立てない
+    if (this.crouching && this.headroom() < COLLISION_HEIGHT.stand) return
     this.crouching = !this.crouching
+  }
+
+  /** 足元から頭がぶつかる所までの高さ (m)。地形が無ければ Infinity */
+  private headroom(): number {
+    const world = this.lastWorld
+    if (!world) return Infinity
+    return world.ceilingHeight(this.position, PLAYER_RADIUS, this.position.y) - this.position.y
   }
 
   /** 押している前後の量。**カメラを通さない** (梯子の上下に使う) */
@@ -1670,14 +1742,8 @@ export class Soldier {
    * 掴むと体は梯子を向き、重力と横移動が止まる。
    */
   grabLadder(): boolean {
-    if (this.onLadder || this.down || this.downed || this.boxed || this.rolling) return false
-    if (this.proneStage !== 'none' || this.saluting) return false
-    /*
-     * **眠っている間は掴めない。** 麻酔で倒れた体が G で梯子を登り始めていた —
-     * 入力は捨てているのに (moveDir)、掴む口だけが眠りを見ていなかった。
-     * 箱を落とされて驚いている間も同じ。
-     */
-    if (this.sleepLeft > 0 || this.bumpLeft > 0) return false
+    // 眠り・箱を落とされた直後・受け身の最中も表で弾く (掴む口だけが眠りを見ていなかった事故があった)
+    if (!can(this.body, 'ladder')) return false
     /*
      * **受け身の最中は掴めない。**
      *
@@ -2000,15 +2066,8 @@ export class Soldier {
       this.proneShiftLeft = 0
       return
     }
-    if (this.proneStage !== 'none') return
-    if (this.down || this.downed || this.standing || this.boxed) return
-    if (!this.onGround) return
-    /*
-     * **刺している間は伏せない。** 刺突は全身の型で、伏せに入る型と同時には
-     * 流せない (脚だけ伏せて腕が刺す)。しゃがみと立ちの行き来は上半身が
-     * 別なので通る。
-     */
-    if (this.stabbing) return
+    // 刺している間は伏せない (刺突は全身の型)。条件は表 (moves.ts) にある
+    if (!can(this.body, 'prone')) return
     /*
      * **型が読めるまで伏せない。**
      *
@@ -2113,8 +2172,16 @@ export class Soldier {
     const probe = this.vaultProbe
     const dropped = (x: number, z: number) => {
       probe.set(x, top, z)
-      // 半径 0 = 点で見る。体の輪で見ると、輪が全部外れる所まで縁が外へずれる
-      return top - world.groundHeight(probe, 0, top) >= HANG_MIN_DROP / 2
+      /*
+       * 半径 0 = 点で見る。体の輪で見ると、輪が全部外れる所まで縁が外へずれる。
+       *
+       * **上も見る。** 足元の高さから下だけ探すと、隣に高い物 (一段高い箱・壁) が
+       * あるとき線がその中から始まり、中の低い面を拾って「落ちている」と読む。
+       * 法線がその物の側を向き、体を壁の中に置いた (木箱から一段上の建物へ)。
+       * 高い所から探せば、高い物はその上面が返って「上がっている」になる
+       */
+      const h = world.groundHeight(probe, 0, top + HANG_LOOK_UP)
+      return top - h >= HANG_MIN_DROP / 2
     }
     /*
      * まず出た向きに沿って縁の点を正確に出す (内側から外へ点で測り、落ちる手前)。
@@ -2181,12 +2248,22 @@ export class Soldier {
       ex = bx
       ez = bz
     }
+    /*
+     * **体を置く場所が空いているか。** ぶら下がりの位置 (縁の外、1.88m 下) に床や
+     * 別の物が来ていれば掴まない (その中に体が入る)。上から見て一番高い面が
+     * 足元より上なら塞がっている
+     */
+    const hangX = ex + nx * HANG_OUT
+    const hangZ = ez + nz * HANG_OUT
+    const hangY = top - HANG_FEET_BELOW
+    probe.set(hangX, top, hangZ)
+    if (world.groundHeight(probe, PLAYER_RADIUS, top + HANG_LOOK_UP) > hangY - 0.05) return
     this.hangStage = 'drop'
     this.hangTopY = top
     this.hangOutX = nx
     this.hangOutZ = nz
     this.hangFrom.copy(this.position)
-    this.hangTo.set(ex + nx * HANG_OUT, top - HANG_FEET_BELOW, ez + nz * HANG_OUT)
+    this.hangTo.set(hangX, hangY, hangZ)
     this.hangProgressMax = 0
     // 出た向きから始めて、落ちる型の頭で壁向きへ回す (hangMovement)
     this.hangTurnFrom = this.yaw
@@ -2306,9 +2383,7 @@ export class Soldier {
    * @returns 跳び始めたら true
    */
   vault(): boolean {
-    if (!this.onGround || this.rolling || this.stabbing || this.down) return false
-    if (this.downed || this.standing || this.boxed || this.saluting || this.bumping) return false
-    if (this.proneStage !== 'none' || this.onLadder) return false
+    if (!can(this.body, 'vault')) return false
     const ahead = this.vaultAhead()
     if (!ahead) return false
     // 転がりと同じく、しゃがみは解いて向きは固定する。**向きは枠に垂直** (均さずに置く)
@@ -2316,6 +2391,7 @@ export class Soldier {
     this.crouching = false
     this.rollYaw = ahead.yaw
     this.yaw = ahead.yaw
+    this.vaultSillRise = ahead.top - this.position.y
     if (ahead.kind === 'up') {
       // 型の上下は抜いてあるので、位置をここから乗る先まで型の上がり方に沿って上げる
       this.vaultFromY = this.position.y
@@ -2332,7 +2408,7 @@ export class Soldier {
    * あればその上面が返り、無ければ床が返る (差 0)。壁なら線が壁の中から
    * 始まって床か 0 を返すので、跳べる高さには入らない。
    */
-  private vaultAhead(): { kind: 'over' | 'up'; landing: number; yaw: number } | null {
+  private vaultAhead(): { kind: 'over' | 'up'; landing: number; yaw: number; top: number } | null {
     const world = this.lastWorld
     if (!world) return null
     const feetY = this.position.y
@@ -2403,7 +2479,7 @@ export class Soldier {
     const near = world.groundHeight(probe, PLAYER_RADIUS, allow)
     if (Math.abs(near - top) <= VAULT_SAME_LEVEL) {
       if (world.ceilingHeight(probe, 0, near) < near + PLAYER_HEIGHT) return null
-      return { kind: 'up', landing: near, yaw }
+      return { kind: 'up', landing: near, yaw, top }
     }
     // 無ければ越えた先の床。**低いのは構わない** (外へ跳び出すのも跳び越え)
     const farAt = reachAt + VAULT_LANDING_FAR
@@ -2411,11 +2487,11 @@ export class Soldier {
     const far = world.groundHeight(probe, PLAYER_RADIUS, allow)
     if (far <= feetY + STEP_UP) {
       if (world.ceilingHeight(probe, 0, feetY) < feetY + PLAYER_HEIGHT) return null
-      return { kind: 'over', landing: far, yaw }
+      return { kind: 'over', landing: far, yaw, top }
     }
     if (Math.abs(far - top) > VAULT_SAME_LEVEL) return null
     if (world.ceilingHeight(probe, 0, far) < far + PLAYER_HEIGHT) return null
-    return { kind: 'up', landing: far, yaw }
+    return { kind: 'up', landing: far, yaw, top }
   }
 
   /**
@@ -2435,16 +2511,8 @@ export class Soldier {
    * しゃがみは解除する。転がった先で立っている姿勢になるため。
    */
   roll(): void {
-    if (!this.onGround || this.rolling || this.stabbing || this.down) return
-    // 倒れている間は転がれない。爆風の代償をここで踏ませる
-    if (this.downed || this.standing) return
-    // 箱を被ったままは転がれない。脱ぐ動作を挟ませることで、
-    // 隠れている状態から即座に回避へ移れないようにする。
-    if (this.boxed || this.saluting) return
-    // 箱を落とされた直後は棒立ち。**ここで転がれると代償が消える**
-    if (this.bumping) return
-    // 伏せからは転がれない。**起き上がる一手を挟ませる**
-    if (this.proneStage !== 'none') return
+    // 倒れ・箱・伏せ・全身の型の最中は転がれない。条件は表 (moves.ts) にある
+    if (!can(this.body, 'roll')) return
     /*
      * **しゃがみは解くが、覚えておく。**
      *
@@ -2950,13 +3018,16 @@ export class Soldier {
             speed: this.currentSpeed * this.crawlSurge(),
             overrideX,
             overrideZ,
-            // 跳び越えの間は足元を枠の上に置いて当たる (上下は動かさない)
-            stepOver: this.vaulting ? VAULT_STEP_OVER : 0,
+            // 跳び越えの間は足元を枠のすぐ上に置いて当たる (上下は動かさない)
+            stepOver: this.vaulting ? Math.max(STEP_UP, this.vaultSillRise - STEP_UP + VAULT_BODY_LIFT) : 0,
           },
           world,
           {
             radius: PLAYER_RADIUS,
-            height: PLAYER_HEIGHT,
+            // 姿勢で変わる。しゃがめば低い開口をくぐれる (窓の鴨居)。跳んでいる間は球 1 つ
+            height: this.vaulting
+              ? Math.max(STEP_UP, this.vaultSillRise - STEP_UP + VAULT_BODY_LIFT) + VAULT_BODY_HEIGHT
+              : COLLISION_HEIGHT[this.stance],
             gravity: this.gravity,
             fallGravityScale: this.fallGravityScale,
             airControl: AIR_CONTROL,
@@ -3000,6 +3071,38 @@ export class Soldier {
     }
 
     /*
+     * **伏せている体は頭と足のぶんだけ長い。** 当たりは中心の筒 1 本なので、
+     * そのままだと頭が壁や縁の外へ出る (縁で伏せると頭が空中に出て、審判の頭は
+     * 板の上に残る — 撃たれもしないし撃てもしない、見た目と判定の食い違い)。
+     *
+     * 頭 (前 0.65m) と足 (後ろ 0.95m、視線を遮る箱と同じ寸法) にも小さい筒を
+     * 置いて壁から押し戻し、どちらかが縁の外に出たら縁で止まって起き上がる
+     * (戻る先はしゃがみ)。段差 (PRONE_EDGE_DROP 未満) はそのまま這い降りる。
+     */
+    if (this.proneStage === 'prone' && !this.onLadder && !this.inWater && !this.down && !this.hanging) {
+      const fx = -Math.sin(this.yaw)
+      const fz = -Math.cos(this.yaw)
+      const end = this.vaultProbe
+      let overEdge = false
+      for (const reach of [BODY_BOX.prone.front, -BODY_BOX.prone.back]) {
+        end.set(this.position.x + fx * reach, this.position.y, this.position.z + fz * reach)
+        const bx = end.x
+        const bz = end.z
+        world.resolveHorizontal(end, PRONE_END_RADIUS, this.position.y, PRONE_END_HEIGHT)
+        this.position.x += end.x - bx
+        this.position.z += end.z - bz
+        if (this.position.y - world.groundHeight(end, PRONE_END_RADIUS, this.position.y) >= PRONE_EDGE_DROP) overEdge = true
+      }
+      if (overEdge && groundedBefore) {
+        // 出る前の足元へ戻して、起き上がる
+        this.position.copy(this.hangProbe)
+        this.mover.onGround = true
+        this.velocityY = 0
+        this.riseFromProne()
+      }
+    }
+
+    /*
      * **歩いて縁から出た。** 下が深ければ落ちずに手を掛ける。
      *
      * 転がり・跳び越え・梯子・水・伏せ・倒れは対象外。段を下りるのは深さで
@@ -3008,14 +3111,9 @@ export class Soldier {
     if (
       groundedBefore &&
       !this.mover.onGround &&
-      !this.hanging &&
-      !this.rolling &&
+      can(this.body, 'hang') &&
       // 窓から跳び降りたのは跳び降り。縁に掴まらない
       !fellFromVault &&
-      !this.onLadder &&
-      !this.inWater &&
-      !this.down &&
-      this.proneStage === 'none' &&
       moveDir.lengthSq() > 1e-6
     ) {
       const below = world.groundHeight(this.position, PLAYER_RADIUS, this.position.y)
@@ -3171,6 +3269,39 @@ export class Soldier {
     } else {
       this.yaw = dampAngle(this.yaw, targetYaw, TURN_LAMBDA, dt)
     }
+    /*
+     * **位置が数でなくなったら、直前の位置へ戻す。**
+     *
+     * どこかの計算 (跳び越え・ぶら下がり・伏せの当たり・段差の押し戻し) で NaN が
+     * 出ると、カメラも NaN になって画面が真っ暗になり、サーバーは「数でない座標」で
+     * 却下し続ける。戻すと同時に、そのときの状態をコンソールへ出して原因を追える
+     * ようにする。
+     */
+    if (!Number.isFinite(this.position.x) || !Number.isFinite(this.position.y) || !Number.isFinite(this.position.z)) {
+      console.error('[Soldier] 位置が数でない。直前へ戻す', {
+        vaulting: this.vaulting,
+        vaultingUp: this.vaultingUp,
+        hangStage: this.hangStage,
+        proneStage: this.proneStage,
+        onLadder: this.onLadder,
+        rolling: this.rolling,
+        yaw: this.yaw,
+        rollYaw: this.rollYaw,
+        moveDir: [moveDir.x, moveDir.z],
+        from: [this.hangProbe.x, this.hangProbe.y, this.hangProbe.z],
+      })
+      this.position.copy(this.hangProbe)
+      this.velocityY = 0
+      this.mover.airX = 0
+      this.mover.airZ = 0
+      if (this.hangStage !== 'none') {
+        this.hangStage = 'none'
+        this.animator?.endHang()
+      }
+      if (this.vaulting) this.animator?.endVault()
+      if (!Number.isFinite(this.yaw)) this.yaw = 0
+      if (!Number.isFinite(this.rollYaw)) this.rollYaw = this.yaw
+    }
     this.object.rotation.y = this.yaw
 
     if (this.animator) {
@@ -3190,6 +3321,8 @@ export class Soldier {
        */
       const upright = this.aiming && this.proneStage === 'none'
       this.animator.setAimPitch(upright ? aimPitch : 0)
+      // 首はカメラの向きへ。構え中・全身の型の間・伏せ・倒れは 0 (体が向く、または向けない)
+      this.animator.setLookYaw(!this.aiming && this.animator.upperFree && this.proneStage === 'none' && !this.down ? this.lookYaw : 0)
       this.animator.setAiming(this.aiming)
       this.animator.update(dt)
 
@@ -3322,6 +3455,8 @@ export class Soldier {
     model.traverse((obj) => {
       if (isMesh(obj)) {
         obj.castShadow = true
+        // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
+        obj.receiveShadow = true
         // スキニング後の実際の姿勢はバウンディングボックスに反映されないため、
         // 画面端でモデルが消えるのを避けて視錐台カリングを切る
         obj.frustumCulled = false
@@ -3391,11 +3526,17 @@ export class Soldier {
           copy.depthWrite = material.transparent ? material.depthWrite : true
           copy.transparent = true
           cloned.set(material, copy)
+          this.skyLight.add(copy)
         }
         return copy
       })
       obj.material = Array.isArray(obj.material) ? replaced : replaced[0]
     })
+  }
+
+  /** 居る場所の空の見え方 (SKY_FLOOR〜1) を体の明るさに。dt は秒 */
+  setSkyLight(target: number, dt: number): void {
+    this.skyLight.follow(target, dt)
   }
 
   /** 構えのポーズを反映させてから、その両手の位置を基準に武器を取り付ける */
