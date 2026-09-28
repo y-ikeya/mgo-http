@@ -291,6 +291,18 @@ const JUMP_LOOP_MAX_SPEED = 3
  */
 const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_roll_down', 'vault', 'vault_up', 'hang_drop', 'hang_climb'])
 /**
+ * 焼かれた移動を**この割合まで止めておく**型。止めた分は残りで取り返す (総距離は同じ)。
+ *
+ * 跳び越えの型は頭から前へ進む。枠の手前で押した瞬間から体が進むので、手を突く
+ * 頃には枠を通り過ぎていて、**何も無い所に手を突いて**いた。手が枠に着くまで
+ * (前半) は体を進めず、着いてから残りの距離を進む。
+ */
+const ROOT_MOTION_HOLD: Partial<Record<Locomotion, { until: number; keep: number }>> = {
+  // until: 型のこの割合まで抑える / keep: その間も焼かれた移動のこれだけは進む。
+  // 0 にすると支点の手が (体が進まないぶん) 後ろへ下がって見える。少し進ませて手を止める
+  vault: { until: 0.45, keep: 0.3 },
+}
+/**
  * 腰の**上下**も潰す型。
  *
  * 一段上へ乗る型 (vault_up) は 0.9m の段に合わせて焼かれているが、乗る物の高さは
@@ -1269,6 +1281,8 @@ export class CharacterAnimator {
   private saluteHeld = false
 
   private readonly scratchVector = new THREE.Vector3()
+  /** 根元の位置を 2 点同時に読むときの 2 つ目 (consumeRootMotion の早回し) */
+  private readonly scratchVector2 = new THREE.Vector3()
   private readonly scratchQuat = new THREE.Quaternion()
   private readonly scratchRotation = new THREE.Quaternion()
 
@@ -3228,6 +3242,17 @@ export class CharacterAnimator {
     this.playWholeBody(PRONE_ROLL_DOWN_KEY, 'prone_roll_down')
   }
 
+  /**
+   * 流している型を seconds ぶん進める。**途中から見た相手の型を合わせる。**
+   *
+   * 相手の姿には「その型になってからの秒数」が載っている (locomotionAge)。頭から
+   * 流した直後にこれだけ進めれば、壁の裏から出てきた相手の登り切りが、体の位置と
+   * 同じ所から始まる。mixer を回すので、混ぜの途中 (fade) も同じだけ進む。
+   */
+  skipAhead(seconds: number): void {
+    if (seconds > 0) this.mixer.update(seconds)
+  }
+
   private playWholeBody(key: string, state: Locomotion, rate = 1): void {
     if (this.dead) return
     const upper = this.upper.get(key)
@@ -3577,6 +3602,8 @@ export class CharacterAnimator {
       this.lastRootTime = action.time
       return false
     }
+    // 前のコマの時刻。止めていた境目を跨いだかを見るのに要る (下の hold)
+    const prevTime = this.lastRootTime
     this.lastRootTime = action.time
 
     if (!this.rootSampleValid) {
@@ -3588,6 +3615,46 @@ export class CharacterAnimator {
     // トラック空間は X/Y が水平、Z が上下 (Armature の +90°X 回転のため)。
     // モデル空間では armature ローカルの +Y が前方 (+Z) に対応する。
     const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1)
+    const hold = ROOT_MOTION_HOLD[name]
+    if (hold) {
+      /*
+       * **前半は焼かれた移動の keep 倍だけ進み、残りは境目から早回しで辿る。**
+       *
+       * 境目から先は曲線全体を残り時間に圧縮して読む (形はそのまま、時間だけ
+       * 縮める)。「残りの区間を引き伸ばす」と、型の終わりにある戻りの動きまで
+       * 何倍にもなって、大きく前へ出てから戻った。前半で進んだ分は後半の倍率を
+       * 下げて差し引くので、総距離は焼かれた通り。
+       */
+      const duration = action.getClip().duration
+      const gate = duration * hold.until
+      const f = (t: number, into: THREE.Vector3) => {
+        // 始点を引いた「進んだ量」。前半は keep 倍、後半は前半の分 + 圧縮した全曲線 × 残りの倍率
+        sampleVectorTrack(stored.times, stored.values, 0, into)
+        const x0 = into.x
+        const y0 = into.y
+        if (t <= gate) {
+          sampleVectorTrack(stored.times, stored.values, t, into)
+          into.set((into.x - x0) * hold.keep, (into.y - y0) * hold.keep, 0)
+          return
+        }
+        sampleVectorTrack(stored.times, stored.values, gate, into)
+        const gx = (into.x - x0) * hold.keep
+        const gy = (into.y - y0) * hold.keep
+        sampleVectorTrack(stored.times, stored.values, duration, into)
+        const total = Math.hypot(into.x - x0, into.y - y0)
+        const rest = total > 1e-4 ? 1 - Math.hypot(gx, gy) / total : 1
+        sampleVectorTrack(stored.times, stored.values, ((t - gate) / (duration - gate)) * duration, into)
+        into.set(gx + (into.x - x0) * rest, gy + (into.y - y0) * rest, 0)
+      }
+      f(action.time, this.scratchVector)
+      f(prevTime, this.scratchVector2)
+      out.set(
+        (this.scratchVector.x - this.scratchVector2.x) * scale,
+        0,
+        (this.scratchVector.y - this.scratchVector2.y) * scale,
+      )
+      return true
+    }
     out.set(
       (this.scratchVector.x - this.lastRootSample.x) * scale,
       0,
@@ -3596,6 +3663,7 @@ export class CharacterAnimator {
     this.lastRootSample.copy(this.scratchVector)
     return true
   }
+
 
   /**
    * 転がりの**ロック**が続いているか。この間は撃てず、向きも変えられない。

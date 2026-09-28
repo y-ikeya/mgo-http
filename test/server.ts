@@ -366,6 +366,7 @@ function snapshotOf(
             ? ('locator' as const)
             : ('rifle' as const),
     locomotion,
+    locomotionAge: 0,
     concentrating: false,
     saluteHeld: false,
     reloading: false,

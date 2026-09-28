@@ -125,7 +125,13 @@ export class MeshMoveWorld implements MoveWorld {
      * 高さそのものなので、届かない高さまで許すことにはならない。
      */
     const rise = this.riseAhead(position, radius, feetY)
-    const bottom = feetY + this.stepUp + rise + radius
+    /*
+     * **低い体では球を体の中に収める。** 下端を段差の上に置く決まりのまま
+     * だと、球の中心は足元 + 0.6m で、伏せた体 (0.55m) より上に出る。ベンチの
+     * 座面 (0.66m) の下へ潜ろうとして、座面の箱の側面に球が当たって入れなかった。
+     * 体より高い所には球を置かない。下へはみ出した分は床 (登れる面) なので押されない
+     */
+    const bottom = Math.min(feetY + this.stepUp + rise + radius, feetY + height - radius)
     const top = feetY + height - radius
 
     for (let round = 0; round < ITERATIONS; round++) {

@@ -159,6 +159,7 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         yaw: bot.yaw,
         pitch: 0,
         cameraYaw: bot.yaw,
+        locomotionAge: 0,
         /*
          * 倒れた / 転んでいる / 起き上がっている / 立っている。
          *

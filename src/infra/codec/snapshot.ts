@@ -151,7 +151,14 @@ const OFF_HELD = 36 // u8
  * 持つのが素直で、64 通/秒でも 1 バイトは問題にならない。
  */
 const OFF_WEAPON = 37 // u8
-export const SNAPSHOT_BYTES = 38
+/**
+ * いまの locomotion になってからの秒数。0.05 秒刻みの u8 (12.75 秒まで)。
+ *
+ * 一度きりの型を途中から見た相手が、進んだ所から流すため。**末尾に足す**
+ */
+const OFF_LOCOMOTION_AGE = 38 // u8
+const LOCOMOTION_AGE_STEP = 0.05
+export const SNAPSHOT_BYTES = 39
 
 const FLAG_AIMING = 1
 const FLAG_CROUCHING = 2
@@ -240,6 +247,7 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   )
   view.setUint8(OFF_HELD, HELD_INDEX.get(snapshot.held) ?? 0)
   view.setUint8(OFF_WEAPON, WEAPON_INDEX.get(snapshot.weapon) ?? 0)
+  view.setUint8(OFF_LOCOMOTION_AGE, Math.max(0, Math.min(255, Math.round(snapshot.locomotionAge / LOCOMOTION_AGE_STEP))))
 
   return buffer
 }
@@ -257,6 +265,7 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     yaw: view.getFloat32(OFF_YAW),
     pitch: view.getFloat32(OFF_PITCH),
     locomotion: LOCOMOTIONS[view.getUint8(OFF_LOCOMOTION)] ?? 'idle',
+    locomotionAge: view.getUint8(OFF_LOCOMOTION_AGE) * LOCOMOTION_AGE_STEP,
     held,
     aiming: (flags & FLAG_AIMING) !== 0,
     crouching: (flags & FLAG_CROUCHING) !== 0,

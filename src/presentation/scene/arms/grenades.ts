@@ -39,6 +39,8 @@ const SPIN = 6
  * **どこへ落とすか**が手であって、そこから先は投げた側にも読めない方がいい。
  */
 const PREVIEW_STEPS = 90
+/** 線の頭を手から本当の軌道へ寄せる点の数。短いと折れて見え、長いと落ちる所まで嘘になる */
+const PREVIEW_HAND_BLEND = 12
 
 export interface Bounce {
   position: THREE.Vector3
@@ -220,6 +222,12 @@ export class Grenades {
     water: Water | null,
     /** 投げ出す速さ。**スキルを掛けた後の値を渡す** (domain の throwSpeedOf) */
     speed: number,
+    /**
+     * 線の見た目の始点 (振りかぶった右手)。**軌道そのものは origin から** —
+     * 落ちる所はサーバーと同じ式で決まるので、線の頭だけを手から出して、
+     * 途中で本当の軌道へ寄せる。無ければ origin から
+     */
+    handStart?: THREE.Vector3,
   ): void {
     const p = this.probe
     p.x = origin.x
@@ -257,6 +265,19 @@ export class Grenades {
       this.previewPoints[i * 3] = p.x
       this.previewPoints[i * 3 + 1] = p.y
       this.previewPoints[i * 3 + 2] = p.z
+    }
+    // 線の頭を手へ。手と軌道の始点のずれを、最初の PREVIEW_HAND_BLEND 点で 0 まで減らす
+    if (handStart) {
+      const dx = handStart.x - origin.x
+      const dy = handStart.y - origin.y
+      const dz = handStart.z - origin.z
+      const blend = Math.min(PREVIEW_HAND_BLEND, count)
+      for (let i = 0; i < blend; i++) {
+        const k = 1 - i / blend
+        this.previewPoints[i * 3] += dx * k
+        this.previewPoints[i * 3 + 1] += dy * k
+        this.previewPoints[i * 3 + 2] += dz * k
+      }
     }
     this.preview.geometry.attributes.position.needsUpdate = true
     this.preview.visible = true

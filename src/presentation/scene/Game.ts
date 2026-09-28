@@ -504,6 +504,18 @@ const SURFACE_TOLERANCE = 0.03;
 const GRENADE_RELEASE_FORWARD = 0.45;
 
 /**
+ * 着弾の音。**材質ごとに鳴らし分ける。** 音を持たない材質は null (黙る)。
+ * 木やコンクリートの音が入るまでは、材質の違う音を流用しない — 当たった物を聞き間違える
+ */
+function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | null {
+  if (surface === "metal") return "hitMetal";
+  if (surface === "glass") return "hitGlass";
+  return null;
+}
+/** 壁で体が画面を塞いだときの薄さの上限 (1 - 0.8 = 0.2 まで薄くなる) */
+const FADE_MAX = 0.8;
+
+/**
  * クレイモアが地面に着く位置。置く型に対する割合。
  *
  * 型は 3.6 秒あるが、手を離れるのはかがんで置いた辺り。残りは立ち上がる動き。
@@ -695,6 +707,8 @@ export class Game {
    * 1 発ぶん持ち越さないため。
    */
   private readonly grenadeOrigin = new THREE.Vector3();
+  /** 振りかぶった右手。予測線の頭をここから出す */
+  private readonly throwHand = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
   /** 投げる構えを取っているか。離した瞬間に投げる */
   private throwAiming = false;
@@ -1445,10 +1459,14 @@ export class Game {
      */
     // **述語で聞く。** 並べて書いていたので decoy を足したときに漏れた
     const throwing = isThrowable(this.inv.held);
-    this.player.setAiming(
-      this.input.aiming && this.input.engaged && !this.loadoutBlocking && !throwing,
-    );
-    this.follow.setAiming(this.player.isAiming);
+    const wantsAim = this.input.aiming && this.input.engaged && !this.loadoutBlocking;
+    this.player.setAiming(wantsAim && !throwing);
+    /*
+     * **カメラは投げ物でも寄る。** 体は構えの型にしないが (振りかぶりと二重になる)、
+     * 見ている側にとって「構えた」のは同じ — 落下点を狙う画面は銃と同じ寄りにする。
+     * 審判も同じ扱い (server/relay.ts: 振りかぶりは構え)
+     */
+    this.follow.setAiming(this.player.isAiming || (wantsAim && throwing));
     this.follow.setViewHeight(this.player.viewHeight);
     // 首はカメラの向きへ (構えていないとき)。相手に「どこを見ているか」を渡す
     this.player.setLookYaw(this.follow.aimYaw - this.player.yaw);
@@ -1509,6 +1527,8 @@ export class Game {
     // 無敵かどうかも支度中かどうかも状態が答える。こちらで時計を回さない —
     // 回すと、サーバーが解いたのにこちらは半透明のまま、が起きる
     this.player.setGhost(isSpawning(this.life) || this.loadoutBlocking);
+    // 壁で体が画面を塞いだら薄くする (最大で半分)
+    this.player.setFade(1 - FADE_MAX * this.follow.crowding);
     this.updateRollContact();
     this.updateBoxContact();
     this.updateStab(dt);
@@ -1646,6 +1666,27 @@ export class Game {
         false,
       );
       return hits.length > 0 ? hits[0].distance : maxDistance;
+    },
+    pushOut: (position, radius) => {
+      const solid = this.stage.cameraWorld;
+      if (!solid) return;
+      // 触れている面の押し出しを足し合わせて動かす。角では 2 面に触れるので 2 度回す
+      for (let round = 0; round < 2; round++) {
+        let px = 0;
+        let py = 0;
+        let pz = 0;
+        let touched = false;
+        solid.touching(position.x, position.y, position.z, radius, (contact) => {
+          touched = true;
+          px += contact.nx * contact.depth;
+          py += contact.ny * contact.depth;
+          pz += contact.nz * contact.depth;
+        });
+        if (!touched) break;
+        position.x += px;
+        position.y += py;
+        position.z += pz;
+      }
     },
   };
 
@@ -3470,7 +3511,8 @@ export class Game {
     // カメラの線も引く (審判と同じ)。向きと構えは審判が姿の記録から取るのと同じ値
     this.eyePose.cameraYaw = this.follow.aimYaw;
     this.eyePose.pitch = this.follow.aimPitch;
-    this.eyePose.aiming = this.player.isAiming;
+    // カメラが寄っているか (投げ物の振りかぶりも寄る)。審判と同じ判断
+    this.eyePose.aiming = this.follow.isAiming;
     const at = target.object.position;
     this.targetPose.x = at.x;
     this.targetPose.y = at.y;
@@ -3543,32 +3585,18 @@ export class Game {
     }
 
     /*
-     * **前へ押しながら押した瞬間、目の前に窓枠や塀があれば跳び越える。**
+     * **跳び越えは別の指 (F / ○)。** 目の前に窓枠や塀があれば跳ぶ。無ければ何もしない。
      *
-     * しゃがみ (離してから) や転がり (0.17 秒) を待たない。跳ぶかどうかは
-     * 目の前の形で決まっていて、押した人はもう決めている。跳んだ押下は
-     * 離してもしゃがまず、押し続けても転がらない (vaultedThisPress)。
-     *
-     * **止まったままなら跳ばない。** 土嚢の前でしゃがみたいのに跳んでいた。
-     * 枠へ向かって歩いている (前を押している) ときだけ跳ぶ — 止まって押せば
-     * 今まで通りしゃがみ。
+     * しゃがみの指 (Space) に相乗りさせていた頃は、土嚢の前でしゃがみたいのに
+     * 跳んだり、前を押していないと跳べなかったりした。指を分ければ、押した人が
+     * 跳ぶと決めている。
      */
-    if (
-      this.input.pushed("stance") &&
-      !this.cocking &&
-      this.input.moveAxis().z < -0.5 &&
-      this.player.vault()
-    ) {
-      this.vaultedThisPress = true;
-    }
-    if (!this.input.down("stance")) this.vaultedThisPress = false;
+    if (this.input.pushed("vault") && !this.cocking) this.player.vault();
 
     // 短く押して離した = しゃがみの切り替え
-    if (this.input.tapped("stance") && !this.vaultedThisPress) this.player.toggleCrouch();
+    if (this.input.tapped("stance")) this.player.toggleCrouch();
 
     if (this.input.holding("stance")) {
-      // 跳んだ押下では転がらない (押したまま伏せるのも無し)
-      if (this.vaultedThisPress) return;
       // 長押しが成立した。**1 回の押下につき 1 度だけ転がる**
       if (!this.rolledThisHold) {
         this.rolledThisHold = true;
@@ -3584,7 +3612,8 @@ export class Game {
        *
        * 起き上がるのは Space のタップ (player.toggleCrouch)。
        */
-      if (this.rolledThisHold && !this.player.rolling) this.player.setProne(true);
+      // 転がりからの伏せは飛び込み。前が空いていれば半歩先 (PRONE_DIVE) に伏せる
+      if (this.rolledThisHold && !this.player.rolling) this.player.setProne(true, true);
       return;
     }
 
@@ -3594,8 +3623,6 @@ export class Game {
 
   /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */
   private rolledThisHold = false;
-  /** この押下で跳び越えたか。離してもしゃがまず、押し続けても転がらない */
-  private vaultedThisPress = false;
 
   /**
    * 投げる構えと、離したときの投擲。
@@ -3785,18 +3812,32 @@ export class Game {
       // 見下ろしているときに遠く、では手の位置が動いて見える
       const flat = Math.hypot(this.aimDir.x, this.aimDir.z) || 1;
       // 手を離れる高さは構えで変わる。**伏せていれば腕も低い所を通る**
+      // (サーバーが手榴弾を出す位置と同じ式。ここを変えるなら domain/item/grenade も)
       this.grenadeOrigin.set(
         this.player.position.x + (this.aimDir.x / flat) * GRENADE_RELEASE_FORWARD,
         this.player.position.y + RELEASE_HEIGHT[this.player.stance],
         this.player.position.z + (this.aimDir.z / flat) * GRENADE_RELEASE_FORWARD,
       );
-      this.grenades.showPreview(
-        this.grenadeOrigin,
-        this.aimDir,
-        this.stage.thrownWorld,
-        this.stage.water,
-        throwSpeedOf(this.skills),
-      );
+      // 線の頭は振りかぶった右手から。軌道 (落ちる所) はサーバーと同じ origin のまま
+      /*
+       * **振りかぶり切ってから線を出す。** 取り出して腕を引いている間は右手が
+       * 動くので、線の頭がそれに付いてうねる。引き切って手が止まり、実際に
+       * 放せる状態になった時に初めて出す (それまで放しても手を離れないので、
+       * 線が無くても嘘にならない)
+       */
+      if (this.player.throwWindupLeft > 0) {
+        this.grenades.hidePreview();
+      } else {
+        const fromHand = this.player.rightHandAt(this.throwHand);
+        this.grenades.showPreview(
+          this.grenadeOrigin,
+          this.aimDir,
+          this.stage.thrownWorld,
+          this.stage.water,
+          throwSpeedOf(this.skills),
+          fromHand ? this.throwHand : undefined,
+        );
+      }
       // 体を照準の方へ向ける。投げる向きと見た目を一致させる
       this.player.setThrowing(true);
       return;
@@ -4228,7 +4269,7 @@ export class Game {
     // 自分の音は輪に出さない。自分がどこに居るかは分かっている。
     // 代わりに輪そのものを塞ぐ。自分の足音で相手の足音が聞こえなくなる。
     if (this.player.consumeRollStart()) {
-      this.audio.play("roll", this.player.position);
+      this.audio.playSelf("roll");
       this.soundRing.suppress(1);
     }
     /*
@@ -4314,7 +4355,10 @@ export class Game {
           : surface === "sand"
             ? "sandStep"
             : "step";
-    const gain = this.audio.play(sound, position, step.volume, step.range);
+    // 自分の足音は聴取点から (左右に寄らない)。相手の足音は足元から (どこかが情報)
+    const gain = ping
+      ? this.audio.play(sound, position, step.volume, step.range)
+      : this.audio.playSelf(sound, step.volume, step.range);
     if (ping) this.addPing("step", position, gain);
   }
 
@@ -4538,15 +4582,14 @@ export class Game {
    * 金属以外は黙る — 材質の違う音を流用すると、当たった物を聞き間違える。
    */
   private playImpact(hit: THREE.Intersection, at: THREE.Vector3): void {
-    if (surfaceOf(hit.object.name) !== "metal") return;
-    this.audio.play("hitMetal", at);
+    const sound = impactSoundOf(surfaceOf(hit.object.name));
+    if (sound) this.audio.play(sound, at);
   }
 
   /** 着弾点から地形を引いて鳴らす。他人の弾のように面が届かないとき */
   private playImpactAt(at: THREE.Vector3): void {
-    const surface = surfaceAt(at, IMPACT_PROBE, this.stage.obstacles, at.y, IMPACT_PROBE);
-    if (surface !== "metal") return;
-    this.audio.play("hitMetal", at);
+    const sound = impactSoundOf(surfaceAt(at, IMPACT_PROBE, this.stage.obstacles, at.y, IMPACT_PROBE));
+    if (sound) this.audio.play(sound, at);
   }
 
   private publishStats(dt: number): void {

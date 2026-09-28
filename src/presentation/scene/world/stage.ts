@@ -2,7 +2,7 @@ import { SKY_FLOOR } from './skylight'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
 import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
-import { decodeStageMesh, meshSubset, MESH_EYE, MESH_PLAYER, type StageMesh } from '../../../sim/space/stagemesh'
+import { decodeStageMesh, meshSubset, MESH_CAMERA, MESH_EYE, MESH_PLAYER, type StageMesh } from '../../../sim/space/stagemesh'
 import { MeshMoveWorld } from '../../../sim/space/meshworld'
 import { PLAYER_HEIGHT, STEP_UP } from '../../../domain/player/moving'
 import { flagsOf } from '../../../domain/stage'
@@ -110,12 +110,39 @@ const CLOUD_COVERAGE = 0.55
 /** 調整用に控えておく空のマテリアル */
 let skyCoverage: ReturnType<typeof uniform> | null = null
 
-/** 天頂の色。真上ほど濃い青になる */
-const SKY_ZENITH = 0x3f78c8
-/** 地平線の色。大気の散乱で白っぽくなる。フォグもこの色に合わせる */
-const SKY_HORIZON = 0xbcd2e4
-/** 太陽と、そのまわりの滲み */
-const SKY_SUN = 0xfff2d8
+/**
+ * 場の見え方 (空・日・地面・霧)。**ステージで選ぶ。**
+ *
+ *   clear  晴れ。青い空、白い日。筏・モール
+ *   dusty  埃っぽい曇り。黄土色に沈んだ空、弱い日、茶色い地面、近い霧。city
+ *          (MGO2 の市街は全体が土で汚れた黄〜茶で、明るい色がほとんど無い)
+ */
+interface Look {
+  /** 天頂の色。真上ほど濃くなる */
+  zenith: number
+  /** 地平線の色。大気の散乱で白っぽくなる。霧もこの色に合わせる */
+  horizon: number
+  /** 太陽と、そのまわりの滲み */
+  sun: number
+  /** 直射の色 */
+  sunLight: number
+  /** 地面からの照り返しの色 (半球光の下側) */
+  ground: number
+  fogNear: number
+  fogFar: number
+}
+const LOOKS: Record<'clear' | 'dusty', Look> = {
+  clear: { zenith: 0x3f78c8, horizon: 0xbcd2e4, sun: 0xfff2d8, sunLight: 0xfff4e6, ground: 0x6b6055, fogNear: 55, fogFar: 135 },
+  dusty: { zenith: 0x8f9a86, horizon: 0xd3c9a2, sun: 0xf0e0b4, sunLight: 0xf3e3c4, ground: 0x5c4c38, fogNear: 40, fogFar: 115 },
+}
+const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dusty', lab: 'dusty' }
+/** いまの場の見え方。buildStage が決めて、空・霧・光・映り込みがこれを読む */
+let look: Look = LOOKS.clear
+/** ?look=clear / ?look=dusty で試せる */
+function lookFor(name: StageName): Look {
+  const forced = new URLSearchParams(location.search).get('look') as keyof typeof LOOKS | null
+  return LOOKS[forced && forced in LOOKS ? forced : STAGE_LOOK[name] ?? 'clear']
+}
 
 /**
  * 空のドームの半径 (m)。
@@ -124,6 +151,44 @@ const SKY_SUN = 0xfff2d8
  * プレイヤーがドームの外へ出ることはないので、カメラに追従させる必要がない。
  */
 const SKY_RADIUS = 400
+/** 映り込みの環境の強さ。拡散の明るさは半球光が持っているので、映り込みぶんだけ */
+const ENVIRONMENT_INTENSITY = 0.5
+
+/**
+ * 空 → 地平 → 地面の縦グラデーション (正距円筒、32 × 16)。
+ *
+ * 絵を落とすほどの物ではないので、その場で作る。上半分は空 (天頂 → 地平)、
+ * 下半分は地面の色。窓に映るのは主に空の側
+ */
+function buildEnvironmentMap(): THREE.Texture {
+  const w = 32
+  const h = 16
+  const data = new Uint8Array(w * h * 4)
+  const zenith = new THREE.Color(look.zenith)
+  const horizon = new THREE.Color(look.horizon)
+  const ground = new THREE.Color(look.ground)
+  const c = new THREE.Color()
+  for (let y = 0; y < h; y++) {
+    // DataTexture は下の行から。t = 0 が地面、1 が天頂
+    const t = (y + 0.5) / h
+    if (t < 0.5) c.copy(ground).lerp(horizon, Math.pow(t / 0.5, 3))
+    else c.copy(horizon).lerp(zenith, (t - 0.5) / 0.5)
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4
+      data[i] = Math.round(c.r * 255)
+      data[i + 1] = Math.round(c.g * 255)
+      data[i + 2] = Math.round(c.b * 255)
+      data[i + 3] = 255
+    }
+  }
+  const texture = new THREE.DataTexture(data, w, h, THREE.RGBAFormat)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.magFilter = THREE.LinearFilter
+  texture.minFilter = THREE.LinearFilter
+  texture.needsUpdate = true
+  return texture
+}
 
 /**
  * 地面テクスチャ 1 枚が覆う実寸 (m)。
@@ -367,6 +432,8 @@ export interface Stage {
    * 当たるのに審判は通さない — その弾は手元でも遮蔽で止める。
    */
   readonly sightWorld: TriangleBvh | null
+  /** カメラを止める面の三角 (CAMERA_BIT)。カメラを壁から押し出すのに使う。届いていなければ null */
+  readonly cameraWorld: TriangleBvh | null
   /**
    * 水面。敷いていなければ null。
    *
@@ -600,9 +667,9 @@ function skyColorAt(
   coverage: Node<'float'>,
   sunDirection: THREE.Vector3,
 ): Node<'vec3'> {
-  const zenith = uniform(new THREE.Color(SKY_ZENITH))
-  const horizon = uniform(new THREE.Color(SKY_HORIZON))
-  const sunColor = uniform(new THREE.Color(SKY_SUN))
+  const zenith = uniform(new THREE.Color(look.zenith))
+  const horizon = uniform(new THREE.Color(look.horizon))
+  const sunColor = uniform(new THREE.Color(look.sun))
   const sunDir = uniform(sunDirection.clone().normalize())
 
   // --- 雲のための雑音 ---
@@ -687,7 +754,7 @@ function skyColorAt(
   /*
    * 地平線より下は裾の色のまま。
    *
-   * 水面は空の球まで敷いてあり、霧の果ては裾の色 (SKY_HORIZON) に沈む。
+   * 水面は空の球まで敷いてあり、霧の果ては裾の色 (look.horizon) に沈む。
    * ここを暗くすると、水の板の縁が空との継ぎ目として 1 本の線に出る。
    * 同じ色にしておけば、水がどこで終わっているか分からない。
    */
@@ -896,6 +963,25 @@ export function loadStageMoveWorld(name: StageName): Promise<MeshMoveWorld | nul
 }
 
 const stageSightWorlds = new Map<StageName, Promise<TriangleBvh | null>>()
+const stageCameraWorlds = new Map<StageName, Promise<TriangleBvh | null>>()
+
+/**
+ * カメラを止める三角 (書き出しの CAMERA_BIT)。**近づきすぎた壁から押し出すのに使う。**
+ *
+ * 遮蔽 (pivot からの線) だけでは、線の脇にある壁の中へ near 平面の四隅が入って、
+ * 画面の端から壁の裏が見える。カメラを球として扱い、触れている面から押し出す。
+ */
+export function loadStageCameraWorld(name: StageName): Promise<TriangleBvh | null> {
+  const cached = stageCameraWorlds.get(name)
+  if (cached) return cached
+  const pending = loadStageMesh(name).then((mesh) => {
+    if (!mesh) return null
+    const solid = new TriangleBvh(meshSubset(mesh, MESH_CAMERA))
+    return solid.size > 0 ? solid : null
+  })
+  stageCameraWorlds.set(name, pending)
+  return pending
+}
 
 /**
  * 視線を止める三角。**審判と同じ集合** (server/stage.ts が MESH_EYE から組む物)。
@@ -1140,19 +1226,16 @@ function createGlassMaterial(): THREE.MeshStandardMaterial {
  * glb の読み込みは非同期なので、先にブロックアウトを出しておいて、
  * 届いた時点で差し替える。Game 側は Stage の配列を都度読むので入れ替えが効く。
  */
-/**
- * 霧の始まりと終わり (m)。
- *
- * 近すぎると中距離の遮蔽物まで白んで、索敵の判断材料が減る。
- */
-const FOG_NEAR = 55
-const FOG_FAR = 135
+// 霧の始まりと終わり (m) は場の見え方 (LOOKS) が持つ。
+// 近すぎると中距離の遮蔽物まで白んで、索敵の判断材料が減る
 
 export function buildStage(scene: THREE.Scene, name: StageName): Stage {
+  // 場の見え方を先に決める。空・霧・光 (buildLights は後から呼ばれる) がこれを読む
+  look = lookFor(name)
   scene.add(buildSky())
   // フォグは空の地平線側と同じ色にする。違うと遠景が地平線で不自然に切れる。
   // 開始距離を遠くしてあるのは、近すぎると中距離の遮蔽物まで白んで索敵の判断材料が減るため。
-  scene.fog = new THREE.Fog(new THREE.Color(SKY_HORIZON), FOG_NEAR, FOG_FAR)
+  scene.fog = new THREE.Fog(new THREE.Color(look.horizon), look.fogNear, look.fogFar)
   /*
    * 濃さを**カメラからの本当の距離**で測り直す。
    *
@@ -1167,8 +1250,8 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    * 同じ距離なら同じ濃さになる。
    */
   scene.fogNode = fog(
-    color(SKY_HORIZON),
-    smoothstep(float(FOG_NEAR), float(FOG_FAR), positionView.length()),
+    color(look.horizon),
+    smoothstep(float(look.fogNear), float(look.fogFar), positionView.length()),
   )
 
   const collidables: THREE.Object3D[] = []
@@ -1208,7 +1291,7 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
      * 描く広さは water.half ではなく空の球まで。**水平線が四角く切れない。**
      *
      * 溺れる範囲 (domain の water.half) はそのまま。ここは見た目だけで、
-     * 霧の向こう (FOG_FAR) は空の裾と同じ色に沈むので、板を伸ばしても
+     * 霧の向こう (look.fogFar) は空の裾と同じ色に沈むので、板を伸ばしても
      * 描く物は増えない。板は 1 枚、映り込みは大きさに依らず 1 回。
      */
     const surface = buildWater(SKY_RADIUS)
@@ -1265,13 +1348,20 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    * glb と同じで後から差し替わる。届かないステージ (三角をまだ出していない)
    * はずっと null で、箱のまま遊べる。
    */
-  const moving: { world: MeshMoveWorld | null; sight: TriangleBvh | null } = { world: null, sight: null }
+  const moving: { world: MeshMoveWorld | null; sight: TriangleBvh | null; camera: TriangleBvh | null } = {
+    world: null,
+    sight: null,
+    camera: null,
+  }
   const meshReady = Promise.all([
     loadStageMoveWorld(name).then((world) => {
       moving.world = world
     }),
     loadStageSightWorld(name).then((sight) => {
       moving.sight = sight
+    }),
+    loadStageCameraWorld(name).then((camera) => {
+      moving.camera = camera
     }),
   ])
 
@@ -1286,6 +1376,9 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
     },
     get sightWorld() {
       return moving.sight
+    },
+    get cameraWorld() {
+      return moving.camera
     },
     get arenaHalf() {
       return arena.half
@@ -1388,8 +1481,24 @@ async function replaceWithModel(
        * 受ける側も切る。透ける面に他の物の影が落ちると、宙に影だけが浮く。
        */
       const glass = surfaceOf(name) === 'glass'
-      obj.castShadow = !glass
+      /*
+       * **透けて描く物 (壁の汚れのデカール) は影を落とさない。**
+       *
+       * 影の描画は絵の透明を見ないので、壁から 2cm 浮かせた汚れの板が板ごと
+       * 影の地図に書かれる。板は自分の深さと比べて自分に影を落とし (自己遮蔽)、
+       * その縞が体の揺れでカメラがわずかに動くたびにチカチカ走った。
+       * 落とさなければ影の地図には壁しか無く、板は壁の影を受けるだけになる。
+       */
+      const material = Array.isArray(obj.material) ? obj.material[0] : obj.material
+      const blended = (material as THREE.Material | undefined)?.transparent === true
+      obj.castShadow = !glass && !blended
       obj.receiveShadow = !glass
+      if (blended && material) {
+        // 壁に貼った板は深さの比べ合いで壁に負けない側へ寄せる (数 mm しか浮いていない)
+        material.polygonOffset = true
+        material.polygonOffsetFactor = -1
+        material.polygonOffsetUnits = -2
+      }
     } else {
       obj.visible = false
     }
@@ -1533,11 +1642,20 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   // これが日陰の明るさそのものになる。日陰は「光が無い場所」ではなく
   // 「直射が無く、空全体からの光だけが届く場所」なので、暗くはあっても黒くはならない。
   // 空の色と揃えてあるのは、青空の下の日陰が青みを帯びるのと同じ理屈。
-  const sky = new THREE.HemisphereLight(SKY_HORIZON, 0x6b6055, tuned('ambient', AMBIENT_INTENSITY))
+  const sky = new THREE.HemisphereLight(look.horizon, look.ground, tuned('ambient', AMBIENT_INTENSITY))
   scene.add(sky)
+  /*
+   * **映り込みの環境。** 空の色の縦グラデーションを 1 枚、環境マップとして置く。
+   *
+   * 無いと、粗さの低い材質 (窓ガラス・黒い鉄・車の塗装) が何も映さず、ただの
+   * 暗い板になる。空の球 (buildSky) は描くための物で、材質はそれを映さない。
+   * 強さは低め — 拡散の側は上の半球光が担っていて、ここは映り込みのため
+   */
+  scene.environment = buildEnvironmentMap()
+  scene.environmentIntensity = ENVIRONMENT_INTENSITY
   ambient = sky
 
-  const sun = new THREE.DirectionalLight(0xfff4e6, tuned('sun', SUN_INTENSITY))
+  const sun = new THREE.DirectionalLight(look.sunLight, tuned('sun', SUN_INTENSITY))
   // 闘技場の真ん中に固定する。動かさない。
   //
   // 追従させると、**エリア中の影が一斉にプレイヤーへ付いてくる**。

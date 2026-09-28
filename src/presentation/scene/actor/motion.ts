@@ -80,6 +80,8 @@ export type WholeBodyLocomotion =
   | 'vault_up'
   | 'hang_drop'
   | 'hang_climb'
+  // 梯子を登り切る。一度きりの型なので、流し始める者が要る (無いと T ポーズ)
+  | 'climb_top'
   | 'death'
   | 'death_front'
   | 'death_back'
@@ -100,6 +102,7 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'vault_up',
   'hang_drop',
   'hang_climb',
+  'climb_top',
   'roll',
   // 受け身。転がるので上半身だけ別の型は重ねられない
   'hard_land',

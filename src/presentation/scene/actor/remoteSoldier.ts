@@ -20,6 +20,7 @@ import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
+import { CLIMB_TOP_TUNING } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import {
   advanceBoxLift,
@@ -126,6 +127,9 @@ const PLAY_WHOLE_BODY: Record<
   // 縁にぶら下がる / 登る。ぶら下がりは型の最後で止まったまま (上半身も戻さない)
   hang_drop: (a) => a.playHang(),
   hang_climb: (a) => a.playHangClimb(),
+  // 梯子を登り切る。自分の側 (soldier.ts) と同じ速さで頭から流す。**流し始める者が
+  // 居ないと重み 1 のまま止まった action に重みが集まって T ポーズ**になる
+  climb_top: (a) => a.playClimbTop(CLIMB_TOP_TUNING.rate),
   // 落下の受け身。削られる高さから落ちた着地
   hard_land: (a) => a.playHardLand(),
   stab: (a) => a.playStab(),
@@ -417,6 +421,8 @@ export class RemoteSoldier {
     }
     if (locomotion !== this.locomotion && isWholeBody(locomotion)) {
       PLAY_WHOLE_BODY[locomotion](animator);
+      // 型の途中から見えた相手は、その分だけ進めてから流す (届くまでの遅れの分も含む)
+      animator.skipAhead(state.locomotionAge);
       // 叫んだこと・回り始めたことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
       this.rollStarted = locomotion === "roll";
       this.sweptThisFrame = locomotion === "sweep";
