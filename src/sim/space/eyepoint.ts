@@ -48,8 +48,10 @@ export const HIP_CAMERA = { distance: 3.8, shoulder: 0, lift: 0.25 }
  * (迷ったら送る側に倒す方針と同じ向き)。
  */
 // lift は負 = カメラが目より下 (2026-09-21 に本人が「構えのカメラはもう少し下」)。
-// 照準の線は画面の中心から出るので、下げたぶん相手を少し見上げる形になる
-export const AIM_CAMERA = { distance: 1.35, shoulder: 0.42, lift: -0.1 }
+// 照準の線は画面の中心から出るので、下げたぶん相手を少し見上げる形になる。
+// -0.1 では見上げが強くて照準が上へ逃げた (2026-09-27 「思ったよりカーソルが上」) ので目の高さに戻した。
+// 手元で試すなら ?aimy= (camera.ts)
+export const AIM_CAMERA = { distance: 1.35, shoulder: 0.42, lift: 0 }
 
 /** カメラが地面へ潜らない下限 (m)。camera.ts の MIN_CAMERA_Y と揃える */
 const MIN_Y = 0.4

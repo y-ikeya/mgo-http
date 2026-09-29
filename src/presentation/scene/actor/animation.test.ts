@@ -705,6 +705,40 @@ describe('勝手に構えない', () => {
     expect(Math.abs(total.z)).toBeLessThan(0.2)
   })
 
+  /**
+   * 跳び越えは**手が枠に着くまで進まない。** 頭から進むと、押した所から体が
+   * 前へ出て、何も無い所に手を突く。止めた分は残りで取り返すので総距離は同じ。
+   */
+  test('跳び越えは前半 45% を抑え、残りで焼かれた距離を全部進む', () => {
+    const anim = animator()
+    run(anim, 1, 'idle')
+    anim.playVault()
+    const duration = gltf.animations.find((c) => c.name === 'vault')!.duration
+    const step = new THREE.Vector3()
+    let early = 0
+    let forward = 0
+    let peak = 0
+    let biggest = 0
+    const frames = Math.ceil(duration * 60)
+    for (let i = 0; i < frames; i++) {
+      anim.update(1 / 60)
+      if (!anim.consumeRootMotion(step)) continue
+      const d = Math.hypot(step.x, step.z)
+      biggest = Math.max(biggest, d)
+      forward += step.z
+      peak = Math.max(peak, forward)
+      if ((i + 1) / 60 < duration * 0.45) early += d
+    }
+    // 前半は少しだけ進む (keep 0.3)。0 だと支点の手が後ろへ下がって見える
+    expect(early).toBeGreaterThan(0.1)
+    expect(early).toBeLessThan(0.9)
+    // 焼かれた距離 (2m 強)。前に 1 コマで飛ぶ穴、大きく出てから戻る穴を塞いだ試験でもある
+    expect(forward).toBeGreaterThan(1.7)
+    expect(forward).toBeLessThan(2.6)
+    expect(peak - forward).toBeLessThan(0.3)
+    expect(biggest).toBeLessThan(0.25)
+  })
+
   test('立っていればボルトの型はそのまま出る', () => {
     const anim = animator()
     run(anim, 1.2, 'idle', true)

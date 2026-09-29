@@ -160,7 +160,27 @@ export interface CameraWorld {
    * 何も無ければ maxDistance をそのまま返す。
    */
   distanceToObstruction(origin: THREE.Vector3, dir: THREE.Vector3, maxDistance: number): number
+  /**
+   * position を半径 radius の球として、触れている面から押し出す。
+   *
+   * 遮蔽の線は pivot とカメラを結ぶ 1 本だけなので、その脇にある壁 (角を曲がった
+   * 直後、廊下の側壁) には気づかない。near 平面の四隅がその壁に入ると画面の端から
+   * 壁の裏が見える。置いた後に球で押し出せば、どの向きの壁でも離れる。
+   */
+  pushOut(position: THREE.Vector3, radius: number): void
 }
+
+/**
+ * カメラを壁から離す球の半径 (m)。
+ *
+ * near は 0.1 で、画角 60° / 16:9 のとき near 平面の四隅は中心から約 0.12m。
+ * それより大きく取っておく。大きすぎると狭い所でカメラが人の頭に入る。
+ */
+const CAMERA_RADIUS = 0.2
+/** カメラがこれより体に寄ったら、体を薄くし始める距離 (m) */
+const CROWD_NEAR = 1.4
+/** 薄さの追従の速さ (1/s)。壁際で明滅させない */
+const CROWD_LAMBDA = 10
 
 /** マウス感度 (rad / px) */
 const SENSITIVITY = 0.0022
@@ -290,6 +310,22 @@ export class FollowCamera {
   private readonly back = new THREE.Vector3()
   /** 肩オフセットを乗せない注視点。壁に肩を付けたときの判定に使う */
   private readonly centerPivot = new THREE.Vector3()
+  /** 肩の向き (水平)。壁までの距離を測るのに使い回す */
+  private readonly sideDir = new THREE.Vector3()
+  /** 肩越しが壁で潰された割合 (0〜1)。computeDesired が毎コマ書く */
+  private sideCollapse = 0
+  /** 体が画面を塞いでいる度合い (0〜1)。均してある */
+  private crowd = 0
+
+  /**
+   * 体が画面を塞いでいる度合い (0〜1)。**体を薄くする量。**
+   *
+   * 2 つの理由で塞がる。構えて肩越しが壁で潰された (sideCollapse)、壁に背中を
+   * 付けてカメラが体に寄った (寄った距離が CROWD_NEAR を切る)。大きい方を取る
+   */
+  get crowding(): number {
+    return this.crowd
+  }
   /** 遮蔽を考慮した実際の距離。目標の distance 以下になる */
   private occludedDistance = HIP_VIEW.distance
   /** 倒した相手を映すときの回り込み角 (rad) */
@@ -309,6 +345,11 @@ export class FollowCamera {
 
   setAiming(aiming: boolean): void {
     this.aiming = aiming
+  }
+
+  /** 寄っているか (構え / 投げ物の振りかぶり)。審判に渡す「どこから見ているか」と揃える */
+  get isAiming(): boolean {
+    return this.aiming
   }
 
   /** 注視点の高さ (m)。姿勢とアニメーションの上下動を含んだ実測値を受ける */
@@ -524,19 +565,35 @@ export class FollowCamera {
     const footY = this.footY
     const pivotY = footY + this.currentViewHeight + this.lift
     this.centerPivot.set(base.x, pivotY, base.z)
-    this.pivot.set(
-      base.x + rightX * (this.shoulder + this.leanOffset),
-      pivotY,
-      base.z + rightZ * (this.shoulder + this.leanOffset),
-    )
+    /*
+     * **肩の側が壁なら、肩越しを縮める。** 肩オフセットは体の中心から右へ 0.42m
+     * (構え) なので、右に壁があると注視点そのものが壁の中に入り、そこから引いた
+     * カメラも壁の中 — 壁の裏が映る。中心から肩の向きへ線を引いて、壁までの
+     * 距離 (カメラの球ぶんを引く) までしか肩を出さない
+     */
+    const wantedSide = this.shoulder + this.leanOffset
+    let side = wantedSide
+    if (world && side > 0) {
+      this.sideDir.set(rightX, 0, rightZ)
+      const free = world.distanceToObstruction(this.centerPivot, this.sideDir, side + CAMERA_RADIUS)
+      side = Math.max(0, Math.min(side, free - CAMERA_RADIUS))
+    }
+    // 肩越しがどれだけ潰されたか (0 = そのまま / 1 = 体の真後ろ)。体を薄くする量に使う
+    this.sideCollapse = wantedSide > 0.05 ? 1 - side / wantedSide : 0
+    this.pivot.set(base.x + rightX * side, pivotY, base.z + rightZ * side)
 
     // 視線の逆方向へ distance だけ引いた位置がカメラの定位置。
     // 途中に壁があればそこまでしか引かない。
     this.back.copy(this.viewDir).negate()
     // 梯子の上では寄りも均す。輪の桟で寄り引きを繰り返さないため
     this.occludedDistance = this.resolveDistance(world, dt, player.onLadder)
+    const pulled = Math.max(0, Math.min(1, (CROWD_NEAR - this.occludedDistance) / (CROWD_NEAR - MIN_OCCLUDED_DISTANCE)))
+    const crowdTarget = Math.max(this.sideCollapse, pulled)
+    this.crowd = dt > 0 ? damp(this.crowd, crowdTarget, CROWD_LAMBDA, dt) : crowdTarget
     this.desired.copy(this.pivot).addScaledVector(this.back, this.occludedDistance)
     if (this.desired.y < this.minY) this.desired.y = this.minY
+    // 線の脇の壁から離す。near 平面の四隅が壁に入ると画面の端から裏が見える
+    world?.pushOut(this.desired, CAMERA_RADIUS)
   }
 
   /**

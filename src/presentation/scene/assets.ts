@@ -1,6 +1,7 @@
 import type * as THREE from 'three'
 import { missingClips } from './actor/animation'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { DEFAULT_SKIN } from './actor/skin'
 import type { StageName } from '../../domain/stage'
 
@@ -68,7 +69,9 @@ export const rootMotionStore = new WeakMap<THREE.AnimationClip, RootMotionTrack>
 function load(url: string): Promise<GLTF> {
   let pending = cache.get(url)
   if (!pending) {
-    pending = new GLTFLoader().loadAsync(url)
+    // ステージの glb は gltfpack で meshopt 圧縮している (tools/export_stage.py)。
+    // 兵士のモデルは圧縮していないが、decoder を渡しておいて困ることはない
+    pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)
     cache.set(url, pending)
   }
   return pending

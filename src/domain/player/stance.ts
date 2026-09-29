@@ -83,7 +83,10 @@ export const COLLISION_HEIGHT: Record<Stance, number> = {
   stand: 1.8,
   crouch: 1.25,
   box: 1.25,
-  prone: 0.7,
+  // 伏せた体は実際 0.4m (BODY_BOX.prone)。0.7 にしていた頃、ベンチの下 (座面まで 0.63m) に
+  // 潜れなかった。頭ひとつぶんの余裕 (0.15) を残して 0.55。低い所で起き上がれないのは
+  // toggleCrouch の頭上の確かめが止める
+  prone: 0.55,
   down: 0.7,
 }
 

@@ -50,6 +50,15 @@ export interface PlayerSnapshot {
   cameraYaw: number
   /** 再生すべき移動アニメ。速度から推定するより確実で、帯域も食わない */
   locomotion: Locomotion
+  /**
+   * いまの locomotion になってからの秒数。
+   *
+   * 一度きりの型 (転がり・跳び越え・登り切り…) は、受け取った側が切り替わった瞬間に
+   * 頭から流す。型の途中で初めて見えた相手 (壁の裏から出た、繋ぎ直した) は、体は
+   * もう終わりかけなのに絵が頭から始まってずれる。これだけ進めてから流す。
+   * 0.05 秒刻み、12.75 秒まで (それ以上は頭打ち)。
+   */
+  locomotionAge: number
   aiming: boolean
   /**
    * 持っている銃。

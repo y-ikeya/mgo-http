@@ -144,6 +144,8 @@ const SOUNDS = {
    * 銃声の届く範囲すべてで着弾まで聞こえると、どこから撃たれたのか読めなくなる。
    */
   hitMetal: { file: "hit_metal1.mp3", reference: 3, max: 34 },
+  /** ガラスに当たった。窓 (glass_) を撃つと割れる音。届く距離は金属と同じ */
+  hitGlass: { file: "glass_break1.mp3", reference: 3, max: 34 },
   /**
    * 武器を地面へ置く / 拾う。
    *
@@ -566,6 +568,17 @@ export class GameAudio {
     sound.play();
 
     return this.audibility(position, profile.reference * range, profile.max * range) * volume;
+  }
+
+  /**
+   * 自分の体から出る音 (足音・転がり)。**聴取点そのものから鳴らす。**
+   *
+   * 足元の位置で鳴らすと、聴取点 (カメラ) は体の後ろ上で、構えれば右肩の外に
+   * あるので、自分の足音が左右どちらかに寄って聞こえる (「右のイヤホンだけ強い」)。
+   * 自分の音に定位は要らない — どこで鳴ったかは分かっている。
+   */
+  playSelf(name: SoundName, volume = 1, range = 1): number {
+    return this.play(name, this.listener.getWorldPosition(this.listenerPosition), volume, range);
   }
 
   /** 枠ごとの低域通過。作り直すと繋ぎ直しで音が途切れるので控えておく */

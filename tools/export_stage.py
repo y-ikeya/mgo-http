@@ -50,6 +50,17 @@ def is_stair(name):
     return 'stair' in name.lower()
 
 
+# 下に潜れる家具。**座面 (天板) と脚だけが人に当たる。** 名前に bench / table
+def is_bench(name):
+    lower = name.lower()
+    return 'bench' in lower or 'table' in lower
+
+
+# 土嚢。**人の層は積みごとの箱 1 つ**、弾と視線は袋の形のまま。名前に sand_bag
+def is_sandbag(name):
+    return 'sand_bag' in name.lower()
+
+
 # 階段を何本の帯に割って上端を拾うか
 STAIR_BINS = 12
 
@@ -326,6 +337,50 @@ for obj in bpy.context.scene.objects:
 if _inherited:
     print(f'  親の札を子に写した: {_inherited} 個')
 
+# --- 絵の無い画像を材質から外す ---------------------------------------------
+#
+# 元のファイルが無い画像 (Downloads から持ち込んで消した、など) が材質に繋がって
+# いると、glb には**中身の無い texture** が出る。読む側 (three の GLTFLoader) はそこで
+# 読み込みごと失敗し、ステージはブロックアウト (豆腐と平らな地面) のまま — 「別の
+# ステージが出た」「湧く位置がおかしい」になる。1 枚の絵のために全部を失わない。
+# 繋ぎを外して材質の色だけで出し、どの物のどの絵かを出す (本人が繋ぎ直せるように)
+_missing = []
+_swapped = []
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
+        continue
+    for slot in obj.material_slots:
+        mat = slot.material
+        if not mat or not mat.use_nodes:
+            continue
+        for node in list(mat.node_tree.nodes):
+            if node.type != 'TEX_IMAGE' or not node.image:
+                continue
+            image = node.image
+            if image.size[0] > 0 and image.size[1] > 0:
+                continue
+            # 同じファイル名の読める絵が他にあれば、それに差し替える。持ち込みを 2 度
+            # 取り込むと `.001` の複製ができ、片方だけ元の場所が消えることがある
+            base = os.path.basename(image.filepath)
+            twin = next((im for im in bpy.data.images if im is not image and im.size[0] > 0
+                         and os.path.basename(im.filepath) == base), None) if base else None
+            if twin is not None:
+                node.image = twin
+                _swapped.append((obj.name, mat.name, image.name, twin.name))
+                continue
+            for link in [l for l in mat.node_tree.links if l.from_node == node]:
+                mat.node_tree.links.remove(link)
+            _missing.append((obj.name, mat.name, image.name, image.filepath))
+if _swapped:
+    print('\n--- 絵が読めないので、同じファイル名の読める絵に差し替えた ---')
+    for name, mat, img, twin in _swapped:
+        print(f'  {name} / {mat}: {img} → {twin}')
+if _missing:
+    print('\n--- 絵が読めない (材質から外して出した。ファイルを置き直して繋ぎ直す) ---')
+    for name, mat, img, path in _missing:
+        print(f'  {name} / {mat}: {img}  ({path})')
+    print('')
+
 exported = []
 skipped = []
 for obj in bpy.context.scene.objects:
@@ -356,6 +411,22 @@ if not exported:
 # **同じ形に同じモディファイアなら、確定した形も共有する。** 土嚢 97 個は 14 種の形を
 # 共有していて、そこに同じ Decimate が付く。1 個ずつ確定させると 97 個の別々の形に
 # なり、glb が 97 倍膨らむし、空の焼き込みも (共有していない物として) 97 個ぶん焼く。
+#
+# **1cm 未満のベベルは外す。** 窓枠や腕金に付けた 3〜8mm のベベル (segments 2) は
+# ゲームの距離では見えないのに三角を 5〜6 倍にする (桟 1 組で 2 万枚)。上限で
+# 間引かれても頂点は残るので、glb が 1 つ 0.5MB ずつ膨らんだ。
+BEVEL_MIN_WIDTH = 0.01
+thin_bevels = 0
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or not obj.select_get():
+        continue
+    for mod in list(obj.modifiers):
+        if mod.type == 'BEVEL' and mod.width < BEVEL_MIN_WIDTH:
+            obj.modifiers.remove(mod)
+            thin_bevels += 1
+if thin_bevels:
+    print(f'  {BEVEL_MIN_WIDTH * 100:.0f}cm 未満のベベルを外した: {thin_bevels} 個')
+
 baked = []
 baked_by_key = {}
 depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -825,6 +896,96 @@ kept_bodies = []
 
 # 坂の板を敷いた階段。**黙って置き換えない** — 名前を出す
 ramped_stairs = []
+# 座面と脚の箱に置き換えた家具。同じく名前を出す
+benched = []
+# 脚を探す格子の目 (m) と、地面に着いていると見なす高さ (m)
+BENCH_CELL = 0.1
+BENCH_FOOT = 0.05
+
+
+def bench_boxes(obj):
+    """ベンチ・机の人の層。**座面 (天板) + 背もたれの箱 1 つと、脚の柱**を返す。
+
+    置き物として 1 つの箱にすると座面の下が詰まって、伏せて潜れない。座面の下面の
+    高さで上下に分け、上は 1 つの箱 (背もたれ込み)、下は地面に着いている塊 (脚) だけを
+    柱にする。地面に着いていない物 (脚をつなぐ貫) は絵だけ — 伏せた体が引っ掛かる。
+    箱は軸に沿う (回して置いた家具は少し大きめに当たる)。
+    """
+    mesh = obj.data
+    mw = obj.matrix_world
+    nm = mw.to_3x3().inverted().transposed()
+    verts = [to_gltf(mw @ v.co) for v in mesh.vertices]
+    if not verts:
+        return None
+    floor_y = min(v[1] for v in verts)
+    # 座面 = 一番広い上向きの面の帯。その下にある下向きの面の帯が座面の下面
+    ups = {}
+    downs = {}
+    for poly in mesh.polygons:
+        n = (nm @ poly.normal).normalized()
+        y = round(to_gltf(mw @ poly.center)[1], 2)
+        area = poly.area * abs(n.z)   # Blender の z = 上
+        if n.z > 0.7:
+            ups[y] = ups.get(y, 0.0) + area
+        elif n.z < -0.7:
+            downs[y] = downs.get(y, 0.0) + area
+    if not ups:
+        return None
+    seat_top = max(ups, key=ups.get)
+    under = [y for y in downs if seat_top - 0.2 <= y < seat_top]
+    seat_bottom = max(under, key=lambda y: downs[y]) if under else seat_top - 0.05
+    if seat_bottom - floor_y < 0.3:
+        return None   # 潜る隙間が無い。普通の置き物として扱う
+
+    def box(lo, hi):
+        corners = [(x, y, z) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+        faces = ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3))
+        out = []
+        for a, b, c, d in faces:
+            for tri in ((a, b, c), (a, c, d)):
+                for i in tri:
+                    v = corners[i]
+                    out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
+        return out
+
+    out = []
+    upper = [v for v in verts if v[1] >= seat_bottom - 0.01]
+    out.extend(box(
+        (min(v[0] for v in upper), seat_bottom, min(v[2] for v in upper)),
+        (max(v[0] for v in upper), max(v[1] for v in upper), max(v[2] for v in upper)),
+    ))
+    # 脚: 座面より下の頂点を格子に落として、隣り合う目をつなぐ
+    cells = {}
+    for x, y, z in verts:
+        if y >= seat_bottom - 0.01:
+            continue
+        key = (int(x // BENCH_CELL), int(z // BENCH_CELL))
+        cells.setdefault(key, []).append((x, y, z))
+    seen = set()
+    legs = 0
+    for start in cells:
+        if start in seen:
+            continue
+        stack = [start]
+        seen.add(start)
+        group = []
+        while stack:
+            cur = stack.pop()
+            group.extend(cells[cur])
+            for dx in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    nxt = (cur[0] + dx, cur[1] + dz)
+                    if nxt in cells and nxt not in seen:
+                        seen.add(nxt)
+                        stack.append(nxt)
+        if min(v[1] for v in group) > floor_y + BENCH_FOOT:
+            continue   # 地面に着いていない = 貫。絵だけ
+        out.extend(box(
+            (min(v[0] for v in group) - 0.02, floor_y, min(v[2] for v in group) - 0.02),
+            (max(v[0] for v in group) + 0.02, seat_bottom, max(v[2] for v in group) + 0.02),
+        ))
+        legs += 1
+    return out, seat_bottom - floor_y, legs
 # 坂の板の厚み (m)。薄すぎると斜めから抜ける
 RAMP_THICK = 0.3
 
@@ -908,6 +1069,75 @@ def box_is_fair(obj, tris):
         return area / surface >= SLAB_FILL_MIN
     # 詰まっている物。木箱やドラム缶は外枠の面に三角が乗っている
     return area / surface >= BOX_FILL_MIN
+# --- 土嚢は積みごとに 1 つの箱で受ける ---------------------------------------
+#
+# 跳び越えは札ではなく高さで決まる (上面が足元から 0.3〜1.2m。soldier.ts の
+# VAULT_MIN / VAULT_MAX)。袋の形をそのまま人の層にすると、上面は袋の丸みで
+# でこぼこ、積みの高さは置き方しだいで、**同じ列で跳べる所と跳べない所が混ざる**。
+# ベンチ・階段と同じく、人の層だけ書き出しが箱に置き換える — XY が重なる袋を
+# 1 つの積みにまとめ、その外接の箱 (天面は平ら) を人に当てる。弾と視線は袋のまま。
+# 見た目は自由に積み直してよく、跳べるかは箱の天面 1 つで決まる。
+#
+# 箱の天面は実寸のまま (1.2m に丸めない)。丸めると絵より低い所を跳んで体が袋に
+# 沈む。上限を越えた積みは壁で、下に「跳べない積み」として名前を出す。
+#
+# **箱は積み 1 つに 1 個ではなく、袋 1 つに 1 個。** 積み全体の外接だと、折れた列や
+# 二重の列が 5.5 × 2.0m の板になり、跳び越えは「向こう側に立てる場所」を見つけられず
+# **上に乗る** (up) になった。袋ごとの箱 (足元は袋の外接、天面はその袋の真上に積まれた
+# 袋の一番高い所) なら足元の形は袋の並びどおりで、天面だけが列に沿って平らになる。
+SANDBAG_JOIN = 0.1        # この距離 (m) まで近い袋は同じ積み
+VAULT_MAX_HEIGHT = 1.2    # soldier.ts の VAULT_MAX と揃える
+VAULT_MIN_HEIGHT = 0.3    # soldier.ts の VAULT_MIN。段差 (0.25) との間は上がれず跳べもしない
+STEP_UP_HEIGHT = 0.25
+
+
+def box_triangles(lo, hi):
+    corners = [(x, y, z) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
+    faces = ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3))
+    out = []
+    for a, b, c, d in faces:
+        for tri in ((a, b, c), (a, c, d)):
+            for i in tri:
+                v = corners[i]
+                out.extend((round(v[0], 3), round(v[1], 3), round(v[2], 3)))
+    return out
+
+
+sandbag_stacks = []          # [{'lo', 'hi', 'names'}]
+sandbag_stack_of = {}        # obj.name → stack
+sandbag_bounds = {}          # obj.name → (lo, hi) glTF
+for obj in bpy.context.scene.objects:
+    if obj.type != 'MESH' or not is_sandbag(obj.name) or 'col_' in obj.name.lower():
+        continue
+    if not flags_of(obj)['player']:
+        continue
+    lo, hi = gltf_bounds(obj)
+    lo, hi = list(lo), list(hi)
+    sandbag_bounds[obj.name] = (lo, hi)
+    joined = None
+    for stack in sandbag_stacks:
+        # glTF は y が上。XZ で重なる (か触れる) 袋を同じ積みにする
+        if (lo[0] < stack['hi'][0] + SANDBAG_JOIN and hi[0] > stack['lo'][0] - SANDBAG_JOIN
+                and lo[2] < stack['hi'][2] + SANDBAG_JOIN and hi[2] > stack['lo'][2] - SANDBAG_JOIN):
+            if joined is None:
+                stack['lo'] = [min(a, b) for a, b in zip(stack['lo'], lo)]
+                stack['hi'] = [max(a, b) for a, b in zip(stack['hi'], hi)]
+                stack['names'].append(obj.name)
+                joined = stack
+            else:
+                # 2 つの積みを橋渡しする袋。後の積みを先の積みへ吸収する
+                joined['lo'] = [min(a, b) for a, b in zip(joined['lo'], stack['lo'])]
+                joined['hi'] = [max(a, b) for a, b in zip(joined['hi'], stack['hi'])]
+                joined['names'].extend(stack['names'])
+                stack['names'] = []
+    if joined is None:
+        joined = {'lo': lo, 'hi': hi, 'names': [obj.name]}
+        sandbag_stacks.append(joined)
+sandbag_stacks = [s for s in sandbag_stacks if s['names']]
+for stack in sandbag_stacks:
+    for name in stack['names']:
+        sandbag_stack_of[name] = stack
+
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or obj.name.startswith(REF_PREFIX):
         continue
@@ -931,6 +1161,31 @@ for obj in bpy.context.scene.objects:
     # Blender で col_ を別に作らなくてよい — 名前に stair が入っていれば書き出しが
     # 敷く。**vis_ を付けた階段にも敷く** (見た目だけにしておいて、歩く面はこちら)。
     # 自分で col_ を置いた物には敷かない (二重になる)。
+    # --- 土嚢は積みの箱だけが人に当たる ---
+    stack = sandbag_stack_of.get(obj.name)
+    if stack is not None and (mark & PLAYER_BIT):
+        mark &= ~PLAYER_BIT
+        lo, hi = sandbag_bounds[obj.name]
+        # 天面: この袋の真上 (XZ が重なる) に積まれた袋の一番高い所
+        top = hi[1]
+        for other in stack['names']:
+            olo, ohi = sandbag_bounds[other]
+            if olo[0] < hi[0] and ohi[0] > lo[0] and olo[2] < hi[2] and ohi[2] > lo[2]:
+                top = max(top, ohi[1])
+        parts = box_triangles(lo, (hi[0], top, hi[2]))
+        positions.extend(parts)
+        marks.extend([PLAYER_BIT | surface_mark] * (len(parts) // 9))
+
+    # --- ベンチ・机は座面と脚だけ ---
+    if is_bench(obj.name) and (mark & PLAYER_BIT) and 'col_' not in obj.name.lower():
+        made = bench_boxes(obj)
+        if made:
+            parts, gap, legs = made
+            positions.extend(parts)
+            marks.extend([PLAYER_BIT | surface_mark] * (len(parts) // 9))
+            mark &= ~PLAYER_BIT
+            benched.append((obj.name, gap, legs))
+
     if is_stair(obj.name) and 'col_' not in obj.name.lower():
         box = next((b for b in boxes if b['name'] == obj.name), None)
         ramp = ramp_triangles_of(box) if box else None
@@ -1337,6 +1592,38 @@ bpy.ops.export_scene.gltf(
     export_all_vertex_colors=False,
 )
 
+# --- 頂点を詰める --------------------------------------------------------------
+#
+# Blender は頂点を素のまま (位置・法線・UV が float32、1 頂点 40 バイト) 書く。
+# 街が育つと形だけで 18MB になり、Pages の 25MiB を超えた。gltfpack で量子化
+# (KHR_mesh_quantization) と meshopt 圧縮 (EXT_meshopt_compression) を掛けると
+# 形は 3〜5 分の 1 になる。読む側は GLTFLoader に MeshoptDecoder を渡している
+# (src/presentation/scene/assets.ts)。当たり判定は mesh.bin なので影響しない。
+#
+# -kn は名前付きの節点を残す (ゲームは節点の名前から札を読む)。gltfpack は
+# 名前付き節点の下に量子化の平行移動・拡縮を持つ子節点を作り、そこに形を
+# 付ける。ゲーム側は親の名前も繋いで見る (stage.ts) ので札はそのまま読める。
+# -vpf: 位置は float のまま (量子化しない)。-vp 16 だと街全体で 6mm 刻みになり、
+# 壁から 3〜4mm 浮かせた汚れのデカールが壁と同じ深さに丸まって、カメラの揺れで
+# チカチカした (建物 6 の雨だれ)。位置ぶんの容量は増えるが meshopt の圧縮は掛かる。
+# -vt 16: UV は 16 ビット (壁の絵は 60 回繰り返す UV を持つので、既定の 12 ビットだと粗い)。
+import subprocess
+gltfpack = os.path.join(root, 'node_modules', '.bin', 'gltfpack')
+if os.path.exists(gltfpack):
+    raw_size = os.path.getsize(glb_path)
+    packed_path = glb_path[:-len('.glb')] + '.packed.glb'   # gltfpack は出力も .glb でないと断る
+    result = subprocess.run(
+        [gltfpack, '-i', glb_path, '-o', packed_path, '-cc', '-kn', '-km', '-ke', '-vpf', '-vt', '16'],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0 and os.path.exists(packed_path):
+        os.replace(packed_path, glb_path)
+        print(f'  gltfpack で詰めた: {raw_size / 1e6:.1f}MB → {os.path.getsize(glb_path) / 1e6:.1f}MB')
+    else:
+        print(f'  gltfpack に失敗したので素のまま出す: {result.stderr.strip()[:200]}')
+else:
+    print('  gltfpack が無い (bun install) ので素のまま出す')
+
 # 材質の内訳も出す。札の付け忘れは数を見ると気づける
 counts = {}
 for name in exported:
@@ -1347,6 +1634,47 @@ print(f'\n書き出し: {glb_path}')
 print(f'          {json_path} (箱 {len(boxes)} 個 / うち坂 {slopes} 個 / 梯子 {len(ladders)} 本)')
 for name in ramped_stairs:
     print(f'          階段 {name}: 人の層は段の角を結んだ坂の板 (見た目・弾・視線は段のまま)')
+for name, gap, legs in benched:
+    print(f'          家具 {name}: 人の層は座面の箱 + 脚 {legs} 本 (下に {gap:.2f}m の隙間。貫は絵だけ)')
+if sandbag_stacks:
+    # 高さは**地面から天面まで**。一番下の袋は地面に 0.3m ほど沈めて置いてあるので、
+    # 箱の底から測ると 0.3m 高く出て「跳べない」と嘘を言う。積みの真ん中から下へ
+    # 光線を落とし、袋以外に当たった所を地面とする
+    _dg = bpy.context.evaluated_depsgraph_get()
+
+    def ground_under_stack(st):
+        # 地面の板に穴があると裏面 (2.5m 下) を拾うので、5 点落として一番高い所を採る
+        cx = (st['lo'][0] + st['hi'][0]) / 2
+        cy = -(st['lo'][2] + st['hi'][2]) / 2      # glTF の z → Blender の y
+        top = st['hi'][1]
+        down = mathutils.Vector((0, 0, -1))
+        best = None
+        for dx, dy in ((0, 0), (0.4, 0), (-0.4, 0), (0, 0.4), (0, -0.4)):
+            origin = mathutils.Vector((cx + dx, cy + dy, top + 0.5))
+            for _ in range(12):
+                hit, loc, _n, _i, hit_obj, _m = bpy.context.scene.ray_cast(_dg, origin, down, distance=50)
+                if not hit:
+                    break
+                if is_sandbag(hit_obj.name) or hit_obj.name.startswith(('vis_', 'ref_')):
+                    origin = loc + down * 0.02
+                    continue
+                if best is None or loc.z > best:
+                    best = loc.z
+                break
+        return best if best is not None else st['lo'][1]
+
+    for st in sandbag_stacks:
+        st['height'] = st['hi'][1] - ground_under_stack(st)
+    heights = [st['height'] for st in sandbag_stacks]
+    print(f'          土嚢 {len(sandbag_stack_of)} 袋 → 袋ごとの箱 (天面は列に沿って平ら) が人に当たる。積み {len(sandbag_stacks)} 個'
+          f' (地面から天面まで {min(heights):.2f}〜{max(heights):.2f}m。弾と視線は袋のまま)')
+    for st in sandbag_stacks:
+        h = st['height']
+        at = f'({(st["lo"][0] + st["hi"][0]) / 2:.1f}, {-(st["lo"][2] + st["hi"][2]) / 2:.1f})'
+        if h > VAULT_MAX_HEIGHT:
+            print(f'  跳べない積み {at}: 高さ {h:.2f}m > {VAULT_MAX_HEIGHT} (壁になる。{len(st["names"])} 袋)')
+        elif STEP_UP_HEIGHT < h < VAULT_MIN_HEIGHT:
+            print(f'  上がれず跳べもしない積み {at}: 高さ {h:.2f}m ({STEP_UP_HEIGHT}〜{VAULT_MIN_HEIGHT} の隙間。{len(st["names"])} 袋)')
 for team, base in bases.items():
     print(f'          基地 {team:5s} ({base["x"]}, {base["y"]}, {base["z"]})')
 for ladder in ladders:

@@ -117,7 +117,10 @@ deploy: deploy-server deploy-web
 
 # 接続先 (wss://mgohttp.pepaga.me) は .env.production からビルド時に焼かれる。
 # 手元の開発には効かないので、開発中に本番へ繋がる事故は起きない。
-deploy-web: check
+#
+# **試験は回さない。** 配るのは origin/main で、そこは CI が通している。ここでもう一度
+# 回すと同じ試験を手元で待つだけ (数分)。手元で確かめたければ make check
+deploy-web: build
 	bunx wrangler pages deploy dist --project-name $(PAGES_PROJECT) --branch main --commit-dirty=true
 
 # **origin から取り直す。** 手元の作業中のものを送らない —

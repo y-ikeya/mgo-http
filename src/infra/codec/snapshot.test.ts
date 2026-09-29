@@ -53,4 +53,11 @@ describe('位置の符号', () => {
       expect(read.held, `番号の表に無い持ち物: ${id}`).toBe(id)
     }
   })
+
+  test('型の経過は 0.05 秒刻みで往復し、12.75 秒で頭打ち', () => {
+    const round = (age: number) => decodeSnapshot(new DataView(encodeSnapshot({ ...SNAPSHOT, locomotionAge: age })), 'a').locomotionAge
+    expect(round(0)).toBe(0)
+    expect(round(1.234)).toBeCloseTo(1.25, 5)
+    expect(round(40)).toBeCloseTo(12.75, 5)
+  })
 })

@@ -132,7 +132,8 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   player.yaw = snapshot.yaw
   player.cameraYaw = snapshot.cameraYaw
   player.pitch = snapshot.pitch
-  player.aiming = snapshot.aiming
+  // 振りかぶり (投げ物を構えている) も構え。客のカメラは銃と同じに寄っているので、見える判定の目もそちら
+  player.aiming = snapshot.aiming || snapshot.holdingGrenade
   player.locomotion = snapshot.locomotion
   // 持っている銃。威力と連射の上限をこれで引く
   /*

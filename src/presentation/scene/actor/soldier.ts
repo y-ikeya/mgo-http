@@ -242,7 +242,9 @@ const HARD_LAND_TIME = 2.03
  * VAULT_MAX はそれより低くないと、跳べたのに「壁を抜けた」で戻される。
  */
 // 段差 (0.25) との間の高さ (0.26〜0.44) は上がれず跳べもしない。ステージ側でそこを避ける
-const VAULT_MIN = 0.45
+// 0.45 だった頃、土嚢 (0.33〜0.47m) が段差 (0.25) にも跳び越えにも掛からず、立ち止まるしか無かった。
+// 跳び越えが別の指 (F / ○) になって「しゃがみたいのに跳ぶ」が無くなったので、段差のすぐ上から跳べる
+const VAULT_MIN = 0.3
 const VAULT_MAX = 1.2
 /** 障害を探す距離 (m)。近い順。体を付けて立つ (0.4) から一歩手前 (1.0) まで */
 const VAULT_REACHES = [0.4, 0.55, 0.7, 0.85, 1.0] as const
@@ -254,6 +256,10 @@ const VAULT_LANDING_NEAR = 0.8
 const VAULT_LANDING_FAR = 1.3
 /** 障害の上に要る隙間 (m)。屈んで越えるので身長より低くてよい */
 const VAULT_HEADROOM = 1.0
+/** 枠の上に体を置いたとき、これ以上押し戻されたら塞がっている (m)。窓の鉄棒・格子 */
+const VAULT_CLEAR_PUSH = 0.05
+/** 枠の上から少し先も見る距離 (m)。棒が枠の奥側に立っていることがある */
+const VAULT_CLEAR_STEP = 0.4
 /**
  * 跳んでいる間の体の当たり。**枠のすぐ上に置く球 1 つ。**
  *
@@ -295,6 +301,13 @@ const HANG_MIN_DROP = 2.3
 const HANG_LOOK_UP = 20
 /** 這っていて頭か足が縁の外に出たとき、これより深ければ落ちずに止まって起き上がる (m) */
 const PRONE_EDGE_DROP = 0.6
+/**
+ * 転がりから伏せる時に前へ滑る距離 (m)。
+ *
+ * その場で腹這いになると、飛び込んだ勢いが絵から消える。前が空いていれば
+ * 半歩先に伏せる。壁や縁があればその手前まで (無ければ滑らない)。
+ */
+const PRONE_DIVE = 0.5
 /** 伏せの頭と足に置く筒の半径と高さ (m)。壁に頭を入れない・縁から頭を出さないための当たり */
 const PRONE_END_RADIUS = 0.2
 const PRONE_END_HEIGHT = 0.45
@@ -474,6 +487,8 @@ export class Soldier {
   private leftHandBone: THREE.Bone | null = null
   /** 繋ぎのモーションの残り時間 (秒) */
   private proneShiftLeft = 0
+  /** 伏せに入る間に前へ滑る速さ (m/s)。転がりからの飛び込みだけ > 0 */
+  private proneDiveSpeed = 0
   /**
    * 寝返りの間に回す向き。**回している間だけ 0 より大きい。**
    *
@@ -683,6 +698,19 @@ export class Soldier {
   private readonly vaultProbe = new THREE.Vector3()
   /** 動かす前の足元。縁から出たときの縁の点になる */
   private readonly hangProbe = new THREE.Vector3()
+  /** 飛び込み (diveReach) の探り用。hangProbe は縁へ戻す位置を持っているので流用しない */
+  private readonly diveProbe = new THREE.Vector3()
+  /** 右手の骨。投げ物の放物線と手榴弾の出る位置に使う。模型が届くまで null */
+  private rightHandBone: THREE.Object3D | null = null
+  /** 前のコマに転がっていたか。転がり終わりの 1 コマを捕まえる */
+  private rolledLastFrame = false
+
+  /** 右手の世界座標。骨が無ければ false (呼ぶ側が体の位置から出す) */
+  rightHandAt(out: THREE.Vector3): boolean {
+    if (!this.rightHandBone) return false
+    this.rightHandBone.getWorldPosition(out)
+    return true
+  }
   /** 一段上へ乗る跳び越えの、始めた床と乗る先の高さ */
   private vaultFromY = 0
   private vaultToY = 0
@@ -844,7 +872,16 @@ export class Soldier {
    * 自前で動きを進めない。移動アニメも推定せず state をそのまま再生する。
    * 予測を持ち込むのはサーバー権威にしてからで、今はまず「ずれない」ほうを取る。
    */
+  /** 最後に送った locomotion と、それになった時刻 (ms)。型の経過 (locomotionAge) に使う */
+  private sentLocomotion: Locomotion | null = null
+  private locomotionSince = 0
+
   snapshot(id: string, time: number): PlayerSnapshot {
+    const locomotion = this.locomotion
+    if (locomotion !== this.sentLocomotion) {
+      this.sentLocomotion = locomotion
+      this.locomotionSince = time
+    }
     return {
       id,
       time,
@@ -858,7 +895,8 @@ export class Soldier {
       reloading: false,
       // 無敵かどうかはサーバーが書き込む。名乗る値ではない
       protectedNow: false,
-      locomotion: this.locomotion,
+      locomotion,
+      locomotionAge: (time - this.locomotionSince) / 1000,
       aiming: this.aiming,
       weapon: this.weaponKind,
       crouching: this.crouching,
@@ -1186,14 +1224,35 @@ export class Soldier {
   setGhost(on: boolean): void {
     if (this.ghost === on || !this.model) return
     this.ghost = on
-    this.model.traverse((obj) => {
-      if (!isMesh(obj)) return
-      const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-      for (const material of materials) material.opacity = on ? GHOST_OPACITY : 1
-    })
+    this.applyOpacity()
   }
 
   private ghost = false
+  /** カメラに押されて体が画面を塞ぐときの薄さ (1 = 不透明)。無敵の薄さ (ghost) が優先 */
+  private fade = 1
+
+  /**
+   * 体を薄くする。**カメラが壁で体に寄せられて、照準のあたりを体が隠すとき。**
+   *
+   * 三人称の弱点で、右に壁があると肩越しが縮んで体が画面の真ん中に来る。
+   * MGO2 も同じ場面で体を半透明にしていた。呼ぶのは毎コマ (camera.ts の crowding)
+   */
+  setFade(opacity: number): void {
+    const next = Math.max(0.2, Math.min(1, opacity))
+    if (Math.abs(next - this.fade) < 0.005) return
+    this.fade = next
+    if (!this.ghost) this.applyOpacity()
+  }
+
+  private applyOpacity(): void {
+    if (!this.model) return
+    const opacity = this.ghost ? GHOST_OPACITY : this.fade
+    this.model.traverse((obj) => {
+      if (!isMesh(obj)) return
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
+      for (const material of materials) material.opacity = opacity
+    })
+  }
 
   /**
    * 繋ぎ直しで**その命の続き**へ戻す。
@@ -2060,10 +2119,11 @@ export class Soldier {
    *
    * 起き上がるのは Space のタップ (toggleCrouch)。
    */
-  setProne(on: boolean): void {
+  setProne(on: boolean, dive = false): void {
     if (!on) {
       this.proneStage = 'none'
       this.proneShiftLeft = 0
+      this.proneDiveSpeed = 0
       return
     }
     // 刺している間は伏せない (刺突は全身の型)。条件は表 (moves.ts) にある
@@ -2079,9 +2139,38 @@ export class Soldier {
     if (span <= 0) return
     this.proneStage = 'prone_down'
     this.proneShiftLeft = span
+    this.proneDiveSpeed = dive ? this.diveReach() / span : 0
     // 伏せは屈みの延長。頭の高さも音の届き方もそちら側で扱う
     this.crouching = true
     this.animator?.playProneDown()
+  }
+
+  /**
+   * 転がりから伏せる時に前へ滑れる距離 (0〜PRONE_DIVE)。
+   *
+   * 伏せた体の高さで前を押してみて、壁があればその手前まで。滑った先の頭の位置
+   * (前 0.65m) の下が縁 (PRONE_EDGE_DROP 以上の落差) なら滑らない — 縁で伏せると
+   * 頭が空中に出て、起き上がる仕掛けがすぐ働く。
+   */
+  private diveReach(): number {
+    const world = this.lastWorld
+    if (!world) return 0
+    const fx = -Math.sin(this.yaw)
+    const fz = -Math.cos(this.yaw)
+    const end = this.diveProbe
+    end.set(this.position.x + fx * PRONE_DIVE, this.position.y, this.position.z + fz * PRONE_DIVE)
+    world.resolveHorizontal(end, PLAYER_RADIUS, this.position.y, COLLISION_HEIGHT.prone)
+    // 押し戻されたぶんだけ短く。前向きの成分だけを取る
+    const reach = Math.max(0, Math.min(PRONE_DIVE, (end.x - this.position.x) * fx + (end.z - this.position.z) * fz))
+    if (reach < 0.05) return 0
+    const head = end
+    head.set(
+      this.position.x + fx * (reach + BODY_BOX.prone.front),
+      this.position.y,
+      this.position.z + fz * (reach + BODY_BOX.prone.front),
+    )
+    if (this.position.y - world.groundHeight(head, PRONE_END_RADIUS, this.position.y) >= PRONE_EDGE_DROP) return 0
+    return reach
   }
 
   /**
@@ -2460,6 +2549,19 @@ export class Soldier {
     if (Number.isNaN(top)) return null
     // 枠の上に体が通る隙間
     if (world.ceilingHeight(probe, PLAYER_RADIUS, top) < top + VAULT_HEADROOM) return null
+    /*
+     * **枠の上に体が置けるか。** 上下の隙間だけ見ていると、枠の中に立つ物
+     * (窓の鉄棒・ガラス・格子) を素通りして跳んだ。枠の上とその少し先に体を
+     * 置いてみて、押し戻されるなら塞がっている
+     */
+    const clearAt = (dist: number): boolean => {
+      probe.set(this.position.x + fx * dist, top, this.position.z + fz * dist)
+      const bx = probe.x
+      const bz = probe.z
+      world.resolveHorizontal(probe, PLAYER_RADIUS, top, VAULT_BODY_HEIGHT)
+      return Math.hypot(probe.x - bx, probe.z - bz) < VAULT_CLEAR_PUSH
+    }
+    if (!clearAt(reachAt) || !clearAt(reachAt + VAULT_CLEAR_STEP)) return null
     /*
      * 向こう側。**先の床の高さで越えるか乗るかが決まる。**
      *
@@ -2950,6 +3052,11 @@ export class Soldier {
      * 終わる** — 転がった意味が絵から抜ける。
      */
     const proneRolling = this.proneStage === 'prone_roll_down'
+    // 転がりからの飛び込み。伏せに入る型の間、前へ滑る (setProne の diveReach)
+    if (overrideX === undefined && this.proneStage === 'prone_down' && this.proneDiveSpeed > 0) {
+      overrideX = -Math.sin(this.yaw) * this.proneDiveSpeed
+      overrideZ = -Math.cos(this.yaw) * this.proneDiveSpeed
+    }
     const tumbling = overrideX === undefined && (this.rolling || proneRolling)
     if (tumbling) {
       overrideX = 0
@@ -3024,10 +3131,13 @@ export class Soldier {
           world,
           {
             radius: PLAYER_RADIUS,
-            // 姿勢で変わる。しゃがめば低い開口をくぐれる (窓の鴨居)。跳んでいる間は球 1 つ
+            // 姿勢で変わる。しゃがめば低い開口をくぐれる (窓の鴨居)。跳んでいる間は球 1 つ。
+            // 転がっている間は頭が下がるので、しゃがみと同じ高さ (しゃがまないと通れない所を転がって抜ける)
             height: this.vaulting
               ? Math.max(STEP_UP, this.vaultSillRise - STEP_UP + VAULT_BODY_LIFT) + VAULT_BODY_HEIGHT
-              : COLLISION_HEIGHT[this.stance],
+              : this.rolling
+                ? COLLISION_HEIGHT.crouch
+                : COLLISION_HEIGHT[this.stance],
             gravity: this.gravity,
             fallGravityScale: this.fallGravityScale,
             airControl: AIR_CONTROL,
@@ -3203,6 +3313,7 @@ export class Soldier {
         const toProne =
           this.proneStage === 'prone_down' || this.proneStage === 'prone_roll_down'
         this.proneStage = toProne ? 'prone' : 'none'
+        this.proneDiveSpeed = 0
         if (this.proneStage === 'none') this.crouching = true
       }
     }
@@ -3348,6 +3459,11 @@ export class Soldier {
         this.rollFromCrouch = false
         this.crouching = true
       }
+      // 転がり終わった所に立てる高さが無ければ、しゃがんだまま (低い開口を転がって抜けた時)
+      if (this.rolledLastFrame && !this.rolling && !this.crouching && this.headroom() < COLLISION_HEIGHT.stand) {
+        this.crouching = true
+      }
+      this.rolledLastFrame = this.rolling
 
       // 銃の持ち方を姿勢に合わせる。切り替わりで跳ねないよう補間して追う
       const before = this.weaponStance
@@ -3582,6 +3698,8 @@ export class Soldier {
     const leftHand = findBoneBySuffix(model, 'LeftHand')
     // 伏せてボルトを引く間だけ銃を預ける先。**あの型は右手でボルトを引く**
     this.leftHandBone = leftHand
+    // 投げ物の放物線の始点 (rightHandAt)
+    this.rightHandBone = rightHand
     if (!rightHand || !leftHand) {
       console.warn('[Soldier] 手ボーンが見つからない。武器を取り付けられない')
       weapon.dispose()

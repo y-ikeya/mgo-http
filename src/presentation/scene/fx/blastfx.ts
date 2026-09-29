@@ -305,9 +305,22 @@ export class BlastFx {
 
     // 一瞬だけ周りを照らす。壁の裏に居ても反射で「近い」が分かる
     this.light = new THREE.PointLight(0xffa040, 0, RADIUS * 2.5)
-    this.light.visible = false
+    /*
+     * **消えている間も visible のまま (強さ 0)。** visible を切ると場面の光の数が変わり、
+     * 点ける瞬間に全部の材質のシェーダーが組み直される — 爆発のたびに画面が一瞬止まった
+     * のはこれ。強さ 0 の点光源は数に入ったまま何も照らさない
+     */
+    this.light.intensity = 0
     this.group.add(this.light)
+    // 最初の爆発で粒・破片・輪のシェーダーを組む止まりを避ける。起動時に 1 度だけ描かせる
+    this.warmFrames = 2
+    for (const puff of this.puffs) puff.sprite.frustumCulled = false
+    this.debris.frustumCulled = false
+    this.ring.frustumCulled = false
   }
+
+  /** 起動直後に見えない大きさで描く残りコマ数。0 になったら隠す */
+  private warmFrames = 0
 
   /**
    * 場の光を読む。**太陽の向きと、太陽・空の色。**
@@ -426,11 +439,22 @@ export class BlastFx {
     this.placeDebris()
 
     this.light.position.copy(at)
-    this.light.visible = true
     this.lightLife = 0.45
   }
 
   update(dt: number): void {
+    if (this.warmFrames > 0) {
+      // 見えない大きさで 1 度描かせて、シェーダーを先に組ませる
+      this.warmFrames--
+      const on = this.warmFrames > 0
+      for (const puff of this.puffs) {
+        puff.sprite.visible = on
+        puff.sprite.scale.setScalar(on ? 0.001 : 1)
+      }
+      this.ring.visible = on
+      this.debris.visible = on
+      if (!on) return
+    }
     for (const puff of this.puffs) {
       if (!puff.sprite.visible) continue
 
@@ -472,8 +496,7 @@ export class BlastFx {
     if (this.lightLife > 0) {
       this.lightLife -= dt
       const left = Math.max(0, this.lightLife) / 0.45
-      if (left <= 0) this.light.visible = false
-      else this.light.intensity = left * left * 70 * this.size
+      this.light.intensity = left <= 0 ? 0 : left * left * 70 * this.size
     }
 
     if (this.debris.visible) {
