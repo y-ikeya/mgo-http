@@ -108,7 +108,7 @@ export class Grenades {
     void loadGrenade().then((gltf) => {
       this.model = gltf.scene
       this.model.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) obj.castShadow = true
+        if ((obj as THREE.Mesh).isMesh) obj.castShadow = false   // 動く物は影マップに入れない (world/staticShadow.ts)
       })
     })
   }

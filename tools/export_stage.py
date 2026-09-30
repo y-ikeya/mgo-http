@@ -12,6 +12,7 @@
 # 何も問題なく見えるのに、ゲームに入れて初めて壊れているのが分かる、を減らす。
 
 import bpy
+import bmesh
 import sys
 import os
 import math
@@ -501,6 +502,18 @@ for obj in list(bpy.context.scene.objects):
         collapsed.name = mesh.name + '_slim'
         obj.modifiers.remove(mod)
         slim = collapsed
+    # **5 角以上の面はここで三角に割る。** 平らな面を溶かすと、窓の口を彫った壁が
+    # 穴の周りで 37 頂点のような複雑な多角形になる。それを glTF の書き出しに割らせると
+    # 一部の三角が裏返り (頂点法線が巻き順と逆)、影の浮かせ量が壁の中を向いて
+    # 三角やブロックの形に割れた (建物 9 と区画 32 の 2F)。耳切りで割れば裏返らない
+    ngons = [p for p in slim.polygons if len(p.vertices) > 4]
+    if ngons:
+        tri_bm = bmesh.new()
+        tri_bm.from_mesh(slim)
+        tri_bm.faces.ensure_lookup_table()
+        bmesh.ops.triangulate(tri_bm, faces=[tri_bm.faces[p.index] for p in ngons], quad_method='BEAUTY', ngon_method='EAR_CLIP')
+        tri_bm.to_mesh(slim)
+        tri_bm.free()
     obj.data = slim
     thinned[mesh.name] = slim
     slim.calc_loop_triangles()
@@ -1051,8 +1064,94 @@ def ramp_triangles_of(box):
     return out
 
 
+# 軸に沿っていない面がこれより多ければ箱ではない (面積の割合)。斜めに切った角や
+# L 字の折れは外枠に写らないので、三角のまま出す
+BOX_SKEW_MAX = 0.10   # 木箱の板の面取りが 4% 弱あるので、それより上に
+
+
+def skewed_area_ratio(obj):
+    """物の座標系で、軸に沿っていない面の面積の割合。回して置いた箱は 0 のまま"""
+    total = 0.0
+    skew = 0.0
+    for poly in obj.data.polygons:
+        n = poly.normal
+        total += poly.area
+        if max(abs(n.x), abs(n.y), abs(n.z)) < 0.95:
+            skew += poly.area
+    return skew / total if total > 1e-9 else 0.0
+
+
+# 体積が外枠のこれより小さければ箱ではない。L 字 (商店街 15) を箱にすると、
+# 折れの内側 (店の前の通り) まで塞がる
+BOX_VOLUME_MIN = 0.85
+
+
+def volume_ratio(obj):
+    """物の体積 / 外枠の体積 (物の座標系)。閉じた殻の符号付き体積の和"""
+    mesh = obj.data
+    verts = mesh.vertices
+    volume = 0.0
+    for poly in mesh.polygons:
+        idx = poly.vertices
+        a = verts[idx[0]].co
+        for i in range(1, len(idx) - 1):
+            b = verts[idx[i]].co
+            c = verts[idx[i + 1]].co
+            volume += a.dot(b.cross(c)) / 6.0
+    lo = [min(v.co[i] for v in verts) for i in range(3)]
+    hi = [max(v.co[i] for v in verts) for i in range(3)]
+    box = (hi[0] - lo[0]) * (hi[1] - lo[1]) * (hi[2] - lo[2])
+    return abs(volume) / box if box > 1e-9 else 1.0
+
+
+# 高さの帯ごとの足跡がこれ以上 (m) 違えば箱ではない。基壇や段、張り出しのある建物 22 を
+# 箱にすると、段の外縁に壁が立って乗れなかった
+BOX_BAND_TOLERANCE = 0.15
+
+
+def band_extent_spread(obj):
+    """物の座標系で、下・中・上の帯にある頂点の XY の広がりを比べ、最大の差 (m) を返す"""
+    if len(obj.data.vertices) < 8:
+        return 0.0
+    # 物の座標系だが、大きさは世界の m で測る (持ち込みの木箱は cm 単位の形を 0.01 倍で置いてある)
+    scale = obj.matrix_world.to_scale()
+    verts = [mathutils.Vector((v.co.x * scale.x, v.co.y * scale.y, v.co.z * scale.z)) for v in obj.data.vertices]
+    lo = [min(v[i] for v in verts) for i in range(3)]
+    hi = [max(v[i] for v in verts) for i in range(3)]
+    height = hi[2] - lo[2]
+    # 見るのは建物の背丈の物だけ。木箱のような置き物は板の出っ張りで差が出るが、箱で十分
+    if height < 2.5:
+        return 0.0
+    band = min(0.6, height / 4)
+    mid = (lo[2] + hi[2]) / 2
+    # 足元 (基壇や段)、その少し上 (1 階の素の壁)、中ほど (張り出し)、上 (パラペット)。
+    # 基壇と張り出しが同じ幅だと足元と中ほどだけでは差が出ないので、1 階の壁の帯を挟む
+    ranges = ((lo[2], lo[2] + 0.35), (lo[2] + 0.5, lo[2] + 1.2), (mid - band, mid + band), (hi[2] - band, hi[2]))
+    extents = []
+    for z0, z1 in ranges:
+        xs = [v.x for v in verts if z0 <= v.z <= z1]
+        ys = [v.y for v in verts if z0 <= v.z <= z1]
+        if not xs:
+            continue
+        extents.append((max(xs) - min(xs), max(ys) - min(ys)))
+    if len(extents) < 2:
+        return 0.0
+    return max(max(e[0] for e in extents) - min(e[0] for e in extents),
+               max(e[1] for e in extents) - min(e[1] for e in extents))
+
+
 def box_is_fair(obj, tris):
     """外枠がその物の形を写しているか。**箱で代用してよいかの物差し**"""
+    # 斜めの面 (切った角、折れた外形) を持つ物は外枠に写らない。建物 9 の斜めの角を
+    # 箱にすると、切り落とした所へ入れなかった
+    if skewed_area_ratio(obj) > BOX_SKEW_MAX:
+        return False
+    # 外枠の中がすかすかな物 (L 字・コの字・張り出し) も写らない
+    if len(obj.data.polygons) <= 400 and volume_ratio(obj) < BOX_VOLUME_MIN:
+        return False
+    # 段や基壇、張り出しのある物も写らない (高さによって足跡の広さが違う)
+    if band_extent_spread(obj) > BOX_BAND_TOLERANCE:
+        return False
     lo, hi = gltf_bounds(obj)
     dx, dy, dz = (hi[i] - lo[i] for i in range(3))
     area = 0.0
@@ -1328,9 +1427,48 @@ for obj in bpy.context.scene.objects:
         print(f'  {obj.name}: 真下に床が無い。空の高さのまま')
     bases[team] = {'x': round(x, 2), 'y': round(floor if floor is not None else y, 2), 'z': round(z, 2)}
 
+# --- 太陽 ----------------------------------------------------------------------
+#
+# **光は Blender で決める。** Sun ランプ (名前が sun で始まる) の向き・色・強さを
+# json に書き、ゲームはそれで平行光を作る (stage.ts の applyStageSun)。Blender の
+# 画面 (Material Preview で scene lights / world を使う) とゲームの影の向きが揃う。
+# 無ければゲームは今までどおりコード側の既定の太陽を使う。
+sun = None
+for obj in bpy.context.scene.objects:
+    if obj.type != 'LIGHT' or obj.data.type != 'SUN' or not obj.name.lower().startswith('sun'):
+        continue
+    travel = obj.matrix_world.to_quaternion() @ mathutils.Vector((0, 0, -1))   # 光の進む向き (Blender の Sun は −Z へ照らす)
+    toward = to_gltf(-travel)                                                   # 地面から光源へ向く単位ベクトル (glTF 座標)
+    sun = {
+        'dir': [round(v, 4) for v in toward],
+        'color': [round(c, 4) for c in obj.data.color],   # linear
+        'strength': round(obj.data.energy, 3),
+    }
+    print(f'  太陽 {obj.name}: 向き {sun["dir"]} 強さ {sun["strength"]}')
+    break
+
+# --- 見た目の仕掛け (煙など) ------------------------------------------------------
+#
+# `fx_<種類>_◯◯` の Empty をそのまま json に落とす。ゲーム側が種類ごとに描く
+# (煙は fx/stageSmoke.ts)。大きさは Empty の拡大率。当たりも音も持たない
+fx = []
+for obj in bpy.context.scene.objects:
+    if obj.type != 'EMPTY' or not obj.name.lower().startswith('fx_'):
+        continue
+    parts = obj.name.split('_')
+    kind = parts[1].lower() if len(parts) > 1 else ''
+    x, y, z = to_gltf(obj.matrix_world.translation)
+    fx.append({'kind': kind, 'name': obj.name, 'x': round(x, 2), 'y': round(y, 2), 'z': round(z, 2), 'size': round(max(obj.matrix_world.to_scale()), 2)})
+    print(f'  仕掛け {obj.name}: {kind} ({x:.1f}, {y:.1f}, {z:.1f}) 大きさ {fx[-1]["size"]}')
+
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
 with open(json_path, 'w') as f:
-    json.dump({'boxes': boxes, 'ladders': ladders, 'bases': bases}, f, ensure_ascii=False, indent=0)
+    out = {'boxes': boxes, 'ladders': ladders, 'bases': bases}
+    if sun:
+        out['sun'] = sun
+    if fx:
+        out['fx'] = fx
+    json.dump(out, f, ensure_ascii=False, indent=0)
 
 # 三角は別の口へ、しかも生の数値で。
 #

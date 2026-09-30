@@ -18,6 +18,7 @@
  */
 
 import { MODES, type Mode } from '../../domain/match/room'
+import type { VoiceId } from '../../domain/player/voice'
 import { DEATH_POINTS, KILL_POINTS, STUN_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
 import type { Team } from '../../domain/player/player'
 import type { KillEvent, MatchMessage, ServerMessage } from '../protocol/types'
@@ -42,6 +43,15 @@ export interface PointEntry {
   at: number
 }
 
+/** ボイスの 1 行。キルログと同じ欄に「名前：セリフ」で出す */
+export interface VoiceEntry {
+  id: string
+  name: string
+  team: Team
+  line: VoiceId
+  at: number
+}
+
 export interface MatchReplica {
   /** 部屋のルール。**入った時点では分からない** — 最初の match で決まる */
   mode: Mode
@@ -54,6 +64,7 @@ export interface MatchReplica {
   /** 自分を倒した相手。死んだあと映す先。**自爆なら空** */
   killedBy: string
   killFeed: KillEntry[]
+  voiceFeed: VoiceEntry[]
   pointFeed: PointEntry[]
 }
 
@@ -65,6 +76,7 @@ export function newMatchReplica(): MatchReplica {
     leaking: false,
     killedBy: '',
     killFeed: [],
+    voiceFeed: [],
     pointFeed: [],
   }
 }
@@ -87,6 +99,8 @@ export type MatchEffect =
    * 分かる (熱中の条件 1: 行動に応えが返る)。他人の HS には出さない。
    */
   | { kind: 'headshot' }
+  /** 誰かがボイスを言った。音を鳴らす (出す欄はレプリカが持っている) */
+  | { kind: 'voice'; line: VoiceId }
 
 /**
  * 報せを 1 つ受けて、レプリカを進める。
@@ -146,6 +160,12 @@ export function applyMatch(
         if (message.head) return [{ kind: 'headshot' }]
       }
       return []
+    }
+
+    case 'voice': {
+      replica.voiceFeed.unshift({ id: message.id, name: message.name ?? '', team: message.team ?? 'blue', line: message.line, at: now })
+      replica.voiceFeed.length = Math.min(replica.voiceFeed.length, KILL_FEED_MAX)
+      return [{ kind: 'voice', line: message.line }]
     }
 
     case 'kill': {

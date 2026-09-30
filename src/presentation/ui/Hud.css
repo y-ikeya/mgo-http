@@ -162,21 +162,26 @@
 }
 
 /* キル表示。STAGE のパネルの真下に積む */
+/* 倒した行とボイスの行を 1 つの箱に積む。行ごとに囲むと段が増えるたびに枠が並んで騒がしい */
 .hud-kills {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
+  align-items: stretch;
+  gap: 2px;
   pointer-events: none;
+}
+
+.hud-kills:has(.hud-kill) {
+  padding: 4px 0;
+  background: rgba(10, 16, 8, 0.55);
+  border: 1px solid rgba(160, 190, 140, 0.18);
 }
 
 .hud-kill {
   display: flex;
   align-items: baseline;
   gap: 7px;
-  padding: 3px 10px;
-  background: rgba(10, 16, 8, 0.55);
-  border: 1px solid rgba(160, 190, 140, 0.18);
+  padding: 1px 10px;
   font-size: 12px;
   color: rgba(200, 212, 192, 0.75);
   white-space: nowrap;
@@ -187,13 +192,11 @@
  * 「誰が誰を」は色で、「自分に関係があるか」は枠で読む。
  */
 .hud-kill-mine {
-  border-color: rgba(160, 190, 140, 0.55);
-  background: rgba(24, 34, 18, 0.65);
+  background: rgba(60, 84, 46, 0.45);
 }
 
 .hud-kill-death {
-  border-color: rgba(224, 83, 60, 0.6);
-  background: rgba(40, 14, 10, 0.65);
+  background: rgba(110, 34, 24, 0.5);
 }
 
 .hud-kill-name {
@@ -1346,4 +1349,46 @@
   white-space: pre-wrap;
   max-width: 60vw;
   pointer-events: none;
+}
+
+/* 定型文のボイス。倒した行と同じ欄に「名前：セリフ」 */
+.hud-voice-text {
+  color: #e8e2c8;
+}
+
+/* ボイスの番号の一覧。画面の下に横一列 (MGO2 の VOICE の帯) */
+.hud-voice-menu {
+  position: absolute;
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 8px 18px;
+  background: rgba(10, 16, 8, 0.6);
+  border: 1px solid rgba(160, 190, 140, 0.35);
+  border-radius: 3px;
+  font-size: 15px;
+  color: #e8e2c8;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hud-voice-title {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: rgba(232, 226, 200, 0.6);
+}
+
+.hud-voice-key {
+  display: inline-block;
+  min-width: 1.2em;
+  margin-right: 6px;
+  padding: 0 4px;
+  border: 1px solid rgba(232, 226, 200, 0.5);
+  border-radius: 3px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(232, 226, 200, 0.85);
 }

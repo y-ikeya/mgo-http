@@ -19,6 +19,7 @@
 import { dropWeapon, pickUp } from './arms/drops'
 import { recordLag } from '../src/domain/match/lag'
 import { AUTH_CLOSE_CODE, LAG_CLOSE_CODE } from '../src/application/protocol/types'
+import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
 import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
@@ -818,11 +819,24 @@ function handleMessage(
       break
     }
 
+    case 'voice': {
+      // 定型文のボイス。表に無い物と連打は捨て、名前と所属を足して全員へ (本人にも)
+      if (!voiceLine(message.line)) break
+      const now = Date.now()
+      if (now - (lastVoiceAt.get(player.id) ?? 0) < VOICE_COOLDOWN * 1000) break
+      lastVoiceAt.set(player.id, now)
+      broadcast(room, { type: 'voice', id: player.id, line: message.line, name: player.name, team: player.team })
+      break
+    }
+
     default:
       // 見た目のもの (knock) は中身を見ずに流す
       broadcast(room, message, player.id)
   }
 }
+
+/** ボイスを最後に言った時刻 (id → ms)。間隔で連打を弾く */
+const lastVoiceAt = new Map<string, number>()
 
 const server = Bun.serve<Client>({
   port: PORT,

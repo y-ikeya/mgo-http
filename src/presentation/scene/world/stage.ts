@@ -1029,6 +1029,67 @@ export function loadStageBases(name: StageName): Promise<Partial<Record<Team, Sp
   return pending
 }
 
+/** stage.json の太陽 (Blender の Sun ランプから。tools/export_stage.py) */
+export interface StageSun {
+  /** 地面から光源へ向く単位ベクトル */
+  dir: [number, number, number]
+  /** linear の RGB */
+  color: [number, number, number]
+  /** Blender の Sun の強さ。BLENDER_SUN_REFERENCE でゲームの SUN_INTENSITY */
+  strength: number
+}
+
+export function loadStageSun(name: StageName): Promise<StageSun | null> {
+  return fetch(asset.model(`stage_${name}.json`))
+    .then((res) => res.json() as Promise<{ sun?: StageSun }>)
+    .then((data) => data.sun ?? null)
+    .catch((error) => {
+      console.warn(`[Stage] stage_${name}.json が読めない (太陽)`, error)
+      return null
+    })
+}
+
+/** stage.json の見た目の仕掛け (Blender の fx_ の Empty。tools/export_stage.py) */
+export interface StageFx {
+  /** 種類。'smoke' など (名前の 2 つ目の語) */
+  kind: string
+  name: string
+  x: number
+  y: number
+  z: number
+  /** Empty の拡大率。煙なら湧く範囲と玉の大きさ */
+  size: number
+}
+
+export function loadStageFx(name: StageName): Promise<StageFx[]> {
+  return fetch(asset.model(`stage_${name}.json`))
+    .then((res) => res.json() as Promise<{ fx?: StageFx[] }>)
+    .then((data) => data.fx ?? [])
+    .catch((error) => {
+      console.warn(`[Stage] stage_${name}.json が読めない (仕掛け)`, error)
+      return []
+    })
+}
+
+/** 光源を引いておく距離 (m)。平行光なので向きだけが効き、遠いほど影の枠の near で切られない */
+const SUN_DISTANCE = 150
+/** Blender の Sun の強さがこの値のとき、ゲームは SUN_INTENSITY で照らす */
+const BLENDER_SUN_REFERENCE = 3.0
+
+/**
+ * **光は Blender で決める。** stage.json の太陽を平行光に写す。向き・色・強さ。
+ * 影の枠は向きに依るので、このあと fitShadowToStage を呼び直す
+ */
+export function applyStageSun(sun: THREE.DirectionalLight, data: StageSun): void {
+  const dir = new THREE.Vector3(data.dir[0], data.dir[1], data.dir[2])
+  if (dir.lengthSq() < 1e-6) return
+  dir.normalize()
+  sun.position.copy(sun.target.position).addScaledVector(dir, SUN_DISTANCE)
+  sun.color.setRGB(data.color[0], data.color[1], data.color[2], THREE.LinearSRGBColorSpace)
+  sun.intensity = tuned('sun', SUN_INTENSITY) * (data.strength / BLENDER_SUN_REFERENCE)
+  sun.shadow.needsUpdate = true
+}
+
 export function loadStageLadders(name: StageName): Promise<Ladder[]> {
   const cached = stageLadders.get(name)
   if (cached) return cached
@@ -1493,12 +1554,12 @@ async function replaceWithModel(
       const blended = (material as THREE.Material | undefined)?.transparent === true
       obj.castShadow = !glass && !blended
       obj.receiveShadow = !glass
-      if (blended && material) {
-        // 壁に貼った板は深さの比べ合いで壁に負けない側へ寄せる (数 mm しか浮いていない)
-        material.polygonOffset = true
-        material.polygonOffsetFactor = -1
-        material.polygonOffsetUnits = -2
-      }
+      /*
+       * 壁に貼った板の深さは素のまま比べる。polygonOffset で手前へ寄せていたが、
+       * WebGPU (深さを逆向きに持つ) では寄せる向きが裏返って板が壁と食い合い、
+       * 遠くから見ると建物 9 の雨だれがモザイクのように割れた。板は壁から 2cm
+       * 浮かせてあり、位置は float のまま (gltfpack -vpf) なので、それで足りる
+       */
     } else {
       obj.visible = false
     }
@@ -1674,6 +1735,15 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   sun.position.set(72, 120, 48)
   sun.target.position.set(0, 0, 0)
   sun.castShadow = true
+  /*
+   * **影マップは動かない物だけを 1 度焼く。** 太陽も枠も動かないので、街の影は
+   * 描き直す理由が無い。動く物 (人・箱・武器・投げ物) は影マップに入れず、人は
+   * 足元の丸い影で受ける (actor/blobShadow.ts)。置いた物が増減した時だけ
+   * world/staticShadow.ts 経由で needsUpdate を立てる
+   */
+  // 切り分け用: ?shadow=live で毎フレーム描き直す (焼いた瞬間の物が写り込んでいないか見る)
+  sun.shadow.autoUpdate = new URLSearchParams(location.search).get('shadow') === 'live'
+  sun.shadow.needsUpdate = true
   /*
    * 影マップの画素数。
    *

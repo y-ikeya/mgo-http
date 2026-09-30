@@ -190,7 +190,7 @@ export class ThrownItems {
    */
   throwFrom(origin: THREE.Vector3, direction: THREE.Vector3, remote = false): void {
     const mesh = new THREE.Mesh(this.geometry, this.material)
-    mesh.castShadow = true
+    mesh.castShadow = false   // 動く物は影マップに入れない (world/staticShadow.ts)
     mesh.position.copy(origin).addScaledVector(direction, RELEASE_FORWARD)
     // 他人の投擲は軌跡を見せない。投げた場所が割れると音で釣れない
     mesh.visible = !remote

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { refreshStaticShadows } from '../world/staticShadow'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 import { materialOpacity, normalView, positionView } from 'three/tsl'
 
@@ -430,6 +431,7 @@ export class Locators {
     const group = new THREE.Group()
     group.position.set(body.x, body.y, body.z)
     this.scene.add(group)
+    refreshStaticShadows()   // 置いた物は影マップに焼き直す
     const item: Live = {
       id,
       group,
@@ -833,6 +835,7 @@ export class Locators {
     for (const layer of item.layers) layer.material.dispose()
     item.layers.length = 0
     item.group.removeFromParent()
+    refreshStaticShadows()
   }
 }
 

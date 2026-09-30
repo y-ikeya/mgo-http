@@ -290,6 +290,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <div class="hud-leak">位置が漏れている</div>
       </Show>
 
+      {/* 定型文のボイス。T で出て、1〜5 で言う。3 秒で畳む (domain/player/voice.ts) */}
+      <Show when={props.stats?.voiceMenu}>
+        <div class="hud-voice-menu">
+          <span class="hud-voice-title">{props.stats?.voiceMenu?.title}</span>
+          <For each={props.stats?.voiceMenu?.items ?? []}>
+            {(label, i) => (
+              <span class="hud-voice-item">
+                <span class="hud-voice-key">{props.stats?.voiceMenu?.pad ? ['↑', '→', '↓', '←'][i()] : i() + 1}</span>
+                {label}
+              </span>
+            )}
+          </For>
+        </div>
+      </Show>
+
       {/*
         人待ち。時計は動かない。
 
@@ -432,7 +447,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
         <div class="hud-kills">
           <For each={props.stats?.kills ?? []}>
-            {(kill) => (
+            {(item) => item.type === 'voice' ? (
+              /* 誰かのボイス。倒した行と同じ欄に「名前：セリフ」。言った直後に倒せば 2 段に積まれる */
+              <div class="hud-kill hud-voice" classList={{ 'hud-kill-mine': item.id === props.selfId }}>
+                <span class={`hud-kill-name hud-kill-${item.team}`}>{item.name}</span>
+                <span class="hud-voice-text">：{item.text}</span>
+              </div>
+            ) : (() => { const kill = item; return (
               <div
                 class="hud-kill"
                 classList={{
@@ -454,7 +475,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
                 <span class={`hud-kill-name hud-kill-${kill.victimTeam}`}>{kill.victimName}</span>
                 <span class="hud-kill-weapon">({kill.weapon})</span>
               </div>
-            )}
+            ) })()}
           </For>
         </div>
       </div>

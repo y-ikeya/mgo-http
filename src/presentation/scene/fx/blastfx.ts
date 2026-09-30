@@ -271,7 +271,7 @@ export class BlastFx {
       }),
       DEBRIS_COUNT,
     )
-    this.debris.castShadow = true
+    this.debris.castShadow = false   // 動く物は影マップに入れない (world/staticShadow.ts)
     this.debris.frustumCulled = false
     this.debris.visible = false
     this.debris.instanceMatrix.setUsage(THREE.DynamicDrawUsage)

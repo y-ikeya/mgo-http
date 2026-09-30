@@ -49,8 +49,8 @@ const PAD_BUTTONS = {
   vault: [1],
   /** □ / X */
   reload: [2],
-  /** L3 / 左スティック押し込み */
-  crouch: [10],
+  /** L3 / 左スティック押し込み。定型文のボイスの一覧を出す (続きは十字キー) */
+  voice: [10],
   /**
    * L1。**単押しでダンボール、長押しで道具の一覧。**
    *
@@ -126,6 +126,8 @@ const BINDINGS = {
   reload: { keys: ['KeyR'], pad: 'reload' },
   menu: { keys: ['Tab'], pad: 'menu' },
   salute: { keys: ['KeyV'], pad: 'salute' },
+  /** 定型文のボイス。T で番号の一覧を出し、1〜5 で言う (domain/player/voice.ts) */
+  voice: { keys: ['KeyT'], pad: 'voice' },
   zoom: { keys: ['KeyZ'], pad: 'zoom' },
   /** 武器の一覧。単押しで往復、押している間は一覧を送る */
   swapWeapon: { keys: ['KeyQ'], pad: 'swap' },

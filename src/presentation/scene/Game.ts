@@ -1,4 +1,8 @@
 import { skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { onStaticShadowRefresh } from "./world/staticShadow";
+import { StageSmoke } from "./fx/stageSmoke";
+import { StageSparks } from "./fx/stageSparks";
+import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
 import * as THREE from "three";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
 import { pass } from "three/tsl";
@@ -27,6 +31,9 @@ import {
   buildBases,
   buildStage,
   fitShadowToStage,
+  loadStageSun,
+  loadStageFx,
+  applyStageSun,
   loadStageLadders,
   STAGE_CODE,
   type Stage, loadStageBases } from "./world/stage";
@@ -133,6 +140,14 @@ import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/
  * **窓によって並ぶ物が違う**ので、1 つの union にまとめてある。
  */
 export type LoadoutFocus = "primary" | "secondary" | "support" | SkillId;
+
+/** キルログの欄に出す 1 行。倒した / 眠らせた、または誰かのボイス */
+export type HudFeedItem =
+  | (KillEvent & { stun?: boolean; at: number })
+  | { type: "voice"; id: string; name: string; team: Team; text: string; at: number };
+
+/** パッドでボイスを選ぶ十字キーの並び。上から時計回り */
+const VOICE_PAD_ORDER = ["menuUp", "menuRight", "menuDown", "menuLeft"] as const;
 
 export interface GameStats {
   /**
@@ -270,7 +285,9 @@ export interface GameStats {
    * 残機が減っていないので**同じ色で出してはいけない** (出す側が三角の色を
    * 分ける)。レプリカは KillEntry として別に持っているので、ここで畳んで渡す。
    */
-  kills: (KillEvent & { stun?: boolean })[]
+  kills: HudFeedItem[]
+  /** ボイスの番号の一覧を出しているか (T を押した直後)。見出しと並べる文字列 */
+  voiceMenu: { title: string; items: readonly string[]; pad: boolean } | null
   /** 残っている投げ物 */
   throwables: number
   /** 手榴弾の残り */
@@ -718,6 +735,14 @@ export class Game {
    */
   private readonly net: NetTransport;
   private readonly shots: Shots;
+  /** ボイスの番号の一覧を出している期限 (ms)。0 なら出していない */
+  private voiceMenuUntil = 0;
+  /** 2 段目 (分類を選んだ後)。null なら 1 段目 (分類を選ぶ) */
+  private voiceCategory: number | null = null;
+  /** ステージに置いた煙 (stage.json の fx)。届くまでは無い */
+  private stageSmoke: StageSmoke | null = null;
+  /** ステージに置いた火花 (stage.json の fx) */
+  private stageSparks: StageSparks | null = null;
   private readonly audio: GameAudio;
   private readonly container: HTMLElement;
   private readonly resizeObserver: ResizeObserver;
@@ -994,7 +1019,7 @@ export class Game {
     this.wheelLeft = 0;
     // Z は 1 段ずつ上げて、一番上まで行ったら肩越しへ戻る。
     // トラックパッドではホイールが扱いにくいので、キーでも回せるようにしてある
-    const cycled = this.input.tapped("zoom");
+    const cycled = (this.input.tapped("zoom") && !this.voiceMenuOpen());
     const levels = this.weapon.scope.length;
 
     if (!this.player.isAiming || levels === 0) {
@@ -1141,7 +1166,22 @@ export class Game {
      */
     void this.stage.ready.then(() => {
       this.stageReady = true;
-      // 影の枠をステージの広さに合わせる。原点 ±65m のままだと city で縁が斜めの線に出る
+    });
+    // 太陽は Blender で決めた向き (stage.json)。届いたら光を写してから影の枠を合わせる
+    // (枠は向きに依る)。原点 ±65m のままだと city で縁が斜めの線に出る
+    // 残骸の煙のような、ステージに置いた見た目の仕掛け
+    void loadStageFx(this.stageName).then((fx) => {
+      const smoke = fx.filter((f) => f.kind === "smoke");
+      if (smoke.length > 0) this.stageSmoke = new StageSmoke(this.scene, smoke);
+      const sparks = fx.filter((f) => f.kind === "spark");
+      if (sparks.length > 0) {
+        this.stageSparks = new StageSparks(this.scene, sparks, (origin) => {
+          this.audio.play("spark", origin, 0.7);
+        });
+      }
+    });
+    void Promise.all([this.stage.ready, loadStageSun(this.stageName)]).then(([, sunData]) => {
+      if (sunData) applyStageSun(this.sun, sunData);
       fitShadowToStage(this.sun, this.stage);
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
@@ -1155,6 +1195,10 @@ export class Game {
     this.bases = buildBases(this.stageName);
     this.scene.add(this.bases);
     this.sun = buildLights(this.scene);
+    // 動かない物が増減したら影マップを 1 度描き直す (world/staticShadow.ts)
+    onStaticShadowRefresh(() => {
+      this.sun.shadow.needsUpdate = true;
+    });
     this.placeAtSpawn();
     this.scene.add(this.player.object);
     this.remotes = new RemoteSoldiers(this.scene);
@@ -1485,10 +1529,32 @@ export class Game {
     if (this.input.tapped("menu")) this.setMenu(!this.menuOpen);
 
     // 支度の画面が開いている間は出さない。**十字キー下は行を送るほうに使う**
-    if (!this.loadoutBlocking && this.input.tapped("salute")) this.player.salute();
+    const voiceOpen = this.voiceMenuOpen();
+    if (!this.loadoutBlocking && !voiceOpen && this.input.tapped("salute")) this.player.salute();
+    // 定型文のボイス。T で一覧、続けて 1〜5 で言う。届くのはサーバーから戻ってきてから
+    if (!this.loadoutBlocking && this.input.tapped("voice")) {
+      this.voiceMenuUntil = this.voiceMenuUntil > Date.now() ? 0 : Date.now() + VOICE_MENU_SECONDS * 1000;
+      this.voiceCategory = null;
+    }
+    if (this.voiceMenuUntil > Date.now()) {
+      // 1 段目は分類 (挨拶 / 驚き / 煽り)、2 段目はその中のセリフ
+      const category = this.voiceCategory === null ? null : VOICE_CATEGORIES[this.voiceCategory];
+      const count = category ? category.lines.length : VOICE_CATEGORIES.length;
+      for (let i = 0; i < count; i++) {
+        if (!this.voicePicked(i)) continue;
+        if (category) {
+          this.net.send({ type: "voice", id: this.net.id, line: category.lines[i] });
+          this.voiceMenuUntil = 0;
+          this.voiceCategory = null;
+        } else {
+          this.voiceCategory = i;
+          this.voiceMenuUntil = Date.now() + VOICE_MENU_SECONDS * 1000;
+        }
+      }
+    }
     this.updateLinks();
     // 押している間は手を挙げたまま。離すと下ろす
-    this.player.setSaluteHeld(!this.loadoutBlocking && this.input.down("salute"));
+    this.player.setSaluteHeld(!this.loadoutBlocking && !voiceOpen && this.input.down("salute"));
     // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
     // 先に見た物が倒したフラグを後の物が読むことになる
     this.triggerEdge = this.input.firing && !this.wasFiring;
@@ -1611,6 +1677,8 @@ export class Game {
       this.listeningLevel(),
     );
     this.shots.update(dt);
+    this.stageSmoke?.update(dt);
+    this.stageSparks?.update(dt);
     // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
     this.decoys.update(dt);
     // 手榴弾と同じ物理を同じ刻みで解く。止まったら点滅が始まる
@@ -1776,6 +1844,12 @@ export class Game {
       case "headshot":
         this.audio.playUi("headshot");
         break;
+      // 誰かのボイス。無線なので距離を見ず、耳元で鳴らす
+      case "voice": {
+        const line = voiceLine(effect.line);
+        if (line) this.audio.playVoice(line.sound);   // 位置を持たない。前の声は途中で止める
+        break;
+      }
       case "phase":
         // 陣営が無い部屋には基地も無い
         if (this.bases) this.bases.visible = effect.teams;
@@ -4109,7 +4183,8 @@ export class Game {
       },
       select: wheel + this.input.consumeListStep(),
       drop: this.input.tapped("drop"),
-      toSupport: this.input.tapped("toSupport"),
+      // 十字キー上はボイスの一覧が出ている間はそちらの番号 (パッドはボタンを消費しない)
+      toSupport: this.input.tapped("toSupport") && !this.voiceMenuOpen(),
     };
 
     const events = this.inv.hand(intent, {
@@ -4442,6 +4517,39 @@ export class Game {
    * 見えている相手の音はここを通らない。位置が届いているので、
    * 動きから自分で数えて鳴らしている。
    */
+  /**
+   * キルログの欄に出す物。倒した / 眠らせた行と、誰かのボイスを**新しい順に 1 列**に並べる。
+   * ボイスの直後に倒せば 2 段に積まれる (MGO2 と同じ欄の使い方)
+   */
+  private voiceMenuOpen(): boolean {
+    return this.voiceMenuUntil > Date.now();
+  }
+
+  /** ボイスの一覧で i 番目を選んだか。鍵盤は数字、パッドは十字キー (上 → 右 → 下 → 左) */
+  private voicePicked(i: number): boolean {
+    if (this.input.slotPressed(i)) return true;
+    const pad = VOICE_PAD_ORDER[i];
+    return pad !== undefined && this.input.tapped(pad);
+  }
+
+  private feedItems(now: number): HudFeedItem[] {
+    const kills: HudFeedItem[] = this.replica.killFeed
+      .filter((entry) => now - entry.at < KILL_FEED_DURATION * 1000)
+      // **眠らせた印も一緒に渡す。** 捨てると、出す側が倒したのと区別できない
+      .map((entry) => ({ ...entry.event, stun: entry.stun, at: entry.at }));
+    const voices: HudFeedItem[] = this.replica.voiceFeed
+      .filter((entry) => now - entry.at < KILL_FEED_DURATION * 1000)
+      .map((entry) => ({
+        type: "voice" as const,
+        id: entry.id,
+        name: entry.name,
+        team: entry.team,
+        text: voiceLine(entry.line)?.label ?? entry.line,
+        at: entry.at,
+      }));
+    return [...kills, ...voices].sort((a, b) => b.at - a.at).slice(0, 5);
+  }
+
   private hearNoise(message: NoiseEvent): void {
     const at = this.noisePos.set(
       this.player.position.x + Math.sin(message.bearing) * message.distance,
@@ -4708,10 +4816,17 @@ export class Game {
       points: this.replica.pointFeed.filter(
         (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
       ),
-      kills: this.replica.killFeed
-        .filter((entry) => now - entry.at < KILL_FEED_DURATION * 1000)
-        // **眠らせた印も一緒に渡す。** 捨てると、出す側が倒したのと区別できない
-        .map((entry) => ({ ...entry.event, stun: entry.stun })),
+      kills: this.feedItems(now),
+      voiceMenu:
+        this.voiceMenuUntil > now
+          ? this.voiceCategory === null
+            ? { title: "VOICE", items: VOICE_CATEGORIES.map((c) => c.label), pad: this.input.activeDevice === "gamepad" }
+            : {
+                title: VOICE_CATEGORIES[this.voiceCategory].label,
+                items: VOICE_CATEGORIES[this.voiceCategory].lines.map((id) => voiceLine(id)?.label ?? id),
+                pad: this.input.activeDevice === "gamepad",
+              }
+          : null,
       throwables: this.inv.countOf('magazine'),
       grenades: this.inv.supportCount,
       /**
