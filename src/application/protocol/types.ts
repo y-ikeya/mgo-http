@@ -4,6 +4,7 @@ import type { Surface } from '../../domain/stage'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import type { HeldId } from '../../domain/item/held'
 import type { Life } from '../../domain/player/lifecycle'
+import type { VoiceId } from '../../domain/player/voice'
 
 /**
  * ネットワークで流す型。
@@ -222,6 +223,21 @@ export interface KnockEvent {
  *
  * 跳ねるたびに音が鳴るが、送るのは 1 通で済む。
  */
+/**
+ * 定型文のボイス (domain/player/voice.ts)。
+ *
+ * 客は id と line だけ送る。サーバーが名前と所属を足して**部屋の全員** (本人も含む) へ
+ * 流す。無線という建前で距離を見ない。連打はサーバーが間隔で弾く。
+ */
+export interface VoiceEvent {
+  type: 'voice'
+  id: string
+  line: VoiceId
+  /** サーバーが足す。客から届いた物には無い */
+  name?: string
+  team?: Team
+}
+
 export interface ThrowEvent {
   type: 'throw'
   id: string
@@ -1173,6 +1189,7 @@ export type ClientMessage =
   | ThrowEvent
   | StabEvent
   | ResupplyEvent
+  | VoiceEvent
   | PongMessage
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
@@ -1198,6 +1215,7 @@ export type ServerMessage =
   | SensedEvent
   | SensedGoneEvent
   | ResuppliedEvent
+  | VoiceEvent
   | SelfMessage
   | PingMessage
   | ExplosionEvent

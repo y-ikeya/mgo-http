@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { loadClaymore } from '../assets'
+import { refreshStaticShadows } from '../world/staticShadow'
 
 /**
  * 置かれたクレイモア。
@@ -51,6 +52,7 @@ export class Claymores {
       // 間に合わなかったぶんを本物に差し替える
       for (const [id, entry] of [...this.live]) {
         this.scene.remove(entry.mesh)
+    refreshStaticShadows()
         this.live.delete(id)
         this.place(id, entry.at, entry.yaw)
       }
@@ -69,6 +71,7 @@ export class Claymores {
     mesh.position.set(at[0], at[1], at[2])
     mesh.rotation.y = yaw
     this.scene.add(mesh)
+    refreshStaticShadows()   // 置いた物は影マップに焼き直す
     this.live.set(id, { mesh, at: [at[0], at[1], at[2]], yaw })
   }
 
@@ -87,12 +90,14 @@ export class Claymores {
     const entry = this.live.get(id)
     if (!entry) return
     this.scene.remove(entry.mesh)
+    refreshStaticShadows()
     this.live.delete(id)
   }
 
   /** 試合の仕切り直し。置きっぱなしを持ち越さない */
   clear(): void {
     for (const entry of this.live.values()) this.scene.remove(entry.mesh)
+    refreshStaticShadows()
     this.live.clear()
   }
 }

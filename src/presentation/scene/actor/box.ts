@@ -314,7 +314,7 @@ function template(): THREE.Object3D {
     const mesh = new THREE.Mesh(geometry, make(face.key))
     mesh.rotation.set(face.rotation[0], face.rotation[1], face.rotation[2])
     mesh.position.set(face.position[0], face.position[1], face.position[2])
-    mesh.castShadow = true
+    mesh.castShadow = false   // 動く物は影マップに入れない (world/staticShadow.ts)
     mesh.receiveShadow = true
     group.add(mesh)
   }

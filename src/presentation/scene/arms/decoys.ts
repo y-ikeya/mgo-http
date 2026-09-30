@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { loadSoldier } from '../assets'
+import { refreshStaticShadows } from '../world/staticShadow'
 import { skinFor } from '../actor/skin'
 import { DEPLOY_SECONDS } from '../../../domain/item/decoy'
 
@@ -165,6 +166,7 @@ export class Decoys {
     this.applyScale(entry)
     this.live.set(id, entry)
     this.scene.add(group)
+    refreshStaticShadows()   // 置いた物は影マップに焼き直す
 
     void this.attachModel(id, entry)
   }
@@ -295,6 +297,7 @@ export class Decoys {
     const entry = this.live.get(id)
     if (!entry) return
     this.scene.remove(entry.group)
+    refreshStaticShadows()
     entry.group.traverse((obj) => {
       const mesh = obj as THREE.Mesh
       if (!mesh.isMesh) return

@@ -341,7 +341,7 @@ export class Weapon {
     this.proneGrip = (config.proneGrip ?? this.crouchGrip).clone()
     this.proneRotation = (config.proneRotation ?? this.crouchRotation).clone()
     this.object.traverse((obj) => {
-      if (isMesh(obj)) obj.castShadow = true
+      if (isMesh(obj)) obj.castShadow = false   // 動く物は影マップに入れない (world/staticShadow.ts)
     })
   }
 

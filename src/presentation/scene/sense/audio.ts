@@ -146,6 +146,8 @@ const SOUNDS = {
   hitMetal: { file: "hit_metal1.mp3", reference: 3, max: 34 },
   /** ガラスに当たった。窓 (glass_) を撃つと割れる音。届く距離は金属と同じ */
   hitGlass: { file: "glass_break1.mp3", reference: 3, max: 34 },
+  /** 切れかけの電線の火花 (fx/stageSparks.ts)。小さい音なので近くだけ (20m) */
+  spark: { file: "spark1.mp3", reference: 2, max: 20 },
   /**
    * 武器を地面へ置く / 拾う。
    *
@@ -406,6 +408,19 @@ const AMBIENCE_VOLUME = 0.12;
  * 環境音と同じ THREE.Audio (位置を持たない) で鳴らす。
  */
 const UI_SOUNDS = {
+  /**
+   * 定型文のボイス (domain/player/voice.ts)。**無線なので位置を持たない** — 方向も
+   * 減衰も掛けず、どこに居ても同じに聞こえる。位置付きで鳴らすと耳元でも
+   * パンとフィルタが掛かって曇った。声は効果音より小さめに
+   */
+  voiceGoodLuck: { file: "voice_goodluck1.mp3", volume: 0.45 },
+  voiceMatane: { file: "voice_matane1.mp3", volume: 0.45 },
+  voiceSesshou: { file: "voice_sesshou1.mp3", volume: 0.45 },
+  voiceShinukato: { file: "voice_shinukato1.mp3", volume: 0.45 },
+  voiceYolo: { file: "voice_yolo1.mp3", volume: 0.45 },
+  voiceGrenade: { file: "voice_grenade1.mp3", volume: 0.45 },
+  voiceStomach: { file: "voice_stomach1.mp3", volume: 0.45 },
+  voiceSumimasen: { file: "voice_sumimasen1.mp3", volume: 0.45 },
   /** 持ち物の一覧が出た。**押さえ続けて出るので、出た瞬間が要る** */
   browse: { file: "clang1.mp3", volume: 0.55 },
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
@@ -433,6 +448,8 @@ export class GameAudio {
   /** 画面の音。世界の音とは別の棚に置く — 同じ名前が両方に居てよい */
   private readonly uiBuffers = new Map<UiSoundName, AudioBuffer>();
   private readonly uiPool: THREE.Audio[] = [];
+  /** ボイス専用の 1 枠。**新しい声が来たら前の声を途中で止める** (重ねない) */
+  private voiceSound: THREE.Audio | null = null;
   private uiNext = 0;
   private readonly pool: THREE.PositionalAudio[] = [];
   private readonly anchors: THREE.Object3D[] = [];
@@ -502,6 +519,21 @@ export class GameAudio {
    * どこに立っていても、どこを向いていても同じ大きさ。返す物も無い —
    * レーダーに映る音ではないので、聞こえた強さを問う相手が居ない。
    */
+  /**
+   * 定型文のボイスを鳴らす。画面の音と同じく位置を持たないが、**枠は 1 つだけ**。
+   * 続けて来たら前の声を途中で止めて新しい声に替える。重ねると聞き取れない
+   */
+  playVoice(name: UiSoundName): void {
+    const buffer = this.uiBuffers.get(name);
+    if (!buffer) return;
+    if (!this.voiceSound) this.voiceSound = new THREE.Audio(this.listener);
+    const sound = this.voiceSound;
+    if (sound.isPlaying) sound.stop();
+    sound.setBuffer(buffer);
+    sound.setVolume(UI_SOUNDS[name].volume);
+    sound.play();
+  }
+
   playUi(name: UiSoundName): void {
     const buffer = this.uiBuffers.get(name);
     if (!buffer) return;

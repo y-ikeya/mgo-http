@@ -1,4 +1,5 @@
 import { SkyLight } from '../world/skylight';
+import { BlobShadow } from './blobShadow';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import {
@@ -172,6 +173,8 @@ const PLAY_WHOLE_BODY: Record<
 export class RemoteSoldier {
   readonly id: string;
   readonly object = new THREE.Group();
+  /** 足元の丸い影。太陽の影マップには人を入れない (world/staticShadow.ts) */
+  private readonly blob = new BlobShadow();
   /** ボーンに追従する当たり判定。メッシュではなくこれを撃つ */
   readonly hitbox = new Hitbox();
 
@@ -323,6 +326,7 @@ export class RemoteSoldier {
     this.skin = skin;
     this.box = createCardboardBox();
     this.object.add(this.box);
+    this.object.add(this.blob.mesh);
     scene.add(this.object);
     void this.load();
   }
@@ -478,6 +482,14 @@ export class RemoteSoldier {
     // 伏せている間は上体を傾けない。腹這いでは背骨の回転面が横倒しなので、
     // 同じ角度を当てると体が起き上がって見える (player.ts に理由)
     const prone = state.locomotion === "prone_idle" || state.locomotion === "crawl_f";
+    this.blob.set(
+      prone || state.locomotion.startsWith("prone") || state.locomotion === "crawl_b"
+        ? "prone"
+        : state.locomotion.startsWith("crouch") || state.locomotion.startsWith("lean_crouch")
+          ? "crouch"
+          : "stand",
+    );
+    this.blob.update(dt);
     animator.setAimPitch(state.aiming && !this.serverDead && !prone ? state.pitch : 0);
     // 首はカメラの向きへ。**相手がどこを見ているかを渡す**。構え中は体が向いている
     {
@@ -825,7 +837,7 @@ export class RemoteSoldier {
     const cloned = new Map<THREE.Material, THREE.Material>();
     model.traverse((obj) => {
       if (!isMesh(obj)) return;
-      obj.castShadow = true;
+      obj.castShadow = false;   // 影マップは動かない物だけ。人の影は足元の丸 (blob)
       // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
       obj.receiveShadow = true;
       // スキニング後の姿勢はバウンディングボックスに出ないので視錐台カリングを切る

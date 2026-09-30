@@ -1,4 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
+import { BlobShadow } from './blobShadow'
 import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
@@ -450,6 +451,8 @@ const ZERO_MOVE = new THREE.Vector3()
 export class Soldier {
   /** シーンに add するルート */
   readonly object = new THREE.Group()
+  /** 足元の丸い影。太陽の影マップには人を入れない (world/staticShadow.ts) */
+  private readonly blob = new BlobShadow()
   /** 居る場所の空の見え方を材質に掛ける (屋内で暗くなる) */
   private readonly skyLight = new SkyLight()
 
@@ -816,6 +819,7 @@ export class Soldier {
     this.object.add(this.placeholder)
     this.box = createCardboardBox()
     this.object.add(this.box)
+    this.object.add(this.blob.mesh)
   }
 
   /**
@@ -2907,6 +2911,8 @@ export class Soldier {
   ): void {
     this.aimPitch = aimPitch
     this.lastWorld = world
+    this.blob.set(this.isProne ? 'prone' : this.isCrouching ? 'crouch' : 'stand')
+    this.blob.update(dt)
 
     // 倒れている間は入力を捨てる。重力と接地だけは回して、体が宙に浮かないようにする。
     if (this.down) moveDir = ZERO_MOVE
@@ -3570,7 +3576,7 @@ export class Soldier {
     model.rotation.y = MODEL_YAW_OFFSET
     model.traverse((obj) => {
       if (isMesh(obj)) {
-        obj.castShadow = true
+        obj.castShadow = false   // 影マップは動かない物だけ。人の影は足元の丸 (blob)
         // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
         obj.receiveShadow = true
         // スキニング後の実際の姿勢はバウンディングボックスに反映されないため、
@@ -3828,7 +3834,7 @@ function buildPlaceholder(): THREE.Group {
     new THREE.MeshStandardMaterial({ color: 0x6f7a63, roughness: 0.9 }),
   )
   mesh.position.y = PLAYER_HEIGHT / 2
-  mesh.castShadow = true
+  mesh.castShadow = false
   group.add(mesh)
   return group
 }

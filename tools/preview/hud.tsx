@@ -67,6 +67,17 @@ const cases: Record<string, Partial<GameStats>> = {
     match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 6, required: 2, players: [] },
     team: 'blue',
   },
+  // 定型文のボイス。T で出る番号の一覧と、倒した行と同じ欄に積まれる「名前：セリフ」
+  voice: {
+    match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 6, required: 2, players: [] },
+    team: 'blue',
+    voiceMenu: { title: 'VOICE', items: ['挨拶', '驚き', '煽り', 'その他'], pad: false },
+    kills: [
+      { type: 'kill', killer: 'me', killerName: 'CLAYMORE', killerTeam: 'blue', victim: 'x', victimName: 'do_nard', victimTeam: 'red', weapon: 'M4', headshot: false, at: Date.now() },
+      { type: 'voice', id: 'me', name: 'CLAYMORE', team: 'blue', text: '幸運を祈る', at: Date.now() - 1500 },
+      { type: 'voice', id: 'y', name: 'coffee-san', team: 'red', text: 'よろしくお願いします！', at: Date.now() - 3000 },
+    ],
+  },
   /*
    * 数えている間。**数字は上、指令は真ん中。**
    *

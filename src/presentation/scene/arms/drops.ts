@@ -84,7 +84,7 @@ export class Drops {
       // 銃口が -Z を向いているので、横倒しにして「落ちている」形にする
       model.rotation.z = Math.PI / 2
       model.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) obj.castShadow = true
+        if (obj instanceof THREE.Mesh) obj.castShadow = false   // 動く物は影マップに入れない (world/staticShadow.ts)
       })
       /*
        * **形の中心を軸に回す。**
