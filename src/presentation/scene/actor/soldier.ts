@@ -276,6 +276,8 @@ const VAULT_BODY_HEIGHT = 0.95
 const VAULT_FALL_DROP = 0.5
 /** 型のここまでは切らずに流す (尺に対する割合)。手を掛けて体を回すまで */
 const VAULT_FALL_PHASE = 0.6
+/** しゃがみから乗る時、乗る型をここで切ってしゃがみへ渡す (尺に対する割合)。腰の上がりが 9 割の所 */
+const VAULT_UP_CROUCH_CUT = 0.72
 /** 先の床が枠の上面とこれ以内の差なら「同じ高さ」= 一段上へ乗る (m) */
 const VAULT_SAME_LEVEL = 0.35
 /** 枠への向きを測る本数。周りで跳べる上面が見つかる向きの平均を取る */
@@ -348,9 +350,13 @@ const HANG_EDGE_REACH = 0.6
  *
  * 階段を駆け上がると一段ごとに接地と離地を繰り返すので、
  * 小さな段差まで拾うと着地モーションが出ずっぱりになる。
- * 0.6m のジャンプの着地は 3.4 m/s なので、それは拾って段差は捨てる高さに置く。
+ *
+ * 落ちる速さは**落ちる時の重力 (9.8 × FALL_GRAVITY_SCALE 1.8 = 17.6 m/s²)** で決まる:
+ * 段 1 つ (0.25m) で 3.0、瓦礫や土嚢 (0.35m) で 3.5、跳躍の高さ (0.6m) で 4.6。
+ * 3.0 にしていた頃は 0.26m 以上の段を下りるだけで着地の型 (膝を曲げる) が出て、
+ * 一段降りるたびに一瞬しゃがんで見えた。段差は捨てて跳躍だけ拾う所に引く
  */
-const LANDING_MIN_SPEED = 3.0
+const LANDING_MIN_SPEED = 4.3
 
 /**
  * 空中で進行方向を変えられる度合い (0 = 変えられない)。
@@ -3160,6 +3166,18 @@ export class Soldier {
      */
     if (this.vaultingUp && this.animator) {
       this.position.y = this.vaultFromY + (this.vaultToY - this.vaultFromY) * this.animator.vaultRise()
+      /*
+       * **しゃがみから乗ったら、型の終わり (立ち上がる所) は流さない。**
+       *
+       * 乗る型 (RunningJumpUp) は最後の 3 割で膝を伸ばして立ち上がる。しゃがみから
+       * 跳んだ場合は型が終わった瞬間にしゃがみへ戻すので、立ち上がり切ってから
+       * しゃがみへ瞬間移動して見えた。体が乗り切った所 (腰の上がりが 9 割) で型を
+       * 切り、膝を曲げた姿のまましゃがみの型へ混ぜる。残りの上がりはここで足す
+       */
+      if (this.rollFromCrouch && this.animator.oneShotPhase('vault_up') >= VAULT_UP_CROUCH_CUT) {
+        this.position.y = this.vaultToY
+        this.animator.endVault()
+      }
     }
 
     /*

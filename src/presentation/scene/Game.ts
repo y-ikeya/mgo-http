@@ -1115,9 +1115,18 @@ export class Game {
     //
     // three と three/webgpu は同じ three.core.js を読んでいるので、
     // Vector3 や Object3D は同じクラスのまま。混ざっても壊れない。
-    this.renderer = new WebGPURenderer({ antialias: true });
+    /*
+     * 深さの持ち方は既定 (0 が手前)。反転 (reversed) にすると遠くの精度は上がるが、
+     * 入れた途端に陽の当たる壁 (建物 9 の南面など) が一面チラついた (影の比べ方が
+     * 反転と噛み合っていない)。切り分け用: ?rdepth=1 で反転にできる
+     */
+    this.renderer = new WebGPURenderer({
+      antialias: true,
+      reversedDepthBuffer: new URLSearchParams(location.search).get("rdepth") === "1",
+    });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
+    // 切り分け用: ?shadow=0 で影を切る
+    this.renderer.shadowMap.enabled = new URLSearchParams(location.search).get("shadow") !== "0";
     // three r185 で PCFSoftShadowMap は deprecated (内部で PCFShadowMap にフォールバックする)
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     // 露出という 1 つのつまみで明るさを動かせるようにする。
