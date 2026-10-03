@@ -1667,6 +1667,18 @@ MAX_TEXTURE = 2048
 # 置き物 (壁や床でない、三角の多い形) の絵はさらに小さく。木箱は 1m 角で、2K を
 # 貼っても遊ぶ距離では見分けられない
 PROP_MAX_TEXTURE = 1024
+# 法線の絵はさらに小さく。glb の 21MB のうち絵が 18MB で、一番大きいのは地面・壁・煉瓦の法線
+# (2K で 1 枚 0.9〜2.1MB)。法線の細かさは近づかないと見分けられないので 1K で足りる
+NORMAL_MAX_TEXTURE = 1024
+
+def is_normal_map(node):
+    """法線の絵か。Normal Map ノードに繋がっているか、名前で判る (nor_gl / normal)"""
+    for output in node.outputs:
+        for link in output.links:
+            if link.to_node.type == 'NORMAL_MAP':
+                return True
+    name = node.image.name.lower()
+    return '_nor' in name or 'normal' in name
 
 def shrink_textures():
     seen = set()
@@ -1689,13 +1701,15 @@ def shrink_textures():
                 seen.add(image.name)
                 w, h = image.size
                 cap = PROP_MAX_TEXTURE if is_prop else MAX_TEXTURE
+                if is_normal_map(node):
+                    cap = min(cap, NORMAL_MAX_TEXTURE)
                 if max(w, h) <= cap:
                     continue
                 scale = cap / max(w, h)
                 image.scale(max(1, int(w * scale)), max(1, int(h * scale)))
                 shrunk.append((image.name, w, h, image.size[0], image.size[1]))
     if shrunk:
-        print(f'  絵を縮めた: {len(shrunk)} 枚 (上限 {MAX_TEXTURE}、置き物は {PROP_MAX_TEXTURE})')
+        print(f'  絵を縮めた: {len(shrunk)} 枚 (上限 {MAX_TEXTURE}、置き物は {PROP_MAX_TEXTURE}、法線は {NORMAL_MAX_TEXTURE})')
         for name, w, h, nw, nh in shrunk:
             print(f'    {name[:38]:40} {w}x{h} → {nw}x{nh}')
     else:

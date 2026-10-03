@@ -205,6 +205,16 @@ const GROUND_TILE_SIZE = 4
  * 実際の上限は GPU 次第で、three が対応値まで切り下げる。
  */
 const GROUND_ANISOTROPY = 8
+/**
+ * 切り分けの切り替え (URL)。壁のチラつきが何から来ているかを、1 つずつ消して見るための物。
+ *   ?nmap=0   法線の絵を貼らない
+ *   ?decal=0  汚れの板を隠す
+ *   ?shadow=0 影を切る (Game.ts)
+ */
+const DIAG = (() => {
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams()
+  return { nmap: q.get('nmap') !== '0', decal: q.get('decal') !== '0' }
+})()
 
 /**
  * 高所へ上がる階段を段の配列にする。
@@ -570,7 +580,8 @@ async function applyStructureTexture(
       loader.loadAsync(asset.texture(`${prefix}_rough.jpg`)),
     ])
     material.map = setup(diffuse, true)
-    material.normalMap = setup(normal, false)
+    // 切り分け用: ?nmap=0 で法線の絵を貼らない (壁のギラつきが法線の絵か見る)
+    if (DIAG.nmap) material.normalMap = setup(normal, false)
     material.roughnessMap = setup(roughness, false)
     // マップ側の値を使うので、係数は 1 にして素通しにする
     material.color.setHex(0xffffff)
@@ -1563,6 +1574,8 @@ async function replaceWithModel(
     } else {
       obj.visible = false
     }
+    // 切り分け用: ?decal=0 で壁の汚れの板を隠す
+    if (!DIAG.decal && name.includes('decal')) obj.visible = false
 
     /*
      * **壊れた形は止める側に入れない。**

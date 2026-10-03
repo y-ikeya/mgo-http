@@ -226,31 +226,6 @@
 }
 },
 {
-"name": "concrete_building18",
-"min": [
--5.655,
-9.034,
--4.557
-],
-"max": [
-3.544,
-13.168,
-8.212
-],
-"top": {
-"h": 13.1681,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "concrete_building17",
 "min": [
 5.816,
@@ -439,31 +414,6 @@
 ],
 "top": {
 "h": 13.3883,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "concrete_building18.001",
-"min": [
--3.888,
-8.981,
-7.677
-],
-"max": [
-0.522,
-13.115,
-13.993
-],
-"top": {
-"h": 13.115,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1888,31 +1838,6 @@
 }
 },
 {
-"name": "concrete_building18.002",
-"min": [
--7.067,
-12.976,
--4.815
-],
-"max": [
-3.546,
-17.111,
-8.502
-],
-"top": {
-"h": 17.1109,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "wood_box.013",
 "min": [
 -9.212,
@@ -2115,14 +2040,14 @@
 {
 "name": "wood_box.021",
 "min": [
--23.956,
+-23.491,
 9.86,
-5.773
+5.463
 ],
 "max": [
--22.853,
+-22.387,
 11.013,
-7.19
+6.88
 ],
 "top": {
 "h": 11.0132,
@@ -2140,14 +2065,14 @@
 {
 "name": "wood_box.022",
 "min": [
--23.956,
+-23.491,
 10.97,
-5.773
+5.463
 ],
 "max": [
--22.853,
+-22.387,
 12.124,
-7.19
+6.88
 ],
 "top": {
 "h": 12.1238,
@@ -11602,16 +11527,16 @@
 "name": "vis_decal_b5_streaks_nouv",
 "min": [
 -35.514,
-10.05,
+9.98,
 -13.284
 ],
 "max": [
 -18.746,
-17.96,
+17.89,
 2.754
 ],
 "top": {
-"h": 17.96,
+"h": 17.89,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -11677,16 +11602,16 @@
 "name": "vis_decal_b31_streaks_nouv",
 "min": [
 -24.034,
-10.05,
+9.98,
 28.806
 ],
 "max": [
 -4.546,
-20.66,
+20.59,
 44.214
 ],
 "top": {
-"h": 20.66,
+"h": 20.59,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -11752,16 +11677,16 @@
 "name": "vis_decal_b6_streaks_nouv",
 "min": [
 -38.904,
-10.05,
+9.98,
 -32.714
 ],
 "max": [
 -27.535,
-16.66,
+16.59,
 -18.786
 ],
 "top": {
-"h": 16.66,
+"h": 16.59,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -12354,16 +12279,16 @@
 "name": "vis_decal_b17_streaks_nouv",
 "min": [
 5.816,
-10.05,
+9.98,
 -15.364
 ],
 "max": [
 18.254,
-14.06,
+13.99,
 18.124
 ],
 "top": {
-"h": 14.06,
+"h": 13.99,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13179,107 +13104,6 @@
 }
 },
 {
-"name": "concrete_poles",
-"min": [
--11.322,
-10.0,
--12.17
-],
-"max": [
--7.438,
-19.0,
-27.2
-],
-"top": {
-"h": 19.0,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "metal_pole_arms",
-"min": [
--12.06,
-9.95,
--12.3
-],
-"max": [
--6.7,
-19.05,
-27.25
-],
-"top": {
-"h": 19.05,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "metal_wall_brackets",
-"min": [
--18.746,
-16.35,
--26.9
-],
-"max": [
-5.816,
-18.5,
-12.25
-],
-"top": {
-"h": 18.5,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "vis_metal_wires_notexture",
-"min": [
--18.327,
-16.761,
--26.723
-],
-"max": [
-5.399,
-18.435,
-27.05
-],
-"top": {
-"h": 18.4349,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false,
-"texture": false
-}
-},
-{
 "name": "metal_building31_sign",
 "min": [
 -11.961,
@@ -13634,16 +13458,16 @@
 "name": "vis_decal_b15_streak_nouv",
 "min": [
 33.892,
-11.28,
+11.21,
 -95.16
 ],
 "max": [
 39.03,
-12.61,
+12.54,
 -71.713
 ],
 "top": {
-"h": 12.61,
+"h": 12.54,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13784,17 +13608,17 @@
 {
 "name": "vis_decal_b32_streak_nouv",
 "min": [
--1.516,
-10.84,
--36.402
+-1.23,
+10.77,
+-36.277
 ],
 "max": [
-14.042,
-15.65,
+13.792,
+15.58,
 -21.37
 ],
 "top": {
-"h": 15.65,
+"h": 15.58,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13936,16 +13760,16 @@
 "name": "vis_decal_b9_streak_nouv",
 "min": [
 -4.0,
-10.82,
+10.85,
 -73.93
 ],
 "max": [
-17.066,
-19.0,
+17.061,
+18.931,
 -58.05
 ],
 "top": {
-"h": 19.0,
+"h": 18.9312,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14087,16 +13911,16 @@
 "name": "vis_decal_b22_streak_nouv",
 "min": [
 -4.73,
-10.78,
+10.81,
 -19.72
 ],
 "max": [
 3.36,
-19.0,
+18.932,
 -7.88
 ],
 "top": {
-"h": 19.0,
+"h": 18.9316,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14263,16 +14087,16 @@
 "name": "vis_decal_b10_streak_nouv",
 "min": [
 -27.965,
-10.9,
+10.93,
 -73.395
 ],
 "max": [
 -13.225,
-15.65,
+15.583,
 -55.855
 ],
 "top": {
-"h": 15.65,
+"h": 15.5826,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14490,16 +14314,16 @@
 "name": "concrete_building3",
 "min": [
 -35.83,
-9.783,
+9.78,
 4.77
 ],
 "max": [
 -17.97,
-21.013,
+21.1,
 23.73
 ],
 "top": {
-"h": 21.0135,
+"h": 21.1,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14515,16 +14339,16 @@
 "name": "concrete_building3_rubble",
 "min": [
 -35.225,
-9.835,
+9.854,
 4.392
 ],
 "max": [
 -23.118,
-10.687,
+10.684,
 11.2
 ],
 "top": {
-"h": 10.687,
+"h": 10.6836,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14540,19 +14364,19 @@
 "name": "col_concrete_building3_ramp",
 "min": [
 -34.3,
-9.833,
+9.83,
 3.6
 ],
 "max": [
 -24.0,
-10.153,
+10.03,
 6.9
 ],
 "top": {
-"h": 9.8635,
-"dx": 0.0,
-"dz": 0.17059,
-"thick": 0.5929
+"h": 9.9917,
+"dx": -0.0,
+"dz": 0.01537,
+"thick": 0.2125
 },
 "flags": {
 "draw": false,
@@ -14575,10 +14399,10 @@
 23.0
 ],
 "top": {
-"h": 10.1801,
-"dx": -0.21341,
+"h": 10.0486,
+"dx": -0.03821,
 "dz": -0.0,
-"thick": 0.3501
+"thick": 0.2186
 },
 "flags": {
 "draw": false,
@@ -14597,11 +14421,11 @@
 ],
 "max": [
 -21.7,
-13.12,
+13.21,
 18.4
 ],
 "top": {
-"h": 13.12,
+"h": 13.21,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14626,10 +14450,10 @@
 15.65
 ],
 "top": {
-"h": 10.0948,
-"dx": -0.21341,
+"h": 10.0443,
+"dx": -0.05558,
 "dz": -0.0,
-"thick": 0.2648
+"thick": 0.2143
 },
 "flags": {
 "draw": false,
@@ -14652,10 +14476,10 @@
 9.3
 ],
 "top": {
-"h": 10.0948,
-"dx": -0.21341,
+"h": 10.0443,
+"dx": -0.05558,
 "dz": -0.0,
-"thick": 0.2648
+"thick": 0.2143
 },
 "flags": {
 "draw": false,
@@ -14669,16 +14493,16 @@
 "name": "metal_building3_shutters",
 "min": [
 -35.48,
-10.033,
+10.03,
 5.12
 ],
 "max": [
 -18.32,
-19.863,
+19.95,
 23.38
 ],
 "top": {
-"h": 19.8635,
+"h": 19.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14694,16 +14518,16 @@
 "name": "glass_building3_panes_notexture",
 "min": [
 -35.59,
-12.083,
+12.08,
 5.01
 ],
 "max": [
 -18.21,
-20.063,
+20.15,
 23.49
 ],
 "top": {
-"h": 20.0635,
+"h": 20.15,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14720,16 +14544,16 @@
 "name": "metal_building3_bars",
 "min": [
 -35.37,
-12.083,
+12.08,
 10.838
 ],
 "max": [
 -18.43,
-12.683,
+12.68,
 23.27
 ],
 "top": {
-"h": 12.6835,
+"h": 12.68,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14745,16 +14569,16 @@
 "name": "vis_decal_b3_streak_nouv",
 "min": [
 -35.77,
-10.783,
+10.8,
 4.83
 ],
 "max": [
 -18.03,
-18.913,
+18.93,
 23.67
 ],
 "top": {
-"h": 18.9135,
+"h": 18.93,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14770,16 +14594,493 @@
 "name": "vis_decal_b3_grime_nouv",
 "min": [
 -35.42,
-10.033,
+10.03,
 5.18
 ],
 "max": [
 -18.38,
-11.033,
+11.029,
 23.32
 ],
 "top": {
-"h": 11.0329,
+"h": 11.0294,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "concrete_building18",
+"min": [
+-7.15,
+9.88,
+-4.89
+],
+"max": [
+3.84,
+17.75,
+14.29
+],
+"top": {
+"h": 17.75,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_building18_shutters",
+"min": [
+-6.8,
+10.13,
+-4.54
+],
+"max": [
+0.25,
+16.6,
+13.72
+],
+"top": {
+"h": 16.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "glass_building18_panes_notexture",
+"min": [
+-6.91,
+12.18,
+-4.65
+],
+"max": [
+1.747,
+16.8,
+8.34
+],
+"top": {
+"h": 16.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false
+}
+},
+{
+"name": "metal_building18_bars",
+"min": [
+-5.62,
+12.18,
+-4.53
+],
+"max": [
+0.955,
+12.78,
+1.937
+],
+"top": {
+"h": 12.78,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_decal_b18_streak_nouv",
+"min": [
+-7.09,
+10.88,
+-4.83
+],
+"max": [
+1.717,
+15.58,
+8.52
+],
+"top": {
+"h": 15.58,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b18_grime_nouv",
+"min": [
+-5.67,
+10.13,
+-4.58
+],
+"max": [
+3.24,
+11.108,
+14.01
+],
+"top": {
+"h": 11.1076,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "concrete_poles",
+"min": [
+-11.322,
+10.0,
+-12.17
+],
+"max": [
+-7.438,
+19.0,
+27.2
+],
+"top": {
+"h": 19.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_pole_arms",
+"min": [
+-12.06,
+9.95,
+-12.3
+],
+"max": [
+-6.7,
+19.05,
+27.25
+],
+"top": {
+"h": 19.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_wall_brackets",
+"min": [
+-18.746,
+16.35,
+-26.9
+],
+"max": [
+5.816,
+18.5,
+22.874
+],
+"top": {
+"h": 18.5,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_metal_wires_notexture",
+"min": [
+-18.327,
+16.761,
+-26.723
+],
+"max": [
+5.399,
+18.435,
+27.05
+],
+"top": {
+"h": 18.4349,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
+}
+},
+{
+"name": "vis_decal_b3_edge_nouv",
+"min": [
+-35.753,
+10.05,
+4.847
+],
+"max": [
+-18.047,
+21.08,
+23.653
+],
+"top": {
+"h": 21.08,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b9_edge_nouv",
+"min": [
+-3.983,
+10.09,
+-73.913
+],
+"max": [
+17.045,
+21.08,
+-58.067
+],
+"top": {
+"h": 21.08,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b10_edge_nouv",
+"min": [
+-27.943,
+10.17,
+-73.383
+],
+"max": [
+-13.237,
+17.73,
+-55.877
+],
+"top": {
+"h": 17.73,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b22_edge_nouv",
+"min": [
+-4.713,
+10.05,
+-19.703
+],
+"max": [
+3.343,
+21.08,
+-7.897
+],
+"top": {
+"h": 21.08,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b32_edge_nouv",
+"min": [
+-4.173,
+9.86,
+-37.784
+],
+"max": [
+15.034,
+17.73,
+-21.387
+],
+"top": {
+"h": 17.73,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b18_edge_nouv",
+"min": [
+-7.073,
+10.15,
+-4.813
+],
+"max": [
+3.553,
+17.73,
+13.993
+],
+"top": {
+"h": 17.73,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b17_edge_nouv",
+"min": [
+5.817,
+9.452,
+-15.363
+],
+"max": [
+18.253,
+16.716,
+18.123
+],
+"top": {
+"h": 16.7162,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b31_edge_nouv",
+"min": [
+-24.033,
+9.42,
+28.807
+],
+"max": [
+-4.466,
+23.18,
+44.213
+],
+"top": {
+"h": 23.18,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b15_edge_nouv",
+"min": [
+32.957,
+9.85,
+-98.293
+],
+"max": [
+43.493,
+13.51,
+-68.387
+],
+"top": {
+"h": 13.51,
 "dx": 0.0,
 "dz": 0.0
 },
