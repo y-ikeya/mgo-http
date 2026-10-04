@@ -36,7 +36,10 @@ import {
   applyStageSun,
   loadStageLadders,
   STAGE_CODE,
-  type Stage, loadStageBases } from "./world/stage";
+  type Stage, loadStageBases, loadStageBoxes } from "./world/stage";
+import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
+import { type StageBox, solidBlockers } from "../../sim/space/vision";
+import { PlacePreview } from "./arms/placePreview";
 import {
   ceilingHeight,
   clampToArena,
@@ -667,6 +670,14 @@ export class Game {
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
   private readonly claymores: Claymores;
+  /** 置く所の予告 (印と見張る扇) */
+  private readonly placePreview: PlacePreview;
+  /**
+   * 人が止まる箱。**審判と同じ集合** (server/stage.ts の solid) を、置ける場所の
+   * 判定 (placeSpot) に使う。届くまでは空 — その間は「置ける」と見る (弾くのは審判)
+   */
+  private placeSolid: StageBox[] = [];
+  private readonly placeAt: PlaceSpot = { x: 0, y: 0, z: 0, ok: false };
   private readonly decoys: Decoys;
   /** 割れた場所の置き場。毎回作らない */
   private readonly popAt = new THREE.Vector3();
@@ -1144,6 +1155,9 @@ export class Game {
     void loadStageBases(this.stageName).then((bases) => {
       this.stageBases = bases;
     });
+    void loadStageBoxes(this.stageName).then((boxes) => {
+      this.placeSolid = solidBlockers(boxes);
+    });
     /*
      * 水面をこの 2 つへ配る。**溺れた体は沈み、見ている側は水の上に残る。**
      *
@@ -1185,7 +1199,14 @@ export class Game {
       const sparks = fx.filter((f) => f.kind === "spark");
       if (sparks.length > 0) {
         this.stageSparks = new StageSparks(this.scene, sparks, (origin) => {
-          this.audio.play("spark", origin, 0.7);
+          /*
+           * **環境音も輪に出す。** 火花のバチッは足音と同じ扱いで、聞こえた強さのぶん
+           * その向きに山が立つ。切れかけの電線のそばでは輪が火花の山で埋まって、
+           * 人の足音の山が紛れる — **うるさい所で耳を澄ますと損をする**。静かな所を
+           * 選んで聞く、という判断を作るための物。輪を薄くはしない (塞ぐのは自分の音だけ)
+           */
+          const gain = this.audio.play("spark", origin, 0.7);
+          this.addPing("ambient", origin, gain);
         });
       }
     });
@@ -1217,6 +1238,7 @@ export class Game {
     this.grenades = new Grenades(this.scene);
     this.locators = new Locators(this.scene);
     this.claymores = new Claymores(this.scene);
+    this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
     this.sensed = new Sensed(this.scene);
@@ -3822,6 +3844,7 @@ export class Game {
     // クレイモアから離れたときも同じ。**構えっぱなしで腕が上がったまま**になる
     if (!isPlaceable(this.inv.held) && this.setupAiming && this.setupRelease <= 0) {
       this.setupAiming = false;
+      this.placePreview.hide();
       this.player.cancelThrow();
       this.player.setThrowing(false);
     }
@@ -4006,6 +4029,11 @@ export class Game {
    * **落下点は見せない** — 投げる物ではないので、置くのは自分の足元の前と決まっている。
    *
    * 置く型は 3.6 秒あって、その間ずっと無防備。置いて離れる道具の代償がここ。
+   *
+   * **置けない所では置く型に入らない。** 審判は壁際や縁の外を黙って弾く
+   * (placeSpot)。客が見ずに型だけ流すと、しゃがんで立ち上がって何も出ない、
+   * という形で出る。同じ式を手元で読んで、置けない間は引き金を無視して
+   * 構えのまま留める。印は赤くなるので、動けば置けると分かる。
    */
   private updateClaymoreSetup(): void {
     const canPlace =
@@ -4019,7 +4047,36 @@ export class Game {
     const held = canPlace && this.input.aiming;
     // 手榴弾と同じドメインルール。**構え始めと同じフレームに引かれた分も覚えておく**
     const pulled = this.triggerEdge || this.pendingSetup;
-    const release = held && this.setupAiming && pulled;
+    // 置く所。審判と同じ式 (向きは体の向き = 審判が受け取る yaw)
+    const spot = held
+      ? placeSpot(
+          { x: this.player.position.x, y: this.player.position.y, z: this.player.position.z, yaw: this.player.yaw },
+          this.placeSolid,
+          STEP_UP,
+          // 人が止まる面。審判と同じ (server/stage.ts の body)。無ければ箱で見る
+          this.stage.moveWorld?.surfaces ?? null,
+          this.placeAt,
+        )
+      : null;
+    if (spot && this.placeSolid.length === 0 && !this.stage.moveWorld) {
+      // 箱も面もまだ無い (届いていない / 読めなかった)。地面が 0 に見えて高い所では
+      // 全部「浮く」になるので、見ずに通す。弾くのは審判の仕事のまま
+      spot.ok = true;
+      spot.y = this.player.position.y;
+    }
+    // 構えている間だけ描く。置く型が流れ始めたら消す (置く所はもう決まった)
+    if (spot && this.setupRelease <= 0) {
+      this.placePreview.show(spot, this.player.yaw, this.setupHeld === "claymore");
+    } else {
+      this.placePreview.hide();
+    }
+    const placeable = !!spot?.ok;
+    if (pulled && !placeable) {
+      // 置けない所で引いた。**捨てる** — 動いて置ける所へ来た時に勝手に置かれると、
+      // 置く気の無い場所に置く。引き直してもらう
+      this.pendingSetup = false;
+    }
+    const release = held && this.setupAiming && pulled && placeable;
 
     if (held && !release) {
       /*
@@ -4037,7 +4094,8 @@ export class Game {
 
       if (!this.setupAiming) {
         this.player.playSetup();
-        this.pendingSetup = this.triggerEdge;
+        // 置けない所で引かれた分は覚えない (上と同じ理由)
+        this.pendingSetup = this.triggerEdge && placeable;
       }
       this.setupAiming = true;
       // 体をカメラの方へ向ける。置く向き = 自分の向きなので、これが照準になる
@@ -4061,6 +4119,7 @@ export class Game {
     }
     this.setupAiming = false;
     this.pendingSetup = false;
+    this.placePreview.hide();
     // 構えをやめただけなら置かない。覗いて場所を確かめる、が使える
     if (!release || !canPlace) {
       this.player.cancelThrow();

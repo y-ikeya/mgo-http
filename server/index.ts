@@ -51,7 +51,7 @@ import { newSession, sessionFor, sessionOf, sessions } from './session'
 import { type Client, ROOM_CAPACITY, broadcast, hostileToOwner, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
-import { lifeElapsed, newMatchPlayer, resupply, type MatchPlayer } from '../src/domain/player/player'
+import { headHeightOf, lifeElapsed, newMatchPlayer, resupply, type MatchPlayer } from '../src/domain/player/player'
 import {
   MODES,
   ROOMS,
@@ -66,8 +66,8 @@ import { RECONNECT_GRACE_MS, assignTeam, connected, present, nextSlot } from '..
 import { stampLocomotion, stampProtected } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD } from '../src/domain/item/held'
-import { triggeredBy } from '../src/sim/judge/claymore'
-import { TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
+import { sensedBy } from '../src/sim/judge/claymore'
+import { SENSE_HEIGHT, SENSOR_HEIGHT, TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
 import { costOf } from '../src/domain/player/skill'
@@ -340,12 +340,13 @@ setInterval(() => {
       if (room.phase === 'playing') {
         for (let i = room.claymores.length - 1; i >= 0; i--) {
           const claymore = room.claymores[i]
-          // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する**
+          // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する。**
+          // 壁の向こう・角の裏・別の階は反応しない (sensedBy)
           const hit = present(room).some(
             (p) =>
               canBeHurt(p.life) &&
               (p.id === claymore.owner || p.team !== claymore.team) &&
-              triggeredBy(claymore, p, TRIGGER_RANGE, TRIGGER_COS),
+              sensedBy(claymore, p, TRIGGER_RANGE, TRIGGER_COS, headHeightOf(p), SENSE_HEIGHT, SENSOR_HEIGHT, room.stage.sight),
           )
           if (!hit) continue
           detonateClaymore(room, claymore)

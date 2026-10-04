@@ -5,12 +5,13 @@
 import { connected, present } from '../../src/domain/match/match'
 import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
-import type { MatchPlayer, Team } from '../../src/domain/player/player'
+import { headHeightOf, type MatchPlayer, type Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
-import { PLACE_FORWARD, type Placed, SHOT_HALF, SHOT_TOP, blastReach, canPlaceAt } from '../../src/sim/judge/claymore'
-import { blastEffect } from '../../src/domain/item/claymore'
+import { type Placed, SHOT_HALF, SHOT_TOP, placeSpot } from '../../src/sim/judge/claymore'
+import { blastExposure } from '../../src/sim/judge/blast'
+import { BLAST_RANGE, SENSOR_HEIGHT, blastEffect } from '../../src/domain/item/claymore'
 import { overflowing } from '../../src/domain/item/held'
-import { type StageBox, groundUnder, segmentHitsBox } from '../../src/sim/space/vision'
+import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
 import { dropGrenade } from './grenade'
 import { sees } from '../relay'
@@ -44,14 +45,11 @@ export function placeClaymore(room: RoomWorld, from: MatchPlayer): void {
   // クレイモアを拾って持ち替えた人が置けなかった
   if (!canAct(from.life) || from.held !== 'claymore' || from.grenades <= 0) return
 
-  const forward = [-Math.sin(from.yaw), -Math.cos(from.yaw)]
-  const x = from.x + forward[0] * PLACE_FORWARD
-  const z = from.z + forward[1] * PLACE_FORWARD
-
   // 壁の中や縁の外へは置けない。**弾いても数は減らさない** —
-  // 置けなかったのに手フラグが減ると、押し間違いが取り返しの付かない損になる
-  const ground = groundUnder(x, z, from.y, room.stage.solid, STEP_UP).top
-  if (!canPlaceAt(x, z, from.y, ground, room.stage.solid)) return
+  // 置けなかったのに手フラグが減ると、押し間違いが取り返しの付かない損になる。
+  // 客も同じ式で見ていて、置けない所では置く型に入らない (Game.updateClaymoreSetup)
+  const spot = placeSpot(from, room.stage.solid, STEP_UP, room.stage.body)
+  if (!spot.ok) return
 
   from.grenades--
   /*
@@ -71,10 +69,10 @@ export function placeClaymore(room: RoomWorld, from: MatchPlayer): void {
     id: nextClaymoreId++,
     owner: from.id,
     team: from.team,
-    x,
+    x: spot.x,
     // 地面に乗せる。足元をそのまま使うと、段差の上に置いたときに沈む
-    y: ground,
-    z,
+    y: spot.y,
+    z: spot.z,
     // 置いた本人と同じ向き。自分が来た方を向く形になる
     yaw: from.yaw,
   }
@@ -191,8 +189,14 @@ export function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
     // 同じドメインルールで、自分の物で死ぬことがある。誰が味方かはルールが決める
     if (victim.id !== claymore.owner && !hostileToOwner(room, claymore.team, victim)) continue
 
-    // 距離を測るのは sim、何ダメージかはドメインルール (domain/item/claymore.ts)
-    const hit = blastEffect(blastReach(claymore, victim))
+    // 距離と遮蔽を測るのは sim、何ダメージかはドメインルール (domain/item/claymore.ts)。
+    // **壁の裏は減る** — 手榴弾と同じ blastExposure で、体の何割が爆心から見えていたか
+    const seen = blastExposure(
+      claymore.x, claymore.y + SENSOR_HEIGHT, claymore.z,
+      victim, headHeightOf(victim), BLAST_RANGE, room.stage.sight,
+    )
+    if (!seen) continue
+    const hit = blastEffect(seen.distance, seen.cover)
     if (hit.damage <= 0) continue
     const hurt = applyBlastDamage(
       room, victim, hit.damage,

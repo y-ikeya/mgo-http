@@ -48,13 +48,10 @@ export const SENSE_SECONDS = 5
 export const SHOT_HALF = 0.3
 export const SHOT_TOP = 1.7
 
-/**
- * 置ける場所の前方向 (m)。クレイモアと同じ。
- *
- * 足元ではなく少し前に置く。足元だと自分の体と重なって、置いた本人から
- * 見えなくなる。
+/*
+ * 置く位置 (前へ 0.9m) はクレイモアと同じ式 (sim/judge/claymore.ts の placeSpot)。
+ * 足元ではなく少し前に置く。足元だと自分の体と重なって、置いた本人から見えなくなる。
  */
-export const PLACE_FORWARD = 0.9
 
 /**
  * ぶつかったと見なす近さ (m)。人の半径 + 人形の半分。

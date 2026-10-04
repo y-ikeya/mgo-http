@@ -65,19 +65,44 @@ export interface BlastEffect {
 }
 
 /**
- * その距離で、どれだけ削れて転ぶか。
+ * 遮蔽の裏でどれだけ残るか。手榴弾と同じ値 (grenade.ts の BLAST_SHADOWED)。
+ *
+ * 0 にすると壁 1 枚で無傷。残しておくと「角の裏でも少しは食らう」になる。
+ */
+export const BLAST_SHADOWED = 0.25
+
+/**
+ * その距離・その晒され方で、どれだけ削れて転ぶか。
  *
  * 至近で 75、端で 25 まで線形に落ちる。**置いた本人も例外にしない** — 誰に
  * 当たったかを見ないのは、自分の物で削れることをドメインルールとして認めているため。
  *
- * 距離を測るのは sim (judge/claymore.ts の blastReach)。
+ * **壁の裏は減る。** 体の何割が爆心から見えていたか (cover) を手榴弾と同じ式で
+ * 掛ける。全部隠れていれば 1/4。転ぶのは遮蔽の外に居た相手だけ。
+ *
+ * 距離と遮蔽を測るのは sim (judge/blast.ts の blastExposure)。
+ *
+ * @param cover 爆心から見えていた体の割合 (0..1)
  */
-export function blastEffect(distance: number): BlastEffect {
+export function blastEffect(distance: number, cover: number): BlastEffect {
   if (distance > BLAST_RANGE) return { damage: 0, knock: false }
   const t = distance / BLAST_RANGE
+  const shade = BLAST_SHADOWED + (1 - BLAST_SHADOWED) * cover
   return {
-    damage: BLAST_MAX - t * (BLAST_MAX - BLAST_MIN),
+    damage: (BLAST_MAX - t * (BLAST_MAX - BLAST_MIN)) * shade,
     // 手榴弾と同じ割合 (届く距離の 7 割) で転ぶ。端で掠っただけの相手は立っている
-    knock: t < KNOCK_RATIO,
+    knock: cover > 0 && t < KNOCK_RATIO,
   }
 }
+
+/**
+ * 反応する高さの幅 (m)。相手の足元がこれより上下に離れていれば**別の階**。
+ *
+ * 見張るのは床の上を通る人。上の階の床は視線も止めるが、吹き抜けや手すりの
+ * 隙間から見えてしまうことがあるので、高さでも切る。1 段の段差 (0.4m) や
+ * 低い台の上は中。
+ */
+export const SENSE_HEIGHT = 1.2
+
+/** 見張る目の高さ (m)。本体の真ん中あたり */
+export const SENSOR_HEIGHT = 0.13

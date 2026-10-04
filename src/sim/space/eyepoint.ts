@@ -33,14 +33,6 @@
 import { firstBlockedAt, type StageBox } from './vision'
 
 /**
- * 腰だめのカメラ。**camera.ts の HIP_VIEW はここから読む** (値を 2 か所に置かない)。
- *
- * MGO2 の構図 (2026-09-21 に本人の切り抜きで測った): 真後ろから 3.8m、注視点は
- * 目より 0.25m 上。キャラは画面の真ん中の少し下に居る。lift は注視点を目の
- * 高さからどれだけ上げるか (m) で、上げるほどカメラも上がる。
- */
-export const HIP_CAMERA = { distance: 3.8, shoulder: 0, lift: 0.25 }
-/**
  * 構えたときのカメラ。camera.ts の AIM_VIEW と揃える。
  *
  * 実際は武器ごとに少し違う (domain/item/weapons.ts の aimDistance 等、1.3〜1.5m)。
@@ -52,6 +44,24 @@ export const HIP_CAMERA = { distance: 3.8, shoulder: 0, lift: 0.25 }
 // -0.1 では見上げが強くて照準が上へ逃げた (2026-09-27 「思ったよりカーソルが上」) ので目の高さに戻した。
 // 手元で試すなら ?aimy= (camera.ts)
 export const AIM_CAMERA = { distance: 1.35, shoulder: 0.42, lift: 0 }
+/**
+ * 腰だめのカメラ。**camera.ts の HIP_VIEW はここから読む** (値を 2 か所に置かない)。
+ *
+ * **構えの線の上に置く。** 注視点は構えと同じ (目の高さ・右肩 0.42m)、そこから
+ * 3.8m 引くだけ。カメラが構えの線の上に在ると、構えた瞬間に照準が出る場所が
+ * 画面の **1 点に固定される** — 相手が 5m 先でも 30m 先でも、立っていても
+ * しゃがんでいても同じ所。
+ *
+ * 以前は MGO2 の切り抜きに合わせて真後ろ (shoulder 0)・目より 0.25m 上に
+ * 置いていた。構えの線から左 0.42m・上 0.25m ずれていたので、照準が出る所が
+ * **相手との距離で動いた** (近いと右下、遠いと中央)。構える前に「相手の頭が
+ * 来る所」へ画面を持っていく操作が、そのたびに違う所を狙うことになっていた
+ * (2026-10-04 本人: 姿勢で照準の出る所が変わるのがストレス)。
+ *
+ * 画面の中でキャラが左に寄る分は、camera.ts が少し見下ろす向きで補う
+ * (HIP_PITCH_DOWN)。位置はここ、向きはあちら — 審判が見るのは位置だけ。
+ */
+export const HIP_CAMERA = { distance: 3.8, shoulder: AIM_CAMERA.shoulder, lift: AIM_CAMERA.lift }
 
 /** カメラが地面へ潜らない下限 (m)。camera.ts の MIN_CAMERA_Y と揃える */
 const MIN_Y = 0.4

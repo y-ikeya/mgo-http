@@ -1136,6 +1136,27 @@ export class CharacterAnimator {
   private pair: { windup: string; release: string; held: boolean; whole: boolean } | null = null
   /** 置く型の後半の尺 (秒) */
   setupReleaseDuration = 0
+  /** 置く型の速さの倍率 (TRAP MASTERY)。クリップを読む前に決まっていても効くよう持っておく */
+  private setupSpeed = 1
+
+  /**
+   * 置く型の速さを決める。**振りかぶりも置き切るのも同じ倍率**で速める。
+   *
+   * 置き切る方は素から SETUP_RELEASE_RATE で流しているので、その上に掛ける。
+   * 上下を同じ速さで流す — 片方だけ速めると腰から上と下が離れる。
+   */
+  setSetupSpeed(scale: number): void {
+    this.setupSpeed = scale
+    for (const [key, base] of [[SETUP_WINDUP_KEY, 1], [SETUP_RELEASE_KEY, SETUP_RELEASE_RATE]] as const) {
+      const rate = base * scale
+      this.upper.get(key)?.setEffectiveTimeScale(rate)
+      this.lower.get(key as Locomotion)?.setEffectiveTimeScale(rate)
+    }
+    // **実際に流れる秒数**を持つ。クリップの尺をそのまま出すと、速めたぶん
+    // 手を離れる時刻が後ろにずれて、置き終わってから物が出る
+    const clip = this.upper.get(SETUP_RELEASE_KEY)?.getClip()
+    this.setupReleaseDuration = (clip?.duration ?? 0) / (SETUP_RELEASE_RATE * scale)
+  }
 
   /** 吹き飛ばされる型の再生速度 (調整用)。着地の時刻もこれで割る */
   sweepRate = SWEEP_RATE
@@ -1640,9 +1661,7 @@ export class CharacterAnimator {
         this.lower.get(key as Locomotion)?.setEffectiveTimeScale(SETUP_RELEASE_RATE)
       }
     }
-    // **実際に流れる秒数**を持つ。クリップの尺をそのまま出すと、速めたぶん
-    // 手を離れる時刻が後ろにずれて、置き終わってから物が出る
-    this.setupReleaseDuration = (byName.get(SETUP_RELEASE_KEY)?.duration ?? 0) / SETUP_RELEASE_RATE
+    this.setSetupSpeed(this.setupSpeed)
 
     const bolt = byName.get('bolt')
     if (bolt) {
@@ -3438,7 +3457,7 @@ export class CharacterAnimator {
     /*
      * **実時間で返す。** 呼ぶ側は待ち時間として足すので (Game の setupRelease)、
      * クリップの秒のままだと**速めたぶんだけ長く待つ**ことになる。
-     * クレイモアの振りかぶりは 1.8 倍で流している。
+     * クレイモアの振りかぶりは TRAP MASTERY で速まる (setSetupSpeed)。
      */
     const rate = windup.getEffectiveTimeScale() || 1
     return Math.max(0, (windup.getClip().duration - windup.time) / rate)

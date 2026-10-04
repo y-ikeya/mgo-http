@@ -93,6 +93,11 @@ export class MeshMoveWorld implements MoveWorld {
   private readonly height: number
   private readonly stepUp: number
 
+  /** 人が止まる面そのもの。置ける場所の判定 (judge/claymore の placeSpot) が同じ面を見る */
+  get surfaces(): TriangleBvh {
+    return this.solid
+  }
+
   constructor(solid: TriangleBvh, options: MeshWorldOptions) {
     this.solid = solid
     this.height = options.height

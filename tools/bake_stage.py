@@ -36,6 +36,9 @@ SAMPLES = int(argv[0]) if argv and argv[0].isdigit() else 24
 # 面を割る間隔 (m)。細かいほど滑らかだが頂点が増える
 CELL = 4.0
 # ↑ 2.0 にしていた頃、40m の建物 1 棟が 12,000 枚 (glb の形が 8MB) になった。環境光は緩やかにしか変わらないので 4m で足りる
+# 小さな物 (これより小さい) の刻み (m)。箱 1 つの面の中にも頂点が入る
+PROP_SIZE = 6.0
+PROP_CELL = 0.8
 # 一番暗い所の明るさ。0 にすると奥が真っ黒になる — 実際は跳ね返りで少しは明るい
 FLOOR = 0.3
 # 光線を飛ばす距離 (m)。ステージの対角より長ければ十分
@@ -87,15 +90,18 @@ def subdivide(obj):
     # 「長くない」ことになって割られず (72 棟の箱がそうだった)、格子刻みでは刻み幅が負に
     # なって while が終わらなかった (書き出しが 10 分たっても終わらない)
     scale = max(abs(v) for v in obj.matrix_world.to_scale())
+    # 小さな物 (置き物・ブロック) は細かく割る。2m の箱を 4m 刻みだと面の 4 隅だけに値が入り、
+    # 四角を 2 つの三角に割った境で明るさの変わり方が折れて、斜めの線に見えた (基地の近くのブロック)
+    cell = CELL if max(obj.dimensions) >= PROP_SIZE else PROP_CELL
     bm = bmesh.new()
     bm.from_mesh(mesh)
     for _ in range(6):
         long_edges = [e for e in bm.edges
-                      if (e.verts[0].co - e.verts[1].co).length * scale > CELL]
+                      if (e.verts[0].co - e.verts[1].co).length * scale > cell]
         if not long_edges:
             break
         bmesh.ops.subdivide_edges(bm, edges=long_edges, cuts=1, use_grid_fill=True)
-    grid_cut(bm, scale)
+    grid_cut(bm, scale, cell)
     bm.to_mesh(mesh)
     bm.free()
 
@@ -114,7 +120,7 @@ def tangents(n):
     return t1, n.cross(t1).normalized()
 
 
-def grid_cut(bm, scale):
+def grid_cut(bm, scale, cell=CELL):
     """広い面を CELL の格子に刻む。辺を割るだけでは足りない面のため。
 
     窓の口を彫った壁は、口を避けた 1 枚の大きな多角形になる。辺を割っても頂点は縁に
@@ -141,7 +147,7 @@ def grid_cut(bm, scale):
         # 書き出しが 10 分を超えた。刻むのは、まだ CELL より広がっている面 (窓を彫った壁) だけ
         t1, t2 = tangents(n)
         cos = [v.co for v in f.verts]
-        if all(max(c.dot(t) for c in cos) - min(c.dot(t) for c in cos) < CELL * 1.25 / scale for t in (t1, t2)):
+        if all(max(c.dot(t) for c in cos) - min(c.dot(t) for c in cos) < cell * 1.25 / scale for t in (t1, t2)):
             continue
         key = (round(n.x, 2), round(n.y, 2), round(n.z, 2))
         groups.setdefault(key, []).append(f)
@@ -153,7 +159,7 @@ def grid_cut(bm, scale):
         for t in (t1, t2):
             ts = [v.co.dot(t) for v in verts]
             lo, hi = min(ts), max(ts)
-            step = CELL / scale
+            step = cell / scale
             if step <= 0:
                 return
             x = lo + step

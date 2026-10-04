@@ -110,6 +110,40 @@ describe('AWARENESS', () => {
   }, 30000)
 })
 
+describe('TRAP MASTERY', () => {
+  test('持つ人の置き物は、相手が AWARENESS を持っていても気配にならない', async () => {
+    server = await startServer()
+    const { a, b } = await twoWithSkills(['tm-a1', 'tm-b1'], { a: { trapMastery: 1 }, b: { awareness: 1 } })
+    // a が 12m 先で置く。TRAP MASTERY が無ければ b に届く距離 (上の AWARENESS の試験と同じ)
+    await placed(a)
+
+    expect(b.got('sensed')).toBe(0)
+    // 置けていること自体は変わらない
+    expect(a.got('decoyPlaced')).toBe(1)
+  }, 30000)
+})
+
+describe('THROWING MASTERY', () => {
+  /** 投げ物は THROWING MASTERY の側で隠れる。TRAP MASTERY では隠れない */
+  test('持つ人の手榴弾は気配にならない。無ければ映る', async () => {
+    server = await startServer()
+    const { a, b } = await twoWithSkills(['th-a1', 'th-b1'], { a: { throwing: 1 }, b: { awareness: 1 } })
+    // a が足元へ落とす (b は 12m 先)。導火線 3 秒の間に気配の走査が何度も回る
+    a.send({ type: 'grenade', dir: [0, -1, 0] })
+    await Bun.sleep(1200)
+    expect(b.got('sensed')).toBe(0)
+  }, 30000)
+
+  test('TRAP MASTERY では手榴弾は隠れない', async () => {
+    server = await startServer()
+    const { a, b } = await twoWithSkills(['th-a2', 'th-b2'], { a: { trapMastery: 1 }, b: { awareness: 1 } })
+    a.send({ type: 'grenade', dir: [0, -1, 0] })
+    await Bun.sleep(1200)
+    expect(b.got('sensed')).toBeGreaterThanOrEqual(1)
+    expect((b.last.get('sensed') as { key: string }).key.startsWith('grenade:')).toBe(true)
+  }, 30000)
+})
+
 describe('E LOCATOR は気配で暴く', () => {
   /**
    * **輪郭ではなく霧。** 暴かれた相手は exposed (壁越しの輪郭) ではなく

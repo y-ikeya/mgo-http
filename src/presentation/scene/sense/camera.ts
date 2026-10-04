@@ -36,13 +36,33 @@ import { AIM_CAMERA, HIP_CAMERA } from '../../../sim/space/eyepoint'
  * 構えは武器ごとの値 (domain/item/weapons.ts の aimDistance 等) で、同じ形の
  * ?aimd= ?aims= ?aimf= ?aimy= で上書きできる (setAimView)。
  */
+/**
+ * 腰だめで**どれだけ見下ろすか** (rad)。
+ *
+ * 腰だめのカメラは構えの線の上に在る (eyepoint.ts の HIP_CAMERA)。真っ直ぐ
+ * 構えの向きを向くと、構えた時に照準が出る所が画面のど真ん中で、キャラの頭は
+ * その真横 (左 0.42m = 6 度)。少し見下ろす向きにすると、その点が中央の少し上へ
+ * 移り、**キャラの頭のやや右上**に照準が出る形になる。弾道 (aimDirection) は
+ * 変えない — 向きだけで、線は構えのまま。
+ *
+ *     ?camp=3    度で試す
+ */
+const HIP_PITCH_DOWN = (tunedSigned('camp', 3) * Math.PI) / 180
+
+/** ?cams= で腰だめの肩を直に決めたいとき。無ければ構えの肩に追従する (update) */
+const HIP_SHOULDER_TUNED = ((): number | null => {
+  const raw = new URLSearchParams(globalThis.location?.search ?? '').get('cams')
+  return raw !== null && Number.isFinite(Number(raw)) ? Number(raw) : null
+})()
+
 const HIP_VIEW = {
   distance: tunedSigned('camd', HIP_CAMERA.distance),
-  shoulder: tunedSigned('cams', HIP_CAMERA.shoulder),
+  shoulder: HIP_SHOULDER_TUNED ?? HIP_CAMERA.shoulder,
   fov: tunedSigned('camf', 60),
   lift: tunedSigned('camy', HIP_CAMERA.lift),
+  pitchDown: HIP_PITCH_DOWN,
 }
-const AIM_VIEW = { ...AIM_CAMERA, fov: 38 }
+const AIM_VIEW = { ...AIM_CAMERA, fov: 38, pitchDown: 0 }
 
 /** URL の数値。負も通す (world/stage.ts の tuned は明るさ用で負を弾く) */
 function tunedSigned(name: string, fallback: number): number {
@@ -292,6 +312,8 @@ export class FollowCamera {
   private shoulder = HIP_VIEW.shoulder
   /** 注視点の上下のずらし (m)。腰だめと構えで違うので均しながら動く */
   private lift = HIP_VIEW.lift
+  /** 見下ろしの足し分 (rad)。腰だめだけ。構えると 0 へ均す */
+  private pitchDown = HIP_VIEW.pitchDown
   /** 覗きながら傾いた分の横ずれ (m、右が正)。肩のずれと同じ向きに足す */
   private leanOffset = 0
   private leanTarget = 0
@@ -305,6 +327,8 @@ export class FollowCamera {
   private currentViewHeight = PLAYER_HEIGHT * 0.85
 
   private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ')
+  /** カメラ本体の向き。腰だめでは弾道の向き (euler) より pitchDown だけ下を向く */
+  private readonly lookEuler = new THREE.Euler(0, 0, 0, 'YXZ')
   /** 注視点 = 弾道の始点。カメラの視線軸上にあるのでクロスヘアと一致する */
   private readonly pivot = new THREE.Vector3()
   private readonly viewDir = new THREE.Vector3()
@@ -503,7 +527,7 @@ export class FollowCamera {
     this.occludedDistance = this.distance
     this.computeDesired(player, world, 0)
     this.camera.position.copy(this.desired)
-    this.camera.rotation.copy(this.euler)
+    this.camera.rotation.copy(this.lookEuler)
   }
 
   update(dt: number, player: Soldier, world?: CameraWorld): void {
@@ -519,8 +543,15 @@ export class FollowCamera {
 
     const target = this.aiming ? this.aimView : HIP_VIEW
     this.distance = damp(this.distance, target.distance, AIM_LAMBDA, dt)
-    this.shoulder = damp(this.shoulder, target.shoulder, AIM_LAMBDA, dt)
+    /*
+     * 腰だめの肩のずれは**いま持っている銃の構えと同じ**にする。カメラを構えの
+     * 線の上に置くのが目的なので、銃ごとに違う肩のずれ (weapons.ts の aimShoulder)
+     * に追従させる。覗く銃 (shoulder 0) なら真後ろ。URL で ?cams= が来ていればそれ
+     */
+    const shoulder = this.aiming || HIP_SHOULDER_TUNED !== null ? target.shoulder : this.aimView.shoulder
+    this.shoulder = damp(this.shoulder, shoulder, AIM_LAMBDA, dt)
     this.lift = damp(this.lift, target.lift, AIM_LAMBDA, dt)
+    this.pitchDown = damp(this.pitchDown, target.pitchDown, AIM_LAMBDA, dt)
     this.leanOffset = damp(this.leanOffset, this.leanTarget, AIM_LAMBDA, dt)
 
     const fov = damp(this.fov, target.fov, AIM_LAMBDA, dt)
@@ -538,7 +569,7 @@ export class FollowCamera {
       damp(p.y, this.desired.y, POSITION_LAMBDA, dt),
       damp(p.z, this.desired.z, POSITION_LAMBDA, dt),
     )
-    this.camera.rotation.copy(this.euler)
+    this.camera.rotation.copy(this.lookEuler)
   }
 
   setAspect(aspect: number): void {
@@ -551,6 +582,7 @@ export class FollowCamera {
     const yaw = this.aimYaw
     this.euler.set(this.aimPitch, yaw, 0)
     this.viewDir.set(0, 0, -1).applyEuler(this.euler)
+    this.lookEuler.set(this.aimPitch - this.pitchDown, yaw, 0)
 
     // 肩オフセットは水平方向のみ (pitch で肩越しの左右がブレないように)
     const rightX = Math.cos(yaw)

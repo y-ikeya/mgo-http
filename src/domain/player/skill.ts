@@ -39,6 +39,7 @@ export type SkillId =
   | 'exposure'
   | 'targetAlert'
   | 'awareness'
+  | 'trapMastery'
 
 /** 取れるレベル。0 は「取っていない」 */
 type SkillLevel = 1 | 2 | 3
@@ -110,7 +111,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   throwing: {
     id: 'throwing',
     label: 'THROWING MASTERY',
-    hint: '遠くへ投げられる',
+    hint: '遠くへ投げられる。**投げた手榴弾が相手の AWARENESS に映らない**',
     /*
      * **段が無い。取るか取らないかだけ** (ENEMY EXPOSURE と同じ扱い)。
      *
@@ -148,6 +149,19 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
     /*
      * **段が無い。** 本家は段で届く距離が伸びた (8 / 15 / 20.5m) が、
      * 値段が 1 のままなら上の段しか選ばれない (EE と同じ理由)。距離を 1 つに決める。
+     */
+    levels: 1,
+  },
+  trapMastery: {
+    id: 'trapMastery',
+    label: 'TRAP MASTERY',
+    hint: '置くのが速い。**置いた物 (クレイモア / DECOY / E LOCATOR) が相手の AWARENESS に映らない**',
+    /*
+     * **段が無い。** 速さに段を付けても、映らなくなる方は on/off なので、上の段しか
+     * 選ばれない (EE・AWARENESS と同じ理由)。
+     *
+     * AWARENESS の裏返しとして置く。向こうが 1 コストで置き物を見抜くなら、
+     * こちらも 1 コストで見抜かれなくなる — **どちらを買ったかの読み合い**になる。
      */
     levels: 1,
   },
@@ -471,6 +485,31 @@ export function hasAwareness(skills: Skills): boolean {
 
 export const AWARENESS_RADIUS = 15
 
+/**
+ * TRAP MASTERY。**置くのが速く、置いた物が AWARENESS に映らない。**
+ *
+ * 映らなくなるのは**置く物**だけ (クレイモア / DECOY / E LOCATOR)。手榴弾は投げ物で、
+ * そちらは THROWING MASTERY の側 (hidesGrenades)。決めるのはサーバー (server/aware.ts)。
+ */
+export function hasTrapMastery(skills: Skills): boolean {
+  return levelOf(skills, 'trapMastery') > 0
+}
+
+/**
+ * THROWING MASTERY。**投げた手榴弾が AWARENESS に映らない。**
+ *
+ * 置き物は TRAP MASTERY、投げ物は THROWING MASTERY — 腕前ごとに隠せる物が分かれる。
+ * 遠くへ投げられるだけだと 1 コストの重みが EE や AWARENESS に負けていた
+ */
+export function hidesGrenades(skills: Skills): boolean {
+  return levelOf(skills, 'throwing') > 0
+}
+
+/** 置く型の速さの倍率。振りかぶりも置き切るのも同じだけ速くなる */
+export function setupSpeedScale(skills: Skills): number {
+  return SETUP_SPEED[levelOf(skills, 'trapMastery')] ?? 1
+}
+
 // --- 段ごとの値。添字が Lv で、0 は「取っていない」 ---
 
 // Lv3 が 1.16 だった頃は Lv2 (1.1) の時点で「速すぎる」と実機で出た (2026-09-21)。
@@ -497,5 +536,7 @@ const MASTERY_RECOVERY = [1, 1.1, 1.2, 1.35] as const
  * (1.1 → 1.21 倍) よりは明確に遠い、という位置に置いた。
  */
 const THROW_SCALE = [1, 1.2] as const
+// 置く速さ。**1 段だけ。** 1.4 倍 — 振りかぶり 1.77 秒が 1.26 秒に。かがむ動きが早送りに見えない上限
+const SETUP_SPEED = [1, 1.4] as const
 // **1 段だけ。** 添字 0 は「取っていない」
 const EXPOSE_SECONDS = [0, 5] as const

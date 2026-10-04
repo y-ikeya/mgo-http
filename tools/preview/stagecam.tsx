@@ -9,6 +9,7 @@
  *     ?shadow=0              太陽の影マップを切る
  *     ?vcol=0                焼き込みの頂点色 (空の見え方) を切る
  *     ?col=1                 描かない物 (col_ など) も描く
+ *     ?place=x,y,z,yaw       その足元・向きで置く所の予告 (印と扇) を出す。置けなければ赤
  *
  * --- なぜ要るか ---
  * 壁に斜めの帯が出た時、影マップの影なのか、焼き込んだ頂点色なのか、見えない当たりの
@@ -17,7 +18,11 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
+import { placeSpot } from '../../src/sim/judge/claymore'
+import { solidBlockers } from '../../src/sim/space/vision'
+import { STEP_UP } from '../../src/domain/player/moving'
 
 const query = new URLSearchParams(location.search)
 const stageName = (query.get('stage') ?? 'city') as StageName
@@ -68,6 +73,17 @@ if (query.get('vcol') === '0' || query.get('col') === '1') {
       }
     }
   })
+}
+
+// 置く所の予告。本番と同じ式 (placeSpot) と同じ描き方 (PlacePreview)
+const placeRaw = query.get('place')?.split(',').map(Number)
+if (placeRaw && placeRaw.length === 4 && placeRaw.every(Number.isFinite)) {
+  const solid = solidBlockers(await loadStageBoxes(stageName))
+  const from = { x: placeRaw[0]!, y: placeRaw[1]!, z: placeRaw[2]!, yaw: placeRaw[3]! }
+  const move = await loadStageMoveWorld(stageName)
+  const spot = placeSpot(from, solid, STEP_UP, move?.surfaces ?? null)
+  new PlacePreview(scene).show(spot, from.yaw, true)
+  console.log(`[place] ${spot.x.toFixed(2)} ${spot.y.toFixed(2)} ${spot.z.toFixed(2)} ok=${spot.ok}`)
 }
 
 const panel = document.createElement('pre')

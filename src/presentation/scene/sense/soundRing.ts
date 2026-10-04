@@ -61,7 +61,8 @@ const NOISE_HOLD = 0.5
 /** 保持が明けてから聞こえるようになる速さ。大きいほど早い */
 const NOISE_RECOVERY = 9
 
-export type PingKind = 'step' | 'roll' | 'shot' | 'hit'
+/** ambient は環境音 (火花など)。色も尺も足音と同じ — 「何の音か」は音そのもので分かる */
+export type PingKind = 'step' | 'roll' | 'shot' | 'hit' | 'ambient'
 
 /**
  * 山の色。基本は白。
