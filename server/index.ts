@@ -21,7 +21,7 @@ import { recordLag } from '../src/domain/match/lag'
 import { AUTH_CLOSE_CODE, LAG_CLOSE_CODE } from '../src/application/protocol/types'
 import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
-import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
+import { type Claymore, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
@@ -338,19 +338,22 @@ setInterval(() => {
 
       // クレイモア。前を敵が通ったら起爆する
       if (room.phase === 'playing') {
-        for (let i = room.claymores.length - 1; i >= 0; i--) {
-          const claymore = room.claymores[i]
-          // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する。**
-          // 壁の向こう・角の裏・別の階は反応しない (sensedBy)
-          const hit = present(room).some(
+        // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する。**
+        // 壁の向こう・角の裏・別の階は反応しない (sensedBy)
+        const tripped = (claymore: Claymore): boolean =>
+          present(room).some(
             (p) =>
               canBeHurt(p.life) &&
               (p.id === claymore.owner || p.team !== claymore.team) &&
               sensedBy(claymore, p, TRIGGER_RANGE, TRIGGER_COS, headHeightOf(p), SENSE_HEIGHT, SENSOR_HEIGHT, room.stage.sight),
           )
-          if (!hit) continue
-          detonateClaymore(room, claymore)
-          room.claymores.splice(i, 1)
+        // **一覧から外してから起爆する。** 爆風が近くの物を誘爆させて一覧を
+        // 書き換えるので、添字で回さずに毎回頭から探し直す
+        for (;;) {
+          const i = room.claymores.findIndex(tripped)
+          if (i < 0) break
+          const [claymore] = room.claymores.splice(i, 1)
+          detonateClaymore(room, claymore!)
         }
       }
     }

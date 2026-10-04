@@ -20,6 +20,7 @@ import {
 } from '../../src/domain/item/grenade'
 import { stanceOf } from '../../src/domain/player/stance'
 import { applyBlastDamage } from '../damage'
+import { blastPlaced } from './claymore'
 import { type RoomWorld, broadcast, hostileToOwner, setLife } from '../world'
 
 /**
@@ -164,6 +165,9 @@ export function detonate(room: RoomWorld, nade: Grenade): void {
   // 何が起きたのか分からなくなる (銃と同じドメインルール)。
   // 飛ぶことと爆ぜることは止めない — 一人で立ち上げて試せなくなる
   if (room.phase !== 'playing') return
+
+  // 置き物を壊す。クレイモアは誘爆し、DECOY は破れる (claymore.ts の blastPlaced)
+  blastPlaced(room, x, y, z, BLAST_RADIUS)
 
   for (const victim of present(room)) {
     // 撃たれる状態に居る人だけ。まだ湧いていない・無敵・倒れている最中は通らない

@@ -14,6 +14,7 @@ import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
 import { dropGrenade } from './grenade'
+import { popDecoy } from './decoy'
 import { sees } from '../relay'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast, friendlyTeam, hostileToOwner } from '../world'
@@ -150,16 +151,20 @@ function evictOldest(room: RoomWorld, owner: string): void {
 }
 
 export function shotHitsClaymore(room: RoomWorld, from: readonly number[], to: readonly number[]): void {
-  for (let i = room.claymores.length - 1; i >= 0; i--) {
-    const claymore = room.claymores[i]
+  const hit = (claymore: Claymore): boolean => {
     const box: StageBox = {
       name: 'claymore',
       min: [claymore.x - SHOT_HALF, claymore.y, claymore.z - SHOT_HALF],
       max: [claymore.x + SHOT_HALF, claymore.y + SHOT_TOP, claymore.z + SHOT_HALF],
     }
-    if (!segmentHitsBox(from[0], from[1], from[2], to[0], to[1], to[2], box)) continue
-    detonateClaymore(room, claymore)
-    room.claymores.splice(i, 1)
+    return segmentHitsBox(from[0]!, from[1]!, from[2]!, to[0]!, to[1]!, to[2]!, box)
+  }
+  // 一覧から外してから起爆する (誘爆が一覧を書き換える。index.ts の tick と同じ形)
+  for (;;) {
+    const i = room.claymores.findIndex(hit)
+    if (i < 0) break
+    const [claymore] = room.claymores.splice(i, 1)
+    detonateClaymore(room, claymore!)
   }
 }
 
@@ -176,12 +181,52 @@ export function clearClaymores(room: RoomWorld): void {
   for (const viewer of connected(room)) sessionOf(viewer).seenClaymores.clear()
 }
 
-/** 起爆。前に居た敵だけを巻き込む */
+/**
+ * 爆風で置き物を壊す。**クレイモアは誘爆し、DECOY は破れる。**
+ *
+ * 置き物を壊せるのが弾だけだと、角の罠を処理する手が「撃つ」しか無い。
+ * MGO2 と同じで、手榴弾 1 個で掃除できる方が罠に対する手が増える。代わりに
+ * 置く側には「並べ過ぎると 1 個で一掃される」代償が付く — 誘爆は連鎖する。
+ *
+ * 届く範囲は人と同じ (呼ぶ側の radius)。**遮蔽も人と同じ**で、爆心から本体へ
+ * 線が通る物だけ。壁の裏の罠は残る。E LOCATOR は投げ物なので触らない。
+ *
+ * 誘爆の順: 一覧から外してから起爆する。外す前に起爆すると、その爆風が
+ * 自分自身をもう一度見つけて止まらない。
+ */
+export function blastPlaced(room: RoomWorld, cx: number, cy: number, cz: number, radius: number): void {
+  for (let i = room.decoys.length - 1; i >= 0; i--) {
+    const decoy = room.decoys[i]!
+    if (!reaches(room, cx, cy, cz, decoy.x, decoy.y + DECOY_CHEST, decoy.z, radius)) continue
+    room.decoys.splice(i, 1)
+    popDecoy(room, decoy)
+  }
+  // 誘爆。1 つ爆ぜるたびに一覧が変わるので、毎回頭から探し直す
+  for (;;) {
+    const i = room.claymores.findIndex((c) => reaches(room, cx, cy, cz, c.x, c.y + SENSOR_HEIGHT, c.z, radius))
+    if (i < 0) break
+    const [next] = room.claymores.splice(i, 1)
+    detonateClaymore(room, next!)
+  }
+}
+
+/** DECOY の胸の高さ (m)。爆心から見る点 */
+const DECOY_CHEST = 0.9
+
+/** 爆心から置き物へ届くか。距離の中で、線が通る */
+function reaches(room: RoomWorld, cx: number, cy: number, cz: number, x: number, y: number, z: number, radius: number): boolean {
+  if (Math.hypot(x - cx, y - cy, z - cz) > radius) return false
+  return room.stage.sight.clear(cx, cy, cz, x, y, z)
+}
+
+/** 起爆。前に居た敵だけを巻き込む。近くの置き物は壊す (blastPlaced) */
 export function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
   // 起爆は隠さない。音も光も壁を回り込んで届く (手榴弾と同じドメインルール)
   broadcast(room, { type: 'claymoreGone', id: claymore.id, blast: true })
   for (const viewer of connected(room)) sessionOf(viewer).seenClaymores.delete(claymore.id)
   if (room.phase !== 'playing') return
+
+  blastPlaced(room, claymore.x, claymore.y + SENSOR_HEIGHT, claymore.z, BLAST_RANGE)
 
   for (const victim of present(room)) {
     if (!canBeHurt(victim.life)) continue
