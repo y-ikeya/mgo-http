@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { blastReach, canPlaceAt, triggeredBy, type Placed } from './claymore'
+import { blastReach, canPlaceAt, placeSpot, triggeredBy, type Placed } from './claymore'
 
 /**
  * **試験の数字はここで決める。** 遊びの側 (domain) の値を持ち出さない —
@@ -88,5 +88,37 @@ describe('置ける場所', () => {
   test('床の上には置ける。地面そのものに当たって弾かれない', () => {
     const floor = [{ min: [-10, -1, -10], max: [10, 0, 10] }]
     expect(canPlaceAt(0, 0, 0, 0, floor)).toBe(true)
+  })
+})
+
+describe('置く所 (placeSpot)。審判も客も同じ式', () => {
+  const floor = [{ name: 'floor', min: [-10, -1, -10], max: [10, 0, 10] }]
+
+  test('前へ 0.9m、地面に乗る', () => {
+    // yaw = 0 なら前は -Z
+    const spot = placeSpot({ x: 0, y: 0, z: 0, yaw: 0 }, floor, 0.4)
+    expect(spot.x).toBeCloseTo(0)
+    expect(spot.z).toBeCloseTo(-0.9)
+    expect(spot.y).toBeCloseTo(0)
+    expect(spot.ok).toBe(true)
+  })
+
+  test('前が壁なら置けない。場所は返す (印を赤く出すため)', () => {
+    const wall = [...floor, { name: 'wall', min: [-2, 0, -1.5], max: [2, 2, -0.5] }]
+    const spot = placeSpot({ x: 0, y: 0, z: 0, yaw: 0 }, wall, 0.4)
+    expect(spot.ok).toBe(false)
+    expect(spot.z).toBeCloseTo(-0.9)
+  })
+
+  test('縁の外は浮くので置けない。後ろを向けば置ける', () => {
+    const ledge = [{ name: 'ledge', min: [-10, 0, 0], max: [10, 2, 10] }]
+    expect(placeSpot({ x: 0, y: 2, z: 0.5, yaw: 0 }, ledge, 0.4).ok).toBe(false)
+    expect(placeSpot({ x: 0, y: 2, z: 0.5, yaw: Math.PI }, ledge, 0.4).ok).toBe(true)
+  })
+
+  test('渡した器に書く (毎フレーム呼んでも散らかさない)', () => {
+    const out = { x: 9, y: 9, z: 9, ok: false }
+    expect(placeSpot({ x: 1, y: 0, z: 1, yaw: 0 }, floor, 0.4, out)).toBe(out)
+    expect(out.x).toBeCloseTo(1)
   })
 })

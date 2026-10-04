@@ -17,17 +17,16 @@ import { canAct } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
 import type { MatchPlayer, Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
-import { type Placed, canPlaceAt } from '../../src/sim/judge/claymore'
+import { type Placed, placeSpot } from '../../src/sim/judge/claymore'
 import {
   BUMP_COOLDOWN,
   BUMP_RANGE,
   DEPLOY_SECONDS,
-  PLACE_FORWARD,
   SHOT_HALF,
   SHOT_TOP,
 } from '../../src/domain/item/decoy'
 import { overflowing } from '../../src/domain/item/held'
-import { type StageBox, groundUnder, segmentHitsBox } from '../../src/sim/space/vision'
+import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast } from '../world'
 
@@ -67,12 +66,8 @@ export function placeDecoy(room: RoomWorld, from: MatchPlayer, now: number): voi
   // **手にある物で決める。** 装備の選択で見ると、拾って持ち替えた人が置けない
   if (!canAct(from.life) || from.held !== 'decoy' || from.grenades <= 0) return
 
-  const forward = [-Math.sin(from.yaw), -Math.cos(from.yaw)]
-  const x = from.x + forward[0] * PLACE_FORWARD
-  const z = from.z + forward[1] * PLACE_FORWARD
-
-  const ground = groundUnder(x, z, from.y, room.stage.solid, STEP_UP).top
-  if (!canPlaceAt(x, z, from.y, ground, room.stage.solid)) return
+  const spot = placeSpot(from, room.stage.solid, STEP_UP)
+  if (!spot.ok) return
 
   from.grenades--
   /*
@@ -88,10 +83,10 @@ export function placeDecoy(room: RoomWorld, from: MatchPlayer, now: number): voi
     owner: from.id,
     team: from.team,
     skin: from.name,
-    x,
+    x: spot.x,
     // 地面に乗せる。足元をそのまま使うと、段差の上に置いたときに沈む
-    y: ground,
-    z,
+    y: spot.y,
+    z: spot.z,
     /*
      * **置いた本人と向かい合わせにする。**
      *

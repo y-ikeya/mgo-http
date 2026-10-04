@@ -8,9 +8,45 @@
  * three にも DOM にも依存しない。サーバーが起爆を決める。
  */
 
+import { type StageBox, groundUnder } from '../space/vision'
 
 /** 置く位置。本人の足元から前へ何 m か */
 export const PLACE_FORWARD = 0.9
+
+export interface PlaceSpot {
+  x: number
+  /** 地面の高さ。置く物はここに乗る */
+  y: number
+  z: number
+  /** 置けるか (canPlaceAt) */
+  ok: boolean
+}
+
+/**
+ * 置く場所と、そこに置けるか。**サーバーも客も同じ式を読む。**
+ *
+ * 前へ 0.9m、地面に乗せる、埋まる / 浮くを弾く — の 3 つを 1 か所に。
+ * サーバーだけに在ると、客は置けない場所でも置く型を流し切ってから何も
+ * 起きない、という形で出る (刺さらない相手にナイフの当たり表示だけ出した件と
+ * 同じ穴)。客はこれを見て、置けない時は置く型に入らず、置ける時は
+ * **どこに置かれるか**を描く。
+ *
+ * @param from 置く人。yaw は hitcheck と同じ規約 (前が -sin, -cos)
+ */
+export function placeSpot(
+  from: { x: number; y: number; z: number; yaw: number },
+  solid: StageBox[],
+  stepUp: number,
+  out: PlaceSpot = { x: 0, y: 0, z: 0, ok: false },
+): PlaceSpot {
+  const [fx, fz] = forwardOf(from.yaw)
+  out.x = from.x + fx * PLACE_FORWARD
+  out.z = from.z + fz * PLACE_FORWARD
+  // 地面に乗せる。足元をそのまま使うと、段差の上に置いたときに沈む
+  out.y = groundUnder(out.x, out.z, from.y, solid, stepUp).top
+  out.ok = canPlaceAt(out.x, out.z, from.y, out.y, solid)
+  return out
+}
 
 /**
  * 置ける場所か。
@@ -20,9 +56,7 @@ export const PLACE_FORWARD = 0.9
  *   **埋まる** … その点が箱の中に入っている。壁際で前を向くとこうなる
  *   **浮く**   … 足元と地面の高さが離れている。縁の外へはみ出すとこうなる
  *
- * **クライアントも同じ式を読む。** サーバーだけに入れると、置く型が 3.6 秒
- * 流れきってから何も起きない、という形で出る (刺さらない相手にナイフの当たり
- * 表示だけ出した件と同じ穴)。
+ * 呼ぶのは placeSpot。客もそこから読む。
  *
  * @param feetY 置く人の足元の高さ
  * @param ground その XZ の地面の高さ (groundUnder が返す top)
