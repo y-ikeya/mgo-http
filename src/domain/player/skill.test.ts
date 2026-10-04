@@ -1,7 +1,7 @@
 import { MODES } from '../match/room'
 import { describe, expect, test } from 'bun:test'
 import {
-  MASTERY_OF, SKILLS, alertTriggeredBy, hasAwareness, hasTrapMastery, setupSpeedScale, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
+  MASTERY_OF, SKILLS, alertTriggeredBy, hasAwareness, hasTrapMastery, hidesGrenades, setupSpeedScale, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
   isAffordable, levelOf, masteryJitterScale, masteryReloadScale, masterySpreadScale,
   runnerScale, throwScale,
   type Skills,
@@ -383,6 +383,13 @@ describe('TRAP MASTERY', () => {
     expect(setupSpeedScale({ trapMastery: 1 })).toBeGreaterThan(1)
     // 早送りに見えない範囲
     expect(setupSpeedScale({ trapMastery: 1 })).toBeLessThanOrEqual(1.5)
+  })
+
+  /** 投げ物は THROWING MASTERY の側。持ち替えても隠せる物は混ざらない */
+  test('手榴弾を隠すのは THROWING MASTERY', () => {
+    expect(hidesGrenades({ throwing: 1 })).toBe(true)
+    expect(hidesGrenades({ trapMastery: 1 })).toBe(false)
+    expect(hasTrapMastery({ throwing: 1 })).toBe(false)
   })
 
   /** AWARENESS と組ませても 2 コスト。置く側と見抜く側を両方持てる */

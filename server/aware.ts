@@ -18,7 +18,7 @@
 import { connected } from '../src/domain/match/match'
 import { onBattlefield } from '../src/domain/player/lifecycle'
 import { leakReaches, leakTag, type MatchPlayer } from '../src/domain/player/player'
-import { AWARENESS_RADIUS, hasAwareness, hasTrapMastery } from '../src/domain/player/skill'
+import { AWARENESS_RADIUS, hasAwareness, hasTrapMastery, hidesGrenades, type Skills } from '../src/domain/player/skill'
 import type { ServerMessage } from '../src/application/protocol/types'
 import type { Team } from '../src/domain/player/player'
 import { sessionOf } from './session'
@@ -40,15 +40,16 @@ interface Sensible {
 function sensibles(room: RoomWorld): Sensible[] {
   const out: Sensible[] = []
   /*
-   * **TRAP MASTERY を持つ人の置き物は気配にならない。**
+   * **腕前のある人の物は気配にならない。**
    *
-   * 置く物 (クレイモア / DECOY / E LOCATOR) だけ。手榴弾は投げ物なので映ったまま。
-   * 席を立った人の物は、持ち主が分からないので素のまま (映る)
+   * 置く物 (クレイモア / DECOY / E LOCATOR) は TRAP MASTERY、投げ物 (手榴弾) は
+   * THROWING MASTERY。席を立った人の物は、持ち主が分からないので素のまま (映る)
    */
-  const hidden = (owner: string): boolean => {
+  const hiddenBy = (owner: string, has: (skills: Skills) => boolean): boolean => {
     const player = room.players.get(owner)
-    return !!player && hasTrapMastery(player.skills)
+    return !!player && has(player.skills)
   }
+  const hidden = (owner: string): boolean => hiddenBy(owner, hasTrapMastery)
   for (const c of room.claymores) {
     if (hidden(c.owner)) continue
     out.push({ key: `claymore:${c.id}`, owner: c.owner, team: c.team, x: c.x, y: c.y, z: c.z })
@@ -61,7 +62,10 @@ function sensibles(room: RoomWorld): Sensible[] {
     if (!l.body.resting || hidden(l.owner)) continue
     out.push({ key: `locator:${l.id}`, owner: l.owner, team: l.team, x: l.body.x, y: l.body.y, z: l.body.z })
   }
-  for (const g of room.grenades) out.push({ key: `grenade:${g.id}`, owner: g.owner, team: g.team, x: g.body.x, y: g.body.y, z: g.body.z })
+  for (const g of room.grenades) {
+    if (hiddenBy(g.owner, hidesGrenades)) continue
+    out.push({ key: `grenade:${g.id}`, owner: g.owner, team: g.team, x: g.body.x, y: g.body.y, z: g.body.z })
+  }
   return out
 }
 

@@ -111,7 +111,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   throwing: {
     id: 'throwing',
     label: 'THROWING MASTERY',
-    hint: '遠くへ投げられる',
+    hint: '遠くへ投げられる。**投げた手榴弾が相手の AWARENESS に映らない**',
     /*
      * **段が無い。取るか取らないかだけ** (ENEMY EXPOSURE と同じ扱い)。
      *
@@ -489,10 +489,20 @@ export const AWARENESS_RADIUS = 15
  * TRAP MASTERY。**置くのが速く、置いた物が AWARENESS に映らない。**
  *
  * 映らなくなるのは**置く物**だけ (クレイモア / DECOY / E LOCATOR)。手榴弾は投げ物で、
- * 置く腕前とは別の話なので映ったまま。決めるのはサーバー (server/aware.ts)。
+ * そちらは THROWING MASTERY の側 (hidesGrenades)。決めるのはサーバー (server/aware.ts)。
  */
 export function hasTrapMastery(skills: Skills): boolean {
   return levelOf(skills, 'trapMastery') > 0
+}
+
+/**
+ * THROWING MASTERY。**投げた手榴弾が AWARENESS に映らない。**
+ *
+ * 置き物は TRAP MASTERY、投げ物は THROWING MASTERY — 腕前ごとに隠せる物が分かれる。
+ * 遠くへ投げられるだけだと 1 コストの重みが EE や AWARENESS に負けていた
+ */
+export function hidesGrenades(skills: Skills): boolean {
+  return levelOf(skills, 'throwing') > 0
 }
 
 /** 置く型の速さの倍率。振りかぶりも置き切るのも同じだけ速くなる */
