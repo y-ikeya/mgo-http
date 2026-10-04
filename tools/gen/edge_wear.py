@@ -76,12 +76,18 @@ def edge_material():
     return m
 
 
-def corner_spans(body):
-    """本体の外角 (縦・凸・直角に近い辺) を (x, y) ごとに z の区間へまとめる"""
-    dg = bpy.context.evaluated_depsgraph_get()
-    ev = body.evaluated_get(dg)
+def corner_spans(body, use_base=False):
+    """本体の外角 (縦・凸・直角に近い辺) を (x, y) ごとに z の区間へまとめる。
+
+    use_base: モディファイアを掛ける前の形で見る。小さな bevel が付いた箱は角が 45 度の面 2 枚になって
+    直角の辺が無くなる (bevel は 1cm 未満なら書き出しで落ちるので、見た目は角のまま)
+    """
     bm = bmesh.new()
-    bm.from_mesh(ev.data)
+    if use_base:
+        bm.from_mesh(body.data)
+    else:
+        dg = bpy.context.evaluated_depsgraph_get()
+        bm.from_mesh(body.evaluated_get(dg).data)
     bm.transform(body.matrix_world)
     bm.normal_update()
     spans = {}
@@ -158,12 +164,12 @@ def fix_decal_normals(obj):
     return len(flip)
 
 
-def make_edge_decals(body, tag):
+def make_edge_decals(body, tag, use_base=False):
     mat = edge_material()
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
     count = 0
-    for x, y, z0, z1, (n1, n2) in corner_spans(body):
+    for x, y, z0, z1, (n1, n2) in corner_spans(body, use_base):
         c = Vector((x, y, 0))
         for n, other in ((n1, n2), (n2, n1)):
             t = Vector((-n.y, n.x, 0)).normalized()
