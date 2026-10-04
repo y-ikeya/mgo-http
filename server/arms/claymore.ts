@@ -47,7 +47,7 @@ export function placeClaymore(room: RoomWorld, from: MatchPlayer): void {
   // 壁の中や縁の外へは置けない。**弾いても数は減らさない** —
   // 置けなかったのに手フラグが減ると、押し間違いが取り返しの付かない損になる。
   // 客も同じ式で見ていて、置けない所では置く型に入らない (Game.updateClaymoreSetup)
-  const spot = placeSpot(from, room.stage.solid, STEP_UP)
+  const spot = placeSpot(from, room.stage.solid, STEP_UP, room.stage.body)
   if (!spot.ok) return
 
   from.grenades--

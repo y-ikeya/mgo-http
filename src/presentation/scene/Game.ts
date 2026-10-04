@@ -4053,11 +4053,13 @@ export class Game {
           { x: this.player.position.x, y: this.player.position.y, z: this.player.position.z, yaw: this.player.yaw },
           this.placeSolid,
           STEP_UP,
+          // 人が止まる面。審判と同じ (server/stage.ts の body)。無ければ箱で見る
+          this.stage.moveWorld?.surfaces ?? null,
           this.placeAt,
         )
       : null;
-    if (spot && this.placeSolid.length === 0) {
-      // 箱がまだ無い (届いていない / 読めなかった)。地面が 0 に見えて高い所では
+    if (spot && this.placeSolid.length === 0 && !this.stage.moveWorld) {
+      // 箱も面もまだ無い (届いていない / 読めなかった)。地面が 0 に見えて高い所では
       // 全部「浮く」になるので、見ずに通す。弾くのは審判の仕事のまま
       spot.ok = true;
       spot.y = this.player.position.y;

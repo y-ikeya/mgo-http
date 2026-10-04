@@ -18,7 +18,7 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
@@ -80,7 +80,8 @@ const placeRaw = query.get('place')?.split(',').map(Number)
 if (placeRaw && placeRaw.length === 4 && placeRaw.every(Number.isFinite)) {
   const solid = solidBlockers(await loadStageBoxes(stageName))
   const from = { x: placeRaw[0]!, y: placeRaw[1]!, z: placeRaw[2]!, yaw: placeRaw[3]! }
-  const spot = placeSpot(from, solid, STEP_UP)
+  const move = await loadStageMoveWorld(stageName)
+  const spot = placeSpot(from, solid, STEP_UP, move?.surfaces ?? null)
   new PlacePreview(scene).show(spot, from.yaw, true)
   console.log(`[place] ${spot.x.toFixed(2)} ${spot.y.toFixed(2)} ${spot.z.toFixed(2)} ok=${spot.ok}`)
 }

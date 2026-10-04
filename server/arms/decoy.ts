@@ -66,7 +66,7 @@ export function placeDecoy(room: RoomWorld, from: MatchPlayer, now: number): voi
   // **手にある物で決める。** 装備の選択で見ると、拾って持ち替えた人が置けない
   if (!canAct(from.life) || from.held !== 'decoy' || from.grenades <= 0) return
 
-  const spot = placeSpot(from, room.stage.solid, STEP_UP)
+  const spot = placeSpot(from, room.stage.solid, STEP_UP, room.stage.body)
   if (!spot.ok) return
 
   from.grenades--
