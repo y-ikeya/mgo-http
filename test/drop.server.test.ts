@@ -148,6 +148,38 @@ describe('クレイモアを置く', () => {
     b.close()
   }, 30000)
 
+  /**
+   * 置いた物は**前を通った敵で起爆する**。壁や階で区切る方 (sensedBy) は
+   * 地形の要る話なので sim の試験 (judge/claymore.test.ts)。ここは開けた所で
+   * 鳴ること — 遮蔽の判定を足して、何も無い所でも鳴らなくなっていないか
+   */
+  test('前を通った敵で起爆して、削れる', async () => {
+    const { a, b } = await twoPlayers(server, 'claymore', ['erin', 'frank'])
+    // a は z=-6 で +Z (b の方) を向いて置く。置く所は 0.9m 先 (z=-5.1)、正面は +Z
+    a.cameraYaw = Math.PI
+    a.holdClaymore(true)
+    await Bun.sleep(300)
+    a.send({ type: 'claymore' })
+    await Bun.sleep(400)
+    expect(a.messages.some((m) => m.type === 'claymorePlaced')).toBe(true)
+    a.holdClaymore(false)
+    a.reset()
+    b.reset()
+
+    // b が正面 2m に踏み込む
+    b.moveTo(0, 0, -3)
+    await Bun.sleep(600)
+
+    const gone = b.messages.find((m) => m.type === 'claymoreGone')
+    expect(gone?.type === 'claymoreGone' && gone.blast).toBe(true)
+    const text = await server.health()
+    const line = text.match(/frank \((\d+)\)/)
+    expect(line ? Number(line[1]) : 100).toBeLessThan(100)
+
+    a.close()
+    b.close()
+  }, 30000)
+
   test('**手にしていなければ置けない。** 何も配られない', async () => {
     const { a, b } = await twoPlayers(server)
     a.reset()

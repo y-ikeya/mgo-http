@@ -8,7 +8,7 @@
  * three にも DOM にも依存しない。サーバーが起爆を決める。
  */
 
-import { type SolidWorld, type StageBox, groundUnder } from '../space/vision'
+import { type SightBlocker, type SolidWorld, type StageBox, groundUnder } from '../space/vision'
 
 /** 置く位置。本人の足元から前へ何 m か (手が届く所) */
 export const PLACE_FORWARD = 0.9
@@ -284,16 +284,54 @@ export function triggeredBy(
   return (dx / distance) * fx + (dz / distance) * fz >= cos
 }
 
+/** 見る点 (足元からの高さ、頭の高さに対する割合)。脛と腰。頭だけ出ていても床の上は通っていない */
+const SENSE_RATIOS = [0.18, 0.5] as const
+
 /**
- * 爆心から相手までの距離 (m)。**量はここで決めない** (domain/item/claymore.ts)。
+ * その相手に反応するか。**扇の中で、同じ高さで、見えている時だけ。**
  *
- * **全方位に測る。** 向きが意味を持つのは「いつ起爆するか」(triggeredBy) まで。
+ * 扇 (triggeredBy) は平面の形。それだけだと**壁の向こう・角の裏・上下の階**を
+ * 通った人でも起爆していた。見張るのは目の前の床を通る人なので:
+ *
+ *   - 足元の高さが SENSE_HEIGHT より離れていれば別の階 (床越しに反応しない)
+ *   - 本体の目 (SENSOR_HEIGHT) から相手の脛か腰へ線が通らなければ反応しない
+ *     (壁・角・箱の裏を通っても反応しない)
+ *
+ * 線を見る面は審判の遮蔽 (sight)。弾が通らない所は見張れない、で揃う。
+ *
+ * @param head 相手の頭の高さ (m、足元から)。姿勢で変わるので呼ぶ側が渡す
+ * @param senseHeight 反応する高さの幅 (m)
+ * @param sensorHeight 本体の目の高さ (m)
+ */
+export function sensedBy(
+  mine: Placed,
+  target: Target,
+  range: number,
+  cos: number,
+  head: number,
+  senseHeight: number,
+  sensorHeight: number,
+  world: SightBlocker,
+): boolean {
+  if (!triggeredBy(mine, target, range, cos)) return false
+  if (Math.abs(target.y - mine.y) > senseHeight) return false
+  const ey = mine.y + sensorHeight
+  for (const ratio of SENSE_RATIOS) {
+    if (world.clear(mine.x, ey, mine.z, target.x, target.y + head * ratio, target.z)) return true
+  }
+  return false
+}
+
+/**
+ * 爆心から相手までの平面の距離 (m)。**量はここで決めない** (domain/item/claymore.ts)。
+ *
+ * **全方位に測る。** 向きが意味を持つのは「いつ起爆するか」(sensedBy) まで。
  * 爆ぜてしまえば火薬は前も後ろも無い — 真後ろに立っていた人だけ無傷、は
  * 物として嘘になる。置く側から見ても、**背後を通られたら起爆しない**という
  * 時点で向きの代償は払っている。
  *
- * 高さは見ない (足元の平面で測る)。上の階に居る人を巻き込む問題は、階の概念が
- * 入ってから。
+ * 審判の爆風は手榴弾と同じ blastExposure (judge/blast.ts) を通す — 距離に
+ * 加えて**壁の裏なら減る**。ここは「向きが爆風に効かない」ことの表明として残す。
  */
 export function blastReach(mine: Placed, target: Target): number {
   return Math.hypot(target.x - mine.x, target.z - mine.z)

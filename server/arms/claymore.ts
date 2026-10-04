@@ -5,10 +5,11 @@
 import { connected, present } from '../../src/domain/match/match'
 import { canAct, canBeHurt } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
-import type { MatchPlayer, Team } from '../../src/domain/player/player'
+import { headHeightOf, type MatchPlayer, type Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
-import { type Placed, SHOT_HALF, SHOT_TOP, blastReach, placeSpot } from '../../src/sim/judge/claymore'
-import { blastEffect } from '../../src/domain/item/claymore'
+import { type Placed, SHOT_HALF, SHOT_TOP, placeSpot } from '../../src/sim/judge/claymore'
+import { blastExposure } from '../../src/sim/judge/blast'
+import { BLAST_RANGE, SENSOR_HEIGHT, blastEffect } from '../../src/domain/item/claymore'
 import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
@@ -188,8 +189,14 @@ export function detonateClaymore(room: RoomWorld, claymore: Claymore): void {
     // 同じドメインルールで、自分の物で死ぬことがある。誰が味方かはルールが決める
     if (victim.id !== claymore.owner && !hostileToOwner(room, claymore.team, victim)) continue
 
-    // 距離を測るのは sim、何ダメージかはドメインルール (domain/item/claymore.ts)
-    const hit = blastEffect(blastReach(claymore, victim))
+    // 距離と遮蔽を測るのは sim、何ダメージかはドメインルール (domain/item/claymore.ts)。
+    // **壁の裏は減る** — 手榴弾と同じ blastExposure で、体の何割が爆心から見えていたか
+    const seen = blastExposure(
+      claymore.x, claymore.y + SENSOR_HEIGHT, claymore.z,
+      victim, headHeightOf(victim), BLAST_RANGE, room.stage.sight,
+    )
+    if (!seen) continue
+    const hit = blastEffect(seen.distance, seen.cover)
     if (hit.damage <= 0) continue
     const hurt = applyBlastDamage(
       room, victim, hit.damage,

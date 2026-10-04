@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { blastReach, canPlaceAt, placeSpot, triggeredBy, type Placed } from './claymore'
+import { blastReach, canPlaceAt, placeSpot, sensedBy, triggeredBy, type Placed } from './claymore'
 import type { StageBox } from '../space/vision'
 import { TriangleBvh } from '../space/bvh'
 
@@ -227,5 +227,35 @@ describe('置く所を面の網で見る (審判が人を立たせている面�
     const spot = placeSpot({ x: 0, y: 0, z: 0.4, yaw: 0 }, [], 0.4, world)
     expect(spot.ok).toBe(true)
     expect(spot.y).toBeCloseTo(0.3, 3)
+  })
+})
+
+describe('反応するのは、扇の中で・同じ高さで・見えている相手だけ (sensedBy)', () => {
+  const HEAD = 1.7
+  const open = { clear: () => true }
+  /** z = -1 の所に壁。線がその面を跨げば通らない */
+  const wallAt = (wz: number) => ({
+    clear: (_ax: number, _ay: number, az: number, _bx: number, _by: number, bz: number) => (az - wz) * (bz - wz) > 0,
+  })
+  const sense = (target: { x: number; y: number; z: number }, world: { clear: (...a: number[]) => boolean }) =>
+    sensedBy(at(0), target, RANGE, COS, HEAD, 1.2, 0.13, world)
+
+  test('何も無ければ扇の中で反応する', () => {
+    expect(sense({ x: 0, y: 0, z: -2 }, open)).toBe(true)
+  })
+
+  test('壁の向こうは反応しない。壁の手前なら反応する', () => {
+    expect(sense({ x: 0, y: 0, z: -2 }, wallAt(-1))).toBe(false)
+    expect(sense({ x: 0, y: 0, z: -0.8 }, wallAt(-1))).toBe(true)
+  })
+
+  test('別の階 (上下に 1.2m より離れた足元) は反応しない。1 段の段差は中', () => {
+    expect(sense({ x: 0, y: 3.2, z: -2 }, open)).toBe(false)
+    expect(sense({ x: 0, y: -3.2, z: -2 }, open)).toBe(false)
+    expect(sense({ x: 0, y: 0.4, z: -2 }, open)).toBe(true)
+  })
+
+  test('扇の外は、見えていても反応しない', () => {
+    expect(sense({ x: 0, y: 0, z: 2 }, open)).toBe(false)
   })
 })
