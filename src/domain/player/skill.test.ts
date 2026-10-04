@@ -1,7 +1,7 @@
 import { MODES } from '../match/room'
 import { describe, expect, test } from 'bun:test'
 import {
-  MASTERY_OF, SKILLS, alertTriggeredBy, hasAwareness, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
+  MASTERY_OF, SKILLS, alertTriggeredBy, hasAwareness, hasTrapMastery, setupSpeedScale, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
   isAffordable, levelOf, masteryJitterScale, masteryReloadScale, masterySpreadScale,
   runnerScale, throwScale,
   type Skills,
@@ -49,8 +49,8 @@ describe('4 コストの予算', () => {
     expect(isAffordable({ runner: 9 } as never)).toBe(false)
   })
 
-  test('**11 ある。** 2 つだと全員が両方取って選択が生まれない', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(11)
+  test('**12 ある。** 2 つだと全員が両方取って選択が生まれない', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(12)
   })
 })
 
@@ -365,5 +365,28 @@ describe('AWARENESS', () => {
   /** 情報系 2 つで 2 コスト。火力に 2 残る */
   test('EE と一緒に取っても 2 コスト', () => {
     expect(costOf({ exposure: 1, awareness: 1 })).toBe(2)
+  })
+})
+
+describe('TRAP MASTERY', () => {
+  /** 段が無い。取るか取らないかだけ (AWARENESS の裏返し) */
+  test('1 段だけ。2 は買えない', () => {
+    expect(SKILLS.trapMastery.levels).toBe(1)
+    expect(isAffordable({ trapMastery: 1 })).toBe(true)
+    expect(isAffordable({ trapMastery: 2 })).toBe(false)
+  })
+
+  test('取っていれば置き物が映らない側になり、置くのが速い', () => {
+    expect(hasTrapMastery({ trapMastery: 1 })).toBe(true)
+    expect(hasTrapMastery({})).toBe(false)
+    expect(setupSpeedScale({})).toBe(1)
+    expect(setupSpeedScale({ trapMastery: 1 })).toBeGreaterThan(1)
+    // 早送りに見えない範囲
+    expect(setupSpeedScale({ trapMastery: 1 })).toBeLessThanOrEqual(1.5)
+  })
+
+  /** AWARENESS と組ませても 2 コスト。置く側と見抜く側を両方持てる */
+  test('AWARENESS と一緒に持てる', () => {
+    expect(isAffordable({ trapMastery: 1, awareness: 1, rifleMastery: 2 })).toBe(true)
   })
 })

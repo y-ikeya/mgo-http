@@ -110,6 +110,19 @@ describe('AWARENESS', () => {
   }, 30000)
 })
 
+describe('TRAP MASTERY', () => {
+  test('持つ人の置き物は、相手が AWARENESS を持っていても気配にならない', async () => {
+    server = await startServer()
+    const { a, b } = await twoWithSkills(['tm-a1', 'tm-b1'], { a: { trapMastery: 1 }, b: { awareness: 1 } })
+    // a が 12m 先で置く。TRAP MASTERY が無ければ b に届く距離 (上の AWARENESS の試験と同じ)
+    await placed(a)
+
+    expect(b.got('sensed')).toBe(0)
+    // 置けていること自体は変わらない
+    expect(a.got('decoyPlaced')).toBe(1)
+  }, 30000)
+})
+
 describe('E LOCATOR は気配で暴く', () => {
   /**
    * **輪郭ではなく霧。** 暴かれた相手は exposed (壁越しの輪郭) ではなく

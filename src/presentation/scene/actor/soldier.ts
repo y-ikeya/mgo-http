@@ -1,6 +1,6 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { BlobShadow } from './blobShadow'
-import { boxMoveScale, runnerScale, type Skills } from '../../../domain/player/skill'
+import { boxMoveScale, runnerScale, setupSpeedScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
   LADDER_SPEED,
@@ -528,6 +528,8 @@ export class Soldier {
   /** サーバーが認めたスキルを受け取る。試合中は変わらない */
   setSkills(skills: Skills): void {
     this.skills = skills
+    // 置く型の速さだけは animator 側に持たせる (クリップの再生速度なので)
+    this.animator?.setSetupSpeed(setupSpeedScale(skills))
   }
 
   /**
@@ -3611,6 +3613,7 @@ export class Soldier {
     // 読み込み前に持ち替えている場合があるので、いま手にある物から決める
     this.animator.setPistol(!isTwoHanded(this.held))
     this.animator.setKnife(this.held === 'knife')
+    this.animator.setSetupSpeed(setupSpeedScale(this.skills))
     this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
     // 模型が届く前に眠らされていた (読み直しの続き)。寝ている姿から始める
     if (this.sleepLeft > 0) this.animator.playSleep(true)

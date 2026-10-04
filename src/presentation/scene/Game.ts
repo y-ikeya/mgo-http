@@ -1185,7 +1185,14 @@ export class Game {
       const sparks = fx.filter((f) => f.kind === "spark");
       if (sparks.length > 0) {
         this.stageSparks = new StageSparks(this.scene, sparks, (origin) => {
-          this.audio.play("spark", origin, 0.7);
+          /*
+           * **環境音も輪に出す。** 火花のバチッは足音と同じ扱いで、聞こえた強さのぶん
+           * その向きに山が立つ。切れかけの電線のそばでは輪が火花の山で埋まって、
+           * 人の足音の山が紛れる — **うるさい所で耳を澄ますと損をする**。静かな所を
+           * 選んで聞く、という判断を作るための物。輪を薄くはしない (塞ぐのは自分の音だけ)
+           */
+          const gain = this.audio.play("spark", origin, 0.7);
+          this.addPing("ambient", origin, gain);
         });
       }
     });
