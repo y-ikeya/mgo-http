@@ -29,9 +29,6 @@ import {
   resolveLocomotion,
   STAIR_DROP_MAX,
   STAIR_DROP_MIN,
-  STAIR_HOLD,
-  STAIR_PAIR_WINDOW,
-  STAIR_RISE_MIN,
 } from './motion'
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
@@ -675,12 +672,7 @@ export class Soldier {
    * 持たせないと、段の上を歩いている一瞬だけ走りの型に戻って点滅する。
    */
   private stairFor = 0
-  /** 直前の段から何秒か。この間に**同じ向き**の次の段が来たら階段 (STAIR_PAIR_WINDOW) */
-  private sinceStep = Number.POSITIVE_INFINITY
-  /** 直前の段が下りだったか。上って下りて、は階段ではない (箱の上で行き来している) */
-  private lastStepDown = false
   /** 前のフレームの足元の高さ。段差を上がったかを見るのに使う */
-  private lastFeetY = 0
   /** その階段は下りか。上りと下りで型が違う */
   private stairDown = false
   /** 地面を離れたときの高さ。**どれだけ落ちたか**を測るのに使う */
@@ -1222,7 +1214,7 @@ export class Soldier {
    * 連続して鳴る。
    *
    * --- 高さ ---
-   * 段差も落下も**前のフレームの高さとの差**で読んでいる (lastFeetY / airFromY)。
+   * 落下は**最後に地面に触れていた高さとの差**で読んでいる (airFromY)。
    * 控えを置いたままにすると、**跳んだ距離がまるごと「1 フレームで上がった /
    * 落ちた」ことになる**。
    *
@@ -1232,8 +1224,7 @@ export class Soldier {
    */
   warpTo(x: number, y: number, z: number): void {
     this.footsteps.warp(x, y, z)
-    // 跳んだ先を「さっきも居た高さ」にする。差が 0 なら段差にも落下にもならない
-    this.lastFeetY = y
+    // 跳んだ先を「さっきも居た高さ」にする。差が 0 なら落下にならない
     this.airFromY = y
     // 流れかけていた型も畳む。跳ぶ前の段差や落下は、跳んだ先には無い
     this.stairFor = 0
@@ -3340,50 +3331,19 @@ export class Soldier {
      * 坂も上がるが、そちらは連続なので 1 フレームの上がり幅が小さい
      * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
      */
-    const rise = this.position.y - this.lastFeetY
-    this.sinceStep += dt
-    // **同じ向きの段が続いている間**だけ階段。1 つ目は型を流さない。上り下りを
-    // 行き来するのは階段ではなく箱の上で遊んでいる (2026-10-06 基地のケースで左右に往復)
-    const recent = this.sinceStep <= STAIR_PAIR_WINDOW
-    if (this.grounded && rise >= STAIR_RISE_MIN) {
-      if ((recent && !this.lastStepDown) || (this.stairFor > 0 && !this.stairDown)) {
-        this.stairFor = STAIR_HOLD
-        this.stairDown = false
-      }
-      this.sinceStep = 0
-      this.lastStepDown = false
-    } else if (
-      moved.landed &&
-      dropped >= STAIR_DROP_MIN &&
-      dropped <= STAIR_DROP_MAX &&
-      this.currentSpeed > 0.5
-    ) {
-      /*
-       * **下りは「どれだけ落ちたか」で見る。速さではなく高さ。**
-       *
-       * 一度**速さで分けようとして失敗した。** 坂を下りると数フレーム宙に浮く
-       * ことがあり、そのぶん加速して 1.2 m/s くらいは出る (17.6 m/s² で
-       * 4 フレーム落ちれば届く)。段と同じ速さになるので分けられない。
-       *
-       * 落ちた**高さ**なら混ざらない:
-       *
-       *     坂        7cm       地面が逃げるぶんだけ浮く
-       *     段 1〜2 つ 25〜50cm  下りの型
-       *     床から     1m 以上   落下 (受け身に譲る)
-       *
-       * 最後に地面へ触れていた高さを覚えておいて、着いた高さとの差を見る。
-       */
-      if ((recent && this.lastStepDown) || (this.stairFor > 0 && this.stairDown)) {
-        this.stairFor = STAIR_HOLD
-        this.stairDown = true
-      }
-      // 型を流さなくても「段を下りた」ことに変わりは無い。着地の型は出さない
-      stepDown = true
-      this.sinceStep = 0
-      this.lastStepDown = true
-    } else if (this.stairFor > 0) {
-      this.stairFor -= dt
-    }
+    /*
+     * **階段の型は流さない。**
+     *
+     * 階段の歩く面は書き出しが坂の板に置き換えている (tools/export_stage.py の
+     * ramped_stairs) ので、本物の階段では足元が 1 コマで跳ねない。1 コマで跳ねるのは
+     * 縁石や箱 (基地の軍用ケース) に乗り降りした時だけで、そこで上り下りの型を流すと、
+     * 位置はもう動いているのに型の上下が重なって**余計に浮く / 屈伸する** (2026-10-05)。
+     * 型 (up_stair / down_stair) は glb に残してあるが、入口はここで閉じる。
+     *
+     * 段を**下りた**こと自体は見る。着地の型 (jump_down) を出さないため。
+     */
+    if (moved.landed && dropped >= STAIR_DROP_MIN && dropped <= STAIR_DROP_MAX) stepDown = true
+    if (this.stairFor > 0) this.stairFor -= dt
 
     // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す。
     // **削られる速さなら受け身。** 体力が減ったことが動きにも出る
@@ -3439,7 +3399,6 @@ export class Soldier {
      * 総量が落差として出る)。着地したフレームも含めて、触れていたら控える。
      */
     if (this.grounded) this.airFromY = this.position.y
-    this.lastFeetY = this.position.y
     this.actualSpeed = moved.actualSpeed
 
     // 倒れている間の時計。起き上がるのは操作されたときだけ (standUp)
