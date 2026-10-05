@@ -106,6 +106,14 @@ const CROUCH_SPEED_SCALE = 0.7
  * 頭より下に来るとキャラの体が肩越しの視界を塞ぐ。
  */
 const VIEW_CLEARANCE = 0.1
+
+/**
+ * 置き終わってから何秒までを「片膝立ちのまま」と見るか。
+ *
+ * その間に構え直せば振りかぶりを飛ばす (姿勢が同じなので)。それを過ぎると
+ * しゃがみの姿勢へ戻っているので、しゃがみからの構え (1.0 秒目から) になる
+ */
+const KNEEL_CARRY_SECONDS = 0.35
 /** モデル未読み込み時の注視点の高さ (m) */
 const FALLBACK_VIEW_HEIGHT = PLAYER_HEIGHT * 0.85
 /** しゃがみ時の散布の倍率。止まって狙う価値をここで作る */
@@ -776,6 +784,8 @@ export class Soldier {
   private rollFromCrouch = false
   /** 前のコマで置く型 (claymore_place) が流れていたか。終わった瞬間を拾うため */
   private wasPlacing = false
+  /** 置き終わってからの秒数。直後に構え直す時、片膝立ちの姿勢をそのまま使う */
+  private sincePlaced = Number.POSITIVE_INFINITY
 
   /**
    * このステージの梯子。**Game が読み込んで渡す。**
@@ -1460,8 +1470,10 @@ export class Soldier {
   }
 
   playSetup(): void {
-    // しゃがんでいれば腰が屈んだ所から (立ち上がって屈み直さない)
-    this.animator?.playSetup(this.crouching)
+    // 置き終わった直後なら片膝立ちのまま (振りかぶり無し)。しゃがんでいれば腰が
+    // 屈んだ所から。どちらも立ち上がって屈み直さないため
+    const kneeling = this.sincePlaced < KNEEL_CARRY_SECONDS
+    this.animator?.playSetup(kneeling ? 'kneel' : this.crouching ? 'crouch' : 'stand')
   }
 
   /**
@@ -3477,8 +3489,12 @@ export class Soldier {
        */
       const setting = this.animator.setupLocomotion
       // 置く型が終わった (null) か、そのまま次の構えへ入った (windup) か、どちらでもしゃがみに
-      if (this.wasPlacing && setting !== 'claymore_place' && this.proneStage === 'none' && !this.down) this.crouching = true
+      if (this.wasPlacing && setting !== 'claymore_place' && this.proneStage === 'none' && !this.down) {
+        this.crouching = true
+        this.sincePlaced = 0
+      }
       this.wasPlacing = setting === 'claymore_place'
+      this.sincePlaced += dt
 
       const head = this.animator.headHeight()
       if (head !== null) {

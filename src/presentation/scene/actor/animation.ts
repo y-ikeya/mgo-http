@@ -3387,16 +3387,21 @@ export class CharacterAnimator {
 
   /** クレイモアを構え始める。**かがむので全身** */
   /**
-   * @param fromCrouch しゃがんだまま構える。**振りかぶりを腰が屈んだ所から始める。**
-   *   構えの型は立ちから片膝立ちへ下りる 1.27 秒で、頭から流すとしゃがんでいた人が
-   *   一度立ち上がってから屈み直す。置いた直後に Shift を押したままだとそれが
-   *   毎回出ていた (2026-10-05)。腰が 0.63m まで下りる 1.0 秒目から流す
+   * @param from どの姿勢から構えるか。**振りかぶりをその姿勢に合う所から始める。**
+   *   構えの型は立ちから片膝立ちへ下りる 1.27 秒。頭から流すとしゃがんでいた人が
+   *   一度立ち上がってから屈み直す (2026-10-05 に置いた直後の Shift 押しっぱなしで出た)。
+   *   - 'stand'  … 頭から
+   *   - 'crouch' … 腰が 0.63m まで下りる 1.0 秒目から
+   *   - 'kneel'  … 置き終わった直後 (片膝立ちのまま)。**最後のコマから** = 振りかぶり無し。
+   *     1.0 秒目から流すと腰が 0.45 → 0.63 → 0.45 と一度持ち上がって「ピクッ」と見える
    */
-  playSetup(fromCrouch = false): void {
+  playSetup(from: 'stand' | 'crouch' | 'kneel' = 'stand'): void {
     this.playPair(SETUP_WINDUP_KEY, SETUP_RELEASE_KEY, true)
-    if (!fromCrouch) return
+    if (from === 'stand') return
     for (const action of [this.upper.get(SETUP_WINDUP_KEY), this.lower.get(SETUP_WINDUP_KEY as Locomotion)]) {
-      if (action) action.time = Math.min(SETUP_CROUCH_START, action.getClip().duration)
+      if (!action) continue
+      const duration = action.getClip().duration
+      action.time = from === 'kneel' ? duration : Math.min(SETUP_CROUCH_START, duration)
     }
   }
 
