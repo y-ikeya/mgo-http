@@ -15243,7 +15243,7 @@
 }
 },
 {
-"name": "wood_toolbox_blue",
+"name": "wood_toolbox_blue_boxcol",
 "min": [
 -18.84,
 9.962,
@@ -15268,7 +15268,7 @@
 }
 },
 {
-"name": "wood_toolbox_red",
+"name": "wood_toolbox_red_boxcol",
 "min": [
 0.905,
 9.944,
@@ -16322,7 +16322,7 @@
 }
 },
 {
-"name": "defaultMaterial",
+"name": "metal_dumpster2",
 "min": [
 -45.773,
 9.797,
@@ -16347,7 +16347,7 @@
 }
 },
 {
-"name": "defaultMaterial.001",
+"name": "metal_dumpster1",
 "min": [
 7.655,
 9.797,

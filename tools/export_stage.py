@@ -276,7 +276,9 @@ bpy.ops.object.select_all(action='DESELECT')
 #
 # 筏のように**自分の .blend に箱を持っているステージには置かない** (二重になる)。
 # 名前に toolbox か old_military_crate を含む物があれば、それが箱。
+# `boxcol` は人の層を外枠の箱にする札 (蓋の開いた箱の中へ足が落ちないように)
 TOOLBOX_PREFIX = 'wood_toolbox'
+TOOLBOX_SUFFIX = '_boxcol'
 TOOLBOX_BLEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'props', 'crate.blend')
 
 
@@ -301,7 +303,7 @@ def place_toolboxes():
         # 印は床から浮かせて (ときに床に埋めて) 置かれる。1m 上から真下へ線を引いて床の天面を取る
         hit, where, *_ = bpy.context.scene.ray_cast(depsgraph, at + Vector((0, 0, 1.0)), Vector((0, 0, -1.0)))
         box = template if marker is markers[0] else template.copy()
-        box.name = TOOLBOX_PREFIX + '_' + marker.name.lower().replace('meta_', '').replace('base', '').strip('_') or TOOLBOX_PREFIX
+        box.name = (TOOLBOX_PREFIX + '_' + marker.name.lower().replace('meta_', '').replace('base', '').strip('_') or TOOLBOX_PREFIX) + TOOLBOX_SUFFIX
         box.location = Vector((at.x, at.y, where.z if hit else at.z))
         bpy.context.scene.collection.objects.link(box)
         print(f'  工具箱: {marker.name} の下 ({box.location.x:.1f}, {box.location.y:.1f}, {box.location.z:.2f}) に {box.name} を置いた' + ('' if hit else ' (床が見つからず印の高さ)'))
@@ -1325,7 +1327,13 @@ for obj in bpy.context.scene.objects:
     #
     # **別に当たり用の物を足させない。** 同じ形を 2 つ置くと、片方だけ動かした
     # ときに見た目と当たりがずれる。1 つの物に札を付けて済ませる。
-    if 'nobox' in obj.name or not box_is_fair(obj, tris):
+    #
+    # 逆に `boxcol` の札は**必ず箱にする**。基地の軍用ケース (蓋が開いた箱、3,036 枚) は
+    # 中が空なので「外枠が形を写していない」と判じられて三角のまま残り、人が上に乗ると
+    # 真ん中の線が開いた蓋から中の底を拾って、縁と底の間で沈んだり跳ねたりした
+    # (2026-10-05「ケースに乗るとビョンと浮く、降りると屈伸」)。人にとっては箱でよい物
+    force_box = 'boxcol' in obj.name.lower()
+    if not force_box and ('nobox' in obj.name or not box_is_fair(obj, tris)):
         positions.extend(tris)
         marks.extend([mark] * count)
         kept_bodies.append((obj.name, count))
