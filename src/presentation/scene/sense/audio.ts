@@ -426,7 +426,9 @@ const UI_SOUNDS = {
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
   switch: { file: "list_switch1.mp3", volume: 0.55 },
   /** 自分の弾が頭に入って倒した / 眠らせた。位置は持たない (自分への応え) */
-  headshot: { file: "headshot1.mp3", volume: 0.7 },
+  // 2026-10-05: tin.mp3 (tools/raw) を +12 半音に上げた物。前の headshot1 は音程の無い
+  // シャリ音で埋もれた。倒した合図なので UI 音の中で一番大きく
+  headshot: { file: "headshot2.mp3", volume: 1.0 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;

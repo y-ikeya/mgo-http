@@ -380,3 +380,10 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 取らない (梯子と同じ)。
 
 雷電と名無しへは同じ物を `--rotation-only` を足して入れる。`knife_idle` は半身の構えで腰が 90° 横を向いているが、手と頭は他の構えと同じ方を向いているので回してはいけない。上半身だけ乗せると腰の基準合わせで捻れるため、ゲームでは立ち止まって構えた間だけ全身で使う。
+
+### 頭を抜いた音 (headshot2.mp3)
+
+`tools/raw/tin.mp3` (本人の素材、885Hz の金属のリング) を +12 半音に上げた物。
+再生速度で上げる (`asetrate`) ので短く鋭くなる。音量は -9 LUFS に揃えて天井 -0.3 dB:
+
+    ffmpeg -i tools/raw/tin.mp3 -af "asetrate=96000,aresample=48000,loudnorm=I=-9:TP=-0.3:LRA=5,alimiter=limit=0.97" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
