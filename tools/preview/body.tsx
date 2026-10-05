@@ -228,11 +228,11 @@ if (query.has('hang')) anim.playHang()
 if (query.has('hangclimb')) anim.playHangClimb()
 // ?stab … 刺す。姿勢が伏せ (clip=prone_idle) なら伏せた刺突になる
 if (query.has('stab')) anim.playStab()
-// ?setup … クレイモアを構える (振りかぶりを頭から)。?place … 構え切った所から置く型を流す。
+// ?setup … クレイモアを構える (振りかぶりを頭から。&fromcrouch で屈んだ所から)。?place … 構え切った所から置く型を流す。
 // locomotion に 'claymore_place' を渡しても出ない (一度きりの全身の型は playSetup が入口)
 // ?setupspeed=1.75 … TRAP MASTERY の速さで (soldier.ts の setSkills と同じ口)
 if (query.has('setupspeed')) anim.setSetupSpeed(Number(query.get('setupspeed')))
-if (query.has('setup')) anim.playSetup()
+if (query.has('setup')) anim.playSetup(query.has('fromcrouch'))
 if (query.has('place')) anim.releaseSetup()
 for (let t = 0; t < stopAt; t += 1 / 60) {
   // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)

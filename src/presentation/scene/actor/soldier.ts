@@ -1460,7 +1460,8 @@ export class Soldier {
   }
 
   playSetup(): void {
-    this.animator?.playSetup()
+    // しゃがんでいれば腰が屈んだ所から (立ち上がって屈み直さない)
+    this.animator?.playSetup(this.crouching)
   }
 
   /**
@@ -3475,7 +3476,8 @@ export class Soldier {
        * 立ちたければ Space。構えをやめただけ (置かずに戻った) 時は変えない
        */
       const setting = this.animator.setupLocomotion
-      if (this.wasPlacing && setting === null && this.proneStage === 'none' && !this.down) this.crouching = true
+      // 置く型が終わった (null) か、そのまま次の構えへ入った (windup) か、どちらでもしゃがみに
+      if (this.wasPlacing && setting !== 'claymore_place' && this.proneStage === 'none' && !this.down) this.crouching = true
       this.wasPlacing = setting === 'claymore_place'
 
       const head = this.animator.headHeight()

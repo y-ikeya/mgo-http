@@ -665,6 +665,8 @@ const SETUP_RELEASE_KEY = 'claymore_place'
  * TRAP MASTERY の分は setSetupSpeed が上に掛ける。
  */
 const SETUP_RELEASE_RATE = 1
+/** しゃがみから構える時、振りかぶりの何秒目から流すか (腰が 0.63m まで下りた所) */
+const SETUP_CROUCH_START = 1.0
 const ROLL_KEY = 'roll'
 /**
  * 落下の受け身。**上半身にも同じクリップを流す。**
@@ -3384,8 +3386,18 @@ export class CharacterAnimator {
   }
 
   /** クレイモアを構え始める。**かがむので全身** */
-  playSetup(): void {
+  /**
+   * @param fromCrouch しゃがんだまま構える。**振りかぶりを腰が屈んだ所から始める。**
+   *   構えの型は立ちから片膝立ちへ下りる 1.27 秒で、頭から流すとしゃがんでいた人が
+   *   一度立ち上がってから屈み直す。置いた直後に Shift を押したままだとそれが
+   *   毎回出ていた (2026-10-05)。腰が 0.63m まで下りる 1.0 秒目から流す
+   */
+  playSetup(fromCrouch = false): void {
     this.playPair(SETUP_WINDUP_KEY, SETUP_RELEASE_KEY, true)
+    if (!fromCrouch) return
+    for (const action of [this.upper.get(SETUP_WINDUP_KEY), this.lower.get(SETUP_WINDUP_KEY as Locomotion)]) {
+      if (action) action.time = Math.min(SETUP_CROUCH_START, action.getClip().duration)
+    }
   }
 
   /**

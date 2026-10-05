@@ -4093,8 +4093,12 @@ export class Game {
        * しゃがみ直すように見えた。
        *
        * 置く型が流れている間 (setupRelease > 0) は何もしない。
+       *
+       * **置き切るまで次を構えない。** 手を離れた後も置く型は続いている
+       * (置くのは型の 8 割の所)。そこで次の振りかぶりを頭から流すと、しゃがんで
+       * 置いた人が立ち上がって見える (振りかぶりは立ち姿から始まる)
        */
-      if (this.setupRelease > 0) return;
+      if (this.setupRelease > 0 || (!this.setupAiming && this.player.placing)) return;
 
       if (!this.setupAiming) {
         this.player.playSetup();
