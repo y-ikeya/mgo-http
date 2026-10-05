@@ -30,6 +30,7 @@ import {
   STAIR_DROP_MAX,
   STAIR_DROP_MIN,
   STAIR_HOLD,
+  STAIR_PAIR_WINDOW,
   STAIR_RISE_MIN,
 } from './motion'
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
@@ -674,6 +675,8 @@ export class Soldier {
    * 持たせないと、段の上を歩いている一瞬だけ走りの型に戻って点滅する。
    */
   private stairFor = 0
+  /** 直前の段から何秒か。この間に次の段が来たら階段 (STAIR_PAIR_WINDOW) */
+  private sinceStep = Number.POSITIVE_INFINITY
   /** 前のフレームの足元の高さ。段差を上がったかを見るのに使う */
   private lastFeetY = 0
   /** その階段は下りか。上りと下りで型が違う */
@@ -3336,9 +3339,15 @@ export class Soldier {
      * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
      */
     const rise = this.position.y - this.lastFeetY
+    this.sinceStep += dt
+    // 段が続いている間 (型を持っている間も含む) だけ階段。1 つ目は型を流さない
+    const stairs = this.sinceStep <= STAIR_PAIR_WINDOW || this.stairFor > 0
     if (this.grounded && rise >= STAIR_RISE_MIN) {
-      this.stairFor = STAIR_HOLD
-      this.stairDown = false
+      if (stairs) {
+        this.stairFor = STAIR_HOLD
+        this.stairDown = false
+      }
+      this.sinceStep = 0
     } else if (
       moved.landed &&
       dropped >= STAIR_DROP_MIN &&
@@ -3360,9 +3369,13 @@ export class Soldier {
        *
        * 最後に地面へ触れていた高さを覚えておいて、着いた高さとの差を見る。
        */
-      this.stairFor = STAIR_HOLD
-      this.stairDown = true
+      if (stairs) {
+        this.stairFor = STAIR_HOLD
+        this.stairDown = true
+      }
+      // 型を流さなくても「段を下りた」ことに変わりは無い。着地の型は出さない
       stepDown = true
+      this.sinceStep = 0
     } else if (this.stairFor > 0) {
       this.stairFor -= dt
     }
