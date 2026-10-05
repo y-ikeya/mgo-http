@@ -45,6 +45,8 @@
     "proneFiring.fbx": "prone_fire",
     "proneReload.fbx": "prone_reload",
     "Prone Throw.fbx": "prone_throw",
+    "setup1_1.fbx#2": "claymore_windup",
+    "setup2.fbx": "claymore_place",
     "proneTurn.fbx": "prone_turn",
     "dieFront.fbx": "death_front",
     "dieBack.fbx": "death_back"
