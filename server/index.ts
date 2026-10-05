@@ -21,10 +21,11 @@ import { recordLag } from '../src/domain/match/lag'
 import { AUTH_CLOSE_CODE, LAG_CLOSE_CODE } from '../src/application/protocol/types'
 import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
-import { type Claymore, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
+import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
+import { BLAST_RADIUS } from '../src/domain/item/grenade'
 import {
   relayLocators,
   shotHitsLocator,
@@ -320,6 +321,8 @@ setInterval(() => {
         nade.fuse -= TICK_MS / 1000
         if (nade.fuse <= 0) {
           detonate(room, nade)
+          // 置き物を壊す。クレイモアは誘爆し、DECOY は破れる (grenade.ts から引くと輪になるのでここで)
+          if (room.phase === 'playing') blastPlaced(room, nade.body.x, nade.body.y, nade.body.z, BLAST_RADIUS)
           room.grenades.splice(i, 1)
         }
       }

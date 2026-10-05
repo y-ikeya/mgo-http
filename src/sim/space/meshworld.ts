@@ -268,7 +268,15 @@ export class MeshMoveWorld implements MoveWorld {
    */
   groundHeight(position: Vec3, radius: number, feetY: number): number {
     const from = feetY + Math.max(PROBE_UP, this.stepUp + 0.05)
-    const limit = feetY + this.stepUp
+    /*
+     * **横の押し返しと同じ高さまで乗れる** (stepUp + STEP_TOUCH)。
+     *
+     * 乗れる上限が段差ちょうど (0.25) で、押し返さない上限が 0.35 だった。その間の
+     * 高さの物 (基地の軍用ケース、上面 0.28m) は**乗れもせず止まりもせず**、歩くと
+     * 中へ入ってケースの中に立った (2026-10-05)。真ん中の線が上面を見つけても
+     * 「高すぎる」で捨て、輪の縁が外の地面を拾っていた
+     */
+    const limit = feetY + this.stepUp + STEP_TOUCH
 
     /*
      * **真ん中が着いているなら、その高さ。**
