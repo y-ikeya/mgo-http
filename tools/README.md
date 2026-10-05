@@ -391,5 +391,5 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
   打音の頭は元から天井なので、音量を上げても頭が割れるだけ
 
 ```sh
-ffmpeg -i tools/raw/tin.mp3 -af "asetrate=143616,aresample=48000,rubberband=tempo=0.271:pitchq=quality,equalizer=f=2650:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
+ffmpeg -i tools/raw/tin.mp3 -af "asetrate=143837,aresample=48000,rubberband=tempo=0.271:pitchq=quality,equalizer=f=2650:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
 ```
