@@ -385,6 +385,8 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 
 `tools/raw/tin.mp3` (本人の素材、885Hz の金属のリング) を +12 半音に上げた物。
 再生速度で上げる (`asetrate`) ので短く鋭くなる。打音の頭が既に天井なので、**圧縮してリングの
-胴を持ち上げる** (平均 -29 dB → -23.5 dB、天井 -0.7 dB)。音量だけ上げても頭が割れるだけ:
+胴を持ち上げる** (音量だけ上げても頭が割れるだけ)。それを音程を保ったまま 2.5 倍に
+引き伸ばして 1.27 秒にし (本人: 鳴っている音をもう少し長く)、最後の 0.37 秒を
+フェードで消す (切ると「ブツッ」と終わる):
 
-    ffmpeg -i tools/raw/tin.mp3 -af "asetrate=96000,aresample=48000,acompressor=threshold=-24dB:ratio=6:attack=1:release=120:makeup=10,alimiter=limit=0.95:attack=1:release=50" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
+    ffmpeg -i tools/raw/tin.mp3 -af "asetrate=96000,aresample=48000,rubberband=tempo=0.4:pitchq=quality,acompressor=threshold=-24dB:ratio=6:attack=1:release=120:makeup=10,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
