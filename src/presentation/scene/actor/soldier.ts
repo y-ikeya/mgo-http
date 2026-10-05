@@ -774,6 +774,8 @@ export class Soldier {
   private hangOutZ = 0
   /** しゃがみから転がったか。転がり終わりでしゃがみへ戻す */
   private rollFromCrouch = false
+  /** 前のコマで置く型 (claymore_place) が流れていたか。終わった瞬間を拾うため */
+  private wasPlacing = false
 
   /**
    * このステージの梯子。**Game が読み込んで渡す。**
@@ -3464,6 +3466,17 @@ export class Soldier {
       this.animator.update(dt)
 
       this.object.updateMatrixWorld(true)
+
+      /*
+       * **置き終わったらしゃがみで復帰する。** 置く型 (2026-10-05 の本人作) は
+       * しゃがんだ姿勢で終わる。立っていた人をそのまま立ちの姿勢へ戻すと、
+       * 型が終わった瞬間に立ち上がる動きが足される — 置いた直後に頭が出るのは
+       * 置く側の意図と逆 (縁のぶら下がりから登り切った時と同じ扱い)。
+       * 立ちたければ Space。構えをやめただけ (置かずに戻った) 時は変えない
+       */
+      const setting = this.animator.setupLocomotion
+      if (this.wasPlacing && setting === null && this.proneStage === 'none' && !this.down) this.crouching = true
+      this.wasPlacing = setting === 'claymore_place'
 
       const head = this.animator.headHeight()
       if (head !== null) {
