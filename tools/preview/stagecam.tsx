@@ -8,7 +8,7 @@
  *     ?fov=60
  *     ?shadow=0              太陽の影マップを切る
  *     ?vcol=0                焼き込みの頂点色 (空の見え方) を切る
- *     ?col=1                 描かない物 (col_ など) も描く
+ *     ?col=1                 人が止まる面を水色で重ねる (?col=box 審判の箱 / ?col=all 両方。本番と同じ)
  *     ?place=x,y,z,yaw       その足元・向きで置く所の予告 (印と扇) を出す。置けなければ赤
  *
  * --- なぜ要るか ---
@@ -18,7 +18,7 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { addColliderOverlay, applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
@@ -47,6 +47,8 @@ await renderer.init()
 
 const scene = new THREE.Scene()
 const stage = buildStage(scene, stageName)
+// ?col=1 / box / all … 当たりの形を透けて重ねる (本番と同じ switch)
+addColliderOverlay(scene, stageName)
 const sun = buildLights(scene)
 sun.castShadow = query.get('shadow') !== '0'
 
@@ -58,11 +60,11 @@ const [, sunData] = await Promise.all([stage.ready, loadStageSun(stageName)])
 if (sunData) applyStageSun(sun, sunData)
 fitShadowToStage(sun, stage)
 
-if (query.get('vcol') === '0' || query.get('col') === '1') {
+if (query.get('vcol') === '0' || query.get('col') === 'raw') {
   scene.traverse((obj) => {
     const mesh = obj as THREE.Mesh
     if (!mesh.isMesh) return
-    if (query.get('col') === '1' && !mesh.visible) mesh.visible = true
+    if (query.get('col') === 'raw' && !mesh.visible) mesh.visible = true
     if (query.get('vcol') === '0') {
       for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
         const m = material as THREE.Material & { vertexColors?: boolean }
@@ -88,7 +90,7 @@ if (placeRaw && placeRaw.length === 4 && placeRaw.every(Number.isFinite)) {
 
 const panel = document.createElement('pre')
 panel.className = 'panel'
-panel.textContent = `stage ${stageName}\neye ${eye.toArray().map((v) => v.toFixed(1)).join(',')}\nlook ${look.toArray().map((v) => v.toFixed(1)).join(',')}\nshadow ${sun.castShadow ? 'on' : 'off'}  vcol ${query.get('vcol') === '0' ? 'off' : 'on'}  col ${query.get('col') === '1' ? 'shown' : 'hidden'}`
+panel.textContent = `stage ${stageName}\neye ${eye.toArray().map((v) => v.toFixed(1)).join(',')}\nlook ${look.toArray().map((v) => v.toFixed(1)).join(',')}\nshadow ${sun.castShadow ? 'on' : 'off'}  vcol ${query.get('vcol') === '0' ? 'off' : 'on'}  col ${query.get('col') ?? 'off'}`
 document.body.appendChild(panel)
 
 /*

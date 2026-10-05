@@ -35,7 +35,7 @@ import {
 import type { Obstacle } from '../../../sim/space/collision'
 import { TriangleBvh } from '../../../sim/space/bvh'
 import type { SolidWorld } from '../../../sim/space/vision'
-import { isPathClear, SANE_HEIGHT, sightBlockers } from '../../../sim/space/vision'
+import { isPathClear, SANE_HEIGHT, sightBlockers, solidBlockers } from '../../../sim/space/vision'
 import type { Ladder } from '../../../domain/stage'
 import type { StageBox } from '../../../sim/space/vision'
 import { arenaHalfOf } from '../../../sim/judge/motioncheck'
@@ -213,7 +213,23 @@ const GROUND_ANISOTROPY = 8
  */
 const DIAG = (() => {
   const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams()
-  return { nmap: q.get('nmap') !== '0', decal: q.get('decal') !== '0' }
+  const col = q.get('col')
+  return {
+    nmap: q.get('nmap') !== '0',
+    decal: q.get('decal') !== '0',
+    /*
+     * **当たりを透けて描く** (切り分け用)。
+     *
+     *     ?col=1     人が止まる面 (MESH_PLAYER の三角 = 実際にぶつかっている物) を水色で
+     *     ?col=box   審判の箱 (stage.json の solid。置ける場所・足音・気配の判定が読む物) を橙で
+     *     ?col=all   両方
+     *
+     * 「物に引っかかる」「ここに置けない」の原因が、描いている物ではなく当たりの形に
+     * あることが多い。描画と当たりは別の集合なので、重ねて見ないと分からない
+     */
+    colMesh: col === '1' || col === 'all',
+    colBox: col === 'box' || col === 'all',
+  }
 })()
 
 /**
@@ -1461,6 +1477,62 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
       }),
       meshReady,
     ]).then(() => undefined),
+  }
+}
+
+/**
+ * 当たりの形を透けて描く (?col=)。DIAG の注を見よ。
+ *
+ * 面は**三角をそのまま**張る (人が止まる BVH と同じ positions)。箱は stage.json の
+ * solid をそのまま。どちらも深さは書かず、描いている物の上に重ねる。
+ */
+export function addColliderOverlay(scene: THREE.Scene, name: StageName): void {
+  if (DIAG.colMesh) {
+    void loadStageMesh(name).then((mesh) => {
+      if (!mesh) return
+      const { positions } = meshSubset(mesh, MESH_PLAYER)
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      geometry.computeVertexNormals()
+      const fill = new THREE.Mesh(
+        geometry,
+        new THREE.MeshBasicMaterial({ color: 0x40c8ff, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+      )
+      const edge = new THREE.Mesh(
+        geometry,
+        new THREE.MeshBasicMaterial({ color: 0x9fe6ff, wireframe: true, transparent: true, opacity: 0.25, depthWrite: false, toneMapped: false }),
+      )
+      fill.renderOrder = 20
+      edge.renderOrder = 21
+      fill.frustumCulled = false
+      edge.frustumCulled = false
+      scene.add(fill, edge)
+      console.warn(`[Stage] 当たりの面を重ねた: 三角 ${positions.length / 9} 枚 (?col)`)
+    })
+  }
+  if (DIAG.colBox) {
+    void loadStageBoxes(name).then((boxes) => {
+      const solid = solidBlockers(boxes)
+      const material = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
+      const line = new THREE.LineBasicMaterial({ color: 0xffc080, transparent: true, opacity: 0.6, toneMapped: false })
+      const group = new THREE.Group()
+      for (const box of solid) {
+        const w = box.max[0] - box.min[0]
+        const h = box.max[1] - box.min[1]
+        const d = box.max[2] - box.min[2]
+        if (w > 150 || d > 150) continue // 地面の箱は全部を覆うだけなので描かない
+        const geometry = new THREE.BoxGeometry(w, h, d)
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.position.set((box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2)
+        mesh.renderOrder = 22
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), line)
+        edges.position.copy(mesh.position)
+        edges.renderOrder = 23
+        group.add(mesh, edges)
+      }
+      scene.add(group)
+      console.warn(`[Stage] 審判の箱を重ねた: ${group.children.length / 2} 個 (?col=box)`)
+    })
   }
 }
 
