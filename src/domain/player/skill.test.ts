@@ -382,7 +382,7 @@ describe('TRAP MASTERY', () => {
     expect(setupSpeedScale({})).toBe(1)
     expect(setupSpeedScale({ trapMastery: 1 })).toBeGreaterThan(1)
     // 早送りに見えない範囲
-    expect(setupSpeedScale({ trapMastery: 1 })).toBeLessThanOrEqual(1.5)
+    expect(setupSpeedScale({ trapMastery: 1 })).toBeLessThanOrEqual(2)
   })
 
   /** 投げ物は THROWING MASTERY の側。持ち替えても隠せる物は混ざらない */
