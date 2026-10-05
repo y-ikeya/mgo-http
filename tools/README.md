@@ -334,8 +334,8 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 `retarget_clip.py` で世界の向きから焼き直す (腰の高さは元が 1.0m で Ch35 と同じなので
 `--hips-from` は要らない)。置く型 `claymore_place` も本人作の `tools/raw/setup2_1.fbx` の
 **3 本目の take** (`setup2_1.fbx#3`、0.90 秒。1・2 本目は setup1_1 と同じ物)。構えの最後の
-姿勢から始まり、しゃがんだまま終わる (立ち上がりを含まない)。右手が床に着くのは 3 コマ目で、
-Game の CLAYMORE_PLACE_RATIO (0.1) はそこ。
+姿勢から始まり、しゃがんだまま終わる (立ち上がりを含まない)。右手は 3 コマ目と 23 コマ目で床に着く。
+Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
 
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_windup.json
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
