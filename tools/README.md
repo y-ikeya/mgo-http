@@ -383,10 +383,13 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 
 ### 頭を抜いた音 (headshot2.mp3)
 
-`tools/raw/tin.mp3` (本人の素材、885Hz の金属のリング) を +12 半音に上げた物。
-再生速度で上げる (`asetrate`) ので短く鋭くなる。打音の頭が既に天井なので、**圧縮してリングの
-胴を持ち上げる** (音量だけ上げても頭が割れるだけ)。それを音程を保ったまま 2.5 倍に
-引き伸ばして 1.27 秒にし (本人: 鳴っている音をもう少し長く)、最後の 0.37 秒を
-フェードで消す (切ると「ブツッ」と終わる):
+`tools/raw/tin.mp3` (本人の素材、885Hz の金属のリング) から。2026-10-05 に本人と聴き比べて決めた形:
 
-    ffmpeg -i tools/raw/tin.mp3 -af "asetrate=96000,aresample=48000,rubberband=tempo=0.4:pitchq=quality,acompressor=threshold=-24dB:ratio=6:attack=1:release=120:makeup=10,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
+- 再生速度で **+19 半音** (基音 約 2.65kHz)。+12 では「股間を打ったようなコミカルな音」だった
+- 音程を保ったまま引き伸ばして **1.25 秒** (鳴っている音をもう少し長く)、最後 0.37 秒はフェード (切ると「ブツッ」)
+- 基音の帯を **+7dB**、強めの圧縮で**リングの胴を持ち上げる** (「真ん中の音を強く」= 帯域も時間も)。
+  打音の頭は元から天井なので、音量を上げても頭が割れるだけ
+
+```sh
+ffmpeg -i tools/raw/tin.mp3 -af "asetrate=143616,aresample=48000,rubberband=tempo=0.271:pitchq=quality,equalizer=f=2650:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
+```
