@@ -15193,6 +15193,56 @@
 }
 },
 {
+"name": "wood_Door_b5_entry.002",
+"min": [
+-45.54,
+9.958,
+-18.627
+],
+"max": [
+-45.469,
+12.238,
+-17.664
+],
+"top": {
+"h": 12.2383,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_Door_b5_entry_frame.001",
+"min": [
+-45.605,
+9.953,
+-18.716
+],
+"max": [
+-45.491,
+12.336,
+-17.565
+],
+"top": {
+"h": 12.3362,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue",
 "min": [
 -18.84,
@@ -16260,6 +16310,56 @@
 ],
 "top": {
 "h": 15.0479,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "defaultMaterial",
+"min": [
+-45.773,
+9.797,
+-14.194
+],
+"max": [
+-43.773,
+11.36,
+-12.848
+],
+"top": {
+"h": 11.3597,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "defaultMaterial.001",
+"min": [
+7.655,
+9.797,
+62.371
+],
+"max": [
+9.002,
+11.36,
+64.371
+],
+"top": {
+"h": 11.3597,
 "dx": 0.0,
 "dz": 0.0
 },
