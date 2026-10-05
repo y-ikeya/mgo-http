@@ -1486,6 +1486,11 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
  * 面は**三角をそのまま**張る (人が止まる BVH と同じ positions)。箱は stage.json の
  * solid をそのまま。どちらも深さは書かず、描いている物の上に重ねる。
  */
+/** ?col= が何かしら付いているか (自分のカプセルも描く) */
+export function colliderOverlayOn(): boolean {
+  return DIAG.colMesh || DIAG.colBox
+}
+
 export function addColliderOverlay(scene: THREE.Scene, name: StageName): void {
   if (DIAG.colMesh) {
     void loadStageMesh(name).then((mesh) => {

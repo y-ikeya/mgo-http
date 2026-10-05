@@ -36,7 +36,7 @@ import {
   applyStageSun,
   loadStageLadders,
   STAGE_CODE,
-  type Stage, addColliderOverlay, loadStageBases, loadStageBoxes } from "./world/stage";
+  type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
 import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
 import { type StageBox, solidBlockers } from "../../sim/space/vision";
 import { PlacePreview } from "./arms/placePreview";
@@ -1156,6 +1156,8 @@ export class Game {
     this.stage = buildStage(this.scene, this.stageName);
     // 切り分け用: ?col=1 / ?col=box / ?col=all で当たりの形を透けて重ねる (world/stage.ts の DIAG)
     addColliderOverlay(this.scene, this.stageName);
+    // 同じ switch で自分のカプセルも (体は AABB ではなくカプセルで止まる)
+    this.player.showCollider(colliderOverlayOn());
     void loadStageBases(this.stageName).then((bases) => {
       this.stageBases = bases;
     });

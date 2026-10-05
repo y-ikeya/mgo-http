@@ -784,6 +784,8 @@ export class Soldier {
   private rollFromCrouch = false
   /** 前のコマで置く型 (claymore_place) が流れていたか。終わった瞬間を拾うため */
   private wasPlacing = false
+  /** 当たりの形を透けて描く (?col=)。無ければ描かない */
+  private colliderView: { capsule: THREE.Mesh; step: THREE.LineLoop; height: number } | null = null
   /** 置き終わってからの秒数。直後に構え直す時、片膝立ちの姿勢をそのまま使う */
   private sincePlaced = Number.POSITIVE_INFINITY
 
@@ -1774,6 +1776,50 @@ export class Soldier {
     // しゃがみから立つのも同じ。低い天井の下では立てない
     if (this.crouching && this.headroom() < COLLISION_HEIGHT.stand) return
     this.crouching = !this.crouching
+  }
+
+  /**
+   * 自分の当たり (カプセル) を透けて描く。**切り分け用** (Game の ?col=、stage.ts の DIAG)。
+   *
+   * 体は AABB ではなく**カプセル**で止まる (sim/space/meshworld.ts)。半径 0.35m、
+   * 下の球の中心は足元 + 段差 (0.25m) + 半径、上の球の中心は足元 + 姿勢の高さ − 半径。
+   * 段差より下は球が無い (そこは床と見なして押されない) ので、カプセルは足元から
+   * 浮いて見える。足元の輪はその段差の高さ — **これより低い物は乗り越え、高い物に止まる**
+   */
+  showCollider(on: boolean): void {
+    if (!on) {
+      if (this.colliderView) {
+        this.object.remove(this.colliderView.capsule, this.colliderView.step)
+        this.colliderView = null
+      }
+      return
+    }
+    if (this.colliderView) return
+    const material = new THREE.MeshBasicMaterial({ color: 0xff60d0, wireframe: true, transparent: true, opacity: 0.6, depthTest: false, toneMapped: false })
+    const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(PLAYER_RADIUS, 1, 4, 12), material)
+    capsule.renderOrder = 30
+    const ring = new THREE.BufferGeometry().setFromPoints(
+      Array.from({ length: 24 }, (_, i) => new THREE.Vector3(Math.cos((i / 24) * Math.PI * 2) * PLAYER_RADIUS, 0, Math.sin((i / 24) * Math.PI * 2) * PLAYER_RADIUS)),
+    )
+    const step = new THREE.LineLoop(ring, new THREE.LineBasicMaterial({ color: 0xffe060, transparent: true, opacity: 0.9, depthTest: false, toneMapped: false }))
+    step.renderOrder = 31
+    this.object.add(capsule, step)
+    this.colliderView = { capsule, step, height: -1 }
+  }
+
+  private updateColliderView(): void {
+    const view = this.colliderView
+    if (!view) return
+    const height = this.rolling ? COLLISION_HEIGHT.crouch : COLLISION_HEIGHT[this.stance]
+    const bottom = Math.min(STEP_UP + PLAYER_RADIUS, height - PLAYER_RADIUS)
+    const top = height - PLAYER_RADIUS
+    if (view.height !== height) {
+      view.capsule.geometry.dispose()
+      view.capsule.geometry = new THREE.CapsuleGeometry(PLAYER_RADIUS, Math.max(0, top - bottom), 4, 12)
+      view.height = height
+    }
+    view.capsule.position.y = (bottom + top) / 2
+    view.step.position.y = STEP_UP
   }
 
   /** 足元から頭がぶつかる所までの高さ (m)。地形が無ければ Infinity */
@@ -3455,6 +3501,7 @@ export class Soldier {
       if (!Number.isFinite(this.rollYaw)) this.rollYaw = this.yaw
     }
     this.object.rotation.y = this.yaw
+    this.updateColliderView()
 
     if (this.animator) {
       // 足が滑らないよう、その瞬間の速度に再生速度を合わせ続ける
