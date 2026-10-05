@@ -675,8 +675,10 @@ export class Soldier {
    * 持たせないと、段の上を歩いている一瞬だけ走りの型に戻って点滅する。
    */
   private stairFor = 0
-  /** 直前の段から何秒か。この間に次の段が来たら階段 (STAIR_PAIR_WINDOW) */
+  /** 直前の段から何秒か。この間に**同じ向き**の次の段が来たら階段 (STAIR_PAIR_WINDOW) */
   private sinceStep = Number.POSITIVE_INFINITY
+  /** 直前の段が下りだったか。上って下りて、は階段ではない (箱の上で行き来している) */
+  private lastStepDown = false
   /** 前のフレームの足元の高さ。段差を上がったかを見るのに使う */
   private lastFeetY = 0
   /** その階段は下りか。上りと下りで型が違う */
@@ -3340,14 +3342,16 @@ export class Soldier {
      */
     const rise = this.position.y - this.lastFeetY
     this.sinceStep += dt
-    // 段が続いている間 (型を持っている間も含む) だけ階段。1 つ目は型を流さない
-    const stairs = this.sinceStep <= STAIR_PAIR_WINDOW || this.stairFor > 0
+    // **同じ向きの段が続いている間**だけ階段。1 つ目は型を流さない。上り下りを
+    // 行き来するのは階段ではなく箱の上で遊んでいる (2026-10-06 基地のケースで左右に往復)
+    const recent = this.sinceStep <= STAIR_PAIR_WINDOW
     if (this.grounded && rise >= STAIR_RISE_MIN) {
-      if (stairs) {
+      if ((recent && !this.lastStepDown) || (this.stairFor > 0 && !this.stairDown)) {
         this.stairFor = STAIR_HOLD
         this.stairDown = false
       }
       this.sinceStep = 0
+      this.lastStepDown = false
     } else if (
       moved.landed &&
       dropped >= STAIR_DROP_MIN &&
@@ -3369,13 +3373,14 @@ export class Soldier {
        *
        * 最後に地面へ触れていた高さを覚えておいて、着いた高さとの差を見る。
        */
-      if (stairs) {
+      if ((recent && this.lastStepDown) || (this.stairFor > 0 && this.stairDown)) {
         this.stairFor = STAIR_HOLD
         this.stairDown = true
       }
       // 型を流さなくても「段を下りた」ことに変わりは無い。着地の型は出さない
       stepDown = true
       this.sinceStep = 0
+      this.lastStepDown = true
     } else if (this.stairFor > 0) {
       this.stairFor -= dt
     }
