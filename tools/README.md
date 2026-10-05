@@ -332,10 +332,14 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 (`setup1_1.fbx#2`、1.27 秒。1 本目は片膝立ちの揺れのループで未使用)。**素の姿勢が Ch35 と
 違う**ので `convert_character.py` で直に写すと腰が 1.6m から始まる (立ちで 60cm 浮く)。
 `retarget_clip.py` で世界の向きから焼き直す (腰の高さは元が 1.0m で Ch35 と同じなので
-`--hips-from` は要らない)。置く型 `claymore_place` は Mixamo の `setup2.fbx` (3.60 秒)。
+`--hips-from` は要らない)。置く型 `claymore_place` も本人作の `tools/raw/setup2_1.fbx` の
+**3 本目の take** (`setup2_1.fbx#3`、0.90 秒。1・2 本目は setup1_1 と同じ物)。構えの最後の
+姿勢から始まり、しゃがんだまま終わる (立ち上がりを含まない)。右手が床に着くのは 3 コマ目で、
+Game の CLAYMORE_PLACE_RATIO (0.1) はそこ。
 
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_windup.json
-    for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb claymore_windup.glb claymore_windup public/models/$g.glb; done
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
+    for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
 
 `knife_idle` (tools/knife_idle.json) と `stab` (tools/stab.json) は **Ch35 ではないキャラで落とした FBX** (背丈が半分、素の姿勢も違う) なので、`convert_character.py` で直に写すと腕が頭の上に上がる。`retarget_clip.py` で世界の向きから焼き直し、腰の高さが半分なので `--hips-from` で既存の型の高さに揃えて足す:
 

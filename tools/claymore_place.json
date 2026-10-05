@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "setup2_1.fbx#3": "claymore_place" },
+  "out": "claymore_place.glb",
+  "maxTexture": 64
+}
