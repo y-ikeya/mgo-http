@@ -1782,6 +1782,45 @@ def shrink_textures():
 
 shrink_textures()
 
+
+def patch_gltf_vertex_color():
+    """Blender の glTF 書き出しの不具合を避ける。**材質が 2 つ以上あるメッシュの頂点色。**
+
+    export_vertex_color='ACTIVE' で、材質の節が頂点色を使っていない時、
+    2 つ目以降の材質には「どの COLOR_n を使うか」の代わりに頂点色の名前
+    ('skysky') が控えられる (Blender 5.2 の primitive_extract.py の manage_material_info)。
+    書く段 (__manage_color_attributes) は COLOR_n と比べるので一致せず、
+    **その材質の面は頂点色を 1.0 (白) で塗り潰される。**
+
+    焼いた「空の見え方」が 1 つ目の材質にしか乗らず、建物 3 の内装 (床のタイル・
+    壁紙) が屋内なのに外と同じ明るさで出ていた (2026-10-06)。控えを COLOR_n に
+    直してから先へ進める。
+    """
+    from io_scene_gltf2.blender.exp import primitive_extract as pe
+    # 色を書く段 (名前が隠されたメソッド)。manage_material_info の最後で呼ばれるので、
+    # 控えはその直前に直す
+    original = pe.PrimitiveCreator._PrimitiveCreator__manage_color_attributes
+    if getattr(original, '_mgo2_patched', False):
+        return
+
+    def manage_color_attributes(self):
+        names = {}
+        for vc in self.vc_infos:
+            if vc.get('forced'):
+                continue
+            key = (vc['color'] or '') + (vc['alpha'] or '')
+            names.setdefault(key, vc['gltf_name'])
+        for idx, value in list(self.material_idxs_using_vc.items()):
+            if value in names:
+                self.material_idxs_using_vc[idx] = names[value]
+        return original(self)
+
+    manage_color_attributes._mgo2_patched = True
+    pe.PrimitiveCreator._PrimitiveCreator__manage_color_attributes = manage_color_attributes
+
+
+patch_gltf_vertex_color()
+
 # 材質は載せる。
 #
 # 以前は 'NONE' にして「見た目はゲーム側で付ける」ことにしていた。箱しか無かった
