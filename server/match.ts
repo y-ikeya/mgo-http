@@ -7,6 +7,7 @@
 
 import {
   MIN_PLAYERS,
+  ASSEMBLED_SECONDS,
   READY_SECONDS,
   type Match,
   connected,
@@ -46,6 +47,11 @@ export const MATCH_DURATION_MS = 5 * 60 * 1000
  * ものなので、環境変数で変えられるようにしてある (箱の上で試すのに再配置が要らない)。
  */
 export const TICKETS = Math.max(1, Number(process.env.MGO2_TICKETS) || 20)
+/**
+ * 揃った告知の長さ (ms)。**試験だけ 0 にする** (MGO2_ASSEMBLE_MS)。試験は揃ってすぐ
+ * READY を押すので、5 秒の告知の間に押した分は支度に入った所で消えてしまう
+ */
+const ASSEMBLE_MS = process.env.MGO2_ASSEMBLE_MS !== undefined ? Number(process.env.MGO2_ASSEMBLE_MS) : ASSEMBLED_SECONDS * 1000
 
 /** 決着してから次の支度が始まるまで (ms)。結果を読む時間 */
 export const INTERMISSION_MS = 10 * 1000
@@ -494,6 +500,10 @@ export function updateMatch(room: RoomWorld, now: number): void {
       room.matchId = null
     }
   } else if (room.phase === 'waiting' && enough) {
+    // **すぐ支度へ入らない。** 揃ったことを告げてから (domain/match/match.ts の assembled)
+    room.phase = 'assembled'
+    room.endsAt = now + ASSEMBLE_MS
+  } else if (room.phase === 'assembled' && now >= room.endsAt) {
     enterReady(room, now)
   } else if (room.phase === 'ready') {
     /*

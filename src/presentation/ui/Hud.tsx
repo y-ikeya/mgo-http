@@ -43,6 +43,22 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   onCleanup(() => clearInterval(timer))
 
   const phase = () => props.stats?.match?.phase
+  /*
+   * **揃った告知から支度へ、暗転を挟む。** 告知の終わりで黒へ落とし (CSS の
+   * hud-assembled-black)、支度に入ったら黒から明ける。告知を経ずに支度へ入った
+   * (結果画面の後など) 時は明けない
+   */
+  const [dawn, setDawn] = createSignal(false)
+  let lastPhase: string | undefined
+  createEffect(() => {
+    const now = phase()
+    if (lastPhase === 'assembled' && now === 'ready') {
+      setDawn(true)
+      const timer = setTimeout(() => setDawn(false), 900)
+      onCleanup(() => clearTimeout(timer))
+    }
+    lastPhase = now
+  })
   /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
   const mode = () => props.stats?.match?.mode ?? 'TDM'
   const teams = () => MODES[mode()].teams
@@ -321,6 +337,23 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             {props.stats?.match?.required ?? 2}
           </div>
         </div>
+      </Show>
+
+      {/*
+        揃った。**何が起きたかを言ってから支度へ。** 5 秒 (domain/match/match.ts の
+        ASSEMBLED_SECONDS) のうち最後の 1 秒で暗転する。支度の画面はその黒から明ける
+      */}
+      <Show when={phase() === 'assembled'}>
+        <div class="hud-assembled">
+          <div class="hud-assembled-line" />
+          <div class="hud-assembled-title">{t('hud.assembledTitle')}</div>
+          <div class="hud-assembled-sub">{t('hud.assembledSub')}</div>
+          <div class="hud-assembled-line" />
+        </div>
+        <div class="hud-assembled-black" />
+      </Show>
+      <Show when={dawn()}>
+        <div class="hud-dawn" />
       </Show>
 
       {/*

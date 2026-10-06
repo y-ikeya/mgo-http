@@ -874,7 +874,7 @@ export interface RosterMessage {
  *   playing   … 試合中。ダメージが入るのはここだけ
  *   over      … 決着。結果を見せている
  */
-export type MatchPhase = 'waiting' | 'ready' | 'countdown' | 'playing' | 'over'
+export type MatchPhase = 'waiting' | 'assembled' | 'ready' | 'countdown' | 'playing' | 'over'
 
 /**
  * 部屋の一覧 (`GET /rooms`) が返す 1 部屋ぶん。

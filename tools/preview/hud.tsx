@@ -88,6 +88,11 @@ const cases: Record<string, Partial<GameStats>> = {
     match: { phase: 'countdown', mode: 'TDM', blue: 0, red: 0, endsAt: Date.now() + 4000, present: 2, required: 2, players: [] },
     team: 'red',
   },
+  // 揃った告知。5 秒で黒へ落ちる (?case=assembled)
+  assembled: {
+    match: { phase: 'assembled', mode: 'TDM', blue: 0, red: 0, endsAt: Date.now() + 5000, present: 2, required: 2, players: [] },
+    team: 'blue',
+  },
   // 点の増減
   points: {
     points: [

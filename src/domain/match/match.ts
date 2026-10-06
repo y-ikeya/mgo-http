@@ -15,6 +15,7 @@ import { MODES, type Mode, type ModeSpec } from './room'
  * 試合の段階。
  *
  *     waiting     人を待っている
+ *     assembled   揃った。「マッチを開始します」を 5 秒見せる
  *     countdown   全員を湧き地点へ戻してから数える
  *     playing     走っている
  *     over        決着。結果を読む時間
@@ -22,6 +23,15 @@ import { MODES, type Mode, type ModeSpec } from './room'
 export type Phase =
   /** 対戦者が足りない。**時計は回らない** */
   | 'waiting'
+  /**
+   * 揃った。**告知を見せてから支度へ。**
+   *
+   * 揃った瞬間に支度の画面へ切り替えていた頃は、何が起きたのか分からないまま
+   * 装備の表が出た (2026-10-06 本人: 味気ない)。「対戦者が揃いました。マッチを
+   * 開始します」を 5 秒出して、暗転してから支度へ入る。この間に誰かが抜ければ
+   * 待ちへ戻る
+   */
+  | 'assembled'
   /**
    * 支度の時間。**全員が READY を押すか、60 秒経つと始まる。**
    *
@@ -53,6 +63,9 @@ export const MIN_PLAYERS = 2
  * ので、上限だけ決めておけばよい。
  */
 export const READY_SECONDS = 60
+
+/** 揃った告知を見せる長さ (秒)。最後の 1 秒ほどで暗転する (画面の側) */
+export const ASSEMBLED_SECONDS = 5
 
 /**
  * 席を空けて待つ時間 (ms)。
