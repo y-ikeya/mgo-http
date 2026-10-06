@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { BUMP_SETTLE } from '../../../domain/item/cbox'
 import { asset } from '../assets'
 import { damp } from '../util/math'
 import { createHandleAlpha } from './cardboard'
@@ -341,23 +342,74 @@ export function createCardboardBox(): THREE.Object3D {
  *
  * 被る箱と同じ絵・同じ寸法。見た目で「人が入っているか」が分からないのが
  * ダンボールの肝なので、空の箱が転がっていて初めて**疑う意味**が出る。
- * 当たりも音も無い (紙箱なので押せば動く物、という体で素通り)。動かないので影は落とす
+ * 人は止まる (書き出しが人の層に箱を入れる)、弾は通る。触れると**一度だけ**
+ * ガタッと揺れる (審判が見つけて配る。server/arms/cbox.ts)。動かないので影は落とす。
  *
- * @param y 置く床の高さ (箱の底)
+ * 揺れは「押された先へ傾いて戻る」。底の縁を支点に傾けたいので、回す中心を
+ * 底に置く (箱の絵は中心が原点なので、1 つ親を挟んで底へずらす)
  */
-export function placeEmptyBox(scene: THREE.Scene, x: number, y: number, z: number, yaw: number, size = 1): THREE.Object3D {
-  const box = template().clone(true)
-  box.traverse((obj) => {
-    const mesh = obj as THREE.Mesh
-    if (mesh.isMesh) mesh.castShadow = true
-  })
-  box.scale.set(tuning.width * size, tuning.height * size, tuning.depth * size)
-  box.position.set(x, y + (tuning.height * size) / 2, z)
-  box.rotation.y = yaw
-  box.visible = true
-  scene.add(box)
-  return box
+export class EmptyBoxes {
+  private readonly scene: THREE.Scene
+  private readonly live: { pivot: THREE.Object3D; yaw: number; axisX: number; axisZ: number; left: number }[] = []
+
+  constructor(scene: THREE.Scene) {
+    this.scene = scene
+  }
+
+  /** @param y 置く床の高さ (箱の底) */
+  place(x: number, y: number, z: number, yaw: number, size = 1): void {
+    const box = template().clone(true)
+    box.traverse((obj) => {
+      const mesh = obj as THREE.Mesh
+      if (mesh.isMesh) mesh.castShadow = true
+    })
+    const h = tuning.height * size
+    box.scale.set(tuning.width * size, h, tuning.depth * size)
+    box.position.set(0, h / 2, 0)
+    box.visible = true
+    const pivot = new THREE.Group()
+    pivot.position.set(x, y, z)
+    pivot.rotation.y = yaw
+    pivot.add(box)
+    this.scene.add(pivot)
+    this.live.push({ pivot, yaw, axisX: 0, axisZ: 0, left: 0 })
+  }
+
+  /**
+   * 触れられた。押された先 (世界の向き) へ一度だけ傾いて戻る。
+   *
+   * @param dirX 触った人から箱へ向かう向き (世界)
+   */
+  bump(index: number, dirX: number, dirZ: number): void {
+    const entry = this.live[index]
+    if (!entry) return
+    const reach = Math.hypot(dirX, dirZ) || 1
+    // 世界の向きを箱の向きへ直す (箱は yaw で回してある)
+    const sin = Math.sin(-entry.yaw)
+    const cos = Math.cos(-entry.yaw)
+    const x = (dirX / reach) * cos - (dirZ / reach) * sin
+    const z = (dirX / reach) * sin + (dirZ / reach) * cos
+    // 押された先へ倒れる = 進む向きに直交する軸で回す。x へ押されたら z 軸回りに −、z へ押されたら x 軸回りに +
+    entry.axisX = z
+    entry.axisZ = -x
+    entry.left = BUMP_SETTLE
+  }
+
+  update(dt: number): void {
+    for (const entry of this.live) {
+      if (entry.left <= 0) continue
+      entry.left = Math.max(0, entry.left - dt)
+      const t = BUMP_SETTLE - entry.left
+      // 1 往復半で止まる減衰。頭 (t=0) で一番大きく傾く
+      const tilt = BUMP_TILT * Math.cos((t / BUMP_SETTLE) * Math.PI * 3) * (1 - t / BUMP_SETTLE)
+      entry.pivot.rotation.set(entry.axisX * tilt, entry.yaw, entry.axisZ * tilt, 'YXZ')
+      if (entry.left === 0) entry.pivot.rotation.set(0, entry.yaw, 0, 'YXZ')
+    }
+  }
 }
+
+/** 揺れの傾き (rad)。6 度。紙箱が押されて縁で跳ねる程度 */
+const BUMP_TILT = THREE.MathUtils.degToRad(6)
 
 /**
  * 不透明度を反映する。

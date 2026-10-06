@@ -19,7 +19,7 @@
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { addColliderOverlay, applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
-import { placeEmptyBox } from '../../src/presentation/scene/actor/box'
+import { EmptyBoxes } from '../../src/presentation/scene/actor/box'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
@@ -51,8 +51,9 @@ const stage = buildStage(scene, stageName)
 // ?col=1 / box / all … 当たりの形を透けて重ねる (本番と同じ switch)
 addColliderOverlay(scene, stageName)
 // 空のダンボール (fx_cbox_)。本番は Game が置く
+const emptyBoxes = new EmptyBoxes(scene)
 void loadStageFx(stageName).then((fx) => {
-  for (const f of fx) if (f.kind === 'cbox') placeEmptyBox(scene, f.x, f.y, f.z, f.yaw ?? 0, f.size)
+  for (const f of fx) if (f.kind === 'cbox') emptyBoxes.place(f.x, f.y, f.z, f.yaw ?? 0, f.size)
 })
 const sun = buildLights(scene)
 sun.castShadow = query.get('shadow') !== '0'

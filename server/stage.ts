@@ -84,6 +84,17 @@ export interface Terrain {
   arenaHalf: number
   /** 基地。書き出しが blend の meta_*base* から写した物。無ければ表 (STAGES) へ落ちる */
   bases: Partial<Record<Team, Spot>>
+  /** 空のダンボール (stage.json の fx の cbox)。触れたら揺らす (arms/cbox.ts) */
+  cboxes: CboxProp[]
+}
+
+/** 空のダンボール 1 つ。位置は床の上 (箱の底)、向きは three の Y 回り */
+export interface CboxProp {
+  x: number
+  y: number
+  z: number
+  yaw: number
+  size: number
 }
 
 /** 地形が読めなかったときの姿。**対戦は成立する** (全員が全員を見られる) */
@@ -97,6 +108,7 @@ function bare(name: StageName): Terrain {
     camera: [],
     arenaHalf: Number.POSITIVE_INFINITY,
     bases: {},
+    cboxes: [],
   }
 }
 
@@ -113,6 +125,7 @@ async function load(name: StageName): Promise<Terrain> {
     const data = (await Bun.file(path).json()) as {
       boxes: StageBox[]
       bases?: Partial<Record<Team, Spot>>
+      fx?: { kind: string; x: number; y: number; z: number; size: number; yaw?: number }[]
     }
     const solid = solidBlockers(data.boxes)
     const half = arenaHalfOf(solid)
@@ -133,6 +146,9 @@ async function load(name: StageName): Promise<Terrain> {
       camera: cameraBlockers(data.boxes),
       arenaHalf: half,
       bases: data.bases ?? {},
+      cboxes: (data.fx ?? [])
+        .filter((f) => f.kind === 'cbox')
+        .map((f) => ({ x: f.x, y: f.y, z: f.z, yaw: f.yaw ?? 0, size: f.size })),
     }
   } catch {
     console.warn(`stage_${name}.json が読めない。遮蔽の判定なしで動かす (位置は全員へ配られる)`)

@@ -23,6 +23,7 @@ import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
 import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
+import { bumpCboxes } from './arms/cbox'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
 import { BLAST_RADIUS } from '../src/domain/item/grenade'
@@ -199,6 +200,8 @@ setInterval(() => {
       relayAwareness(room, now)
       // 誰かが decoy に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
       bumpDecoys(room, now)
+      // 空のダンボールも同じ。触れたら一度揺れる (申告は受けない)
+      bumpCboxes(room, now)
       // 構えて狙われている人が居れば、狙っている側を光らせる (TARGET ALERT Lv3)
       alertAims(room, now)
       for (const player of connected(room)) {

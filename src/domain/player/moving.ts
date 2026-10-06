@@ -30,3 +30,5 @@ export const STEP_UP = 0.25
  * 地形が人のファイルを読むのは向きが逆なので、共有の数字はこちらへ。
  */
 export const PLAYER_HEIGHT = 1.8
+/** 体の半径 (m)。カプセルの太さ。審判が「触れた」を見る時 (空のダンボール) も同じ数字 */
+export const PLAYER_RADIUS = 0.35

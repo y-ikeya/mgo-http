@@ -1459,6 +1459,8 @@ for obj in bpy.context.scene.objects:
 #
 # `fx_<種類>_◯◯` の Empty をそのまま json に落とす。ゲーム側が種類ごとに描く
 # (煙は fx/stageSmoke.ts)。大きさは Empty の拡大率。当たりも音も持たない
+# 空のダンボールの寸法 (m)。被る箱 (src/presentation/scene/actor/box.ts の tuning) と同じ
+CBOX_W, CBOX_H, CBOX_D = 0.9, 1.0, 1.2
 fx = []
 for obj in bpy.context.scene.objects:
     if obj.type != 'EMPTY' or not obj.name.lower().startswith('fx_'):
@@ -1469,12 +1471,39 @@ for obj in bpy.context.scene.objects:
     # 向き (Blender の Z 回り)。glTF の Y 回りにそのまま写る (x, y, z) → (x, z, -y)。
     # 空の箱 (fx_cbox_) のように向きのある物が読む
     yaw = obj.matrix_world.to_euler().z
+    size = round(max(obj.matrix_world.to_scale()), 2)
     # 床に置く物 (空の箱) は真下の床の天面に。Empty は床から浮いて (埋めて) 置かれがち
     if kind == 'cbox':
         floor = floor_under(x, y, z)
         if floor is not None:
             y = floor
-    fx.append({'kind': kind, 'name': obj.name, 'x': round(x, 2), 'y': round(y, 2), 'z': round(z, 2), 'size': round(max(obj.matrix_world.to_scale()), 2), 'yaw': round(yaw, 3)})
+        # **人は止まる、弾は通る、視線は遮る。** 被る箱と同じ寸法 (actor/box.ts の tuning) を
+        # 向きに合わせて回した箱を、人の層の三角と json の箱の両方に入れる。触れた時に
+        # 揺らすのは審判 (server/arms/cbox.ts) で、これと同じ寸法で見る
+        hw, hh, hd = CBOX_W / 2 * size, CBOX_H * size, CBOX_D / 2 * size
+        c, s_ = math.cos(yaw), math.sin(yaw)
+        corners = []
+        for lx, lz in ((-hw, -hd), (hw, -hd), (hw, hd), (-hw, hd)):
+            # three の Y 回り: x' = x cos + z sin, z' = -x sin + z cos
+            corners.append((x + lx * c + lz * s_, z - lx * s_ + lz * c))
+        tris = []
+        ring = [(cx, y, cz) for cx, cz in corners] + [(cx, y + hh, cz) for cx, cz in corners]
+        for a, b, c2, d in ((0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (3, 2, 1, 0)):
+            for tri in ((a, b, c2), (a, c2, d)):
+                for k in tri:
+                    tris.extend(ring[k])
+        positions.extend(tris)
+        marks.extend([PLAYER_BIT | EYE_BIT | CAMERA_BIT | (SURFACE_IDS['wood'] << SURFACE_SHIFT)] * (len(tris) // 9))
+        xs = [cx for cx, _ in corners]
+        zs = [cz for _, cz in corners]
+        boxes.append({
+            'name': 'cbox_' + obj.name,
+            'min': [round(min(xs), 3), round(y, 3), round(min(zs), 3)],
+            'max': [round(max(xs), 3), round(y + hh, 3), round(max(zs), 3)],
+            'top': {'h': round(y + hh, 3), 'dx': 0.0, 'dz': 0.0},
+            'flags': {'draw': False, 'player': True, 'bullet': False, 'eye': True, 'camera': True},
+        })
+    fx.append({'kind': kind, 'name': obj.name, 'x': round(x, 2), 'y': round(y, 2), 'z': round(z, 2), 'size': size, 'yaw': round(yaw, 3)})
     print(f'  仕掛け {obj.name}: {kind} ({x:.1f}, {y:.1f}, {z:.1f}) 大きさ {fx[-1]["size"]}')
 
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')

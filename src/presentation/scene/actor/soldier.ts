@@ -19,7 +19,7 @@ import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
 import { stepMovement, type MoveResult, type Mover } from '../../../sim/space/movement'
-import { PLAYER_HEIGHT as BODY_HEIGHT, STEP_UP } from '../../../domain/player/moving'
+import { PLAYER_HEIGHT as BODY_HEIGHT, PLAYER_RADIUS as DOMAIN_RADIUS, STEP_UP } from '../../../domain/player/moving'
 import { can, type BodyState } from '../../../domain/player/moves'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
@@ -37,7 +37,7 @@ import type { WeaponTarget } from '../arms/weapon'
 
 /** カプセルの円柱部分の長さ (m)。全高 = LENGTH + RADIUS * 2 */
 const CAPSULE_LENGTH = 1.1
-const CAPSULE_RADIUS = 0.35
+const CAPSULE_RADIUS = DOMAIN_RADIUS
 // 寸法とドメインの数字が食い違ったら、どちらかを直すこと
 if (CAPSULE_LENGTH + CAPSULE_RADIUS * 2 !== BODY_HEIGHT) {
   console.warn('[Soldier] カプセルの寸法と PLAYER_HEIGHT が食い違っている')

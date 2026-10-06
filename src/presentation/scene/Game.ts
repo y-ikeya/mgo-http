@@ -54,7 +54,7 @@ import { Locators } from "./arms/locators";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
-import { placeEmptyBox } from "./actor/box";
+import { EmptyBoxes } from "./actor/box";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { Sensed } from "./fx/sensed";
@@ -673,6 +673,8 @@ export class Game {
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
   private readonly claymores: Claymores;
+  /** 誰も入っていないダンボール (ステージの置き物) */
+  private readonly emptyBoxes: EmptyBoxes;
   /** 置く所の予告 (印と見張る扇) */
   private readonly placePreview: PlacePreview;
   /**
@@ -1203,8 +1205,8 @@ export class Game {
     void loadStageFx(this.stageName).then((fx) => {
       const smoke = fx.filter((f) => f.kind === "smoke");
       if (smoke.length > 0) this.stageSmoke = new StageSmoke(this.scene, smoke);
-      // 誰も入っていないダンボール。被る箱と同じ絵で、当たりは無い
-      for (const f of fx) if (f.kind === "cbox") placeEmptyBox(this.scene, f.x, f.y, f.z, f.yaw ?? 0, f.size);
+      // 誰も入っていないダンボール。被る箱と同じ絵。人は止まり、触れると一度揺れる
+      for (const f of fx) if (f.kind === "cbox") this.emptyBoxes.place(f.x, f.y, f.z, f.yaw ?? 0, f.size);
       const sparks = fx.filter((f) => f.kind === "spark");
       if (sparks.length > 0) {
         this.stageSparks = new StageSparks(this.scene, sparks, (origin) => {
@@ -1247,6 +1249,7 @@ export class Game {
     this.grenades = new Grenades(this.scene);
     this.locators = new Locators(this.scene);
     this.claymores = new Claymores(this.scene);
+    this.emptyBoxes = new EmptyBoxes(this.scene);
     this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
@@ -1721,6 +1724,7 @@ export class Game {
     this.stageSparks?.update(dt);
     // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
     this.decoys.update(dt);
+    this.emptyBoxes.update(dt);
     // 手榴弾と同じ物理を同じ刻みで解く。止まったら点滅が始まる
     this.locators.update(
       dt,
@@ -2297,6 +2301,11 @@ export class Game {
        */
       case "decoyBumped":
         this.decoys.bump(message.id, message.dirX, message.dirZ);
+        break;
+
+      // 空のダンボールに誰かが触れた。一度だけガタッと揺れる
+      case "cboxBumped":
+        this.emptyBoxes.bump(message.index, message.dirX, message.dirZ);
         break;
 
       /*
