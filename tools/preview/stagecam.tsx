@@ -9,6 +9,7 @@
  *     ?shadow=0              太陽の影マップを切る
  *     ?vcol=0                焼き込みの頂点色 (空の見え方) を切る
  *     ?col=1                 人が止まる面を水色で重ねる (?col=box 審判の箱 / ?col=all 両方。本番と同じ)
+ *     ?rdepth=0              深さを既定の向きに戻す (逆向きが既定。util/depth.ts)
  *     ?place=x,y,z,yaw       その足元・向きで置く所の予告 (印と扇) を出す。置けなければ赤
  *
  * --- なぜ要るか ---
@@ -20,6 +21,7 @@ import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { addColliderOverlay, applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
 import { EmptyBoxes } from '../../src/presentation/scene/actor/box'
+import { REVERSED_DEPTH } from '../../src/presentation/scene/util/depth'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
@@ -35,8 +37,8 @@ const eye = vec('eye', [-12, 11, 48])
 const look = vec('look', [-8, 13, 44])
 const fov = Number(query.get('fov') ?? '60')
 
-// 深さの持ち方は本番と同じ既定 (?rdepth=1 で反転)
-const renderer = new WebGPURenderer({ antialias: true, reversedDepthBuffer: query.get('rdepth') === '1' })
+// 深さの持ち方は本番と同じ (逆向きが既定。?rdepth=0 で戻す)
+const renderer = new WebGPURenderer({ antialias: true, reversedDepthBuffer: REVERSED_DEPTH })
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = query.get('shadow') !== '0'

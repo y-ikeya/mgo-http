@@ -55,6 +55,7 @@ import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
 import { EmptyBoxes } from "./actor/box";
+import { REVERSED_DEPTH } from "./util/depth";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { Sensed } from "./fx/sensed";
@@ -1138,7 +1139,8 @@ export class Game {
      */
     this.renderer = new WebGPURenderer({
       antialias: true,
-      reversedDepthBuffer: new URLSearchParams(location.search).get("rdepth") === "1",
+      // 逆向きの深さ (util/depth.ts)。遠くの薄い板が壁と食い合わない
+      reversedDepthBuffer: REVERSED_DEPTH,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     // 切り分け用: ?shadow=0 で影を切る
