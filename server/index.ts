@@ -201,7 +201,7 @@ setInterval(() => {
       // 誰かが decoy に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
       bumpDecoys(room, now)
       // 空のダンボールも同じ。触れたら一度揺れる (申告は受けない)
-      bumpCboxes(room, now)
+      bumpCboxes(room)
       // 構えて狙われている人が居れば、狙っている側を光らせる (TARGET ALERT Lv3)
       alertAims(room, now)
       for (const player of connected(room)) {
