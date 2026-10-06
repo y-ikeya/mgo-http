@@ -83,3 +83,29 @@ describe('bodyVisible (箱の 12 辺)', () => {
     expect(bodyVisible(...eye, -0.4, FLOOR, -1.6, 0, BODY_BOX.stand, sightEdge)).toBe(false)
   })
 })
+
+describe('網で寄せる (CameraBlocker)', () => {
+  test('何にも当たらなければ引き切る。外接の箱の中 (建物の窪み) でも頭へ戻さない', () => {
+    const open = { hit: () => null }
+    const eye = cameraPoint(0, 0, 0, 0, 0, false, 1.5, open)
+    // 向き 0 は -z を見る。カメラは +z 側へ引く
+    expect(eye.z).toBeCloseTo(HIP_CAMERA.distance, 5)
+    expect(eye.x).toBeCloseTo(HIP_CAMERA.shoulder, 5)
+  })
+
+  test('後ろの壁の手前で止まる', () => {
+    // 引く線の半分で当たる
+    const wall = { hit: (_ax: number, _ay: number, az: number, _bx: number, _by: number, bz: number) => (bz > az ? { t: 0.5 } : null) }
+    const eye = cameraPoint(0, 0, 0, 0, 0, false, 1.5, wall)
+    expect(eye.z).toBeLessThan(HIP_CAMERA.distance / 2)
+    expect(eye.z).toBeGreaterThanOrEqual(0)
+  })
+
+  test('肩へずらす間に壁があれば頭から引く', () => {
+    // 右 (+x) へずらす線だけが当たる
+    const side = { hit: (ax: number, _ay: number, _az: number, bx: number) => (bx > ax + 0.1 ? { t: 0.1 } : null) }
+    const eye = cameraPoint(0, 0, 0, 0, 0, false, 1.5, side)
+    expect(eye.x).toBeCloseTo(0, 5)
+    expect(eye.z).toBeCloseTo(HIP_CAMERA.distance, 5)
+  })
+})

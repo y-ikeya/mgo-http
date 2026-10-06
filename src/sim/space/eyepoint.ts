@@ -89,6 +89,19 @@ export function viewDirection(yaw: number, pitch: number): [number, number, numb
   return [-Math.sin(yaw) * cosPitch, Math.sin(pitch), -Math.cos(yaw) * cosPitch]
 }
 
+/**
+ * カメラを止める物。**箱か、三角の網か。**
+ *
+ * 網があるステージは網で寄せる (画面の camera.ts が網で寄せるのと揃える)。
+ * 箱は建物 1 棟を外接で包むので、凹んだ所 (建物 3 の入口の窪み) に立つと
+ * 箱の中に居ることになり、カメラが頭まで戻されていた。画面では肩越しに
+ * 見えている相手が、審判の線では窪みの縁に当たって「見えない」になり、
+ * 位置が配られなかった (2026-10-06、pepa から nanashi が映らない)。
+ */
+export type CameraBlocker =
+  | StageBox[]
+  | { hit(ax: number, ay: number, az: number, bx: number, by: number, bz: number): { t: number } | null }
+
 export interface ViewPoint {
   x: number
   y: number
@@ -112,7 +125,7 @@ export function cameraPoint(
   pitch: number,
   aiming: boolean,
   viewHeight: number,
-  boxes: StageBox[] = [],
+  boxes: CameraBlocker = [],
   out: ViewPoint = { x: 0, y: 0, z: 0 },
 ): ViewPoint {
   const view = aiming ? AIM_CAMERA : HIP_CAMERA
@@ -120,9 +133,29 @@ export function cameraPoint(
   const [dirX, dirY, dirZ] = viewDirection(yaw, pitch)
 
   // 肩へのずれは水平だけ (pitch で肩越しの左右がブレないように)
-  const pivotX = x + Math.cos(yaw) * view.shoulder
-  const pivotY = feetY + viewHeight + view.lift
-  const pivotZ = z + -Math.sin(yaw) * view.shoulder
+  let pivotX = x + Math.cos(yaw) * view.shoulder
+  let pivotY = feetY + viewHeight + view.lift
+  let pivotZ = z + -Math.sin(yaw) * view.shoulder
+
+  if (!Array.isArray(boxes)) {
+    // 網。肩へずらす間に壁があれば肩のずれを捨てる (壁に体の側面を付けた時)
+    if (boxes.hit(x, feetY + viewHeight, z, pivotX, pivotY, pivotZ)) {
+      pivotX = x
+      pivotY = feetY + viewHeight
+      pivotZ = z
+    }
+    let distance = view.distance
+    const hit = boxes.hit(
+      pivotX, pivotY, pivotZ,
+      pivotX - dirX * distance, pivotY - dirY * distance, pivotZ - dirZ * distance,
+    )
+    if (hit) distance = Math.max(0, hit.t * distance - PADDING)
+    out.x = pivotX - dirX * distance
+    out.y = pivotY - dirY * distance
+    out.z = pivotZ - dirZ * distance
+    if (out.y < MIN_Y) out.y = MIN_Y
+    return out
+  }
 
   // 視線の逆へ引く。途中に壁があればそこまで
   let distance = view.distance
@@ -179,7 +212,7 @@ export interface Viewer {
 export function seesFromCamera(
   viewer: Viewer,
   viewHeights: readonly [number, number],
-  cameraBoxes: StageBox[],
+  cameraBoxes: CameraBlocker,
   visibleFrom: (eyeX: number, eyeY: number, eyeZ: number) => boolean,
   scratch: ViewPoint = { x: 0, y: 0, z: 0 },
 ): boolean {
