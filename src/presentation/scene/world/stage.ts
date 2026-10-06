@@ -1086,6 +1086,8 @@ export interface StageFx {
   z: number
   /** Empty の拡大率。煙なら湧く範囲と玉の大きさ */
   size: number
+  /** 向き (rad、Blender の Z 回り = three の Y 回り)。古い json には無い */
+  yaw?: number
 }
 
 export function loadStageFx(name: StageName): Promise<StageFx[]> {

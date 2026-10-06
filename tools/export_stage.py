@@ -1466,7 +1466,15 @@ for obj in bpy.context.scene.objects:
     parts = obj.name.split('_')
     kind = parts[1].lower() if len(parts) > 1 else ''
     x, y, z = to_gltf(obj.matrix_world.translation)
-    fx.append({'kind': kind, 'name': obj.name, 'x': round(x, 2), 'y': round(y, 2), 'z': round(z, 2), 'size': round(max(obj.matrix_world.to_scale()), 2)})
+    # 向き (Blender の Z 回り)。glTF の Y 回りにそのまま写る (x, y, z) → (x, z, -y)。
+    # 空の箱 (fx_cbox_) のように向きのある物が読む
+    yaw = obj.matrix_world.to_euler().z
+    # 床に置く物 (空の箱) は真下の床の天面に。Empty は床から浮いて (埋めて) 置かれがち
+    if kind == 'cbox':
+        floor = floor_under(x, y, z)
+        if floor is not None:
+            y = floor
+    fx.append({'kind': kind, 'name': obj.name, 'x': round(x, 2), 'y': round(y, 2), 'z': round(z, 2), 'size': round(max(obj.matrix_world.to_scale()), 2), 'yaw': round(yaw, 3)})
     print(f'  仕掛け {obj.name}: {kind} ({x:.1f}, {y:.1f}, {z:.1f}) 大きさ {fx[-1]["size"]}')
 
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')

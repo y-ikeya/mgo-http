@@ -337,6 +337,29 @@ export function createCardboardBox(): THREE.Object3D {
 }
 
 /**
+ * **誰も入っていない箱**をステージに置く (stage.json の fx_cbox_、tools/export_stage.py)。
+ *
+ * 被る箱と同じ絵・同じ寸法。見た目で「人が入っているか」が分からないのが
+ * ダンボールの肝なので、空の箱が転がっていて初めて**疑う意味**が出る。
+ * 当たりも音も無い (紙箱なので押せば動く物、という体で素通り)。動かないので影は落とす
+ *
+ * @param y 置く床の高さ (箱の底)
+ */
+export function placeEmptyBox(scene: THREE.Scene, x: number, y: number, z: number, yaw: number, size = 1): THREE.Object3D {
+  const box = template().clone(true)
+  box.traverse((obj) => {
+    const mesh = obj as THREE.Mesh
+    if (mesh.isMesh) mesh.castShadow = true
+  })
+  box.scale.set(tuning.width * size, tuning.height * size, tuning.depth * size)
+  box.position.set(x, y + (tuning.height * size) / 2, z)
+  box.rotation.y = yaw
+  box.visible = true
+  scene.add(box)
+  return box
+}
+
+/**
  * 不透明度を反映する。
  *
  * transparent の切り替えはシェーダーの再構築を伴うので、値が変わったときだけ触る。

@@ -54,6 +54,7 @@ import { Locators } from "./arms/locators";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
+import { placeEmptyBox } from "./actor/box";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { Sensed } from "./fx/sensed";
@@ -1202,6 +1203,8 @@ export class Game {
     void loadStageFx(this.stageName).then((fx) => {
       const smoke = fx.filter((f) => f.kind === "smoke");
       if (smoke.length > 0) this.stageSmoke = new StageSmoke(this.scene, smoke);
+      // 誰も入っていないダンボール。被る箱と同じ絵で、当たりは無い
+      for (const f of fx) if (f.kind === "cbox") placeEmptyBox(this.scene, f.x, f.y, f.z, f.yaw ?? 0, f.size);
       const sparks = fx.filter((f) => f.kind === "spark");
       if (sparks.length > 0) {
         this.stageSparks = new StageSparks(this.scene, sparks, (origin) => {
