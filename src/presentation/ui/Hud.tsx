@@ -340,16 +340,12 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
-        揃った。**何が起きたかを言ってから支度へ。** 5 秒 (domain/match/match.ts の
-        ASSEMBLED_SECONDS) のうち最後の 1 秒で暗転する。支度の画面はその黒から明ける
+        揃った。**何が起きたかを言ってから支度へ。** 告知は始まる時と同じ指令の帯
+        (Orders)。5 秒 (domain/match/match.ts の ASSEMBLED_SECONDS) のうち最後の 1 秒で
+        暗転する。支度の画面はその黒から明ける
       */}
       <Show when={phase() === 'assembled'}>
-        <div class="hud-assembled">
-          <div class="hud-assembled-line" />
-          <div class="hud-assembled-title">{t('hud.assembledTitle')}</div>
-          <div class="hud-assembled-sub">{t('hud.assembledSub')}</div>
-          <div class="hud-assembled-line" />
-        </div>
+        {/* 告知そのものは指令の帯 (Orders) が出す。ここは最後の暗転だけ */}
         <div class="hud-assembled-black" />
       </Show>
       <Show when={dawn()}>

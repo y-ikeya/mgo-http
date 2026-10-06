@@ -1394,44 +1394,10 @@
 }
 
 /*
- * 揃った告知。**静かに出て、黒へ落ちる。**
- *
- * 文字は 0.6 秒で浮かび、4 秒目から黒が被さって 5 秒で真っ暗になる (告知の長さは
- * domain/match/match.ts の ASSEMBLED_SECONDS)。支度の画面 (loadout、z-index 6) より
- * 上に重ねるので fixed で最前に置く
+ * 揃った告知の終わりの暗転。告知は指令の帯 (Orders) が出し、4 秒目から黒が被さって
+ * 5 秒で真っ暗になる (告知の長さは domain/match/match.ts の ASSEMBLED_SECONDS)。
+ * 支度の画面 (loadout、z-index 6) より上に重ねるので fixed で最前に置く
  */
-.hud-assembled {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(6, 10, 6, 0.55) 0%, rgba(6, 10, 6, 0.15) 70%);
-  animation: hud-assembled-in 0.6s ease-out both;
-}
-
-.hud-assembled-title {
-  font-size: 34px;
-  letter-spacing: 0.3em;
-  color: #d8e6cc;
-}
-
-.hud-assembled-sub {
-  font-size: 14px;
-  letter-spacing: 0.24em;
-  color: rgba(180, 204, 160, 0.8);
-}
-
-.hud-assembled-line {
-  width: min(520px, 70vw);
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(180, 204, 160, 0.6), transparent);
-}
-
 .hud-assembled-black {
   position: fixed;
   inset: 0;
@@ -1449,11 +1415,6 @@
   background: #000;
   pointer-events: none;
   animation: hud-dawn 0.9s ease-out both;
-}
-
-@keyframes hud-assembled-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
 }
 
 @keyframes hud-assembled-black {

@@ -28,6 +28,11 @@ export default function Orders(props: {
   phase: string | undefined
 }) {
   const [showing, setShowing] = createSignal(false)
+  /**
+   * 揃った告知として出しているか (assembled)。**同じ帯で「試合が決まった」を言う**
+   * (2026-10-06 本人: 始まる時の帯で揃ったことも知らせたい)。色は中立
+   */
+  const [assembled, setAssembled] = createSignal(false)
   const [leaving, setLeaving] = createSignal(false)
   let timers: ReturnType<typeof setTimeout>[] = []
 
@@ -52,8 +57,23 @@ export default function Orders(props: {
     const before = was
     was = now
 
+    if (now === 'assembled') {
+      clear()
+      setAssembled(true)
+      setLeaving(false)
+      setShowing(true)
+      return
+    }
+    // 告知が終わった。**画面は暗転しているので、待たずに消す**
+    if (before === 'assembled') {
+      clear()
+      setAssembled(false)
+      setShowing(false)
+      setLeaving(false)
+    }
     if (now === 'countdown') {
       clear()
+      setAssembled(false)
       setLeaving(false)
       setShowing(true)
       return
@@ -76,7 +96,7 @@ export default function Orders(props: {
   onCleanup(clear)
 
   /** 自分の陣営。個人戦では色を持たないので中立の色で出す */
-  const side = () => (props.team === 'red' ? 'red' : props.team === 'blue' ? 'blue' : 'solo')
+  const side = () => (assembled() ? 'solo' : props.team === 'red' ? 'red' : props.team === 'blue' ? 'blue' : 'solo')
 
   /**
    * 何をすれば勝ちか。**モードで変わる。**
@@ -84,12 +104,13 @@ export default function Orders(props: {
    * チーム戦は相手の色を名指しする。個人戦は名指しできない (全員が敵)。
    */
   const order = () => {
+    if (assembled()) return `${t('hud.assembledTitle')} — ${t('hud.assembledSub')}`
     if (!MODES[props.mode].teams) return t('orders.dm')
     return props.team === 'red' ? t('orders.tdm.blue') : t('orders.tdm.red')
   }
 
   const heading = () =>
-    props.team === 'red' ? 'RED' : props.team === 'blue' ? 'BLUE' : MODES[props.mode].id
+    assembled() ? 'MATCH' : props.team === 'red' ? 'RED' : props.team === 'blue' ? 'BLUE' : MODES[props.mode].id
 
   return (
     <Show when={showing()}>
