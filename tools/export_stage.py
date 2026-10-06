@@ -1083,6 +1083,21 @@ def skewed_area_ratio(obj):
     return skew / total if total > 1e-9 else 0.0
 
 
+# 斜めの面 1 枚の面積がこれを越えたら箱にしない (m²、世界の大きさで)。木箱の面取りは数 cm²
+BOX_SKEW_FACE_MAX = 0.25
+
+
+def largest_skewed_face(obj):
+    """世界の大きさで、軸に沿っていない面のうち一番大きい物の面積"""
+    scale = max(abs(v) for v in obj.matrix_world.to_scale())
+    best = 0.0
+    for poly in obj.data.polygons:
+        n = poly.normal
+        if max(abs(n.x), abs(n.y), abs(n.z)) < 0.95:
+            best = max(best, poly.area * scale * scale)
+    return best
+
+
 # 体積が外枠のこれより小さければ箱ではない。L 字 (商店街 15) を箱にすると、
 # 折れの内側 (店の前の通り) まで塞がる
 BOX_VOLUME_MIN = 0.85
@@ -1147,6 +1162,11 @@ def box_is_fair(obj, tris):
     # 斜めの面 (切った角、折れた外形) を持つ物は外枠に写らない。建物 9 の斜めの角を
     # 箱にすると、切り落とした所へ入れなかった
     if skewed_area_ratio(obj) > BOX_SKEW_MAX:
+        return False
+    # **大きな斜めの面が 1 枚でもあれば箱にしない。** 割合で見ると、大きな物の角を
+    # 1 つ切り落とした所 (snipePoint1 の 1.7m²、全体の 2%) が通ってしまい、切り落とした
+    # 分が人にだけ見えない壁として残った (2026-10-06)
+    if largest_skewed_face(obj) > BOX_SKEW_FACE_MAX:
         return False
     # 外枠の中がすかすかな物 (L 字・コの字・張り出し) も写らない
     if len(obj.data.polygons) <= 400 and volume_ratio(obj) < BOX_VOLUME_MIN:

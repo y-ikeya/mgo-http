@@ -15368,7 +15368,7 @@
 }
 },
 {
-"name": "concrete_cube",
+"name": "concrete_cube_nobox",
 "min": [
 -9.645,
 9.843,
