@@ -92,6 +92,18 @@ export interface MoveTuning {
  */
 const GROUND_SNAP = 0.12
 
+/**
+ * 段に乗る速さ (m/s)。**地面に居るまま段を上がる時だけ** (着地は別)。
+ *
+ * 段の天面へ 1 コマで跳ぶと、足元が 0.3m 瞬間移動する。自分の画面では絵とカメラで
+ * 均せるが、**相手の画面では頭の線が 1 更新で跳ぶ** — 段の乗り降りを繰り返すと頭を
+ * 狙えない (2026-10-06 本人の懸念)。絵だけ均すと見えている頭と審判の頭がずれる。
+ * 物理そのものを「登る速さ」で動かせば、自分・相手・審判の全部が同じ滑らかな線に
+ * なる。3 m/s で 0.3m を 0.1 秒。登る間は riseAhead が球を持ち上げているので、
+ * 段の側面に押し返されない
+ */
+const STEP_RATE = 3
+
 export interface MoveResult {
   /** このフレームで着地したか */
   landed: boolean
@@ -178,7 +190,8 @@ export function stepMovement(
   let impactSpeed = 0
 
   if (position.y <= ground) {
-    position.y = ground
+    // 地面に居たまま段に当たったなら、登る速さで上がる。空中から着いたなら即座に
+    position.y = wasGrounded ? Math.min(ground, position.y + STEP_RATE * dt) : ground
     // 速度を消す前に衝撃の大きさを控える
     impactSpeed = -mover.velocityY
     mover.velocityY = 0
