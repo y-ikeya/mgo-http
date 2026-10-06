@@ -148,8 +148,10 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
   },
   // 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**
   echo: { mode: 'PRACTICE', stages: only('training') },
-  // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある
-  foxtrot: { mode: 'PRACTICE', stages: only('lab') },
+  // 検証場。段・窓・通路・階段・堀で動作を試す部屋 (lab)。的も 2 つ置いてある。
+  // **いまは city。** 落下の受け身 (4.1m 以上) を試すのに lab の一番高い所 (3.0m) では
+  // 足りない (2026-10-06)。lab に戻すなら only('lab')
+  foxtrot: { mode: 'PRACTICE', stages: only('city') },
 }
 
 /** その部屋で持ち込める主武器。**省いてあれば全部** */
