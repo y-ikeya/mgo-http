@@ -27,8 +27,6 @@ import {
   climbSurge,
   crawlSurge,
   resolveLocomotion,
-  STAIR_DROP_MAX,
-  STAIR_DROP_MIN,
 } from './motion'
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
@@ -216,14 +214,6 @@ const FALL_GRAVITY_SCALE = 1.8
  * ジャンプが無くなったので、段差から降りるときの想定として置いてある。
  */
 const FALL_REFERENCE_HEIGHT = 0.6
-/**
- * 着地モーションを出しておく時間 (秒)。
- *
- * クリップは 0.67 秒あるが、全部流すと着地のたびに膝を曲げた時間が長く残る。
- * 落下 0.35 秒に対して着地 0.3 秒が乗ると、屈んでいる時間のほうが長く見えてしまう。
- * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
- */
-const LANDING_TIME = 0.16
 
 
 /**
@@ -352,22 +342,6 @@ const HANG_NORMAL_REACH = 0.15
 /** 法線に沿って縁まで詰める刻みと上限 (m) */
 const HANG_EDGE_STEP = 0.05
 const HANG_EDGE_REACH = 0.6
-/**
- * 着地モーションを出す落下速度の下限 (m/s)。
- *
- * 階段を駆け上がると一段ごとに接地と離地を繰り返すので、
- * 小さな段差まで拾うと着地モーションが出ずっぱりになる。
- *
- * 落ちる速さは**落ちる時の重力 (9.8 × FALL_GRAVITY_SCALE 1.8 = 17.6 m/s²)** で決まる:
- * 段 1 つ (0.25m) で 3.0、瓦礫や土嚢 (0.35m) で 3.5、跳躍の高さ (0.6m) で 4.6。
- * 3.0 にしていた頃は 0.26m 以上の段を下りるだけで着地の型 (膝を曲げる) が出て、
- * 一段降りるたびに一瞬しゃがんで見えた。
- *
- * **4.3 (跳躍の高さ) でも肩の高さ (1.4m、7.0 m/s) から降りるだけで膝を曲げた**
- * (2026-10-06 本人: 要らない)。膝を曲げる型は**体が受け止めないと不自然な高さ**
- * だけに。2m (8.4 m/s) から。削られる高さ (FALL_SAFE_SPEED 12 = 4.1m) はこの上
- */
-const LANDING_MIN_SPEED = 8.4
 
 /**
  * 空中で進行方向を変えられる度合い (0 = 変えられない)。
@@ -663,7 +637,6 @@ export class Soldier {
   }
 
   /** 着地モーションの残り時間 */
-  private landingTimer = 0
   /**
    * 空中に居る時間 (秒)。接地したら 0 に戻す。
    *
@@ -681,7 +654,6 @@ export class Soldier {
   /** その階段は下りか。上りと下りで型が違う */
   private stairDown = false
   /** 地面を離れたときの高さ。**どれだけ落ちたか**を測るのに使う */
-  private airFromY = 0
   /** 受け身の残り時間。ただの着地より長い */
   private hardLandTimer = 0
   /**
@@ -1219,23 +1191,14 @@ export class Soldier {
    * 連続して鳴る。
    *
    * --- 高さ ---
-   * 落下は**最後に地面に触れていた高さとの差**で読んでいる (airFromY)。
-   * 控えを置いたままにすると、**跳んだ距離がまるごと「1 フレームで上がった /
-   * 落ちた」ことになる**。
-   *
-   * 実際に出た形: 画面を読み直すと、湧き地点へ仮置きされた高さが控えに残った
-   * まま、サーバーの位置 (resume) が書き込まれる。その差が段差と読まれて、
-   * **一瞬 up_stair の型が流れて体が浮き、0.45 秒 (STAIR_HOLD) で戻る**。
+   * 流れかけていた型 (階段・空中) も畳む。跳ぶ前の段差や落下は、跳んだ先には無い
    */
   warpTo(x: number, y: number, z: number): void {
     this.footsteps.warp(x, y, z)
-    // 跳んだ先を「さっきも居た高さ」にする。差が 0 なら落下にならない
-    this.airFromY = y
     // 流れかけていた型も畳む。跳ぶ前の段差や落下は、跳んだ先には無い
     this.stairFor = 0
     this.stairDown = false
     this.airborneFor = 0
-    this.landingTimer = 0
     this.hardLandTimer = 0
   }
 
@@ -3326,47 +3289,24 @@ export class Soldier {
      * 階段が下りられない床のように見えていた。**先にここで段だと分かれば**、
      * 下の落下の型は出さなくていい。
      */
-    // 前に地面に触れていた高さとの差。**控えるのは使ったあと** (下)
-    const dropped = this.airFromY - this.position.y
     this.airborneFor = this.grounded ? 0 : this.airborneFor + dt
-    let stepDown = false
-    /*
-     * 階段を上ったか。**1 フレームで足元が跳ね上がったら段差。**
-     *
-     * 坂も上がるが、そちらは連続なので 1 フレームの上がり幅が小さい
-     * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
-     */
-    /*
-     * **階段の型は流さない。**
-     *
-     * 階段の歩く面は書き出しが坂の板に置き換えている (tools/export_stage.py の
-     * ramped_stairs) ので、本物の階段では足元が 1 コマで跳ねない。1 コマで跳ねるのは
-     * 縁石や箱 (基地の軍用ケース) に乗り降りした時だけで、そこで上り下りの型を流すと、
-     * 位置はもう動いているのに型の上下が重なって**余計に浮く / 屈伸する** (2026-10-05)。
-     * 型 (up_stair / down_stair) は glb に残してあるが、入口はここで閉じる。
-     *
-     * 段を**下りた**こと自体は見る。着地の型 (jump_down) を出さないため。
-     */
-    if (moved.landed && dropped >= STAIR_DROP_MIN && dropped <= STAIR_DROP_MAX) stepDown = true
     if (this.stairFor > 0) this.stairFor -= dt
 
-    // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す。
-    // **削られる速さなら受け身。** 体力が減ったことが動きにも出る
-    if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED && !stepDown) {
-      this.landingTimer = LANDING_TIME
-      if (fallDamage(moved.impactSpeed) > 0) {
-        this.hardLandTimer = HARD_LAND_TIME
-        // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
-        this.hardLandYaw = this.yaw
-        this.animator?.playHardLand()
-      } else {
-        this.animator?.playLanding()
-      }
+    /*
+     * **着地の型は受け身だけ。** 削られる速さ (FALL_SAFE_SPEED) で落ちた時に転がる。
+     * それより軽い着地で膝を曲げる型 (jump_down) は外した — 肩の高さから降りる
+     * たびに屈んで見えて、動きが重かった (2026-10-06 本人: 使わないので消す)。
+     * 階段は坂の板なので着地にならず、段や箱からは足元の位置が動くだけ
+     */
+    if (moved.landed && fallDamage(moved.impactSpeed) > 0) {
+      this.hardLandTimer = HARD_LAND_TIME
+      // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
+      this.hardLandYaw = this.yaw
+      this.animator?.playHardLand()
     }
     // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
     // サーバーなので、速さを申告して同じ式 (damage.ts) を向こうで通してもらう
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
-    if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
@@ -3403,7 +3343,6 @@ export class Soldier {
      * ようとすると更新の機会が来ない (最初に離れた高さのまま固まり、坂を下りた
      * 総量が落差として出る)。着地したフレームも含めて、触れていたら控える。
      */
-    if (this.grounded) this.airFromY = this.position.y
     this.actualSpeed = moved.actualSpeed
 
     // 倒れている間の時計。起き上がるのは操作されたときだけ (standUp)
@@ -3877,7 +3816,6 @@ export class Soldier {
       hangClimbing: this.hangStage === 'climb',
       hangHolding: this.hangStage === 'hang' || this.hangStage === 'drop',
       onGround: this.onGround,
-      landing: this.landingTimer,
       hardLand: this.hardLandTimer,
       airborneFor: this.airborneFor,
       stairFor: this.stairFor,

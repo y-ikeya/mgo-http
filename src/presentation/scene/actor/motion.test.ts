@@ -31,7 +31,6 @@ const base: StanceInput = {
   proneShift: null,
   rolling: false,
   onGround: true,
-  landing: 0,
   hardLand: 0,
   airborneFor: 0,
   stairFor: 0,
@@ -66,9 +65,9 @@ describe('刺す姿勢', () => {
 })
 
 describe('堪える着地', () => {
-  test('削られる高さから落ちたら堪える型。ただの着地とは別', () => {
+  test('削られる高さから落ちたら堪える型。軽い着地に型は無い (2026-10-06 に外した)', () => {
     expect(resolveLocomotion({ ...base, hardLand: 1.6 })).toBe('hard_land')
-    expect(resolveLocomotion({ ...base, landing: 0.1 })).toBe('jump_down')
+    expect(resolveLocomotion({ ...base })).not.toBe('jump_down')
   })
 
   test('堪えている間は移動の型に戻らない。**堪え切るまで続く**', () => {

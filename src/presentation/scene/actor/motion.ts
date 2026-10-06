@@ -287,8 +287,6 @@ export interface StanceInput {
   /** 縁に手を掛けて待っている (落ち切った後)。hanging と一緒に true で来る */
   hangHolding: boolean
   onGround: boolean
-  /** 着地モーションの残り時間 (秒) */
-  landing: number
   /**
    * 空中に居る時間 (秒)。0 なら接地している。
    *
@@ -303,7 +301,7 @@ export interface StanceInput {
   /**
    * 受け身の残り時間 (秒)。0 なら受け身ではない。
    *
-   * ただの着地 (landing) と別に持つ。落下ダメージが入る速さで落ちたときだけで、
+   * 落下ダメージが入る速さで落ちたときだけで、
    * 尺もクリップに合わせて長い。
    */
   hardLand: number
@@ -431,7 +429,6 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.stairFor > 0) return input.stairDown ? 'down_stair' : 'up_stair'
   // 削られる高さから落ちた着地は受け身。ただの着地より長く、転がり切るまで続く
   if (input.hardLand > 0) return 'hard_land'
-  if (input.landing > 0) return 'jump_down'
 
   const stopping =
     input.previous === 'idle' || input.previous === 'crouch_idle'
