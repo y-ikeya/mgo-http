@@ -1799,22 +1799,31 @@ export class Game {
     pushOut: (position, radius) => {
       const solid = this.stage.cameraWorld;
       if (!solid) return;
-      // 触れている面の押し出しを足し合わせて動かす。角では 2 面に触れるので 2 度回す
+      /*
+       * 触れている面の向きを足し合わせて押す向きを決め、**量は一番深い食い込みだけ**。
+       *
+       * 深さを全部足していた頃は、三角の細かい物 (錆びた車、数百枚が球の中) に
+       * 触れた途端に数十枚ぶんの深さが足し合わさって、1cm の食い込みで 0.5m 跳んだ。
+       * 車と壁の間で構えるとカメラが空へ飛んだのはこれ (2026-10-06)。角では
+       * 2 面に触れるので 2 度回す (向きは足すので角から斜めに抜ける)
+       */
       for (let round = 0; round < 2; round++) {
-        let px = 0;
-        let py = 0;
-        let pz = 0;
-        let touched = false;
+        let nx = 0;
+        let ny = 0;
+        let nz = 0;
+        let deepest = 0;
         solid.touching(position.x, position.y, position.z, radius, (contact) => {
-          touched = true;
-          px += contact.nx * contact.depth;
-          py += contact.ny * contact.depth;
-          pz += contact.nz * contact.depth;
+          nx += contact.nx * contact.depth;
+          ny += contact.ny * contact.depth;
+          nz += contact.nz * contact.depth;
+          if (contact.depth > deepest) deepest = contact.depth;
         });
-        if (!touched) break;
-        position.x += px;
-        position.y += py;
-        position.z += pz;
+        if (deepest <= 0) break;
+        const len = Math.hypot(nx, ny, nz);
+        if (len < 1e-9) break;
+        position.x += (nx / len) * deepest;
+        position.y += (ny / len) * deepest;
+        position.z += (nz / len) * deepest;
       }
     },
   };
