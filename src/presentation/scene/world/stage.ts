@@ -36,6 +36,7 @@ import type { Obstacle } from '../../../sim/space/collision'
 import { TriangleBvh } from '../../../sim/space/bvh'
 import type { SolidWorld } from '../../../sim/space/vision'
 import { isPathClear, SANE_HEIGHT, sightBlockers, solidBlockers } from '../../../sim/space/vision'
+import { TOWARD_CAMERA } from '../util/depth'
 import type { Ladder } from '../../../domain/stage'
 import type { StageBox } from '../../../sim/space/vision'
 import { arenaHalfOf } from '../../../sim/judge/motioncheck'
@@ -1655,6 +1656,19 @@ async function replaceWithModel(
     }
     // 切り分け用: ?decal=0 で壁の汚れの板を隠す
     if (!DIAG.decal && name.includes('decal')) obj.visible = false
+    /*
+     * **汚れの板は深さの比べ合いで壁に勝たせる。** 板は壁から 3mm〜1.5cm しか浮いて
+     * いないので、角度と距離によっては壁と深さが並んでブロック状に食い合った
+     * (2026-10-06 建物 3 の入り口の柱。深さを逆向きにしても残った)。位置はそのままで、
+     * 比べる時だけ手前へ寄せる。向きは深さの持ち方で裏返る (util/depth.ts)
+     */
+    if (name.includes('decal')) {
+      for (const material of Array.isArray(obj.material) ? obj.material : [obj.material]) {
+        material.polygonOffset = true
+        material.polygonOffsetFactor = 4 * TOWARD_CAMERA
+        material.polygonOffsetUnits = 4 * TOWARD_CAMERA
+      }
+    }
 
     /*
      * **壊れた形は止める側に入れない。**
