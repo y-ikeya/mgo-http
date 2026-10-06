@@ -112,6 +112,14 @@ const VIEW_CLEARANCE = 0.1
  * しゃがみの姿勢へ戻っているので、しゃがみからの構え (1.0 秒目から) になる
  */
 const KNEEL_CARRY_SECONDS = 0.35
+
+/**
+ * 体の見た目の高さが物理に追いつく速さ (1/秒)。10 で 0.1 秒ほど。
+ * カメラ (6) より少し速い — 体が遅れ過ぎると段の縁に足がめり込んで見える
+ */
+const VISUAL_LAMBDA = 10
+/** これより大きく動いたら均さず追いつかせる (m)。カメラの STEP_SNAP と同じ線 */
+const VISUAL_SNAP = 0.45
 /** モデル未読み込み時の注視点の高さ (m) */
 const FALLBACK_VIEW_HEIGHT = PLAYER_HEIGHT * 0.85
 /** しゃがみ時の散布の倍率。止まって狙う価値をここで作る */
@@ -781,6 +789,8 @@ export class Soldier {
   private rollFromCrouch = false
   /** 前のコマで置く型 (claymore_place) が流れていたか。終わった瞬間を拾うため */
   private wasPlacing = false
+  /** 描く体の高さ (均した値)。物理の高さは object.position.y */
+  private visualY = 0
   /** 当たりの形を透けて描く (?col=)。無ければ描かない */
   private colliderView: { capsule: THREE.Mesh; step: THREE.LineLoop; height: number } | null = null
   /** 置き終わってからの秒数。直後に構え直す時、片膝立ちの姿勢をそのまま使う */
@@ -1226,6 +1236,8 @@ export class Soldier {
     this.footsteps.warp(x, y, z)
     // 跳んだ先を「さっきも居た高さ」にする。差が 0 なら落下にならない
     this.airFromY = y
+    // 絵も跳んだ先へ。均すと湧いた所で体が下から浮いてくる
+    this.visualY = y
     // 流れかけていた型も畳む。跳ぶ前の段差や落下は、跳んだ先には無い
     this.stairFor = 0
     this.stairDown = false
@@ -1772,6 +1784,28 @@ export class Soldier {
     // しゃがみから立つのも同じ。低い天井の下では立てない
     if (this.crouching && this.headroom() < COLLISION_HEIGHT.stand) return
     this.crouching = !this.crouching
+  }
+
+  /**
+   * **体の見た目の高さを均す。** 物理の位置 (object) は段に乗った瞬間に跳ぶが、
+   * 描く体 (model) はそこへ 0.1 秒ほどかけて追いつく。
+   *
+   * 当たり・審判へ送る位置・自分のカプセルは物理のまま。動くのは絵だけ。
+   * カメラは注視点の足元を同じ考えで均している (sense/camera.ts の STEP_LAMBDA)。
+   * 体だけ跳ぶと、三人称で見ている自キャラの頭が 1 コマで 0.3m 上がって見えた
+   * (2026-10-06 基地の軍用ケース。縁を斜めの当たりにする案もあったが、絵と当たりが
+   * 食い違う上に箱ごとに手が要る。見た目を均すなら当たりは四角のままでよい)。
+   *
+   * **大きく動いたときは追いつかせる** — 落下・跳躍・湧き直しまで均すと、
+   * 落ちている間ずっと体が浮いて付いてくる。線はカメラと同じ 0.45m
+   */
+  private smoothVisualHeight(dt: number): void {
+    const target = this.object.position.y
+    if (Math.abs(target - this.visualY) > VISUAL_SNAP) this.visualY = target
+    else this.visualY = damp(this.visualY, target, VISUAL_LAMBDA, dt)
+    const lift = this.visualY - target
+    if (this.model) this.model.position.y = lift
+    if (this.placeholder) this.placeholder.position.y = lift
   }
 
   /**
@@ -3479,6 +3513,7 @@ export class Soldier {
     }
     this.object.rotation.y = this.yaw
     this.updateColliderView()
+    this.smoothVisualHeight(dt)
 
     if (this.animator) {
       // 足が滑らないよう、その瞬間の速度に再生速度を合わせ続ける
