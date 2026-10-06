@@ -2895,9 +2895,15 @@ export class Game {
     this.net.send({ type: "spawn" });
   }
 
-  /** いま装備の画面が出ているか。状態がそのまま答えになる */
+  /**
+   * いま装備の画面が出ているか。状態がそのまま答えになる。
+   *
+   * **揃った告知の間だけは出さない。** 後から入った人は入った時点で支度に
+   * 居るので、そのままだと「対戦者が揃いました」が装備の画面に隠れて見えない
+   * (2026-10-06 本人)。告知が終われば支度 (READY UP) として出る
+   */
   private get loadoutBlocking(): boolean {
-    return this.canChooseLoadout;
+    return this.canChooseLoadout && this.replica.match?.phase !== "assembled";
   }
 
   /**
