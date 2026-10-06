@@ -227,6 +227,27 @@ const FALL_REFERENCE_HEIGHT = 0.6
  * 差し替わったので、その仕掛けからは外してある。
  */
 const HARD_LAND_TIME = 2.03
+/**
+ * 軽い着地 (jump_down、膝を曲げる) を出しておく時間 (秒)。
+ *
+ * クリップは 0.67 秒あるが、全部流すと着地のたびに膝を曲げた時間が長く残る。
+ * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
+ */
+const LANDING_TIME = 0.16
+/**
+ * 軽い着地の型を出す落下速度の下限 (m/s)。2m (8.4 m/s) から。
+ *
+ * 落ちる速さは落ちる時の重力 (9.8 × FALL_GRAVITY_SCALE 1.8 = 17.6 m/s²) で決まる:
+ * 段 1 つ (0.25m) で 3.0、跳躍の高さ (0.6m) で 4.6、肩の高さ (1.4m) で 7.0。
+ * それらで膝を曲げると一段降りるたびに屈んで見えるので拾わない。
+ * 削られる高さ (FALL_SAFE_SPEED 12 = 4.1m) はこの上で、そちらは受け身 (hard_land)。
+ *
+ * **型は接地した瞬間 (moved.landed) にだけ始める。** 2026-10-06 の朝に「空中で膝が
+ * 曲がる」ように見えたのは、絵の高さを物理より 0.1 秒遅らせて均していた間
+ * (524261b〜4f07536) だけで、均しは外れている。いまは物理と絵が同じ高さなので、
+ * 接地で始めれば足が着いてから曲がる。
+ */
+const LANDING_MIN_SPEED = 8.4
 
 /*
  * 跳び越え (vault)。**転がりの代わりに出る。**
@@ -656,6 +677,8 @@ export class Soldier {
   /** 地面を離れたときの高さ。**どれだけ落ちたか**を測るのに使う */
   /** 受け身の残り時間。ただの着地より長い */
   private hardLandTimer = 0
+  /** 軽い着地 (膝を曲げる) の残り時間 */
+  private landingTimer = 0
   /**
    * 跳躍の設定。高さを固定したまま重力を変えられるよう、初速は毎回 sqrt(2gh) で出す。
    * 重力だけ上げれば「同じ高さまで跳ぶが滞空が短い」になる。
@@ -1200,6 +1223,7 @@ export class Soldier {
     this.stairDown = false
     this.airborneFor = 0
     this.hardLandTimer = 0
+    this.landingTimer = 0
   }
 
   /**
@@ -3293,21 +3317,27 @@ export class Soldier {
     if (this.stairFor > 0) this.stairFor -= dt
 
     /*
-     * **着地の型は受け身だけ。** 削られる速さ (FALL_SAFE_SPEED) で落ちた時に転がる。
-     * それより軽い着地で膝を曲げる型 (jump_down) は外した — 肩の高さから降りる
-     * たびに屈んで見えて、動きが重かった (2026-10-06 本人: 使わないので消す)。
+     * 着地の型は**接地した瞬間** (moved.landed) にだけ始める。空中では始めない。
+     * 削られる速さ (FALL_SAFE_SPEED) なら受け身 (hard_land)、2m 以上 (LANDING_MIN_SPEED)
+     * なら膝を曲げる軽い着地 (jump_down)、それ未満 (段・箱・肩の高さ) は何も流さない。
      * 階段は坂の板なので着地にならず、段や箱からは足元の位置が動くだけ
      */
-    if (moved.landed && fallDamage(moved.impactSpeed) > 0) {
-      this.hardLandTimer = HARD_LAND_TIME
-      // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
-      this.hardLandYaw = this.yaw
-      this.animator?.playHardLand()
+    if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED) {
+      if (fallDamage(moved.impactSpeed) > 0) {
+        this.hardLandTimer = HARD_LAND_TIME
+        // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
+        this.hardLandYaw = this.yaw
+        this.animator?.playHardLand()
+      } else {
+        this.landingTimer = LANDING_TIME
+        this.animator?.playLanding()
+      }
     }
     // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
     // サーバーなので、速さを申告して同じ式 (damage.ts) を向こうで通してもらう
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
+    if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
     /*
@@ -3817,6 +3847,7 @@ export class Soldier {
       hangHolding: this.hangStage === 'hang' || this.hangStage === 'drop',
       onGround: this.onGround,
       hardLand: this.hardLandTimer,
+      landing: this.landingTimer,
       airborneFor: this.airborneFor,
       stairFor: this.stairFor,
       stairDown: this.stairDown,
