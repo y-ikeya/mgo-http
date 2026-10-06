@@ -183,6 +183,27 @@ def make_edge_decals(body, tag, use_base=False):
             for loop, (uu, vv) in zip(f.loops, ((0, 0), (1, 0), (1, zb - za), (0, zb - za))):
                 loop[uv].uv = (uu, vv)
             count += 1
+    # **同じ面に 2 枚重ねない。** 角の検出が同じ角を 2 度返すことがあり (建物 3 の窪みの
+    # 南の角)、同じ深さの板 2 枚がブロック状に食い合った (2026-10-06)。深さの精度では
+    # 直らない。同じ平面で外接が重なる面は小さい方を捨てる
+    drop = []
+    faces = list(bm.faces)
+    for i, a in enumerate(faces):
+        if a in drop:
+            continue
+        ca = a.calc_center_median()
+        for b in faces[i + 1:]:
+            if b in drop or a.normal.dot(b.normal) < 0.99:
+                continue
+            if abs((b.calc_center_median() - ca).dot(a.normal)) > 0.002:
+                continue
+            ov = [min(max(v.co[k] for v in a.verts), max(v.co[k] for v in b.verts)) -
+                  max(min(v.co[k] for v in a.verts), min(v.co[k] for v in b.verts)) for k in range(3)]
+            if min(ov) > -0.001 and ov[2] > 0.05 and (ov[0] > 0.02 or ov[1] > 0.02):
+                drop.append(a if a.calc_area() < b.calc_area() else b)
+    if drop:
+        bmesh.ops.delete(bm, geom=drop, context='FACES')
+        count -= len(drop)
     name = 'vis_decal_b%s_edge_nouv' % tag
     if name in bpy.data.objects:
         bpy.data.objects.remove(bpy.data.objects[name], do_unlink=True)
