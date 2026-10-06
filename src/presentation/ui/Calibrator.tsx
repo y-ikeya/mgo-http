@@ -141,7 +141,7 @@ const INITIAL_SWEEP_RATE = 1
 const INITIAL_STAND_RATE = 1.2
 /** Game.ts の RELOAD_SOUND_AT と揃えること */
 const INITIAL_RELOAD_SOUND = 0.28
-/** Game.ts の DEFAULT_EXPOSURE と揃えること */
+/** calibration.ts の DEFAULT_EXPOSURE と揃えること */
 const INITIAL_EXPOSURE = 3.0
 /**
  * 弾に掛かる重力の初期値。**重複を作らず domain から引く。**

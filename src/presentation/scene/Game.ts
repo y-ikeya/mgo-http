@@ -1,4 +1,5 @@
-import { skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
 import { GAME_SET_SECONDS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
@@ -417,8 +418,24 @@ const IMPACT_WORLD = 0xffd9a0;
 /** 命中表示を HUD に出しておく時間 (秒) */
 const HIT_FEEDBACK_DURATION = 0.6;
 
-/** トーンマッピングの露出。全体の明るさはまずここで調整する */
-const DEFAULT_EXPOSURE = 3.0;
+/*
+ * **目の慣れ (自動露出)。** 屋内に入ると露出を上げ、外へ出ると戻す。
+ *
+ * 地形は空の見え方を頂点に焼いてあるので (bake_stage.py)、屋内は外の 3 割まで
+ * 暗い。外から覗けば暗く見えるのはそのままで良い。中に居る人の目だけ慣らすと、
+ * 室内は普通の明るさになり、戸口や窓の外の表通りが白く飛んで見える (2026-10-06 本人)。
+ *
+ * 明るさはカメラの頭の上が塞がっているか (skylight.ts の openSkyAt) で決める。
+ * 光線 9 本なので描画は重くならない。**振れ幅は抑える** — 露出は敵が見えるかに
+ * 直接効くので、こもる側だけが有利になりすぎないように。?adapt=0 で切れる
+ */
+/** 屋根の下 (頭の上が全く開いていない) で露出に掛ける倍率 */
+const ADAPT_MAX = 1.8;
+/** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
+const ADAPT_OPEN = 0.75;
+/** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */
+const ADAPT_RATE_DARK = 1.6;
+const ADAPT_RATE_LIGHT = 3.0;
 
 /**
  * 明るさの丸め方。**?tone=aces のように URL から切り替えられる。**
@@ -1154,9 +1171,9 @@ export class Game {
     this.renderer.toneMapping =
       TONE_CURVES[query.get("tone") ?? ""] ?? THREE.NeutralToneMapping;
     const exposure = Number(query.get("exposure"));
-    this.renderer.toneMappingExposure = Number.isFinite(exposure) && exposure > 0
-      ? exposure
-      : DEFAULT_EXPOSURE;
+    if (Number.isFinite(exposure) && exposure > 0) this.knobs.exposure = exposure;
+    this.renderer.toneMappingExposure = this.knobs.exposure;
+    this.adaptOn = query.get("adapt") !== "0";
     container.appendChild(this.renderer.domElement);
 
     this.stage = buildStage(this.scene, this.stageName);
@@ -3651,12 +3668,31 @@ export class Game {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
   };
 
+  /** 目の慣れを使うか (?adapt=0 で切る)。いま掛けている倍率 */
+  private adaptOn = true;
+  private adapt = 1;
+
+  /** 露出を目の慣れに合わせる。上の ADAPT_* の註釈 */
+  private updateExposure(sight: TriangleBvh | null, dt: number): void {
+    let target = 1;
+    if (this.adaptOn && sight) {
+      const at = this.follow.camera.position;
+      const open = openSkyAt(sight, at.x, at.y, at.z);
+      const covered = Math.min(1, Math.max(0, 1 - open / ADAPT_OPEN));
+      target = 1 + (ADAPT_MAX - 1) * covered;
+    }
+    const rate = target > this.adapt ? ADAPT_RATE_DARK : ADAPT_RATE_LIGHT;
+    this.adapt += (target - this.adapt) * (1 - Math.exp(-rate * dt));
+    this.renderer.toneMappingExposure = this.knobs.exposure * this.adapt;
+  }
+
   /**
    * 屋内に入ったら人も暗くする。地形は空の見え方を頂点に焼いてあるが、人は動くので
    * 居る場所で毎コマ測る (9 本の光線 × 人数。三角の網なので一瞬)。
    */
   private updateSkyLight(dt: number): void {
     const sight = this.stage.sightWorld;
+    this.updateExposure(sight, dt);
     if (!sight) return;
     const me = this.player.position;
     this.player.setSkyLight(skyAt(sight, me.x, me.y + SKY_PROBE_HEIGHT, me.z), dt);

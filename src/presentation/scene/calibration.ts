@@ -33,13 +33,22 @@ export interface Knobs {
   reloadSoundAt: number
   /** 弾に掛かる重力の上書き。null なら武器の値 (domain) をそのまま使う */
   bulletGravity: number | null
+  /**
+   * 露出の基準。**画面に掛かるのはこれに目の慣れを掛けた値** (Game.ts の updateExposure)。
+   * 屋内に入ると上がり、外へ出ると戻る
+   */
+  exposure: number
 }
+
+/** トーンマッピングの露出。全体の明るさはまずここで調整する */
+export const DEFAULT_EXPOSURE = 3.0
 
 export function defaultKnobs(): Knobs {
   return {
     grenadeRelease: GRENADE_RELEASE_RATIO,
     boltDelay: BOLT_DELAY,
     reloadSoundAt: RELOAD_SOUND_AT,
+    exposure: DEFAULT_EXPOSURE,
     bulletGravity: null,
   }
 }
@@ -112,7 +121,7 @@ export function createCalibration(t: CalibrationTargets) {
     },
     /** 画面全体の明るさ (トーンマッピングの露出) */
     setExposure(exposure: number) {
-      t.renderer.toneMappingExposure = exposure
+      t.knobs.exposure = exposure
     },
     /** 構え時のカメラの寄り */
     setAimView(view: { distance: number; shoulder: number; fov: number }) {

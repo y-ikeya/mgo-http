@@ -63,3 +63,27 @@ export class SkyLight {
     }
   }
 }
+
+/*
+ * **頭の上が塞がっているか。** 目の慣れ (Game.ts の updateExposure) に使う。
+ *
+ * skyAt は斜め 45° も見るので、建物に挟まれた通りでも半分ほど「暗い」と出る。
+ * 露出をそれで決めると、外の通りまで明るくなってしまう。屋根の下かどうかは
+ * 真上に近い線だけで決まる — 真上と、そこから 20° 傾けた 8 本。
+ */
+const ROOF_RAYS: readonly (readonly [number, number, number])[] = [
+  [0, 1, 0],
+  ...Array.from({ length: 8 }, (_, i) => {
+    const angle = (i / 8) * Math.PI * 2
+    return [Math.cos(angle) * 0.34, 0.94, Math.sin(angle) * 0.34] as const
+  }),
+]
+
+/** 頭の上が開いている割合 (0〜1)。屋内は 0、開けた通りは 1 */
+export function openSkyAt(sight: TriangleBvh, x: number, y: number, z: number): number {
+  let open = 0
+  for (const [dx, dy, dz] of ROOF_RAYS) {
+    if (sight.clear(x, y, z, x + dx * REACH, y + dy * REACH, z + dz * REACH)) open++
+  }
+  return open / ROOF_RAYS.length
+}
