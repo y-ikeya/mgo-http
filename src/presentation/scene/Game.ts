@@ -1,5 +1,6 @@
 import { skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
 import { onStaticShadowRefresh } from "./world/staticShadow";
+import { GAME_SET_SECONDS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
 import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
@@ -1428,6 +1429,7 @@ export class Game {
   }
 
   dispose(): void {
+    clearTimeout(this.resultTimer);
     this.disposed = true;
     this.renderer.setAnimationLoop(null);
     if (this.snapshotHandle !== null) clearInterval(this.snapshotHandle);
@@ -1911,6 +1913,9 @@ export class Game {
     };
   }
 
+  /** 決着の帯の後で成績表を開く時計 */
+  private resultTimer: ReturnType<typeof setTimeout> | undefined;
+
   private perform(effect: MatchEffect): void {
     switch (effect.kind) {
       case "headshot":
@@ -1947,8 +1952,14 @@ export class Game {
          * 見えていた。始まってから畳むのでは遅い (ポインタが離れていて、
          * 始まった瞬間に動けない)。
          */
-        if (effect.to === "over") this.setMenu(true);
-        else if (this.menuOpen) this.setMenu(false);
+        // **「試合終了」の帯を見せ終えてから開く** (Hud.tsx)。同時に開くと、帯と
+        // 一緒に VICTORY / DEFEAT が出てしまい、2 段に分けた意味が無くなる
+        clearTimeout(this.resultTimer);
+        if (effect.to === "over") {
+          this.resultTimer = setTimeout(() => {
+            if (this.replica.match?.phase === "over") this.setMenu(true);
+          }, GAME_SET_SECONDS * 1000);
+        } else if (this.menuOpen) this.setMenu(false);
         break;
 
       case "team":

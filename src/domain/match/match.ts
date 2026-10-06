@@ -68,6 +68,12 @@ export const READY_SECONDS = 60
 export const ASSEMBLED_SECONDS = 5
 
 /**
+ * 決着の「GAME SET / 試合終了」だけを見せる長さ (秒)。勝敗と成績表はこの後に開く。
+ * 結果を見せる時間 (server/match.ts の INTERMISSION_MS 10 秒) の頭に置く
+ */
+export const GAME_SET_SECONDS = 2.4
+
+/**
  * 席を空けて待つ時間 (ms)。
  *
  * リロードや一瞬の電波切れで戻ってこられる長さ。長くすると、抜けた相手を

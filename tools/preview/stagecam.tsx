@@ -23,6 +23,7 @@ import { addColliderOverlay, applyStageSun, buildLights, buildStage, fitShadowTo
 import { EmptyBoxes } from '../../src/presentation/scene/actor/box'
 import { REVERSED_DEPTH } from '../../src/presentation/scene/util/depth'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
+import { BlastFx } from '../../src/presentation/scene/fx/blastfx'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
 import { STEP_UP } from '../../src/domain/player/moving'
@@ -145,7 +146,33 @@ async function diffFrames(): Promise<void> {
   document.body.appendChild(panel)
 }
 
+/*
+ * ?blast=x,y,z … 街の中で爆発を起こし、前後のコマの時間を記録する (爆発で画面が止まる件の切り分け)。
+ * 3 秒後に 1 度。結果は window.blastTimes とコンソールへ
+ */
+const blastAt = query.get('blast')?.split(',').map(Number)
+const blastFx = blastAt && blastAt.length === 3 ? new BlastFx(scene) : null
+const times: number[] = []
+let lastT = performance.now()
+let blasted = false
+const started = performance.now()
+;(window as unknown as { blastTimes: number[] }).blastTimes = times
+// 背面のタブでは rAF が止まるので、外から 1 コマずつ回せるように出しておく
+;(window as unknown as Record<string, unknown>).stagecam = { renderer, scene, camera, blastFx, THREE }
 function frame(): void {
+  const now = performance.now()
+  const dt = (now - lastT) / 1000
+  lastT = now
+  if (blastFx) {
+    if (!blasted && now - started > 3000) {
+      blasted = true
+      times.push(-1)
+      blastFx.explode(new THREE.Vector3(blastAt![0], blastAt![1], blastAt![2]))
+    }
+    blastFx.update(dt)
+    if (now - started > 2000 && times.length < 120) times.push(Math.round(dt * 1000))
+    if (times.length === 120) { console.log('[blast] frame ms', times.join(' ')); times.push(-2) }
+  }
   renderer.render(scene, camera)
   requestAnimationFrame(frame)
 }

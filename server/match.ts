@@ -523,20 +523,15 @@ export function updateMatch(room: RoomWorld, now: number): void {
     room.matchId = crypto.randomUUID()
     room.startedAt = now
     /*
-     * **押し出さない。武器を選ぶのはここから。**
+     * **始まったら全員を戦場へ出す。** 装備の画面を開いたままの人も、その時点で
+     * 選んでいた装備で湧かせる。武器は秒読みの間 (LOADOUT) に選べる。
      *
-     * 支度の段階 (ready) で決めるのは、誰と戦うかとスキルまで。武器は試合が
-     * 始まってから選ぶ物なので、始まった時点で装備画面に入っていてほしい。
-     *
-     * 支度の時計だけ入れ直す。ready の 60 秒を待っている間ずっと choosing に
-     * 居るので、そのままだと**始まった瞬間に打ち切り (30 秒) を過ぎている**
-     * ことになって、選ぶ間もなく湧かされる。
-     *
-     * 選ばない人は今までどおり 30 秒で湧かされる (lifecycle.ts の
-     * CHOOSE_TIMEOUT)。始まっているのに画面の裏で立ち尽くす人は出ない。
+     * 以前は「武器を選ぶのはここから」として支度に留め、OK を押すまで湧かさなかった。
+     * 試合が始まったのに装備の画面が出ているのは意味が無い (2026-10-06 本人)。
+     * 試合中に入ってきた人・倒れた人は今までどおり画面で選んでから出る
      */
     for (const player of connected(room)) {
-      if (canChoose(player.life)) player.lifeAt = now
+      if (canChoose(player.life)) spawn(room, player, now)
     }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる

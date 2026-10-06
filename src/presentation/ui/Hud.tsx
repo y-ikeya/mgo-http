@@ -1,4 +1,5 @@
-import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import { GAME_SET_SECONDS } from '../../domain/match/match'
 import { CRITICAL_HEALTH } from '../../domain/rule/damage'
 import { t } from '../../i18n'
 import { HELD, type HeldId, isSupport } from '../../domain/item/held'
@@ -42,7 +43,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   const timer = setInterval(() => setNow(Date.now()), 250)
   onCleanup(() => clearInterval(timer))
 
-  const phase = () => props.stats?.match?.phase
+  // **段階が変わった時だけ動く値にする。** stats は 0.1 秒ごとに差し替わるので、
+  // そのまま読むと下の時計が 0.1 秒ごとに作り直され (onCleanup で消され)、鳴らない
+  const phase = createMemo(() => props.stats?.match?.phase)
   /*
    * **揃った告知から支度へ、暗転を挟む。** 告知の終わりで黒へ落とし (CSS の
    * hud-assembled-black)、支度に入ったら黒から明ける。告知を経ずに支度へ入った
@@ -61,7 +64,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     const now = phase()
     if (now === 'over' && lastResultPhase !== 'over') {
       setRevealed(false)
-      const timer = setTimeout(() => setRevealed(true), GAME_SET_MS)
+      const timer = setTimeout(() => setRevealed(true), GAME_SET_SECONDS * 1000)
       onCleanup(() => clearTimeout(timer))
     }
     lastResultPhase = now
@@ -826,6 +829,3 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     </div>
   )
 }
-
-/** 「試合終了」を見せてから勝敗を開けるまで (ms) */
-const GAME_SET_MS = 2400
