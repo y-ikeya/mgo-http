@@ -1426,3 +1426,23 @@
   from { opacity: 1; }
   to { opacity: 0; }
 }
+
+/* 決着の 2 段目。勝敗は大きく出て縮み、点数と次の試合までは遅れて出る */
+.hud-result-reveal {
+  animation: hud-result-fade 0.35s ease-out both;
+}
+.hud-result-reveal .hud-result-title {
+  animation: hud-result-pop 0.7s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+.hud-result-reveal .hud-result-score,
+.hud-result-reveal .hud-result-next {
+  animation: hud-result-fade 0.5s ease-out 0.6s both;
+}
+@keyframes hud-result-pop {
+  from { opacity: 0; transform: scale(1.6); letter-spacing: 0.6em; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hud-result-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

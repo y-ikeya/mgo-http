@@ -88,6 +88,11 @@ const cases: Record<string, Partial<GameStats>> = {
     match: { phase: 'countdown', mode: 'TDM', blue: 0, red: 0, endsAt: Date.now() + 4000, present: 2, required: 2, players: [] },
     team: 'red',
   },
+  // 決着。「試合終了」の帯 → 2.4 秒後に勝敗 (?case=over)
+  over: {
+    match: { phase: 'over', mode: 'TDM', blue: 7, red: 0, winner: 'blue', endsAt: Date.now() + 10000, present: 2, required: 2, players: [] },
+    team: 'blue',
+  },
   // 揃った告知。5 秒で黒へ落ちる (?case=assembled)
   assembled: {
     match: { phase: 'assembled', mode: 'TDM', blue: 0, red: 0, endsAt: Date.now() + 5000, present: 2, required: 2, players: [] },

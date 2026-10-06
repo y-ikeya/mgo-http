@@ -49,6 +49,23 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * (結果画面の後など) 時は明けない
    */
   const [dawn, setDawn] = createSignal(false)
+  /*
+   * **決着は 2 段で出す。** まず「試合終了」だけを帯で告げ、間を置いてから勝敗を
+   * 開ける。終わった瞬間に VICTORY / DEFEAT を出すと、どちらだったかを待つ間が
+   * 無くて味気なかった (2026-10-06 本人)。結果を見せる時間は 10 秒あるので
+   * (server/match.ts の INTERMISSION_MS)、2.4 秒は前に置ける
+   */
+  const [revealed, setRevealed] = createSignal(true)
+  let lastResultPhase: string | undefined
+  createEffect(() => {
+    const now = phase()
+    if (now === 'over' && lastResultPhase !== 'over') {
+      setRevealed(false)
+      const timer = setTimeout(() => setRevealed(true), GAME_SET_MS)
+      onCleanup(() => clearTimeout(timer))
+    }
+    lastResultPhase = now
+  })
   let lastPhase: string | undefined
   createEffect(() => {
     const now = phase()
@@ -375,9 +392,20 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       */}
       <Orders mode={mode()} team={props.stats?.team} phase={phase()} />
 
-      {/* 決着。次の支度が始まるまでの間だけ出る */}
-      <Show when={phase() === 'over'}>
-        <div class="hud-result">
+      {/* 決着の 1 段目。「試合終了」だけを指令と同じ帯で告げる */}
+      <Show when={phase() === 'over' && !revealed()}>
+        <div class="orders orders-solo hud-game-set">
+          <div class="orders-band">
+            <div class="orders-heading">GAME SET</div>
+            <div class="orders-rule" />
+            <div class="orders-text">{t('hud.gameSet')}</div>
+          </div>
+        </div>
+      </Show>
+
+      {/* 決着の 2 段目。次の支度が始まるまでの間だけ出る */}
+      <Show when={phase() === 'over' && revealed()}>
+        <div class="hud-result hud-result-reveal">
           <div
             class="hud-result-title"
             classList={{ 'hud-result-win': won(), 'hud-result-lose': lost() }}
@@ -798,3 +826,6 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     </div>
   )
 }
+
+/** 「試合終了」を見せてから勝敗を開けるまで (ms) */
+const GAME_SET_MS = 2400
