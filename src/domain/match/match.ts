@@ -107,6 +107,15 @@ export interface Match {
    */
   matchId: string | null
   startedAt: number
+  /**
+   * この試合でどちらの陣営に座ったか (人の id から)。**入り直しても同じ側へ戻す。**
+   *
+   * 席を畳んだ後 (戻るで出た) や、古い接続が閉じる前に入り直した時 (リロード) は
+   * 新しく来た人として割り振っていた。少ない側へ入るので、負けている側の人が
+   * 入り直すだけで勝っている側へ移れた (2026-10-06 本人)。
+   * 試合の頭で陣営を切り直す時 (shuffleTeams) に書き直す
+   */
+  teamsOf: Map<string, Team>
 }
 
 export function newMatch(mode: Mode): Match {
@@ -123,6 +132,7 @@ export function newMatch(mode: Mode): Match {
     lastLimbo: 0,
     matchId: null,
     startedAt: 0,
+    teamsOf: new Map(),
   }
 }
 
@@ -175,19 +185,26 @@ export function holdingSeats(room: Match, now: number): MatchPlayer[] {
  *
  * 本人に選ばせない。人数が偏ったまま始まると、腕前より頭数で決まってしまう。
  */
-export function assignTeam(room: Match): Team {
+export function assignTeam(room: Match, id?: string): Team {
   // **練習部屋は全員青。** 赤は棒立ちの的の側で、そこへ人を入れる意味が無い
   if (room.mode.id === 'PRACTICE') return 'blue'
   // 陣営で分かれない部屋 (個人戦・休憩) は全員同じ色。色が分かれていると
   // 「味方が居る」と読めてしまう
   if (!room.mode.teams) return 'blue'
+  // この試合で座ったことがあれば同じ側 (Match の teamsOf)
+  const before = id === undefined ? undefined : room.teamsOf.get(id)
+  if (before) return before
   let blue = 0
   let red = 0
   for (const player of connected(room)) {
+    // 自分の古い席は数えない (閉じる前の接続が残っている間に入り直した時)
+    if (player.id === id) continue
     if (player.team === 'blue') blue++
     else red++
   }
-  return blue <= red ? 'blue' : 'red'
+  const team = blue <= red ? 'blue' : 'red'
+  if (id !== undefined) room.teamsOf.set(id, team)
+  return team
 }
 
 /**
@@ -219,8 +236,10 @@ export function shuffleTeams(room: Match, roll: () => number): void {
     ;[seats[i], seats[j]] = [seats[j], seats[i]]
   }
   const half = Math.ceil(seats.length / 2)
+  room.teamsOf.clear()
   seats.forEach((player, index) => {
     player.team = index < half ? 'blue' : 'red'
+    room.teamsOf.set(player.id, player.team)
   })
 }
 

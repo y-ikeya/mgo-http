@@ -1037,6 +1037,19 @@ const server = Bun.serve<Client>({
       /** 続きへ戻す人。名簿を送ったあとに渡す */
       let resumed: MatchPlayer | null = null
 
+      /*
+       * **古い接続が閉じる前に入り直した。** リロードや戻る→すぐ入るで起きる。
+       * 古い方の閉じた知らせは後から届く (close は送り主を確かめて捨てる)。
+       *
+       * 新しく来た人として扱っていた頃は、自分の古い席を数えた上で少ない側へ
+       * 割り振られ、**陣営が入れ替わった**。負けている側から入り直すだけで勝って
+       * いる側へ移れた (2026-10-06 本人)。閉じたのと同じ扱いにして、席の続きへ戻す
+       */
+      if (seat && !isAwaitingReturn(seat.life)) {
+        seat.wasAlive = canAct(seat.life)
+        setLife(room, seat, 'dropped')
+      }
+
       if (seat && isAwaitingReturn(seat.life)) {
         // 席が残っていた。**その命の続きから始める。**
         //
@@ -1074,7 +1087,8 @@ const server = Bun.serve<Client>({
         const joined = newMatchPlayer({
           id: socket.data.id,
           name: socket.data.name ?? socket.data.id.slice(0, 4).toUpperCase(),
-          team: assignTeam(room),
+          // この試合で座ったことがあれば同じ側 (席を畳んでから入り直した人)
+          team: assignTeam(room, socket.data.id),
           slot: nextSlot(room),
           now: Date.now(),
         })
