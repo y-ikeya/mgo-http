@@ -1770,9 +1770,26 @@ export class Game {
 
   private readonly cameraWorld: CameraWorld = {
     distanceToObstruction: (origin, dir, maxDistance) => {
+      /*
+       * **三角の網 (CAMERA_BIT) で見る。表裏を問わない。**
+       *
+       * three の Raycaster は材質の side を見るので、片面の板 (窓ガラス) に裏から
+       * 当たった線は素通りする。建物 31 の窓ガラスは面が内を向いていて、窓を背に
+       * 構えるとカメラの線が窓を抜け、カメラが建物の中に入った (2026-10-06)。
+       * 網は「三角に表裏は無い」として引くので (bvh.ts)、どちらから当たっても止まる。
+       * 押し出し (pushOut) と同じ集合を見ることにもなる
+       */
+      const solid = this.stage.cameraWorld;
+      if (solid) {
+        const hit = solid.hit(
+          origin.x, origin.y, origin.z,
+          origin.x + dir.x * maxDistance, origin.y + dir.y * maxDistance, origin.z + dir.z * maxDistance,
+        );
+        return hit ? hit.t * maxDistance : maxDistance;
+      }
+      // 網が届くまでは描く物で見る (カメラを止める面だけ。弾を止める面とは別)
       this.cameraRay.set(origin, dir);
       this.cameraRay.far = maxDistance;
-      // カメラを止める面だけ。弾を止める面とは別 (金網はカメラを寄せない、など)
       const hits = this.cameraRay.intersectObjects(
         this.stage.cameraBlockers,
         false,
