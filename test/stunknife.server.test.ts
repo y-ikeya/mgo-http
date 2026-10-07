@@ -57,3 +57,32 @@ test('眠らせる刺突は 1 回で眠り、充電が満ちるまで次は効�
   expect(me.poses.get(second!.slot)?.locomotion).toBe('sleep')
   me.close()
 }, 50_000)
+
+test('眠っている的は、見下ろさないと刺せない (真っ直ぐ前では刺さらない)', async () => {
+  const me = new Client(server, 'stun2', [SECOND!.x, 0, SECOND!.z + 1], 'echo')
+  await me.ready()
+  me.live()
+  await Bun.sleep(3400)
+  me.send({ type: 'spawn' })
+  await Bun.sleep(3600)
+  const target = targets(me)[1]!
+  // 先の試験が眠らせていなければ眠らせる (起きるのは 30 秒後)
+  stab(me, target, true)
+  await Bun.sleep(400)
+  expect(me.poses.get(target.slot)?.locomotion).toBe('sleep')
+
+  // 真っ直ぐ前を見たまま殺す刺突。寝ている体には届かない
+  me.pitch = 0
+  await Bun.sleep(200)
+  stab(me, target, false)
+  await Bun.sleep(400)
+  expect(me.poses.get(target.slot)?.locomotion).toBe('sleep')
+
+  // 見下ろせば刺さる
+  me.pitch = -0.6
+  await Bun.sleep(200)
+  stab(me, target, false)
+  await Bun.sleep(400)
+  expect(me.poses.get(target.slot)?.locomotion).toMatch(/^death/)
+  me.close()
+}, 30_000)

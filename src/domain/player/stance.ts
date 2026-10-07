@@ -43,6 +43,12 @@ export function stanceOf(locomotion: Locomotion): Stance {
     locomotion === 'prone_stab'
   )
     return 'prone'
+  /*
+   * 眠っている。**寝転んでいるので伏せと同じ高さ。** 表に無かった頃は立ち扱いで、
+   * 足元に寝ている人へ真っ直ぐ前を刺しても刺さり、弾も寝た体の上の空中で当たった
+   * (2026-10-08)。倒れている相手と同じく、刺すには見下ろす (STAB_DOWN_PITCH)
+   */
+  if (locomotion === 'sleep') return 'prone'
   // 伏せたまま倒れた。**倒れているので down** (頭の高さは死体のもの)
   if (locomotion === 'prone_death') return 'down'
   /*

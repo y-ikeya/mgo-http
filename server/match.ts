@@ -1,3 +1,4 @@
+import type { Locomotion } from '../src/domain/player/locomotion'
 /**
  * 試合の段階と時計。
  *
@@ -147,9 +148,40 @@ export function updateTargets(room: RoomWorld, now: number): void {
       broadcast(room, { type: 'respawn', id: bot.id })
       broadcast(room, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
     }
+    // **見せている姿を、審判が見る姿にもする。** 送る姿だけ組み立てていた頃は、
+    // 転んでいても眠っていても審判の中では立っていて、足元の的に真っ直ぐ前を
+    // 刺しても刺さった (2026-10-08)
+    bot.locomotion = targetLocomotion(bot, now)
     recordPose(bot)
     relayState(room, bot, targetPayload(bot, now))
   }
+}
+
+/*
+ * 的の姿。倒れた / 眠っている / 転んでいる / 起き上がっている / 立っている。
+ *
+ * **起き上がる型を挟む。** 転んだ姿から直に立ち姿へ飛ばすと、寝た脚と
+ * 立った上半身が混ざって、銃を上空へ構えて見える。
+ *
+ * **倒れたほうが眠りより強い。** 眠っている的を撃って倒したら、
+ * 眠ったままではなく倒れた姿へ移らないと、何が起きたのか読めない。
+ *
+ * 眠りを爆風の転倒より先に見るのは、**眠っている間は飛ばされても
+ * 起き上がらない**から。転んで立ち上がる型に移ると、眠っているのに
+ * 立つ、という絵になる。
+ */
+export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
+  return isDowned(bot.life)
+    ? bot.downFromBehind
+      ? 'death_front'
+      : 'death_back'
+    : isAsleep(bot.sleepUntil, now)
+      ? 'sleep'
+      : bot.downLeft > TARGET_STAND
+        ? 'sweep'
+        : bot.downLeft > 0
+          ? 'stand'
+          : 'idle'
 }
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
@@ -166,34 +198,7 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         pitch: 0,
         cameraYaw: bot.yaw,
         locomotionAge: 0,
-        /*
-         * 倒れた / 転んでいる / 起き上がっている / 立っている。
-         *
-         * **起き上がる型を挟む。** 転んだ姿から直に立ち姿へ飛ばすと、寝た脚と
-         * 立った上半身が混ざって、銃を上空へ構えて見える。
-         */
-        /*
-         * 倒れた / 眠っている / 転んでいる / 起き上がっている / 立っている。
-         *
-         * **倒れたほうが眠りより強い。** 眠っている的を撃って倒したら、
-         * 眠ったままではなく倒れた姿へ移らないと、何が起きたのか読めない。
-         *
-         * 眠りを爆風の転倒より先に見るのは、**眠っている間は飛ばされても
-         * 起き上がらない**から。転んで立ち上がる型に移ると、眠っているのに
-         * 立つ、という絵になる。
-         */
-        locomotion:
-          isDowned(bot.life)
-            ? bot.downFromBehind
-              ? 'death_front'
-              : 'death_back'
-            : isAsleep(bot.sleepUntil, now)
-              ? 'sleep'
-              : bot.downLeft > TARGET_STAND
-                ? 'sweep'
-                : bot.downLeft > 0
-                  ? 'stand'
-                  : 'idle',
+        locomotion: bot.locomotion,
         aiming: false,
         weapon: 'rifle',
         crouching: false,
