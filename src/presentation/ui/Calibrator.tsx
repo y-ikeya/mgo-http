@@ -156,7 +156,7 @@ const INITIAL_CLOUD = 0.55
 const INITIAL_AMBIENT = 2.6
 const INITIAL_SHADOW = 0.88
 /** camera.ts の AIM_VIEW と揃えること */
-const INITIAL_AIM_VIEW = { distance: 1.35, shoulder: 0.42, fov: 38 }
+const INITIAL_AIM_VIEW = { distance: 1.35, shoulder: 0.3, fov: 38 }
 /** player.ts の GRAVITY / JUMP_HEIGHT / MOVE_SPEED と揃えること */
 const INITIAL_JUMP = { gravity: 9.8, height: 0.6, fall: 1.8 }
 const INITIAL_MOVE_SPEED = 3.8
