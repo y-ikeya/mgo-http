@@ -29,8 +29,8 @@ describe('補給', () => {
     a.send({ type: 'shot', id: a.id, from: [0, 1.4, -6], to: [0, 1.4, 6] })
     await Bun.sleep(200)
 
-    // 基地の上へ。位置が届いてから頼む
-    a.moveTo(base.x, base.y ?? 0, base.z)
+    // 基地の上へ歩いて行く (1 通で跳ぶと弾かれる)。位置が届いてから頼む
+    await a.walkTo(base.x, base.y ?? 0, base.z)
     await Bun.sleep(300)
     a.reset()
     a.send({ type: 'resupply' })
@@ -52,7 +52,7 @@ describe('補給', () => {
     const team = roster.players.find((p) => p.id === a.id)!.team
     const base = STAGES.city.bases[team]
 
-    a.moveTo(base.x + RESUPPLY_RADIUS + 2, base.y ?? 0, base.z)
+    await a.walkTo(base.x + RESUPPLY_RADIUS + 2, base.y ?? 0, base.z)
     await Bun.sleep(300)
     a.reset()
     a.send({ type: 'resupply' })
