@@ -1182,6 +1182,13 @@ export class CharacterAnimator {
    * 置き切る方は素から SETUP_RELEASE_RATE で流しているので、その上に掛ける。
    * 上下を同じ速さで流す — 片方だけ速めると腰から上と下が離れる。
    */
+  /** 刺す型の再生速度 (KNIFE MASTERY)。尺 (stabDuration) はこれで割る */
+  stabSpeed = 1
+
+  setStabSpeed(scale: number): void {
+    this.stabSpeed = scale
+  }
+
   setSetupSpeed(scale: number): void {
     this.setupSpeed = scale
     for (const [key, base] of [[SETUP_WINDUP_KEY, 1], [SETUP_RELEASE_KEY, SETUP_RELEASE_RATE]] as const) {
@@ -3621,6 +3628,9 @@ export class CharacterAnimator {
     const lower = this.lower.get(prone ? 'prone_stab' : 'stab')
     if (!upper || !lower) return
     // 上下を同時に頭から流す。同じクリップなので腰の向きが食い違わない。
+    // 速さは KNIFE MASTERY (stabSpeed)。上下に同じだけ掛ける
+    upper.setEffectiveTimeScale(this.stabSpeed)
+    lower.setEffectiveTimeScale(this.stabSpeed)
     upper.reset().play()
     lower.reset().play()
     this.upperState = 'stab'

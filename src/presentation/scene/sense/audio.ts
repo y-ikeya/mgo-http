@@ -68,6 +68,8 @@ const SOUNDS = {
    * 何が起きたか分からない — **静かに始末できる**、が刃物の値打ちなので。
    */
   stab: { file: "knife_stab1.mp3", reference: 3, max: 18 },
+  /** スタンナイフの放電 (本人の素材 elec.mp3)。眠らせる刺突を振った人の手元で鳴る */
+  zap: { file: "stun_elec1.mp3", reference: 3, max: 20 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
   // P90。突撃銃より軽い音で、間隔が詰まるぶん 1 発を短く聞かせたい

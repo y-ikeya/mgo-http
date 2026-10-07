@@ -832,6 +832,12 @@ function handleMessage(
       break
     }
 
+    // スタンナイフの放電。見た目と音だけ。**名乗りは信じず**送り主の id を付けて流す
+    case 'zap':
+      if (!canAct(player.life)) break
+      broadcast(room, { type: 'zap', id: player.id }, player.id)
+      break
+
     case 'voice': {
       // 定型文のボイス。表に無い物と連打は捨て、名前と所属を足して全員へ (本人にも)
       if (!voiceLine(message.line)) break

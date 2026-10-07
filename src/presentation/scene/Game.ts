@@ -21,6 +21,7 @@ import {
   canChooseSkills,
   masteryReloadScale,
   masteryRecoveryScale,
+  stunChargeSeconds,
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
@@ -60,6 +61,7 @@ import { EmptyBoxes } from "./actor/box";
 import { REVERSED_DEPTH } from "./util/depth";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
+import { StunSparks } from "./fx/stunSparks";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
@@ -713,6 +715,8 @@ export class Game {
   /** 割れた場所の置き場。毎回作らない */
   private readonly popAt = new THREE.Vector3();
   private readonly blast: BlastFx;
+  /** スタンナイフの放電 (fx/stunSparks.ts)。自分と他人の刃先に出す */
+  private readonly stunSparks: StunSparks;
   /** 気配 (AWARENESS)。**何が在るかは届かない**ので、霧を置くだけ */
   private readonly sensed: Sensed;
   private readonly casings: Casings;
@@ -1280,6 +1284,7 @@ export class Game {
     this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
+    this.stunSparks = new StunSparks(this.scene);
     this.sensed = new Sensed(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
@@ -1766,6 +1771,7 @@ export class Game {
       (at) => this.audio.play("locatorBeep", at),
     );
     this.blast.update(dt);
+    this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
       // 水に落ちたら輪だけ出して沈める。**金属の音は鳴らさない**
@@ -2234,6 +2240,16 @@ export class Game {
         this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
         this.audio.play("resupply", this.player.position);
         break;
+
+      // 他の人がスタンナイフを振った。**手元で放電して鳴る**
+      case "zap": {
+        const id = message.id;
+        if (id === this.net.id) break;
+        const at = this.remotes.positionOf(id);
+        if (at) this.audio.play("zap", at);
+        this.stunSparks.discharge((out) => this.remotes.handOf(id, out));
+        break;
+      }
 
       case "throw":
         // 初速だけが届く。同じ物理を同じ地形に対して解くので、
@@ -3230,7 +3246,7 @@ export class Game {
 
   /** スタンナイフの充電 (0〜1)。HUD のメーター */
   private get stunChargeNow(): number {
-    return stunCharge(this.stunReadyAt, Date.now());
+    return stunCharge(this.stunReadyAt, Date.now(), stunChargeSeconds(this.skills));
   }
 
   /**
@@ -3244,7 +3260,16 @@ export class Game {
       return;
     if (stun && this.stunChargeNow < 1) return;
     this.stabStun = stun;
-    if (stun) this.stunReadyAt = stunReadyAfter(Date.now());
+    if (stun) {
+      this.stunReadyAt = stunReadyAfter(Date.now(), stunChargeSeconds(this.skills));
+      /*
+       * **バチバチと刃先が光る。** 振り始めから腕が伸び切る所まで。刃が無ければ
+       * (模型が届く前) 右手から。音も同じ所で鳴らし、他の人へも知らせる (zap)
+       */
+      this.stunSparks.discharge((out) => this.player.knifeTip(out) ?? this.player.handWorld(out));
+      this.audio.play("zap", this.player.position);
+      this.net.send({ type: "zap", id: this.net.id });
+    }
     this.stabTimer = this.player.stabDuration || FALLBACK_STAB_DURATION;
     this.stabResolved = false;
     // 型が違うので腕が伸びる所も違う。振り始めの姿勢で決める

@@ -27,6 +27,7 @@ import { SkyLight } from '../../src/presentation/scene/world/skylight'
 import { loadSoldier } from '../../src/presentation/scene/assets'
 import { CharacterAnimator, findBoneBySuffix } from '../../src/presentation/scene/actor/animation'
 import { Weapon, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
+import { StunSparks } from '../../src/presentation/scene/fx/stunSparks'
 
 const WIDTH = 1280
 const HEIGHT = 900
@@ -234,6 +235,10 @@ if (query.has('stab')) anim.playStab()
 if (query.has('setupspeed')) anim.setSetupSpeed(Number(query.get('setupspeed')))
 if (query.has('setup')) anim.playSetup(query.has('fromkneel') ? 'kneel' : query.has('fromcrouch') ? 'crouch' : 'stand')
 if (query.has('place')) anim.releaseSetup()
+// ?zap … スタンナイフの放電 (fx/stunSparks.ts)。頭から右手に出す。&stab と組むと刺しながら
+const zap = query.has('zap') ? new StunSparks(scene) : null
+const zapHand = findBoneBySuffix(model, 'RightHand')
+if (zap && zapHand) zap.discharge((out) => out.setFromMatrixPosition(zapHand.matrixWorld))
 for (let t = 0; t < stopAt; t += 1 / 60) {
   // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
   if (!oneShot && !query.has('stab')) anim.setLocomotion(clipName as never)
@@ -241,6 +246,10 @@ for (let t = 0; t < stopAt; t += 1 / 60) {
   if (query.has('setup') || query.has('place')) anim.setLocomotion((anim.setupLocomotion ?? clipName) as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
+  if (zap) {
+    model.updateMatrixWorld(true)
+    zap.update(1 / 60)
+  }
 }
 model.updateMatrixWorld(true)
 // ?bones … 手と腰の高さを出す (ぶら下がりで足元を縁からどれだけ下げるかを測る)

@@ -188,6 +188,17 @@ export interface StabEvent {
 }
 
 /**
+ * スタンナイフで眠らせる刺突を振り始めた。**見た目と音だけ** (刃先の放電)。
+ *
+ * 当たったかどうかとは関係しない (それは DamageEvent の stun)。送り主の id は
+ * サーバーが付け直して、他の全員へ流す
+ */
+export interface ZapEvent {
+  type: 'zap'
+  id: string
+}
+
+/**
  * 補給したい。**自分の基地の上で押す。**
  *
  * 位置は載せない。届いている位置と基地の距離をサーバーが見る。
@@ -1207,6 +1218,7 @@ export type ClientMessage =
   | KnockEvent
   | ThrowEvent
   | StabEvent
+  | ZapEvent
   | ResupplyEvent
   | VoiceEvent
   | PongMessage
@@ -1245,6 +1257,7 @@ export type ServerMessage =
   | ShotEvent
   | KnockEvent
   | ThrowEvent
+  | ZapEvent
   | ClaymorePlaced
   | ClaymoreGone
   | DecoyPlaced

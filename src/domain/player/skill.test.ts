@@ -1,6 +1,8 @@
 import { MODES } from '../match/room'
 import { describe, expect, test } from 'bun:test'
 import {
+  stabSpeedScale,
+  stunChargeSeconds,
   MASTERY_OF, SKILLS, alertTriggeredBy, hasAwareness, hasTrapMastery, hidesGrenades, setupSpeedScale, SKILL_BUDGET, boxMoveScale, canChooseSkills, costOf, exposeSeconds,
   isAffordable, levelOf, masteryJitterScale, masteryReloadScale, masterySpreadScale,
   runnerScale, throwScale,
@@ -49,8 +51,15 @@ describe('4 コストの予算', () => {
     expect(isAffordable({ runner: 9 } as never)).toBe(false)
   })
 
-  test('**12 ある。** 2 つだと全員が両方取って選択が生まれない', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(12)
+  test('**13 ある。** 2 つだと全員が両方取って選択が生まれない', () => {
+    expect(Object.keys(SKILLS)).toHaveLength(13)
+  })
+
+  test('KNIFE MASTERY: 段で刺すのが速く、スタンナイフの充電が早い (素 20 秒)', () => {
+    expect(stunChargeSeconds({})).toBe(20)
+    expect(stunChargeSeconds({ knifeMastery: 3 })).toBeLessThan(stunChargeSeconds({ knifeMastery: 1 }))
+    expect(stabSpeedScale({})).toBe(1)
+    expect(stabSpeedScale({ knifeMastery: 3 })).toBeGreaterThan(stabSpeedScale({ knifeMastery: 1 }))
   })
 })
 

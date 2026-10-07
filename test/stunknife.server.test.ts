@@ -3,7 +3,7 @@ import { Client, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { STAGES } from '../src/domain/stage'
 import { ROOMS } from '../src/domain/match/room'
-import { STUN_CHARGE_SECONDS } from '../src/domain/rule/damage'
+import { stunChargeSeconds } from '../src/domain/player/skill'
 
 /**
  * スタンナイフ。**眠らせる刺突は 1 回で眠る。充電が満ちるまで次は効かない。**
@@ -51,9 +51,9 @@ test('眠らせる刺突は 1 回で眠り、充電が満ちるまで次は効�
   expect(me.poses.get(second!.slot)?.locomotion).not.toBe('sleep')
 
   // 満ちるまで待てば、同じ所からの同じ刺突が効く (届いていなかったのではない)
-  await Bun.sleep(STUN_CHARGE_SECONDS * 1000)
+  await Bun.sleep(stunChargeSeconds({}) * 1000)
   stab(me, second!, true)
   await Bun.sleep(400)
   expect(me.poses.get(second!.slot)?.locomotion).toBe('sleep')
   me.close()
-}, 45_000)
+}, 50_000)

@@ -26,7 +26,7 @@ import {
 } from '../src/domain/player/player'
 import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage, stunReadyAfter } from '../src/domain/rule/damage'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
-import { exposeSeconds } from '../src/domain/player/skill'
+import { exposeSeconds, stunChargeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
 import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
@@ -424,7 +424,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
     if (now < attacker.stunReadyAt) return NOT_HURT
     // もう眠っている相手には効かせない。**充電も減らさない**
     if (isAsleep(victim.sleepUntil, now)) return NOT_HURT
-    attacker.stunReadyAt = stunReadyAfter(now)
+    attacker.stunReadyAt = stunReadyAfter(now, stunChargeSeconds(attacker.skills))
     return applyTranquilizer(room, attacker, victim, victim.stamina + 1, event, 'STUN KNIFE')
   }
 

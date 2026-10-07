@@ -770,6 +770,17 @@ export class RemoteSoldier {
     return dead;
   }
 
+  /** 右手の骨。スタンナイフの放電の出所 (他人の画面ではナイフの模型を持たせていない) */
+  private rightHand: THREE.Object3D | null = null
+
+  /** 右手のワールド座標。模型が届く前・姿が無い時は null */
+  handWorld(out: THREE.Vector3): THREE.Vector3 | null {
+    if (!this.model || !this.object.visible) return null
+    this.rightHand ??= findBoneBySuffix(this.model, "RightHand") ?? null
+    if (!this.rightHand) return null
+    return out.setFromMatrixPosition(this.rightHand.matrixWorld)
+  }
+
   dispose(): void {
     this.disposed = true;
     this.animator?.dispose();
@@ -860,6 +871,7 @@ export class RemoteSoldier {
     if (this.serverDead) this.animator.playDeath();
 
     this.model = model;
+    this.rightHand = null;
     await this.attachWeapon(model);
   }
 
@@ -1312,6 +1324,11 @@ export class RemoteSoldiers {
   /** 今いる場所。倒れていなくても音を鳴らす先が要るとき用 */
   positionOf(id: string): THREE.Vector3 | null {
     return this.players.get(id)?.object.position ?? null;
+  }
+
+  /** その人の右手のワールド座標 (スタンナイフの放電の出所)。見えていなければ null */
+  handOf(id: string, out: THREE.Vector3): THREE.Vector3 | null {
+    return this.players.get(id)?.handWorld(out) ?? null;
   }
 
   /**

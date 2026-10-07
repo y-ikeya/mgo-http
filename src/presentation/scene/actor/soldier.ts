@@ -1,6 +1,6 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { BlobShadow } from './blobShadow'
-import { boxMoveScale, runnerScale, setupSpeedScale, type Skills } from '../../../domain/player/skill'
+import { boxMoveScale, runnerScale, setupSpeedScale, stabSpeedScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
   LADDER_SPEED,
@@ -541,6 +541,7 @@ export class Soldier {
     this.skills = skills
     // 置く型の速さだけは animator 側に持たせる (クリップの再生速度なので)
     this.animator?.setSetupSpeed(setupSpeedScale(skills))
+    this.animator?.setStabSpeed(stabSpeedScale(skills))
   }
 
   /**
@@ -1543,9 +1544,11 @@ export class Soldier {
   /** 刺突モーションの尺 (秒)。伏せていれば伏せた刺突の尺。モデル未着なら 0 */
   get stabDuration(): number {
     if (!this.animator) return 0
-    return this.isProne && this.animator.proneStabDuration > 0
+    // KNIFE MASTERY で速く流すぶん短い。判定の位置は尺に対する割合なので一緒に早まる
+    const clip = this.isProne && this.animator.proneStabDuration > 0
       ? this.animator.proneStabDuration
       : this.animator.stabDuration
+    return clip / this.animator.stabSpeed
   }
 
   /** 刺突中か。この間は発砲できない */
@@ -1602,6 +1605,13 @@ export class Soldier {
   /** 刃先のワールド座標。判定の起点に使う */
   knifeTip(out: THREE.Vector3): THREE.Vector3 | null {
     return this.knife ? this.knife.muzzleWorld(out) : null
+  }
+
+  /** 右手のワールド座標。刃が無い時 (模型が届く前) の放電の出所 */
+  handWorld(out: THREE.Vector3): THREE.Vector3 | null {
+    if (!this.model) return null
+    const hand = findBoneBySuffix(this.model, 'RightHand')
+    return hand ? out.setFromMatrixPosition(hand.matrixWorld) : null
   }
 
   /** 発砲モーションの再生・停止。上半身レイヤーにだけ効く */
@@ -3663,6 +3673,7 @@ export class Soldier {
     this.animator.setPistol(!isTwoHanded(this.held))
     this.animator.setKnife(this.held === 'knife')
     this.animator.setSetupSpeed(setupSpeedScale(this.skills))
+    this.animator.setStabSpeed(stabSpeedScale(this.skills))
     this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
     // 模型が届く前に眠らされていた (読み直しの続き)。寝ている姿から始める
     if (this.sleepLeft > 0) this.animator.playSleep(true)
