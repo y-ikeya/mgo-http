@@ -302,6 +302,8 @@ export interface MatchPlayer extends Player {
    */
   homeX: number
   homeZ: number
+  /** 的の足元の高さ。地面が 0 ではないステージ (検証場は 0.1) で埋まらないように */
+  homeY: number
   /**
    * 的が起き上がるまでの残り (秒)。0 なら立っている。
    *
@@ -417,6 +419,7 @@ export function newMatchPlayer(seed: {
     knockLeft: 0,
     homeX: 0,
     homeZ: 0,
+    homeY: 0,
     downLeft: 0,
     downFromBehind: false,
     weapon: 'rifle',
@@ -455,14 +458,18 @@ export function newBot(seed: {
   team: Team
   x: number
   z: number
+  /** 足元の高さ。省けば 0 */
+  y?: number
   now: number
 }): MatchPlayer {
   const bot = newMatchPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
   bot.bot = true
   bot.x = seed.x
+  bot.y = seed.y ?? 0
   bot.z = seed.z
   // 倒れて戻るときの場所。**吹き飛ばされただけなら戻らない**
   bot.homeX = seed.x
+  bot.homeY = bot.y
   bot.homeZ = seed.z
   bot.life = 'alive'
   // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
@@ -489,6 +496,7 @@ export function reviveBot(bot: MatchPlayer, now: number): void {
   bot.downLeft = 0
   // **倒れて戻るときだけ並び直す。** 吹き飛ばされただけならその場で立ち上がる
   bot.x = bot.homeX
+  bot.y = bot.homeY
   bot.z = bot.homeZ
 }
 
