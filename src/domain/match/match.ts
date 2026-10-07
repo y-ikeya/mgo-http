@@ -15,6 +15,7 @@ import { MODES, type Mode, type ModeSpec } from './room'
  * 試合の段階。
  *
  *     waiting     人を待っている
+ *     assembled   揃った。「マッチを開始します」を 5 秒見せる
  *     countdown   全員を湧き地点へ戻してから数える
  *     playing     走っている
  *     over        決着。結果を読む時間
@@ -22,6 +23,15 @@ import { MODES, type Mode, type ModeSpec } from './room'
 export type Phase =
   /** 対戦者が足りない。**時計は回らない** */
   | 'waiting'
+  /**
+   * 揃った。**告知を見せてから支度へ。**
+   *
+   * 揃った瞬間に支度の画面へ切り替えていた頃は、何が起きたのか分からないまま
+   * 装備の表が出た (2026-10-06 本人: 味気ない)。「対戦者が揃いました。マッチを
+   * 開始します」を 5 秒出して、暗転してから支度へ入る。この間に誰かが抜ければ
+   * 待ちへ戻る
+   */
+  | 'assembled'
   /**
    * 支度の時間。**全員が READY を押すか、60 秒経つと始まる。**
    *
@@ -53,6 +63,15 @@ export const MIN_PLAYERS = 2
  * ので、上限だけ決めておけばよい。
  */
 export const READY_SECONDS = 60
+
+/** 揃った告知を見せる長さ (秒)。最後の 1 秒ほどで暗転する (画面の側) */
+export const ASSEMBLED_SECONDS = 5
+
+/**
+ * 決着の「GAME SET / 試合終了」だけを見せる長さ (秒)。勝敗と成績表はこの後に開く。
+ * 結果を見せる時間 (server/match.ts の INTERMISSION_MS 10 秒) の頭に置く
+ */
+export const GAME_SET_SECONDS = 2.4
 
 /**
  * 席を空けて待つ時間 (ms)。
@@ -88,6 +107,15 @@ export interface Match {
    */
   matchId: string | null
   startedAt: number
+  /**
+   * この試合でどちらの陣営に座ったか (人の id から)。**入り直しても同じ側へ戻す。**
+   *
+   * 席を畳んだ後 (戻るで出た) や、古い接続が閉じる前に入り直した時 (リロード) は
+   * 新しく来た人として割り振っていた。少ない側へ入るので、負けている側の人が
+   * 入り直すだけで勝っている側へ移れた (2026-10-06 本人)。
+   * 試合の頭で陣営を切り直す時 (shuffleTeams) に書き直す
+   */
+  teamsOf: Map<string, Team>
 }
 
 export function newMatch(mode: Mode): Match {
@@ -104,6 +132,7 @@ export function newMatch(mode: Mode): Match {
     lastLimbo: 0,
     matchId: null,
     startedAt: 0,
+    teamsOf: new Map(),
   }
 }
 
@@ -156,19 +185,26 @@ export function holdingSeats(room: Match, now: number): MatchPlayer[] {
  *
  * 本人に選ばせない。人数が偏ったまま始まると、腕前より頭数で決まってしまう。
  */
-export function assignTeam(room: Match): Team {
+export function assignTeam(room: Match, id?: string): Team {
   // **練習部屋は全員青。** 赤は棒立ちの的の側で、そこへ人を入れる意味が無い
   if (room.mode.id === 'PRACTICE') return 'blue'
   // 陣営で分かれない部屋 (個人戦・休憩) は全員同じ色。色が分かれていると
   // 「味方が居る」と読めてしまう
   if (!room.mode.teams) return 'blue'
+  // この試合で座ったことがあれば同じ側 (Match の teamsOf)
+  const before = id === undefined ? undefined : room.teamsOf.get(id)
+  if (before) return before
   let blue = 0
   let red = 0
   for (const player of connected(room)) {
+    // 自分の古い席は数えない (閉じる前の接続が残っている間に入り直した時)
+    if (player.id === id) continue
     if (player.team === 'blue') blue++
     else red++
   }
-  return blue <= red ? 'blue' : 'red'
+  const team = blue <= red ? 'blue' : 'red'
+  if (id !== undefined) room.teamsOf.set(id, team)
+  return team
 }
 
 /**
@@ -200,8 +236,10 @@ export function shuffleTeams(room: Match, roll: () => number): void {
     ;[seats[i], seats[j]] = [seats[j], seats[i]]
   }
   const half = Math.ceil(seats.length / 2)
+  room.teamsOf.clear()
   seats.forEach((player, index) => {
     player.team = index < half ? 'blue' : 'red'
+    room.teamsOf.set(player.id, player.team)
   })
 }
 

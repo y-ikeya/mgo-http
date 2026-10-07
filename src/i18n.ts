@@ -45,6 +45,7 @@ const JA = {
 
   // --- 部屋の一覧 ---
   'lobby.waiting': '待機中',
+  'lobby.assembled': 'まもなく開始',
   'lobby.ready': '支度中',
   'lobby.countdown': 'まもなく開始',
   'lobby.playing': '対戦中',
@@ -57,6 +58,10 @@ const JA = {
   // --- 試合中 ---
   'hud.loading': '戦場を読み込んでいます',
   'hud.waitingForOpponent': '対戦相手を待っています',
+  'hud.assembledTitle': '対戦者が揃いました',
+  'hud.gameSet': '試合終了',
+  'hud.assembledSub': 'マッチを開始します',
+  'loadout.readyGuide': 'スキルを選んで READY を押してください',
   'hud.matchGone': 'その試合はすでに終了しています',
   'hud.scopeHint': 'Z / ホイールで覗く',
   'hud.climbHint': 'G / △ で梯子を登る',
@@ -127,6 +132,7 @@ const EN: Record<Key, string> = {
   'login.toSignUp': 'Create an account (Sign up)',
 
   'lobby.waiting': 'Waiting',
+  'lobby.assembled': 'Starting soon',
   'lobby.ready': 'Getting ready',
   'lobby.countdown': 'Starting soon',
   'lobby.playing': 'In progress',
@@ -138,6 +144,10 @@ const EN: Record<Key, string> = {
 
   'hud.loading': 'Loading the battlefield',
   'hud.waitingForOpponent': 'Waiting for an opponent',
+  'hud.assembledTitle': 'Opponents assembled',
+  'hud.gameSet': 'The match is over',
+  'hud.assembledSub': 'The match is about to begin',
+  'loadout.readyGuide': 'Choose your skills, then press READY',
   'hud.matchGone': 'That match is already over',
   'hud.scopeHint': 'Z / wheel to scope',
   'hud.climbHint': 'G / △ to climb',

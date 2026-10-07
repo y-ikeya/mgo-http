@@ -1,4 +1,5 @@
-import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import { GAME_SET_SECONDS } from '../../domain/match/match'
 import { CRITICAL_HEALTH } from '../../domain/rule/damage'
 import { t } from '../../i18n'
 import { HELD, type HeldId, isSupport } from '../../domain/item/held'
@@ -42,7 +43,42 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   const timer = setInterval(() => setNow(Date.now()), 250)
   onCleanup(() => clearInterval(timer))
 
-  const phase = () => props.stats?.match?.phase
+  // **段階が変わった時だけ動く値にする。** stats は 0.1 秒ごとに差し替わるので、
+  // そのまま読むと下の時計が 0.1 秒ごとに作り直され (onCleanup で消され)、鳴らない
+  const phase = createMemo(() => props.stats?.match?.phase)
+  /*
+   * **揃った告知から支度へ、暗転を挟む。** 告知の終わりで黒へ落とし (CSS の
+   * hud-assembled-black)、支度に入ったら黒から明ける。告知を経ずに支度へ入った
+   * (結果画面の後など) 時は明けない
+   */
+  const [dawn, setDawn] = createSignal(false)
+  /*
+   * **決着は 2 段で出す。** まず「試合終了」だけを帯で告げ、間を置いてから勝敗を
+   * 開ける。終わった瞬間に VICTORY / DEFEAT を出すと、どちらだったかを待つ間が
+   * 無くて味気なかった (2026-10-06 本人)。結果を見せる時間は 10 秒あるので
+   * (server/match.ts の INTERMISSION_MS)、2.4 秒は前に置ける
+   */
+  const [revealed, setRevealed] = createSignal(true)
+  let lastResultPhase: string | undefined
+  createEffect(() => {
+    const now = phase()
+    if (now === 'over' && lastResultPhase !== 'over') {
+      setRevealed(false)
+      const timer = setTimeout(() => setRevealed(true), GAME_SET_SECONDS * 1000)
+      onCleanup(() => clearTimeout(timer))
+    }
+    lastResultPhase = now
+  })
+  let lastPhase: string | undefined
+  createEffect(() => {
+    const now = phase()
+    if (lastPhase === 'assembled' && now === 'ready') {
+      setDawn(true)
+      const timer = setTimeout(() => setDawn(false), 900)
+      onCleanup(() => clearTimeout(timer))
+    }
+    lastPhase = now
+  })
   /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
   const mode = () => props.stats?.match?.mode ?? 'TDM'
   const teams = () => MODES[mode()].teams
@@ -324,6 +360,19 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
+        揃った。**何が起きたかを言ってから支度へ。** 告知は始まる時と同じ指令の帯
+        (Orders)。5 秒 (domain/match/match.ts の ASSEMBLED_SECONDS) のうち最後の 1 秒で
+        暗転する。支度の画面はその黒から明ける
+      */}
+      <Show when={phase() === 'assembled'}>
+        {/* 告知そのものは指令の帯 (Orders) が出す。ここは最後の暗転だけ */}
+        <div class="hud-assembled-black" />
+      </Show>
+      <Show when={dawn()}>
+        <div class="hud-dawn" />
+      </Show>
+
+      {/*
         支度。湧き地点へ戻してから数える。
 
         **帯が上、数字が下。** 数えている間は指令 (Orders) が出るので、
@@ -346,9 +395,20 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       */}
       <Orders mode={mode()} team={props.stats?.team} phase={phase()} />
 
-      {/* 決着。次の支度が始まるまでの間だけ出る */}
-      <Show when={phase() === 'over'}>
-        <div class="hud-result">
+      {/* 決着の 1 段目。「試合終了」だけを指令と同じ帯で告げる */}
+      <Show when={phase() === 'over' && !revealed()}>
+        <div class="orders orders-solo hud-game-set">
+          <div class="orders-band">
+            <div class="orders-heading">GAME SET</div>
+            <div class="orders-rule" />
+            <div class="orders-text">{t('hud.gameSet')}</div>
+          </div>
+        </div>
+      </Show>
+
+      {/* 決着の 2 段目。次の支度が始まるまでの間だけ出る */}
+      <Show when={phase() === 'over' && revealed()}>
+        <div class="hud-result hud-result-reveal">
           <div
             class="hud-result-title"
             classList={{ 'hud-result-win': won(), 'hud-result-lose': lost() }}

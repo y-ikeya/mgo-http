@@ -149,6 +149,84 @@
 "eye": true,
 "camera": true
 }
+},
+{
+"name": "concrete_tower",
+"min": [
+-8.0,
+0.0,
+4.0
+],
+"max": [
+-4.0,
+6.0,
+8.0
+],
+"top": {
+"h": 6.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
 }
-]
+},
+{
+"name": "concrete_tower_ledge",
+"min": [
+-7.5,
+4.2,
+1.0
+],
+"max": [
+-4.5,
+4.5,
+4.0
+],
+"top": {
+"h": 4.5,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_ramp_tower",
+"min": [
+-20.0,
+0.0,
+4.75
+],
+"max": [
+-8.0,
+6.0,
+7.25
+],
+"top": {
+"h": -0.0,
+"dx": 0.5,
+"dz": 0.0,
+"thick": 6.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+}
+],
+"ladders": [],
+"bases": {}
 }

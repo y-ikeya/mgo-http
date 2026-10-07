@@ -729,16 +729,16 @@
 "name": "concrete_building6.003",
 "min": [
 -38.868,
-9.769,
+9.719,
 -32.702
 ],
 "max": [
 -17.565,
-10.031,
+9.98,
 -18.793
 ],
 "top": {
-"h": 10.0308,
+"h": 9.9801,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -2040,12 +2040,12 @@
 {
 "name": "wood_box.021",
 "min": [
--23.491,
+-23.636,
 9.86,
 5.463
 ],
 "max": [
--22.387,
+-22.532,
 11.013,
 6.88
 ],
@@ -2065,12 +2065,12 @@
 {
 "name": "wood_box.022",
 "min": [
--23.491,
+-23.636,
 10.97,
 5.463
 ],
 "max": [
--22.387,
+-22.532,
 12.124,
 6.88
 ],
@@ -9070,31 +9070,6 @@
 }
 },
 {
-"name": "concrete_floor1_nouv.005",
-"min": [
--25.116,
-9.878,
-16.304
-],
-"max": [
--18.508,
-9.994,
-23.145
-],
-"top": {
-"h": 9.9942,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "concrete_building3.004",
 "min": [
 -3.89,
@@ -13257,16 +13232,16 @@
 "name": "vis_decal_ground_dirt_nouv",
 "min": [
 -55.041,
-9.087,
+9.107,
 -100.172
 ],
 "max": [
 50.934,
-10.014,
+10.034,
 91.162
 ],
 "top": {
-"h": 10.0144,
+"h": 10.0344,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14314,16 +14289,16 @@
 "name": "concrete_building3",
 "min": [
 -35.83,
-9.78,
+9.744,
 4.77
 ],
 "max": [
 -17.97,
-21.1,
+21.064,
 23.73
 ],
 "top": {
-"h": 21.1,
+"h": 21.0643,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -15193,7 +15168,132 @@
 }
 },
 {
-"name": "wood_toolbox_blue",
+"name": "wood_Door_b5_entry.002",
+"min": [
+-45.54,
+9.958,
+-18.627
+],
+"max": [
+-45.469,
+12.238,
+-17.664
+],
+"top": {
+"h": 12.2383,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_Door_b5_entry_frame.001",
+"min": [
+-45.605,
+9.953,
+-18.716
+],
+"max": [
+-45.491,
+12.336,
+-17.565
+],
+"top": {
+"h": 12.3362,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_decal_b6_in_grime_nouv",
+"min": [
+-38.81,
+10.03,
+-32.71
+],
+"max": [
+-17.41,
+16.41,
+-18.76
+],
+"top": {
+"h": 16.4101,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b3_in_grime_nouv",
+"min": [
+-35.08,
+9.994,
+5.52
+],
+"max": [
+-18.4,
+10.412,
+22.98
+],
+"top": {
+"h": 10.4119,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b3_rubble_dirt_nouv",
+"min": [
+-35.06,
+9.006,
+10.85
+],
+"max": [
+-32.34,
+10.006,
+17.25
+],
+"top": {
+"h": 10.006,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "wood_toolbox_blue_boxcol",
 "min": [
 -18.84,
 9.962,
@@ -15218,7 +15318,7 @@
 }
 },
 {
-"name": "wood_toolbox_red",
+"name": "wood_toolbox_red_boxcol",
 "min": [
 0.905,
 9.944,
@@ -15268,7 +15368,7 @@
 }
 },
 {
-"name": "concrete_cube",
+"name": "concrete_cube_nobox",
 "min": [
 -9.645,
 9.843,
@@ -16272,6 +16372,56 @@
 }
 },
 {
+"name": "metal_dumpster2",
+"min": [
+-45.773,
+9.797,
+-14.194
+],
+"max": [
+-43.773,
+11.36,
+-12.848
+],
+"top": {
+"h": 11.3597,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_dumpster1",
+"min": [
+7.655,
+9.797,
+62.371
+],
+"max": [
+9.002,
+11.36,
+64.371
+],
+"top": {
+"h": 11.3597,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "Icosphere",
 "min": [
 -0.951,
@@ -16333,12 +16483,12 @@
 "bases": {
 "blue": {
 "x": -18.41,
-"y": 10.01,
+"y": 10.03,
 "z": 49.09
 },
 "red": {
 "x": 1.33,
-"y": 10.01,
+"y": 10.03,
 "z": -76.6
 }
 },
@@ -16362,7 +16512,8 @@
 "x": 29.0,
 "y": 12.7,
 "z": -96.8,
-"size": 1.2
+"size": 1.2,
+"yaw": 0.0
 },
 {
 "kind": "spark",
@@ -16370,7 +16521,8 @@
 "x": -16.85,
 "y": 18.41,
 "z": -26.72,
-"size": 1.0
+"size": 1.0,
+"yaw": 0.0
 },
 {
 "kind": "spark",
@@ -16378,7 +16530,8 @@
 "x": -6.89,
 "y": 18.41,
 "z": -0.01,
-"size": 1.0
+"size": 1.0,
+"yaw": 0.0
 },
 {
 "kind": "spark",
@@ -16386,7 +16539,8 @@
 "x": -5.14,
 "y": 16.81,
 "z": -11.99,
-"size": 1.0
+"size": 1.0,
+"yaw": 0.0
 },
 {
 "kind": "spark",
@@ -16394,7 +16548,8 @@
 "x": -18.33,
 "y": 16.81,
 "z": 0.01,
-"size": 1.0
+"size": 1.0,
+"yaw": 0.0
 }
 ]
 }

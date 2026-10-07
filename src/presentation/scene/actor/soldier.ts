@@ -19,7 +19,7 @@ import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
 import { stepMovement, type MoveResult, type Mover } from '../../../sim/space/movement'
-import { PLAYER_HEIGHT as BODY_HEIGHT, STEP_UP } from '../../../domain/player/moving'
+import { PLAYER_HEIGHT as BODY_HEIGHT, PLAYER_RADIUS as DOMAIN_RADIUS, STEP_UP } from '../../../domain/player/moving'
 import { can, type BodyState } from '../../../domain/player/moves'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
@@ -27,10 +27,6 @@ import {
   climbSurge,
   crawlSurge,
   resolveLocomotion,
-  STAIR_DROP_MAX,
-  STAIR_DROP_MIN,
-  STAIR_HOLD,
-  STAIR_RISE_MIN,
 } from './motion'
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
@@ -41,7 +37,7 @@ import type { WeaponTarget } from '../arms/weapon'
 
 /** カプセルの円柱部分の長さ (m)。全高 = LENGTH + RADIUS * 2 */
 const CAPSULE_LENGTH = 1.1
-const CAPSULE_RADIUS = 0.35
+const CAPSULE_RADIUS = DOMAIN_RADIUS
 // 寸法とドメインの数字が食い違ったら、どちらかを直すこと
 if (CAPSULE_LENGTH + CAPSULE_RADIUS * 2 !== BODY_HEIGHT) {
   console.warn('[Soldier] カプセルの寸法と PLAYER_HEIGHT が食い違っている')
@@ -106,6 +102,15 @@ const CROUCH_SPEED_SCALE = 0.7
  * 頭より下に来るとキャラの体が肩越しの視界を塞ぐ。
  */
 const VIEW_CLEARANCE = 0.1
+
+/**
+ * 置き終わってから何秒までを「片膝立ちのまま」と見るか。
+ *
+ * その間に構え直せば振りかぶりを飛ばす (姿勢が同じなので)。それを過ぎると
+ * しゃがみの姿勢へ戻っているので、しゃがみからの構え (1.0 秒目から) になる
+ */
+const KNEEL_CARRY_SECONDS = 0.35
+
 /** モデル未読み込み時の注視点の高さ (m) */
 const FALLBACK_VIEW_HEIGHT = PLAYER_HEIGHT * 0.85
 /** しゃがみ時の散布の倍率。止まって狙う価値をここで作る */
@@ -209,14 +214,6 @@ const FALL_GRAVITY_SCALE = 1.8
  * ジャンプが無くなったので、段差から降りるときの想定として置いてある。
  */
 const FALL_REFERENCE_HEIGHT = 0.6
-/**
- * 着地モーションを出しておく時間 (秒)。
- *
- * クリップは 0.67 秒あるが、全部流すと着地のたびに膝を曲げた時間が長く残る。
- * 落下 0.35 秒に対して着地 0.3 秒が乗ると、屈んでいる時間のほうが長く見えてしまう。
- * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
- */
-const LANDING_TIME = 0.16
 
 
 /**
@@ -230,6 +227,27 @@ const LANDING_TIME = 0.16
  * 差し替わったので、その仕掛けからは外してある。
  */
 const HARD_LAND_TIME = 2.03
+/**
+ * 軽い着地 (jump_down、膝を曲げる) を出しておく時間 (秒)。
+ *
+ * クリップは 0.67 秒あるが、全部流すと着地のたびに膝を曲げた時間が長く残る。
+ * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
+ */
+const LANDING_TIME = 0.16
+/**
+ * 軽い着地の型を出す落下速度の下限 (m/s)。2m (8.4 m/s) から。
+ *
+ * 落ちる速さは落ちる時の重力 (9.8 × FALL_GRAVITY_SCALE 1.8 = 17.6 m/s²) で決まる:
+ * 段 1 つ (0.25m) で 3.0、跳躍の高さ (0.6m) で 4.6、肩の高さ (1.4m) で 7.0。
+ * それらで膝を曲げると一段降りるたびに屈んで見えるので拾わない。
+ * 削られる高さ (FALL_SAFE_SPEED 12 = 4.1m) はこの上で、そちらは受け身 (hard_land)。
+ *
+ * **型は接地した瞬間 (moved.landed) にだけ始める。** 2026-10-06 の朝に「空中で膝が
+ * 曲がる」ように見えたのは、絵の高さを物理より 0.1 秒遅らせて均していた間
+ * (524261b〜4f07536) だけで、均しは外れている。いまは物理と絵が同じ高さなので、
+ * 接地で始めれば足が着いてから曲がる。
+ */
+const LANDING_MIN_SPEED = 8.4
 
 /*
  * 跳び越え (vault)。**転がりの代わりに出る。**
@@ -345,18 +363,6 @@ const HANG_NORMAL_REACH = 0.15
 /** 法線に沿って縁まで詰める刻みと上限 (m) */
 const HANG_EDGE_STEP = 0.05
 const HANG_EDGE_REACH = 0.6
-/**
- * 着地モーションを出す落下速度の下限 (m/s)。
- *
- * 階段を駆け上がると一段ごとに接地と離地を繰り返すので、
- * 小さな段差まで拾うと着地モーションが出ずっぱりになる。
- *
- * 落ちる速さは**落ちる時の重力 (9.8 × FALL_GRAVITY_SCALE 1.8 = 17.6 m/s²)** で決まる:
- * 段 1 つ (0.25m) で 3.0、瓦礫や土嚢 (0.35m) で 3.5、跳躍の高さ (0.6m) で 4.6。
- * 3.0 にしていた頃は 0.26m 以上の段を下りるだけで着地の型 (膝を曲げる) が出て、
- * 一段降りるたびに一瞬しゃがんで見えた。段差は捨てて跳躍だけ拾う所に引く
- */
-const LANDING_MIN_SPEED = 4.3
 
 /**
  * 空中で進行方向を変えられる度合い (0 = 変えられない)。
@@ -652,7 +658,6 @@ export class Soldier {
   }
 
   /** 着地モーションの残り時間 */
-  private landingTimer = 0
   /**
    * 空中に居る時間 (秒)。接地したら 0 に戻す。
    *
@@ -667,13 +672,13 @@ export class Soldier {
    */
   private stairFor = 0
   /** 前のフレームの足元の高さ。段差を上がったかを見るのに使う */
-  private lastFeetY = 0
   /** その階段は下りか。上りと下りで型が違う */
   private stairDown = false
   /** 地面を離れたときの高さ。**どれだけ落ちたか**を測るのに使う */
-  private airFromY = 0
   /** 受け身の残り時間。ただの着地より長い */
   private hardLandTimer = 0
+  /** 軽い着地 (膝を曲げる) の残り時間 */
+  private landingTimer = 0
   /**
    * 跳躍の設定。高さを固定したまま重力を変えられるよう、初速は毎回 sqrt(2gh) で出す。
    * 重力だけ上げれば「同じ高さまで跳ぶが滞空が短い」になる。
@@ -774,6 +779,12 @@ export class Soldier {
   private hangOutZ = 0
   /** しゃがみから転がったか。転がり終わりでしゃがみへ戻す */
   private rollFromCrouch = false
+  /** 前のコマで置く型 (claymore_place) が流れていたか。終わった瞬間を拾うため */
+  private wasPlacing = false
+  /** 当たりの形を透けて描く (?col=)。無ければ描かない */
+  private colliderView: { capsule: THREE.Mesh; step: THREE.LineLoop; height: number } | null = null
+  /** 置き終わってからの秒数。直後に構え直す時、片膝立ちの姿勢をそのまま使う */
+  private sincePlaced = Number.POSITIVE_INFINITY
 
   /**
    * このステージの梯子。**Game が読み込んで渡す。**
@@ -1203,25 +1214,16 @@ export class Soldier {
    * 連続して鳴る。
    *
    * --- 高さ ---
-   * 段差も落下も**前のフレームの高さとの差**で読んでいる (lastFeetY / airFromY)。
-   * 控えを置いたままにすると、**跳んだ距離がまるごと「1 フレームで上がった /
-   * 落ちた」ことになる**。
-   *
-   * 実際に出た形: 画面を読み直すと、湧き地点へ仮置きされた高さが控えに残った
-   * まま、サーバーの位置 (resume) が書き込まれる。その差が段差と読まれて、
-   * **一瞬 up_stair の型が流れて体が浮き、0.45 秒 (STAIR_HOLD) で戻る**。
+   * 流れかけていた型 (階段・空中) も畳む。跳ぶ前の段差や落下は、跳んだ先には無い
    */
   warpTo(x: number, y: number, z: number): void {
     this.footsteps.warp(x, y, z)
-    // 跳んだ先を「さっきも居た高さ」にする。差が 0 なら段差にも落下にもならない
-    this.lastFeetY = y
-    this.airFromY = y
     // 流れかけていた型も畳む。跳ぶ前の段差や落下は、跳んだ先には無い
     this.stairFor = 0
     this.stairDown = false
     this.airborneFor = 0
-    this.landingTimer = 0
     this.hardLandTimer = 0
+    this.landingTimer = 0
   }
 
   /**
@@ -1458,7 +1460,10 @@ export class Soldier {
   }
 
   playSetup(): void {
-    this.animator?.playSetup()
+    // 置き終わった直後なら片膝立ちのまま (振りかぶり無し)。しゃがんでいれば腰が
+    // 屈んだ所から。どちらも立ち上がって屈み直さないため
+    const kneeling = this.sincePlaced < KNEEL_CARRY_SECONDS
+    this.animator?.playSetup(kneeling ? 'kneel' : this.crouching ? 'crouch' : 'stand')
   }
 
   /**
@@ -1759,6 +1764,50 @@ export class Soldier {
     // しゃがみから立つのも同じ。低い天井の下では立てない
     if (this.crouching && this.headroom() < COLLISION_HEIGHT.stand) return
     this.crouching = !this.crouching
+  }
+
+  /**
+   * 自分の当たり (カプセル) を透けて描く。**切り分け用** (Game の ?col=、stage.ts の DIAG)。
+   *
+   * 体は AABB ではなく**カプセル**で止まる (sim/space/meshworld.ts)。半径 0.35m、
+   * 下の球の中心は足元 + 段差 (0.25m) + 半径、上の球の中心は足元 + 姿勢の高さ − 半径。
+   * 段差より下は球が無い (そこは床と見なして押されない) ので、カプセルは足元から
+   * 浮いて見える。足元の輪はその段差の高さ — **これより低い物は乗り越え、高い物に止まる**
+   */
+  showCollider(on: boolean): void {
+    if (!on) {
+      if (this.colliderView) {
+        this.object.remove(this.colliderView.capsule, this.colliderView.step)
+        this.colliderView = null
+      }
+      return
+    }
+    if (this.colliderView) return
+    const material = new THREE.MeshBasicMaterial({ color: 0xff60d0, wireframe: true, transparent: true, opacity: 0.6, depthTest: false, toneMapped: false })
+    const capsule = new THREE.Mesh(new THREE.CapsuleGeometry(PLAYER_RADIUS, 1, 4, 12), material)
+    capsule.renderOrder = 30
+    const ring = new THREE.BufferGeometry().setFromPoints(
+      Array.from({ length: 24 }, (_, i) => new THREE.Vector3(Math.cos((i / 24) * Math.PI * 2) * PLAYER_RADIUS, 0, Math.sin((i / 24) * Math.PI * 2) * PLAYER_RADIUS)),
+    )
+    const step = new THREE.LineLoop(ring, new THREE.LineBasicMaterial({ color: 0xffe060, transparent: true, opacity: 0.9, depthTest: false, toneMapped: false }))
+    step.renderOrder = 31
+    this.object.add(capsule, step)
+    this.colliderView = { capsule, step, height: -1 }
+  }
+
+  private updateColliderView(): void {
+    const view = this.colliderView
+    if (!view) return
+    const height = this.rolling ? COLLISION_HEIGHT.crouch : COLLISION_HEIGHT[this.stance]
+    const bottom = Math.min(STEP_UP + PLAYER_RADIUS, height - PLAYER_RADIUS)
+    const top = height - PLAYER_RADIUS
+    if (view.height !== height) {
+      view.capsule.geometry.dispose()
+      view.capsule.geometry = new THREE.CapsuleGeometry(PLAYER_RADIUS, Math.max(0, top - bottom), 4, 12)
+      view.height = height
+    }
+    view.capsule.position.y = (bottom + top) / 2
+    view.step.position.y = STEP_UP
   }
 
   /** 足元から頭がぶつかる所までの高さ (m)。地形が無ければ Infinity */
@@ -3264,66 +3313,31 @@ export class Soldier {
      * 階段が下りられない床のように見えていた。**先にここで段だと分かれば**、
      * 下の落下の型は出さなくていい。
      */
-    // 前に地面に触れていた高さとの差。**控えるのは使ったあと** (下)
-    const dropped = this.airFromY - this.position.y
     this.airborneFor = this.grounded ? 0 : this.airborneFor + dt
-    let stepDown = false
-    /*
-     * 階段を上ったか。**1 フレームで足元が跳ね上がったら段差。**
-     *
-     * 坂も上がるが、そちらは連続なので 1 フレームの上がり幅が小さい
-     * (13 度の坂を 5m/s で上っても 0.02m)。段差は 0.25m 飛ぶので分けられる。
-     */
-    const rise = this.position.y - this.lastFeetY
-    if (this.grounded && rise >= STAIR_RISE_MIN) {
-      this.stairFor = STAIR_HOLD
-      this.stairDown = false
-    } else if (
-      moved.landed &&
-      dropped >= STAIR_DROP_MIN &&
-      dropped <= STAIR_DROP_MAX &&
-      this.currentSpeed > 0.5
-    ) {
-      /*
-       * **下りは「どれだけ落ちたか」で見る。速さではなく高さ。**
-       *
-       * 一度**速さで分けようとして失敗した。** 坂を下りると数フレーム宙に浮く
-       * ことがあり、そのぶん加速して 1.2 m/s くらいは出る (17.6 m/s² で
-       * 4 フレーム落ちれば届く)。段と同じ速さになるので分けられない。
-       *
-       * 落ちた**高さ**なら混ざらない:
-       *
-       *     坂        7cm       地面が逃げるぶんだけ浮く
-       *     段 1〜2 つ 25〜50cm  下りの型
-       *     床から     1m 以上   落下 (受け身に譲る)
-       *
-       * 最後に地面へ触れていた高さを覚えておいて、着いた高さとの差を見る。
-       */
-      this.stairFor = STAIR_HOLD
-      this.stairDown = true
-      stepDown = true
-    } else if (this.stairFor > 0) {
-      this.stairFor -= dt
-    }
+    if (this.stairFor > 0) this.stairFor -= dt
 
-    // 空中から地面に触れた瞬間、かつ十分な速さで落ちてきたときだけ流す。
-    // **削られる速さなら受け身。** 体力が減ったことが動きにも出る
-    if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED && !stepDown) {
-      this.landingTimer = LANDING_TIME
+    /*
+     * 着地の型は**接地した瞬間** (moved.landed) にだけ始める。空中では始めない。
+     * 削られる速さ (FALL_SAFE_SPEED) なら受け身 (hard_land)、2m 以上 (LANDING_MIN_SPEED)
+     * なら膝を曲げる軽い着地 (jump_down)、それ未満 (段・箱・肩の高さ) は何も流さない。
+     * 階段は坂の板なので着地にならず、段や箱からは足元の位置が動くだけ
+     */
+    if (moved.landed && moved.impactSpeed >= LANDING_MIN_SPEED) {
       if (fallDamage(moved.impactSpeed) > 0) {
         this.hardLandTimer = HARD_LAND_TIME
         // 流れる向きは着いた瞬間に固定する。転がりながら舵は切れない
         this.hardLandYaw = this.yaw
         this.animator?.playHardLand()
       } else {
+        this.landingTimer = LANDING_TIME
         this.animator?.playLanding()
       }
     }
     // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
     // サーバーなので、速さを申告して同じ式 (damage.ts) を向こうで通してもらう
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
-    if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
+    if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
     /*
@@ -3359,8 +3373,6 @@ export class Soldier {
      * ようとすると更新の機会が来ない (最初に離れた高さのまま固まり、坂を下りた
      * 総量が落差として出る)。着地したフレームも含めて、触れていたら控える。
      */
-    if (this.grounded) this.airFromY = this.position.y
-    this.lastFeetY = this.position.y
     this.actualSpeed = moved.actualSpeed
 
     // 倒れている間の時計。起き上がるのは操作されたときだけ (standUp)
@@ -3440,6 +3452,7 @@ export class Soldier {
       if (!Number.isFinite(this.rollYaw)) this.rollYaw = this.yaw
     }
     this.object.rotation.y = this.yaw
+    this.updateColliderView()
 
     if (this.animator) {
       // 足が滑らないよう、その瞬間の速度に再生速度を合わせ続ける
@@ -3464,6 +3477,22 @@ export class Soldier {
       this.animator.update(dt)
 
       this.object.updateMatrixWorld(true)
+
+      /*
+       * **置き終わったらしゃがみで復帰する。** 置く型 (2026-10-05 の本人作) は
+       * しゃがんだ姿勢で終わる。立っていた人をそのまま立ちの姿勢へ戻すと、
+       * 型が終わった瞬間に立ち上がる動きが足される — 置いた直後に頭が出るのは
+       * 置く側の意図と逆 (縁のぶら下がりから登り切った時と同じ扱い)。
+       * 立ちたければ Space。構えをやめただけ (置かずに戻った) 時は変えない
+       */
+      const setting = this.animator.setupLocomotion
+      // 置く型が終わった (null) か、そのまま次の構えへ入った (windup) か、どちらでもしゃがみに
+      if (this.wasPlacing && setting !== 'claymore_place' && this.proneStage === 'none' && !this.down) {
+        this.crouching = true
+        this.sincePlaced = 0
+      }
+      this.wasPlacing = setting === 'claymore_place'
+      this.sincePlaced += dt
 
       const head = this.animator.headHeight()
       if (head !== null) {
@@ -3817,8 +3846,8 @@ export class Soldier {
       hangClimbing: this.hangStage === 'climb',
       hangHolding: this.hangStage === 'hang' || this.hangStage === 'drop',
       onGround: this.onGround,
-      landing: this.landingTimer,
       hardLand: this.hardLandTimer,
+      landing: this.landingTimer,
       airborneFor: this.airborneFor,
       stairFor: this.stairFor,
       stairDown: this.stairDown,

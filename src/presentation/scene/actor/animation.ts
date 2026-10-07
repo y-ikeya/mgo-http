@@ -646,7 +646,8 @@ const PRONE_THROW_RELEASE_KEY = 'prone_throw_release'
 /**
  * クレイモアを置く型。投擲と**同じ 2 段**で、押している間は構えたまま止まる。
  *
- * 尺は 1.77 秒 + 3.60 秒。投擲 (1.50 + 0.83) よりずっと長い — 置いて離れる道具は
+ * 尺は 1.27 秒 + 0.90 秒 (2026-10-05 に本人が作った型。Mixamo の 1.77 + 3.60 秒は長かった)。
+ * 投擲 (1.50 + 0.83) と同じくらい — 置いて離れる道具は
  * 「その場に留まる時間」そのものが代償になっている。
  */
 const SETUP_WINDUP_KEY = 'claymore_windup'
@@ -655,18 +656,17 @@ const SETUP_RELEASE_KEY = 'claymore_place'
 /**
  * 置き切る型の再生速度。
  *
- * 素の 3.60 秒は**長すぎた**。かがんで置いて立ち上がるまでが 1 つのクリップに
- * 入っていて、後半はほぼ立ち上がるだけ。代償として払わせたいのは「その場に
- * 留まる時間」だが、置き終わってからも足が止まっているのは、代償ではなく
- * ただ操作が返ってこない時間になる。
+ * Mixamo の 3.60 秒の型 (かがんで置いて立ち上がるまで) を使っていた頃は 2.2 倍で
+ * 流していた。後半はほぼ立ち上がるだけで、置き終わってからも足が止まっているのは
+ * 代償ではなくただ操作が返ってこない時間だったため。
  *
- * 振りかぶり (1.77 秒) はそのまま。押している間の話なので、長くて困らない。
- *
- * **一度 1.8 倍に速めたが戻した。** 待ち時間は縮むが、かがむ動作が早送りに
- * 見える。待ちの本体は「引き金を引いてから手が床に着くまで」で、そちらは
- * 置く瞬間を測り直して縮めてある (Game の CLAYMORE_PLACE_RATIO)。
+ * **2026-10-05 に本人が作った 0.90 秒の型に替えた。** しゃがんだまま置いて
+ * しゃがみで終わる (立ち上がりを含まない) ので、速める理由が無い。等倍。
+ * TRAP MASTERY の分は setSetupSpeed が上に掛ける。
  */
-const SETUP_RELEASE_RATE = 2.2
+const SETUP_RELEASE_RATE = 1
+/** しゃがみから構える時、振りかぶりの何秒目から流すか (腰が 0.63m まで下りた所) */
+const SETUP_CROUCH_START = 1.0
 const ROLL_KEY = 'roll'
 /**
  * 落下の受け身。**上半身にも同じクリップを流す。**
@@ -3386,8 +3386,23 @@ export class CharacterAnimator {
   }
 
   /** クレイモアを構え始める。**かがむので全身** */
-  playSetup(): void {
+  /**
+   * @param from どの姿勢から構えるか。**振りかぶりをその姿勢に合う所から始める。**
+   *   構えの型は立ちから片膝立ちへ下りる 1.27 秒。頭から流すとしゃがんでいた人が
+   *   一度立ち上がってから屈み直す (2026-10-05 に置いた直後の Shift 押しっぱなしで出た)。
+   *   - 'stand'  … 頭から
+   *   - 'crouch' … 腰が 0.63m まで下りる 1.0 秒目から
+   *   - 'kneel'  … 置き終わった直後 (片膝立ちのまま)。**最後のコマから** = 振りかぶり無し。
+   *     1.0 秒目から流すと腰が 0.45 → 0.63 → 0.45 と一度持ち上がって「ピクッ」と見える
+   */
+  playSetup(from: 'stand' | 'crouch' | 'kneel' = 'stand'): void {
     this.playPair(SETUP_WINDUP_KEY, SETUP_RELEASE_KEY, true)
+    if (from === 'stand') return
+    for (const action of [this.upper.get(SETUP_WINDUP_KEY), this.lower.get(SETUP_WINDUP_KEY as Locomotion)]) {
+      if (!action) continue
+      const duration = action.getClip().duration
+      action.time = from === 'kneel' ? duration : Math.min(SETUP_CROUCH_START, duration)
+    }
   }
 
   /**

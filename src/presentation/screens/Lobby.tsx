@@ -27,6 +27,7 @@ const POLL_MS = 2000;
 /** 段階の呼び名。引くたびに t() を通す (言語は起動時に決まっているので実質定数) */
 const PHASE_LABEL: Record<MatchPhase, () => string> = {
   waiting: () => t("lobby.waiting"),
+  assembled: () => t("lobby.assembled"),
   ready: () => t("lobby.ready"),
   countdown: () => t("lobby.countdown"),
   playing: () => t("lobby.playing"),

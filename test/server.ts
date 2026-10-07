@@ -71,6 +71,8 @@ export async function startServer(env: Record<string, string> = {}): Promise<Ser
       // 避け方がステージの形に依存するので、**地図を描き替えると
       // 地形と関係ない試験がまとめて落ちた** (当たりの申告が全部弾かれる形で)。
       MGO2_NO_STAGE: '1',
+      // 揃った告知 (5 秒) を飛ばす。試験は揃ってすぐ READY を押す
+      MGO2_ASSEMBLE_MS: '0',
       // **試験は本番の表に書かない。**
       //
       // bun は .env を勝手に読むので、何もしないと手元の秘密鍵をそのまま継いで
@@ -235,6 +237,30 @@ export class Client {
 
   moveTo(x: number, y: number, z: number): void {
     this.position = [x, y, z]
+  }
+
+  /**
+   * 歩いて行く。**1 通で跳べる距離 (motioncheck.ts の MAX_STEP 15m) より小さく刻む。**
+   *
+   * moveTo は 1 通で跳ぶので、湧いた直後の見逃し (relay.ts の WARP_GRACE) を
+   * 過ぎてから遠くへ置くと「跳んだ」で弾かれる。live() で送り続けている前提
+   */
+  async walkTo(x: number, y: number, z: number, step = 10): Promise<void> {
+    for (;;) {
+      const [px, py, pz] = this.position
+      const dx = x - px
+      const dy = y - py
+      const dz = z - pz
+      const distance = Math.hypot(dx, dy, dz)
+      if (distance <= step) {
+        this.position = [x, y, z]
+        return
+      }
+      const k = step / distance
+      this.position = [px + dx * k, py + dy * k, pz + dz * k]
+      // 1 通は届けてから次の刻みへ (64Hz で 16ms)
+      await Bun.sleep(40)
+    }
   }
 
   sendState(locomotion = 'idle'): void {

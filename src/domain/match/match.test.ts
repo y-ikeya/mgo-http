@@ -79,6 +79,34 @@ describe('陣営の割り振り', () => {
     join(match, 'a', 0, 'blue')
     expect(assignTeam(match)).toBe('red')
   })
+
+  test('自分の古い席は数えない。閉じる前の接続が残っていても同じ側の頭数で決める', () => {
+    const match = room('TDM')
+    join(match, 'a', 0, 'blue')
+    join(match, 'b', 1, 'red')
+    // a の古い席が残ったまま a が入り直す。数えると青 1 赤 1 から「少ない側」がぶれる
+    expect(assignTeam(match, 'a')).toBe('blue')
+  })
+
+  test('この試合で座った側へ戻す。**入り直して陣営を移ることはできない**', () => {
+    const match = room('TDM')
+    join(match, 'a', 0, 'blue')
+    join(match, 'b', 1, 'red')
+    join(match, 'c', 2, 'blue')
+    shuffleTeams(match, () => 0)
+    const first = match.players.get('c')!.team
+    // c が出て (席を畳む)、入り直す。少ない側は c の居た側になるとは限らない
+    match.players.delete('c')
+    expect(assignTeam(match, 'c')).toBe(first)
+  })
+
+  test('次の試合で切り直したら覚えも書き直す', () => {
+    const match = room('TDM')
+    join(match, 'a', 0, 'blue')
+    join(match, 'b', 1, 'red')
+    shuffleTeams(match, () => 0)
+    for (const [id, player] of match.players) expect(match.teamsOf.get(id)).toBe(player.team)
+  })
 })
 
 /**

@@ -8,7 +8,8 @@
  *     ?fov=60
  *     ?shadow=0              太陽の影マップを切る
  *     ?vcol=0                焼き込みの頂点色 (空の見え方) を切る
- *     ?col=1                 描かない物 (col_ など) も描く
+ *     ?col=1                 人が止まる面を水色で重ねる (?col=box 審判の箱 / ?col=all 両方。本番と同じ)
+ *     ?rdepth=0              深さを既定の向きに戻す (逆向きが既定。util/depth.ts)
  *     ?place=x,y,z,yaw       その足元・向きで置く所の予告 (印と扇) を出す。置けなければ赤
  *
  * --- なぜ要るか ---
@@ -18,8 +19,11 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { addColliderOverlay, applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { EmptyBoxes } from '../../src/presentation/scene/actor/box'
+import { REVERSED_DEPTH } from '../../src/presentation/scene/util/depth'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
+import { BlastFx } from '../../src/presentation/scene/fx/blastfx'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
 import { STEP_UP } from '../../src/domain/player/moving'
@@ -34,8 +38,8 @@ const eye = vec('eye', [-12, 11, 48])
 const look = vec('look', [-8, 13, 44])
 const fov = Number(query.get('fov') ?? '60')
 
-// 深さの持ち方は本番と同じ既定 (?rdepth=1 で反転)
-const renderer = new WebGPURenderer({ antialias: true, reversedDepthBuffer: query.get('rdepth') === '1' })
+// 深さの持ち方は本番と同じ (逆向きが既定。?rdepth=0 で戻す)
+const renderer = new WebGPURenderer({ antialias: true, reversedDepthBuffer: REVERSED_DEPTH })
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = query.get('shadow') !== '0'
@@ -47,6 +51,13 @@ await renderer.init()
 
 const scene = new THREE.Scene()
 const stage = buildStage(scene, stageName)
+// ?col=1 / box / all … 当たりの形を透けて重ねる (本番と同じ switch)
+addColliderOverlay(scene, stageName)
+// 空のダンボール (fx_cbox_)。本番は Game が置く
+const emptyBoxes = new EmptyBoxes(scene)
+void loadStageFx(stageName).then((fx) => {
+  for (const f of fx) if (f.kind === 'cbox') emptyBoxes.place(f.x, f.y, f.z, f.yaw ?? 0, f.size)
+})
 const sun = buildLights(scene)
 sun.castShadow = query.get('shadow') !== '0'
 
@@ -58,11 +69,11 @@ const [, sunData] = await Promise.all([stage.ready, loadStageSun(stageName)])
 if (sunData) applyStageSun(sun, sunData)
 fitShadowToStage(sun, stage)
 
-if (query.get('vcol') === '0' || query.get('col') === '1') {
+if (query.get('vcol') === '0' || query.get('col') === 'raw') {
   scene.traverse((obj) => {
     const mesh = obj as THREE.Mesh
     if (!mesh.isMesh) return
-    if (query.get('col') === '1' && !mesh.visible) mesh.visible = true
+    if (query.get('col') === 'raw' && !mesh.visible) mesh.visible = true
     if (query.get('vcol') === '0') {
       for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
         const m = material as THREE.Material & { vertexColors?: boolean }
@@ -88,7 +99,7 @@ if (placeRaw && placeRaw.length === 4 && placeRaw.every(Number.isFinite)) {
 
 const panel = document.createElement('pre')
 panel.className = 'panel'
-panel.textContent = `stage ${stageName}\neye ${eye.toArray().map((v) => v.toFixed(1)).join(',')}\nlook ${look.toArray().map((v) => v.toFixed(1)).join(',')}\nshadow ${sun.castShadow ? 'on' : 'off'}  vcol ${query.get('vcol') === '0' ? 'off' : 'on'}  col ${query.get('col') === '1' ? 'shown' : 'hidden'}`
+panel.textContent = `stage ${stageName}\neye ${eye.toArray().map((v) => v.toFixed(1)).join(',')}\nlook ${look.toArray().map((v) => v.toFixed(1)).join(',')}\nshadow ${sun.castShadow ? 'on' : 'off'}  vcol ${query.get('vcol') === '0' ? 'off' : 'on'}  col ${query.get('col') ?? 'off'}`
 document.body.appendChild(panel)
 
 /*
@@ -135,7 +146,33 @@ async function diffFrames(): Promise<void> {
   document.body.appendChild(panel)
 }
 
+/*
+ * ?blast=x,y,z … 街の中で爆発を起こし、前後のコマの時間を記録する (爆発で画面が止まる件の切り分け)。
+ * 3 秒後に 1 度。結果は window.blastTimes とコンソールへ
+ */
+const blastAt = query.get('blast')?.split(',').map(Number)
+const blastFx = blastAt && blastAt.length === 3 ? new BlastFx(scene) : null
+const times: number[] = []
+let lastT = performance.now()
+let blasted = false
+const started = performance.now()
+;(window as unknown as { blastTimes: number[] }).blastTimes = times
+// 背面のタブでは rAF が止まるので、外から 1 コマずつ回せるように出しておく
+;(window as unknown as Record<string, unknown>).stagecam = { renderer, scene, camera, blastFx, THREE }
 function frame(): void {
+  const now = performance.now()
+  const dt = (now - lastT) / 1000
+  lastT = now
+  if (blastFx) {
+    if (!blasted && now - started > 3000) {
+      blasted = true
+      times.push(-1)
+      blastFx.explode(new THREE.Vector3(blastAt![0], blastAt![1], blastAt![2]))
+    }
+    blastFx.update(dt)
+    if (now - started > 2000 && times.length < 120) times.push(Math.round(dt * 1000))
+    if (times.length === 120) { console.log('[blast] frame ms', times.join(' ')); times.push(-2) }
+  }
   renderer.render(scene, camera)
   requestAnimationFrame(frame)
 }

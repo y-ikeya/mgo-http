@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { TOWARD_CAMERA } from '../util/depth'
 
 /**
  * 人の足元の丸い影。
@@ -48,10 +49,10 @@ export class BlobShadow {
       transparent: true,
       opacity: OPACITY,
       depthWrite: false,
-      // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる
+      // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)
       polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
+      polygonOffsetFactor: 2 * TOWARD_CAMERA,
+      polygonOffsetUnits: 2 * TOWARD_CAMERA,
     })
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
     this.mesh.rotation.x = -Math.PI / 2

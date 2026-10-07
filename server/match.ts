@@ -7,6 +7,7 @@
 
 import {
   MIN_PLAYERS,
+  ASSEMBLED_SECONDS,
   READY_SECONDS,
   type Match,
   connected,
@@ -46,6 +47,11 @@ export const MATCH_DURATION_MS = 5 * 60 * 1000
  * ものなので、環境変数で変えられるようにしてある (箱の上で試すのに再配置が要らない)。
  */
 export const TICKETS = Math.max(1, Number(process.env.MGO2_TICKETS) || 20)
+/**
+ * 揃った告知の長さ (ms)。**試験だけ 0 にする** (MGO2_ASSEMBLE_MS)。試験は揃ってすぐ
+ * READY を押すので、5 秒の告知の間に押した分は支度に入った所で消えてしまう
+ */
+const ASSEMBLE_MS = process.env.MGO2_ASSEMBLE_MS !== undefined ? Number(process.env.MGO2_ASSEMBLE_MS) : ASSEMBLED_SECONDS * 1000
 
 /** 決着してから次の支度が始まるまで (ms)。結果を読む時間 */
 export const INTERMISSION_MS = 10 * 1000
@@ -494,6 +500,10 @@ export function updateMatch(room: RoomWorld, now: number): void {
       room.matchId = null
     }
   } else if (room.phase === 'waiting' && enough) {
+    // **すぐ支度へ入らない。** 揃ったことを告げてから (domain/match/match.ts の assembled)
+    room.phase = 'assembled'
+    room.endsAt = now + ASSEMBLE_MS
+  } else if (room.phase === 'assembled' && now >= room.endsAt) {
     enterReady(room, now)
   } else if (room.phase === 'ready') {
     /*
@@ -505,6 +515,18 @@ export function updateMatch(room: RoomWorld, now: number): void {
     if (allReady(room) || now >= room.endsAt) {
       room.phase = 'countdown'
       room.endsAt = now + COUNTDOWN_MS
+      /*
+       * **数え始めたら全員を戦場へ出す。** 支度の画面 (READY UP) に居た人も、
+       * その時点で選んでいた装備で湧かせる。
+       *
+       * 以前は「武器を選ぶのは始まってから」として支度に留め、秒読みの間と
+       * 始まった後も装備の画面 (LOADOUT) を出していた。試合が始まるのに
+       * 装備の画面が開いているのは意味が無い (2026-10-06 本人)。
+       * 秒読みの最中に入ってきた人・倒れた人は今までどおり画面で選んでから出る
+       */
+      for (const player of connected(room)) {
+        if (canChoose(player.life)) spawn(room, player, now)
+      }
     }
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
@@ -512,22 +534,6 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく
     room.matchId = crypto.randomUUID()
     room.startedAt = now
-    /*
-     * **押し出さない。武器を選ぶのはここから。**
-     *
-     * 支度の段階 (ready) で決めるのは、誰と戦うかとスキルまで。武器は試合が
-     * 始まってから選ぶ物なので、始まった時点で装備画面に入っていてほしい。
-     *
-     * 支度の時計だけ入れ直す。ready の 60 秒を待っている間ずっと choosing に
-     * 居るので、そのままだと**始まった瞬間に打ち切り (30 秒) を過ぎている**
-     * ことになって、選ぶ間もなく湧かされる。
-     *
-     * 選ばない人は今までどおり 30 秒で湧かされる (lifecycle.ts の
-     * CHOOSE_TIMEOUT)。始まっているのに画面の裏で立ち尽くす人は出ない。
-     */
-    for (const player of connected(room)) {
-      if (canChoose(player.life)) player.lifeAt = now
-    }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     room.phase = 'over'

@@ -412,3 +412,13 @@
   background: rgba(150, 214, 132, 0.22);
   border-color: rgba(150, 214, 132, 0.6);
 }
+
+/* 支度の案内。見出しのすぐ下に、目に入る明るさで */
+.loadout-guide {
+  padding: 12px 24px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: #d8e6cc;
+  background: rgba(120, 160, 100, 0.12);
+  border-bottom: 1px solid rgba(160, 190, 140, 0.16);
+}

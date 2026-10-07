@@ -82,9 +82,11 @@ Blender の中では問題なく見えるのに、ゲームに入れて初めて
 | `◯◯stair◯◯` | 階段。**人が歩く面は書き出しが坂の板に置き換える** (段を踏むと頭が段ごとに跳ねるため)。見た目・弾・視線は段のまま。`vis_` を付けても坂は敷く。自分で `col_` を置いた階段には敷かない。板は箱の下端から上端へ張るので、最上段の天面は上の床と同じ高さにしておく |
 | `sand_bag◯◯` | 土嚢。**人の層は袋ごとの箱** (足元は袋の外接、天面はその真上に積まれた袋の一番高い所で、列に沿って平ら)、弾・視線は袋のまま。積み全体を 1 箱にすると折れた列が板になって跳べず上に乗る。跳べるかは箱の天面で決まる (足元から 0.3〜1.2m)。1.2m を越えた積みと 0.25〜0.3m の積みは書き出しの記録に名前が出る |
 | `◯◯bench◯◯` `◯◯table◯◯` | ベンチ・机。**人の層は座面 (+ 背もたれ) の箱と、地面に着いた脚の柱だけ**。脚をつなぐ貫は絵だけなので、伏せて下に潜れる (座面の下が 0.55m 以上の物)。弾・視線は形のまま |
+| `◯◯boxcol` / `◯◯nobox` | **人の層を外枠の箱にする / しない。** 面が多い物 (400 枚超) は書き出しが「外枠が形を写しているか」を見て箱に置き換えるが、札で決め打ちできる。`boxcol` は蓋の開いた箱 (基地の軍用ケース) のように中が空でも人には箱でよい物に。足が開口から中へ落ちて跳ねるのを防ぐ。`nobox` は窪みに入れる塔のように箱にすると入れなくなる物に。弾・視線は形のまま |
 | `ref_◯◯` | 書き出しから除外 (寸法の物差し) |
 | `fx_smoke_◯◯` (Empty) | **煙。** その場所から煙が上がり続ける (fx/stageSmoke.ts)。Empty の拡大率が湧く範囲と玉の大きさ。当たりも音も無い |
 | `fx_spark_◯◯` (Empty) | **火花。** 数秒に 1 度ぱっと散る (fx/stageSparks.ts)。電線の継ぎ目に |
+| `fx_cbox_◯◯` (Empty) | **誰も入っていないダンボール。** 被る箱と同じ絵・寸法 (actor/box.ts の EmptyBoxes)。Empty の Z 回転が向き、拡大率が大きさ。真下の床に置く。**人は止まり、弾は通り、視線は遮る** (書き出しが人の層に箱を入れる)。触れると一度だけ揺れる (審判が見つけて全員へ配る。server/arms/cbox.ts) |
 | `sun◯◯` (Sun ランプ) | **太陽。** 向き・色・強さを json に書き、ゲームの平行光がそれに揃う (Blender の Material Preview で scene lights / world を使えば影の向きが同じに見える)。強さ 3.0 がゲームの既定の明るさ。無ければコード側の既定 |
 | `◯◯_nouv` | **UV を触らない。**焼き込んだ絵を持つ物に付ける (後置き)。材質に絵が繋がっていて面が多い物 (木箱など 60 面超) は付けなくても触らない。箱に繰り返しの絵を貼った物は貼り直す |
 | 札なし | 描画も判定もする / 材質は金属 |
@@ -320,12 +322,26 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
 `hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`
-`knee_relaxed` `knee_ready` `prone_bolt` `knife_idle` `vault` `vault_up` `hang_drop` `hang_climb`) は
+`knee_relaxed` `knee_ready` `prone_bolt` `knife_idle` `vault` `vault_up` `hang_drop` `hang_climb`
+`claymore_windup` `claymore_place`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 
     $BLENDER -b --factory-startup --python tools/convert_character.py -- <1本だけの設定.json>
     bun tools/merge_clip.js public/models/soldier.glb <単体.glb> <クリップ名> public/models/soldier.glb
+
+クレイモアの構え `claymore_windup` は本人が作った `tools/raw/setup1_1.fbx` の **2 本目の take**
+(`setup1_1.fbx#2`、1.27 秒。1 本目は片膝立ちの揺れのループで未使用)。**素の姿勢が Ch35 と
+違う**ので `convert_character.py` で直に写すと腰が 1.6m から始まる (立ちで 60cm 浮く)。
+`retarget_clip.py` で世界の向きから焼き直す (腰の高さは元が 1.0m で Ch35 と同じなので
+`--hips-from` は要らない)。置く型 `claymore_place` も本人作の `tools/raw/setup2_1.fbx` の
+**3 本目の take** (`setup2_1.fbx#3`、0.90 秒。1・2 本目は setup1_1 と同じ物)。構えの最後の
+姿勢から始まり、しゃがんだまま終わる (立ち上がりを含まない)。右手は 3 コマ目と 23 コマ目で床に着く。
+Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_windup.json
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
+    for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
 
 `knife_idle` (tools/knife_idle.json) と `stab` (tools/stab.json) は **Ch35 ではないキャラで落とした FBX** (背丈が半分、素の姿勢も違う) なので、`convert_character.py` で直に写すと腕が頭の上に上がる。`retarget_clip.py` で世界の向きから焼き直し、腰の高さが半分なので `--hips-from` で既存の型の高さに揃えて足す:
 
@@ -366,3 +382,16 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 取らない (梯子と同じ)。
 
 雷電と名無しへは同じ物を `--rotation-only` を足して入れる。`knife_idle` は半身の構えで腰が 90° 横を向いているが、手と頭は他の構えと同じ方を向いているので回してはいけない。上半身だけ乗せると腰の基準合わせで捻れるため、ゲームでは立ち止まって構えた間だけ全身で使う。
+
+### 頭を抜いた音 (headshot2.mp3)
+
+`tools/raw/tin.mp3` (本人の素材、885Hz の金属のリング) から。2026-10-05 に本人と聴き比べて決めた形:
+
+- 再生速度で **+19 半音** (基音 約 2.65kHz)。+12 では「股間を打ったようなコミカルな音」だった
+- 音程を保ったまま引き伸ばして **1.25 秒** (鳴っている音をもう少し長く)、最後 0.37 秒はフェード (切ると「ブツッ」)
+- 基音の帯を **+7dB**、強めの圧縮で**リングの胴を持ち上げる** (「真ん中の音を強く」= 帯域も時間も)。
+  打音の頭は元から天井なので、音量を上げても頭が割れるだけ
+
+```sh
+ffmpeg -i tools/raw/tin.mp3 -af "asetrate=143837,aresample=48000,rubberband=tempo=0.271:pitchq=quality,equalizer=f=2650:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
+```

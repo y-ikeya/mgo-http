@@ -1,5 +1,7 @@
-import { skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
+import { GAME_SET_SECONDS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
 import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
@@ -36,7 +38,7 @@ import {
   applyStageSun,
   loadStageLadders,
   STAGE_CODE,
-  type Stage, loadStageBases, loadStageBoxes } from "./world/stage";
+  type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
 import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
 import { type StageBox, solidBlockers } from "../../sim/space/vision";
 import { PlacePreview } from "./arms/placePreview";
@@ -54,6 +56,8 @@ import { Locators } from "./arms/locators";
 import { ThrownItems } from "./arms/thrown";
 import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
+import { EmptyBoxes } from "./actor/box";
+import { REVERSED_DEPTH } from "./util/depth";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { Sensed } from "./fx/sensed";
@@ -414,8 +418,24 @@ const IMPACT_WORLD = 0xffd9a0;
 /** 命中表示を HUD に出しておく時間 (秒) */
 const HIT_FEEDBACK_DURATION = 0.6;
 
-/** トーンマッピングの露出。全体の明るさはまずここで調整する */
-const DEFAULT_EXPOSURE = 3.0;
+/*
+ * **目の慣れ (自動露出)。** 屋内に入ると露出を上げ、外へ出ると戻す。
+ *
+ * 地形は空の見え方を頂点に焼いてあるので (bake_stage.py)、屋内は外の 3 割まで
+ * 暗い。外から覗けば暗く見えるのはそのままで良い。中に居る人の目だけ慣らすと、
+ * 室内は普通の明るさになり、戸口や窓の外の表通りが白く飛んで見える (2026-10-06 本人)。
+ *
+ * 明るさはカメラの頭の上が塞がっているか (skylight.ts の openSkyAt) で決める。
+ * 光線 9 本なので描画は重くならない。**振れ幅は抑える** — 露出は敵が見えるかに
+ * 直接効くので、こもる側だけが有利になりすぎないように。?adapt=0 で切れる
+ */
+/** 屋根の下 (頭の上が全く開いていない) で露出に掛ける倍率 */
+const ADAPT_MAX = 1.8;
+/** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
+const ADAPT_OPEN = 0.75;
+/** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */
+const ADAPT_RATE_DARK = 1.6;
+const ADAPT_RATE_LIGHT = 3.0;
 
 /**
  * 明るさの丸め方。**?tone=aces のように URL から切り替えられる。**
@@ -538,13 +558,15 @@ const FADE_MAX = 0.8;
 /**
  * クレイモアが地面に着く位置。置く型に対する割合。
  *
- * 型は 3.6 秒あるが、手を離れるのはかがんで置いた辺り。残りは立ち上がる動き。
+ * **測った値を置く** (目分量だと手が上がりかけた後に現れる)。本人が作った
+ * 0.90 秒の型 (2026-10-05) は右手が 2 度床へ下りる — 2〜3 コマ目と 23〜24 コマ目
+ * (0.77〜0.80 秒、手の高さ 0.20m)。**後半の方で出す** (本人の指定)。前半で出すと
+ * 残りの動きが「置いた物をいじっている」に見える。0.8 = 21.6 コマ目で、
+ * 審判の返事 (claymorePlaced) が届いて絵に出るまでの往復ぶんだけ早めてある。
  *
- * **0.38 は測った値。** 右手が一番低くなるのがそこ (0.37m)。50% では既に
- * 0.58m まで戻り、67% では 1.10m — 目分量で置いていた 0.55 は**手が上がり
- * かけた後**で、置いたのに 0.28 秒遅れて現れていた。
+ * Mixamo の 3.6 秒の型では 0.38 だった (右手が一番低い 0.37m の所)。
  */
-const CLAYMORE_PLACE_RATIO = 0.38;
+const CLAYMORE_PLACE_RATIO = 0.8;
 
 /**
  * 破裂音を鳴らす高さ (m)。人形の胸のあたり。
@@ -670,6 +692,8 @@ export class Game {
   private readonly thrown: ThrownItems;
   private readonly grenades: Grenades;
   private readonly claymores: Claymores;
+  /** 誰も入っていないダンボール (ステージの置き物) */
+  private readonly emptyBoxes: EmptyBoxes;
   /** 置く所の予告 (印と見張る扇) */
   private readonly placePreview: PlacePreview;
   /**
@@ -1133,7 +1157,8 @@ export class Game {
      */
     this.renderer = new WebGPURenderer({
       antialias: true,
-      reversedDepthBuffer: new URLSearchParams(location.search).get("rdepth") === "1",
+      // 逆向きの深さ (util/depth.ts)。遠くの薄い板が壁と食い合わない
+      reversedDepthBuffer: REVERSED_DEPTH,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     // 切り分け用: ?shadow=0 で影を切る
@@ -1146,12 +1171,16 @@ export class Game {
     this.renderer.toneMapping =
       TONE_CURVES[query.get("tone") ?? ""] ?? THREE.NeutralToneMapping;
     const exposure = Number(query.get("exposure"));
-    this.renderer.toneMappingExposure = Number.isFinite(exposure) && exposure > 0
-      ? exposure
-      : DEFAULT_EXPOSURE;
+    if (Number.isFinite(exposure) && exposure > 0) this.knobs.exposure = exposure;
+    this.renderer.toneMappingExposure = this.knobs.exposure;
+    this.adaptOn = query.get("adapt") !== "0";
     container.appendChild(this.renderer.domElement);
 
     this.stage = buildStage(this.scene, this.stageName);
+    // 切り分け用: ?col=1 / ?col=box / ?col=all で当たりの形を透けて重ねる (world/stage.ts の DIAG)
+    addColliderOverlay(this.scene, this.stageName);
+    // 同じ switch で自分のカプセルも (体は AABB ではなくカプセルで止まる)
+    this.player.showCollider(colliderOverlayOn());
     void loadStageBases(this.stageName).then((bases) => {
       this.stageBases = bases;
     });
@@ -1196,6 +1225,8 @@ export class Game {
     void loadStageFx(this.stageName).then((fx) => {
       const smoke = fx.filter((f) => f.kind === "smoke");
       if (smoke.length > 0) this.stageSmoke = new StageSmoke(this.scene, smoke);
+      // 誰も入っていないダンボール。被る箱と同じ絵。人は止まり、触れると一度揺れる
+      for (const f of fx) if (f.kind === "cbox") this.emptyBoxes.place(f.x, f.y, f.z, f.yaw ?? 0, f.size);
       const sparks = fx.filter((f) => f.kind === "spark");
       if (sparks.length > 0) {
         this.stageSparks = new StageSparks(this.scene, sparks, (origin) => {
@@ -1238,6 +1269,7 @@ export class Game {
     this.grenades = new Grenades(this.scene);
     this.locators = new Locators(this.scene);
     this.claymores = new Claymores(this.scene);
+    this.emptyBoxes = new EmptyBoxes(this.scene);
     this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
@@ -1414,6 +1446,7 @@ export class Game {
   }
 
   dispose(): void {
+    clearTimeout(this.resultTimer);
     this.disposed = true;
     this.renderer.setAnimationLoop(null);
     if (this.snapshotHandle !== null) clearInterval(this.snapshotHandle);
@@ -1712,6 +1745,7 @@ export class Game {
     this.stageSparks?.update(dt);
     // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
     this.decoys.update(dt);
+    this.emptyBoxes.update(dt);
     // 手榴弾と同じ物理を同じ刻みで解く。止まったら点滅が始まる
     this.locators.update(
       dt,
@@ -1757,9 +1791,26 @@ export class Game {
 
   private readonly cameraWorld: CameraWorld = {
     distanceToObstruction: (origin, dir, maxDistance) => {
+      /*
+       * **三角の網 (CAMERA_BIT) で見る。表裏を問わない。**
+       *
+       * three の Raycaster は材質の side を見るので、片面の板 (窓ガラス) に裏から
+       * 当たった線は素通りする。建物 31 の窓ガラスは面が内を向いていて、窓を背に
+       * 構えるとカメラの線が窓を抜け、カメラが建物の中に入った (2026-10-06)。
+       * 網は「三角に表裏は無い」として引くので (bvh.ts)、どちらから当たっても止まる。
+       * 押し出し (pushOut) と同じ集合を見ることにもなる
+       */
+      const solid = this.stage.cameraWorld;
+      if (solid) {
+        const hit = solid.hit(
+          origin.x, origin.y, origin.z,
+          origin.x + dir.x * maxDistance, origin.y + dir.y * maxDistance, origin.z + dir.z * maxDistance,
+        );
+        return hit ? hit.t * maxDistance : maxDistance;
+      }
+      // 網が届くまでは描く物で見る (カメラを止める面だけ。弾を止める面とは別)
       this.cameraRay.set(origin, dir);
       this.cameraRay.far = maxDistance;
-      // カメラを止める面だけ。弾を止める面とは別 (金網はカメラを寄せない、など)
       const hits = this.cameraRay.intersectObjects(
         this.stage.cameraBlockers,
         false,
@@ -1769,22 +1820,31 @@ export class Game {
     pushOut: (position, radius) => {
       const solid = this.stage.cameraWorld;
       if (!solid) return;
-      // 触れている面の押し出しを足し合わせて動かす。角では 2 面に触れるので 2 度回す
+      /*
+       * 触れている面の向きを足し合わせて押す向きを決め、**量は一番深い食い込みだけ**。
+       *
+       * 深さを全部足していた頃は、三角の細かい物 (錆びた車、数百枚が球の中) に
+       * 触れた途端に数十枚ぶんの深さが足し合わさって、1cm の食い込みで 0.5m 跳んだ。
+       * 車と壁の間で構えるとカメラが空へ飛んだのはこれ (2026-10-06)。角では
+       * 2 面に触れるので 2 度回す (向きは足すので角から斜めに抜ける)
+       */
       for (let round = 0; round < 2; round++) {
-        let px = 0;
-        let py = 0;
-        let pz = 0;
-        let touched = false;
+        let nx = 0;
+        let ny = 0;
+        let nz = 0;
+        let deepest = 0;
         solid.touching(position.x, position.y, position.z, radius, (contact) => {
-          touched = true;
-          px += contact.nx * contact.depth;
-          py += contact.ny * contact.depth;
-          pz += contact.nz * contact.depth;
+          nx += contact.nx * contact.depth;
+          ny += contact.ny * contact.depth;
+          nz += contact.nz * contact.depth;
+          if (contact.depth > deepest) deepest = contact.depth;
         });
-        if (!touched) break;
-        position.x += px;
-        position.y += py;
-        position.z += pz;
+        if (deepest <= 0) break;
+        const len = Math.hypot(nx, ny, nz);
+        if (len < 1e-9) break;
+        position.x += (nx / len) * deepest;
+        position.y += (ny / len) * deepest;
+        position.z += (nz / len) * deepest;
       }
     },
   };
@@ -1870,6 +1930,9 @@ export class Game {
     };
   }
 
+  /** 決着の帯の後で成績表を開く時計 */
+  private resultTimer: ReturnType<typeof setTimeout> | undefined;
+
   private perform(effect: MatchEffect): void {
     switch (effect.kind) {
       case "headshot":
@@ -1906,8 +1969,14 @@ export class Game {
          * 見えていた。始まってから畳むのでは遅い (ポインタが離れていて、
          * 始まった瞬間に動けない)。
          */
-        if (effect.to === "over") this.setMenu(true);
-        else if (this.menuOpen) this.setMenu(false);
+        // **「試合終了」の帯を見せ終えてから開く** (Hud.tsx)。同時に開くと、帯と
+        // 一緒に VICTORY / DEFEAT が出てしまい、2 段に分けた意味が無くなる
+        clearTimeout(this.resultTimer);
+        if (effect.to === "over") {
+          this.resultTimer = setTimeout(() => {
+            if (this.replica.match?.phase === "over") this.setMenu(true);
+          }, GAME_SET_SECONDS * 1000);
+        } else if (this.menuOpen) this.setMenu(false);
         break;
 
       case "team":
@@ -2288,6 +2357,11 @@ export class Game {
        */
       case "decoyBumped":
         this.decoys.bump(message.id, message.dirX, message.dirZ);
+        break;
+
+      // 空のダンボールに誰かが触れた。一度だけガタッと揺れる
+      case "cboxBumped":
+        this.emptyBoxes.bump(message.index, message.dirX, message.dirZ);
         break;
 
       /*
@@ -2838,9 +2912,15 @@ export class Game {
     this.net.send({ type: "spawn" });
   }
 
-  /** いま装備の画面が出ているか。状態がそのまま答えになる */
+  /**
+   * いま装備の画面が出ているか。状態がそのまま答えになる。
+   *
+   * **揃った告知の間だけは出さない。** 後から入った人は入った時点で支度に
+   * 居るので、そのままだと「対戦者が揃いました」が装備の画面に隠れて見えない
+   * (2026-10-06 本人)。告知が終われば支度 (READY UP) として出る
+   */
   private get loadoutBlocking(): boolean {
-    return this.canChooseLoadout;
+    return this.canChooseLoadout && this.replica.match?.phase !== "assembled";
   }
 
   /**
@@ -3588,12 +3668,31 @@ export class Game {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
   };
 
+  /** 目の慣れを使うか (?adapt=0 で切る)。いま掛けている倍率 */
+  private adaptOn = true;
+  private adapt = 1;
+
+  /** 露出を目の慣れに合わせる。上の ADAPT_* の註釈 */
+  private updateExposure(sight: TriangleBvh | null, dt: number): void {
+    let target = 1;
+    if (this.adaptOn && sight) {
+      const at = this.follow.camera.position;
+      const open = openSkyAt(sight, at.x, at.y, at.z);
+      const covered = Math.min(1, Math.max(0, 1 - open / ADAPT_OPEN));
+      target = 1 + (ADAPT_MAX - 1) * covered;
+    }
+    const rate = target > this.adapt ? ADAPT_RATE_DARK : ADAPT_RATE_LIGHT;
+    this.adapt += (target - this.adapt) * (1 - Math.exp(-rate * dt));
+    this.renderer.toneMappingExposure = this.knobs.exposure * this.adapt;
+  }
+
   /**
    * 屋内に入ったら人も暗くする。地形は空の見え方を頂点に焼いてあるが、人は動くので
    * 居る場所で毎コマ測る (9 本の光線 × 人数。三角の網なので一瞬)。
    */
   private updateSkyLight(dt: number): void {
     const sight = this.stage.sightWorld;
+    this.updateExposure(sight, dt);
     if (!sight) return;
     const me = this.player.position;
     this.player.setSkyLight(skyAt(sight, me.x, me.y + SKY_PROBE_HEIGHT, me.z), dt);
@@ -4089,8 +4188,12 @@ export class Game {
        * しゃがみ直すように見えた。
        *
        * 置く型が流れている間 (setupRelease > 0) は何もしない。
+       *
+       * **置き切るまで次を構えない。** 手を離れた後も置く型は続いている
+       * (置くのは型の 8 割の所)。そこで次の振りかぶりを頭から流すと、しゃがんで
+       * 置いた人が立ち上がって見える (振りかぶりは立ち姿から始まる)
        */
-      if (this.setupRelease > 0) return;
+      if (this.setupRelease > 0 || (!this.setupAiming && this.player.placing)) return;
 
       if (!this.setupAiming) {
         this.player.playSetup();

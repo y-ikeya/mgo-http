@@ -413,9 +413,9 @@
 10.166
 ],
 "top": {
-"h": 0.3009,
+"h": 0.2851,
 "dx": 0.0,
-"dz": 0.35746,
+"dz": 0.37053,
 "riser": 0.15,
 "foot": 0.15,
 "head": 1.8
@@ -879,7 +879,83 @@
 }
 },
 {
-"name": "wood_toolbox_blue",
+"name": "concrete_tower",
+"min": [
+-2.0,
+0.0,
+-22.0
+],
+"max": [
+2.0,
+6.0,
+-18.0
+],
+"top": {
+"h": 6.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_tower_ledge",
+"min": [
+-1.5,
+4.2,
+-25.0
+],
+"max": [
+1.5,
+4.5,
+-22.0
+],
+"top": {
+"h": 4.5,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_ramp_tower",
+"min": [
+-14.0,
+0.0,
+-21.25
+],
+"max": [
+-2.0,
+6.0,
+-18.75
+],
+"top": {
+"h": 0.0,
+"dx": 0.5,
+"dz": 0.0,
+"thick": 6.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_toolbox_blue_boxcol",
 "min": [
 -10.429,
 0.1,
@@ -904,7 +980,7 @@
 }
 },
 {
-"name": "wood_toolbox_red",
+"name": "wood_toolbox_red_boxcol",
 "min": [
 11.571,
 0.1,
@@ -924,6 +1000,106 @@
 "draw": true,
 "player": true,
 "bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "cbox_fx_cbox_1",
+"min": [
+-6.59,
+0.1,
+-4.696
+],
+"max": [
+-5.41,
+1.1,
+-3.304
+],
+"top": {
+"h": 1.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "cbox_fx_cbox_2",
+"min": [
+2.31,
+0.1,
+11.255
+],
+"max": [
+3.69,
+1.1,
+12.745
+],
+"top": {
+"h": 1.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "cbox_fx_cbox_3",
+"min": [
+9.331,
+0.1,
+-22.547
+],
+"max": [
+10.669,
+1.1,
+-21.453
+],
+"top": {
+"h": 1.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "cbox_fx_cbox_4",
+"min": [
+-14.45,
+0.1,
+19.4
+],
+"max": [
+-13.55,
+1.1,
+20.6
+],
+"top": {
+"h": 1.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
 "eye": true,
 "camera": true
 }
@@ -957,5 +1133,43 @@
 "y": 0.1,
 "z": -8.0
 }
+},
+"fx": [
+{
+"kind": "cbox",
+"name": "fx_cbox_1",
+"x": -6.0,
+"y": 0.1,
+"z": -4.0,
+"size": 1.0,
+"yaw": 0.262
+},
+{
+"kind": "cbox",
+"name": "fx_cbox_2",
+"x": 3.0,
+"y": 0.1,
+"z": 12.0,
+"size": 1.0,
+"yaw": -0.524
+},
+{
+"kind": "cbox",
+"name": "fx_cbox_3",
+"x": 10.0,
+"y": 0.1,
+"z": -22.0,
+"size": 1.0,
+"yaw": 1.396
+},
+{
+"kind": "cbox",
+"name": "fx_cbox_4",
+"x": -14.0,
+"y": 0.1,
+"z": 20.0,
+"size": 1.0,
+"yaw": 0.0
 }
+]
 }

@@ -201,6 +201,11 @@ export default function Loadout(props: {
           </span>
         </header>
 
+        {/* 支度で何をするか。**揃った告知の直後に出る画面なので、することを一行で言う** */}
+        <Show when={preparing()}>
+          <div class="loadout-guide">{t('loadout.readyGuide')}</div>
+        </Show>
+
         {/*
           参加者。**支度の段階だけ。**
 

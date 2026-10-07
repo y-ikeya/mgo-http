@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { spot, startServer, twoPlayers, type Server } from './server'
+import { Client, spot, startServer, twoPlayers, type Server } from './server'
+import { DEPLOY_SECONDS } from '../src/domain/item/decoy'
 import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
@@ -180,12 +181,91 @@ describe('クレイモアを置く', () => {
     b.close()
   }, 30000)
 
+  /**
+   * **爆風で誘爆する。** 近くに並べた物は 1 つ鳴れば全部鳴る。
+   * 置く側に「並べ過ぎると一掃される」代償が付く (claymore.ts の blastPlaced)
+   */
+  test('爆風の中の別のクレイモアは誘爆する', async () => {
+    const { a, b } = await twoPlayers(server, 'claymore', ['gail', 'hank'])
+    // a: z=-6 で +Z を向いて置く → z=-5.1、正面 +Z (扇は z -5.1〜-1.1)
+    a.cameraYaw = Math.PI
+    a.holdClaymore(true)
+    await Bun.sleep(300)
+    a.send({ type: 'claymore' })
+    await Bun.sleep(400)
+    a.holdClaymore(false)
+    // b: z=-1 で +Z を向いて置く → z=-0.1、正面 +Z (誰も居ない方)。a の物から 5m
+    b.moveTo(0, 0, -1)
+    b.cameraYaw = Math.PI
+    b.holdClaymore(true)
+    await Bun.sleep(300)
+    b.send({ type: 'claymore' })
+    await Bun.sleep(400)
+    b.holdClaymore(false)
+    expect(b.messages.filter((m) => m.type === 'claymorePlaced').length).toBe(2)
+    a.reset()
+    b.reset()
+
+    // b が a の物の正面へ踏み込む。a の物が鳴り、5m 先の b の物も鳴る
+    b.moveTo(0, 0, -3)
+    await Bun.sleep(600)
+    const gone = b.messages.filter((m) => m.type === 'claymoreGone' && m.blast)
+    expect(gone.length).toBe(2)
+
+    a.close()
+    b.close()
+  }, 30000)
+
   test('**手にしていなければ置けない。** 何も配られない', async () => {
     const { a, b } = await twoPlayers(server)
     a.reset()
     a.send({ type: 'claymore' })
     await Bun.sleep(400)
     expect(a.messages.some((m) => m.type === 'claymorePlaced')).toBe(false)
+    a.close()
+    b.close()
+  }, 30000)
+})
+
+/**
+ * **爆風で DECOY は破れる。** 手榴弾 1 個で罠を掃除できる (claymore.ts の blastPlaced)。
+ * 置き主を晒しはしない — 投げた側は「人かもしれない物」を遠くから処理しただけで、
+ * 罠に掛かった訳ではない。
+ */
+describe('爆風と DECOY', () => {
+  test('手榴弾の爆風の中の DECOY は破れる', async () => {
+    // a は手榴弾、b は DECOY。支度で別々に選ぶので twoPlayers は使えない
+    const a = await new Client(server, 'ivan', spot(0, -6)).ready()
+    const b = await new Client(server, 'judy', spot(0, 6)).ready()
+    a.live()
+    b.live()
+    a.send({ type: 'loadout', primary: 'rifle', support: 'grenade' })
+    b.send({ type: 'loadout', primary: 'rifle', support: 'decoy' })
+    await Bun.sleep(400)
+    a.send({ type: 'ready', ready: true })
+    b.send({ type: 'ready', ready: true })
+    await Bun.sleep(3400)
+    a.send({ type: 'spawn' })
+    b.send({ type: 'spawn' })
+    await Bun.sleep(3600)
+
+    // b が a の 3m 手前に置く
+    b.moveTo(0, 0, -3)
+    b.holdDecoy(true)
+    await Bun.sleep(300)
+    b.send({ type: 'decoy' })
+    await Bun.sleep(DEPLOY_SECONDS * 1000 + 300)
+    b.holdDecoy(false)
+    expect(b.messages.some((m) => m.type === 'decoyPlaced')).toBe(true)
+    a.reset()
+    b.reset()
+
+    // a が足元へ落とす。導火線 3 秒
+    a.send({ type: 'grenade', dir: [0, -1, 0] })
+    await Bun.sleep(4000)
+    const gone = b.messages.find((m) => m.type === 'decoyGone')
+    expect(gone?.type === 'decoyGone' && gone.popped).toBe(true)
+
     a.close()
     b.close()
   }, 30000)

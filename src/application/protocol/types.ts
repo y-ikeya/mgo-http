@@ -502,6 +502,20 @@ export interface DecoyBumped {
   dirZ: number
 }
 
+/**
+ * 空のダンボール (ステージの置き物) に誰かが触れた。全員へ。
+ *
+ * decoy と同じで、判定は審判が持つ位置から出す。index は stage.json の fx の
+ * cbox を並べた順
+ */
+export interface CboxBumped {
+  type: 'cboxBumped'
+  index: number
+  /** 押された先の向き (世界)。触った人から箱へ */
+  dirX: number
+  dirZ: number
+}
+
 /** 割れた / 消えた */
 export interface DecoyGone {
   type: 'decoyGone'
@@ -860,7 +874,7 @@ export interface RosterMessage {
  *   playing   … 試合中。ダメージが入るのはここだけ
  *   over      … 決着。結果を見せている
  */
-export type MatchPhase = 'waiting' | 'ready' | 'countdown' | 'playing' | 'over'
+export type MatchPhase = 'waiting' | 'assembled' | 'ready' | 'countdown' | 'playing' | 'over'
 
 /**
  * 部屋の一覧 (`GET /rooms`) が返す 1 部屋ぶん。
@@ -1230,6 +1244,7 @@ export type ServerMessage =
   | ClaymoreGone
   | DecoyPlaced
   | DecoyBumped
+  | CboxBumped
   | DecoyGone
   | LocatorThrown
   | LocatorPlaced

@@ -276,7 +276,9 @@ bpy.ops.object.select_all(action='DESELECT')
 #
 # 筏のように**自分の .blend に箱を持っているステージには置かない** (二重になる)。
 # 名前に toolbox か old_military_crate を含む物があれば、それが箱。
+# `boxcol` は人の層を外枠の箱にする札 (蓋の開いた箱の中へ足が落ちないように)
 TOOLBOX_PREFIX = 'wood_toolbox'
+TOOLBOX_SUFFIX = '_boxcol'
 TOOLBOX_BLEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'props', 'crate.blend')
 
 
@@ -301,7 +303,7 @@ def place_toolboxes():
         # 印は床から浮かせて (ときに床に埋めて) 置かれる。1m 上から真下へ線を引いて床の天面を取る
         hit, where, *_ = bpy.context.scene.ray_cast(depsgraph, at + Vector((0, 0, 1.0)), Vector((0, 0, -1.0)))
         box = template if marker is markers[0] else template.copy()
-        box.name = TOOLBOX_PREFIX + '_' + marker.name.lower().replace('meta_', '').replace('base', '').strip('_') or TOOLBOX_PREFIX
+        box.name = (TOOLBOX_PREFIX + '_' + marker.name.lower().replace('meta_', '').replace('base', '').strip('_') or TOOLBOX_PREFIX) + TOOLBOX_SUFFIX
         box.location = Vector((at.x, at.y, where.z if hit else at.z))
         bpy.context.scene.collection.objects.link(box)
         print(f'  工具箱: {marker.name} の下 ({box.location.x:.1f}, {box.location.y:.1f}, {box.location.z:.2f}) に {box.name} を置いた' + ('' if hit else ' (床が見つからず印の高さ)'))
@@ -1081,6 +1083,21 @@ def skewed_area_ratio(obj):
     return skew / total if total > 1e-9 else 0.0
 
 
+# 斜めの面 1 枚の面積がこれを越えたら箱にしない (m²、世界の大きさで)。木箱の面取りは数 cm²
+BOX_SKEW_FACE_MAX = 0.25
+
+
+def largest_skewed_face(obj):
+    """世界の大きさで、軸に沿っていない面のうち一番大きい物の面積"""
+    scale = max(abs(v) for v in obj.matrix_world.to_scale())
+    best = 0.0
+    for poly in obj.data.polygons:
+        n = poly.normal
+        if max(abs(n.x), abs(n.y), abs(n.z)) < 0.95:
+            best = max(best, poly.area * scale * scale)
+    return best
+
+
 # 体積が外枠のこれより小さければ箱ではない。L 字 (商店街 15) を箱にすると、
 # 折れの内側 (店の前の通り) まで塞がる
 BOX_VOLUME_MIN = 0.85
@@ -1145,6 +1162,11 @@ def box_is_fair(obj, tris):
     # 斜めの面 (切った角、折れた外形) を持つ物は外枠に写らない。建物 9 の斜めの角を
     # 箱にすると、切り落とした所へ入れなかった
     if skewed_area_ratio(obj) > BOX_SKEW_MAX:
+        return False
+    # **大きな斜めの面が 1 枚でもあれば箱にしない。** 割合で見ると、大きな物の角を
+    # 1 つ切り落とした所 (snipePoint1 の 1.7m²、全体の 2%) が通ってしまい、切り落とした
+    # 分が人にだけ見えない壁として残った (2026-10-06)
+    if largest_skewed_face(obj) > BOX_SKEW_FACE_MAX:
         return False
     # 外枠の中がすかすかな物 (L 字・コの字・張り出し) も写らない
     if len(obj.data.polygons) <= 400 and volume_ratio(obj) < BOX_VOLUME_MIN:
@@ -1325,7 +1347,13 @@ for obj in bpy.context.scene.objects:
     #
     # **別に当たり用の物を足させない。** 同じ形を 2 つ置くと、片方だけ動かした
     # ときに見た目と当たりがずれる。1 つの物に札を付けて済ませる。
-    if 'nobox' in obj.name or not box_is_fair(obj, tris):
+    #
+    # 逆に `boxcol` の札は**必ず箱にする**。基地の軍用ケース (蓋が開いた箱、3,036 枚) は
+    # 中が空なので「外枠が形を写していない」と判じられて三角のまま残り、人が上に乗ると
+    # 真ん中の線が開いた蓋から中の底を拾って、縁と底の間で沈んだり跳ねたりした
+    # (2026-10-05「ケースに乗るとビョンと浮く、降りると屈伸」)。人にとっては箱でよい物
+    force_box = 'boxcol' in obj.name.lower()
+    if not force_box and ('nobox' in obj.name or not box_is_fair(obj, tris)):
         positions.extend(tris)
         marks.extend([mark] * count)
         kept_bodies.append((obj.name, count))
@@ -1451,6 +1479,8 @@ for obj in bpy.context.scene.objects:
 #
 # `fx_<種類>_◯◯` の Empty をそのまま json に落とす。ゲーム側が種類ごとに描く
 # (煙は fx/stageSmoke.ts)。大きさは Empty の拡大率。当たりも音も持たない
+# 空のダンボールの寸法 (m)。被る箱 (src/presentation/scene/actor/box.ts の tuning) と同じ
+CBOX_W, CBOX_H, CBOX_D = 0.9, 1.0, 1.2
 fx = []
 for obj in bpy.context.scene.objects:
     if obj.type != 'EMPTY' or not obj.name.lower().startswith('fx_'):
@@ -1458,7 +1488,42 @@ for obj in bpy.context.scene.objects:
     parts = obj.name.split('_')
     kind = parts[1].lower() if len(parts) > 1 else ''
     x, y, z = to_gltf(obj.matrix_world.translation)
-    fx.append({'kind': kind, 'name': obj.name, 'x': round(x, 2), 'y': round(y, 2), 'z': round(z, 2), 'size': round(max(obj.matrix_world.to_scale()), 2)})
+    # 向き (Blender の Z 回り)。glTF の Y 回りにそのまま写る (x, y, z) → (x, z, -y)。
+    # 空の箱 (fx_cbox_) のように向きのある物が読む
+    yaw = obj.matrix_world.to_euler().z
+    size = round(max(obj.matrix_world.to_scale()), 2)
+    # 床に置く物 (空の箱) は真下の床の天面に。Empty は床から浮いて (埋めて) 置かれがち
+    if kind == 'cbox':
+        floor = floor_under(x, y, z)
+        if floor is not None:
+            y = floor
+        # **人は止まる、弾は通る、視線は遮る。** 被る箱と同じ寸法 (actor/box.ts の tuning) を
+        # 向きに合わせて回した箱を、人の層の三角と json の箱の両方に入れる。触れた時に
+        # 揺らすのは審判 (server/arms/cbox.ts) で、これと同じ寸法で見る
+        hw, hh, hd = CBOX_W / 2 * size, CBOX_H * size, CBOX_D / 2 * size
+        c, s_ = math.cos(yaw), math.sin(yaw)
+        corners = []
+        for lx, lz in ((-hw, -hd), (hw, -hd), (hw, hd), (-hw, hd)):
+            # three の Y 回り: x' = x cos + z sin, z' = -x sin + z cos
+            corners.append((x + lx * c + lz * s_, z - lx * s_ + lz * c))
+        tris = []
+        ring = [(cx, y, cz) for cx, cz in corners] + [(cx, y + hh, cz) for cx, cz in corners]
+        for a, b, c2, d in ((0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (3, 2, 1, 0)):
+            for tri in ((a, b, c2), (a, c2, d)):
+                for k in tri:
+                    tris.extend(ring[k])
+        positions.extend(tris)
+        marks.extend([PLAYER_BIT | EYE_BIT | CAMERA_BIT | (SURFACE_IDS['wood'] << SURFACE_SHIFT)] * (len(tris) // 9))
+        xs = [cx for cx, _ in corners]
+        zs = [cz for _, cz in corners]
+        boxes.append({
+            'name': 'cbox_' + obj.name,
+            'min': [round(min(xs), 3), round(y, 3), round(min(zs), 3)],
+            'max': [round(max(xs), 3), round(y + hh, 3), round(max(zs), 3)],
+            'top': {'h': round(y + hh, 3), 'dx': 0.0, 'dz': 0.0},
+            'flags': {'draw': False, 'player': True, 'bullet': False, 'eye': True, 'camera': True},
+        })
+    fx.append({'kind': kind, 'name': obj.name, 'x': round(x, 2), 'y': round(y, 2), 'z': round(z, 2), 'size': size, 'yaw': round(yaw, 3)})
     print(f'  仕掛け {obj.name}: {kind} ({x:.1f}, {y:.1f}, {z:.1f}) 大きさ {fx[-1]["size"]}')
 
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
@@ -1716,6 +1781,45 @@ def shrink_textures():
         print(f'  絵はそのまま: 上限 {MAX_TEXTURE} を超える物は無い')
 
 shrink_textures()
+
+
+def patch_gltf_vertex_color():
+    """Blender の glTF 書き出しの不具合を避ける。**材質が 2 つ以上あるメッシュの頂点色。**
+
+    export_vertex_color='ACTIVE' で、材質の節が頂点色を使っていない時、
+    2 つ目以降の材質には「どの COLOR_n を使うか」の代わりに頂点色の名前
+    ('skysky') が控えられる (Blender 5.2 の primitive_extract.py の manage_material_info)。
+    書く段 (__manage_color_attributes) は COLOR_n と比べるので一致せず、
+    **その材質の面は頂点色を 1.0 (白) で塗り潰される。**
+
+    焼いた「空の見え方」が 1 つ目の材質にしか乗らず、建物 3 の内装 (床のタイル・
+    壁紙) が屋内なのに外と同じ明るさで出ていた (2026-10-06)。控えを COLOR_n に
+    直してから先へ進める。
+    """
+    from io_scene_gltf2.blender.exp import primitive_extract as pe
+    # 色を書く段 (名前が隠されたメソッド)。manage_material_info の最後で呼ばれるので、
+    # 控えはその直前に直す
+    original = pe.PrimitiveCreator._PrimitiveCreator__manage_color_attributes
+    if getattr(original, '_mgo2_patched', False):
+        return
+
+    def manage_color_attributes(self):
+        names = {}
+        for vc in self.vc_infos:
+            if vc.get('forced'):
+                continue
+            key = (vc['color'] or '') + (vc['alpha'] or '')
+            names.setdefault(key, vc['gltf_name'])
+        for idx, value in list(self.material_idxs_using_vc.items()):
+            if value in names:
+                self.material_idxs_using_vc[idx] = names[value]
+        return original(self)
+
+    manage_color_attributes._mgo2_patched = True
+    pe.PrimitiveCreator._PrimitiveCreator__manage_color_attributes = manage_color_attributes
+
+
+patch_gltf_vertex_color()
 
 # 材質は載せる。
 #

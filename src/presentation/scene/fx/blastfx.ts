@@ -173,6 +173,9 @@ const DEBRIS_COLOR = 0x2b2c2e
 const DEBRIS_ROUGHNESS = 0.45
 const DEBRIS_METALNESS = 0.8
 
+/** 見えない大きさで描くコマ数。最後の 1 コマで隠す */
+const WARM_FRAMES = 3
+
 export class BlastFx {
   private readonly group = new THREE.Group()
   private readonly puffs: Puff[] = []
@@ -212,11 +215,19 @@ export class BlastFx {
     // WebGPU では、それが提出中のバッファの破棄になって以後ずっと描画が崩れる
     // (箱の影が出ず、人の影が置き去りになる)。同じ URL なので HTTP は 1 回で済む。
     const loader = new THREE.TextureLoader()
+    // 画像が届くと材質が組み直される。全部届いたら、もう 1 度見えない大きさで描かせる
+    // (起動時の下描きは画像の無い材質で組むので、最初の爆発で組み直しが走って止まっていた)
+    const total = RECIPE.reduce((sum, kind) => sum + kind.count, 0)
+    let loaded = 0
+    const onLoad = () => {
+      loaded++
+      if (loaded === total) this.warmFrames = WARM_FRAMES
+    }
     for (const kind of RECIPE) {
       for (let i = 0; i < kind.count; i++) {
         const texture = loader.load(
           asset.texture('particles.png'),
-          undefined,
+          onLoad,
           undefined,
           (error) => console.warn('[爆発] particles.png が読めない', error),
         )
@@ -313,7 +324,7 @@ export class BlastFx {
     this.light.intensity = 0
     this.group.add(this.light)
     // 最初の爆発で粒・破片・輪のシェーダーを組む止まりを避ける。起動時に 1 度だけ描かせる
-    this.warmFrames = 2
+    this.warmFrames = WARM_FRAMES
     for (const puff of this.puffs) puff.sprite.frustumCulled = false
     this.debris.frustumCulled = false
     this.ring.frustumCulled = false
@@ -453,7 +464,9 @@ export class BlastFx {
       }
       this.ring.visible = on
       this.debris.visible = on
-      if (!on) return
+      // 下描きの間は動かさない。下の処理に進むと、寿命の尽きた粒として即座に隠され、
+      // 描かれないまま終わる (最初の爆発で止まっていたのはこれ)
+      return
     }
     for (const puff of this.puffs) {
       if (!puff.sprite.visible) continue

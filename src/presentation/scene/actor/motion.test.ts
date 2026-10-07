@@ -31,8 +31,8 @@ const base: StanceInput = {
   proneShift: null,
   rolling: false,
   onGround: true,
-  landing: 0,
   hardLand: 0,
+  landing: 0,
   airborneFor: 0,
   stairFor: 0,
   stairDown: false,
@@ -66,9 +66,12 @@ describe('刺す姿勢', () => {
 })
 
 describe('堪える着地', () => {
-  test('削られる高さから落ちたら堪える型。ただの着地とは別', () => {
+  test('削られる高さから落ちたら堪える型。2m 以上の着地は膝を曲げる。どちらも接地してから', () => {
     expect(resolveLocomotion({ ...base, hardLand: 1.6 })).toBe('hard_land')
     expect(resolveLocomotion({ ...base, landing: 0.1 })).toBe('jump_down')
+    expect(resolveLocomotion({ ...base })).not.toBe('jump_down')
+    // 受け身が立っていれば受け身が勝つ (同時には立たないが、順序は決めておく)
+    expect(resolveLocomotion({ ...base, hardLand: 1.0, landing: 0.1 })).toBe('hard_land')
   })
 
   test('堪えている間は移動の型に戻らない。**堪え切るまで続く**', () => {

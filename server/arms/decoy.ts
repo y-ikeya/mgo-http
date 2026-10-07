@@ -280,7 +280,7 @@ export function stabHitsDecoy(room: RoomWorld, from: MatchPlayer, now: number): 
  *
  * **遠くから安全に撃った人ほど、自分が晒されたことに気づけない。**
  */
-function popDecoy(room: RoomWorld, decoy: Decoy): void {
+export function popDecoy(room: RoomWorld, decoy: Decoy): void {
   broadcast(room, {
     type: 'decoyGone',
     id: decoy.id,

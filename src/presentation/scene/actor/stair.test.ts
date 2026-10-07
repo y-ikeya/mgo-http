@@ -104,14 +104,21 @@ describe('坂と階段', () => {
     }
   })
 
-  test('坂を上っても段とは読まれない', () => {
+  test('坂を上っても 1 コマの上がり幅は小さい', () => {
     const { rises } = walk(slopeUp, RUN)
     expect(Math.max(...rises)).toBeLessThan(STAIR_RISE_MIN)
   })
 
-  test('階段を上ったら段と読まれる', () => {
+  /**
+   * **段は 1 コマで跳ばない。** 登る速さ (movement.ts の STEP_RATE、3 m/s) で上がる。
+   * 跳ぶと相手の画面で頭の線が 1 更新で動き、段の乗り降りで頭を狙えなくなる。
+   * 段 1 つ (0.25m) は 5 コマほどかけて上がる
+   */
+  test('階段を上っても 1 コマで段ぶん跳ばない', () => {
     const { rises } = walk(stairUp, RUN)
-    expect(Math.max(...rises)).toBeGreaterThanOrEqual(STAIR_RISE_MIN)
+    expect(Math.max(...rises)).toBeGreaterThan(0.02)
+    expect(Math.max(...rises)).toBeLessThan(RISE)
+    expect(Math.max(...rises)).toBeLessThanOrEqual(3 * DT + 1e-6)
   })
 
   test('平らな床では一度も浮かない', () => {

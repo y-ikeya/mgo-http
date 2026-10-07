@@ -21,10 +21,12 @@ import { recordLag } from '../src/domain/match/lag'
 import { AUTH_CLOSE_CODE, LAG_CLOSE_CODE } from '../src/application/protocol/types'
 import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
-import { detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
+import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
+import { bumpCboxes } from './arms/cbox'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
+import { BLAST_RADIUS } from '../src/domain/item/grenade'
 import {
   relayLocators,
   shotHitsLocator,
@@ -198,6 +200,8 @@ setInterval(() => {
       relayAwareness(room, now)
       // 誰かが decoy に触れたら揺らす。**申告は受けない** (嘘の合図が作れる)
       bumpDecoys(room, now)
+      // 空のダンボールも同じ。触れたら一度揺れる (申告は受けない)
+      bumpCboxes(room)
       // 構えて狙われている人が居れば、狙っている側を光らせる (TARGET ALERT Lv3)
       alertAims(room, now)
       for (const player of connected(room)) {
@@ -320,6 +324,8 @@ setInterval(() => {
         nade.fuse -= TICK_MS / 1000
         if (nade.fuse <= 0) {
           detonate(room, nade)
+          // 置き物を壊す。クレイモアは誘爆し、DECOY は破れる (grenade.ts から引くと輪になるのでここで)
+          if (room.phase === 'playing') blastPlaced(room, nade.body.x, nade.body.y, nade.body.z, BLAST_RADIUS)
           room.grenades.splice(i, 1)
         }
       }
@@ -338,19 +344,22 @@ setInterval(() => {
 
       // クレイモア。前を敵が通ったら起爆する
       if (room.phase === 'playing') {
-        for (let i = room.claymores.length - 1; i >= 0; i--) {
-          const claymore = room.claymores[i]
-          // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する。**
-          // 壁の向こう・角の裏・別の階は反応しない (sensedBy)
-          const hit = present(room).some(
+        // 起爆させるのも同じ顔ぶれ。**置いた本人が前を通れば起爆する。**
+        // 壁の向こう・角の裏・別の階は反応しない (sensedBy)
+        const tripped = (claymore: Claymore): boolean =>
+          present(room).some(
             (p) =>
               canBeHurt(p.life) &&
               (p.id === claymore.owner || p.team !== claymore.team) &&
               sensedBy(claymore, p, TRIGGER_RANGE, TRIGGER_COS, headHeightOf(p), SENSE_HEIGHT, SENSOR_HEIGHT, room.stage.sight),
           )
-          if (!hit) continue
-          detonateClaymore(room, claymore)
-          room.claymores.splice(i, 1)
+        // **一覧から外してから起爆する。** 爆風が近くの物を誘爆させて一覧を
+        // 書き換えるので、添字で回さずに毎回頭から探し直す
+        for (;;) {
+          const i = room.claymores.findIndex(tripped)
+          if (i < 0) break
+          const [claymore] = room.claymores.splice(i, 1)
+          detonateClaymore(room, claymore!)
         }
       }
     }
@@ -1028,6 +1037,19 @@ const server = Bun.serve<Client>({
       /** 続きへ戻す人。名簿を送ったあとに渡す */
       let resumed: MatchPlayer | null = null
 
+      /*
+       * **古い接続が閉じる前に入り直した。** リロードや戻る→すぐ入るで起きる。
+       * 古い方の閉じた知らせは後から届く (close は送り主を確かめて捨てる)。
+       *
+       * 新しく来た人として扱っていた頃は、自分の古い席を数えた上で少ない側へ
+       * 割り振られ、**陣営が入れ替わった**。負けている側から入り直すだけで勝って
+       * いる側へ移れた (2026-10-06 本人)。閉じたのと同じ扱いにして、席の続きへ戻す
+       */
+      if (seat && !isAwaitingReturn(seat.life)) {
+        seat.wasAlive = canAct(seat.life)
+        setLife(room, seat, 'dropped')
+      }
+
       if (seat && isAwaitingReturn(seat.life)) {
         // 席が残っていた。**その命の続きから始める。**
         //
@@ -1065,7 +1087,8 @@ const server = Bun.serve<Client>({
         const joined = newMatchPlayer({
           id: socket.data.id,
           name: socket.data.name ?? socket.data.id.slice(0, 4).toUpperCase(),
-          team: assignTeam(room),
+          // この試合で座ったことがあれば同じ側 (席を畳んでから入り直した人)
+          team: assignTeam(room, socket.data.id),
           slot: nextSlot(room),
           now: Date.now(),
         })

@@ -1392,3 +1392,57 @@
   font-size: 12px;
   color: rgba(232, 226, 200, 0.85);
 }
+
+/*
+ * 揃った告知の終わりの暗転。告知は指令の帯 (Orders) が出し、4 秒目から黒が被さって
+ * 5 秒で真っ暗になる (告知の長さは domain/match/match.ts の ASSEMBLED_SECONDS)。
+ * 支度の画面 (loadout、z-index 6) より上に重ねるので fixed で最前に置く
+ */
+.hud-assembled-black {
+  position: fixed;
+  inset: 0;
+  z-index: 61;
+  background: #000;
+  pointer-events: none;
+  animation: hud-assembled-black 5s linear both;
+}
+
+/* 支度の画面が黒から明ける */
+.hud-dawn {
+  position: fixed;
+  inset: 0;
+  z-index: 61;
+  background: #000;
+  pointer-events: none;
+  animation: hud-dawn 0.9s ease-out both;
+}
+
+@keyframes hud-assembled-black {
+  0%, 78% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes hud-dawn {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 決着の 2 段目。勝敗は大きく出て縮み、点数と次の試合までは遅れて出る */
+.hud-result-reveal {
+  animation: hud-result-fade 0.35s ease-out both;
+}
+.hud-result-reveal .hud-result-title {
+  animation: hud-result-pop 0.7s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+.hud-result-reveal .hud-result-score,
+.hud-result-reveal .hud-result-next {
+  animation: hud-result-fade 0.5s ease-out 0.6s both;
+}
+@keyframes hud-result-pop {
+  from { opacity: 0; transform: scale(1.6); letter-spacing: 0.6em; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hud-result-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

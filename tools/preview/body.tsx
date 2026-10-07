@@ -215,7 +215,8 @@ if (gunName) {
 const firing = query.has('fire')
 // 一度きりの全身の型は**姿勢を決めてから**頭から流す。伏せていれば伏せの刺突になる
 const oneShot =
-  query.has('roll') || query.has('vault') || query.has('vaultup') || query.has('hang') || query.has('hangclimb')
+  query.has('roll') || query.has('vault') || query.has('vaultup') || query.has('hang') || query.has('hangclimb') ||
+  query.has('setup') || query.has('place')
 if (!oneShot) anim.setLocomotion(clipName as never)
 if (query.has('roll')) anim.playRoll()
 // ?vault … 窓枠を跳び越える。転がりと同じ全身の型で、playVault が入口
@@ -227,9 +228,17 @@ if (query.has('hang')) anim.playHang()
 if (query.has('hangclimb')) anim.playHangClimb()
 // ?stab … 刺す。姿勢が伏せ (clip=prone_idle) なら伏せた刺突になる
 if (query.has('stab')) anim.playStab()
+// ?setup … クレイモアを構える (振りかぶりを頭から。&fromcrouch で屈んだ所から)。?place … 構え切った所から置く型を流す。
+// locomotion に 'claymore_place' を渡しても出ない (一度きりの全身の型は playSetup が入口)
+// ?setupspeed=1.75 … TRAP MASTERY の速さで (soldier.ts の setSkills と同じ口)
+if (query.has('setupspeed')) anim.setSetupSpeed(Number(query.get('setupspeed')))
+if (query.has('setup')) anim.playSetup(query.has('fromkneel') ? 'kneel' : query.has('fromcrouch') ? 'crouch' : 'stand')
+if (query.has('place')) anim.releaseSetup()
 for (let t = 0; t < stopAt; t += 1 / 60) {
   // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
   if (!oneShot && !query.has('stab')) anim.setLocomotion(clipName as never)
+  // 置く型は本番と同じく、姿勢を setupLocomotion から引く (soldier.ts の setting)
+  if (query.has('setup') || query.has('place')) anim.setLocomotion((anim.setupLocomotion ?? clipName) as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
 }

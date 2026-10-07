@@ -200,6 +200,11 @@ export interface CameraWorld {
  * それより大きく取っておく。大きすぎると狭い所でカメラが人の頭に入る。
  */
 const CAMERA_RADIUS = 0.2
+/** 寄りの線を太くする 4 本 (球の縁、右・左・上・下) */
+const RAY_RING: readonly [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+const UP = new THREE.Vector3(0, 1, 0)
+/** 押し出しの均し (1/秒)。12 で 0.08 秒ほど。速すぎると暴れが残り、遅いと壁の裏が見える */
+const PUSH_LAMBDA = 12
 /** カメラがこれより体に寄ったら、体を薄くし始める距離 (m) */
 const CROWD_NEAR = 1.4
 /** 薄さの追従の速さ (1/s)。壁際で明滅させない */
@@ -339,6 +344,13 @@ export class FollowCamera {
   private readonly centerPivot = new THREE.Vector3()
   /** 肩の向き (水平)。壁までの距離を測るのに使い回す */
   private readonly sideDir = new THREE.Vector3()
+  /** 寄りの線を太くするための横の向き (back に直交する 2 本) */
+  private readonly rayRight = new THREE.Vector3()
+  private readonly rayUp = new THREE.Vector3()
+  private readonly rayFrom = new THREE.Vector3()
+  /** 壁から押し出された量 (均した値)。毎コマ別の面に押されて暴れるのを止める */
+  private readonly pushOffset = new THREE.Vector3()
+  private readonly pushed = new THREE.Vector3()
   /** 肩越しが壁で潰された割合 (0〜1)。computeDesired が毎コマ書く */
   private sideCollapse = 0
   /** 体が画面を塞いでいる度合い (0〜1)。均してある */
@@ -627,8 +639,30 @@ export class FollowCamera {
     this.crowd = dt > 0 ? damp(this.crowd, crowdTarget, CROWD_LAMBDA, dt) : crowdTarget
     this.desired.copy(this.pivot).addScaledVector(this.back, this.occludedDistance)
     if (this.desired.y < this.minY) this.desired.y = this.minY
-    // 線の脇の壁から離す。near 平面の四隅が壁に入ると画面の端から裏が見える
-    world?.pushOut(this.desired, CAMERA_RADIUS)
+    /*
+     * 線の脇の壁から離す。near 平面の四隅が壁に入ると画面の端から裏が見える。
+     *
+     * **押し出しは均す。** 車と壁の間のような狭い所では、押し出しが毎コマ別の面
+     * (車の車輪・壁・車体) に当たって答えが跳び、カメラが暴れた (2026-10-06
+     * 建物 31 と車の間で構えると)。押された量を覚えて均しながら足す。均した位置が
+     * まだ面の中なら、その分だけは即座に押す (壁の裏は 1 コマも見せない)
+     */
+    if (world) {
+      this.pushed.copy(this.desired)
+      world.pushOut(this.pushed, CAMERA_RADIUS)
+      this.pushed.sub(this.desired)
+      if (dt > 0) {
+        this.pushOffset.set(
+          damp(this.pushOffset.x, this.pushed.x, PUSH_LAMBDA, dt),
+          damp(this.pushOffset.y, this.pushed.y, PUSH_LAMBDA, dt),
+          damp(this.pushOffset.z, this.pushed.z, PUSH_LAMBDA, dt),
+        )
+      } else {
+        this.pushOffset.copy(this.pushed)
+      }
+      this.desired.add(this.pushOffset)
+      world.pushOut(this.desired, CAMERA_RADIUS)
+    }
   }
 
   /**
@@ -649,10 +683,23 @@ export class FollowCamera {
   ): number {
     if (!world) return this.distance
 
-    const blocked = Math.min(
+    /*
+     * **線を太くする。** 中心 1 本だと、線は通るのに球 (半径 0.2) が脇の物に
+     * 掠って押し出しに回り、押し出しは毎コマ別の面に当たって暴れる。球の縁に
+     * 当たる 4 本を足して、脇の物にも寄り (こちらは均してある) で止まる
+     */
+    this.rayRight.crossVectors(this.back, UP)
+    if (this.rayRight.lengthSq() < 1e-6) this.rayRight.set(1, 0, 0)
+    this.rayRight.normalize().multiplyScalar(CAMERA_RADIUS * 0.8)
+    this.rayUp.crossVectors(this.rayRight, this.back).normalize().multiplyScalar(CAMERA_RADIUS * 0.8)
+    let blocked = Math.min(
       world.distanceToObstruction(this.pivot, this.back, this.distance),
       world.distanceToObstruction(this.centerPivot, this.back, this.distance),
     )
+    for (const [sx, sy] of RAY_RING) {
+      this.rayFrom.copy(this.pivot).addScaledVector(this.rayRight, sx).addScaledVector(this.rayUp, sy)
+      blocked = Math.min(blocked, world.distanceToObstruction(this.rayFrom, this.back, this.distance))
+    }
     const target =
       blocked >= this.distance
         ? this.distance

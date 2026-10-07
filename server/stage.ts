@@ -28,7 +28,8 @@ import {
   type SolidWorld,
   type StageBox,
 } from '../src/sim/space/vision'
-import { decodeStageMesh, meshSubset, MESH_EYE, MESH_BULLET, MESH_PLAYER } from '../src/sim/space/stagemesh'
+import { decodeStageMesh, meshSubset, MESH_EYE, MESH_BULLET, MESH_PLAYER, MESH_CAMERA } from '../src/sim/space/stagemesh'
+import type { CameraBlocker } from '../src/sim/space/eyepoint'
 import { TriangleBvh } from '../src/sim/space/bvh'
 
 /**
@@ -74,16 +75,27 @@ export interface Terrain {
    */
   thrown: SolidWorld
   /**
-   * カメラが入れない面。**これも箱。**
+   * カメラが入れない面。**網があれば網 (CAMERA の印)、無ければ箱。**
    *
-   * 壁の手前へ寄せるには「どこで当たったか」が要るので、通るかどうかしか
-   * 答えない三角の網では足りない。
+   * 画面のカメラは網で寄せている。箱は建物を外接で包むので、凹んだ所では
+   * 画面と審判でカメラの位置が食い違う (sim/space/eyepoint.ts の CameraBlocker)
    */
-  camera: StageBox[]
+  camera: CameraBlocker
   /** 遊べる範囲の半分 (m)。**箱の外接から出す** — 広げた分が場外にならないように */
   arenaHalf: number
   /** 基地。書き出しが blend の meta_*base* から写した物。無ければ表 (STAGES) へ落ちる */
   bases: Partial<Record<Team, Spot>>
+  /** 空のダンボール (stage.json の fx の cbox)。触れたら揺らす (arms/cbox.ts) */
+  cboxes: CboxProp[]
+}
+
+/** 空のダンボール 1 つ。位置は床の上 (箱の底)、向きは three の Y 回り */
+export interface CboxProp {
+  x: number
+  y: number
+  z: number
+  yaw: number
+  size: number
 }
 
 /** 地形が読めなかったときの姿。**対戦は成立する** (全員が全員を見られる) */
@@ -97,6 +109,7 @@ function bare(name: StageName): Terrain {
     camera: [],
     arenaHalf: Number.POSITIVE_INFINITY,
     bases: {},
+    cboxes: [],
   }
 }
 
@@ -113,6 +126,7 @@ async function load(name: StageName): Promise<Terrain> {
     const data = (await Bun.file(path).json()) as {
       boxes: StageBox[]
       bases?: Partial<Record<Team, Spot>>
+      fx?: { kind: string; x: number; y: number; z: number; size: number; yaw?: number }[]
     }
     const solid = solidBlockers(data.boxes)
     const half = arenaHalfOf(solid)
@@ -130,9 +144,12 @@ async function load(name: StageName): Promise<Terrain> {
       thrown,
       body,
       solid,
-      camera: cameraBlockers(data.boxes),
+      camera: mesh && mesh.camera.size > 0 ? mesh.camera : cameraBlockers(data.boxes),
       arenaHalf: half,
       bases: data.bases ?? {},
+      cboxes: (data.fx ?? [])
+        .filter((f) => f.kind === 'cbox')
+        .map((f) => ({ x: f.x, y: f.y, z: f.z, yaw: f.yaw ?? 0, size: f.size })),
     }
   } catch {
     console.warn(`stage_${name}.json が読めない。遮蔽の判定なしで動かす (位置は全員へ配られる)`)
@@ -168,12 +185,13 @@ function boxedSight(name: StageName, boxes: StageBox[]): SightBlocker {
  */
 async function loadMesh(
   name: StageName,
-): Promise<{ sight: SightBlocker; thrown: SolidWorld; body: SolidWorld } | null> {
+): Promise<{ sight: SightBlocker; camera: TriangleBvh; thrown: SolidWorld; body: SolidWorld } | null> {
   const path = new URL(`../public/models/stage_${name}.mesh.bin`, import.meta.url)
   try {
     const mesh = decodeStageMesh(await Bun.file(path).arrayBuffer())
     return {
       sight: new TriangleBvh(meshSubset(mesh, MESH_EYE)),
+      camera: new TriangleBvh(meshSubset(mesh, MESH_CAMERA)),
       thrown: new TriangleBvh(meshSubset(mesh, MESH_BULLET)),
       body: new TriangleBvh(meshSubset(mesh, MESH_PLAYER)),
     }
