@@ -75,6 +75,11 @@ type HandEvent =
   | { kind: 'selected' }
   /** 一覧が出た。音を鳴らすのに使う */
   | { kind: 'opened' }
+  /**
+   * 一覧を開かずに持ち替えた (単押しのトグル / 支援の名指し)。**一覧で選び直した
+   * のと同じ音を鳴らす** — 持ち替えたことが耳でも分かるように (本人 2026-10-08)
+   */
+  | { kind: 'switched' }
 
 /**
  * 撃てるかを決めるのに要る、いまの体の状態。
@@ -467,16 +472,26 @@ export class Inventory {
       this.heldFor[family] = 0
       if (opened) this.browse = null
       if (pick) this.switchTo(pick)
-      else this.toggle(family)
+      else if (this.changes(() => this.toggle(family))) events.push({ kind: 'switched' })
     }
 
     // 名指しの持ち替え。一覧を開かずに行き先が決まっているとき
     if (intent.toSupport) {
       const support = this.supportId
-      if (support) this.switchTo(support)
+      if (support && this.changes(() => this.switchTo(support))) events.push({ kind: 'switched' })
     }
 
     return events
+  }
+
+  /**
+   * 持ち替えで何かが動いたか。**返り値ではなく前後の姿で見る** — 持ち替えの
+   * 最中に押すと行き先を溜めるだけで false が返るが、押した手応えは要る
+   */
+  private changes(act: () => unknown): boolean {
+    const before = `${this.current}|${this.lastWeapon}|${this.queued}`
+    act()
+    return `${this.current}|${this.lastWeapon}|${this.queued}` !== before
   }
 
   /** 一覧を開いた時点の位置。いま手にある物に合わせる */

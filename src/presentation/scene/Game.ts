@@ -4399,6 +4399,10 @@ export class Game {
           // 一覧の中で 1 段動いた。開いた音と同じく画面の音
           this.audio.playUi("switch");
           break;
+        case "switched":
+          // 一覧を開かずに持ち替えた (トグル / 支援の名指し)。一覧で選び直したのと同じ音
+          this.audio.playUi("switch");
+          break;
       }
     }
   }
