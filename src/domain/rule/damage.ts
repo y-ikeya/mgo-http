@@ -112,6 +112,27 @@ export const RECOVER_RATE = 8
  * 強めるときの変更が小さくなる。
  */
 
+/**
+ * スタンナイフ。**構えて R2 で刺すと、殺さずに眠らせる** (R1 は殺す刺突)。
+ *
+ * 使うには充電が満ちている必要がある。**満ちるまでの時間が枷** — いつでも
+ * 眠らせられると、殺す刺突を選ぶ理由が無くなる。振れば空振りでも充電は空になる
+ * (審判は当たった時だけ知るので、当たった時の間隔で確かめる)。湧いた時は満ちている。
+ * MGO2 のスタンナイフの形 (本人 2026-10-08)
+ */
+export const STUN_CHARGE_SECONDS = 15
+
+/** 次に眠らせられる時刻 (ms) を、いま使った時刻から出す */
+export function stunReadyAfter(now: number): number {
+  return now + STUN_CHARGE_SECONDS * 1000
+}
+
+/** 充電の溜まり具合 (0〜1)。readyAt は満ちる時刻 (ms) */
+export function stunCharge(readyAt: number, now: number): number {
+  if (now >= readyAt) return 1
+  return Math.max(0, 1 - (readyAt - now) / (STUN_CHARGE_SECONDS * 1000))
+}
+
 /** ナイフのダメージ。背後からなら即死 */
 export function meleeDamage(fromBehind: boolean): number {
   return fromBehind ? MELEE_BACK_DAMAGE : MELEE_FRONT_DAMAGE

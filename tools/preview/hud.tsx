@@ -31,6 +31,9 @@ const base = {
 const cases: Record<string, Partial<GameStats>> = {
   normal: {},
   boxed: { held: 'box', tool: 'box', toolInHand: true },
+  // スタンナイフの充電。溜まっている途中 / 満ちた
+  knifeCharging: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 0.45 },
+  knifeCharged: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 1 },
   boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'm9', ammo: 10, magazine: 12, reserve: 48 },
   noneSelected: { tool: 'none', toolInHand: false },
   empty: { ammo: 0 },

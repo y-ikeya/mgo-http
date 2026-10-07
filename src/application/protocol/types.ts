@@ -162,6 +162,11 @@ export interface DamageEvent {
   id: string
   target: string
   kind: 'bullet' | 'melee'
+  /**
+   * ナイフのとき、**殺さずに眠らせる刺突** (スタンナイフ、R2)。充電が満ちて
+   * いるかは審判が確かめる (domain/rule/damage.ts の STUN_CHARGE_SECONDS)
+   */
+  stun?: boolean
   /** 弾のとき。部位と距離からダメージが決まる */
   zone?: HitZone
   distance?: number

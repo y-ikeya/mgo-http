@@ -721,6 +721,18 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             </For>
           </div>
         </Show>
+        {/*
+          スタンナイフの充電。**弾の目盛りの場所に 1 本の棒。** 一定の時間で溜まり、
+          満ちたら明るくなる (構えて R2 / X で眠らせる刺突が出せる)。MGO2 と同じ置き方
+        */}
+        <Show when={props.stats?.weaponHeld === 'knife' && !props.stats?.browsing}>
+          <div
+            class="hud-weapon-charge"
+            classList={{ 'hud-weapon-charge-full': (props.stats?.stunCharge ?? 0) >= 1 }}
+          >
+            <div class="hud-weapon-charge-fill" style={{ width: `${Math.round((props.stats?.stunCharge ?? 0) * 100)}%` }} />
+          </div>
+        </Show>
         {/* 投げ物は装填が無い。残りの数だけ */}
         <Show when={!heldIsGun() && heldCount() !== null}>
           <div class="hud-weapon-count">× {heldCount()}</div>

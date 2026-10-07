@@ -24,7 +24,7 @@ import {
   type MatchPlayer,
   isProtected,
 } from '../src/domain/player/player'
-import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage } from '../src/domain/rule/damage'
+import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage, stunReadyAfter } from '../src/domain/rule/damage'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
@@ -414,16 +414,18 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
           )
 
   /*
-   * --- 麻酔 ---
+   * --- スタンナイフ ---
    *
-   * **体力を削らない。** 同じ「当てた」でも、削り切ったときに起きることが
-   * 違う (domain/player/stamina.ts)。倒れるのではなく、その場で眠る。
-   *
-   * 削る量は zone をそのまま使う。距離の減衰も同じ式を通っているので、
-   * 遠くから当てた麻酔は効きが薄い。
+   * **1 回で眠る。** 充電が満ちていなければ通さない (前に眠らせてから
+   * STUN_CHARGE_SECONDS 経っていない)。手元のメーターを飛ばして送ってきても効かない
    */
-  if (weaponOf(attacker.weapon).tranquilizer && event.kind === 'bullet') {
-    return applyTranquilizer(room, attacker, victim, amount, event)
+  if (event.kind === 'melee' && event.stun) {
+    const now = Date.now()
+    if (now < attacker.stunReadyAt) return NOT_HURT
+    // もう眠っている相手には効かせない。**充電も減らさない**
+    if (isAsleep(victim.sleepUntil, now)) return NOT_HURT
+    attacker.stunReadyAt = stunReadyAfter(now)
+    return applyTranquilizer(room, attacker, victim, victim.stamina + 1, event, 'STUN KNIFE')
   }
 
   /*
@@ -529,6 +531,8 @@ function applyTranquilizer(
   victim: MatchPlayer,
   amount: number,
   event: Extract<ClientMessage, { type: 'damage' }>,
+  /** キルログに出す名前。省けば手にある銃の名前 (スタンナイフは銃ではない) */
+  label?: string,
 ): Hurt {
   const now = Date.now()
   const drain = drainStamina(victim.stamina, amount, isAsleep(victim.sleepUntil, now))
@@ -556,7 +560,7 @@ function applyTranquilizer(
     targetName: victim.name,
     targetTeam: victim.team,
     // 使った物。表から引く (直書きすると武器を増やすたびに嘘になる)
-    weapon: weaponOf(attacker.weapon).kill,
+    weapon: label ?? weaponOf(attacker.weapon).kill,
     head: event.zone === 'HEAD',
   })
   broadcast(room, matchState(room))

@@ -368,6 +368,8 @@ export interface MatchPlayer extends Player {
   stamina: number
   /** 眠りが明ける時刻 (ms)。0 なら眠っていない */
   sleepUntil: number
+  /** スタンナイフの充電が満ちる時刻 (ms)。湧いた時に今へ戻す (満ちた状態) */
+  stunReadyAt: number
   /** 歩いた距離の積算。足音を出す間隔を決める */
   footsteps: Footsteps
   /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
@@ -437,6 +439,7 @@ export function newMatchPlayer(seed: {
     ready: false,
     stamina: MAX_STAMINA,
     sleepUntil: 0,
+    stunReadyAt: 0,
     headshots: 0,
     headDeaths: 0,
     suicides: 0,

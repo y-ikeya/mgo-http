@@ -324,6 +324,8 @@ export function resetPlayers(room: RoomWorld): void {
  */
 export function spawn(room: RoomWorld, player: MatchPlayer, now = Date.now()): void {
   refill(player)
+  // スタンナイフは満ちた状態で湧く
+  player.stunReadyAt = now
   // **眠りも醒める。** 知らせないと、湧いた本人の画面が暗いまま
   sendStamina(player)
   setLife(room, player, 'spawning', now)

@@ -901,6 +901,28 @@
   background: rgba(240, 246, 252, 0.9);
 }
 
+/*
+ * スタンナイフの充電。弾の目盛り (hud-weapon-mag) と同じ帯に 1 本の棒。
+ * 溜まっている間は鈍い青、満ちたら明るく光る — 使えるかを読まずに分かる
+ */
+.hud-weapon-charge {
+  position: relative;
+  flex: 0 0 8px;
+  width: 100%;
+  margin-top: 2px;
+  background: rgba(219, 230, 242, 0.16);
+}
+
+.hud-weapon-charge-fill {
+  height: 100%;
+  background: rgba(120, 170, 220, 0.75);
+}
+
+.hud-weapon-charge-full .hud-weapon-charge-fill {
+  background: rgba(160, 225, 255, 0.98);
+  box-shadow: 0 0 6px rgba(140, 210, 255, 0.85);
+}
+
 /* 空。目盛りごと赤く落として、数字を読まなくても分かる */
 .hud-weapon-empty .hud-weapon-tick-on {
   background: rgba(255, 138, 114, 0.9);

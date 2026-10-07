@@ -63,7 +63,7 @@ import { BlastFx } from "./fx/blastfx";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
 import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
@@ -311,6 +311,8 @@ export interface GameStats {
   held: HeldId
   /** 武器系で選んでいる物。道具を手にしていても変わらない */
   weaponHeld: HeldId
+  /** スタンナイフの充電 (0〜1)。ナイフのカードの弾の目盛りの所に出す */
+  stunCharge: number
   /** 道具系で選んでいる物。使っていなければ 'none' */
   tool: HeldId
   /** その道具をいま手にしているか */
@@ -3093,6 +3095,8 @@ export class Game {
     this.reloadSoundIn = 0;
     this.boltIn = 0;
     this.stabTimer = 0;
+    // スタンナイフは満ちた状態で湧く (審判の spawn と同じ)
+    this.stunReadyAt = Date.now();
     this.spread.reset();
     this.follow.snapTo(this.player, this.cameraWorld);
   }
@@ -3216,11 +3220,31 @@ export class Game {
 
   /** いま振っている刺突の判定を出す位置 (STAB_HIT_PHASE / PRONE_STAB_HIT_PHASE) */
   private stabHitPhase = STAB_HIT_PHASE;
+  /** いま振っているのが眠らせる刺突 (スタンナイフ) か */
+  private stabStun = false;
+  /**
+   * スタンナイフの充電が満ちる時刻 (Date.now)。**湧いた時に今へ戻す** (満ちた状態)。
+   * 審判も同じ時計を持っていて、満ちる前の当たりは通さない (server/damage.ts)
+   */
+  private stunReadyAt = 0;
 
-  /** ナイフを振り始める。リロード中と多重の振りは受け付けない */
-  private startStab(): void {
+  /** スタンナイフの充電 (0〜1)。HUD のメーター */
+  private get stunChargeNow(): number {
+    return stunCharge(this.stunReadyAt, Date.now());
+  }
+
+  /**
+   * ナイフを振り始める。リロード中と多重の振りは受け付けない。
+   *
+   * stun = 眠らせる刺突。**充電が満ちていなければ振らない** (空振りもしない)。
+   * 振ったら空振りでも充電は空になる
+   */
+  private startStab(stun = false): void {
     if (this.stabTimer > 0 || this.reloadTimer > 0 || this.player.rolling)
       return;
+    if (stun && this.stunChargeNow < 1) return;
+    this.stabStun = stun;
+    if (stun) this.stunReadyAt = stunReadyAfter(Date.now());
     this.stabTimer = this.player.stabDuration || FALLBACK_STAB_DURATION;
     this.stabResolved = false;
     // 型が違うので腕が伸びる所も違う。振り始めの姿勢で決める
@@ -3283,7 +3307,7 @@ export class Game {
      * いるのは、刺した瞬間に何か出さないと手応えが無いから。**巻き戻しの
      * 結果と食い違うことはあり得る**が、数字が動くわけではない。
      */
-    this.lastHitZone = result.fromBehind ? "BACKSTAB" : "KNIFE";
+    this.lastHitZone = this.stabStun ? "STUN" : result.fromBehind ? "BACKSTAB" : "KNIFE";
     this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
     // 刺さった音。**空振りでは鳴らさない** — 当てたかどうかで結果が全部決まる
     this.audio.play("stab", this.player.position);
@@ -3292,6 +3316,8 @@ export class Game {
       id: this.net.id,
       target: result.id,
       kind: "melee",
+      // 眠らせる刺突。充電を確かめるのは審判
+      ...(this.stabStun ? { stun: true } : {}),
     });
   }
 
@@ -3309,15 +3335,26 @@ export class Game {
     if (this.inv.held !== "knife") return;
     // ナイフは押した瞬間に振る。押しっぱなしで連打しない。
     // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
+    /*
+     * **構えていなければ刺さない。** ナイフを持っているだけで R2 で刺せた
+     * (本人 2026-10-08)。銃と同じく、構えてから使う。押したことは消すので、
+     * 押したまま構えても後から刺さない。
+     *
+     * 構えて 2 通り (MGO2 のスタンナイフ):
+     *   殺す刺突      パッド R1 / 鍵盤 左クリック
+     *   眠らせる刺突  パッド R2 / 鍵盤 X   (充電が満ちている時だけ)
+     */
+    const aiming = this.player.isAiming;
+    const killTap = this.input.tapped("killStab");
+    const stunTap = this.input.tapped("stunStab");
     if (this.input.firing && this.inv.pressedOnce) {
       this.inv.consumePress();
-      /*
-       * **構えていなければ刺さない。** ナイフを持っているだけで R2 で刺せた
-       * (本人 2026-10-08)。銃と同じく、構えてから使う。押したことは消すので、
-       * 押したまま構えても後から刺さない
-       */
-      if (this.player.isAiming) this.startStab();
+      if (aiming) this.startStab(this.input.firingByPad);
+      return;
     }
+    if (!aiming) return;
+    if (killTap) this.startStab(false);
+    else if (stunTap) this.startStab(true);
   }
 
   private updateWeapon(dt: number): void {
@@ -5044,6 +5081,7 @@ export class Game {
       held: this.inv.held,
       // **武器のカードに出す物。** 道具を手にしていても変わらない
       weaponHeld: shownWeapon,
+      stunCharge: this.stunChargeNow,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
       browsingFamily: this.inv.browsing?.family ?? null,
