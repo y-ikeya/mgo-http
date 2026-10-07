@@ -14,7 +14,12 @@ import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance, COLLISION_
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { CharacterAnimator, findBoneBySuffix } from './animation'
-import type { Locomotion } from '../../../domain/player/locomotion'
+import {
+  CROUCH_WALK_TOP_SPEED,
+  WALK_STICK,
+  WALK_TOP_SPEED,
+  type Locomotion,
+} from '../../../domain/player/locomotion'
 import { loadSoldier } from '../assets'
 import { isMesh } from '../util/guards'
 import { damp, dampAngle } from '../util/math'
@@ -3057,6 +3062,17 @@ export class Soldier {
     // 伏せは一番遅い。**担いでいる物は効かない** — 腕で這うので、
     // 背中の銃の重さが進みに出る形になっていない
     if (this.proneStage === 'prone') targetSpeed = this.moveSpeed * PRONE_SPEED_SCALE
+    /*
+     * **歩き。** スティックが浅い間は、倒し具合に比例して歩きの速さまで。
+     *
+     * 進む速さは「向き (長さ = 倒し具合) × この速さ」なので、ここを
+     * 歩きの上限 ÷ WALK_STICK にすると、WALK_STICK まで倒して上限、浅いほど遅い。
+     * 走りの速さのままだと、半分倒しで 1.5 m/s の早足になって歩きに見えない
+     */
+    if (this.walking(moveDir)) {
+      const top = this.crouching ? CROUCH_WALK_TOP_SPEED : WALK_TOP_SPEED
+      targetSpeed = Math.min(targetSpeed, top / WALK_STICK)
+    }
     // 出入りの最中は動けない。倒れる / 起き上がるのと同じ
     if (this.proneShifting) targetSpeed = 0
     /*
@@ -3455,10 +3471,14 @@ export class Soldier {
     this.updateColliderView()
 
     if (this.animator) {
-      // 足が滑らないよう、その瞬間の速度に再生速度を合わせ続ける
-      if (Math.abs(this.currentSpeed - this.appliedAnimationSpeed) > 0.01) {
-        this.animator.setMoveSpeed(this.currentSpeed)
-        this.appliedAnimationSpeed = this.currentSpeed
+      // 足が滑らないよう、その瞬間の速度に再生速度を合わせ続ける。
+      // **実際の速さは 速さ × スティックの倒し具合。** 浅く倒すと遅く進むのに
+      // 足だけ全力の拍で回っていた (止まっている間は前の値のまま)
+      const stick = Math.min(1, Math.hypot(moveDir.x, moveDir.z))
+      const animationSpeed = stick > 1e-3 ? this.currentSpeed * stick : this.appliedAnimationSpeed
+      if (Math.abs(animationSpeed - this.appliedAnimationSpeed) > 0.01) {
+        this.animator.setMoveSpeed(animationSpeed)
+        this.appliedAnimationSpeed = animationSpeed
       }
       this.animator.setLocomotion(this.resolveLocomotion(moveDir))
       // 構えていないときに体が照準の上下へ傾くと、ただ歩いているのに前後に折れて見える
@@ -3819,6 +3839,19 @@ export class Soldier {
    * 集めることと、決まった結果に応じて**こちら側の状態を畳む**ことだけ。
    * (敬礼をやめる、落下ループの尺を渡す、といった副作用は共有側に置けない)
    */
+  /**
+   * いま歩きか (速さの上限を掛けるか)。**型の選び方 (motion.ts) と揃える** —
+   * 構えていない、箱でも伏せでもない、スティックが浅い。前のコマが歩きなら
+   * 出る側のしきい値 (WALK_STICK_EXIT) までは歩きのまま
+   */
+  private walking(moveDir: THREE.Vector3): boolean {
+    if (this.aiming || this.boxed || this.proneStage !== 'none') return false
+    const stick = Math.hypot(moveDir.x, moveDir.z)
+    if (stick < 1e-3) return false
+    if (this.locomotion === 'walk' || this.locomotion === 'crouch_walk') return true
+    return stick < WALK_STICK
+  }
+
   private resolveLocomotion(moveDir: THREE.Vector3): Locomotion {
     const saluting = this.saluting
     const next = resolveLocomotion({

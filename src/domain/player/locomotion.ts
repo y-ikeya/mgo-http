@@ -196,6 +196,30 @@ export type Locomotion =
   | 'jump_down'
   | `run_${MoveDirection}`
   | `crouch_${MoveDirection}`
+  /**
+   * 歩き。**スティックを浅く倒して、構えずに進んでいる。**
+   *
+   * 走りより遅く、足音も小さく近くまでしか届かない (domain/rule/footsteps.ts)。
+   * 立ちとしゃがみの 2 つ (しゃがみはしゃがみ走りの型を遅く流す)。方向は前だけ —
+   * 構えていない間は体が進む方を向く。
+   * 構えている間は今までどおり 8 方向の型 (構えの遅さで既に歩く速さ)
+   */
+  | 'walk'
+  | 'crouch_walk'
+
+/**
+ * 歩きに入るスティックの倒し具合 (0〜1)。これより浅ければ歩き。
+ * 出るのは少し深く (WALK_STICK_EXIT) — 境目で走りと歩きが行き来しないように
+ */
+export const WALK_STICK = 0.6
+export const WALK_STICK_EXIT = 0.65
+/**
+ * 歩きの一番速い所 (m/s)。スティックを WALK_STICK まで倒した時の速さで、
+ * 浅いほど比例して遅い。歩きの型の再生もここを上限にする (他人の型は速さが
+ * 届かないので、この値で流す)
+ */
+export const WALK_TOP_SPEED = 1.3
+export const CROUCH_WALK_TOP_SPEED = 0.9
 
 /** 立ち / しゃがみ、それぞれの 8 方向の状態を引く */
 /**

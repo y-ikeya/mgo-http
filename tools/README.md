@@ -323,7 +323,7 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
 `hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`
 `knee_relaxed` `knee_ready` `prone_bolt` `knife_idle` `vault` `vault_up` `hang_drop` `hang_climb`
-`claymore_windup` `claymore_place`) は
+`claymore_windup` `claymore_place` `walk` `walk_unarmed`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 
@@ -342,6 +342,17 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_windup.json
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
+
+立ち歩き 2 本 (tools/walk.json) は本人作の Mixamo の FBX (`tools/raw/` の RifleStandWalk / BareStandWalk、
+2026-10-08)。その場歩きで Ch35 と同じ骨なので直に写せる。本来の速さは接地している足が後ろへ滑る速さの
+中央値で測った (animation.ts の WALK_CLIP_SPEED ほか): 長物 1.27 / 手ぶら 0.78 m/s。
+しゃがみ歩きはしゃがみ走りの型を遅く流す (同じ時に作った RifleCrouchWalk / BareCrouchWalk は使わない)。
+
+    $BLENDER -b --factory-startup --python tools/convert_character.py -- tools/walk.json
+    for c in walk walk_unarmed; do
+      bun tools/merge_clip.js public/models/soldier.glb walk.glb $c public/models/soldier.glb
+      for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb walk.glb $c public/models/$g.glb --rotation-only; done
+    done
 
 `knife_idle` (tools/knife_idle.json) と `stab` (tools/stab.json) は **Ch35 ではないキャラで落とした FBX** (背丈が半分、素の姿勢も違う) なので、`convert_character.py` で直に写すと腕が頭の上に上がる。`retarget_clip.py` で世界の向きから焼き直し、腰の高さが半分なので `--hips-from` で既存の型の高さに揃えて足す:
 

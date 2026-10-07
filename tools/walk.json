@@ -1,0 +1,10 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": {
+    "RifleStandWalk.fbx": "walk",
+    "BareStandWalk.fbx": "walk_unarmed"
+  },
+  "out": "walk.glb",
+  "maxTexture": 64
+}

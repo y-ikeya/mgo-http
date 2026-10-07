@@ -4,7 +4,9 @@ import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
 import {
+  CROUCH_WALK_TOP_SPEED,
   MOVE_DIRECTIONS,
+  WALK_TOP_SPEED,
   emptyHanded,
   type Locomotion,
   type MoveDirection,
@@ -53,6 +55,10 @@ const AIM_HIP_LAMBDA = 10
  */
 const LOWER_CLIPS: Record<Locomotion, string> = {
   idle: 'idle',
+  // 歩き (本人作、tools/walk.json)。構えていない間だけなので、脱力の表と同じ型
+  walk: 'walk',
+  // しゃがみ歩きは**しゃがみ走りをゆっくり流す** (本人 2026-10-08、専用の型は要らない)
+  crouch_walk: 'crouch_f',
   // 落下の受け身。着地 (jump_down) とは別のクリップ
   hard_land: 'hard_land',
   // 階段を上る。**下半身だけ** — 上は構えたまま上れる
@@ -183,6 +189,10 @@ type UpperState =
  */
 const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
+  // 歩きは長物を提げた型。上下とも同じクリップ (RELAXED_LOWER_STATES)
+  walk: 'walk',
+  // しゃがみ歩きはしゃがみ走りと同じ上半身
+  crouch_walk: 'knee_relaxed',
   // 梯子は全身で 1 つの型。**構えていても同じ** — 両手が塞がっている
   climb: 'climb',
   climb_top: 'climb_top',
@@ -259,6 +269,7 @@ const POSE_ONLY_CLIPS = new Set(['knee_relaxed', 'knee_ready'])
 
 const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
   'crouch_idle',
+  'crouch_walk',
   'lean_crouch_left',
   'lean_crouch_right',
   ...MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion),
@@ -521,6 +532,10 @@ const PISTOL_RELOAD_RATE = 1.7
  */
 const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   idle: 'pistol_relaxed',
+  // 手ぶらの歩き (拳銃は納めている、ナイフ・投げ物も同じ表)
+  walk: 'walk_unarmed',
+  // しゃがみ歩きはしゃがみ走りと同じ手ぶらの型
+  crouch_walk: 'crouch_unarmed',
   crouch_idle: 'pistol_relaxed',
   sneak: 'crouch_unarmed',
   /*
@@ -915,7 +930,29 @@ const PRONE_RISE_RATE = 1.5
  */
 const RUN_CADENCE = 1.41
 
+/*
+ * 立ち歩きの型の本来の速さ (m/s)。**その場歩きなので、接地している足が後ろへ
+ * 滑る速さ**から測った (Blender で 1 コマずつ、中央値)。長物と手ぶらで違う —
+ * 手ぶらはゆっくり大股 (1 秒に 1.2 歩)、長物は普通の歩き (1.8 歩)。
+ */
+const WALK_CLIP_SPEED = 1.27
+/** 状態ではなく**クリップ**で速さが違う物。手ぶらの表 (PISTOL_RELAXED) が引く */
+const CLIP_NATIVE_SPEED: Record<string, number> = {
+  walk_unarmed: 0.78,
+}
+/**
+ * 歩きの再生の上限 (m/s)。**他人の型には速さが届かない** (moveSpeed は走りの値の
+ * まま) ので、上限で切らないと他人の歩きが倍速で回る。自分は実際の速さが来る
+ */
+const WALK_TOPS: Partial<Record<Locomotion, number>> = {
+  walk: WALK_TOP_SPEED,
+  crouch_walk: CROUCH_WALK_TOP_SPEED,
+}
+
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
+  walk: WALK_CLIP_SPEED,
+  // しゃがみ走りの型をそのまま遅く流す
+  crouch_walk: CROUCH_CLIP_SPEED,
   sneak: SNEAK_CLIP_SPEED,
   crawl_f: CRAWL_CLIP_SPEED,
   // 後退も同じ速さで作られている
@@ -1076,7 +1113,7 @@ const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as 
  * 本来の姿勢として残す。なので X の差 8.6° が上体の傾きとして残り、**立って
  * いるだけで右へ 15° ほど傾いて**見えた。上下を同じクリップにすれば差が無くなる。
  */
-const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle'])
+const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle', 'walk'])
 
 /** 脱力中の下半身を引く鍵。**元の状態と、流すクリップの組** */
 function relaxedLowerKey(state: Locomotion, clip: string): string {
@@ -2406,8 +2443,15 @@ export class CharacterAnimator {
             : RUN_STATES.has(state as Locomotion)
               ? this.runCadence
               : 1
-      const scale = (this.moveSpeed / clipSpeed) * rate
       const locomotion = state as Locomotion
+      const top = WALK_TOPS[locomotion]
+      const speed = top === undefined ? this.moveSpeed : Math.min(this.moveSpeed, top)
+      const scale = (speed / clipSpeed) * rate
+      // クリップごとに本来の速さが違う物 (手ぶらの歩き) はそちらで割る
+      const scaleOf = (name: string | undefined) => {
+        const native = name === undefined ? undefined : CLIP_NATIVE_SPEED[name]
+        return native === undefined ? scale : (speed / native) * rate
+      }
       this.lower.get(locomotion)?.setEffectiveTimeScale(scale)
       /*
        * 脱力中の下半身にも同じ速さを掛ける。**掛け忘れると足だけ滑る** —
@@ -2416,7 +2460,7 @@ export class CharacterAnimator {
        */
       for (const table of [RELAXED_CLIPS, PISTOL_RELAXED]) {
         const name = table[locomotion]
-        if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scale)
+        if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scaleOf(name))
       }
       /*
        * **上下が同じクリップなら、速さも同じにする。**
@@ -2437,8 +2481,8 @@ export class CharacterAnimator {
        * 27°) に膨らんでいた。拳銃の走り (run_f@pistol_run) も同じ。
        */
       if (RELAXED_LOWER_STATES.has(locomotion)) {
-        this.upper.get(relaxedKey(locomotion))?.setEffectiveTimeScale(scale)
-        this.upper.get(pistolKey(locomotion))?.setEffectiveTimeScale(scale)
+        this.upper.get(relaxedKey(locomotion))?.setEffectiveTimeScale(scaleOf(RELAXED_CLIPS[locomotion]))
+        this.upper.get(pistolKey(locomotion))?.setEffectiveTimeScale(scaleOf(PISTOL_RELAXED[locomotion]))
       }
     }
 

@@ -18,6 +18,8 @@
 
 import {
   locomotionFor,
+  WALK_STICK,
+  WALK_STICK_EXIT,
   MOVE_DIRECTIONS,
   type Locomotion,
 } from '../../../domain/player/locomotion'
@@ -224,6 +226,8 @@ export function climbSurge(phase: number): number {
  */
 export const IDLE_ENTER_SPEED = 0.2
 export const IDLE_EXIT_SPEED = 0.6
+/** 歩きの止まる / 動き出す速さ (m/s)。歩きは入りと出を分けない (下の resolveLocomotion) */
+export const WALK_STOP_SPEED = 0.08
 
 /** 姿勢を決めるのに要るもの。どこから来た値かは問わない */
 export interface StanceInput {
@@ -437,13 +441,31 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // 2m 以上から落ちた着地は膝を曲げる。接地の瞬間からの短い型
   if (input.landing > 0) return 'jump_down'
 
-  const stopping =
-    input.previous === 'idle' || input.previous === 'crouch_idle'
+  /*
+   * **スティックが浅ければ歩き。構えていない間だけ。**
+   *
+   * キーボードは常に倒し切り (長さ 1) なので歩きにはならない。構えている間は
+   * 体が照準を向いたまま横へ動くので 8 方向の型が要り、歩きの型 (前だけ) は使えない
+   */
+  const stick = Math.hypot(input.dirX, input.dirZ)
+  const walkingBefore = input.previous === 'walk' || input.previous === 'crouch_walk'
+  const walk = !input.aiming && stick < (walkingBefore ? WALK_STICK_EXIT : WALK_STICK)
+
+  /*
+   * 止まる / 動き出す速さ。**歩きは低い所で切る。** ゆっくり歩くと 0.2 m/s を
+   * 割るので、走りのしきい値 (出 0.6) のままだと棒立ちのまま滑って進む。
+   * 足踏みを防ぐ入りと出の差 (キーを短く叩いた時) はスティックでは起きない
+   */
+  const stopping = walk
+    ? WALK_STOP_SPEED
+    : input.previous === 'idle' || input.previous === 'crouch_idle'
       ? IDLE_EXIT_SPEED
       : IDLE_ENTER_SPEED
   if (input.actualSpeed < stopping || !hasDirection(input)) {
     return input.crouching ? 'crouch_idle' : 'idle'
   }
+
+  if (walk) return input.crouching ? 'crouch_walk' : 'walk'
 
   return locomotionFor(input.crouching, directionOf(input.dirX, input.dirZ, input.yaw))
 }
