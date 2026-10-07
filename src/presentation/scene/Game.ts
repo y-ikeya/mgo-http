@@ -401,10 +401,15 @@ const MAX_RANGE = 200;
 /**
  * 刺突の判定を出すタイミング (クリップ尺に対する割合)。
  *
- * モーションの頭で判定すると、刃が届く前に相手が倒れて不自然に見える。
- * 腕を突き出す辺りで出す。1.93 秒の 35% = 約 0.68 秒。
+ * **腕が伸び切る直前。** 頭で出すと刃が届く前に倒れ、遅いと刺さってから間が
+ * 開いて倒れる。立ちの刺突 (stab、57 コマ) は 9〜12 コマ目で腕が伸び、12 コマ目で
+ * 伸び切って 24 コマ目まで保つ (右肩から手まで 0.35 → 0.61m、soldier.glb で実測)。
+ * 10.5 コマ目 = 19%。以前の 35% は伸び切ってから 0.4 秒後で、「刺さってから
+ * ちょっと間が開いてやられる」だった (本人 2026-10-08)。しゃがみも同じ型
  */
-const STAB_HIT_PHASE = 0.35;
+const STAB_HIT_PHASE = 0.19;
+/** 伏せた刺突 (prone_stab、41 コマ)。11〜17 コマ目で伸びるので、伸び切る直前の 15 コマ目 */
+const PRONE_STAB_HIT_PHASE = 0.36;
 /** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
 const FALLBACK_STAB_DURATION = 1.9;
 
@@ -3209,12 +3214,17 @@ export class Game {
     return true;
   }
 
+  /** いま振っている刺突の判定を出す位置 (STAB_HIT_PHASE / PRONE_STAB_HIT_PHASE) */
+  private stabHitPhase = STAB_HIT_PHASE;
+
   /** ナイフを振り始める。リロード中と多重の振りは受け付けない */
   private startStab(): void {
     if (this.stabTimer > 0 || this.reloadTimer > 0 || this.player.rolling)
       return;
     this.stabTimer = this.player.stabDuration || FALLBACK_STAB_DURATION;
     this.stabResolved = false;
+    // 型が違うので腕が伸びる所も違う。振り始めの姿勢で決める
+    this.stabHitPhase = this.player.isProne ? PRONE_STAB_HIT_PHASE : STAB_HIT_PHASE;
     this.player.stab();
   }
 
@@ -3228,7 +3238,7 @@ export class Game {
     const elapsed = total - this.stabTimer;
     this.stabTimer -= dt;
 
-    if (this.stabResolved || elapsed < total * STAB_HIT_PHASE) return;
+    if (this.stabResolved || elapsed < total * this.stabHitPhase) return;
     this.stabResolved = true;
 
     // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ)
@@ -3301,7 +3311,12 @@ export class Game {
     // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
     if (this.input.firing && this.inv.pressedOnce) {
       this.inv.consumePress();
-      this.startStab();
+      /*
+       * **構えていなければ刺さない。** ナイフを持っているだけで R2 で刺せた
+       * (本人 2026-10-08)。銃と同じく、構えてから使う。押したことは消すので、
+       * 押したまま構えても後から刺さない
+       */
+      if (this.player.isAiming) this.startStab();
     }
   }
 
