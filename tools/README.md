@@ -387,11 +387,12 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 
 `tools/raw/tin.mp3` (本人の素材、885Hz の金属のリング) から。2026-10-05 に本人と聴き比べて決めた形:
 
-- 再生速度で **+19 半音** (基音 約 2.65kHz)。+12 では「股間を打ったようなコミカルな音」だった
+- 再生速度で **+21 半音** (基音 約 2.98kHz)。+12 では「股間を打ったようなコミカルな音」だった。
+  +19 で決めた後、2026-10-07 に「もう少し高く」で +21 へ (速さと胴の帯も同じだけ動かす)
 - 音程を保ったまま引き伸ばして **1.25 秒** (鳴っている音をもう少し長く)、最後 0.37 秒はフェード (切ると「ブツッ」)
-- 基音の帯を **+7dB**、強めの圧縮で**リングの胴を持ち上げる** (「真ん中の音を強く」= 帯域も時間も)。
+- 基音の帯 (+21 で 2977Hz) を **+7dB**、強めの圧縮で**リングの胴を持ち上げる** (「真ん中の音を強く」= 帯域も時間も)。
   打音の頭は元から天井なので、音量を上げても頭が割れるだけ
 
 ```sh
-ffmpeg -i tools/raw/tin.mp3 -af "asetrate=143837,aresample=48000,rubberband=tempo=0.271:pitchq=quality,equalizer=f=2650:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
+ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=tempo=0.2414:pitchq=quality,equalizer=f=2977:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
 ```

@@ -426,7 +426,7 @@ const UI_SOUNDS = {
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
   switch: { file: "list_switch1.mp3", volume: 0.55 },
   /** 自分の弾が頭に入って倒した / 眠らせた。位置は持たない (自分への応え) */
-  // 2026-10-05: tin.mp3 (tools/raw) を +19 半音に上げて圧縮した物 (tools/README.md)。
+  // 2026-10-05: tin.mp3 (tools/raw) を +19 半音に上げて圧縮した物 (tools/README.md)。10-07 に +21 へ。
   // 前の headshot1 は音程の無いシャリ音で埋もれた。音源を強くしたぶん、音量は戻す
   // (1.0 は「ちょっとうるさい」、0.6 でも「もう少し小さく」)
   headshot: { file: "headshot2.mp3", volume: 0.4 },
