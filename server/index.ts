@@ -60,6 +60,7 @@ import {
   ROOM_NAMES,
   isHostile,
   isRoomName,
+  isRoomOpen,
   modeOf,
   primariesOf,
   secondaryOf,
@@ -94,6 +95,8 @@ import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/eq
  * 起動して静かに繋がらないので、原因を探すのに時間が要る。
  */
 const PORT = Number(process.env.PORT ?? 8787)
+/** 手元だけの部屋 (domain/match/room.ts の local) を開くか。package.json の server だけが立てる */
+const LOCAL_ROOMS = process.env.MGO2_LOCAL_ROOMS === '1'
 
 /**
  * サーバーの刻み (ms)。64Hz。
@@ -930,7 +933,7 @@ const server = Bun.serve<Client>({
     if (url.pathname === '/rooms') {
       // 返す形は src/application/protocol/types.ts の RoomSummary。画面側も同じ宣言を読む。
       // satisfies なので、増やしても減らしてもここで落ちる
-      const summaries = ROOM_NAMES.map((name) => {
+      const summaries = ROOM_NAMES.filter((name) => isRoomOpen(name, LOCAL_ROOMS)).map((name) => {
         const room = rooms.get(name)
         const here = room ? connected(room) : []
         return {
@@ -964,7 +967,7 @@ const server = Bun.serve<Client>({
 
     // 部屋は決まったものだけ。知らない名前で新しく作らせない
     const name = url.searchParams.get('room') ?? ROOM_NAMES[0]
-    if (!isRoomName(name)) return new Response('そんな部屋は無い', { status: 404 })
+    if (!isRoomName(name) || !isRoomOpen(name, LOCAL_ROOMS)) return new Response('そんな部屋は無い', { status: 404 })
 
     /*
      * token を出してきたのに確かめられない (切れている)。**一度受けて、符号を

@@ -93,6 +93,11 @@ export const MODES: Record<Mode, ModeSpec> = {
  */
 interface RoomSpec {
   mode: Mode
+  /**
+   * **手元でだけ開く部屋。** 公開しているサーバーでは一覧に出さず、入らせもしない。
+   * 開けるのはサーバーが MGO2_LOCAL_ROOMS=1 で起きた時だけ (package.json の server)
+   */
+  local?: true
   /** 回すステージ。**いまは全部 1 枚だけの fixed** */
   stages: Rotation
   /**
@@ -148,8 +153,9 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
   },
   // 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**
   echo: { mode: 'PRACTICE', stages: only('training') },
-  // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある
-  foxtrot: { mode: 'PRACTICE', stages: only('lab') },
+  // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある。
+  // 作る側の道具なので公開しない (2026-10-07 本人)
+  foxtrot: { mode: 'PRACTICE', stages: only('lab'), local: true },
 }
 
 /** その部屋で持ち込める主武器。**省いてあれば全部** */
@@ -161,6 +167,11 @@ export function primariesOf(room: RoomName): readonly WeaponId[] {
 export function secondaryOf(room: RoomName): WeaponId | null {
   const spec = ROOMS[room]
   return spec.secondary === undefined ? 'm9' : spec.secondary
+}
+
+/** その部屋を開いてよいか。手元だけの部屋 (local) は、手元で起きたサーバーでだけ開く */
+export function isRoomOpen(room: RoomName, localRooms: boolean): boolean {
+  return !ROOMS[room].local || localRooms
 }
 
 export function isRoomName(name: string): name is RoomName {
