@@ -7,23 +7,27 @@ import * as THREE from 'three'
  * 要点 — 目の前で青白く光れば、刺されたのが「眠らせる方」だと分かる。
  *
  * 1 回の放電は 0.7 秒。その間 0.05 秒ごとに小さな粒を散らし (重力で落ちる)、
- * 刃先の周りに折れ線の電弧を毎コマ引き直し、丸い光を明滅させる。粒と光は
+ * 刃先の周りに折れ線の電弧を毎コマ引き直す (時々途切れてちらつく)。粒は
  * 加算の Sprite で露出に左右されない (toneMapped: false)。当たりは持たない。
+ * 丸い光は置かない — 腕が青く塗り潰されて安っぽかった
  *
  * 出所は毎コマ聞き直す (anchor)。刃は腕と一緒に突き出されるので、
  * 振り始めの位置に置いたままだと腕から離れて宙に残る。
  */
 const DURATION = 0.7
 const BURST_EVERY = 0.05
-const PER_BURST = 5
+const PER_BURST = 3
 const POOL = 60
 const PARTICLE_SIZE = 0.022
 const PARTICLE_SPEED = 2.2
 const GRAVITY = 6
-const ARCS = 4
+const ARCS = 2
 const ARC_POINTS = 6
 const ARC_REACH = 0.3
-const GLOW_SIZE = 0.32
+/*
+ * **控えめに。** 光らせすぎると安っぽい (本人 2026-10-08)。粒は少なく暗め、
+ * 電弧は 2 本で時々途切れる
+ */
 /** 出し始めに見えない大きさで描くコマ数。初めて出す瞬間にシェーダーを組んで止まらないように */
 const WARM_FRAMES = 3
 
@@ -66,8 +70,6 @@ export class StunSparks {
   private readonly group = new THREE.Group()
   private readonly particles: Particle[] = []
   private readonly arcs: THREE.Line[] = []
-  private readonly glow: THREE.Sprite
-  private readonly glowMaterial: THREE.SpriteMaterial
   private readonly active: Discharge[] = []
   private readonly at = new THREE.Vector3()
   private nextParticle = 0
@@ -84,7 +86,7 @@ export class StunSparks {
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         toneMapped: false,
-        color: new THREE.Color(1.6, 2.2, 3.0),
+        color: new THREE.Color(1.0, 1.3, 1.8),
       })
       const sprite = new THREE.Sprite(material)
       sprite.scale.setScalar(PARTICLE_SIZE)
@@ -93,9 +95,9 @@ export class StunSparks {
       this.particles.push({ sprite, material, velocity: new THREE.Vector3(), life: 0, span: 0 })
     }
     const arcMaterial = new THREE.LineBasicMaterial({
-      color: new THREE.Color(1.8, 2.4, 3.2),
+      color: new THREE.Color(1.0, 1.35, 1.8),
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.7,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       toneMapped: false,
@@ -108,19 +110,6 @@ export class StunSparks {
       this.group.add(line)
       this.arcs.push(line)
     }
-    this.glowMaterial = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-      color: new THREE.Color(0.9, 1.2, 1.6),
-    })
-    this.glow = new THREE.Sprite(this.glowMaterial)
-    this.glow.scale.setScalar(GLOW_SIZE)
-    this.glow.frustumCulled = false
-    this.group.add(this.glow)
   }
 
   /** 放電を始める。anchor は刃先 (無ければ手) のワールド座標を返す */
@@ -138,13 +127,10 @@ export class StunSparks {
         p.sprite.scale.setScalar(on ? 0.001 : PARTICLE_SIZE)
       }
       for (const arc of this.arcs) arc.visible = on
-      this.glow.visible = on
-      this.glow.scale.setScalar(on ? 0.001 : GLOW_SIZE)
       return
     }
 
     let anyArc = false
-    let glowOpacity = 0
     for (let i = this.active.length - 1; i >= 0; i--) {
       const d = this.active[i]!
       d.left -= dt
@@ -163,14 +149,9 @@ export class StunSparks {
       if (!anyArc) {
         this.drawArcs(origin)
         anyArc = true
-        this.glow.position.copy(origin)
       }
-      // 明滅。**一定に光らせない** — 放電はちらつくもの
-      glowOpacity = Math.max(glowOpacity, (0.08 + Math.random() * 0.22) * Math.min(1, d.left / 0.15))
     }
-    for (const arc of this.arcs) arc.visible = anyArc && Math.random() > 0.25
-    this.glow.visible = glowOpacity > 0
-    this.glowMaterial.opacity = glowOpacity
+    for (const arc of this.arcs) arc.visible = anyArc && Math.random() > 0.45
 
     for (const p of this.particles) {
       if (p.life <= 0) continue
