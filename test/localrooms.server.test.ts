@@ -25,7 +25,17 @@ test('公開のサーバーでは foxtrot が一覧に無く、入れない', as
   expect(join.status).toBe(404)
 }, 30000)
 
-test('手元のサーバーでは foxtrot が開く', async () => {
+async function trainingRoom(server: Server): Promise<string> {
+  return ((await (await fetch(`http://localhost:${server.port}/training`)).json()) as { room: string }).room
+}
+
+test('手元のサーバーでは練習 (/training) が foxtrot を開く。一覧には出さない', async () => {
   server = await startServer({ MGO2_LOCAL_ROOMS: '1' })
-  expect(await listed(server)).toContain('foxtrot')
+  expect(await listed(server)).not.toContain('foxtrot')
+  expect(await trainingRoom(server)).toBe('foxtrot')
+}, 30000)
+
+test('公開のサーバーでは練習は echo', async () => {
+  server = await startServer({ MGO2_LOCAL_ROOMS: '0' })
+  expect(await trainingRoom(server)).toBe('echo')
 }, 30000)

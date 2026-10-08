@@ -1,21 +1,19 @@
 import { createResource, Show } from 'solid-js'
 import { t } from '../../i18n'
-import { fetchRooms } from '../../infra/api/rooms'
+import { fetchTrainingRoom } from '../../infra/api/rooms'
 import type { Identity } from '../../infra/auth/session'
 import Play from './Play'
 import './Lobby.css'
 
 /**
- * 練習 (/training)。**練習の部屋へそのまま入る。**
+ * 練習 (/training)。**自分だけの練習部屋へそのまま入る。**
  *
- * 入る部屋はサーバーに聞いて決める。手元のサーバーなら検証場 (foxtrot、段・窓・
- * 梯子・的が揃っている)、公開しているサーバーでは foxtrot を開かないので
- * (domain/match/room.ts の local)、更地の練習場 (echo) へ。
+ * 入る部屋はサーバーに訊く (GET /training)。手元のサーバーなら検証場 (foxtrot、
+ * 段・窓・梯子・的が揃っている)、公開しているサーバーは更地の練習場 (echo)。
  */
 async function trainingRoom(): Promise<string> {
   try {
-    const rooms = await fetchRooms()
-    return rooms.some((room) => room.name === 'foxtrot') ? 'foxtrot' : 'echo'
+    return await fetchTrainingRoom()
   } catch {
     return 'echo'
   }

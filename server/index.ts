@@ -935,11 +935,18 @@ const server = Bun.serve<Client>({
       })
     }
 
+    // --- 練習で入る部屋 ---
+    // 手元のサーバーなら検証場 (foxtrot)、公開のサーバーは更地の練習場 (echo)。画面の /training が訊く
+    if (url.pathname === '/training') {
+      const room = isRoomOpen('foxtrot', LOCAL_ROOMS) ? 'foxtrot' : 'echo'
+      return Response.json({ room }, { headers: CORS })
+    }
+
     // --- 部屋の一覧 ---
     if (url.pathname === '/rooms') {
       // 返す形は src/application/protocol/types.ts の RoomSummary。画面側も同じ宣言を読む。
       // satisfies なので、増やしても減らしてもここで落ちる
-      const summaries = ROOM_NAMES.filter((name) => isRoomOpen(name, LOCAL_ROOMS)).map((name) => {
+      const summaries = ROOM_NAMES.filter((name) => isRoomOpen(name, LOCAL_ROOMS) && !ROOMS[name].unlisted).map((name) => {
         const room = rooms.get(name)
         const here = room ? connected(room) : []
         return {

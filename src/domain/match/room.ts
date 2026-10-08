@@ -94,10 +94,15 @@ export const MODES: Record<Mode, ModeSpec> = {
 interface RoomSpec {
   mode: Mode
   /**
-   * **手元でだけ開く部屋。** 公開しているサーバーでは一覧に出さず、入らせもしない。
+   * **手元でだけ開く部屋。** 公開しているサーバーでは入らせない。
    * 開けるのはサーバーが MGO2_LOCAL_ROOMS=1 で起きた時だけ (package.json の server)
    */
   local?: true
+  /**
+   * **一覧に出さない。** 練習 (/training) が自分だけの部屋として開くので、
+   * 共有の部屋として並べる意味が無い (2026-10-08 本人)
+   */
+  unlisted?: true
   /** 回すステージ。**いまは全部 1 枚だけの fixed** */
   stages: Rotation
   /**
@@ -155,7 +160,7 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
   echo: { mode: 'PRACTICE', stages: only('training') },
   // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある。
   // 作る側の道具なので公開しない (2026-10-07 本人)
-  foxtrot: { mode: 'PRACTICE', stages: only('lab'), local: true },
+  foxtrot: { mode: 'PRACTICE', stages: only('lab'), local: true, unlisted: true },
 }
 
 /** その部屋で持ち込める主武器。**省いてあれば全部** */
