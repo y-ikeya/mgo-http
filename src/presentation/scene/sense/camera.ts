@@ -49,6 +49,16 @@ import { AIM_CAMERA, HIP_CAMERA } from '../../../sim/space/eyepoint'
  */
 const HIP_PITCH_DOWN = (tunedSigned('camp', 3) * Math.PI) / 180
 
+/**
+ * 構えた瞬間に視線を上げる量 (rad)。解くと同じだけ戻す。**腰だめの画面は変えない。**
+ *
+ * 腰だめは斜め上から見下ろすので、構えた時に照準が相手の足元寄りに来て、頭へ
+ * 目線を合わせ直すのが手間だった (2026-10-08 本人)。向きごと回すので照準 = 弾の向き。
+ *
+ *     ?aimp=4    度で試す
+ */
+const AIM_PITCH_UP = (tunedSigned('aimp', 4) * Math.PI) / 180
+
 /** ?cams= で腰だめの肩を直に決めたいとき。無ければ構えの肩に追従する (update) */
 const HIP_SHOULDER_TUNED = ((): number | null => {
   const raw = new URLSearchParams(globalThis.location?.search ?? '').get('cams')
@@ -383,8 +393,16 @@ export class FollowCamera {
   }
 
   setAiming(aiming: boolean): void {
+    /*
+     * **構えた瞬間に視線を少し上げ、解いたら戻す** (AIM_PITCH_UP)。向きそのもの
+     * (弾の向き) を回すので、照準は画面の中心のまま。一度に跳ばさず update で寄せる
+     */
+    if (aiming !== this.aiming) this.pendingPitch += aiming ? AIM_PITCH_UP : -AIM_PITCH_UP
     this.aiming = aiming
   }
+
+  /** 構えの出入りで、まだ回していない上下の量 (rad) */
+  private pendingPitch = 0
 
   /** 寄っているか (構え / 投げ物の振りかぶり)。審判に渡す「どこから見ているか」と揃える */
   get isAiming(): boolean {
@@ -552,6 +570,13 @@ export class FollowCamera {
     }
 
     this.currentViewHeight = damp(this.currentViewHeight, this.viewHeight, STANCE_LAMBDA, dt)
+
+    // 構えの出入りの上下を、構えの寄りと同じ速さで寄せる
+    if (this.pendingPitch !== 0) {
+      const step = Math.abs(this.pendingPitch) < 1e-4 ? this.pendingPitch : this.pendingPitch * (1 - Math.exp(-AIM_LAMBDA * dt))
+      this.pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, this.pitch + step))
+      this.pendingPitch -= step
+    }
 
     const target = this.aiming ? this.aimView : HIP_VIEW
     this.distance = damp(this.distance, target.distance, AIM_LAMBDA, dt)
