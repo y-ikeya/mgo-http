@@ -150,6 +150,8 @@ const SOUNDS = {
   hitMetal: { file: "hit_metal1.mp3", reference: 3, max: 34 },
   /** ガラスに当たった。窓 (glass_) を撃つと割れる音。届く距離は金属と同じ */
   hitGlass: { file: "glass_break1.mp3", reference: 3, max: 34 },
+  /** 木に当たった (木箱・板・扉)。本人の素材 destroyWood.mp3 */
+  hitWood: { file: "wood_break1.mp3", reference: 3, max: 34 },
   /** 切れかけの電線の火花 (fx/stageSparks.ts)。小さい音なので近くだけ (20m) */
   spark: { file: "spark1.mp3", reference: 2, max: 20 },
   /**

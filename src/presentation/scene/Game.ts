@@ -556,9 +556,10 @@ const GRENADE_RELEASE_FORWARD = 0.45;
  * 着弾の音。**材質ごとに鳴らし分ける。** 音を持たない材質は null (黙る)。
  * 木やコンクリートの音が入るまでは、材質の違う音を流用しない — 当たった物を聞き間違える
  */
-function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | null {
+function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | "hitWood" | null {
   if (surface === "metal") return "hitMetal";
   if (surface === "glass") return "hitGlass";
+  if (surface === "wood") return "hitWood";
   return null;
 }
 /** 壁で体が画面を塞いだときの薄さの上限 (1 - 0.8 = 0.2 まで薄くなる) */
