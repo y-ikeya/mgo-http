@@ -46,6 +46,12 @@ import { firstBlockedAt, type StageBox } from './vision'
 // 肩は 0.42 → 0.30 (2026-10-07 「構えた時のレティクルをもう少し左に」)。weapons.ts の aimShoulder と揃える
 export const AIM_CAMERA = { distance: 1.35, shoulder: 0.3, lift: 0 }
 /**
+ * しゃがんで構えた時に肩のずれへ足す量 (m)。**しゃがむと体が半身になり、
+ * 照準 (画面の中心) に体が被る** (本人 2026-10-08「reticle が自キャラと被って見づらい」)。
+ * 画面のカメラ (camera.ts) と審判の線 (seesFromCamera / hitcheck) が同じ値を読む
+ */
+export const CROUCH_AIM_SHOULDER_EXTRA = 0.18
+/**
  * 腰だめのカメラ。**camera.ts の HIP_VIEW はここから読む** (値を 2 か所に置かない)。
  *
  * **構えの線の上に置く。** 注視点は構えと同じ (目の高さ・右肩 0.30m)、そこから
@@ -130,15 +136,18 @@ export function cameraPoint(
   viewHeight: number,
   boxes: CameraBlocker = [],
   out: ViewPoint = { x: 0, y: 0, z: 0 },
+  /** 肩のずれに足す量 (しゃがんで構えた時の CROUCH_AIM_SHOULDER_EXTRA) */
+  extraShoulder = 0,
 ): ViewPoint {
   const view = aiming ? AIM_CAMERA : HIP_CAMERA
+  const shoulder = view.shoulder + extraShoulder
 
   const [dirX, dirY, dirZ] = viewDirection(yaw, pitch)
 
   // 肩へのずれは水平だけ (pitch で肩越しの左右がブレないように)
-  let pivotX = x + Math.cos(yaw) * view.shoulder
+  let pivotX = x + Math.cos(yaw) * shoulder
   let pivotY = feetY + viewHeight + view.lift
-  let pivotZ = z + -Math.sin(yaw) * view.shoulder
+  let pivotZ = z + -Math.sin(yaw) * shoulder
 
   if (!Array.isArray(boxes)) {
     // 網。肩へずらす間に壁があれば肩のずれを捨てる (壁に体の側面を付けた時)
@@ -200,6 +209,8 @@ export interface Viewer {
   cameraYaw: number
   pitch: number
   aiming: boolean
+  /** しゃがんでいるか。構えていれば肩のずれが増える (CROUCH_AIM_SHOULDER_EXTRA) */
+  crouching?: boolean
 }
 
 /**
@@ -225,6 +236,7 @@ export function seesFromCamera(
       viewer.x, viewer.y, viewer.z,
       viewer.cameraYaw, viewer.pitch, viewer.aiming,
       height, cameraBoxes, scratch,
+      viewer.aiming && viewer.crouching ? CROUCH_AIM_SHOULDER_EXTRA : 0,
     )
     if (visibleFrom(eye.x, eye.y, eye.z)) return true
 

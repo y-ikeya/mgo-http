@@ -281,6 +281,7 @@ function eyeOf(viewer: MatchPlayer): Viewer {
   leanedViewer.cameraYaw = viewer.cameraYaw
   leanedViewer.pitch = viewer.pitch
   leanedViewer.aiming = viewer.aiming
+  leanedViewer.crouching = viewer.crouching
   return leanedViewer
 }
 

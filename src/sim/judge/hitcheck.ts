@@ -15,7 +15,7 @@ import type { HitZone } from '../../domain/rule/damage'
 import type { SightBlocker } from '../space/vision'
 import type { Pose } from '../../domain/player/player'
 import type { Stance } from '../../domain/player/stance'
-import { cameraPoint } from '../space/eyepoint'
+import { cameraPoint, CROUCH_AIM_SHOULDER_EXTRA } from '../space/eyepoint'
 import { hasLineOfSight } from '../space/vision'
 
 // 姿の形は domain (人の過去の姿そのものなので)。ここからも出す
@@ -297,10 +297,14 @@ export function zoneExposed(
   if (reaches(attacker.x, attacker.y + rules.viewHeight(attacker.stance), attacker.z)) return true
 
   // 2. カメラの線。**相手から体が見えるときだけ**
+  const aiming = attacker.aiming ?? true
   const cam = cameraPoint(
     attacker.x, attacker.y, attacker.z,
-    attacker.cameraYaw ?? attacker.yaw, attacker.pitch, attacker.aiming ?? true,
+    attacker.cameraYaw ?? attacker.yaw, attacker.pitch, aiming,
     rules.viewHeight(attacker.stance),
+    undefined, undefined,
+    // しゃがんで構えると肩のずれが増える (画面のカメラと同じ)
+    aiming && attacker.stance === 'crouch' ? CROUCH_AIM_SHOULDER_EXTRA : 0,
   )
   if (!reaches(cam.x, cam.y, cam.z)) return false
   const targetEyeY = target.y + rules.headHeight(target.stance)

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { damp } from '../util/math'
 import type { Soldier } from '../actor/soldier'
 import { PLAYER_HEIGHT } from '../actor/soldier'
-import { AIM_CAMERA, HIP_CAMERA } from '../../../sim/space/eyepoint'
+import { AIM_CAMERA, CROUCH_AIM_SHOULDER_EXTRA, HIP_CAMERA } from '../../../sim/space/eyepoint'
 
 /**
  * 構えていないとき / 構えているときのカメラ。
@@ -560,7 +560,9 @@ export class FollowCamera {
      * 線の上に置くのが目的なので、銃ごとに違う肩のずれ (weapons.ts の aimShoulder)
      * に追従させる。覗く銃 (shoulder 0) なら真後ろ。URL で ?cams= が来ていればそれ
      */
-    const shoulder = this.aiming || HIP_SHOULDER_TUNED !== null ? target.shoulder : this.aimView.shoulder
+    // しゃがんで構えると体が半身になって照準に被る。そのぶん右へ (eyepoint.ts の CROUCH_AIM_SHOULDER_EXTRA)
+    const crouchExtra = this.aiming && target.shoulder > 0 && player.stance === 'crouch' ? CROUCH_AIM_SHOULDER_EXTRA : 0
+    const shoulder = (this.aiming || HIP_SHOULDER_TUNED !== null ? target.shoulder : this.aimView.shoulder) + crouchExtra
     this.shoulder = damp(this.shoulder, shoulder, AIM_LAMBDA, dt)
     this.lift = damp(this.lift, target.lift, AIM_LAMBDA, dt)
     this.pitchDown = damp(this.pitchDown, target.pitchDown, AIM_LAMBDA, dt)
