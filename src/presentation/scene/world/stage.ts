@@ -131,17 +131,38 @@ interface Look {
   ground: number
   fogNear: number
   fogFar: number
+  /**
+   * 夜。**光の色と強さを Blender の太陽から上書きする** (月明かり)。
+   * 色は直射の色 (sunLight) を使い、強さは昼の何倍か。日陰の明るさ (半球光) も同じく倍率で
+   */
+  night?: { sunScale: number; ambientScale: number; ambientSky: number }
 }
-const LOOKS: Record<'clear' | 'dusty', Look> = {
+/** 夜の雲の明るさ (昼の何倍)。昼の白い雲のままだと夜空に浮いて見えた */
+const NIGHT_CLOUD = 0.12
+const LOOKS: Record<'clear' | 'dusty' | 'night', Look> = {
   clear: { zenith: 0x3f78c8, horizon: 0xbcd2e4, sun: 0xfff2d8, sunLight: 0xfff4e6, ground: 0x6b6055, fogNear: 55, fogFar: 135 },
   dusty: { zenith: 0x8f9a86, horizon: 0xd3c9a2, sun: 0xf0e0b4, sunLight: 0xf3e3c4, ground: 0x5c4c38, fogNear: 40, fogFar: 115 },
+  /*
+   * 夜 (2026-10-08 本人「雰囲気を変えるくらい、夜っぽく暗く」)。濃紺の空と青白い月明かり。
+   * **埃が舞っていないので見通しは昼より良い** (霧が遠い)。暗さは画面の上だけで、
+   * 見える判定 (サーバー) は変わらない — 真っ暗にはしない
+   */
+  night: {
+    // sun (月の滲み) は暗く — 昼の明るさのままだと月の周りの空が灰白く広がった
+    zenith: 0x0a1326, horizon: 0x2a3550, sun: 0x46506a, sunLight: 0xa9bde6, ground: 0x1d1b1c,
+    fogNear: 75, fogFar: 175,
+    // 日陰が黒く潰れない程度に半球光を残す。空の色が暗いぶん強さは昼のまま (0.4・0.55 では路地の壁が黒く潰れた)
+    // 日陰の空の色は地平線 (濃紺) より明るい青 — 地平線の色のままでは路地の壁が黒く潰れた
+    night: { sunScale: 0.22, ambientScale: 1.0, ambientSky: 0x56688f },
+  },
 }
 const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dusty', lab: 'dusty' }
 /** いまの場の見え方。buildStage が決めて、空・霧・光・映り込みがこれを読む */
 let look: Look = LOOKS.clear
-/** ?look=clear / ?look=dusty で試せる */
+/** ?look=clear / dusty / night で試せる。試写 (stagecam) は look が視点なので ?mood= で */
 function lookFor(name: StageName): Look {
-  const forced = new URLSearchParams(location.search).get('look') as keyof typeof LOOKS | null
+  const query = new URLSearchParams(location.search)
+  const forced = (query.get('mood') ?? query.get('look')) as keyof typeof LOOKS | null
   return LOOKS[forced && forced in LOOKS ? forced : STAGE_LOOK[name] ?? 'clear']
 }
 
@@ -776,7 +797,7 @@ function skyColorAt(
     vec3(0.6, 0.64, 0.7),
     vec3(1.0, 0.98, 0.93),
     pow(toSun, 3).mul(0.7).add(0.3),
-  )
+  ).mul(float(look.night ? NIGHT_CLOUD : 1))
   color = mix(color, lit, cloud.mul(0.88))
 
   /*
@@ -1117,6 +1138,11 @@ export function applyStageSun(sun: THREE.DirectionalLight, data: StageSun): void
   sun.position.copy(sun.target.position).addScaledVector(dir, SUN_DISTANCE)
   sun.color.setRGB(data.color[0], data.color[1], data.color[2], THREE.LinearSRGBColorSpace)
   sun.intensity = tuned('sun', SUN_INTENSITY) * (data.strength / BLENDER_SUN_REFERENCE)
+  // 夜は月明かり。色は見た目の表、強さは昼の何分の 1 か
+  if (look.night) {
+    sun.color.set(look.sunLight)
+    sun.intensity *= look.night.sunScale
+  }
   sun.shadow.needsUpdate = true
 }
 
@@ -1809,7 +1835,7 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   // これが日陰の明るさそのものになる。日陰は「光が無い場所」ではなく
   // 「直射が無く、空全体からの光だけが届く場所」なので、暗くはあっても黒くはならない。
   // 空の色と揃えてあるのは、青空の下の日陰が青みを帯びるのと同じ理屈。
-  const sky = new THREE.HemisphereLight(look.horizon, look.ground, tuned('ambient', AMBIENT_INTENSITY))
+  const sky = new THREE.HemisphereLight(look.night?.ambientSky ?? look.horizon, look.ground, tuned('ambient', AMBIENT_INTENSITY) * (look.night?.ambientScale ?? 1))
   scene.add(sky)
   /*
    * **映り込みの環境。** 空の色の縦グラデーションを 1 枚、環境マップとして置く。
