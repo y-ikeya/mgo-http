@@ -1,0 +1,56 @@
+/*
+ * 最初の画面の 2 つの入口。部屋の一覧のカードと同じ色域で、大きく並べる。
+ */
+.home-modes {
+  max-width: 620px;
+  margin: 8vh auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .home-modes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.home-mode {
+  /* 内側の余白を幅に含める。含めないと狭い画面で横にはみ出し、頁ごと広がる */
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 150px;
+  padding: 22px 20px;
+  background: rgba(24, 30, 22, 0.75);
+  border: 1px solid rgba(160, 190, 140, 0.22);
+  color: rgba(214, 226, 200, 0.95);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.home-mode:hover,
+.home-mode:focus-visible {
+  border-color: rgba(190, 220, 160, 0.6);
+  background: rgba(32, 40, 28, 0.85);
+  outline: none;
+}
+
+.home-mode-label {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 20px;
+  letter-spacing: 0.14em;
+}
+
+.home-mode-hint {
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(170, 186, 156, 0.8);
+}

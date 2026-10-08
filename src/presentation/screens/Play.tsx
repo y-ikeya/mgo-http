@@ -49,8 +49,17 @@ function statsRequested(): boolean {
 /** 一言を出しておく時間 (ms)。App.css の play-notice の薄れ方と揃える */
 const NOTICE_MS = 6000
 
-export default function Play(props: { identity: Identity }) {
+export default function Play(props: {
+  identity: Identity
+  /**
+   * 入る部屋を URL ではなく呼ぶ側が決める (/training)。**その時は URL を書き換えず、
+   * 出たら最初の画面 (/) へ戻る** — 練習は部屋の一覧を通らない
+   */
+  room?: string
+}) {
   const params = useParams<{ room: string; match?: string }>()
+  const roomName = () => props.room ?? params.room
+  const training = props.room !== undefined
   /*
    * 入ってきたときに指していた試合。**一度だけ見る。**
    *
@@ -109,7 +118,9 @@ export default function Play(props: { identity: Identity }) {
       }
     }
 
-    const room = params.room
+    // 練習 (/training) は URL を部屋の形に書き換えない
+    if (training) return
+    const room = roomName()
     // 長い札をそのまま貼ると読めない。頭だけで十分に見分けられる
     const path = label ? `/rooms/${room}/match/${label}` : `/rooms/${room}`
     if (location.pathname === path) return
@@ -143,7 +154,7 @@ export default function Play(props: { identity: Identity }) {
   /** 出ることを伝えてから離れる。伝えないと、残った人は席が畳まれるまで待つ */
   const leaveRoom = () => {
     game()?.leaveRoom()
-    navigate('/rooms')
+    navigate(training ? '/' : '/rooms')
   }
 
   /*
@@ -159,7 +170,7 @@ export default function Play(props: { identity: Identity }) {
   })
 
   onMount(() => {
-    const instance = new Game(container, props.identity, params.room)
+    const instance = new Game(container, props.identity, roomName())
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
     instance.onLoadout = (next) => {
       setPrimary(next.primary)

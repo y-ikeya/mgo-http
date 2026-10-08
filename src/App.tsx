@@ -6,13 +6,17 @@ import GpuBlocked from './presentation/ui/GpuBlocked'
 import Login from './presentation/screens/Login'
 import Lobby from './presentation/screens/Lobby'
 import Play from './presentation/screens/Play'
+import Home from './presentation/screens/Home'
+import Training from './presentation/screens/Training'
 import './App.css'
 
 /**
  * 画面の出し分け。
  *
+ *   /              対戦か練習かを選ぶ
  *   /rooms         部屋の一覧
  *   /rooms/:room   対戦
+ *   /training      練習の部屋へそのまま入る
  *
  * ログインしていなければ、どの経路でも入り口を出す。行き先を覚えたまま
  * 入り口を被せるだけなので、ログインしたらそのまま元の場所へ進む。
@@ -56,6 +60,8 @@ export default function App() {
       <Show when={gpu.ok && identity()}>
         {(who) => (
           <Router>
+            <Route path="/" component={() => <Home identity={who()} />} />
+            <Route path="/training" component={() => <Training identity={who()} />} />
             <Route path="/rooms" component={() => <Lobby identity={who()} />} />
             <Route path="/rooms/:room" component={() => <Play identity={who()} />} />
             {/*
@@ -74,7 +80,7 @@ export default function App() {
             */}
             <Route
               path="*"
-              component={() => <Navigate href={`/rooms${location.search}`} />}
+              component={() => <Navigate href={`/${location.search}`} />}
             />
           </Router>
         )}
