@@ -55,9 +55,9 @@ const HIP_PITCH_DOWN = (tunedSigned('camp', 3) * Math.PI) / 180
  * 腰だめは斜め上から見下ろすので、構えた時に照準が相手の足元寄りに来て、頭へ
  * 目線を合わせ直すのが手間だった (2026-10-08 本人)。向きごと回すので照準 = 弾の向き。
  *
- *     ?aimp=4    度で試す
+ *     ?aimp=3    度で試す (本人が試して 3 に決めた)
  */
-const AIM_PITCH_UP = (tunedSigned('aimp', 4) * Math.PI) / 180
+const AIM_PITCH_UP = (tunedSigned('aimp', 3) * Math.PI) / 180
 
 /** ?cams= で腰だめの肩を直に決めたいとき。無ければ構えの肩に追従する (update) */
 const HIP_SHOULDER_TUNED = ((): number | null => {

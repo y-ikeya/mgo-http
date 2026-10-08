@@ -45,10 +45,10 @@ import { firstBlockedAt, type StageBox } from './vision'
 // 手元で試すなら ?aimy= (camera.ts)
 // 肩は 0.42 → 0.30 (2026-10-07 「構えた時のレティクルをもう少し左に」) → 0.40 (10-08、しゃがみで体が照準に被る。
 // 姿勢ごとには変えない)。weapons.ts の aimShoulder と揃える
-// lift は 10-08 に -0.12 → -0.2 へ (本人「構えたらカメラが少し下がって、相手を少し見上げる形に。
+// lift は 10-08 に試して -0.08 に決めた (本人「構えたらカメラが少し下がって、相手を少し見上げる形に。
 // 腰だめは斜め上から見下ろすので、頭に合わせる時に目線を合わせ直すのが大変」)。
 // 腰だめのカメラ (HIP_CAMERA) は目の高さのまま — 構えた時だけ下がる
-export const AIM_CAMERA = { distance: 1.35, shoulder: 0.4, lift: -0.2 }
+export const AIM_CAMERA = { distance: 1.35, shoulder: 0.4, lift: -0.08 }
 /**
  * 腰だめのカメラ。**camera.ts の HIP_VIEW はここから読む** (値を 2 か所に置かない)。
  *
