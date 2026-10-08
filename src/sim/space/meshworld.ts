@@ -45,6 +45,8 @@ const WALKABLE_Y = 0.5
 const GENTLE_Y = 0.85
 /** 段差に足す許し (m)。段差ちょうどの角に触れても壁にしない */
 const STEP_TOUCH = 0.1
+/** 低い体で、段差の縁とみなす高さの余裕 (m)。rise は輪の縁で測るので、触れた点は少し上に出る */
+const LOW_STEP_SLACK = 0.03
 /** 輪の縁で高い床を探す本数 (keepOffHighFloors) */
 const STEP_SAMPLES = 8
 /** 中心まで入ったとき、空いた所を探す刻みと届く距離 (m) */
@@ -138,6 +140,14 @@ export class MeshMoveWorld implements MoveWorld {
      */
     const bottom = Math.min(feetY + this.stepUp + rise + radius, feetY + height - radius)
     const top = feetY + height - radius
+    /*
+     * 球を体の中に収めた (伏せ) とき、**球の下側が段差の縁に触れる。** 触れた所が
+     * 体の周りの登れる高さ (rise) 以下なら、それは段差であって壁ではない — 乗るのは
+     * 足元の仕事 (groundHeight)。押し返していたので、伏せたまま 3cm の床の縁を
+     * 越えられず、ベンチの下 (床の板の上) へ外の砂地から潜れなかった (2026-10-08)。
+     * 壁には球の中心の高さで触れるので、ここでは除かれない
+     */
+    const lowBody = bottom < feetY + this.stepUp + rise + radius
 
     for (let round = 0; round < ITERATIONS; round++) {
       let pushX = 0
@@ -147,6 +157,7 @@ export class MeshMoveWorld implements MoveWorld {
         const ratio = BODY_SLICES === 1 ? 0 : slice / (BODY_SLICES - 1)
         const y = bottom + Math.max(0, top - bottom) * ratio
         this.solid.touching(position.x, y, position.z, radius, (contact) => {
+          if (lowBody && y - contact.ny * (radius - contact.depth) <= feetY + rise + LOW_STEP_SLACK) return
           /*
            * 登れる面は押し返さない。坂の上で水平に押されると進めなくなる。
            *

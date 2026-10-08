@@ -194,3 +194,26 @@ describe('足元の材質', () => {
     expect(world([]).surfaceUnder({ x: 0, y: 5, z: 0 }, 5)).toBeNull()
   })
 })
+
+/**
+ * 伏せた体 (0.55m) で低い床の縁を越える。**球を体の中に収めると、球の下側が
+ * 3cm の縁に触れて壁として押し返されていた** (ベンチの下の床の板へ外から潜れなかった)。
+ */
+describe('伏せて低い縁を越える', () => {
+  // 外の地面 (x < 0) は高さ 0、板 (x >= 0) は 0.03。縁は縦の面
+  const tris = [...slab(-5, -5, 0, 5, 0), ...slab(0, -5, 5, 5, 0.03), ...wallAtX(0, -5, 5, 0, 0.03)]
+
+  test('3cm の縁は押し返さない (段差として足元が乗る)', () => {
+    const w = world(tris)
+    const at = { x: -0.1, y: 0, z: 0 }
+    w.resolveHorizontal(at, 0.35, 0, 0.55)
+    expect(at.x).toBeCloseTo(-0.1, 3)
+  })
+
+  test('壁は今までどおり押し返す', () => {
+    const w = world([...slab(-5, -5, 5, 5, 0), ...wallAtX(0, -5, 5, 0, 3)])
+    const at = { x: -0.1, y: 0, z: 0 }
+    w.resolveHorizontal(at, 0.35, 0, 0.55)
+    expect(at.x).toBeLessThan(-0.3)
+  })
+})
