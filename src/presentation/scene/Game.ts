@@ -1134,7 +1134,10 @@ export class Game {
   /** 副武器。**部屋が外していれば null** (ROOMS の secondary) */
   private readonly secondary: WeaponId | null;
 
-  constructor(container: HTMLElement, identity: Identity, room: string) {
+  /**
+   * @param privateRoom 自分だけの部屋に入る (練習 /training)。他の人とは出会わない
+   */
+  constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
     this.container = container;
     /*
      * どのステージに乗るか。**部屋から引く** (domain/match/room.ts)。
@@ -1167,7 +1170,7 @@ export class Game {
       this.pendingLoadout.primary = this.primaries[0] ?? null;
     }
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
-    this.net = createTransport(identity, room);
+    this.net = createTransport(identity, room, privateRoom);
     // 自機のモデルはここで読み始める。**構築時ではない** —
     // どのモデルを着るかは名前で決まり、名前を知っているのはこちら (skin.ts)
     this.player.start(selfSkin(identity.displayName));

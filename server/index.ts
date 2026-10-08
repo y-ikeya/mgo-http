@@ -50,7 +50,7 @@ import {
 } from './match'
 import { receiveSnapshot, relayShot, relayState, seesPlayer, sendHealth, sendStamina} from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
-import { type Client, ROOM_CAPACITY, broadcast, hostileToOwner, roomOf, rooms, setLife } from './world'
+import { type Client, ROOM_CAPACITY, broadcast, hostileToOwner, privateRoomKey, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
 import { headHeightOf, lifeElapsed, newMatchPlayer, resupply, type MatchPlayer } from '../src/domain/player/player'
@@ -187,7 +187,7 @@ setInterval(() => {
       if (room.players.size === 0) {
         // **部屋ごと畳む。** 中に在った物 (手榴弾・クレイモア・落ちている武器) も
         // 一緒に消える。持ち主が部屋なので、掃除を書き忘れようがない
-        rooms.delete(room.name)
+        rooms.delete(room.key)
         continue
       }
 
@@ -481,7 +481,7 @@ function handleMessage(
   socket: Bun.ServerWebSocket<Client>,
   raw: string | Buffer | Uint8Array | ArrayBuffer,
 ): void {
-  const room = rooms.get(socket.data.room)
+  const room = rooms.get(socket.data.roomKey)
   const player = room?.players.get(socket.data.id)
   if (!room || !player) return
 
@@ -983,7 +983,7 @@ const server = Bun.serve<Client>({
      */
     if (!identity && url.searchParams.get('token')) {
       const upgraded = server.upgrade(request, {
-        data: { id: '', room: name, reject: 'auth' } satisfies Client,
+        data: { id: '', room: name, roomKey: name, reject: 'auth' } satisfies Client,
       })
       return upgraded ? undefined : new Response('誰なのか分からない', { status: 401 })
     }
@@ -995,8 +995,17 @@ const server = Bun.serve<Client>({
       return new Response('この部屋はまだ開いていない', { status: 503 })
     }
 
+    /*
+     * 自分だけの練習部屋 (?private=1)。**練習の部屋に限る** — 対戦の部屋を人ごとに
+     * 割ったら対戦にならない。鍵を人ごとに分けるだけで、ルールと地形は同じ部屋の物
+     */
+    const roomKey =
+      url.searchParams.get('private') === '1' && modeOf(name).id === 'PRACTICE'
+        ? privateRoomKey(name, identity.subject)
+        : name
+
     // 満員。ただし席を持っている本人 (繋ぎ直し) は通す
-    const existing = rooms.get(name)
+    const existing = rooms.get(roomKey)
     const seated = existing?.players.has(identity.subject) ?? false
     if (!seated && existing && connected(existing).length >= ROOM_CAPACITY) {
       return new Response('満員', { status: 503 })
@@ -1007,6 +1016,7 @@ const server = Bun.serve<Client>({
         id: identity.subject,
         name: identity.name,
         room: name,
+        roomKey,
       },
     })
     return upgraded ? undefined : new Response('WebSocket でつないでほしい', { status: 426 })
@@ -1034,14 +1044,14 @@ const server = Bun.serve<Client>({
        * **別の部屋へ移った人の席を取っておくためではない。**
        */
       for (const [name, other] of rooms) {
-        if (name === socket.data.room) continue
+        if (name === socket.data.roomKey) continue
         const stale = other.players.get(socket.data.id)
         if (!stale) continue
         console.info(`[入室] ${stale.name} の席を ${name} から畳む (${socket.data.room} へ移った)`)
         leaveRoom(other, stale)
       }
 
-      const room = roomOf(socket.data.room)
+      const room = roomOf(socket.data.room, socket.data.roomKey)
       const seat = room.players.get(socket.data.id)
       /** 続きへ戻す人。名簿を送ったあとに渡す */
       let resumed: MatchPlayer | null = null
@@ -1150,7 +1160,7 @@ const server = Bun.serve<Client>({
     },
 
     close(socket) {
-      const room = rooms.get(socket.data.room)
+      const room = rooms.get(socket.data.roomKey)
       const player = room?.players.get(socket.data.id)
       if (!room || !player) return
       // 同じ ID で繋ぎ直したあとに、古い接続の後始末が届くことがある。

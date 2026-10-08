@@ -170,7 +170,8 @@ export default function Play(props: {
   })
 
   onMount(() => {
-    const instance = new Game(container, props.identity, roomName())
+    // 練習 (/training) は自分だけの部屋。他の人と出会わない
+    const instance = new Game(container, props.identity, roomName(), training)
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
     instance.onLoadout = (next) => {
       setPrimary(next.primary)

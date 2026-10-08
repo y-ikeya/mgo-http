@@ -26,6 +26,11 @@ export interface Client {
   /** 繋ぐ前に確かめてある (isRoomName)。以後は部屋の名前として扱ってよい */
   room: RoomName
   /**
+   * 部屋の帳簿 (rooms) を引く鍵。**普段は部屋の名前そのもの。** 自分だけの練習部屋
+   * (?private=1) は `foxtrot~<id>` のように人ごとに分かれる (privateRoomKey)
+   */
+  roomKey: string
+  /**
    * 断る理由。**付いていれば open で閉じる。**
    *
    * 認証の切れた token で来た接続に、符号付きの close を返すために一度受ける
@@ -49,8 +54,10 @@ export interface Client {
  * ため** (手榴弾は Projectile を持つ)。だからサーバー側で包む。
  */
 export interface RoomWorld extends Match {
-  /** 部屋の名前。配る相手を引くのに要る */
+  /** 部屋の名前。ルールと地形はこの名前の表から引く */
   name: RoomName
+  /** 帳簿 (rooms) の鍵。共有の部屋は名前と同じ、自分だけの練習部屋は人ごと */
+  key: string
   /** 飛んでいる手榴弾 */
   grenades: Grenade[]
   /** 置かれたクレイモア */
@@ -80,7 +87,15 @@ export interface RoomWorld extends Match {
   stage: Terrain
 }
 
-export const rooms = new Map<RoomName, RoomWorld>()
+export const rooms = new Map<string, RoomWorld>()
+
+/**
+ * 自分だけの練習部屋の鍵。**同じルールの部屋を人ごとに作る** (2026-10-08 本人「練習で出会うな」)。
+ * 一覧 (/rooms) は名前で引くので、ここで作った部屋は出ない
+ */
+export function privateRoomKey(name: RoomName, id: string): string {
+  return `${name}~${id}`
+}
 
 /**
  * 投げた物・置いた物の持ち主から見て敵か。
@@ -103,14 +118,15 @@ export function friendlyTeam(room: Match, viewer: MatchPlayer, owner: Team): boo
 /** 1 部屋の上限。4 対 4 */
 export const ROOM_CAPACITY = 8
 
-export function roomOf(name: RoomName): RoomWorld {
-  let room = rooms.get(name)
+export function roomOf(name: RoomName, key: string = name): RoomWorld {
+  let room = rooms.get(key)
   if (!room) {
     // 回す表から 1 枚選ぶ。**初回なので前は無い** (previous = null)
     const stage = nextStage(ROOMS[name].stages, null, Math.random())
     room = {
       ...newMatch(ROOMS[name].mode),
       name,
+      key,
       grenades: [],
       claymores: [],
       decoys: [],
@@ -119,7 +135,7 @@ export function roomOf(name: RoomName): RoomWorld {
       stage: terrainOf(stage),
     }
     if (room.mode.id === 'PRACTICE') placeTargets(room)
-    rooms.set(name, room)
+    rooms.set(key, room)
   }
   return room
 }

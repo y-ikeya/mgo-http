@@ -173,12 +173,13 @@ export class Client {
     at: [number, number, number] = [0, 0, 0],
     /** 入る部屋。既定はチーム戦 (bravo) — 陣営の規則を見る試験が多いので */
     room = 'bravo',
-    options: { pongDelay?: number } = {},
+    options: { pongDelay?: number; privateRoom?: boolean } = {},
   ) {
     this.id = id
     this.position = at
     this.pongDelay = options.pongDelay ?? 0
-    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=${room}&id=${id}`)
+    // privateRoom: 自分だけの練習部屋 (/training と同じ ?private=1)
+    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=${room}&id=${id}${options.privateRoom ? '&private=1' : ''}`)
     this.socket.binaryType = 'arraybuffer'
     this.socket.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (event.data instanceof ArrayBuffer) {

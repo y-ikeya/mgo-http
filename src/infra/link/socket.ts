@@ -18,6 +18,7 @@ export class NetSocket implements NetTransport {
 
   private readonly base: string
   private readonly room: string
+  private readonly privateRoom: boolean
   private readonly tokenOf: () => string | undefined
   private readonly listeners = new Set<(message: ServerMessage) => void>()
   /**
@@ -61,7 +62,10 @@ export class NetSocket implements NetTransport {
     url: string,
     room = 'default',
     token?: string | (() => string | undefined),
+    /** 自分だけの部屋に入る (練習)。サーバーが同じルールの部屋を人ごとに作る */
+    privateRoom = false,
   ) {
+    this.privateRoom = privateRoom
     this.id = id
     this.name = name
     this.base = url
@@ -84,7 +88,7 @@ export class NetSocket implements NetTransport {
     const who = token
       ? `token=${encodeURIComponent(token)}`
       : `id=${encodeURIComponent(this.id)}`
-    return `${this.base}?${who}&room=${encodeURIComponent(this.room)}`
+    return `${this.base}?${who}&room=${encodeURIComponent(this.room)}${this.privateRoom ? '&private=1' : ''}`
   }
 
   send(message: ClientMessage): void {
