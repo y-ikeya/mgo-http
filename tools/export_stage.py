@@ -1207,6 +1207,11 @@ def box_is_fair(obj, tris):
 # **上に乗る** (up) になった。袋ごとの箱 (足元は袋の外接、天面はその袋の真上に積まれた
 # 袋の一番高い所) なら足元の形は袋の並びどおりで、天面だけが列に沿って平らになる。
 SANDBAG_JOIN = 0.1        # この距離 (m) まで近い袋は同じ積み
+# 袋ごとの箱を、**まっすぐ並んだ分だけ 1 つにまとめる** (本人 2026-10-08「まとめて一つの壁でいい」)。
+# まとめた箱の足元が、元の箱の足元を足したものよりこれ以上広がるならまとめない —
+# 折れた列や斜めの列を 1 枚の板にすると跳び越えの着地が無くなる (上の註釈)
+SANDBAG_MERGE_SLACK = 0.12   # m² (足元の面積の増え)
+SANDBAG_MERGE_HEIGHT = 0.06  # m (天面・底の高さの差)
 VAULT_MAX_HEIGHT = 1.2    # soldier.ts の VAULT_MAX と揃える
 VAULT_MIN_HEIGHT = 0.3    # soldier.ts の VAULT_MIN。段差 (0.25) との間は上がれず跳べもしない
 STEP_UP_HEIGHT = 0.25
@@ -1293,9 +1298,9 @@ for obj in bpy.context.scene.objects:
             olo, ohi = sandbag_bounds[other]
             if olo[0] < hi[0] and ohi[0] > lo[0] and olo[2] < hi[2] and ohi[2] > lo[2]:
                 top = max(top, ohi[1])
-        parts = box_triangles(lo, (hi[0], top, hi[2]))
-        positions.extend(parts)
-        marks.extend([PLAYER_BIT | surface_mark] * (len(parts) // 9))
+        # 箱は後でまとめてから書く (merge_sandbag_boxes)。**底は積みの底まで下ろす** —
+        # 上の段の袋の箱が宙に浮いたままだと、真下の袋の箱と底が揃わずまとまらない
+        stack.setdefault('boxes', []).append([[lo[0], stack['lo'][1], lo[2]], [hi[0], top, hi[2]], surface_mark])
 
     # --- ベンチ・机は座面と脚だけ ---
     if is_bench(obj.name) and (mark & PLAYER_BIT) and 'col_' not in obj.name.lower():
@@ -1551,6 +1556,42 @@ with open(json_path, 'w') as f:
 # 印は「何を止めるか」と「何でできているか」。読む側が用途ごとに振り分けて、
 # 別々の木を組む。1 バイトに詰めてあるので、印を増やしても大きさは変わらない。
 import struct
+
+def merge_sandbag_boxes(items):
+    """積みの中の袋の箱を、まっすぐ並んだ分だけまとめる。足元が広がる組はまとめない"""
+    def area(lo, hi):
+        return max(0.0, hi[0] - lo[0]) * max(0.0, hi[2] - lo[2])
+    def overlap(a, b):
+        return max(0.0, min(a[1][0], b[1][0]) - max(a[0][0], b[0][0])) * max(0.0, min(a[1][2], b[1][2]) - max(a[0][2], b[0][2]))
+    boxes = [list(b) for b in items]
+    merged = True
+    while merged:
+        merged = False
+        for i in range(len(boxes)):
+            for j in range(i + 1, len(boxes)):
+                a, b = boxes[i], boxes[j]
+                if abs(a[1][1] - b[1][1]) > SANDBAG_MERGE_HEIGHT or abs(a[0][1] - b[0][1]) > SANDBAG_MERGE_HEIGHT:
+                    continue
+                lo = [min(a[0][k], b[0][k]) for k in range(3)]
+                hi = [max(a[1][k], b[1][k]) for k in range(3)]
+                if area(lo, hi) > area(*a[:2]) + area(*b[:2]) - overlap(a, b) + SANDBAG_MERGE_SLACK:
+                    continue
+                boxes[i] = [lo, hi, a[2]]
+                del boxes[j]
+                merged = True
+                break
+            if merged:
+                break
+    return boxes
+
+
+sandbag_box_count = 0
+for stack in sandbag_stacks:
+    for lo, hi, surface_mark in merge_sandbag_boxes(stack.get('boxes', [])):
+        parts = box_triangles(lo, hi)
+        positions.extend(parts)
+        marks.extend([PLAYER_BIT | surface_mark] * (len(parts) // 9))
+        sandbag_box_count += 1
 
 bin_path = os.path.join(root, 'public', 'models', stage_name + '.mesh.bin')
 with open(bin_path, 'wb') as f:
@@ -1924,7 +1965,7 @@ if sandbag_stacks:
     for st in sandbag_stacks:
         st['height'] = st['hi'][1] - ground_under_stack(st)
     heights = [st['height'] for st in sandbag_stacks]
-    print(f'          土嚢 {len(sandbag_stack_of)} 袋 → 袋ごとの箱 (天面は列に沿って平ら) が人に当たる。積み {len(sandbag_stacks)} 個'
+    print(f'          土嚢 {len(sandbag_stack_of)} 袋 → まっすぐな列ごとにまとめた箱 {sandbag_box_count} 個 (天面は列に沿って平ら) が人に当たる。積み {len(sandbag_stacks)} 個'
           f' (地面から天面まで {min(heights):.2f}〜{max(heights):.2f}m。弾と視線は袋のまま)')
     for st in sandbag_stacks:
         h = st['height']
