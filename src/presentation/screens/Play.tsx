@@ -166,7 +166,8 @@ export default function Play(props: {
    */
   createEffect(() => {
     if (!stats()?.expired) return
-    navigate('/rooms', { state: { notice: 'expired' } })
+    // 最初の画面 (/) へ。対戦でも練習でも、入り直すのはそこから
+    navigate('/', { state: { notice: 'expired' } })
   })
 
   onMount(() => {

@@ -1,4 +1,5 @@
-import { useNavigate } from '@solidjs/router'
+import { createSignal, onMount, Show } from 'solid-js'
+import { useLocation, useNavigate } from '@solidjs/router'
 import { t } from '../../i18n'
 import type { Identity } from '../../infra/auth/session'
 import { signOut } from '../../infra/auth/session'
@@ -16,6 +17,15 @@ import './Home.css'
  */
 export default function Home(props: { identity: Identity }) {
   const navigate = useNavigate()
+  /*
+   * 部屋から戻された理由 (認証が切れた)。**一度だけ出す** — 遷移の状態は履歴に
+   * 残るので、読んだら消す (Lobby と同じ扱い)。押しても消える
+   */
+  const route = useLocation<{ notice?: string }>()
+  const [notice, setNotice] = createSignal(route.state?.notice === 'expired' ? t('lobby.expired') : '')
+  onMount(() => {
+    if (route.state?.notice) window.history.replaceState(null, '')
+  })
   // クエリは持って行く (?server= などは先で読まれる。Lobby の enter と同じ)
   const go = (path: string) => navigate(`${path}${location.search}`)
 
@@ -36,6 +46,12 @@ export default function Home(props: { identity: Identity }) {
           </button>
         </div>
       </header>
+
+      <Show when={notice()}>
+        <div class="lobby-error" onClick={() => setNotice('')} title="OK">
+          {notice()}
+        </div>
+      </Show>
 
       <div class="home-modes">
         <button class="home-mode" onClick={() => go('/rooms')}>
