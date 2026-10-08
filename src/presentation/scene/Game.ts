@@ -15,7 +15,7 @@ import { Input } from "../../infra/input";
 import { Soldier, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/soldier";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
-import { STAGES, type Spot, surfaceOf, waterOf, type StageName } from "../../domain/stage";
+import { STAGES, type Spot, surfaceOf, taggedSurface, waterOf, type StageName } from "../../domain/stage";
 import {
   SKILLS,
   canChooseSkills,
@@ -553,14 +553,29 @@ const SURFACE_TOLERANCE = 0.03;
 const GRENADE_RELEASE_FORWARD = 0.45;
 
 /**
- * 着弾の音。**材質ごとに鳴らし分ける。** 音を持たない材質は null (黙る)。
- * 木やコンクリートの音が入るまでは、材質の違う音を流用しない — 当たった物を聞き間違える
+ * 着弾の音。**材質ごとに鳴らし分ける。** 専用の音が無い材質 (壁・地面) は
+ * hit.mp3 (本人 2026-10-08「指定がなかったらこれ」)
  */
-function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | "hitWood" | null {
+function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | "hitWood" | "hitDefault" {
   if (surface === "metal") return "hitMetal";
   if (surface === "glass") return "hitGlass";
   if (surface === "wood") return "hitWood";
-  return null;
+  return "hitDefault";
+}
+
+/**
+ * 当たった物の材質。**名前は親まで遡って引く。**
+ *
+ * 材質を 2 つ以上持つ形は、読み込むと材質ごとの子 (mesh_29_1 のような名前) に
+ * 割れる。子の名前にはタグが無いので既定 (金属) に落ち、建物を撃っても金属の音と
+ * 火花が出ていた (2026-10-08)。タグのある名前に当たるまで親を辿る
+ */
+function surfaceOfHit(object: THREE.Object3D): ReturnType<typeof surfaceOf> {
+  for (let at: THREE.Object3D | null = object; at; at = at.parent) {
+    const surface = taggedSurface(at.name);
+    if (surface) return surface;
+  }
+  return surfaceOf(object.name);
 }
 /** 壁で体が画面を塞いだときの薄さの上限 (1 - 0.8 = 0.2 まで薄くなる) */
 const FADE_MAX = 0.8;
@@ -3647,7 +3662,7 @@ export class Game {
       hitPlayer || splashed ? null : hitTerrain ? this.hitNormal : null,
       IMPACT_WORLD,
       // **当たった物の名前から引く。** 音を鳴らすのと同じ引き方 (playImpact)
-      hitTerrain ? surfaceOf(hitTerrain.object.name) : undefined,
+      hitTerrain ? surfaceOfHit(hitTerrain.object) : undefined,
     );
     // 金属に当たった音。**材質は当たった面の名前から引く** (地形と同じ決めごと)
     if (!hitPlayer && !splashed && hitTerrain) this.playImpact(hitTerrain, this.hitPoint);
@@ -4945,14 +4960,12 @@ export class Game {
    * 金属以外は黙る — 材質の違う音を流用すると、当たった物を聞き間違える。
    */
   private playImpact(hit: THREE.Intersection, at: THREE.Vector3): void {
-    const sound = impactSoundOf(surfaceOf(hit.object.name));
-    if (sound) this.audio.play(sound, at);
+    this.audio.play(impactSoundOf(surfaceOfHit(hit.object)), at);
   }
 
   /** 着弾点から地形を引いて鳴らす。他人の弾のように面が届かないとき */
   private playImpactAt(at: THREE.Vector3): void {
-    const sound = impactSoundOf(surfaceAt(at, IMPACT_PROBE, this.stage.obstacles, at.y, IMPACT_PROBE));
-    if (sound) this.audio.play(sound, at);
+    this.audio.play(impactSoundOf(surfaceAt(at, IMPACT_PROBE, this.stage.obstacles, at.y, IMPACT_PROBE)), at);
   }
 
   private publishStats(dt: number): void {
