@@ -308,7 +308,8 @@ export interface WeaponSpec {
   aimDistance: number
   /**
    * 肩越しの横ずれ (m)。**照準 (画面の中心) とキャラの頭の間の距離になる。**
-   * 2026-10-07 に全部 0.12m 詰めた (本人「構えた時のレティクルをもう少し左に」)
+   * 2026-10-07 に全部 0.12m 詰めた (本人「構えた時のレティクルをもう少し左に」)。
+   * 10-08 に全部 0.10m 戻した (しゃがむと体が半身になって照準に被る。姿勢で変えず全体で)
    */
   aimShoulder: number
   /** 構えている間の移動速度の倍率 */
@@ -398,7 +399,7 @@ const SMG: WeaponSpec = {
   // 突撃銃より寄らない。近距離で振り回す銃なので、視野を狭めない
   aimFov: 42,
   aimDistance: 1.3,
-  aimShoulder: 0.28,
+  aimShoulder: 0.38,
   // 軽いぶん構えたままでも動ける
   aimSpeedScale: 0.62,
   scope: [],
@@ -472,7 +473,7 @@ const RIFLE: WeaponSpec = {
 
   aimFov: 38,
   aimDistance: 1.35,
-  aimShoulder: 0.3,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.55,
   scope: [],
 }
@@ -534,7 +535,7 @@ const SNIPER: WeaponSpec = {
   // 構えただけなら突撃銃と同じ肩越し。覗くのは別の操作
   aimFov: 38,
   aimDistance: 1.35,
-  aimShoulder: 0.3,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.35,
   // 腰だめの画角 60 度を基準にした倍率。tan(30°) / tan(fov/2) で出る
   scope: [
@@ -630,7 +631,7 @@ const MOSIN: WeaponSpec = {
 
   aimFov: 38,
   aimDistance: 1.35,
-  aimShoulder: 0.3,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.35,
   /*
    * 覗ける。**倍率は狙撃銃より控えめ。**
@@ -740,7 +741,7 @@ const PISTOL: WeaponSpec = {
   // 覗く倍率は持たない。肩越しのまま撃つ銃
   aimFov: 44,
   aimDistance: 1.5,
-  aimShoulder: 0.34,
+  aimShoulder: 0.44,
   aimSpeedScale: 0.72,
   scope: [],
 }
@@ -817,7 +818,7 @@ const M1911: WeaponSpec = {
   spreadPerStance: 0.12,
   aimFov: 44,
   aimDistance: 1.5,
-  aimShoulder: 0.34,
+  aimShoulder: 0.44,
   aimSpeedScale: 0.7,
   scope: [],
 }
@@ -894,7 +895,7 @@ const SHOTGUN: WeaponSpec = {
   // 覗く物ではない。肩越しのまま間合いへ入る
   aimFov: 42,
   aimDistance: 1.35,
-  aimShoulder: 0.3,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.5,
   // 覗く段は持たない。間合いへ入る武器なので、遠くを見る道具が要らない
   scope: [],
