@@ -45,9 +45,13 @@ import { AIM_CAMERA, HIP_CAMERA } from '../../../sim/space/eyepoint'
  * 移り、**キャラの頭のやや右上**に照準が出る形になる。弾道 (aimDirection) は
  * 変えない — 向きだけで、線は構えのまま。
  *
- *     ?camp=3    度で試す
+ * **構えると、この分だけ視線が上を向く。** 3° から 7° にした (2026-10-08 本人
+ * 「構えたら少し上を見る感じに。腰だめは斜め上から見下ろすので、頭に合わせる時に
+ * 目線を合わせ直すのが大変」)。構えた後の照準 = 画面の中心 = 弾の向きは変わらない。
+ *
+ *     ?camp=7    度で試す
  */
-const HIP_PITCH_DOWN = (tunedSigned('camp', 3) * Math.PI) / 180
+const HIP_PITCH_DOWN = (tunedSigned('camp', 7) * Math.PI) / 180
 
 /** ?cams= で腰だめの肩を直に決めたいとき。無ければ構えの肩に追従する (update) */
 const HIP_SHOULDER_TUNED = ((): number | null => {
