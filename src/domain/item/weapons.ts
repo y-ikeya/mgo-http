@@ -187,7 +187,7 @@ export interface WeaponSpec {
    */
   pelletSpread?: number
   /** ボルトを操作する音。無ければ鳴らさない (狙撃銃は発砲音に入っている) */
-  boltSound?: 'shotgunCock' | 'mosinCock'
+  boltSound?: 'shotgunCock' | 'mosinCock' | 'm9Cock'
   /**
    * ボルトを操作する型の再生速度。**1 より小さいほど遅い。**
    *
@@ -702,10 +702,11 @@ const PISTOL: WeaponSpec = {
    * (本人「ゲームバランス的にもう少し遅く」)。撃てない時間が長いほど、
    * 外した 1 発の重さが増す
    *
-   * **音は鳴らさない。** 消音された銃なので、遊底の音だけが響くのはおかしい。
-   * 専用の音が来たら boltSound に足す。
+   * 遊底を引く音は本人の素材 (m9Cocking.mp3、tools/raw に元の freesound の 6 秒もある)。
+   * 消音された銃なので、狙撃銃やショットガンより近くまでしか届かない (audio.ts の m9Cock)
    */
   bolt: true,
+  boltSound: 'm9Cock',
   boltScale: 1.2,
   magazine: 12,
   reserve: 48,

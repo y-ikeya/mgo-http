@@ -58,6 +58,8 @@ const SOUNDS = {
   mosin: { file: "mosin_shot1.mp3", reference: 4, max: weaponOf("mosin").noiseRange },
   /** ボルトを引く音。発砲音に入っていないので別に鳴らす */
   mosinCock: { file: "mosin_cock1.mp3", reference: 3, max: 24 },
+  /** M9 (麻酔銃) の遊底。消音された銃なので近くまで (本人の素材 m9Cocking.mp3) */
+  m9Cock: { file: "m9_cock1.mp3", reference: 2, max: 15 },
   /**
    * ナイフが刺さった音。**当たった時だけ鳴る。**
    *
