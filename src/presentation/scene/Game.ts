@@ -3310,6 +3310,8 @@ export class Game {
       this.meleeForward,
       // 見下ろしていれば倒れている相手にも届く。構えていなければ水平とみなす
       this.player.isAiming ? this.follow.aimPitch : 0,
+      // 倒れた相手には屈んで (しゃがみ / 伏せ) 見下ろしたときだけ届く
+      this.player.stance,
     );
     if (!result) return;
 

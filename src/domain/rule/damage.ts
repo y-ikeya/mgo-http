@@ -201,11 +201,19 @@ export const STAB_DOWN_PITCH = -0.35
  * 幾何 (間合いと角度) は sim/judge/hitcheck.ts。ここに在るのは
  * 「誰を刺せるか」というドメインルールだけ。
  */
-export function canBeStabbed(stance: Stance, aimPitch = 0): boolean {
+export function canBeStabbed(stance: Stance, aimPitch = 0, attacker: Stance = 'stand'): boolean {
   if (STABBABLE.has(stance)) return true
-  // 倒れている相手。**下を狙っているときだけ**通る
-  return aimPitch <= STAB_DOWN_PITCH
+  /*
+   * 倒れている (寝ている) 相手。**屈んで、下を狙っているときだけ**通る。
+   *
+   * 立ったまま見下ろしても刃は床まで届かない。立って見下ろすだけで刺せていた
+   * (本人 2026-10-08「リーチ的におかしい」)。しゃがみか伏せで、見下ろしたときだけ
+   */
+  return REACHES_FLOOR.has(attacker) && aimPitch <= STAB_DOWN_PITCH
 }
+
+/** 床の高さまで刃が届く構え。立っている人の腕は床まで届かない */
+const REACHES_FLOOR: ReadonlySet<Stance> = new Set<Stance>(['crouch', 'prone'])
 
 
 /** 削られた結果 */
@@ -290,7 +298,9 @@ export const HIT_RULES = {
   viewHeight: (stance: Stance) => (VIEW_HEIGHT[stance][0] + VIEW_HEIGHT[stance][1]) / 2,
   // 傾きの横ずれ。sim (hitcheck) は domain の値を直に引かないので、ここから渡す
   leanShift,
-  canBeStabbed,
+  // 判定の層は構えを文字列で持つ (sim は domain の型を知らない)。中身は stanceOf の値
+  canBeStabbed: (stance: string, aimPitch: number, attacker: string) =>
+    canBeStabbed(stance as Stance, aimPitch, attacker as Stance),
   meleeRange: MELEE_RANGE,
   meleeSlack: MELEE_SLACK,
   backstabDot: BACKSTAB_DOT,

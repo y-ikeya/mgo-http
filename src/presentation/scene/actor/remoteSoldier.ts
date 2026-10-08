@@ -265,8 +265,8 @@ export class RemoteSoldier {
    * locomotion をそのまま公開せず、**問いの形で出す**。外から構えを見て
    * 各所で判定を組み立てると、サーバー側のドメインルールとだんだんずれる。
    */
-  stabbableFrom(aimPitch: number): boolean {
-    return canBeStabbed(stanceOf(this.locomotion), aimPitch);
+  stabbableFrom(aimPitch: number, attacker: Stance): boolean {
+    return canBeStabbed(stanceOf(this.locomotion), aimPitch, attacker);
   }
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
@@ -1200,6 +1200,8 @@ export class RemoteSoldiers {
      * 読むので、手元で外しておかないと空振りに「当たった」表示だけが出る。
      */
     aimPitch: number,
+    /** 刺す側の構え。倒れた相手には屈んでいないと届かない */
+    attacker: Stance,
   ): { id: string; fromBehind: boolean; distance: number; side: Team } | null {
     let closest: { player: RemoteSoldier; distance: number } | null = null;
 
@@ -1208,7 +1210,7 @@ export class RemoteSoldiers {
       // 倒れている相手には刺さらない。**サーバーと同じ式を読む** —
       // 手元で外しておかないと、サーバーが弾いた空振りに対して
       // 「当たった」表示だけが出る
-      if (!player.stabbableFrom(aimPitch)) continue;
+      if (!player.stabbableFrom(aimPitch, attacker)) continue;
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;
       const distance = this.scratch.length();

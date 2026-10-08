@@ -230,8 +230,11 @@ export class Client {
   }
 
   /** 位置を送り続ける。実際のクライアントと同じ 64Hz */
+  /** live() が送り続ける姿勢 (locomotion)。しゃがませるなら 'crouch_idle' */
+  pose = 'idle'
+
   live(hz = 64): this {
-    this.timer = setInterval(() => this.sendState(), 1000 / hz)
+    this.timer = setInterval(() => this.sendState(this.pose), 1000 / hz)
     return this
   }
 

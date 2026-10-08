@@ -53,7 +53,8 @@ export interface HitRules {
   /** その部位の縦の幅 (頭の高さに対する比率、下端と上端)。胴と脚は筒なので球では足りない */
   zoneSpan(zone: HitZone): readonly [number, number]
   /** その構えに刃が通るか */
-  canBeStabbed(stance: string, aimPitch: number): boolean
+  /** 刺さる構えか。倒れた相手には、刺す側が屈んで見下ろしているときだけ (attacker は刺す側の構え) */
+  canBeStabbed(stance: string, aimPitch: number, attacker: string): boolean
   /** ナイフの間合い (m) と、そこに許す余裕 */
   meleeRange: number
   meleeSlack: number
@@ -328,7 +329,7 @@ function verifyPose(
 
   if (claim.kind === 'melee') {
     // 倒れている相手には刺さらない
-    if (!rules.canBeStabbed(target.stance, attacker.pitch)) {
+    if (!rules.canBeStabbed(target.stance, attacker.pitch, attacker.stance)) {
       return { ok: false, reason: `刺さる姿勢ではない (${target.stance})` }
     }
 
