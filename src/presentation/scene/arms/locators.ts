@@ -92,6 +92,17 @@ const HALO_OPACITY = 0.8
  */
 const LAMP_LIGHT = 0.15
 const LAMP_LIGHT_REACH = 1.5
+/**
+ * 床に光を落とせる数。**最初から場面に置いておき、使い回す。**
+ *
+ * 投げるたびに光を足していた頃は、投げた瞬間 (と消えた瞬間) に画面が止まった
+ * (2026-10-09 本人)。WebGPU の three は場面の光の数が変わると全部の材質を組み
+ * 直すため。数は変えず、強さだけ出し入れする。足りない分は光を落とさない
+ * (灯の点滅と光の玉は出る)。1 人 3 個 × 2 人ぶん
+ */
+const LIGHT_POOL = 6
+/** 起動時に見えない大きさで描くコマ数。模型・光の玉・波の材質を先に組ませる */
+const WARM_FRAMES = 3
 
 /** 光の絵の一辺 (px)。滲みだけなので大きく要らない */
 const GLOW_PIXELS = 128
@@ -319,11 +330,22 @@ export class Locators {
    * 誰の物かは、本人にだけ出す光の玉 (陣営色) が答える。
    */
   private readonly lampColor = new THREE.Color(0xffffff)
+  /** 使い回す光 (LIGHT_POOL)。場面に置きっぱなしで、使っていない物は強さ 0 */
+  private readonly lights: THREE.PointLight[] = []
+  private readonly lightsInUse = new Set<THREE.PointLight>()
+  /** 起動直後に描かせている見えない 1 揃い。描き終えたら外す */
+  private warm: { group: THREE.Group; frames: number; layers: THREE.Mesh[] } | null = null
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
     // 名簿が届くまでの分。届いたら塗り直す (setSelfTeam)
     this.haloMaterial.color.setHex(this.teamColor)
+    for (let i = 0; i < LIGHT_POOL; i++) {
+      const light = new THREE.PointLight(this.lampColor, 0, LAMP_LIGHT_REACH, 2)
+      light.castShadow = false
+      this.scene.add(light)
+      this.lights.push(light)
+    }
 
     void loadLocator().then((gltf) => {
       const model = gltf.scene
@@ -347,6 +369,7 @@ export class Locators {
         console.warn(`[E LOCATOR] 模型に ${LAMP_NAME} が無い。点滅しない`)
       }
       this.model = model
+      this.warmUp()
       // 読み込みの前に投げられた分を模型へ入れ替える。**姿勢も測り直す** —
       // 模型が無い間に置かれた物は、半径も灯の向きも分からないまま落ち着いている
       for (const item of this.live) {
@@ -558,7 +581,7 @@ export class Locators {
       child.removeFromParent()
     }
     item.lamp = null
-    item.light = null
+    this.releaseLight(item)
 
     if (!this.model) {
       const box = new THREE.Mesh(
@@ -601,14 +624,47 @@ export class Locators {
        * 灯の位置は模型の中の節なので、袋から見た座標へ直す。倒れても袋ごと
        * 回るので、光は灯に付いて回る。
        */
-      const light = new THREE.PointLight(this.lampColor, 0, LAMP_LIGHT_REACH, 2)
-      light.castShadow = false
-      item.group.updateMatrixWorld(true)
-      light.position.copy(item.lamp.getWorldPosition(new THREE.Vector3()))
-      item.group.worldToLocal(light.position)
-      item.group.add(light)
-      item.light = light
+      item.light = this.takeLight()
     }
+  }
+
+  /** 空いている光を借りる。**足りなければ null** (光を落とさないだけ) */
+  private takeLight(): THREE.PointLight | null {
+    const light = this.lights.find((l) => !this.lightsInUse.has(l)) ?? null
+    if (light) {
+      this.lightsInUse.add(light)
+      light.color.copy(this.lampColor)
+    }
+    return light
+  }
+
+  /** 借りていた光を返す。強さを 0 にするだけで、場面からは外さない */
+  private releaseLight(item: Live): void {
+    if (!item.light) return
+    item.light.intensity = 0
+    this.lightsInUse.delete(item.light)
+    item.light = null
+  }
+
+  /**
+   * 模型・光の玉・波を、見えない大きさで数コマ描かせる。**最初に投げた瞬間に
+   * シェーダーを組む止まりを避ける** (爆発の blastfx.ts と同じ)
+   */
+  private warmUp(): void {
+    if (!this.model) return
+    const group = new THREE.Group()
+    const model = this.model.clone(true)
+    model.add(new THREE.Sprite(this.haloMaterial))
+    group.add(model)
+    const fake = { group, layers: [] as THREE.Mesh[] } as unknown as Live
+    this.buildWave(fake)
+    for (const layer of fake.layers) layer.visible = true
+    group.scale.setScalar(0.0001)
+    group.traverse((obj) => {
+      obj.frustumCulled = false
+    })
+    this.scene.add(group)
+    this.warm = { group, frames: WARM_FRAMES, layers: fake.layers }
   }
 
   /**
@@ -663,6 +719,11 @@ export class Locators {
     onBlink?: (at: THREE.Vector3) => void,
   ): void {
     this.onBlink = onBlink
+    if (this.warm && --this.warm.frames <= 0) {
+      this.warm.group.removeFromParent()
+      for (const layer of this.warm.layers) (layer.material as THREE.Material).dispose()
+      this.warm = null
+    }
     // 刻みはサーバーと同じ固定値。フレーム間隔で解くと軌道がずれる
     this.accumulator = Math.min(this.accumulator + dt, 0.25)
     while (this.accumulator >= FIXED_STEP) {
@@ -758,7 +819,11 @@ export class Locators {
    */
   private lamp(item: Live, on: boolean): void {
     if (item.lamp) item.lamp.visible = on
-    if (item.light) item.light.intensity = on ? LAMP_LIGHT : 0
+    if (item.light) {
+      // 光は場面に直に置いてある。灯の位置へ毎回合わせる (転がる・倒れる)
+      if (item.lamp) item.lamp.getWorldPosition(item.light.position)
+      item.light.intensity = on ? LAMP_LIGHT : 0
+    }
     if (on && !item.lit) this.onBlink?.(item.group.position)
     item.lit = on
   }
@@ -832,6 +897,7 @@ export class Locators {
    * (waveShape) は使い回しているので捨てない。
    */
   private drop(item: Live): void {
+    this.releaseLight(item)
     for (const layer of item.layers) layer.material.dispose()
     item.layers.length = 0
     item.group.removeFromParent()
