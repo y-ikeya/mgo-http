@@ -35,6 +35,9 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
 /** 1 段送ったときに滑る距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
 const BROWSE_SLIDE = 26
 
+/** 待合室を閉じる前に黒へ落とし始める (ms)。落ちきるのは CSS の transition (0.8 秒) */
+const STANDBY_BLACK_MS = 1000
+
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
   // 残り時間の表示だけは秒ごとに動かす。stats は 0.1 秒ごとに来るが、
@@ -72,13 +75,20 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   let lastPhase: string | undefined
   createEffect(() => {
     const now = phase()
-    if (lastPhase === 'assembled' && now === 'ready') {
+    // 待合室 (ready) から試合 (countdown) へも同じく黒から明ける (2026-10-09 本人)
+    if ((lastPhase === 'assembled' && now === 'ready') || (lastPhase === 'ready' && now === 'countdown')) {
       setDawn(true)
       const timer = setTimeout(() => setDawn(false), 900)
       onCleanup(() => clearTimeout(timer))
     }
     lastPhase = now
   })
+  /**
+   * 待合室の締め切りの最後の 1 秒で黒へ落とす。**締め切りから毎回測る** — 全員が
+   * READY で縮んだ締め切りにも効き、誰かが取り消して締め切りが戻れば黒も引く
+   */
+  const standbyClosing = () =>
+    phase() === 'ready' && (props.stats?.match?.endsAt ?? Infinity) - now() <= STANDBY_BLACK_MS
   /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
   const mode = () => props.stats?.match?.mode ?? 'TDM'
   const teams = () => MODES[mode()].teams
@@ -371,6 +381,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={dawn()}>
         <div class="hud-dawn" />
       </Show>
+      {/* 待合室から試合へ。締め切りの最後で黒へ落ち、秒読みに入ると上の hud-dawn で明ける */}
+      <div class="hud-standby-black" classList={{ 'hud-standby-black-on': standbyClosing() }} />
 
       {/*
         支度。湧き地点へ戻してから数える。

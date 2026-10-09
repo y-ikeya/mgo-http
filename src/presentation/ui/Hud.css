@@ -1429,6 +1429,20 @@
   animation: hud-assembled-black 5s linear both;
 }
 
+/* 待合室から試合へ。締め切りの最後に黒へ落ちる (Hud.tsx の standbyClosing) */
+.hud-standby-black {
+  position: fixed;
+  inset: 0;
+  z-index: 61;
+  background: #000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s linear;
+}
+.hud-standby-black-on {
+  opacity: 1;
+}
+
 /* 支度の画面が黒から明ける */
 .hud-dawn {
   position: fixed;

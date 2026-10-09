@@ -57,7 +57,19 @@ export class Portrait {
   private mark(state: string): void {
     this.host.dataset.portrait = state
     console.info(`[Portrait] ${state}`)
+    // 原因が分かるまで画面にも出す (左下に小さく)。分かったら消す
+    if (!this.status) {
+      this.status = document.createElement('div')
+      Object.assign(this.status.style, {
+        position: 'absolute', left: '12px', bottom: '12px', zIndex: '1',
+        font: '11px ui-monospace, monospace', color: 'rgba(200,220,180,0.7)', whiteSpace: 'pre',
+      })
+      this.host.appendChild(this.status)
+    }
+    this.status.textContent += `${this.status.textContent ? '\n' : ''}${state}`
   }
+
+  private status: HTMLDivElement | null = null
 
   private fit(): void {
     const w = Math.max(1, this.host.clientWidth)
@@ -112,10 +124,22 @@ export class Portrait {
     void this.renderer.setAnimationLoop(() => this.frame())
   }
 
+  private frames = 0
+
   private frame(): void {
     const dt = Math.min(this.clock.getDelta(), 1 / 20)
     this.anim?.update(dt)
-    this.renderer.render(this.scene, this.camera)
+    try {
+      this.renderer.render(this.scene, this.camera)
+    } catch (error) {
+      if (this.frames < 3) this.mark(`描けない: ${error}`)
+    }
+    this.frames++
+    if (this.frames === 60) {
+      const canvas = this.renderer.domElement
+      const backend = (this.renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
+      this.mark(`60 コマ描いた (${canvas.width}x${canvas.height}, ${backend?.isWebGPUBackend ? 'WebGPU' : 'WebGL'})`)
+    }
   }
 
   dispose(): void {
