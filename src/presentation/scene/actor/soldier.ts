@@ -3061,13 +3061,11 @@ export class Soldier {
     let targetSpeed = this.crouching
       ? this.moveSpeed * CROUCH_SPEED_SCALE * carrying
       : this.moveSpeed * (this.aiming ? this.aimSpeedScale : carrying)
-    // ダンボールを被っている間も担いでいる物は同じ。
-    //
-    // **CBOX MOVE と FAST MOVE は重なる** (carrying に FAST MOVE が入っている)。
-    // 箱で速く動きたいなら両方に予算を割く、という選択にしてある — 被っている間は
-    // 撃てないので、速さを買うことが攻撃力を捨てることと釣り合う。
+    // ダンボールを被っている間は **CBOX MOVE だけで決まる。** 持っていた銃の重さも
+    // FAST MOVE も効かない — 被れば誰でも同じ速さで、速くするのは箱のスキルだけ
+    // (2026-10-09 本人)
     if (this.boxed) {
-      targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * boxMoveScale(this.skills) * carrying
+      targetSpeed = this.moveSpeed * BOX_SPEED_SCALE * boxMoveScale(this.skills)
     }
     // 伏せは一番遅い。**担いでいる物は効かない** — 腕で這うので、
     // 背中の銃の重さが進みに出る形になっていない
