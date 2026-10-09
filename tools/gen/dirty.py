@@ -46,7 +46,7 @@ def quad(bm, uv, pts, uvs):
     return f
 
 
-def outline(zcut):
+def outline(zcut, min_len=0.3):
     """本体を z = zcut で切った輪郭の辺 [(a, b, 外向きの法線)]"""
     dg = bpy.context.evaluated_depsgraph_get()
     bm = bmesh.new()
@@ -59,7 +59,7 @@ def outline(zcut):
     out = []
     for e in edges:
         a, b = e.verts[0].co.copy(), e.verts[1].co.copy()
-        if (b - a).length < 0.3:
+        if (b - a).length < min_len:
             continue
         t = (b - a).normalized()
         n = Vector((t.y, -t.x, 0))
@@ -117,15 +117,17 @@ def runs(edges):
 # ---- 泥
 if not ONLY or 'grime' in ONLY:
     gr = bmesh.new(); gr_uv = gr.loops.layers.uv.new('UVMap')
-    for a, b, n in runs(outline(GROUND + 0.2)):
+    # **短い辺も拾う** (柱型の出っ張りの側面は 30cm ほど)。捨てると出っ張りの
+    # 両脇で帯が切れ、角から引いた分と合わせて細切れに見えた (2026-10-09 本人)
+    for a, b, n in runs(outline(GROUND + 0.2, min_len=0.08)):
         L = (b - a).length
-        if L < 0.6:
+        if L < 0.08:
             continue
         t = (b - a).normalized()
-        # 角から少し引く。角で隣の面の帯と重なると、そこだけ濃くなる
-        p0 = Vector((a.x, a.y, GROUND)) + t * 0.05 + n * E
-        p1 = Vector((b.x, b.y, GROUND)) - t * 0.05 + n * E
-        u1 = (L - 0.1) / GRIME_TILE
+        # 角まで通す。隣の面の帯とは角で突き合わせになる (外へ 1cm 浮かせてあるので重ならない)
+        p0 = Vector((a.x, a.y, GROUND)) + n * E
+        p1 = Vector((b.x, b.y, GROUND)) + n * E
+        u1 = L / GRIME_TILE
         up = Vector((0, 0, GRIME_H))
         quad(gr, gr_uv, [p0, p1, p1 + up, p0 + up], ((0, 0), (u1, 0), (u1, 1), (0, 1)))
     o = finish('vis_decal_b%s_grime_nouv' % TAG, gr, grime_mat)
