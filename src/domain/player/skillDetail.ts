@@ -98,7 +98,7 @@ export function skillDetail(id: SkillId): SkillDetail {
       return {
         summary: 'ダンボールを被ったまま速く動ける',
         effects: [{ label: '箱で動く速さ', values: perLevel(id, boxMoveScale).map(percent) }],
-        notes: ['FAST MOVE と重なる (掛け算)'],
+        notes: [],
       }
     case 'smgMastery':
     case 'rifleMastery':
