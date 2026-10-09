@@ -1191,16 +1191,16 @@
 "name": "concrete_building11.003",
 "min": [
 -24.643,
-5.216,
+12.39,
 -36.599
 ],
 "max": [
 -24.058,
-13.147,
+13.134,
 -36.003
 ],
 "top": {
-"h": 13.1469,
+"h": 13.1343,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -11524,31 +11524,6 @@
 }
 },
 {
-"name": "vis_decal_b5_grime_nouv",
-"min": [
--35.514,
-10.0,
--13.284
-],
-"max": [
--18.746,
-10.7,
-2.754
-],
-"top": {
-"h": 10.7,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "vis_decal_b5_cracks_nouv",
 "min": [
 -35.514,
@@ -11599,31 +11574,6 @@
 }
 },
 {
-"name": "vis_decal_b31_grime_nouv",
-"min": [
--24.034,
-10.0,
-28.806
-],
-"max": [
--4.462,
-10.7,
-44.214
-],
-"top": {
-"h": 10.7,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "vis_decal_b31_cracks_nouv",
 "min": [
 -24.034,
@@ -11662,31 +11612,6 @@
 ],
 "top": {
 "h": 16.59,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_b6_grime_nouv",
-"min": [
--38.904,
-10.0,
--32.714
-],
-"max": [
--17.396,
-10.7,
--18.76
-],
-"top": {
-"h": 10.7,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -12276,31 +12201,6 @@
 }
 },
 {
-"name": "vis_decal_b17_grime_nouv",
-"min": [
-5.82,
-10.0,
--15.364
-],
-"max": [
-18.254,
-10.7,
-18.124
-],
-"top": {
-"h": 10.7,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "vis_decal_b17_cracks_nouv",
 "min": [
 5.816,
@@ -12478,14 +12378,14 @@
 {
 "name": "concrete_terrace_roof",
 "min": [
--18.545,
+-20.366,
 16.55,
--44.967
+-46.497
 ],
 "max": [
 -9.473,
 17.3,
--35.622
+-35.533
 ],
 "top": {
 "h": 17.3,
@@ -13455,31 +13355,6 @@
 }
 },
 {
-"name": "vis_decal_b15_grime_nouv",
-"min": [
-33.43,
-9.93,
--96.49
-],
-"max": [
-39.02,
-10.708,
--68.86
-],
-"top": {
-"h": 10.708,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "concrete_building32",
 "min": [
 -4.25,
@@ -13594,31 +13469,6 @@
 ],
 "top": {
 "h": 15.58,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_b32_grime_nouv",
-"min": [
--3.641,
-10.09,
--37.092
-],
-"max": [
-14.346,
-11.071,
--21.72
-],
-"top": {
-"h": 11.0714,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13757,31 +13607,6 @@
 }
 },
 {
-"name": "vis_decal_b9_grime_nouv",
-"min": [
--3.65,
-10.07,
--73.58
-],
-"max": [
-16.739,
-11.069,
--58.4
-],
-"top": {
-"h": 11.0692,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "concrete_building22",
 "min": [
 -4.79,
@@ -13896,31 +13721,6 @@
 ],
 "top": {
 "h": 18.9316,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_b22_grime_nouv",
-"min": [
--4.38,
-10.03,
--19.37
-],
-"max": [
-3.01,
-11.014,
--8.23
-],
-"top": {
-"h": 11.0145,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14072,31 +13872,6 @@
 ],
 "top": {
 "h": 15.5826,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_b10_grime_nouv",
-"min": [
--27.615,
-10.15,
--73.045
-],
-"max": [
--13.575,
-11.149,
--56.205
-],
-"top": {
-"h": 11.1486,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14566,31 +14341,6 @@
 }
 },
 {
-"name": "vis_decal_b3_grime_nouv",
-"min": [
--35.42,
-10.03,
-5.18
-],
-"max": [
--18.38,
-11.029,
-23.32
-],
-"top": {
-"h": 11.0294,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "concrete_building18",
 "min": [
 -7.15,
@@ -14717,31 +14467,6 @@
 }
 },
 {
-"name": "vis_decal_b18_grime_nouv",
-"min": [
--5.67,
-10.13,
--4.58
-],
-"max": [
-3.24,
-11.108,
-14.01
-],
-"top": {
-"h": 11.1076,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "concrete_poles",
 "min": [
 -11.322,
@@ -14800,11 +14525,11 @@
 ],
 "max": [
 5.816,
-18.5,
+18.42,
 22.874
 ],
 "top": {
-"h": 18.5,
+"h": 18.42,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -15056,31 +14781,6 @@
 ],
 "top": {
 "h": 13.51,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_bsp1_grime_nouv",
-"min": [
--9.655,
-10.0,
--53.3
-],
-"max": [
--0.83,
-10.977,
--45.616
-],
-"top": {
-"h": 10.9773,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -15444,31 +15144,6 @@
 }
 },
 {
-"name": "vis_decal_b24_grime_nouv",
-"min": [
-8.976,
-10.0,
-58.336
-],
-"max": [
-25.984,
-10.7,
-86.374
-],
-"top": {
-"h": 10.7,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
 "name": "vis_decal_b24_cracks_nouv",
 "min": [
 8.976,
@@ -15491,6 +15166,356 @@
 "bullet": false,
 "eye": true,
 "camera": false
+}
+},
+{
+"name": "vis_decal_b9_grime_nouv",
+"min": [
+-3.64,
+10.07,
+-73.57
+],
+"max": [
+16.733,
+10.87,
+-58.41
+],
+"top": {
+"h": 10.87,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_bsp1_grime_nouv",
+"min": [
+-9.655,
+10.0,
+-53.3
+],
+"max": [
+-0.83,
+10.8,
+-45.618
+],
+"top": {
+"h": 10.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b3_grime_nouv",
+"min": [
+-35.41,
+10.03,
+5.19
+],
+"max": [
+-18.39,
+10.83,
+23.31
+],
+"top": {
+"h": 10.83,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b5_grime_nouv",
+"min": [
+-35.525,
+10.0,
+-13.285
+],
+"max": [
+-18.736,
+10.8,
+2.756
+],
+"top": {
+"h": 10.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b10_grime_nouv",
+"min": [
+-27.605,
+10.15,
+-73.035
+],
+"max": [
+-13.585,
+10.95,
+-56.215
+],
+"top": {
+"h": 10.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b15_grime_nouv",
+"min": [
+33.41,
+9.93,
+-96.51
+],
+"max": [
+39.08,
+10.73,
+-68.51
+],
+"top": {
+"h": 10.73,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b17_grime_nouv",
+"min": [
+5.816,
+10.0,
+-15.373
+],
+"max": [
+18.261,
+10.8,
+18.134
+],
+"top": {
+"h": 10.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b18_grime_nouv",
+"min": [
+-5.66,
+10.13,
+-4.57
+],
+"max": [
+3.54,
+10.93,
+14.0
+],
+"top": {
+"h": 10.93,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b22_grime_nouv",
+"min": [
+-4.37,
+10.03,
+-19.36
+],
+"max": [
+3.0,
+10.83,
+-8.24
+],
+"top": {
+"h": 10.83,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b24_grime_nouv",
+"min": [
+8.976,
+10.0,
+58.332
+],
+"max": [
+25.994,
+10.8,
+86.382
+],
+"top": {
+"h": 10.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b31_grime_nouv",
+"min": [
+-24.04,
+10.0,
+28.8
+],
+"max": [
+-4.458,
+10.8,
+44.22
+],
+"top": {
+"h": 10.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b32_grime_nouv",
+"min": [
+-3.827,
+10.09,
+-37.294
+],
+"max": [
+14.546,
+10.89,
+-21.73
+],
+"top": {
+"h": 10.89,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b6_grime_nouv",
+"min": [
+-38.91,
+10.0,
+-32.72
+],
+"max": [
+-17.39,
+10.8,
+-18.75
+],
+"top": {
+"h": 10.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "concrete_building11.007",
+"min": [
+-24.643,
+9.882,
+-36.599
+],
+"max": [
+-24.058,
+10.358,
+-36.003
+],
+"top": {
+"h": 10.3577,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
 }
 },
 {
