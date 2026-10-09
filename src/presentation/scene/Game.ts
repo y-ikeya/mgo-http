@@ -27,7 +27,7 @@ import {
 } from "../../domain/player/skill";
 import { BLAST_RADIUS, RELEASE_HEIGHT, throwSpeedOf } from "../../domain/item/grenade";
 import { pelletsOf } from "../../domain/item/weapons";
-import { leanMetres, type Lean, type Stance } from "../../domain/player/stance";
+import { VIEW_HEIGHT, leanMetres, type Lean, type Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
 import {
   buildLights,
@@ -2836,6 +2836,10 @@ export class Game {
    * 引っ込められた、では物陰から撃てない (2026-10-09 本人)
    *
    * 下ろしている間は少し長めに測る。境目で構えと下ろしを行き来させない
+   *
+   * **高さは姿勢の表 (VIEW_HEIGHT) から取る。頭の実測は使わない** — 構えて下を
+   * 向くと頭が下がるので、実測だと「構える → 頭が下がって塞がる → 下ろす →
+   * 頭が上がって通る」を繰り返した (2026-10-09 本人)
    */
   private measureMuzzleBlocked(): boolean {
     const held = this.inv.held;
@@ -2843,13 +2847,17 @@ export class Game {
     const solid = this.stage.moveWorld?.surfaces;
     if (!solid) return false;
     const me = this.player.position;
-    const y = me.y + Math.max(MUZZLE_MIN_HEIGHT, this.player.viewHeight - MUZZLE_BELOW_EYE);
+    const stance = this.player.stance;
+    const [low, high] = VIEW_HEIGHT[stance];
+    const y = me.y + Math.max(MUZZLE_MIN_HEIGHT, low - MUZZLE_BELOW_EYE);
     const reach = weaponOf(held).aimReach * (this.muzzleBlocked ? MUZZLE_HYSTERESIS : 1);
     const yaw = this.follow.aimYaw;
     const tx = me.x - Math.sin(yaw) * reach;
     const tz = me.z - Math.cos(yaw) * reach;
     if (solid.clear(me.x, y, me.z, tx, y, tz)) return false;
-    const over = me.y + this.player.viewHeight + MUZZLE_OVER_EYE;
+    // 伏せの幅の上は起き上がりかけの頭なので、伏せたままの頭 (下の端) で見る
+    const eye = stance === "prone" || stance === "down" ? low : high;
+    const over = me.y + eye + MUZZLE_OVER_EYE;
     return !solid.clear(me.x, over, me.z, tx, over, tz);
   }
 
