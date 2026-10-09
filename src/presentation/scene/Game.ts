@@ -2810,6 +2810,9 @@ export class Game {
     this.setSkill(focus, Math.max(0, Math.min(3, level)));
   }
 
+  /** 長押しで READY にした押下を、まだ離していない */
+  private readyReleaseWait = false;
+
   /** READY を押し始めた時刻 (performance.now)。0 なら押していない */
   private readyHoldSince = 0;
 
@@ -2847,7 +2850,13 @@ export class Game {
        * いるつもりの × で READY になり、相手が先に押していると支度が終わった
        * (2026-10-09 本人)。取り消しは 1 押しで — 外すのは急いでいい
        */
-      if (this.selfReady) {
+      /*
+       * 長押しで READY にした、その押下を離すまでは取り消しを読まない。
+       * 離した瞬間が 1 押しとして立ち、押し続けて離すと解除されていた
+       */
+      if (this.readyReleaseWait) {
+        if (!this.input.down("spawn")) this.readyReleaseWait = false;
+      } else if (this.selfReady) {
         this.readyHoldSince = 0;
         if (this.input.tapped("spawn")) this.setReady(false);
       } else if (this.input.down("spawn")) {
@@ -2855,6 +2864,7 @@ export class Game {
         if (this.readyHoldSince === 0) this.readyHoldSince = now;
         if (now - this.readyHoldSince >= READY_HOLD * 1000) {
           this.readyHoldSince = 0;
+          this.readyReleaseWait = true;
           this.setReady(true);
         }
       } else {

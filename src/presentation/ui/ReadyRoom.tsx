@@ -68,6 +68,8 @@ export default function ReadyRoom(props: {
    * 数えて hold で渡してくる — 両方のうち進んでいる方を描く
    */
   const [pressedAt, setPressedAt] = createSignal(0)
+  /** 押し下げた時に READY だったか */
+  let readyAtDown = false
   const [now, setNow] = createSignal(0)
   let raf = 0
   const tick = () => {
@@ -169,12 +171,15 @@ export default function ReadyRoom(props: {
             classList={{ 'loadout-ok-ready': ready() }}
             style={{ '--fill': fill() }}
             onPointerDown={() => {
-              if (!ready()) setPressedAt(performance.now())
+              readyAtDown = ready()
+              if (!readyAtDown) setPressedAt(performance.now())
             }}
             onPointerUp={() => setPressedAt(0)}
             onPointerLeave={() => setPressedAt(0)}
             onClick={() => {
-              if (ready()) props.onReady(false)
+              // 押した時に既に READY だった時だけ取り消す。長押しで READY にした
+              // その押下を離した時の click で外さない
+              if (readyAtDown && ready()) props.onReady(false)
             }}
           >
             {ready() ? 'READY を取り消す' : 'READY (長押し)'}
