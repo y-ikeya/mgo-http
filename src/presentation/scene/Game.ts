@@ -418,6 +418,8 @@ const STAB_HIT_PHASE = 0.19;
 const PRONE_STAB_HIT_PHASE = 0.36;
 /** 銃を構える高さは目の線からこれだけ下 (m) */
 const MUZZLE_BELOW_EYE = 0.15;
+/** 低い遮蔽を越えて構える時、銃を出す高さは目の線からこれだけ上 (m) */
+const MUZZLE_OVER_EYE = 0.05;
 /** 伏せていても銃はこれより下には無い (m)。床を拾わない */
 const MUZZLE_MIN_HEIGHT = 0.15;
 /** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
@@ -2829,6 +2831,10 @@ export class Game {
    * (武器の表の aimReach) だけ水平に線を引く。** 当たる面は人が止まる物
    * (茂みは通す・ガラスや柵は止める)。高さは目の線より少し下 (銃を構える所)。
    *
+   * **低い遮蔽 (土嚢など) は越えて構えられる。** 銃の高さで当たっても、目の
+   * 高さの線が通るなら銃を上に出せる。土嚢の陰にしゃがんで寄ったら銃を
+   * 引っ込められた、では物陰から撃てない (2026-10-09 本人)
+   *
    * 下ろしている間は少し長めに測る。境目で構えと下ろしを行き来させない
    */
   private measureMuzzleBlocked(): boolean {
@@ -2840,7 +2846,11 @@ export class Game {
     const y = me.y + Math.max(MUZZLE_MIN_HEIGHT, this.player.viewHeight - MUZZLE_BELOW_EYE);
     const reach = weaponOf(held).aimReach * (this.muzzleBlocked ? MUZZLE_HYSTERESIS : 1);
     const yaw = this.follow.aimYaw;
-    return !solid.clear(me.x, y, me.z, me.x - Math.sin(yaw) * reach, y, me.z - Math.cos(yaw) * reach);
+    const tx = me.x - Math.sin(yaw) * reach;
+    const tz = me.z - Math.cos(yaw) * reach;
+    if (solid.clear(me.x, y, me.z, tx, y, tz)) return false;
+    const over = me.y + this.player.viewHeight + MUZZLE_OVER_EYE;
+    return !solid.clear(me.x, over, me.z, tx, over, tz);
   }
 
   /** 長押しで READY にした押下を、まだ離していない */
