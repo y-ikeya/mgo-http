@@ -9,6 +9,9 @@
 #     以前は 2.3m ごとに板を分けて 10cm 空け、高さも板ごとに変えていた — 壁の途中の辺の
 #     切れ目で余りの切れ端もできて、細切れに見えた (2026-10-09 本人)。
 #     DIRTY に 'only': ['grime'] を渡すと泥だけ作り直す (雨だれ・角は乱数なので触らない)。
+#     作り直す時は 'like_existing': True も渡す — いまの汚れが付いている壁にだけ作る (見えない側は外したまま)。
+#     壁を別々の物で組んだ建物は 'body' に名前の並びを渡す (b6: concrete_wall6_east / north / south / west)。
+#     2026-10-09 に全棟 (b3 b5 b6 b9 b10 b15 b17 b18 b22 b24 b31 b32 sp1) をこれで作り直した。
 # 雨だれ: 壁の面ごとに 1〜3 本、壁の上端から 0.8〜1.6m 垂らす。細いので縞が半分の絵 (decal_streak_half)。
 # 角: tools/gen/edge_wear.py。
 import bpy, bmesh, random
@@ -17,7 +20,9 @@ from mathutils import Vector
 E = 0.01
 cfg = globals().get('DIRTY', {})
 random.seed(cfg.get('seed', 5))
-body = bpy.data.objects[cfg['body']]
+# 本体は 1 つか、壁を別々の物で組んだ建物 (b6 の concrete_wall6_*) なら名前の並び
+BODIES = [bpy.data.objects[n] for n in (cfg['body'] if isinstance(cfg['body'], (list, tuple)) else [cfg['body']])]
+body = BODIES[0]
 TAG = cfg['tag']
 GROUND = cfg.get('ground', 10.0)
 grime_mat = bpy.data.materials['decal_grime']
@@ -50,8 +55,15 @@ def outline(zcut, min_len=0.3):
     """本体を z = zcut で切った輪郭の辺 [(a, b, 外向きの法線)]"""
     dg = bpy.context.evaluated_depsgraph_get()
     bm = bmesh.new()
-    bm.from_mesh(body.evaluated_get(dg).data)
-    bm.transform(body.matrix_world)
+    for part in BODIES:
+        one = bmesh.new()
+        one.from_mesh(part.evaluated_get(dg).data)
+        one.transform(part.matrix_world)
+        tmp = bpy.data.meshes.new('_dirty_tmp')
+        one.to_mesh(tmp)
+        one.free()
+        bm.from_mesh(tmp)
+        bpy.data.meshes.remove(tmp)
     r = bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, zcut), plane_no=(0, 0, 1), clear_inner=True, clear_outer=True)
     edges = [g for g in r['geom_cut'] if isinstance(g, bmesh.types.BMEdge)]
     pts = [v.co.copy() for e in edges for v in e.verts]
@@ -114,6 +126,70 @@ def runs(edges):
     return out
 
 
+def keep_like(bm, uv, old):
+    """いまある汚れ (old) が付いていた壁にだけ帯を残す。範囲もそこに揃える。
+
+    見えない壁 (隣の建物に面した側) の汚れは前に外してある (2026-10 本人:
+    見えない所は要らない)。作り直しで戻さないため。部屋の中の面 (古い帯より
+    内側) は捨て、柱型の出っ張り (外側) は拾う。出っ張りの側面のような短い帯は、
+    両端が残した帯に付いていれば残す。
+    """
+    M = old.matrix_world
+    lines = []
+    for p in old.data.polygons:
+        n = M.to_3x3() @ p.normal
+        n.z = 0
+        if n.length < 0.5:
+            continue
+        lines.append((n.normalized(), [M @ old.data.vertices[i].co for i in p.vertices]))
+    keep = set()
+    for f in bm.faces:
+        n = f.normal.copy(); n.z = 0
+        if n.length < 0.5:
+            continue
+        n.normalize()
+        t = Vector((-n.y, n.x, 0))
+        ws = [v.co for v in f.verts]
+        ss = [w.dot(t) for w in ws]
+        s0, s1 = min(ss), max(ss)
+        spans = []
+        for on, ovs in lines:
+            if abs(on.dot(n)) < 0.9:
+                continue
+            # 外か内かは古い帯の向き (壁から外へ) で測る。新しい帯は向きをまだ揃えていない
+            off = sum(w.to_2d().dot(on.to_2d()) for w in ws) / len(ws)
+            oo = sum(v.to_2d().dot(on.to_2d()) for v in ovs) / len(ovs)
+            if not (oo - 0.1 <= off <= oo + 0.6):
+                continue
+            os_ = [v.dot(t) for v in ovs]
+            if max(os_) > s0 - 0.3 and min(os_) < s1 + 0.3:
+                spans.append((min(os_), max(os_)))
+        if not spans:
+            continue
+        lo = max(s0, min(a for a, b in spans) - 0.35)
+        hi = min(s1, max(b for a, b in spans) + 0.35)
+        if hi - lo < 0.1:
+            continue
+        for l in f.loops:
+            sv = l.vert.co.dot(t)
+            if sv < lo or sv > hi:
+                l.vert.co += t * (min(max(sv, lo), hi) - sv)
+        for l in f.loops:
+            l[uv].uv.x = (l.vert.co.dot(t) - lo) / GRIME_TILE
+        keep.add(f)
+
+    def ends(f):
+        return [v.co.to_2d() for v in sorted(f.verts, key=lambda v: v.co.z)[:2]]
+    kept = [e for f in keep for e in ends(f)]
+    for f in bm.faces:
+        if f in keep:
+            continue
+        e = ends(f)
+        if (e[0] - e[1]).length < 0.7 and all(any((p - q).length < 0.06 for q in kept) for p in e):
+            keep.add(f)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f not in keep], context='FACES')
+
+
 # ---- 泥
 if not ONLY or 'grime' in ONLY:
     gr = bmesh.new(); gr_uv = gr.loops.layers.uv.new('UVMap')
@@ -130,6 +206,11 @@ if not ONLY or 'grime' in ONLY:
         u1 = L / GRIME_TILE
         up = Vector((0, 0, GRIME_H))
         quad(gr, gr_uv, [p0, p1, p1 + up, p0 + up], ((0, 0), (u1, 0), (u1, 1), (0, 1)))
+    # 'like_existing': True … いまの汚れが付いている壁にだけ作り直す (向きを揃えてから比べる)
+    old = bpy.data.objects.get('vis_decal_b%s_grime_nouv' % TAG)
+    if cfg.get('like_existing') and old:
+        gr.normal_update()
+        keep_like(gr, gr_uv, old)
     o = finish('vis_decal_b%s_grime_nouv' % TAG, gr, grime_mat)
     if o and ONLY:
         # 裏返った面を表へ (通しで回す時は下の角の段でまとめてやる)
