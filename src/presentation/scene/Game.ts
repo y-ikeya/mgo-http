@@ -1155,6 +1155,18 @@ export class Game {
    * @param privateRoom 自分だけの部屋に入る (練習 /training)。他の人とは出会わない
    */
   constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
+    /*
+     * **1 枚の頁で動く試合は 1 つだけ。** 前の物が残っていれば片付ける。
+     *
+     * 開発中にコードを差し替える (HMR) と、画面は作り直されるのに古い Game が
+     * 片付けられずに残ることがあった。残った方は通信も位置の送信も続けるので、
+     * 本人が部屋の一覧へ戻った後も、サーバーには「部屋に居て立っている人」として
+     * 残り、相手が居なくならず試合が終わらなかった (2026-10-09)。HMR で Game の
+     * 型そのものが差し替わるので、控えは型の外 (globalThis) に置く
+     */
+    const page = globalThis as { __mgoGame?: Game };
+    if (page.__mgoGame && page.__mgoGame !== this) page.__mgoGame.dispose();
+    page.__mgoGame = this;
     this.container = container;
     /*
      * どのステージに乗るか。**部屋から引く** (domain/match/room.ts)。
@@ -1494,6 +1506,10 @@ export class Game {
   }
 
   dispose(): void {
+    // 2 度呼ばれてよい (画面の片付けと、次の Game が古い物を片付けるのと)
+    if (this.disposed) return;
+    const page = globalThis as { __mgoGame?: Game };
+    if (page.__mgoGame === this) page.__mgoGame = undefined;
     clearTimeout(this.resultTimer);
     this.disposed = true;
     this.renderer.setAnimationLoop(null);
