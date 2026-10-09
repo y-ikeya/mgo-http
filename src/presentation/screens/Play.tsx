@@ -166,8 +166,12 @@ export default function Play(props: {
    */
   createEffect(() => {
     if (!stats()?.expired) return
-    // 最初の画面 (/) へ。対戦でも練習でも、入り直すのはそこから
-    navigate('/', { state: { notice: 'expired' } })
+    /*
+     * **来た所へ返す。** 対戦なら部屋の一覧 (/rooms)、練習なら最初の画面 (/)。
+     * 練習を /training へ直に返さないのは、あの画面は開いた瞬間に繋ぎに行くので、
+     * 認証が戻っていなければまた切れて、ここへ戻ってくる (行き来が止まらない)
+     */
+    navigate(training ? '/' : '/rooms', { state: { notice: 'expired' } })
   })
 
   onMount(() => {
