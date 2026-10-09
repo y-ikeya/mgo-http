@@ -141,6 +141,12 @@ export interface WeaponSpec {
   shotSound: 'rifle' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
+  /**
+   * 構えた時に銃口が体の中心からどれだけ前へ出るか (m)。**この先に壁や物が
+   * あると構えられない** (presentation の Game が地形に聞く)。長い銃ほど
+   * 壁際で構えにくい — 狭い所で狙撃銃を持つ代償 (2026-10-09 本人)
+   */
+  aimReach: number
 
   // --- 威力 ---
   /**
@@ -349,6 +355,7 @@ const SMG: WeaponSpec = {
   shotSound: 'smg',
   reloadSound: 'smgReload',
   model: 'smg',
+  aimReach: 0.55,
 
   // 頭 1 発 / 胴 7 発 (0.39 秒) / 脚 15 発
   cost: 0,
@@ -418,6 +425,7 @@ const RIFLE: WeaponSpec = {
   shotSound: 'rifle',
   reloadSound: 'reload',
   model: 'rifle',
+  aimReach: 0.75,
 
   // 頭 1 発 / 胴 5 発 / 脚 10 発
   cost: 0,
@@ -495,6 +503,7 @@ const SNIPER: WeaponSpec = {
   shotSound: 'snipe',
   reloadSound: 'reload',
   model: 'sniper',
+  aimReach: 0.95,
 
   // 頭 1 発 / 胴 2 発 / 脚 4 発。
   //
@@ -575,6 +584,7 @@ const MOSIN: WeaponSpec = {
   boltSound: 'mosinCock',
   reloadSound: 'reload',
   model: 'mosin',
+  aimReach: 0.95,
   cost: 0,
   // モシンナガン M91/30。狙撃銃 (5.5) より軽いが、突撃銃よりは重い
   weight: 4.0,
@@ -666,6 +676,7 @@ const PISTOL: WeaponSpec = {
   shotSound: 'm9',
   reloadSound: 'pistolReload',
   model: 'm9',
+  aimReach: 0.4,
   // 胴 4 発。突撃銃 (5 発) よりわずかに速いだけで、離れると減衰で届かなくなる
   zone: { HEAD: 100, BODY: 25, LEGS: 12.5 },
   /*
@@ -792,6 +803,7 @@ const M1911: WeaponSpec = {
   shotSound: 'm1911',
   reloadSound: 'm1911Reload',
   model: 'm1911',
+  aimReach: 0.4,
   // 胴 3 発。M9 (4 発) より 1 発早い
   zone: { HEAD: 100, BODY: 34, LEGS: 16 },
   fullRange: 12,
@@ -831,6 +843,7 @@ const SHOTGUN: WeaponSpec = {
   boltSound: 'shotgunCock',
   reloadSound: 'reload',
   model: 'shotgun',
+  aimReach: 0.8,
 
   cost: 0,
   // M870。木製ストックの実銃の値

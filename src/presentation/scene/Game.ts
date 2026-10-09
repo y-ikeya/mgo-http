@@ -416,6 +416,12 @@ const MAX_RANGE = 200;
 const STAB_HIT_PHASE = 0.19;
 /** 伏せた刺突 (prone_stab、41 コマ)。11〜17 コマ目で伸びるので、伸び切る直前の 15 コマ目 */
 const PRONE_STAB_HIT_PHASE = 0.36;
+/** 銃を構える高さは目の線からこれだけ下 (m) */
+const MUZZLE_BELOW_EYE = 0.15;
+/** 伏せていても銃はこれより下には無い (m)。床を拾わない */
+const MUZZLE_MIN_HEIGHT = 0.15;
+/** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
+const MUZZLE_HYSTERESIS = 1.08;
 /** READY に入るまで押し続ける時間 (秒)。画面のボタンも同じ長さ (ReadyRoom.tsx) */
 export const READY_HOLD = 0.6;
 /** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
@@ -1603,7 +1609,12 @@ export class Game {
     // **述語で聞く。** 並べて書いていたので decoy を足したときに漏れた
     const throwing = isThrowable(this.inv.held);
     const wantsAim = this.input.aiming && this.input.engaged && !this.loadoutBlocking;
-    this.player.setAiming(wantsAim && !throwing);
+    /*
+     * **銃口の先に壁や物があると構えられない。** 毎フレーム聞くので、構えたまま
+     * 壁へ寄っていけば、そこで銃を下ろす (2026-10-09 本人)
+     */
+    this.muzzleBlocked = this.measureMuzzleBlocked();
+    this.player.setAiming(wantsAim && !throwing && !this.muzzleBlocked);
     /*
      * **カメラは投げ物でも寄る。** 体は構えの型にしないが (振りかぶりと二重になる)、
      * 見ている側にとって「構えた」のは同じ — 落下点を狙う画面は銃と同じ寄りにする。
@@ -2808,6 +2819,28 @@ export class Game {
     if (!this.canChooseSkillsNow) return;
     const level = (this.skills[focus] ?? 0) + step;
     this.setSkill(focus, Math.max(0, Math.min(3, level)));
+  }
+
+  /** 銃口の先が壁や物に当たっていて、構えられない */
+  private muzzleBlocked = false;
+
+  /**
+   * 構えた銃が壁や物に刺さるか。**体の中心から照準の向きへ、銃の長さ
+   * (武器の表の aimReach) だけ水平に線を引く。** 当たる面は人が止まる物
+   * (茂みは通す・ガラスや柵は止める)。高さは目の線より少し下 (銃を構える所)。
+   *
+   * 下ろしている間は少し長めに測る。境目で構えと下ろしを行き来させない
+   */
+  private measureMuzzleBlocked(): boolean {
+    const held = this.inv.held;
+    if (!isGun(held)) return false;
+    const solid = this.stage.moveWorld?.surfaces;
+    if (!solid) return false;
+    const me = this.player.position;
+    const y = me.y + Math.max(MUZZLE_MIN_HEIGHT, this.player.viewHeight - MUZZLE_BELOW_EYE);
+    const reach = weaponOf(held).aimReach * (this.muzzleBlocked ? MUZZLE_HYSTERESIS : 1);
+    const yaw = this.follow.aimYaw;
+    return !solid.clear(me.x, y, me.z, me.x - Math.sin(yaw) * reach, y, me.z - Math.cos(yaw) * reach);
   }
 
   /** 長押しで READY にした押下を、まだ離していない */
