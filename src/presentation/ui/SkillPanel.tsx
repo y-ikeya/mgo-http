@@ -27,6 +27,8 @@ export function SkillList(props: {
    * 対戦表は読むだけの場所なので渡さない (印を出しても押せない)。
    */
   focus?: string
+  /** 指した技 (マウスを乗せた)。待合室が詳しい数字を出すのに使う */
+  onHover?: (id: SkillId) => void
 }) {
   const skillList = Object.values(SKILLS)
   const spent = () => costOf(props.skills)
@@ -39,6 +41,7 @@ export function SkillList(props: {
           <div
             class="skill"
             classList={{ 'skill-on': level() > 0, 'skill-focus': props.focus === spec.id }}
+            onMouseEnter={() => props.onHover?.(spec.id)}
           >
             <span class="skill-name">{spec.label}</span>
             {/*

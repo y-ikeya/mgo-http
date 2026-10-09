@@ -53,6 +53,12 @@ export const TICKETS = Math.max(1, Number(process.env.MGO2_TICKETS) || 20)
  * READY を押すので、5 秒の告知の間に押した分は支度に入った所で消えてしまう
  */
 const ASSEMBLE_MS = process.env.MGO2_ASSEMBLE_MS !== undefined ? Number(process.env.MGO2_ASSEMBLE_MS) : ASSEMBLED_SECONDS * 1000
+/**
+ * 全員の READY が揃ってから数え始めるまで (ms)。**この間に誰かが取り消せば支度へ戻る。**
+ * 揃った瞬間に始めていた頃は、相手が先に押していると自分の 1 押しで支度が終わり、
+ * 押し間違いに気付いても取り消す間が無かった (2026-10-09 本人)。試験は 0 (test/server.ts)
+ */
+const READY_GRACE_MS = process.env.MGO2_READY_GRACE_MS !== undefined ? Number(process.env.MGO2_READY_GRACE_MS) : 3000
 
 /** 決着してから次の支度が始まるまで (ms)。結果を読む時間 */
 export const INTERMISSION_MS = 10 * 1000
@@ -419,6 +425,8 @@ function enterReady(room: RoomWorld, now: number): void {
   room.matchId = null
   room.phase = 'ready'
   room.endsAt = now + READY_SECONDS * 1000
+  room.allReadyAt = 0
+  room.readyDeadline = room.endsAt
   room.blue = TICKETS
   room.red = TICKETS
   room.winner = undefined
@@ -427,13 +435,14 @@ function enterReady(room: RoomWorld, now: number): void {
 }
 
 /**
- * 全員の支度が済んだか。**居る人だけ数える。**
+ * 全員の支度が済んだか。**席を持っている人を全員数える** (戻りを待っている人も)。
  *
- * 接続の切れた人 (dropped) を数えると、戻ってこない人が居る限り始まらない。
- * 席は 30 秒残るので、そこを待っていると部屋が止まる。
+ * 繋がっている人だけを数えていた頃は、相手がリロードで一瞬切れた間に残った 1 人が
+ * 押すと揃ったことになり、相手を置いて始まった (2026-10-09)。戻ってこない人で部屋が
+ * 止まることは無い — 支度の締め切り (READY_SECONDS) で始まり、席も 30 秒で畳まれる
  */
 function allReady(room: RoomWorld): boolean {
-  const here = connected(room).filter((p) => !p.bot)
+  const here = [...room.players.values()].filter((p) => !p.bot)
   return here.length > 0 && here.every((p) => p.ready)
 }
 
@@ -519,7 +528,23 @@ export function updateMatch(room: RoomWorld, now: number): void {
      * 押さない人が居ても止めない。席を離れた人 1 人で部屋が止まるのは、
      * 装備の打ち切り (CHOOSE_TIMEOUT) と同じ理由で困る。
      */
-    if (allReady(room) || now >= room.endsAt) {
+    /*
+     * **揃っても少し待つ** (READY_GRACE_MS)。待っている間は締め切りをそこまで
+     * 縮めて見せ、誰かが取り消したら元の締め切りへ戻す
+     */
+    const all = allReady(room)
+    if (all && room.allReadyAt === 0) {
+      room.allReadyAt = now
+      room.readyDeadline = room.endsAt
+      room.endsAt = Math.min(room.endsAt, now + READY_GRACE_MS)
+      broadcast(room, matchState(room))
+    } else if (!all && room.allReadyAt !== 0) {
+      room.allReadyAt = 0
+      room.endsAt = room.readyDeadline
+      broadcast(room, matchState(room))
+    }
+    if (now >= room.endsAt) {
+      room.allReadyAt = 0
       room.phase = 'countdown'
       room.endsAt = now + COUNTDOWN_MS
       /*

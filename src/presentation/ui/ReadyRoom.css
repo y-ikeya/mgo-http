@@ -1,0 +1,179 @@
+/*
+ * 待合室。左に兵士、右にスキルと効き目、下に参加者と READY。
+ * 色は装備画面 (Loadout.css) と同じ域。部品 (参加者・READY) はあちらの物を使う。
+ */
+.readyroom {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  pointer-events: auto;
+  background: rgba(6, 9, 6, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.readyroom-stage {
+  position: relative;
+  min-height: 0;
+  background: radial-gradient(ellipse at 50% 70%, rgba(60, 74, 52, 0.55), rgba(6, 9, 6, 0) 70%);
+}
+
+.readyroom-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.readyroom-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: rgba(12, 16, 10, 0.88);
+  border-left: 1px solid rgba(160, 190, 140, 0.24);
+}
+
+.readyroom-skills {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px 24px;
+  overflow-y: auto;
+}
+
+.readyroom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.readyroom-budget {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: rgba(190, 210, 170, 0.85);
+  margin-bottom: 6px;
+}
+
+.readyroom-locked {
+  display: block;
+  margin-top: 4px;
+  letter-spacing: 0;
+  color: rgba(220, 190, 120, 0.85);
+}
+
+.readyroom-detail {
+  align-self: start;
+  padding: 14px 16px;
+  border: 1px solid rgba(160, 190, 140, 0.2);
+  background: rgba(20, 26, 17, 0.7);
+  color: rgba(210, 222, 196, 0.92);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.readyroom-detail-name {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 16px;
+  letter-spacing: 0.14em;
+}
+
+.readyroom-detail-summary {
+  margin: 6px 0 10px;
+  color: rgba(186, 202, 170, 0.9);
+}
+
+.readyroom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.readyroom-table th,
+.readyroom-table td {
+  padding: 4px 6px;
+  text-align: right;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.1);
+  white-space: nowrap;
+}
+
+.readyroom-table th {
+  font-weight: normal;
+  font-size: 11px;
+  color: rgba(160, 180, 146, 0.7);
+}
+
+.readyroom-table .readyroom-label {
+  text-align: left;
+  white-space: normal;
+  color: rgba(176, 192, 160, 0.85);
+}
+
+.readyroom-table .readyroom-on {
+  color: rgba(226, 240, 200, 1);
+  background: rgba(120, 160, 90, 0.18);
+}
+
+.readyroom-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(170, 186, 156, 0.85);
+}
+
+.readyroom-cost {
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(150, 166, 136, 0.7);
+}
+
+.readyroom-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(160, 190, 140, 0.16);
+}
+
+.readyroom-foot .loadout-roster {
+  flex: 1;
+}
+
+/* 長押しで左から満ちる */
+.readyroom-ready {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  width: auto;
+  min-width: 220px;
+  border-top: none;
+  border: 1px solid rgba(160, 190, 140, 0.24);
+}
+
+.readyroom-ready::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(var(--fill, 0));
+  background: rgba(150, 200, 110, 0.32);
+  pointer-events: none;
+}
+
+.readyroom-guide {
+  padding: 0 24px 14px;
+  font-size: 12px;
+  color: rgba(160, 176, 146, 0.75);
+}
+
+@media (max-width: 760px) {
+  .readyroom {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 30vh minmax(0, 1fr);
+  }
+  .readyroom-skills {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

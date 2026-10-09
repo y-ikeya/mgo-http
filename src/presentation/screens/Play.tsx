@@ -10,6 +10,9 @@ import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
 import { CHOICES } from '../../domain/item/weapons'
+import ReadyRoom from '../ui/ReadyRoom'
+import { selfSkin } from '../scene/actor/skin'
+import type { WeaponKind } from '../scene/arms/weapon'
 import Loadout from '../ui/Loadout'
 import Blocked from '../ui/Blocked'
 import Leaving from '../ui/Leaving'
@@ -121,8 +124,18 @@ export default function Play(props: {
     // 練習 (/training) は URL を部屋の形に書き換えない
     if (training) return
     const room = roomName()
+    /*
+     * 支度の間 (ready) は待合室の URL (/standby)。**短命だが分けておく** —
+     * 試合の札はまだ無く (始まる時に発番)、部屋の URL のままだと「いま
+     * 支度中か」が URL から読めない (2026-10-09 本人)
+     */
     // 長い札をそのまま貼ると読めない。頭だけで十分に見分けられる
-    const path = label ? `/rooms/${room}/match/${label}` : `/rooms/${room}`
+    const path =
+      current.phase === 'ready'
+        ? `/rooms/${room}/standby`
+        : label
+          ? `/rooms/${room}/match/${label}`
+          : `/rooms/${room}`
     if (location.pathname === path) return
     history.replaceState(history.state, '', `${path}${location.search}`)
   })
@@ -282,7 +295,26 @@ export default function Play(props: {
         装備。支度をしている間 (domain/player/lifecycle.ts の choosing) だけ出す。
         入った直後と、倒れて次に湧くまでがそこにあたる。
       */}
-      <Show when={stats()?.loadoutOpen}>
+      {/*
+        待合室。試合前の支度 (ready) の間は装備画面ではなくこちら。
+        スキルの効き目を数字で読み、長押しで READY する (ui/ReadyRoom.tsx)
+      */}
+      <Show when={stats()?.loadoutOpen && stats()?.match?.phase === 'ready'}>
+        <ReadyRoom
+          skin={selfSkin(props.identity.displayName)}
+          gun={(stats()?.primary ?? null) as WeaponKind | null}
+          left={stats()?.loadoutLeft ?? 0}
+          skills={stats()?.skills ?? {}}
+          skillsOpen={stats()?.skillsOpen ?? false}
+          onSkill={(id, level) => game()?.setSkill(id, level)}
+          players={stats()?.scores ?? []}
+          selfId={game()?.selfId ?? ''}
+          onReady={(next) => game()?.setReady(next)}
+          hold={stats()?.readyHold ?? 0}
+          focus={stats()?.loadoutFocus ?? 'primary'}
+        />
+      </Show>
+      <Show when={stats()?.loadoutOpen && stats()?.match?.phase !== 'ready'}>
         <Loadout
           primary={stats()?.primary ?? primary()}
           support={support()}

@@ -236,6 +236,8 @@ export interface GameStats {
   menuOpen: boolean;
   /** 装備の画面を開いているか */
   loadoutOpen: boolean;
+  /** READY の長押しの進み (0〜1)。鍵盤とパッドで押している分 */
+  readyHold: number;
   /** 装備の画面が自動で閉じるまで (秒) */
   loadoutLeft: number;
   /** OK が効くようになるまで (秒)。0 なら押せる */
@@ -414,6 +416,8 @@ const MAX_RANGE = 200;
 const STAB_HIT_PHASE = 0.19;
 /** 伏せた刺突 (prone_stab、41 コマ)。11〜17 コマ目で伸びるので、伸び切る直前の 15 コマ目 */
 const PRONE_STAB_HIT_PHASE = 0.36;
+/** READY に入るまで押し続ける時間 (秒)。画面のボタンも同じ長さ (ReadyRoom.tsx) */
+export const READY_HOLD = 0.6;
 /** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
 const FALLBACK_STAB_DURATION = 1.9;
 
@@ -2806,6 +2810,15 @@ export class Game {
     this.setSkill(focus, Math.max(0, Math.min(3, level)));
   }
 
+  /** READY を押し始めた時刻 (performance.now)。0 なら押していない */
+  private readyHoldSince = 0;
+
+  /** READY の長押しの進み (0〜1)。画面の READY のボタンが満ちていく */
+  private get readyHoldRatio(): number {
+    if (this.readyHoldSince === 0) return 0;
+    return Math.min(1, (performance.now() - this.readyHoldSince) / (READY_HOLD * 1000));
+  }
+
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
     /*
@@ -2828,9 +2841,29 @@ export class Game {
      * 一番下のボタンが「READY」から「OK」に変わるだけで、位置も操作も同じ。
      * 別のキーにすると、始まる前と後で押す指が変わる。
      */
-    if (this.input.tapped("spawn")) {
-      if (this.replica.match?.phase === "ready") this.setReady(!this.selfReady);
-      else this.requestSpawn();
+    if (this.replica.match?.phase === "ready") {
+      /*
+       * **READY は長押し** (READY_HOLD)。1 押しで入っていた頃は、スキルを選んで
+       * いるつもりの × で READY になり、相手が先に押していると支度が終わった
+       * (2026-10-09 本人)。取り消しは 1 押しで — 外すのは急いでいい
+       */
+      if (this.selfReady) {
+        this.readyHoldSince = 0;
+        if (this.input.tapped("spawn")) this.setReady(false);
+      } else if (this.input.down("spawn")) {
+        const now = performance.now();
+        if (this.readyHoldSince === 0) this.readyHoldSince = now;
+        if (now - this.readyHoldSince >= READY_HOLD * 1000) {
+          this.readyHoldSince = 0;
+          this.setReady(true);
+        }
+      } else {
+        this.readyHoldSince = 0;
+      }
+      // 押した瞬間の立ち上がりは食っておく (長押しの途中で湧く側へ漏らさない)
+      this.input.tapped("spawn");
+    } else if (this.input.tapped("spawn")) {
+      this.requestSpawn();
     }
     // **番号は並び順から出す。** 主武器が 1 から、投擲はその続き。
     // 直に書くと、銃が 1 挺増えたときに番号が重なる (P90 を足して実際に重なった)
@@ -5042,6 +5075,7 @@ export class Game {
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
       menuOpen: this.menuOpen,
       loadoutOpen: this.loadoutBlocking,
+      readyHold: this.readyHoldRatio,
       /*
        * 残り秒。**支度の段階では試合が始まるまでを出す。**
        *

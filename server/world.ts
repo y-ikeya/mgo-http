@@ -58,6 +58,10 @@ export interface RoomWorld extends Match {
   name: RoomName
   /** 帳簿 (rooms) の鍵。共有の部屋は名前と同じ、自分だけの練習部屋は人ごと */
   key: string
+  /** 支度の段階で全員の READY が揃った時刻 (ms)。0 なら揃っていない (server/match.ts の READY_GRACE_MS) */
+  allReadyAt: number
+  /** 揃う前の支度の締め切り。誰かが取り消したらここへ戻す */
+  readyDeadline: number
   /** 飛んでいる手榴弾 */
   grenades: Grenade[]
   /** 置かれたクレイモア */
@@ -127,6 +131,8 @@ export function roomOf(name: RoomName, key: string = name): RoomWorld {
       ...newMatch(ROOMS[name].mode),
       name,
       key,
+      allReadyAt: 0,
+      readyDeadline: 0,
       grenades: [],
       claymores: [],
       decoys: [],
