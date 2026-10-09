@@ -42,7 +42,21 @@ export class Portrait {
     this.camera.lookAt(0, 0.92, 0)
     this.resize.observe(host)
     this.fit()
-    void this.build(skin, gun)
+    this.mark(`作った (${skin}, ${gun ?? '銃なし'})`)
+    this.build(skin, gun).catch((error) => {
+      this.mark(`失敗: ${error}`)
+      console.error('[Portrait] 兵士を出せない', error)
+    })
+  }
+
+  /**
+   * いまどこまで進んだか。**画面に兵士が出ない時の手掛かり** — 試写では出るのに
+   * 試合の画面で出なかった (2026-10-09)。置き場 (host) の data-portrait と
+   * コンソールの [Portrait] に残す
+   */
+  private mark(state: string): void {
+    this.host.dataset.portrait = state
+    console.info(`[Portrait] ${state}`)
   }
 
   private fit(): void {
@@ -58,6 +72,10 @@ export class Portrait {
     if (this.disposed) return
     // 読んだ物は試合の兵士と共有している。**写して使う**
     const model = cloneSkinned(gltf.scene)
+    // 動かした後の姿勢は外接の球に映らない。端で消えないよう切る (soldier.ts と同じ)
+    model.traverse((obj) => {
+      obj.frustumCulled = false
+    })
     model.rotation.y = MODEL_YAW_OFFSET
     const root = new THREE.Group()
     root.rotation.y = Math.PI + TURN
@@ -89,6 +107,7 @@ export class Portrait {
       anim.setHandsEmpty(true)
     }
     this.anim = anim
+    this.mark(`描き始め (${this.host.clientWidth}x${this.host.clientHeight})`)
     this.clock.start()
     void this.renderer.setAnimationLoop(() => this.frame())
   }

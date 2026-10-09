@@ -5084,7 +5084,7 @@ export class Game {
        * 持っているので、そちらから引く。
        */
       loadoutLeft:
-        this.replica.match?.phase === "ready"
+        this.replica.match?.phase === "ready" || this.replica.match?.phase === "countdown"
           ? Math.max(0, Math.ceil(((this.replica.match?.endsAt ?? 0) - now) / 1000))
           : Math.max(0, Math.ceil(CHOOSE_TIMEOUT - this.chooseElapsed)),
       // OK が効くようになるまで。押せないボタンを押させないための表示

@@ -548,17 +548,10 @@ export function updateMatch(room: RoomWorld, now: number): void {
       room.phase = 'countdown'
       room.endsAt = now + COUNTDOWN_MS
       /*
-       * **数え始めたら全員を戦場へ出す。** 支度の画面 (READY UP) に居た人も、
-       * その時点で選んでいた装備で湧かせる。
-       *
-       * 以前は「武器を選ぶのは始まってから」として支度に留め、秒読みの間と
-       * 始まった後も装備の画面 (LOADOUT) を出していた。試合が始まるのに
-       * 装備の画面が開いているのは意味が無い (2026-10-06 本人)。
-       * 秒読みの最中に入ってきた人・倒れた人は今までどおり画面で選んでから出る
+       * **秒読みの間は装備画面で武器を選ぶ。** 待合室ではスキルだけを決め、
+       * 武器はその後 (2026-10-09 本人: 待合室で武器を選ぶ必要は無い)。
+       * OK を押した人から湧き、残った人は始まる時に湧かせる (下の playing)
        */
-      for (const player of connected(room)) {
-        if (canChoose(player.life)) spawn(room, player, now)
-      }
     }
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
@@ -566,6 +559,13 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく
     room.matchId = crypto.randomUUID()
     room.startedAt = now
+    /*
+     * **始まる時にまだ選んでいる人は、選んでいた装備で出す。** 試合が始まるのに
+     * 装備の画面が開いているのは意味が無い (2026-10-06 本人)
+     */
+    for (const player of connected(room)) {
+      if (canChoose(player.life)) spawn(room, player, now)
+    }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     room.phase = 'over'
