@@ -65,7 +65,7 @@ import {
   primariesOf,
   secondaryOf,
 } from '../src/domain/match/room'
-import { RECONNECT_GRACE_MS, assignTeam, connected, present, nextSlot } from '../src/domain/match/match'
+import { RECONNECT_GRACE_MS, assignTeam, connected, holdsChoosing, present, nextSlot } from '../src/domain/match/match'
 import { stampLocomotion, stampProtected } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD } from '../src/domain/item/held'
@@ -216,7 +216,7 @@ setInterval(() => {
          */
         const effect = advanceLife(player.life, lifeElapsed(player, now))
         if (effect?.kind === 'life') setLife(room, player, effect.to, now)
-        else if (effect?.kind === 'spawn') spawn(room, player, now)
+        else if (effect?.kind === 'spawn' && !holdsChoosing(room.phase)) spawn(room, player, now)
 
         /*
          * ここから下は**戦場に立っている人だけ** (眠り・スタミナ・溺れ)。

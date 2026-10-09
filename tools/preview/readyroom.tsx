@@ -8,9 +8,33 @@
  */
 import { render } from 'solid-js/web'
 import ReadyRoom from '../../src/presentation/ui/ReadyRoom'
+import * as THREE from 'three'
+import { WebGPURenderer } from 'three/webgpu'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { loadSoldier } from '../../src/presentation/scene/assets'
+import { buildLights } from '../../src/presentation/scene/world/stage'
 
 const query = new URLSearchParams(location.search)
 const ready = query.has('ready')
+
+/*
+ * ?game … 試合の描画器を後ろで回す (同じ兵士を描く)。本番では読んだ模型を
+ * 試合の描画器と待合室の描画器が分け合うので、その形で兵士が出るかを見る
+ */
+if (query.has('game')) {
+  const renderer = new WebGPURenderer({ antialias: true })
+  renderer.setSize(400, 300)
+  Object.assign(renderer.domElement.style, { position: 'fixed', right: '0', bottom: '0', zIndex: '99' })
+  document.body.appendChild(renderer.domElement)
+  const scene = new THREE.Scene()
+  buildLights(scene)
+  const camera = new THREE.PerspectiveCamera(40, 4 / 3, 0.1, 50)
+  camera.position.set(0, 1, 4)
+  const gltf = await loadSoldier(query.get('skin') ?? 'soldier')
+  scene.add(cloneSkinned(gltf.scene))
+  void renderer.setAnimationLoop(() => renderer.render(scene, camera))
+  await new Promise((r) => setTimeout(r, Number(query.get('delay') ?? '1500')))
+}
 
 render(
   () => (

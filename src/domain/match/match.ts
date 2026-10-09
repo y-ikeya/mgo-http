@@ -68,6 +68,18 @@ export const READY_SECONDS = 60
 export const ASSEMBLED_SECONDS = 5
 
 /**
+ * 支度の打ち切り (lifecycle.ts の CHOOSE_TIMEOUT) を止めておく段階か。
+ *
+ * 揃った告知 (assembled) と支度 (ready) の間は**部屋の時計が湧かせる** —
+ * 秒読みに入った時に全員を出す。人ごとの 30 秒で先に湧かせると、締め切り
+ * (60 秒) の前に待合室が閉じて、スキルを選んでいる途中で戦場に出された
+ * (2026-10-09 本人)。打ち切りは試合中に倒れた人が相手を止めないための物
+ */
+export function holdsChoosing(phase: Phase): boolean {
+  return phase === 'assembled' || phase === 'ready'
+}
+
+/**
  * 決着の「GAME SET / 試合終了」だけを見せる長さ (秒)。勝敗と成績表はこの後に開く。
  * 結果を見せる時間 (server/match.ts の INTERMISSION_MS 10 秒) の頭に置く
  */
