@@ -418,8 +418,11 @@ const STAB_HIT_PHASE = 0.19;
 const PRONE_STAB_HIT_PHASE = 0.36;
 /** 銃を構える高さは目の線からこれだけ下 (m) */
 const MUZZLE_BELOW_EYE = 0.15;
-/** 低い遮蔽を越えて構える時、銃を出す高さは目の線からこれだけ上 (m) */
-const MUZZLE_OVER_EYE = 0.05;
+/**
+ * 越えて構えられる高さは、表の目の線からこれだけ下 (m)。表は頭 + 0.1 なので、
+ * **頭の高さより低い物だけ越えられる** (しゃがみで約 0.94m。1.05m の土嚢は越えない)
+ */
+const MUZZLE_OVER_BELOW_EYE = 0.1;
 /** 伏せていても銃はこれより下には無い (m)。床を拾わない */
 const MUZZLE_MIN_HEIGHT = 0.15;
 /** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
@@ -2856,10 +2859,10 @@ export class Game {
     const tz = me.z - Math.cos(yaw) * reach;
     if (solid.clear(me.x, y, me.z, tx, y, tz)) return false;
     /*
-     * 越えられるのは**その姿勢の頭 (表の下の端) より低い物だけ。** しゃがんで
+     * 越えられるのは**その姿勢の頭より低い物だけ。** しゃがんで
      * いる時に中腰くらいの物が前にあれば下ろす (2026-10-09 本人)
      */
-    const over = me.y + low + MUZZLE_OVER_EYE;
+    const over = me.y + low - MUZZLE_OVER_BELOW_EYE;
     return !solid.clear(me.x, over, me.z, tx, over, tz);
   }
 
