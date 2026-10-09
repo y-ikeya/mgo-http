@@ -81,6 +81,16 @@ const cases: Record<string, Partial<GameStats>> = {
       { type: 'voice', id: 'y', name: 'coffee-san', team: 'red', text: 'よろしくお願いします！', at: Date.now() - 3000 },
     ],
   },
+  // 抜けた / 戻りを待っている (?case=presence)
+  presence: {
+    match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 3, required: 2, players: [] },
+    team: 'blue',
+    kills: [
+      { type: 'presence', id: 'a', name: 'nanashi', team: 'red', state: 'away', at: Date.now() },
+      { type: 'kill', killer: 'me', killerName: 'pepa1404', killerTeam: 'blue', victim: 'x', victimName: 'do_nard', victimTeam: 'red', weapon: 'AK47', headshot: false, at: Date.now() - 1000 },
+      { type: 'presence', id: 'b', name: 'coffee-san', team: 'blue', state: 'left', at: Date.now() - 2000 },
+    ],
+  },
   /*
    * 数えている間。**数字は上、指令は真ん中。**
    *

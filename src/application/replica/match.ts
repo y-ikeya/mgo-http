@@ -52,6 +52,20 @@ export interface VoiceEntry {
   at: number
 }
 
+/**
+ * 誰かが抜けた / 戻りを待っている。キルログと同じ欄に出す (2026-10-09 本人)。
+ *
+ *   away  🫥 名前       … 接続が切れて席が空いている (30 秒は戻りを待つ)
+ *   left  🏃‍♀️🚪 名前   … 出た。待っても戻らなかった時もこちらに変わる
+ */
+export interface PresenceEntry {
+  id: string
+  name: string
+  team: Team
+  state: 'away' | 'left'
+  at: number
+}
+
 export interface MatchReplica {
   /** 部屋のルール。**入った時点では分からない** — 最初の match で決まる */
   mode: Mode
@@ -66,6 +80,7 @@ export interface MatchReplica {
   killFeed: KillEntry[]
   voiceFeed: VoiceEntry[]
   pointFeed: PointEntry[]
+  presenceFeed: PresenceEntry[]
 }
 
 export function newMatchReplica(): MatchReplica {
@@ -78,6 +93,7 @@ export function newMatchReplica(): MatchReplica {
     killFeed: [],
     voiceFeed: [],
     pointFeed: [],
+    presenceFeed: [],
   }
 }
 
@@ -119,6 +135,7 @@ export function applyMatch(
       replica.mode = message.mode
       replica.leaking = message.leader === selfId
       const changed = replica.match?.phase !== message.phase
+      notePresence(replica, replica.match, message, selfId, now)
       replica.match = message
       return changed ? [{ kind: 'phase', to: message.phase, teams: MODES[message.mode].teams }] : []
     }
@@ -204,4 +221,37 @@ function score(replica: MatchReplica, event: KillEvent, selfId: string, now: num
   const delta = suicide ? SUICIDE_POINTS : mine ? KILL_POINTS : DEATH_POINTS
   replica.pointFeed.unshift({ label, delta, at: now })
   replica.pointFeed.length = Math.min(replica.pointFeed.length, POINT_FEED_MAX)
+}
+
+/**
+ * 前の match と見比べて、**抜けた人・戻りを待っている人**を欄へ積む。
+ *
+ * 名簿から消えたら抜けた (自分から出た / 30 秒戻らなかった)。away が立ったら
+ * 戻りを待っている。戻ってきたら 🫥 の行を下げる。自分のことは出さない
+ */
+function notePresence(
+  replica: MatchReplica,
+  before: MatchMessage | null,
+  after: MatchMessage,
+  selfId: string,
+  now: number,
+): void {
+  if (!before?.players || !after.players) return
+  const next = new Map(after.players.map((player) => [player.id, player]))
+  const dropAway = (id: string) => {
+    replica.presenceFeed = replica.presenceFeed.filter((entry) => !(entry.id === id && entry.state === 'away'))
+  }
+  for (const was of before.players) {
+    if (was.id === selfId) continue
+    const is = next.get(was.id)
+    if (!is) {
+      dropAway(was.id)
+      replica.presenceFeed.unshift({ id: was.id, name: was.name, team: was.team, state: 'left', at: now })
+    } else if (is.away && !was.away) {
+      replica.presenceFeed.unshift({ id: is.id, name: is.name, team: is.team, state: 'away', at: now })
+    } else if (!is.away && was.away) {
+      dropAway(is.id)
+    }
+  }
+  replica.presenceFeed.length = Math.min(replica.presenceFeed.length, KILL_FEED_MAX)
 }

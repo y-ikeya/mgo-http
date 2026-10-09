@@ -1,7 +1,7 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
-import { GAME_SET_SECONDS } from "../../domain/match/match";
+import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
 import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
@@ -153,7 +153,9 @@ export type LoadoutFocus = "primary" | "secondary" | "support" | SkillId;
 /** キルログの欄に出す 1 行。倒した / 眠らせた、または誰かのボイス */
 export type HudFeedItem =
   | (KillEvent & { stun?: boolean; at: number })
-  | { type: "voice"; id: string; name: string; team: Team; text: string; at: number };
+  | { type: "voice"; id: string; name: string; team: Team; text: string; at: number }
+  /** 抜けた / 戻りを待っている (application/replica/match.ts の PresenceEntry) */
+  | { type: "presence"; id: string; name: string; team: Team; state: "away" | "left"; at: number };
 
 /** パッドでボイスを選ぶ十字キーの並び。上から時計回り */
 const VOICE_PAD_ORDER = ["menuUp", "menuRight", "menuDown", "menuLeft"] as const;
@@ -4919,7 +4921,18 @@ export class Game {
         text: voiceLine(entry.line)?.label ?? entry.line,
         at: entry.at,
       }));
-    return [...kills, ...voices].sort((a, b) => b.at - a.at).slice(0, 5);
+    /*
+     * 🫥 は**戻るか抜けるかが決まるまで出しておく** (席を待つのは 30 秒)。
+     * 🏃‍♀️🚪 はキルと同じ長さで消す
+     */
+    const presence: HudFeedItem[] = this.replica.presenceFeed
+      .filter((entry) =>
+        entry.state === "away"
+          ? now - entry.at < RECONNECT_GRACE_MS + 5000
+          : now - entry.at < KILL_FEED_DURATION * 1000,
+      )
+      .map((entry) => ({ type: "presence" as const, ...entry }));
+    return [...kills, ...voices, ...presence].sort((a, b) => b.at - a.at).slice(0, 5);
   }
 
   private hearNoise(message: NoiseEvent): void {

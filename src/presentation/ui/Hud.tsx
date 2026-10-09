@@ -519,7 +519,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
         <div class="hud-kills">
           <For each={props.stats?.kills ?? []}>
-            {(item) => item.type === 'voice' ? (
+            {(item) => item.type === 'presence' ? (
+              /* 抜けた / 戻りを待っている。戻りを待つ間は 🫥、抜けたら 🏃‍♀️🚪 */
+              <div class="hud-kill hud-voice">
+                <span class="hud-voice-text">{item.state === 'away' ? '🫥' : '🏃‍♀️🚪'}&nbsp;</span>
+                <span class={`hud-kill-name hud-kill-${item.team}`}>{item.name}</span>
+              </div>
+            ) : item.type === 'voice' ? (
               /* 誰かのボイス。倒した行と同じ欄に「名前：セリフ」。言った直後に倒せば 2 段に積まれる */
               <div class="hud-kill hud-voice" classList={{ 'hud-kill-mine': item.id === props.selfId }}>
                 <span class={`hud-kill-name hud-kill-${item.team}`}>{item.name}</span>
