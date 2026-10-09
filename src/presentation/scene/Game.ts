@@ -2848,16 +2848,18 @@ export class Game {
     if (!solid) return false;
     const me = this.player.position;
     const stance = this.player.stance;
-    const [low, high] = VIEW_HEIGHT[stance];
+    const [low] = VIEW_HEIGHT[stance];
     const y = me.y + Math.max(MUZZLE_MIN_HEIGHT, low - MUZZLE_BELOW_EYE);
     const reach = weaponOf(held).aimReach * (this.muzzleBlocked ? MUZZLE_HYSTERESIS : 1);
     const yaw = this.follow.aimYaw;
     const tx = me.x - Math.sin(yaw) * reach;
     const tz = me.z - Math.cos(yaw) * reach;
     if (solid.clear(me.x, y, me.z, tx, y, tz)) return false;
-    // 伏せの幅の上は起き上がりかけの頭なので、伏せたままの頭 (下の端) で見る
-    const eye = stance === "prone" || stance === "down" ? low : high;
-    const over = me.y + eye + MUZZLE_OVER_EYE;
+    /*
+     * 越えられるのは**その姿勢の頭 (表の下の端) より低い物だけ。** しゃがんで
+     * いる時に中腰くらいの物が前にあれば下ろす (2026-10-09 本人)
+     */
+    const over = me.y + low + MUZZLE_OVER_EYE;
     return !solid.clear(me.x, over, me.z, tx, over, tz);
   }
 
