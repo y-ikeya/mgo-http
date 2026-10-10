@@ -74,6 +74,8 @@ const SOUNDS = {
   zap: { file: "stun_elec1.mp3", reference: 3, max: 20 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
+  // M4 の装填 (本人、2026-10-10)。2.1 秒でリロード (2.5 秒) に収まる
+  m4Reload: { file: "m4_reload1.mp3", reference: 2, max: 24 },
   // P90。突撃銃より軽い音で、間隔が詰まるぶん 1 発を短く聞かせたい
   smg: { file: "p90_shot1.mp3", reference: 5, max: weaponOf("smg").noiseRange },
   smgReload: { file: "p90_reload1.mp3", reference: 2, max: 24 },
