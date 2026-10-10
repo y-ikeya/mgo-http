@@ -332,8 +332,12 @@ const M1911: WeaponConfig = {
   alignBarrel: true,
   grip: new THREE.Vector3(0.05, 0.005, 0.125),
   rotation: new THREE.Euler(degrees(-5), 0, 0),
-  crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
-  crouchRotation: new THREE.Euler(degrees(-5), 0, 0),
+  // しゃがみ・伏せ・右手のずらしは M9 と同じ (本人 2026-10-10)
+  crouchGrip: new THREE.Vector3(-0.005, -0.03, 0.08),
+  crouchRotation: new THREE.Euler(degrees(-52), degrees(12), degrees(-72)),
+  proneGrip: new THREE.Vector3(0.035, 0, 0.11),
+  proneRotation: new THREE.Euler(degrees(-5), 0, 0),
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(0.005, 0, 0) },
   tip: new THREE.Vector3(0, 0.067, -0.172),
 }
 
