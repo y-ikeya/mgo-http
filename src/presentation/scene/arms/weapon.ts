@@ -222,9 +222,9 @@ const SMG: WeaponConfig = {
   // しゃがむと上半身が前に倒れるので、銃も倒して抱え込む (pitch -7 → -44)
   crouchGrip: new THREE.Vector3(0.02, 0.115, -0.44),
   crouchRotation: new THREE.Euler(degrees(-45), degrees(16), degrees(-3)),
-  // 伏せは前のしゃがみの値のまま (しゃがみを詰め直した時に巻き込まない)
-  proneGrip: new THREE.Vector3(-0.05, 0.035, -0.455),
-  proneRotation: new THREE.Euler(degrees(-44), degrees(15), degrees(14)),
+  // 伏せ。本人が三面図で詰めた値 (2026-10-10)
+  proneGrip: new THREE.Vector3(0.005, 0.12, -0.51),
+  proneRotation: new THREE.Euler(degrees(-1), degrees(-14), degrees(-17)),
   // 銃口。断面の実測 (最も -Z の点)
   tip: new THREE.Vector3(0, 0.16, -0.845),
 }
