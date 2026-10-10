@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "m4Walk.fbx#4": "aim_walk" },
+  "out": "aim_walk.glb",
+  "maxTexture": 64
+}

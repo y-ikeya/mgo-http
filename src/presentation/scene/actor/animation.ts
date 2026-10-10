@@ -936,6 +936,17 @@ const RUN_CADENCE = 1.41
  * 手ぶらはゆっくり大股 (1 秒に 1.2 歩)、長物は普通の歩き (1.8 歩)。
  */
 const WALK_CLIP_SPEED = 1.27
+/**
+ * 構えて前へ歩く型 (本人作 tools/raw/m4Walk.fbx の 4 本目、2026-10-10)。
+ *
+ * 構えて前へ動く間は、走り (run_f) の脚を遅く回していた — 大股で小走りに
+ * 見える。**下半身だけ**この型に替える。上半身はいままでの構え (銃の握りを
+ * 合わせてある型) のまま。その場歩きなので、接地した足が後ろへ滑る速さを
+ * 本来の速さにして割る (WALK_CLIP_SPEED と同じ測り方)。
+ */
+const AIM_WALK_CLIP = 'aim_walk'
+const AIM_WALK_KEY = `run_f@${AIM_WALK_CLIP}`
+const AIM_WALK_CLIP_SPEED = 0.94
 /** 状態ではなく**クリップ**で速さが違う物。手ぶらの表 (PISTOL_RELAXED) が引く */
 const CLIP_NATIVE_SPEED: Record<string, number> = {
   walk_unarmed: 0.78,
@@ -1533,6 +1544,13 @@ export class CharacterAnimator {
      * 上半身だけ乗せると腰の基準合わせ (alignSpineToUpperClip) がその 90° を
      * 捻れと読んで上体を回してしまう。全身なら上下が同じ型で補正が掛からない。
      */
+    const aimWalk = byName.get(AIM_WALK_CLIP)
+    if (aimWalk) {
+      const action = this.mixer.clipAction(splitClip(aimWalk, 'lower', AIM_WALK_KEY))
+      action.play()
+      this.lower.set(AIM_WALK_KEY, action)
+      this.lowerClipNames.set(AIM_WALK_KEY, aimWalk.name)
+    }
     const knifeClip = byName.get('knife_idle')
     if (knifeClip) {
       const key = relaxedLowerKey('idle', knifeClip.name)
@@ -2469,6 +2487,8 @@ export class CharacterAnimator {
         const name = table[locomotion]
         if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scaleOf(name))
       }
+      // 構えて前へ歩く型。走りの底上げ (rate) は掛けない — 歩きなので
+      if (locomotion === 'run_f') this.lower.get(AIM_WALK_KEY)?.setEffectiveTimeScale(speed / AIM_WALK_CLIP_SPEED)
       /*
        * **上下が同じクリップなら、速さも同じにする。**
        *
@@ -2520,6 +2540,13 @@ export class CharacterAnimator {
     if (this.knife && this.aiming && this.locomotion === 'prone_idle') {
       const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
       if (this.lower.has(key)) return key
+    }
+    // 長物を構えて前へ。脚だけ歩きの型 (AIM_WALK_CLIP)
+    if (
+      this.aiming && this.locomotion === 'run_f' && !this.pistol && !this.knife && !this.handsEmpty &&
+      this.lower.has(AIM_WALK_KEY)
+    ) {
+      return AIM_WALK_KEY
     }
     if (this.aiming || !RELAXED_LOWER_STATES.has(this.locomotion)) return this.locomotion
     const name = this.pistol ? PISTOL_RELAXED[this.locomotion] : RELAXED_CLIPS[this.locomotion]
