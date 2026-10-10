@@ -41,6 +41,12 @@ export interface WeaponConfig {
    * 測るのは tools/preview/weapon.html?views=3 (斜めの枠の札に銃身の角度が出る)
    */
   aimTrim?: { pitch: number; yaw: number; crouchPitch: number; crouchYaw: number }
+  /**
+   * 構えた時に**上体を起こす量** (度、立ち・しゃがみ)。animation.ts の gunLift。
+   * ずれが大きい時は銃を回すより先にこちらで取り返す — 銃だけを 45° 回すと、
+   * 前を握る左手が大きく持ち上がった (P90 のしゃがみ、2026-10-10 本人)
+   */
+  aimLift?: { stand: number; crouch: number }
   /** 向きの微調整。両手の位置からは手首のひねりが決まらないため */
   rotation: THREE.Euler
   /** しゃがみ姿勢での値。無ければ立ちと同じものを使う */
@@ -95,7 +101,9 @@ const degrees = (value: number) => THREE.MathUtils.degToRad(value)
  */
 const RIFLE: WeaponConfig = {
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 33.0, crouchYaw: 4.3 },
+  aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 10.5, crouchYaw: 13.8 },
+  // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
+  aimLift: { stand: 0, crouch: 35 },
   grip: new THREE.Vector3(-0.095, 0.145, -0.165),
   rotation: new THREE.Euler(degrees(-10), degrees(-16), degrees(80)),
   // しゃがむと上半身の角度が変わるので、同じ握り方では銃が体から浮く。
@@ -115,7 +123,9 @@ const RIFLE: WeaponConfig = {
  */
 const SHOTGUN: WeaponConfig = {
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -11.6, yaw: 0.0, crouchPitch: 32.2, crouchYaw: 3.5 },
+  aimTrim: { pitch: -11.6, yaw: 0.0, crouchPitch: 9.6, crouchYaw: 14.0 },
+  // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
+  aimLift: { stand: 0, crouch: 35 },
   // 実機で詰めた値
   grip: new THREE.Vector3(0.02, 0.1, -0.05),
   rotation: new THREE.Euler(degrees(-6), degrees(-17), degrees(-9)),
@@ -162,7 +172,9 @@ const M4: WeaponConfig = {
  */
 const SMG: WeaponConfig = {
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -9.1, yaw: -10.0, crouchPitch: 44.6, crouchYaw: -14.5 },
+  aimTrim: { pitch: -9.1, yaw: -10.0, crouchPitch: 15.6, crouchYaw: -5.2 },
+  // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
+  aimLift: { stand: 0, crouch: 40 },
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
   grip: new THREE.Vector3(0, 0.1, -0.435),
   rotation: new THREE.Euler(degrees(-7), degrees(-9), degrees(7)),

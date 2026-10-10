@@ -1339,6 +1339,12 @@ export class CharacterAnimator {
   relaxedLean = RELAXED_LEAN
   /** 構えたときに上体を起こす量 (rad)。姿勢ごと。?aimlevel= で触れる */
   aimLevel = { ...AIM_LEVEL }
+  /**
+   * 手にある銃の**上体の起こし** (rad、weapon.ts の aimLift)。aimLevel に足す。
+   * しゃがんで構えた型は銃によって 30° 以上下を向くので、大半は上体を起こして
+   * 取り返す — 両手ごと上がるので左手が銃から離れない。残りは銃を回す (aimTrim)
+   */
+  gunLift = { stand: 0, crouch: 0 }
   private lean = 0
   /** ダンボールを被っているか。前傾を深くして頭を下げる */
   private boxed = false
@@ -2009,10 +2015,10 @@ export class CharacterAnimator {
       : committed
         ? 0
         : this.aiming
-          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す
+          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す (+ 銃ごとの起こし)
             CROUCH_LOCOMOTIONS.has(this.locomotion)
-            ? this.aimLevel.crouch
-            : this.aimLevel.stand
+            ? this.aimLevel.crouch + this.gunLift.crouch
+            : this.aimLevel.stand + this.gunLift.stand
           : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
     this.mixer.update(dt)

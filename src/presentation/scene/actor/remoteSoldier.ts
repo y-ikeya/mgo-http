@@ -48,7 +48,7 @@ import { BUFFER_SIZE, Presence } from "../../../sim/space/presence";
 import { Hitbox } from "./hitbox";
 import { damp, dampAngle } from "../util/math";
 import { LADDER_SPEED } from "../../../domain/stage";
-import { Weapon, WEAPON_STANCE_LAMBDA, weaponStanceOf } from "../arms/weapon";
+import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA, weaponStanceOf } from "../arms/weapon";
 import { onBattlefield } from "../../../domain/player/lifecycle";
 import type { Player } from "../../../domain/player/player";
 import {
@@ -501,6 +501,10 @@ export class RemoteSoldier {
       const delta = state.cameraYaw - this.yaw;
       animator.setLookYaw(!state.aiming && !this.serverDead && !prone && animator.upperFree ? Math.atan2(Math.sin(delta), Math.cos(delta)) : 0);
     }
+    // 手にある銃の上体の起こし (weapon.ts の aimLift)。自機と同じ
+    const lift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.aimLift;
+    animator.gunLift.stand = THREE.MathUtils.degToRad(lift?.stand ?? 0);
+    animator.gunLift.crouch = THREE.MathUtils.degToRad(lift?.crouch ?? 0);
     // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
     this.leftArm.restore();
     animator.update(dt);

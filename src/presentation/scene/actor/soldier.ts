@@ -37,7 +37,7 @@ import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, pla
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
 import { LeftArmFollow } from './armIk'
-import { Weapon, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
+import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
 
@@ -3507,6 +3507,10 @@ export class Soldier {
       // 首はカメラの向きへ。構え中・全身の型の間・伏せ・倒れは 0 (体が向く、または向けない)
       this.animator.setLookYaw(!this.aiming && this.animator.upperFree && this.proneStage === 'none' && !this.down ? this.lookYaw : 0)
       this.animator.setAiming(this.aiming)
+      // 手にある銃の上体の起こし (weapon.ts の aimLift)
+      const lift = isGun(this.held) ? WEAPON_CONFIGS[this.held].aimLift : undefined
+      this.animator.gunLift.stand = THREE.MathUtils.degToRad(lift?.stand ?? 0)
+      this.animator.gunLift.crouch = THREE.MathUtils.degToRad(lift?.crouch ?? 0)
       // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
       this.leftArm.restore()
       this.animator.update(dt)
