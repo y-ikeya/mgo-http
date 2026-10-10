@@ -2991,7 +2991,14 @@ export class CharacterAnimator {
       if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_FIRE_KEY)) {
         return PRONE_FIRE_KEY
       }
-      if (this.upper.has(FIRE_KEY)) return FIRE_KEY
+      /*
+       * **しゃがみでは撃つ型に替えない。** 撃つ型は立ちの形しか無く、しゃがみの構え
+       * (knee_ready) から替えると上体が起きて後ろへ反り、撃つたびに行き来して
+       * ガクガクした (2026-10-10 本人)。しゃがみの握りと銃口の補正も knee_ready に
+       * 合わせて詰めてある。下の構えの枝がしゃがみの構えを返す
+       */
+      const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
+      if (!crouching && this.upper.has(FIRE_KEY)) return FIRE_KEY
     }
     if (this.upperState === 'reload') {
       // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
