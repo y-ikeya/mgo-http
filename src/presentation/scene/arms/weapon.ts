@@ -138,7 +138,7 @@ const RIFLE: WeaponConfig = {
 
 
 /**
- * M870。全長 1190mm のポンプ式。
+ * M870。全長 980mm のポンプ式 (戦術用の短い型。1190mm の狩猟用の長さでは床尾が体に刺さった)。
  *
  * 銃口の位置が突撃銃とほぼ同じ (0.174 対 0.171) なので、握りの調整値も
  * そのまま流用できる — convert_gltf_gun.py が銃口を揃えて書き出すのは
@@ -147,7 +147,7 @@ const RIFLE: WeaponConfig = {
 const SHOTGUN: WeaponConfig = {
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
-    position: new THREE.Vector3(-0.115, 0.0196, -0.4229),
+    position: new THREE.Vector3(-0.094, 0.046, -0.497),
     quaternion: new THREE.Quaternion(-0.62, -0.3384, -0.2309, 0.6692),
   },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
@@ -155,16 +155,17 @@ const SHOTGUN: WeaponConfig = {
   // しゃがみは握りを直したので上体は起こさない (M4 と同じ)
   aimLift: { stand: 0, crouch: 0 },
   // 実機で詰めた値
-  grip: new THREE.Vector3(0.02, 0.1, -0.05),
+  // 全長 0.98m (戦術用の短い型) に縮めた。握りと左手は銃口を中心に同じ割合で写した
+  grip: new THREE.Vector3(0.018, 0.113, -0.19),
   rotation: new THREE.Euler(degrees(-6), degrees(-17), degrees(-9)),
   /*
    * しゃがみ。**AK の値を写していたので、しゃがむと銃が横へ 80° 寝た** (本人:
    * しゃがみ構えで銃が左に回る)。AK の模型は寝た向きで作られていて 80° で起こす
    * が、M870 は上を向いている。M4 と同じく立ちの握りから詰めた値
    */
-  crouchGrip: new THREE.Vector3(0.02, 0.1, -0.05),
+  crouchGrip: new THREE.Vector3(0.018, 0.113, -0.19),
   crouchRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-9)),
-  tip: new THREE.Vector3(0.007, 0.174, -0.845),
+  tip: new THREE.Vector3(0.006, 0.172, -0.845),
 }
 
 /**
