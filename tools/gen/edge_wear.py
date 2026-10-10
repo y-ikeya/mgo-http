@@ -23,6 +23,8 @@ W_PX, H_PX = 128, 512
 W = 0.16          # 帯の幅 (m)
 E = 0.003         # 壁から浮かせる量 (m)
 MIN_SPAN = 1.0    # これより短い角 (基壇・庇の輪) には貼らない (m)
+# 入り隅 (壁どうしが内側で交わる角) はこれより長い物だけ。窓の口の奥の角を拾わない (m)
+MIN_SPAN_CONCAVE = 2.0
 
 
 def make_texture():
@@ -76,7 +78,7 @@ def edge_material():
     return m
 
 
-def corner_spans(body, use_base=False):
+def corner_spans(body, use_base=False, convex=True, concave=False):
     """本体の外角 (縦・凸・直角に近い辺) を (x, y) ごとに z の区間へまとめる。
 
     use_base: モディファイアを掛ける前の形で見る。小さな bevel が付いた箱は角が 45 度の面 2 枚になって
@@ -101,10 +103,11 @@ def corner_spans(body, use_base=False):
         n1, n2 = f1.normal, f2.normal
         if abs(n1.z) > 0.3 or abs(n2.z) > 0.3 or n1.dot(n2) > 0.5:
             continue
-        if (f2.calc_center_median() - f1.calc_center_median()).dot(n1) >= 0:
-            continue                               # 凹の辺 (窓の口の縁など)
-        key = (round(a.x, 2), round(a.y, 2))
-        spans.setdefault(key, {'n': (n1.copy(), n2.copy()), 'z': []})['z'].append((min(a.z, b.z), max(a.z, b.z)))
+        is_concave = (f2.calc_center_median() - f1.calc_center_median()).dot(n1) >= 0
+        if (is_concave and not concave) or (not is_concave and not convex):
+            continue
+        key = (round(a.x, 2), round(a.y, 2), is_concave)
+        spans.setdefault(key, {'n': (n1.copy(), n2.copy()), 'z': [], 'concave': is_concave})['z'].append((min(a.z, b.z), max(a.z, b.z)))
     bm.free()
     out = []
     for key, d in spans.items():
@@ -116,8 +119,8 @@ def corner_spans(body, use_base=False):
             else:
                 merged.append([z0, z1])
         for z0, z1 in merged:
-            if z1 - z0 >= MIN_SPAN:
-                out.append((key[0], key[1], z0, z1, d['n']))
+            if z1 - z0 >= (MIN_SPAN_CONCAVE if d['concave'] else MIN_SPAN):
+                out.append((key[0], key[1], z0, z1, d['n'], d['concave']))
     return out
 
 
@@ -164,18 +167,26 @@ def fix_decal_normals(obj):
     return len(flip)
 
 
-def make_edge_decals(body, tag, use_base=False):
+def make_edge_decals(body, tag, use_base=False, convex=True, concave=False, name=None, bodies=None):
+    """角の帯。convex = 出隅、concave = 入り隅 (壁どうしの交線、2026-10-10 本人)。
+    bodies を渡すと、壁を別々の物で組んだ建物 (b6) をまとめて見る"""
     mat = edge_material()
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new('UVMap')
     count = 0
-    for x, y, z0, z1, (n1, n2) in corner_spans(body, use_base):
+    spans = []
+    for part in (bodies or [body]):
+        spans += corner_spans(part, use_base, convex, concave)
+    for x, y, z0, z1, (n1, n2), is_concave in spans:
         c = Vector((x, y, 0))
         for n, other in ((n1, n2), (n2, n1)):
             t = Vector((-n.y, n.x, 0)).normalized()
-            if t.dot(other) > 0:
-                t = -t                             # 角からその面に沿って離れる向き
-            p0 = c + n * E - t * E                 # 角の手前 E まで延ばす (2 枚が浮かせた分の角で出会う)
+            # 角からその面に沿って離れる向き。出隅は相手の面の向きと逆、入り隅は同じ側へ延びる
+            if (t.dot(other) > 0) != is_concave:
+                t = -t
+            # 出隅は角の手前 E まで延ばす (2 枚が浮かせた分の角で出会う)。
+            # 入り隅は相手の壁から E 離して始める (相手の板と食い合わない)
+            p0 = c + n * E + (t * E if is_concave else -t * E)
             za, zb = z0 + 0.02, z1 - 0.02
             pts = [p0 + Vector((0, 0, za)), p0 + t * (W + E) + Vector((0, 0, za)),
                    p0 + t * (W + E) + Vector((0, 0, zb)), p0 + Vector((0, 0, zb))]
@@ -204,7 +215,7 @@ def make_edge_decals(body, tag, use_base=False):
     if drop:
         bmesh.ops.delete(bm, geom=drop, context='FACES')
         count -= len(drop)
-    name = 'vis_decal_b%s_edge_nouv' % tag
+    name = name or 'vis_decal_b%s_edge_nouv' % tag
     if name in bpy.data.objects:
         bpy.data.objects.remove(bpy.data.objects[name], do_unlink=True)
     if not count:
