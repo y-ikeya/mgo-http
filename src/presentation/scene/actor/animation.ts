@@ -1345,6 +1345,12 @@ export class CharacterAnimator {
    * 取り返す — 両手ごと上がるので左手が銃から離れない。残りは銃を回す (aimTrim)
    */
   gunLift = { stand: 0, crouch: 0 }
+  /**
+   * いま掛けている起こし。**背骨 3 本だけを起こし、首と頭は同じだけ戻す** —
+   * 照準の曲げ (首と頭にも配る) に乗せていた頃は、しゃがみで頭まで上を向いて
+   * 上目遣いになった (2026-10-10 本人)。腕は背骨に乗るので、起こしは全部銃に届く
+   */
+  private gunLiftNow = 0
   private lean = 0
   /** ダンボールを被っているか。前傾を深くして頭を下げる */
   private boxed = false
@@ -2017,10 +2023,18 @@ export class CharacterAnimator {
         : this.aiming
           ? // 構えている間は逆に起こす。型が下を向いているぶんを返す (+ 銃ごとの起こし)
             CROUCH_LOCOMOTIONS.has(this.locomotion)
-            ? this.aimLevel.crouch + this.gunLift.crouch
-            : this.aimLevel.stand + this.gunLift.stand
+            ? this.aimLevel.crouch
+            : this.aimLevel.stand
           : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
+    // 銃ごとの上体の起こし (gunLift)。構えている間だけ
+    const liftTarget =
+      this.aiming && !committed && !this.boxed
+        ? CROUCH_LOCOMOTIONS.has(this.locomotion)
+          ? this.gunLift.crouch
+          : this.gunLift.stand
+        : 0
+    this.gunLiftNow = damp(this.gunLiftNow, liftTarget, AIM_PITCH_LAMBDA, dt)
     this.mixer.update(dt)
 
     // mixer がボーンの回転を書き換えた「後」に上乗せする。順序を逆にすると毎フレーム消える。
@@ -2360,6 +2374,18 @@ export class CharacterAnimator {
     if (total !== 0) {
       for (const entry of axes) {
         this.scratchRotation.setFromAxisAngle(entry.axis, total * entry.weight)
+        entry.bone.quaternion.multiply(this.scratchRotation)
+      }
+    }
+    // 銃ごとの起こし。背骨 3 本で全量 (配分の比で割る)、首と頭で同じだけ戻す
+    if (Math.abs(this.gunLiftNow) > 1e-4) {
+      const spineShare = axes.reduce((sum, e) => sum + (e.suffix.startsWith('Spine') ? e.weight : 0), 0) || 1
+      const headCount = axes.filter((e) => !e.suffix.startsWith('Spine')).length || 1
+      for (const entry of axes) {
+        const amount = entry.suffix.startsWith('Spine')
+          ? (this.gunLiftNow * entry.weight) / spineShare
+          : -this.gunLiftNow / headCount
+        this.scratchRotation.setFromAxisAngle(entry.axis, amount)
         entry.bone.quaternion.multiply(this.scratchRotation)
       }
     }
