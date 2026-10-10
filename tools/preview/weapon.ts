@@ -21,6 +21,8 @@ import { CHOICES, type WeaponId } from '../../src/domain/item/weapons'
  * 銃口から 2 本の線を引く — **赤が銃身の延長、緑が体の真っすぐ前・水平。**
  * 重なっていれば銃口は照準へ向いている (weapon.ts の aimTrim と同じ物差し)。
  * 平行投影の枠はホイールで寄る。
+ *   ?stance=crouch  映す姿勢 / ?fixeddt  1 コマ 0.05 秒 (headless で撮る時)
+ *   ?trim=0  補正を外す / ?trimp=&trimy=&trimcp=&trimcy=  補正を試す / ?noik  左腕の付け直しを止める
  *
  * --- 部屋に入らずに見る ---
  * 対戦部屋に入ると席を 1 つ潰すし、伏せて構えるまでに何度も操作が要る。
@@ -157,6 +159,12 @@ const aimLevel = (() => {
 
 const cells: Cell[] = CELLS.map((spec, i) => {
   const player = new Soldier()
+  // ?noik … 左腕の付け直し (armIk.ts) を止めて見る
+  if (new URLSearchParams(location.search).has('noik')) {
+    const arm = (player as unknown as { leftArm: { apply: () => void; restore: () => void } }).leftArm
+    arm.apply = () => {}
+    arm.restore = () => {}
+  }
   player.start('soldier')
   // 横一列に並べる。1 体ずつ別のカメラで抜くので、間隔は被らない程度でよい
   player.position.set(i * SPACING, 0, 0)
@@ -577,6 +585,7 @@ layout()
 window.addEventListener('resize', layout)
 
 const clock = new THREE.Clock()
+const FIXED_DT = new URLSearchParams(location.search).has('fixeddt')
 
 /*
  * 銃口から引く 2 本。**赤 = 銃身の延長、緑 = 体の真っすぐ前・水平。**
@@ -667,7 +676,9 @@ function renderTri(cw: number, ch: number): void {
 let sinceDump = 0
 
 function frame(): void {
-  const dt = Math.min(clock.getDelta(), 0.05)
+  // ?fixeddt … 1 コマを 0.05 秒に固定する。headless の仮想時計では dt がほぼ 0 で、
+  // 構えの寄り (補正の重みなど) が寄り切らないまま撮れてしまう
+  const dt = FIXED_DT ? 0.05 : Math.min(clock.getDelta(), 0.05)
   // 銃口の向きは数フレームおきに出し直す。**秒で間引かない** —
   // 仮想時計や背面タブでは dt がほぼ 0 になり、読み込み前の 1 回で止まる
   sinceDump += 1

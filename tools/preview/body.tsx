@@ -15,7 +15,6 @@
  *     ?shadow                 影を受ける体。頭上に板を吊って上半身に影を落とす
  *     ?sky=0.4                屋内の暗さ (空の見え方 SKY_FLOOR〜1) を体に掛ける
  *     ?trace                  0.1 秒ごとに銃身と両手の向きを書き出す (コンソールの [trace])
- *     ?trimp=8&trimy=-5       構えの補正 (weapon.ts の aimTrim) を上書きする。しゃがみは trimcp / trimcy
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
@@ -28,7 +27,7 @@ import { buildLights } from '../../src/presentation/scene/world/stage'
 import { SkyLight } from '../../src/presentation/scene/world/skylight'
 import { loadSoldier } from '../../src/presentation/scene/assets'
 import { CharacterAnimator, findBoneBySuffix } from '../../src/presentation/scene/actor/animation'
-import { Weapon, WEAPON_CONFIGS, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
+import { Weapon, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
 import { StunSparks } from '../../src/presentation/scene/fx/stunSparks'
 
 const WIDTH = 1280
@@ -145,18 +144,6 @@ if (query.has('nomip')) {
  */
 const pitch = (Number(query.get('pitch') ?? '0') * Math.PI) / 180
 const anim = new CharacterAnimator(model, gltf.animations, 4.5)
-/*
- * 銃ごとの構えの補正 (weapon.ts の aimTrim)。本番と同じ値を掛ける。
- * ?trimp=8&trimy=-5 … 値を上書きして試す (度、上・左が正)
- */
-{
-  const g = query.get('gun') as WeaponKind | null
-  const trim = g ? WEAPON_CONFIGS[g]?.aimTrim : undefined
-  anim.aimTrim.pitch = (Number(query.get('trimp') ?? trim?.pitch ?? 0) * Math.PI) / 180
-  anim.aimTrim.yaw = (Number(query.get('trimy') ?? trim?.yaw ?? 0) * Math.PI) / 180
-  anim.aimTrim.crouchPitch = (Number(query.get('trimcp') ?? trim?.crouchPitch ?? 0) * Math.PI) / 180
-  anim.aimTrim.crouchYaw = (Number(query.get('trimcy') ?? trim?.crouchYaw ?? 0) * Math.PI) / 180
-}
 // ?onehand … 片手の持ち物 (拳銃・手榴弾・設置物) の姿勢を見る
 // ?empty   … 手に何も出ていない (投げ物・設置物)。転がりの尻尾が変わる
 anim.setPistol(query.has('onehand') || query.has('empty'))

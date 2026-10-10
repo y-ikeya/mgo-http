@@ -1120,9 +1120,6 @@ function relaxedLowerKey(state: Locomotion, clip: string): string {
   return `${state}@${clip}`
 }
 
-/** 腕が付いている背骨 (Spine2) までの曲げの配分の和。首と頭のぶんは銃に乗らない */
-const ARMS_SHARE = 0.7
-
 const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
   // yaw は、しゃがみのときに半身へ構えるための左右の配分。
   // 首から上を負にしてあるのは、子が親の回転を継ぐため。背骨を 0.7 回した
@@ -1342,18 +1339,6 @@ export class CharacterAnimator {
   relaxedLean = RELAXED_LEAN
   /** 構えたときに上体を起こす量 (rad)。姿勢ごと。?aimlevel= で触れる */
   aimLevel = { ...AIM_LEVEL }
-  /**
-   * 構えた時に**銃身を照準へ揃える上体の補正** (rad、銃ごと、weapon.ts の aimTrim)。
-   *
-   * 握りは右手と左手で決まるので、銃ごとに銃身が照準から少しずれる。本人作の
-   * 構え歩き (tools/raw/m4Walk.fbx) では銃身が真っすぐ前・水平だったのに、AK は
-   * 8.5° 下・5° 左、P90 は 6° 下・12° 左を向いていた (2026-10-10)。銃だけ回すと
-   * 左手が銃から離れるので、**上体ごと**回す。首と頭は旋回 (yawWeight) で戻るので
-   * 目線は照準に残る。値は「銃身が動く角度」で、背骨の配分 (腕は 7 割) はここで割り戻す
-   */
-  aimTrim = { pitch: 0, yaw: 0, crouchPitch: 0, crouchYaw: 0 }
-  /** 構えの入り抜けで補正を寄せる量 (0..1) */
-  private aimTrimBlend = 0
   private lean = 0
   /** ダンボールを被っているか。前傾を深くして頭を下げる */
   private boxed = false
@@ -2024,14 +2009,12 @@ export class CharacterAnimator {
       : committed
         ? 0
         : this.aiming
-          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す (+ 銃ごとの補正)
-            (CROUCH_LOCOMOTIONS.has(this.locomotion)
-              ? this.aimLevel.crouch
-              : this.aimLevel.stand) +
-            THREE.MathUtils.lerp(this.aimTrim.pitch, this.aimTrim.crouchPitch, this.crouchBlend) / ARMS_SHARE
+          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す
+            CROUCH_LOCOMOTIONS.has(this.locomotion)
+            ? this.aimLevel.crouch
+            : this.aimLevel.stand
           : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
-    this.aimTrimBlend = damp(this.aimTrimBlend, this.aiming && !committed && !this.boxed ? 1 : 0, AIM_HIP_LAMBDA, dt)
     this.mixer.update(dt)
 
     // mixer がボーンの回転を書き換えた「後」に上乗せする。順序を逆にすると毎フレーム消える。
@@ -2162,9 +2145,7 @@ export class CharacterAnimator {
     this.crouchBlend = damp(this.crouchBlend, target, CROUCH_TORSO_LAMBDA, dt)
 
     // 上向きの軸に対して正が左回りなので、右へ回すには符号を反転する
-    // 銃ごとの補正の左右 (aimTrim)。腕が乗る背骨の旋回は配分の和 (ARMS_SHARE) だけ効く
-    const trimYaw = THREE.MathUtils.lerp(this.aimTrim.yaw, this.aimTrim.crouchYaw, this.crouchBlend)
-    const total = -this.crouchTorsoYaw * this.crouchBlend + (trimYaw / ARMS_SHARE) * this.aimTrimBlend
+    const total = -this.crouchTorsoYaw * this.crouchBlend
     if (Math.abs(total) < 0.001) return
 
     for (const entry of axes) {

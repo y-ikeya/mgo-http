@@ -1,3 +1,4 @@
+import { LeftArmFollow } from "./armIk";
 import { SkyLight } from '../world/skylight';
 import { BlobShadow } from './blobShadow';
 import * as THREE from "three";
@@ -206,6 +207,10 @@ export class RemoteSoldier {
   private linked = false;
   /** 読み込んだ体。銃を差し替えるときに手ボーンを引き直すのに要る */
   private model: THREE.Object3D | null = null;
+  /** 構えの補正の掛かり具合 (weapon.ts の aimTrim) */
+  private aimTrimWeight = 0;
+  /** 補正で回った銃に左手を付いていかせる (armIk.ts) */
+  private readonly leftArm = new LeftArmFollow();
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle';
   /** 差し替えの最中。二重に走らせない */
@@ -496,6 +501,8 @@ export class RemoteSoldier {
       const delta = state.cameraYaw - this.yaw;
       animator.setLookYaw(!state.aiming && !this.serverDead && !prone && animator.upperFree ? Math.atan2(Math.sin(delta), Math.cos(delta)) : 0);
     }
+    // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
+    this.leftArm.restore();
     animator.update(dt);
 
     /*
@@ -512,6 +519,13 @@ export class RemoteSoldier {
       dt,
     )
     this.weapon?.applyStance(this.weaponStance)
+    // 構えている間は銃口を照準へ揃え、左手を付いていかせる (自機と同じ。soldier.ts)
+    this.aimTrimWeight = damp(this.aimTrimWeight, state.aiming && !this.serverDead && !prone ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+    this.weapon?.setAimWeight(this.aimTrimWeight)
+    if (this.model && this.weapon) {
+      this.weapon.object.updateWorldMatrix(true, false)
+      this.leftArm.apply(this.model, this.weapon)
+    }
 
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている
     void this.equip(state.weapon)

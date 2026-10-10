@@ -36,7 +36,8 @@ import {
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
-import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
+import { LeftArmFollow } from './armIk'
+import { Weapon, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
 
@@ -521,6 +522,10 @@ export class Soldier {
   private proneTurnLeft = 0
 
   private weaponStance = 0
+  /** 構えの補正の掛かり具合 (weapon.ts の aimTrim) */
+  private aimTrimWeight = 0
+  /** 補正で回った銃に左手を付いていかせる */
+  private readonly leftArm = new LeftArmFollow()
   /** 姿勢が変わっている速さ。散布に効かせる */
   private stanceRateValue = 0
   /** 読み込んだ体。銃を差し替えるときに手ボーンを引き直すのに要る */
@@ -3502,12 +3507,8 @@ export class Soldier {
       // 首はカメラの向きへ。構え中・全身の型の間・伏せ・倒れは 0 (体が向く、または向けない)
       this.animator.setLookYaw(!this.aiming && this.animator.upperFree && this.proneStage === 'none' && !this.down ? this.lookYaw : 0)
       this.animator.setAiming(this.aiming)
-      // 手にある銃の構えの補正 (weapon.ts の aimTrim)。伏せは型が違うので掛けない
-      const trim = isGun(this.held) && this.proneStage === 'none' ? WEAPON_CONFIGS[this.held].aimTrim : undefined
-      this.animator.aimTrim.pitch = THREE.MathUtils.degToRad(trim?.pitch ?? 0)
-      this.animator.aimTrim.yaw = THREE.MathUtils.degToRad(trim?.yaw ?? 0)
-      this.animator.aimTrim.crouchPitch = THREE.MathUtils.degToRad(trim?.crouchPitch ?? 0)
-      this.animator.aimTrim.crouchYaw = THREE.MathUtils.degToRad(trim?.crouchYaw ?? 0)
+      // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
+      this.leftArm.restore()
       this.animator.update(dt)
 
       this.object.updateMatrixWorld(true)
@@ -3576,6 +3577,16 @@ export class Soldier {
        */
       const lend = this.proneStage === 'prone' && this.animator.bolting
       this.weapon?.holdWith(lend ? this.leftHandBone : null)
+      /*
+       * 構えている間だけ、銃を握りを支点に回して銃口を照準へ揃える (weapon.ts の
+       * aimTrim)。回した分、左手を付いていかせる (armIk.ts)
+       */
+      this.aimTrimWeight = damp(this.aimTrimWeight, this.aiming && this.proneStage === 'none' ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+      this.weapon?.setAimWeight(this.aimTrimWeight)
+      if (this.model && this.weapon) {
+        this.weapon.object.updateWorldMatrix(true, false)
+        this.leftArm.apply(this.model, this.weapon)
+      }
       // 姿勢がどれだけ速く変わっているか。散布に効かせる
       this.stanceRateValue = dt > 0 ? Math.abs(this.weaponStance - before) / dt : 0
 
