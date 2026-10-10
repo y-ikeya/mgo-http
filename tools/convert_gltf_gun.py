@@ -42,9 +42,19 @@ FORCE = argv[3].lower() if len(argv) > 3 else ''
 #
 #   $BLENDER ... -- scene.gltf public/models/mosin.glb 1.232 "" MNStock_Low.002
 ONLY = argv[4] if len(argv) > 4 else ''
+# カンマで区切れば複数 (M1911 は銃本体と小さな部品が別の物で、間に火花の板と 9m の線が挟まっていた)
+ONLY_NAMES = [name for name in ONLY.split(',') if name]
+#
+# 銃口を置く場所 (glTF の座標、"x,y,z")。省略すると長物の rifle.glb に揃える。
+# **拳銃は M9 (m9.glb) に揃える** — 握りと銃口の値を M9 と分け合うので:
+#
+#   $BLENDER ... -- tools/raw/m1911/scene.gltf public/models/m1911.glb 0.216 "" Object_7,Object_8 0,0.067,-0.172
+TIP_ARG = argv[5] if len(argv) > 5 else ''
 
 # 既存の rifle.glb の銃口位置 (weapon.ts の RIFLE.tip)
 TIP = mathutils.Vector((0.0, 0.171, -0.845))
+if TIP_ARG:
+    TIP = mathutils.Vector(tuple(float(v) for v in TIP_ARG.split(',')))
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)
@@ -70,7 +80,7 @@ for obj in list(bpy.context.scene.objects):
 if ONLY:
     kept = []
     for obj in list(bpy.context.scene.objects):
-        if obj.name.startswith(ONLY):
+        if any(obj.name.startswith(name) for name in ONLY_NAMES):
             kept.append(obj.name)
         else:
             bpy.data.objects.remove(obj, do_unlink=True)
