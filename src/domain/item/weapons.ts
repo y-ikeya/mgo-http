@@ -138,7 +138,7 @@ export interface WeaponSpec {
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
   reloadSound: 'reload' | 'pistolReload' | 'm1911Reload' | 'smgReload' | 'm4Reload'
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
+  shotSound: 'rifle' | 'm4' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
   /**
@@ -504,6 +504,7 @@ const M4: WeaponSpec = {
   label: 'M4',
   kill: 'M4 CUSTOM',
   model: 'm4',
+  shotSound: 'm4',
   reloadSound: 'm4Reload',
   // 全長 0.84m (床尾を伸ばした時)。AK (0.88m) より少し短い
   aimReach: 0.72,
