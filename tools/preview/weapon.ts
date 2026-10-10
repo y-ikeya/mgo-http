@@ -349,6 +349,18 @@ function dump(): void {
       `${rot}: new THREE.Euler(degrees(${d(v.rotation.x)}), degrees(${d(v.rotation.y)}), degrees(${d(v.rotation.z)})),`,
     )
   }
+  const hold = WEAPON_CONFIGS[weapon as keyof typeof WEAPON_CONFIGS]?.leftHand
+  if (hold) {
+    const p = hold.position
+    const q = hold.quaternion
+    const f = (n: number) => n.toFixed(4)
+    lines.push(
+      `leftHand: {`,
+      `  position: new THREE.Vector3(${f(p.x)}, ${f(p.y)}, ${f(p.z)}),`,
+      `  quaternion: new THREE.Quaternion(${f(q.x)}, ${f(q.y)}, ${f(q.z)}, ${f(q.w)}),`,
+      `},`,
+    )
+  }
   const text = lines.join('\n')
   if (code.textContent !== text) code.textContent = text
   report.textContent = aimReport()
@@ -456,6 +468,32 @@ function drawPanel(): void {
     slider('R', deg(v.rotation.z), -180, 180, 1, (n) => (v.rotation.z = THREE.MathUtils.degToRad(n))),
   )
   panel.append(turn)
+
+  /*
+   * 左手 (weapon.ts の leftHand)。**構えている間、左手首を置く所** (銃の空間)。
+   * 全部の姿勢で同じ値。設定を直に書き換えるので、その場で絵に出る
+   */
+  const config = WEAPON_CONFIGS[weapon as keyof typeof WEAPON_CONFIGS]
+  if (config?.leftHand) {
+    const hold = config.leftHand
+    const euler = new THREE.Euler().setFromQuaternion(hold.quaternion)
+    const heading = document.createElement('div')
+    heading.textContent = '左手 (構え・全姿勢)'
+    heading.style.cssText = 'margin:10px 0 4px;opacity:.7'
+    const left = document.createElement('div')
+    left.className = 'group'
+    const turnLeft = () => hold.quaternion.setFromEuler(euler)
+    left.append(
+      heading,
+      slider('lx', hold.position.x, -0.6, 0.6, 0.005, (n) => (hold.position.x = n)),
+      slider('ly', hold.position.y, -0.6, 0.6, 0.005, (n) => (hold.position.y = n)),
+      slider('lz', hold.position.z, -1.0, 0.4, 0.005, (n) => (hold.position.z = n)),
+      slider('lP', deg(euler.x), -180, 180, 1, (n) => ((euler.x = THREE.MathUtils.degToRad(n)), turnLeft())),
+      slider('lY', deg(euler.y), -180, 180, 1, (n) => ((euler.y = THREE.MathUtils.degToRad(n)), turnLeft())),
+      slider('lR', deg(euler.z), -180, 180, 1, (n) => ((euler.z = THREE.MathUtils.degToRad(n)), turnLeft())),
+    )
+    panel.append(left)
+  }
 
   /*
    * 視点の操作。**画面の上で直に動かす** ので、ここは説明と切り替えだけ。
