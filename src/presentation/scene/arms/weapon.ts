@@ -342,8 +342,12 @@ const PISTOL: WeaponConfig = {
   alignBarrel: true,
   grip: new THREE.Vector3(0.05, 0.005, 0.125),
   rotation: new THREE.Euler(degrees(-5), 0, 0),
-  crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
-  crouchRotation: new THREE.Euler(degrees(-5), 0, 0),
+  // しゃがみは本人が三面図で詰めた値 (2026-10-10)。伏せは前の値を明示して残す
+  crouchGrip: new THREE.Vector3(-0.005, -0.03, 0.08),
+  crouchRotation: new THREE.Euler(degrees(-52), degrees(12), degrees(-72)),
+  proneGrip: new THREE.Vector3(0.035, 0, 0.11),
+  proneRotation: new THREE.Euler(degrees(-5), 0, 0),
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(0.005, 0, 0) },
   // 銃口。モデルの先端 5mm を測ると y 0.051〜0.083 で、その中央。
   // 置き値のままだと 4.7cm 低く 6.6cm 手前から弾が出ていた
   tip: new THREE.Vector3(0, 0.067, -0.172),
