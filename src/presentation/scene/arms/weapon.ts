@@ -113,6 +113,8 @@ const degrees = (value: number) => THREE.MathUtils.degToRad(value)
  * 握った姿勢を持っているので、コードで動かしていない。
  */
 const RIFLE: WeaponConfig = {
+  // しゃがみ構えの右手が高い (本人 2026-10-10)。右手首を 5cm 下げる (銃は向きを保って一緒に下がる)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(0, -0.05, 0) },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
     position: new THREE.Vector3(-0.149, 0.2777, -0.5436),
