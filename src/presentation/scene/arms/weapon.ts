@@ -60,6 +60,12 @@ export interface WeaponConfig {
    * 立ち・しゃがみ別。銃は一緒に動く (向きは変わらない)。armIk.ts の RightArmShift
    */
   rightShift?: { stand: THREE.Vector3; crouch: THREE.Vector3 }
+  /**
+   * 構えている間、**銃身を照準の向きへ毎コマ直に向ける** (握りを支点に回す)。
+   * 拳銃は付け方が長物と違い (前腕の向きが基準)、aimTrim の角度が素直に効かない
+   * — 銃を胸の前で横に持ち、銃口が左へ 47〜83° 向いていた (2026-10-10 本人)
+   */
+  alignBarrel?: boolean
   /** 向きの微調整。両手の位置からは手首のひねりが決まらないため */
   rotation: THREE.Euler
   /** しゃがみ姿勢での値。無ければ立ちと同じものを使う */
@@ -322,6 +328,8 @@ const SNIPER: WeaponConfig = {
  * 無い。ずれていたら調整パネルで詰める。
  */
 const M1911: WeaponConfig = {
+  // 構えている間、銃身を照準へ毎コマ向ける (alignBarrel の注)
+  alignBarrel: true,
   grip: new THREE.Vector3(0.05, 0.005, 0.125),
   rotation: new THREE.Euler(degrees(-5), 0, 0),
   crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
@@ -330,6 +338,8 @@ const M1911: WeaponConfig = {
 }
 
 const PISTOL: WeaponConfig = {
+  // 構えている間、銃身を照準へ毎コマ向ける (alignBarrel の注)
+  alignBarrel: true,
   grip: new THREE.Vector3(0.05, 0.005, 0.125),
   rotation: new THREE.Euler(degrees(-5), 0, 0),
   crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
@@ -645,6 +655,8 @@ export class Weapon {
     this.place(blend)
     this.plainQuaternion.copy(this.object.quaternion)
     this.applyAimTrim(blend)
+    // 置き直したので、向け直しの基準も取り直す
+    this.restSaved = false
   }
 
   /**
@@ -680,6 +692,42 @@ export class Weapon {
     this.object.quaternion.premultiply(local)
     const after = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
     this.object.position.add(before.sub(after))
+  }
+
+  /** alignBarrel で回す前の置き場所。毎コマここへ戻してから向け直す */
+  private readonly restQuaternion = new THREE.Quaternion()
+  private readonly restPosition = new THREE.Vector3()
+  private restSaved = false
+
+  /**
+   * 銃身を世界の向き dir へ向ける (alignBarrel の銃だけ)。重み 0..1。
+   * **毎コマ呼ぶ** — 手は型で動くので、向け直しも毎コマ要る
+   */
+  alignTo(dir: THREE.Vector3, weight: number): void {
+    if (!this.config.alignBarrel || this.lent) return
+    if (this.restSaved) {
+      this.object.quaternion.copy(this.restQuaternion)
+      this.object.position.copy(this.restPosition)
+    } else {
+      this.restQuaternion.copy(this.object.quaternion)
+      this.restPosition.copy(this.object.position)
+      this.restSaved = true
+    }
+    if (weight <= 0) return
+    const parent = this.object.parent
+    if (!parent) return
+    this.object.updateWorldMatrix(true, false)
+    const barrel = new THREE.Vector3(0, 0, -1).transformDirection(this.object.matrixWorld)
+    const turn = new THREE.Quaternion().setFromUnitVectors(barrel, dir.clone().normalize())
+    turn.slerp(new THREE.Quaternion(), 1 - weight)
+    const parentWorld = parent.getWorldQuaternion(new THREE.Quaternion())
+    const local = parentWorld.clone().invert().multiply(turn).multiply(parentWorld)
+    const grip = this.blendGrip
+    const before = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
+    this.object.quaternion.premultiply(local)
+    const after = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
+    this.object.position.add(before.sub(after))
+    this.object.updateWorldMatrix(false, true)
   }
 
   /**

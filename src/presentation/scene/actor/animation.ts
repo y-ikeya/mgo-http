@@ -1129,6 +1129,19 @@ function relaxedLowerKey(state: Locomotion, clip: string): string {
  */
 const CLIP_FACING: Record<string, number> = {
   pistol_relaxed: THREE.MathUtils.degToRad(30),
+  // ナイフを立って構えた全身の型。腰が 50° 回った半身 (本人: ナイフを持つと斜め)
+  knife_idle: THREE.MathUtils.degToRad(35),
+}
+
+/**
+ * **上半身の型が斜めの物**を、背骨で正面へ回す角度 (rad、左回りが正)。首と頭は
+ * 同じだけ戻して顔を正面に残す。拳銃の構えは上体が右へ回った半身だった
+ * (2026-10-10 本人)。銃身は Soldier が照準へ向け直す (weapon.ts の alignBarrel)
+ */
+const UPPER_FACING: Record<string, number> = {
+  pistol_aim: THREE.MathUtils.degToRad(25),
+  pistol_crouch_aim: THREE.MathUtils.degToRad(25),
+  pistol_fire: THREE.MathUtils.degToRad(25),
 }
 
 const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
@@ -1295,6 +1308,8 @@ export class CharacterAnimator {
   private readonly hipsBase = new THREE.Quaternion()
   /** いま掛けている向きの補正 (rad、CLIP_FACING)。型が変わる時は寄せて切り替える */
   private facingFix = 0
+  /** いま掛けている上半身の向きの補正 (rad、UPPER_FACING) */
+  private upperFacing = 0
   private hipsCaptured = false
   /**
    * 上半身クリップごとの腰の回転トラック。
@@ -2181,7 +2196,10 @@ export class CharacterAnimator {
     this.crouchBlend = damp(this.crouchBlend, target, CROUCH_TORSO_LAMBDA, dt)
 
     // 上向きの軸に対して正が左回りなので、右へ回すには符号を反転する
-    const total = -this.crouchTorsoYaw * this.crouchBlend
+    // 上半身の型ごとの向きの補正 (UPPER_FACING)
+    const upperName = this.upperClipNames.get(this.resolveUpperKey())
+    this.upperFacing = damp(this.upperFacing, (upperName && UPPER_FACING[upperName]) || 0, CROUCH_TORSO_LAMBDA, dt)
+    const total = -this.crouchTorsoYaw * this.crouchBlend + this.upperFacing
     if (Math.abs(total) < 0.001) return
 
     for (const entry of axes) {

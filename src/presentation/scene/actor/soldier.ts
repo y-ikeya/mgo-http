@@ -529,6 +529,8 @@ export class Soldier {
   /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
   private readonly rightArm = new RightArmShift()
   private readonly rightShiftNow = new THREE.Vector3()
+  /** 照準の向き (世界)。拳銃の銃身を向ける先 */
+  private readonly aimDir = new THREE.Vector3()
   /** 姿勢が変わっている速さ。散布に効かせる */
   private stanceRateValue = 0
   /** 読み込んだ体。銃を差し替えるときに手ボーンを引き直すのに要る */
@@ -3601,6 +3603,10 @@ export class Soldier {
           this.rightArm.apply(this.model, this.object, this.rightShiftNow)
         }
         this.weapon.object.updateWorldMatrix(true, false)
+        // 拳銃は銃身を照準へ直に向ける (alignBarrel)。体の正面と照準の上下
+        const pitch = this.proneStage === 'none' ? this.aimPitch : 0
+        this.aimDir.set(-Math.sin(this.yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(this.yaw) * Math.cos(pitch))
+        this.weapon.alignTo(this.aimDir, this.aimTrimWeight)
         this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
       }
       // 姿勢がどれだけ速く変わっているか。散布に効かせる

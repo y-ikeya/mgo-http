@@ -214,6 +214,8 @@ export class RemoteSoldier {
   /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
   private readonly rightArm = new RightArmShift();
   private readonly rightShiftNow = new THREE.Vector3();
+  /** 照準の向き (世界)。拳銃の銃身を向ける先 */
+  private readonly aimDir = new THREE.Vector3();
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle';
   /** 差し替えの最中。二重に走らせない */
@@ -540,6 +542,12 @@ export class RemoteSoldier {
         this.rightArm.apply(this.model, this.object, this.rightShiftNow);
       }
       this.weapon.object.updateWorldMatrix(true, false)
+      // 拳銃は銃身を照準へ直に向ける (alignBarrel)。自機と同じ
+      {
+        const pitch = prone ? 0 : state.pitch;
+        this.aimDir.set(-Math.sin(this.yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(this.yaw) * Math.cos(pitch));
+        this.weapon.alignTo(this.aimDir, this.aimTrimWeight);
+      }
       this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
     }
 
