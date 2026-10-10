@@ -114,9 +114,9 @@ const RIFLE: WeaponConfig = {
     quaternion: new THREE.Quaternion(0.6558, -0.1875, 0.6602, -0.3145),
   },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 9.2, crouchYaw: 14.5 },
+  aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 22.9, crouchYaw: 7.8 },
   // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
-  aimLift: { stand: 0, crouch: 25 },
+  aimLift: { stand: 0, crouch: 10 },
   grip: new THREE.Vector3(-0.095, 0.145, -0.165),
   rotation: new THREE.Euler(degrees(-10), degrees(-16), degrees(80)),
   // しゃがむと上半身の角度が変わるので、同じ握り方では銃が体から浮く。
@@ -206,9 +206,9 @@ const SMG: WeaponConfig = {
     quaternion: new THREE.Quaternion(-0.4283, -0.2438, -0.3835, 0.7811),
   },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -7.7, yaw: -10.5, crouchPitch: 15.6, crouchYaw: -5.2 },
+  aimTrim: { pitch: -7.7, yaw: -10.5, crouchPitch: 32.5, crouchYaw: -11.9 },
   // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
-  aimLift: { stand: 0, crouch: 28 },
+  aimLift: { stand: 0, crouch: 10 },
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
   grip: new THREE.Vector3(0.01, 0.11, -0.465),
   rotation: new THREE.Euler(degrees(-8), degrees(-8), degrees(0)),
