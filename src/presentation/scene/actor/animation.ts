@@ -1120,6 +1120,17 @@ function relaxedLowerKey(state: Locomotion, clip: string): string {
   return `${state}@${clip}`
 }
 
+/**
+ * **型そのものが斜めに作られている物**を、腰ごと正面へ回す角度 (rad、左回りが正)。
+ *
+ * 拳銃・ナイフ・投げ物を持って構えていない時の型 (pistol_relaxed) は、腰が正面から
+ * 43° 右へ回っていた (長物の relaxed_idle は 12°)。体ごと斜めに立って見えた
+ * (2026-10-10 本人)。胸は腰より 26° 正面寄りなので、腰と胸の真ん中が正面に来る 30°
+ */
+const CLIP_FACING: Record<string, number> = {
+  pistol_relaxed: THREE.MathUtils.degToRad(30),
+}
+
 const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
   // yaw は、しゃがみのときに半身へ構えるための左右の配分。
   // 首から上を負にしてあるのは、子が親の回転を継ぐため。背骨を 0.7 回した
@@ -1282,6 +1293,8 @@ export class CharacterAnimator {
   private hipsBone: THREE.Bone | null = null
   private readonly uprightHips = new THREE.Quaternion()
   private readonly hipsBase = new THREE.Quaternion()
+  /** いま掛けている向きの補正 (rad、CLIP_FACING)。型が変わる時は寄せて切り替える */
+  private facingFix = 0
   private hipsCaptured = false
   /**
    * 上半身クリップごとの腰の回転トラック。
@@ -2027,6 +2040,9 @@ export class CharacterAnimator {
             : this.aimLevel.stand
           : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
+    // 型ごとの向きの補正。**いま下半身に流している型**で引く
+    const lowerName = this.lowerClipNames.get(this.resolveLowerKey())
+    this.facingFix = damp(this.facingFix, (lowerName && CLIP_FACING[lowerName]) || 0, AIM_HIP_LAMBDA, dt)
     // 銃ごとの上体の起こし (gunLift)。構えている間だけ
     const liftTarget =
       this.aiming && !committed && !this.boxed
@@ -2186,8 +2202,17 @@ export class CharacterAnimator {
     this.hipsBase.copy(bone.quaternion)
     this.hipsCaptured = true
 
-    if (this.hipSquare < 1e-3) return
-    bone.quaternion.slerp(this.uprightHips, this.hipSquare)
+    if (this.hipSquare >= 1e-3) bone.quaternion.slerp(this.uprightHips, this.hipSquare)
+
+    // 型ごとの向きの補正 (CLIP_FACING)。腰ごと世界の上を軸に回すので、脚も上体も一緒に回る
+    if (Math.abs(this.facingFix) > 1e-4) {
+      const parent = bone.parent
+      const parentWorld = parent ? parent.getWorldQuaternion(this.scratchQuat) : new THREE.Quaternion()
+      const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.facingFix)
+      // 親の空間で回す: 親の逆 × 回し × 親
+      const local = parentWorld.clone().invert().multiply(turn).multiply(parentWorld)
+      bone.quaternion.premultiply(local)
+    }
   }
 
   /**
@@ -2389,12 +2414,14 @@ export class CharacterAnimator {
         entry.bone.quaternion.multiply(this.scratchRotation)
       }
     }
-    // 首の向き。上下の曲げの後に、首と頭だけを上向きの軸で回す (LOOK_CHAIN)
-    if (Math.abs(this.lookYaw) > 1e-4) {
+    // 首の向き。上下の曲げの後に、首と頭だけを上向きの軸で回す (LOOK_CHAIN)。
+    // 型の向きの補正 (facingFix) で体ごと回した分は、首と頭で戻して顔を正面に残す
+    const headYaw = this.lookYaw - this.facingFix
+    if (Math.abs(headYaw) > 1e-4) {
       for (const entry of axes) {
         const share = LOOK_CHAIN[entry.suffix]
         if (!share) continue
-        this.scratchRotation.setFromAxisAngle(entry.yawAxis, this.lookYaw * share)
+        this.scratchRotation.setFromAxisAngle(entry.yawAxis, headYaw * share)
         entry.bone.quaternion.multiply(this.scratchRotation)
       }
     }
