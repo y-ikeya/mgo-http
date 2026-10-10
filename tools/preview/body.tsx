@@ -14,6 +14,8 @@
  *     ?tilt=fwd|right         箱を進行方向へ倒した姿 (fwd = 前へ、right = 右へ全開)
  *     ?shadow                 影を受ける体。頭上に板を吊って上半身に影を落とす
  *     ?sky=0.4                屋内の暗さ (空の見え方 SKY_FLOOR〜1) を体に掛ける
+ *     ?trace                  0.1 秒ごとに銃身と両手の向きを書き出す (コンソールの [trace])
+ *     ?trimp=8&trimy=-5       構えの補正 (weapon.ts の aimTrim) を上書きする。しゃがみは trimcp / trimcy
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
@@ -26,7 +28,7 @@ import { buildLights } from '../../src/presentation/scene/world/stage'
 import { SkyLight } from '../../src/presentation/scene/world/skylight'
 import { loadSoldier } from '../../src/presentation/scene/assets'
 import { CharacterAnimator, findBoneBySuffix } from '../../src/presentation/scene/actor/animation'
-import { Weapon, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
+import { Weapon, WEAPON_CONFIGS, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
 import { StunSparks } from '../../src/presentation/scene/fx/stunSparks'
 
 const WIDTH = 1280
@@ -143,6 +145,18 @@ if (query.has('nomip')) {
  */
 const pitch = (Number(query.get('pitch') ?? '0') * Math.PI) / 180
 const anim = new CharacterAnimator(model, gltf.animations, 4.5)
+/*
+ * 銃ごとの構えの補正 (weapon.ts の aimTrim)。本番と同じ値を掛ける。
+ * ?trimp=8&trimy=-5 … 値を上書きして試す (度、上・左が正)
+ */
+{
+  const g = query.get('gun') as WeaponKind | null
+  const trim = g ? WEAPON_CONFIGS[g]?.aimTrim : undefined
+  anim.aimTrim.pitch = (Number(query.get('trimp') ?? trim?.pitch ?? 0) * Math.PI) / 180
+  anim.aimTrim.yaw = (Number(query.get('trimy') ?? trim?.yaw ?? 0) * Math.PI) / 180
+  anim.aimTrim.crouchPitch = (Number(query.get('trimcp') ?? trim?.crouchPitch ?? 0) * Math.PI) / 180
+  anim.aimTrim.crouchYaw = (Number(query.get('trimcy') ?? trim?.crouchYaw ?? 0) * Math.PI) / 180
+}
 // ?onehand … 片手の持ち物 (拳銃・手榴弾・設置物) の姿勢を見る
 // ?empty   … 手に何も出ていない (投げ物・設置物)。転がりの尻尾が変わる
 anim.setPistol(query.has('onehand') || query.has('empty'))
@@ -239,7 +253,33 @@ if (query.has('place')) anim.releaseSetup()
 const zap = query.has('zap') ? new StunSparks(scene) : null
 const zapHand = findBoneBySuffix(model, 'RightHand')
 if (zap && zapHand) zap.discharge((out) => out.setFromMatrixPosition(zapHand.matrixWorld))
+/*
+ * ?trace … 0.1 秒ごとに**銃身と両手の向き**を書き出す (体の前に対する左右・上下、度)。
+ * 構えて歩く間に銃口が揺れていないかを、お手本 (tools/raw/m4Walk.fbx の 4 本目) と比べる
+ */
+const trace = query.has('trace')
+const traceRight = findBoneBySuffix(model, 'RightHand')
+const traceLeft = findBoneBySuffix(model, 'LeftHand')
+let traceAt = 0
+const deg = (r: number) => ((r * 180) / Math.PI).toFixed(1)
 for (let t = 0; t < stopAt; t += 1 / 60) {
+  if (trace && weapon && traceRight && traceLeft && t >= traceAt) {
+    traceAt += 0.1
+    model.updateMatrixWorld(true)
+    const barrel = new THREE.Vector3(0, 0, -1).transformDirection(weapon.object.matrixWorld)
+    const hands = new THREE.Vector3()
+      .setFromMatrixPosition(traceLeft.matrixWorld)
+      .sub(new THREE.Vector3().setFromMatrixPosition(traceRight.matrixWorld))
+      .normalize()
+    // 体の前は根の -Z (turn で回した分を戻して測る)
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(root.quaternion)
+    const yawOf = (v: THREE.Vector3) => Math.atan2(v.x * fwd.z - v.z * fwd.x, -(v.x * fwd.x + v.z * fwd.z))
+    console.log(
+      '[trace]', t.toFixed(1),
+      'barrel', deg(yawOf(barrel)), deg(Math.asin(barrel.y)),
+      'hands', deg(yawOf(hands)), deg(Math.asin(hands.y)),
+    )
+  }
   // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
   if (!oneShot && !query.has('stab')) anim.setLocomotion(clipName as never)
   // 置く型は本番と同じく、姿勢を setupLocomotion から引く (soldier.ts の setting)
@@ -261,6 +301,11 @@ if (query.has('bones')) {
       bone.getWorldPosition(v)
       console.log('[bones]', suffix, v.y.toFixed(3), 'x', v.x.toFixed(3), 'z', v.z.toFixed(3))
     }
+  }
+  // 銃口の高さ (構えの壁判定の高さを決めるのに使う)
+  if (weapon) {
+    const muzzle = weapon.muzzleWorld(new THREE.Vector3())
+    console.log('[bones] muzzle', muzzle.y.toFixed(3), 'forward', Math.hypot(muzzle.x, muzzle.z).toFixed(3))
   }
   // 胸の向き = 上 × (左肩→右肩)。骨の軸より確か (ぶら下がりでは腰も頭も傾く)
   {

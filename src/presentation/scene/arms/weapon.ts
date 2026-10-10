@@ -30,6 +30,12 @@ const EJECT_LOCAL = { x: 0.04, y: 0.06, z: -0.12 }
 export interface WeaponConfig {
   /** 右手が握る位置。手ボーンは手首にあるので、実機で合わせた値になっている */
   grip: THREE.Vector3
+  /**
+   * 構えた時に銃身を照準へ揃える上体の補正 (度、上・左が正)。animation.ts の
+   * aimTrim の注。**立って構え、照準が水平の時に銃身が真っすぐ前・水平になる値**。
+   * 測るのは tools/preview/body.html?clip=run_f&aim&trace&gun=…
+   */
+  aimTrim?: { pitch: number; yaw: number; crouchPitch: number; crouchYaw: number }
   /** 向きの微調整。両手の位置からは手首のひねりが決まらないため */
   rotation: THREE.Euler
   /** しゃがみ姿勢での値。無ければ立ちと同じものを使う */
@@ -83,6 +89,8 @@ const degrees = (value: number) => THREE.MathUtils.degToRad(value)
  * 握った姿勢を持っているので、コードで動かしていない。
  */
 const RIFLE: WeaponConfig = {
+  // 構えた時に銃身を真っすぐ前・水平に (立ち・しゃがみそれぞれ測った値。m4Walk のお手本に揃える)
+  aimTrim: { pitch: 8.6, yaw: -5.1, crouchPitch: 17.5, crouchYaw: 20.3 },
   grip: new THREE.Vector3(-0.095, 0.145, -0.165),
   rotation: new THREE.Euler(degrees(-10), degrees(-16), degrees(80)),
   // しゃがむと上半身の角度が変わるので、同じ握り方では銃が体から浮く。
@@ -101,6 +109,8 @@ const RIFLE: WeaponConfig = {
  * このため。
  */
 const SHOTGUN: WeaponConfig = {
+  // 構えた時に銃身を真っすぐ前・水平に (立ち・しゃがみそれぞれ測った値。m4Walk のお手本に揃える)
+  aimTrim: { pitch: 4.7, yaw: -4.3, crouchPitch: 13.4, crouchYaw: 20.6 },
   // 実機で詰めた値
   grip: new THREE.Vector3(0.02, 0.1, -0.05),
   rotation: new THREE.Euler(degrees(-6), degrees(-17), degrees(-9)),
@@ -118,6 +128,8 @@ const SHOTGUN: WeaponConfig = {
  * 銃口の位置も M870 とほぼ同じ (0.174 対 0.166)
  */
 const M4: WeaponConfig = {
+  // 構えた時に銃身を真っすぐ前・水平に (立ち・しゃがみそれぞれ測った値。m4Walk のお手本に揃える)
+  aimTrim: { pitch: 4.7, yaw: -4.3, crouchPitch: 13.4, crouchYaw: 20.6 },
   ...SHOTGUN,
   /*
    * 握りは**ピストルグリップ**。M870 は床尾の付け根を握るので、そのままだと手が
@@ -143,6 +155,8 @@ const M4: WeaponConfig = {
  * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
  */
 const SMG: WeaponConfig = {
+  // 構えた時に銃身を真っすぐ前・水平に (立ち・しゃがみそれぞれ測った値。m4Walk のお手本に揃える)
+  aimTrim: { pitch: 5.9, yaw: -12.3, crouchPitch: 16.3, crouchYaw: 12.1 },
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
   grip: new THREE.Vector3(0, 0.1, -0.435),
   rotation: new THREE.Euler(degrees(-7), degrees(-9), degrees(7)),
@@ -178,6 +192,8 @@ const KNIFE: WeaponConfig = {
  * 実際の見え方は調整パネルで詰める。ここは出発点。
  */
 const SNIPER: WeaponConfig = {
+  // 構えた時に銃身を真っすぐ前・水平に (立ち・しゃがみそれぞれ測った値。m4Walk のお手本に揃える)
+  aimTrim: { pitch: 18.7, yaw: -11.8, crouchPitch: 29.0, crouchYaw: 14.8 },
   grip: new THREE.Vector3(0.01, 0.28, 0.135),
   rotation: new THREE.Euler(degrees(-20), degrees(-9), degrees(-180)),
   /*

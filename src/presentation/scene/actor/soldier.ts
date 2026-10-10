@@ -36,7 +36,7 @@ import {
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
-import { Weapon, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
+import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
 
@@ -3502,6 +3502,12 @@ export class Soldier {
       // 首はカメラの向きへ。構え中・全身の型の間・伏せ・倒れは 0 (体が向く、または向けない)
       this.animator.setLookYaw(!this.aiming && this.animator.upperFree && this.proneStage === 'none' && !this.down ? this.lookYaw : 0)
       this.animator.setAiming(this.aiming)
+      // 手にある銃の構えの補正 (weapon.ts の aimTrim)。伏せは型が違うので掛けない
+      const trim = isGun(this.held) && this.proneStage === 'none' ? WEAPON_CONFIGS[this.held].aimTrim : undefined
+      this.animator.aimTrim.pitch = THREE.MathUtils.degToRad(trim?.pitch ?? 0)
+      this.animator.aimTrim.yaw = THREE.MathUtils.degToRad(trim?.yaw ?? 0)
+      this.animator.aimTrim.crouchPitch = THREE.MathUtils.degToRad(trim?.crouchPitch ?? 0)
+      this.animator.aimTrim.crouchYaw = THREE.MathUtils.degToRad(trim?.crouchYaw ?? 0)
       this.animator.update(dt)
 
       this.object.updateMatrixWorld(true)
