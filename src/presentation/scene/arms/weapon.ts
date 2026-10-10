@@ -114,22 +114,25 @@ const degrees = (value: number) => THREE.MathUtils.degToRad(value)
  */
 const RIFLE: WeaponConfig = {
   // しゃがみ構えの右手が高い・外に開いている (本人 2026-10-10)。右手首を 5cm 下げ、体の中心側へ 6cm (銃は向きを保って一緒に動く)
-  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.06, -0.05, 0) },
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.07, -0.05, 0) },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
-    position: new THREE.Vector3(-0.149, 0.2777, -0.5436),
-    quaternion: new THREE.Quaternion(0.6558, -0.1875, 0.6602, -0.3145),
+    position: new THREE.Vector3(-0.115, 0.23, -0.53),
+    quaternion: new THREE.Quaternion(-0.1264, 0.4312, -0.8492, 0.2776),
   },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 22.9, crouchYaw: 7.8 },
+  aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 21.7, crouchYaw: 9.5 },
   // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
   aimLift: { stand: 0, crouch: 10 },
   grip: new THREE.Vector3(-0.095, 0.145, -0.165),
   rotation: new THREE.Euler(degrees(-10), degrees(-16), degrees(80)),
   // しゃがむと上半身の角度が変わるので、同じ握り方では銃が体から浮く。
   // 姿勢ごとに値を持って、切り替わりの間は補間する。
-  crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
-  crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
+  crouchGrip: new THREE.Vector3(-0.095, 0.16, -0.195),
+  crouchRotation: new THREE.Euler(degrees(-33), degrees(-5), degrees(80)),
+  // 伏せは前のしゃがみの値のまま (しゃがみを詰め直した時に巻き込まない)
+  proneGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
+  proneRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
   tip: new THREE.Vector3(0, 0.171, -0.845),
 }
 
