@@ -119,7 +119,11 @@ export class LeftArmFollow {
   }
 
   /** 型を当てて銃を置いた**後**に呼ぶ (骨の世界行列が新しいこと) */
-  apply(model: THREE.Object3D, weapon: Corrected | null): void {
+  /**
+   * @param moved 右手をずらした量 (世界、RightArmShift.moved)。銃が一緒に動いたので、
+   *   置き場所 (leftHand) の無い銃では左手も同じだけ動かす
+   */
+  apply(model: THREE.Object3D, weapon: Corrected | null, moved?: THREE.Vector3): void {
     if (!weapon) return
     if (this.searched !== model) {
       this.searched = model
@@ -150,11 +154,24 @@ export class LeftArmFollow {
       reachTwoBone(upper, lower, end, target, this.turn)
       return
     }
-    if (!weapon.aimCorrection(this.delta, this.pivot)) return
+    const rotated = weapon.aimCorrection(this.delta, this.pivot)
+    const shifted = moved !== undefined && moved.lengthSq() > 1e-8
+    if (!rotated && !shifted) return
     this.saved = [upper.quaternion.clone(), lower.quaternion.clone(), end.quaternion.clone()]
     end.updateWorldMatrix(true, false)
     this.wrist.setFromMatrixPosition(end.matrixWorld)
+    if (!rotated) {
+      this.delta.identity()
+      this.pivot.copy(this.wrist)
+    }
+    /*
+     * 銃が回った分を回す (支点は握り)。右手をずらした分は、その支点ごと動いている —
+     * 回す前の手首の位置を「ずらす前の銃」に対して取っているので、ずらした量を足す
+     */
+    // 支点 (握り) はずらした後の銃から取っているので、ずらす前へ戻してから回す
+    if (rotated && shifted) this.pivot.sub(moved)
     const target = this.wrist.sub(this.pivot).applyQuaternion(this.delta).add(this.pivot)
+    if (shifted) target.add(moved)
     this.turn.copy(this.delta).multiply(end.getWorldQuaternion(new THREE.Quaternion()))
     reachTwoBone(upper, lower, end, target, this.turn)
   }
@@ -185,7 +202,11 @@ export class RightArmShift {
    * @param body 体の根 (向きを持つ物)。ずらす量はこの空間 (+X が右、+Y が上、-Z が前)
    * @param shift ずらす量 (m)。重みは掛けた後の値を渡す
    */
+  /** ずらした量 (世界)。左手を同じだけ動かすのに使う (LeftArmFollow.apply の moved) */
+  readonly moved = new THREE.Vector3()
+
   apply(model: THREE.Object3D, body: THREE.Object3D, shift: THREE.Vector3): void {
+    this.moved.set(0, 0, 0)
     if (shift.lengthSq() < 1e-8) return
     if (this.searched !== model) {
       this.searched = model
@@ -209,5 +230,6 @@ export class RightArmShift {
     const offset = shift.clone().applyQuaternion(body.getWorldQuaternion(new THREE.Quaternion()))
     const keep = end.getWorldQuaternion(new THREE.Quaternion())
     reachTwoBone(upper, lower, end, wrist.add(offset), keep)
+    this.moved.copy(offset)
   }
 }

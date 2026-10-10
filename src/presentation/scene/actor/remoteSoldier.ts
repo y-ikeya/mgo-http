@@ -533,13 +533,14 @@ export class RemoteSoldier {
     if (this.model && this.weapon) {
       // 右手を先にずらす (rightShift)。自機と同じ
       const shift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.rightShift;
+      this.rightArm.moved.set(0, 0, 0);
       if (shift) {
         const crouch = Math.min(1, this.weaponStance);
         this.rightShiftNow.lerpVectors(shift.stand, shift.crouch, crouch).multiplyScalar(this.aimTrimWeight);
         this.rightArm.apply(this.model, this.object, this.rightShiftNow);
       }
       this.weapon.object.updateWorldMatrix(true, false)
-      this.leftArm.apply(this.model, this.weapon)
+      this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
     }
 
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている

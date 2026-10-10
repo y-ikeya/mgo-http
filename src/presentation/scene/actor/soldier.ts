@@ -3594,13 +3594,14 @@ export class Soldier {
       if (this.model && this.weapon) {
         // 右手を先にずらす (rightShift)。銃が一緒に動くので、左手はその後で運ぶ
         const shift = isGun(this.held) ? WEAPON_CONFIGS[this.held].rightShift : undefined
+        this.rightArm.moved.set(0, 0, 0)
         if (shift) {
           const crouch = Math.min(1, this.weaponStance)
           this.rightShiftNow.lerpVectors(shift.stand, shift.crouch, crouch).multiplyScalar(this.aimTrimWeight)
           this.rightArm.apply(this.model, this.object, this.rightShiftNow)
         }
         this.weapon.object.updateWorldMatrix(true, false)
-        this.leftArm.apply(this.model, this.weapon)
+        this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
       }
       // 姿勢がどれだけ速く変わっているか。散布に効かせる
       this.stanceRateValue = dt > 0 ? Math.abs(this.weaponStance - before) / dt : 0

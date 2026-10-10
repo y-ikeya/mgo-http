@@ -145,6 +145,8 @@ const RIFLE: WeaponConfig = {
  * このため。
  */
 const SHOTGUN: WeaponConfig = {
+  // しゃがみ構えの右手を体の中心側へ 6.5cm (M4 と同じ。本人 2026-10-10)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
     position: new THREE.Vector3(-0.094, 0.046, -0.497),
@@ -265,6 +267,8 @@ const KNIFE: WeaponConfig = {
  * 実際の見え方は調整パネルで詰める。ここは出発点。
  */
 const SNIPER: WeaponConfig = {
+  // しゃがみ構えの右手を体の中心側へ 6.5cm (M4 と同じ。本人 2026-10-10)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
   aimTrim: { pitch: 3.9, yaw: -9.3, crouchPitch: 1.6, crouchYaw: 9.1 },
   grip: new THREE.Vector3(0.01, 0.28, 0.135),
