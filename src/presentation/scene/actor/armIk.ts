@@ -159,3 +159,55 @@ export class LeftArmFollow {
     reachTwoBone(upper, lower, end, target, this.turn)
   }
 }
+
+/**
+ * **構えている間、右手首を体の空間でずらす** (weapon.ts の rightShift)。銃は右手に
+ * 付いているので一緒に動く。手首の向きは変えないので、銃口の向きは変わらない。
+ * 左手は後で LeftArmFollow が銃の決まった所へ運び直す。
+ *
+ * 曲げた骨は次のコマで型を当てる前に戻す (restore)。LeftArmFollow と同じ
+ */
+export class RightArmShift {
+  private bones: { upper: THREE.Object3D; lower: THREE.Object3D; end: THREE.Object3D } | null = null
+  private searched: THREE.Object3D | null = null
+  private saved: THREE.Quaternion[] | null = null
+
+  restore(): void {
+    if (!this.saved || !this.bones) return
+    const { upper, lower, end } = this.bones
+    upper.quaternion.copy(this.saved[0])
+    lower.quaternion.copy(this.saved[1])
+    end.quaternion.copy(this.saved[2])
+    this.saved = null
+  }
+
+  /**
+   * @param body 体の根 (向きを持つ物)。ずらす量はこの空間 (+X が右、+Y が上、-Z が前)
+   * @param shift ずらす量 (m)。重みは掛けた後の値を渡す
+   */
+  apply(model: THREE.Object3D, body: THREE.Object3D, shift: THREE.Vector3): void {
+    if (shift.lengthSq() < 1e-8) return
+    if (this.searched !== model) {
+      this.searched = model
+      const find = (suffix: string) => {
+        let hit: THREE.Object3D | null = null
+        model.traverse((o) => {
+          if (!hit && o.name.endsWith(suffix) && (o as THREE.Bone).isBone) hit = o
+        })
+        return hit as THREE.Object3D | null
+      }
+      const upper = find('RightArm')
+      const lower = find('RightForeArm')
+      const end = find('RightHand')
+      this.bones = upper && lower && end ? { upper, lower, end } : null
+    }
+    if (!this.bones) return
+    const { upper, lower, end } = this.bones
+    this.saved = [upper.quaternion.clone(), lower.quaternion.clone(), end.quaternion.clone()]
+    end.updateWorldMatrix(true, false)
+    const wrist = new THREE.Vector3().setFromMatrixPosition(end.matrixWorld)
+    const offset = shift.clone().applyQuaternion(body.getWorldQuaternion(new THREE.Quaternion()))
+    const keep = end.getWorldQuaternion(new THREE.Quaternion())
+    reachTwoBone(upper, lower, end, wrist.add(offset), keep)
+  }
+}

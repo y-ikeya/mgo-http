@@ -349,6 +349,11 @@ function dump(): void {
       `${rot}: new THREE.Euler(degrees(${d(v.rotation.x)}), degrees(${d(v.rotation.y)}), degrees(${d(v.rotation.z)})),`,
     )
   }
+  const shifted = WEAPON_CONFIGS[weapon as keyof typeof WEAPON_CONFIGS]?.rightShift
+  if (shifted) {
+    const v3 = (v: THREE.Vector3) => `new THREE.Vector3(${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`
+    lines.push(`rightShift: { stand: ${v3(shifted.stand)}, crouch: ${v3(shifted.crouch)} },`)
+  }
   const hold = WEAPON_CONFIGS[weapon as keyof typeof WEAPON_CONFIGS]?.leftHand
   if (hold) {
     const p = hold.position
@@ -493,6 +498,28 @@ function drawPanel(): void {
       slider('lR', deg(euler.z), -180, 180, 1, (n) => ((euler.z = THREE.MathUtils.degToRad(n)), turnLeft())),
     )
     panel.append(left)
+  }
+
+  /*
+   * 右手のずらし (weapon.ts の rightShift)。構えている間、右手首を体の空間でずらす
+   * (+X が右・+Y が上・-Z が前)。編集中の姿勢 (立ち / しゃがみ) の値
+   */
+  if (config && editing.key !== 'prone') {
+    const target = config as { rightShift?: { stand: THREE.Vector3; crouch: THREE.Vector3 } }
+    target.rightShift ??= { stand: new THREE.Vector3(), crouch: new THREE.Vector3() }
+    const shift = editing.key === 'crouch' ? target.rightShift.crouch : target.rightShift.stand
+    const heading = document.createElement('div')
+    heading.textContent = `右手のずらし (構え・${editing.label})`
+    heading.style.cssText = 'margin:10px 0 4px;opacity:.7'
+    const right = document.createElement('div')
+    right.className = 'group'
+    right.append(
+      heading,
+      slider('rx', shift.x, -0.2, 0.2, 0.005, (n) => (shift.x = n)),
+      slider('ry', shift.y, -0.2, 0.2, 0.005, (n) => (shift.y = n)),
+      slider('rz', shift.z, -0.2, 0.2, 0.005, (n) => (shift.z = n)),
+    )
+    panel.append(right)
   }
 
   /*

@@ -36,7 +36,7 @@ import {
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
-import { LeftArmFollow } from './armIk'
+import { LeftArmFollow, RightArmShift } from './armIk'
 import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
@@ -526,6 +526,9 @@ export class Soldier {
   private aimTrimWeight = 0
   /** 補正で回った銃に左手を付いていかせる */
   private readonly leftArm = new LeftArmFollow()
+  /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
+  private readonly rightArm = new RightArmShift()
+  private readonly rightShiftNow = new THREE.Vector3()
   /** 姿勢が変わっている速さ。散布に効かせる */
   private stanceRateValue = 0
   /** 読み込んだ体。銃を差し替えるときに手ボーンを引き直すのに要る */
@@ -3513,6 +3516,7 @@ export class Soldier {
       this.animator.gunLift.crouch = THREE.MathUtils.degToRad(lift?.crouch ?? 0)
       // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
       this.leftArm.restore()
+      this.rightArm.restore()
       this.animator.update(dt)
 
       this.object.updateMatrixWorld(true)
@@ -3588,6 +3592,13 @@ export class Soldier {
       this.aimTrimWeight = damp(this.aimTrimWeight, this.aiming && this.proneStage === 'none' ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
       this.weapon?.setAimWeight(this.aimTrimWeight)
       if (this.model && this.weapon) {
+        // 右手を先にずらす (rightShift)。銃が一緒に動くので、左手はその後で運ぶ
+        const shift = isGun(this.held) ? WEAPON_CONFIGS[this.held].rightShift : undefined
+        if (shift) {
+          const crouch = Math.min(1, this.weaponStance)
+          this.rightShiftNow.lerpVectors(shift.stand, shift.crouch, crouch).multiplyScalar(this.aimTrimWeight)
+          this.rightArm.apply(this.model, this.object, this.rightShiftNow)
+        }
         this.weapon.object.updateWorldMatrix(true, false)
         this.leftArm.apply(this.model, this.weapon)
       }

@@ -1,4 +1,4 @@
-import { LeftArmFollow } from "./armIk";
+import { LeftArmFollow, RightArmShift } from "./armIk";
 import { SkyLight } from '../world/skylight';
 import { BlobShadow } from './blobShadow';
 import * as THREE from "three";
@@ -211,6 +211,9 @@ export class RemoteSoldier {
   private aimTrimWeight = 0;
   /** 補正で回った銃に左手を付いていかせる (armIk.ts) */
   private readonly leftArm = new LeftArmFollow();
+  /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
+  private readonly rightArm = new RightArmShift();
+  private readonly rightShiftNow = new THREE.Vector3();
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle';
   /** 差し替えの最中。二重に走らせない */
@@ -507,6 +510,7 @@ export class RemoteSoldier {
     animator.gunLift.crouch = THREE.MathUtils.degToRad(lift?.crouch ?? 0);
     // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
     this.leftArm.restore();
+    this.rightArm.restore();
     animator.update(dt);
 
     /*
@@ -527,6 +531,13 @@ export class RemoteSoldier {
     this.aimTrimWeight = damp(this.aimTrimWeight, state.aiming && !this.serverDead && !prone ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
     this.weapon?.setAimWeight(this.aimTrimWeight)
     if (this.model && this.weapon) {
+      // 右手を先にずらす (rightShift)。自機と同じ
+      const shift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.rightShift;
+      if (shift) {
+        const crouch = Math.min(1, this.weaponStance);
+        this.rightShiftNow.lerpVectors(shift.stand, shift.crouch, crouch).multiplyScalar(this.aimTrimWeight);
+        this.rightArm.apply(this.model, this.object, this.rightShiftNow);
+      }
       this.weapon.object.updateWorldMatrix(true, false)
       this.leftArm.apply(this.model, this.weapon)
     }

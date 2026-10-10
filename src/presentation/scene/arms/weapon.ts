@@ -55,6 +55,11 @@ export interface WeaponConfig {
    * (2026-10-10 本人: AK のしゃがみ構え)。無ければ、回した分だけ付いていく
    */
   leftHand?: { position: THREE.Vector3; quaternion: THREE.Quaternion }
+  /**
+   * 構えている間、**右手首をずらす量** (m、体の空間: +X が右・+Y が上・-Z が前)。
+   * 立ち・しゃがみ別。銃は一緒に動く (向きは変わらない)。armIk.ts の RightArmShift
+   */
+  rightShift?: { stand: THREE.Vector3; crouch: THREE.Vector3 }
   /** 向きの微調整。両手の位置からは手首のひねりが決まらないため */
   rotation: THREE.Euler
   /** しゃがみ姿勢での値。無ければ立ちと同じものを使う */
@@ -200,6 +205,8 @@ const M4: WeaponConfig = {
  * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
  */
 const SMG: WeaponConfig = {
+  // しゃがみ構えの右手を目の前へ (体の中心側へ 6cm)。本人 2026-10-10
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.06, 0, 0) },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
     position: new THREE.Vector3(-0.065, 0.045, -0.7),
