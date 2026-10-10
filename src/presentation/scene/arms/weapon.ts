@@ -47,6 +47,14 @@ export interface WeaponConfig {
    * 前を握る左手が大きく持ち上がった (P90 のしゃがみ、2026-10-10 本人)
    */
   aimLift?: { stand: number; crouch: number }
+  /**
+   * 構えている間、**左手首を置く所** (銃の空間の位置と向き)。立って構えた時の
+   * 左手 (どの銃もハンドガードを自然に握っている) を測った値
+   * (tools/preview/weapon.html?views=3&lh)。しゃがんでも同じ所を握らせる —
+   * しゃがみの型の左手はハンドガードを握っておらず、銃の上に浮いていた
+   * (2026-10-10 本人: AK のしゃがみ構え)。無ければ、回した分だけ付いていく
+   */
+  leftHand?: { position: THREE.Vector3; quaternion: THREE.Quaternion }
   /** 向きの微調整。両手の位置からは手首のひねりが決まらないため */
   rotation: THREE.Euler
   /** しゃがみ姿勢での値。無ければ立ちと同じものを使う */
@@ -100,6 +108,11 @@ const degrees = (value: number) => THREE.MathUtils.degToRad(value)
  * 握った姿勢を持っているので、コードで動かしていない。
  */
 const RIFLE: WeaponConfig = {
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.149, 0.2777, -0.5436),
+    quaternion: new THREE.Quaternion(0.6558, -0.1875, 0.6602, -0.3145),
+  },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
   aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 10.5, crouchYaw: 13.8 },
   // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
@@ -122,6 +135,11 @@ const RIFLE: WeaponConfig = {
  * このため。
  */
 const SHOTGUN: WeaponConfig = {
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.115, 0.0196, -0.4229),
+    quaternion: new THREE.Quaternion(-0.62, -0.3384, -0.2309, 0.6692),
+  },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
   aimTrim: { pitch: -11.6, yaw: 0.0, crouchPitch: 9.6, crouchYaw: 14.0 },
   // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
@@ -144,6 +162,11 @@ const SHOTGUN: WeaponConfig = {
  */
 const M4: WeaponConfig = {
   ...SHOTGUN,
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.115, 0.0046, -0.5729),
+    quaternion: new THREE.Quaternion(-0.62, -0.3384, -0.2309, 0.6692),
+  },
   // M870 の補正を写さない (写しより後ろに書く)
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
   aimTrim: { pitch: -10.0, yaw: -0.4, crouchPitch: -16.7, crouchYaw: 18.3 },
@@ -171,6 +194,11 @@ const M4: WeaponConfig = {
  * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
  */
 const SMG: WeaponConfig = {
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.0948, 0.0589, -0.8263),
+    quaternion: new THREE.Quaternion(-0.6295, -0.3033, -0.36, 0.6182),
+  },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
   aimTrim: { pitch: -9.1, yaw: -10.0, crouchPitch: 15.6, crouchYaw: -5.2 },
   // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
@@ -618,6 +646,22 @@ export class Weapon {
     this.object.quaternion.premultiply(local)
     const after = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
     this.object.position.add(before.sub(after))
+  }
+
+  /**
+   * 構えている間に**左手首を置く所** (世界)。銃に leftHand が無ければ false
+   */
+  leftHandTarget(outPosition: THREE.Vector3, outQuaternion: THREE.Quaternion): boolean {
+    const hold = this.config.leftHand
+    if (!hold || this.aimWeight <= 0) return false
+    outPosition.copy(hold.position).applyMatrix4(this.object.matrixWorld)
+    outQuaternion.copy(this.object.getWorldQuaternion(new THREE.Quaternion())).multiply(hold.quaternion)
+    return true
+  }
+
+  /** 構えの補正の掛かり具合 (0..1) */
+  get aimAmount(): number {
+    return this.aimWeight
   }
 
   /**

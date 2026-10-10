@@ -81,6 +81,8 @@ function setWorldQuaternion(bone: THREE.Object3D, world: THREE.Quaternion): void
 /** 銃の補正 (Weapon.aimCorrection) を受け取れる物 */
 interface Corrected {
   aimCorrection(outDelta: THREE.Quaternion, outPivot: THREE.Vector3): boolean
+  leftHandTarget(outPosition: THREE.Vector3, outQuaternion: THREE.Quaternion): boolean
+  readonly aimAmount: number
 }
 
 /**
@@ -97,6 +99,8 @@ export class LeftArmFollow {
   private readonly pivot = new THREE.Vector3()
   private readonly wrist = new THREE.Vector3()
   private readonly turn = new THREE.Quaternion()
+  private readonly hold = new THREE.Vector3()
+  private readonly holdTurn = new THREE.Quaternion()
   /**
    * 曲げる前の骨の向き。**次のコマで型を当てる前に戻す** (restore)。
    * 型は骨を毎コマ書き直すとは限らないので、戻さないと曲げがコマごとに積もって
@@ -131,8 +135,22 @@ export class LeftArmFollow {
       const end = find('LeftHand')
       this.bones = upper && lower && end ? { upper, lower, end } : null
     }
-    if (!this.bones || !weapon.aimCorrection(this.delta, this.pivot)) return
+    if (!this.bones) return
     const { upper, lower, end } = this.bones
+    /*
+     * 銃に左手の置き場所 (leftHand) があればそこへ。構えの掛かり具合で寄せる
+     */
+    if (weapon.leftHandTarget(this.hold, this.holdTurn)) {
+      const weight = weapon.aimAmount
+      this.saved = [upper.quaternion.clone(), lower.quaternion.clone(), end.quaternion.clone()]
+      end.updateWorldMatrix(true, false)
+      this.wrist.setFromMatrixPosition(end.matrixWorld)
+      const target = this.wrist.lerp(this.hold, weight)
+      this.turn.copy(end.getWorldQuaternion(new THREE.Quaternion())).slerp(this.holdTurn, weight)
+      reachTwoBone(upper, lower, end, target, this.turn)
+      return
+    }
+    if (!weapon.aimCorrection(this.delta, this.pivot)) return
     this.saved = [upper.quaternion.clone(), lower.quaternion.clone(), end.quaternion.clone()]
     end.updateWorldMatrix(true, false)
     this.wrist.setFromMatrixPosition(end.matrixWorld)

@@ -613,6 +613,24 @@ function triCell(): Cell {
 
 function renderTri(cw: number, ch: number): void {
   const cell = triCell()
+  /*
+   * ?lh … 左手首の位置と向きを**銃から見た値で**書き出す (weapon.ts の leftHand に写す)。
+   * 立って構えた時は、どの銃も左手が自然にハンドガードを握っているので、そこで測る
+   */
+  if (new URLSearchParams(location.search).has('lh')) {
+    let hand: THREE.Object3D | null = null
+    cell.player.object.traverse((o) => {
+      if (!hand && o.name.endsWith('LeftHand') && (o as THREE.Bone).isBone) hand = o
+    })
+    const g = (cell.player as unknown as { weapon: { object: THREE.Object3D } | null }).weapon
+    if (hand && g) {
+      const local = g.object.matrixWorld.clone().invert().multiply((hand as THREE.Object3D).matrixWorld)
+      const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3()
+      local.decompose(p, q, sc)
+      const f = (n: number) => n.toFixed(4)
+      console.log(`[lh] ${weapon} ${editing.key} position ${f(p.x)}, ${f(p.y)}, ${f(p.z)} quaternion ${f(q.x)}, ${f(q.y)}, ${f(q.z)}, ${f(q.w)}`)
+    }
+  }
   // 横一列に並べてあるので、横から見ると隣の体が重なる。**映す 1 体だけ出す**
   for (const other of cells) other.player.object.visible = other === cell
   const p = cell.player.position
