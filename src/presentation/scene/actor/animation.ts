@@ -1139,9 +1139,9 @@ const CLIP_FACING: Record<string, number> = {
  * (2026-10-10 本人)。銃身は Soldier が照準へ向け直す (weapon.ts の alignBarrel)
  */
 const UPPER_FACING: Record<string, number> = {
-  pistol_aim: THREE.MathUtils.degToRad(25),
+  // **しゃがみだけ。** 立ちの構えはもとから正面寄りで、同じだけ回すと左へ 45° 回りすぎた
+  // (本人 2026-10-10)。撃つ型 (pistol_fire) は立ちでも使うので入れない
   pistol_crouch_aim: THREE.MathUtils.degToRad(25),
-  pistol_fire: THREE.MathUtils.degToRad(25),
 }
 
 const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
