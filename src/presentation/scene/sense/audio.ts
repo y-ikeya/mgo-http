@@ -42,9 +42,11 @@ import { STEP_RANGE } from "../../../domain/rule/noise"
 const SOUNDS = {
   rifle: { file: "ak47_shot1.mp3", reference: 6, max: weaponOf("rifle").noiseRange },
   /*
-   * M4。**AK の音を軽く高くした物** (3 半音上げ、200Hz より下を削る。2026-10-10)。
-   * 実銃の素材が見つかるまでの代わり。5.56mm は 7.62mm より軽く乾いた音なので、
-   * 耳で AK と聞き分けられる。候補 a (2 半音) / c (4 半音) は tools/raw/m4_shot/
+   * M4。**AK の音を軽く・乾かした物** (2026-10-10、本人「もっと乾いた音」)。
+   * 3 半音上げ、400Hz より下を削り、250Hz の響きを -6dB、3.5kHz の破裂を +6dB、
+   * 残響の尾を 0.38 秒で切る。実銃の素材が見つかるまでの代わり。5.56mm は
+   * 7.62mm より軽く乾いた音なので、耳で AK と聞き分けられる。
+   * 候補 a〜f は tools/raw/m4_shot/ (いまは e)
    */
   m4: { file: "m4_shot1.mp3", reference: 6, max: weaponOf("m4").noiseRange },
   /**
