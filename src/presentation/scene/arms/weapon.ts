@@ -141,14 +141,19 @@ const SHOTGUN: WeaponConfig = {
     quaternion: new THREE.Quaternion(-0.62, -0.3384, -0.2309, 0.6692),
   },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -11.6, yaw: 0.0, crouchPitch: 9.6, crouchYaw: 14.0 },
-  // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
-  aimLift: { stand: 0, crouch: 35 },
+  aimTrim: { pitch: -11.6, yaw: 0.0, crouchPitch: -16.7, crouchYaw: 18.3 },
+  // しゃがみは握りを直したので上体は起こさない (M4 と同じ)
+  aimLift: { stand: 0, crouch: 0 },
   // 実機で詰めた値
   grip: new THREE.Vector3(0.02, 0.1, -0.05),
   rotation: new THREE.Euler(degrees(-6), degrees(-17), degrees(-9)),
-  crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
-  crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
+  /*
+   * しゃがみ。**AK の値を写していたので、しゃがむと銃が横へ 80° 寝た** (本人:
+   * しゃがみ構えで銃が左に回る)。AK の模型は寝た向きで作られていて 80° で起こす
+   * が、M870 は上を向いている。M4 と同じく立ちの握りから詰めた値
+   */
+  crouchGrip: new THREE.Vector3(0.02, 0.1, -0.05),
+  crouchRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-9)),
   tip: new THREE.Vector3(0.007, 0.174, -0.845),
 }
 
@@ -168,6 +173,7 @@ const M4: WeaponConfig = {
     quaternion: new THREE.Quaternion(-0.62, -0.3384, -0.2309, 0.6692),
   },
   // M870 の補正を写さない (写しより後ろに書く)
+  aimLift: { stand: 0, crouch: 0 },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
   aimTrim: { pitch: -10.0, yaw: -0.4, crouchPitch: -16.7, crouchYaw: 18.3 },
   /*
