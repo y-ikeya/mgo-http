@@ -22,7 +22,7 @@
 import { MAX_HEALTH, type HitZone } from '../rule/damage'
 import { HELD } from './held'
 
-export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'mosin' | 'm9' | 'm1911' | 'shotgun'
+export type WeaponId = 'smg' | 'rifle' | 'm4' | 'sniper' | 'mosin' | 'm9' | 'm1911' | 'shotgun'
 
 /**
  * 装備の枠。
@@ -487,6 +487,36 @@ const RIFLE: WeaponSpec = {
 }
 
 /**
+ * M4 CUSTOM。**AK と対にする: 一発は軽いが、素直で当てやすい** (2026-10-10 本人)。
+ *
+ *   AK47  胴 5 発 (20) / 660 RPM / 荒れる / 3.5kg / 715 m/s
+ *   M4    胴 6 発 (17) / 800 RPM / 締まる / 3.0kg / 900 m/s
+ *
+ * 全部当たれば倒すまでの時間はほぼ同じ (AK 4 間隔 0.36 秒、M4 5 間隔 0.375 秒)。
+ * 差が出るのは**当てられるか** — 中距離や動きながらは散らない M4、全弾入る
+ * 間合いなら弾数の少ない AK (予備弾も長持ち)。「どちらが強いか」ではなく
+ * 「どの間合いで戦うつもりか」で選ぶ。腕前は AK と同じ札 (rifleMastery)。
+ * 模型は SINNIK の M4 Carbine (CC-BY-4.0、クレジットは CREDITS.md)。
+ */
+const M4: WeaponSpec = {
+  ...RIFLE,
+  id: 'm4',
+  label: 'M4',
+  kill: 'M4 CUSTOM',
+  model: 'm4',
+  // 全長 0.84m (床尾を伸ばした時)。AK (0.88m) より少し短い
+  aimReach: 0.72,
+  weight: 3.0,
+  // 頭 1 発 / 胴 6 発 / 脚 12 発
+  zone: { HEAD: 100, BODY: 17, LEGS: 8.5 },
+  fireInterval: 0.075, // 800 RPM
+  bulletSpeed: 900, // 5.56x45mm
+  sway: 0.22,
+  spreadPerShot: 0.09,
+  spreadMax: 1.2,
+}
+
+/**
  * 狙撃銃 (Remington XM2010)。
  *
  * 突撃銃の裏返しになるよう組んである。**止まっていれば当たり、動けば当たらない。**
@@ -918,6 +948,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   smg: SMG,
   shotgun: SHOTGUN,
   rifle: RIFLE,
+  m4: M4,
   sniper: SNIPER,
   mosin: MOSIN,
   m9: PISTOL,

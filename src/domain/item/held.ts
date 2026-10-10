@@ -216,6 +216,8 @@ const SLOT_ORDER: Record<Slot, number> = {
 export const HELD: Record<HeldId, HeldSpec> = {
   smg: { id: 'smg', label: 'P90', family: 'weapon', slot: 'primary', weight: 2.6, shoots: true, twoHanded: true },
   rifle: { id: 'rifle', label: 'AK47', family: 'weapon', slot: 'primary', weight: 3.5, shoots: true, twoHanded: true },
+  // AK と対の突撃銃。軽く素直で、一発が軽い (weapons.ts の M4)
+  m4: { id: 'm4', label: 'M4', family: 'weapon', slot: 'primary', weight: 3.0, shoots: true, twoHanded: true },
   sniper: { id: 'sniper', label: 'XM2010', family: 'weapon', slot: 'primary', weight: 5.5, shoots: true, twoHanded: true },
   // 麻酔の狙撃銃。殺さないが、眠らせれば同じだけ数を減らせる
   mosin: { id: 'mosin', label: 'MOSIN', family: 'weapon', slot: 'primary', weight: 4.0, shoots: true, twoHanded: true },

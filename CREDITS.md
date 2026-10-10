@@ -14,6 +14,7 @@
 | [Old Rusty Car](https://sketchfab.com/3d-models/old-rusty-car-95baa20ebc5d4d2e869f0b549be838fe) | 立体駐車場に停めてある車 | [Renafox](https://sketchfab.com/kryik1023) | CC-BY-**NC** 4.0 |
 | [Small price car](https://sketchfab.com/3d-models/small-price-car-67c84e4d30ae42fda22c0a0c7526df26) | 同上 | [Oliv1e](https://sketchfab.com/Oliv1e) | CC-BY 4.0 |
 | [P90 Final](https://sketchfab.com/3d-models/p90-final-cd59e752d0a34623a0e61a5623ee2762) | サブマシンガン (`public/models/smg.glb`) | [charles.cla](https://sketchfab.com/charles.cla) | CC-BY-**NC** 4.0 |
+| [M4 Carbine](https://sketchfab.com/3d-models/m4-carbine-b516a8416b1044a7839b4a89dc24ca38) | 突撃銃 M4 CUSTOM (`public/models/m4.glb`) | [SINNIK](https://sketchfab.com/sinnik) | CC-BY 4.0 |
 
 そのまま貼る文言:
 
@@ -22,6 +23,8 @@
 > This work is based on "Small price car" (https://sketchfab.com/3d-models/small-price-car-67c84e4d30ae42fda22c0a0c7526df26) by Oliv1e (https://sketchfab.com/Oliv1e) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 > This work is based on "P90 Final" (https://sketchfab.com/3d-models/p90-final-cd59e752d0a34623a0e61a5623ee2762) by charles.cla (https://sketchfab.com/charles.cla) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+
+> This work is based on "M4 Carbine" (https://sketchfab.com/3d-models/m4-carbine-b516a8416b1044a7839b4a89dc24ca38) by SINNIK (https://sketchfab.com/sinnik) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 ### NC (非営利) が 2 つ混ざっている
 

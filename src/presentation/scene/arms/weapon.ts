@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadM1911, loadMosin, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
+import { loadKnife, loadM1911, loadMosin, loadM4, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
 import { isMesh } from '../util/guards'
 import type { Stance } from '../../../domain/player/stance'
 
@@ -92,6 +92,7 @@ const RIFLE: WeaponConfig = {
   tip: new THREE.Vector3(0, 0.171, -0.845),
 }
 
+
 /**
  * M870。全長 1190mm のポンプ式。
  *
@@ -106,6 +107,29 @@ const SHOTGUN: WeaponConfig = {
   crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
   crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
   tip: new THREE.Vector3(0.007, 0.174, -0.845),
+}
+
+/**
+ * M4 CUSTOM。全長 840mm。**握りは M870 の値を流用する。**
+ *
+ * AK の模型は元から銃身を軸に 90° 寝た向きで作られていて、握りの回転 (80°) で
+ * 起こしている。convert_gltf_gun.py で書き出した銃 (M870・M4) は上が上を向いて
+ * いるので、AK の値を使うと逆に寝る — 弾倉が横を向き、照準器が横へ飛び出した。
+ * 銃口の位置も M870 とほぼ同じ (0.174 対 0.166)
+ */
+const M4: WeaponConfig = {
+  ...SHOTGUN,
+  /*
+   * 握りは**ピストルグリップ**。M870 は床尾の付け根を握るので、そのままだと手が
+   * 床尾に来て銃が前へ 25cm ずれた。M870 の値と模型の握る点のずれ (前へ 3cm・
+   * 下へ 4cm) を、M4 のピストルグリップ (z -0.274, y 0.083) に当てた
+   */
+  grip: new THREE.Vector3(0.02, 0.085, -0.2),
+  // しゃがみ・伏せは立ちと同じ握りから。**M870 のしゃがみの値は AK を写した物**
+  // (寝た模型を 80° 起こす回転) なので、上を向いた M4 に当てると逆に寝る
+  crouchGrip: new THREE.Vector3(0.02, 0.085, -0.2),
+  crouchRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-9)),
+  tip: new THREE.Vector3(0.003, 0.166, -0.845),
 }
 
 /**
@@ -227,7 +251,7 @@ const PISTOL: WeaponConfig = {
  */
 const MOSIN: WeaponConfig = SNIPER
 
-export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, shotgun: SHOTGUN, sniper: SNIPER, mosin: MOSIN, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
+export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, m4: M4, shotgun: SHOTGUN, sniper: SNIPER, mosin: MOSIN, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
 
 /**
@@ -358,6 +382,8 @@ export class Weapon {
               ? await loadM1911()
             : kind === 'mosin'
               ? await loadMosin()
+            : kind === 'm4'
+              ? await loadM4()
             : kind === 'smg'
               ? await loadSmg()
               : kind === 'shotgun'

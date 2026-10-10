@@ -46,6 +46,7 @@ const iconUrl = (id: WeaponId | SupportId) =>
 const CATEGORY: Record<WeaponId | SupportId, string> = {
   smg: 'SMG',
   rifle: 'ASSLT.R',
+  m4: 'ASSLT.R',
   shotgun: 'SHOTGUN',
   sniper: 'SNIPER.R',
   mosin: 'SNIPER.R',

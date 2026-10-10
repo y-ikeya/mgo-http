@@ -34,6 +34,7 @@ const RIFLE_URL = asset.model('rifle.glb')
 const SHOTGUN_URL = asset.model('shotgun.glb')
 const SNIPER_URL = asset.model('sniper.glb')
 const MOSIN_URL = asset.model('mosin.glb')
+const M4_URL = asset.model('m4.glb')
 const M1911_URL = asset.model('m1911.glb')
 const PISTOL_URL = asset.model('m9.glb')
 const CASING_URL = asset.model('casing_rifle.glb')
@@ -124,6 +125,10 @@ export function loadSniper(): Promise<GLTF> {
 
 export function loadMosin(): Promise<GLTF> {
   return load(MOSIN_URL)
+}
+
+export function loadM4(): Promise<GLTF> {
+  return load(M4_URL)
 }
 
 export function loadPistol(): Promise<GLTF> {

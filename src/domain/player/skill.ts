@@ -188,6 +188,8 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
 export const MASTERY_OF: Record<WeaponId, SkillId> = {
   smg: 'smgMastery',
   rifle: 'rifleMastery',
+  // M4 も突撃銃の腕前で扱う (同じ構えの銃を 2 つに割らない。mosin と同じ理由)
+  m4: 'rifleMastery',
   sniper: 'sniperMastery',
   // 麻酔の狙撃銃も狙撃銃の腕前で扱う。**同じ構えの銃を 2 つに割らない** —
   // 予算 4 では 2 挺を極められないので、割ると片方が死に札になる

@@ -133,10 +133,13 @@ describe('武器の mastery', () => {
      * **狙撃銃も同じ理由で 2 挺が 1 つを分け合う** (XM2010 / モシンナガン)。
      * 構えも間合いも同じで、違うのは殺すか眠らせるかだけ。別にすると
      * 「麻酔を持つ日は腕前を捨てる」になって、選ぶ理由が消える。
+     *
+     * **突撃銃も同じ** (AK47 / M4)。間合いが同じで、違うのは一発の重さと扱いやすさ
      */
     const primaries = CHOICES.primary.map((id) => MASTERY_OF[id])
-    expect(new Set(primaries).size).toBe(primaries.length - 1)
+    expect(new Set(primaries).size).toBe(primaries.length - 2)
     expect(MASTERY_OF.mosin).toBe(MASTERY_OF.sniper)
+    expect(MASTERY_OF.m4).toBe(MASTERY_OF.rifle)
     expect(MASTERY_OF.m9).toBe(MASTERY_OF.m1911)
     expect(costOf({ smgMastery: 3, sniperMastery: 3 })).toBeGreaterThan(SKILL_BUDGET)
   })

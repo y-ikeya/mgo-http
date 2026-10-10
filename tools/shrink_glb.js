@@ -43,6 +43,9 @@ for (const [i, image] of (gltf.images ?? []).entries()) {
   const after = (shrunk.length / 1024 / 1024).toFixed(2)
   console.log(`image ${String(i).padStart(2)}: ${before} MB -> ${after} MB`)
   replaced.set(image.bufferView, shrunk)
+  // 中身は JPEG になったので札も合わせる。**PNG で配られた物 (m4) は札が png のまま
+  // 残って読めなくなる**
+  image.mimeType = 'image/jpeg'
 
   unlinkSync(inPath)
   unlinkSync(outPath)
