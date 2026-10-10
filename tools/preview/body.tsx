@@ -161,7 +161,8 @@ const anim = new CharacterAnimator(model, gltf.animations, 4.5)
 // ?empty   … 手に何も出ていない (投げ物・設置物)。転がりの尻尾が変わる
 anim.setPistol(query.has('onehand') || query.has('empty'))
 anim.setHandsEmpty(query.has('empty'))
-anim.setAiming(query.has('aim'))
+// 構えは銃を付けた後で入れる (下の取り付けの注)
+anim.setAiming(false)
 // ?knife … ナイフを持っている (構えると knife_idle)
 anim.setKnife(query.has('knife'))
 // ?look=60 … 首をカメラの向きへ (度、左が正)。構えていないときだけ効く
@@ -189,6 +190,12 @@ if (box) {
 const gunName = query.get('gun')
 let weapon: Weapon | null = null
 if (gunName) {
+  /*
+   * **構えていない姿勢で付ける。** 本番の Soldier は湧いた直後 (構えていない) に
+   * 付けて、その手の向きを以後ずっと基準にする。構えた姿勢で付けていた頃は基準が
+   * 違い、同じ握りの値でも銃の向きが本番と 20° 近くずれた (AK: ここでは 8.6° 下、
+   * 本番は 10° 上。2026-10-10)
+   */
   anim.update(0)
   model.updateMatrixWorld(true)
   const right = findBoneBySuffix(model, 'RightHand')
@@ -214,6 +221,8 @@ if (gunName) {
     }
   }
 }
+
+anim.setAiming(query.has('aim'))
 
 /*
  * **刻んで進める。** 一気に進めると、骨の追従 (ばね) が 1 歩で終わってしまう。
