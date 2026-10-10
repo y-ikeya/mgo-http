@@ -179,9 +179,11 @@ const M4: WeaponConfig = {
   ...SHOTGUN,
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
-    position: new THREE.Vector3(-0.115, 0.0046, -0.5729),
-    quaternion: new THREE.Quaternion(-0.62, -0.3384, -0.2309, 0.6692),
+    position: new THREE.Vector3(-0.06, 0.05, -0.525),
+    quaternion: new THREE.Quaternion(-0.3784, -0.2579, -0.3503, 0.8171),
   },
+  // しゃがみ構えの右手を体の中心側へ 6.5cm (本人が三面図で詰めた値)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
   // M870 の補正を写さない (写しより後ろに書く)
   aimLift: { stand: 0, crouch: 0 },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
@@ -194,8 +196,11 @@ const M4: WeaponConfig = {
   grip: new THREE.Vector3(0.02, 0.085, -0.2),
   // しゃがみ・伏せは立ちと同じ握りから。**M870 のしゃがみの値は AK を写した物**
   // (寝た模型を 80° 起こす回転) なので、上を向いた M4 に当てると逆に寝る
-  crouchGrip: new THREE.Vector3(0.02, 0.085, -0.2),
-  crouchRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-9)),
+  crouchGrip: new THREE.Vector3(0.005, 0.105, -0.23),
+  crouchRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-1)),
+  // 伏せは前のしゃがみの値のまま (しゃがみを詰め直した時に巻き込まない)
+  proneGrip: new THREE.Vector3(0.02, 0.085, -0.2),
+  proneRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-9)),
   tip: new THREE.Vector3(0.003, 0.166, -0.845),
 }
 
