@@ -209,19 +209,22 @@ const SMG: WeaponConfig = {
   rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.06, 0, 0) },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
-    position: new THREE.Vector3(-0.065, 0.045, -0.7),
+    position: new THREE.Vector3(-0.075, 0.04, -0.68),
     quaternion: new THREE.Quaternion(-0.4283, -0.2438, -0.3835, 0.7811),
   },
   // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -7.7, yaw: -10.5, crouchPitch: 32.5, crouchYaw: -11.9 },
+  aimTrim: { pitch: -7.7, yaw: -10.5, crouchPitch: 33.7, crouchYaw: -12.2 },
   // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
   aimLift: { stand: 0, crouch: 10 },
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
   grip: new THREE.Vector3(0.01, 0.11, -0.465),
   rotation: new THREE.Euler(degrees(-8), degrees(-8), degrees(0)),
   // しゃがむと上半身が前に倒れるので、銃も倒して抱え込む (pitch -7 → -44)
-  crouchGrip: new THREE.Vector3(-0.05, 0.035, -0.455),
-  crouchRotation: new THREE.Euler(degrees(-44), degrees(15), degrees(14)),
+  crouchGrip: new THREE.Vector3(0.02, 0.115, -0.44),
+  crouchRotation: new THREE.Euler(degrees(-45), degrees(16), degrees(-3)),
+  // 伏せは前のしゃがみの値のまま (しゃがみを詰め直した時に巻き込まない)
+  proneGrip: new THREE.Vector3(-0.05, 0.035, -0.455),
+  proneRotation: new THREE.Euler(degrees(-44), degrees(15), degrees(14)),
   // 銃口。断面の実測 (最も -Z の点)
   tip: new THREE.Vector3(0, 0.16, -0.845),
 }
