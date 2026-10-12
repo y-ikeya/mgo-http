@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { CQC_LAND_SECONDS } from '../../../domain/player/cqc'
 import { isBone } from '../util/guards'
 import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
@@ -621,8 +622,6 @@ const SWEEP_KEY = 'sweep'
  * — 上半身の状態も 'sweep' のまま、引く型だけが違う (fallKey)
  */
 const THROWN_KEY = 'cqc_thrown'
-/** 投げられて背中が地面に着くまで (秒、クリップ内の時刻)。tools/raw/cqc.blend の 55 コマ目 (24fps) */
-const THROWN_LAND = 2.25
 /** CQC で投げる / 空振りする。全身の型 */
 const CQC_THROW_KEY = 'cqc_throw'
 /**
@@ -3767,7 +3766,8 @@ export class CharacterAnimator {
     this.upperState = 'sweep'
     this.locomotion = 'cqc_thrown'
     this.fallKey = THROWN_KEY
-    this.sweepDuration = THROWN_LAND / CQC_RATE
+    // 背中が着くまで。サーバーがスタミナを減らすのも同じ時刻 (domain/player/cqc.ts)
+    this.sweepDuration = CQC_LAND_SECONDS
     this.rootSampleValid = false
   }
 

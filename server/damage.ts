@@ -31,6 +31,7 @@ import { alertHit } from './alert'
 import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
 import {
   CQC_FACING_COS,
+  CQC_LAND_SECONDS,
   CQC_PAIR_DISTANCE,
   CQC_REACH,
   CQC_STAMINA,
@@ -628,27 +629,8 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
   if (isAsleep(victim.sleepUntil, now) || !canBeThrown(victim.locomotion)) return
   // 型の尺 (2.9 秒を 1.2 倍速 = 2.4 秒) の間は次を受けない
   session.cqcUntil = now + 2000
-
-  const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
-  victim.stamina = drain.stamina
-  victim.concentratingSince = 0
-  if (drain.slept) {
-    victim.sleepUntil = now + SLEEP_SECONDS * 1000
-    attacker.stuns++
-    broadcast(room, {
-      type: 'stun',
-      by: attacker.id,
-      byName: attacker.name,
-      byTeam: attacker.team,
-      target: victim.id,
-      targetName: victim.name,
-      targetTeam: victim.team,
-      weapon: 'CQC',
-      head: false,
-    })
-    broadcast(room, matchState(room))
-  }
-  sendStamina(victim)
+  // スタミナは**倒し切った時**に減らす (背中が地面に着く所)
+  setTimeout(() => cqcLanded(room, attacker, victim), CQC_LAND_SECONDS * 1000)
 
   /*
    * 投げる側の正面へ寄せて、投げる側を向かせる。型が 2 人の間合い
@@ -668,4 +650,37 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
   sessionFor(victim)?.socket.send(
     JSON.stringify({ type: 'thrown', by: attacker.id, x: attacker.x, z: attacker.z, yaw } satisfies ServerMessage),
   )
+}
+
+/**
+ * CQC で投げた相手の背中が地面に着いた。**ここでスタミナを減らす。**
+ *
+ * 投げている間に相手が倒された・抜けた・眠った・試合が終わった なら何もしない
+ * (その間に起きたことのほうが強い)
+ */
+function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer): void {
+  if (room.players.get(victim.id) !== victim || !canBeHurt(victim.life)) return
+  if (room.phase !== 'playing') return
+  const now = Date.now()
+  if (isAsleep(victim.sleepUntil, now)) return
+  const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
+  victim.stamina = drain.stamina
+  victim.concentratingSince = 0
+  if (drain.slept) {
+    victim.sleepUntil = now + SLEEP_SECONDS * 1000
+    attacker.stuns++
+    broadcast(room, {
+      type: 'stun',
+      by: attacker.id,
+      byName: attacker.name,
+      byTeam: attacker.team,
+      target: victim.id,
+      targetName: victim.name,
+      targetTeam: victim.team,
+      weapon: 'CQC',
+      head: false,
+    })
+    broadcast(room, matchState(room))
+  }
+  if (!victim.bot) sendStamina(victim)
 }
