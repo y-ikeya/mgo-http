@@ -3574,13 +3574,28 @@ export class Game {
    *
    * @returns 引き金を CQC に使った (刺突へは回さない)
    */
+  /** 投げ切る型の最中に押された CQC。手を離れたら出す (updateCqc) */
+  private cqcQueued = false;
+
   private updateCqc(): boolean {
-    if (this.input.aiming || this.player.isAiming || !canThrowWith(this.inv.held)) return false;
-    if (!this.input.firing || !this.inv.pressedOnce) return false;
-    this.inv.consumePress();
+    if (this.input.aiming || this.player.isAiming || !canThrowWith(this.inv.held)) {
+      this.cqcQueued = false;
+      return false;
+    }
+    const pressed = this.input.firing && this.inv.pressedOnce;
+    if (pressed) this.inv.consumePress();
+    if (!pressed && !this.cqcQueued) return false;
     if (this.stabTimer > 0 || this.reloadTimer > 0) return true;
-    // 投げ切る / 置き切る型の最中 (構えを解いても型は終わるまで流れる)
-    if (this.grenadeRelease > 0 || this.setupRelease > 0) return true;
+    /*
+     * 投げ切る / 置き切る型の最中 (手を離れるまで最大 1 秒ほど)。**押したことは覚えておいて、
+     * 手を離れた瞬間に出す。** 捨てていたので、手榴弾を投げてすぐ目の前の敵に掛けようと
+     * すると何も起きなかった (本人 2026-10-12)
+     */
+    if (this.grenadeRelease > 0 || this.setupRelease > 0) {
+      this.cqcQueued = true;
+      return true;
+    }
+    this.cqcQueued = false;
     const look = this.player.yaw;
     this.meleeForward.set(-Math.sin(look), 0, -Math.cos(look));
     const target = this.remotes.cqcTarget(this.player.position, this.meleeForward, (id, side) =>
