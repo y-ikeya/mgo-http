@@ -96,7 +96,10 @@ export default function Lobby(props: { identity: Identity }) {
   return (
     <div class="lobby">
       <header class="lobby-head">
-        <div class="lobby-title">MGOHTTP</div>
+        {/* 押すと最初の画面 (対戦か練習かを選ぶ) へ戻る */}
+        <button class="lobby-title lobby-home" onClick={() => navigate(`/${location.search}`)} title="最初の画面へ">
+          MGOHTTP
+        </button>
         <div class="lobby-who">
           {props.identity.displayName}
           <button

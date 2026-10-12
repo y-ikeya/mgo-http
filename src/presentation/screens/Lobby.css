@@ -274,3 +274,15 @@
   color: rgba(190, 206, 176, 0.55);
   white-space: nowrap;
 }
+
+/* 題字を押すと最初の画面へ。見た目は題字のまま */
+.lobby-home {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+.lobby-home:hover {
+  opacity: 0.8;
+}
