@@ -3,7 +3,7 @@ import { t } from '../../i18n'
 import { useNavigate, useParams } from '@solidjs/router'
 import type * as THREE from 'three'
 import { Game, type GameStats } from '../scene/Game'
-import type { Identity } from '../../infra/auth/session'
+import { ensureFresh, type Identity } from '../../infra/auth/session'
 import type { WeaponTarget } from '../scene/arms/weapon'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import Calibrator from '../ui/Calibrator'
@@ -184,12 +184,21 @@ export default function Play(props: {
      * 練習を /training へ直に返さないのは、あの画面は開いた瞬間に繋ぎに行くので、
      * 認証が戻っていなければまた切れて、ここへ戻ってくる (行き来が止まらない)
      */
-    navigate(training ? '/' : '/rooms', { state: { notice: 'expired' } })
+    // 戻る前に token を取り直す。取り直さないと、入り直した時にまた弾かれる
+    void ensureFresh(true).finally(() => navigate(training ? '/' : '/rooms', { state: { notice: 'expired' } }))
   })
 
-  onMount(() => {
+  let alive = true
+  onCleanup(() => {
+    alive = false
+  })
+  onMount(async () => {
+    // 繋ぐ前に、期限が近ければ token を取り直す (裏に回っていた間に切れていることがある)
+    const identity = (await ensureFresh()) ?? props.identity
+    // 取り直している間に画面を離れていたら作らない
+    if (!alive) return
     // 練習 (/training) は自分だけの部屋。他の人と出会わない
-    const instance = new Game(container, props.identity, roomName(), training)
+    const instance = new Game(container, identity, roomName(), training)
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
     instance.onLoadout = (next) => {
       setPrimary(next.primary)

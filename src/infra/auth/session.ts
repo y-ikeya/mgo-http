@@ -203,6 +203,30 @@ export function signOut(): void {
   store(null)
 }
 
+/**
+ * **期限が近ければ (切れていれば) いま取り直す。** 部屋へ繋ぐ前と、弾かれた時に呼ぶ。
+ *
+ * 取り直しはタイマーでしか走っていなかった。タブが裏に回るとブラウザがタイマーを
+ * 止めるので、取り直さないまま期限が切れる。弾かれて最初の画面へ戻っても古い
+ * token のままで、練習に入り直すとまた弾かれた (2026-10-12 本人)。
+ * force: 期限に関わらず取り直す (サーバーに断られた時。時計がずれていても直す)
+ */
+export async function ensureFresh(force = false): Promise<Identity | null> {
+  if (!session) return null
+  if (force || session.expires_at - REFRESH_MARGIN <= Math.floor(Date.now() / 1000)) {
+    await refresh()
+    scheduleRefresh()
+  }
+  return currentIdentity()
+}
+
+// タブが前に戻った時も見る (裏の間はタイマーが止まっている)
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void ensureFresh()
+  })
+}
+
 /** 起動時に呼ぶ。期限が近ければ先に取り直しておく */
 export async function restore(): Promise<Identity | null> {
   if (!session) return null
