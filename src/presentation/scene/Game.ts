@@ -3562,7 +3562,10 @@ export class Game {
 
   /**
    * CQC (domain/player/cqc.ts)。**構えずに引き金を引く。** 片手で持つ物 (拳銃・
-   * ナイフ) の時だけで、長物では何も起きない。
+   * ナイフ・投げる物・置く物) の時だけで、長物では何も起きない。
+   *
+   * 構えているかは**ボタンで見る** (input.aiming)。投げ物を構えている間は体の構え
+   * (isAiming) が立たないので、そちらで見ると構えて引いた手榴弾が CQC に化ける
    *
    * 見ている方 (カメラ) の近くに立っている敵が居れば、そちらへ向き直って投げる。
    * 居ない・しゃがんでいる・箱に入っている なら**空振り** — 型の後に棒立ちの隙が
@@ -3571,10 +3574,12 @@ export class Game {
    * @returns 引き金を CQC に使った (刺突へは回さない)
    */
   private updateCqc(): boolean {
-    if (this.player.isAiming || !canThrowWith(this.inv.held)) return false;
+    if (this.input.aiming || this.player.isAiming || !canThrowWith(this.inv.held)) return false;
     if (!this.input.firing || !this.inv.pressedOnce) return false;
     this.inv.consumePress();
     if (this.stabTimer > 0 || this.reloadTimer > 0) return true;
+    // 投げ切る / 置き切る型の最中 (構えを解いても型は終わるまで流れる)
+    if (this.grenadeRelease > 0 || this.setupRelease > 0) return true;
     const look = this.follow.aimYaw;
     this.meleeForward.set(-Math.sin(look), 0, -Math.cos(look));
     const target = this.remotes.cqcTarget(this.player.position, this.meleeForward, (id, side) =>

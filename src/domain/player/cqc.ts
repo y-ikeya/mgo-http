@@ -2,9 +2,10 @@
  * CQC。**左で殴って怯ませ、右腕を喉に掛けて、足を払って仰向けに倒す。**
  *
  * --- 掛かる時 ---
- * 投げる側: 構えずに引き金を引く。手にあるのが**片手で持つ物** (拳銃・ナイフ) の
- *   時だけ — 突撃銃や狙撃銃のような両手で持つ長物では掛けられない。投げる物・置く物
- *   (手榴弾・クレイモア …) は引き金がそれ自体を使うので入らない。
+ * 投げる側: 構えずに引き金を引く。手にあるのが**片手で持つ物** (拳銃・ナイフ・
+ *   投げる物・置く物) の時だけ — 突撃銃や狙撃銃のような両手で持つ長物では掛けられない。
+ *   投げる物・置く物は**構えてから**引き金で投げる / 置くので、構えていない引き金は
+ *   空いている (本人 2026-10-12: 手榴弾でも CQC できるように)。
  * 投げられる側: **立っている時だけ。** しゃがんでいる・箱に入っている・伏せている
  *   相手には腕が掛からない (本人 2026-10-12)。
  *
@@ -18,7 +19,7 @@
  *
  * three にも DOM にも依存しない。サーバーが同じ規則を読む。
  */
-import { isGun, isTwoHanded, type HeldId } from '../item/held'
+import { isGun, isThrowable, isTwoHanded, type HeldId } from '../item/held'
 import { MOVE_DIRECTIONS, type Locomotion } from './locomotion'
 
 /** 掛けられる距離 (m、体の中心どうし、水平)。腕を伸ばして喉に届く所まで */
@@ -59,9 +60,9 @@ export const CQC_STAMINA = 25
  */
 export const CQC_MISS_RECOVERY = 0.6
 
-/** その物を持って掛けられるか。両手で持つ長物は掛けられない */
+/** その物を持って掛けられるか。両手で持つ長物は掛けられない。箱を被っていては掛けられない */
 export function canThrowWith(held: HeldId): boolean {
-  return !isTwoHanded(held) && (isGun(held) || held === 'knife')
+  return !isTwoHanded(held) && (isGun(held) || held === 'knife' || isThrowable(held))
 }
 
 /**

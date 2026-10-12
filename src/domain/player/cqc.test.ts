@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import { canBeThrown, canThrowWith } from './cqc'
 
 describe('CQC', () => {
-  test('片手で持つ物 (拳銃・ナイフ) なら掛けられる。長物・投げる物では掛けられない', () => {
-    expect(canThrowWith('m9')).toBe(true)
-    expect(canThrowWith('m1911')).toBe(true)
-    expect(canThrowWith('knife')).toBe(true)
-    for (const held of ['rifle', 'm4', 'smg', 'sniper', 'mosin', 'shotgun', 'grenade', 'claymore', 'box'] as const) {
+  test('片手で持つ物 (拳銃・ナイフ・投げる物・置く物) なら掛けられる。長物と箱では掛けられない', () => {
+    for (const held of ['m9', 'm1911', 'knife', 'grenade', 'locator', 'claymore', 'decoy'] as const) {
+      expect(canThrowWith(held)).toBe(true)
+    }
+    for (const held of ['rifle', 'm4', 'smg', 'sniper', 'mosin', 'shotgun', 'box'] as const) {
       expect(canThrowWith(held)).toBe(false)
     }
   })
