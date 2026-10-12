@@ -158,7 +158,7 @@ export type Locomotion =
    * CQC (domain/player/cqc.ts)。**全身の型で、焼かれた移動を辿る。**
    *
    *   cqc_throw   投げる。殴って、喉に腕を掛けて、足を払う
-   *   cqc_miss    空振り。腕を伸ばした所で止まる (その後の棒立ちは idle のまま)
+   *   cqc_miss    空振り。左のフックだけ出して引き戻す (その後の棒立ちは idle のまま)
    *   cqc_thrown  投げられる。仰向けに倒れて終わり、そのまま倒れている間の姿になる
    *               (sweep と同じ扱い: 起きる・這う・寝たまま撃つ)
    */

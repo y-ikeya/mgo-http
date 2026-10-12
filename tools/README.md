@@ -413,7 +413,8 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 本人と Blender で組んだ型 (`tools/raw/cqc.blend`、24fps、70 コマ)。投げる側 `attacker` の
 `cqc_throw` と、投げられる側 `victim` の `cqc_thrown` を、骨組みだけ選んで glTF に書き出し
 (export_animation_mode=ACTIVE_ACTIONS)、名前を付け直して 3 つの皮に merge した。空振り
-`cqc_miss` は `cqc_throw` の頭 1.0 秒 (腕を喉へ伸ばした所まで) を split_clip で切り出した物。
+`cqc_miss` は cqc.blend の別の action (22 コマ): 左のフックが伸び切る 11 コマまでは投げと同じで、
+そこから左手だけ構えへ引き戻す (右手は振らない)。
 
 組むときの道具は `tools/cqc/` (pose.py = 体の向きで骨を回す、legs.py = つま先を床に留めて
 脚を解き直す)。元にした素材は Boxing / LightHitToHead / SweepFall (`tools/cqc/*.json` で
