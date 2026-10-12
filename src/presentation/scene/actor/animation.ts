@@ -3787,6 +3787,16 @@ export class CharacterAnimator {
     this.rootSampleValid = false
   }
 
+  /**
+   * CQC で投げられている途中で**放された** (投げた側が倒れた)。倒れる型をやめて
+   * 普段の姿へ戻す。倒れかけの姿から立ち姿へは、型の重みの補間で繋がる
+   */
+  releaseThrown(): void {
+    if (this.fallKey !== THROWN_KEY) return
+    if (this.upperState === 'sweep') this.upperState = 'stance'
+    this.fallKey = SWEEP_KEY
+  }
+
   /** CQC の型 (投げる / 空振り) が流れているか */
   get cqcBusy(): boolean {
     return this.cqcKind !== null

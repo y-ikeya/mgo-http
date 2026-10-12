@@ -4,6 +4,7 @@
  *     bunx vite → http://localhost:5174/tools/preview/cqc.html
  *     ?t=1.2        最初に止める秒。下のバーで動かせる
  *     ?miss         投げる側を空振りの型にする (相手は立ったまま)
+ *     ?release=1.2  その秒で投げられる側を放す (投げた側が倒れた時、soldier の releaseThrown)
  *     ?cam=side|front|top|back   カメラ (既定 side)。?dist= で距離
  *     ?skin=soldier_raiden
  *
@@ -26,6 +27,7 @@ const num = (key: string, fallback: number) => {
 }
 const stopAt = num('t', 0)
 const miss = query.has('miss')
+const releaseAt = num('release', -1)
 const cam = query.get('cam') ?? 'side'
 const dist = num('dist', 4)
 const skin = query.get('skin') ?? 'soldier'
@@ -91,6 +93,10 @@ function seekTo(t: number): void {
     current = 0
   }
   while (current < t) {
+    if (releaseAt >= 0 && current < releaseAt && current + STEP >= releaseAt) {
+      victim.anim.releaseThrown()
+      victim.anim.setLocomotion('idle' as never)
+    }
     for (const b of bodies) {
       b.anim.update(STEP)
       // soldier.ts と同じ写し方 (モデル空間の正面 +Z、yaw + π)

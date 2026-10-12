@@ -15,7 +15,7 @@ import type { Decoy } from './arms/decoy'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
 import type { Locator } from './arms/locator'
-import { sessionOf } from './session'
+import { sessionFor, sessionOf } from './session'
 import { terrainOf, type Terrain } from './stage'
 
 export interface Client {
@@ -171,6 +171,31 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
     return
   }
   broadcast(room, { type: 'life', id: player.id, state: next })
+  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す
+  if (next !== 'alive' && next !== 'spawning') releaseCqc(room, player)
+}
+
+/**
+ * CQC で投げている相手を**放す**。背中が地面に着く前に投げた側が倒れた・抜けた時。
+ *
+ * 相手は倒れかけの所から立ち直り、スタミナは減らない (着いた時の始末を取り消す)。
+ * 人には本人へ released を送る (倒れているのは本人の画面なので)。的はこちらで立たせる
+ */
+export function releaseCqc(room: RoomWorld, attacker: MatchPlayer): void {
+  // 的には接続が無い (投げることも無い)
+  const session = sessionFor(attacker)
+  const pending = session?.cqcThrow
+  if (!session || !pending) return
+  session.cqcThrow = null
+  clearTimeout(pending.timer)
+  const victim = pending.victim
+  if (room.players.get(victim.id) !== victim) return
+  if (victim.bot) {
+    victim.downLeft = 0
+    victim.downThrown = false
+    return
+  }
+  sessionFor(victim)?.socket.send(JSON.stringify({ type: 'released' } satisfies ServerMessage))
 }
 
 /**

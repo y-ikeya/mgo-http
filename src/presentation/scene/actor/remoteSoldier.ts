@@ -443,6 +443,10 @@ export class RemoteSoldier {
       // 'hang' (待つ姿) もここを通る。落ちる型の上半身を止め絵へ渡すため
       animator.endHang();
     }
+    // CQC で投げられている途中で放された (倒れる型から普段の姿へ)。上半身を戻す
+    if (this.locomotion === "cqc_thrown" && locomotion !== "cqc_thrown" && !isWholeBody(locomotion)) {
+      animator.releaseThrown();
+    }
     if (locomotion !== this.locomotion && isWholeBody(locomotion)) {
       PLAY_WHOLE_BODY[locomotion](animator);
       // 型の途中から見えた相手は、その分だけ進めてから流す (届くまでの遅れの分も含む)

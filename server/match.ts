@@ -30,7 +30,7 @@ import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
-import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, setLife } from './world'
+import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, setLife } from './world'
 import { forgetPoses, recordPose } from './history'
 
 /** 1 試合の長さ (ms) */
@@ -354,6 +354,8 @@ export function spawn(room: RoomWorld, player: MatchPlayer, now = Date.now()): v
 export function leaveRoom(room: RoomWorld, player: MatchPlayer): void {
   // 走っている試合を捨てて出た。抜けたことごと残す
   if (room.phase === 'playing') recordSeat(room, player, true)
+  // 投げている途中で出た。相手を放す
+  releaseCqc(room, player)
   room.players.delete(player.id)
   // 持っていた過去も捨てる。**残すと、入り直した人が前の命の位置で当たる**
   forgetPoses(player.id)

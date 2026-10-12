@@ -629,8 +629,15 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
   if (isAsleep(victim.sleepUntil, now) || !canBeThrown(victim.locomotion)) return
   // 型の尺 (2.9 秒を 1.2 倍速 = 2.4 秒) の間は次を受けない
   session.cqcUntil = now + 2000
-  // スタミナは**倒し切った時**に減らす (背中が地面に着く所)
-  setTimeout(() => cqcLanded(room, attacker, victim), CQC_LAND_SECONDS * 1000)
+  // スタミナは**倒し切った時**に減らす (背中が地面に着く所)。その前に投げた側が
+  // 倒れたら放す (world.ts の releaseCqc が始末を取り消す)
+  session.cqcThrow = {
+    victim,
+    timer: setTimeout(() => {
+      session.cqcThrow = null
+      cqcLanded(room, attacker, victim)
+    }, CQC_LAND_SECONDS * 1000),
+  }
 
   /*
    * 投げる側の正面へ寄せて、投げる側を向かせる。型が 2 人の間合い

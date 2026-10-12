@@ -386,6 +386,14 @@ export interface ThrownEvent {
   yaw: number
 }
 
+/**
+ * CQC で投げられている途中で、**投げた側が倒れた / 抜けた。** 放されたので立ち直る。
+ * 背中が地面に着く前にだけ届く。スタミナは減らない
+ */
+export interface ReleasedEvent {
+  type: 'released'
+}
+
 /** 爆発した。位置は全員に配る (音も光も届くので隠す意味が無い) */
 export interface ExplosionEvent {
   type: 'explosion'
@@ -1278,6 +1286,7 @@ export type ServerMessage =
   | ExplosionEvent
   | KnockDownEvent
   | ThrownEvent
+  | ReleasedEvent
   | GrenadeSpawn
   | ResumeMessage
   // 素通しされてきた物

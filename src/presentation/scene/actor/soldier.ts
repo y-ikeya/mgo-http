@@ -26,7 +26,7 @@ import { damp, dampAngle } from '../util/math'
 import { stepMovement, type MoveResult, type Mover } from '../../../sim/space/movement'
 import { PLAYER_HEIGHT as BODY_HEIGHT, PLAYER_RADIUS as DOMAIN_RADIUS, STEP_UP } from '../../../domain/player/moving'
 import { can, type BodyState } from '../../../domain/player/moves'
-import { CQC_MISS_RECOVERY, CQC_PAIR_DISTANCE } from '../../../domain/player/cqc'
+import { CQC_LAND_SECONDS, CQC_MISS_RECOVERY, CQC_PAIR_DISTANCE } from '../../../domain/player/cqc'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
 import {
@@ -2341,6 +2341,18 @@ export class Soldier {
    * @param x 投げた側の位置 (世界)
    * @param yaw 投げた側の向き
    */
+  /**
+   * CQC で投げられている途中で放された (投げた側が倒れた)。**背中が着く前だけ** —
+   * 着いた後に届いた知らせ (遅れ) では起こさない。倒れたままなら、起きるのは本人の操作
+   */
+  releaseThrown(): void {
+    if (!this.downed_ || !this.thrownFall || this.down) return
+    if (this.downElapsed >= CQC_LAND_SECONDS + 0.3) return
+    this.downed_ = false
+    this.thrownFall = false
+    this.animator?.releaseThrown()
+  }
+
   thrown(x: number, z: number, yaw: number): void {
     if (this.down || this.downed) return
     this.knockDown()

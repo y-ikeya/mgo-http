@@ -2516,6 +2516,11 @@ export class Game {
         this.loseHeldGrenade();
         break;
 
+      // 投げた側が倒れて、放された。倒れかけから立ち直る
+      case "released":
+        this.player.releaseThrown();
+        break;
+
       case "knockdown":
         this.player.knockDown();
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
