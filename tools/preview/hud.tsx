@@ -81,6 +81,13 @@ const cases: Record<string, Partial<GameStats>> = {
       { type: 'voice', id: 'y', name: 'coffee-san', team: 'red', text: 'よろしくお願いします！', at: Date.now() - 3000 },
     ],
   },
+  // 構えようとしたが銃口の先が塞がっている (?case=blocked)
+  blocked: {
+    match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 2, required: 2, players: [] },
+    team: 'blue',
+    aimBlocked: true,
+    aiming: false,
+  },
   // 抜けた / 戻りを待っている (?case=presence)
   presence: {
     match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 3, required: 2, players: [] },

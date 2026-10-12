@@ -194,6 +194,8 @@ export interface GameStats {
   downed: boolean;
   /** 構えているか。クロスヘアはこのときだけ出す */
   aiming: boolean;
+  /** 構えようとしているが、銃口の先が塞がっていて構えられない */
+  aimBlocked: boolean;
   /** 現在の散布界 (度)。クロスヘアの開き具合に使う */
   spread: number;
   /** その部屋で選べる主武器。**部屋が絞ることがある** */
@@ -1645,7 +1647,11 @@ export class Game {
      * 見ている側にとって「構えた」のは同じ — 落下点を狙う画面は銃と同じ寄りにする。
      * 審判も同じ扱い (server/relay.ts: 振りかぶりは構え)
      */
-    this.follow.setAiming(this.player.isAiming || (wantsAim && throwing));
+    /*
+     * 銃口の先が塞がっていて構えられない時も、**カメラは構えの寄りにする。** 銃が
+     * 下りたままで画面も寄らないと、なぜ撃てないのかが分からない (2026-10-12 本人)
+     */
+    this.follow.setAiming(this.player.isAiming || (wantsAim && (throwing || this.muzzleBlocked)));
     this.follow.setViewHeight(this.player.viewHeight);
     // 首はカメラの向きへ (構えていないとき)。相手に「どこを見ているか」を渡す
     this.player.setLookYaw(this.follow.aimYaw - this.player.yaw);
@@ -5159,6 +5165,8 @@ export class Game {
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
+      // 構えようとしているが、銃口の先が塞がっていて構えられない (照準の輪を ✕ にする)
+      aimBlocked: this.muzzleBlocked && this.input.aiming && isGun(this.inv.held),
       spread: this.spread.degrees(this.weapon, this.skills),
       // 持ち込める主武器。**部屋が絞る**ことがある (ROOMS の primaries)
       primaries: this.primaries,

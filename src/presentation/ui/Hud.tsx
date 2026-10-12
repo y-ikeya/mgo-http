@@ -643,6 +643,16 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
+        構えようとしたが、銃口の先が塞がっていて構えられない。**輪の代わりに ✕。**
+        カメラは構えの寄りになるので、なぜ撃てないかを印で言う (2026-10-12 本人)
+      */}
+      <Show when={locked() && props.stats?.aimBlocked && !props.stats?.aiming}>
+        <div class="crosshair">
+          <span class="crosshair-blocked">✕</span>
+        </div>
+      </Show>
+
+      {/*
         刃物では出さない。**十字も輪も「そこへ飛ぶ」ための印**で、
         届く範囲が体の前 2m しかない刃物には言うことが無い。
       */}

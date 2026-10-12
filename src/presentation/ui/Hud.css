@@ -1482,3 +1482,15 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* 銃口の先が塞がっていて構えられない。輪の位置に ✕ */
+.crosshair-blocked {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(255, 140, 120, 0.85);
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
