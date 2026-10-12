@@ -91,6 +91,9 @@ export type WholeBodyLocomotion =
   | 'jump_down'
   | 'sweep'
   | 'stand'
+  | 'cqc_throw'
+  | 'cqc_miss'
+  | 'cqc_thrown'
   | 'away'
   | 'bump'
   | 'prone_down'
@@ -117,6 +120,10 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'jump_down',
   'sweep',
   'stand',
+  // CQC。殴って投げる / 空振り / 投げられて倒れる
+  'cqc_throw',
+  'cqc_miss',
+  'cqc_thrown',
   // 切れた人の姿。上半身だけ別の型を重ねると、銃を構えたまま固まる
   'away',
   // ダンボールで敵にぶつかった反応。上だけ構えに戻ると、銃を構えたまま驚く
@@ -254,6 +261,10 @@ export interface StanceInput {
   setting: 'claymore_windup' | 'claymore_place' | null
   /** 爆風で倒れているか */
   downed: boolean
+  /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
+  thrown?: boolean
+  /** CQC で投げている / 空振りしている最中の型。していなければ null */
+  cqc?: 'cqc_throw' | 'cqc_miss' | null
   /**
    * 起き上がっている最中か。
    *
@@ -345,7 +356,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.climbing) return input.climbing
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
-  if (input.downed) return 'sweep'
+  if (input.downed) return input.thrown ? 'cqc_thrown' : 'sweep'
 
   // 箱が落ちて棒立ちになっている間。動けないので方向も速さも見ない
   if (input.bumped > 0) return 'bump'
@@ -401,6 +412,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.hangClimbing) return 'hang_climb'
   if (input.hangHolding) return 'hang'
   if (input.hanging) return 'hang_drop'
+  if (input.cqc) return input.cqc
   if (input.vaultingUp) return 'vault_up'
   if (input.vaulting) return 'vault'
   if (input.rolling) return 'roll'

@@ -98,6 +98,8 @@ export interface Session {
    */
   /** 最後に配ったスタミナ (切り上げ)。変わらない値を流さないための控え */
   staminaShown: number
+  /** CQC の型が終わる時刻 (Date.now)。それまでの次の CQC は弾く (投げながら投げない) */
+  cqcUntil: number
   healthShown: number
   /** 却下した申告の数。/health に出す (当たり判定が疑わしい人が分かる) */
   rejected: number
@@ -185,6 +187,7 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     pingAt: 0,
     healthShown: player.health,
     staminaShown: player.stamina,
+    cqcUntil: 0,
     rejected: 0,
     lastReject: '',
     resuppliedAt: 0,

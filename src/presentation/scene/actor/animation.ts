@@ -81,6 +81,11 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 起き上がりは仰向け用 (STAND_CLIP) を引く — sweep が仰向けで終わるため
   sweep: 'sweep',
   stand: 'stand_front',
+  // CQC (domain/player/cqc.ts)。投げる / 空振り / 投げられる。どれも全身の型で、
+  // 焼かれた移動を辿る (ROOT_MOTION_CLIPS)。投げられる型は仰向けで終わる (sweep と同じ)
+  cqc_throw: 'cqc_throw',
+  cqc_miss: 'cqc_miss',
+  cqc_thrown: 'cqc_thrown',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
   /*
@@ -174,6 +179,9 @@ type UpperState =
   | 'bolt'
   | 'sweep'
   | 'stand'
+  // CQC で投げている / 空振り。投げられる側は 'sweep' (倒れる型が違うだけ、fallKey)
+  | 'cqc_throw'
+  | 'cqc_miss'
   // 接続が切れた人の姿
   | 'away'
 
@@ -300,7 +308,18 @@ const JUMP_LOOP_MAX_SPEED = 3
  * **着地は入れない。** 転がる型だった頃は 3m 進む必要があったが、いまの
  * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
  */
-const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_roll_down', 'vault', 'vault_up', 'hang_drop', 'hang_climb'])
+const ROOT_MOTION_CLIPS = new Set([
+  'roll',
+  'prone_roll_down',
+  'vault',
+  'vault_up',
+  'hang_drop',
+  'hang_climb',
+  // CQC。投げる側は 0.7m 踏み込み、投げられる側は 0.7m 後ろへ倒れる
+  'cqc_throw',
+  'cqc_miss',
+  'cqc_thrown',
+])
 /**
  * 焼かれた移動を**この割合まで止めておく**型。止めた分は残りで取り返す (総距離は同じ)。
  *
@@ -481,6 +500,10 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
   'stand',
+  'cqc_throw',
+  'cqc_miss',
+  // 投げられて倒れた姿のまま留める (sweep と同じ)
+  'cqc_thrown',
   'jump_up',
   'jump_down',
   'death',
@@ -593,6 +616,16 @@ const PRONE_KNIFE_KEY = 'prone_knife'
 const BOLT_KEY = 'bolt'
 /** 爆風で吹き飛ばされる。倒れた姿勢で終わる */
 const SWEEP_KEY = 'sweep'
+/**
+ * CQC で投げられて倒れる (domain/player/cqc.ts)。**倒れた後は sweep と同じ扱い**
+ * — 上半身の状態も 'sweep' のまま、引く型だけが違う (fallKey)
+ */
+const THROWN_KEY = 'cqc_thrown'
+/** 投げられて背中が地面に着くまで (秒、クリップ内の時刻)。tools/raw/cqc.blend の 55 コマ目 (24fps) */
+const THROWN_LAND = 2.25
+/** CQC で投げる / 空振りする。全身の型 */
+const CQC_THROW_KEY = 'cqc_throw'
+const CQC_MISS_KEY = 'cqc_miss'
 /**
  * 吹き飛ばされる型の再生速度。
  *
@@ -781,6 +814,9 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   BOLT_KEY,
   PRONE_BOLT_KEY,
   SWEEP_KEY,
+  THROWN_KEY,
+  CQC_THROW_KEY,
+  CQC_MISS_KEY,
   STAND_KEY,
   THROW_WINDUP_KEY,
   THROW_RELEASE_KEY,
@@ -1442,6 +1478,9 @@ export class CharacterAnimator {
       finished === this.upper.get(BOLT_KEY) ||
       finished === this.upper.get(PRONE_BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
+      finished === this.upper.get(THROWN_KEY) ||
+      finished === this.upper.get(CQC_THROW_KEY) ||
+      finished === this.upper.get(CQC_MISS_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
       finished === this.upper.get(THROW_RELEASE_KEY) ||
       finished === this.upper.get(SETUP_RELEASE_KEY)
@@ -1691,6 +1730,7 @@ export class CharacterAnimator {
 
     for (const [key, name] of [
       [SWEEP_KEY, 'sweep'],
+      [THROWN_KEY, 'cqc_thrown'],
       [STAND_KEY, STAND_CLIP],
     ] as const) {
       const clip = byName.get(name)
@@ -1817,6 +1857,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [HANG_DROP_KEY, 'hang_drop'],
       [HANG_CLIMB_KEY, 'hang_climb'],
+      [CQC_THROW_KEY, 'cqc_throw'],
+      [CQC_MISS_KEY, 'cqc_miss'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -3046,7 +3088,7 @@ export class CharacterAnimator {
       if (prone && this.upper.has(PRONE_BOLT_KEY)) return PRONE_BOLT_KEY
       if (!prone && this.upper.has(BOLT_KEY)) return BOLT_KEY
     }
-    if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
+    if (this.upperState === 'sweep' && this.upper.has(this.fallKey)) return this.fallKey
     if (this.upperState === 'throw' && this.pair) {
       // **振りかぶりが残っている間は前半のまま。** 放した瞬間に後半へ渡すと、
       // 後半はまだ流れていない (updateThrow が振りかぶりの終わりを待つ) ので
@@ -3070,6 +3112,9 @@ export class CharacterAnimator {
     // 跳び越えも同じ。上だけ構えに戻ると、銃を構えたまま脚だけ跳ぶ
     if (this.upperState === 'vault' && this.upper.has(VAULT_KEY)) return VAULT_KEY
     if (this.upperState === 'vault_up' && this.upper.has(VAULT_UP_KEY)) return VAULT_UP_KEY
+    // CQC も同じ。上だけ構えに戻ると、銃を構えたまま足を払う
+    if (this.upperState === 'cqc_throw' && this.upper.has(CQC_THROW_KEY)) return CQC_THROW_KEY
+    if (this.upperState === 'cqc_miss' && this.upper.has(CQC_MISS_KEY)) return CQC_MISS_KEY
     if (this.upperState === 'hang_drop' && this.upper.has(HANG_DROP_KEY)) return HANG_DROP_KEY
     if (this.upperState === 'hang_climb' && this.upper.has(HANG_CLIMB_KEY)) return HANG_CLIMB_KEY
     // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
@@ -3089,8 +3134,12 @@ export class CharacterAnimator {
     // 非構えのクリップがこの姿勢に無いので、既定の代用に任せると
     // **構えの上半身**が出る。倒れた直後に何もしていないのに銃を構え直して見えた。
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
-    if (!this.aiming && this.locomotion === 'sweep' && this.upper.has(SWEEP_KEY)) {
-      return SWEEP_KEY
+    if (
+      !this.aiming &&
+      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown') &&
+      this.upper.has(this.fallKey)
+    ) {
+      return this.fallKey
     }
 
     /*
@@ -3687,6 +3736,59 @@ export class CharacterAnimator {
     lower.reset().setEffectiveTimeScale(this.sweepRate).play()
     this.upperState = 'sweep'
     this.locomotion = 'sweep'
+    this.fallKey = SWEEP_KEY
+    this.sweepDuration = SWEEP_LAND / this.sweepRate
+  }
+
+  /**
+   * 倒れている間に引く型。吹き飛ばされたなら sweep、CQC で投げられたなら
+   * cqc_thrown。**倒れた後の扱いは同じ** (伏せ撃ち・這い出す・起きる) なので、
+   * 状態は分けずに型だけ差し替える
+   */
+  private fallKey: string = SWEEP_KEY
+
+  /**
+   * CQC で投げられる。**倒れた後は爆風で倒れた時と同じ** (playSweep)。
+   * 型は焼かれた移動を辿って、0.7m 後ろへ仰向けに倒れる
+   */
+  playThrown(): void {
+    if (this.dead) return
+    const upper = this.upper.get(THROWN_KEY)
+    const lower = this.lower.get('cqc_thrown')
+    if (!upper || !lower) return this.playSweep()
+    upper.reset().play()
+    lower.reset().play()
+    this.upperState = 'sweep'
+    this.locomotion = 'cqc_thrown'
+    this.fallKey = THROWN_KEY
+    this.sweepDuration = THROWN_LAND
+    this.rootSampleValid = false
+  }
+
+  /**
+   * CQC を掛ける (throw) / 空振りする (miss)。全身の型で、焼かれた移動を辿る。
+   * 跳び越えと同じく、終わるまで操作は効かない (cqcBusy)
+   */
+  playCqc(kind: 'cqc_throw' | 'cqc_miss'): void {
+    if (this.dead) return
+    const upper = this.upper.get(kind === 'cqc_throw' ? CQC_THROW_KEY : CQC_MISS_KEY)
+    const lower = this.lower.get(kind)
+    if (!upper || !lower) return
+    upper.reset().play()
+    lower.reset().play()
+    this.upperState = kind
+    this.locomotion = kind
+    this.rootSampleValid = false
+  }
+
+  /** CQC の型 (投げる / 空振り) が流れているか */
+  get cqcBusy(): boolean {
+    return this.cqcKind !== null
+  }
+
+  /** 流れている CQC の型。流れていなければ null */
+  get cqcKind(): 'cqc_throw' | 'cqc_miss' | null {
+    return this.upperState === 'cqc_throw' || this.upperState === 'cqc_miss' ? this.upperState : null
   }
 
   /** 伏せた所から立ち上がる。途中で止められない */

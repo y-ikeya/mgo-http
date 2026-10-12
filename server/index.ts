@@ -34,7 +34,7 @@ import {
   stepLocators,
   throwLocator,
 } from './arms/locator'
-import { MAX_FALL_SPEED, applyBlastDamage, applyDamage, reject} from './damage'
+import { MAX_FALL_SPEED, applyBlastDamage, applyCqc, applyDamage, reject} from './damage'
 import { alertAims, alertShot } from './alert'
 import { relayAwareness, revealTo } from './aware'
 import {
@@ -624,6 +624,11 @@ function handleMessage(
      * 撃って割ったときと同じに晒す。**歩いて確かめに行っても代償は同じ** —
      * 近づいた分だけ確実に見分けられるので、そこは腕前として残す。
      */
+    // CQC を掛けた。掛かるかはこちらが決める (server/damage.ts)
+    case 'cqc':
+      applyCqc(room, player, message.target)
+      break
+
     case 'stab':
       // 刃でも壊せる。**歩いて壊しに行けることが、この道具の裏側**
       stabHitsLocator(room, player)

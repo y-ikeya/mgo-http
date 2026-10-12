@@ -184,7 +184,9 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
     : isAsleep(bot.sleepUntil, now)
       ? 'sleep'
       : bot.downLeft > TARGET_STAND
-        ? 'sweep'
+        ? bot.downThrown
+          ? 'cqc_thrown'
+          : 'sweep'
         : bot.downLeft > 0
           ? 'stand'
           : 'idle'

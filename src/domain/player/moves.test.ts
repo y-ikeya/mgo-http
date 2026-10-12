@@ -20,6 +20,8 @@ const standing: BodyState = {
   landing: false,
   inWater: false,
   aiming: false,
+  crouching: false,
+  cqc: false,
 }
 
 describe('できること', () => {

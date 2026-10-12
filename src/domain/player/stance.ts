@@ -31,7 +31,7 @@ export function stanceOf(locomotion: Locomotion): Stance {
   if (locomotion === 'death' || locomotion === 'death_front' || locomotion === 'death_back')
     return 'down'
   // 爆風で倒れている間。起き上がりの途中も含めて低い姿勢として扱う
-  if (locomotion === 'sweep' || locomotion === 'stand') return 'prone'
+  if (locomotion === 'sweep' || locomotion === 'cqc_thrown' || locomotion === 'stand') return 'prone'
   if (locomotion === 'sneak' || locomotion === 'sit') return 'box'
   // ダンボールが落ちた直後。棒立ちなので、頭は立ちの高さに戻っている
   if (locomotion === 'bump') return 'stand'

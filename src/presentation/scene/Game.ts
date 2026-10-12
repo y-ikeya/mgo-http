@@ -1,4 +1,5 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
 import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
@@ -2509,6 +2510,12 @@ export class Game {
         break;
       }
 
+      // CQC で投げられた。投げた側の正面へ寄って倒れる (soldier の thrown)
+      case "thrown":
+        this.player.thrown(message.x, message.z, message.yaw);
+        this.loseHeldGrenade();
+        break;
+
       case "knockdown":
         this.player.knockDown();
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
@@ -3522,6 +3529,7 @@ export class Game {
   private updateTrigger(): void {
     if (!canAct(this.life) || this.loadoutBlocking) return;
     if (this.inv.switching) return;
+    if (this.updateCqc()) return;
     if (this.inv.held !== "knife") return;
     // ナイフは押した瞬間に振る。押しっぱなしで連打しない。
     // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
@@ -3545,6 +3553,42 @@ export class Game {
     if (!aiming) return;
     if (killTap) this.startStab(false);
     else if (stunTap) this.startStab(true);
+  }
+
+  /**
+   * CQC (domain/player/cqc.ts)。**構えずに引き金を引く。** 片手で持つ物 (拳銃・
+   * ナイフ) の時だけで、長物では何も起きない。
+   *
+   * 見ている方 (カメラ) の近くに立っている敵が居れば、そちらへ向き直って投げる。
+   * 居ない・しゃがんでいる・箱に入っている なら**空振り** — 型の後に棒立ちの隙が
+   * 残る (soldier の cqcRecoverLeft)。掛かったかを決めるのはサーバー
+   *
+   * @returns 引き金を CQC に使った (刺突へは回さない)
+   */
+  private updateCqc(): boolean {
+    if (this.player.isAiming || !canThrowWith(this.inv.held)) return false;
+    if (!this.input.firing || !this.inv.pressedOnce) return false;
+    this.inv.consumePress();
+    if (this.stabTimer > 0 || this.reloadTimer > 0) return true;
+    const look = this.follow.aimYaw;
+    this.meleeForward.set(-Math.sin(look), 0, -Math.cos(look));
+    const target = this.remotes.cqcTarget(this.player.position, this.meleeForward, (id, side) =>
+      this.hostileTo(id, side),
+    );
+    if (target?.throwable) {
+      const face = Math.atan2(
+        -(target.position.x - this.player.position.x),
+        -(target.position.z - this.player.position.z),
+      );
+      if (this.player.cqc("cqc_throw", face)) this.net.send({ type: "cqc", target: target.id });
+      return true;
+    }
+    // 相手が居れば、空振りでもそちらへ振る
+    const face = target
+      ? Math.atan2(-(target.position.x - this.player.position.x), -(target.position.z - this.player.position.z))
+      : look;
+    this.player.cqc("cqc_miss", face);
+    return true;
   }
 
   private updateWeapon(dt: number): void {

@@ -96,6 +96,10 @@ export const LOCOMOTIONS: Locomotion[] = [
   // 歩き (スティックを浅く)。**末尾に足す**
   'walk',
   'crouch_walk',
+  // CQC (投げる / 空振り / 投げられる)。**末尾に足す**
+  'cqc_throw',
+  'cqc_miss',
+  'cqc_thrown',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

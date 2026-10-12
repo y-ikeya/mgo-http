@@ -18,6 +18,7 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
+import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
@@ -145,6 +146,10 @@ const PLAY_WHOLE_BODY: Record<
   // 爆風で倒れる / 起き上がる
   sweep: (a) => a.playSweep(),
   stand: (a) => a.playStand(),
+  // CQC。投げる / 空振り / 投げられる (倒れた後は sweep と同じ姿で留まる)
+  cqc_throw: (a) => a.playCqc('cqc_throw'),
+  cqc_miss: (a) => a.playCqc('cqc_miss'),
+  cqc_thrown: (a) => a.playThrown(),
   // 接続が切れた人。1 枚の静止ポーズ
   away: (a) => a.playAway(),
   // ダンボールで敵にぶつかって、箱が落ちた
@@ -268,6 +273,11 @@ export class RemoteSoldier {
   /** 梯子の絵を進める率 (-1..1)。位置の上下から出して均す */
   private climbRate = 0;
   private locomotion: Locomotion = "idle";
+
+  /** CQC を掛けられる姿勢か (立っているか)。domain/player/cqc.ts */
+  get throwable(): boolean {
+    return canBeThrown(this.locomotion);
+  }
 
   /**
    * いま刃が通る構えか。
@@ -1278,6 +1288,40 @@ export class RemoteSoldiers {
       // **敵かどうかはここでは決めない。** 個人戦では同じ色でも敵なので、
       // ルールを知っている側 (Game) が判断する
       side: closest.player.side,
+    };
+  }
+
+  /**
+   * CQC を掛ける相手。**正面の扇の中で一番近い相手** (CQC_REACH / CQC_FACING_COS)。
+   *
+   * 掛かるか (立っているか) は返すだけで、ここでは外さない — しゃがんだ相手に
+   * 押せば空振りになる、を呼ぶ側が決める。味方は呼ぶ側が外す (hostile)
+   *
+   * @param forward 掛ける側の向き (水平、正規化済み)
+   */
+  cqcTarget(
+    origin: THREE.Vector3,
+    forward: THREE.Vector3,
+    hostile: (id: string, side: Team) => boolean,
+  ): { id: string; throwable: boolean; position: THREE.Vector3 } | null {
+    let closest: { player: RemoteSoldier; distance: number } | null = null;
+    for (const player of this.players.values()) {
+      if (player.health <= 0 || !player.object.visible) continue;
+      if (!hostile(player.id, player.side)) continue;
+      this.scratch.subVectors(player.object.position, origin);
+      this.scratch.y = 0;
+      const distance = this.scratch.length();
+      if (distance > CQC_REACH || distance < 1e-4) continue;
+      if (Math.abs(player.object.position.y - origin.y) > 0.8) continue;
+      this.scratch.divideScalar(distance);
+      if (this.scratch.dot(forward) < CQC_FACING_COS) continue;
+      if (!closest || distance < closest.distance) closest = { player, distance };
+    }
+    if (!closest) return null;
+    return {
+      id: closest.player.id,
+      throwable: closest.player.throwable,
+      position: closest.player.object.position,
     };
   }
 

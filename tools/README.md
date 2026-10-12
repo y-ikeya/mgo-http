@@ -407,3 +407,14 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 ```sh
 ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=tempo=0.2414:pitchq=quality,equalizer=f=2977:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
 ```
+
+### CQC の型 (cqc_throw / cqc_miss / cqc_thrown)
+
+本人と Blender で組んだ型 (`tools/raw/cqc.blend`、24fps、70 コマ)。投げる側 `attacker` の
+`cqc_throw` と、投げられる側 `victim` の `cqc_thrown` を、骨組みだけ選んで glTF に書き出し
+(export_animation_mode=ACTIVE_ACTIONS)、名前を付け直して 3 つの皮に merge した。空振り
+`cqc_miss` は `cqc_throw` の頭 1.0 秒 (腕を喉へ伸ばした所まで) を split_clip で切り出した物。
+
+組むときの道具は `tools/cqc/` (pose.py = 体の向きで骨を回す、legs.py = つま先を床に留めて
+脚を解き直す)。元にした素材は Boxing / LightHitToHead / SweepFall (`tools/cqc/*.json` で
+retarget_clip に通した)。試写は `tools/preview/cqc.html` (2 人並べて型の移動も辿る)。

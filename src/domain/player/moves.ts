@@ -51,6 +51,10 @@ export interface BodyState {
   inWater: boolean
   /** 構えている */
   aiming: boolean
+  /** しゃがんでいる (伏せは prone) */
+  crouching: boolean
+  /** CQC で投げている / 空振りしている (domain/player/cqc.ts)。全身の型 */
+  cqc: boolean
 }
 
 export type Flag = keyof BodyState
@@ -69,6 +73,7 @@ export type Move =
   | 'throw'
   | 'place'
   | 'sleep'
+  | 'cqc'
 
 interface Rule {
   needs: readonly Flag[]
@@ -76,7 +81,7 @@ interface Rule {
 }
 
 /** 全身の型で体を占める動作。これらの最中は、他の全身の動作を始められない */
-const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing']
+const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing', 'cqc']
 /** 倒れている・眠っている。何もできない */
 const HELPLESS: readonly Flag[] = ['dead', 'downed', 'standingUp', 'sleeping']
 
@@ -99,27 +104,27 @@ export const MOVES: Record<Move, Rule> = {
   // 伏せる。刺突は全身の型なので、伏せに入る型と同時には流せない
   prone: {
     needs: ['onGround'],
-    not: [...HELPLESS, 'boxed', 'stabbing', 'vaulting', 'hanging', 'onLadder', 'prone'],
+    not: [...HELPLESS, 'boxed', 'stabbing', 'vaulting', 'hanging', 'onLadder', 'prone', 'cqc'],
   },
   // しゃがみの切り替え。倒れ・箱・伏せは呼ぶ側で別の動作 (起きる・脱ぐ・起き上がる) に振る
   crouch: {
     needs: ['onGround'],
-    not: ['dead', 'saluting', 'standingUp', 'vaulting', 'hanging'],
+    not: ['dead', 'saluting', 'standingUp', 'vaulting', 'hanging', 'cqc'],
   },
   // ナイフで刺す。伏せたままでも刺せる (prone_stab)
   stab: {
     needs: [],
-    not: [...HELPLESS, 'boxed', 'saluting', 'bumping', 'rolling', 'vaulting', 'hanging', 'onLadder'],
+    not: [...HELPLESS, 'boxed', 'saluting', 'bumping', 'rolling', 'vaulting', 'hanging', 'onLadder', 'cqc'],
   },
   // 敬礼。構えている間はしない
   salute: {
     needs: [],
-    not: [...HELPLESS, 'boxed', 'rolling', 'stabbing', 'vaulting', 'hanging', 'aiming', 'bumping', 'onLadder'],
+    not: [...HELPLESS, 'boxed', 'rolling', 'stabbing', 'vaulting', 'hanging', 'aiming', 'bumping', 'onLadder', 'cqc'],
   },
   // 梯子を掴む。受け身の最中は掴めない
   ladder: {
     needs: [],
-    not: [...HELPLESS, 'onLadder', 'boxed', 'rolling', 'vaulting', 'hanging', 'prone', 'saluting', 'bumping', 'landing'],
+    not: [...HELPLESS, 'onLadder', 'boxed', 'rolling', 'vaulting', 'hanging', 'prone', 'saluting', 'bumping', 'landing', 'cqc'],
   },
   // ダンボールを被る。箱はしゃがんだ体に被せてあるので伏せたままは被れない
   box: {
@@ -129,22 +134,30 @@ export const MOVES: Record<Move, Rule> = {
   // 構える。全身の型の最中は構えの上半身を乗せられない
   aim: {
     needs: [],
-    not: [...HELPLESS, 'saluting', 'rolling', 'vaulting', 'hanging'],
+    not: [...HELPLESS, 'saluting', 'rolling', 'vaulting', 'hanging', 'cqc'],
   },
   // 投げる (手榴弾・デコイ)。梯子と箱は両手が塞がっている。転がりは全身の型
   throw: {
     needs: [],
-    not: [...HELPLESS, 'boxed', 'onLadder', 'rolling', 'vaulting', 'hanging'],
+    not: [...HELPLESS, 'boxed', 'onLadder', 'rolling', 'vaulting', 'hanging', 'cqc'],
   },
   // 置く (クレイモア)。投げると同じ
   place: {
     needs: [],
-    not: [...HELPLESS, 'boxed', 'onLadder', 'rolling', 'vaulting', 'hanging'],
+    not: [...HELPLESS, 'boxed', 'onLadder', 'rolling', 'vaulting', 'hanging', 'cqc'],
   },
   // 麻酔で眠る。倒れている体には効かせない (もう倒れている)
   sleep: {
     needs: [],
     not: ['dead', 'downed'],
+  },
+  /*
+   * CQC を掛ける (domain/player/cqc.ts)。**立って、構えずに。** 手に何を持って
+   * いるか (長物では掛けられない) は体ではなく持ち物の話なので canThrowWith に聞く
+   */
+  cqc: {
+    needs: ['onGround'],
+    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'crouching', 'onLadder', 'inWater', 'aiming', 'landing'],
   },
 }
 

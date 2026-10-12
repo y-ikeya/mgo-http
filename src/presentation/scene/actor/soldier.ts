@@ -26,6 +26,7 @@ import { damp, dampAngle } from '../util/math'
 import { stepMovement, type MoveResult, type Mover } from '../../../sim/space/movement'
 import { PLAYER_HEIGHT as BODY_HEIGHT, PLAYER_RADIUS as DOMAIN_RADIUS, STEP_UP } from '../../../domain/player/moving'
 import { can, type BodyState } from '../../../domain/player/moves'
+import { CQC_MISS_RECOVERY, CQC_PAIR_DISTANCE } from '../../../domain/player/cqc'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Water } from '../../../domain/stage'
 import {
@@ -724,6 +725,14 @@ export class Soldier {
    * 落ちる前に決めた向きへ逃がす。
    */
   private hardLandYaw = 0
+  /** CQC で流している型 (投げる / 空振り)。終わったのを見て空振りの隙へ移る */
+  private cqcStarted: 'cqc_throw' | 'cqc_miss' | null = null
+  /** 空振りの後の棒立ちの残り (秒)。この間は動けず、構えられない */
+  private cqcRecoverLeft = 0
+  /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
+  private thrownFall = false
+  /** 投げられて倒れる向き。型に焼かれた移動をこの向きで辿る */
+  private thrownYaw = 0
   /** 転がり始めたか。音を鳴らす側が 1 回だけ拾う */
   private rollStarted = false
   /** 跳び越えの下見に使う作業ベクトル */
@@ -1040,6 +1049,8 @@ export class Soldier {
       landing: this.landing,
       inWater: this.inWater,
       aiming: this.aiming,
+      crouching: this.crouching,
+      cqc: this.cqcBusy,
     }
   }
 
@@ -1654,6 +1665,11 @@ export class Soldier {
      * 撃つ側の条件を増やさずに済む。
      */
     if (this.bumping) {
+      this.aiming = false
+      return
+    }
+    // CQC の型と、空振りの後の棒立ちの間も構えられない。**空振りの隙はここ**
+    if (this.cqcBusy) {
       this.aiming = false
       return
     }
@@ -2294,7 +2310,48 @@ export class Soldier {
   /** ローリング中か。この間は撃てず、方向も変えられない */
   get rolling(): boolean {
     // 跳び越えも転がりと同じ縛り (撃てず、向きも変えられず、重ねて始められない)
-    return (this.animator?.rolling ?? false) || this.vaulting || this.hanging
+    // CQC の型も同じ (空振りの後の棒立ちは含めない — 型が無いので転がりの姿に落ちる)
+    return (this.animator?.rolling ?? false) || this.vaulting || this.hanging || (this.animator?.cqcBusy ?? false)
+  }
+
+  /** CQC の型の最中か、空振りの後の棒立ちの最中か。この間は動けず、構えられない */
+  get cqcBusy(): boolean {
+    return (this.animator?.cqcBusy ?? false) || this.cqcRecoverLeft > 0
+  }
+
+  /**
+   * CQC を掛ける (throw) / 空振りする (miss)。**向きは相手へ向け直してから** (yaw)。
+   * 掛かるかどうかは Game が相手を見て決めている。型の移動は向きを固定して辿る
+   * (転がりと同じ道、rollYaw)
+   */
+  cqc(kind: 'cqc_throw' | 'cqc_miss', yaw: number): boolean {
+    if (!can(this.body, 'cqc') || !this.animator) return false
+    this.yaw = yaw
+    this.rollYaw = yaw
+    this.cqcStarted = kind
+    this.animator.playCqc(kind)
+    return true
+  }
+
+  /**
+   * CQC で投げられた。**投げた側の正面へ寄って、そちらを向いて倒れる** — 型が 2 人の
+   * 間合いと向き合いを前提に組んであるので。倒れた後は爆風で倒れた時と同じ
+   * (伏せ撃ち・這い出す・起きる、knockDown)。
+   *
+   * @param x 投げた側の位置 (世界)
+   * @param yaw 投げた側の向き
+   */
+  thrown(x: number, z: number, yaw: number): void {
+    if (this.down || this.downed) return
+    this.knockDown()
+    this.thrownFall = true
+    this.yaw = yaw + Math.PI
+    this.thrownYaw = this.yaw
+    this.position.x = x - Math.sin(yaw) * CQC_PAIR_DISTANCE
+    this.position.z = z - Math.cos(yaw) * CQC_PAIR_DISTANCE
+    this.object.position.copy(this.position)
+    this.object.rotation.y = this.yaw
+    this.animator?.playThrown()
   }
 
   /** 窓枠を跳び越えている最中か (越える / 乗る のどちらも) */
@@ -2827,6 +2884,7 @@ export class Soldier {
     this.downElapsed = 0
     // 押しっぱなしを引き継がせない。離して押し直すまで構えない
     this.aimLatched = true
+    this.thrownFall = false
     this.animator?.playSweep()
   }
 
@@ -3154,14 +3212,27 @@ export class Soldier {
       overrideX = -Math.sin(this.yaw) * this.proneDiveSpeed
       overrideZ = -Math.cos(this.yaw) * this.proneDiveSpeed
     }
-    const tumbling = overrideX === undefined && (this.rolling || proneRolling)
+    // CQC で投げられて倒れている間も、型に焼かれた移動 (後ろへ 0.7m) を辿る
+    const thrownSliding = this.downed_ && this.thrownFall
+    const tumbling = overrideX === undefined && (this.rolling || proneRolling || thrownSliding)
+    // 空振りの後の棒立ち。動けない
+    if (overrideX === undefined && this.cqcRecoverLeft > 0) {
+      overrideX = 0
+      overrideZ = 0
+    }
     if (tumbling) {
       overrideX = 0
       overrideZ = 0
       if (dt > 0 && this.animator?.consumeRootMotion(this.scratchVelocity)) {
         // モデル空間 (正面 +Z) の移動をワールドへ写す。
         // モデルは 180° 回してあるので yaw + π の回転になる。
-        const yaw = proneRolling ? this.yaw : this.rolling ? this.rollYaw : this.hardLandYaw
+        const yaw = thrownSliding
+          ? this.thrownYaw
+          : proneRolling
+            ? this.yaw
+            : this.rolling
+              ? this.rollYaw
+              : this.hardLandYaw
         const sin = Math.sin(yaw)
         const cos = Math.cos(yaw)
         const dx = this.scratchVelocity.x
@@ -3411,6 +3482,12 @@ export class Soldier {
 
     // 倒れている間の時計。起き上がるのは操作されたときだけ (standUp)
     if (this.downed_) this.downElapsed += dt
+    // CQC の型が終わった。**空振りなら棒立ちの隙へ** (CQC_MISS_RECOVERY)
+    if (this.cqcRecoverLeft > 0) this.cqcRecoverLeft = Math.max(0, this.cqcRecoverLeft - dt)
+    if (this.cqcStarted && !(this.animator?.cqcBusy ?? false)) {
+      if (this.cqcStarted === 'cqc_miss') this.cqcRecoverLeft = CQC_MISS_RECOVERY
+      this.cqcStarted = null
+    }
     if (this.standing) {
       this.standTimer -= dt
       if (this.standTimer <= 0) this.standing = false
@@ -3435,6 +3512,9 @@ export class Soldier {
       targetYaw = this.climbYaw
     } else if (this.rolling) {
       targetYaw = this.rollYaw
+    } else if (this.cqcRecoverLeft > 0) {
+      // 空振りの後の棒立ち。向きも変えられない
+      targetYaw = this.yaw
     } else if (!this.aiming && !this.throwing) {
       // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ) を向くので、その逆算
       targetYaw =
@@ -3910,6 +3990,8 @@ export class Soldier {
       aiming: this.aiming,
       saluting,
       downed: this.downed,
+      thrown: this.thrownFall,
+      cqc: this.animator?.cqcKind ?? null,
       standingUp: this.standing,
       bumped: this.bumpLeft,
       asleep: this.sleepLeft > 0,

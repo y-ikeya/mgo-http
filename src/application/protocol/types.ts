@@ -361,6 +361,31 @@ export interface KnockDownEvent {
   dirZ: number
 }
 
+/**
+ * CQC を掛けた (domain/player/cqc.ts)。**相手を名指しする。**
+ *
+ * 掛かるかどうかはサーバーが決める — 距離・向き・手にある物・相手が立っているか。
+ * 空振りは送らない (姿勢 cqc_miss として周りに流れる)
+ */
+export interface CqcEvent {
+  type: 'cqc'
+  target: string
+}
+
+/**
+ * CQC で投げられた。**投げられた本人にだけ送る** (周りには姿勢 cqc_thrown で伝わる)。
+ *
+ * 投げた側の位置と向きを渡す。投げられた側はその正面 (CQC_PAIR_DISTANCE) へ寄って、
+ * 投げた側を向いて倒れる — 型が 2 人の間合いと向きを前提に組んであるので
+ */
+export interface ThrownEvent {
+  type: 'thrown'
+  by: string
+  x: number
+  z: number
+  yaw: number
+}
+
 /** 爆発した。位置は全員に配る (音も光も届くので隠す意味が無い) */
 export interface ExplosionEvent {
   type: 'explosion'
@@ -1213,6 +1238,7 @@ export type ClientMessage =
   | ReadyEvent
   | RefetchRoster
   | ReloadEvent
+  | CqcEvent
   // 見た目だけの物。当たったかどうかに関わらないので素通しする
   | ShotEvent
   | KnockEvent
@@ -1251,6 +1277,7 @@ export type ServerMessage =
   | PingMessage
   | ExplosionEvent
   | KnockDownEvent
+  | ThrownEvent
   | GrenadeSpawn
   | ResumeMessage
   // 素通しされてきた物

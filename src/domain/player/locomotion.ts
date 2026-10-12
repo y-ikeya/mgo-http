@@ -155,6 +155,17 @@ export type Locomotion =
   | 'sweep'
   | 'stand'
   /**
+   * CQC (domain/player/cqc.ts)。**全身の型で、焼かれた移動を辿る。**
+   *
+   *   cqc_throw   投げる。殴って、喉に腕を掛けて、足を払う
+   *   cqc_miss    空振り。腕を伸ばした所で止まる (その後の棒立ちは idle のまま)
+   *   cqc_thrown  投げられる。仰向けに倒れて終わり、そのまま倒れている間の姿になる
+   *               (sweep と同じ扱い: 起きる・這う・寝たまま撃つ)
+   */
+  | 'cqc_throw'
+  | 'cqc_miss'
+  | 'cqc_thrown'
+  /**
    * 伏せている。**しゃがみの下にもう一段。**
    *
    * 止まっている姿と這っている姿を分ける。ダンボールの sneak / sit と同じ理由で、
@@ -254,7 +265,10 @@ export function emptyHanded(locomotion: Locomotion): boolean {
     locomotion === 'death' ||
     locomotion === 'death_front' ||
     locomotion === 'death_back' ||
-    locomotion === 'prone_death'
+    locomotion === 'prone_death' ||
+    // CQC。殴って喉に腕を掛ける型なので、銃を出すと握らずに浮く
+    locomotion === 'cqc_throw' ||
+    locomotion === 'cqc_miss'
   )
 }
 

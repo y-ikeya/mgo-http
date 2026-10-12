@@ -29,6 +29,14 @@ import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds, stunChargeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
 import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
+import {
+  CQC_FACING_COS,
+  CQC_PAIR_DISTANCE,
+  CQC_REACH,
+  CQC_STAMINA,
+  canBeThrown,
+  canThrowWith,
+} from '../src/domain/player/cqc'
 import type { ClientMessage, ServerMessage } from '../src/application/protocol/types'
 import { isBackstab, verifyHit } from '../src/sim/judge/hitcheck'
 import { posesOf } from './history'
@@ -36,7 +44,7 @@ import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
 import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { TARGET_DOWN, type RoomWorld, broadcast, setLife } from './world'
+import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -156,6 +164,7 @@ function knockAway(victim: MatchPlayer, fromX: number, fromZ: number): void {
   victim.knockX = awayX / reach
   victim.knockZ = awayZ / reach
   if (victim.bot) {
+    victim.downThrown = false
     victim.knockLeft = KNOCK_TIME
     // 滑り終わってからも転んだまま。**時間で立ち上がる**
     victim.downLeft = TARGET_DOWN
@@ -425,7 +434,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
     // もう眠っている相手には効かせない。**充電も減らさない**
     if (isAsleep(victim.sleepUntil, now)) return NOT_HURT
     attacker.stunReadyAt = stunReadyAfter(now, stunChargeSeconds(attacker.skills))
-    return applyTranquilizer(room, attacker, victim, victim.stamina + 1, event, 'STUN KNIFE')
+    return applyTranquilizer(room, attacker, victim, victim.stamina + 1, event.zone === 'HEAD', 'STUN KNIFE')
   }
 
   /*
@@ -438,7 +447,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
    * 遠くから当てた麻酔は効きが薄い。
    */
   if (weaponOf(attacker.weapon).tranquilizer && event.kind === 'bullet') {
-    return applyTranquilizer(room, attacker, victim, amount, event)
+    return applyTranquilizer(room, attacker, victim, amount, event.zone === 'HEAD')
   }
 
   const wound = hurt(victim, amount)
@@ -530,7 +539,8 @@ function applyTranquilizer(
   attacker: MatchPlayer,
   victim: MatchPlayer,
   amount: number,
-  event: Extract<ClientMessage, { type: 'damage' }>,
+  /** 頭に当てたか。キルログに印を出す */
+  head: boolean,
   /** キルログに出す名前。省けば手にある銃の名前 (スタンナイフは銃ではない) */
   label?: string,
 ): Hurt {
@@ -561,7 +571,7 @@ function applyTranquilizer(
     targetTeam: victim.team,
     // 使った物。表から引く (直書きすると武器を増やすたびに嘘になる)
     weapon: label ?? weaponOf(attacker.weapon).kill,
-    head: event.zone === 'HEAD',
+    head,
   })
   broadcast(room, matchState(room))
   /*
@@ -569,4 +579,93 @@ function applyTranquilizer(
    * 同じで、眠った体が手榴弾を握ったままなのはおかしい。
    */
   return { downed: false, letGo: true }
+}
+
+/**
+ * 届いている位置が古い分の余裕 (m)。**投げる側は押した瞬間の自分の画面で決めている**
+ * ので、ここで同じ距離を求めると、互いに歩いていれば 1 通ぶん遅れた分だけ弾く
+ */
+const CQC_LAG_SLACK = 0.6
+
+/**
+ * CQC を掛けた (domain/player/cqc.ts)。**掛かるかはこちらが決める。**
+ *
+ * 見るのは 手にある物 (長物は不可)・距離・向き・相手が立っているか。届いている
+ * 位置と姿勢で判じる。掛かったら相手のスタミナを削り (体力は削らない)、投げられた
+ * ことを本人にだけ知らせる — 倒れるのは本人の画面で、周りには姿勢で伝わる。
+ *
+ * 相手がしゃがんだ・箱に入った、で掛からなかった時は**黙って捨てる**。投げる側の
+ * 画面で掛かったように見えても、相手は倒れない (届くまでの間に姿勢が変わった)
+ */
+export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string): void {
+  const victim = room.players.get(target)
+  if (!victim || victim.id === attacker.id || !canBeHurt(victim.life)) return
+  const now = Date.now()
+  if (isAsleep(attacker.sleepUntil, now)) return
+  if (isProtected(attacker)) setLife(room, attacker, 'alive')
+  if (isProtected(victim)) return
+  if (!isHostile(room.mode, attacker, victim)) return
+  if (room.phase !== 'playing') return
+  if (!canThrowWith(attacker.held)) {
+    reject(attacker, `長物で CQC (${attacker.held})`)
+    return
+  }
+  const session = sessionOf(attacker)
+  if (now < session.cqcUntil) {
+    reject(attacker, 'CQC の型の最中に CQC')
+    return
+  }
+  const dx = victim.x - attacker.x
+  const dz = victim.z - attacker.z
+  const distance = Math.hypot(dx, dz)
+  if (distance > CQC_REACH + CQC_LAG_SLACK) {
+    reject(attacker, `CQC が遠い (${distance.toFixed(2)}m)`)
+    return
+  }
+  // 向き。押した瞬間に相手へ向き直っているので、届いている向きは少し古い — 緩く見る
+  const facing = distance > 1e-3 ? (dx * -Math.sin(attacker.yaw) + dz * -Math.cos(attacker.yaw)) / distance : 1
+  if (facing < CQC_FACING_COS - 0.5) return
+  if (isAsleep(victim.sleepUntil, now) || !canBeThrown(victim.locomotion)) return
+  // 型の尺 (2.9 秒) の間は次を受けない
+  session.cqcUntil = now + 2500
+
+  const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
+  victim.stamina = drain.stamina
+  victim.concentratingSince = 0
+  if (drain.slept) {
+    victim.sleepUntil = now + SLEEP_SECONDS * 1000
+    attacker.stuns++
+    broadcast(room, {
+      type: 'stun',
+      by: attacker.id,
+      byName: attacker.name,
+      byTeam: attacker.team,
+      target: victim.id,
+      targetName: victim.name,
+      targetTeam: victim.team,
+      weapon: 'CQC',
+      head: false,
+    })
+    broadcast(room, matchState(room))
+  }
+  sendStamina(victim)
+
+  /*
+   * 投げる側の正面へ寄せて、投げる側を向かせる。型が 2 人の間合い
+   * (CQC_PAIR_DISTANCE) と向き合いを前提に組んであるので
+   */
+  const yaw = attacker.yaw
+  if (victim.bot) {
+    victim.x = attacker.x - Math.sin(yaw) * CQC_PAIR_DISTANCE
+    victim.z = attacker.z - Math.cos(yaw) * CQC_PAIR_DISTANCE
+    victim.yaw = yaw + Math.PI
+    victim.knockLeft = 0
+    // 倒れる型 (2.9 秒) を流し切ってから少し寝て、起き上がる
+    victim.downLeft = TARGET_STAND + 3.5
+    victim.downThrown = true
+    return
+  }
+  sessionFor(victim)?.socket.send(
+    JSON.stringify({ type: 'thrown', by: attacker.id, x: attacker.x, z: attacker.z, yaw } satisfies ServerMessage),
+  )
 }

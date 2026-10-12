@@ -315,6 +315,8 @@ export interface MatchPlayer extends Player {
    * 立った上半身が混ざる** (銃を上空へ構えて見える)。
    */
   downLeft: number
+  /** 的が倒れているのが CQC で投げられたからか。倒れている姿が違う (cqc_thrown) */
+  downThrown: boolean
   /**
    * 倒された時、撃った相手が背後に居たか。**倒れる向きに出る。**
    *
@@ -423,6 +425,7 @@ export function newMatchPlayer(seed: {
     homeZ: 0,
     homeY: 0,
     downLeft: 0,
+    downThrown: false,
     downFromBehind: false,
     weapon: 'rifle',
     primary: 'rifle',
