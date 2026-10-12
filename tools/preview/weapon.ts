@@ -719,7 +719,7 @@ function renderTri(cw: number, ch: number): void {
     const text = `斜め (回せる) — 銃身 上 ${up.toFixed(1)}° / 右 ${right.toFixed(1)}°`
     if (labels[3] && labels[3].textContent !== text) {
       labels[3].textContent = text
-      console.log(`[tri] ${weapon} ${editing.key} up ${up.toFixed(1)} right ${right.toFixed(1)}`)
+      console.log(`[tri] ${weapon} ${editing.key} up ${up.toFixed(1)} right ${right.toFixed(1)} muzzle ${(muzzle.y - cell.player.position.y).toFixed(3)}`)
     }
     // 体の前は -Z (この画面では向きを回さない)
     set(forwardLine, new THREE.Vector3(0, 0, -1))

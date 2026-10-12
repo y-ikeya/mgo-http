@@ -420,11 +420,12 @@ const STAB_HIT_PHASE = 0.19;
 const PRONE_STAB_HIT_PHASE = 0.36;
 /** 銃を構える高さは目の線からこれだけ下 (m) */
 const MUZZLE_BELOW_EYE = 0.15;
-/**
- * 越えて構えられる高さは、表の目の線からこれだけ下 (m)。表は頭 + 0.1 なので、
- * **頭の高さより低い物だけ越えられる** (しゃがみで約 0.94m。1.05m の土嚢は越えない)
- */
-const MUZZLE_OVER_BELOW_EYE = 0.1;
+/** 銃の胴の下側は銃口からこれだけ下 (m)。ここが遮蔽の上に出ていれば構えられる */
+const GUN_BELOW_MUZZLE = 0.06;
+/** 下ろした後に構え直すには、銃口がこれだけ上に余裕を持って出ている必要がある (m) */
+const MUZZLE_HEIGHT_MARGIN = 0.04;
+/** 構えてからこの秒数が経つまで銃口の高さを覚えない (姿勢が寄り切る前の値を掴まない) */
+const AIM_SETTLE_SECONDS = 0.6;
 /** 伏せていても銃はこれより下には無い (m)。床を拾わない */
 const MUZZLE_MIN_HEIGHT = 0.15;
 /** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
@@ -1636,6 +1637,7 @@ export class Game {
      * **銃口の先に壁や物があると構えられない。** 毎フレーム聞くので、構えたまま
      * 壁へ寄っていけば、そこで銃を下ろす (2026-10-09 本人)
      */
+    this.aimHeld = this.player.isAiming ? this.aimHeld + dt : 0;
     this.muzzleBlocked = this.measureMuzzleBlocked();
     this.player.setAiming(wantsAim && !throwing && !this.muzzleBlocked);
     /*
@@ -2862,6 +2864,15 @@ export class Game {
    * 向くと頭が下がるので、実測だと「構える → 頭が下がって塞がる → 下ろす →
    * 頭が上がって通る」を繰り返した (2026-10-09 本人)
    */
+  /**
+   * 構えた時の**実際の銃口の高さ** (足元から、m)。銃と姿勢ごとに、構えている間に
+   * 測って覚える。下ろしている間は銃口が下がっているので、覚えた値で判定する
+   */
+  private readonly muzzleHeights = new Map<string, number>();
+  private readonly muzzleScratch = new THREE.Vector3();
+  /** 構えてからの時間 (秒)。構えの寄りが済むまで銃口の高さを覚えない */
+  private aimHeld = 0;
+
   private measureMuzzleBlocked(): boolean {
     const held = this.inv.held;
     if (!isGun(held)) return false;
@@ -2869,19 +2880,29 @@ export class Game {
     if (!solid) return false;
     const me = this.player.position;
     const stance = this.player.stance;
+    const key = `${held}:${stance}`;
+    /*
+     * **構えた時の銃口の高さで線を 1 本引く。** 銃口が箱の上に出ていれば構えられ、
+     * 埋まっていれば下ろす (2026-10-09 本人)。姿勢の目安の高さで測り、「頭より低い物は
+     * 越えられる」としていた頃は、しゃがんだ P90 の銃口が 0.9m の箱に埋まるのに構えられた
+     */
+    if (this.player.isAiming && this.aimHeld > AIM_SETTLE_SECONDS) {
+      const muzzle = this.player.muzzle(this.muzzleScratch);
+      this.muzzleHeights.set(key, Math.max(MUZZLE_MIN_HEIGHT, muzzle.y - me.y));
+    }
     const [low] = VIEW_HEIGHT[stance];
-    const y = me.y + Math.max(MUZZLE_MIN_HEIGHT, low - MUZZLE_BELOW_EYE);
+    const height = this.muzzleHeights.get(key) ?? Math.max(MUZZLE_MIN_HEIGHT, low - MUZZLE_BELOW_EYE);
     const reach = weaponOf(held).aimReach * (this.muzzleBlocked ? MUZZLE_HYSTERESIS : 1);
     const yaw = this.follow.aimYaw;
     const tx = me.x - Math.sin(yaw) * reach;
     const tz = me.z - Math.cos(yaw) * reach;
-    if (solid.clear(me.x, y, me.z, tx, y, tz)) return false;
+    // 下ろしている間は少し低く見る (境目で構えと下ろしを行き来させない)
     /*
-     * 越えられるのは**その姿勢の頭より低い物だけ。** しゃがんで
-     * いる時に中腰くらいの物が前にあれば下ろす (2026-10-09 本人)
+     * 線は**銃の下側**の高さで引く。銃口だけ見ると、しゃがんだ P90 の銃口が 0.9m の箱の
+     * 上に 3cm 出ているだけで、銃の胴は箱に埋まったまま構えられた (2026-10-12 本人)
      */
-    const over = me.y + low - MUZZLE_OVER_BELOW_EYE;
-    return !solid.clear(me.x, over, me.z, tx, over, tz);
+    const y = me.y + height - GUN_BELOW_MUZZLE - (this.muzzleBlocked ? MUZZLE_HEIGHT_MARGIN : 0);
+    return !solid.clear(me.x, y, me.z, tx, y, tz);
   }
 
   /** 長押しで READY にした押下を、まだ離していない */
