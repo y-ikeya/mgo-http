@@ -181,6 +181,23 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
  * 相手は倒れかけの所から立ち直り、スタミナは減らない (着いた時の始末を取り消す)。
  * 人には本人へ released を送る (倒れているのは本人の画面なので)。的はこちらで立たせる
  */
+/**
+ * 爆風・散弾で吹き飛ばされた。**CQC より吹き飛ぶほうが強い。**
+ *
+ * 投げている側なら相手を放す (releaseCqc)。投げられている側なら、投げた側の
+ * 着地の始末 (スタミナ) を取り消す — 本人は吹き飛ぶ型へ移る (knockdown が届く) ので
+ * 放す知らせは要らない。的の転び方は呼ぶ側 (knockAway) が上書きする
+ */
+export function cancelCqc(room: RoomWorld, player: MatchPlayer): void {
+  releaseCqc(room, player)
+  for (const other of room.players.values()) {
+    const session = sessionFor(other)
+    if (session?.cqcThrow?.victim !== player) continue
+    clearTimeout(session.cqcThrow.timer)
+    session.cqcThrow = null
+  }
+}
+
 export function releaseCqc(room: RoomWorld, attacker: MatchPlayer): void {
   // 的には接続が無い (投げることも無い)
   const session = sessionFor(attacker)

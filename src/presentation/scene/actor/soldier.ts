@@ -2884,7 +2884,14 @@ export class Soldier {
    * 中断できないので、そこが無防備な時間になる。
    */
   knockDown(): void {
-    if (this.down || this.downed) return
+    if (this.down) return
+    /*
+     * 倒れている間は飛ばされない。**ただし CQC で投げられて背中が着く前は別** —
+     * 爆風・散弾のほうが強いので、投げられる型を捨てて吹き飛ぶ (サーバーも CQC を
+     * 取り消している、world.ts の cancelCqc)
+     */
+    const midThrow = this.thrownFall && this.downElapsed < CQC_LAND_SECONDS
+    if (this.downed && !midThrow) return
     // 吹き飛ばされたら手も離れる。爆風で梯子に貼り付いたままにはならない
     this.releaseLadder()
     this.crouching = false

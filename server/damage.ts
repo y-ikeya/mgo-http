@@ -45,7 +45,7 @@ import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
 import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, setLife } from './world'
+import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -158,7 +158,9 @@ export function exposeTo(
  * 2 か所に書いていた頃、散弾を足すときに片方だけ直すことになった。飛ばす形は
  * 1 つなので、呼び分けるのは「いつ飛ばすか」だけにする。
  */
-function knockAway(victim: MatchPlayer, fromX: number, fromZ: number): void {
+function knockAway(room: RoomWorld, victim: MatchPlayer, fromX: number, fromZ: number): void {
+  // 投げている / 投げられている CQC は取り消す。吹き飛ぶほうが強い
+  cancelCqc(room, victim)
   const awayX = victim.x - fromX
   const awayZ = victim.z - fromZ
   const reach = Math.hypot(awayX, awayZ) || 1
@@ -218,13 +220,13 @@ function shotgunBandFor(
  *
  * **1 発につき 1 回。** 粒ごとに飛ばすと 8 回重なって吹き飛ぶ (怯みと同じ)。
  */
-function pushIfShotgun(attacker: MatchPlayer, victim: MatchPlayer, band: ShotgunBand | null): void {
+function pushIfShotgun(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer, band: ShotgunBand | null): void {
   if (!band?.knock) return
   const session = sessionOf(attacker)
   if (session.pushedThisShot) return
   session.pushedThisShot = true
   if (!isSeated(victim.life)) return
-  knockAway(victim, attacker.x, attacker.z)
+  knockAway(room, victim, attacker.x, attacker.z)
 }
 
 export function applyBlastDamage(
@@ -250,7 +252,7 @@ export function applyBlastDamage(
     sendHealth(room, victim, amount, false, bearing)
     // **的にも爆風は当たる。** 送り先が無いなら送らないだけ
     if (knock && isSeated(victim.life)) {
-      knockAway(victim, fromX, fromZ)
+      knockAway(room, victim, fromX, fromZ)
       // **手が緩んだことは呼ぶ側に返す。** 振りかぶったまま転べば足元に落ちる
       // (ピンは抜けているのでそのまま爆ぜる) が、それをやるのは武器の側
       return { downed: false, letGo: true }
@@ -473,7 +475,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
     // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。
     // 遠くから頭を撃たれた人が、そのまま何事もなく投げ切るのはおかしい
 
-    pushIfShotgun(attacker, victim, band)
+    pushIfShotgun(room, attacker, victim, band)
 
     sendHealth(
       room,
@@ -489,7 +491,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
   }
 
   // 倒れても飛ばす。**近くで散弾を食らえば体ごと持って行かれる**
-  pushIfShotgun(attacker, victim, band)
+  pushIfShotgun(room, attacker, victim, band)
   // どちら側から撃たれたか。**的は自分で倒れる**ので、控えてから状態を移す
   const behind = event.kind === 'melee' ? stabbedBehind : isBehind(victim, attacker)
   victim.downFromBehind = behind
