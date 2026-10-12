@@ -625,6 +625,12 @@ const THROWN_KEY = 'cqc_thrown'
 const THROWN_LAND = 2.25
 /** CQC で投げる / 空振りする。全身の型 */
 const CQC_THROW_KEY = 'cqc_throw'
+/**
+ * CQC の型 (投げる / 空振り / 投げられる) の再生速度。Blender で組んだ 2.9 秒は
+ * ゆっくりすぎた (本人 2026-10-12: 1.2 倍くらい速く)。投げる側と投げられる側は
+ * **同じ速さで流す** — ずらすと喉に掛けた腕と首が離れる
+ */
+const CQC_RATE = 1.2
 const CQC_MISS_KEY = 'cqc_miss'
 /**
  * 吹き飛ばされる型の再生速度。
@@ -3756,12 +3762,12 @@ export class CharacterAnimator {
     const upper = this.upper.get(THROWN_KEY)
     const lower = this.lower.get('cqc_thrown')
     if (!upper || !lower) return this.playSweep()
-    upper.reset().play()
-    lower.reset().play()
+    upper.reset().setEffectiveTimeScale(CQC_RATE).play()
+    lower.reset().setEffectiveTimeScale(CQC_RATE).play()
     this.upperState = 'sweep'
     this.locomotion = 'cqc_thrown'
     this.fallKey = THROWN_KEY
-    this.sweepDuration = THROWN_LAND
+    this.sweepDuration = THROWN_LAND / CQC_RATE
     this.rootSampleValid = false
   }
 
@@ -3774,8 +3780,8 @@ export class CharacterAnimator {
     const upper = this.upper.get(kind === 'cqc_throw' ? CQC_THROW_KEY : CQC_MISS_KEY)
     const lower = this.lower.get(kind)
     if (!upper || !lower) return
-    upper.reset().play()
-    lower.reset().play()
+    upper.reset().setEffectiveTimeScale(CQC_RATE).play()
+    lower.reset().setEffectiveTimeScale(CQC_RATE).play()
     this.upperState = kind
     this.locomotion = kind
     this.rootSampleValid = false

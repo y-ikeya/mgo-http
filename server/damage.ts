@@ -626,8 +626,8 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
   const facing = distance > 1e-3 ? (dx * -Math.sin(attacker.yaw) + dz * -Math.cos(attacker.yaw)) / distance : 1
   if (facing < CQC_FACING_COS - 0.5) return
   if (isAsleep(victim.sleepUntil, now) || !canBeThrown(victim.locomotion)) return
-  // 型の尺 (2.9 秒) の間は次を受けない
-  session.cqcUntil = now + 2500
+  // 型の尺 (2.9 秒を 1.2 倍速 = 2.4 秒) の間は次を受けない
+  session.cqcUntil = now + 2000
 
   const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
   victim.stamina = drain.stamina
