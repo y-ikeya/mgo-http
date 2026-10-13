@@ -310,6 +310,8 @@ const JUMP_LOOP_MAX_SPEED = 3
  * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
  */
 const ROOT_MOTION_CLIPS = new Set([
+  // 梯子を登り切る。**位置は soldier が腰の曲線 (riseProgress / forwardProgress) で運ぶ**
+  'climb_top',
   'roll',
   'prone_roll_down',
   'vault',
@@ -341,7 +343,7 @@ const ROOT_MOTION_HOLD: Partial<Record<Locomotion, { until: number; keep: number
  * 合わせた瞬間に差のぶん跳ねる。上下は型から抜き、位置のほうを型の上がり方
  * (vaultRise) に沿ってコードで上げる。
  */
-const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb'])
+const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top'])
 /**
  * 上下を抜く型のうち、**終わりの腰の高さを別の型に合わせる物。**
  *

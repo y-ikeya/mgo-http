@@ -404,56 +404,34 @@ const MODEL_YAW_OFFSET = Math.PI
 
 /** 倒れている間に渡す移動入力。毎フレーム作らないよう使い回す */
 /**
- * 登り切りの詰め物。**試写から触れるように表に出してある。**
+ * 登り切りの詰め物。
  *
- * tools/preview/climbtop.html のつまみがここを書き換える。数字を決めるのは
- * 絵を見ながらでないと無理で、直すたびに読み込み直していたら埒が明かない。
+ * **体の運びは型に任せる。** 素材 (ClimbingToTop、Ch35 で撮り直した物 2026-10-13) は
+ * 腰の移動を持っていて、それを辿る (animation.ts の riseProgress / forwardProgress)。
+ * 上下は腰の上下の曲線、前後は腰の前後の曲線のとおりに、掴んだ所から屋上へ渡す。
  *
- * 素材 (ClimbingToTop) はこう動く。合わせる相手はこれ (尺 2.99 秒):
+ * 以前は素材が体の小さいキャラで撮られていて腰の移動が半分しか無く、移動を捨てて
+ * 「〜1.0 秒で登る / よいしょで 0.35m / 55% から前へ」と**手で真似ていた**。
+ * 素材と合っていないと掴んだ手が滑るので、試写のつまみで詰め続けることになっていた。
  *
- *   〜1.0 秒  梯子を登り続けている
- *   1.0〜1.5 秒  **よいしょ、と体を引き上げる**
- *   1.5 秒〜  足を抜いて屋上へ乗せる。体はもう上がらない
+ * 素材の動き (30fps、4.03 秒):
  *
- * 素材の腰の移動は捨てて取り込んである (merge_clip の --no-root) ので、体を
- * 動かしているのはこちらの補間だけ。**素材が止めている所で動かすと、掴んだ
- * 手が滑る。**
+ *   1〜15 コマ   梯子に掴まったまま
+ *   15〜43       登る (腰 +0.7m)
+ *   43〜57       よいしょと引き上げる
+ *   57〜78       体を上げながら前へ踏み出す
+ *   78〜         屋上で立ち直る
  */
 export const CLIMB_TOP_TUNING = {
   /** 型を流す速さ。素材 4.03 秒は長いので詰める (尺 2.99 秒) */
   rate: 1.35,
   /**
-   * 上端の何 m 手前で乗り越えに入るか。
-   *
-   * 1.2 (手が一番上の桟に掛かる高さ) にしていたが、登りの型が 1 回多く回って
-   * から乗り越えに入るのが待ちに見えた。**掴む 1 回分 (0.8m = 登りの型 1 周)
-   * 早く入る。** 乗り越えの型の頭は登りの動きなので、そこで残りを登る。
+   * 上端の何 m 手前で乗り越えに入るか。**素材で足が上がる量** (1.46m) に合わせる —
+   * 型の上下をそのまま (引き伸ばさずに) 辿れる
    */
-  lead: 2.0,
-  /** よいしょの始まり (型の 0〜1)。0.33 ＝ 1.0 秒 */
-  heaveFrom: 0.33,
-  /** よいしょの終わり。0.5 ＝ 1.5 秒 */
-  heaveTo: 0.5,
-  /**
-   * よいしょまでに上げておく分 (m)。**型の頭の登りで進む高さ。**
-   *
-   * 割合ではなく m で持つ。上端までの残り (lead + 屋上との差) は梯子ごとに
-   * 違うので、割合だと梯子が変わるたびによいしょの高さが変わる。
-   * 0.35m (手が桟に掛かってから) + 0.8m (早めた掴む 1 回分)。1.0 秒で
-   * 登るので 1.15 m/s。梯子の登る速さ (1.0 m/s) とほぼ同じ
-   */
-  riseClimb: 1.15,
-  /**
-   * よいしょで上げる分 (m)。**残りは足を抜きながら上がる。**
-   *
-   * ここで上げ切ると、引き上げ切った所で体が高く来すぎる。素材の引き上げは
-   * 「胸まで上げる」動きで、屋上の高さまで一息に上がるわけではない。
-   */
-  riseHeave: 0.35,
-  /** 前へ踏み出し始める所 (型の 0〜1)。上がり切る前に出すと壁にめり込む */
-  stepPhase: 0.55,
-  /** 踏み出す量 (m)。掴んでいた所から屋上の上へ */
-  step: 0.5,
+  lead: 1.46,
+  /** 前へ渡る量 (m)。**素材の腰が前へ進む量** (1.35m) */
+  step: 1.35,
   /** 床があるかを踏んでみる距離 (m)。梯子の際では屋上か空かを読み違える */
   probe: 0.8,
 }
@@ -840,6 +818,9 @@ export class Soldier {
   /** 登り切る型の始めと終わりの足元。その間を渡す */
   private readonly climbFrom = new THREE.Vector3()
   private readonly climbTo = new THREE.Vector3()
+  /** 登り切りで、型の腰の曲線がどこまで進んだか (上下 / 前後、0..1)。戻さない */
+  private climbRise = 0
+  private climbAhead = 0
   /** 掴む側を確かめるときの置き場。毎回作らない */
   private readonly climbProbe = new THREE.Vector3()
   private moveSpeed = MOVE_SPEED
@@ -2087,6 +2068,8 @@ export class Soldier {
     const overZ = ladder.axis === 'z' ? grip.z + step.across : grip.z
     this.climbTo.set(overX, step.floor, overZ)
     this.climbTopLeft = span / CLIMB_TOP_TUNING.rate
+    this.climbRise = 0
+    this.climbAhead = 0
     this.climbing = null
     this.velocityY = 0
     this.animator?.playClimbTop(CLIMB_TOP_TUNING.rate)
@@ -2123,48 +2106,23 @@ export class Soldier {
     return { across: -this.climbSide * CLIMB_TOP_TUNING.step, floor: top }
   }
 
-  /** 登り切る型の最中。決めた道を時間で渡る */
+  /**
+   * 登り切る型の最中。**型の腰の曲線のとおりに渡る。**
+   *
+   * 上下は腰の上下の曲線 (riseProgress)、前後は腰の前後の曲線 (forwardProgress) を
+   * 0..1 にして、掴んだ所 (climbFrom) から降り立つ所 (climbTo) へ当てる。素材は
+   * 立ち直る所で腰が少し沈むので、**戻さない** (一番進んだ所を保つ)
+   */
   private advanceClimbTop(dt: number): void {
     if (this.climbTopLeft <= 0) return
-    const span = (this.animator?.climbTopDuration ?? 0) / CLIMB_TOP_TUNING.rate
     this.climbTopLeft = Math.max(0, this.climbTopLeft - dt)
-    const done = span > 0 ? 1 - this.climbTopLeft / span : 1
-    /*
-     * **登る → よいしょ → 足を抜く → 一歩出る。**
-     *
-     * 素材が体を引き上げている間 (1.0〜1.5 秒) に合わせて上げる。そこを外して
-     * 動かすと、手すりを掴んだ手が上へ流れる。残りは足を抜きながら上げて、
-     * 最後に床の上へ一歩出る。上がり切る前に前へ寄せると、梯子を吊っている
-     * コンクリートに足がめり込む。
-     */
-    const at = (from: number, to: number) =>
-      Math.min(1, Math.max(0, (done - from) / (to - from)))
-    const smooth = (t: number) => t * t * (3 - 2 * t)
-    // **出だしで一気に、終わりで収める。** よいしょはここが遅いと重く見える
-    const heaveEase = (t: number) => 1 - (1 - t) * (1 - t) * (1 - t)
-
-    /*
-     * 縦は**登る → よいしょ → もう上がらない**。素材の動きに合わせる。
-     */
-    /*
-     * 縦は 3 つに分ける。**登る → よいしょ → 足を抜きながら残りを上げる。**
-     *
-     * よいしょで上げ切ると、引き上げた所で体が高く来すぎる (素材は胸まで
-     * 上げる動きで、屋上の高さまで一息には上がらない)。
-     */
-    // m で持っている登りとよいしょを、この梯子の残りの高さに対する割合へ
-    const total = Math.max(1e-3, this.climbTo.y - this.climbFrom.y)
-    const riseClimb = Math.min(1, CLIMB_TOP_TUNING.riseClimb / total)
-    const riseHeave = Math.min(1 - riseClimb, CLIMB_TOP_TUNING.riseHeave / total)
-    const rest = Math.max(0, 1 - riseClimb - riseHeave)
-    const up =
-      riseClimb * at(0, CLIMB_TOP_TUNING.heaveFrom) +
-      riseHeave * heaveEase(at(CLIMB_TOP_TUNING.heaveFrom, CLIMB_TOP_TUNING.heaveTo)) +
-      rest * smooth(at(CLIMB_TOP_TUNING.heaveTo, CLIMB_TOP_TUNING.stepPhase))
-    this.position.y = this.climbFrom.y + (this.climbTo.y - this.climbFrom.y) * up
-    const step = smooth(at(CLIMB_TOP_TUNING.stepPhase, 1))
-    this.position.x = this.climbFrom.x + (this.climbTo.x - this.climbFrom.x) * step
-    this.position.z = this.climbFrom.z + (this.climbTo.z - this.climbFrom.z) * step
+    const animator = this.animator
+    const done = this.climbTopLeft <= 0
+    this.climbRise = done ? 1 : Math.max(this.climbRise, animator?.riseProgress('climb_top') ?? 1)
+    this.climbAhead = done ? 1 : Math.max(this.climbAhead, animator?.forwardProgress('climb_top') ?? 1)
+    this.position.y = this.climbFrom.y + (this.climbTo.y - this.climbFrom.y) * this.climbRise
+    this.position.x = this.climbFrom.x + (this.climbTo.x - this.climbFrom.x) * this.climbAhead
+    this.position.z = this.climbFrom.z + (this.climbTo.z - this.climbFrom.z) * this.climbAhead
     this.velocityY = 0
   }
 
