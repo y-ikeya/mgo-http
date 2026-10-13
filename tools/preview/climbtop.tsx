@@ -8,7 +8,7 @@
  *     ?dist=3.2   カメラの距離
  *     ?ladder=ladder_b.001  どの梯子か
  *     ?stage=0    ステージの見た目を出さない (読み込みが重いとき)
- *     ?map=training  どのステージの梯子か (既定 raft)
+ *     ?map=lab    どのステージの梯子か (raft / training / lab、既定 raft)。?ladder= で選ぶ
  *
  * --- なぜ要るか ---
  * 登り切りは 3 秒しかないのに、梯子の下から回すと 12 秒待つ。しかも
@@ -35,7 +35,7 @@ const view = query.get('view') ?? 'side'
 const dist = Number(query.get('dist') ?? '3.2')
 const wanted = query.get('ladder') ?? ''
 const showStage = query.get('stage') !== '0'
-const map = (query.get('map') ?? 'raft') as 'raft' | 'training'
+const map = (query.get('map') ?? 'raft') as 'raft' | 'training' | 'lab'
 /** 何秒ぶん回せるようにするか。登り切りは 3 秒ほど */
 const SPAN = 6
 /**
