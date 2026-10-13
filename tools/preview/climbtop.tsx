@@ -8,6 +8,7 @@
  *     ?dist=3.2   カメラの距離
  *     ?ladder=ladder_b.001  どの梯子か
  *     ?stage=0    ステージの見た目を出さない (読み込みが重いとき)
+ *     ?down       屋上から梯子へ歩いて出て、上から掴んで降りる所を見る
  *     ?map=lab    どのステージの梯子か (raft / training / lab、既定 raft)。?ladder= で選ぶ
  *
  * --- なぜ要るか ---
@@ -35,6 +36,7 @@ const view = query.get('view') ?? 'side'
 const dist = Number(query.get('dist') ?? '3.2')
 const wanted = query.get('ladder') ?? ''
 const showStage = query.get('stage') !== '0'
+const down = query.has('down')
 const map = (query.get('map') ?? 'raft') as 'raft' | 'training' | 'lab'
 /** 何秒ぶん回せるようにするか。登り切りは 3 秒ほど */
 const SPAN = 6
@@ -135,14 +137,25 @@ document.body.appendChild(panel)
 
 async function draw(at: number): Promise<void> {
   const soldier = await rebuild()
-  // 上端の手前、梯子の上に置いて掴ませる
-  soldier.position.set(startX, ladder.max[1] - startBelow(), midZ)
-  soldier.grabLadder()
-  soldier.setStickForward(1)
+  const toward = new THREE.Vector3()
+  if (down) {
+    // 屋上 (掴む側の反対) の縁の 1m 手前に立たせ、梯子へ向かって歩かせる
+    soldier.position.set(midX - startSide * 1.0, ladder.max[1], midZ)
+    toward.set(startSide, 0, 0)
+  } else {
+    // 上端の手前、梯子の上に置いて掴ませる
+    soldier.position.set(startX, ladder.max[1] - startBelow(), midZ)
+    soldier.grabLadder()
+    soldier.setStickForward(1)
+  }
 
   const track: string[] = []
   for (let t = 0; t < at; t += 1 / 60) {
-    soldier.update(1 / 60, new THREE.Vector3(), soldier.yaw, 0, world)
+    if (down) {
+      // 掴むまでは梯子へ歩く (前を押し続ける)。掴んで 0.5 秒したら後ろへ引いて降りる
+      soldier.setStickForward(soldier.onLadder && t > 1.5 ? -1 : 1)
+      soldier.update(1 / 60, soldier.onLadder ? new THREE.Vector3() : toward, soldier.yaw, 0, world)
+    } else soldier.update(1 / 60, new THREE.Vector3(), soldier.yaw, 0, world)
     if (Math.abs(t * 4 - Math.round(t * 4)) < 1 / 120) {
       track.push(
         `${t.toFixed(2)}s 高さ${soldier.position.y.toFixed(2)} 横${(soldier.position.x - midX).toFixed(2)}`,

@@ -437,6 +437,10 @@ export const CLIMB_TOP_TUNING = {
 }
 
 const ZERO_MOVE = new THREE.Vector3()
+/** 縁から出た時に、上端がこの距離 (m) の内にある梯子を上から掴む */
+const LADDER_TOP_REACH = 0.6
+/** 上から掴んだ時の足元 (上端から何 m 下)。登り切りの入り口 (lead) より下 */
+const LADDER_TOP_MOUNT = CLIMB_TOP_TUNING.lead + 0.1
 
 /**
  * プレイヤーキャラクター。
@@ -815,6 +819,11 @@ export class Soldier {
    * 横から見ている間は「上」が体の前にならず、押しても登らない。
    */
   private stickForward = 0
+  /**
+   * 梯子を**上から**掴んだ直後、前 (登る) を効かせない。**一度離すまで。**
+   * 縁へ歩いてきた前入力のままだと、掴んだそばから登り返して屋上へ戻る
+   */
+  private climbUpLatched = false
   /** 登り切る型の始めと終わりの足元。その間を渡す */
   private readonly climbFrom = new THREE.Vector3()
   private readonly climbTo = new THREE.Vector3()
@@ -1932,6 +1941,49 @@ export class Soldier {
   }
 
   /**
+   * 縁から歩いて出た所に梯子の上端がある。**上から掴んで降り始める。**
+   *
+   * ぶら下がり (hang) は掴む物の無い縁の話で、梯子があるのに縁に手を掛けるのは
+   * おかしい (本人 2026-10-13)。屋上と反対側 (梯子の外側) に立って梯子を向き、
+   * 上端から LADDER_TOP_MOUNT 下を掴む — 登り切りの入り口より下なので、そのまま
+   * 登り返しには入らない。掴んだ時の前入力は一度離すまで効かせない (climbUpLatched)
+   *
+   * 降り始める型は無い。掴む高さへそのまま移る
+   *
+   * @param edge 縁から出る直前の足元
+   * @param heading 歩いていた向き。**こちらの側に立つ** — 縁を出る前に梯子の上端の板を
+   *   踏んで越えていることがあり、出た位置では屋上側か外側かを見間違える
+   */
+  private grabLadderFromTop(edge: THREE.Vector3, heading: THREE.Vector3): boolean {
+    if (!can(this.body, 'ladder')) return false
+    const ladder = this.ladders.find((l) => {
+      if (Math.abs(edge.y - l.max[1]) > LADDER_TOP_REACH) return false
+      const dx = Math.max(l.min[0] - edge.x, 0, edge.x - l.max[0])
+      const dz = Math.max(l.min[2] - edge.z, 0, edge.z - l.max[2])
+      return Math.hypot(dx, dz) <= LADDER_TOP_REACH
+    })
+    if (!ladder) return false
+    // 歩いて出た先の側 (屋上の反対) に立つ
+    const out = ladder.axis === 'x' ? heading.x : heading.z
+    if (Math.abs(out) < 0.2) return false
+    const side: 1 | -1 = out > 0 ? 1 : -1
+    const grip = ladderGrip(ladder, edge.x, edge.z, side)
+    this.climbSide = side
+    this.climbing = ladder
+    this.position.set(grip.x, Math.max(ladder.min[1], ladder.max[1] - LADDER_TOP_MOUNT), grip.z)
+    this.yaw = grip.yaw
+    this.climbYaw = grip.yaw
+    this.velocityY = 0
+    this.mover.airX = 0
+    this.mover.airZ = 0
+    this.crouching = false
+    this.aiming = false
+    this.climbUpLatched = true
+    this.animator?.setClimbRate(0)
+    return true
+  }
+
+  /**
    * 手を離す。**そのまま落ちる** (Space / 下端で下がる / 眠り・転倒・死)。
    *
    * **登り切る型の最中も畳む。** 掴んでいる状態 (climbing) だけ消しても、
@@ -1978,7 +2030,8 @@ export class Soldier {
      * 上下は**押した量そのまま**。カメラ基準の向きを使うと、梯子を横から
      * 見ている間は「上」が体の前にならず、押しても登らない。
      */
-    const forward = this.stickForward
+    if (this.stickForward <= 0.1) this.climbUpLatched = false
+    const forward = this.climbUpLatched ? Math.min(0, this.stickForward) : this.stickForward
     /*
      * **押すたびにぐいと上がる。** 均した速さは LADDER_SPEED のまま。
      *
@@ -3384,7 +3437,10 @@ export class Soldier {
       moveDir.lengthSq() > 1e-6
     ) {
       const below = world.groundHeight(this.position, PLAYER_RADIUS, this.position.y)
-      if (this.position.y - below >= HANG_MIN_DROP) this.beginHang(this.hangProbe, moveDir)
+      // 縁に梯子の上端があれば、ぶら下がらずに梯子を上から掴む
+      if (this.position.y - below >= HANG_MIN_DROP && !this.grabLadderFromTop(this.hangProbe, moveDir)) {
+        this.beginHang(this.hangProbe, moveDir)
+      }
     }
 
     /*
