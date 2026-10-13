@@ -8,6 +8,7 @@
  *     ?dist=3.2   カメラの距離
  *     ?ladder=ladder_b.001  どの梯子か
  *     ?stage=0    ステージの見た目を出さない (読み込みが重いとき)
+ *     ?map=training  どのステージの梯子か (既定 raft)
  *
  * --- なぜ要るか ---
  * 登り切りは 3 秒しかないのに、梯子の下から回すと 12 秒待つ。しかも
@@ -34,6 +35,7 @@ const view = query.get('view') ?? 'side'
 const dist = Number(query.get('dist') ?? '3.2')
 const wanted = query.get('ladder') ?? ''
 const showStage = query.get('stage') !== '0'
+const map = (query.get('map') ?? 'raft') as 'raft' | 'training'
 /** 何秒ぶん回せるようにするか。登り切りは 3 秒ほど */
 const SPAN = 6
 /**
@@ -57,13 +59,13 @@ await renderer.init()
 const scene = new THREE.Scene()
 buildLights(scene)
 
-const ladders = await loadStageLadders('raft')
+const ladders = await loadStageLadders(map)
 const ladder = ladders.find((l) => l.name === wanted) ?? ladders[0]
-const world = await loadStageMoveWorld('raft')
+const world = await loadStageMoveWorld(map)
 if (!ladder) throw new Error('梯子が無い')
 
 if (showStage) {
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/models/stage_raft.glb')
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`/models/stage_${map}.glb`)
   scene.add(gltf.scene)
 }
 
