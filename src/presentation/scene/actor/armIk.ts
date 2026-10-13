@@ -329,3 +329,83 @@ export class HandPin {
     reachTwoBone(upper, lower, end, this.wrist.lerp(this.target, weight), this.turn.slerp(this.targetTurn, weight))
   }
 }
+
+/**
+ * **背骨を曲げて、銃身の上下を照準に合わせる。** 構えている間だけ。
+ *
+ * 照準の上下は型の上に手続きで足している (animation.ts の AIM_PITCH_GAIN 倍、
+ * MAX_AIM_BEND で打ち切り)。倍率は見た目で合わせた値で、銃身の角度を測っていない —
+ * 上を向くと行き過ぎ (照準 +30° で銃身 +42.6°)、下は -29° で止まる (照準 -60° で
+ * 銃身 -26.6°)。ここで**実際の銃身の角度を測って、ずれた分を背骨で曲げ直す。**
+ * 上限は掛けない (2026-10-13 本人: おかしくなってもいいから背骨を折る方向で)
+ *
+ * 曲げた骨は次のコマで型を当てる前に戻す (restore)
+ */
+export class SpineAim {
+  private bones: THREE.Object3D[] | null = null
+  private searched: THREE.Object3D | null = null
+  private saved: THREE.Quaternion[] | null = null
+  private readonly barrel = new THREE.Vector3()
+  private readonly right = new THREE.Vector3()
+  private readonly forward = new THREE.Vector3()
+  private readonly turn = new THREE.Quaternion()
+  private readonly twist = new THREE.Quaternion()
+  private readonly world = new THREE.Quaternion()
+  private static readonly UP = new THREE.Vector3(0, 1, 0)
+
+  restore(): void {
+    if (!this.saved || !this.bones) return
+    this.bones.forEach((bone, i) => bone.quaternion.copy(this.saved![i]))
+    this.saved = null
+  }
+
+  /**
+   * @param gun 銃の模型。ローカル -Z が銃身の向き
+   * @param yaw 体の向き (soldier と同じ決めごと: 前は (-sin, 0, -cos))
+   * @param pitch 合わせたい上下 (rad、上が正)
+   * @param weight 構えの掛かり具合
+   */
+  apply(model: THREE.Object3D, gun: THREE.Object3D, yaw: number, pitch: number, weight: number): void {
+    if (weight <= 1e-3) return
+    if (this.searched !== model) {
+      this.searched = model
+      const found: THREE.Object3D[] = []
+      for (const suffix of ['Spine', 'Spine1', 'Spine2']) {
+        let hit: THREE.Object3D | null = null
+        model.traverse((o) => {
+          if (!hit && o.name.endsWith(suffix) && !o.name.endsWith(`${suffix}1`) && !o.name.endsWith(`${suffix}2`) && (o as THREE.Bone).isBone) hit = o
+        })
+        if (hit) found.push(hit)
+      }
+      this.bones = found.length === 3 ? found : null
+    }
+    if (!this.bones) return
+    this.saved = this.bones.map((b) => b.quaternion.clone())
+    // 体の右と前。右の軸で回すと前が上へ起きる
+    this.right.set(Math.cos(yaw), 0, -Math.sin(yaw))
+    this.forward.set(-Math.sin(yaw), 0, -Math.cos(yaw))
+    /*
+     * 3 回で詰める (曲げると肩の位置も動くので 1 回では残る)。
+     *
+     * **左右も合わせる。** 銃身は体の正面の面に無いので、大きく曲げると横へ逃げる
+     * (照準 -60° で右へ 10〜12°)。背骨を縦の軸でひねって戻す
+     */
+    for (let pass = 0; pass < 3; pass++) {
+      gun.updateWorldMatrix(true, false)
+      this.barrel.set(0, 0, -1).transformDirection(gun.matrixWorld)
+      const now = Math.asin(THREE.MathUtils.clamp(this.barrel.y, -1, 1))
+      const error = (pitch - now) * weight
+      // 横のずれ (右が正)。真上・真下に近いと読めないので水平の成分で測る
+      const side = Math.atan2(this.barrel.dot(this.right), this.barrel.dot(this.forward)) * weight
+      if (Math.abs(error) < 1e-3 && Math.abs(side) < 1e-3) break
+      this.turn.setFromAxisAngle(this.right, error / this.bones.length)
+      // 縦の軸で +θ 回すと左へ向く。右へずれた分だけ左へ
+      this.twist.setFromAxisAngle(SpineAim.UP, side / this.bones.length)
+      this.turn.premultiply(this.twist)
+      for (const bone of this.bones) {
+        bone.getWorldQuaternion(this.world)
+        setWorldQuaternion(bone, this.world.premultiply(this.turn))
+      }
+    }
+  }
+}

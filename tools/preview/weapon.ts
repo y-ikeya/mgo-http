@@ -28,6 +28,7 @@ import { CHOICES, type WeaponId } from '../../src/domain/item/weapons'
  * 対戦部屋に入ると席を 1 つ潰すし、伏せて構えるまでに何度も操作が要る。
  * ここは姿勢を直に立てる。
  */
+const q0 = new URLSearchParams(location.search)
 const CELLS = [
   { label: '立ち · 脱力', crouch: false, prone: false, aim: false },
   { label: '立ち · 構え', crouch: false, prone: false, aim: true },
@@ -804,7 +805,8 @@ function frame(): void {
     // **毎フレーム当てる。** 読み込みが終わる前に呼んでも中身がまだ無い
     if (aimLevel) cell.player.setAimLevel(aimLevel.stand, aimLevel.crouch)
     cell.player.setAiming(cell.spec.aim)
-    cell.player.update(dt, ZERO, cell.player.yaw, 0, WORLD)
+    // ?aimpitch=-40 … 照準の上下 (度、上が正)。銃身が照準を指すかを見る
+    cell.player.update(dt, ZERO, cell.player.yaw, (Number(q0.get('aimpitch') ?? 0) * Math.PI) / 180, WORLD)
   }
 
   const width = renderer.domElement.width / renderer.getPixelRatio()

@@ -37,7 +37,7 @@ import {
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
-import { HandPin, LeftArmFollow, RightArmShift, climbGripWeight } from './armIk'
+import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from './armIk'
 import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
@@ -512,6 +512,8 @@ export class Soldier {
   /** 梯子を登り切る間、手を掴んだ所に留める (armIk.ts の CLIMB_TOP_GRIPS) */
   private readonly gripRight = new HandPin('Right')
   private readonly gripLeft = new HandPin('Left')
+  /** 構えている間、銃身の上下を照準へ合わせるよう背骨を曲げ直す (armIk.ts) */
+  private readonly spineAim = new SpineAim()
   /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
   private readonly rightArm = new RightArmShift()
   private readonly rightShiftNow = new THREE.Vector3()
@@ -3637,6 +3639,7 @@ export class Soldier {
       this.rightArm.restore()
       this.gripRight.restore()
       this.gripLeft.restore()
+      this.spineAim.restore()
       this.animator.update(dt)
 
       this.object.updateMatrixWorld(true)
@@ -3718,6 +3721,10 @@ export class Soldier {
       this.aimTrimWeight = damp(this.aimTrimWeight, this.aiming && this.proneStage === 'none' ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
       this.weapon?.setAimWeight(this.aimTrimWeight)
       if (this.model && this.weapon) {
+        // 銃身の上下を照準へ。**背骨で曲げる** (腕や銃を動かす補正より先)
+        if (this.proneStage === 'none' && isGun(this.held)) {
+          this.spineAim.apply(this.model, this.weapon.object, this.yaw, this.aimPitch, this.aimTrimWeight)
+        }
         // 右手を先にずらす (rightShift)。銃が一緒に動くので、左手はその後で運ぶ
         const shift = isGun(this.held) ? WEAPON_CONFIGS[this.held].rightShift : undefined
         this.rightArm.moved.set(0, 0, 0)

@@ -1,4 +1,4 @@
-import { HandPin, LeftArmFollow, RightArmShift, climbGripWeight } from "./armIk";
+import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
 import { BlobShadow } from './blobShadow';
 import * as THREE from "three";
@@ -219,6 +219,8 @@ export class RemoteSoldier {
   /** 梯子を登り切る間、手を掴んだ所に留める。自機と同じ (soldier.ts) */
   private readonly gripRight = new HandPin("Right");
   private readonly gripLeft = new HandPin("Left");
+  /** 構えている間、銃身の上下を照準へ合わせるよう背骨を曲げ直す。自機と同じ */
+  private readonly spineAim = new SpineAim();
   /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
   private readonly rightArm = new RightArmShift();
   private readonly rightShiftNow = new THREE.Vector3();
@@ -532,6 +534,7 @@ export class RemoteSoldier {
     this.rightArm.restore();
     this.gripRight.restore();
     this.gripLeft.restore();
+    this.spineAim.restore();
     animator.update(dt);
     if (this.model) {
       this.object.updateMatrixWorld(true);
@@ -558,6 +561,8 @@ export class RemoteSoldier {
     this.aimTrimWeight = damp(this.aimTrimWeight, state.aiming && !this.serverDead && !prone ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
     this.weapon?.setAimWeight(this.aimTrimWeight)
     if (this.model && this.weapon) {
+      // 銃身の上下を照準へ。背骨で曲げる。自機と同じ
+      if (!prone) this.spineAim.apply(this.model, this.weapon.object, this.yaw, state.pitch, this.aimTrimWeight);
       // 右手を先にずらす (rightShift)。自機と同じ
       const shift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.rightShift;
       this.rightArm.moved.set(0, 0, 0);
