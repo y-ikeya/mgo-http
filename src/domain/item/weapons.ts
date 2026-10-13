@@ -328,8 +328,12 @@ export interface WeaponSpec {
    * 「構える」と「覗く」を別の操作にしてある。
    *
    * 各段は { 画角 (度), 表示する倍率 }。
+   *
+   * sight … **眼鏡ではなく銃の照準器を覗く段** (突撃銃の主観、2026-10-13 本人)。
+   * スコープの絵は重ねず、主観用の銃 (照門・照星 / ホロサイト) が画面に出る。
+   * 弾は画面の真ん中へ飛ぶので、照準器の線と弾の行き先は必ず一致する
    */
-  scope: { fov: number; label: string }[]
+  scope: { fov: number; label: string; sight?: true }[]
 }
 
 
@@ -483,7 +487,8 @@ const RIFLE: WeaponSpec = {
   aimDistance: 1.35,
   aimShoulder: 0.4,
   aimSpeedScale: 0.55,
-  scope: [],
+  // 主観。照門と照星を覗く (等倍に近い画角)
+  scope: [{ fov: 30, label: '1x', sight: true }],
 }
 
 /**
@@ -501,6 +506,8 @@ const RIFLE: WeaponSpec = {
 const M4: WeaponSpec = {
   ...RIFLE,
   id: 'm4',
+  // 主観。機関部の上のホロサイトを覗く
+  scope: [{ fov: 30, label: '1x', sight: true }],
   label: 'M4',
   kill: 'M4 CUSTOM',
   model: 'm4',

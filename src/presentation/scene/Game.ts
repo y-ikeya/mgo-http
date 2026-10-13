@@ -1,4 +1,5 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS } from "./arms/weapon";
 import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
@@ -266,6 +267,8 @@ export interface GameStats {
   loadoutFocus: LoadoutFocus;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
+  /** 覗いているのが銃の照準器か (突撃銃の主観)。眼鏡ではないのでスコープの絵を重ねない */
+  sight: boolean;
   /** いま持っている銃。調整パネルが追従する */
   equipped: WeaponId;
   /** 覗いている倍率。空なら覗いていない */
@@ -1130,6 +1133,49 @@ export class Game {
         : { distance: spec.aimDistance, shoulder: spec.aimShoulder, fov: spec.aimFov },
     );
     this.player.setSelfVisible(!this.scoped);
+    this.updateSightModel(level?.sight !== undefined);
+  }
+
+  /** 主観用の銃 (照準器を覗く段)。カメラに付けて置く */
+  private sightModel: { held: string; object: THREE.Object3D } | null = null;
+  /** 読み込み中の銃。同じ物を 2 度読まない */
+  private sightLoading: string | null = null;
+
+  /**
+   * 照準器を覗く段 (突撃銃の主観) で、**銃をカメラの前に出す。**
+   *
+   * 体が持っている銃ではなく、同じ模型をもう 1 つカメラに付ける (主観用)。体の銃は
+   * 型の揺れ・背骨の補正・手の位置で毎コマ少しずつ動くので、それを覗くと照準器が
+   * 画面の真ん中から逸れる。カメラに付けた銃は、目の点 (weapon.ts の sight.eye) が
+   * カメラの位置に来るよう置くので、照準線がいつも画面の真ん中を通る — 弾も画面の
+   * 真ん中へ飛ぶので、照準器と弾の行き先が一致する
+   */
+  private updateSightModel(show: boolean): void {
+    const held = this.inv.held;
+    const config = isGun(held) ? SIGHT_CONFIGS[held].sight : undefined;
+    const wanted = show && config !== undefined;
+    if (wanted && this.sightModel?.held !== held && this.sightLoading !== held && isGun(held)) {
+      this.sightLoading = held;
+      void Weapon.load(held).then((weapon) => {
+        if (this.sightLoading !== held) return;
+        this.sightLoading = null;
+        if (this.sightModel) this.sightModel.object.removeFromParent();
+        const object = weapon.object;
+        const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), config!.pitch).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), config!.roll));
+        object.quaternion.copy(turn);
+        object.position.copy(config!.eye).applyQuaternion(turn).negate();
+        object.traverse((o) => {
+          o.castShadow = false;
+          o.frustumCulled = false;
+        });
+        // カメラの子は、カメラが場面に入っていないと描かれない
+        const camera = this.follow.camera;
+        if (!camera.parent) this.scene.add(camera);
+        camera.add(object);
+        this.sightModel = { held, object };
+      });
+    }
+    if (this.sightModel) this.sightModel.object.visible = wanted && this.sightModel.held === held;
   }
   /** 自分の所属。名簿で届くまでは青として振る舞う */
 
@@ -5288,6 +5334,7 @@ export class Game {
       loadoutFocus: this.loadoutFocus,
       skillsOpen: this.canChooseSkillsNow,
       scoped: this.scoped,
+      sight: this.scoped && this.weapon.scope[this.zoomStep - 1]?.sight === true,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,

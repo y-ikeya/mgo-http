@@ -560,7 +560,11 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
       {/* 照準は画面中央固定。カメラの視線軸がそのまま弾道になる */}
       {/* スコープ。覗いている間だけ */}
-      <Show when={props.stats?.scoped}>
+      {/*
+        銃の照準器を覗いている (突撃銃の主観) 間は**何も重ねない** — 照門と照星、
+        ホロサイトの輪は画面に出ている主観用の銃そのもの
+      */}
+      <Show when={props.stats?.scoped && !props.stats?.sight}>
         {/*
           眼鏡の中身は銃ごとに違う。**モシンナガンは古い眼鏡** — 目盛りも
           測距も無く、柱と横線だけ。XM2010 の目盛りを出すと、置き撃ちで

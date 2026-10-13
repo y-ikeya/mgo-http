@@ -102,6 +102,16 @@ export interface WeaponConfig {
   proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
   tip: THREE.Vector3
+  /**
+   * 主観で照準器を覗く時の、**目の位置** (模型の空間) と模型の起こし (rad、銃身の軸回り)。
+   *
+   * 主観用の銃はカメラに付けて、この点がカメラの位置に来るよう置く。目の点は
+   * 照準線 (照門と照星 / ホロサイトの窓の中心を通る、銃身と平行な線) の上、照門の
+   * 後ろに取る — こうすると照準線がそのまま画面の真ん中を通る (弾の行き先と一致)。
+   * 模型が横倒しで入っている銃 (AK) は roll で起こす。照準線が銃身と平行でない銃は
+   * pitch (rad、正で銃口が上) で傾けて、照準線のほうをカメラの向きに揃える
+   */
+  sight?: { eye: THREE.Vector3; roll: number; pitch: number }
   /** 左手を添える位置。片手武器は null で、その場合 IK を掛けない */
 }
 
@@ -119,6 +129,14 @@ const degrees = (value: number) => THREE.MathUtils.degToRad(value)
  * 握った姿勢を持っているので、コードで動かしていない。
  */
 const RIFLE: WeaponConfig = {
+  /*
+   * 主観の目。**模型は横倒し** (上が +X) なので 90° 起こす。照門の V 字の底は銃身の
+   * 軸から +X へ 0.0482m (前 0.47m)、照星 (輪の中の柱) の頂は 0.0462m (前 0.82m) —
+   * 照準線は銃身から 0.33° 下がっている。銃を 0.33° 起こして照準線をカメラへ揃え、
+   * 目はその線の上、照門の 17cm 後ろ
+   * (tools/preview/sight.html で照門の底と照星の頂を真ん中に重ねて測った)
+   */
+  sight: { eye: new THREE.Vector3(0.0492, 0.165, -0.3), roll: Math.PI / 2, pitch: 0.0057 },
   // しゃがみ構えの右手が高い・外に開いている (本人 2026-10-10)。右手首を 5cm 下げ、体の中心側へ 6cm (銃は向きを保って一緒に動く)
   rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.07, -0.05, 0) },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
@@ -189,6 +207,12 @@ const SHOTGUN: WeaponConfig = {
  */
 const M4: WeaponConfig = {
   ...SHOTGUN,
+  /*
+   * 主観の目。機関部の上のホロサイト (前 0.30〜0.36m)。**窓に照準の輪が描かれている**
+   * ので、その真ん中 (高さ 0.235m) を画面の真ん中へ。模型は立っている (上が +Y)。
+   * 目は窓の 15cm 後ろ (tools/preview/sight.html で輪を真ん中に重ねて測った)
+   */
+  sight: { eye: new THREE.Vector3(0.0006, 0.2349, -0.15), roll: 0, pitch: 0 },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
     position: new THREE.Vector3(-0.06, 0.05, -0.525),

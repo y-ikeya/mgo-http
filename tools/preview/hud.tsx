@@ -18,7 +18,7 @@ const base = {
   locked: true, shots: 0, ammo: 24, magazine: 30, reserve: 60,
   reloading: false, downed: false, aiming: false, spread: 1.2, crouching: false,
   hitZone: '', links: [], menuOpen: false, loadoutOpen: false, loadoutLeft: 0,
-  loadoutWait: 0, scoped: false, equipped: 'rifle', zoom: '', canZoom: false,
+  loadoutWait: 0, scoped: false, sight: false, equipped: 'rifle', zoom: '', canZoom: false,
   scores: [], health: 100, maxHealth: 100, dead: false, kills: [],
   throwables: 2, grenades: 3, browsing: null, held: 'rifle', weaponHeld: 'rifle',
   tool: 'none', toolInHand: false, browsingFamily: null, switching: false,
