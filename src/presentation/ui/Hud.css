@@ -1495,3 +1495,28 @@
   text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
 }
 
+
+/* ホロサイトの輪と点 (EOTech の 65 MOA の輪と 1 MOA の点)。画面の真ん中 = 弾の行き先 */
+.sight-holo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5.4vh;
+  height: 5.4vh;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 50, 30, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 3px rgba(255, 60, 30, 0.7);
+  pointer-events: none;
+}
+.sight-holo-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(255, 50, 30, 0.95);
+  box-shadow: 0 0 3px rgba(255, 60, 30, 0.8);
+}

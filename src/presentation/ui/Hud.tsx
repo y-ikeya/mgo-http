@@ -561,9 +561,15 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       {/* 照準は画面中央固定。カメラの視線軸がそのまま弾道になる */}
       {/* スコープ。覗いている間だけ */}
       {/*
-        銃の照準器を覗いている (突撃銃の主観) 間は**何も重ねない** — 照門と照星、
-        ホロサイトの輪は画面に出ている主観用の銃そのもの
+        銃の照準器を覗いている (突撃銃の主観) 間は、照門と照星は主観用の銃そのもの。
+        **ホロサイトだけ輪と点を出す** — 窓のガラスは透けない作りなので主観用の銃から
+        削ってあり、ガラスに描かれていた輪も一緒に消えている
       */}
+      <Show when={props.stats?.scoped && props.stats?.sight === 'holo'}>
+        <div class="sight-holo">
+          <div class="sight-holo-dot" />
+        </div>
+      </Show>
       <Show when={props.stats?.scoped && !props.stats?.sight}>
         {/*
           眼鏡の中身は銃ごとに違う。**モシンナガンは古い眼鏡** — 目盛りも

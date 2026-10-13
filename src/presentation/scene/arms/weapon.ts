@@ -111,7 +111,12 @@ export interface WeaponConfig {
    * 模型が横倒しで入っている銃 (AK) は roll で起こす。照準線が銃身と平行でない銃は
    * pitch (rad、正で銃口が上) で傾けて、照準線のほうをカメラの向きに揃える
    */
-  sight?: { eye: THREE.Vector3; roll: number; pitch: number }
+  /**
+   * glass … **主観用の銃で素通しにする窓** (模型の空間の箱)。この中の、目の方 (±Z) を
+   * 向いた三角形を主観用の銃から削る。ホロサイトのガラスが透けない作りで、覗くと窓が
+   * 画面を塞いでいた (本人 2026-10-13)。体が持つ銃は削らない
+   */
+  sight?: { eye: THREE.Vector3; roll: number; pitch: number; glass?: { min: THREE.Vector3; max: THREE.Vector3 } }
   /** 左手を添える位置。片手武器は null で、その場合 IK を掛けない */
 }
 
@@ -212,7 +217,13 @@ const M4: WeaponConfig = {
    * ので、その真ん中 (高さ 0.235m) を画面の真ん中へ。模型は立っている (上が +Y)。
    * 目は窓の 15cm 後ろ (tools/preview/sight.html で輪を真ん中に重ねて測った)
    */
-  sight: { eye: new THREE.Vector3(0.0006, 0.2349, -0.15), roll: 0, pitch: 0 },
+  sight: {
+    eye: new THREE.Vector3(0.0006, 0.2349, -0.15),
+    roll: 0,
+    pitch: 0,
+    // 窓のガラス: 後ろ (前 0.307m) と前 (前 0.345m) の細かい三角形。枠 (横 ±0.015〜0.017) は残す
+    glass: { min: new THREE.Vector3(-0.0148, 0.199, -0.352), max: new THREE.Vector3(0.0148, 0.246, -0.3) },
+  },
   // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
   leftHand: {
     position: new THREE.Vector3(-0.06, 0.05, -0.525),
@@ -908,4 +919,49 @@ export class Weapon {
   dispose(): void {
     this.object.removeFromParent()
   }
+}
+
+/**
+ * 主観用の銃から**窓のガラスを削る** (weapon.ts の sight.glass)。
+ *
+ * 箱の中にあって目の方 (±Z) を向いた三角形を、索引から外す。形は体の銃と共有
+ * しているので、複製してから削る
+ */
+export function cutSightGlass(root: THREE.Object3D, box: { min: THREE.Vector3; max: THREE.Vector3 }): void {
+  root.updateMatrixWorld(true);
+  const toRoot = new THREE.Matrix4();
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  const centre = new THREE.Vector3();
+  const rootInverse = root.matrixWorld.clone().invert();
+  root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const geometry = mesh.geometry.clone();
+    const position = geometry.getAttribute('position');
+    const index = geometry.index ?? null;
+    const count = index ? index.count : position.count;
+    toRoot.multiplyMatrices(rootInverse, mesh.matrixWorld);
+    const kept: number[] = [];
+    for (let i = 0; i < count; i += 3) {
+      const ia = index ? index.getX(i) : i;
+      const ib = index ? index.getX(i + 1) : i + 1;
+      const ic = index ? index.getX(i + 2) : i + 2;
+      a.fromBufferAttribute(position, ia).applyMatrix4(toRoot);
+      b.fromBufferAttribute(position, ib).applyMatrix4(toRoot);
+      c.fromBufferAttribute(position, ic).applyMatrix4(toRoot);
+      centre.copy(a).add(b).add(c).divideScalar(3);
+      normal.subVectors(c, b).cross(a.clone().sub(b)).normalize();
+      const glass =
+        centre.x > box.min.x && centre.x < box.max.x &&
+        centre.y > box.min.y && centre.y < box.max.y &&
+        centre.z > box.min.z && centre.z < box.max.z &&
+        Math.abs(normal.z) > 0.9;
+      if (!glass) kept.push(ia, ib, ic);
+    }
+    geometry.setIndex(kept);
+    mesh.geometry = geometry;
+  });
 }

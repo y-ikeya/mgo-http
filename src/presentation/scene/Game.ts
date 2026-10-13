@@ -1,5 +1,5 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
-import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS } from "./arms/weapon";
+import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/weapon";
 import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
@@ -267,8 +267,11 @@ export interface GameStats {
   loadoutFocus: LoadoutFocus;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
-  /** 覗いているのが銃の照準器か (突撃銃の主観)。眼鏡ではないのでスコープの絵を重ねない */
-  sight: boolean;
+  /**
+   * 覗いているのが銃の照準器か (突撃銃の主観)。眼鏡ではないのでスコープの絵を重ねない。
+   * holo はホロサイトの輪と点を画面の真ん中に出す。null なら眼鏡か、覗いていない
+   */
+  sight: "iron" | "holo" | null;
   /** いま持っている銃。調整パネルが追従する */
   equipped: WeaponId;
   /** 覗いている倍率。空なら覗いていない */
@@ -1185,6 +1188,7 @@ export class Game {
           o.castShadow = false;
           o.frustumCulled = false;
         });
+        if (config!.glass) cutSightGlass(object, config!.glass);
         // カメラの子は、カメラが場面に入っていないと描かれない
         const camera = this.follow.camera;
         if (!camera.parent) this.scene.add(camera);
@@ -5359,7 +5363,7 @@ export class Game {
       loadoutFocus: this.loadoutFocus,
       skillsOpen: this.canChooseSkillsNow,
       scoped: this.scoped,
-      sight: this.scoped && this.weapon.scope[this.zoomStep - 1]?.sight === true,
+      sight: this.scoped ? (this.weapon.scope[this.zoomStep - 1]?.sight ?? null) : null,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
@@ -5452,3 +5456,4 @@ export class Game {
     // 太い線は画面上の px で太さが決まるので、描画先の大きさを知らせる
   }
 }
+

@@ -11,7 +11,7 @@
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { buildLights } from '../../src/presentation/scene/world/stage'
-import { Weapon, WEAPON_CONFIGS } from '../../src/presentation/scene/arms/weapon'
+import { Weapon, WEAPON_CONFIGS, cutSightGlass } from '../../src/presentation/scene/arms/weapon'
 
 const query = new URLSearchParams(location.search)
 const kind = (query.get('weapon') ?? 'rifle') as 'rifle' | 'm4'
@@ -40,6 +40,7 @@ const sight = WEAPON_CONFIGS[kind].sight!
 const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), sight.pitch).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), sight.roll))
 weapon.object.quaternion.copy(turn)
 weapon.object.position.copy(sight.eye).applyQuaternion(turn).negate()
+if (sight.glass) cutSightGlass(weapon.object, sight.glass)
 camera.add(weapon.object)
 
 // 真ん中の十字 (画面に描く)
