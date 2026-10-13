@@ -233,3 +233,99 @@ export class RightArmShift {
     this.moved.copy(offset)
   }
 }
+
+/**
+ * 梯子を登り切る型 (climb_top、ClimbingToTop 30fps 121 コマ) で、**手を掴んだ所に留める**区間。
+ *
+ * 素材の手は掴んでいる間も止まっていない — 右手首は 25〜69 コマで上へ 0.27m、前へ
+ * 0.24m 動く (Mixamo の素材の実測)。そのまま流すと手すりの上を手が滑るので、掴んだ
+ * 瞬間の位置に留めて腕を曲げ直す (HandPin)。掴む / 離す前後は数コマかけて型の手へ戻す
+ *
+ *     grab   この コマで掴む (位置を取る)
+ *     full   ここから留め切る
+ *     loose  ここから離し始める
+ *     free   ここで型の手に戻り切る
+ */
+export const CLIMB_TOP_GRIPS = {
+  // 右手: 上端の上の手すりを掴んで体を引き上げる。73 コマから押し上げて離す
+  Right: { grab: 25, full: 28, loose: 66, free: 72 },
+  // 左手: 上端の桟を押さえて登る。45 コマから屋上へ手を移す
+  Left: { grab: 2, full: 5, loose: 40, free: 46 },
+} as const
+
+/** その手を留める重み (0..1)。frame は型の中のコマ (1〜121) */
+export function climbGripWeight(side: 'Left' | 'Right', frame: number): number {
+  const g = CLIMB_TOP_GRIPS[side]
+  if (frame < g.grab || frame >= g.free) return 0
+  const smooth = (t: number) => t * t * (3 - 2 * t)
+  if (frame < g.full) return smooth((frame - g.grab) / (g.full - g.grab))
+  if (frame < g.loose) return 1
+  return 1 - smooth((frame - g.loose) / (g.free - g.loose))
+}
+
+/**
+ * **手を世界の 1 点に留める** (梯子の手すりを掴んでいる間)。
+ *
+ * 重みが 0 から上がった最初のコマの手首の位置と向きを覚え、そこへ腕を曲げ直す。
+ * 重みが 0 に戻ったら忘れる (次に掴む時に取り直す)。曲げた骨は次のコマで型を
+ * 当てる前に戻す (restore)。LeftArmFollow と同じ
+ */
+export class HandPin {
+  private bones: { upper: THREE.Object3D; lower: THREE.Object3D; end: THREE.Object3D } | null = null
+  private searched: THREE.Object3D | null = null
+  private saved: THREE.Quaternion[] | null = null
+  private holding = false
+  private readonly target = new THREE.Vector3()
+  private readonly targetTurn = new THREE.Quaternion()
+  private readonly wrist = new THREE.Vector3()
+  private readonly turn = new THREE.Quaternion()
+
+  private readonly side: 'Left' | 'Right'
+
+  constructor(side: 'Left' | 'Right') {
+    this.side = side
+  }
+
+  restore(): void {
+    if (!this.saved || !this.bones) return
+    const { upper, lower, end } = this.bones
+    upper.quaternion.copy(this.saved[0])
+    lower.quaternion.copy(this.saved[1])
+    end.quaternion.copy(this.saved[2])
+    this.saved = null
+  }
+
+  /** 型を当てた**後**に呼ぶ (骨の世界行列が新しいこと) */
+  apply(model: THREE.Object3D, weight: number): void {
+    if (weight <= 0) {
+      this.holding = false
+      return
+    }
+    if (this.searched !== model) {
+      this.searched = model
+      const find = (suffix: string) => {
+        let hit: THREE.Object3D | null = null
+        model.traverse((o) => {
+          if (!hit && o.name.endsWith(suffix) && (o as THREE.Bone).isBone) hit = o
+        })
+        return hit as THREE.Object3D | null
+      }
+      const upper = find(`${this.side}Arm`)
+      const lower = find(`${this.side}ForeArm`)
+      const end = find(`${this.side}Hand`)
+      this.bones = upper && lower && end ? { upper, lower, end } : null
+    }
+    if (!this.bones) return
+    const { upper, lower, end } = this.bones
+    end.updateWorldMatrix(true, false)
+    this.wrist.setFromMatrixPosition(end.matrixWorld)
+    end.getWorldQuaternion(this.turn)
+    if (!this.holding) {
+      this.holding = true
+      this.target.copy(this.wrist)
+      this.targetTurn.copy(this.turn)
+    }
+    this.saved = [upper.quaternion.clone(), lower.quaternion.clone(), end.quaternion.clone()]
+    reachTwoBone(upper, lower, end, this.wrist.lerp(this.target, weight), this.turn.slerp(this.targetTurn, weight))
+  }
+}

@@ -37,7 +37,7 @@ import {
 import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
-import { LeftArmFollow, RightArmShift } from './armIk'
+import { HandPin, LeftArmFollow, RightArmShift, climbGripWeight } from './armIk'
 import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
@@ -509,6 +509,9 @@ export class Soldier {
   private aimTrimWeight = 0
   /** 補正で回った銃に左手を付いていかせる */
   private readonly leftArm = new LeftArmFollow()
+  /** 梯子を登り切る間、手を掴んだ所に留める (armIk.ts の CLIMB_TOP_GRIPS) */
+  private readonly gripRight = new HandPin('Right')
+  private readonly gripLeft = new HandPin('Left')
   /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
   private readonly rightArm = new RightArmShift()
   private readonly rightShiftNow = new THREE.Vector3()
@@ -3632,9 +3635,17 @@ export class Soldier {
       // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
       this.leftArm.restore()
       this.rightArm.restore()
+      this.gripRight.restore()
+      this.gripLeft.restore()
       this.animator.update(dt)
 
       this.object.updateMatrixWorld(true)
+      // 梯子を登り切る間は手を掴んだ所に留める (型の手は手すりの上を滑る)
+      if (this.model) {
+        const frame = this.climbTopLeft > 0 ? this.animator.oneShotPhase('climb_top') * 120 + 1 : 0
+        this.gripRight.apply(this.model, climbGripWeight('Right', frame))
+        this.gripLeft.apply(this.model, climbGripWeight('Left', frame))
+      }
 
       /*
        * **置き終わったらしゃがみで復帰する。** 置く型 (2026-10-05 の本人作) は

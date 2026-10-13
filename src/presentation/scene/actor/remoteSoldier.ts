@@ -1,4 +1,4 @@
-import { LeftArmFollow, RightArmShift } from "./armIk";
+import { HandPin, LeftArmFollow, RightArmShift, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
 import { BlobShadow } from './blobShadow';
 import * as THREE from "three";
@@ -216,6 +216,9 @@ export class RemoteSoldier {
   private aimTrimWeight = 0;
   /** 補正で回った銃に左手を付いていかせる (armIk.ts) */
   private readonly leftArm = new LeftArmFollow();
+  /** 梯子を登り切る間、手を掴んだ所に留める。自機と同じ (soldier.ts) */
+  private readonly gripRight = new HandPin("Right");
+  private readonly gripLeft = new HandPin("Left");
   /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
   private readonly rightArm = new RightArmShift();
   private readonly rightShiftNow = new THREE.Vector3();
@@ -527,7 +530,15 @@ export class RemoteSoldier {
     // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
     this.leftArm.restore();
     this.rightArm.restore();
+    this.gripRight.restore();
+    this.gripLeft.restore();
     animator.update(dt);
+    if (this.model) {
+      this.object.updateMatrixWorld(true);
+      const frame = locomotion === "climb_top" ? animator.oneShotPhase("climb_top") * 120 + 1 : 0;
+      this.gripRight.apply(this.model, climbGripWeight("Right", frame));
+      this.gripLeft.apply(this.model, climbGripWeight("Left", frame));
+    }
 
     /*
      * 銃の持ち方も姿勢に合わせる。**自機と同じ式で当てる。**
