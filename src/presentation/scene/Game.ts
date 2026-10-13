@@ -1136,6 +1136,23 @@ export class Game {
     this.updateSightModel(level?.sight !== undefined);
   }
 
+  private readonly fpMuzzle = new THREE.Vector3();
+
+  /**
+   * 主観の銃口 (世界)。主観用の銃が出ていればその銃口、無ければ (スコープ) 目の少し
+   * 前の下 — 画面に映っている所から出す
+   */
+  private firstPersonMuzzle(out: THREE.Vector3): THREE.Vector3 {
+    const camera = this.follow.camera;
+    camera.updateMatrixWorld(true);
+    const model = this.sightModel;
+    const held = this.inv.held;
+    if (model && model.object.visible && isGun(held)) {
+      return out.copy(SIGHT_CONFIGS[held].tip).applyMatrix4(model.object.matrixWorld);
+    }
+    return out.set(0, -0.08, -0.5).applyMatrix4(camera.matrixWorld);
+  }
+
   /** 主観用の銃 (照準器を覗く段)。カメラに付けて置く */
   private sightModel: { held: string; object: THREE.Object3D } | null = null;
   /** 読み込み中の銃。同じ物を 2 度読まない */
@@ -3917,8 +3934,16 @@ export class Game {
     const splashed =
       hitPlayer === null && this.splashOnPath(this.muzzlePos, this.hitPoint);
 
+    /*
+     * 自分の画面に描く弾道の出どころ。**主観の間は主観用の銃の銃口から。**
+     *
+     * 主観では体を隠して、カメラに付けた銃を見せている。体の銃口から出すと、覗いて
+     * 傾いた時に画面の銃と煙がずれる (傾き方が体とカメラで違う、2026-10-13 本人)。
+     * 他の人へ送る弾道は体の銃口のまま (向こうに見えているのは体)
+     */
+    const drawFrom = this.scoped ? this.firstPersonMuzzle(this.fpMuzzle) : this.muzzlePos;
     this.shots.fire(
-      this.muzzlePos,
+      drawFrom,
       this.hitPoint,
       // **人に当たったら痕を出さない。** 痕はワールドに置くので、当たった
       // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
