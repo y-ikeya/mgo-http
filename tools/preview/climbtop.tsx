@@ -8,6 +8,7 @@
  *     ?dist=3.2   カメラの距離
  *     ?ladder=ladder_b.001  どの梯子か
  *     ?stage=0    ステージの見た目を出さない (読み込みが重いとき)
+ *     ?hands      手の位置を 0.05 秒ごとにコンソールへ (掴む所を探す)
  *     ?down       屋上から梯子へ歩いて出て、上から掴んで降りる所を見る
  *     ?map=lab    どのステージの梯子か (raft / training / lab、既定 raft)。?ladder= で選ぶ
  *
@@ -37,6 +38,7 @@ const dist = Number(query.get('dist') ?? '3.2')
 const wanted = query.get('ladder') ?? ''
 const showStage = query.get('stage') !== '0'
 const down = query.has('down')
+const hands = query.has('hands')
 const map = (query.get('map') ?? 'raft') as 'raft' | 'training' | 'lab'
 /** 何秒ぶん回せるようにするか。登り切りは 3 秒ほど */
 const SPAN = 6
@@ -156,6 +158,20 @@ async function draw(at: number): Promise<void> {
       soldier.setStickForward(soldier.onLadder && t > 1.5 ? -1 : 1)
       soldier.update(1 / 60, soldier.onLadder ? new THREE.Vector3() : toward, soldier.yaw, 0, world)
     } else soldier.update(1 / 60, new THREE.Vector3(), soldier.yaw, 0, world)
+    if (hands && Math.round(t * 60) % 3 === 0) {
+      soldier.object.updateMatrixWorld(true)
+      const at = (suffix: string) => {
+        let found: THREE.Object3D | null = null
+        soldier.object.traverse((o) => {
+          if (!found && o.name.endsWith(suffix)) found = o
+        })
+        return found ? (found as THREE.Object3D).getWorldPosition(new THREE.Vector3()) : null
+      }
+      const r = at('RightHand')
+      const l = at('LeftHand')
+      const f = (v: THREE.Vector3 | null) => (v ? `${(v.x - midX).toFixed(2)},${(v.y - ladder.max[1]).toFixed(2)},${(v.z - midZ).toFixed(2)}` : '-')
+      console.log(`[hands] ${t.toFixed(2)} ${soldier.locomotion} R ${f(r)} L ${f(l)}`)
+    }
     if (Math.abs(t * 4 - Math.round(t * 4)) < 1 / 120) {
       track.push(
         `${t.toFixed(2)}s 高さ${soldier.position.y.toFixed(2)} 横${(soldier.position.x - midX).toFixed(2)}`,
