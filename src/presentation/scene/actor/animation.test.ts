@@ -623,6 +623,50 @@ describe('勝手に構えない', () => {
     }
   })
 
+  /**
+   * **しゃがんだまま正面から倒されたら、しゃがみから後ろへ崩れる** (本人 2026-10-14)。
+   * 背後からは型が無いので立ちの型。向きの分からない 1 通目でもしゃがみを選び、
+   * 2 通目が「背後から」ならそこで立ちの型へ替える
+   */
+  test('しゃがんだまま正面から倒されたら、しゃがみの崩れ', () => {
+    for (const from of ['crouch_idle', 'crouch_f', 'lean_crouch_left']) {
+      for (const first of [false, undefined]) {
+        const anim = animator()
+        run(anim, 1.2, from)
+        anim.playDeath(first)
+        run(anim, 0.1, from)
+        anim.playDeath(false)
+        run(anim, 0.6, from)
+        expect(playing(anim, 'lower')).toEqual(['crouch_death'])
+        expect(playing(anim, 'upper')).toEqual(['crouch_death'])
+      }
+    }
+  })
+
+  test('しゃがんだまま背後から倒されたら、立ちの型で前へ', () => {
+    for (const first of [true, undefined]) {
+      const anim = animator()
+      run(anim, 1.2, 'crouch_idle')
+      anim.playDeath(first)
+      run(anim, 0.1, 'crouch_idle')
+      anim.playDeath(true)
+      run(anim, 0.6, 'crouch_idle')
+      expect(playing(anim, 'lower')).toEqual(['death_front'])
+    }
+  })
+
+  /** 倒れたまま留まる。**流れ直すと 数秒ごとに倒れ直す** */
+  test('伏せ・しゃがみの崩れは最後の姿勢で留まる', () => {
+    for (const [from, clip] of [['prone_idle', 'prone_death'], ['crouch_idle', 'crouch_death']] as const) {
+      const anim = animator()
+      run(anim, 1.2, from)
+      anim.playDeath(false)
+      run(anim, 8, from)
+      const action = (anim as unknown as Record<string, Map<string, THREE.AnimationAction>>).lower.get(clip)!
+      expect(action.time).toBeCloseTo(action.getClip().duration, 2)
+    }
+  })
+
   test('立っていれば、いままでどおり向きで倒れる', () => {
     const anim = animator()
     run(anim, 1.2, 'idle')

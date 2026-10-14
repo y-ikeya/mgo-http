@@ -109,6 +109,12 @@ export type Locomotion =
    * 撃たれた瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
    */
   | 'prone_death'
+  /**
+   * しゃがんだまま正面から倒された。後ろへ尻もちをつくように崩れる。
+   * 立ちの型だと、しゃがんでいた体が一度立ち上がってから崩れる (本人 2026-10-14)。
+   * 背後から倒された時は立ちの型 (death_front) のまま
+   */
+  | 'crouch_death'
   /** 伏せたまま後ろへ下がる。前進 (crawl_f) と対 */
   | 'crawl_b'
   /** 伏せたまま刺す。全身の型 (立ちの stab と同じ扱い) */
@@ -266,6 +272,7 @@ export function emptyHanded(locomotion: Locomotion): boolean {
     locomotion === 'death_front' ||
     locomotion === 'death_back' ||
     locomotion === 'prone_death' ||
+    locomotion === 'crouch_death' ||
     // CQC。殴って喉に腕を掛ける型なので、銃を出すと握らずに浮く
     locomotion === 'cqc_throw' ||
     locomotion === 'cqc_miss'

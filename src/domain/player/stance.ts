@@ -51,6 +51,8 @@ export function stanceOf(locomotion: Locomotion): Stance {
   if (locomotion === 'sleep') return 'prone'
   // 伏せたまま倒れた。**倒れているので down** (頭の高さは死体のもの)
   if (locomotion === 'prone_death') return 'down'
+  // しゃがんだまま倒れた。名前が crouch_ で始まるので、しゃがみの判定より先に見る
+  if (locomotion === 'crouch_death') return 'down'
   /*
    * 伏せへの出入り。**高いほうで採る。**
    *

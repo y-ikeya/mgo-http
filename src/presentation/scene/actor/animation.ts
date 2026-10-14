@@ -101,6 +101,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   crawl_b: 'crawl_b',
   // 伏せたまま倒された。立ちの型で倒れると、一度立ち上がってから崩れる
   prone_death: 'prone_death',
+  // しゃがんだまま正面から倒された
+  crouch_death: 'crouch_death',
   // 伏せへの出入り。全身の型なので上半身も同じクリップから取る
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
@@ -216,6 +218,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   crawl_f: 'crawl_f',
   crawl_b: 'crawl_b',
   prone_death: 'prone_death',
+  crouch_death: 'crouch_death',
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
   prone_roll_down: 'prone_roll_down',
@@ -512,6 +515,9 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'death',
   'death_front',
   'death_back',
+  // 伏せ / しゃがみのまま倒れる。**ここに無いと下半身だけ流れ直して倒れ直す**
+  'prone_death',
+  'crouch_death',
   // 眠り。**最後の姿勢で止める** — 流し直すと 30 秒の間ずっと倒れ直す
   'sleep',
   'salute',
@@ -743,6 +749,7 @@ const DEATH_KEY = 'death'
 const DEATH_FRONT_KEY = 'death_front'
 /** 伏せたまま倒された型。**向きは無い** — 既にその向きで寝ている */
 const PRONE_DEATH_KEY = 'prone_death'
+const CROUCH_DEATH_KEY = 'crouch_death'
 const DEATH_BACK_KEY = 'death_back'
 /**
  * 麻酔で眠っている型。**上半身も要る。**
@@ -842,6 +849,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   DEATH_FRONT_KEY,
   DEATH_BACK_KEY,
   PRONE_DEATH_KEY,
+  CROUCH_DEATH_KEY,
   PRONE_DOWN_KEY,
   PRONE_RISE_KEY,
   PRONE_ROLL_DOWN_KEY,
@@ -1941,6 +1949,8 @@ export class CharacterAnimator {
       [DEATH_BACK_KEY, 'death_back'],
       // 伏せたまま倒された。**向きは無い** — 既にその向きで寝ている
       [PRONE_DEATH_KEY, 'prone_death'],
+      // しゃがんだまま正面から倒された。後ろへ崩れる
+      [CROUCH_DEATH_KEY, 'crouch_death'],
       // 眠り。倒れる型と同じで、最後の姿勢のまま留める
       [SLEEP_KEY, 'sleep'],
     ] as const) {
@@ -2897,6 +2907,9 @@ export class CharacterAnimator {
    *
    * @param fromBehind 背後から撃たれたか。分からなければ省く
    */
+  /** しゃがみの崩れを、向きが分からないまま選んだか (playDeath) */
+  private crouchDeathGuessed = false
+
   playDeath(fromBehind?: boolean): void {
     /*
      * **伏せたまま倒されたら、伏せたまま崩れる。**
@@ -2912,6 +2925,9 @@ export class CharacterAnimator {
      * 伏せていた体が立ち上がってから崩れていた (本人 2026-10-14)
      */
     if (this.locomotion === 'prone_death') return
+    // しゃがみの崩れは、向きが分からないまま選んでいて (下の crouchDeathGuessed)、
+    // 後から「背後から」と届いた時だけ立ちの型 (前へ倒れる) へ替える
+    if (this.locomotion === 'crouch_death' && !(fromBehind === true && this.crouchDeathGuessed)) return
     // 伏せに入る途中・仰向けから這い出す途中も、体はもう床にある
     const lying = PRONE_LOCOMOTIONS.has(this.locomotion) || this.locomotion === 'prone_down' || this.locomotion === 'prone_roll_down'
     if (lying && this.upper.has(PRONE_DEATH_KEY)) {
@@ -2922,6 +2938,27 @@ export class CharacterAnimator {
         lower.reset().play()
         this.upperState = 'death'
         this.locomotion = 'prone_death'
+        return
+      }
+    }
+
+    /*
+     * **しゃがんだまま正面から倒されたら、しゃがみから後ろへ崩れる** (本人 2026-10-14)。
+     * 背後からは型が無いので立ちの型 (前へ倒れる)。
+     *
+     * 向きが分からない 1 通目 (生死の一通) でも、しゃがんでいればこちらを選ぶ。
+     * 立ちの型で待つと、しゃがんでいた体が 2 通目までの間に立ち上がる。2 通目が
+     * 「背後から」なら上で立ちの型へ替える
+     */
+    if (fromBehind !== true && this.upperState !== 'death' && CROUCH_LOCOMOTIONS.has(this.locomotion) && this.upper.has(CROUCH_DEATH_KEY)) {
+      const upper = this.upper.get(CROUCH_DEATH_KEY)
+      const lower = this.lower.get('crouch_death')
+      if (upper && lower) {
+        upper.reset().play()
+        lower.reset().play()
+        this.upperState = 'death'
+        this.locomotion = 'crouch_death'
+        this.crouchDeathGuessed = fromBehind === undefined
         return
       }
     }
@@ -3075,6 +3112,7 @@ export class CharacterAnimator {
       // 伏せたまま崩れている。**ここで返さないと上半身の重みが流れていない立ちの型へ
       // 寄って、上半身だけ T ポーズ**になった (2026-10-14)
       if (this.locomotion === 'prone_death' && this.upper.has(PRONE_DEATH_KEY)) return PRONE_DEATH_KEY
+      if (this.locomotion === 'crouch_death' && this.upper.has(CROUCH_DEATH_KEY)) return CROUCH_DEATH_KEY
       // 倒れる向きの型があればそちら。無ければ元の 1 本
       if (this.locomotion === 'death_front' && this.upper.has(DEATH_FRONT_KEY)) {
         return DEATH_FRONT_KEY

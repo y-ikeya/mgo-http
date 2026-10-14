@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "CrouchFrontDeath.fbx": "crouch_death" },
+  "out": "crouch_death.glb",
+  "maxTexture": 64
+}

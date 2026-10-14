@@ -15,6 +15,7 @@
  *     ?shadow                 影を受ける体。頭上に板を吊って上半身に影を落とす
  *     ?sky=0.4                屋内の暗さ (空の見え方 SKY_FLOOR〜1) を体に掛ける
  *     ?trace                  0.1 秒ごとに銃身と両手の向きを書き出す (コンソールの [trace])
+ *     ?death=front|back|none  clip の姿勢で 1 秒置いてから倒す (front = 正面から撃たれた)。t は倒してから
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
@@ -247,6 +248,15 @@ if (query.has('setup')) anim.playSetup(query.has('fromkneel') ? 'kneel' : query.
 if (query.has('place')) anim.releaseSetup()
 // ?zap … スタンナイフの放電 (fx/stunSparks.ts)。頭から右手に出す。&stab と組むと刺しながら
 const zap = query.has('zap') ? new StunSparks(scene) : null
+// ?death … 姿勢を 1 秒落ち着かせてから倒す。相手の体と同じ口 (playDeath) を通す
+const death = query.get('death')
+if (death) {
+  for (let i = 0; i < 60; i++) {
+    anim.setLocomotion(clipName as never)
+    anim.update(1 / 60)
+  }
+  anim.playDeath(death === 'front' ? false : death === 'back' ? true : undefined)
+}
 const zapHand = findBoneBySuffix(model, 'RightHand')
 if (zap && zapHand) zap.discharge((out) => out.setFromMatrixPosition(zapHand.matrixWorld))
 /*
