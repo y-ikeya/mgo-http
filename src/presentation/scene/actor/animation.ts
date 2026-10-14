@@ -2942,8 +2942,14 @@ export class CharacterAnimator {
     // しゃがみの崩れは、向きが分からないまま選んでいて (下の crouchDeathGuessed)、
     // 後から「背後から」と届いた時だけ立ちの型 (前へ倒れる) へ替える
     if (this.locomotion === 'crouch_death' && !(fromBehind === true && this.crouchDeathGuessed)) return
-    // 伏せに入る途中・仰向けから這い出す途中も、体はもう床にある
-    const lying = PRONE_LOCOMOTIONS.has(this.locomotion) || this.locomotion === 'prone_down' || this.locomotion === 'prone_roll_down'
+    // 伏せに入る途中・仰向けから這い出す途中も、体はもう床にある。
+    // **眠っている (スタン) 体もうつ伏せで床にある** (眠りの型の終わりは伏せの崩れの
+    // 始まりと同じ向き)。立ちの型だと、寝ていた体が立ってから崩れた (本人 2026-10-14)
+    const lying =
+      PRONE_LOCOMOTIONS.has(this.locomotion) ||
+      this.locomotion === 'prone_down' ||
+      this.locomotion === 'prone_roll_down' ||
+      this.locomotion === 'sleep'
     if (lying && this.upper.has(PRONE_DEATH_KEY)) {
       const upper = this.upper.get(PRONE_DEATH_KEY)
       const lower = this.lower.get('prone_death')

@@ -667,6 +667,22 @@ describe('勝手に構えない', () => {
     }
   })
 
+  /** **眠らされた (スタン) まま倒されたら、伏せと同じく床で崩れる。** 立ち上がらない */
+  test('眠っている体を倒すと、伏せの崩れ', () => {
+    for (const second of [true, false, undefined]) {
+      const anim = animator()
+      run(anim, 1.2, 'idle')
+      anim.playSleep()
+      run(anim, 4, 'sleep')
+      anim.playDeath()
+      run(anim, 0.1, 'sleep')
+      anim.playDeath(second)
+      run(anim, 0.6, 'sleep')
+      expect(playing(anim, 'lower')).toEqual(['prone_death'])
+      expect(playing(anim, 'upper')).toEqual(['prone_death'])
+    }
+  })
+
   test('立っていれば、いままでどおり向きで倒れる', () => {
     const anim = animator()
     run(anim, 1.2, 'idle')
