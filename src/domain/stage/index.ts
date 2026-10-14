@@ -344,6 +344,11 @@ const LAB: StageSpec = {
   targets: [
     { x: -18, z: 0, y: 0.1 },
     { x: 4, z: -30, y: 0.1 },
+    // 低い的。手元の /training はこの検証場なので、ここにも置く (2026-10-14)。それぞれの立った的の両脇
+    { x: -18, z: -3, y: 0.1, stance: 'crouch' },
+    { x: -18, z: 3, y: 0.1, stance: 'prone' },
+    { x: 1.5, z: -30, y: 0.1, stance: 'crouch' },
+    { x: 6.5, z: -30, y: 0.1, stance: 'prone' },
   ],
 }
 
