@@ -4,16 +4,16 @@
 "name": "concrete_building2",
 "min": [
 -44.565,
-9.457,
+9.516,
 29.891
 ],
 "max": [
 -26.297,
-35.443,
+23.641,
 44.705
 ],
 "top": {
-"h": 35.4433,
+"h": 23.6413,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -158,7 +158,7 @@
 70.25
 ],
 "max": [
--2.604,
+-2.603,
 20.423,
 87.777
 ],
@@ -283,7 +283,7 @@
 55.693
 ],
 "max": [
-22.155,
+22.156,
 13.286,
 63.177
 ],
@@ -304,7 +304,7 @@
 "name": "concrete_building28",
 "min": [
 -53.814,
--4.403,
+9.8,
 -28.078
 ],
 "max": [
@@ -313,7 +313,7 @@
 -6.683
 ],
 "top": {
-"h": 18.0557,
+"h": 18.056,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -329,16 +329,16 @@
 "name": "concrete_building29",
 "min": [
 -49.41,
-9.746,
+9.744,
 -26.555
 ],
 "max": [
 -45.518,
-17.572,
+12.983,
 -16.639
 ],
 "top": {
-"h": 17.5718,
+"h": 12.9828,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -483,7 +483,7 @@
 43.138
 ],
 "max": [
--27.329,
+-27.328,
 19.287,
 57.952
 ],
@@ -1013,9 +1013,9 @@
 -25.67
 ],
 "top": {
-"h": 10.1984,
+"h": 10.2142,
 "dx": 0.0,
-"dz": 0.37053,
+"dz": 0.35746,
 "riser": 0.15,
 "foot": 10.06,
 "head": 11.71
@@ -1041,9 +1041,9 @@
 -25.897
 ],
 "top": {
-"h": 13.335,
+"h": 13.2942,
 "dx": 0.0,
-"dz": -0.37053,
+"dz": -0.35746,
 "riser": 0.15,
 "foot": 11.6,
 "head": 13.25
@@ -1094,9 +1094,9 @@
 -25.67
 ],
 "top": {
-"h": 13.2345,
+"h": 13.2504,
 "dx": 0.0,
-"dz": 0.37053,
+"dz": 0.35746,
 "riser": 0.15,
 "foot": 13.1,
 "head": 14.75
@@ -1122,9 +1122,9 @@
 -25.897
 ],
 "top": {
-"h": 16.2081,
+"h": 16.1672,
 "dx": 0.0,
-"dz": -0.37053,
+"dz": -0.35746,
 "riser": 0.15,
 "foot": 14.47,
 "head": 16.12
@@ -1366,16 +1366,16 @@
 "name": "concrete_building29.001",
 "min": [
 -49.396,
-12.635,
+12.599,
 -24.196
 ],
 "max": [
 -47.065,
-18.803,
+15.095,
 -19.553
 ],
 "top": {
-"h": 18.8027,
+"h": 15.0946,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3530,16 +3530,16 @@
 "name": "concrete_building6.053",
 "min": [
 -12.44,
-13.76,
+14.314,
 -41.98
 ],
 "max": [
 -9.891,
-18.342,
+16.117,
 -41.714
 ],
 "top": {
-"h": 18.3416,
+"h": 16.1166,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3555,16 +3555,16 @@
 "name": "concrete_building6.054",
 "min": [
 -10.129,
-13.747,
+14.309,
 -45.221
 ],
 "max": [
 -9.891,
-18.329,
+16.112,
 -41.97
 ],
 "top": {
-"h": 18.329,
+"h": 16.1116,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4247,12 +4247,12 @@
 {
 "name": "metal_WaterTank_WaterTank",
 "min": [
--6.715,
+-5.882,
 13.011,
 -50.286
 ],
 "max": [
--4.927,
+-4.094,
 16.676,
 -48.402
 ],
@@ -4917,16 +4917,16 @@
 "name": "concrete_building29.003",
 "min": [
 -45.701,
-12.871,
+12.897,
 -24.126
 ],
 "max": [
 -45.533,
-15.86,
+14.047,
 -16.729
 ],
 "top": {
-"h": 15.86,
+"h": 14.0467,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13483,14 +13483,14 @@
 {
 "name": "concrete_building9",
 "min": [
--4.06,
+-3.93,
 9.82,
--73.99
+-73.86
 ],
 "max": [
-17.155,
+17.024,
 21.1,
--57.99
+-58.12
 ],
 "top": {
 "h": 21.1,
@@ -13508,14 +13508,14 @@
 {
 "name": "metal_building9_shutters",
 "min": [
--3.71,
+-3.36,
 10.07,
--73.64
+-73.29
 ],
 "max": [
-16.775,
+16.425,
 19.95,
--58.34
+-58.69
 ],
 "top": {
 "h": 19.95,
@@ -13533,14 +13533,14 @@
 {
 "name": "glass_building9_panes_notexture",
 "min": [
--3.82,
+-3.47,
 12.12,
--73.75
+-73.4
 ],
 "max": [
-16.876,
+16.526,
 20.15,
--58.23
+-58.58
 ],
 "top": {
 "h": 20.15,
@@ -13584,14 +13584,14 @@
 {
 "name": "vis_decal_b9_streak_nouv",
 "min": [
--4.0,
+-3.65,
 10.85,
--73.93
+-73.58
 ],
 "max": [
-17.061,
+16.711,
 18.931,
--58.05
+-58.4
 ],
 "top": {
 "h": 18.9312,
@@ -13735,14 +13735,14 @@
 {
 "name": "concrete_building10",
 "min": [
--28.025,
+-27.895,
 9.9,
--73.455
+-73.325
 ],
 "max": [
--13.165,
+-13.295,
 17.75,
--55.795
+-55.925
 ],
 "top": {
 "h": 17.75,
@@ -13785,14 +13785,14 @@
 {
 "name": "metal_building10_shutters",
 "min": [
--27.675,
+-27.325,
 10.15,
--73.105
+-72.755
 ],
 "max": [
--13.515,
+-13.865,
 16.6,
--56.145
+-56.495
 ],
 "top": {
 "h": 16.6,
@@ -13810,14 +13810,14 @@
 {
 "name": "glass_building10_panes_notexture",
 "min": [
--27.785,
+-27.435,
 12.2,
--73.215
+-72.865
 ],
 "max": [
--13.405,
+-13.755,
 16.8,
--56.035
+-56.385
 ],
 "top": {
 "h": 16.8,
@@ -13861,14 +13861,14 @@
 {
 "name": "vis_decal_b10_streak_nouv",
 "min": [
--27.965,
+-27.615,
 10.93,
--73.395
+-73.045
 ],
 "max": [
--13.225,
+-13.575,
 15.583,
--55.855
+-56.205
 ],
 "top": {
 "h": 15.5826,
@@ -13913,10 +13913,10 @@
 "min": [
 -31.14,
 12.97,
--71.58
+-75.075
 ],
 "max": [
--27.3,
+-13.2,
 13.7,
 -58.86
 ],
@@ -13938,10 +13938,10 @@
 "min": [
 -30.99,
 13.04,
--71.53
+-74.97
 ],
 "max": [
--27.3,
+-13.3,
 13.22,
 -58.91
 ],
@@ -14124,7 +14124,7 @@
 ],
 "top": {
 "h": 9.9917,
-"dx": -0.0,
+"dx": 0.0,
 "dz": 0.01537,
 "thick": 0.2125
 },
@@ -14149,10 +14149,10 @@
 23.0
 ],
 "top": {
-"h": 10.047,
-"dx": -0.03718,
-"dz": 0.00041,
-"thick": 0.219
+"h": 10.0486,
+"dx": -0.03821,
+"dz": -0.0,
+"thick": 0.2186
 },
 "flags": {
 "draw": false,
@@ -14200,10 +14200,10 @@
 15.65
 ],
 "top": {
-"h": 10.0445,
-"dx": -0.05485,
+"h": 10.0443,
+"dx": -0.05558,
 "dz": -0.0,
-"thick": 0.2145
+"thick": 0.2143
 },
 "flags": {
 "draw": false,
@@ -14226,10 +14226,10 @@
 9.3
 ],
 "top": {
-"h": 10.0445,
-"dx": -0.05485,
-"dz": 0.0,
-"thick": 0.2145
+"h": 10.0443,
+"dx": -0.05558,
+"dz": -0.0,
+"thick": 0.2143
 },
 "flags": {
 "draw": false,
@@ -14581,56 +14581,6 @@
 ],
 "top": {
 "h": 21.08,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_b9_edge_nouv",
-"min": [
--3.983,
-10.09,
--73.913
-],
-"max": [
-17.045,
-21.08,
--58.067
-],
-"top": {
-"h": 21.08,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_b10_edge_nouv",
-"min": [
--27.943,
-10.17,
--73.383
-],
-"max": [
--13.237,
-17.73,
--55.877
-],
-"top": {
-"h": 17.73,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -15519,6 +15469,1008 @@
 }
 },
 {
+"name": "vis_decal_b3_inedge_nouv",
+"min": [
+-35.077,
+10.014,
+5.523
+],
+"max": [
+-18.723,
+21.044,
+22.977
+],
+"top": {
+"h": 21.0443,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b9_inedge_nouv",
+"min": [
+-3.496,
+10.09,
+-73.426
+],
+"max": [
+16.556,
+21.08,
+-58.554
+],
+"top": {
+"h": 21.08,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b10_inedge_nouv",
+"min": [
+-27.466,
+10.17,
+-72.886
+],
+"max": [
+-13.724,
+13.03,
+-56.354
+],
+"top": {
+"h": 13.03,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b15_inedge_nouv",
+"min": [
+33.413,
+9.85,
+-97.126
+],
+"max": [
+39.446,
+13.51,
+-68.843
+],
+"top": {
+"h": 13.51,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b18_inedge_nouv",
+"min": [
+-5.516,
+10.15,
+-4.426
+],
+"max": [
+0.686,
+13.48,
+13.856
+],
+"top": {
+"h": 13.48,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b22_inedge_nouv",
+"min": [
+-4.226,
+10.05,
+-19.216
+],
+"max": [
+2.856,
+12.91,
+-8.384
+],
+"top": {
+"h": 12.91,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b32_inedge_nouv",
+"min": [
+-2.127,
+10.11,
+-36.417
+],
+"max": [
+11.548,
+12.97,
+-21.874
+],
+"top": {
+"h": 12.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_bsp1_inedge_nouv",
+"min": [
+-8.717,
+10.007,
+-52.387
+],
+"max": [
+-0.837,
+12.264,
+-45.627
+],
+"top": {
+"h": 12.2635,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b5_edge_nouv",
+"min": [
+-35.513,
+9.921,
+-13.283
+],
+"max": [
+-18.747,
+21.564,
+2.753
+],
+"top": {
+"h": 21.5645,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b24_edge_nouv",
+"min": [
+8.977,
+9.896,
+58.337
+],
+"max": [
+25.983,
+20.153,
+86.373
+],
+"top": {
+"h": 20.1529,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b6_edge_nouv",
+"min": [
+-38.903,
+9.62,
+-32.713
+],
+"max": [
+-17.397,
+19.43,
+-18.757
+],
+"top": {
+"h": 19.43,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "concrete_b9_eave_n1",
+"min": [
+-3.45,
+13.07,
+-75.56
+],
+"max": [
+9.85,
+13.21,
+-73.56
+],
+"top": {
+"h": 13.21,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_n2",
+"min": [
+9.85,
+13.07,
+-74.51
+],
+"max": [
+18.68,
+13.21,
+-72.47
+],
+"top": {
+"h": 13.21,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_e",
+"min": [
+16.68,
+13.07,
+-72.47
+],
+"max": [
+18.68,
+13.21,
+-65.53
+],
+"top": {
+"h": 13.21,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_00",
+"min": [
+-3.05,
+12.37,
+-74.76
+],
+"max": [
+-2.95,
+13.07,
+-73.56
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_01",
+"min": [
+-0.05,
+12.37,
+-74.76
+],
+"max": [
+0.05,
+13.07,
+-73.56
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_02",
+"min": [
+2.95,
+12.37,
+-74.76
+],
+"max": [
+3.05,
+13.07,
+-73.56
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_03",
+"min": [
+5.95,
+12.37,
+-74.76
+],
+"max": [
+6.05,
+13.07,
+-73.56
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_04",
+"min": [
+9.25,
+12.37,
+-74.76
+],
+"max": [
+9.35,
+13.07,
+-73.56
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_05",
+"min": [
+10.35,
+12.37,
+-73.7
+],
+"max": [
+10.45,
+13.07,
+-72.5
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_06",
+"min": [
+13.35,
+12.37,
+-73.7
+],
+"max": [
+13.45,
+13.07,
+-72.5
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_07",
+"min": [
+16.25,
+12.37,
+-73.7
+],
+"max": [
+16.35,
+13.07,
+-72.5
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_08",
+"min": [
+16.68,
+12.37,
+-65.95
+],
+"max": [
+17.88,
+13.07,
+-65.85
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_09",
+"min": [
+16.68,
+12.37,
+-67.65
+],
+"max": [
+17.88,
+13.07,
+-67.55
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_10",
+"min": [
+16.68,
+12.37,
+-70.65
+],
+"max": [
+17.88,
+13.07,
+-70.55
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_b9_eave_brace_11",
+"min": [
+16.68,
+12.37,
+-72.15
+],
+"max": [
+17.88,
+13.07,
+-72.05
+],
+"top": {
+"h": 13.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building10_eave_n",
+"min": [
+-31.04,
+13.22,
+-75.025
+],
+"max": [
+-13.25,
+13.55,
+-71.53
+],
+"top": {
+"h": 13.55,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_decal_b9_edge_nouv",
+"min": [
+-3.633,
+10.09,
+-73.563
+],
+"max": [
+16.695,
+21.08,
+-58.417
+],
+"top": {
+"h": 21.08,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b10_edge_nouv",
+"min": [
+-27.593,
+10.17,
+-73.033
+],
+"max": [
+-13.587,
+17.73,
+-56.217
+],
+"top": {
+"h": 17.73,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "wood_box.042",
+"min": [
+-7.301,
+13.915,
+-50.166
+],
+"max": [
+-5.978,
+16.074,
+-48.736
+],
+"top": {
+"h": 16.0738,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_decal_b28_grime_nouv",
+"min": [
+-53.824,
+10.0,
+-28.088
+],
+"max": [
+-49.35,
+10.8,
+-6.673
+],
+"top": {
+"h": 10.8,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b28_streak_nouv",
+"min": [
+-53.824,
+15.708,
+-28.088
+],
+"max": [
+-49.35,
+18.036,
+-6.673
+],
+"top": {
+"h": 18.036,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_decal_b28_edge_nouv",
+"min": [
+-53.813,
+9.82,
+-28.083
+],
+"max": [
+-49.357,
+18.036,
+-6.677
+],
+"top": {
+"h": 18.036,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "glass_building28_panes_notexture",
+"min": [
+-53.654,
+11.3,
+-27.918
+],
+"max": [
+-49.52,
+17.3,
+-14.7
+],
+"top": {
+"h": 17.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false
+}
+},
+{
+"name": "metal_building28_shutters",
+"min": [
+-53.614,
+10.0,
+-21.6
+],
+"max": [
+-53.594,
+12.6,
+-19.0
+],
+"top": {
+"h": 12.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_building28_bars",
+"min": [
+-53.769,
+11.3,
+-28.033
+],
+"max": [
+-51.187,
+12.3,
+-14.8
+],
+"top": {
+"h": 12.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_building28_boards",
+"min": [
+-53.774,
+13.81,
+-25.884
+],
+"max": [
+-49.4,
+17.266,
+-18.113
+],
+"top": {
+"h": 17.266,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_building28_interior_notexture",
+"min": [
+-53.464,
+13.804,
+-25.896
+],
+"max": [
+-49.71,
+17.296,
+-18.104
+],
+"top": {
+"h": 17.296,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
+}
+},
+{
+"name": "metal_building28_pipe",
+"min": [
+-53.934,
+10.0,
+-28.198
+],
+"max": [
+-53.405,
+17.956,
+-13.705
+],
+"top": {
+"h": 17.956,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building28_trim",
+"min": [
+-53.874,
+11.23,
+-28.138
+],
+"max": [
+-49.3,
+18.136,
+-6.643
+],
+"top": {
+"h": 18.136,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -18.84,
@@ -15671,12 +16623,12 @@
 {
 "name": "concrete_tank_base",
 "min": [
--6.804,
+-5.971,
 13.856,
 -50.288
 ],
 "max": [
--4.804,
+-3.971,
 14.057,
 -48.288
 ],
@@ -16021,17 +16973,17 @@
 {
 "name": "metal_shutter.011",
 "min": [
--17.67,
+-17.84,
 9.805,
 -22.495
 ],
 "max": [
--17.374,
+-17.543,
 12.919,
 -19.653
 ],
 "top": {
-"h": 12.9195,
+"h": 12.9194,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -16046,17 +16998,17 @@
 {
 "name": "metal_shutter.012",
 "min": [
--17.67,
+-17.819,
 9.805,
 -26.969
 ],
 "max": [
--17.374,
+-17.523,
 12.919,
 -24.126
 ],
 "top": {
-"h": 12.9195,
+"h": 12.9194,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -16434,10 +17386,10 @@
 9.647
 ],
 "top": {
-"h": 10.0929,
-"dx": -0.01988,
-"dz": -0.00166,
-"thick": 0.0594
+"h": 10.0923,
+"dx": -0.01949,
+"dz": -0.00163,
+"thick": 0.0588
 },
 "flags": {
 "draw": true,
@@ -16717,19 +17669,6 @@
 "y": 10.03,
 "z": -76.6
 }
-},
-"sun": {
-"dir": [
-0.4867,
-0.8111,
-0.3244
-],
-"color": [
-0.8963,
-0.7682,
-0.552
-],
-"strength": 3.0
 },
 "fx": [
 {
