@@ -2624,6 +2624,13 @@ export class Game {
         this.loseHeldGrenade();
         break;
 
+      // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
+      case "stun": {
+        const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
+        if (at) this.audio.play("stunOof", at);
+        break;
+      }
+
       // 投げた側が倒れて、放された。倒れかけから立ち直る
       case "released":
         this.player.releaseThrown();
