@@ -603,6 +603,23 @@ describe('勝手に構えない', () => {
     }
   })
 
+  /**
+   * **倒れたことが 2 通で届いても、伏せたまま。** 相手の体には生死の一通 (向き無し) と
+   * 向きを持った姿勢 (death_front) の 2 通で届く。2 通目で立ちの型に上書きされて、
+   * 伏せていた体が立ってから崩れていた (本人 2026-10-14)
+   */
+  test('倒れたことが 2 度届いても、伏せたまま崩れる', () => {
+    for (const second of [true, false, undefined]) {
+      const anim = animator()
+      run(anim, 1.2, 'prone_idle')
+      anim.playDeath()
+      run(anim, 0.1, 'prone_idle')
+      anim.playDeath(second)
+      run(anim, 0.6, 'prone_idle')
+      expect(playing(anim, 'lower')).toEqual(['prone_death'])
+    }
+  })
+
   test('立っていれば、いままでどおり向きで倒れる', () => {
     const anim = animator()
     run(anim, 1.2, 'idle')

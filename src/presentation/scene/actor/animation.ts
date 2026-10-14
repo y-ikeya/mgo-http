@@ -2905,8 +2905,16 @@ export class CharacterAnimator {
      * 瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
      *
      * 向きは見ない。**うつ伏せから前も後ろも無い** — 既にその向きで寝ている。
+     *
+     * **2 度目は流し直さない。** 相手の体には倒れたことが 2 通で届く — 生死の一通
+     * (setLife → 向き無し) と、向きを持った姿勢 (death_front / death_back)。1 通目で
+     * prone_death に移った後、2 通目は「伏せていない」ので立ちの型で上書きして、
+     * 伏せていた体が立ち上がってから崩れていた (本人 2026-10-14)
      */
-    if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_DEATH_KEY)) {
+    if (this.locomotion === 'prone_death') return
+    // 伏せに入る途中・仰向けから這い出す途中も、体はもう床にある
+    const lying = PRONE_LOCOMOTIONS.has(this.locomotion) || this.locomotion === 'prone_down' || this.locomotion === 'prone_roll_down'
+    if (lying && this.upper.has(PRONE_DEATH_KEY)) {
       const upper = this.upper.get(PRONE_DEATH_KEY)
       const lower = this.lower.get('prone_death')
       if (upper && lower) {
