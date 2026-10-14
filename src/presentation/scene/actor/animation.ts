@@ -357,6 +357,11 @@ const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'cl
  */
 export const DEATH_SLIDE_CLIPS = new Set(['death', 'death_front', 'death_back', 'crouch_death'])
 /**
+ * 下がりを型のこの倍だけ出す。**前へ倒れる型は大げさ** — 型のままだと背後から撃たれて
+ * 2.3m 前へ飛んだ (本人 2026-10-14「前に飛びすぎ」)。後ろへ倒れる型 (1m) と同じくらいに抑える
+ */
+const DEATH_SLIDE_SCALE: Partial<Record<string, number>> = { death_front: 0.35, death: 0.5 }
+/**
  * 上下を抜く型のうち、**終わりの腰の高さを別の型に合わせる物。**
  *
  * 登る型 (hang_climb) の終わりはしゃがみ。腰を立ちの高さ (0.97m) に固定したままだと
@@ -3472,7 +3477,8 @@ export class CharacterAnimator {
     const y0 = stored.values[1]
     sampleVectorTrack(stored.times, stored.values, end ? action.getClip().duration : action.time, this.scratchVector)
     // トラック空間は X/Y が水平 (consumeRootMotion と同じ)。+Y が模型の前 (+Z)
-    out.set((this.scratchVector.x - x0) * scale, 0, (this.scratchVector.y - y0) * scale)
+    const k = scale * (DEATH_SLIDE_SCALE[name] ?? 1)
+    out.set((this.scratchVector.x - x0) * k, 0, (this.scratchVector.y - y0) * k)
     return name
   }
 
