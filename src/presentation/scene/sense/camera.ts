@@ -404,6 +404,26 @@ export class FollowCamera {
   /** 構えの出入りで、まだ回していない上下の量 (rad) */
   private pendingPitch = 0
 
+  /**
+   * 狙っている所までの距離 (m)。0 なら何もしない。
+   *
+   * **肩越しと主観を切り替えても、狙っている所を変えない** (本人 2026-10-14
+   * 「M4 で頭に合わせてから主観にすると、頭の左にずれる」)。弾の線は注視点
+   * (pivot) から出るので、主観で肩のずれ (shoulder) と高さ (lift) が 0 へ寄ると
+   * 線がそのぶん横・上下へ平行に動く。動いた量だけ向きを回して、この距離の
+   * 所を指したままにする。寄り終わったら止める
+   */
+  private holdDistance = 0
+  private heldShoulder = 0
+  private heldLift = 0
+
+  /** 切り替えの間、いま狙っている所 (distance m 先) を指したままにする */
+  holdAimAt(distance: number): void {
+    this.holdDistance = distance
+    this.heldShoulder = this.shoulder
+    this.heldLift = this.lift
+  }
+
   /** 寄っているか (構え / 投げ物の振りかぶり)。審判に渡す「どこから見ているか」と揃える */
   get isAiming(): boolean {
     return this.aiming
@@ -590,6 +610,14 @@ export class FollowCamera {
     this.lift = damp(this.lift, target.lift, AIM_LAMBDA, dt)
     this.pitchDown = damp(this.pitchDown, target.pitchDown, AIM_LAMBDA, dt)
     this.leanOffset = damp(this.leanOffset, this.leanTarget, AIM_LAMBDA, dt)
+    if (this.holdDistance > 0) {
+      // 線が右へ動けば左を向く (yaw が増えると左)、上へ動けば下を向く
+      this.yaw += Math.atan((this.shoulder - this.heldShoulder) / this.holdDistance)
+      this.pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, this.pitch - Math.atan((this.lift - this.heldLift) / this.holdDistance)))
+      this.heldShoulder = this.shoulder
+      this.heldLift = this.lift
+      if (Math.abs(this.shoulder - shoulder) < 1e-4 && Math.abs(this.lift - target.lift) < 1e-4) this.holdDistance = 0
+    }
 
     const fov = damp(this.fov, target.fov, AIM_LAMBDA, dt)
     if (Math.abs(fov - this.fov) > 1e-4) {

@@ -1130,6 +1130,17 @@ export class Game {
   private applyWeaponView(): void {
     const spec = this.weapon;
     const level = this.zoomStep > 0 ? spec.scope[this.zoomStep - 1] : null;
+    /*
+     * 肩越しと主観を切り替えた。**狙っている所はそのまま** — 主観では弾の線が
+     * 肩のずれの分だけ横へ動くので、カメラがいま指している所までの距離を渡して、
+     * 寄る間ずっとそこを指させる (sense/camera.ts の holdAimAt)
+     */
+    const zoomed = this.player.isAiming && this.zoomStep > 0;
+    if (this.player.isAiming && this.wasAiming && zoomed !== this.wasZoomed) {
+      this.follow.holdAimAt(this.aimedDistance());
+    }
+    this.wasZoomed = zoomed;
+    this.wasAiming = this.player.isAiming;
     this.follow.setAimView(
       level
         ? { distance: 0, shoulder: 0, fov: level.fov }
@@ -1140,6 +1151,20 @@ export class Game {
   }
 
   private readonly fpMuzzle = new THREE.Vector3();
+  private wasZoomed = false;
+  private wasAiming = false;
+
+  /** 画面の中心が指している所までの距離 (m)。地形か人。何も無ければ遠く */
+  private aimedDistance(): number {
+    this.follow.aimOrigin(this.aimOrigin);
+    this.follow.aimDirection(this.aimDir);
+    this.raycaster.set(this.aimOrigin, this.aimDir);
+    this.raycaster.far = MAX_RANGE;
+    const terrain = this.raycaster.intersectObjects(this.stage.collidables, false)[0];
+    const limit = terrain ? terrain.distance : MAX_RANGE;
+    const player = this.remotes.raycast(this.aimOrigin, this.aimDir, limit);
+    return Math.max(2, player ? player.distance : limit);
+  }
 
   /**
    * 主観の銃口 (世界)。主観用の銃が出ていればその銃口、無ければ (スコープ) 目の少し
