@@ -71,6 +71,11 @@ const LAYERS: Record<string, readonly string[]> = {
    */
   'infra/input': [],
   /**
+   * この端末に覚えておく好み (前回選んだ装備)。**どこにも依存しない。**
+   * 消えても困らない物だけ — 失くしてよいかで auth の保存と分けてある
+   */
+  'infra/prefs': [],
+  /**
    * アプリケーションの状態。**server/ と同じ高さの双子。**
    *
    * どちらも状態を持ち、報せを受けて更新する。違うのは**決めるか、従うか**だけ
@@ -102,6 +107,7 @@ const LAYERS: Record<string, readonly string[]> = {
     'infra/api',
     'infra/auth',
     'infra/input',
+    'infra/prefs',
     'i18n',
   ],
   i18n: [],
