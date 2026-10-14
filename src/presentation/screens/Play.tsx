@@ -208,6 +208,8 @@ export default function Play(props: {
       setPrimary(next.primary)
       setSupport(next.support)
     }
+    // 前回選んだ物 (初めてなら一覧の先頭) に印を付けて開く
+    instance.onLoadout(instance.chosenLoadout)
     void instance.start(setStats)
     setGame(instance)
   })

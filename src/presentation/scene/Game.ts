@@ -143,6 +143,7 @@ import {
 } from "../../application/protocol/types";
 import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
+import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 /**
@@ -1291,12 +1292,23 @@ export class Game {
      *
      * **一覧が空なら銃を持たない部屋。** ナイフだけになる。
      */
-    const carryable =
-      this.pendingLoadout.primary !== null &&
-      this.primaries.includes(this.pendingLoadout.primary);
-    if (!carryable) {
-      this.pendingLoadout.primary = this.primaries[0] ?? null;
+    /*
+     * **前回選んだ物から始める。初めてなら一覧の先頭 (P90)** (本人 2026-10-14)。
+     * 部屋で持ち込めない物は先頭へ丸める。繋ぎ直した時はサーバーが覚えている物が
+     * 後から届いて上書きする (そちらのほうが新しい)
+     */
+    const last = loadLastLoadout();
+    const lastPrimary = last?.primary as WeaponId | null | undefined;
+    this.pendingLoadout.primary =
+      lastPrimary && this.primaries.includes(lastPrimary) ? lastPrimary : (this.primaries[0] ?? null);
+    const lastSecondary = last?.secondary as WeaponId | null | undefined;
+    if (this.secondary !== null && lastSecondary && CHOICES.secondary.includes(lastSecondary)) {
+      this.pendingLoadout.secondary = lastSecondary;
     }
+    const lastSupport = last?.support as SupportId | undefined;
+    if (lastSupport && SUPPORTS.includes(lastSupport)) this.pendingLoadout.support = lastSupport;
+    this.loadout = { ...this.pendingLoadout };
+    this.inv.refill(this.loadout);
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room, privateRoom);
     // 自機のモデルはここで読み始める。**構築時ではない** —
@@ -3203,6 +3215,8 @@ export class Game {
   private requestSpawn(): void {
     if (!this.canChooseLoadout) return;
     if (this.chooseElapsed < CHOOSE_FLOOR) return;
+    // 選んだ物を先に伝える。**一度も選び直さずに出ると、サーバーは既定 (AK47) のまま**
+    this.sendLoadout();
     this.net.send({ type: "spawn" });
   }
 
@@ -3326,6 +3340,7 @@ export class Game {
    * (読み直すとこちらは既定値へ戻る)。
    */
   private sendLoadout(): void {
+    saveLastLoadout(this.pendingLoadout);
     this.net.send({
       type: "loadout",
       support: this.pendingLoadout.support,
@@ -3364,6 +3379,11 @@ export class Game {
 
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
   onLoadout: ((next: { primary: WeaponId | null; support: SupportId }) => void) | null = null;
+
+  /** 次に湧く時の装備 (画面の印の初めの値)。前回選んだ物か、一覧の先頭 */
+  get chosenLoadout(): { primary: WeaponId | null; support: SupportId } {
+    return this.pendingLoadout;
+  }
 
   /**
    * 戦場へ出た。
