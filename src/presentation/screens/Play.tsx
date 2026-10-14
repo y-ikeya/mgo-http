@@ -158,8 +158,12 @@ export default function Play(props: {
    *
    * 待っている間や結果を見ている間に抜けても、誰の試合も壊れない。
    * そこまで引き止めると、ただ邪魔なだけになる。
+   *
+   * **練習 (/training) は引き止めない。** 自分だけの部屋なので、抜けても
+   * 誰の試合も壊れない (本人 2026-10-14)
    */
   const inMatch = () => {
+    if (training) return false
     const phase = stats()?.match?.phase
     return phase === 'countdown' || phase === 'playing'
   }
