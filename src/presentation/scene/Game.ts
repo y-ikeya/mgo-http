@@ -142,6 +142,7 @@ import {
   type Team,
 } from "../../application/protocol/types";
 import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
+import { setSlideBlocker } from "./actor/deathSlide";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 /**
@@ -1251,6 +1252,8 @@ export class Game {
    * @param privateRoom 自分だけの部屋に入る (練習 /training)。他の人とは出会わない
    */
   constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
+    // 倒れた体が下がる時、壁で止める。カメラと同じ網で見る (表裏を問わない)
+    setSlideBlocker((origin, dir, max) => this.cameraWorld.distanceToObstruction(origin, dir, max));
     /*
      * **1 枚の頁で動く試合は 1 つだけ。** 前の物が残っていれば片付ける。
      *
@@ -1602,6 +1605,7 @@ export class Game {
   }
 
   dispose(): void {
+    setSlideBlocker(null);
     // 2 度呼ばれてよい (画面の片付けと、次の Game が古い物を片付けるのと)
     if (this.disposed) return;
     const page = globalThis as { __mgoGame?: Game };

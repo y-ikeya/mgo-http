@@ -25,6 +25,7 @@ import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
+import { DeathSlide } from "./deathSlide";
 import {
   advanceBoxLift,
   BoxMotion,
@@ -179,6 +180,7 @@ const PLAY_WHOLE_BODY: Record<
 export class RemoteSoldier {
   readonly id: string;
   readonly object = new THREE.Group();
+  private readonly deathSlide = new DeathSlide();
   /** 足元の丸い影。太陽の影マップには人を入れない (world/staticShadow.ts) */
   private readonly blob = new BlobShadow();
   /** ボーンに追従する当たり判定。メッシュではなくこれを撃つ */
@@ -536,6 +538,8 @@ export class RemoteSoldier {
     this.gripLeft.restore();
     this.spineAim.restore();
     animator.update(dt);
+    // 倒れる型の下がりを模型で出す (壁の手前まで)
+    if (this.model) this.deathSlide.update(animator, this.object, this.model);
     if (this.model) {
       this.object.updateMatrixWorld(true);
       const frame = locomotion === "climb_top" ? animator.oneShotPhase("climb_top") * 120 + 1 : 0;

@@ -1232,3 +1232,64 @@ describe('置き切るまで構え直さない', () => {
     expect(hipsAt(1)).toBeLessThan(0.5)
   })
 })
+
+/**
+ * 倒れる型の下がり。**型どおりに下がり、壁があれば手前で止まる** (本人 2026-10-14)。
+ * 腰からは抜いてある (位置はコードが持つ) ので、模型をずらして出す (deathSlide.ts)。
+ */
+describe('倒れながら下がる', () => {
+  const fall = (from: string, fromBehind: boolean) => {
+    const anim = animator()
+    run(anim, 1.2, from)
+    anim.playDeath(fromBehind)
+    return anim
+  }
+
+  test('しゃがんで正面から倒されると、後ろへ約 1m', () => {
+    const anim = fall('crouch_idle', false)
+    run(anim, 4, 'crouch_idle')
+    const out = new THREE.Vector3()
+    expect(anim.deathSlide(out)).toBe('crouch_death')
+    // 模型の正面は +Z。後ろへ
+    expect(out.z).toBeLessThan(-0.8)
+    expect(out.z).toBeGreaterThan(-1.2)
+  })
+
+  test('模型をずらして出す。壁が 0.6m 後ろなら、体の厚み (0.3m) を残して止まる', () => {
+    const { DeathSlide, setSlideBlocker } = require('./deathSlide') as typeof import('./deathSlide')
+    for (const [wall, expected] of [[null, 1.0], [0.6, 0.3]] as const) {
+      setSlideBlocker(wall === null ? null : (_o, _d, max) => Math.min(max, wall))
+      const anim = fall('crouch_idle', false)
+      const object = new THREE.Group()
+      const model = new THREE.Group()
+      model.rotation.y = Math.PI
+      object.add(model)
+      const slide = new DeathSlide()
+      for (let i = 0; i < 240; i++) {
+        anim.setLocomotion('crouch_idle' as never)
+        anim.update(1 / 60)
+        slide.update(anim, object, model)
+      }
+      expect(model.position.length()).toBeCloseTo(expected, 1)
+    }
+    setSlideBlocker(null)
+  })
+
+  test('生き返ったら模型は元の所へ戻る', () => {
+    const { DeathSlide } = require('./deathSlide') as typeof import('./deathSlide')
+    const anim = fall('idle', false)
+    const object = new THREE.Group()
+    const model = new THREE.Group()
+    object.add(model)
+    const slide = new DeathSlide()
+    for (let i = 0; i < 120; i++) {
+      anim.update(1 / 60)
+      slide.update(anim, object, model)
+    }
+    expect(model.position.length()).toBeGreaterThan(0.3)
+    anim.revive()
+    anim.update(1 / 60)
+    slide.update(anim, object, model)
+    expect(model.position.length()).toBe(0)
+  })
+})

@@ -38,6 +38,7 @@ import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, pla
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
 import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from './armIk'
+import { DeathSlide } from './deathSlide'
 import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA } from '../arms/weapon'
 import type { PlayerSnapshot } from '../../../application/protocol/types'
 import type { WeaponTarget } from '../arms/weapon'
@@ -452,6 +453,7 @@ const LADDER_TOP_MOUNT = CLIMB_TOP_TUNING.lead + 0.1
 export class Soldier {
   /** シーンに add するルート */
   readonly object = new THREE.Group()
+  private readonly deathSlide = new DeathSlide()
   /** 足元の丸い影。太陽の影マップには人を入れない (world/staticShadow.ts) */
   private readonly blob = new BlobShadow()
   /** 居る場所の空の見え方を材質に掛ける (屋内で暗くなる) */
@@ -3641,6 +3643,8 @@ export class Soldier {
       this.gripLeft.restore()
       this.spineAim.restore()
       this.animator.update(dt)
+      // 倒れる型の下がりを模型で出す (壁の手前まで)
+      if (this.model) this.deathSlide.update(this.animator, this.object, this.model)
 
       this.object.updateMatrixWorld(true)
       // 梯子を登り切る間は手を掴んだ所に留める (型の手は手すりの上を滑る)

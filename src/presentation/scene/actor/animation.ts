@@ -348,6 +348,15 @@ const ROOT_MOTION_HOLD: Partial<Record<Locomotion, { until: number; keep: number
  */
 const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top'])
 /**
+ * 倒れる型の**前後の移動を絵として残す**型 (deathSlide)。
+ *
+ * 型は倒れながら下がる (後ろへ倒れる型で 1.0m、前へ倒れる型で 2.3m)。位置はコードが
+ * 持つので他の型と同じく腰からは抜くが、抜いたままだと**足が前へ滑って**その場に
+ * 崩れる (本人 2026-10-14)。抜いた分を模型ごとずらして戻す。位置 (判定の所) は
+ * 動かさない — 倒れた後は判定に使わない。壁の手前で止めるのは体の側 (DeathSlide)
+ */
+export const DEATH_SLIDE_CLIPS = new Set(['death', 'death_front', 'death_back', 'crouch_death'])
+/**
  * 上下を抜く型のうち、**終わりの腰の高さを別の型に合わせる物。**
  *
  * 登る型 (hang_climb) の終わりはしゃがみ。腰を立ちの高さ (0.97m) に固定したままだと
@@ -1530,7 +1539,7 @@ export class CharacterAnimator {
       // 取り除く前に控える。後からでは値が潰れている。
       // クリップは全員で共有しているので、控えも共有の置き場に持つ。
       // ここで自分の Map にだけ控えると、2 人目は潰れたあとを控えてしまう。
-      if (rootBone && ROOT_MOTION_CLIPS.has(clip.name)) {
+      if (rootBone && (ROOT_MOTION_CLIPS.has(clip.name) || DEATH_SLIDE_CLIPS.has(clip.name))) {
         let stored = rootMotionStore.get(clip)
         if (!stored) {
           const track = clip.tracks.find(
@@ -3443,6 +3452,38 @@ export class CharacterAnimator {
    */
   forwardProgress(name: Locomotion): number {
     return this.trackProgress(name, 1)
+  }
+
+  /**
+   * 倒れる型が**頭から今までに**動いた量 (模型の空間、m、正面 +Z)。倒れていない・
+   * 移動を残す型でなければ null。返すのは流れている型の名前 (替わったら測り直す合図)
+   *
+   * @param end true なら今ではなく型の終わりまでの量
+   */
+  deathSlide(out: THREE.Vector3, end = false): string | null {
+    if (this.upperState !== 'death') return null
+    const name = this.locomotion
+    if (!DEATH_SLIDE_CLIPS.has(name)) return null
+    const stored = this.rootMotion.get(name)
+    const action = this.lower.get(name)
+    const scale = this.skeletonScaleOf()
+    if (!stored || !action || scale === 0) return null
+    const x0 = stored.values[0]
+    const y0 = stored.values[1]
+    sampleVectorTrack(stored.times, stored.values, end ? action.getClip().duration : action.time, this.scratchVector)
+    // トラック空間は X/Y が水平 (consumeRootMotion と同じ)。+Y が模型の前 (+Z)
+    out.set((this.scratchVector.x - x0) * scale, 0, (this.scratchVector.y - y0) * scale)
+    return name
+  }
+
+  /** 骨組みの縮尺 (トラックの cm → m)。模型が届く前は 0 */
+  private skeletonScaleOf(): number {
+    if (this.skeletonScale === 0) {
+      const armature = this.hipsBone?.parent
+      if (!armature) return 0
+      this.skeletonScale = armature.getWorldScale(this.scratchVector).x
+    }
+    return this.skeletonScale
   }
 
   /** 腰の軌道の 1 成分 (0 = 横、1 = 前後、2 = 上下) を頭〜終わりで 0..1 に */
