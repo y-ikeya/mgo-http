@@ -556,10 +556,19 @@ export function updateMatch(room: RoomWorld, now: number): void {
       room.phase = 'countdown'
       room.endsAt = now + COUNTDOWN_MS
       /*
-       * **秒読みの間は装備画面で武器を選ぶ。** 待合室ではスキルだけを決め、
+       * **ここから装備画面で武器を選ぶ。** 待合室ではスキルだけを決め、
        * 武器はその後 (2026-10-09 本人: 待合室で武器を選ぶ必要は無い)。
-       * OK を押した人から湧き、残った人は始まる時に湧かせる (下の playing)
+       *
+       * **選べるのはここから 30 秒** (lifecycle.ts の CHOOSE_TIMEOUT)。試合は秒読みの後に
+       * 待たずに始まり、OK を押した人から出て動ける。30 秒経っても選んでいる人は、
+       * 選んでいた装備で出す (2026-10-15 本人)。秒読み (5 秒) で始まる時に全員を出していた
+       * 頃は、スキルを決めた後に武器を選ぶ間が 5 秒しかなかった。
+       *
+       * 人ごとの 30 秒の時計をここで 0 にする。待合室に居た間の分を数えると、入った瞬間に打ち切られる
        */
+      for (const player of connected(room)) {
+        if (canChoose(player.life)) player.lifeAt = now
+      }
     }
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
@@ -567,13 +576,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく
     room.matchId = crypto.randomUUID()
     room.startedAt = now
-    /*
-     * **始まる時にまだ選んでいる人は、選んでいた装備で出す。** 試合が始まるのに
-     * 装備の画面が開いているのは意味が無い (2026-10-06 本人)
-     */
-    for (const player of connected(room)) {
-      if (canChoose(player.life)) spawn(room, player, now)
-    }
+    // まだ選んでいる人は出さない。秒読みに入った時から数えて 30 秒で打ち切る (上の countdown)
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     room.phase = 'over'
