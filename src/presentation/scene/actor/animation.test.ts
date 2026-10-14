@@ -600,6 +600,7 @@ describe('勝手に構えない', () => {
       anim.playDeath(true)
       run(anim, 0.6, from)
       expect(playing(anim, 'lower')).toEqual(['prone_death'])
+      expect(playing(anim, 'upper')).toEqual(['prone_death'])
     }
   })
 
@@ -617,6 +618,8 @@ describe('勝手に構えない', () => {
       anim.playDeath(second)
       run(anim, 0.6, 'prone_idle')
       expect(playing(anim, 'lower')).toEqual(['prone_death'])
+      // 上半身も。重みが流れていない型へ寄ると上半身だけ T ポーズになる
+      expect(playing(anim, 'upper')).toEqual(['prone_death'])
     }
   })
 

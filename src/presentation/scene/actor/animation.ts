@@ -3072,6 +3072,9 @@ export class CharacterAnimator {
     if (this.locomotion === 'sleep' && this.upper.has(SLEEP_KEY)) return SLEEP_KEY
     // 倒れている間は他の何よりも優先する
     if (this.upperState === 'death') {
+      // 伏せたまま崩れている。**ここで返さないと上半身の重みが流れていない立ちの型へ
+      // 寄って、上半身だけ T ポーズ**になった (2026-10-14)
+      if (this.locomotion === 'prone_death' && this.upper.has(PRONE_DEATH_KEY)) return PRONE_DEATH_KEY
       // 倒れる向きの型があればそちら。無ければ元の 1 本
       if (this.locomotion === 'death_front' && this.upper.has(DEATH_FRONT_KEY)) {
         return DEATH_FRONT_KEY
