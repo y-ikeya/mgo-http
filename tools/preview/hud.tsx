@@ -55,6 +55,9 @@ const cases: Record<string, Partial<GameStats>> = {
   dozing: { asleep: true, sleepDepth: 0.4, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
   // 麻酔の狙撃銃。**眼鏡の中身が違う** (目盛りの無い古い眼鏡)
   // M4 の主観 (ホロサイト)。画面の真ん中に輪と点だけ
+  // CQC を掛けられる物 (拳銃・手榴弾) を持っている。カードの左上に赤い CQC
+  cqcPistol: { equipped: 'm9', held: 'm9', weaponHeld: 'm9', ammo: 15, magazine: 15, reserve: 45 },
+  cqcGrenade: { held: 'grenade', weaponHeld: 'grenade', grenades: 2 },
   sightHolo: { scoped: true, sight: 'holo', equipped: 'm4', held: 'm4', weaponHeld: 'm4', zoom: '1x', ammo: 30, magazine: 30, reserve: 90 },
   scopedMosin: { scoped: true, equipped: 'mosin', held: 'mosin', weaponHeld: 'mosin', zoom: '4x', ammo: 5, magazine: 5, reserve: 15 },
   // 個人戦。残機は 1 つ、上に DM

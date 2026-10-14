@@ -3,6 +3,7 @@ import { GAME_SET_SECONDS } from '../../domain/match/match'
 import { CRITICAL_HEALTH } from '../../domain/rule/damage'
 import { t } from '../../i18n'
 import { HELD, type HeldId, isSupport } from '../../domain/item/held'
+import { canThrowWith } from '../../domain/player/cqc'
 import { MODES } from '../../domain/match/room'
 import { isTranquilizer } from '../../domain/item/weapons'
 import type { GameStats } from '../scene/Game'
@@ -746,6 +747,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           'hud-weapon-tranq': heldIsTranq(),
         }}
       >
+        {/* 手にある物で CQC を掛けられる (片手で持つ物)。長物では出ない */}
+        <Show when={canThrowWith(held())}>
+          <div class="hud-weapon-cqc">CQC</div>
+        </Show>
         <Show when={heldIsGun()}>
           <div class="hud-weapon-spare">{heldTotal()}</div>
         </Show>

@@ -865,6 +865,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+.hud-weapon-cqc {
+  /*
+   * CQC を掛けられる物を持っている印。**カードの左上** (本人 2026-10-14)。
+   * 数字と名前は右に寄せてあるので、左上は空いている
+   */
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #ff4a3d;
+}
+
 .hud-weapon-name {
   font-size: 15px;
   letter-spacing: 0.14em;
