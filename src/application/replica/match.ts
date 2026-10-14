@@ -136,7 +136,13 @@ export function applyMatch(
       replica.leaking = message.leader === selfId
       const changed = replica.match?.phase !== message.phase
       notePresence(replica, replica.match, message, selfId, now)
-      replica.match = message
+      /*
+       * **終わる時刻を手元の時計へ直す。** サーバーの時刻のまま自分の時計と比べると、
+       * 手元の時計のずれがそのまま残り時間のずれになる (9 秒遅れていて、残り 9 秒で
+       * 終わった)。送ってから届くまでの遅れ (数十 ms) は残り時間に含まれたままになる
+       */
+      replica.match =
+        message.endsAt > 0 ? { ...message, endsAt: now + (message.endsAt - message.sentAt) } : message
       return changed ? [{ kind: 'phase', to: message.phase, teams: MODES[message.mode].teams }] : []
     }
 

@@ -227,3 +227,25 @@ describe('抜けた知らせ', () => {
     expect(replica.presenceFeed).toEqual([])
   })
 })
+
+
+/**
+ * 残り時間。**手元の時計がずれていても、サーバーと同じ残りになる** (本人 2026-10-15)。
+ * 終わる時刻はサーバーの時計で来るので、そのまま自分の時計と比べると、ずれが
+ * そのまま残り時間のずれになる。
+ */
+describe('終わる時刻', () => {
+  test('手元の時計が 9 秒遅れていても、残りは送られた時の残りのまま', () => {
+    const replica = newMatchReplica()
+    const server = 1_000_000
+    const local = server - 9_000
+    applyMatch(replica, matchMessage({ endsAt: server + 60_000, sentAt: server }), SELF, local)
+    expect((replica.match?.endsAt ?? 0) - local).toBe(60_000)
+  })
+
+  test('待っている間 (0) はそのまま 0', () => {
+    const replica = newMatchReplica()
+    applyMatch(replica, matchMessage({ phase: 'waiting', endsAt: 0, sentAt: 5 }), SELF, 123)
+    expect(replica.match?.endsAt).toBe(0)
+  })
+})

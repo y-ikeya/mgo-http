@@ -263,6 +263,7 @@ export function matchState(room: Match): ServerMessage {
     blue: room.blue,
     red: room.red,
     endsAt: room.endsAt,
+    sentAt: Date.now(),
     phase: room.phase,
     present: connected(room).length,
     required: MIN_PLAYERS,

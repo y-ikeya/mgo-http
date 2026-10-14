@@ -1040,8 +1040,15 @@ export interface MatchMessage {
   /**
    * 今の段階が終わる時刻 (Date.now)。残り時間はここから引いて出す。
    * waiting は人が揃うまで進まないので 0。
+   *
+   * **サーバーの時計の時刻。** 受け取った側はそのまま自分の時計と比べない —
+   * 下の sentAt との差 (残り) を、受け取った時刻に足して自分の時計へ直す
+   * (application/replica/match.ts)。手元の時計が 9 秒遅れていて、残り 9 秒で
+   * 試合が終わった (本人 2026-10-15)
    */
   endsAt: number
+  /** これを送った時刻 (サーバーの Date.now)。endsAt を手元の時計へ直すのに使う */
+  sentAt: number
   /**
    * 部屋の段階。
    *
