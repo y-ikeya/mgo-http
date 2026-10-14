@@ -81,12 +81,17 @@ const GROUND_SKY_FLOOR = SKY_FLOOR
  * 濃くしたのは絵のためだけではない。**影が暗ければ、影に隠れることに値打ちが
  * 出る。** 接敵までは互いに透明でいようとする遊びなので、隠れる場所が増える
  * ほうが筋が通る。
+ *
+ * **1.2 から 0.7 へ (2026-10-14 本人「影のなかはもう少し光量を落とした方がいい、
+ * まだ明るすぎる」)。** city の庇を人の頭の上まで下げて、その下の日陰が明るく
+ * 浮いていた。日陰の明るさはほぼこれだけで決まる (0 にすると真っ黒) ので、ここを下げる。
+ * 日向は直射が大半なので、ほとんど変わらない
  */
-const AMBIENT_INTENSITY = 1.2
+const AMBIENT_INTENSITY = 0.7
 /** 直射日光の強さ */
 const SUN_INTENSITY = 3.6
-/** 影の濃さ (0..1)。1 で完全に直射を遮る */
-const SHADOW_INTENSITY = 0.88
+/** 影の濃さ (0..1)。1 で完全に直射を遮る。0.88 では直射の 1 割強が影に漏れていた */
+const SHADOW_INTENSITY = 0.95
 
 /**
  * URL から明るさを触る。**?ambient=1.4&sun=3.2&shadow=0.95**
@@ -153,7 +158,9 @@ const LOOKS: Record<'clear' | 'dusty' | 'night', Look> = {
     fogNear: 75, fogFar: 175,
     // 日陰が黒く潰れない程度に半球光を残す。空の色が暗いぶん強さは昼のまま (0.4・0.55 では路地の壁が黒く潰れた)
     // 日陰の空の色は地平線 (濃紺) より明るい青 — 地平線の色のままでは路地の壁が黒く潰れた
-    night: { sunScale: 0.22, ambientScale: 1.0, ambientSky: 0x56688f },
+    // ambientScale は昼の天空光 (AMBIENT_INTENSITY) に掛ける倍率。昼の日陰を 1.2 → 0.7 へ落とした時、
+    // 夜の日陰は変えないよう 1.0 → 1.7 にした (0.7 × 1.7 ≒ 1.2)
+    night: { sunScale: 0.22, ambientScale: 1.7, ambientSky: 0x56688f },
   },
 }
 const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dusty', lab: 'dusty' }
