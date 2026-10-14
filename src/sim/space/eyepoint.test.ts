@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { cameraPoint, seesFromCamera, AIM_CAMERA, HIP_CAMERA } from './eyepoint'
 import { bodyVisible, boxSight, hasLineOfSight, type StageBox } from './vision'
-import { BODY_BOX } from '../../domain/player/stance'
+import { BODY_BOX, leanMetres } from '../../domain/player/stance'
 
 /**
  * どこから見ているか。**注視点の高さは呼ぶ側が渡す。**
@@ -107,5 +107,33 @@ describe('網で寄せる (CameraBlocker)', () => {
     const eye = cameraPoint(0, 0, 0, 0, 0, false, 1.5, side)
     expect(eye.x).toBeCloseTo(0, 5)
     expect(eye.z).toBeCloseTo(HIP_CAMERA.distance, 5)
+  })
+})
+
+/**
+ * 覗いて傾く (lean)。**傾いた時だけ、角の向こうの相手が配られる。**
+ *
+ * 見る側は壁の裏。壁は目の前 (z = -1.1) にあって、左の縁は x = -0.2。相手は
+ * 縁の向こうの左前 (x = -1, z = -10)、こちらを向いて立っている。
+ *
+ *     傾かない    目は x = 0。縁の内側なので、線は壁に当たる
+ *     左へ傾く    目は 0.21m 左 (domain/player/stance.ts の LEAN_SHIFT)。縁を越えて見える
+ *
+ * サーバーは傾きを姿勢 (lean_left) から読み、目と体を横へずらして渡す
+ * (server/relay.ts の eyeOf)。ここではずらした後の目を渡す。
+ */
+describe('傾いて角の向こうを覗く', () => {
+  const FLOOR = 10
+  const wall: StageBox = { name: 'wall', min: [-0.2, FLOOR, -1.2], max: [5, FLOOR + 3.0, -1.0] }
+  const sight = boxSight([wall])
+  const enemy = (ex: number, ey: number, ez: number) => bodyVisible(ex, ey, ez, -1, FLOOR, -10, Math.PI, BODY_BOX.stand, sight)
+  const viewer = (x: number) => ({ x, y: FLOOR, z: 0, cameraYaw: 0, pitch: 0, aiming: true })
+
+  test('傾かなければ見えない (肩越しのカメラからも、目の位置からも)', () => {
+    expect(seesFromCamera(viewer(0), [1.45, 1.57], [], enemy)).toBe(false)
+  })
+
+  test('左へ傾けば見える', () => {
+    expect(seesFromCamera(viewer(leanMetres(-1, 'stand')), [1.45, 1.57], [], enemy)).toBe(true)
   })
 })
