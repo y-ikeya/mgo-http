@@ -415,6 +415,10 @@ const STATS_INTERVAL = 0.1;
 const MAX_DT = 1 / 20;
 /** 弾が届く距離 (m)。何にも当たらなければここまで飛んで消える */
 const MAX_RANGE = 200;
+/** この長さを超えたコマを「詰まった」と記録する (ms)。遅延で切る境目 (600ms) の半分 */
+const SLOW_FRAME_MS = 300;
+/** 詰まりを知らせる間隔の下限 (ms) */
+const SLOW_FRAME_EVERY_MS = 5_000;
 
 
 /**
@@ -1655,6 +1659,7 @@ export class Game {
   }
 
   private tick(time: number): void {
+    this.noteSlowFrame(time - this.lastTime);
     const dt = Math.min((time - this.lastTime) / 1000, MAX_DT);
     this.lastTime = time;
 
@@ -2071,6 +2076,40 @@ export class Game {
    * 補間するので、**間隔が一定でない**と補間の速度が揺れる。描画の速さは
    * 機械ごとに違うが、送る速さは揃えられる。
    */
+  /** 最後に詰まりを知らせた時刻 (ms)。続けて詰まった時に毎コマ送らない */
+  private slowReportedAt = 0;
+
+  /**
+   * 画面が詰まったら記録する。**コンソールとサーバーのログの両方へ。**
+   *
+   * 遅延で切られる人の多くは、回線ではなく描画の詰まりだった (2026-10-15。往復 1 秒は
+   * 東京の箱には遠すぎる)。ping の返事は描画と同じ流れで返すので、詰まりは遅れに
+   * 見える。**どこで・何を描いていて詰まったか**を残しておけば、重い所を探せる。
+   *
+   * 裏のタブ (描画が止まる) と、極端に長い間 (タブを戻した時) は数えない。
+   */
+  private noteSlowFrame(gap: number): void {
+    if (this.lastTime === 0 || gap < SLOW_FRAME_MS || gap > 10_000 || document.hidden) return;
+    const now = performance.now();
+    if (now - this.slowReportedAt < SLOW_FRAME_EVERY_MS) return;
+    this.slowReportedAt = now;
+    const p = this.player.position;
+    const info = (this.renderer as unknown as { info?: { render?: { drawCalls?: number; calls?: number; triangles?: number } } }).info?.render;
+    const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    const report = {
+      type: "slowFrame" as const,
+      ms: Math.round(gap),
+      x: p.x,
+      z: p.z,
+      yaw: this.follow.aimYaw,
+      draws: info?.drawCalls ?? info?.calls ?? 0,
+      triangles: info?.triangles ?? 0,
+      heap: memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0,
+    };
+    console.warn("[重い]", report);
+    this.net.send(report);
+  }
+
   /** 直前に位置を送った時刻と、その間隔の均し (ms)。名目は 1/64 秒 */
   private sentAt = 0;
   private sendGap = 0;

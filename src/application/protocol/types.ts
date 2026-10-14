@@ -816,6 +816,28 @@ export interface PongMessage {
 }
 
 /**
+ * 画面が詰まった (1 コマに SLOW_FRAME_MS 以上かかった)。**診断のためだけ。**
+ *
+ * 遅延で切られる人の多くは回線ではなく描画の詰まりだった (2026-10-15)。ping の
+ * 返事は描画と同じ流れで返すので、1 コマが 0.6 秒を超えると遅れと区別が付かない。
+ * サーバーはログに書くだけで、遊びには何も効かない
+ */
+export interface SlowFrameEvent {
+  type: 'slowFrame'
+  /** そのコマにかかった時間 (ms) */
+  ms: number
+  /** 立っていた所と向き (three の座標、rad) */
+  x: number
+  z: number
+  yaw: number
+  /** 直前のコマの描画の量。何が重いかの手掛かり */
+  draws: number
+  triangles: number
+  /** JS の使用メモリ (MB)。Chrome だけ取れる。取れなければ 0 */
+  heap: number
+}
+
+/**
  * 自分の本当の値。**3 秒ごとに、1 人ずつ届く。**
  *
  * --- なぜ要るか ---
@@ -1263,6 +1285,7 @@ export type ClientMessage =
   | ResupplyEvent
   | VoiceEvent
   | PongMessage
+  | SlowFrameEvent
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =

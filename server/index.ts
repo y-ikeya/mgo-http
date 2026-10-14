@@ -837,6 +837,16 @@ function handleMessage(
       break
     }
 
+    // 画面が詰まった。**ログに書くだけ** (遅延で切る前に何が起きていたかを後で読む)
+    case 'slowFrame': {
+      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : -1)
+      console.warn(
+        `[重い] ${player.name} ${n(message.ms)}ms 位置 (${n(message.x)}, ${n(message.z)}) 向き ${n(((message.yaw as number) * 180) / Math.PI)}° ` +
+          `描画 ${n(message.draws)} 回 / ${n(message.triangles)} 三角 heap ${n(message.heap)}MB ステージ ${room.stage.name}`,
+      )
+      break
+    }
+
     // スタンナイフの放電。見た目と音だけ。**名乗りは信じず**送り主の id を付けて流す
     case 'zap':
       if (!canAct(player.life)) break
