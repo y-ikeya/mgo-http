@@ -129,8 +129,23 @@ const BINDINGS = {
   /** 定型文のボイス。T で番号の一覧を出し、1〜5 で言う (domain/player/voice.ts) */
   voice: { keys: ['KeyT'], pad: 'voice' },
   zoom: { keys: ['KeyZ'], pad: 'zoom' },
-  /** 武器の一覧。単押しで往復、押している間は一覧を送る */
-  swapWeapon: { keys: ['KeyQ'], pad: 'swap' },
+  /**
+   * 武器の一覧。単押しで往復、押している間は一覧を送る。
+   *
+   * **構えている間の R1 は殺す刺突に譲る** (killStab)。構えたままでは持ち替え
+   * られない (domain/item/inventory.ts) ので、構えている R1 は元々空いていた
+   */
+  swapWeapon: { keys: ['KeyQ'], pad: 'swap', yieldsWhenAiming: true },
+  /**
+   * ナイフを構えて殺す刺突。**パッドは R1。** 鍵盤は左クリック (引き金) が殺す
+   * 刺突なので、ここにキーは無い (Game.ts の updateTrigger)
+   */
+  killStab: { keys: [], pad: 'swap' },
+  /**
+   * ナイフを構えて眠らせる刺突 (スタンナイフ)。鍵盤は X。パッドは R2 (引き金)
+   * なので、ここにボタンは無い。充電が満ちていなければ振らない
+   */
+  stunStab: { keys: ['KeyX'] },
   /** 道具の一覧。単押しでダンボール、押している間は一覧 */
   swapTool: { keys: ['KeyC'], pad: 'box' },
   drop: { keys: ['KeyG'], pad: 'drop' },
@@ -402,6 +417,11 @@ export class Input {
 
   get firing(): boolean {
     return this.fireHeld || this.padDown('fire')
+  }
+
+  /** 引き金がパッドの R2 か。ナイフは R2 が眠らせる刺突、左クリックが殺す刺突 */
+  get firingByPad(): boolean {
+    return this.padDown('fire')
   }
 
   /**

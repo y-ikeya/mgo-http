@@ -53,6 +53,10 @@ const JA = {
   'lobby.unreachable': 'サーバーに繋がらない',
   'lobby.expired': '長時間操作がなかったため部屋から退出しました',
   'lobby.loading': '読み込み中…',
+  'home.versus': '対戦',
+  'home.versusHint': '部屋を選んで、他のプレイヤーと戦う',
+  'home.training': '練習',
+  'home.trainingHint': 'ひとりで動きと撃ち方を試す。的が立っている',
 
 
   // --- 試合中 ---
@@ -140,6 +144,10 @@ const EN: Record<Key, string> = {
   'lobby.unreachable': 'Cannot reach the server',
   'lobby.expired': 'You were removed from the room after a long period of inactivity',
   'lobby.loading': 'Loading…',
+  'home.versus': 'VERSUS',
+  'home.versusHint': 'Pick a room and fight other players',
+  'home.training': 'TRAINING',
+  'home.trainingHint': 'Try movement and shooting on your own. Targets are set up',
 
 
   'hud.loading': 'Loading the battlefield',

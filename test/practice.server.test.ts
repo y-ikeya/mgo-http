@@ -45,12 +45,13 @@ describe('練習部屋', () => {
     solo.close()
   })
 
-  test('的が 5 体、赤で並んでいる', async () => {
+  // 数はステージの表から。**しゃがみ・伏せの的を足して 5 体から 9 体になった時に置き去りになった**
+  test('的がステージの表の数だけ、赤で並んでいる', async () => {
     const solo = await enterPractice('watcher')
     await Bun.sleep(400)
     const roster = solo.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
     const targets = roster.players.filter((p) => p.id.startsWith('target-'))
-    expect(targets.length).toBe(5)
+    expect(targets.length).toBe(STAGES[ROOMS.echo.stages.stages[0]].targets.length)
     expect(targets.every((t) => t.team === 'red')).toBe(true)
     solo.close()
   })

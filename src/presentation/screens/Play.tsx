@@ -3,13 +3,16 @@ import { t } from '../../i18n'
 import { useNavigate, useParams } from '@solidjs/router'
 import type * as THREE from 'three'
 import { Game, type GameStats } from '../scene/Game'
-import type { Identity } from '../../infra/auth/session'
+import { ensureFresh, type Identity } from '../../infra/auth/session'
 import type { WeaponTarget } from '../scene/arms/weapon'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
 import { CHOICES } from '../../domain/item/weapons'
+import ReadyRoom from '../ui/ReadyRoom'
+import { selfSkin } from '../scene/actor/skin'
+import type { WeaponKind } from '../scene/arms/weapon'
 import Loadout from '../ui/Loadout'
 import Blocked from '../ui/Blocked'
 import Leaving from '../ui/Leaving'
@@ -49,8 +52,17 @@ function statsRequested(): boolean {
 /** 一言を出しておく時間 (ms)。App.css の play-notice の薄れ方と揃える */
 const NOTICE_MS = 6000
 
-export default function Play(props: { identity: Identity }) {
+export default function Play(props: {
+  identity: Identity
+  /**
+   * 入る部屋を URL ではなく呼ぶ側が決める (/training)。**その時は URL を書き換えず、
+   * 出たら最初の画面 (/) へ戻る** — 練習は部屋の一覧を通らない
+   */
+  room?: string
+}) {
   const params = useParams<{ room: string; match?: string }>()
+  const roomName = () => props.room ?? params.room
+  const training = props.room !== undefined
   /*
    * 入ってきたときに指していた試合。**一度だけ見る。**
    *
@@ -109,9 +121,21 @@ export default function Play(props: { identity: Identity }) {
       }
     }
 
-    const room = params.room
+    // 練習 (/training) は URL を部屋の形に書き換えない
+    if (training) return
+    const room = roomName()
+    /*
+     * 支度の間 (ready) は待合室の URL (/standby)。**短命だが分けておく** —
+     * 試合の札はまだ無く (始まる時に発番)、部屋の URL のままだと「いま
+     * 支度中か」が URL から読めない (2026-10-09 本人)
+     */
     // 長い札をそのまま貼ると読めない。頭だけで十分に見分けられる
-    const path = label ? `/rooms/${room}/match/${label}` : `/rooms/${room}`
+    const path =
+      current.phase === 'ready'
+        ? `/rooms/${room}/standby`
+        : label
+          ? `/rooms/${room}/match/${label}`
+          : `/rooms/${room}`
     if (location.pathname === path) return
     history.replaceState(history.state, '', `${path}${location.search}`)
   })
@@ -134,8 +158,12 @@ export default function Play(props: { identity: Identity }) {
    *
    * 待っている間や結果を見ている間に抜けても、誰の試合も壊れない。
    * そこまで引き止めると、ただ邪魔なだけになる。
+   *
+   * **練習 (/training) は引き止めない。** 自分だけの部屋なので、抜けても
+   * 誰の試合も壊れない (本人 2026-10-14)
    */
   const inMatch = () => {
+    if (training) return false
     const phase = stats()?.match?.phase
     return phase === 'countdown' || phase === 'playing'
   }
@@ -143,7 +171,7 @@ export default function Play(props: { identity: Identity }) {
   /** 出ることを伝えてから離れる。伝えないと、残った人は席が畳まれるまで待つ */
   const leaveRoom = () => {
     game()?.leaveRoom()
-    navigate('/rooms')
+    navigate(training ? '/' : '/rooms')
   }
 
   /*
@@ -155,16 +183,33 @@ export default function Play(props: { identity: Identity }) {
    */
   createEffect(() => {
     if (!stats()?.expired) return
-    navigate('/rooms', { state: { notice: 'expired' } })
+    /*
+     * **来た所へ返す。** 対戦なら部屋の一覧 (/rooms)、練習なら最初の画面 (/)。
+     * 練習を /training へ直に返さないのは、あの画面は開いた瞬間に繋ぎに行くので、
+     * 認証が戻っていなければまた切れて、ここへ戻ってくる (行き来が止まらない)
+     */
+    // 戻る前に token を取り直す。取り直さないと、入り直した時にまた弾かれる
+    void ensureFresh(true).finally(() => navigate(training ? '/' : '/rooms', { state: { notice: 'expired' } }))
   })
 
-  onMount(() => {
-    const instance = new Game(container, props.identity, params.room)
+  let alive = true
+  onCleanup(() => {
+    alive = false
+  })
+  onMount(async () => {
+    // 繋ぐ前に、期限が近ければ token を取り直す (裏に回っていた間に切れていることがある)
+    const identity = (await ensureFresh()) ?? props.identity
+    // 取り直している間に画面を離れていたら作らない
+    if (!alive) return
+    // 練習 (/training) は自分だけの部屋。他の人と出会わない
+    const instance = new Game(container, identity, roomName(), training)
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
     instance.onLoadout = (next) => {
       setPrimary(next.primary)
       setSupport(next.support)
     }
+    // 前回選んだ物 (初めてなら一覧の先頭) に印を付けて開く
+    instance.onLoadout(instance.chosenLoadout)
     void instance.start(setStats)
     setGame(instance)
   })
@@ -265,7 +310,26 @@ export default function Play(props: { identity: Identity }) {
         装備。支度をしている間 (domain/player/lifecycle.ts の choosing) だけ出す。
         入った直後と、倒れて次に湧くまでがそこにあたる。
       */}
-      <Show when={stats()?.loadoutOpen}>
+      {/*
+        待合室。試合前の支度 (ready) の間は装備画面ではなくこちら。
+        スキルの効き目を数字で読み、長押しで READY する (ui/ReadyRoom.tsx)
+      */}
+      <Show when={stats()?.loadoutOpen && stats()?.match?.phase === 'ready'}>
+        <ReadyRoom
+          skin={selfSkin(props.identity.displayName)}
+          gun={(stats()?.primary ?? null) as WeaponKind | null}
+          left={stats()?.loadoutLeft ?? 0}
+          skills={stats()?.skills ?? {}}
+          skillsOpen={stats()?.skillsOpen ?? false}
+          onSkill={(id, level) => game()?.setSkill(id, level)}
+          players={stats()?.scores ?? []}
+          selfId={game()?.selfId ?? ''}
+          onReady={(next) => game()?.setReady(next)}
+          hold={stats()?.readyHold ?? 0}
+          focus={stats()?.loadoutFocus ?? 'primary'}
+        />
+      </Show>
+      <Show when={stats()?.loadoutOpen && stats()?.match?.phase !== 'ready'}>
         <Loadout
           primary={stats()?.primary ?? primary()}
           support={support()}

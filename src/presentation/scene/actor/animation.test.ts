@@ -600,6 +600,86 @@ describe('勝手に構えない', () => {
       anim.playDeath(true)
       run(anim, 0.6, from)
       expect(playing(anim, 'lower')).toEqual(['prone_death'])
+      expect(playing(anim, 'upper')).toEqual(['prone_death'])
+    }
+  })
+
+  /**
+   * **倒れたことが 2 通で届いても、伏せたまま。** 相手の体には生死の一通 (向き無し) と
+   * 向きを持った姿勢 (death_front) の 2 通で届く。2 通目で立ちの型に上書きされて、
+   * 伏せていた体が立ってから崩れていた (本人 2026-10-14)
+   */
+  test('倒れたことが 2 度届いても、伏せたまま崩れる', () => {
+    for (const second of [true, false, undefined]) {
+      const anim = animator()
+      run(anim, 1.2, 'prone_idle')
+      anim.playDeath()
+      run(anim, 0.1, 'prone_idle')
+      anim.playDeath(second)
+      run(anim, 0.6, 'prone_idle')
+      expect(playing(anim, 'lower')).toEqual(['prone_death'])
+      // 上半身も。重みが流れていない型へ寄ると上半身だけ T ポーズになる
+      expect(playing(anim, 'upper')).toEqual(['prone_death'])
+    }
+  })
+
+  /**
+   * **しゃがんだまま正面から倒されたら、しゃがみから後ろへ崩れる** (本人 2026-10-14)。
+   * 背後からは型が無いので立ちの型。向きの分からない 1 通目でもしゃがみを選び、
+   * 2 通目が「背後から」ならそこで立ちの型へ替える
+   */
+  test('しゃがんだまま正面から倒されたら、しゃがみの崩れ', () => {
+    for (const from of ['crouch_idle', 'crouch_f', 'lean_crouch_left']) {
+      for (const first of [false, undefined]) {
+        const anim = animator()
+        run(anim, 1.2, from)
+        anim.playDeath(first)
+        run(anim, 0.1, from)
+        anim.playDeath(false)
+        run(anim, 0.6, from)
+        expect(playing(anim, 'lower')).toEqual(['crouch_death'])
+        expect(playing(anim, 'upper')).toEqual(['crouch_death'])
+      }
+    }
+  })
+
+  test('しゃがんだまま背後から倒されたら、立ちの型で前へ', () => {
+    for (const first of [true, undefined]) {
+      const anim = animator()
+      run(anim, 1.2, 'crouch_idle')
+      anim.playDeath(first)
+      run(anim, 0.1, 'crouch_idle')
+      anim.playDeath(true)
+      run(anim, 0.6, 'crouch_idle')
+      expect(playing(anim, 'lower')).toEqual(['death_front'])
+    }
+  })
+
+  /** 倒れたまま留まる。**流れ直すと 数秒ごとに倒れ直す** */
+  test('伏せ・しゃがみの崩れは最後の姿勢で留まる', () => {
+    for (const [from, clip] of [['prone_idle', 'prone_death'], ['crouch_idle', 'crouch_death']] as const) {
+      const anim = animator()
+      run(anim, 1.2, from)
+      anim.playDeath(false)
+      run(anim, 8, from)
+      const action = (anim as unknown as Record<string, Map<string, THREE.AnimationAction>>).lower.get(clip)!
+      expect(action.time).toBeCloseTo(action.getClip().duration, 2)
+    }
+  })
+
+  /** **眠らされた (スタン) まま倒されたら、伏せと同じく床で崩れる。** 立ち上がらない */
+  test('眠っている体を倒すと、伏せの崩れ', () => {
+    for (const second of [true, false, undefined]) {
+      const anim = animator()
+      run(anim, 1.2, 'idle')
+      anim.playSleep()
+      run(anim, 4, 'sleep')
+      anim.playDeath()
+      run(anim, 0.1, 'sleep')
+      anim.playDeath(second)
+      run(anim, 0.6, 'sleep')
+      expect(playing(anim, 'lower')).toEqual(['prone_death'])
+      expect(playing(anim, 'upper')).toEqual(['prone_death'])
     }
   })
 
@@ -1166,5 +1246,66 @@ describe('置き切るまで構え直さない', () => {
     // 頭は立ち、終わりはかがみ。**この差が「流し直すと立ち上がる」の正体**
     expect(hipsAt(0)).toBeGreaterThan(0.8)
     expect(hipsAt(1)).toBeLessThan(0.5)
+  })
+})
+
+/**
+ * 倒れる型の下がり。**型どおりに下がり、壁があれば手前で止まる** (本人 2026-10-14)。
+ * 腰からは抜いてある (位置はコードが持つ) ので、模型をずらして出す (deathSlide.ts)。
+ */
+describe('倒れながら下がる', () => {
+  const fall = (from: string, fromBehind: boolean) => {
+    const anim = animator()
+    run(anim, 1.2, from)
+    anim.playDeath(fromBehind)
+    return anim
+  }
+
+  test('しゃがんで正面から倒されると、後ろへ約 1m', () => {
+    const anim = fall('crouch_idle', false)
+    run(anim, 4, 'crouch_idle')
+    const out = new THREE.Vector3()
+    expect(anim.deathSlide(out)).toBe('crouch_death')
+    // 模型の正面は +Z。後ろへ
+    expect(out.z).toBeLessThan(-0.8)
+    expect(out.z).toBeGreaterThan(-1.2)
+  })
+
+  test('模型をずらして出す。壁が 0.6m 後ろなら、体の厚み (0.3m) を残して止まる', () => {
+    const { DeathSlide, setSlideBlocker } = require('./deathSlide') as typeof import('./deathSlide')
+    for (const [wall, expected] of [[null, 1.0], [0.6, 0.3]] as const) {
+      setSlideBlocker(wall === null ? null : (_o, _d, max) => Math.min(max, wall))
+      const anim = fall('crouch_idle', false)
+      const object = new THREE.Group()
+      const model = new THREE.Group()
+      model.rotation.y = Math.PI
+      object.add(model)
+      const slide = new DeathSlide()
+      for (let i = 0; i < 240; i++) {
+        anim.setLocomotion('crouch_idle' as never)
+        anim.update(1 / 60)
+        slide.update(anim, object, model)
+      }
+      expect(model.position.length()).toBeCloseTo(expected, 1)
+    }
+    setSlideBlocker(null)
+  })
+
+  test('生き返ったら模型は元の所へ戻る', () => {
+    const { DeathSlide } = require('./deathSlide') as typeof import('./deathSlide')
+    const anim = fall('idle', false)
+    const object = new THREE.Group()
+    const model = new THREE.Group()
+    object.add(model)
+    const slide = new DeathSlide()
+    for (let i = 0; i < 120; i++) {
+      anim.update(1 / 60)
+      slide.update(anim, object, model)
+    }
+    expect(model.position.length()).toBeGreaterThan(0.3)
+    anim.revive()
+    anim.update(1 / 60)
+    slide.update(anim, object, model)
+    expect(model.position.length()).toBe(0)
   })
 })

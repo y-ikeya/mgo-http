@@ -15,7 +15,7 @@ import type { Decoy } from './arms/decoy'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
 import type { Locator } from './arms/locator'
-import { sessionOf } from './session'
+import { sessionFor, sessionOf } from './session'
 import { terrainOf, type Terrain } from './stage'
 
 export interface Client {
@@ -25,6 +25,11 @@ export interface Client {
   name?: string
   /** 繋ぐ前に確かめてある (isRoomName)。以後は部屋の名前として扱ってよい */
   room: RoomName
+  /**
+   * 部屋の帳簿 (rooms) を引く鍵。**普段は部屋の名前そのもの。** 自分だけの練習部屋
+   * (?private=1) は `foxtrot~<id>` のように人ごとに分かれる (privateRoomKey)
+   */
+  roomKey: string
   /**
    * 断る理由。**付いていれば open で閉じる。**
    *
@@ -49,8 +54,14 @@ export interface Client {
  * ため** (手榴弾は Projectile を持つ)。だからサーバー側で包む。
  */
 export interface RoomWorld extends Match {
-  /** 部屋の名前。配る相手を引くのに要る */
+  /** 部屋の名前。ルールと地形はこの名前の表から引く */
   name: RoomName
+  /** 帳簿 (rooms) の鍵。共有の部屋は名前と同じ、自分だけの練習部屋は人ごと */
+  key: string
+  /** 支度の段階で全員の READY が揃った時刻 (ms)。0 なら揃っていない (server/match.ts の READY_GRACE_MS) */
+  allReadyAt: number
+  /** 揃う前の支度の締め切り。誰かが取り消したらここへ戻す */
+  readyDeadline: number
   /** 飛んでいる手榴弾 */
   grenades: Grenade[]
   /** 置かれたクレイモア */
@@ -80,7 +91,15 @@ export interface RoomWorld extends Match {
   stage: Terrain
 }
 
-export const rooms = new Map<RoomName, RoomWorld>()
+export const rooms = new Map<string, RoomWorld>()
+
+/**
+ * 自分だけの練習部屋の鍵。**同じルールの部屋を人ごとに作る** (2026-10-08 本人「練習で出会うな」)。
+ * 一覧 (/rooms) は名前で引くので、ここで作った部屋は出ない
+ */
+export function privateRoomKey(name: RoomName, id: string): string {
+  return `${name}~${id}`
+}
 
 /**
  * 投げた物・置いた物の持ち主から見て敵か。
@@ -103,14 +122,17 @@ export function friendlyTeam(room: Match, viewer: MatchPlayer, owner: Team): boo
 /** 1 部屋の上限。4 対 4 */
 export const ROOM_CAPACITY = 8
 
-export function roomOf(name: RoomName): RoomWorld {
-  let room = rooms.get(name)
+export function roomOf(name: RoomName, key: string = name): RoomWorld {
+  let room = rooms.get(key)
   if (!room) {
     // 回す表から 1 枚選ぶ。**初回なので前は無い** (previous = null)
     const stage = nextStage(ROOMS[name].stages, null, Math.random())
     room = {
       ...newMatch(ROOMS[name].mode),
       name,
+      key,
+      allReadyAt: 0,
+      readyDeadline: 0,
       grenades: [],
       claymores: [],
       decoys: [],
@@ -119,7 +141,7 @@ export function roomOf(name: RoomName): RoomWorld {
       stage: terrainOf(stage),
     }
     if (room.mode.id === 'PRACTICE') placeTargets(room)
-    rooms.set(name, room)
+    rooms.set(key, room)
   }
   return room
 }
@@ -149,6 +171,48 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
     return
   }
   broadcast(room, { type: 'life', id: player.id, state: next })
+  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す
+  if (next !== 'alive' && next !== 'spawning') releaseCqc(room, player)
+}
+
+/**
+ * CQC で投げている相手を**放す**。背中が地面に着く前に投げた側が倒れた・抜けた時。
+ *
+ * 相手は倒れかけの所から立ち直り、スタミナは減らない (着いた時の始末を取り消す)。
+ * 人には本人へ released を送る (倒れているのは本人の画面なので)。的はこちらで立たせる
+ */
+/**
+ * 爆風・散弾で吹き飛ばされた。**CQC より吹き飛ぶほうが強い。**
+ *
+ * 投げている側なら相手を放す (releaseCqc)。投げられている側なら、投げた側の
+ * 着地の始末 (スタミナ) を取り消す — 本人は吹き飛ぶ型へ移る (knockdown が届く) ので
+ * 放す知らせは要らない。的の転び方は呼ぶ側 (knockAway) が上書きする
+ */
+export function cancelCqc(room: RoomWorld, player: MatchPlayer): void {
+  releaseCqc(room, player)
+  for (const other of room.players.values()) {
+    const session = sessionFor(other)
+    if (session?.cqcThrow?.victim !== player) continue
+    clearTimeout(session.cqcThrow.timer)
+    session.cqcThrow = null
+  }
+}
+
+export function releaseCqc(room: RoomWorld, attacker: MatchPlayer): void {
+  // 的には接続が無い (投げることも無い)
+  const session = sessionFor(attacker)
+  const pending = session?.cqcThrow
+  if (!session || !pending) return
+  session.cqcThrow = null
+  clearTimeout(pending.timer)
+  const victim = pending.victim
+  if (room.players.get(victim.id) !== victim) return
+  if (victim.bot) {
+    victim.downLeft = 0
+    victim.downThrown = false
+    return
+  }
+  sessionFor(victim)?.socket.send(JSON.stringify({ type: 'released' } satisfies ServerMessage))
 }
 
 /**
@@ -199,6 +263,9 @@ export function placeTargets(room: RoomWorld): void {
       team: 'red',
       x: at.x,
       z: at.z,
+      // 地面が 0 でないステージで埋まらないように (検証場の地面は 0.1)
+      y: at.y,
+      stance: at.stance,
       now,
     })
     room.players.set(bot.id, bot)

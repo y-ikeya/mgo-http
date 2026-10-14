@@ -53,8 +53,9 @@ const RULES = {
   zoneSpan: (zone: string): readonly [number, number] =>
     zone === 'HEAD' ? [1, 1] : zone === 'BODY' ? [0.66, 0.92] : [0.09, 0.66],
   // 立ち・しゃがみ・箱は刺さる。倒れている相手は見下ろしたときだけ
-  canBeStabbed: (stance: string, aimPitch: number) =>
-    stance === 'stand' || stance === 'crouch' || stance === 'box' || aimPitch <= DOWN_PITCH,
+  canBeStabbed: (stance: string, aimPitch: number, attacker: string) =>
+    stance === 'stand' || stance === 'crouch' || stance === 'box' ||
+    ((attacker === 'crouch' || attacker === 'prone') && aimPitch <= DOWN_PITCH),
   meleeRange: 2,
   meleeSlack: 1.2,
   backstabDot: 0.34,
@@ -148,10 +149,10 @@ describe('背後から刺したか', () => {
 })
 
 describe('倒れている相手を刺す', () => {
-  /** 刺せる間合いに並べて、見下ろす角度を変える */
-  const stab = (targetStance: Stance, pitch: number) =>
+  /** 刺せる間合いに並べて、刺す側の構えと見下ろす角度を変える */
+  const stab = (targetStance: Stance, pitch: number, attacker: Stance = 'crouch') =>
     verifyHit(
-      history([0, 0], 'stand', 0, pitch),
+      history([0, 0], attacker, 0, pitch),
       history([0, 1], targetStance),
       { kind: 'melee' },
       OPEN_SIGHT,
@@ -161,17 +162,22 @@ describe('倒れている相手を刺す', () => {
     expect(stab('prone', 0).ok).toBe(false)
   })
 
-  test('見下ろせば通る。しゃがんで下を狙う手間が要る', () => {
+  test('しゃがんで見下ろせば通る。伏せていても同じ', () => {
     expect(stab('prone', DOWN_PITCH).ok).toBe(true)
     expect(stab('prone', -0.8).ok).toBe(true)
+    expect(stab('prone', -0.8, 'prone').ok).toBe(true)
+  })
+
+  test('**立ったまま見下ろしても届かない。** 腕は床まで届かない', () => {
+    expect(stab('prone', -0.8, 'stand').ok).toBe(false)
   })
 
   test('少し下を向いた程度では通らない', () => {
     expect(stab('prone', -0.1).ok).toBe(false)
   })
 
-  test('立っている相手は見下ろさなくても刺さる', () => {
-    expect(stab('stand', 0).ok).toBe(true)
+  test('立っている相手は見下ろさなくても刺さる (立っていても)', () => {
+    expect(stab('stand', 0, 'stand').ok).toBe(true)
   })
 })
 

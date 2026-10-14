@@ -1,10 +1,13 @@
 import * as THREE from 'three'
+import { CQC_LAND_SECONDS } from '../../../domain/player/cqc'
 import { isBone } from '../util/guards'
 import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
 import {
+  CROUCH_WALK_TOP_SPEED,
   MOVE_DIRECTIONS,
+  WALK_TOP_SPEED,
   emptyHanded,
   type Locomotion,
   type MoveDirection,
@@ -53,6 +56,10 @@ const AIM_HIP_LAMBDA = 10
  */
 const LOWER_CLIPS: Record<Locomotion, string> = {
   idle: 'idle',
+  // 歩き (本人作、tools/walk.json)。構えていない間だけなので、脱力の表と同じ型
+  walk: 'walk',
+  // しゃがみ歩きは**しゃがみ走りをゆっくり流す** (本人 2026-10-08、専用の型は要らない)
+  crouch_walk: 'crouch_f',
   // 落下の受け身。着地 (jump_down) とは別のクリップ
   hard_land: 'hard_land',
   // 階段を上る。**下半身だけ** — 上は構えたまま上れる
@@ -75,6 +82,11 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 起き上がりは仰向け用 (STAND_CLIP) を引く — sweep が仰向けで終わるため
   sweep: 'sweep',
   stand: 'stand_front',
+  // CQC (domain/player/cqc.ts)。投げる / 空振り / 投げられる。どれも全身の型で、
+  // 焼かれた移動を辿る (ROOT_MOTION_CLIPS)。投げられる型は仰向けで終わる (sweep と同じ)
+  cqc_throw: 'cqc_throw',
+  cqc_miss: 'cqc_miss',
+  cqc_thrown: 'cqc_thrown',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
   /*
@@ -89,6 +101,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   crawl_b: 'crawl_b',
   // 伏せたまま倒された。立ちの型で倒れると、一度立ち上がってから崩れる
   prone_death: 'prone_death',
+  // しゃがんだまま正面から倒された
+  crouch_death: 'crouch_death',
   // 伏せへの出入り。全身の型なので上半身も同じクリップから取る
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
@@ -168,6 +182,9 @@ type UpperState =
   | 'bolt'
   | 'sweep'
   | 'stand'
+  // CQC で投げている / 空振り。投げられる側は 'sweep' (倒れる型が違うだけ、fallKey)
+  | 'cqc_throw'
+  | 'cqc_miss'
   // 接続が切れた人の姿
   | 'away'
 
@@ -183,6 +200,10 @@ type UpperState =
  */
 const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
+  // 歩きは長物を提げた型。上下とも同じクリップ (RELAXED_LOWER_STATES)
+  walk: 'walk',
+  // しゃがみ歩きはしゃがみ走りと同じ上半身
+  crouch_walk: 'knee_relaxed',
   // 梯子は全身で 1 つの型。**構えていても同じ** — 両手が塞がっている
   climb: 'climb',
   climb_top: 'climb_top',
@@ -197,6 +218,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   crawl_f: 'crawl_f',
   crawl_b: 'crawl_b',
   prone_death: 'prone_death',
+  crouch_death: 'crouch_death',
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
   prone_roll_down: 'prone_roll_down',
@@ -259,6 +281,7 @@ const POSE_ONLY_CLIPS = new Set(['knee_relaxed', 'knee_ready'])
 
 const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
   'crouch_idle',
+  'crouch_walk',
   'lean_crouch_left',
   'lean_crouch_right',
   ...MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion),
@@ -289,7 +312,20 @@ const JUMP_LOOP_MAX_SPEED = 3
  * **着地は入れない。** 転がる型だった頃は 3m 進む必要があったが、いまの
  * 着地 (hard_land) は膝を突いて堪える動きで、その場から動かない。
  */
-const ROOT_MOTION_CLIPS = new Set(['roll', 'prone_roll_down', 'vault', 'vault_up', 'hang_drop', 'hang_climb'])
+const ROOT_MOTION_CLIPS = new Set([
+  // 梯子を登り切る。**位置は soldier が腰の曲線 (riseProgress / forwardProgress) で運ぶ**
+  'climb_top',
+  'roll',
+  'prone_roll_down',
+  'vault',
+  'vault_up',
+  'hang_drop',
+  'hang_climb',
+  // CQC。投げる側は 0.7m 踏み込み、投げられる側は 0.7m 後ろへ倒れる
+  'cqc_throw',
+  'cqc_miss',
+  'cqc_thrown',
+])
 /**
  * 焼かれた移動を**この割合まで止めておく**型。止めた分は残りで取り返す (総距離は同じ)。
  *
@@ -310,7 +346,21 @@ const ROOT_MOTION_HOLD: Partial<Record<Locomotion, { until: number; keep: number
  * 合わせた瞬間に差のぶん跳ねる。上下は型から抜き、位置のほうを型の上がり方
  * (vaultRise) に沿ってコードで上げる。
  */
-const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb'])
+const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top'])
+/**
+ * 倒れる型の**前後の移動を絵として残す**型 (deathSlide)。
+ *
+ * 型は倒れながら下がる (後ろへ倒れる型で 1.0m、前へ倒れる型で 2.3m)。位置はコードが
+ * 持つので他の型と同じく腰からは抜くが、抜いたままだと**足が前へ滑って**その場に
+ * 崩れる (本人 2026-10-14)。抜いた分を模型ごとずらして戻す。位置 (判定の所) は
+ * 動かさない — 倒れた後は判定に使わない。壁の手前で止めるのは体の側 (DeathSlide)
+ */
+export const DEATH_SLIDE_CLIPS = new Set(['death', 'death_front', 'death_back', 'crouch_death'])
+/**
+ * 下がりを型のこの倍だけ出す。**前へ倒れる型は大げさ** — 型のままだと背後から撃たれて
+ * 2.3m 前へ飛んだ (本人 2026-10-14「前に飛びすぎ」)。後ろへ倒れる型 (1m) と同じくらいに抑える
+ */
+const DEATH_SLIDE_SCALE: Partial<Record<string, number>> = { death_front: 0.35, death: 0.5 }
 /**
  * 上下を抜く型のうち、**終わりの腰の高さを別の型に合わせる物。**
  *
@@ -470,11 +520,18 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
   'stand',
+  'cqc_throw',
+  'cqc_miss',
+  // 投げられて倒れた姿のまま留める (sweep と同じ)
+  'cqc_thrown',
   'jump_up',
   'jump_down',
   'death',
   'death_front',
   'death_back',
+  // 伏せ / しゃがみのまま倒れる。**ここに無いと下半身だけ流れ直して倒れ直す**
+  'prone_death',
+  'crouch_death',
   // 眠り。**最後の姿勢で止める** — 流し直すと 30 秒の間ずっと倒れ直す
   'sleep',
   'salute',
@@ -521,6 +578,10 @@ const PISTOL_RELOAD_RATE = 1.7
  */
 const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   idle: 'pistol_relaxed',
+  // 手ぶらの歩き (拳銃は納めている、ナイフ・投げ物も同じ表)
+  walk: 'walk_unarmed',
+  // しゃがみ歩きはしゃがみ走りと同じ手ぶらの型
+  crouch_walk: 'crouch_unarmed',
   crouch_idle: 'pistol_relaxed',
   sneak: 'crouch_unarmed',
   /*
@@ -578,6 +639,20 @@ const PRONE_KNIFE_KEY = 'prone_knife'
 const BOLT_KEY = 'bolt'
 /** 爆風で吹き飛ばされる。倒れた姿勢で終わる */
 const SWEEP_KEY = 'sweep'
+/**
+ * CQC で投げられて倒れる (domain/player/cqc.ts)。**倒れた後は sweep と同じ扱い**
+ * — 上半身の状態も 'sweep' のまま、引く型だけが違う (fallKey)
+ */
+const THROWN_KEY = 'cqc_thrown'
+/** CQC で投げる / 空振りする。全身の型 */
+const CQC_THROW_KEY = 'cqc_throw'
+/**
+ * CQC の型 (投げる / 空振り / 投げられる) の再生速度。Blender で組んだ 2.9 秒は
+ * ゆっくりすぎた (本人 2026-10-12: 1.2 倍くらい速く)。投げる側と投げられる側は
+ * **同じ速さで流す** — ずらすと喉に掛けた腕と首が離れる
+ */
+const CQC_RATE = 1.2
+const CQC_MISS_KEY = 'cqc_miss'
 /**
  * 吹き飛ばされる型の再生速度。
  *
@@ -688,6 +763,7 @@ const DEATH_KEY = 'death'
 const DEATH_FRONT_KEY = 'death_front'
 /** 伏せたまま倒された型。**向きは無い** — 既にその向きで寝ている */
 const PRONE_DEATH_KEY = 'prone_death'
+const CROUCH_DEATH_KEY = 'crouch_death'
 const DEATH_BACK_KEY = 'death_back'
 /**
  * 麻酔で眠っている型。**上半身も要る。**
@@ -766,6 +842,9 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   BOLT_KEY,
   PRONE_BOLT_KEY,
   SWEEP_KEY,
+  THROWN_KEY,
+  CQC_THROW_KEY,
+  CQC_MISS_KEY,
   STAND_KEY,
   THROW_WINDUP_KEY,
   THROW_RELEASE_KEY,
@@ -784,6 +863,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   DEATH_FRONT_KEY,
   DEATH_BACK_KEY,
   PRONE_DEATH_KEY,
+  CROUCH_DEATH_KEY,
   PRONE_DOWN_KEY,
   PRONE_RISE_KEY,
   PRONE_ROLL_DOWN_KEY,
@@ -915,7 +995,29 @@ const PRONE_RISE_RATE = 1.5
  */
 const RUN_CADENCE = 1.41
 
+/*
+ * 立ち歩きの型の本来の速さ (m/s)。**その場歩きなので、接地している足が後ろへ
+ * 滑る速さ**から測った (Blender で 1 コマずつ、中央値)。長物と手ぶらで違う —
+ * 手ぶらはゆっくり大股 (1 秒に 1.2 歩)、長物は普通の歩き (1.8 歩)。
+ */
+const WALK_CLIP_SPEED = 1.27
+/** 状態ではなく**クリップ**で速さが違う物。手ぶらの表 (PISTOL_RELAXED) が引く */
+const CLIP_NATIVE_SPEED: Record<string, number> = {
+  walk_unarmed: 0.78,
+}
+/**
+ * 歩きの再生の上限 (m/s)。**他人の型には速さが届かない** (moveSpeed は走りの値の
+ * まま) ので、上限で切らないと他人の歩きが倍速で回る。自分は実際の速さが来る
+ */
+const WALK_TOPS: Partial<Record<Locomotion, number>> = {
+  walk: WALK_TOP_SPEED,
+  crouch_walk: CROUCH_WALK_TOP_SPEED,
+}
+
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
+  walk: WALK_CLIP_SPEED,
+  // しゃがみ走りの型をそのまま遅く流す
+  crouch_walk: CROUCH_CLIP_SPEED,
   sneak: SNEAK_CLIP_SPEED,
   crawl_f: CRAWL_CLIP_SPEED,
   // 後退も同じ速さで作られている
@@ -1076,11 +1178,35 @@ const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as 
  * 本来の姿勢として残す。なので X の差 8.6° が上体の傾きとして残り、**立って
  * いるだけで右へ 15° ほど傾いて**見えた。上下を同じクリップにすれば差が無くなる。
  */
-const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle'])
+const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle', 'walk'])
 
 /** 脱力中の下半身を引く鍵。**元の状態と、流すクリップの組** */
 function relaxedLowerKey(state: Locomotion, clip: string): string {
   return `${state}@${clip}`
+}
+
+/**
+ * **型そのものが斜めに作られている物**を、腰ごと正面へ回す角度 (rad、左回りが正)。
+ *
+ * 拳銃・ナイフ・投げ物を持って構えていない時の型 (pistol_relaxed) は、腰が正面から
+ * 43° 右へ回っていた (長物の relaxed_idle は 12°)。体ごと斜めに立って見えた
+ * (2026-10-10 本人)。胸は腰より 26° 正面寄りなので、腰と胸の真ん中が正面に来る 30°
+ */
+const CLIP_FACING: Record<string, number> = {
+  pistol_relaxed: THREE.MathUtils.degToRad(30),
+  // ナイフを立って構えた全身の型。腰が 50° 回った半身 (本人: ナイフを持つと斜め)
+  knife_idle: THREE.MathUtils.degToRad(35),
+}
+
+/**
+ * **上半身の型が斜めの物**を、背骨で正面へ回す角度 (rad、左回りが正)。首と頭は
+ * 同じだけ戻して顔を正面に残す。拳銃の構えは上体が右へ回った半身だった
+ * (2026-10-10 本人)。銃身は Soldier が照準へ向け直す (weapon.ts の alignBarrel)
+ */
+const UPPER_FACING: Record<string, number> = {
+  // **しゃがみだけ。** 立ちの構えはもとから正面寄りで、同じだけ回すと左へ 45° 回りすぎた
+  // (本人 2026-10-10)。撃つ型 (pistol_fire) は立ちでも使うので入れない
+  pistol_crouch_aim: THREE.MathUtils.degToRad(25),
 }
 
 const AIM_PITCH_CHAIN: { suffix: string; weight: number; yaw: number }[] = [
@@ -1145,6 +1271,13 @@ export class CharacterAnimator {
    * 置き切る方は素から SETUP_RELEASE_RATE で流しているので、その上に掛ける。
    * 上下を同じ速さで流す — 片方だけ速めると腰から上と下が離れる。
    */
+  /** 刺す型の再生速度 (KNIFE MASTERY)。尺 (stabDuration) はこれで割る */
+  stabSpeed = 1
+
+  setStabSpeed(scale: number): void {
+    this.stabSpeed = scale
+  }
+
   setSetupSpeed(scale: number): void {
     this.setupSpeed = scale
     for (const [key, base] of [[SETUP_WINDUP_KEY, 1], [SETUP_RELEASE_KEY, SETUP_RELEASE_RATE]] as const) {
@@ -1238,6 +1371,10 @@ export class CharacterAnimator {
   private hipsBone: THREE.Bone | null = null
   private readonly uprightHips = new THREE.Quaternion()
   private readonly hipsBase = new THREE.Quaternion()
+  /** いま掛けている向きの補正 (rad、CLIP_FACING)。型が変わる時は寄せて切り替える */
+  private facingFix = 0
+  /** いま掛けている上半身の向きの補正 (rad、UPPER_FACING) */
+  private upperFacing = 0
   private hipsCaptured = false
   /**
    * 上半身クリップごとの腰の回転トラック。
@@ -1295,6 +1432,18 @@ export class CharacterAnimator {
   relaxedLean = RELAXED_LEAN
   /** 構えたときに上体を起こす量 (rad)。姿勢ごと。?aimlevel= で触れる */
   aimLevel = { ...AIM_LEVEL }
+  /**
+   * 手にある銃の**上体の起こし** (rad、weapon.ts の aimLift)。aimLevel に足す。
+   * しゃがんで構えた型は銃によって 30° 以上下を向くので、大半は上体を起こして
+   * 取り返す — 両手ごと上がるので左手が銃から離れない。残りは銃を回す (aimTrim)
+   */
+  gunLift = { stand: 0, crouch: 0 }
+  /**
+   * いま掛けている起こし。**背骨 3 本だけを起こし、首と頭は同じだけ戻す** —
+   * 照準の曲げ (首と頭にも配る) に乗せていた頃は、しゃがみで頭まで上を向いて
+   * 上目遣いになった (2026-10-10 本人)。腕は背骨に乗るので、起こしは全部銃に届く
+   */
+  private gunLiftNow = 0
   private lean = 0
   /** ダンボールを被っているか。前傾を深くして頭を下げる */
   private boxed = false
@@ -1358,6 +1507,9 @@ export class CharacterAnimator {
       finished === this.upper.get(BOLT_KEY) ||
       finished === this.upper.get(PRONE_BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
+      finished === this.upper.get(THROWN_KEY) ||
+      finished === this.upper.get(CQC_THROW_KEY) ||
+      finished === this.upper.get(CQC_MISS_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
       finished === this.upper.get(THROW_RELEASE_KEY) ||
       finished === this.upper.get(SETUP_RELEASE_KEY)
@@ -1392,7 +1544,7 @@ export class CharacterAnimator {
       // 取り除く前に控える。後からでは値が潰れている。
       // クリップは全員で共有しているので、控えも共有の置き場に持つ。
       // ここで自分の Map にだけ控えると、2 人目は潰れたあとを控えてしまう。
-      if (rootBone && ROOT_MOTION_CLIPS.has(clip.name)) {
+      if (rootBone && (ROOT_MOTION_CLIPS.has(clip.name) || DEATH_SLIDE_CLIPS.has(clip.name))) {
         let stored = rootMotionStore.get(clip)
         if (!stored) {
           const track = clip.tracks.find(
@@ -1607,6 +1759,7 @@ export class CharacterAnimator {
 
     for (const [key, name] of [
       [SWEEP_KEY, 'sweep'],
+      [THROWN_KEY, 'cqc_thrown'],
       [STAND_KEY, STAND_CLIP],
     ] as const) {
       const clip = byName.get(name)
@@ -1733,6 +1886,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [HANG_DROP_KEY, 'hang_drop'],
       [HANG_CLIMB_KEY, 'hang_climb'],
+      [CQC_THROW_KEY, 'cqc_throw'],
+      [CQC_MISS_KEY, 'cqc_miss'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -1808,6 +1963,8 @@ export class CharacterAnimator {
       [DEATH_BACK_KEY, 'death_back'],
       // 伏せたまま倒された。**向きは無い** — 既にその向きで寝ている
       [PRONE_DEATH_KEY, 'prone_death'],
+      // しゃがんだまま正面から倒された。後ろへ崩れる
+      [CROUCH_DEATH_KEY, 'crouch_death'],
       // 眠り。倒れる型と同じで、最後の姿勢のまま留める
       [SLEEP_KEY, 'sleep'],
     ] as const) {
@@ -1965,12 +2122,23 @@ export class CharacterAnimator {
       : committed
         ? 0
         : this.aiming
-          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す
+          ? // 構えている間は逆に起こす。型が下を向いているぶんを返す (+ 銃ごとの起こし)
             CROUCH_LOCOMOTIONS.has(this.locomotion)
             ? this.aimLevel.crouch
             : this.aimLevel.stand
           : this.relaxedLean
     this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
+    // 型ごとの向きの補正。**いま下半身に流している型**で引く
+    const lowerName = this.lowerClipNames.get(this.resolveLowerKey())
+    this.facingFix = damp(this.facingFix, (lowerName && CLIP_FACING[lowerName]) || 0, AIM_HIP_LAMBDA, dt)
+    // 銃ごとの上体の起こし (gunLift)。構えている間だけ
+    const liftTarget =
+      this.aiming && !committed && !this.boxed
+        ? CROUCH_LOCOMOTIONS.has(this.locomotion)
+          ? this.gunLift.crouch
+          : this.gunLift.stand
+        : 0
+    this.gunLiftNow = damp(this.gunLiftNow, liftTarget, AIM_PITCH_LAMBDA, dt)
     this.mixer.update(dt)
 
     // mixer がボーンの回転を書き換えた「後」に上乗せする。順序を逆にすると毎フレーム消える。
@@ -2101,7 +2269,10 @@ export class CharacterAnimator {
     this.crouchBlend = damp(this.crouchBlend, target, CROUCH_TORSO_LAMBDA, dt)
 
     // 上向きの軸に対して正が左回りなので、右へ回すには符号を反転する
-    const total = -this.crouchTorsoYaw * this.crouchBlend
+    // 上半身の型ごとの向きの補正 (UPPER_FACING)
+    const upperName = this.upperClipNames.get(this.resolveUpperKey())
+    this.upperFacing = damp(this.upperFacing, (upperName && UPPER_FACING[upperName]) || 0, CROUCH_TORSO_LAMBDA, dt)
+    const total = -this.crouchTorsoYaw * this.crouchBlend + this.upperFacing
     if (Math.abs(total) < 0.001) return
 
     for (const entry of axes) {
@@ -2122,8 +2293,17 @@ export class CharacterAnimator {
     this.hipsBase.copy(bone.quaternion)
     this.hipsCaptured = true
 
-    if (this.hipSquare < 1e-3) return
-    bone.quaternion.slerp(this.uprightHips, this.hipSquare)
+    if (this.hipSquare >= 1e-3) bone.quaternion.slerp(this.uprightHips, this.hipSquare)
+
+    // 型ごとの向きの補正 (CLIP_FACING)。腰ごと世界の上を軸に回すので、脚も上体も一緒に回る
+    if (Math.abs(this.facingFix) > 1e-4) {
+      const parent = bone.parent
+      const parentWorld = parent ? parent.getWorldQuaternion(this.scratchQuat) : new THREE.Quaternion()
+      const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.facingFix)
+      // 親の空間で回す: 親の逆 × 回し × 親
+      const local = parentWorld.clone().invert().multiply(turn).multiply(parentWorld)
+      bone.quaternion.premultiply(local)
+    }
   }
 
   /**
@@ -2313,12 +2493,26 @@ export class CharacterAnimator {
         entry.bone.quaternion.multiply(this.scratchRotation)
       }
     }
-    // 首の向き。上下の曲げの後に、首と頭だけを上向きの軸で回す (LOOK_CHAIN)
-    if (Math.abs(this.lookYaw) > 1e-4) {
+    // 銃ごとの起こし。背骨 3 本で全量 (配分の比で割る)、首と頭で同じだけ戻す
+    if (Math.abs(this.gunLiftNow) > 1e-4) {
+      const spineShare = axes.reduce((sum, e) => sum + (e.suffix.startsWith('Spine') ? e.weight : 0), 0) || 1
+      const headCount = axes.filter((e) => !e.suffix.startsWith('Spine')).length || 1
+      for (const entry of axes) {
+        const amount = entry.suffix.startsWith('Spine')
+          ? (this.gunLiftNow * entry.weight) / spineShare
+          : -this.gunLiftNow / headCount
+        this.scratchRotation.setFromAxisAngle(entry.axis, amount)
+        entry.bone.quaternion.multiply(this.scratchRotation)
+      }
+    }
+    // 首の向き。上下の曲げの後に、首と頭だけを上向きの軸で回す (LOOK_CHAIN)。
+    // 型の向きの補正 (facingFix) で体ごと回した分は、首と頭で戻して顔を正面に残す
+    const headYaw = this.lookYaw - this.facingFix
+    if (Math.abs(headYaw) > 1e-4) {
       for (const entry of axes) {
         const share = LOOK_CHAIN[entry.suffix]
         if (!share) continue
-        this.scratchRotation.setFromAxisAngle(entry.yawAxis, this.lookYaw * share)
+        this.scratchRotation.setFromAxisAngle(entry.yawAxis, headYaw * share)
         entry.bone.quaternion.multiply(this.scratchRotation)
       }
     }
@@ -2406,8 +2600,15 @@ export class CharacterAnimator {
             : RUN_STATES.has(state as Locomotion)
               ? this.runCadence
               : 1
-      const scale = (this.moveSpeed / clipSpeed) * rate
       const locomotion = state as Locomotion
+      const top = WALK_TOPS[locomotion]
+      const speed = top === undefined ? this.moveSpeed : Math.min(this.moveSpeed, top)
+      const scale = (speed / clipSpeed) * rate
+      // クリップごとに本来の速さが違う物 (手ぶらの歩き) はそちらで割る
+      const scaleOf = (name: string | undefined) => {
+        const native = name === undefined ? undefined : CLIP_NATIVE_SPEED[name]
+        return native === undefined ? scale : (speed / native) * rate
+      }
       this.lower.get(locomotion)?.setEffectiveTimeScale(scale)
       /*
        * 脱力中の下半身にも同じ速さを掛ける。**掛け忘れると足だけ滑る** —
@@ -2416,7 +2617,7 @@ export class CharacterAnimator {
        */
       for (const table of [RELAXED_CLIPS, PISTOL_RELAXED]) {
         const name = table[locomotion]
-        if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scale)
+        if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scaleOf(name))
       }
       /*
        * **上下が同じクリップなら、速さも同じにする。**
@@ -2437,8 +2638,8 @@ export class CharacterAnimator {
        * 27°) に膨らんでいた。拳銃の走り (run_f@pistol_run) も同じ。
        */
       if (RELAXED_LOWER_STATES.has(locomotion)) {
-        this.upper.get(relaxedKey(locomotion))?.setEffectiveTimeScale(scale)
-        this.upper.get(pistolKey(locomotion))?.setEffectiveTimeScale(scale)
+        this.upper.get(relaxedKey(locomotion))?.setEffectiveTimeScale(scaleOf(RELAXED_CLIPS[locomotion]))
+        this.upper.get(pistolKey(locomotion))?.setEffectiveTimeScale(scaleOf(PISTOL_RELAXED[locomotion]))
       }
     }
 
@@ -2720,6 +2921,9 @@ export class CharacterAnimator {
    *
    * @param fromBehind 背後から撃たれたか。分からなければ省く
    */
+  /** しゃがみの崩れを、向きが分からないまま選んだか (playDeath) */
+  private crouchDeathGuessed = false
+
   playDeath(fromBehind?: boolean): void {
     /*
      * **伏せたまま倒されたら、伏せたまま崩れる。**
@@ -2728,8 +2932,25 @@ export class CharacterAnimator {
      * 瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
      *
      * 向きは見ない。**うつ伏せから前も後ろも無い** — 既にその向きで寝ている。
+     *
+     * **2 度目は流し直さない。** 相手の体には倒れたことが 2 通で届く — 生死の一通
+     * (setLife → 向き無し) と、向きを持った姿勢 (death_front / death_back)。1 通目で
+     * prone_death に移った後、2 通目は「伏せていない」ので立ちの型で上書きして、
+     * 伏せていた体が立ち上がってから崩れていた (本人 2026-10-14)
      */
-    if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_DEATH_KEY)) {
+    if (this.locomotion === 'prone_death') return
+    // しゃがみの崩れは、向きが分からないまま選んでいて (下の crouchDeathGuessed)、
+    // 後から「背後から」と届いた時だけ立ちの型 (前へ倒れる) へ替える
+    if (this.locomotion === 'crouch_death' && !(fromBehind === true && this.crouchDeathGuessed)) return
+    // 伏せに入る途中・仰向けから這い出す途中も、体はもう床にある。
+    // **眠っている (スタン) 体もうつ伏せで床にある** (眠りの型の終わりは伏せの崩れの
+    // 始まりと同じ向き)。立ちの型だと、寝ていた体が立ってから崩れた (本人 2026-10-14)
+    const lying =
+      PRONE_LOCOMOTIONS.has(this.locomotion) ||
+      this.locomotion === 'prone_down' ||
+      this.locomotion === 'prone_roll_down' ||
+      this.locomotion === 'sleep'
+    if (lying && this.upper.has(PRONE_DEATH_KEY)) {
       const upper = this.upper.get(PRONE_DEATH_KEY)
       const lower = this.lower.get('prone_death')
       if (upper && lower) {
@@ -2737,6 +2958,27 @@ export class CharacterAnimator {
         lower.reset().play()
         this.upperState = 'death'
         this.locomotion = 'prone_death'
+        return
+      }
+    }
+
+    /*
+     * **しゃがんだまま正面から倒されたら、しゃがみから後ろへ崩れる** (本人 2026-10-14)。
+     * 背後からは型が無いので立ちの型 (前へ倒れる)。
+     *
+     * 向きが分からない 1 通目 (生死の一通) でも、しゃがんでいればこちらを選ぶ。
+     * 立ちの型で待つと、しゃがんでいた体が 2 通目までの間に立ち上がる。2 通目が
+     * 「背後から」なら上で立ちの型へ替える
+     */
+    if (fromBehind !== true && this.upperState !== 'death' && CROUCH_LOCOMOTIONS.has(this.locomotion) && this.upper.has(CROUCH_DEATH_KEY)) {
+      const upper = this.upper.get(CROUCH_DEATH_KEY)
+      const lower = this.lower.get('crouch_death')
+      if (upper && lower) {
+        upper.reset().play()
+        lower.reset().play()
+        this.upperState = 'death'
+        this.locomotion = 'crouch_death'
+        this.crouchDeathGuessed = fromBehind === undefined
         return
       }
     }
@@ -2863,7 +3105,14 @@ export class CharacterAnimator {
       if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_FIRE_KEY)) {
         return PRONE_FIRE_KEY
       }
-      if (this.upper.has(FIRE_KEY)) return FIRE_KEY
+      /*
+       * **しゃがみでは撃つ型に替えない。** 撃つ型は立ちの形しか無く、しゃがみの構え
+       * (knee_ready) から替えると上体が起きて後ろへ反り、撃つたびに行き来して
+       * ガクガクした (2026-10-10 本人)。しゃがみの握りと銃口の補正も knee_ready に
+       * 合わせて詰めてある。下の構えの枝がしゃがみの構えを返す
+       */
+      const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
+      if (!crouching && this.upper.has(FIRE_KEY)) return FIRE_KEY
     }
     if (this.upperState === 'reload') {
       // 銃ごとに型を引き分ける。片手の拳銃を両手の型でリロードすると形が崩れる
@@ -2880,6 +3129,10 @@ export class CharacterAnimator {
     if (this.locomotion === 'sleep' && this.upper.has(SLEEP_KEY)) return SLEEP_KEY
     // 倒れている間は他の何よりも優先する
     if (this.upperState === 'death') {
+      // 伏せたまま崩れている。**ここで返さないと上半身の重みが流れていない立ちの型へ
+      // 寄って、上半身だけ T ポーズ**になった (2026-10-14)
+      if (this.locomotion === 'prone_death' && this.upper.has(PRONE_DEATH_KEY)) return PRONE_DEATH_KEY
+      if (this.locomotion === 'crouch_death' && this.upper.has(CROUCH_DEATH_KEY)) return CROUCH_DEATH_KEY
       // 倒れる向きの型があればそちら。無ければ元の 1 本
       if (this.locomotion === 'death_front' && this.upper.has(DEATH_FRONT_KEY)) {
         return DEATH_FRONT_KEY
@@ -2911,7 +3164,7 @@ export class CharacterAnimator {
       if (prone && this.upper.has(PRONE_BOLT_KEY)) return PRONE_BOLT_KEY
       if (!prone && this.upper.has(BOLT_KEY)) return BOLT_KEY
     }
-    if (this.upperState === 'sweep' && this.upper.has(SWEEP_KEY)) return SWEEP_KEY
+    if (this.upperState === 'sweep' && this.upper.has(this.fallKey)) return this.fallKey
     if (this.upperState === 'throw' && this.pair) {
       // **振りかぶりが残っている間は前半のまま。** 放した瞬間に後半へ渡すと、
       // 後半はまだ流れていない (updateThrow が振りかぶりの終わりを待つ) ので
@@ -2935,6 +3188,9 @@ export class CharacterAnimator {
     // 跳び越えも同じ。上だけ構えに戻ると、銃を構えたまま脚だけ跳ぶ
     if (this.upperState === 'vault' && this.upper.has(VAULT_KEY)) return VAULT_KEY
     if (this.upperState === 'vault_up' && this.upper.has(VAULT_UP_KEY)) return VAULT_UP_KEY
+    // CQC も同じ。上だけ構えに戻ると、銃を構えたまま足を払う
+    if (this.upperState === 'cqc_throw' && this.upper.has(CQC_THROW_KEY)) return CQC_THROW_KEY
+    if (this.upperState === 'cqc_miss' && this.upper.has(CQC_MISS_KEY)) return CQC_MISS_KEY
     if (this.upperState === 'hang_drop' && this.upper.has(HANG_DROP_KEY)) return HANG_DROP_KEY
     if (this.upperState === 'hang_climb' && this.upper.has(HANG_CLIMB_KEY)) return HANG_CLIMB_KEY
     // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
@@ -2954,8 +3210,12 @@ export class CharacterAnimator {
     // 非構えのクリップがこの姿勢に無いので、既定の代用に任せると
     // **構えの上半身**が出る。倒れた直後に何もしていないのに銃を構え直して見えた。
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
-    if (!this.aiming && this.locomotion === 'sweep' && this.upper.has(SWEEP_KEY)) {
-      return SWEEP_KEY
+    if (
+      !this.aiming &&
+      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown') &&
+      this.upper.has(this.fallKey)
+    ) {
+      return this.fallKey
     }
 
     /*
@@ -3203,6 +3463,39 @@ export class CharacterAnimator {
    */
   forwardProgress(name: Locomotion): number {
     return this.trackProgress(name, 1)
+  }
+
+  /**
+   * 倒れる型が**頭から今までに**動いた量 (模型の空間、m、正面 +Z)。倒れていない・
+   * 移動を残す型でなければ null。返すのは流れている型の名前 (替わったら測り直す合図)
+   *
+   * @param end true なら今ではなく型の終わりまでの量
+   */
+  deathSlide(out: THREE.Vector3, end = false): string | null {
+    if (this.upperState !== 'death') return null
+    const name = this.locomotion
+    if (!DEATH_SLIDE_CLIPS.has(name)) return null
+    const stored = this.rootMotion.get(name)
+    const action = this.lower.get(name)
+    const scale = this.skeletonScaleOf()
+    if (!stored || !action || scale === 0) return null
+    const x0 = stored.values[0]
+    const y0 = stored.values[1]
+    sampleVectorTrack(stored.times, stored.values, end ? action.getClip().duration : action.time, this.scratchVector)
+    // トラック空間は X/Y が水平 (consumeRootMotion と同じ)。+Y が模型の前 (+Z)
+    const k = scale * (DEATH_SLIDE_SCALE[name] ?? 1)
+    out.set((this.scratchVector.x - x0) * k, 0, (this.scratchVector.y - y0) * k)
+    return name
+  }
+
+  /** 骨組みの縮尺 (トラックの cm → m)。模型が届く前は 0 */
+  private skeletonScaleOf(): number {
+    if (this.skeletonScale === 0) {
+      const armature = this.hipsBone?.parent
+      if (!armature) return 0
+      this.skeletonScale = armature.getWorldScale(this.scratchVector).x
+    }
+    return this.skeletonScale
   }
 
   /** 腰の軌道の 1 成分 (0 = 横、1 = 前後、2 = 上下) を頭〜終わりで 0..1 に */
@@ -3552,6 +3845,70 @@ export class CharacterAnimator {
     lower.reset().setEffectiveTimeScale(this.sweepRate).play()
     this.upperState = 'sweep'
     this.locomotion = 'sweep'
+    this.fallKey = SWEEP_KEY
+    this.sweepDuration = SWEEP_LAND / this.sweepRate
+  }
+
+  /**
+   * 倒れている間に引く型。吹き飛ばされたなら sweep、CQC で投げられたなら
+   * cqc_thrown。**倒れた後の扱いは同じ** (伏せ撃ち・這い出す・起きる) なので、
+   * 状態は分けずに型だけ差し替える
+   */
+  private fallKey: string = SWEEP_KEY
+
+  /**
+   * CQC で投げられる。**倒れた後は爆風で倒れた時と同じ** (playSweep)。
+   * 型は焼かれた移動を辿って、0.7m 後ろへ仰向けに倒れる
+   */
+  playThrown(): void {
+    if (this.dead) return
+    const upper = this.upper.get(THROWN_KEY)
+    const lower = this.lower.get('cqc_thrown')
+    if (!upper || !lower) return this.playSweep()
+    upper.reset().setEffectiveTimeScale(CQC_RATE).play()
+    lower.reset().setEffectiveTimeScale(CQC_RATE).play()
+    this.upperState = 'sweep'
+    this.locomotion = 'cqc_thrown'
+    this.fallKey = THROWN_KEY
+    // 背中が着くまで。サーバーがスタミナを減らすのも同じ時刻 (domain/player/cqc.ts)
+    this.sweepDuration = CQC_LAND_SECONDS
+    this.rootSampleValid = false
+  }
+
+  /**
+   * CQC を掛ける (throw) / 空振りする (miss)。全身の型で、焼かれた移動を辿る。
+   * 跳び越えと同じく、終わるまで操作は効かない (cqcBusy)
+   */
+  playCqc(kind: 'cqc_throw' | 'cqc_miss'): void {
+    if (this.dead) return
+    const upper = this.upper.get(kind === 'cqc_throw' ? CQC_THROW_KEY : CQC_MISS_KEY)
+    const lower = this.lower.get(kind)
+    if (!upper || !lower) return
+    upper.reset().setEffectiveTimeScale(CQC_RATE).play()
+    lower.reset().setEffectiveTimeScale(CQC_RATE).play()
+    this.upperState = kind
+    this.locomotion = kind
+    this.rootSampleValid = false
+  }
+
+  /**
+   * CQC で投げられている途中で**放された** (投げた側が倒れた)。倒れる型をやめて
+   * 普段の姿へ戻す。倒れかけの姿から立ち姿へは、型の重みの補間で繋がる
+   */
+  releaseThrown(): void {
+    if (this.fallKey !== THROWN_KEY) return
+    if (this.upperState === 'sweep') this.upperState = 'stance'
+    this.fallKey = SWEEP_KEY
+  }
+
+  /** CQC の型 (投げる / 空振り) が流れているか */
+  get cqcBusy(): boolean {
+    return this.cqcKind !== null
+  }
+
+  /** 流れている CQC の型。流れていなければ null */
+  get cqcKind(): 'cqc_throw' | 'cqc_miss' | null {
+    return this.upperState === 'cqc_throw' || this.upperState === 'cqc_miss' ? this.upperState : null
   }
 
   /** 伏せた所から立ち上がる。途中で止められない */
@@ -3577,6 +3934,9 @@ export class CharacterAnimator {
     const lower = this.lower.get(prone ? 'prone_stab' : 'stab')
     if (!upper || !lower) return
     // 上下を同時に頭から流す。同じクリップなので腰の向きが食い違わない。
+    // 速さは KNIFE MASTERY (stabSpeed)。上下に同じだけ掛ける
+    upper.setEffectiveTimeScale(this.stabSpeed)
+    lower.setEffectiveTimeScale(this.stabSpeed)
     upper.reset().play()
     lower.reset().play()
     this.upperState = 'stab'

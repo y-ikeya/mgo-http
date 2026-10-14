@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { loadKnife, loadM1911, loadMosin, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
+import { loadKnife, loadM1911, loadMosin, loadM4, loadRifle, loadSmg, loadShotgun, loadSniper, loadPistol } from '../assets'
 import { isMesh } from '../util/guards'
 import type { Stance } from '../../../domain/player/stance'
 
@@ -30,6 +30,42 @@ const EJECT_LOCAL = { x: 0.04, y: 0.06, z: -0.12 }
 export interface WeaponConfig {
   /** 右手が握る位置。手ボーンは手首にあるので、実機で合わせた値になっている */
   grip: THREE.Vector3
+  /**
+   * **構えている間だけ、銃を右手の握りを支点に回す角度** (度、銃口が上・左へ
+   * 向くのが正)。立ちとしゃがみで別。伏せは回さない。
+   *
+   * 握りの値は「構えていない姿勢で付けた手の向き」が基準なので、構えると
+   * 銃口が照準からずれる — 本番で AK 9° 上・M4 13° 上 (2026-10-10、本人作の
+   * 構え歩き m4Walk では真っすぐ前・水平)。銃だけ回すと左手が置いていかれるので、
+   * Soldier が左腕を曲げ直して付け直す (actor/armIk.ts)。
+   * 測るのは tools/preview/weapon.html?views=3 (斜めの枠の札に銃身の角度が出る)
+   */
+  aimTrim?: { pitch: number; yaw: number; crouchPitch: number; crouchYaw: number }
+  /**
+   * 構えた時に**上体を起こす量** (度、立ち・しゃがみ)。animation.ts の gunLift。
+   * ずれが大きい時は銃を回すより先にこちらで取り返す — 銃だけを 45° 回すと、
+   * 前を握る左手が大きく持ち上がった (P90 のしゃがみ、2026-10-10 本人)
+   */
+  aimLift?: { stand: number; crouch: number }
+  /**
+   * 構えている間、**左手首を置く所** (銃の空間の位置と向き)。立って構えた時の
+   * 左手 (どの銃もハンドガードを自然に握っている) を測った値
+   * (tools/preview/weapon.html?views=3&lh)。しゃがんでも同じ所を握らせる —
+   * しゃがみの型の左手はハンドガードを握っておらず、銃の上に浮いていた
+   * (2026-10-10 本人: AK のしゃがみ構え)。無ければ、回した分だけ付いていく
+   */
+  leftHand?: { position: THREE.Vector3; quaternion: THREE.Quaternion }
+  /**
+   * 構えている間、**右手首をずらす量** (m、体の空間: +X が右・+Y が上・-Z が前)。
+   * 立ち・しゃがみ別。銃は一緒に動く (向きは変わらない)。armIk.ts の RightArmShift
+   */
+  rightShift?: { stand: THREE.Vector3; crouch: THREE.Vector3 }
+  /**
+   * 構えている間、**銃身を照準の向きへ毎コマ直に向ける** (握りを支点に回す)。
+   * 拳銃は付け方が長物と違い (前腕の向きが基準)、aimTrim の角度が素直に効かない
+   * — 銃を胸の前で横に持ち、銃口が左へ 47〜83° 向いていた (2026-10-10 本人)
+   */
+  alignBarrel?: boolean
   /** 向きの微調整。両手の位置からは手首のひねりが決まらないため */
   rotation: THREE.Euler
   /** しゃがみ姿勢での値。無ければ立ちと同じものを使う */
@@ -66,6 +102,21 @@ export interface WeaponConfig {
   proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
   tip: THREE.Vector3
+  /**
+   * 主観で照準器を覗く時の、**目の位置** (模型の空間) と模型の起こし (rad、銃身の軸回り)。
+   *
+   * 主観用の銃はカメラに付けて、この点がカメラの位置に来るよう置く。目の点は
+   * 照準線 (照門と照星 / ホロサイトの窓の中心を通る、銃身と平行な線) の上、照門の
+   * 後ろに取る — こうすると照準線がそのまま画面の真ん中を通る (弾の行き先と一致)。
+   * 模型が横倒しで入っている銃 (AK) は roll で起こす。照準線が銃身と平行でない銃は
+   * pitch (rad、正で銃口が上) で傾けて、照準線のほうをカメラの向きに揃える
+   */
+  /**
+   * glass … **主観用の銃で素通しにする窓** (模型の空間の箱)。この中の、目の方 (±Z) を
+   * 向いた三角形を主観用の銃から削る。ホロサイトのガラスが透けない作りで、覗くと窓が
+   * 画面を塞いでいた (本人 2026-10-13)。体が持つ銃は削らない
+   */
+  sight?: { eye: THREE.Vector3; roll: number; pitch: number; glass?: { min: THREE.Vector3; max: THREE.Vector3 } }
   /** 左手を添える位置。片手武器は null で、その場合 IK を掛けない */
 }
 
@@ -83,29 +134,121 @@ const degrees = (value: number) => THREE.MathUtils.degToRad(value)
  * 握った姿勢を持っているので、コードで動かしていない。
  */
 const RIFLE: WeaponConfig = {
+  /*
+   * 主観の目。**模型は横倒し** (上が +X) なので 90° 起こす。照門の V 字の底は銃身の
+   * 軸から +X へ 0.0482m (前 0.47m)、照星 (輪の中の柱) の頂は 0.0462m (前 0.82m) —
+   * 照準線は銃身から 0.33° 下がっている。銃を 0.33° 起こして照準線をカメラへ揃え、
+   * 目はその線の上、照門の 17cm 後ろ
+   * (tools/preview/sight.html で照門の底と照星の頂を真ん中に重ねて測った)
+   */
+  sight: { eye: new THREE.Vector3(0.0492, 0.165, -0.3), roll: Math.PI / 2, pitch: 0.0057 },
+  // しゃがみ構えの右手が高い・外に開いている (本人 2026-10-10)。右手首を 5cm 下げ、体の中心側へ 6cm (銃は向きを保って一緒に動く)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.07, -0.05, 0) },
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.115, 0.23, -0.53),
+    quaternion: new THREE.Quaternion(-0.1264, 0.4312, -0.8492, 0.2776),
+  },
+  // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
+  aimTrim: { pitch: -6.3, yaw: -1.6, crouchPitch: 21.7, crouchYaw: 9.5 },
+  // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
+  aimLift: { stand: 0, crouch: 10 },
   grip: new THREE.Vector3(-0.095, 0.145, -0.165),
   rotation: new THREE.Euler(degrees(-10), degrees(-16), degrees(80)),
   // しゃがむと上半身の角度が変わるので、同じ握り方では銃が体から浮く。
   // 姿勢ごとに値を持って、切り替わりの間は補間する。
-  crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
-  crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
+  crouchGrip: new THREE.Vector3(-0.095, 0.16, -0.195),
+  crouchRotation: new THREE.Euler(degrees(-33), degrees(-5), degrees(80)),
+  // 伏せは前のしゃがみの値のまま (しゃがみを詰め直した時に巻き込まない)
+  proneGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
+  proneRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
   tip: new THREE.Vector3(0, 0.171, -0.845),
 }
 
+
 /**
- * M870。全長 1190mm のポンプ式。
+ * M870。全長 980mm のポンプ式 (戦術用の短い型。1190mm の狩猟用の長さでは床尾が体に刺さった)。
  *
  * 銃口の位置が突撃銃とほぼ同じ (0.174 対 0.171) なので、握りの調整値も
  * そのまま流用できる — convert_gltf_gun.py が銃口を揃えて書き出すのは
  * このため。
  */
 const SHOTGUN: WeaponConfig = {
+  // しゃがみ構えの右手を体の中心側へ 6.5cm (M4 と同じ。本人 2026-10-10)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.04, 0.045, -0.485),
+    quaternion: new THREE.Quaternion(-0.4176, -0.3685, -0.2654, 0.787),
+  },
+  // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
+  aimTrim: { pitch: -11.6, yaw: 0.0, crouchPitch: -17.6, crouchYaw: 19.6 },
+  // しゃがみは握りを直したので上体は起こさない (M4 と同じ)
+  aimLift: { stand: 0, crouch: 0 },
   // 実機で詰めた値
-  grip: new THREE.Vector3(0.02, 0.1, -0.05),
+  // 全長 0.98m (戦術用の短い型) に縮めた。握りと左手は銃口を中心に同じ割合で写した
+  grip: new THREE.Vector3(0.018, 0.113, -0.19),
   rotation: new THREE.Euler(degrees(-6), degrees(-17), degrees(-9)),
-  crouchGrip: new THREE.Vector3(-0.105, 0.14, -0.2),
-  crouchRotation: new THREE.Euler(degrees(-34), degrees(-3), degrees(80)),
-  tip: new THREE.Vector3(0.007, 0.174, -0.845),
+  /*
+   * しゃがみ。**AK の値を写していたので、しゃがむと銃が横へ 80° 寝た** (本人:
+   * しゃがみ構えで銃が左に回る)。AK の模型は寝た向きで作られていて 80° で起こす
+   * が、M870 は上を向いている。M4 と同じく立ちの握りから詰めた値
+   */
+  crouchGrip: new THREE.Vector3(-0.01, 0.115, -0.185),
+  crouchRotation: new THREE.Euler(degrees(15), degrees(-18), degrees(-20)),
+  // 伏せは前のしゃがみの値のまま (しゃがみを詰め直した時に巻き込まない)
+  proneGrip: new THREE.Vector3(0.018, 0.113, -0.19),
+  proneRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-9)),
+  tip: new THREE.Vector3(0.006, 0.172, -0.845),
+}
+
+/**
+ * M4 CUSTOM。全長 840mm。**握りは M870 の値を流用する。**
+ *
+ * AK の模型は元から銃身を軸に 90° 寝た向きで作られていて、握りの回転 (80°) で
+ * 起こしている。convert_gltf_gun.py で書き出した銃 (M870・M4) は上が上を向いて
+ * いるので、AK の値を使うと逆に寝る — 弾倉が横を向き、照準器が横へ飛び出した。
+ * 銃口の位置も M870 とほぼ同じ (0.174 対 0.166)
+ */
+const M4: WeaponConfig = {
+  ...SHOTGUN,
+  /*
+   * 主観の目。機関部の上のホロサイト (前 0.30〜0.36m)。**窓に照準の輪が描かれている**
+   * ので、その真ん中 (高さ 0.235m) を画面の真ん中へ。模型は立っている (上が +Y)。
+   * 目は窓の 15cm 後ろ (tools/preview/sight.html で輪を真ん中に重ねて測った)
+   */
+  sight: {
+    eye: new THREE.Vector3(0.0006, 0.2349, -0.15),
+    roll: 0,
+    pitch: 0,
+    // 窓のガラス: 後ろ (前 0.307m) と前 (前 0.345m) の細かい三角形。枠 (横 ±0.015〜0.017) は残す
+    glass: { min: new THREE.Vector3(-0.0148, 0.199, -0.352), max: new THREE.Vector3(0.0148, 0.246, -0.3) },
+  },
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.06, 0.05, -0.525),
+    quaternion: new THREE.Quaternion(-0.3784, -0.2579, -0.3503, 0.8171),
+  },
+  // しゃがみ構えの右手を体の中心側へ 6.5cm (本人が三面図で詰めた値)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
+  // M870 の補正を写さない (写しより後ろに書く)
+  aimLift: { stand: 0, crouch: 0 },
+  // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
+  aimTrim: { pitch: -10.0, yaw: -0.4, crouchPitch: -16.7, crouchYaw: 18.3 },
+  /*
+   * 握りは**ピストルグリップ**。M870 は床尾の付け根を握るので、そのままだと手が
+   * 床尾に来て銃が前へ 25cm ずれた。M870 の値と模型の握る点のずれ (前へ 3cm・
+   * 下へ 4cm) を、M4 のピストルグリップ (z -0.274, y 0.083) に当てた
+   */
+  grip: new THREE.Vector3(0.02, 0.085, -0.2),
+  // しゃがみ・伏せは立ちと同じ握りから。**M870 のしゃがみの値は AK を写した物**
+  // (寝た模型を 80° 起こす回転) なので、上を向いた M4 に当てると逆に寝る
+  crouchGrip: new THREE.Vector3(0.005, 0.105, -0.23),
+  crouchRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-1)),
+  // 伏せは前のしゃがみの値のまま (しゃがみを詰め直した時に巻き込まない)
+  proneGrip: new THREE.Vector3(0.02, 0.085, -0.2),
+  proneRotation: new THREE.Euler(degrees(14), degrees(-17), degrees(-9)),
+  tip: new THREE.Vector3(0.003, 0.166, -0.845),
 }
 
 /**
@@ -119,12 +262,26 @@ const SHOTGUN: WeaponConfig = {
  * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
  */
 const SMG: WeaponConfig = {
+  // しゃがみ構えの右手を目の前へ (体の中心側へ 6cm)。本人 2026-10-10
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.06, 0, 0) },
+  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
+  leftHand: {
+    position: new THREE.Vector3(-0.075, 0.04, -0.68),
+    quaternion: new THREE.Quaternion(-0.4283, -0.2438, -0.3835, 0.7811),
+  },
+  // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
+  aimTrim: { pitch: -7.7, yaw: -10.5, crouchPitch: 33.7, crouchYaw: -12.2 },
+  // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
+  aimLift: { stand: 0, crouch: 10 },
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
-  grip: new THREE.Vector3(0, 0.1, -0.435),
-  rotation: new THREE.Euler(degrees(-7), degrees(-9), degrees(7)),
+  grip: new THREE.Vector3(0.01, 0.11, -0.465),
+  rotation: new THREE.Euler(degrees(-8), degrees(-8), degrees(0)),
   // しゃがむと上半身が前に倒れるので、銃も倒して抱え込む (pitch -7 → -44)
-  crouchGrip: new THREE.Vector3(-0.05, 0.035, -0.455),
-  crouchRotation: new THREE.Euler(degrees(-44), degrees(15), degrees(14)),
+  crouchGrip: new THREE.Vector3(0.02, 0.115, -0.44),
+  crouchRotation: new THREE.Euler(degrees(-45), degrees(16), degrees(-3)),
+  // 伏せ。本人が三面図で詰めた値 (2026-10-10)
+  proneGrip: new THREE.Vector3(0.005, 0.12, -0.51),
+  proneRotation: new THREE.Euler(degrees(-1), degrees(-14), degrees(-17)),
   // 銃口。断面の実測 (最も -Z の点)
   tip: new THREE.Vector3(0, 0.16, -0.845),
 }
@@ -154,6 +311,10 @@ const KNIFE: WeaponConfig = {
  * 実際の見え方は調整パネルで詰める。ここは出発点。
  */
 const SNIPER: WeaponConfig = {
+  // しゃがみ構えの右手を体の中心側へ 6.5cm (M4 と同じ。本人 2026-10-10)
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
+  // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
+  aimTrim: { pitch: 3.9, yaw: -9.3, crouchPitch: 1.6, crouchYaw: 9.1 },
   grip: new THREE.Vector3(0.01, 0.28, 0.135),
   rotation: new THREE.Euler(degrees(-20), degrees(-9), degrees(-180)),
   /*
@@ -202,18 +363,32 @@ const SNIPER: WeaponConfig = {
  * 無い。ずれていたら調整パネルで詰める。
  */
 const M1911: WeaponConfig = {
-  grip: new THREE.Vector3(0.05, 0.005, 0.125),
-  rotation: new THREE.Euler(degrees(-5), 0, 0),
-  crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
-  crouchRotation: new THREE.Euler(degrees(-5), 0, 0),
+  // 構えている間、銃身を照準へ毎コマ向ける (alignBarrel の注)
+  alignBarrel: true,
+  // 立ちは本人が三面図で詰めた値 (2026-10-10)
+  grip: new THREE.Vector3(0.04, -0.01, 0.09),
+  rotation: new THREE.Euler(degrees(-6), degrees(3), degrees(-2)),
+  // しゃがみ・伏せ・右手のずらしは M9 と同じ (本人 2026-10-10)
+  crouchGrip: new THREE.Vector3(-0.005, -0.025, 0.105),
+  crouchRotation: new THREE.Euler(degrees(-16), degrees(33), degrees(-1)),
+  proneGrip: new THREE.Vector3(0.035, 0, 0.11),
+  proneRotation: new THREE.Euler(degrees(-5), 0, 0),
+  rightShift: { stand: new THREE.Vector3(0.06, -0.005, 0.02), crouch: new THREE.Vector3(-0.03, -0.045, 0.04) },
   tip: new THREE.Vector3(0, 0.067, -0.172),
 }
 
 const PISTOL: WeaponConfig = {
-  grip: new THREE.Vector3(0.05, 0.005, 0.125),
-  rotation: new THREE.Euler(degrees(-5), 0, 0),
-  crouchGrip: new THREE.Vector3(0.035, 0, 0.11),
-  crouchRotation: new THREE.Euler(degrees(-5), 0, 0),
+  // 構えている間、銃身を照準へ毎コマ向ける (alignBarrel の注)
+  alignBarrel: true,
+  // 立ちは本人が三面図で詰めた値 (2026-10-10)
+  grip: new THREE.Vector3(0.04, -0.01, 0.09),
+  rotation: new THREE.Euler(degrees(-6), degrees(3), degrees(-2)),
+  // しゃがみは本人が三面図で詰めた値 (2026-10-10)。伏せは前の値を明示して残す
+  crouchGrip: new THREE.Vector3(-0.005, -0.025, 0.105),
+  crouchRotation: new THREE.Euler(degrees(-16), degrees(33), degrees(-1)),
+  proneGrip: new THREE.Vector3(0.035, 0, 0.11),
+  proneRotation: new THREE.Euler(degrees(-5), 0, 0),
+  rightShift: { stand: new THREE.Vector3(0.06, -0.005, 0.02), crouch: new THREE.Vector3(-0.03, -0.045, 0.04) },
   // 銃口。モデルの先端 5mm を測ると y 0.051〜0.083 で、その中央。
   // 置き値のままだと 4.7cm 低く 6.6cm 手前から弾が出ていた
   tip: new THREE.Vector3(0, 0.067, -0.172),
@@ -227,7 +402,7 @@ const PISTOL: WeaponConfig = {
  */
 const MOSIN: WeaponConfig = SNIPER
 
-export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, shotgun: SHOTGUN, sniper: SNIPER, mosin: MOSIN, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
+export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, m4: M4, shotgun: SHOTGUN, sniper: SNIPER, mosin: MOSIN, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
 
 /**
@@ -295,6 +470,11 @@ export class Weapon {
    * 隣どうしを繋いだ 1 本の軸で足りる。
    */
   private stance = -1
+  /** 構えの補正 (aimTrim) をどれだけ掛けるか (0..1)。Soldier が構えに合わせて寄せる */
+  private aimWeight = 0
+  /** 補正を掛ける前の置き場所 (親 = 手の空間)。左手を付け直す基準に使う */
+  private readonly plainQuaternion = new THREE.Quaternion()
+  private readonly correctionScratch = new THREE.Quaternion()
   /**
    * 取り付けた手。**預けた後に戻す先**。
    *
@@ -358,6 +538,8 @@ export class Weapon {
               ? await loadM1911()
             : kind === 'mosin'
               ? await loadMosin()
+            : kind === 'm4'
+              ? await loadM4()
             : kind === 'smg'
               ? await loadSmg()
               : kind === 'shotgun'
@@ -505,7 +687,127 @@ export class Weapon {
     this.rebuild(Math.max(this.stance, 0))
   }
 
+  /**
+   * 構えの補正の掛かり具合 (0..1)。**変わった時だけ組み直す。**
+   */
+  setAimWeight(weight: number): void {
+    if (Math.abs(weight - this.aimWeight) < 0.002) return
+    this.aimWeight = weight
+    if (!this.lent) this.rebuild(this.stance < 0 ? 0 : this.stance)
+  }
+
   private rebuild(blend: number): void {
+    this.place(blend)
+    this.plainQuaternion.copy(this.object.quaternion)
+    this.applyAimTrim(blend)
+    // 置き直したので、向け直しの基準も取り直す
+    this.restSaved = false
+  }
+
+  /**
+   * 構えの補正 (aimTrim) を掛ける。**握り (grip) を支点に回す** — 右手と銃の
+   * 関係は変わらず、銃口だけが向きを変える。立ち→しゃがみで混ぜ、伏せへ向けて抜く
+   */
+  private applyAimTrim(blend: number): void {
+    const trim = this.config.aimTrim
+    if (!trim || this.aimWeight <= 0) return
+    const crouch = Math.min(1, blend)
+    const fade = blend <= 1 ? 1 : Math.max(0, 2 - blend)
+    const weight = this.aimWeight * fade
+    if (weight <= 0) return
+    const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(trim.pitch, trim.crouchPitch, crouch)) * weight
+    const yaw = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(trim.yaw, trim.crouchYaw, crouch)) * weight
+    /*
+     * **付けた時の基準の空間で回す** (右 = +X、上 = +Y が世界と揃っている。attachTo の
+     * baseRotation)。銃の空間で回すと、模型ごとに軸が違う — AK の模型は銃身を
+     * 軸に 90° 寝ているので、上下に回したつもりが左右に化けた。
+     * 手の空間へは: 手の基準の逆 × (基準 × 回し × 基準の逆) × 手の基準
+     */
+    const ctx = this.context
+    if (!ctx) return
+    const turn = this.correctionScratch.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'))
+    // 行列には骨の縮尺 (Armature の 0.01) が混じっているので、向きだけ分けて取る
+    const hand = new THREE.Quaternion()
+    ctx.handWorldInverse.clone().invert().decompose(new THREE.Vector3(), hand, new THREE.Vector3())
+    const inWorld = ctx.baseRotation.clone().multiply(turn).multiply(ctx.baseRotation.clone().invert())
+    const local = hand.clone().invert().multiply(inWorld).multiply(hand)
+    // 握りが動かないよう位置を戻す: 位置 += 回す前の握り − 回した後の握り (手の空間、縮尺込み)
+    const grip = this.blendGrip
+    const before = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
+    this.object.quaternion.premultiply(local)
+    const after = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
+    this.object.position.add(before.sub(after))
+  }
+
+  /** alignBarrel で回す前の置き場所。毎コマここへ戻してから向け直す */
+  private readonly restQuaternion = new THREE.Quaternion()
+  private readonly restPosition = new THREE.Vector3()
+  private restSaved = false
+
+  /**
+   * 銃身を世界の向き dir へ向ける (alignBarrel の銃だけ)。重み 0..1。
+   * **毎コマ呼ぶ** — 手は型で動くので、向け直しも毎コマ要る
+   */
+  alignTo(dir: THREE.Vector3, weight: number): void {
+    if (!this.config.alignBarrel || this.lent) return
+    if (this.restSaved) {
+      this.object.quaternion.copy(this.restQuaternion)
+      this.object.position.copy(this.restPosition)
+    } else {
+      this.restQuaternion.copy(this.object.quaternion)
+      this.restPosition.copy(this.object.position)
+      this.restSaved = true
+    }
+    if (weight <= 0) return
+    const parent = this.object.parent
+    if (!parent) return
+    this.object.updateWorldMatrix(true, false)
+    const barrel = new THREE.Vector3(0, 0, -1).transformDirection(this.object.matrixWorld)
+    const turn = new THREE.Quaternion().setFromUnitVectors(barrel, dir.clone().normalize())
+    turn.slerp(new THREE.Quaternion(), 1 - weight)
+    const parentWorld = parent.getWorldQuaternion(new THREE.Quaternion())
+    const local = parentWorld.clone().invert().multiply(turn).multiply(parentWorld)
+    const grip = this.blendGrip
+    const before = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
+    this.object.quaternion.premultiply(local)
+    const after = grip.clone().multiply(this.object.scale).applyQuaternion(this.object.quaternion)
+    this.object.position.add(before.sub(after))
+    this.object.updateWorldMatrix(false, true)
+  }
+
+  /**
+   * 構えている間に**左手首を置く所** (世界)。銃に leftHand が無ければ false
+   */
+  leftHandTarget(outPosition: THREE.Vector3, outQuaternion: THREE.Quaternion): boolean {
+    const hold = this.config.leftHand
+    if (!hold || this.aimWeight <= 0) return false
+    outPosition.copy(hold.position).applyMatrix4(this.object.matrixWorld)
+    outQuaternion.copy(this.object.getWorldQuaternion(new THREE.Quaternion())).multiply(hold.quaternion)
+    return true
+  }
+
+  /** 構えの補正の掛かり具合 (0..1) */
+  get aimAmount(): number {
+    return this.aimWeight
+  }
+
+  /**
+   * 構えの補正で銃が回った分を、**世界の向きで**返す (回した後 × 回す前の逆)。
+   * 補正が掛かっていなければ false。支点 (握り) の世界座標も返す
+   */
+  aimCorrection(outDelta: THREE.Quaternion, outPivot: THREE.Vector3): boolean {
+    if (this.object.quaternion.angleTo(this.plainQuaternion) < 1e-4) return false
+    const parent = this.object.parent
+    if (!parent) return false
+    const parentWorld = parent.getWorldQuaternion(new THREE.Quaternion())
+    const corrected = parentWorld.clone().multiply(this.object.quaternion)
+    const plain = parentWorld.multiply(this.plainQuaternion)
+    outDelta.copy(corrected).multiply(plain.invert())
+    outPivot.copy(this.blendGrip).applyMatrix4(this.object.matrixWorld)
+    return true
+  }
+
+  private place(blend: number): void {
     /*
      * 隣どうしを繋ぐ。0〜1 は立ち→しゃがみ、1〜2 はしゃがみ→伏せ。
      *
@@ -561,6 +863,10 @@ export class Weapon {
    */
   calibrate(grip: THREE.Vector3, extraRotation: THREE.Euler): void {
     this.calibrateWith(grip, new THREE.Quaternion().setFromEuler(extraRotation))
+    // 調整パネルから当て直しても、構えの補正は掛け直す (掛けないと補正が消えたまま残る)
+    this.blendGrip.copy(grip)
+    this.plainQuaternion.copy(this.object.quaternion)
+    this.applyAimTrim(this.stance < 0 ? 0 : this.stance)
   }
 
   private calibrateWith(grip: THREE.Vector3, extra: THREE.Quaternion): void {
@@ -613,4 +919,49 @@ export class Weapon {
   dispose(): void {
     this.object.removeFromParent()
   }
+}
+
+/**
+ * 主観用の銃から**窓のガラスを削る** (weapon.ts の sight.glass)。
+ *
+ * 箱の中にあって目の方 (±Z) を向いた三角形を、索引から外す。形は体の銃と共有
+ * しているので、複製してから削る
+ */
+export function cutSightGlass(root: THREE.Object3D, box: { min: THREE.Vector3; max: THREE.Vector3 }): void {
+  root.updateMatrixWorld(true);
+  const toRoot = new THREE.Matrix4();
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  const centre = new THREE.Vector3();
+  const rootInverse = root.matrixWorld.clone().invert();
+  root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const geometry = mesh.geometry.clone();
+    const position = geometry.getAttribute('position');
+    const index = geometry.index ?? null;
+    const count = index ? index.count : position.count;
+    toRoot.multiplyMatrices(rootInverse, mesh.matrixWorld);
+    const kept: number[] = [];
+    for (let i = 0; i < count; i += 3) {
+      const ia = index ? index.getX(i) : i;
+      const ib = index ? index.getX(i + 1) : i + 1;
+      const ic = index ? index.getX(i + 2) : i + 2;
+      a.fromBufferAttribute(position, ia).applyMatrix4(toRoot);
+      b.fromBufferAttribute(position, ib).applyMatrix4(toRoot);
+      c.fromBufferAttribute(position, ic).applyMatrix4(toRoot);
+      centre.copy(a).add(b).add(c).divideScalar(3);
+      normal.subVectors(c, b).cross(a.clone().sub(b)).normalize();
+      const glass =
+        centre.x > box.min.x && centre.x < box.max.x &&
+        centre.y > box.min.y && centre.y < box.max.y &&
+        centre.z > box.min.z && centre.z < box.max.z &&
+        Math.abs(normal.z) > 0.9;
+      if (!glass) kept.push(ia, ib, ic);
+    }
+    geometry.setIndex(kept);
+    mesh.geometry = geometry;
+  });
 }

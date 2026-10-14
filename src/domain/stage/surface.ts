@@ -49,8 +49,13 @@ export const SURFACE_ORDER: readonly Surface[] = ['concrete', 'metal', 'wood', '
 export const DEFAULT_SURFACE: Surface = 'metal'
 
 export function surfaceOf(name: string): Surface {
+  return taggedSurface(name) ?? DEFAULT_SURFACE
+}
+
+/** 名前に材質のタグがあればその材質、無ければ null (既定へ落とさない) */
+export function taggedSurface(name: string): Surface | null {
   for (const [tag, surface] of Object.entries(SURFACE_TAGS)) {
     if (name.includes(tag)) return surface
   }
-  return DEFAULT_SURFACE
+  return null
 }

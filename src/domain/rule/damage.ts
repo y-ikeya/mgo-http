@@ -112,6 +112,26 @@ export const RECOVER_RATE = 8
  * 強めるときの変更が小さくなる。
  */
 
+/**
+ * スタンナイフ。**構えて R2 で刺すと、殺さずに眠らせる** (R1 は殺す刺突)。
+ *
+ * 使うには充電が満ちている必要がある。**満ちるまでの時間が枷** — いつでも
+ * 眠らせられると、殺す刺突を選ぶ理由が無くなる。振れば空振りでも充電は空になる
+ * (審判は当たった時だけ知るので、当たった時の間隔で確かめる)。湧いた時は満ちている。
+ * 満ちるまでの長さは素 20 秒、KNIFE MASTERY で縮む (skill.ts の stunChargeSeconds)。
+ * MGO2 のスタンナイフの形 (本人 2026-10-08)
+ */
+/** 次に眠らせられる時刻 (ms)。満ちるまでの秒数は KNIFE MASTERY で決まる (skill.ts の stunChargeSeconds) */
+export function stunReadyAfter(now: number, seconds: number): number {
+  return now + seconds * 1000
+}
+
+/** 充電の溜まり具合 (0〜1)。readyAt は満ちる時刻 (ms) */
+export function stunCharge(readyAt: number, now: number, seconds: number): number {
+  if (now >= readyAt) return 1
+  return Math.max(0, 1 - (readyAt - now) / (seconds * 1000))
+}
+
 /** ナイフのダメージ。背後からなら即死 */
 export function meleeDamage(fromBehind: boolean): number {
   return fromBehind ? MELEE_BACK_DAMAGE : MELEE_FRONT_DAMAGE
@@ -181,11 +201,19 @@ export const STAB_DOWN_PITCH = -0.35
  * 幾何 (間合いと角度) は sim/judge/hitcheck.ts。ここに在るのは
  * 「誰を刺せるか」というドメインルールだけ。
  */
-export function canBeStabbed(stance: Stance, aimPitch = 0): boolean {
+export function canBeStabbed(stance: Stance, aimPitch = 0, attacker: Stance = 'stand'): boolean {
   if (STABBABLE.has(stance)) return true
-  // 倒れている相手。**下を狙っているときだけ**通る
-  return aimPitch <= STAB_DOWN_PITCH
+  /*
+   * 倒れている (寝ている) 相手。**屈んで、下を狙っているときだけ**通る。
+   *
+   * 立ったまま見下ろしても刃は床まで届かない。立って見下ろすだけで刺せていた
+   * (本人 2026-10-08「リーチ的におかしい」)。しゃがみか伏せで、見下ろしたときだけ
+   */
+  return REACHES_FLOOR.has(attacker) && aimPitch <= STAB_DOWN_PITCH
 }
+
+/** 床の高さまで刃が届く構え。立っている人の腕は床まで届かない */
+const REACHES_FLOOR: ReadonlySet<Stance> = new Set<Stance>(['crouch', 'prone'])
 
 
 /** 削られた結果 */
@@ -270,7 +298,9 @@ export const HIT_RULES = {
   viewHeight: (stance: Stance) => (VIEW_HEIGHT[stance][0] + VIEW_HEIGHT[stance][1]) / 2,
   // 傾きの横ずれ。sim (hitcheck) は domain の値を直に引かないので、ここから渡す
   leanShift,
-  canBeStabbed,
+  // 判定の層は構えを文字列で持つ (sim は domain の型を知らない)。中身は stanceOf の値
+  canBeStabbed: (stance: string, aimPitch: number, attacker: string) =>
+    canBeStabbed(stance as Stance, aimPitch, attacker as Stance),
   meleeRange: MELEE_RANGE,
   meleeSlack: MELEE_SLACK,
   backstabDot: BACKSTAB_DOT,

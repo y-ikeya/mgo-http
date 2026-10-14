@@ -1,7 +1,9 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/weapon";
+import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
-import { GAME_SET_SECONDS } from "../../domain/match/match";
+import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
 import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
@@ -15,18 +17,19 @@ import { Input } from "../../infra/input";
 import { Soldier, PLAYER_HEIGHT, PLAYER_RADIUS, type PlayerWorld } from "./actor/soldier";
 import { Shots } from "./fx/shots";
 import { Spread } from "../../domain/item/spread";
-import { STAGES, type Spot, surfaceOf, waterOf, type StageName } from "../../domain/stage";
+import { STAGES, type Spot, surfaceOf, taggedSurface, waterOf, type StageName } from "../../domain/stage";
 import {
   SKILLS,
   canChooseSkills,
   masteryReloadScale,
   masteryRecoveryScale,
+  stunChargeSeconds,
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
 import { BLAST_RADIUS, RELEASE_HEIGHT, throwSpeedOf } from "../../domain/item/grenade";
 import { pelletsOf } from "../../domain/item/weapons";
-import { leanMetres, type Lean, type Stance } from "../../domain/player/stance";
+import { VIEW_HEIGHT, leanMetres, type Lean, type Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
 import {
   buildLights,
@@ -60,10 +63,11 @@ import { EmptyBoxes } from "./actor/box";
 import { REVERSED_DEPTH } from "./util/depth";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
+import { StunSparks } from "./fx/stunSparks";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
 import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
@@ -138,6 +142,8 @@ import {
   type Team,
 } from "../../application/protocol/types";
 import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
+import { setSlideBlocker } from "./actor/deathSlide";
+import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 /**
@@ -151,7 +157,9 @@ export type LoadoutFocus = "primary" | "secondary" | "support" | SkillId;
 /** キルログの欄に出す 1 行。倒した / 眠らせた、または誰かのボイス */
 export type HudFeedItem =
   | (KillEvent & { stun?: boolean; at: number })
-  | { type: "voice"; id: string; name: string; team: Team; text: string; at: number };
+  | { type: "voice"; id: string; name: string; team: Team; text: string; at: number }
+  /** 抜けた / 戻りを待っている (application/replica/match.ts の PresenceEntry) */
+  | { type: "presence"; id: string; name: string; team: Team; state: "away" | "left"; at: number };
 
 /** パッドでボイスを選ぶ十字キーの並び。上から時計回り */
 const VOICE_PAD_ORDER = ["menuUp", "menuRight", "menuDown", "menuLeft"] as const;
@@ -190,6 +198,8 @@ export interface GameStats {
   downed: boolean;
   /** 構えているか。クロスヘアはこのときだけ出す */
   aiming: boolean;
+  /** 構えようとしているが、銃口の先が塞がっていて構えられない */
+  aimBlocked: boolean;
   /** 現在の散布界 (度)。クロスヘアの開き具合に使う */
   spread: number;
   /** その部屋で選べる主武器。**部屋が絞ることがある** */
@@ -234,6 +244,8 @@ export interface GameStats {
   menuOpen: boolean;
   /** 装備の画面を開いているか */
   loadoutOpen: boolean;
+  /** READY の長押しの進み (0〜1)。鍵盤とパッドで押している分 */
+  readyHold: number;
   /** 装備の画面が自動で閉じるまで (秒) */
   loadoutLeft: number;
   /** OK が効くようになるまで (秒)。0 なら押せる */
@@ -257,6 +269,11 @@ export interface GameStats {
   loadoutFocus: LoadoutFocus;
   /** スコープを覗いているか。覗いている間は専用の表示にする */
   scoped: boolean;
+  /**
+   * 覗いているのが銃の照準器か (突撃銃の主観)。眼鏡ではないのでスコープの絵を重ねない。
+   * holo はホロサイトの輪と点を画面の真ん中に出す。null なら眼鏡か、覗いていない
+   */
+  sight: "iron" | "holo" | null;
   /** いま持っている銃。調整パネルが追従する */
   equipped: WeaponId;
   /** 覗いている倍率。空なら覗いていない */
@@ -311,6 +328,8 @@ export interface GameStats {
   held: HeldId
   /** 武器系で選んでいる物。道具を手にしていても変わらない */
   weaponHeld: HeldId
+  /** スタンナイフの充電 (0〜1)。ナイフのカードの弾の目盛りの所に出す */
+  stunCharge: number
   /** 道具系で選んでいる物。使っていなければ 'none' */
   tool: HeldId
   /** その道具をいま手にしているか */
@@ -401,10 +420,29 @@ const MAX_RANGE = 200;
 /**
  * 刺突の判定を出すタイミング (クリップ尺に対する割合)。
  *
- * モーションの頭で判定すると、刃が届く前に相手が倒れて不自然に見える。
- * 腕を突き出す辺りで出す。1.93 秒の 35% = 約 0.68 秒。
+ * **腕が伸び切る直前。** 頭で出すと刃が届く前に倒れ、遅いと刺さってから間が
+ * 開いて倒れる。立ちの刺突 (stab、57 コマ) は 9〜12 コマ目で腕が伸び、12 コマ目で
+ * 伸び切って 24 コマ目まで保つ (右肩から手まで 0.35 → 0.61m、soldier.glb で実測)。
+ * 10.5 コマ目 = 19%。以前の 35% は伸び切ってから 0.4 秒後で、「刺さってから
+ * ちょっと間が開いてやられる」だった (本人 2026-10-08)。しゃがみも同じ型
  */
-const STAB_HIT_PHASE = 0.35;
+const STAB_HIT_PHASE = 0.19;
+/** 伏せた刺突 (prone_stab、41 コマ)。11〜17 コマ目で伸びるので、伸び切る直前の 15 コマ目 */
+const PRONE_STAB_HIT_PHASE = 0.36;
+/** 銃を構える高さは目の線からこれだけ下 (m) */
+const MUZZLE_BELOW_EYE = 0.15;
+/** 銃の胴の下側は銃口からこれだけ下 (m)。ここが遮蔽の上に出ていれば構えられる */
+const GUN_BELOW_MUZZLE = 0.06;
+/** 下ろした後に構え直すには、銃口がこれだけ上に余裕を持って出ている必要がある (m) */
+const MUZZLE_HEIGHT_MARGIN = 0.04;
+/** 構えてからこの秒数が経つまで銃口の高さを覚えない (姿勢が寄り切る前の値を掴まない) */
+const AIM_SETTLE_SECONDS = 0.6;
+/** 伏せていても銃はこれより下には無い (m)。床を拾わない */
+const MUZZLE_MIN_HEIGHT = 0.15;
+/** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
+const MUZZLE_HYSTERESIS = 1.08;
+/** READY に入るまで押し続ける時間 (秒)。画面のボタンも同じ長さ (ReadyRoom.tsx) */
+export const READY_HOLD = 0.6;
 /** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
 const FALLBACK_STAB_DURATION = 1.9;
 
@@ -544,13 +582,29 @@ const SURFACE_TOLERANCE = 0.03;
 const GRENADE_RELEASE_FORWARD = 0.45;
 
 /**
- * 着弾の音。**材質ごとに鳴らし分ける。** 音を持たない材質は null (黙る)。
- * 木やコンクリートの音が入るまでは、材質の違う音を流用しない — 当たった物を聞き間違える
+ * 着弾の音。**材質ごとに鳴らし分ける。** 専用の音が無い材質 (壁・地面) は
+ * hit.mp3 (本人 2026-10-08「指定がなかったらこれ」)
  */
-function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | null {
+function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | "hitWood" | "hitDefault" {
   if (surface === "metal") return "hitMetal";
   if (surface === "glass") return "hitGlass";
-  return null;
+  if (surface === "wood") return "hitWood";
+  return "hitDefault";
+}
+
+/**
+ * 当たった物の材質。**名前は親まで遡って引く。**
+ *
+ * 材質を 2 つ以上持つ形は、読み込むと材質ごとの子 (mesh_29_1 のような名前) に
+ * 割れる。子の名前にはタグが無いので既定 (金属) に落ち、建物を撃っても金属の音と
+ * 火花が出ていた (2026-10-08)。タグのある名前に当たるまで親を辿る
+ */
+function surfaceOfHit(object: THREE.Object3D): ReturnType<typeof surfaceOf> {
+  for (let at: THREE.Object3D | null = object; at; at = at.parent) {
+    const surface = taggedSurface(at.name);
+    if (surface) return surface;
+  }
+  return surfaceOf(object.name);
 }
 /** 壁で体が画面を塞いだときの薄さの上限 (1 - 0.8 = 0.2 まで薄くなる) */
 const FADE_MAX = 0.8;
@@ -706,6 +760,8 @@ export class Game {
   /** 割れた場所の置き場。毎回作らない */
   private readonly popAt = new THREE.Vector3();
   private readonly blast: BlastFx;
+  /** スタンナイフの放電 (fx/stunSparks.ts)。自分と他人の刃先に出す */
+  private readonly stunSparks: StunSparks;
   /** 気配 (AWARENESS)。**何が在るかは届かない**ので、霧を置くだけ */
   private readonly sensed: Sensed;
   private readonly casings: Casings;
@@ -1076,12 +1132,98 @@ export class Game {
   private applyWeaponView(): void {
     const spec = this.weapon;
     const level = this.zoomStep > 0 ? spec.scope[this.zoomStep - 1] : null;
+    /*
+     * 肩越しと主観を切り替えた。**狙っている所はそのまま** — 主観では弾の線が
+     * 肩のずれの分だけ横へ動くので、カメラがいま指している所までの距離を渡して、
+     * 寄る間ずっとそこを指させる (sense/camera.ts の holdAimAt)
+     */
+    const zoomed = this.player.isAiming && this.zoomStep > 0;
+    if (this.player.isAiming && this.wasAiming && zoomed !== this.wasZoomed) {
+      this.follow.holdAimAt(this.aimedDistance());
+    }
+    this.wasZoomed = zoomed;
+    this.wasAiming = this.player.isAiming;
     this.follow.setAimView(
       level
         ? { distance: 0, shoulder: 0, fov: level.fov }
         : { distance: spec.aimDistance, shoulder: spec.aimShoulder, fov: spec.aimFov },
     );
     this.player.setSelfVisible(!this.scoped);
+    this.updateSightModel(level?.sight !== undefined);
+  }
+
+  private readonly fpMuzzle = new THREE.Vector3();
+  private wasZoomed = false;
+  private wasAiming = false;
+
+  /** 画面の中心が指している所までの距離 (m)。地形か人。何も無ければ遠く */
+  private aimedDistance(): number {
+    this.follow.aimOrigin(this.aimOrigin);
+    this.follow.aimDirection(this.aimDir);
+    this.raycaster.set(this.aimOrigin, this.aimDir);
+    this.raycaster.far = MAX_RANGE;
+    const terrain = this.raycaster.intersectObjects(this.stage.collidables, false)[0];
+    const limit = terrain ? terrain.distance : MAX_RANGE;
+    const player = this.remotes.raycast(this.aimOrigin, this.aimDir, limit);
+    return Math.max(2, player ? player.distance : limit);
+  }
+
+  /**
+   * 主観の銃口 (世界)。主観用の銃が出ていればその銃口、無ければ (スコープ) 目の少し
+   * 前の下 — 画面に映っている所から出す
+   */
+  private firstPersonMuzzle(out: THREE.Vector3): THREE.Vector3 {
+    const camera = this.follow.camera;
+    camera.updateMatrixWorld(true);
+    const model = this.sightModel;
+    const held = this.inv.held;
+    if (model && model.object.visible && isGun(held)) {
+      return out.copy(SIGHT_CONFIGS[held].tip).applyMatrix4(model.object.matrixWorld);
+    }
+    return out.set(0, -0.08, -0.5).applyMatrix4(camera.matrixWorld);
+  }
+
+  /** 主観用の銃 (照準器を覗く段)。カメラに付けて置く */
+  private sightModel: { held: string; object: THREE.Object3D } | null = null;
+  /** 読み込み中の銃。同じ物を 2 度読まない */
+  private sightLoading: string | null = null;
+
+  /**
+   * 照準器を覗く段 (突撃銃の主観) で、**銃をカメラの前に出す。**
+   *
+   * 体が持っている銃ではなく、同じ模型をもう 1 つカメラに付ける (主観用)。体の銃は
+   * 型の揺れ・背骨の補正・手の位置で毎コマ少しずつ動くので、それを覗くと照準器が
+   * 画面の真ん中から逸れる。カメラに付けた銃は、目の点 (weapon.ts の sight.eye) が
+   * カメラの位置に来るよう置くので、照準線がいつも画面の真ん中を通る — 弾も画面の
+   * 真ん中へ飛ぶので、照準器と弾の行き先が一致する
+   */
+  private updateSightModel(show: boolean): void {
+    const held = this.inv.held;
+    const config = isGun(held) ? SIGHT_CONFIGS[held].sight : undefined;
+    const wanted = show && config !== undefined;
+    if (wanted && this.sightModel?.held !== held && this.sightLoading !== held && isGun(held)) {
+      this.sightLoading = held;
+      void Weapon.load(held).then((weapon) => {
+        if (this.sightLoading !== held) return;
+        this.sightLoading = null;
+        if (this.sightModel) this.sightModel.object.removeFromParent();
+        const object = weapon.object;
+        const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), config!.pitch).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), config!.roll));
+        object.quaternion.copy(turn);
+        object.position.copy(config!.eye).applyQuaternion(turn).negate();
+        object.traverse((o) => {
+          o.castShadow = false;
+          o.frustumCulled = false;
+        });
+        if (config!.glass) cutSightGlass(object, config!.glass);
+        // カメラの子は、カメラが場面に入っていないと描かれない
+        const camera = this.follow.camera;
+        if (!camera.parent) this.scene.add(camera);
+        camera.add(object);
+        this.sightModel = { held, object };
+      });
+    }
+    if (this.sightModel) this.sightModel.object.visible = wanted && this.sightModel.held === held;
   }
   /** 自分の所属。名簿で届くまでは青として振る舞う */
 
@@ -1107,7 +1249,24 @@ export class Game {
   /** 副武器。**部屋が外していれば null** (ROOMS の secondary) */
   private readonly secondary: WeaponId | null;
 
-  constructor(container: HTMLElement, identity: Identity, room: string) {
+  /**
+   * @param privateRoom 自分だけの部屋に入る (練習 /training)。他の人とは出会わない
+   */
+  constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
+    // 倒れた体が下がる時、壁で止める。カメラと同じ網で見る (表裏を問わない)
+    setSlideBlocker((origin, dir, max) => this.cameraWorld.distanceToObstruction(origin, dir, max));
+    /*
+     * **1 枚の頁で動く試合は 1 つだけ。** 前の物が残っていれば片付ける。
+     *
+     * 開発中にコードを差し替える (HMR) と、画面は作り直されるのに古い Game が
+     * 片付けられずに残ることがあった。残った方は通信も位置の送信も続けるので、
+     * 本人が部屋の一覧へ戻った後も、サーバーには「部屋に居て立っている人」として
+     * 残り、相手が居なくならず試合が終わらなかった (2026-10-09)。HMR で Game の
+     * 型そのものが差し替わるので、控えは型の外 (globalThis) に置く
+     */
+    const page = globalThis as { __mgoGame?: Game };
+    if (page.__mgoGame && page.__mgoGame !== this) page.__mgoGame.dispose();
+    page.__mgoGame = this;
     this.container = container;
     /*
      * どのステージに乗るか。**部屋から引く** (domain/match/room.ts)。
@@ -1133,14 +1292,25 @@ export class Game {
      *
      * **一覧が空なら銃を持たない部屋。** ナイフだけになる。
      */
-    const carryable =
-      this.pendingLoadout.primary !== null &&
-      this.primaries.includes(this.pendingLoadout.primary);
-    if (!carryable) {
-      this.pendingLoadout.primary = this.primaries[0] ?? null;
+    /*
+     * **前回選んだ物から始める。初めてなら一覧の先頭 (P90)** (本人 2026-10-14)。
+     * 部屋で持ち込めない物は先頭へ丸める。繋ぎ直した時はサーバーが覚えている物が
+     * 後から届いて上書きする (そちらのほうが新しい)
+     */
+    const last = loadLastLoadout();
+    const lastPrimary = last?.primary as WeaponId | null | undefined;
+    this.pendingLoadout.primary =
+      lastPrimary && this.primaries.includes(lastPrimary) ? lastPrimary : (this.primaries[0] ?? null);
+    const lastSecondary = last?.secondary as WeaponId | null | undefined;
+    if (this.secondary !== null && lastSecondary && CHOICES.secondary.includes(lastSecondary)) {
+      this.pendingLoadout.secondary = lastSecondary;
     }
+    const lastSupport = last?.support as SupportId | undefined;
+    if (lastSupport && SUPPORTS.includes(lastSupport)) this.pendingLoadout.support = lastSupport;
+    this.loadout = { ...this.pendingLoadout };
+    this.inv.refill(this.loadout);
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
-    this.net = createTransport(identity, room);
+    this.net = createTransport(identity, room, privateRoom);
     // 自機のモデルはここで読み始める。**構築時ではない** —
     // どのモデルを着るかは名前で決まり、名前を知っているのはこちら (skin.ts)
     this.player.start(selfSkin(identity.displayName));
@@ -1273,6 +1443,7 @@ export class Game {
     this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
+    this.stunSparks = new StunSparks(this.scene);
     this.sensed = new Sensed(this.scene);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
@@ -1446,6 +1617,11 @@ export class Game {
   }
 
   dispose(): void {
+    setSlideBlocker(null);
+    // 2 度呼ばれてよい (画面の片付けと、次の Game が古い物を片付けるのと)
+    if (this.disposed) return;
+    const page = globalThis as { __mgoGame?: Game };
+    if (page.__mgoGame === this) page.__mgoGame = undefined;
     clearTimeout(this.resultTimer);
     this.disposed = true;
     this.renderer.setAnimationLoop(null);
@@ -1568,13 +1744,23 @@ export class Game {
     // **述語で聞く。** 並べて書いていたので decoy を足したときに漏れた
     const throwing = isThrowable(this.inv.held);
     const wantsAim = this.input.aiming && this.input.engaged && !this.loadoutBlocking;
-    this.player.setAiming(wantsAim && !throwing);
+    /*
+     * **銃口の先に壁や物があると構えられない。** 毎フレーム聞くので、構えたまま
+     * 壁へ寄っていけば、そこで銃を下ろす (2026-10-09 本人)
+     */
+    this.aimHeld = this.player.isAiming ? this.aimHeld + dt : 0;
+    this.muzzleBlocked = this.measureMuzzleBlocked();
+    this.player.setAiming(wantsAim && !throwing && !this.muzzleBlocked);
     /*
      * **カメラは投げ物でも寄る。** 体は構えの型にしないが (振りかぶりと二重になる)、
      * 見ている側にとって「構えた」のは同じ — 落下点を狙う画面は銃と同じ寄りにする。
      * 審判も同じ扱い (server/relay.ts: 振りかぶりは構え)
      */
-    this.follow.setAiming(this.player.isAiming || (wantsAim && throwing));
+    /*
+     * 銃口の先が塞がっていて構えられない時も、**カメラは構えの寄りにする。** 銃が
+     * 下りたままで画面も寄らないと、なぜ撃てないのかが分からない (2026-10-12 本人)
+     */
+    this.follow.setAiming(this.player.isAiming || (wantsAim && (throwing || this.muzzleBlocked)));
     this.follow.setViewHeight(this.player.viewHeight);
     // 首はカメラの向きへ (構えていないとき)。相手に「どこを見ているか」を渡す
     this.player.setLookYaw(this.follow.aimYaw - this.player.yaw);
@@ -1759,6 +1945,7 @@ export class Game {
       (at) => this.audio.play("locatorBeep", at),
     );
     this.blast.update(dt);
+    this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
       // 水に落ちたら輪だけ出して沈める。**金属の音は鳴らさない**
@@ -2228,6 +2415,16 @@ export class Game {
         this.audio.play("resupply", this.player.position);
         break;
 
+      // 他の人がスタンナイフを振った。**手元で放電して鳴る**
+      case "zap": {
+        const id = message.id;
+        if (id === this.net.id) break;
+        const at = this.remotes.positionOf(id);
+        if (at) this.audio.play("zap", at);
+        this.stunSparks.discharge((out) => this.remotes.handOf(id, out));
+        break;
+      }
+
       case "throw":
         // 初速だけが届く。同じ物理を同じ地形に対して解くので、
         // 跳ねる場所も落ちる場所もこちらで求まる。
@@ -2420,6 +2617,24 @@ export class Game {
         }
         break;
       }
+
+      // CQC で投げられた。投げた側の正面へ寄って倒れる (soldier の thrown)
+      case "thrown":
+        this.player.thrown(message.x, message.z, message.yaw);
+        this.loseHeldGrenade();
+        break;
+
+      // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
+      case "stun": {
+        const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
+        if (at) this.audio.play("stunOof", at);
+        break;
+      }
+
+      // 投げた側が倒れて、放された。倒れかけから立ち直る
+      case "released":
+        this.player.releaseThrown();
+        break;
 
       case "knockdown":
         this.player.knockDown();
@@ -2764,6 +2979,77 @@ export class Game {
     this.setSkill(focus, Math.max(0, Math.min(3, level)));
   }
 
+  /** 銃口の先が壁や物に当たっていて、構えられない */
+  private muzzleBlocked = false;
+
+  /**
+   * 構えた銃が壁や物に刺さるか。**体の中心から照準の向きへ、銃の長さ
+   * (武器の表の aimReach) だけ水平に線を引く。** 当たる面は人が止まる物
+   * (茂みは通す・ガラスや柵は止める)。高さは目の線より少し下 (銃を構える所)。
+   *
+   * **低い遮蔽 (土嚢など) は越えて構えられる。** 銃の高さで当たっても、目の
+   * 高さの線が通るなら銃を上に出せる。土嚢の陰にしゃがんで寄ったら銃を
+   * 引っ込められた、では物陰から撃てない (2026-10-09 本人)
+   *
+   * 下ろしている間は少し長めに測る。境目で構えと下ろしを行き来させない
+   *
+   * **高さは姿勢の表 (VIEW_HEIGHT) から取る。頭の実測は使わない** — 構えて下を
+   * 向くと頭が下がるので、実測だと「構える → 頭が下がって塞がる → 下ろす →
+   * 頭が上がって通る」を繰り返した (2026-10-09 本人)
+   */
+  /**
+   * 構えた時の**実際の銃口の高さ** (足元から、m)。銃と姿勢ごとに、構えている間に
+   * 測って覚える。下ろしている間は銃口が下がっているので、覚えた値で判定する
+   */
+  private readonly muzzleHeights = new Map<string, number>();
+  private readonly muzzleScratch = new THREE.Vector3();
+  /** 構えてからの時間 (秒)。構えの寄りが済むまで銃口の高さを覚えない */
+  private aimHeld = 0;
+
+  private measureMuzzleBlocked(): boolean {
+    const held = this.inv.held;
+    if (!isGun(held)) return false;
+    const solid = this.stage.moveWorld?.surfaces;
+    if (!solid) return false;
+    const me = this.player.position;
+    const stance = this.player.stance;
+    const key = `${held}:${stance}`;
+    /*
+     * **構えた時の銃口の高さで線を 1 本引く。** 銃口が箱の上に出ていれば構えられ、
+     * 埋まっていれば下ろす (2026-10-09 本人)。姿勢の目安の高さで測り、「頭より低い物は
+     * 越えられる」としていた頃は、しゃがんだ P90 の銃口が 0.9m の箱に埋まるのに構えられた
+     */
+    if (this.player.isAiming && this.aimHeld > AIM_SETTLE_SECONDS) {
+      const muzzle = this.player.muzzle(this.muzzleScratch);
+      this.muzzleHeights.set(key, Math.max(MUZZLE_MIN_HEIGHT, muzzle.y - me.y));
+    }
+    const [low] = VIEW_HEIGHT[stance];
+    const height = this.muzzleHeights.get(key) ?? Math.max(MUZZLE_MIN_HEIGHT, low - MUZZLE_BELOW_EYE);
+    const reach = weaponOf(held).aimReach * (this.muzzleBlocked ? MUZZLE_HYSTERESIS : 1);
+    const yaw = this.follow.aimYaw;
+    const tx = me.x - Math.sin(yaw) * reach;
+    const tz = me.z - Math.cos(yaw) * reach;
+    // 下ろしている間は少し低く見る (境目で構えと下ろしを行き来させない)
+    /*
+     * 線は**銃の下側**の高さで引く。銃口だけ見ると、しゃがんだ P90 の銃口が 0.9m の箱の
+     * 上に 3cm 出ているだけで、銃の胴は箱に埋まったまま構えられた (2026-10-12 本人)
+     */
+    const y = me.y + height - GUN_BELOW_MUZZLE - (this.muzzleBlocked ? MUZZLE_HEIGHT_MARGIN : 0);
+    return !solid.clear(me.x, y, me.z, tx, y, tz);
+  }
+
+  /** 長押しで READY にした押下を、まだ離していない */
+  private readyReleaseWait = false;
+
+  /** READY を押し始めた時刻 (performance.now)。0 なら押していない */
+  private readyHoldSince = 0;
+
+  /** READY の長押しの進み (0〜1)。画面の READY のボタンが満ちていく */
+  private get readyHoldRatio(): number {
+    if (this.readyHoldSince === 0) return 0;
+    return Math.min(1, (performance.now() - this.readyHoldSince) / (READY_HOLD * 1000));
+  }
+
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
     /*
@@ -2786,9 +3072,36 @@ export class Game {
      * 一番下のボタンが「READY」から「OK」に変わるだけで、位置も操作も同じ。
      * 別のキーにすると、始まる前と後で押す指が変わる。
      */
-    if (this.input.tapped("spawn")) {
-      if (this.replica.match?.phase === "ready") this.setReady(!this.selfReady);
-      else this.requestSpawn();
+    if (this.replica.match?.phase === "ready") {
+      /*
+       * **READY は長押し** (READY_HOLD)。1 押しで入っていた頃は、スキルを選んで
+       * いるつもりの × で READY になり、相手が先に押していると支度が終わった
+       * (2026-10-09 本人)。取り消しは 1 押しで — 外すのは急いでいい
+       */
+      /*
+       * 長押しで READY にした、その押下を離すまでは取り消しを読まない。
+       * 離した瞬間が 1 押しとして立ち、押し続けて離すと解除されていた
+       */
+      if (this.readyReleaseWait) {
+        if (!this.input.down("spawn")) this.readyReleaseWait = false;
+      } else if (this.selfReady) {
+        this.readyHoldSince = 0;
+        if (this.input.tapped("spawn")) this.setReady(false);
+      } else if (this.input.down("spawn")) {
+        const now = performance.now();
+        if (this.readyHoldSince === 0) this.readyHoldSince = now;
+        if (now - this.readyHoldSince >= READY_HOLD * 1000) {
+          this.readyHoldSince = 0;
+          this.readyReleaseWait = true;
+          this.setReady(true);
+        }
+      } else {
+        this.readyHoldSince = 0;
+      }
+      // 押した瞬間の立ち上がりは食っておく (長押しの途中で湧く側へ漏らさない)
+      this.input.tapped("spawn");
+    } else if (this.input.tapped("spawn")) {
+      this.requestSpawn();
     }
     // **番号は並び順から出す。** 主武器が 1 から、投擲はその続き。
     // 直に書くと、銃が 1 挺増えたときに番号が重なる (P90 を足して実際に重なった)
@@ -2909,6 +3222,8 @@ export class Game {
   private requestSpawn(): void {
     if (!this.canChooseLoadout) return;
     if (this.chooseElapsed < CHOOSE_FLOOR) return;
+    // 選んだ物を先に伝える。**一度も選び直さずに出ると、サーバーは既定 (AK47) のまま**
+    this.sendLoadout();
     this.net.send({ type: "spawn" });
   }
 
@@ -3032,6 +3347,7 @@ export class Game {
    * (読み直すとこちらは既定値へ戻る)。
    */
   private sendLoadout(): void {
+    saveLastLoadout(this.pendingLoadout);
     this.net.send({
       type: "loadout",
       support: this.pendingLoadout.support,
@@ -3071,6 +3387,11 @@ export class Game {
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
   onLoadout: ((next: { primary: WeaponId | null; support: SupportId }) => void) | null = null;
 
+  /** 次に湧く時の装備 (画面の印の初めの値)。前回選んだ物か、一覧の先頭 */
+  get chosenLoadout(): { primary: WeaponId | null; support: SupportId } {
+    return this.pendingLoadout;
+  }
+
   /**
    * 戦場へ出た。
    *
@@ -3088,6 +3409,8 @@ export class Game {
     this.reloadSoundIn = 0;
     this.boltIn = 0;
     this.stabTimer = 0;
+    // スタンナイフは満ちた状態で湧く (審判の spawn と同じ)
+    this.stunReadyAt = Date.now();
     this.spread.reset();
     this.follow.snapTo(this.player, this.cameraWorld);
   }
@@ -3209,12 +3532,46 @@ export class Game {
     return true;
   }
 
-  /** ナイフを振り始める。リロード中と多重の振りは受け付けない */
-  private startStab(): void {
+  /** いま振っている刺突の判定を出す位置 (STAB_HIT_PHASE / PRONE_STAB_HIT_PHASE) */
+  private stabHitPhase = STAB_HIT_PHASE;
+  /** いま振っているのが眠らせる刺突 (スタンナイフ) か */
+  private stabStun = false;
+  /**
+   * スタンナイフの充電が満ちる時刻 (Date.now)。**湧いた時に今へ戻す** (満ちた状態)。
+   * 審判も同じ時計を持っていて、満ちる前の当たりは通さない (server/damage.ts)
+   */
+  private stunReadyAt = 0;
+
+  /** スタンナイフの充電 (0〜1)。HUD のメーター */
+  private get stunChargeNow(): number {
+    return stunCharge(this.stunReadyAt, Date.now(), stunChargeSeconds(this.skills));
+  }
+
+  /**
+   * ナイフを振り始める。リロード中と多重の振りは受け付けない。
+   *
+   * stun = 眠らせる刺突。**充電が満ちていなければ振らない** (空振りもしない)。
+   * 振ったら空振りでも充電は空になる
+   */
+  private startStab(stun = false): void {
     if (this.stabTimer > 0 || this.reloadTimer > 0 || this.player.rolling)
       return;
+    if (stun && this.stunChargeNow < 1) return;
+    this.stabStun = stun;
+    if (stun) {
+      this.stunReadyAt = stunReadyAfter(Date.now(), stunChargeSeconds(this.skills));
+      /*
+       * **バチバチと刃先が光る。** 振り始めから腕が伸び切る所まで。刃が無ければ
+       * (模型が届く前) 右手から。音も同じ所で鳴らし、他の人へも知らせる (zap)
+       */
+      this.stunSparks.discharge((out) => this.player.knifeTip(out) ?? this.player.handWorld(out));
+      this.audio.play("zap", this.player.position);
+      this.net.send({ type: "zap", id: this.net.id });
+    }
     this.stabTimer = this.player.stabDuration || FALLBACK_STAB_DURATION;
     this.stabResolved = false;
+    // 型が違うので腕が伸びる所も違う。振り始めの姿勢で決める
+    this.stabHitPhase = this.player.isProne ? PRONE_STAB_HIT_PHASE : STAB_HIT_PHASE;
     this.player.stab();
   }
 
@@ -3228,7 +3585,7 @@ export class Game {
     const elapsed = total - this.stabTimer;
     this.stabTimer -= dt;
 
-    if (this.stabResolved || elapsed < total * STAB_HIT_PHASE) return;
+    if (this.stabResolved || elapsed < total * this.stabHitPhase) return;
     this.stabResolved = true;
 
     // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ)
@@ -3251,6 +3608,8 @@ export class Game {
       this.meleeForward,
       // 見下ろしていれば倒れている相手にも届く。構えていなければ水平とみなす
       this.player.isAiming ? this.follow.aimPitch : 0,
+      // 倒れた相手には屈んで (しゃがみ / 伏せ) 見下ろしたときだけ届く
+      this.player.stance,
     );
     if (!result) return;
 
@@ -3273,7 +3632,7 @@ export class Game {
      * いるのは、刺した瞬間に何か出さないと手応えが無いから。**巻き戻しの
      * 結果と食い違うことはあり得る**が、数字が動くわけではない。
      */
-    this.lastHitZone = result.fromBehind ? "BACKSTAB" : "KNIFE";
+    this.lastHitZone = this.stabStun ? "STUN" : result.fromBehind ? "BACKSTAB" : "KNIFE";
     this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
     // 刺さった音。**空振りでは鳴らさない** — 当てたかどうかで結果が全部決まる
     this.audio.play("stab", this.player.position);
@@ -3282,6 +3641,8 @@ export class Game {
       id: this.net.id,
       target: result.id,
       kind: "melee",
+      // 眠らせる刺突。充電を確かめるのは審判
+      ...(this.stabStun ? { stun: true } : {}),
     });
   }
 
@@ -3296,13 +3657,87 @@ export class Game {
   private updateTrigger(): void {
     if (!canAct(this.life) || this.loadoutBlocking) return;
     if (this.inv.switching) return;
+    if (this.updateCqc()) return;
     if (this.inv.held !== "knife") return;
     // ナイフは押した瞬間に振る。押しっぱなしで連打しない。
     // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
+    /*
+     * **構えていなければ刺さない。** ナイフを持っているだけで R2 で刺せた
+     * (本人 2026-10-08)。銃と同じく、構えてから使う。押したことは消すので、
+     * 押したまま構えても後から刺さない。
+     *
+     * 構えて 2 通り (MGO2 のスタンナイフ):
+     *   殺す刺突      パッド R1 / 鍵盤 左クリック
+     *   眠らせる刺突  パッド R2 / 鍵盤 X   (充電が満ちている時だけ)
+     */
+    const aiming = this.player.isAiming;
+    const killTap = this.input.tapped("killStab");
+    const stunTap = this.input.tapped("stunStab");
     if (this.input.firing && this.inv.pressedOnce) {
       this.inv.consumePress();
-      this.startStab();
+      if (aiming) this.startStab(this.input.firingByPad);
+      return;
     }
+    if (!aiming) return;
+    if (killTap) this.startStab(false);
+    else if (stunTap) this.startStab(true);
+  }
+
+  /**
+   * CQC (domain/player/cqc.ts)。**構えずに引き金を引く。** 片手で持つ物 (拳銃・
+   * ナイフ・投げる物・置く物) の時だけで、長物では何も起きない。
+   *
+   * 構えているかは**ボタンで見る** (input.aiming)。投げ物を構えている間は体の構え
+   * (isAiming) が立たないので、そちらで見ると構えて引いた手榴弾が CQC に化ける
+   *
+   * **体の正面**の近くに立っている敵が居れば、そちらへ向き直って投げる。カメラの向きは
+   * 見ない (本人 2026-10-12) — 別の方の相手に掛けたいなら、移動で体をそちらへ向けてから押す。
+   * 居ない・しゃがんでいる・箱に入っている なら**空振り** — 型の後に棒立ちの隙が
+   * 残る (soldier の cqcRecoverLeft)。掛かったかを決めるのはサーバー
+   *
+   * @returns 引き金を CQC に使った (刺突へは回さない)
+   */
+  /** 投げ切る型の最中に押された CQC。手を離れたら出す (updateCqc) */
+  private cqcQueued = false;
+
+  private updateCqc(): boolean {
+    if (this.input.aiming || this.player.isAiming || !canThrowWith(this.inv.held)) {
+      this.cqcQueued = false;
+      return false;
+    }
+    const pressed = this.input.firing && this.inv.pressedOnce;
+    if (pressed) this.inv.consumePress();
+    if (!pressed && !this.cqcQueued) return false;
+    if (this.stabTimer > 0 || this.reloadTimer > 0) return true;
+    /*
+     * 投げ切る / 置き切る型の最中 (手を離れるまで最大 1 秒ほど)。**押したことは覚えておいて、
+     * 手を離れた瞬間に出す。** 捨てていたので、手榴弾を投げてすぐ目の前の敵に掛けようと
+     * すると何も起きなかった (本人 2026-10-12)
+     */
+    if (this.grenadeRelease > 0 || this.setupRelease > 0) {
+      this.cqcQueued = true;
+      return true;
+    }
+    this.cqcQueued = false;
+    const look = this.player.yaw;
+    this.meleeForward.set(-Math.sin(look), 0, -Math.cos(look));
+    const target = this.remotes.cqcTarget(this.player.position, this.meleeForward, (id, side) =>
+      this.hostileTo(id, side),
+    );
+    if (target?.throwable) {
+      const face = Math.atan2(
+        -(target.position.x - this.player.position.x),
+        -(target.position.z - this.player.position.z),
+      );
+      if (this.player.cqc("cqc_throw", face)) this.net.send({ type: "cqc", target: target.id });
+      return true;
+    }
+    // 相手が居れば、空振りでもそちらへ振る
+    const face = target
+      ? Math.atan2(-(target.position.x - this.player.position.x), -(target.position.z - this.player.position.z))
+      : look;
+    this.player.cqc("cqc_miss", face);
+    return true;
   }
 
   private updateWeapon(dt: number): void {
@@ -3559,15 +3994,23 @@ export class Game {
     const splashed =
       hitPlayer === null && this.splashOnPath(this.muzzlePos, this.hitPoint);
 
+    /*
+     * 自分の画面に描く弾道の出どころ。**主観の間は主観用の銃の銃口から。**
+     *
+     * 主観では体を隠して、カメラに付けた銃を見せている。体の銃口から出すと、覗いて
+     * 傾いた時に画面の銃と煙がずれる (傾き方が体とカメラで違う、2026-10-13 本人)。
+     * 他の人へ送る弾道は体の銃口のまま (向こうに見えているのは体)
+     */
+    const drawFrom = this.scoped ? this.firstPersonMuzzle(this.fpMuzzle) : this.muzzlePos;
     this.shots.fire(
-      this.muzzlePos,
+      drawFrom,
       this.hitPoint,
       // **人に当たったら痕を出さない。** 痕はワールドに置くので、当たった
       // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
       hitPlayer || splashed ? null : hitTerrain ? this.hitNormal : null,
       IMPACT_WORLD,
       // **当たった物の名前から引く。** 音を鳴らすのと同じ引き方 (playImpact)
-      hitTerrain ? surfaceOf(hitTerrain.object.name) : undefined,
+      hitTerrain ? surfaceOfHit(hitTerrain.object) : undefined,
     );
     // 金属に当たった音。**材質は当たった面の名前から引く** (地形と同じ決めごと)
     if (!hitPlayer && !splashed && hitTerrain) this.playImpact(hitTerrain, this.hitPoint);
@@ -4399,6 +4842,10 @@ export class Game {
           // 一覧の中で 1 段動いた。開いた音と同じく画面の音
           this.audio.playUi("switch");
           break;
+        case "switched":
+          // 一覧を開かずに持ち替えた (トグル / 支援の名指し)。一覧で選び直したのと同じ音
+          this.audio.playUi("switch");
+          break;
       }
     }
   }
@@ -4718,7 +5165,18 @@ export class Game {
         text: voiceLine(entry.line)?.label ?? entry.line,
         at: entry.at,
       }));
-    return [...kills, ...voices].sort((a, b) => b.at - a.at).slice(0, 5);
+    /*
+     * 🫥 は**戻るか抜けるかが決まるまで出しておく** (席を待つのは 30 秒)。
+     * 🏃‍♀️🚪 はキルと同じ長さで消す
+     */
+    const presence: HudFeedItem[] = this.replica.presenceFeed
+      .filter((entry) =>
+        entry.state === "away"
+          ? now - entry.at < RECONNECT_GRACE_MS + 5000
+          : now - entry.at < KILL_FEED_DURATION * 1000,
+      )
+      .map((entry) => ({ type: "presence" as const, ...entry }));
+    return [...kills, ...voices, ...presence].sort((a, b) => b.at - a.at).slice(0, 5);
   }
 
   private hearNoise(message: NoiseEvent): void {
@@ -4861,14 +5319,12 @@ export class Game {
    * 金属以外は黙る — 材質の違う音を流用すると、当たった物を聞き間違える。
    */
   private playImpact(hit: THREE.Intersection, at: THREE.Vector3): void {
-    const sound = impactSoundOf(surfaceOf(hit.object.name));
-    if (sound) this.audio.play(sound, at);
+    this.audio.play(impactSoundOf(surfaceOfHit(hit.object)), at);
   }
 
   /** 着弾点から地形を引いて鳴らす。他人の弾のように面が届かないとき */
   private playImpactAt(at: THREE.Vector3): void {
-    const sound = impactSoundOf(surfaceAt(at, IMPACT_PROBE, this.stage.obstacles, at.y, IMPACT_PROBE));
-    if (sound) this.audio.play(sound, at);
+    this.audio.play(impactSoundOf(surfaceAt(at, IMPACT_PROBE, this.stage.obstacles, at.y, IMPACT_PROBE)), at);
   }
 
   private publishStats(dt: number): void {
@@ -4910,6 +5366,8 @@ export class Game {
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
+      // 構えようとしているが、銃口の先が塞がっていて構えられない (照準の輪を ✕ にする)
+      aimBlocked: this.muzzleBlocked && this.input.aiming && isGun(this.inv.held),
       spread: this.spread.degrees(this.weapon, this.skills),
       // 持ち込める主武器。**部屋が絞る**ことがある (ROOMS の primaries)
       primaries: this.primaries,
@@ -4942,6 +5400,7 @@ export class Game {
       links: this.links.filter((l) => now - l.at < LINK_FEED_LIFE * 1000).map((l) => l.name),
       menuOpen: this.menuOpen,
       loadoutOpen: this.loadoutBlocking,
+      readyHold: this.readyHoldRatio,
       /*
        * 残り秒。**支度の段階では試合が始まるまでを出す。**
        *
@@ -4950,7 +5409,7 @@ export class Game {
        * 持っているので、そちらから引く。
        */
       loadoutLeft:
-        this.replica.match?.phase === "ready"
+        this.replica.match?.phase === "ready" || this.replica.match?.phase === "countdown"
           ? Math.max(0, Math.ceil(((this.replica.match?.endsAt ?? 0) - now) / 1000))
           : Math.max(0, Math.ceil(CHOOSE_TIMEOUT - this.chooseElapsed)),
       // OK が効くようになるまで。押せないボタンを押させないための表示
@@ -4960,6 +5419,7 @@ export class Game {
       loadoutFocus: this.loadoutFocus,
       skillsOpen: this.canChooseSkillsNow,
       scoped: this.scoped,
+      sight: this.scoped ? (this.weapon.scope[this.zoomStep - 1]?.sight ?? null) : null,
       equipped: this.player.equipped,
       zoom: this.zoomStep > 0 ? this.weapon.scope[this.zoomStep - 1].label : "",
       canZoom: this.weapon.scope.length > 0 && this.player.isAiming,
@@ -5025,6 +5485,7 @@ export class Game {
       held: this.inv.held,
       // **武器のカードに出す物。** 道具を手にしていても変わらない
       weaponHeld: shownWeapon,
+      stunCharge: this.stunChargeNow,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
       browsingFamily: this.inv.browsing?.family ?? null,
@@ -5051,3 +5512,4 @@ export class Game {
     // 太い線は画面上の px で太さが決まるので、描画先の大きさを知らせる
   }
 }
+

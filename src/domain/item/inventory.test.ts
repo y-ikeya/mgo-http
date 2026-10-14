@@ -645,3 +645,40 @@ describe('被れない体勢', () => {
     expect(inv.held).not.toBe('box')
   })
 })
+
+/**
+ * 一覧を開かずに持ち替えた時も、**一覧で選び直したのと同じ音**を鳴らす
+ * (出来事 switched)。武器も支援も同じ。
+ */
+describe('持ち替えの音', () => {
+  test('武器の単押しで持ち替えたら switched', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD / 2)
+    const events = inv.hand(press(), FREE, 0.016)
+    expect(inv.held).toBe('m9')
+    expect(events).toContainEqual({ kind: 'switched' })
+  })
+
+  test('支援の名指しで持ち替えたら switched、もう持っていれば鳴らない', () => {
+    const inv = make()
+    const first = inv.hand(press({ toSupport: true }), FREE, 0.016)
+    expect(first).toContainEqual({ kind: 'switched' })
+    settle(inv)
+    const again = inv.hand(press({ toSupport: true }), FREE, 0.016)
+    expect(again).not.toContainEqual({ kind: 'switched' })
+  })
+
+  test('道具の単押しでも switched', () => {
+    const inv = make()
+    hold(inv, 'tool', BROWSE_HOLD / 2)
+    const events = inv.hand(press(), FREE, 0.016)
+    expect(events).toContainEqual({ kind: 'switched' })
+  })
+
+  test('一覧を開いて選んだ時は switched を出さない (選び直しの音がもう鳴っている)', () => {
+    const inv = make()
+    hold(inv, 'weapon', BROWSE_HOLD, { select: -1 })
+    const events = inv.hand(press(), FREE, 0.016)
+    expect(events).not.toContainEqual({ kind: 'switched' })
+  })
+})

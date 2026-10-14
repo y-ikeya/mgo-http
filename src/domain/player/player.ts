@@ -302,6 +302,10 @@ export interface MatchPlayer extends Player {
    */
   homeX: number
   homeZ: number
+  /** 的の足元の高さ。地面が 0 ではないステージ (検証場は 0.1) で埋まらないように */
+  homeY: number
+  /** 的の構え。立っている / しゃがんでいる / 伏せている。人は使わない */
+  homeStance: 'stand' | 'crouch' | 'prone'
   /**
    * 的が起き上がるまでの残り (秒)。0 なら立っている。
    *
@@ -313,6 +317,8 @@ export interface MatchPlayer extends Player {
    * 立った上半身が混ざる** (銃を上空へ構えて見える)。
    */
   downLeft: number
+  /** 的が倒れているのが CQC で投げられたからか。倒れている姿が違う (cqc_thrown) */
+  downThrown: boolean
   /**
    * 倒された時、撃った相手が背後に居たか。**倒れる向きに出る。**
    *
@@ -366,6 +372,8 @@ export interface MatchPlayer extends Player {
   stamina: number
   /** 眠りが明ける時刻 (ms)。0 なら眠っていない */
   sleepUntil: number
+  /** スタンナイフの充電が満ちる時刻 (ms)。湧いた時に今へ戻す (満ちた状態) */
+  stunReadyAt: number
   /** 歩いた距離の積算。足音を出す間隔を決める */
   footsteps: Footsteps
   /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
@@ -417,7 +425,10 @@ export function newMatchPlayer(seed: {
     knockLeft: 0,
     homeX: 0,
     homeZ: 0,
+    homeY: 0,
+    homeStance: 'stand',
     downLeft: 0,
+    downThrown: false,
     downFromBehind: false,
     weapon: 'rifle',
     primary: 'rifle',
@@ -434,6 +445,7 @@ export function newMatchPlayer(seed: {
     ready: false,
     stamina: MAX_STAMINA,
     sleepUntil: 0,
+    stunReadyAt: 0,
     headshots: 0,
     headDeaths: 0,
     suicides: 0,
@@ -455,15 +467,22 @@ export function newBot(seed: {
   team: Team
   x: number
   z: number
+  /** 足元の高さ。省けば 0 */
+  y?: number
+  /** 構え。省けば立っている */
+  stance?: 'stand' | 'crouch' | 'prone'
   now: number
 }): MatchPlayer {
   const bot = newMatchPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
   bot.bot = true
   bot.x = seed.x
+  bot.y = seed.y ?? 0
   bot.z = seed.z
   // 倒れて戻るときの場所。**吹き飛ばされただけなら戻らない**
   bot.homeX = seed.x
+  bot.homeY = bot.y
   bot.homeZ = seed.z
+  bot.homeStance = seed.stance ?? 'stand'
   bot.life = 'alive'
   // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
   bot.yaw = Math.PI
@@ -489,6 +508,7 @@ export function reviveBot(bot: MatchPlayer, now: number): void {
   bot.downLeft = 0
   // **倒れて戻るときだけ並び直す。** 吹き飛ばされただけならその場で立ち上がる
   bot.x = bot.homeX
+  bot.y = bot.homeY
   bot.z = bot.homeZ
 }
 

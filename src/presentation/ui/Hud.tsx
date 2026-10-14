@@ -3,6 +3,7 @@ import { GAME_SET_SECONDS } from '../../domain/match/match'
 import { CRITICAL_HEALTH } from '../../domain/rule/damage'
 import { t } from '../../i18n'
 import { HELD, type HeldId, isSupport } from '../../domain/item/held'
+import { canThrowWith } from '../../domain/player/cqc'
 import { MODES } from '../../domain/match/room'
 import { isTranquilizer } from '../../domain/item/weapons'
 import type { GameStats } from '../scene/Game'
@@ -34,6 +35,9 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
 
 /** 1 段送ったときに滑る距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
 const BROWSE_SLIDE = 26
+
+/** 待合室を閉じる前に黒へ落とし始める (ms)。落ちきるのは CSS の transition (0.8 秒) */
+const STANDBY_BLACK_MS = 1000
 
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
@@ -72,13 +76,20 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   let lastPhase: string | undefined
   createEffect(() => {
     const now = phase()
-    if (lastPhase === 'assembled' && now === 'ready') {
+    // 待合室 (ready) から試合 (countdown) へも同じく黒から明ける (2026-10-09 本人)
+    if ((lastPhase === 'assembled' && now === 'ready') || (lastPhase === 'ready' && now === 'countdown')) {
       setDawn(true)
       const timer = setTimeout(() => setDawn(false), 900)
       onCleanup(() => clearTimeout(timer))
     }
     lastPhase = now
   })
+  /**
+   * 待合室の締め切りの最後の 1 秒で黒へ落とす。**締め切りから毎回測る** — 全員が
+   * READY で縮んだ締め切りにも効き、誰かが取り消して締め切りが戻れば黒も引く
+   */
+  const standbyClosing = () =>
+    phase() === 'ready' && (props.stats?.match?.endsAt ?? Infinity) - now() <= STANDBY_BLACK_MS
   /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
   const mode = () => props.stats?.match?.mode ?? 'TDM'
   const teams = () => MODES[mode()].teams
@@ -371,6 +382,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       <Show when={dawn()}>
         <div class="hud-dawn" />
       </Show>
+      {/* 待合室から試合へ。締め切りの最後で黒へ落ち、秒読みに入ると上の hud-dawn で明ける */}
+      <div class="hud-standby-black" classList={{ 'hud-standby-black-on': standbyClosing() }} />
 
       {/*
         支度。湧き地点へ戻してから数える。
@@ -507,7 +520,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
         <div class="hud-kills">
           <For each={props.stats?.kills ?? []}>
-            {(item) => item.type === 'voice' ? (
+            {(item) => item.type === 'presence' ? (
+              /* 抜けた / 戻りを待っている。戻りを待つ間は 🫥、抜けたら 🏃‍♀️🚪 */
+              <div class="hud-kill hud-voice">
+                <span class="hud-voice-text">{item.state === 'away' ? '🫥' : '🏃‍♀️🚪'}&nbsp;</span>
+                <span class={`hud-kill-name hud-kill-${item.team}`}>{item.name}</span>
+              </div>
+            ) : item.type === 'voice' ? (
               /* 誰かのボイス。倒した行と同じ欄に「名前：セリフ」。言った直後に倒せば 2 段に積まれる */
               <div class="hud-kill hud-voice" classList={{ 'hud-kill-mine': item.id === props.selfId }}>
                 <span class={`hud-kill-name hud-kill-${item.team}`}>{item.name}</span>
@@ -542,7 +561,17 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
       {/* 照準は画面中央固定。カメラの視線軸がそのまま弾道になる */}
       {/* スコープ。覗いている間だけ */}
-      <Show when={props.stats?.scoped}>
+      {/*
+        銃の照準器を覗いている (突撃銃の主観) 間は、照門と照星は主観用の銃そのもの。
+        **ホロサイトだけ輪と点を出す** — 窓のガラスは透けない作りなので主観用の銃から
+        削ってあり、ガラスに描かれていた輪も一緒に消えている
+      */}
+      <Show when={props.stats?.scoped && props.stats?.sight === 'holo'}>
+        <div class="sight-holo">
+          <div class="sight-holo-dot" />
+        </div>
+      </Show>
+      <Show when={props.stats?.scoped && !props.stats?.sight}>
         {/*
           眼鏡の中身は銃ごとに違う。**モシンナガンは古い眼鏡** — 目盛りも
           測距も無く、柱と横線だけ。XM2010 の目盛りを出すと、置き撃ちで
@@ -622,6 +651,16 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       {/* 基地の上。同じ指が補給になる */}
       <Show when={props.stats?.canResupply}>
         <div class="scope-hint">{t('hud.resupplyHint')}</div>
+      </Show>
+
+      {/*
+        構えようとしたが、銃口の先が塞がっていて構えられない。**輪の代わりに ✕。**
+        カメラは構えの寄りになるので、なぜ撃てないかを印で言う (2026-10-12 本人)
+      */}
+      <Show when={locked() && props.stats?.aimBlocked && !props.stats?.aiming}>
+        <div class="crosshair">
+          <span class="crosshair-blocked">✕</span>
+        </div>
       </Show>
 
       {/*
@@ -708,6 +747,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           'hud-weapon-tranq': heldIsTranq(),
         }}
       >
+        {/* 手にある物で CQC を掛けられる (片手で持つ物)。長物では出ない */}
+        <Show when={canThrowWith(held())}>
+          <div class="hud-weapon-cqc">CQC</div>
+        </Show>
         <Show when={heldIsGun()}>
           <div class="hud-weapon-spare">{heldTotal()}</div>
         </Show>
@@ -719,6 +762,18 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
                 <span class="hud-weapon-tick" classList={{ 'hud-weapon-tick-on': filled }} />
               )}
             </For>
+          </div>
+        </Show>
+        {/*
+          スタンナイフの充電。**弾の目盛りの場所に 1 本の棒。** 一定の時間で溜まり、
+          満ちたら明るくなる (構えて R2 / X で眠らせる刺突が出せる)。MGO2 と同じ置き方
+        */}
+        <Show when={props.stats?.weaponHeld === 'knife' && !props.stats?.browsing}>
+          <div
+            class="hud-weapon-charge"
+            classList={{ 'hud-weapon-charge-full': (props.stats?.stunCharge ?? 0) >= 1 }}
+          >
+            <div class="hud-weapon-charge-fill" style={{ width: `${Math.round((props.stats?.stunCharge ?? 0) * 100)}%` }} />
           </div>
         </Show>
         {/* 投げ物は装填が無い。残りの数だけ */}

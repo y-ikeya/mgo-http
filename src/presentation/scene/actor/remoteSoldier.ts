@@ -1,3 +1,4 @@
+import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
 import { BlobShadow } from './blobShadow';
 import * as THREE from "three";
@@ -17,12 +18,14 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
+import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
+import { DeathSlide } from "./deathSlide";
 import {
   advanceBoxLift,
   BoxMotion,
@@ -47,7 +50,7 @@ import { BUFFER_SIZE, Presence } from "../../../sim/space/presence";
 import { Hitbox } from "./hitbox";
 import { damp, dampAngle } from "../util/math";
 import { LADDER_SPEED } from "../../../domain/stage";
-import { Weapon, WEAPON_STANCE_LAMBDA, weaponStanceOf } from "../arms/weapon";
+import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA, weaponStanceOf } from "../arms/weapon";
 import { onBattlefield } from "../../../domain/player/lifecycle";
 import type { Player } from "../../../domain/player/player";
 import {
@@ -144,6 +147,10 @@ const PLAY_WHOLE_BODY: Record<
   // 爆風で倒れる / 起き上がる
   sweep: (a) => a.playSweep(),
   stand: (a) => a.playStand(),
+  // CQC。投げる / 空振り / 投げられる (倒れた後は sweep と同じ姿で留まる)
+  cqc_throw: (a) => a.playCqc('cqc_throw'),
+  cqc_miss: (a) => a.playCqc('cqc_miss'),
+  cqc_thrown: (a) => a.playThrown(),
   // 接続が切れた人。1 枚の静止ポーズ
   away: (a) => a.playAway(),
   // ダンボールで敵にぶつかって、箱が落ちた
@@ -173,6 +180,7 @@ const PLAY_WHOLE_BODY: Record<
 export class RemoteSoldier {
   readonly id: string;
   readonly object = new THREE.Group();
+  private readonly deathSlide = new DeathSlide();
   /** 足元の丸い影。太陽の影マップには人を入れない (world/staticShadow.ts) */
   private readonly blob = new BlobShadow();
   /** ボーンに追従する当たり判定。メッシュではなくこれを撃つ */
@@ -206,6 +214,20 @@ export class RemoteSoldier {
   private linked = false;
   /** 読み込んだ体。銃を差し替えるときに手ボーンを引き直すのに要る */
   private model: THREE.Object3D | null = null;
+  /** 構えの補正の掛かり具合 (weapon.ts の aimTrim) */
+  private aimTrimWeight = 0;
+  /** 補正で回った銃に左手を付いていかせる (armIk.ts) */
+  private readonly leftArm = new LeftArmFollow();
+  /** 梯子を登り切る間、手を掴んだ所に留める。自機と同じ (soldier.ts) */
+  private readonly gripRight = new HandPin("Right");
+  private readonly gripLeft = new HandPin("Left");
+  /** 構えている間、銃身の上下を照準へ合わせるよう背骨を曲げ直す。自機と同じ */
+  private readonly spineAim = new SpineAim();
+  /** 構えている間、右手首をずらす (weapon.ts の rightShift) */
+  private readonly rightArm = new RightArmShift();
+  private readonly rightShiftNow = new THREE.Vector3();
+  /** 照準の向き (世界)。拳銃の銃身を向ける先 */
+  private readonly aimDir = new THREE.Vector3();
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle';
   /** 差し替えの最中。二重に走らせない */
@@ -259,14 +281,19 @@ export class RemoteSoldier {
   private climbRate = 0;
   private locomotion: Locomotion = "idle";
 
+  /** CQC を掛けられる姿勢か (立っているか)。domain/player/cqc.ts */
+  get throwable(): boolean {
+    return canBeThrown(this.locomotion);
+  }
+
   /**
    * いま刃が通る構えか。
    *
    * locomotion をそのまま公開せず、**問いの形で出す**。外から構えを見て
    * 各所で判定を組み立てると、サーバー側のドメインルールとだんだんずれる。
    */
-  stabbableFrom(aimPitch: number): boolean {
-    return canBeStabbed(stanceOf(this.locomotion), aimPitch);
+  stabbableFrom(aimPitch: number, attacker: Stance): boolean {
+    return canBeStabbed(stanceOf(this.locomotion), aimPitch, attacker);
   }
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
@@ -423,6 +450,10 @@ export class RemoteSoldier {
       // 'hang' (待つ姿) もここを通る。落ちる型の上半身を止め絵へ渡すため
       animator.endHang();
     }
+    // CQC で投げられている途中で放された (倒れる型から普段の姿へ)。上半身を戻す
+    if (this.locomotion === "cqc_thrown" && locomotion !== "cqc_thrown" && !isWholeBody(locomotion)) {
+      animator.releaseThrown();
+    }
     if (locomotion !== this.locomotion && isWholeBody(locomotion)) {
       PLAY_WHOLE_BODY[locomotion](animator);
       // 型の途中から見えた相手は、その分だけ進めてから流す (届くまでの遅れの分も含む)
@@ -496,7 +527,25 @@ export class RemoteSoldier {
       const delta = state.cameraYaw - this.yaw;
       animator.setLookYaw(!state.aiming && !this.serverDead && !prone && animator.upperFree ? Math.atan2(Math.sin(delta), Math.cos(delta)) : 0);
     }
+    // 手にある銃の上体の起こし (weapon.ts の aimLift)。自機と同じ
+    const lift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.aimLift;
+    animator.gunLift.stand = THREE.MathUtils.degToRad(lift?.stand ?? 0);
+    animator.gunLift.crouch = THREE.MathUtils.degToRad(lift?.crouch ?? 0);
+    // 前のコマで曲げた左腕を戻してから型を当てる (armIk.ts の restore)
+    this.leftArm.restore();
+    this.rightArm.restore();
+    this.gripRight.restore();
+    this.gripLeft.restore();
+    this.spineAim.restore();
     animator.update(dt);
+    // 倒れる型の下がりを模型で出す (壁の手前まで)
+    if (this.model) this.deathSlide.update(animator, this.object, this.model);
+    if (this.model) {
+      this.object.updateMatrixWorld(true);
+      const frame = locomotion === "climb_top" ? animator.oneShotPhase("climb_top") * 120 + 1 : 0;
+      this.gripRight.apply(this.model, climbGripWeight("Right", frame));
+      this.gripLeft.apply(this.model, climbGripWeight("Left", frame));
+    }
 
     /*
      * 銃の持ち方も姿勢に合わせる。**自機と同じ式で当てる。**
@@ -512,6 +561,29 @@ export class RemoteSoldier {
       dt,
     )
     this.weapon?.applyStance(this.weaponStance)
+    // 構えている間は銃口を照準へ揃え、左手を付いていかせる (自機と同じ。soldier.ts)
+    this.aimTrimWeight = damp(this.aimTrimWeight, state.aiming && !this.serverDead && !prone ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+    this.weapon?.setAimWeight(this.aimTrimWeight)
+    if (this.model && this.weapon) {
+      // 銃身の上下を照準へ。背骨で曲げる。自機と同じ
+      if (!prone) this.spineAim.apply(this.model, this.weapon.object, this.yaw, state.pitch, this.aimTrimWeight);
+      // 右手を先にずらす (rightShift)。自機と同じ
+      const shift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.rightShift;
+      this.rightArm.moved.set(0, 0, 0);
+      if (shift) {
+        const crouch = Math.min(1, this.weaponStance);
+        this.rightShiftNow.lerpVectors(shift.stand, shift.crouch, crouch).multiplyScalar(this.aimTrimWeight);
+        this.rightArm.apply(this.model, this.object, this.rightShiftNow);
+      }
+      this.weapon.object.updateWorldMatrix(true, false)
+      // 拳銃は銃身を照準へ直に向ける (alignBarrel)。自機と同じ
+      {
+        const pitch = prone ? 0 : state.pitch;
+        this.aimDir.set(-Math.sin(this.yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(this.yaw) * Math.cos(pitch));
+        this.weapon.alignTo(this.aimDir, this.aimTrimWeight);
+      }
+      this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
+    }
 
     // 持ち替えに追従する。何を持っているかは位置と一緒に届いている
     void this.equip(state.weapon)
@@ -770,6 +842,17 @@ export class RemoteSoldier {
     return dead;
   }
 
+  /** 右手の骨。スタンナイフの放電の出所 (他人の画面ではナイフの模型を持たせていない) */
+  private rightHand: THREE.Object3D | null = null
+
+  /** 右手のワールド座標。模型が届く前・姿が無い時は null */
+  handWorld(out: THREE.Vector3): THREE.Vector3 | null {
+    if (!this.model || !this.object.visible) return null
+    this.rightHand ??= findBoneBySuffix(this.model, "RightHand") ?? null
+    if (!this.rightHand) return null
+    return out.setFromMatrixPosition(this.rightHand.matrixWorld)
+  }
+
   dispose(): void {
     this.disposed = true;
     this.animator?.dispose();
@@ -860,6 +943,7 @@ export class RemoteSoldier {
     if (this.serverDead) this.animator.playDeath();
 
     this.model = model;
+    this.rightHand = null;
     await this.attachWeapon(model);
   }
 
@@ -1188,6 +1272,8 @@ export class RemoteSoldiers {
      * 読むので、手元で外しておかないと空振りに「当たった」表示だけが出る。
      */
     aimPitch: number,
+    /** 刺す側の構え。倒れた相手には屈んでいないと届かない */
+    attacker: Stance,
   ): { id: string; fromBehind: boolean; distance: number; side: Team } | null {
     let closest: { player: RemoteSoldier; distance: number } | null = null;
 
@@ -1196,7 +1282,7 @@ export class RemoteSoldiers {
       // 倒れている相手には刺さらない。**サーバーと同じ式を読む** —
       // 手元で外しておかないと、サーバーが弾いた空振りに対して
       // 「当たった」表示だけが出る
-      if (!player.stabbableFrom(aimPitch)) continue;
+      if (!player.stabbableFrom(aimPitch, attacker)) continue;
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;
       const distance = this.scratch.length();
@@ -1226,6 +1312,40 @@ export class RemoteSoldiers {
       // **敵かどうかはここでは決めない。** 個人戦では同じ色でも敵なので、
       // ルールを知っている側 (Game) が判断する
       side: closest.player.side,
+    };
+  }
+
+  /**
+   * CQC を掛ける相手。**正面の扇の中で一番近い相手** (CQC_REACH / CQC_FACING_COS)。
+   *
+   * 掛かるか (立っているか) は返すだけで、ここでは外さない — しゃがんだ相手に
+   * 押せば空振りになる、を呼ぶ側が決める。味方は呼ぶ側が外す (hostile)
+   *
+   * @param forward 掛ける側の向き (水平、正規化済み)
+   */
+  cqcTarget(
+    origin: THREE.Vector3,
+    forward: THREE.Vector3,
+    hostile: (id: string, side: Team) => boolean,
+  ): { id: string; throwable: boolean; position: THREE.Vector3 } | null {
+    let closest: { player: RemoteSoldier; distance: number } | null = null;
+    for (const player of this.players.values()) {
+      if (player.health <= 0 || !player.object.visible) continue;
+      if (!hostile(player.id, player.side)) continue;
+      this.scratch.subVectors(player.object.position, origin);
+      this.scratch.y = 0;
+      const distance = this.scratch.length();
+      if (distance > CQC_REACH || distance < 1e-4) continue;
+      if (Math.abs(player.object.position.y - origin.y) > 0.8) continue;
+      this.scratch.divideScalar(distance);
+      if (this.scratch.dot(forward) < CQC_FACING_COS) continue;
+      if (!closest || distance < closest.distance) closest = { player, distance };
+    }
+    if (!closest) return null;
+    return {
+      id: closest.player.id,
+      throwable: closest.player.throwable,
+      position: closest.player.object.position,
     };
   }
 
@@ -1312,6 +1432,11 @@ export class RemoteSoldiers {
   /** 今いる場所。倒れていなくても音を鳴らす先が要るとき用 */
   positionOf(id: string): THREE.Vector3 | null {
     return this.players.get(id)?.object.position ?? null;
+  }
+
+  /** その人の右手のワールド座標 (スタンナイフの放電の出所)。見えていなければ null */
+  handOf(id: string, out: THREE.Vector3): THREE.Vector3 | null {
+    return this.players.get(id)?.handWorld(out) ?? null;
   }
 
   /**

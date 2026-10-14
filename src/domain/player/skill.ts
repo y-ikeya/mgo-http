@@ -40,6 +40,7 @@ export type SkillId =
   | 'targetAlert'
   | 'awareness'
   | 'trapMastery'
+  | 'knifeMastery'
 
 /** 取れるレベル。0 は「取っていない」 */
 type SkillLevel = 1 | 2 | 3
@@ -165,6 +166,16 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
      */
     levels: 1,
   },
+  knifeMastery: {
+    id: 'knifeMastery',
+    label: 'KNIFE MASTERY',
+    hint: '刺すのが速い。**スタンナイフの充電が早く満ちる** (素 20 秒 → Lv3 10 秒)',
+    /*
+     * **段に意味がある。** 速さも充電も段で伸びる (銃の mastery と同じ 3 段)。
+     * ナイフは全員が持っているので、主武器を選ばなくても 1 枠で寄せられる
+     */
+    levels: 3,
+  },
 }
 
 /**
@@ -177,6 +188,8 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
 export const MASTERY_OF: Record<WeaponId, SkillId> = {
   smg: 'smgMastery',
   rifle: 'rifleMastery',
+  // M4 も突撃銃の腕前で扱う (同じ構えの銃を 2 つに割らない。mosin と同じ理由)
+  m4: 'rifleMastery',
   sniper: 'sniperMastery',
   // 麻酔の狙撃銃も狙撃銃の腕前で扱う。**同じ構えの銃を 2 つに割らない** —
   // 予算 4 では 2 挺を極められないので、割ると片方が死に札になる
@@ -298,7 +311,8 @@ export function runnerScale(skills: Skills): number {
 }
 
 /**
- * ダンボールを被っている間の速さの倍率。素の 0.5 に掛ける。
+ * ダンボールを被っている間の速さの倍率。素の箱の速さに掛ける。**箱の速さはこれだけで
+ * 決まる** — 持っている銃の重さも FAST MOVE も掛けない (soldier.ts)。
  *
  * **箱が隠れ場所から移動手段に変わる。** 被ると頭の高さが 0.94m まで下がるので、
  * 遮蔽越しの視線を切ったまま動けるようになる — 情報の設計と直接噛み合う枠。
@@ -510,6 +524,19 @@ export function setupSpeedScale(skills: Skills): number {
   return SETUP_SPEED[levelOf(skills, 'trapMastery')] ?? 1
 }
 
+/** 刺す型の再生速度 (KNIFE MASTERY)。速いほど早く刺さり、隙も短い */
+export function stabSpeedScale(skills: Skills): number {
+  return STAB_SPEED[Math.min(levelOf(skills, 'knifeMastery'), STAB_SPEED.length - 1)]!
+}
+
+/**
+ * スタンナイフの充電が満ちるまで (秒) (KNIFE MASTERY)。**取っていなければ 20 秒**
+ * (本人 2026-10-08)。眠らせる刺突を撃ち続けられない枷はこの長さ
+ */
+export function stunChargeSeconds(skills: Skills): number {
+  return STUN_CHARGE[Math.min(levelOf(skills, 'knifeMastery'), STUN_CHARGE.length - 1)]!
+}
+
 // --- 段ごとの値。添字が Lv で、0 は「取っていない」 ---
 
 // Lv3 が 1.16 だった頃は Lv2 (1.1) の時点で「速すぎる」と実機で出た (2026-09-21)。
@@ -539,5 +566,7 @@ const THROW_SCALE = [1, 1.2] as const
 // 置く速さ。**1 段だけ。** 1.75 倍 — 振りかぶり 1.27 秒が 0.73 秒、置き切り 1.64 秒が 0.94 秒に。
 // 1.4 では「速くなった」と感じにくかった (2026-10-05)。かがむ動きが早送りに見える手前
 const SETUP_SPEED = [1, 1.75] as const
+const STAB_SPEED = [1, 1.15, 1.3, 1.45] as const
+const STUN_CHARGE = [20, 16, 13, 10] as const
 // **1 段だけ。** 添字 0 は「取っていない」
 const EXPOSE_SECONDS = [0, 5] as const

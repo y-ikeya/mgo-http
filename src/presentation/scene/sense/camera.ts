@@ -41,13 +41,23 @@ import { AIM_CAMERA, HIP_CAMERA } from '../../../sim/space/eyepoint'
  *
  * 腰だめのカメラは構えの線の上に在る (eyepoint.ts の HIP_CAMERA)。真っ直ぐ
  * 構えの向きを向くと、構えた時に照準が出る所が画面のど真ん中で、キャラの頭は
- * その真横 (左 0.42m = 6 度)。少し見下ろす向きにすると、その点が中央の少し上へ
+ * その真横 (左 0.40m = 7.6 度)。少し見下ろす向きにすると、その点が中央の少し上へ
  * 移り、**キャラの頭のやや右上**に照準が出る形になる。弾道 (aimDirection) は
  * 変えない — 向きだけで、線は構えのまま。
  *
  *     ?camp=3    度で試す
  */
 const HIP_PITCH_DOWN = (tunedSigned('camp', 3) * Math.PI) / 180
+
+/**
+ * 構えた瞬間に視線を上げる量 (rad)。解くと同じだけ戻す。**腰だめの画面は変えない。**
+ *
+ * 腰だめは斜め上から見下ろすので、構えた時に照準が相手の足元寄りに来て、頭へ
+ * 目線を合わせ直すのが手間だった (2026-10-08 本人)。向きごと回すので照準 = 弾の向き。
+ *
+ *     ?aimp=3    度で試す (本人が試して 3 に決めた)
+ */
+const AIM_PITCH_UP = (tunedSigned('aimp', 3) * Math.PI) / 180
 
 /** ?cams= で腰だめの肩を直に決めたいとき。無ければ構えの肩に追従する (update) */
 const HIP_SHOULDER_TUNED = ((): number | null => {
@@ -383,7 +393,35 @@ export class FollowCamera {
   }
 
   setAiming(aiming: boolean): void {
+    /*
+     * **構えた瞬間に視線を少し上げ、解いたら戻す** (AIM_PITCH_UP)。向きそのもの
+     * (弾の向き) を回すので、照準は画面の中心のまま。一度に跳ばさず update で寄せる
+     */
+    if (aiming !== this.aiming) this.pendingPitch += aiming ? AIM_PITCH_UP : -AIM_PITCH_UP
     this.aiming = aiming
+  }
+
+  /** 構えの出入りで、まだ回していない上下の量 (rad) */
+  private pendingPitch = 0
+
+  /**
+   * 狙っている所までの距離 (m)。0 なら何もしない。
+   *
+   * **肩越しと主観を切り替えても、狙っている所を変えない** (本人 2026-10-14
+   * 「M4 で頭に合わせてから主観にすると、頭の左にずれる」)。弾の線は注視点
+   * (pivot) から出るので、主観で肩のずれ (shoulder) と高さ (lift) が 0 へ寄ると
+   * 線がそのぶん横・上下へ平行に動く。動いた量だけ向きを回して、この距離の
+   * 所を指したままにする。寄り終わったら止める
+   */
+  private holdDistance = 0
+  private heldShoulder = 0
+  private heldLift = 0
+
+  /** 切り替えの間、いま狙っている所 (distance m 先) を指したままにする */
+  holdAimAt(distance: number): void {
+    this.holdDistance = distance
+    this.heldShoulder = this.shoulder
+    this.heldLift = this.lift
   }
 
   /** 寄っているか (構え / 投げ物の振りかぶり)。審判に渡す「どこから見ているか」と揃える */
@@ -553,6 +591,13 @@ export class FollowCamera {
 
     this.currentViewHeight = damp(this.currentViewHeight, this.viewHeight, STANCE_LAMBDA, dt)
 
+    // 構えの出入りの上下を、構えの寄りと同じ速さで寄せる
+    if (this.pendingPitch !== 0) {
+      const step = Math.abs(this.pendingPitch) < 1e-4 ? this.pendingPitch : this.pendingPitch * (1 - Math.exp(-AIM_LAMBDA * dt))
+      this.pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, this.pitch + step))
+      this.pendingPitch -= step
+    }
+
     const target = this.aiming ? this.aimView : HIP_VIEW
     this.distance = damp(this.distance, target.distance, AIM_LAMBDA, dt)
     /*
@@ -565,6 +610,14 @@ export class FollowCamera {
     this.lift = damp(this.lift, target.lift, AIM_LAMBDA, dt)
     this.pitchDown = damp(this.pitchDown, target.pitchDown, AIM_LAMBDA, dt)
     this.leanOffset = damp(this.leanOffset, this.leanTarget, AIM_LAMBDA, dt)
+    if (this.holdDistance > 0) {
+      // 線が右へ動けば左を向く (yaw が増えると左)、上へ動けば下を向く
+      this.yaw += Math.atan((this.shoulder - this.heldShoulder) / this.holdDistance)
+      this.pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, this.pitch - Math.atan((this.lift - this.heldLift) / this.holdDistance)))
+      this.heldShoulder = this.shoulder
+      this.heldLift = this.lift
+      if (Math.abs(this.shoulder - shoulder) < 1e-4 && Math.abs(this.lift - target.lift) < 1e-4) this.holdDistance = 0
+    }
 
     const fov = damp(this.fov, target.fov, AIM_LAMBDA, dt)
     if (Math.abs(fov - this.fov) > 1e-4) {
@@ -613,7 +666,7 @@ export class FollowCamera {
     const pivotY = footY + this.currentViewHeight + this.lift
     this.centerPivot.set(base.x, pivotY, base.z)
     /*
-     * **肩の側が壁なら、肩越しを縮める。** 肩オフセットは体の中心から右へ 0.42m
+     * **肩の側が壁なら、肩越しを縮める。** 肩オフセットは体の中心から右へ 0.40m
      * (構え) なので、右に壁があると注視点そのものが壁の中に入り、そこから引いた
      * カメラも壁の中 — 壁の裏が映る。中心から肩の向きへ線を引いて、壁までの
      * 距離 (カメラの球ぶんを引く) までしか肩を出さない

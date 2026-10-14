@@ -413,9 +413,9 @@
 10.166
 ],
 "top": {
-"h": 0.2851,
+"h": 0.3009,
 "dx": 0.0,
-"dz": 0.37053,
+"dz": 0.35746,
 "riser": 0.15,
 "foot": 0.15,
 "head": 1.8
@@ -955,6 +955,681 @@
 }
 },
 {
+"name": "col_ladder_tower",
+"min": [
+2.005,
+0.0,
+-20.4
+],
+"max": [
+2.095,
+6.0,
+-19.6
+],
+"top": {
+"h": 6.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": true
+}
+},
+{
+"name": "vis_metal_tower_steps_rail_l",
+"min": [
+2.025,
+0.0,
+-19.605
+],
+"max": [
+2.075,
+6.72,
+-19.555
+],
+"top": {
+"h": 6.72,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_over_l",
+"min": [
+1.625,
+6.67,
+-19.605
+],
+"max": [
+2.075,
+6.72,
+-19.555
+],
+"top": {
+"h": 6.72,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_post_l",
+"min": [
+1.625,
+6.0,
+-19.605
+],
+"max": [
+1.675,
+6.72,
+-19.555
+],
+"top": {
+"h": 6.72,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rail_r",
+"min": [
+2.025,
+0.0,
+-20.445
+],
+"max": [
+2.075,
+6.72,
+-20.395
+],
+"top": {
+"h": 6.72,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_over_r",
+"min": [
+1.625,
+6.67,
+-20.445
+],
+"max": [
+2.075,
+6.72,
+-20.395
+],
+"top": {
+"h": 6.72,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_post_r",
+"min": [
+1.625,
+6.0,
+-20.445
+],
+"max": [
+1.675,
+6.72,
+-20.395
+],
+"top": {
+"h": 6.72,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_00",
+"min": [
+2.03,
+-0.66,
+-20.4
+],
+"max": [
+2.07,
+0.34,
+-19.6
+],
+"top": {
+"h": 0.34,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_01",
+"min": [
+2.03,
+-0.36,
+-20.4
+],
+"max": [
+2.07,
+0.64,
+-19.6
+],
+"top": {
+"h": 0.64,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_02",
+"min": [
+2.03,
+-0.06,
+-20.4
+],
+"max": [
+2.07,
+0.94,
+-19.6
+],
+"top": {
+"h": 0.94,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_03",
+"min": [
+2.03,
+0.24,
+-20.4
+],
+"max": [
+2.07,
+1.24,
+-19.6
+],
+"top": {
+"h": 1.24,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_04",
+"min": [
+2.03,
+0.54,
+-20.4
+],
+"max": [
+2.07,
+1.54,
+-19.6
+],
+"top": {
+"h": 1.54,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_05",
+"min": [
+2.03,
+0.84,
+-20.4
+],
+"max": [
+2.07,
+1.84,
+-19.6
+],
+"top": {
+"h": 1.84,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_06",
+"min": [
+2.03,
+1.14,
+-20.4
+],
+"max": [
+2.07,
+2.14,
+-19.6
+],
+"top": {
+"h": 2.14,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_07",
+"min": [
+2.03,
+1.44,
+-20.4
+],
+"max": [
+2.07,
+2.44,
+-19.6
+],
+"top": {
+"h": 2.44,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_08",
+"min": [
+2.03,
+1.74,
+-20.4
+],
+"max": [
+2.07,
+2.74,
+-19.6
+],
+"top": {
+"h": 2.74,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_09",
+"min": [
+2.03,
+2.04,
+-20.4
+],
+"max": [
+2.07,
+3.04,
+-19.6
+],
+"top": {
+"h": 3.04,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_10",
+"min": [
+2.03,
+2.34,
+-20.4
+],
+"max": [
+2.07,
+3.34,
+-19.6
+],
+"top": {
+"h": 3.34,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_11",
+"min": [
+2.03,
+2.64,
+-20.4
+],
+"max": [
+2.07,
+3.64,
+-19.6
+],
+"top": {
+"h": 3.64,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_12",
+"min": [
+2.03,
+2.94,
+-20.4
+],
+"max": [
+2.07,
+3.94,
+-19.6
+],
+"top": {
+"h": 3.94,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_13",
+"min": [
+2.03,
+3.24,
+-20.4
+],
+"max": [
+2.07,
+4.24,
+-19.6
+],
+"top": {
+"h": 4.24,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_14",
+"min": [
+2.03,
+3.54,
+-20.4
+],
+"max": [
+2.07,
+4.54,
+-19.6
+],
+"top": {
+"h": 4.54,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_15",
+"min": [
+2.03,
+3.84,
+-20.4
+],
+"max": [
+2.07,
+4.84,
+-19.6
+],
+"top": {
+"h": 4.84,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_16",
+"min": [
+2.03,
+4.14,
+-20.4
+],
+"max": [
+2.07,
+5.14,
+-19.6
+],
+"top": {
+"h": 5.14,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_17",
+"min": [
+2.03,
+4.44,
+-20.4
+],
+"max": [
+2.07,
+5.44,
+-19.6
+],
+"top": {
+"h": 5.44,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_18",
+"min": [
+2.03,
+4.74,
+-20.4
+],
+"max": [
+2.07,
+5.74,
+-19.6
+],
+"top": {
+"h": 5.74,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
+"name": "vis_metal_tower_steps_rung_19",
+"min": [
+2.03,
+5.04,
+-20.4
+],
+"max": [
+2.07,
+6.04,
+-19.6
+],
+"top": {
+"h": 6.04,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -10.429,
@@ -1119,6 +1794,21 @@
 4.08
 ],
 "axis": "z",
+"parts": 1
+},
+{
+"name": "col_ladder_tower",
+"min": [
+2.005,
+0.0,
+-20.4
+],
+"max": [
+2.095,
+6.0,
+-19.6
+],
+"axis": "x",
 "parts": 1
 }
 ],

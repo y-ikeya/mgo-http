@@ -109,6 +109,12 @@ export type Locomotion =
    * 撃たれた瞬間に姿勢が飛ぶので、見ている側は何が起きたか読めない。
    */
   | 'prone_death'
+  /**
+   * しゃがんだまま正面から倒された。後ろへ尻もちをつくように崩れる。
+   * 立ちの型だと、しゃがんでいた体が一度立ち上がってから崩れる (本人 2026-10-14)。
+   * 背後から倒された時は立ちの型 (death_front) のまま
+   */
+  | 'crouch_death'
   /** 伏せたまま後ろへ下がる。前進 (crawl_f) と対 */
   | 'crawl_b'
   /** 伏せたまま刺す。全身の型 (立ちの stab と同じ扱い) */
@@ -155,6 +161,17 @@ export type Locomotion =
   | 'sweep'
   | 'stand'
   /**
+   * CQC (domain/player/cqc.ts)。**全身の型で、焼かれた移動を辿る。**
+   *
+   *   cqc_throw   投げる。殴って、喉に腕を掛けて、足を払う
+   *   cqc_miss    空振り。左のフックだけ出して引き戻す (その後の棒立ちは idle のまま)
+   *   cqc_thrown  投げられる。仰向けに倒れて終わり、そのまま倒れている間の姿になる
+   *               (sweep と同じ扱い: 起きる・這う・寝たまま撃つ)
+   */
+  | 'cqc_throw'
+  | 'cqc_miss'
+  | 'cqc_thrown'
+  /**
    * 伏せている。**しゃがみの下にもう一段。**
    *
    * 止まっている姿と這っている姿を分ける。ダンボールの sneak / sit と同じ理由で、
@@ -196,6 +213,30 @@ export type Locomotion =
   | 'jump_down'
   | `run_${MoveDirection}`
   | `crouch_${MoveDirection}`
+  /**
+   * 歩き。**スティックを浅く倒して、構えずに進んでいる。**
+   *
+   * 走りより遅く、足音も小さく近くまでしか届かない (domain/rule/footsteps.ts)。
+   * 立ちとしゃがみの 2 つ (しゃがみはしゃがみ走りの型を遅く流す)。方向は前だけ —
+   * 構えていない間は体が進む方を向く。
+   * 構えている間は今までどおり 8 方向の型 (構えの遅さで既に歩く速さ)
+   */
+  | 'walk'
+  | 'crouch_walk'
+
+/**
+ * 歩きに入るスティックの倒し具合 (0〜1)。これより浅ければ歩き。
+ * 出るのは少し深く (WALK_STICK_EXIT) — 境目で走りと歩きが行き来しないように
+ */
+export const WALK_STICK = 0.6
+export const WALK_STICK_EXIT = 0.65
+/**
+ * 歩きの一番速い所 (m/s)。スティックを WALK_STICK まで倒した時の速さで、
+ * 浅いほど比例して遅い。歩きの型の再生もここを上限にする (他人の型は速さが
+ * 届かないので、この値で流す)
+ */
+export const WALK_TOP_SPEED = 1.3
+export const CROUCH_WALK_TOP_SPEED = 0.9
 
 /** 立ち / しゃがみ、それぞれの 8 方向の状態を引く */
 /**
@@ -230,7 +271,11 @@ export function emptyHanded(locomotion: Locomotion): boolean {
     locomotion === 'death' ||
     locomotion === 'death_front' ||
     locomotion === 'death_back' ||
-    locomotion === 'prone_death'
+    locomotion === 'prone_death' ||
+    locomotion === 'crouch_death' ||
+    // CQC。殴って喉に腕を掛ける型なので、銃を出すと握らずに浮く
+    locomotion === 'cqc_throw' ||
+    locomotion === 'cqc_miss'
   )
 }
 

@@ -35,7 +35,7 @@ const BUILT_IN_SERVER = import.meta.env.VITE_SERVER_URL ?? ''
  * @param identity ログイン済みの本人。ID も名前もここから取る。
  *   サーバーは token の署名から ID を導くので、名乗った値は使われない。
  */
-export function createTransport(identity: Identity, room: string): NetTransport {
+export function createTransport(identity: Identity, room: string, privateRoom = false): NetTransport {
   const params = new URLSearchParams(location.search)
   const { subject: id, displayName: name } = identity
 
@@ -44,7 +44,7 @@ export function createTransport(identity: Identity, room: string): NetTransport 
   const url = resolveServerUrl(params.get('server') ?? BUILT_IN_SERVER ?? '1')
   console.info(`[Net] WebSocket で接続: ${url} (room: ${room}, name: ${name})`)
   // 繋ぐたびにその時点の token を渡す。開いた時の物を使い回すと 1 時間で切れる
-  return new NetSocket(id, name, url, room, () => currentIdentity()?.token ?? identity.token)
+  return new NetSocket(id, name, url, room, () => currentIdentity()?.token ?? identity.token, privateRoom)
 }
 
 /** 短い書き方を URL に展開する */

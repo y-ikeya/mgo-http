@@ -41,7 +41,7 @@
 import type { Team } from '../player/player'
 
 // --- 面の宣言。棚の中から取り次ぐ ---
-export { DEFAULT_SURFACE, SURFACE_ORDER, surfaceOf, type Surface } from './surface'
+export { DEFAULT_SURFACE, SURFACE_ORDER, surfaceOf, taggedSurface, type Surface } from './surface'
 export { flagsOf, type SurfaceFlags } from './flags'
 export {
   LADDER_REACH,
@@ -69,6 +69,16 @@ export interface Spot {
   z: number
   /** 立つ床の高さ (m)。省略で 0 */
   y?: number
+}
+
+/**
+ * 練習の的の置き場。**姿勢も持つ。** 省けば立っている。
+ *
+ * しゃがんだ的・伏せた的は、低い頭を狙う練習と、CQC が掛からない相手
+ * (立っている相手にしか掛からない) を確かめるため (本人 2026-10-14)
+ */
+export interface TargetSpot extends Spot {
+  stance?: 'crouch' | 'prone'
 }
 
 /**
@@ -118,7 +128,7 @@ interface StageSpec {
    * **距離を変えながら撃てるように置く。** 同じ距離に並べても、確かめられるのが
    * 1 つの間合いだけになる。練習部屋以外では使われない (空でよい)。
    */
-  targets: Spot[]
+  targets: TargetSpot[]
 }
 
 /**
@@ -215,6 +225,11 @@ const TRAINING: StageSpec = {
     { x: -16, z: -11 },
     { x: -9, z: -4 },
     { x: -2, z: 3 },
+    // 低い的。立っている列の脇に、近いのと遠いのを 1 つずつ
+    { x: -23, z: -28, stance: 'crouch' },
+    { x: -12, z: -20, stance: 'crouch' },
+    { x: -26, z: -12, stance: 'prone' },
+    { x: -13, z: -2, stance: 'prone' },
   ],
 }
 
@@ -325,9 +340,25 @@ const LAB: StageSpec = {
     { x: -10, z: 3, y: 0.1 },
   ],
   // 的も 2 つ。練習の部屋の決まり (的がある) に合わせる。段の列の手前と、堀の向こう
+  // 足元は地面の上面 (0.1)。省くと 0 に立って 10cm 埋まった
   targets: [
-    { x: -18, z: 0 },
-    { x: 4, z: -30 },
+    { x: -18, z: 0, y: 0.1 },
+    { x: 4, z: -30, y: 0.1 },
+    // 低い的。手元の /training はこの検証場なので、ここにも置く (2026-10-14)。それぞれの立った的の両脇
+    { x: -18, z: -3, y: 0.1, stance: 'crouch' },
+    { x: -18, z: 3, y: 0.1, stance: 'prone' },
+    { x: 1.5, z: -30, y: 0.1, stance: 'crouch' },
+    { x: 6.5, z: -30, y: 0.1, stance: 'prone' },
+    /*
+     * 壁際の的 (2026-10-14)。倒れる型の下がりが壁の手前で止まるかを見る。的はいつも
+     * 基地の側 (+z) を向いて立つので、窓の壁 (z = -10) の手前に置けば**背中が壁**、
+     * 壁の向こうに置けば**顔が壁** (回り込んで背後から撃つと前へ倒れて壁に当たる)
+     */
+    { x: -23.5, z: -9.45, y: 0.1 },
+    { x: -16.4, z: -9.45, y: 0.1, stance: 'crouch' },
+    { x: -23.5, z: -10.55, y: 0.1 },
+    // 塔の正面 (z = -18) に背中を付けて
+    { x: 0, z: -17.55, y: 0.1 },
   ],
 }
 

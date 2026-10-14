@@ -18,6 +18,8 @@
 
 import {
   locomotionFor,
+  WALK_STICK,
+  WALK_STICK_EXIT,
   MOVE_DIRECTIONS,
   type Locomotion,
 } from '../../../domain/player/locomotion'
@@ -89,6 +91,9 @@ export type WholeBodyLocomotion =
   | 'jump_down'
   | 'sweep'
   | 'stand'
+  | 'cqc_throw'
+  | 'cqc_miss'
+  | 'cqc_thrown'
   | 'away'
   | 'bump'
   | 'prone_down'
@@ -115,6 +120,10 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'jump_down',
   'sweep',
   'stand',
+  // CQC。殴って投げる / 空振り / 投げられて倒れる
+  'cqc_throw',
+  'cqc_miss',
+  'cqc_thrown',
   // 切れた人の姿。上半身だけ別の型を重ねると、銃を構えたまま固まる
   'away',
   // ダンボールで敵にぶつかった反応。上だけ構えに戻ると、銃を構えたまま驚く
@@ -224,6 +233,8 @@ export function climbSurge(phase: number): number {
  */
 export const IDLE_ENTER_SPEED = 0.2
 export const IDLE_EXIT_SPEED = 0.6
+/** 歩きの止まる / 動き出す速さ (m/s)。歩きは入りと出を分けない (下の resolveLocomotion) */
+export const WALK_STOP_SPEED = 0.08
 
 /** 姿勢を決めるのに要るもの。どこから来た値かは問わない */
 export interface StanceInput {
@@ -250,6 +261,10 @@ export interface StanceInput {
   setting: 'claymore_windup' | 'claymore_place' | null
   /** 爆風で倒れているか */
   downed: boolean
+  /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
+  thrown?: boolean
+  /** CQC で投げている / 空振りしている最中の型。していなければ null */
+  cqc?: 'cqc_throw' | 'cqc_miss' | null
   /**
    * 起き上がっている最中か。
    *
@@ -341,7 +356,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.climbing) return input.climbing
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
-  if (input.downed) return 'sweep'
+  if (input.downed) return input.thrown ? 'cqc_thrown' : 'sweep'
 
   // 箱が落ちて棒立ちになっている間。動けないので方向も速さも見ない
   if (input.bumped > 0) return 'bump'
@@ -397,6 +412,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.hangClimbing) return 'hang_climb'
   if (input.hangHolding) return 'hang'
   if (input.hanging) return 'hang_drop'
+  if (input.cqc) return input.cqc
   if (input.vaultingUp) return 'vault_up'
   if (input.vaulting) return 'vault'
   if (input.rolling) return 'roll'
@@ -437,13 +453,31 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // 2m 以上から落ちた着地は膝を曲げる。接地の瞬間からの短い型
   if (input.landing > 0) return 'jump_down'
 
-  const stopping =
-    input.previous === 'idle' || input.previous === 'crouch_idle'
+  /*
+   * **スティックが浅ければ歩き。構えていない間だけ。**
+   *
+   * キーボードは常に倒し切り (長さ 1) なので歩きにはならない。構えている間は
+   * 体が照準を向いたまま横へ動くので 8 方向の型が要り、歩きの型 (前だけ) は使えない
+   */
+  const stick = Math.hypot(input.dirX, input.dirZ)
+  const walkingBefore = input.previous === 'walk' || input.previous === 'crouch_walk'
+  const walk = !input.aiming && stick < (walkingBefore ? WALK_STICK_EXIT : WALK_STICK)
+
+  /*
+   * 止まる / 動き出す速さ。**歩きは低い所で切る。** ゆっくり歩くと 0.2 m/s を
+   * 割るので、走りのしきい値 (出 0.6) のままだと棒立ちのまま滑って進む。
+   * 足踏みを防ぐ入りと出の差 (キーを短く叩いた時) はスティックでは起きない
+   */
+  const stopping = walk
+    ? WALK_STOP_SPEED
+    : input.previous === 'idle' || input.previous === 'crouch_idle'
       ? IDLE_EXIT_SPEED
       : IDLE_ENTER_SPEED
   if (input.actualSpeed < stopping || !hasDirection(input)) {
     return input.crouching ? 'crouch_idle' : 'idle'
   }
+
+  if (walk) return input.crouching ? 'crouch_walk' : 'walk'
 
   return locomotionFor(input.crouching, directionOf(input.dirX, input.dirZ, input.yaw))
 }

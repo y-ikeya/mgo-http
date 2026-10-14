@@ -63,6 +63,13 @@ const RUN: StepProfile = { distance: 1.26, volume: 1, range: 1 };
  * 「遠くへ伝わらない」。真横に居れば分かる。
  */
 const CROUCH: StepProfile = { distance: 1.0, volume: 0.7, range: 0.45 };
+/**
+ * 歩き。**立ったまま静かに寄る。** 歩幅 0.7m。7m まで近づかないと分からない
+ * (しゃがみの走りより静か、ダンボールよりはうるさい)
+ */
+const WALK: StepProfile = { distance: 0.7, volume: 0.5, range: 0.35 };
+/** しゃがんで歩く。一番静かに足で寄る形。5m */
+const CROUCH_WALK: StepProfile = { distance: 0.6, volume: 0.4, range: 0.25 };
 /** ダンボールで移動しているとき。歩幅 0.81m。5m まで近づかないと分からない */
 const SNEAK: StepProfile = { distance: 0.81, volume: 0.5, range: 0.25 };
 /**
@@ -101,6 +108,9 @@ function profileFor(locomotion: Locomotion): StepProfile | null {
   if (locomotion === "climb") return CLIMB;
   if (locomotion.startsWith("jump_")) return null;
   if (locomotion === "roll") return ROLL;
+  // 歩きは姿勢 (立ち / しゃがみ) より静か。姿勢の表より先に見る
+  if (locomotion === "walk") return WALK;
+  if (locomotion === "crouch_walk") return CROUCH_WALK;
   // 構えは 1 か所の表から引く (stance.ts)。ここで名前を見比べ直すと、
   // モーションが増えたときに片方だけ古くなる
   switch (stanceOf(locomotion)) {

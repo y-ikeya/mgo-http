@@ -73,6 +73,8 @@ export async function startServer(env: Record<string, string> = {}): Promise<Ser
       MGO2_NO_STAGE: '1',
       // 揃った告知 (5 秒) を飛ばす。試験は揃ってすぐ READY を押す
       MGO2_ASSEMBLE_MS: '0',
+      // 全員の READY が揃ってからの待ちも飛ばす
+      MGO2_READY_GRACE_MS: '0',
       // **試験は本番の表に書かない。**
       //
       // bun は .env を勝手に読むので、何もしないと手元の秘密鍵をそのまま継いで
@@ -173,12 +175,13 @@ export class Client {
     at: [number, number, number] = [0, 0, 0],
     /** 入る部屋。既定はチーム戦 (bravo) — 陣営の規則を見る試験が多いので */
     room = 'bravo',
-    options: { pongDelay?: number } = {},
+    options: { pongDelay?: number; privateRoom?: boolean } = {},
   ) {
     this.id = id
     this.position = at
     this.pongDelay = options.pongDelay ?? 0
-    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=${room}&id=${id}`)
+    // privateRoom: 自分だけの練習部屋 (/training と同じ ?private=1)
+    this.socket = new WebSocket(`ws://localhost:${server.port}/?room=${room}&id=${id}${options.privateRoom ? '&private=1' : ''}`)
     this.socket.binaryType = 'arraybuffer'
     this.socket.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (event.data instanceof ArrayBuffer) {
@@ -230,8 +233,11 @@ export class Client {
   }
 
   /** 位置を送り続ける。実際のクライアントと同じ 64Hz */
+  /** live() が送り続ける姿勢 (locomotion)。しゃがませるなら 'crouch_idle' */
+  pose = 'idle'
+
   live(hz = 64): this {
-    this.timer = setInterval(() => this.sendState(), 1000 / hz)
+    this.timer = setInterval(() => this.sendState(this.pose), 1000 / hz)
     return this
   }
 

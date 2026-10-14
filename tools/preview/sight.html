@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>照準器の試写</title>
+<style>
+  html, body { margin: 0; background: #111; color: #eee; font: 14px/1.5 monospace; }
+  canvas { display: block; }
+  #readout { position: fixed; left: 12px; top: 12px; background: rgba(0,0,0,.6); padding: 8px 12px; white-space: pre; }
+  #bar { position: fixed; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 12px; align-items: center; background: rgba(0,0,0,.6); padding: 8px 12px; }
+  #bar input[type=range] { flex: 1; }
+  #bar button { font: inherit; padding: 2px 12px; }
+</style>
+<div id="readout">…</div>
+<script type="module" src="./sight.ts"></script>

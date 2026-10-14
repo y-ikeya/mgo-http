@@ -39,3 +39,31 @@ describe('梯子', () => {
     }
   })
 })
+
+/**
+ * 歩きの足音。**走りより小さく、近くまでしか届かない。**
+ */
+describe('歩き', () => {
+  function firstStep(locomotion: 'walk' | 'crouch_walk' | 'run_f' | 'crouch_f') {
+    const steps = new Footsteps()
+    steps.warp(0, 0, 0)
+    for (let i = 1; i <= 200; i++) {
+      const step = steps.update(0, 0, i * 0.02, locomotion, true)
+      if (step) return step
+    }
+    throw new Error('鳴らない')
+  }
+
+  test('立って歩くと、走りより静かで届く距離も短い', () => {
+    const walk = firstStep('walk')
+    const run = firstStep('run_f')
+    expect(walk.volume).toBeLessThan(run.volume)
+    expect(walk.range).toBeLessThan(run.range)
+  })
+
+  test('しゃがんで歩くと、しゃがんで走るより静か', () => {
+    const walk = firstStep('crouch_walk')
+    const run = firstStep('crouch_f')
+    expect(walk.range).toBeLessThan(run.range)
+  })
+})

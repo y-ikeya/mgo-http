@@ -18,7 +18,7 @@ const base = {
   locked: true, shots: 0, ammo: 24, magazine: 30, reserve: 60,
   reloading: false, downed: false, aiming: false, spread: 1.2, crouching: false,
   hitZone: '', links: [], menuOpen: false, loadoutOpen: false, loadoutLeft: 0,
-  loadoutWait: 0, scoped: false, equipped: 'rifle', zoom: '', canZoom: false,
+  loadoutWait: 0, scoped: false, sight: null, equipped: 'rifle', zoom: '', canZoom: false,
   scores: [], health: 100, maxHealth: 100, dead: false, kills: [],
   throwables: 2, grenades: 3, browsing: null, held: 'rifle', weaponHeld: 'rifle',
   tool: 'none', toolInHand: false, browsingFamily: null, switching: false,
@@ -31,6 +31,9 @@ const base = {
 const cases: Record<string, Partial<GameStats>> = {
   normal: {},
   boxed: { held: 'box', tool: 'box', toolInHand: true },
+  // スタンナイフの充電。溜まっている途中 / 満ちた
+  knifeCharging: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 0.45 },
+  knifeCharged: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 1 },
   boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'm9', ammo: 10, magazine: 12, reserve: 48 },
   noneSelected: { tool: 'none', toolInHand: false },
   empty: { ammo: 0 },
@@ -51,6 +54,11 @@ const cases: Record<string, Partial<GameStats>> = {
   asleep: { asleep: true, sleepDepth: 1, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
   dozing: { asleep: true, sleepDepth: 0.4, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
   // 麻酔の狙撃銃。**眼鏡の中身が違う** (目盛りの無い古い眼鏡)
+  // M4 の主観 (ホロサイト)。画面の真ん中に輪と点だけ
+  // CQC を掛けられる物 (拳銃・手榴弾) を持っている。カードの左上に赤い CQC
+  cqcPistol: { equipped: 'm9', held: 'm9', weaponHeld: 'm9', ammo: 15, magazine: 15, reserve: 45 },
+  cqcGrenade: { held: 'grenade', weaponHeld: 'grenade', grenades: 2 },
+  sightHolo: { scoped: true, sight: 'holo', equipped: 'm4', held: 'm4', weaponHeld: 'm4', zoom: '1x', ammo: 30, magazine: 30, reserve: 90 },
   scopedMosin: { scoped: true, equipped: 'mosin', held: 'mosin', weaponHeld: 'mosin', zoom: '4x', ammo: 5, magazine: 5, reserve: 15 },
   // 個人戦。残機は 1 つ、上に DM
   dm: {
@@ -76,6 +84,23 @@ const cases: Record<string, Partial<GameStats>> = {
       { type: 'kill', killer: 'me', killerName: 'CLAYMORE', killerTeam: 'blue', victim: 'x', victimName: 'do_nard', victimTeam: 'red', weapon: 'M4', headshot: false, at: Date.now() },
       { type: 'voice', id: 'me', name: 'CLAYMORE', team: 'blue', text: '幸運を祈る', at: Date.now() - 1500 },
       { type: 'voice', id: 'y', name: 'coffee-san', team: 'red', text: 'よろしくお願いします！', at: Date.now() - 3000 },
+    ],
+  },
+  // 構えようとしたが銃口の先が塞がっている (?case=blocked)
+  blocked: {
+    match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 2, required: 2, players: [] },
+    team: 'blue',
+    aimBlocked: true,
+    aiming: false,
+  },
+  // 抜けた / 戻りを待っている (?case=presence)
+  presence: {
+    match: { phase: 'playing', mode: 'TDM', blue: 14, red: 11, endsAt: Date.now() + 212000, present: 3, required: 2, players: [] },
+    team: 'blue',
+    kills: [
+      { type: 'presence', id: 'a', name: 'nanashi', team: 'red', state: 'away', at: Date.now() },
+      { type: 'kill', killer: 'me', killerName: 'pepa1404', killerTeam: 'blue', victim: 'x', victimName: 'do_nard', victimTeam: 'red', weapon: 'AK47', headshot: false, at: Date.now() - 1000 },
+      { type: 'presence', id: 'b', name: 'coffee-san', team: 'blue', state: 'left', at: Date.now() - 2000 },
     ],
   },
   /*

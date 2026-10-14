@@ -22,7 +22,7 @@
 import { MAX_HEALTH, type HitZone } from '../rule/damage'
 import { HELD } from './held'
 
-export type WeaponId = 'smg' | 'rifle' | 'sniper' | 'mosin' | 'm9' | 'm1911' | 'shotgun'
+export type WeaponId = 'smg' | 'rifle' | 'm4' | 'sniper' | 'mosin' | 'm9' | 'm1911' | 'shotgun'
 
 /**
  * 装備の枠。
@@ -136,11 +136,17 @@ export interface WeaponSpec {
   /** キル表示に出す名前。実銃の呼び名 */
   kill: string
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
-  reloadSound: 'reload' | 'pistolReload' | 'm1911Reload' | 'smgReload'
+  reloadSound: 'reload' | 'pistolReload' | 'm1911Reload' | 'smgReload' | 'm4Reload'
   /** 撃ったときの音 (audio.ts の名前) */
-  shotSound: 'rifle' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
+  shotSound: 'rifle' | 'm4' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
   model: WeaponId
+  /**
+   * 構えた時に銃口が体の中心からどれだけ前へ出るか (m)。**この先に壁や物が
+   * あると構えられない** (presentation の Game が地形に聞く)。長い銃ほど
+   * 壁際で構えにくい — 狭い所で狙撃銃を持つ代償 (2026-10-09 本人)
+   */
+  aimReach: number
 
   // --- 威力 ---
   /**
@@ -187,7 +193,7 @@ export interface WeaponSpec {
    */
   pelletSpread?: number
   /** ボルトを操作する音。無ければ鳴らさない (狙撃銃は発砲音に入っている) */
-  boltSound?: 'shotgunCock' | 'mosinCock'
+  boltSound?: 'shotgunCock' | 'mosinCock' | 'm9Cock'
   /**
    * ボルトを操作する型の再生速度。**1 より小さいほど遅い。**
    *
@@ -306,7 +312,11 @@ export interface WeaponSpec {
   aimFov: number
   /** カメラの引き (m) */
   aimDistance: number
-  /** 肩越しの横ずれ (m) */
+  /**
+   * 肩越しの横ずれ (m)。**照準 (画面の中心) とキャラの頭の間の距離になる。**
+   * 2026-10-07 に全部 0.12m 詰めた (本人「構えた時のレティクルをもう少し左に」)。
+   * 10-08 に全部 0.10m 戻した (しゃがむと体が半身になって照準に被る。姿勢で変えず全体で)
+   */
   aimShoulder: number
   /** 構えている間の移動速度の倍率 */
   aimSpeedScale: number
@@ -318,8 +328,13 @@ export interface WeaponSpec {
    * 「構える」と「覗く」を別の操作にしてある。
    *
    * 各段は { 画角 (度), 表示する倍率 }。
+   *
+   * sight … **眼鏡ではなく銃の照準器を覗く段** (突撃銃の主観、2026-10-13 本人)。
+   * スコープの絵は重ねず、主観用の銃 (照門・照星 / ホロサイト) が画面に出る。
+   * iron は照門と照星を重ねるだけ。holo はホロサイトで、窓の中の輪と点を画面に出す。
+   * 弾は画面の真ん中へ飛ぶので、照準器の線と弾の行き先は必ず一致する
    */
-  scope: { fov: number; label: string }[]
+  scope: { fov: number; label: string; sight?: 'iron' | 'holo' }[]
 }
 
 
@@ -345,6 +360,7 @@ const SMG: WeaponSpec = {
   shotSound: 'smg',
   reloadSound: 'smgReload',
   model: 'smg',
+  aimReach: 0.55,
 
   // 頭 1 発 / 胴 7 発 (0.39 秒) / 脚 15 発
   cost: 0,
@@ -395,7 +411,7 @@ const SMG: WeaponSpec = {
   // 突撃銃より寄らない。近距離で振り回す銃なので、視野を狭めない
   aimFov: 42,
   aimDistance: 1.3,
-  aimShoulder: 0.4,
+  aimShoulder: 0.38,
   // 軽いぶん構えたままでも動ける
   aimSpeedScale: 0.62,
   scope: [],
@@ -414,6 +430,7 @@ const RIFLE: WeaponSpec = {
   shotSound: 'rifle',
   reloadSound: 'reload',
   model: 'rifle',
+  aimReach: 0.75,
 
   // 頭 1 発 / 胴 5 発 / 脚 10 発
   cost: 0,
@@ -469,9 +486,44 @@ const RIFLE: WeaponSpec = {
 
   aimFov: 38,
   aimDistance: 1.35,
-  aimShoulder: 0.42,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.55,
-  scope: [],
+  // 主観。照門と照星を覗く (等倍に近い画角)
+  scope: [{ fov: 30, label: '1x', sight: 'iron' }],
+}
+
+/**
+ * M4 CUSTOM。**AK と対にする: 一発は軽いが、素直で当てやすい** (2026-10-10 本人)。
+ *
+ *   AK47  胴 5 発 (20) / 660 RPM / 荒れる / 3.5kg / 715 m/s
+ *   M4    胴 6 発 (17) / 800 RPM / 締まる / 3.0kg / 900 m/s
+ *
+ * 全部当たれば倒すまでの時間はほぼ同じ (AK 4 間隔 0.36 秒、M4 5 間隔 0.375 秒)。
+ * 差が出るのは**当てられるか** — 中距離や動きながらは散らない M4、全弾入る
+ * 間合いなら弾数の少ない AK (予備弾も長持ち)。「どちらが強いか」ではなく
+ * 「どの間合いで戦うつもりか」で選ぶ。腕前は AK と同じ札 (rifleMastery)。
+ * 模型は SINNIK の M4 Carbine (CC-BY-4.0、クレジットは CREDITS.md)。
+ */
+const M4: WeaponSpec = {
+  ...RIFLE,
+  id: 'm4',
+  // 主観。機関部の上のホロサイトを覗く
+  scope: [{ fov: 30, label: '1x', sight: 'holo' }],
+  label: 'M4',
+  kill: 'M4 CUSTOM',
+  model: 'm4',
+  shotSound: 'm4',
+  reloadSound: 'm4Reload',
+  // 全長 0.84m (床尾を伸ばした時)。AK (0.88m) より少し短い
+  aimReach: 0.72,
+  weight: 3.0,
+  // 頭 1 発 / 胴 6 発 / 脚 12 発
+  zone: { HEAD: 100, BODY: 17, LEGS: 8.5 },
+  fireInterval: 0.075, // 800 RPM
+  bulletSpeed: 900, // 5.56x45mm
+  sway: 0.22,
+  spreadPerShot: 0.09,
+  spreadMax: 1.2,
 }
 
 /**
@@ -491,6 +543,7 @@ const SNIPER: WeaponSpec = {
   shotSound: 'snipe',
   reloadSound: 'reload',
   model: 'sniper',
+  aimReach: 0.95,
 
   // 頭 1 発 / 胴 2 発 / 脚 4 発。
   //
@@ -531,7 +584,7 @@ const SNIPER: WeaponSpec = {
   // 構えただけなら突撃銃と同じ肩越し。覗くのは別の操作
   aimFov: 38,
   aimDistance: 1.35,
-  aimShoulder: 0.42,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.35,
   // 腰だめの画角 60 度を基準にした倍率。tan(30°) / tan(fov/2) で出る
   scope: [
@@ -571,6 +624,7 @@ const MOSIN: WeaponSpec = {
   boltSound: 'mosinCock',
   reloadSound: 'reload',
   model: 'mosin',
+  aimReach: 0.95,
   cost: 0,
   // モシンナガン M91/30。狙撃銃 (5.5) より軽いが、突撃銃よりは重い
   weight: 4.0,
@@ -627,7 +681,7 @@ const MOSIN: WeaponSpec = {
 
   aimFov: 38,
   aimDistance: 1.35,
-  aimShoulder: 0.42,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.35,
   /*
    * 覗ける。**倍率は狙撃銃より控えめ。**
@@ -662,6 +716,7 @@ const PISTOL: WeaponSpec = {
   shotSound: 'm9',
   reloadSound: 'pistolReload',
   model: 'm9',
+  aimReach: 0.4,
   // 胴 4 発。突撃銃 (5 発) よりわずかに速いだけで、離れると減衰で届かなくなる
   zone: { HEAD: 100, BODY: 25, LEGS: 12.5 },
   /*
@@ -692,14 +747,19 @@ const PISTOL: WeaponSpec = {
    * 胴 4 発が 1.1 秒で揃うので、詰められた側は撃ち返す間もなく眠る。
    *
    * 型の尺がそのまま次の 1 発までの間隔になるので、動き・音・撃てない時間が
-   * 必ず揃う。4 発を当て切るのに 2.4 秒かかる — その間ずっと相手を捉えて
-   * いなければならない、という形にした。
+   * 必ず揃う。4 発を当て切るのに 3.2 秒かかる (1 発ごとに 1.07 秒) — その間
+   * ずっと相手を捉えていなければならない、という形にした。
    *
-   * **音は鳴らさない。** 消音された銃なので、遊底の音だけが響くのはおかしい。
-   * 専用の音が来たら boltSound に足す。
+   * 2026-10-08 に 1.6 倍速 (0.8 秒、4 発 2.4 秒) から 1.2 倍速へ落とした
+   * (本人「ゲームバランス的にもう少し遅く」)。撃てない時間が長いほど、
+   * 外した 1 発の重さが増す
+   *
+   * 遊底を引く音は本人の素材 (m9Cocking.mp3、tools/raw に元の freesound の 6 秒もある)。
+   * 消音された銃なので、狙撃銃やショットガンより近くまでしか届かない (audio.ts の m9Cock)
    */
   bolt: true,
-  boltScale: 1.6,
+  boltSound: 'm9Cock',
+  boltScale: 1.2,
   magazine: 12,
   reserve: 48,
   reload: 2.1,
@@ -732,7 +792,7 @@ const PISTOL: WeaponSpec = {
   // 覗く倍率は持たない。肩越しのまま撃つ銃
   aimFov: 44,
   aimDistance: 1.5,
-  aimShoulder: 0.46,
+  aimShoulder: 0.44,
   aimSpeedScale: 0.72,
   scope: [],
 }
@@ -783,6 +843,7 @@ const M1911: WeaponSpec = {
   shotSound: 'm1911',
   reloadSound: 'm1911Reload',
   model: 'm1911',
+  aimReach: 0.4,
   // 胴 3 発。M9 (4 発) より 1 発早い
   zone: { HEAD: 100, BODY: 34, LEGS: 16 },
   fullRange: 12,
@@ -809,7 +870,7 @@ const M1911: WeaponSpec = {
   spreadPerStance: 0.12,
   aimFov: 44,
   aimDistance: 1.5,
-  aimShoulder: 0.46,
+  aimShoulder: 0.44,
   aimSpeedScale: 0.7,
   scope: [],
 }
@@ -822,6 +883,7 @@ const SHOTGUN: WeaponSpec = {
   boltSound: 'shotgunCock',
   reloadSound: 'reload',
   model: 'shotgun',
+  aimReach: 0.8,
 
   cost: 0,
   // M870。木製ストックの実銃の値
@@ -886,7 +948,7 @@ const SHOTGUN: WeaponSpec = {
   // 覗く物ではない。肩越しのまま間合いへ入る
   aimFov: 42,
   aimDistance: 1.35,
-  aimShoulder: 0.42,
+  aimShoulder: 0.4,
   aimSpeedScale: 0.5,
   // 覗く段は持たない。間合いへ入る武器なので、遠くを見る道具が要らない
   scope: [],
@@ -896,6 +958,7 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   smg: SMG,
   shotgun: SHOTGUN,
   rifle: RIFLE,
+  m4: M4,
   sniper: SNIPER,
   mosin: MOSIN,
   m9: PISTOL,

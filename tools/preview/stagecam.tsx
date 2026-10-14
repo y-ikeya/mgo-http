@@ -45,7 +45,8 @@ renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = query.get('shadow') !== '0'
 renderer.shadowMap.type = THREE.PCFShadowMap
 renderer.toneMapping = THREE.NeutralToneMapping
-renderer.toneMappingExposure = 1.0
+// ?exposure=3 で本番 (Game.ts の DEFAULT_EXPOSURE) と同じ明るさ
+renderer.toneMappingExposure = Number(query.get('exposure') ?? '1')
 document.body.appendChild(renderer.domElement)
 await renderer.init()
 

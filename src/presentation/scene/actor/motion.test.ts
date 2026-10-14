@@ -337,3 +337,33 @@ describe('梯子を登る波', () => {
     expect(low).toBeGreaterThan(0.1)
   })
 })
+
+/**
+ * 歩き。**スティックを浅く倒して、構えずに進む。**
+ */
+describe('歩き', () => {
+  const moving = { ...base, actualSpeed: 0.8, dirZ: -0.4 }
+
+  test('浅く倒せば歩き、しゃがんでいればしゃがみ歩き', () => {
+    expect(resolveLocomotion(moving)).toBe('walk')
+    expect(resolveLocomotion({ ...moving, crouching: true, previous: 'crouch_idle' })).toBe('crouch_walk')
+  })
+
+  test('倒し切れば走り。キーボードは常に倒し切り', () => {
+    expect(resolveLocomotion({ ...moving, dirZ: -1, actualSpeed: 3 })).toBe('run_f')
+  })
+
+  test('構えている間は歩きにしない (横へ動くので 8 方向の型が要る)', () => {
+    expect(resolveLocomotion({ ...moving, aiming: true })).not.toBe('walk')
+  })
+
+  test('止まった所からゆっくり動き出しても歩き (走りのしきい値で棒立ちにならない)', () => {
+    expect(resolveLocomotion({ ...moving, actualSpeed: 0.2 })).toBe('walk')
+  })
+
+  test('境目で行き来しない。歩きからは少し深く倒すまで歩きのまま', () => {
+    const edge = { ...moving, dirZ: -0.62, actualSpeed: 1.3 }
+    expect(resolveLocomotion({ ...edge, previous: 'walk' })).toBe('walk')
+    expect(resolveLocomotion({ ...edge, previous: 'run_f' })).toBe('run_f')
+  })
+})

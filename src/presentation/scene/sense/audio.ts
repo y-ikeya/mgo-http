@@ -41,6 +41,14 @@ import { STEP_RANGE } from "../../../domain/rule/noise"
  */
 const SOUNDS = {
   rifle: { file: "ak47_shot1.mp3", reference: 6, max: weaponOf("rifle").noiseRange },
+  /*
+   * M4。**AK の音を軽く・乾かした物** (2026-10-10、本人「もっと乾いた音」)。
+   * 3 半音上げ、400Hz より下を削り、250Hz の響きを -6dB、3.5kHz の破裂を +6dB、
+   * 残響の尾を 0.38 秒で切る。実銃の素材が見つかるまでの代わり。5.56mm は
+   * 7.62mm より軽く乾いた音なので、耳で AK と聞き分けられる。
+   * 候補 a〜f は tools/raw/m4_shot/ (いまは e)
+   */
+  m4: { file: "m4_shot1.mp3", reference: 6, max: weaponOf("m4").noiseRange },
   /**
    * 狙撃銃。1 発が 1.57 秒あり、後半にボルト操作の音が入っている。
    *
@@ -58,6 +66,8 @@ const SOUNDS = {
   mosin: { file: "mosin_shot1.mp3", reference: 4, max: weaponOf("mosin").noiseRange },
   /** ボルトを引く音。発砲音に入っていないので別に鳴らす */
   mosinCock: { file: "mosin_cock1.mp3", reference: 3, max: 24 },
+  /** M9 (麻酔銃) の遊底。消音された銃なので近くまで (本人の素材 m9Cocking.mp3) */
+  m9Cock: { file: "m9_cock1.mp3", reference: 2, max: 15 },
   /**
    * ナイフが刺さった音。**当たった時だけ鳴る。**
    *
@@ -68,8 +78,12 @@ const SOUNDS = {
    * 何が起きたか分からない — **静かに始末できる**、が刃物の値打ちなので。
    */
   stab: { file: "knife_stab1.mp3", reference: 3, max: 18 },
+  /** スタンナイフの放電 (本人の素材 elec.mp3 を -9dB、2026-10-08「うるさすぎ」)。眠らせる刺突を振った人の手元で鳴る */
+  zap: { file: "stun_elec1.mp3", reference: 3, max: 20 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
+  // M4 の装填 (本人、2026-10-10)。2.1 秒でリロード (2.5 秒) に収まる
+  m4Reload: { file: "m4_reload1.mp3", reference: 2, max: 24 },
   // P90。突撃銃より軽い音で、間隔が詰まるぶん 1 発を短く聞かせたい
   smg: { file: "p90_shot1.mp3", reference: 5, max: weaponOf("smg").noiseRange },
   smgReload: { file: "p90_reload1.mp3", reference: 2, max: 24 },
@@ -146,6 +160,10 @@ const SOUNDS = {
   hitMetal: { file: "hit_metal1.mp3", reference: 3, max: 34 },
   /** ガラスに当たった。窓 (glass_) を撃つと割れる音。届く距離は金属と同じ */
   hitGlass: { file: "glass_break1.mp3", reference: 3, max: 34 },
+  /** 弾が当たった。**材質に専用の音が無い物** (壁・地面など)。本人の素材 hit.mp3 */
+  hitDefault: { file: "hit_default1.mp3", reference: 3, max: 34 },
+  /** 木に当たった (木箱・板・扉)。本人の素材 destroyWood.mp3 */
+  hitWood: { file: "wood_break1.mp3", reference: 3, max: 34 },
   /** 切れかけの電線の火花 (fx/stageSparks.ts)。小さい音なので近くだけ (20m) */
   spark: { file: "spark1.mp3", reference: 2, max: 20 },
   /**
@@ -177,6 +195,13 @@ const SOUNDS = {
    * 近くの相手にだけ「仕留め損ねた」と伝わる。
    */
   pain: { file: "man1_pain1.mp3", reference: 3, max: 26 },
+  /**
+   * 眠らされた (スタン) 時のうめき (本人 2026-10-14)。
+   *
+   * 倒れた叫びほど遠くへは届けない。残機は減っていないので戦況ではないが、
+   * 近くの人には「そこに寝ている相手が居る」が分かる — 拾いに行くか起こすかの判断になる
+   */
+  stunOof: { file: "stunOof.mp3", reference: 4, max: 40 },
   /**
    * 爆風で吹き飛ばされたときの叫び。
    *
@@ -284,6 +309,7 @@ const SOUNDS = {
    * 「近くで撃っている」と伝わってほしい音でもある。副武器で撃つのは
    * 詰められたときか、主武器を撃ち切ったときなので、そこは近い戦いになる。
    */
+  // 素材は tools/raw/m9_original.mp3 を -5dB (2026-10-08「もう少し下げて」)
   m9: { file: "m9.mp3", reference: 5, max: weaponOf("m9").noiseRange },
   /**
    * M1911 の発砲音。**M9 が麻酔になったので分けた。**
@@ -426,10 +452,10 @@ const UI_SOUNDS = {
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
   switch: { file: "list_switch1.mp3", volume: 0.55 },
   /** 自分の弾が頭に入って倒した / 眠らせた。位置は持たない (自分への応え) */
-  // 2026-10-05: tin.mp3 (tools/raw) を +19 半音に上げて圧縮した物 (tools/README.md)。
+  // 2026-10-05: tin.mp3 (tools/raw) を +19 半音に上げて圧縮した物 (tools/README.md)。10-07 に +21 へ。
   // 前の headshot1 は音程の無いシャリ音で埋もれた。音源を強くしたぶん、音量は戻す
-  // (1.0 は「ちょっとうるさい」、0.6 でも「もう少し小さく」)
-  headshot: { file: "headshot2.mp3", volume: 0.4 },
+  // (1.0 は「ちょっとうるさい」、0.6・0.4・0.28 でも「もう少し小さく」)
+  headshot: { file: "headshot2.mp3", volume: 0.2 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;

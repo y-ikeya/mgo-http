@@ -93,6 +93,15 @@ export const LOCOMOTIONS: Locomotion[] = [
   'hang_drop',
   'hang_climb',
   'hang',
+  // 歩き (スティックを浅く)。**末尾に足す**
+  'walk',
+  'crouch_walk',
+  // CQC (投げる / 空振り / 投げられる)。**末尾に足す**
+  'cqc_throw',
+  'cqc_miss',
+  'cqc_thrown',
+  // しゃがんだまま倒れる。**末尾に足す**
+  'crouch_death',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -169,7 +178,7 @@ const FLAG_SALUTE = 16
  *
  * 見た目 (相手が何を構えているか) と、サーバーの威力の計算に要る。
  */
-const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'm9', 'smg', 'shotgun', 'm1911', 'mosin']
+const WEAPON_BITS: WeaponId[] = ['rifle', 'sniper', 'm9', 'smg', 'shotgun', 'm1911', 'mosin', 'm4']
 const WEAPON_INDEX = new Map(WEAPON_BITS.map((id, i) => [id, i]))
 
 /**
@@ -196,6 +205,8 @@ const HELD_BITS: HeldId[] = [
    * `held !== 'locator'` で弾かれて、**何も起きない**。
    */
   'locator',
+  // M4 CUSTOM。**末尾に足す**
+  'm4',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 

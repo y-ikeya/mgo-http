@@ -15,10 +15,20 @@ import { CHOICES, type WeaponId } from '../../src/domain/item/weapons'
  * 6 枚は 6 組の値ではない。**値は 3 組** (立ち / しゃがみ / 伏せ) で、構えて
  * いるかどうかは型が変えている。同じ握りが両方で成り立つかを見るために並べる。
  *
+ * --- 三面図 (?views=3) ---
+ * 編集している姿勢の**構えた体**を、正面・右横・真上の平行投影 (遠近なし) と
+ * 回せる斜めの 4 枠で見る。遠近があると、手前の手と奥の銃の重なりが読めない。
+ * 銃口から 2 本の線を引く — **赤が銃身の延長、緑が体の真っすぐ前・水平。**
+ * 重なっていれば銃口は照準へ向いている (weapon.ts の aimTrim と同じ物差し)。
+ * 平行投影の枠はホイールで寄る。
+ *   ?stance=crouch  映す姿勢 / ?fixeddt  1 コマ 0.05 秒 (headless で撮る時)
+ *   ?trim=0  補正を外す / ?trimp=&trimy=&trimcp=&trimcy=  補正を試す / ?noik  左腕の付け直しを止める
+ *
  * --- 部屋に入らずに見る ---
  * 対戦部屋に入ると席を 1 つ潰すし、伏せて構えるまでに何度も操作が要る。
  * ここは姿勢を直に立てる。
  */
+const q0 = new URLSearchParams(location.search)
 const CELLS = [
   { label: '立ち · 脱力', crouch: false, prone: false, aim: false },
   { label: '立ち · 構え', crouch: false, prone: false, aim: true },
@@ -42,8 +52,20 @@ const WORLD = {
   ceilingHeight: () => Number.POSITIVE_INFINITY,
 }
 
-const COLUMNS = 3
+/** 三面図 (?views=3)。編集している姿勢の構えた体を 4 枠で */
+const TRI = new URLSearchParams(location.search).get('views') === '3'
+const COLUMNS = TRI ? 2 : 3
 const ROWS = 2
+/** 三面図の 4 枠 */
+const TRI_VIEWS = [
+  { label: '正面', dir: new THREE.Vector3(0, 0, -1), up: new THREE.Vector3(0, 1, 0) },
+  { label: '右横 (銃の側)', dir: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0) },
+  { label: '真上 (前が上)', dir: new THREE.Vector3(0, 1, 0), up: new THREE.Vector3(0, 0, -1) },
+  { label: '斜め (回せる)', dir: null, up: new THREE.Vector3(0, 1, 0) },
+] as const
+/** 平行投影で映す縦の幅の半分 (m)。ホイールで変わる */
+let triHalf = 0.55
+const triCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 20)
 
 const renderer = new WebGPURenderer({ antialias: true })
 renderer.toneMapping = THREE.NeutralToneMapping
@@ -138,6 +160,12 @@ const aimLevel = (() => {
 
 const cells: Cell[] = CELLS.map((spec, i) => {
   const player = new Soldier()
+  // ?noik … 左腕の付け直し (armIk.ts) を止めて見る
+  if (new URLSearchParams(location.search).has('noik')) {
+    const arm = (player as unknown as { leftArm: { apply: () => void; restore: () => void } }).leftArm
+    arm.apply = () => {}
+    arm.restore = () => {}
+  }
   player.start('soldier')
   // 横一列に並べる。1 体ずつ別のカメラで抜くので、間隔は被らない程度でよい
   player.position.set(i * SPACING, 0, 0)
@@ -171,11 +199,38 @@ const cells: Cell[] = CELLS.map((spec, i) => {
  * ナイフの構え (knife_idle) が出る。銃は隠れるだけで持たせたままにする —
  * ナイフの模型は銃を付けるときに一緒に付くので、銃が無いとナイフも無い。
  */
+/*
+ * ?trim=0 … 銃ごとの構えの補正 (aimTrim) を外して見る。補正の値を測り直す時に
+ */
+if (new URLSearchParams(location.search).get('trim') === '0') {
+  for (const config of Object.values(WEAPON_CONFIGS)) delete (config as { aimTrim?: unknown }).aimTrim
+}
+
+/*
+ * ?trimp=-8&trimy=1&trimcp=..&trimcy=.. … 開いた銃の補正を上書きして試す (度)
+ */
+{
+  const q = new URLSearchParams(location.search)
+  const id = q.get('weapon') as keyof typeof WEAPON_CONFIGS | null
+  const keys = ['trimp', 'trimy', 'trimcp', 'trimcy'] as const
+  if (id && WEAPON_CONFIGS[id] && keys.some((k) => q.has(k))) {
+    const base = WEAPON_CONFIGS[id].aimTrim ?? { pitch: 0, yaw: 0, crouchPitch: 0, crouchYaw: 0 }
+    ;(WEAPON_CONFIGS[id] as { aimTrim?: unknown }).aimTrim = {
+      pitch: Number(q.get('trimp') ?? base.pitch),
+      yaw: Number(q.get('trimy') ?? base.yaw),
+      crouchPitch: Number(q.get('trimcp') ?? base.crouchPitch),
+      crouchYaw: Number(q.get('trimcy') ?? base.crouchYaw),
+    }
+  }
+}
+
 type Pick = WeaponId | 'knife'
 const ALL_WEAPONS: Pick[] = [...CHOICES.primary, ...CHOICES.secondary, 'knife']
 const asked = new URLSearchParams(location.search).get('weapon') as Pick | null
 let weapon: Pick = asked && ALL_WEAPONS.includes(asked) ? asked : 'rifle'
-let editing: (typeof STANCES)[number] = STANCES[0]
+// ?stance=crouch / prone … 編集する姿勢から始める (三面図で映す姿勢もこれ)
+let editing: (typeof STANCES)[number] =
+  STANCES.find((s) => s.key === new URLSearchParams(location.search).get('stance')) ?? STANCES[0]
 
 /** 編集中の値。**コードの定数を出発点に読む** */
 const values = new Map<string, { grip: THREE.Vector3; rotation: THREE.Euler }>()
@@ -295,6 +350,23 @@ function dump(): void {
       `${rot}: new THREE.Euler(degrees(${d(v.rotation.x)}), degrees(${d(v.rotation.y)}), degrees(${d(v.rotation.z)})),`,
     )
   }
+  const shifted = WEAPON_CONFIGS[weapon as keyof typeof WEAPON_CONFIGS]?.rightShift
+  if (shifted) {
+    const v3 = (v: THREE.Vector3) => `new THREE.Vector3(${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`
+    lines.push(`rightShift: { stand: ${v3(shifted.stand)}, crouch: ${v3(shifted.crouch)} },`)
+  }
+  const hold = WEAPON_CONFIGS[weapon as keyof typeof WEAPON_CONFIGS]?.leftHand
+  if (hold) {
+    const p = hold.position
+    const q = hold.quaternion
+    const f = (n: number) => n.toFixed(4)
+    lines.push(
+      `leftHand: {`,
+      `  position: new THREE.Vector3(${f(p.x)}, ${f(p.y)}, ${f(p.z)}),`,
+      `  quaternion: new THREE.Quaternion(${f(q.x)}, ${f(q.y)}, ${f(q.z)}, ${f(q.w)}),`,
+      `},`,
+    )
+  }
   const text = lines.join('\n')
   if (code.textContent !== text) code.textContent = text
   report.textContent = aimReport()
@@ -404,6 +476,54 @@ function drawPanel(): void {
   panel.append(turn)
 
   /*
+   * 左手 (weapon.ts の leftHand)。**構えている間、左手首を置く所** (銃の空間)。
+   * 全部の姿勢で同じ値。設定を直に書き換えるので、その場で絵に出る
+   */
+  const config = WEAPON_CONFIGS[weapon as keyof typeof WEAPON_CONFIGS]
+  if (config?.leftHand) {
+    const hold = config.leftHand
+    const euler = new THREE.Euler().setFromQuaternion(hold.quaternion)
+    const heading = document.createElement('div')
+    heading.textContent = '左手 (構え・全姿勢)'
+    heading.style.cssText = 'margin:10px 0 4px;opacity:.7'
+    const left = document.createElement('div')
+    left.className = 'group'
+    const turnLeft = () => hold.quaternion.setFromEuler(euler)
+    left.append(
+      heading,
+      slider('lx', hold.position.x, -0.6, 0.6, 0.005, (n) => (hold.position.x = n)),
+      slider('ly', hold.position.y, -0.6, 0.6, 0.005, (n) => (hold.position.y = n)),
+      slider('lz', hold.position.z, -1.0, 0.4, 0.005, (n) => (hold.position.z = n)),
+      slider('lP', deg(euler.x), -180, 180, 1, (n) => ((euler.x = THREE.MathUtils.degToRad(n)), turnLeft())),
+      slider('lY', deg(euler.y), -180, 180, 1, (n) => ((euler.y = THREE.MathUtils.degToRad(n)), turnLeft())),
+      slider('lR', deg(euler.z), -180, 180, 1, (n) => ((euler.z = THREE.MathUtils.degToRad(n)), turnLeft())),
+    )
+    panel.append(left)
+  }
+
+  /*
+   * 右手のずらし (weapon.ts の rightShift)。構えている間、右手首を体の空間でずらす
+   * (+X が右・+Y が上・-Z が前)。編集中の姿勢 (立ち / しゃがみ) の値
+   */
+  if (config && editing.key !== 'prone') {
+    const target = config as { rightShift?: { stand: THREE.Vector3; crouch: THREE.Vector3 } }
+    target.rightShift ??= { stand: new THREE.Vector3(), crouch: new THREE.Vector3() }
+    const shift = editing.key === 'crouch' ? target.rightShift.crouch : target.rightShift.stand
+    const heading = document.createElement('div')
+    heading.textContent = `右手のずらし (構え・${editing.label})`
+    heading.style.cssText = 'margin:10px 0 4px;opacity:.7'
+    const right = document.createElement('div')
+    right.className = 'group'
+    right.append(
+      heading,
+      slider('rx', shift.x, -0.2, 0.2, 0.005, (n) => (shift.x = n)),
+      slider('ry', shift.y, -0.2, 0.2, 0.005, (n) => (shift.y = n)),
+      slider('rz', shift.z, -0.2, 0.2, 0.005, (n) => (shift.z = n)),
+    )
+    panel.append(right)
+  }
+
+  /*
    * 視点の操作。**画面の上で直に動かす** ので、ここは説明と切り替えだけ。
    */
   const link = document.createElement('button')
@@ -433,18 +553,19 @@ function layout(): void {
   const width = window.innerWidth - 320
   const height = window.innerHeight
   renderer.setSize(width, height)
-  for (const [i, cell] of cells.entries()) {
+  for (const cell of cells) {
     cell.camera.aspect = width / COLUMNS / (height / ROWS)
     cell.camera.updateProjectionMatrix()
-    const label = labels[i]
+  }
+  for (const [i, label] of labels.entries()) {
     label.style.left = `${(i % COLUMNS) * (width / COLUMNS) + 10}px`
     label.style.top = `${Math.floor(i / COLUMNS) * (height / ROWS) + 8}px`
   }
 }
 
-for (const cell of cells) {
+for (const cell of TRI ? TRI_VIEWS : cells) {
   const label = document.createElement('div')
-  label.textContent = cell.spec.label
+  label.textContent = 'spec' in cell ? cell.spec.label : cell.label
   label.style.cssText =
     'position:fixed;font-size:11px;letter-spacing:.14em;color:#9ab88c;pointer-events:none'
   document.body.append(label)
@@ -511,6 +632,11 @@ renderer.domElement.addEventListener(
     if (at === null) return
     event.preventDefault()
     const scale = Math.exp(event.deltaY * 0.001)
+    // 三面図の平行投影の枠は寄せ引き。斜めの枠 (4 つ目) は下の回り込みへ
+    if (TRI && at < 3) {
+      triHalf = Math.max(0.1, Math.min(2, triHalf * scale))
+      return
+    }
     for (const [i, cell] of cells.entries()) {
       if (!linked && i !== at) continue
       cell.orbit.dist = Math.max(0.4, Math.min(8, cell.orbit.dist * scale))
@@ -525,11 +651,118 @@ layout()
 window.addEventListener('resize', layout)
 
 const clock = new THREE.Clock()
+const FIXED_DT = new URLSearchParams(location.search).has('fixeddt')
+
+/*
+ * 銃口から引く 2 本。**赤 = 銃身の延長、緑 = 体の真っすぐ前・水平。**
+ * 深さを見ないので体に隠れない
+ */
+function guideLine(color: number): THREE.Line {
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true }),
+  )
+  line.renderOrder = 999
+  line.frustumCulled = false
+  scene.add(line)
+  return line
+}
+const barrelLine = guideLine(0xff4040)
+const forwardLine = guideLine(0x40ff60)
+const GUIDE_LENGTH = 1.5
+
+/** 三面図で映す体。**編集している姿勢の、構えた枠** */
+function triCell(): Cell {
+  const index = editing.key === 'prone' ? 5 : editing.key === 'crouch' ? 3 : 1
+  return cells[index]
+}
+
+function renderTri(cw: number, ch: number): void {
+  const cell = triCell()
+  /*
+   * ?lh … 左手首の位置と向きを**銃から見た値で**書き出す (weapon.ts の leftHand に写す)。
+   * 立って構えた時は、どの銃も左手が自然にハンドガードを握っているので、そこで測る
+   */
+  if (new URLSearchParams(location.search).has('lh')) {
+    let hand: THREE.Object3D | null = null
+    cell.player.object.traverse((o) => {
+      if (!hand && o.name.endsWith('LeftHand') && (o as THREE.Bone).isBone) hand = o
+    })
+    const g = (cell.player as unknown as { weapon: { object: THREE.Object3D } | null }).weapon
+    if (hand && g) {
+      const local = g.object.matrixWorld.clone().invert().multiply((hand as THREE.Object3D).matrixWorld)
+      const p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3()
+      local.decompose(p, q, sc)
+      const f = (n: number) => n.toFixed(4)
+      console.log(`[lh] ${weapon} ${editing.key} position ${f(p.x)}, ${f(p.y)}, ${f(p.z)} quaternion ${f(q.x)}, ${f(q.y)}, ${f(q.z)}, ${f(q.w)}`)
+    }
+  }
+  // 横一列に並べてあるので、横から見ると隣の体が重なる。**映す 1 体だけ出す**
+  for (const other of cells) other.player.object.visible = other === cell
+  const p = cell.player.position
+  const eye = cell.spec.prone ? 0.35 : cell.spec.crouch ? 0.8 : 1.25
+  const focus = new THREE.Vector3(p.x, p.y + eye, p.z)
+
+  // 線を銃口へ合わせる。銃身の向きは銃の -Z
+  const muzzle = cell.player.muzzle(new THREE.Vector3())
+  const gun = (cell.player as unknown as { weapon: { object: THREE.Object3D } | null }).weapon
+  if (gun) {
+    const barrel = new THREE.Vector3(0, 0, -1).transformDirection(gun.object.matrixWorld)
+    const set = (line: THREE.Line, dir: THREE.Vector3) => {
+      const back = muzzle.clone().addScaledVector(dir, -0.9)
+      const ahead = muzzle.clone().addScaledVector(dir, GUIDE_LENGTH)
+      line.geometry.setFromPoints([back, ahead])
+    }
+    set(barrelLine, barrel)
+    // 銃身の向きを数字でも出す (体の前 -Z に対して、上・右が正)
+    const up = (Math.asin(barrel.y) * 180) / Math.PI
+    const right = (Math.atan2(barrel.x, -barrel.z) * 180) / Math.PI
+    const text = `斜め (回せる) — 銃身 上 ${up.toFixed(1)}° / 右 ${right.toFixed(1)}°`
+    if (labels[3] && labels[3].textContent !== text) {
+      labels[3].textContent = text
+      console.log(`[tri] ${weapon} ${editing.key} up ${up.toFixed(1)} right ${right.toFixed(1)} muzzle ${(muzzle.y - cell.player.position.y).toFixed(3)}`)
+    }
+    // 体の前は -Z (この画面では向きを回さない)
+    set(forwardLine, new THREE.Vector3(0, 0, -1))
+  }
+
+  for (const [i, view] of TRI_VIEWS.entries()) {
+    const x = (i % COLUMNS) * cw
+    const y = Math.floor(i / COLUMNS) * ch
+    renderer.setViewport(x, y, cw, ch)
+    renderer.setScissor(x, y, cw, ch)
+    if (view.dir) {
+      const aspect = cw / ch
+      triCamera.left = -triHalf * aspect
+      triCamera.right = triHalf * aspect
+      triCamera.top = triHalf
+      triCamera.bottom = -triHalf
+      triCamera.updateProjectionMatrix()
+      triCamera.up.copy(view.up)
+      triCamera.position.copy(focus).addScaledVector(view.dir, 4)
+      triCamera.lookAt(focus)
+      renderer.render(scene, triCamera)
+    } else {
+      const { yaw, pitch, dist } = cell.orbit
+      cell.camera.aspect = cw / ch
+      cell.camera.updateProjectionMatrix()
+      cell.camera.position.set(
+        focus.x + Math.sin(yaw) * Math.cos(pitch) * dist,
+        focus.y + Math.sin(pitch) * dist,
+        focus.z - Math.cos(yaw) * Math.cos(pitch) * dist,
+      )
+      cell.camera.lookAt(focus)
+      renderer.render(scene, cell.camera)
+    }
+  }
+}
 
 let sinceDump = 0
 
 function frame(): void {
-  const dt = Math.min(clock.getDelta(), 0.05)
+  // ?fixeddt … 1 コマを 0.05 秒に固定する。headless の仮想時計では dt がほぼ 0 で、
+  // 構えの寄り (補正の重みなど) が寄り切らないまま撮れてしまう
+  const dt = FIXED_DT ? 0.05 : Math.min(clock.getDelta(), 0.05)
   // 銃口の向きは数フレームおきに出し直す。**秒で間引かない** —
   // 仮想時計や背面タブでは dt がほぼ 0 になり、読み込み前の 1 回で止まる
   sinceDump += 1
@@ -572,7 +805,8 @@ function frame(): void {
     // **毎フレーム当てる。** 読み込みが終わる前に呼んでも中身がまだ無い
     if (aimLevel) cell.player.setAimLevel(aimLevel.stand, aimLevel.crouch)
     cell.player.setAiming(cell.spec.aim)
-    cell.player.update(dt, ZERO, cell.player.yaw, 0, WORLD)
+    // ?aimpitch=-40 … 照準の上下 (度、上が正)。銃身が照準を指すかを見る
+    cell.player.update(dt, ZERO, cell.player.yaw, (Number(q0.get('aimpitch') ?? 0) * Math.PI) / 180, WORLD)
   }
 
   const width = renderer.domElement.width / renderer.getPixelRatio()
@@ -581,6 +815,12 @@ function frame(): void {
   const ch = height / ROWS
 
   renderer.setScissorTest(true)
+  if (TRI) {
+    renderTri(cw, ch)
+    renderer.setScissorTest(false)
+    requestAnimationFrame(frame)
+    return
+  }
   for (const [i, cell] of cells.entries()) {
     const x = (i % COLUMNS) * cw
     /*

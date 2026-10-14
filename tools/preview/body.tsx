@@ -14,6 +14,8 @@
  *     ?tilt=fwd|right         箱を進行方向へ倒した姿 (fwd = 前へ、right = 右へ全開)
  *     ?shadow                 影を受ける体。頭上に板を吊って上半身に影を落とす
  *     ?sky=0.4                屋内の暗さ (空の見え方 SKY_FLOOR〜1) を体に掛ける
+ *     ?trace                  0.1 秒ごとに銃身と両手の向きを書き出す (コンソールの [trace])
+ *     ?death=front|back|none  clip の姿勢で 1 秒置いてから倒す (front = 正面から撃たれた)。t は倒してから
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
@@ -27,6 +29,7 @@ import { SkyLight } from '../../src/presentation/scene/world/skylight'
 import { loadSoldier } from '../../src/presentation/scene/assets'
 import { CharacterAnimator, findBoneBySuffix } from '../../src/presentation/scene/actor/animation'
 import { Weapon, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
+import { StunSparks } from '../../src/presentation/scene/fx/stunSparks'
 
 const WIDTH = 1280
 const HEIGHT = 900
@@ -146,7 +149,8 @@ const anim = new CharacterAnimator(model, gltf.animations, 4.5)
 // ?empty   … 手に何も出ていない (投げ物・設置物)。転がりの尻尾が変わる
 anim.setPistol(query.has('onehand') || query.has('empty'))
 anim.setHandsEmpty(query.has('empty'))
-anim.setAiming(query.has('aim'))
+// 構えは銃を付けた後で入れる (下の取り付けの注)
+anim.setAiming(false)
 // ?knife … ナイフを持っている (構えると knife_idle)
 anim.setKnife(query.has('knife'))
 // ?look=60 … 首をカメラの向きへ (度、左が正)。構えていないときだけ効く
@@ -174,6 +178,12 @@ if (box) {
 const gunName = query.get('gun')
 let weapon: Weapon | null = null
 if (gunName) {
+  /*
+   * **構えていない姿勢で付ける。** 本番の Soldier は湧いた直後 (構えていない) に
+   * 付けて、その手の向きを以後ずっと基準にする。構えた姿勢で付けていた頃は基準が
+   * 違い、同じ握りの値でも銃の向きが本番と 20° 近くずれた (AK: ここでは 8.6° 下、
+   * 本番は 10° 上。2026-10-10)
+   */
   anim.update(0)
   model.updateMatrixWorld(true)
   const right = findBoneBySuffix(model, 'RightHand')
@@ -199,6 +209,8 @@ if (gunName) {
     }
   }
 }
+
+anim.setAiming(query.has('aim'))
 
 /*
  * **刻んで進める。** 一気に進めると、骨の追従 (ばね) が 1 歩で終わってしまう。
@@ -234,13 +246,56 @@ if (query.has('stab')) anim.playStab()
 if (query.has('setupspeed')) anim.setSetupSpeed(Number(query.get('setupspeed')))
 if (query.has('setup')) anim.playSetup(query.has('fromkneel') ? 'kneel' : query.has('fromcrouch') ? 'crouch' : 'stand')
 if (query.has('place')) anim.releaseSetup()
+// ?zap … スタンナイフの放電 (fx/stunSparks.ts)。頭から右手に出す。&stab と組むと刺しながら
+const zap = query.has('zap') ? new StunSparks(scene) : null
+// ?death … 姿勢を 1 秒落ち着かせてから倒す。相手の体と同じ口 (playDeath) を通す
+const death = query.get('death')
+if (death) {
+  for (let i = 0; i < 60; i++) {
+    anim.setLocomotion(clipName as never)
+    anim.update(1 / 60)
+  }
+  anim.playDeath(death === 'front' ? false : death === 'back' ? true : undefined)
+}
+const zapHand = findBoneBySuffix(model, 'RightHand')
+if (zap && zapHand) zap.discharge((out) => out.setFromMatrixPosition(zapHand.matrixWorld))
+/*
+ * ?trace … 0.1 秒ごとに**銃身と両手の向き**を書き出す (体の前に対する左右・上下、度)。
+ * 構えて歩く間に銃口が揺れていないかを、お手本 (tools/raw/m4Walk.fbx の 4 本目) と比べる
+ */
+const trace = query.has('trace')
+const traceRight = findBoneBySuffix(model, 'RightHand')
+const traceLeft = findBoneBySuffix(model, 'LeftHand')
+let traceAt = 0
+const deg = (r: number) => ((r * 180) / Math.PI).toFixed(1)
 for (let t = 0; t < stopAt; t += 1 / 60) {
+  if (trace && weapon && traceRight && traceLeft && t >= traceAt) {
+    traceAt += 0.1
+    model.updateMatrixWorld(true)
+    const barrel = new THREE.Vector3(0, 0, -1).transformDirection(weapon.object.matrixWorld)
+    const hands = new THREE.Vector3()
+      .setFromMatrixPosition(traceLeft.matrixWorld)
+      .sub(new THREE.Vector3().setFromMatrixPosition(traceRight.matrixWorld))
+      .normalize()
+    // 体の前は根の -Z (turn で回した分を戻して測る)
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(root.quaternion)
+    const yawOf = (v: THREE.Vector3) => Math.atan2(v.x * fwd.z - v.z * fwd.x, -(v.x * fwd.x + v.z * fwd.z))
+    console.log(
+      '[trace]', t.toFixed(1),
+      'barrel', deg(yawOf(barrel)), deg(Math.asin(barrel.y)),
+      'hands', deg(yawOf(hands)), deg(Math.asin(hands.y)),
+    )
+  }
   // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
   if (!oneShot && !query.has('stab')) anim.setLocomotion(clipName as never)
   // 置く型は本番と同じく、姿勢を setupLocomotion から引く (soldier.ts の setting)
   if (query.has('setup') || query.has('place')) anim.setLocomotion((anim.setupLocomotion ?? clipName) as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
+  if (zap) {
+    model.updateMatrixWorld(true)
+    zap.update(1 / 60)
+  }
 }
 model.updateMatrixWorld(true)
 // ?bones … 手と腰の高さを出す (ぶら下がりで足元を縁からどれだけ下げるかを測る)
@@ -252,6 +307,11 @@ if (query.has('bones')) {
       bone.getWorldPosition(v)
       console.log('[bones]', suffix, v.y.toFixed(3), 'x', v.x.toFixed(3), 'z', v.z.toFixed(3))
     }
+  }
+  // 銃口の高さ (構えの壁判定の高さを決めるのに使う)
+  if (weapon) {
+    const muzzle = weapon.muzzleWorld(new THREE.Vector3())
+    console.log('[bones] muzzle', muzzle.y.toFixed(3), 'forward', Math.hypot(muzzle.x, muzzle.z).toFixed(3))
   }
   // 胸の向き = 上 × (左肩→右肩)。骨の軸より確か (ぶら下がりでは腰も頭も傾く)
   {

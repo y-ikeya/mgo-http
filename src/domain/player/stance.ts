@@ -31,7 +31,7 @@ export function stanceOf(locomotion: Locomotion): Stance {
   if (locomotion === 'death' || locomotion === 'death_front' || locomotion === 'death_back')
     return 'down'
   // 爆風で倒れている間。起き上がりの途中も含めて低い姿勢として扱う
-  if (locomotion === 'sweep' || locomotion === 'stand') return 'prone'
+  if (locomotion === 'sweep' || locomotion === 'cqc_thrown' || locomotion === 'stand') return 'prone'
   if (locomotion === 'sneak' || locomotion === 'sit') return 'box'
   // ダンボールが落ちた直後。棒立ちなので、頭は立ちの高さに戻っている
   if (locomotion === 'bump') return 'stand'
@@ -43,8 +43,16 @@ export function stanceOf(locomotion: Locomotion): Stance {
     locomotion === 'prone_stab'
   )
     return 'prone'
+  /*
+   * 眠っている。**寝転んでいるので伏せと同じ高さ。** 表に無かった頃は立ち扱いで、
+   * 足元に寝ている人へ真っ直ぐ前を刺しても刺さり、弾も寝た体の上の空中で当たった
+   * (2026-10-08)。倒れている相手と同じく、刺すには見下ろす (STAB_DOWN_PITCH)
+   */
+  if (locomotion === 'sleep') return 'prone'
   // 伏せたまま倒れた。**倒れているので down** (頭の高さは死体のもの)
   if (locomotion === 'prone_death') return 'down'
+  // しゃがんだまま倒れた。名前が crouch_ で始まるので、しゃがみの判定より先に見る
+  if (locomotion === 'crouch_death') return 'down'
   /*
    * 伏せへの出入り。**高いほうで採る。**
    *

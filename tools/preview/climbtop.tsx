@@ -8,6 +8,9 @@
  *     ?dist=3.2   カメラの距離
  *     ?ladder=ladder_b.001  どの梯子か
  *     ?stage=0    ステージの見た目を出さない (読み込みが重いとき)
+ *     ?hands      手の位置を 0.05 秒ごとにコンソールへ (掴む所を探す)
+ *     ?down       屋上から梯子へ歩いて出て、上から掴んで降りる所を見る
+ *     ?map=lab    どのステージの梯子か (raft / training / lab、既定 raft)。?ladder= で選ぶ
  *
  * --- なぜ要るか ---
  * 登り切りは 3 秒しかないのに、梯子の下から回すと 12 秒待つ。しかも
@@ -34,6 +37,9 @@ const view = query.get('view') ?? 'side'
 const dist = Number(query.get('dist') ?? '3.2')
 const wanted = query.get('ladder') ?? ''
 const showStage = query.get('stage') !== '0'
+const down = query.has('down')
+const hands = query.has('hands')
+const map = (query.get('map') ?? 'raft') as 'raft' | 'training' | 'lab'
 /** 何秒ぶん回せるようにするか。登り切りは 3 秒ほど */
 const SPAN = 6
 /**
@@ -57,13 +63,13 @@ await renderer.init()
 const scene = new THREE.Scene()
 buildLights(scene)
 
-const ladders = await loadStageLadders('raft')
+const ladders = await loadStageLadders(map)
 const ladder = ladders.find((l) => l.name === wanted) ?? ladders[0]
-const world = await loadStageMoveWorld('raft')
+const world = await loadStageMoveWorld(map)
 if (!ladder) throw new Error('梯子が無い')
 
 if (showStage) {
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('/models/stage_raft.glb')
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`/models/stage_${map}.glb`)
   scene.add(gltf.scene)
 }
 
@@ -133,14 +139,39 @@ document.body.appendChild(panel)
 
 async function draw(at: number): Promise<void> {
   const soldier = await rebuild()
-  // 上端の手前、梯子の上に置いて掴ませる
-  soldier.position.set(startX, ladder.max[1] - startBelow(), midZ)
-  soldier.grabLadder()
-  soldier.setStickForward(1)
+  const toward = new THREE.Vector3()
+  if (down) {
+    // 屋上 (掴む側の反対) の縁の 1m 手前に立たせ、梯子へ向かって歩かせる
+    soldier.position.set(midX - startSide * 1.0, ladder.max[1], midZ)
+    toward.set(startSide, 0, 0)
+  } else {
+    // 上端の手前、梯子の上に置いて掴ませる
+    soldier.position.set(startX, ladder.max[1] - startBelow(), midZ)
+    soldier.grabLadder()
+    soldier.setStickForward(1)
+  }
 
   const track: string[] = []
   for (let t = 0; t < at; t += 1 / 60) {
-    soldier.update(1 / 60, new THREE.Vector3(), soldier.yaw, 0, world)
+    if (down) {
+      // 掴むまでは梯子へ歩く (前を押し続ける)。掴んで 0.5 秒したら後ろへ引いて降りる
+      soldier.setStickForward(soldier.onLadder && t > 1.5 ? -1 : 1)
+      soldier.update(1 / 60, soldier.onLadder ? new THREE.Vector3() : toward, soldier.yaw, 0, world)
+    } else soldier.update(1 / 60, new THREE.Vector3(), soldier.yaw, 0, world)
+    if (hands && Math.round(t * 60) % 3 === 0) {
+      soldier.object.updateMatrixWorld(true)
+      const at = (suffix: string) => {
+        let found: THREE.Object3D | null = null
+        soldier.object.traverse((o) => {
+          if (!found && o.name.endsWith(suffix)) found = o
+        })
+        return found ? (found as THREE.Object3D).getWorldPosition(new THREE.Vector3()) : null
+      }
+      const r = at('RightHand')
+      const l = at('LeftHand')
+      const f = (v: THREE.Vector3 | null) => (v ? `${(v.x - midX).toFixed(2)},${(v.y - ladder.max[1]).toFixed(2)},${(v.z - midZ).toFixed(2)}` : '-')
+      console.log(`[hands] ${t.toFixed(2)} ${soldier.locomotion} R ${f(r)} L ${f(l)}`)
+    }
     if (Math.abs(t * 4 - Math.round(t * 4)) < 1 / 120) {
       track.push(
         `${t.toFixed(2)}s 高さ${soldier.position.y.toFixed(2)} 横${(soldier.position.x - midX).toFixed(2)}`,
@@ -212,7 +243,10 @@ async function draw(at: number): Promise<void> {
     '',
     track.slice(-12).join('\n'),
   ].join('\n')
+  // 頁を開かずに数字だけ拾えるように (ヘッドレスの試写)
+  console.log('[climbtop] ' + panel.textContent.split('\n').slice(0, 8).join(' | '))
 }
+
 
 /* --- 下のつまみ。時間を前後に動かす --- */
 const bar = document.createElement('div')
@@ -249,14 +283,11 @@ async function show(at: number): Promise<void> {
   }
 }
 
-/* --- 詰め物のつまみ。**ここを動かしながら絵を見る** --- */
+/* --- 詰め物のつまみ。体の運びは型の腰の曲線なので、触れるのは速さ・入り口・渡る量だけ --- */
 const KNOBS: { key: keyof typeof CLIMB_TOP_TUNING; name: string; min: number; max: number; step: number }[] = [
   { key: 'rate', name: '型の速さ', min: 0.6, max: 2.5, step: 0.05 },
   { key: 'lead', name: '入り口 (上端から m 下)', min: 0.6, max: 5, step: 0.05 },
-  { key: 'heaveFrom', name: 'よいしょ始まり', min: 0, max: 1, step: 0.01 },
-  { key: 'heaveTo', name: 'よいしょ終わり', min: 0, max: 1, step: 0.01 },
-  { key: 'stepPhase', name: '踏み出し始まり', min: 0, max: 1, step: 0.01 },
-  { key: 'step', name: '踏み出す量 (m)', min: 0, max: 1.6, step: 0.05 },
+  { key: 'step', name: '前へ渡る量 (m)', min: 0, max: 2, step: 0.05 },
 ]
 
 const knobBox = document.createElement('div')
@@ -266,64 +297,10 @@ code.className = 'code'
 code.readOnly = true
 
 function writeCode(): void {
-  const span = (CLIMB_TOP_TUNING.heaveTo - CLIMB_TOP_TUNING.heaveFrom) * (4.03 / CLIMB_TOP_TUNING.rate)
-  // 残りの高さは梯子ごとに違う (lead + 屋上との差)。ここでは lead で見積もる
-  const total = CLIMB_TOP_TUNING.lead
-  const metres = CLIMB_TOP_TUNING.riseHeave
   code.value =
     `// soldier.ts の CLIMB_TOP_TUNING へ\n` +
     KNOBS.map((k) => `  ${k.key}: ${Number(CLIMB_TOP_TUNING[k.key].toFixed(3))},`).join('\n') +
-    `\n  riseClimb: ${Number(CLIMB_TOP_TUNING.riseClimb.toFixed(3))},` +
-    `\n  riseHeave: ${Number(CLIMB_TOP_TUNING.riseHeave.toFixed(3))},` +
-    `\n// 型の尺 ${(4.03 / CLIMB_TOP_TUNING.rate).toFixed(2)} 秒 / ` +
-    `よいしょ ${span.toFixed(2)} 秒で ${metres.toFixed(2)}m 上がる / ` +
-    `残り ${Math.max(0, total - CLIMB_TOP_TUNING.riseClimb - CLIMB_TOP_TUNING.riseHeave).toFixed(2)}m は足を抜きながら`
-}
-
-/*
- * 上がる量は **m で触る。** soldier.ts 側も m で持っている (riseClimb / riseHeave)。
- *
- * 上がる高さの全部は入り口 (lead) と屋上との差で決まっていて、それを
- * 「登っている間」「よいしょ」「足を抜きながら」の 3 つに割る。ここでは
- * 前の 2 つを m で触らせて、残りは自動で最後に回す。
- */
-const RISE_KNOBS: { field: 'riseClimb' | 'riseHeave'; name: string }[] = [
-  { field: 'riseClimb', name: 'よいしょ前に上がる量 (m)' },
-  { field: 'riseHeave', name: 'よいしょで上がる量 (m)' },
-]
-const riseRows: { row: HTMLElement; input: HTMLInputElement; value: HTMLElement; field: 'riseClimb' | 'riseHeave' }[] = []
-
-for (const knob of RISE_KNOBS) {
-  const row = document.createElement('label')
-  const name = document.createElement('span')
-  const value = document.createElement('b')
-  const input = document.createElement('input')
-  input.type = 'range'
-  input.min = '0'
-  input.max = '5'
-  input.step = '0.05'
-  name.textContent = knob.name
-  input.addEventListener('input', () => {
-    const metres = Math.min(Number(input.value), CLIMB_TOP_TUNING.lead)
-    CLIMB_TOP_TUNING[knob.field] = metres
-    // 2 つの合計が lead を超えたら、もう片方を削る
-    const other = knob.field === 'riseClimb' ? 'riseHeave' : 'riseClimb'
-    const over = CLIMB_TOP_TUNING.riseClimb + CLIMB_TOP_TUNING.riseHeave - CLIMB_TOP_TUNING.lead
-    if (over > 0) CLIMB_TOP_TUNING[other] = Math.max(0, CLIMB_TOP_TUNING[other] - over)
-    showRises()
-    writeCode()
-    void show(Number(slider.value))
-  })
-  row.append(name, input, value)
-  riseRows.push({ row, input, value, field: knob.field })
-}
-
-function showRises(): void {
-  for (const r of riseRows) {
-    const metres = CLIMB_TOP_TUNING[r.field]
-    r.input.value = metres.toFixed(2)
-    r.value.textContent = metres.toFixed(2)
-  }
+    `\n// 型の尺 ${(4.03 / CLIMB_TOP_TUNING.rate).toFixed(2)} 秒`
 }
 
 for (const knob of KNOBS) {
@@ -341,17 +318,13 @@ for (const knob of KNOBS) {
   input.addEventListener('input', () => {
     CLIMB_TOP_TUNING[knob.key] = Number(input.value)
     value.textContent = input.value
-    // 入り口を動かすと m 表示が変わる (割合は据え置き)
-    showRises()
     writeCode()
     void show(Number(slider.value))
   })
   row.append(name, input, value)
   knobBox.append(row)
 }
-for (const r of riseRows) knobBox.append(r.row)
 knobBox.append(code)
-showRises()
 document.body.appendChild(knobBox)
 writeCode()
 

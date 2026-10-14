@@ -1,3 +1,4 @@
+import type { Locomotion } from '../src/domain/player/locomotion'
 /**
  * 試合の段階と時計。
  *
@@ -29,7 +30,7 @@ import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
-import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, setLife } from './world'
+import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, setLife } from './world'
 import { forgetPoses, recordPose } from './history'
 
 /** 1 試合の長さ (ms) */
@@ -52,6 +53,12 @@ export const TICKETS = Math.max(1, Number(process.env.MGO2_TICKETS) || 20)
  * READY を押すので、5 秒の告知の間に押した分は支度に入った所で消えてしまう
  */
 const ASSEMBLE_MS = process.env.MGO2_ASSEMBLE_MS !== undefined ? Number(process.env.MGO2_ASSEMBLE_MS) : ASSEMBLED_SECONDS * 1000
+/**
+ * 全員の READY が揃ってから数え始めるまで (ms)。**この間に誰かが取り消せば支度へ戻る。**
+ * 揃った瞬間に始めていた頃は、相手が先に押していると自分の 1 押しで支度が終わり、
+ * 押し間違いに気付いても取り消す間が無かった (2026-10-09 本人)。試験は 0 (test/server.ts)
+ */
+const READY_GRACE_MS = process.env.MGO2_READY_GRACE_MS !== undefined ? Number(process.env.MGO2_READY_GRACE_MS) : 3000
 
 /** 決着してから次の支度が始まるまで (ms)。結果を読む時間 */
 export const INTERMISSION_MS = 10 * 1000
@@ -147,10 +154,46 @@ export function updateTargets(room: RoomWorld, now: number): void {
       broadcast(room, { type: 'respawn', id: bot.id })
       broadcast(room, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
     }
+    // **見せている姿を、審判が見る姿にもする。** 送る姿だけ組み立てていた頃は、
+    // 転んでいても眠っていても審判の中では立っていて、足元の的に真っ直ぐ前を
+    // 刺しても刺さった (2026-10-08)
+    bot.locomotion = targetLocomotion(bot, now)
     recordPose(bot)
     relayState(room, bot, targetPayload(bot, now))
   }
 }
+
+/*
+ * 的の姿。倒れた / 眠っている / 転んでいる / 起き上がっている / 立っている。
+ *
+ * **起き上がる型を挟む。** 転んだ姿から直に立ち姿へ飛ばすと、寝た脚と
+ * 立った上半身が混ざって、銃を上空へ構えて見える。
+ *
+ * **倒れたほうが眠りより強い。** 眠っている的を撃って倒したら、
+ * 眠ったままではなく倒れた姿へ移らないと、何が起きたのか読めない。
+ *
+ * 眠りを爆風の転倒より先に見るのは、**眠っている間は飛ばされても
+ * 起き上がらない**から。転んで立ち上がる型に移ると、眠っているのに
+ * 立つ、という絵になる。
+ */
+export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
+  return isDowned(bot.life)
+    ? bot.downFromBehind
+      ? 'death_front'
+      : 'death_back'
+    : isAsleep(bot.sleepUntil, now)
+      ? 'sleep'
+      : bot.downLeft > TARGET_STAND
+        ? bot.downThrown
+          ? 'cqc_thrown'
+          : 'sweep'
+        : bot.downLeft > 0
+          ? 'stand'
+          : REST[bot.homeStance]
+}
+
+/** 的が何もされていない時の姿。構えごと */
+const REST: Record<MatchPlayer['homeStance'], Locomotion> = { stand: 'idle', crouch: 'crouch_idle', prone: 'prone_idle' }
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
 export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
@@ -166,37 +209,10 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         pitch: 0,
         cameraYaw: bot.yaw,
         locomotionAge: 0,
-        /*
-         * 倒れた / 転んでいる / 起き上がっている / 立っている。
-         *
-         * **起き上がる型を挟む。** 転んだ姿から直に立ち姿へ飛ばすと、寝た脚と
-         * 立った上半身が混ざって、銃を上空へ構えて見える。
-         */
-        /*
-         * 倒れた / 眠っている / 転んでいる / 起き上がっている / 立っている。
-         *
-         * **倒れたほうが眠りより強い。** 眠っている的を撃って倒したら、
-         * 眠ったままではなく倒れた姿へ移らないと、何が起きたのか読めない。
-         *
-         * 眠りを爆風の転倒より先に見るのは、**眠っている間は飛ばされても
-         * 起き上がらない**から。転んで立ち上がる型に移ると、眠っているのに
-         * 立つ、という絵になる。
-         */
-        locomotion:
-          isDowned(bot.life)
-            ? bot.downFromBehind
-              ? 'death_front'
-              : 'death_back'
-            : isAsleep(bot.sleepUntil, now)
-              ? 'sleep'
-              : bot.downLeft > TARGET_STAND
-                ? 'sweep'
-                : bot.downLeft > 0
-                  ? 'stand'
-                  : 'idle',
+        locomotion: bot.locomotion,
         aiming: false,
         weapon: 'rifle',
-        crouching: false,
+        crouching: bot.homeStance === 'crouch' && bot.locomotion === 'crouch_idle',
         boxed: false,
         reloading: false,
         protectedNow: false,
@@ -324,6 +340,8 @@ export function resetPlayers(room: RoomWorld): void {
  */
 export function spawn(room: RoomWorld, player: MatchPlayer, now = Date.now()): void {
   refill(player)
+  // スタンナイフは満ちた状態で湧く
+  player.stunReadyAt = now
   // **眠りも醒める。** 知らせないと、湧いた本人の画面が暗いまま
   sendStamina(player)
   setLife(room, player, 'spawning', now)
@@ -339,6 +357,8 @@ export function spawn(room: RoomWorld, player: MatchPlayer, now = Date.now()): v
 export function leaveRoom(room: RoomWorld, player: MatchPlayer): void {
   // 走っている試合を捨てて出た。抜けたことごと残す
   if (room.phase === 'playing') recordSeat(room, player, true)
+  // 投げている途中で出た。相手を放す
+  releaseCqc(room, player)
   room.players.delete(player.id)
   // 持っていた過去も捨てる。**残すと、入り直した人が前の命の位置で当たる**
   forgetPoses(player.id)
@@ -412,6 +432,8 @@ function enterReady(room: RoomWorld, now: number): void {
   room.matchId = null
   room.phase = 'ready'
   room.endsAt = now + READY_SECONDS * 1000
+  room.allReadyAt = 0
+  room.readyDeadline = room.endsAt
   room.blue = TICKETS
   room.red = TICKETS
   room.winner = undefined
@@ -420,13 +442,14 @@ function enterReady(room: RoomWorld, now: number): void {
 }
 
 /**
- * 全員の支度が済んだか。**居る人だけ数える。**
+ * 全員の支度が済んだか。**席を持っている人を全員数える** (戻りを待っている人も)。
  *
- * 接続の切れた人 (dropped) を数えると、戻ってこない人が居る限り始まらない。
- * 席は 30 秒残るので、そこを待っていると部屋が止まる。
+ * 繋がっている人だけを数えていた頃は、相手がリロードで一瞬切れた間に残った 1 人が
+ * 押すと揃ったことになり、相手を置いて始まった (2026-10-09)。戻ってこない人で部屋が
+ * 止まることは無い — 支度の締め切り (READY_SECONDS) で始まり、席も 30 秒で畳まれる
  */
 function allReady(room: RoomWorld): boolean {
-  const here = connected(room).filter((p) => !p.bot)
+  const here = [...room.players.values()].filter((p) => !p.bot)
   return here.length > 0 && here.every((p) => p.ready)
 }
 
@@ -512,21 +535,30 @@ export function updateMatch(room: RoomWorld, now: number): void {
      * 押さない人が居ても止めない。席を離れた人 1 人で部屋が止まるのは、
      * 装備の打ち切り (CHOOSE_TIMEOUT) と同じ理由で困る。
      */
-    if (allReady(room) || now >= room.endsAt) {
+    /*
+     * **揃っても少し待つ** (READY_GRACE_MS)。待っている間は締め切りをそこまで
+     * 縮めて見せ、誰かが取り消したら元の締め切りへ戻す
+     */
+    const all = allReady(room)
+    if (all && room.allReadyAt === 0) {
+      room.allReadyAt = now
+      room.readyDeadline = room.endsAt
+      room.endsAt = Math.min(room.endsAt, now + READY_GRACE_MS)
+      broadcast(room, matchState(room))
+    } else if (!all && room.allReadyAt !== 0) {
+      room.allReadyAt = 0
+      room.endsAt = room.readyDeadline
+      broadcast(room, matchState(room))
+    }
+    if (now >= room.endsAt) {
+      room.allReadyAt = 0
       room.phase = 'countdown'
       room.endsAt = now + COUNTDOWN_MS
       /*
-       * **数え始めたら全員を戦場へ出す。** 支度の画面 (READY UP) に居た人も、
-       * その時点で選んでいた装備で湧かせる。
-       *
-       * 以前は「武器を選ぶのは始まってから」として支度に留め、秒読みの間と
-       * 始まった後も装備の画面 (LOADOUT) を出していた。試合が始まるのに
-       * 装備の画面が開いているのは意味が無い (2026-10-06 本人)。
-       * 秒読みの最中に入ってきた人・倒れた人は今までどおり画面で選んでから出る
+       * **秒読みの間は装備画面で武器を選ぶ。** 待合室ではスキルだけを決め、
+       * 武器はその後 (2026-10-09 本人: 待合室で武器を選ぶ必要は無い)。
+       * OK を押した人から湧き、残った人は始まる時に湧かせる (下の playing)
        */
-      for (const player of connected(room)) {
-        if (canChoose(player.life)) spawn(room, player, now)
-      }
     }
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
@@ -534,6 +566,13 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく
     room.matchId = crypto.randomUUID()
     room.startedAt = now
+    /*
+     * **始まる時にまだ選んでいる人は、選んでいた装備で出す。** 試合が始まるのに
+     * 装備の画面が開いているのは意味が無い (2026-10-06 本人)
+     */
+    for (const player of connected(room)) {
+      if (canChoose(player.life)) spawn(room, player, now)
+    }
   } else if (room.phase === 'playing' && ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     room.phase = 'over'

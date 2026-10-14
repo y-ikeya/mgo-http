@@ -194,3 +194,36 @@ describe('キル', () => {
     expect(replica.killFeed[0].event.victim).toBe('v7')
   })
 })
+
+/**
+ * 抜けた / 戻りを待っている知らせ。**名簿の前後で見比べて出す。**
+ */
+describe('抜けた知らせ', () => {
+  const player = (id: string, away = false) =>
+    ({ id, name: id.toUpperCase(), team: 'blue', kills: 0, deaths: 0, ready: false, away }) as never
+  const withPlayers = (...players: unknown[]) => matchMessage({ players } as never)
+
+  test('名簿から消えたら 🏃‍♀️🚪 (left)', () => {
+    const replica = newMatchReplica()
+    applyMatch(replica, withPlayers(player(SELF), player('bob')), SELF, 0)
+    applyMatch(replica, withPlayers(player(SELF)), SELF, 1)
+    expect(replica.presenceFeed.map((e) => [e.id, e.state])).toEqual([['bob', 'left']])
+  })
+
+  test('切れたら 🫥 (away)、戻ってこなければ 🏃‍♀️🚪 に置き換わる', () => {
+    const replica = newMatchReplica()
+    applyMatch(replica, withPlayers(player(SELF), player('bob')), SELF, 0)
+    applyMatch(replica, withPlayers(player(SELF), player('bob', true)), SELF, 1)
+    expect(replica.presenceFeed.map((e) => e.state)).toEqual(['away'])
+    applyMatch(replica, withPlayers(player(SELF)), SELF, 2)
+    expect(replica.presenceFeed.map((e) => e.state)).toEqual(['left'])
+  })
+
+  test('戻ってきたら 🫥 を下げる。自分のことは出さない', () => {
+    const replica = newMatchReplica()
+    applyMatch(replica, withPlayers(player(SELF), player('bob')), SELF, 0)
+    applyMatch(replica, withPlayers(player(SELF, true), player('bob', true)), SELF, 1)
+    applyMatch(replica, withPlayers(player(SELF), player('bob')), SELF, 2)
+    expect(replica.presenceFeed).toEqual([])
+  })
+})

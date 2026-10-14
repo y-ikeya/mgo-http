@@ -323,7 +323,7 @@ Mixamo から取り直す必要がある。1 本足りないまま書き出す�
 後から足したクリップ (`salute` `bolt` `sweep` `stand` `stand_front` `throw` `away`
 `hard_land` `up_stair` `down_stair` `bump` `crawl_f` `prone_down` `prone_rise` `prone_fire` `prone_reload` `death_front` `death_back`
 `knee_relaxed` `knee_ready` `prone_bolt` `knife_idle` `vault` `vault_up` `hang_drop` `hang_climb`
-`claymore_windup` `claymore_place`) は
+`claymore_windup` `claymore_place` `walk` `walk_unarmed` `crouch_death`) は
 `soldier.json` を通さず `merge_clip.js` で 1 本ずつ足してある。FBX は
 `tools/raw/` にあるので、単体の glb に変換してから差し替える:
 
@@ -342,6 +342,23 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_windup.json
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
+
+しゃがんだまま正面から倒される `crouch_death` は本人が Mixamo から Ch35 で落とした `tools/raw/CrouchFrontDeath.fbx`
+(72 コマ、しゃがみから後ろへ尻もちをついて仰向け)。Ch35 なので `convert_character.py` で直に写せる:
+
+    $BLENDER -b --factory-startup --python tools/convert_character.py -- tools/crouch_death.json
+    for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb crouch_death.glb crouch_death public/models/$g.glb; done
+
+立ち歩き 2 本 (tools/walk.json) は本人作の Mixamo の FBX (`tools/raw/` の RifleStandWalk / BareStandWalk、
+2026-10-08)。その場歩きで Ch35 と同じ骨なので直に写せる。本来の速さは接地している足が後ろへ滑る速さの
+中央値で測った (animation.ts の WALK_CLIP_SPEED ほか): 長物 1.27 / 手ぶら 0.78 m/s。
+しゃがみ歩きはしゃがみ走りの型を遅く流す (同じ時に作った RifleCrouchWalk / BareCrouchWalk は使わない)。
+
+    $BLENDER -b --factory-startup --python tools/convert_character.py -- tools/walk.json
+    for c in walk walk_unarmed; do
+      bun tools/merge_clip.js public/models/soldier.glb walk.glb $c public/models/soldier.glb
+      for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb walk.glb $c public/models/$g.glb --rotation-only; done
+    done
 
 `knife_idle` (tools/knife_idle.json) と `stab` (tools/stab.json) は **Ch35 ではないキャラで落とした FBX** (背丈が半分、素の姿勢も違う) なので、`convert_character.py` で直に写すと腕が頭の上に上がる。`retarget_clip.py` で世界の向きから焼き直し、腰の高さが半分なので `--hips-from` で既存の型の高さに揃えて足す:
 
@@ -387,11 +404,24 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 
 `tools/raw/tin.mp3` (本人の素材、885Hz の金属のリング) から。2026-10-05 に本人と聴き比べて決めた形:
 
-- 再生速度で **+19 半音** (基音 約 2.65kHz)。+12 では「股間を打ったようなコミカルな音」だった
+- 再生速度で **+21 半音** (基音 約 2.98kHz)。+12 では「股間を打ったようなコミカルな音」だった。
+  +19 で決めた後、2026-10-07 に「もう少し高く」で +21 へ (速さと胴の帯も同じだけ動かす)
 - 音程を保ったまま引き伸ばして **1.25 秒** (鳴っている音をもう少し長く)、最後 0.37 秒はフェード (切ると「ブツッ」)
-- 基音の帯を **+7dB**、強めの圧縮で**リングの胴を持ち上げる** (「真ん中の音を強く」= 帯域も時間も)。
+- 基音の帯 (+21 で 2977Hz) を **+7dB**、強めの圧縮で**リングの胴を持ち上げる** (「真ん中の音を強く」= 帯域も時間も)。
   打音の頭は元から天井なので、音量を上げても頭が割れるだけ
 
 ```sh
-ffmpeg -i tools/raw/tin.mp3 -af "asetrate=143837,aresample=48000,rubberband=tempo=0.271:pitchq=quality,equalizer=f=2650:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
+ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=tempo=0.2414:pitchq=quality,equalizer=f=2977:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
 ```
+
+### CQC の型 (cqc_throw / cqc_miss / cqc_thrown)
+
+本人と Blender で組んだ型 (`tools/raw/cqc.blend`、24fps、70 コマ)。投げる側 `attacker` の
+`cqc_throw` と、投げられる側 `victim` の `cqc_thrown` を、骨組みだけ選んで glTF に書き出し
+(export_animation_mode=ACTIVE_ACTIONS)、名前を付け直して 3 つの皮に merge した。空振り
+`cqc_miss` は cqc.blend の別の action (22 コマ): 左のフックが伸び切る 11 コマまでは投げと同じで、
+そこから左手だけ構えへ引き戻す (右手は振らない)。
+
+組むときの道具は `tools/cqc/` (pose.py = 体の向きで骨を回す、legs.py = つま先を床に留めて
+脚を解き直す)。元にした素材は Boxing / LightHitToHead / SweepFall (`tools/cqc/*.json` で
+retarget_clip に通した)。試写は `tools/preview/cqc.html` (2 人並べて型の移動も辿る)。
