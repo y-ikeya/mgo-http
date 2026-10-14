@@ -189,8 +189,11 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
           : 'sweep'
         : bot.downLeft > 0
           ? 'stand'
-          : 'idle'
+          : REST[bot.homeStance]
 }
+
+/** 的が何もされていない時の姿。構えごと */
+const REST: Record<MatchPlayer['homeStance'], Locomotion> = { stand: 'idle', crouch: 'crouch_idle', prone: 'prone_idle' }
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
 export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
@@ -209,7 +212,7 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         locomotion: bot.locomotion,
         aiming: false,
         weapon: 'rifle',
-        crouching: false,
+        crouching: bot.homeStance === 'crouch' && bot.locomotion === 'crouch_idle',
         boxed: false,
         reloading: false,
         protectedNow: false,

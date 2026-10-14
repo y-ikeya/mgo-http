@@ -304,6 +304,8 @@ export interface MatchPlayer extends Player {
   homeZ: number
   /** 的の足元の高さ。地面が 0 ではないステージ (検証場は 0.1) で埋まらないように */
   homeY: number
+  /** 的の構え。立っている / しゃがんでいる / 伏せている。人は使わない */
+  homeStance: 'stand' | 'crouch' | 'prone'
   /**
    * 的が起き上がるまでの残り (秒)。0 なら立っている。
    *
@@ -424,6 +426,7 @@ export function newMatchPlayer(seed: {
     homeX: 0,
     homeZ: 0,
     homeY: 0,
+    homeStance: 'stand',
     downLeft: 0,
     downThrown: false,
     downFromBehind: false,
@@ -466,6 +469,8 @@ export function newBot(seed: {
   z: number
   /** 足元の高さ。省けば 0 */
   y?: number
+  /** 構え。省けば立っている */
+  stance?: 'stand' | 'crouch' | 'prone'
   now: number
 }): MatchPlayer {
   const bot = newMatchPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
@@ -477,6 +482,7 @@ export function newBot(seed: {
   bot.homeX = seed.x
   bot.homeY = bot.y
   bot.homeZ = seed.z
+  bot.homeStance = seed.stance ?? 'stand'
   bot.life = 'alive'
   // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
   bot.yaw = Math.PI

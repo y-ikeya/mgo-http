@@ -72,6 +72,16 @@ export interface Spot {
 }
 
 /**
+ * 練習の的の置き場。**姿勢も持つ。** 省けば立っている。
+ *
+ * しゃがんだ的・伏せた的は、低い頭を狙う練習と、CQC が掛からない相手
+ * (立っている相手にしか掛からない) を確かめるため (本人 2026-10-14)
+ */
+export interface TargetSpot extends Spot {
+  stance?: 'crouch' | 'prone'
+}
+
+/**
  * 水面。**中心から half まで、高さ y の 1 枚。**
  *
  * ここに置くのは、水が見た目だけの物ではないから。**投げた物が沈む**ので、
@@ -118,7 +128,7 @@ interface StageSpec {
    * **距離を変えながら撃てるように置く。** 同じ距離に並べても、確かめられるのが
    * 1 つの間合いだけになる。練習部屋以外では使われない (空でよい)。
    */
-  targets: Spot[]
+  targets: TargetSpot[]
 }
 
 /**
@@ -215,6 +225,11 @@ const TRAINING: StageSpec = {
     { x: -16, z: -11 },
     { x: -9, z: -4 },
     { x: -2, z: 3 },
+    // 低い的。立っている列の脇に、近いのと遠いのを 1 つずつ
+    { x: -23, z: -28, stance: 'crouch' },
+    { x: -12, z: -20, stance: 'crouch' },
+    { x: -26, z: -12, stance: 'prone' },
+    { x: -13, z: -2, stance: 'prone' },
   ],
 }
 
