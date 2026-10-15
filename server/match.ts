@@ -148,6 +148,8 @@ export function updateTargets(room: RoomWorld, now: number): void {
       bot.stamina = MAX_STAMINA
     }
 
+    patrol(bot, now)
+
     if (isDowned(bot.life) && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
       reviveBot(bot, now)
       broadcast(room, { type: 'life', id: bot.id, state: 'alive' })
@@ -189,7 +191,45 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
           : 'sweep'
         : bot.downLeft > 0
           ? 'stand'
-          : REST[bot.homeStance]
+          : patrolling(bot, now)
+            ? 'run_f'
+            : REST[bot.homeStance]
+}
+
+/**
+ * 走り続ける的の速さ (m/s)。**人の走りと同じ** — CQC の練習で、走ってくる相手に
+ * 合わせられるように (soldier.ts の MOVE_SPEED)
+ */
+const PATROL_SPEED = 2.74
+
+/** 的が走っている最中か。倒れている・眠っている・転んでいる・投げられている間は走らない */
+function patrolling(bot: MatchPlayer, now: number): boolean {
+  return bot.patrolTo !== null && !isDowned(bot.life) && !isAsleep(bot.sleepUntil, now) && bot.downLeft <= 0 && bot.knockLeft <= 0
+}
+
+/**
+ * 走り続ける的を 1 刻みぶん進める。**置き場と patrolTo の間を往復する。**
+ *
+ * 端に着いたら折り返す。転ばされた後はその場から、いま向かっていた端へ走り直す
+ * (並び直すのは倒された時だけ、reviveBot)。向きは走っている向き
+ */
+function patrol(bot: MatchPlayer, now: number): void {
+  if (!patrolling(bot, now) || !bot.patrolTo) return
+  const goal = bot.patrolOut ? bot.patrolTo : { x: bot.homeX, z: bot.homeZ }
+  const dx = goal.x - bot.x
+  const dz = goal.z - bot.z
+  const left = Math.hypot(dx, dz)
+  const step = PATROL_SPEED * TICK_SECONDS
+  if (left <= step) {
+    bot.x = goal.x
+    bot.z = goal.z
+    bot.patrolOut = !bot.patrolOut
+    return
+  }
+  bot.x += (dx / left) * step
+  bot.z += (dz / left) * step
+  // 向き 0 で -Z を向く (domain/player/stance.ts の leanShift と同じ取り方)
+  bot.yaw = Math.atan2(-dx, -dz)
 }
 
 /** 的が何もされていない時の姿。構えごと */

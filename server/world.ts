@@ -266,6 +266,7 @@ export function placeTargets(room: RoomWorld): void {
       // 地面が 0 でないステージで埋まらないように (検証場の地面は 0.1)
       y: at.y,
       stance: at.stance,
+      patrol: at.patrol,
       now,
     })
     room.players.set(bot.id, bot)

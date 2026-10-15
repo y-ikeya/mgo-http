@@ -306,6 +306,10 @@ export interface MatchPlayer extends Player {
   homeY: number
   /** 的の構え。立っている / しゃがんでいる / 伏せている。人は使わない */
   homeStance: 'stand' | 'crouch' | 'prone'
+  /** 走り続ける的の、もう一方の端。null なら動かない。人は使わない */
+  patrolTo: { x: number; z: number } | null
+  /** いま向こうの端 (patrolTo) へ走っているか。false なら置き場 (home) へ戻っている */
+  patrolOut: boolean
   /**
    * 的が起き上がるまでの残り (秒)。0 なら立っている。
    *
@@ -427,6 +431,8 @@ export function newMatchPlayer(seed: {
     homeZ: 0,
     homeY: 0,
     homeStance: 'stand',
+    patrolTo: null,
+    patrolOut: true,
     downLeft: 0,
     downThrown: false,
     downFromBehind: false,
@@ -471,6 +477,8 @@ export function newBot(seed: {
   y?: number
   /** 構え。省けば立っている */
   stance?: 'stand' | 'crouch' | 'prone'
+  /** 走り続ける的のもう一方の端。省けば動かない */
+  patrol?: { x: number; z: number }
   now: number
 }): MatchPlayer {
   const bot = newMatchPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
@@ -483,6 +491,7 @@ export function newBot(seed: {
   bot.homeY = bot.y
   bot.homeZ = seed.z
   bot.homeStance = seed.stance ?? 'stand'
+  bot.patrolTo = seed.patrol ?? null
   bot.life = 'alive'
   // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
   bot.yaw = Math.PI
@@ -510,6 +519,7 @@ export function reviveBot(bot: MatchPlayer, now: number): void {
   bot.x = bot.homeX
   bot.y = bot.homeY
   bot.z = bot.homeZ
+  bot.patrolOut = true
 }
 
 /**
