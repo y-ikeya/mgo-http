@@ -22,15 +22,21 @@
 import { isGun, isThrowable, isTwoHanded, type HeldId } from '../item/held'
 import { MOVE_DIRECTIONS, type Locomotion } from './locomotion'
 
-/** 掛けられる距離 (m、体の中心どうし、水平)。腕を伸ばして喉に届く所まで */
-export const CQC_REACH = 1.3
+/**
+ * 掛けられる距離 (m、体の中心どうし、水平)。腕を伸ばして喉に届く所まで。
+ *
+ * 1.3 → 1.8 (本人 2026-10-15「判定が弱すぎる」)。1.3 では体の隙間が 0.7m しかなく、
+ * 相手の姿は通信の分だけ遅れて描かれるので、見た目では届いていても空振りした
+ */
+export const CQC_REACH = 1.8
 
 /**
- * 掛けられる向き。**体の正面からこの角度の内側** (cos)。60° より外は届かない。
+ * 掛けられる向き。**体の正面からこの角度の内側** (cos)。75° より外は届かない
+ * (60° から広げた、本人 2026-10-15)。
  * 見るのは体の向きで、カメラの向きではない (本人 2026-10-12)。相手の向きは問わない —
  * 背後からでも掛かる
  */
-export const CQC_FACING_COS = 0.5
+export const CQC_FACING_COS = Math.cos((75 * Math.PI) / 180)
 
 /**
  * 投げる型の中での 2 人の間合い (m)。投げられる側はここへ寄せられてから倒れる
