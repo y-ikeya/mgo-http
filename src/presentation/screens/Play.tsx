@@ -18,6 +18,7 @@ import Blocked from '../ui/Blocked'
 import Leaving from '../ui/Leaving'
 import Stats from '../ui/Stats'
 import Loading from '../ui/Loading'
+import { loadLookScale, saveLookScale } from '../../infra/prefs/look'
 
 /**
  * 調整パネルを出すか。
@@ -149,6 +150,8 @@ export default function Play(props: {
   const [primary, setPrimary] = createSignal<WeaponId | null>('rifle')
   const [support, setSupport] = createSignal<SupportId>('grenade')
   const [game, setGame] = createSignal<Game | null>(null)
+  /** 視点の感度 (設定のタブ)。この端末に覚えてある値から始める */
+  const [lookScale, setLookScale] = createSignal(loadLookScale())
   /** 部屋を出るか尋ねている最中か。戻るを押した時だけ立つ */
   const [leaving, setLeaving] = createSignal(false)
   let container!: HTMLDivElement
@@ -389,6 +392,12 @@ export default function Play(props: {
           onSkill={(id, level) => game()?.setSkill(id, level)}
           onClose={() => game()?.setMenu(false)}
           onLeave={leaveRoom}
+          lookScale={lookScale()}
+          onLookScale={(next) => {
+            setLookScale(next)
+            saveLookScale(next)
+            game()?.setLookScale(next)
+          }}
         />
       </Show>
 

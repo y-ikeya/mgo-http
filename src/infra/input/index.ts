@@ -440,9 +440,17 @@ export class Input {
   /**
    * 溜まったマウス移動量を返してリセットする。呼び出しは 1 フレーム 1 回。
    */
-  consumeLook(out: { x: number; y: number }): { x: number; y: number } {
-    out.x = this.lookX + this.padLookX
-    out.y = this.lookY + this.padLookY
+  /**
+   * 視点の感度の倍率 (設定画面で選ぶ)。**マウスとパッドで別。** 構えているかで
+   * 使い分けるので、それぞれ 2 本。既定は 1
+   */
+  lookScale = { mouseHip: 1, mouseAim: 1, padHip: 1, padAim: 1 }
+
+  consumeLook(out: { x: number; y: number }, aiming = false): { x: number; y: number } {
+    const mouse = aiming ? this.lookScale.mouseAim : this.lookScale.mouseHip
+    const pad = aiming ? this.lookScale.padAim : this.lookScale.padHip
+    out.x = this.lookX * mouse + this.padLookX * pad
+    out.y = this.lookY * mouse + this.padLookY * pad
     this.lookX = 0
     this.lookY = 0
     return out

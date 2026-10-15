@@ -144,6 +144,7 @@ import {
 import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
+import { loadLookScale, type LookScale } from "../../infra/prefs/look";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 /**
@@ -1259,6 +1260,8 @@ export class Game {
   constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
     // 倒れた体が下がる時、壁で止める。カメラと同じ網で見る (表裏を問わない)
     setSlideBlocker((origin, dir, max) => this.cameraWorld.distanceToObstruction(origin, dir, max));
+    // 前回選んだ感度から始める
+    this.input.lookScale = loadLookScale();
     /*
      * **1 枚の頁で動く試合は 1 つだけ。** 前の物が残っていれば片付ける。
      *
@@ -1670,7 +1673,8 @@ export class Game {
     this.input.advance(dt);
 
     // 視点はマウスが唯一の駆動源。カメラを回してから移動方向を解決する。
-    const look = this.input.consumeLook(this.look);
+    // 感度は構えているかで使い分ける (設定画面の 4 本、infra/prefs/look.ts)
+    const look = this.input.consumeLook(this.look, this.follow.isAiming);
     // 動かせるときだけ視点を回す。
     //
     // 支度中 (装備画面) と倒れている間 (倒した相手を映している間) は、
@@ -3425,6 +3429,11 @@ export class Game {
 
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
   onLoadout: ((next: { primary: WeaponId | null; support: SupportId }) => void) | null = null;
+
+  /** 視点の感度の倍率を差し替える (設定画面)。マウスとパッド、構えていない時と構えている時 */
+  setLookScale(scale: LookScale): void {
+    this.input.lookScale = { ...scale };
+  }
 
   /** 次に湧く時の装備 (画面の印の初めの値)。前回選んだ物か、一覧の先頭 */
   get chosenLoadout(): { primary: WeaponId | null; support: SupportId } {
