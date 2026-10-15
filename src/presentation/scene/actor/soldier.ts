@@ -1689,7 +1689,8 @@ export class Soldier {
     // 押し直させることで、伏せて撃つのが**選んだ結果**になる。
     if (!aiming) this.aimLatched = false
     if (this.downed) {
-      const landed = this.downElapsed >= (this.animator?.sweepDuration ?? 1.5)
+      // 投げられている間は背中が着くまで (CQC_LAND_SECONDS)。転ぶ型の尺とは別
+      const landed = this.downElapsed >= (this.thrownFall ? CQC_LAND_SECONDS : (this.animator?.sweepDuration ?? 1.5))
       this.aiming = landed && aiming && !this.aimLatched
       return
     }
@@ -2891,7 +2892,7 @@ export class Soldier {
 
   /** もう起き上がれるか。表示に使う */
   get canStandUp(): boolean {
-    return this.downed_ && this.downElapsed >= DOWN_LOCK
+    return this.downed_ && !this.downLocked
   }
 
   /** 立ち上がりの最中か。この間は何も受け付けない */
@@ -2944,8 +2945,19 @@ export class Soldier {
    * 倒れた直後 (DOWN_LOCK) は受け付けない。飛ばされている最中に這い出せると、
    * 吹き飛ばされたこと自体が無くなる。
    */
+  /**
+   * 倒れた直後で、まだ何もできない間か。
+   *
+   * 爆風で転んだ時は DOWN_LOCK (0.35 秒) だが、**CQC で投げられている間は背中が着くまで**
+   * (CQC_LAND_SECONDS)。0.35 秒で解けていたので、投げられている最中にスティックを倒すと
+   * 宙で寝返り (prone_roll_down) が始まり、投げの型を捨ててその場でうねっていた (本人 2026-10-15)
+   */
+  private get downLocked(): boolean {
+    return this.downElapsed < (this.thrownFall ? CQC_LAND_SECONDS : DOWN_LOCK)
+  }
+
   private crawlFromDown(): void {
-    if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
+    if (!this.downed_ || this.standing || this.downLocked) return
     this.downed_ = false
     const span = this.animator?.proneRollDownDuration ?? 0
     if (span <= 0) {
@@ -2977,7 +2989,7 @@ export class Soldier {
    * 撃とうとしただけで勝手に起き上がってはいけない。
    */
   standUp(): void {
-    if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
+    if (!this.downed_ || this.standing || this.downLocked) return
     this.downed_ = false
     this.aiming = false
     this.standing = true
