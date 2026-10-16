@@ -34,6 +34,8 @@ const cases: Record<string, Partial<GameStats>> = {
   // スタンナイフの充電。溜まっている途中 / 満ちた
   knifeCharging: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 0.45 },
   knifeCharged: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 1 },
+  // 箱を被ったまま構えた (Cbox で動いている間も同じ)。**狙いの輪は出ない**
+  boxedAim: { held: 'box', tool: 'box', toolInHand: true, aiming: true },
   boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'm9', ammo: 10, magazine: 12, reserve: 48 },
   noneSelected: { tool: 'none', toolInHand: false },
   empty: { ammo: 0 },
