@@ -1261,7 +1261,9 @@ export class Game {
     // 倒れた体が下がる時、壁で止める。カメラと同じ網で見る (表裏を問わない)
     setSlideBlocker((origin, dir, max) => this.cameraWorld.distanceToObstruction(origin, dir, max));
     // 前回選んだ感度から始める
-    this.input.lookScale = loadLookScale();
+    const look = loadLookScale();
+    this.input.lookScale = look;
+    this.input.listInvert = look.listInvert;
     /*
      * **1 枚の頁で動く試合は 1 つだけ。** 前の物が残っていれば片付ける。
      *
@@ -3434,6 +3436,7 @@ export class Game {
   /** 視点の感度の倍率を差し替える (設定画面)。マウスとパッド、構えていない時と構えている時 */
   setLookScale(scale: LookScale): void {
     this.input.lookScale = { ...scale };
+    this.input.listInvert = scale.listInvert;
   }
 
   /** 次に湧く時の装備 (画面の印の初めの値)。前回選んだ物か、一覧の先頭 */

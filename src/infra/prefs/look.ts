@@ -11,9 +11,11 @@ export interface LookScale {
   mouseAim: number
   padHip: number
   padAim: number
+  /** 武器の一覧を右スティックで送る向きを逆にする (本人 2026-10-16) */
+  listInvert: boolean
 }
 
-export const DEFAULT_LOOK_SCALE: LookScale = { mouseHip: 1, mouseAim: 1, padHip: 1, padAim: 1 }
+export const DEFAULT_LOOK_SCALE: LookScale = { mouseHip: 1, mouseAim: 1, padHip: 1, padAim: 1, listInvert: false }
 
 /** 選べる幅。0 にすると向きが変えられなくなる */
 export const LOOK_SCALE_MIN = 0.2
@@ -31,6 +33,7 @@ export function loadLookScale(): LookScale {
       mouseAim: clamp(value.mouseAim),
       padHip: clamp(value.padHip),
       padAim: clamp(value.padAim),
+      listInvert: value.listInvert === true,
     }
   } catch {
     return { ...DEFAULT_LOOK_SCALE }

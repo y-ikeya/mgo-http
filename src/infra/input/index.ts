@@ -763,6 +763,8 @@ export class Input {
   }
 
   private listMode = false
+  /** 一覧を送る向きを逆にする (設定画面) */
+  listInvert = false
   /** 右スティックの上下。一覧を開いている間だけ拾う */
   private listAxis = 0
   /** 直近に 1 段送った時刻。倒しっぱなしで飛ばないように間隔を空ける */
@@ -779,8 +781,10 @@ export class Input {
     const now = performance.now()
     if (now - this.listAt < LIST_REPEAT) return 0
     this.listAt = now
-    // 画面の上が -1 (スティックの上倒しが負) なので、符号を返す前に反転する
-    return this.listAxis < 0 ? 1 : -1
+    // 画面の上が -1 (スティックの上倒しが負) なので、符号を返す前に反転する。
+    // 設定で逆にしてあればさらに返す (listInvert)
+    const step = this.listAxis < 0 ? 1 : -1
+    return this.listInvert ? -step : step
   }
 
   /** 視点を掴む。ユーザーの操作の最中から呼ぶこと */

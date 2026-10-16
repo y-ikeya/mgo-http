@@ -653,6 +653,15 @@
   color: rgba(150, 214, 132, 0.85);
 }
 
+.score-setting-check {
+  grid-template-columns: auto auto;
+  justify-content: start;
+}
+
+.score-setting-check input {
+  accent-color: rgb(150, 214, 132);
+}
+
 .score-settings-reset {
   align-self: flex-start;
   margin-top: 4px;

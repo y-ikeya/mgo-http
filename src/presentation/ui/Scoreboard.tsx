@@ -24,7 +24,7 @@ import './Scoreboard.css'
  */
 
 /** 設定のタブに並べる感度。左の名前と、持っている値の名前 */
-const LOOK_ROWS: { label: string; key: keyof LookScale }[] = [
+const LOOK_ROWS: { label: string; key: 'mouseHip' | 'mouseAim' | 'padHip' | 'padAim' }[] = [
   { label: 'マウス', key: 'mouseHip' },
   { label: 'マウス (構え)', key: 'mouseAim' },
   { label: 'パッド', key: 'padHip' },
@@ -407,6 +407,15 @@ export default function Scoreboard(props: {
                 </label>
               )}
             </For>
+            <div class="score-settings-head">武器の一覧</div>
+            <label class="score-setting score-setting-check">
+              <span class="score-setting-label">スティックの上下を逆に</span>
+              <input
+                type="checkbox"
+                checked={props.lookScale.listInvert}
+                onChange={(e) => props.onLookScale({ ...props.lookScale, listInvert: e.currentTarget.checked })}
+              />
+            </label>
             <button class="score-leave score-settings-reset" onClick={() => props.onLookScale({ ...DEFAULT_LOOK_SCALE })}>
               既定に戻す
             </button>
