@@ -1084,7 +1084,7 @@ export class RemoteSoldiers {
       // **控えを先に引く。** どのモデルを着るかは名前で決まり、モデルの
       // 読み込みは構築と同時に始まる。作ってから名前を入れたのでは間に合わない
       const known = this.pending.get(snapshot.id);
-      player = new RemoteSoldier(snapshot.id, this.scene, skinFor(known?.name));
+      player = new RemoteSoldier(snapshot.id, this.scene, skinFor(known?.name, snapshot.id));
       // 水面は部屋ごとに決まっている。作った所で配る
       player.setWaterY(this.waterY);
       this.players.set(snapshot.id, player);
@@ -1128,8 +1128,8 @@ export class RemoteSoldiers {
    * **失敗しても黙って捨てる。** これは前倒しでしかなく、本当に要るときは実体の
    * 側が同じ物を読んで、そこで例外を出す。ここで騒ぐと二重に出る。
    */
-  private warmSkin(name: string | undefined): void {
-    void loadSoldier(skinFor(name)).catch(() => {});
+  private warmSkin(name: string | undefined, id?: string): void {
+    void loadSoldier(skinFor(name, id)).catch(() => {});
   }
 
   /**
@@ -1141,7 +1141,7 @@ export class RemoteSoldiers {
    *
    */
   sync(id: string, entry: Player): void {
-    this.warmSkin(entry.name);
+    this.warmSkin(entry.name, id);
     const player = this.players.get(id);
     if (!player) {
       this.remember(id, { ...entry });
