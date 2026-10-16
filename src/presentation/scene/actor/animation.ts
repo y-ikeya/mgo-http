@@ -703,6 +703,12 @@ const STAND_RATE = 1.2
  * 溜められると「持ったまま間合いを計る」が最善手になって読み合いが消える。
  */
 const THROW_WINDUP_KEY = 'throw_windup'
+/**
+ * 立ちの振りかぶりを**どこから流すか** (秒)。型は 0〜0.8 秒で胸から取り出し、0.9〜1.2 秒で
+ * ピンを抜き、1.2〜1.5 秒で腕を引く。取り出す所は飛ばして、**ピンを抜く所から始める**
+ * (本人 2026-10-16「すぐにピンを抜いて構えるくらいでいい」)。構えるまで 1.5 → 0.6 秒
+ */
+const THROW_WINDUP_START = 0.9
 const THROW_RELEASE_KEY = 'throw_release'
 
 /**
@@ -3666,6 +3672,8 @@ export class CharacterAnimator {
       return
     }
     this.playPair(THROW_WINDUP_KEY, THROW_RELEASE_KEY)
+    const windup = this.upper.get(THROW_WINDUP_KEY)
+    if (windup) windup.time = Math.min(THROW_WINDUP_START, windup.getClip().duration)
   }
 
   /**

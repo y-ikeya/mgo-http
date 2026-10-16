@@ -16,6 +16,7 @@
  *     ?sky=0.4                屋内の暗さ (空の見え方 SKY_FLOOR〜1) を体に掛ける
  *     ?trace                  0.1 秒ごとに銃身と両手の向きを書き出す (コンソールの [trace])
  *     ?death=front|back|none  clip の姿勢で 1 秒置いてから倒す (front = 正面から撃たれた)。t は倒してから
+ *     ?throw                  手榴弾の振りかぶりを頭から流す (t 秒目で止める)
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
@@ -240,6 +241,10 @@ if (query.has('hang')) anim.playHang()
 if (query.has('hangclimb')) anim.playHangClimb()
 // ?stab … 刺す。姿勢が伏せ (clip=prone_idle) なら伏せた刺突になる
 if (query.has('stab')) anim.playStab()
+if (query.has('throw')) {
+  anim.setHandsEmpty(true)
+  anim.playThrow()
+}
 // ?setup … クレイモアを構える (振りかぶりを頭から。&fromcrouch で屈んだ所から)。?place … 構え切った所から置く型を流す。
 // locomotion に 'claymore_place' を渡しても出ない (一度きりの全身の型は playSetup が入口)
 // ?setupspeed=1.75 … TRAP MASTERY の速さで (soldier.ts の setSkills と同じ口)
