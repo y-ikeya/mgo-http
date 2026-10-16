@@ -11599,31 +11599,6 @@
 }
 },
 {
-"name": "concrete_alley_wall_west_nouv",
-"min": [
-3.55,
-10.0,
--4.81
-],
-"max": [
-3.6,
-17.0,
-8.5
-],
-"top": {
-"h": 17.0,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "wood_alley_window_west",
 "min": [
 3.57,
