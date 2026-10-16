@@ -5139,31 +5139,6 @@
 }
 },
 {
-"name": "concrete_floor1_nouv.002",
-"min": [
--5.669,
-9.878,
--20.163
-],
-"max": [
-3.945,
-9.994,
--7.216
-],
-"top": {
-"h": 9.9937,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "wood_box.029",
 "min": [
 -9.236,
@@ -12089,31 +12064,6 @@
 ],
 "top": {
 "h": 10.0024,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "concrete_floor1_nouv.010",
-"min": [
--5.382,
-9.92,
--26.011
-],
-"max": [
-3.004,
-9.995,
--20.144
-],
-"top": {
-"h": 9.9954,
 "dx": 0.0,
 "dz": 0.0
 },

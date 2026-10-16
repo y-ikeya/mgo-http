@@ -83,7 +83,7 @@ def outline(zcut, min_len=0.3):
 
 
 ONLY = cfg.get('only')
-GRIME_H = cfg.get('grime_h', 0.8)
+GRIME_H = cfg.get('grime_h', 1.0)  # 0.8 → 1.0 (本人 2026-10-16「1m くらいまで高く」)
 GRIME_TILE = 2.3
 # これより浅い奥まりは同じ壁 (m)
 RECESS = 0.06
