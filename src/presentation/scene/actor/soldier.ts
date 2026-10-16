@@ -3800,6 +3800,9 @@ export class Soldier {
       const holstered =
         !gun ||
         barehanded ||
+        // ダンボールの中では出さない。**自分の画面だけ出ていて**、箱から銃がはみ出して
+        // 見えた (本人 2026-10-16)。相手の画面 (remoteSoldier.ts) は元から箱で納めている
+        this.boxed ||
         // ぶら下がっている間は両手が縁に掛かっている
         this.hanging ||
         (!isTwoHanded(this.held) &&
