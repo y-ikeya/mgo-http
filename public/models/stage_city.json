@@ -13112,12 +13112,12 @@
 -36.326
 ],
 "max": [
-13.863,
-16.6,
--21.66
+11.451,
+12.99,
+-22.01
 ],
 "top": {
-"h": 16.6,
+"h": 12.99,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13213,12 +13213,12 @@
 -73.29
 ],
 "max": [
-16.425,
-19.95,
+16.424,
+12.97,
 -58.69
 ],
 "top": {
-"h": 19.95,
+"h": 12.97,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13309,17 +13309,17 @@
 {
 "name": "metal_building22_shutters",
 "min": [
--4.44,
+-4.09,
 10.03,
--19.43
+-19.08
 ],
 "max": [
-3.07,
-19.95,
--8.17
+2.72,
+12.93,
+-8.52
 ],
 "top": {
-"h": 19.95,
+"h": 12.93,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13441,11 +13441,11 @@
 ],
 "max": [
 -13.865,
-16.6,
+13.05,
 -56.495
 ],
 "top": {
-"h": 16.6,
+"h": 13.05,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13867,17 +13867,17 @@
 {
 "name": "metal_building3_shutters",
 "min": [
--35.48,
+-35.13,
 10.03,
-5.12
+6.5
 ],
 "max": [
--18.32,
-19.95,
-23.38
+-26.2,
+12.93,
+23.03
 ],
 "top": {
-"h": 19.95,
+"h": 12.93,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -13968,17 +13968,17 @@
 {
 "name": "metal_building18_shutters",
 "min": [
--6.8,
+-5.38,
 10.13,
--4.54
+-4.29
 ],
 "max": [
 0.25,
-16.6,
+13.03,
 13.72
 ],
 "top": {
-"h": 16.6,
+"h": 13.03,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14943,6 +14943,312 @@
 "bullet": true,
 "eye": true,
 "camera": true
+}
+},
+{
+"name": "wood_building10_boards",
+"min": [
+-27.335,
+15.41,
+-72.765
+],
+"max": [
+-13.855,
+16.558,
+-56.485
+],
+"top": {
+"h": 16.558,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_building10_interior_notexture",
+"min": [
+-27.245,
+15.405,
+-72.675
+],
+"max": [
+-13.945,
+16.595,
+-56.575
+],
+"top": {
+"h": 16.595,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
+}
+},
+{
+"name": "wood_building3_boards",
+"min": [
+-35.49,
+15.41,
+5.11
+],
+"max": [
+-18.31,
+19.908,
+23.39
+],
+"top": {
+"h": 19.908,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_building3_interior_notexture",
+"min": [
+-35.4,
+15.405,
+5.2
+],
+"max": [
+-18.4,
+19.945,
+23.3
+],
+"top": {
+"h": 19.945,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
+}
+},
+{
+"name": "wood_building9_boards",
+"min": [
+-3.37,
+15.41,
+-73.3
+],
+"max": [
+16.435,
+19.908,
+-58.68
+],
+"top": {
+"h": 19.908,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_building9_interior_notexture",
+"min": [
+-3.28,
+15.405,
+-73.21
+],
+"max": [
+16.345,
+19.945,
+-58.77
+],
+"top": {
+"h": 19.945,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
+}
+},
+{
+"name": "wood_building18_boards",
+"min": [
+-6.81,
+15.41,
+-4.55
+],
+"max": [
+-0.522,
+16.558,
+8.24
+],
+"top": {
+"h": 16.558,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_building18_interior_notexture",
+"min": [
+-6.72,
+15.405,
+-4.46
+],
+"max": [
+-0.515,
+16.595,
+8.15
+],
+"top": {
+"h": 16.595,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
+}
+},
+{
+"name": "wood_building22_boards",
+"min": [
+-4.45,
+15.41,
+-19.44
+],
+"max": [
+3.08,
+19.908,
+-8.16
+],
+"top": {
+"h": 19.908,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_building22_interior_notexture",
+"min": [
+-4.36,
+15.405,
+-19.35
+],
+"max": [
+2.99,
+19.945,
+-8.25
+],
+"top": {
+"h": 19.945,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
+}
+},
+{
+"name": "wood_building32_boards",
+"min": [
+-1.101,
+15.41,
+-34.619
+],
+"max": [
+13.863,
+16.558,
+-21.65
+],
+"top": {
+"h": 16.558,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_building32_interior_notexture",
+"min": [
+-1.042,
+15.405,
+-34.564
+],
+"max": [
+13.802,
+16.595,
+-21.74
+],
+"top": {
+"h": 16.595,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false
 }
 },
 {
