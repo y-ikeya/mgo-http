@@ -657,8 +657,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         構えようとしたが、銃口の先が塞がっていて構えられない。**輪の代わりに ✕。**
         カメラは構えの寄りになるので、なぜ撃てないかを印で言う (2026-10-12 本人)
       */}
-      {/* 箱を被っている間は出さない (下の輪と同じ) */}
-      <Show when={locked() && props.stats?.aimBlocked && !props.stats?.aiming && !props.stats?.toolInHand}>
+      <Show when={locked() && props.stats?.aimBlocked && !props.stats?.aiming}>
         <div class="crosshair">
           <span class="crosshair-blocked">✕</span>
         </div>
@@ -673,10 +672,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           locked() &&
           props.stats?.aiming &&
           !props.stats?.scoped &&
-          props.stats?.weaponHeld !== 'knife' &&
-          // ダンボールを被っている・被って動いている間は出さない (本人 2026-10-16)。
-          // 箱の中から撃つわけではないので、狙いの印は言うことが無い
-          !props.stats?.toolInHand
+          props.stats?.weaponHeld !== 'knife'
         }
       >
         {/*
