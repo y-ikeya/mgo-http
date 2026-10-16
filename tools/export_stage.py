@@ -449,6 +449,67 @@ for obj, mesh in baked:
 if baked:
     print(f'  モディファイアを確定させた: {len(baked)} 個 (形 {len(baked_by_key)} 種類)')
 
+# --- 汚れの板を材質ごとに 1 つにまとめる ---------------------------------------
+#
+# 汚れの板 (vis_decal_*) は建物ごとに別の物で作ってあり、そのまま出すと物の数だけ
+# 描く回数が増える (city で 68 回)。three は勝手にまとめないので、ここで 1 つの物に
+# 合わせる。glTF は材質ごとに 1 つの塊になるので、**描く回数は材質の数 (6) になる**
+# (本人 2026-10-15)。.blend の側は建物ごとのまま (作り直しや消すのが楽)。
+#
+# 材質は**中身が同じなら 1 つに寄せる**。建物ごとに作った時に decal_streak.001 … と
+# 写しができていて、同じ画像を指す材質が 6 つあった。写しのままでは塊も 6 つに割れる。
+#
+# 合わせた物の名前は decal を含む — 画面の側が名前で深さの寄せ方を決めている (stage.ts)。
+def _material_key(mat):
+    if not mat.use_nodes or not mat.node_tree:
+        return ('plain', mat.name)
+    nodes = []
+    for node in mat.node_tree.nodes:
+        values = []
+        for socket in node.inputs:
+            if socket.is_linked or not hasattr(socket, 'default_value'):
+                continue
+            v = socket.default_value
+            try:
+                v = tuple(round(x, 4) for x in v)
+            except TypeError:
+                v = round(v, 4) if isinstance(v, float) else v
+            values.append((socket.name, v))
+        image = node.image.filepath if node.type == 'TEX_IMAGE' and node.image else None
+        nodes.append((node.type, image, tuple(values)))
+    links = tuple(sorted((l.from_node.type, l.from_socket.name, l.to_node.type, l.to_socket.name) for l in mat.node_tree.links))
+    return (getattr(mat, 'blend_method', None), tuple(sorted(nodes, key=str)), links)
+
+
+decals = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o.select_get() and 'vis_decal' in o.name]
+if len(decals) > 1:
+    canon = {}
+    for obj in decals:
+        for slot in obj.material_slots:
+            if slot.material:
+                slot.material = canon.setdefault(_material_key(slot.material), slot.material)
+    with bpy.context.temp_override(active_object=decals[0], object=decals[0], selected_objects=decals, selected_editable_objects=decals):
+        bpy.ops.object.join()
+    merged = decals[0]
+    merged.name = 'vis_decal_merged_nouv'
+    # 同じ材質が別の枠に入ったまま残るので、1 つの枠に寄せてから空いた枠を消す
+    mesh = merged.data
+    first = {}
+    remap = []
+    for i, mat in enumerate(mesh.materials):
+        remap.append(first.setdefault(mat.name if mat else None, i))
+    for poly in mesh.polygons:
+        poly.material_index = remap[poly.material_index]
+    for i in reversed(range(len(mesh.materials))):
+        if remap[i] != i:
+            mesh.materials.pop(index=i)
+            # 消した枠より後ろの番号を詰める
+            for poly in mesh.polygons:
+                if poly.material_index > i:
+                    poly.material_index -= 1
+    print(f'  汚れの板を合わせた: {len(decals)} 個 → 1 個 (材質 {len(mesh.materials)})')
+
+
 # --- 置き物の三角を落とす ----------------------------------------------------
 #
 # 木箱のような持ち込みの形は 1 つ 1,600 枚ほどある。壁や床は 12 枚。**置き物 1 つに
