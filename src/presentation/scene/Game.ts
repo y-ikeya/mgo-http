@@ -1779,6 +1779,7 @@ export class Game {
     this.updateLoadoutKeys();
     this.syncLoadoutPointer();
     this.syncHeld();
+    this.releaseUnwornBox();
     this.inv.update(dt, this.input.firing);
     this.updateTrigger();
     this.updateZoom();
@@ -4910,6 +4911,20 @@ export class Game {
       { id: this.net.id, team: this.replica.team ?? "blue" } as never,
       { id, team: side } as never,
     );
+  }
+
+  /**
+   * **体が箱を脱いだのに、持ち物が箱のまま**を直す。
+   *
+   * 箱を脱ぐのは持ち物の側 (道具の切り替え) だけではない — Space (しゃがみの指) や
+   * 眠らされた時は体の側 (soldier の dropBox) が脱ぐ。持ち物は箱のままなので、左下の札は
+   * C.BOX、手は道具で塞がったまま銃が撃てなかった (本人 2026-10-16)。脱いだのは体なので、
+   * 持ち物を体に合わせる (取り上げられた時と同じ dropTool で武器へ戻す)
+   */
+  private releaseUnwornBox(): void {
+    if (!this.inv.usingTool || this.inv.held !== "box" || this.player.isBoxed) return;
+    this.inv.dropTool();
+    this.syncHeld();
   }
 
   private syncHeld(): void {
