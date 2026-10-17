@@ -39,6 +39,7 @@ import {
   loadStageSun,
   loadStageFx,
   applyStageSun,
+  sunProbeOf,
   loadStageLadders,
   STAGE_CODE,
   type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
@@ -97,6 +98,7 @@ import {
   type Side,
 } from "../../domain/match/room";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
+import { setSunProbe } from "./actor/blobShadow";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
@@ -1449,6 +1451,8 @@ export class Game {
     void Promise.all([this.stage.ready, loadStageSun(this.stageName)]).then(([, sunData]) => {
       if (sunData) applyStageSun(this.sun, sunData);
       fitShadowToStage(this.sun, this.stage);
+      // 人の足元の影は、日の当たる所でだけ足す (blobShadow.ts)
+      setSunProbe(sunProbeOf(this.stage, this.sun));
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*

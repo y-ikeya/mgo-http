@@ -12,70 +12,57 @@ import { DRAW_LATER, TOWARD_CAMERA } from '../util/depth'
  * 人の根 (object) の子にして、位置と向きは親に任せる。姿勢で大きさだけ変える:
  * 伏せは向きに沿って長く、少し前 (頭の側) へ寄せる (伏せた体は中心の 0.5m 前に頭)。
  */
-const RADIUS = 0.7
+const RADIUS = 0.6
 /**
- * **影の色 (画面に出る色、固定)。** 下の色と比べて**暗いほうを採る** (min)。
+ * **日なたでの濃さ。** 下の色を何割落とすか (黒を重ねる)。日なたの地面を、すぐ横の建物の影と
+ * 同じ明るさまで落とす値に合わせる。模様 (砂の粒・タイルの目地) は残る。
  *
- * 黒を重ねていた頃は「下の色の何割か」まで落としていたので、もう暗い床 (建物の中・日陰) の
- * 上ではさらに暗い丸が浮いた (2026-10-17 本人「暗い影にもさらに暗さが掛け合わさっていない？」)。
- * 固定の色との min なら、日なたの床はこの暗さまで落ち、これより暗い床は何も変わらない。
- * 日陰の地面と同じくらいの暗さに置く。**比べるのは露出・色調の補正の前の明るさ** なので、
- * 画面で見える日陰の色 (#3a2f1e くらい) よりずっと暗い値になる。環境光 (stage.ts の
- * AMBIENT_INTENSITY) を動かしたら、補正前の明るさで同じ割合だけ動かす (0.7 で #120e08、0.9 で #16110a、1.2 で #1a150d)
+ * 固定の影の色と暗いほうを採る (min) 描き方を試したが、芯が影の色 1 色に置き換わって
+ * 地面の模様が消え、ベタ塗りに見えた (2026-10-17 本人「自分の影の色キモくない？ベタ塗り」)
  */
-export const SHADOW_COLOR = '#1a150d'
+const SUN_OPACITY = 0.65
+/**
+ * **日の当たらない所での濃さ。** 建物の影の中・部屋の中は、もう日陰の明るさなので足さない。
+ *
+ * 黒を同じ濃さで重ねていた頃は、暗い床の上でさらに暗い丸が浮いた (「暗い影にもさらに暗さが
+ * 掛け合わさっていない？」)。影は「日の光を遮る物」なので、日の当たっていない所では何も遮らない
+ */
+const SHADE_OPACITY = 0
+/** 日なたかを測り直す間隔 (秒)。線 1 本なので軽いが、毎コマは要らない */
+const SUN_PROBE_EVERY = 0.1
+/** 足元のどれだけ上から線を引くか (m)。地面そのものに当たらないように */
+const SUN_PROBE_LIFT = 0.3
+
+/**
+ * その足元に日が当たっているか。**ステージが決まってから差し込む** (setSunProbe)。
+ * 届くまでは日なたとして扱う
+ */
+let sunlit: ((x: number, y: number, z: number) => boolean) | null = null
+
+/** 日なたかを答える物を差し込む。ステージと太陽が置けた所で 1 度 (stage.ts の sunProbeOf) */
+export function setSunProbe(probe: ((x: number, y: number, z: number) => boolean) | null): void {
+  sunlit = probe
+}
 
 let sharedTexture: THREE.Texture | null = null
 
-function texture(shade: string): THREE.Texture {
-  if (!sharedTexture) sharedTexture = shadowTexture(shade)
-  return sharedTexture
-}
-
-/**
- * 影の色 (真ん中) から白 (縁) へ。白は min で何も変えないので、縁がなだらかに消える。
- *
- * **ぼかしは光の量で等比に伸ばす。** min は露出・色調の補正をかける前の明るさ (地面は 0.01 前後)
- * で比べるので、画面の色で真っ直ぐ白へ移すと、地面の明るさを越える所が芯のすぐ外に来て縁が
- * くっきり切れた。影の色から 1 まで、補正前の明るさの比で少しずつ上げる
- */
-export function shadowTexture(shade: string): THREE.Texture {
+function texture(): THREE.Texture {
+  if (sharedTexture) return sharedTexture
   const size = 128
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')!
-  const base = new THREE.Color(shade) // 線形の値で持つ (three の Color は線形)
-  const channels = [base.r, base.g, base.b].map((c) => Math.max(c, 1e-4))
-  const darkest = Math.min(...channels)
-  const image = ctx.createImageData(size, size)
-  const color = new THREE.Color()
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const r = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) / (size / 2)
-      // 芯 (半径の 3 割) は影の色のまま、そこから縁へ
-      const t = Math.min(1, Math.max(0, (r - 0.3) / 0.7))
-      const k = t * t * (3 - 2 * t)
-      // **3 色とも同じ比で上げる。** 色ごとに別の速さで白へ寄せると、地面の色との比べ合いで
-      // 縁に緑の輪が出た
-      const gain = Math.pow(1 / darkest, k)
-      color.setRGB(
-        Math.min(1, channels[0] * gain),
-        Math.min(1, channels[1] * gain),
-        Math.min(1, channels[2] * gain),
-      )
-      const at = (y * size + x) * 4
-      const srgb = color.clone().convertLinearToSRGB()
-      image.data[at] = Math.round(srgb.r * 255)
-      image.data[at + 1] = Math.round(srgb.g * 255)
-      image.data[at + 2] = Math.round(srgb.b * 255)
-      image.data[at + 3] = 255
-    }
-  }
-  ctx.putImageData(image, 0, 0)
-  const made = new THREE.CanvasTexture(canvas)
-  made.colorSpace = THREE.SRGBColorSpace
-  return made
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  // 芯を広く残し、縁だけぼかす
+  gradient.addColorStop(0, 'rgba(0,0,0,1)')
+  gradient.addColorStop(0.5, 'rgba(0,0,0,0.9)')
+  gradient.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, size, size)
+  sharedTexture = new THREE.CanvasTexture(canvas)
+  sharedTexture.colorSpace = THREE.NoColorSpace
+  return sharedTexture
 }
 
 export type BlobStance = 'stand' | 'crouch' | 'prone'
@@ -84,19 +71,18 @@ export class BlobShadow {
   readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
   // 姿勢が変わっても形は一瞬で変えず、追いかける (ぱっと切り替わると影が跳ねて見える)
   private readonly target = { x: RADIUS * 2, z: RADIUS * 2, offset: 0 }
+  /** 目指す濃さ。日なたなら SUN_OPACITY、日の当たらない所なら SHADE_OPACITY */
+  private targetOpacity = SUN_OPACITY
+  private probeLeft = 0
+  private readonly at = new THREE.Vector3()
 
   constructor() {
     const material = new THREE.MeshBasicMaterial({
-      map: texture(SHADOW_COLOR),
+      map: texture(),
+      color: 0x000000,
       transparent: true,
+      opacity: SUN_OPACITY,
       depthWrite: false,
-      // **画面の色のまま比べる。** 露出や色調の補正を通すと、屋内 (露出が上がる) で影の色まで明るくなる
-      toneMapped: false,
-      // 下の色と暗いほうを採る (min)。WebGPU の min は係数を 1 にしないと通らない
-      blending: THREE.CustomBlending,
-      blendEquation: THREE.MinEquation,
-      blendSrc: THREE.OneFactor,
-      blendDst: THREE.OneFactor,
       // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)
       polygonOffset: true,
       polygonOffsetFactor: 2 * TOWARD_CAMERA,
@@ -148,6 +134,15 @@ export class BlobShadow {
     s.x += (this.target.x - s.x) * k
     s.y += (this.target.z - s.y) * k   // 平面を倒しているので、奥行きは scale.y
     this.mesh.position.z += (this.target.offset - this.mesh.position.z) * k
+    // 日なたか。影の境をまたぐ時にぱっと変わらないよう、濃さも追いかける
+    this.probeLeft -= dt
+    if (this.probeLeft <= 0 && sunlit) {
+      this.probeLeft = SUN_PROBE_EVERY
+      this.mesh.getWorldPosition(this.at)
+      this.targetOpacity = sunlit(this.at.x, this.at.y + SUN_PROBE_LIFT, this.at.z) ? SUN_OPACITY : SHADE_OPACITY
+    }
+    const material = this.mesh.material
+    material.opacity += (this.targetOpacity - material.opacity) * (1 - Math.exp(-dt * 8))
   }
 
   set visible(value: boolean) {

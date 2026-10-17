@@ -20,7 +20,7 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { addColliderOverlay, applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { addColliderOverlay, applyStageSun, sunProbeOf, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
 import { EmptyBoxes } from '../../src/presentation/scene/actor/box'
 import { REVERSED_DEPTH } from '../../src/presentation/scene/util/depth'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
@@ -28,7 +28,7 @@ import { BlastFx } from '../../src/presentation/scene/fx/blastfx'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
 import { STEP_UP } from '../../src/domain/player/moving'
-import { BlobShadow, shadowTexture } from '../../src/presentation/scene/actor/blobShadow'
+import { BlobShadow, setSunProbe } from '../../src/presentation/scene/actor/blobShadow'
 
 const query = new URLSearchParams(location.search)
 const stageName = (query.get('stage') ?? 'city') as StageName
@@ -70,6 +70,8 @@ camera.lookAt(look)
 
 const [, sunData] = await Promise.all([stage.ready, loadStageSun(stageName)])
 if (sunData) applyStageSun(sun, sunData)
+// 人の足元の影 (日なたでだけ足す)。本番と同じ物
+setSunProbe(sunProbeOf(stage, sun))
 fitShadowToStage(sun, stage)
 
 if (query.get('vcol') === '0' || query.get('col') === 'raw') {
@@ -151,16 +153,16 @@ async function diffFrames(): Promise<void> {
 
 // 人の足元の影。本番と同じ物 (BlobShadow) を、人の根の代わりの入れ物に付けて置く
 const blobAt = query.get('blob')?.split(',').map(Number)
+let blobShadow: BlobShadow | null = null
 if (blobAt && blobAt.length === 3 && blobAt.every(Number.isFinite)) {
   const root = new THREE.Group()
   root.position.set(blobAt[0]!, blobAt[1]!, blobAt[2]!)
-  const blob = new BlobShadow().mesh
+  blobShadow = new BlobShadow()
+  const blob = blobShadow.mesh
   root.add(blob)
   scene.add(root)
   // 切り分け: ?blobro=N で影の描く順を変える
   if (query.get('blobro') !== null) blob.renderOrder = Number(query.get('blobro'))
-  // 切り分け: ?blobcol=3a2f1e で影の色を変える
-  if (query.get('blobcol') !== null) blob.material.map = shadowTexture('#' + query.get('blobcol'))
 
 }
 
@@ -191,6 +193,8 @@ function frame(): void {
     if (now - started > 2000 && times.length < 120) times.push(Math.round(dt * 1000))
     if (times.length === 120) { console.log('[blast] frame ms', times.join(' ')); times.push(-2) }
   }
+  // 足元の影の濃さ (日なたか) を追いかける
+  blobShadow?.update(dt)
   renderer.render(scene, camera)
   requestAnimationFrame(frame)
 }
