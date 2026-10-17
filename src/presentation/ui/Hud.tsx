@@ -76,8 +76,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   let lastPhase: string | undefined
   createEffect(() => {
     const now = phase()
-    // 待合室 (ready) から試合 (countdown) へも同じく黒から明ける (2026-10-09 本人)
-    if ((lastPhase === 'assembled' && now === 'ready') || (lastPhase === 'ready' && now === 'countdown')) {
+    // 待合室 (ready) から試合 (countdown) へも同じく黒から明ける (2026-10-09 本人)。
+    // **TSNE の先攻から後攻へ** (playing → countdown) も。攻守が入れ替わって湧き地点へ飛ぶのを黒で隠す
+    if (
+      (lastPhase === 'assembled' && now === 'ready') ||
+      (lastPhase === 'ready' && now === 'countdown') ||
+      (lastPhase === 'playing' && now === 'countdown')
+    ) {
       setDawn(true)
       const timer = setTimeout(() => setDawn(false), 900)
       onCleanup(() => clearTimeout(timer))
