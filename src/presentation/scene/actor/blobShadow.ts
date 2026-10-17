@@ -14,12 +14,12 @@ import { DRAW_LATER, TOWARD_CAMERA } from '../util/depth'
  */
 const RADIUS = 0.55
 /**
- * 濃さ。**汚れの板 (デカール) の上でも黒く見えるくらい。**
+ * 濃さ。**建物の影と揃える** (2026-10-17 本人「部屋の影を黒く、自分の影を薄くして揃えて」)。
  *
- * STEALTH で体が消えている相手は、足元の影がほぼ唯一の手掛かりになる (2026-10-17 本人)。
- * 0.62 では入り口の泥の上で溶けて見えなかった
+ * 日なたで見ると建物の影と同じくらいの暗さ、建物の中では床の暗がりに溶ける。0.9 では
+ * 建物の中で足元の黒だけが浮いた
  */
-const OPACITY = 0.9
+const OPACITY = 0.6
 
 let sharedTexture: THREE.Texture | null = null
 

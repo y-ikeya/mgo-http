@@ -159,6 +159,8 @@ if (blobAt && blobAt.length === 3 && blobAt.every(Number.isFinite)) {
   scene.add(root)
   // 切り分け: ?blobro=N で影の描く順を変える
   if (query.get('blobro') !== null) blob.renderOrder = Number(query.get('blobro'))
+  // 切り分け: ?blobop=0.5 で影の濃さを変える
+  if (query.get('blobop') !== null) blob.material.opacity = Number(query.get('blobop'))
 }
 
 /*

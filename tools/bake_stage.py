@@ -41,8 +41,9 @@ PROP_SIZE = 6.0
 PROP_CELL = 0.8
 # 一番暗い所の明るさ。0 にすると奥が真っ黒になる — 実際は跳ね返りで少しは明るい。
 # 0.3 では建物の中が明るく、足元の影だけが黒く浮いた (影に入って隠れる意味が薄れる。2026-10-17 本人
-# 「建物の中を濃くして」)。人の明るさ (src/presentation/scene/world/skylight.ts の SKY_FLOOR) と揃える
-FLOOR = 0.12
+# 「建物の中を濃くして」)。0.12 でもまだ明るく、0.06 にして足元の影 (blobShadow.ts の 0.6) と揃えた。
+# 人の明るさ (src/presentation/scene/world/skylight.ts の SKY_FLOOR) と揃える
+FLOOR = 0.06
 # 光線を飛ばす距離 (m)。ステージの対角より長ければ十分
 REACH = 120.0
 # 面から浮かせて撃つ量 (m)。自分自身に当たるのを避ける
