@@ -86,7 +86,7 @@ const GHOST_OPACITY = 0.35
  * STEALTH で消え切るまで (秒)。**じわっと消える** (2026-10-17 本人「一気に透明になるんじゃなくて」)。
  * 自分の体も他の人と同じく消える — 当たって 5 秒出ていることが自分の目でも読める
  */
-export const STEALTH_FADE_OUT = 1.2
+export const STEALTH_FADE_OUT = 0.7
 /** 暴かれて現れ切るまで (秒)。現れる瞬間は読めないと困るので速く */
 export const STEALTH_FADE_IN = 0.15
 
