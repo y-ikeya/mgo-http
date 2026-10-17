@@ -3996,6 +3996,20 @@ export class Soldier {
       return
     }
     if (this.disposed) return
+    /*
+     * **読み込みの間に持ち替えていたら捨てる。** 読み込みは非同期なので、湧いた直後の主武器
+     * (MOSIN) と持ち替えた拳銃 (M9) の 2 つが同時に読まれ、遅く届いたほうが手に付いて
+     * もう片方は消されずに残った — M9 を選んでいるのに MOSIN を持っていた (2026-10-17 本人)
+     */
+    if (kind !== this.weaponKind) {
+      weapon.dispose()
+      return
+    }
+    // 先に付いている物があれば外す (同じ物を 2 回読んだ時)
+    if (this.weapon) {
+      this.weapon.dispose()
+      this.weapon = null
+    }
 
     // バインドポーズ (T ポーズ) のままだと基準がずれるので、構えを 1 フレーム分適用する
     this.animator?.update(0)

@@ -232,8 +232,6 @@ export class RemoteSoldier {
   private readonly aimDir = new THREE.Vector3();
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle';
-  /** 差し替えの最中。二重に走らせない */
-  private swapping = false;
   /** 取り付けの基準。最初の 1 回で決めて、持ち替えでも使い回す */
   private attachRef: {
     matrix: THREE.Matrix4;
@@ -977,21 +975,19 @@ export class RemoteSoldier {
    * 読み込みは共有のキャッシュに乗るので、2 回目以降は待ち時間が出ない。
    */
   private async equip(kind: WeaponId): Promise<void> {
-    if (kind === this.weaponKind || this.swapping) return;
+    if (kind === this.weaponKind) return;
     this.weaponKind = kind
     this.animator?.setPistol(kind === 'm9');
     const model = this.model;
     if (!model) return;
-
-    this.swapping = true;
-    try {
-      const old = this.weapon;
-      this.weapon = null;
-      old?.dispose();
-      await this.attachWeapon(model, kind);
-    } finally {
-      this.swapping = false;
-    }
+    /*
+     * 持ち替え中に次の持ち替えが来ても**捨てない。** 以前は読み込み中の間は無視していて、
+     * 最後の持ち替えが落ちると古い銃のまま残った。後から届いた古い読み込みは attachWeapon が捨てる
+     */
+    const old = this.weapon;
+    this.weapon = null;
+    old?.dispose();
+    await this.attachWeapon(model, kind);
   }
 
   private async attachWeapon(
@@ -1008,6 +1004,15 @@ export class RemoteSoldier {
     if (this.disposed) {
       weapon.dispose();
       return;
+    }
+    // 読み込みの間に持ち替えていたら捨てる (遅く届いた古い銃が手に残らないように。soldier.ts と同じ)
+    if (kind !== this.weaponKind) {
+      weapon.dispose();
+      return;
+    }
+    if (this.weapon) {
+      this.weapon.dispose();
+      this.weapon = null;
     }
 
     // バインドポーズのままだと基準がずれるので、構えを 1 フレーム分適用する
