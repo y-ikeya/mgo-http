@@ -13,7 +13,13 @@ import { TOWARD_CAMERA } from '../util/depth'
  * 伏せは向きに沿って長く、少し前 (頭の側) へ寄せる (伏せた体は中心の 0.5m 前に頭)。
  */
 const RADIUS = 0.55
-const OPACITY = 0.62
+/**
+ * 濃さ。**汚れの板 (デカール) の上でも黒く見えるくらい。**
+ *
+ * STEALTH で体が消えている相手は、足元の影がほぼ唯一の手掛かりになる (2026-10-17 本人)。
+ * 0.62 では入り口の泥の上で溶けて見えなかった
+ */
+const OPACITY = 0.9
 
 let sharedTexture: THREE.Texture | null = null
 
@@ -25,8 +31,9 @@ function texture(): THREE.Texture {
   canvas.height = size
   const ctx = canvas.getContext('2d')!
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  // 芯を広く濃く残し、縁だけぼかす
   gradient.addColorStop(0, 'rgba(0,0,0,1)')
-  gradient.addColorStop(0.55, 'rgba(0,0,0,0.75)')
+  gradient.addColorStop(0.6, 'rgba(0,0,0,0.9)')
   gradient.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, size, size)
@@ -49,10 +56,11 @@ export class BlobShadow {
       transparent: true,
       opacity: OPACITY,
       depthWrite: false,
-      // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)
+      // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)。
+      // **汚れの板 (4) より強く寄せる** — 板の上でも影が負けないように (stage.ts の decal)
       polygonOffset: true,
-      polygonOffsetFactor: 2 * TOWARD_CAMERA,
-      polygonOffsetUnits: 2 * TOWARD_CAMERA,
+      polygonOffsetFactor: 8 * TOWARD_CAMERA,
+      polygonOffsetUnits: 8 * TOWARD_CAMERA,
     })
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
     this.mesh.rotation.x = -Math.PI / 2
@@ -61,7 +69,8 @@ export class BlobShadow {
     this.mesh.receiveShadow = false
     // 親のスキニングと同じ理由で、画面端で消えないように
     this.mesh.frustumCulled = false
-    this.mesh.renderOrder = 1
+    // 汚れの板 (0) より後に描く。透ける物同士は描いた順に重なるので、後に描いた影が上に乗る
+    this.mesh.renderOrder = 2
     this.set('stand')
     this.mesh.scale.set(this.target.x, this.target.z, 1)
   }
