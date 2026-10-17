@@ -61,12 +61,17 @@ export function standing(seats: readonly MatchPlayer[], team: Team, lives: numbe
   return seats.filter((p) => p.team === team && !p.bot && !isOut(p, lives, now)).length
 }
 
-/** 攻める側のステルスがいま効いているか (人ごとではなく側で 1 つ) */
+/**
+ * 攻める側のステルスがいま効いているか (人ごとではなく側で 1 つ)。
+ *
+ * **試合の段階を問わない。** 待機中も効く — 1 人で入って着て、消えるかを確かめられる
+ * ように (2026-10-17 本人)。勝ち負けに関わらない段階なので、効いても困らない
+ */
 export function stealthActive(room: Match, now: number): boolean {
-  return room.mode.sides && room.phase === 'playing' && now >= room.revealedUntil
+  return room.mode.sides && now >= room.revealedUntil
 }
 
-/** その人の体が見えなくなっているか。**攻める側で、戦場に立っている間だけ** */
+/** その人の体が見えなくなっているか。**攻める側で、戦場に立っている間だけ** (着ているかは本人が名乗る) */
 export function isStealthed(room: Match, player: MatchPlayer, now: number): boolean {
   return stealthActive(room, now) && sideOf(room, player.team) === 'attack' && onBattlefield(player.life)
 }

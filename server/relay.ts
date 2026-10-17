@@ -170,7 +170,7 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   stampSlot(view, player.slot)
   // 無敵かどうかはこちらが知っている。送り主に名乗らせない
   stampProtected(view, isProtected(player))
-  // STEALTH は効いている時だけ通す (攻める側・試合中・当たって解けていない)
+  // STEALTH は効いている時だけ通す (攻める側・戦場に立っている・当たって解けていない。待機中も効く)
   stampStealthed(view, isStealthed(room, player, now))
   // 切れたときに配り直せるよう、レプリカを取っておく。
   // bytes は受信バッファなので、持ち回すなら複製が要る

@@ -105,14 +105,20 @@ describe('決着の数え方', () => {
 })
 
 describe('ステルス', () => {
-  test('攻める側だけ。試合中だけ', () => {
+  test('攻める側だけ。**待機中も効く** (1 人で着て確かめられる)', () => {
     const match = tsne()
     const attacker = seat(match, 'a', 'blue')
     const defender = seat(match, 'd', 'red')
     expect(isStealthed(match, attacker, 0)).toBe(true)
     expect(isStealthed(match, defender, 0)).toBe(false)
-    match.phase = 'ready'
-    expect(isStealthed(match, attacker, 0)).toBe(false)
+    match.phase = 'waiting'
+    expect(isStealthed(match, attacker, 0)).toBe(true)
+  })
+
+  test('分かれない部屋では効かない', () => {
+    const match = newMatch('TDM')
+    const player = seat(match, 'a', 'blue')
+    expect(isStealthed(match, player, 0)).toBe(false)
   })
 
   test('**攻める側の誰かに敵の攻撃が当たったら、攻める側全員が 5 秒解ける**', () => {
