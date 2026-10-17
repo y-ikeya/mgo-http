@@ -6,7 +6,7 @@ import { HELD, type HeldId, isSupport } from '../../domain/item/held'
 import { canThrowWith } from '../../domain/player/cqc'
 import { MODES } from '../../domain/match/room'
 import { isTranquilizer } from '../../domain/item/weapons'
-import type { GameStats } from '../scene/Game'
+import { CAUTION_SECONDS, type GameStats } from '../scene/Game'
 import Orders from './Orders'
 import './Hud.css'
 
@@ -324,6 +324,23 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
               {props.stats?.match?.red ?? 0}
             </span>
           </Show>
+        </div>
+      </Show>
+
+      {/*
+        CAUTION (MGO2)。**敵が画面に映ると出る。** 映っている間は満タンで、見えなくなってから
+        左右から真ん中へ縮み、落ち合った所で 0 秒 (2026-10-17 本人)
+      */}
+      <Show when={(props.stats?.caution ?? 0) > 0 && phase() === 'playing'}>
+        <div class="hud-caution">
+          <span class="hud-caution-label">CAUTION</span>
+          <span class="hud-caution-track">
+            <span
+              class="hud-caution-bar"
+              style={{ transform: `scaleX(${Math.min(1, (props.stats?.caution ?? 0) / CAUTION_SECONDS)})` }}
+            />
+          </span>
+          <span class="hud-caution-count">{String(Math.ceil(props.stats?.caution ?? 0)).padStart(2, '0')}</span>
         </div>
       </Show>
 

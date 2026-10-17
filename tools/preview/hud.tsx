@@ -30,6 +30,12 @@ const base = {
 
 const cases: Record<string, Partial<GameStats>> = {
   normal: {},
+  // CAUTION。見えなくなってから 4 秒弱残っている (TSNE の時計の下)
+  caution: {
+    caution: 3.4,
+    team: 'blue' as never,
+    match: { phase: 'playing', mode: 'TSNE', blue: 2, red: 2, endsAt: Date.now() + 83000, present: 4, required: 2, players: [] } as never,
+  },
   boxed: { held: 'box', tool: 'box', toolInHand: true },
   // スタンナイフの充電。溜まっている途中 / 満ちた
   knifeCharging: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 0.45 },

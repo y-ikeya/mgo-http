@@ -719,6 +719,11 @@ export class RemoteSoldier {
   /** ステルスで体が見えなくなっているか (TSNE の攻める側) */
   private stealthed = false;
 
+  /** 体が消えているか (STEALTH)。CAUTION の「見えている」に数えない */
+  get invisible(): boolean {
+    return this.stealthed;
+  }
+
   /**
    * ステルス。**体だけを隠す** (2026-10-17 本人)。
    *
@@ -1349,6 +1354,29 @@ export class RemoteSoldiers {
    *
    * @param forward 掛ける側の向き (水平、正規化済み)
    */
+  /**
+   * 敵が画面に映っているか (CAUTION)。**体が描かれていて、カメラの視野の中に居る。**
+   *
+   * 遮蔽はサーバーが見ている (見えない相手の位置は届かない = 描かれない)。STEALTH で
+   * 体が消えている相手は数えない
+   */
+  seesEnemy(camera: THREE.Camera, hostile: (id: string, side: Team) => boolean): boolean {
+    this.frustumMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.frustumMatrix);
+    for (const player of this.players.values()) {
+      if (player.health <= 0 || !player.object.visible || player.invisible) continue;
+      if (!hostile(player.id, player.side)) continue;
+      // 胸のあたり (足元 + 1m) が視野に入っているか
+      this.scratch.copy(player.object.position);
+      this.scratch.y += 1;
+      if (this.frustum.containsPoint(this.scratch)) return true;
+    }
+    return false;
+  }
+
+  private readonly frustum = new THREE.Frustum();
+  private readonly frustumMatrix = new THREE.Matrix4();
+
   cqcTarget(
     origin: THREE.Vector3,
     forward: THREE.Vector3,
