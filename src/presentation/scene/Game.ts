@@ -2494,8 +2494,12 @@ export class Game {
         if (this.stealthOn && message.stealth === false && message.phase === "playing") {
           this.audio.playUi("detectAlert");
         }
-        // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)
-        if (!this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen) {
+        // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)。**自分の STEALTH が戻った人にだけ** —
+        // 攻める側で、着ている (2026-10-17 本人「set 音は自分だけに聞こえるのでいい」)
+        if (
+          !this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen &&
+          message.attack === this.selfTeam && this.inv.wearingStealth
+        ) {
           this.audio.playUi("stealthSet");
         }
         // 戻った音は「解けていた」を見た後だけ。入室直後の最初の通 (false → true に見える) では鳴らさない

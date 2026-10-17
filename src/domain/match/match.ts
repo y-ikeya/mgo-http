@@ -83,7 +83,7 @@ export function holdsChoosing(phase: Phase): boolean {
 
 /**
  * 決着の「GAME SET / 試合終了」だけを見せる長さ (秒)。勝敗と成績表はこの後に開く。
- * 結果を見せる時間 (server/match.ts の INTERMISSION_MS 10 秒) の頭に置く
+ * 結果を見せる時間 (server/match.ts の INTERMISSION_MS 14.5 秒) の頭に置く
  */
 export const GAME_SET_SECONDS = 2.4
 

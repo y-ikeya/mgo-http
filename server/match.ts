@@ -63,8 +63,14 @@ const ASSEMBLE_MS = process.env.MGO2_ASSEMBLE_MS !== undefined ? Number(process.
  */
 const READY_GRACE_MS = process.env.MGO2_READY_GRACE_MS !== undefined ? Number(process.env.MGO2_READY_GRACE_MS) : 3000
 
-/** 決着してから次の支度が始まるまで (ms)。結果を読む時間 */
-export const INTERMISSION_MS = 10 * 1000
+/**
+ * 決着してから次の支度が始まるまで (ms)。結果を読む時間。
+ *
+ * **結果の曲が鳴り終わるまで待つ** (2026-10-17 本人)。「試合終了」の帯 2.4 秒の後に結果の画面が
+ * 開いて曲 (public/audio/result1.mp3、11.45 秒) が始まるので、2.4 + 11.45 に少し足して 14.5 秒。
+ * 曲を差し替えたらここも合わせる
+ */
+export const INTERMISSION_MS = 14.5 * 1000
 
 /**
  * 試合が始まるまでの数え (ms)。

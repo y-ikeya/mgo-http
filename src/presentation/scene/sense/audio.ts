@@ -457,8 +457,8 @@ const UI_SOUNDS = {
   // HS.mp3 は平均で 6.6dB 小さいので、同じ大きさに聞こえるよう 0.2 × 2.1 ≒ 0.43
   headshot: { file: "headshot3.mp3", volume: 0.43 },
   /**
-   * 結果の画面の曲 (2026-10-17 本人、tools/raw/result.mp3 のまま)。11 秒あり、結果の画面
-   * (7.6 秒) より長いので、画面を畳んだら止める (playJingle / stopJingle)
+   * 結果の画面の曲 (2026-10-17 本人、tools/raw/result.mp3 のまま)。11.45 秒。**結果の画面は
+   * 曲が鳴り終わるまで開いている** (server/match.ts の INTERMISSION_MS)。畳んだら止める
    */
   result: { file: "result1.mp3", volume: 0.5 },
   /**
@@ -467,8 +467,8 @@ const UI_SOUNDS = {
    */
   detectAlert: { file: "detect_alert1.mp3", volume: 0.6 },
   /**
-   * STEALTH が効き始めた。**自分で着た時** (自分にだけ) と、**CAUTION が明けて攻める側の
-   * STEALTH が戻った時** (部屋の全員に。暴かれた音と対) (2026-10-17 本人、tools/raw/stealthSet.mp3 のまま)
+   * STEALTH が効き始めた。**自分にだけ聞こえる** — 自分で着た時と、CAUTION が明けて自分の
+   * STEALTH が戻った時 (2026-10-17 本人、tools/raw/stealthSet.mp3 のまま)
    */
   // 音源が暴かれた音より 7dB 小さいので 1.0 にしたが「ちょっとでかすぎ」(2026-10-17 本人)。0.6、さらに「もう少し小さく」で 0.4
   stealthSet: { file: "stealth_set1.mp3", volume: 0.4 },
