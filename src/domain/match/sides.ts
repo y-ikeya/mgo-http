@@ -8,7 +8,8 @@
  *     勝ち負け   相手の側が**全員倒れたか眠った**ら勝ち。時間切れは守る側の勝ち
  *     ステルス   攻める側の体だけが見えなくなる (武器・影・置いた物は見える)。
  *                攻める側の誰かに敵の攻撃が当たると、**攻める側全員**のステルスが
- *                STEALTH_BREAK_MS だけ解ける。解けている間に当たればまた頭から数える
+ *                STEALTH_BREAK_MS だけ解ける。解けている間に当たればまた頭から数える。
+ *                解けている間が CAUTION (全員の画面に同じ秒数で出る)
  *
  * 色 (Team) とは別の問いにしてある。入れ替えると同じ色が攻めも守りもするので、
  * 「青は攻める」と書くと 1 試合おきに嘘になる。
@@ -22,20 +23,12 @@ import type { Side } from './room'
 /** 当たってからステルスが戻るまで (ms) */
 export const STEALTH_BREAK_MS = 5000
 
-/** CAUTION の長さ (ms)。誰も敵を見なくなってから切れるまで */
-export const CAUTION_MS = 5000
-
 /**
- * 敵を見た。**CAUTION を満タンに戻す** (攻める側と守る側に分かれる部屋の試合中だけ)。
- *
- * 見たかどうか (遮蔽) はサーバーが位置を配る時に決めている (server/relay.ts)。STEALTH で
- * 消えている相手は、位置が届いていても見えていないので数えない
+ * **CAUTION** (MGO2)。守る側の攻撃や CQC が攻める側に当たって、攻める側全員の STEALTH が
+ * 解けている間 (2026-10-17 本人)。全員の画面に同じ秒数で出る。切れる時刻は revealedUntil
  */
-export function noticeEnemy(room: Match, viewer: MatchPlayer, subject: MatchPlayer, now: number): void {
-  if (!room.mode.sides || room.phase !== 'playing') return
-  if (!canAct(viewer.life) || !canAct(subject.life)) return
-  if (isInvisible(room, subject, now)) return
-  room.cautionUntil = now + CAUTION_MS
+export function cautionUntil(room: Match, now: number): number | null {
+  return room.mode.sides && room.revealedUntil > now ? room.revealedUntil : null
 }
 
 /** その色の側。**側に分かれない部屋では null** */

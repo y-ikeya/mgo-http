@@ -19,7 +19,7 @@ import {
   soleTeam,
 } from '../src/domain/match/match'
 import { livesOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
-import { canRespawn, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
+import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
 import { fitLoadout } from '../src/domain/player/equip'
 import { canChoose, isDowned, isSeated } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
@@ -315,7 +315,7 @@ export function matchState(room: Match): ServerMessage {
     red: room.red,
     attack: room.mode.sides ? room.attack : undefined,
     stealth: room.mode.sides ? stealthActive(room, Date.now()) : undefined,
-    cautionUntil: room.mode.sides && room.cautionUntil > Date.now() ? room.cautionUntil : undefined,
+    cautionUntil: cautionUntil(room, Date.now()) ?? undefined,
     endsAt: room.endsAt,
     sentAt: Date.now(),
     phase: room.phase,
@@ -516,7 +516,6 @@ function enterReady(room: RoomWorld, now: number, afterMatch = false): void {
   // **攻守交代。** 試合を 1 つ終えるたびに必ず入れ替える (2026-10-17 本人)
   if (room.mode.sides && afterMatch) swapSides(room)
   room.revealedUntil = 0
-  room.cautionUntil = 0
   for (const player of room.players.values()) player.ready = false
   resetPlayers(room)
   if (room.mode.sides) standingCounts(room, now)
@@ -692,9 +691,9 @@ export function updateMatch(room: RoomWorld, now: number): void {
   const stealth = stealthActive(room, now)
   const stealthChanged = room.mode.sides && stealth !== room.stealthSent
   room.stealthSent = stealth
-  // CAUTION が始まった・延びた (0.3 秒以上) 時もすぐ配る。全員の秒数を揃える
-  const cautionChanged = room.mode.sides && room.cautionUntil - room.cautionSent > 300
-  if (cautionChanged) room.cautionSent = room.cautionUntil
+  // CAUTION (STEALTH が解けた) が始まった・延びた時もすぐ配る。全員の秒数を揃える
+  const cautionChanged = room.mode.sides && room.revealedUntil !== room.cautionSent
+  if (cautionChanged) room.cautionSent = room.revealedUntil
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
   if (previous !== room.phase || stealthChanged || cautionChanged || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
     room.lastBroadcast = now

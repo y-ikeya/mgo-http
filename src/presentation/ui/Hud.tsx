@@ -328,9 +328,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
-        CAUTION (MGO2)。**部屋で 1 つ、自分も敵も同じ秒数を見る。** 誰かが敵を見ると満タンに戻り、
-        誰も見なくなってから左右から真ん中へ縮み、落ち合った所で 0 秒。数えていない時は出さない
-        (2026-10-17 本人)
+        CAUTION (MGO2)。**守る側の攻撃や CQC が攻める側に当たると出る** (攻める側全員の STEALTH が
+        解けている間)。自分も敵も同じ秒数を見る。当たった瞬間に満タンで、左右から真ん中へ縮み、
+        落ち合った所で 0 秒。数えていない時は出さない (2026-10-17 本人)
       */}
       <Show when={(props.stats?.caution ?? 0) > 0 && phase() === 'playing'}>
         <div class="hud-caution">

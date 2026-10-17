@@ -14,7 +14,7 @@ import { STEP_UP } from '../src/domain/player/moving'
 import { type MatchPlayer, headHeightOf, isProtected, lifeElapsed } from '../src/domain/player/player'
 import { surfaceOf } from '../src/domain/stage'
 import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot, stampStealthed } from '../src/infra/codec/snapshot'
-import { isStealthed, noticeEnemy } from '../src/domain/match/sides'
+import { isStealthed } from '../src/domain/match/sides'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { checkMove, checkMoveOnMesh } from '../src/sim/judge/motioncheck'
 import { cameraPoint, seesFromCamera, type Viewer } from '../src/sim/space/eyepoint'
@@ -486,8 +486,6 @@ export function relayState(room: RoomWorld, from: MatchPlayer, payload: Uint8Arr
       // カメラのほうが後ろ上から見下ろすぶん、目より広く見える。そこは許す —
       // 描いている物と送る物がずれているほうが困る
       visible = seesPlayer(room, viewer, from, now)
-      // 敵が見えた。CAUTION を満タンに (部屋で 1 つ。全員が同じ秒数を見る)
-      if (visible) noticeEnemy(room, viewer, from, now)
     }
 
     if (!visible) {

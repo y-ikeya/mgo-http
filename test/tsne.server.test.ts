@@ -60,16 +60,15 @@ describe('TSNE', () => {
     b.close()
   }, 30000)
 
-  test('**CAUTION は部屋で 1 つ。両方の画面に同じ切れる時刻が届く**', async () => {
+  test('**守る側の攻撃が当たると CAUTION。両方の画面に同じ切れる時刻が届く**', async () => {
     const { a, b } = await twoInTsne()
-    // 向かい合って立っている (12m)。互いに見えているので CAUTION が出ている
-    a.reset(); b.reset()
-    await Bun.sleep(600)
+    expect(match(a)?.cautionUntil).toBeUndefined()
+    b.send({ type: 'damage', id: 'bob', target: 'alice', kind: 'bullet', zone: 'BODY', distance: 12 })
+    await Bun.sleep(400)
     const ca = match(a)?.cautionUntil
     const cb = match(b)?.cautionUntil
     expect(ca).toBeGreaterThan(Date.now())
-    expect(cb).toBeGreaterThan(Date.now())
-    expect(Math.abs((ca ?? 0) - (cb ?? 0))).toBeLessThan(400)
+    expect(ca).toBe(cb)
     a.close()
     b.close()
   }, 30000)

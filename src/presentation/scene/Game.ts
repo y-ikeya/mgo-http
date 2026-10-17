@@ -99,7 +99,7 @@ import {
 } from "../../domain/match/room";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunProbe } from "./actor/blobShadow";
-import { CAUTION_MS } from "../../domain/match/sides";
+import { STEALTH_BREAK_MS } from "../../domain/match/sides";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
@@ -490,8 +490,8 @@ const HIT_FEEDBACK_DURATION = 0.6;
  */
 /** 屋根の下 (頭の上が全く開いていない) で露出に掛ける倍率 */
 const ADAPT_MAX = 1.8;
-/** CAUTION の長さ (秒)。バーの満タン。決めているのはサーバー (domain/match/sides.ts の CAUTION_MS) */
-export const CAUTION_SECONDS = CAUTION_MS / 1000;
+/** CAUTION の長さ (秒)。バーの満タン。STEALTH が解けている長さ (domain/match/sides.ts の STEALTH_BREAK_MS) */
+export const CAUTION_SECONDS = STEALTH_BREAK_MS / 1000;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
 const ADAPT_OPEN = 0.75;
 /** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */

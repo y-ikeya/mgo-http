@@ -136,17 +136,12 @@ export interface Match {
   attack: Team
   /**
    * 攻める側のステルスが解けている期限 (Date.now)。**攻める側の誰かが当たるたびに延びる**
-   * (sides.ts の disturbStealth)
+   * (sides.ts の disturbStealth)。**これが CAUTION** — 全員の画面に同じ秒数で出る
    */
   revealedUntil: number
   /** 最後に配ったステルスの状態。変わった時だけ配り直すため */
   stealthSent: boolean
-  /**
-   * CAUTION が切れる時刻 (Date.now)。**部屋で 1 つ、全員が同じ秒数を見る** (2026-10-17 本人)。
-   * 誰かが敵を見ている間は満タンに戻り続け (sides.ts の noticeEnemy)、誰も見なくなってから減る
-   */
-  cautionUntil: number
-  /** 最後に配った cautionUntil。延びた時だけ配り直すため */
+  /** 最後に配った revealedUntil (CAUTION の切れる時刻)。延びた時だけ配り直すため */
   cautionSent: number
 }
 
@@ -168,7 +163,6 @@ export function newMatch(mode: Mode): Match {
     attack: 'blue',
     revealedUntil: 0,
     stealthSent: false,
-    cautionUntil: 0,
     cautionSent: 0,
   }
 }

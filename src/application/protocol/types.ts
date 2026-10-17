@@ -1039,8 +1039,9 @@ export interface MatchMessage {
    */
   stealth?: boolean
   /**
-   * CAUTION が切れる時刻 (サーバーの時計)。**部屋で 1 つ、全員が同じ秒数を見る。**
-   * 出ていない時は無い。受け取る側は endsAt と同じく手元の時計へ直す
+   * CAUTION が切れる時刻 (サーバーの時計)。**守る側の攻撃が攻める側に当たって STEALTH が
+   * 解けている間** (= stealth が false の間)。全員が同じ秒数を見る。出ていない時は無い。
+   * 受け取る側は endsAt と同じく手元の時計へ直す
    */
   cautionUntil?: number
   /**

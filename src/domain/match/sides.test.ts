@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { newMatch, type Match } from './match'
 import { newMatchPlayer, type MatchPlayer, type Team } from '../player/player'
 import {
-  CAUTION_MS, STEALTH_BREAK_MS, canRespawn, disturbStealth, isInvisible, isOut, isStealthed, noticeEnemy, sideOf, standing, stealthActive, swapSides,
+  STEALTH_BREAK_MS, canRespawn, cautionUntil, disturbStealth, isInvisible, isOut, isStealthed, sideOf, standing, stealthActive, swapSides,
 } from './sides'
 import { livesOf, primariesOf, secondariesOf, supportsOf } from './room'
 import { isTranquilizer } from '../item/weapons'
@@ -167,30 +167,14 @@ describe('体が実際に消えているか', () => {
   })
 })
 
-describe('CAUTION (部屋で 1 つ)', () => {
-  test('敵を見たら満タンに戻る。見続ければ延び続ける', () => {
+describe('CAUTION', () => {
+  test('**攻める側に守る側の攻撃が当たって STEALTH が解けている間**。切れる時刻は全員で 1 つ', () => {
     const match = tsne()
     const a = seat(match, 'a', 'blue')
     const d = seat(match, 'd', 'red')
-    noticeEnemy(match, d, a, 1_000)
-    expect(match.cautionUntil).toBe(1_000 + CAUTION_MS)
-    noticeEnemy(match, d, a, 3_000)
-    expect(match.cautionUntil).toBe(3_000 + CAUTION_MS)
-  })
-
-  test('STEALTH で消えている相手・試合の外・分かれない部屋では始まらない', () => {
-    const match = tsne()
-    const a = seat(match, 'a', 'blue')
-    const d = seat(match, 'd', 'red')
-    a.wearingStealth = true
-    noticeEnemy(match, d, a, 1_000)
-    expect(match.cautionUntil).toBe(0)
-    match.phase = 'waiting'
-    noticeEnemy(match, a, d, 1_000)
-    expect(match.cautionUntil).toBe(0)
-    const tdm = newMatch('TDM')
-    tdm.phase = 'playing'
-    noticeEnemy(tdm, seat(tdm, 'x', 'blue'), seat(tdm, 'y', 'red'), 1_000)
-    expect(tdm.cautionUntil).toBe(0)
+    expect(cautionUntil(match, 0)).toBeNull()
+    disturbStealth(match, a, d, 1_000)
+    expect(cautionUntil(match, 1_000)).toBe(1_000 + STEALTH_BREAK_MS)
+    expect(cautionUntil(match, 1_000 + STEALTH_BREAK_MS)).toBeNull()
   })
 })
