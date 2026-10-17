@@ -28,7 +28,7 @@ import { BlastFx } from '../../src/presentation/scene/fx/blastfx'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
 import { STEP_UP } from '../../src/domain/player/moving'
-import { BlobShadow } from '../../src/presentation/scene/actor/blobShadow'
+import { BlobShadow, shadowTexture } from '../../src/presentation/scene/actor/blobShadow'
 
 const query = new URLSearchParams(location.search)
 const stageName = (query.get('stage') ?? 'city') as StageName
@@ -159,8 +159,9 @@ if (blobAt && blobAt.length === 3 && blobAt.every(Number.isFinite)) {
   scene.add(root)
   // 切り分け: ?blobro=N で影の描く順を変える
   if (query.get('blobro') !== null) blob.renderOrder = Number(query.get('blobro'))
-  // 切り分け: ?blobop=0.5 で影の濃さを変える
-  if (query.get('blobop') !== null) blob.material.opacity = Number(query.get('blobop'))
+  // 切り分け: ?blobcol=3a2f1e で影の色を変える
+  if (query.get('blobcol') !== null) blob.material.map = shadowTexture('#' + query.get('blobcol'))
+
 }
 
 /*
