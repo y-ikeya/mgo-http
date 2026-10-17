@@ -159,8 +159,12 @@ export class Inventory {
     this.last = loadout.secondary
     this.previousWeapon = loadout.secondary
     this.lastWeapon = first
-    this.lastTool = 'none'
-    this.wearing = false
+    /*
+     * **STEALTH を持つ人 (TSNE の攻める側) は着た状態で湧く** (2026-10-17 本人「最初から装備してる」)。
+     * 脱ぎたければ道具の一覧で別の物を選ぶ
+     */
+    this.wearing = loadout.stealth === true
+    this.lastTool = this.wearing ? 'stealth' : 'none'
     this.switchLeft = 0
     this.queued = null
   }
@@ -190,6 +194,11 @@ export class Inventory {
       // 道具の並び (C.BOX → STEALTH → NONE) を保つ。NONE の前へ
       const at = this.items.findIndex((item) => item.id === 'none')
       this.items.splice(at < 0 ? this.items.length : at, 0, { id: 'stealth' })
+      // 湧いた時と同じく、着た状態で渡す (箱を被っていたら箱のまま。被っている間は着られない)
+      if (!this.usingTool) {
+        this.wearing = true
+        this.lastTool = 'stealth'
+      }
     } else if (!owned && has) {
       this.items = this.items.filter((item) => item.id !== 'stealth')
       if (this.wearing) {

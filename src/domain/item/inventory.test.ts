@@ -688,6 +688,7 @@ describe('STEALTH (TSNE の攻める側)', () => {
 
   test('**着ても手は武器のまま**。着たまま撃てる', () => {
     const inv = attacker()
+    inv.toggle('tool')
     expect(inv.switchTo('stealth')).toBe(true)
     expect(inv.wearingStealth).toBe(true)
     expect(inv.held).toBe('rifle')
@@ -707,17 +708,19 @@ describe('STEALTH (TSNE の攻める側)', () => {
     expect(inv.wearingStealth).toBe(false)
   })
 
-  test('湧き直すと脱いでいる', () => {
+  test('**着た状態で湧く**。脱いでいても湧き直すと着ている', () => {
     const inv = attacker()
-    inv.switchTo('stealth')
-    inv.refill({ ...loadout, stealth: true })
+    expect(inv.wearingStealth).toBe(true)
+    inv.toggle('tool')
     expect(inv.wearingStealth).toBe(false)
+    inv.refill({ ...loadout, stealth: true })
+    expect(inv.wearingStealth).toBe(true)
   })
 
   test('**湧き直さずに持たせる / 取り上げる** (側が分かる前に湧いていた時)', () => {
     const inv = make()
     inv.setStealthOwned(true)
-    expect(inv.switchTo('stealth')).toBe(true)
+    // 渡された時点で着ている
     expect(inv.wearingStealth).toBe(true)
     inv.setStealthOwned(false)
     expect(inv.wearingStealth).toBe(false)
