@@ -9,7 +9,7 @@ import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
-import { CHOICES } from '../../domain/item/weapons'
+import { CHOICES, SUPPORTS } from '../../domain/item/weapons'
 import ReadyRoom from '../ui/ReadyRoom'
 import { selfSkin } from '../scene/actor/skin'
 import type { WeaponKind } from '../scene/arms/weapon'
@@ -345,6 +345,8 @@ export default function Play(props: {
           onSpawn={() => game()?.closeLoadout()}
           skills={stats()?.skills ?? {}}
           primaries={stats()?.primaries ?? CHOICES.primary}
+          secondaries={stats()?.secondaries ?? CHOICES.secondary}
+          supports={stats()?.supports ?? SUPPORTS}
           // **null は「持たない」。** ?? で埋めると拳銃へ戻る (null は nullish)
           secondary={stats() ? stats()!.secondary : 'm9'}
           /*

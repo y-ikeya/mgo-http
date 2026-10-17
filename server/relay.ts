@@ -13,7 +13,8 @@ import { isLeakedTo } from '../src/domain/player/player'
 import { STEP_UP } from '../src/domain/player/moving'
 import { type MatchPlayer, headHeightOf, isProtected, lifeElapsed } from '../src/domain/player/player'
 import { surfaceOf } from '../src/domain/stage'
-import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/infra/codec/snapshot'
+import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot, stampStealthed } from '../src/infra/codec/snapshot'
+import { isStealthed } from '../src/domain/match/sides'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { checkMove, checkMoveOnMesh } from '../src/sim/judge/motioncheck'
 import { cameraPoint, seesFromCamera, type Viewer } from '../src/sim/space/eyepoint'
@@ -169,6 +170,8 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   stampSlot(view, player.slot)
   // 無敵かどうかはこちらが知っている。送り主に名乗らせない
   stampProtected(view, isProtected(player))
+  // STEALTH は効いている時だけ通す (攻める側・試合中・当たって解けていない)
+  stampStealthed(view, isStealthed(room, player, now))
   // 切れたときに配り直せるよう、レプリカを取っておく。
   // bytes は受信バッファなので、持ち回すなら複製が要る
   sessionOf(player).lastPayload = new Uint8Array(bytes)

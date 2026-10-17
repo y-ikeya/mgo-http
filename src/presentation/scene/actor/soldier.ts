@@ -82,6 +82,8 @@ const MOVE_SPEED = 2.74
 
 /** 無敵の間の濃さ。消さずに薄くする — 居ることは見えていてよい */
 const GHOST_OPACITY = 0.35
+/** ステルス中の自分の体の濃さ。他の人からは消えている (TSNE) */
+const STEALTH_SELF_OPACITY = 0.25
 
 /**
  * 構えている間の移動速度の倍率。
@@ -944,6 +946,8 @@ export class Soldier {
       reloading: false,
       // 無敵かどうかはサーバーが書き込む。名乗る値ではない
       protectedNow: false,
+      // STEALTH を着ているかは呼ぶ側 (持ち物) が持っている。あちらで上書きする
+      stealthed: false,
       locomotion,
       locomotionAge: (time - this.locomotionSince) / 1000,
       aiming: this.aiming,
@@ -1286,13 +1290,30 @@ export class Soldier {
     if (!this.ghost) this.applyOpacity()
   }
 
+  /**
+   * ステルス (TSNE の攻める側)。**自分の体だけ薄く見せる。**
+   *
+   * 他の人からは体が消えている (remoteSoldier.ts の setStealthed)。自分まで消すと
+   * 向きも姿勢も読めなくなるので、薄く残す。手の武器は他の人からも見えているので薄くしない
+   */
+  setStealthed(on: boolean): void {
+    if (this.stealthed === on) return
+    this.stealthed = on
+    this.applyOpacity()
+  }
+
+  private stealthed = false
+
   private applyOpacity(): void {
     if (!this.model) return
     const opacity = this.ghost ? GHOST_OPACITY : this.fade
     this.model.traverse((obj) => {
       if (!isMesh(obj)) return
+      // 体 (骨で動く形) だけがステルスで薄くなる。手の武器は別の形
+      const body = (obj as THREE.SkinnedMesh).isSkinnedMesh === true
+      const value = this.stealthed && body ? Math.min(opacity, STEALTH_SELF_OPACITY) : opacity
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-      for (const material of materials) material.opacity = opacity
+      for (const material of materials) material.opacity = value
     })
   }
 

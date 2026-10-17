@@ -14,6 +14,7 @@ import {
 } from '../src/domain/item/weapons'
 import { loseTicket } from '../src/domain/match/match'
 import { isHostile } from '../src/domain/match/room'
+import { disturbStealth } from '../src/domain/match/sides'
 import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
 import {
   downedBy,
@@ -105,6 +106,8 @@ const NOT_HURT: Hurt = { downed: false, letGo: false }
  */
 function expose(room: RoomWorld, victim: MatchPlayer, attacker: MatchPlayer | undefined): void {
   if (!attacker || attacker.id === victim.id) return
+  // 攻める側に当たったら、攻める側全員のステルスが解ける (TSNE)
+  disturbStealth(room, victim, attacker, Date.now())
   exposeTo(room, victim, attacker, exposeSeconds(attacker.skills))
   // 鏡。**当てられた側**が TARGET ALERT を持っていれば、当てた側が光る
   alertHit(room, victim, attacker)
@@ -672,6 +675,8 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
   if (room.phase !== 'playing') return
   const now = Date.now()
   if (isAsleep(victim.sleepUntil, now)) return
+  // 投げられたのも「当たった」。攻める側ならステルスが解ける (TSNE)
+  disturbStealth(room, victim, attacker, now)
   const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
   victim.stamina = drain.stamina
   victim.concentratingSince = 0

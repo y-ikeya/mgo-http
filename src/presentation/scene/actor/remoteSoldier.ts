@@ -209,6 +209,8 @@ export class RemoteSoldier {
   }
   /** 壁越しに見せる身体。敬礼を交わした味方にだけ出す */
   private readonly glow: THREE.SkinnedMesh[] = [];
+  /** 体の形 (着ている物)。**ステルスで隠すのはこれだけ** — 武器・影・箱は別の物 */
+  private readonly bodies: THREE.SkinnedMesh[] = [];
   private ally = false;
   /** 敬礼を交わしたか。位置は届いていても、繋がるまでは映さない */
   private linked = false;
@@ -600,6 +602,8 @@ export class RemoteSoldier {
 
     // 無敵の間は半透明。撃てない相手だと見て分かる必要がある
     this.setGhost(state.protectedNow)
+    // STEALTH (TSNE)。効いているかはサーバーが確かめて位置に乗せてくる
+    this.setStealthed(state.stealthed)
 
     // 銃を隠す場面は自機と同じドメインルールで当てる。片方だけだと、自分では納めているのに
     // 相手の画面には出たままになる。
@@ -715,9 +719,25 @@ export class RemoteSoldier {
     return this.linked;
   }
 
+  /** ステルスで体が見えなくなっているか (TSNE の攻める側) */
+  private stealthed = false;
+
+  /**
+   * ステルス。**体だけを隠す** (2026-10-17 本人)。
+   *
+   * 手に持った武器 (手の骨に付いている別の形)・足元の影・ダンボール・置いた物は
+   * 見えたまま。光 (味方の発光・漏れ) も消す — 光っていると体の形がそのまま出る
+   */
+  setStealthed(on: boolean): void {
+    if (this.stealthed === on) return;
+    this.stealthed = on;
+    for (const body of this.bodies) body.visible = !on;
+    this.applyGlow();
+  }
+
   private applyGlow(): void {
-    // 漏れている人は敵でも光る。味方は敬礼で繋いだときだけ
-    const on = this.leaking || (this.ally && this.linked);
+    // 漏れている人は敵でも光る。味方は敬礼で繋いだときだけ。ステルス中は光らない
+    const on = !this.stealthed && (this.leaking || (this.ally && this.linked));
     for (const mesh of this.glow) mesh.visible = on;
   }
 
@@ -740,6 +760,8 @@ export class RemoteSoldier {
       if ((obj as THREE.SkinnedMesh).isSkinnedMesh) sources.push(obj as THREE.SkinnedMesh);
     });
 
+    this.bodies.push(...sources);
+    for (const body of this.bodies) body.visible = !this.stealthed;
     for (const source of sources) {
       const material = new MeshBasicNodeMaterial({
         color: ALLY_GLOW_TINT[this.team],
@@ -1449,6 +1471,7 @@ export class RemoteSoldiers {
     this.leader = id;
     this.applyLeaking();
   }
+
 
   /**
    * ENEMY EXPOSURE で抜いた相手。**何秒光るかだけ届く。**

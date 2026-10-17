@@ -1,6 +1,6 @@
 import type { MatchPlayer } from '../player/player'
 import { only, type Rotation } from '../stage'
-import { CHOICES, type WeaponId } from '../item/weapons'
+import { CHOICES, SUPPORTS, isTranquilizer, type SupportId, type WeaponId } from '../item/weapons'
 
 /**
  * 部屋とルール。
@@ -20,7 +20,7 @@ export type RoomName = (typeof ROOM_NAMES)[number]
  *
  *     DM        全員が敵の個人戦
  *     TDM       2 陣営。倒すと相手の残機が減る
- *     TSNE      潜入 / 防御。**非殺傷武器が要る**ので、まだ開けていない
+ *     TSNE      潜入 / 防御。攻める側 (非殺傷 + ナイフ + ステルス) と守る側 (殺傷) に分かれる
  *     INT       休憩。戦績に残らない
  *     PRACTICE  練習。棒立ちの的を撃つ
  */
@@ -59,25 +59,51 @@ export interface ModeSpec {
    * 遮蔽を無視して配る + 体を光らせる、を同じ道で通す。
    */
   leaderGlows: boolean
+  /**
+   * **攻める側と守る側に分かれるか** (TSNE)。
+   *
+   * 分かれる部屋では、持ち込める物 (RoomSpec の armory) が側ごとに違い、攻める側には
+   * ステルスが付く。どちらの色が攻めるかは試合ごとに入れ替わる (match.ts の attack)。
+   */
+  sides: boolean
+}
+
+/** 攻める側か守る側か。**色 (Team) とは別の問い** — 試合ごとに入れ替わる */
+export type Side = 'attack' | 'defence'
+
+/**
+ * 持ち込める物。**側ごとの縛り** (TSNE)。
+ *
+ * 部屋の primaries / secondary と同じ意味で、support の枠も絞る。
+ */
+export interface Armory {
+  primaries: readonly WeaponId[]
+  secondary: WeaponId | null
+  supports: readonly SupportId[]
 }
 
 export const MODES: Record<Mode, ModeSpec> = {
-  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true },
-  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false },
+  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false },
+  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false },
   /**
-   * 潜入側はナイフ以外の殺傷武器を持てず、防御側は非殺傷武器を持てない。
-   * **その縛りがルールの核**なので、麻酔銃とスタングレネードが無いと成立しない。
-   * 枠は残す — 何を作れば開くかが分かる形にしておきたい。
+   * 潜入 / 防御 (2026-10-17 本人)。
+   *
+   *     攻める側  非殺傷の銃 + ナイフ + ステルス。support はデコイとロケーター
+   *     守る側    殺傷の銃だけ。support は手榴弾とクレイモア
+   *
+   * **復活の回数は部屋で決める** (RoomSpec の lives、0 なら復活なし)。
+   * 相手の側が全員倒れるか眠ったら勝ち。時間切れは守る側の勝ち。
+   * 試合ごとに攻守が入れ替わる。
    */
-  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: false, solo: false, teams: true, leaderGlows: false },
-  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false },
+  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: true },
+  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false, sides: false },
   /**
    * 練習。**入る人は全員青**で、赤には棒立ちの的が並ぶ。
    *
    * 戦績に残さないのは、動かない相手を撃った数が記録に混ざると記録の意味が
    * 消えるため。ここで武器の距離感と当て方を確かめる。
    */
-  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false },
+  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false, sides: false },
 }
 
 /**
@@ -136,12 +162,45 @@ interface RoomSpec {
    * 近距離の撃ち合いに勝てるとは限らなくなる。
    */
   secondary?: WeaponId | null
+  /**
+   * **側ごとに持ち込める物** (攻める側と守る側に分かれる部屋だけ)。
+   *
+   * あれば primaries / secondary より優先する。側の分からない時 (試合の外) は
+   * primaries / secondary を見る。
+   */
+  armory?: Record<Side, Armory>
+  /**
+   * **1 人が復活できる回数。** 省けば何度でも、0 なら復活なし。
+   *
+   * 倒れた回数がこれを超えた人は、試合が終わるまでその場から動けない
+   * (カメラだけ回せる)。様子を見て 1・2・3 と変える (2026-10-17 本人)。
+   */
+  lives?: number
+}
+
+/**
+ * TSNE の持ち込み。**殺すか眠らせるかで側が分かれる。**
+ *
+ * 攻める側は非殺傷の銃とナイフだけ。眠らせてから近づいてナイフで仕留める。
+ * 守る側は殺傷の銃だけで、麻酔は持てない。
+ */
+const TSNE_ARMORY: Record<Side, Armory> = {
+  attack: {
+    primaries: CHOICES.primary.filter(isTranquilizer),
+    secondary: 'm9',
+    supports: SUPPORTS.filter((id) => id !== 'grenade' && id !== 'claymore'),
+  },
+  defence: {
+    primaries: CHOICES.primary.filter((id) => !isTranquilizer(id)),
+    secondary: 'm1911',
+    supports: ['grenade', 'claymore'],
+  },
 }
 
 export const ROOMS: Record<RoomName, RoomSpec> = {
   alpha: { mode: 'DM', stages: only('city') },
   bravo: { mode: 'TDM', stages: only('city') },
-  charlie: { mode: 'TSNE', stages: only('mall') },
+  charlie: { mode: 'TSNE', stages: only('city'), armory: TSNE_ARMORY, lives: 0 },
   delta: {
     mode: 'TDM',
     stages: only('raft'),
@@ -163,15 +222,44 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
   foxtrot: { mode: 'PRACTICE', stages: only('lab'), local: true, unlisted: true },
 }
 
-/** その部屋で持ち込める主武器。**省いてあれば全部** */
-export function primariesOf(room: RoomName): readonly WeaponId[] {
-  return ROOMS[room].primaries ?? CHOICES.primary
+/**
+ * その部屋で持ち込める主武器。**省いてあれば全部。**
+ *
+ * 側に分かれる部屋は側ごとの縛り (armory) を見る。側が分からない時 (null) は部屋の値
+ */
+export function primariesOf(room: RoomName, side: Side | null = null): readonly WeaponId[] {
+  const armory = side ? ROOMS[room].armory?.[side] : undefined
+  return armory?.primaries ?? ROOMS[room].primaries ?? CHOICES.primary
 }
 
 /** その部屋の副武器。**省いてあれば拳銃、null なら持たない** */
-export function secondaryOf(room: RoomName): WeaponId | null {
+export function secondaryOf(room: RoomName, side: Side | null = null): WeaponId | null {
+  const armory = side ? ROOMS[room].armory?.[side] : undefined
+  if (armory) return armory.secondary
   const spec = ROOMS[room]
   return spec.secondary === undefined ? 'm9' : spec.secondary
+}
+
+/**
+ * その部屋で選べる副武器の一覧。**副武器を持たせない部屋は空。**
+ *
+ * 側に分かれる部屋は側の 1 挺だけ (攻める側に殺傷の拳銃を持たせない)。それ以外は全部から選べる
+ */
+export function secondariesOf(room: RoomName, side: Side | null = null): readonly WeaponId[] {
+  const armory = side ? ROOMS[room].armory?.[side] : undefined
+  if (armory) return armory.secondary === null ? [] : [armory.secondary]
+  return secondaryOf(room) === null ? [] : CHOICES.secondary
+}
+
+/** その部屋で選べる support。**側に分かれない部屋は全部** */
+export function supportsOf(room: RoomName, side: Side | null = null): readonly SupportId[] {
+  const armory = side ? ROOMS[room].armory?.[side] : undefined
+  return armory?.supports ?? SUPPORTS
+}
+
+/** 1 人が復活できる回数。**null は何度でも** */
+export function livesOf(room: RoomName): number | null {
+  return ROOMS[room].lives ?? null
 }
 
 /** その部屋を開いてよいか。手元だけの部屋 (local) は、手元で起きたサーバーでだけ開く */

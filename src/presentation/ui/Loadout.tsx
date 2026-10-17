@@ -2,8 +2,6 @@ import { For, Show } from 'solid-js'
 import type { LoadoutFocus } from '../scene/Game'
 import { t } from '../../i18n'
 import {
-  CHOICES,
-  SUPPORTS,
   SUPPORT_SPECS,
   WEAPONS,
   type SupportId,
@@ -84,6 +82,10 @@ export default function Loadout(props: {
   primary: WeaponId | null
   /** その部屋で選べる主武器。**部屋が絞ることがある** (domain/match/room.ts) */
   primaries: readonly WeaponId[]
+  /** 選べる副武器。**持たせない部屋は空、TSNE は側の 1 挺** */
+  secondaries: readonly WeaponId[]
+  /** 選べる support。**TSNE は側ごとに違う** */
+  supports: readonly SupportId[]
   /** 副武器。**null なら持たない** — 部屋が外している */
   secondary: WeaponId | null
   support: SupportId
@@ -167,7 +169,7 @@ export default function Loadout(props: {
     {
       key: 'SECONDARY',
       focus: 'secondary' as const,
-      ids: () => (props.secondary === null ? [] : CHOICES.secondary),
+      ids: () => props.secondaries,
       current: (): WeaponId | null => props.secondary ?? 'm9',
       pick: (id: WeaponId) => props.onSecondary(id),
     },
@@ -311,7 +313,7 @@ export default function Loadout(props: {
                 detail={`× ${SUPPORT_SPECS[props.support].count} · ${SUPPORT_SPECS[props.support].hint}`}
               />
               <div class="loadout-items">
-                <For each={SUPPORTS}>
+                <For each={props.supports}>
                   {(id, i) => (
                     <button
                       class="loadout-tile"
@@ -322,7 +324,7 @@ export default function Loadout(props: {
                       {/* 投擲は武器の続き番号。**副武器が無い部屋では前へ詰まる** */}
                       <span class="loadout-key">
                         {props.primaries.length +
-                          (props.secondary === null ? 0 : CHOICES.secondary.length) +
+                          props.secondaries.length +
                           1 +
                           i()}
                       </span>

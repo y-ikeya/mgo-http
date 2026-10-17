@@ -682,3 +682,35 @@ describe('持ち替えの音', () => {
     expect(events).not.toContainEqual({ kind: 'switched' })
   })
 })
+
+describe('STEALTH (TSNE の攻める側)', () => {
+  const attacker = () => new Inventory({ ...loadout, stealth: true })
+
+  test('**着ても手は武器のまま**。着たまま撃てる', () => {
+    const inv = attacker()
+    expect(inv.switchTo('stealth')).toBe(true)
+    expect(inv.wearingStealth).toBe(true)
+    expect(inv.held).toBe('rifle')
+    expect(inv.tool).toBe('stealth')
+  })
+
+  test('道具のボタンを押すと次へ送って脱ぐ (STEALTH → NONE)', () => {
+    const inv = attacker()
+    inv.switchTo('stealth')
+    inv.toggle('tool')
+    expect(inv.wearingStealth).toBe(false)
+  })
+
+  test('持っていない人 (守る側) は着られない', () => {
+    const inv = make()
+    expect(inv.switchTo('stealth')).toBe(false)
+    expect(inv.wearingStealth).toBe(false)
+  })
+
+  test('湧き直すと脱いでいる', () => {
+    const inv = attacker()
+    inv.switchTo('stealth')
+    inv.refill({ ...loadout, stealth: true })
+    expect(inv.wearingStealth).toBe(false)
+  })
+})

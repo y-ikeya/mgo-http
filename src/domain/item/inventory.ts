@@ -160,9 +160,22 @@ export class Inventory {
     this.previousWeapon = loadout.secondary
     this.lastWeapon = first
     this.lastTool = 'none'
+    this.wearing = false
     this.switchLeft = 0
     this.queued = null
   }
+
+  /**
+   * **STEALTH を着ているか** (TSNE の攻める側)。
+   *
+   * 手にある物とは別に持つ。着ても手は武器のまま — 着たまま撃てるし刺せる。
+   * 道具の一覧で STEALTH を選ぶと着て、箱か NONE を選ぶと脱ぐ
+   */
+  get wearingStealth(): boolean {
+    return this.wearing
+  }
+
+  private wearing = false
 
   /**
    * いま手にある物。
@@ -199,6 +212,7 @@ export class Inventory {
   /** 道具系でいま選んでいる物。持っていなければ null */
   get tool(): HeldId {
     if (HELD[this.current].family === 'tool') return this.current
+    if (this.wearing) return 'stealth'
     return this.lastTool ?? 'none'
   }
 
@@ -567,8 +581,26 @@ export class Inventory {
    */
   switchTo(id: HeldId): boolean {
     if (!find(this.items, id)) return false
+    /*
+     * **STEALTH は着る物。手には持たない。**
+     *
+     * 着たら手は武器へ戻す (箱を被っていたら脱ぐ)。箱か NONE を選べば脱ぐ
+     */
+    if (id === 'stealth') {
+      if (this.wearing && !this.usingTool) return false
+      this.wearing = true
+      this.lastTool = 'stealth'
+      if (HELD[this.current].family === 'tool') {
+        this.last = this.current
+        this.current = this.lastWeapon
+        this.switchLeft = SWITCH_TIME
+      }
+      return true
+    }
     // 被れない体勢なら箱には持ち替えない。**手にした形だけ作らない**
     if (id === 'box' && !this.wearable) return false
+    // 箱か NONE を選んだ。STEALTH は脱ぐ
+    if (HELD[id].family === 'tool') this.wearing = false
     /*
      * **道具を使っている間に武器を選んだら、枠だけ差し替える。**
      *
@@ -666,6 +698,10 @@ export class Inventory {
     if (family === 'weapon' && this.usingTool) {
       return this.switchTo(toggleId(this.items, this.weapon, this.previousWeapon))
     }
+    // 着ている STEALTH から道具の一覧を送る (STEALTH → NONE で脱ぐ)
+    if (family === 'tool' && this.wearing && HELD[this.current].family !== 'tool') {
+      return this.switchTo(cycleId(this.items, 'stealth', 1))
+    }
     if (HELD[this.current].family !== family) {
       const target = family === 'weapon' ? this.weapon : this.tool
       // 道具の枠が none のまま入っても意味が無いので、そのときは箱へ
@@ -680,6 +716,9 @@ export class Inventory {
 
   /** 一覧を送る。長押し中の上下 */
   cycle(family: Family, step: number): boolean {
+    if (family === 'tool' && this.wearing && HELD[this.current].family !== 'tool') {
+      return this.switchTo(cycleId(this.items, 'stealth', step))
+    }
     if (HELD[this.current].family !== family) {
       const first = firstOf(this.items, family)
       return first !== null && this.switchTo(first)

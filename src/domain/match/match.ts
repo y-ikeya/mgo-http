@@ -130,6 +130,17 @@ export interface Match {
    * 試合の頭で陣営を切り直す時 (shuffleTeams) に書き直す
    */
   teamsOf: Map<string, Team>
+  /**
+   * **攻める色** (攻める側と守る側に分かれる部屋だけ)。試合ごとに入れ替わる (sides.ts)
+   */
+  attack: Team
+  /**
+   * 攻める側のステルスが解けている期限 (Date.now)。**攻める側の誰かが当たるたびに延びる**
+   * (sides.ts の disturbStealth)
+   */
+  revealedUntil: number
+  /** 最後に配ったステルスの状態。変わった時だけ配り直すため */
+  stealthSent: boolean
 }
 
 export function newMatch(mode: Mode): Match {
@@ -147,6 +158,9 @@ export function newMatch(mode: Mode): Match {
     matchId: null,
     startedAt: 0,
     teamsOf: new Map(),
+    attack: 'blue',
+    revealedUntil: 0,
+    stealthSent: false,
   }
 }
 

@@ -874,7 +874,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         なる (MGO2 も道具は左下で、武器のカードは別に出ていた)。
       */}
       <Show when={props.stats?.tool}>
-        <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand }}>
+        <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand || props.stats?.wearingStealth }}>
           <div class="hud-tool-key">C</div>
           <div class="hud-tool-name">{HELD[shownTool()].label}</div>
         </div>

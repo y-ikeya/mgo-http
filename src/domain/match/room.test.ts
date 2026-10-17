@@ -44,8 +44,9 @@ describe('部屋の割り当て', () => {
     expect(MODES.TDM.leaderGlows).toBe(false)
   })
 
-  test('入れない部屋 (TSNE) は非殺傷武器が要る。枠だけ残す', () => {
-    expect(modeOf('charlie').active).toBe(false)
+  test('charlie は潜入 / 防御 (TSNE) で開いている。ステージは city', () => {
+    expect(modeOf('charlie').id).toBe('TSNE')
+    expect(modeOf('charlie').active).toBe(true)
   })
 })
 
