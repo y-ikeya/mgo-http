@@ -14,8 +14,9 @@
 # 壁を別々に組んだ本体 (b3) だと取れないため。
 #
 # --- 汚し方 ---
-# 口の真ん中 (敷居) から外へ半円の扇を広げる。敷居が一番濃く (絵の v = 1)、縁へ向けて
-# 薄くなる (v = 0)。中へも小さく扇を入れる — 踏み跡は中へ続いている。
+# 外から敷居を通って中へ続く**踏み跡の道**を敷く (本人 2026-10-17「道みたいに建物内に
+# 繋がってるように」)。真ん中の線が濃く、左右と両端で薄い。材質は入り口だけの黒っぽい泥
+# (decal_entry_dirt、絵は tools/raw/decals/decal_entry_dirt.png)。
 import bpy, bmesh, math
 from mathutils import Vector
 
@@ -25,11 +26,27 @@ FOOT_Z = 10.25     # 足元 (窓の口はここで止まる)
 STEP = 0.2         # 壁の線に沿って調べる間隔
 PROBE_OUT = 0.3    # 外接の箱のどれだけ外から線を引くか (隣の建物が近い路地があるので浅く)
 MIN_WIDTH = 0.7    # これより狭い口は入り口と見ない
-MERGE_GAP = 0.5    # 柱で割れた口をまとめる間 (m)。広げすぎると壁で隔たった扉 (b3 の北) まで 1 つになる。割れたままでも扇が重なって 1 つの汚れに見える
-OUT_RADIUS = 2.6   # 外へ広げる半径 (口の幅の半分に足す)
-IN_RADIUS = 1.2    # 中へ入れる半径
-SEGMENTS = 12
+MERGE_GAP_OPEN = 3.0  # 間が 1 階の壁より奥まっていれば、ここまで離れていても 1 つの口
+PATH_OUT = 3.5     # 道を外へ延ばす長さ (口の幅の半分に足す)
+PATH_IN = 2.5      # 道を中へ延ばす長さ
+PATH_HALF = 1.0    # 道の半幅の上限 (口の真ん中を通る踏み跡)
 LIFT = 0.012       # 地面から浮かせる量
+
+
+def _ray(scene, dg, origin, direction, limit=200.0):
+    """汚れの板 (vis_) を素通りして、最初に当たる物"""
+    o = origin.copy()
+    travelled = 0.0
+    for _ in range(12):
+        r = scene.ray_cast(dg, o, direction, distance=limit - travelled)
+        if not r[0] or not r[4].name.startswith('vis_'):
+            if r[0]:
+                return True, r[1], r[4]
+            return False, None, None
+        step = (r[1] - o).length + 0.002
+        travelled += step
+        o = o + direction * step
+    return False, None, None
 
 
 def find_entries(body):
@@ -56,23 +73,32 @@ def find_entries(body):
         s = a + STEP / 2
         while s < b:
             o = start(s)
-            wall = scene.ray_cast(dg, Vector((o.x, o.y, UPPER_Z)), inward)
-            if not wall[0] or wall[4] != body:
+            wall = _ray(scene, dg, Vector((o.x, o.y, UPPER_Z)), inward)
+            if not wall[0] or wall[2] != body:
                 samples.append((s, None)); s += STEP; continue
             d0 = (Vector((wall[1].x, wall[1].y, 0)) - o).length
             deep = True
+            dz = 99
             for z in (DOOR_Z, FOOT_Z):
-                r = scene.ray_cast(dg, Vector((o.x, o.y, z)), inward)
+                r = _ray(scene, dg, Vector((o.x, o.y, z)), inward)
                 d = (Vector((r[1].x, r[1].y, 0)) - o).length if r[0] else 99
-                # 閉まったシャッターは口ではない (奥まっていても通れない)
-                if r[0] and 'shutter' in r[4].name.lower():
+                if z == DOOR_Z:
+                    dz = d
+                # 口に閉まったシャッターがあれば口ではない (奥まっていても通れない)。
+                # 部屋の奥の壁のシャッター (b3 の東は 17m 奥) は関係ない
+                if r[0] and 'shutter' in r[2].name.lower() and d < d0 + 1.0:
                     deep = False
+                    dz = d0
                     break
                 if d < d0 + 0.6:
                     deep = False
-                    break
-            samples.append((s, (d0, deep)))
+            samples.append((s, (d0, deep, dz)))
             s += STEP
+        # 1 階の壁の線 (扉の高さで、口でない所の奥行きの真ん中の値)。2 階が張り出していると
+        # 1 階の壁は 2 階の壁より奥にある
+        walls = sorted(v[2] for _, v in samples if v is not None and not v[1])
+        floor_wall = walls[len(walls) // 2] if walls else 0
+        runs = []
         run = None
         for s, val in samples + [(b, None)]:
             deep = val is not None and val[1]
@@ -81,37 +107,40 @@ def find_entries(body):
             elif deep:
                 run[1] = s
             elif run:
-                width = run[1] - run[0] + STEP
-                if width >= MIN_WIDTH:
-                    mid = start((run[0] + run[1]) / 2) + inward * run[2]
-                    t = Vector((-inward.y, inward.x, 0))
-                    entries.append({'at': Vector((mid.x, mid.y, 0)), 'normal': -inward, 'along': t, 'width': width})
-                run = None
-    # 柱で割れた 1 つの口 (b3 の東の吹き放し) をまとめる: 同じ向きで、間が MERGE_GAP 以内
-    merged = []
-    for e in sorted(entries, key=lambda e: (round(e['normal'].x, 2), round(e['normal'].y, 2), e['at'].dot(e['along']))):
-        prev = merged[-1] if merged else None
-        if prev and prev['normal'].dot(e['normal']) > 0.99:
-            a0 = prev['at'].dot(prev['along']) - prev['width'] / 2
-            a1 = prev['at'].dot(prev['along']) + prev['width'] / 2
-            b0 = e['at'].dot(e['along']) - e['width'] / 2
-            b1 = e['at'].dot(e['along']) + e['width'] / 2
-            if b0 - a1 <= MERGE_GAP and abs((e['at'] - prev['at']).dot(prev['normal'])) < 0.5:
-                lo_, hi_ = min(a0, b0), max(a1, b1)
-                base = prev['at'] - prev['along'] * prev['at'].dot(prev['along'])
-                prev['at'] = base + prev['along'] * ((lo_ + hi_) / 2)
-                prev['width'] = hi_ - lo_
-                continue
-        merged.append(dict(e))
-    return merged
+                runs.append(run); run = None
+        # **柱で割れた 1 つの口をまとめる。** 間の扉の高さが 1 階の壁より奥まっていれば
+        # (柱が口より奥にある) 1 つの口。b3 の東は割れたまま道が両端にしか付かなかった。
+        # 壁で隔たった扉 (b3 の北) はまとめない
+        joined = []
+        for r in runs:
+            if joined:
+                prev = joined[-1]
+                between = [v for t_, v in samples if v is not None and prev[1] < t_ < r[0]]
+                if r[0] - prev[1] <= MERGE_GAP_OPEN and between and all(v[2] > floor_wall + 0.3 for v in between):
+                    prev[1] = r[1]
+                    continue
+            joined.append(list(r))
+        for r in joined:
+            width = r[1] - r[0] + STEP
+            if width >= MIN_WIDTH:
+                mid = start((r[0] + r[1]) / 2) + inward * r[2]
+                t = Vector((-inward.y, inward.x, 0))
+                entries.append({'at': Vector((mid.x, mid.y, 0)), 'normal': -inward, 'along': t, 'width': width})
+    return entries
 
 
 def _ground(scene, dg, p):
-    r = scene.ray_cast(dg, Vector((p.x, p.y, FOOT_Z + 0.4)), Vector((0, 0, -1)))
+    r = _ray(scene, dg, Vector((p.x, p.y, FOOT_Z + 0.4)), Vector((0, 0, -1)))
     return r[1].z if r[0] else 10.0
 
 
 def entry_dirt(body_name, tag):
+    """口ごとに、外から敷居を通って中へ続く踏み跡の道を敷く。
+
+    真ん中の線が一番濃く (絵の v = 1)、左右の縁で薄い (v = 0)。外の端と中の端は
+    細くすぼめて消す。材質は入り口だけの黒っぽい泥 (decal_entry_dirt) —
+    地面の汚れ (decal_dirt) は土の床と同じ焦茶で、地面を暗くしたら溶けて見えなくなった
+    """
     body = bpy.data.objects[body_name]
     entries = find_entries(body)
     dg = bpy.context.evaluated_depsgraph_get()
@@ -122,22 +151,39 @@ def entry_dirt(body_name, tag):
         bpy.data.objects.remove(o, do_unlink=True); bpy.data.meshes.remove(me)
     bm = bmesh.new(); uv = bm.loops.layers.uv.new('UVMap')
     for e in entries:
-        center, n, t, half = e['at'], e['normal'], e['along'], e['width'] / 2
-        for direction, radius in ((1, half + OUT_RADIUS), (-1, IN_RADIUS)):
-            # 半円の扇。真ん中 (敷居) が濃い (v = 1)、縁が薄い (v = 0)
-            c = Vector((center.x, center.y, _ground(scene, dg, center + n * 0.3 * direction) + LIFT))
-            cv = bm.verts.new(c)
-            rim = []
-            for k in range(SEGMENTS + 1):
-                ang = math.pi * k / SEGMENTS
-                dirv = t * math.cos(ang) + n * direction * math.sin(ang)
-                # 口の幅ぶん横へ伸ばした楕円 (幅の広い口ほど横に広い)
-                p = center + t * math.cos(ang) * (radius if direction > 0 else half + 0.2) + n * direction * math.sin(ang) * radius
-                rim.append(bm.verts.new(Vector((p.x, p.y, _ground(scene, dg, p) + LIFT))))
-            for k in range(SEGMENTS):
-                f = bm.faces.new((cv, rim[k], rim[k + 1]))
-                u0, u1 = k / SEGMENTS * 2, (k + 1) / SEGMENTS * 2
-                for loop, val in zip(f.loops, ((0.5 * (u0 + u1), 0.98), (u0, 0.0), (u1, 0.0))):
+        center, n, t = e['at'], e['normal'], e['along']
+        # 道の幅は口の幅ではなく人が通る幅。広い口 (b3 の北は 9.4m) でも真ん中に 1 本
+        half = min(e['width'] / 2, PATH_HALF)
+        # 道の断面: (外への距離, 半幅)。外の端と中の端はすぼめる
+        out_len = PATH_OUT + half
+        # (外への距離, 半幅, 真ん中の濃さ)。両端は細く・薄くして、切れ目を見せない
+        stations = [
+            (-PATH_IN, 0.3, 0.0),
+            (-PATH_IN * 0.6, half * 0.8, 0.7),
+            (0.0, half + 0.2, 1.0),
+            (out_len * 0.35, half + 0.45, 1.0),
+            (out_len * 0.7, half + 0.35, 0.75),
+            (out_len, 0.4, 0.0),
+        ]
+        rows = []
+        for d, w, strength in stations:
+            row = []
+            for side in (-1, 0, 1):
+                p = center + n * d + t * (w * side)
+                row.append(bm.verts.new(Vector((p.x, p.y, _ground(scene, dg, p) + LIFT))))
+            rows.append((d, row, strength))
+        for (d0, r0, s0), (d1, r1, s1) in zip(rows, rows[1:]):
+            u0, u1 = d0 / 2.3, d1 / 2.3
+            for k in range(2):
+                a0, a1 = r0[k], r0[k + 1]
+                b0, b1 = r1[k], r1[k + 1]
+                f = bm.faces.new((a0, a1, b1, b0))
+                # 真ん中の頂点が濃い (k=0 なら a1/b1、k=1 なら a0/b0)。縁は 0
+                if k == 0:
+                    vals = ((u0, 0.0), (u0, s0), (u1, s1), (u1, 0.0))
+                else:
+                    vals = ((u0, s0), (u0, 0.0), (u1, 0.0), (u1, s1))
+                for loop, val in zip(f.loops, vals):
                     loop[uv].uv = val
     bm.normal_update()
     for f in bm.faces:
@@ -146,7 +192,7 @@ def entry_dirt(body_name, tag):
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(name, me)
     scene.collection.objects.link(o)
-    me.materials.append(bpy.data.materials['decal_dirt'])
+    me.materials.append(bpy.data.materials['decal_entry_dirt'])
     return [(round(e['at'].x, 2), round(e['at'].y, 2), round(e['width'], 2)) for e in entries]
 
 
