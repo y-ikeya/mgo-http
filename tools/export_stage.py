@@ -530,6 +530,13 @@ thinned = {}
 for obj in list(bpy.context.scene.objects):
     if obj.type != 'MESH' or not obj.select_get():
         continue
+    # **汚れの板は間引かない。** 合わせた板は 400 枚を超えるので置き物と同じに扱われ、
+    # 平らな面を溶かされていた。入り口の踏み跡の道は地面に寝た板で、濃さを真ん中の線の
+    # 頂点の UV (v = 1) に持たせている — 溶かすと縁の頂点 (v = 0) だけが残り、道全体が
+    # 縁の薄さになって薄いシミに見えた (本人 2026-10-17「blender だと黒い模様が出てるのに
+    # three だと出ない」)。delimit UV は UV の島の境目しか守らない
+    if 'decal' in obj.name:
+        continue
     mesh = obj.data
     if mesh.name in thinned:
         obj.data = thinned[mesh.name]
