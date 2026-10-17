@@ -12,7 +12,7 @@ import type { TriangleBvh } from '../../../sim/space/bvh'
  */
 
 /** 一番暗い所の明るさ。地形の焼き込み (bake_stage.py の FLOOR) と揃える */
-export const SKY_FLOOR = 0.3
+export const SKY_FLOOR = 0.12
 /** 足元から測る点までの高さ (m) */
 export const SKY_PROBE_HEIGHT = 1.0
 /** 光線の長さ (m)。建物の屋根を抜けて空まで届けば十分 */
