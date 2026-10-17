@@ -134,7 +134,7 @@ def _ground(scene, dg, p):
     return r[1].z if r[0] else 10.0
 
 
-def entry_dirt(body_name, tag):
+def entry_dirt(body_name, tag, force=False):
     """口ごとに、外から敷居を通って中へ続く踏み跡の道を敷く。
 
     真ん中の線が一番濃く (絵の v = 1)、左右の縁で薄い (v = 0)。外の端と中の端は
@@ -145,9 +145,14 @@ def entry_dirt(body_name, tag):
     entries = find_entries(body)
     dg = bpy.context.evaluated_depsgraph_get()
     scene = bpy.context.scene
-    # 前に作った物を消す (入り口ごとの物 _1, _2 … と、まとめて 1 つだった頃の物)
+    # 前に作った物を消す (入り口ごとの物 _1, _2 … と、まとめて 1 つだった頃の物)。
+    # **手で直した物があれば作り直さない。** 1 つを参照コピー (Alt+D) して他の入り口へ
+    # 置く使い方をしている (本人 2026-10-17) ので、消すとその写しまで壊れる。force で上書き
     prefix = f'vis_decal_b{tag}_entry_dirt'
-    for o in [o for o in bpy.data.objects if o.name.startswith(prefix)]:
+    existing = [o for o in bpy.data.objects if o.name.startswith(prefix)]
+    if existing and not force:
+        return f'既にある ({len(existing)} 個): {existing[0].name} …。作り直すなら force=True'
+    for o in existing:
         me = o.data
         bpy.data.objects.remove(o, do_unlink=True)
         if me.users == 0:
@@ -209,4 +214,4 @@ def entry_dirt(body_name, tag):
 
 if globals().get('ENTRY_DIRT'):
     _c = ENTRY_DIRT
-    print(entry_dirt(_c['body'], _c['tag']))
+    print(entry_dirt(_c['body'], _c['tag'], _c.get('force', False)))
