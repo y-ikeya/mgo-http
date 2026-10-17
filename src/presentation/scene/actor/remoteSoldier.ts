@@ -23,7 +23,7 @@ import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
-import { CLIMB_TOP_TUNING } from "./soldier";
+import { CLIMB_TOP_TUNING, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import { DeathSlide } from "./deathSlide";
 import {
@@ -306,11 +306,27 @@ export class RemoteSoldier {
   private setGhost(on: boolean): void {
     if (this.ghost === on) return;
     this.ghost = on;
+    this.applyBodyOpacity(true);
+  }
+
+  /**
+   * 体の濃さを掛け直す。**無敵の半透明 × STEALTH の消え具合。**
+   *
+   * @param force 透け方 (transparent) まで切り替える。毎コマの濃さだけなら要らない
+   */
+  private applyBodyOpacity(force = false): void {
+    const fading = this.stealthFade > 0
+    const opacity = (this.ghost ? 0.35 : 1) * (1 - this.stealthFade)
     for (const material of this.tinted) {
-      material.transparent = on || material.userData.wasTransparent === true;
-      material.opacity = on ? 0.35 : 1;
-      material.needsUpdate = true;
+      const transparent = this.ghost || fading || material.userData.wasTransparent === true
+      if (force || material.transparent !== transparent) {
+        material.transparent = transparent
+        material.needsUpdate = true
+      }
+      material.opacity = opacity
     }
+    // 消え切ったら描かない (透明でも描くと重なりの順で縁が残る)
+    for (const body of this.bodies) body.visible = this.stealthFade < 0.999
   }
 
   /** 位置が届いている回数 (通/秒)。診断の表示に使う */
@@ -602,6 +618,7 @@ export class RemoteSoldier {
     this.setGhost(state.protectedNow)
     // STEALTH (TSNE)。効いているかはサーバーが確かめて位置に乗せてくる
     this.setStealthed(state.stealthed)
+    this.stepStealthFade(dt)
 
     // 銃を隠す場面は自機と同じドメインルールで当てる。片方だけだと、自分では納めているのに
     // 相手の画面には出たままになる。
@@ -728,9 +745,23 @@ export class RemoteSoldier {
    * (2026-10-17 本人)。TARGET ALERT の霧はサーバーが出さない (server/alert.ts)
    */
   setStealthed(on: boolean): void {
-    if (this.stealthed === on) return;
     this.stealthed = on;
-    for (const body of this.bodies) body.visible = !on;
+  }
+
+  /**
+   * STEALTH の消え具合 (0 = 見える、1 = 消えた)。**じわっと消え、すぐ現れる** (2026-10-17 本人
+   * 「一気に透明になるんじゃなくてじわっと消えて」)。現れる側は暴かれた瞬間が読めないと困るので速く
+   */
+  private stealthFade = 0;
+
+  private stepStealthFade(dt: number): void {
+    const target = this.stealthed ? 1 : 0
+    if (this.stealthFade === target) return
+    const step = dt / (this.stealthed ? STEALTH_FADE_OUT : STEALTH_FADE_IN)
+    this.stealthFade = target > this.stealthFade
+      ? Math.min(target, this.stealthFade + step)
+      : Math.max(target, this.stealthFade - step)
+    this.applyBodyOpacity()
   }
 
   private applyGlow(): void {
@@ -759,7 +790,7 @@ export class RemoteSoldier {
     });
 
     this.bodies.push(...sources);
-    for (const body of this.bodies) body.visible = !this.stealthed;
+    this.applyBodyOpacity(true);
     for (const source of sources) {
       const material = new MeshBasicNodeMaterial({
         color: ALLY_GLOW_TINT[this.team],

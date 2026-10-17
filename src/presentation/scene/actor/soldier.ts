@@ -83,12 +83,12 @@ const MOVE_SPEED = 2.74
 /** 無敵の間の濃さ。消さずに薄くする — 居ることは見えていてよい */
 const GHOST_OPACITY = 0.35
 /**
- * ステルス中の自分の体の濃さ。**他の人と同じく消す** (TSNE)。
- *
- * 薄く残していた頃は、当たって 5 秒見えるようになったことが自分の画面では分からなかった
- * (2026-10-17 本人)。消えている / 出ているが自分の目でそのまま読める
+ * STEALTH で消え切るまで (秒)。**じわっと消える** (2026-10-17 本人「一気に透明になるんじゃなくて」)。
+ * 自分の体も他の人と同じく消える — 当たって 5 秒出ていることが自分の目でも読める
  */
-const STEALTH_SELF_OPACITY = 0
+export const STEALTH_FADE_OUT = 1.2
+/** 暴かれて現れ切るまで (秒)。現れる瞬間は読めないと困るので速く */
+export const STEALTH_FADE_IN = 0.15
 
 /**
  * 構えている間の移動速度の倍率。
@@ -1302,12 +1302,22 @@ export class Soldier {
    * 手の武器は他の人からも見えているので消さない
    */
   setStealthed(on: boolean): void {
-    if (this.stealthed === on) return
     this.stealthed = on
-    this.applyOpacity()
   }
 
   private stealthed = false
+  /** 消え具合 (0 = 見える、1 = 消えた)。他の人の画面と同じ速さで追いかける (remoteSoldier.ts) */
+  private stealthFade = 0
+
+  private stepStealthFade(dt: number): void {
+    const target = this.stealthed ? 1 : 0
+    if (this.stealthFade === target) return
+    const step = dt / (this.stealthed ? STEALTH_FADE_OUT : STEALTH_FADE_IN)
+    this.stealthFade = target > this.stealthFade
+      ? Math.min(target, this.stealthFade + step)
+      : Math.max(target, this.stealthFade - step)
+    this.applyOpacity()
+  }
 
   private applyOpacity(): void {
     if (!this.model) return
@@ -1316,7 +1326,7 @@ export class Soldier {
       if (!isMesh(obj)) return
       // 体 (骨で動く形) だけがステルスで薄くなる。手の武器は別の形
       const body = (obj as THREE.SkinnedMesh).isSkinnedMesh === true
-      const value = this.stealthed && body ? Math.min(opacity, STEALTH_SELF_OPACITY) : opacity
+      const value = body ? opacity * (1 - this.stealthFade) : opacity
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const material of materials) material.opacity = value
     })
@@ -3132,6 +3142,7 @@ export class Soldier {
     this.lastWorld = world
     this.blob.set(this.isProne ? 'prone' : this.isCrouching ? 'crouch' : 'stand')
     this.blob.update(dt)
+    this.stepStealthFade(dt)
 
     // 倒れている間は入力を捨てる。重力と接地だけは回して、体が宙に浮かないようにする。
     if (this.down) moveDir = ZERO_MOVE
