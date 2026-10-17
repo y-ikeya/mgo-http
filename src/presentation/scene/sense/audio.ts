@@ -461,6 +461,11 @@ const UI_SOUNDS = {
    * (7.6 秒) より長いので、画面を畳んだら止める (playJingle / stopJingle)
    */
   result: { file: "result1.mp3", volume: 0.5 },
+  /**
+   * 攻める側の STEALTH が暴かれた (CAUTION が始まった)。**部屋の全員に同じく鳴る** — CAUTION が
+   * 全員の画面に出るのと同じ (2026-10-17 本人、tools/raw/detectAlert.mp3 のまま)
+   */
+  detectAlert: { file: "detect_alert1.mp3", volume: 0.6 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;

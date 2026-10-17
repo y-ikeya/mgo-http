@@ -2488,6 +2488,10 @@ export class Game {
           this.attackTeam = message.attack ?? null;
           this.applyArmory();
         }
+        // STEALTH が暴かれた瞬間 (効いていた → 解けた)。試合中だけ (CAUTION の始まり)
+        if (this.stealthOn && message.stealth === false && message.phase === "playing") {
+          this.audio.playUi("detectAlert");
+        }
         this.stealthOn = message.stealth === true;
         break;
 
