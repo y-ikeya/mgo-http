@@ -3899,6 +3899,9 @@ export class Soldier {
     this.placeholder = null
     this.object.add(model)
     this.model = model
+    // 読み込み前に受けた濃さ (無敵の半透明・STEALTH) を掛け直す。受けた時は体がまだ無く、素通りしている
+    // (リロードすると STEALTH を着て湧くのに体が見えていた。2026-10-17 本人)
+    this.applyOpacity()
     this.leftArmBone = findBoneBySuffix(model, 'LeftArm')
     this.rightArmBone = findBoneBySuffix(model, 'RightArm')
 
