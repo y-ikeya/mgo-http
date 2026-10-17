@@ -452,10 +452,10 @@ const UI_SOUNDS = {
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
   switch: { file: "list_switch1.mp3", volume: 0.55 },
   /** 自分の弾が頭に入って倒した / 眠らせた。位置は持たない (自分への応え) */
-  // 2026-10-05: tin.mp3 (tools/raw) を +19 半音に上げて圧縮した物 (tools/README.md)。10-07 に +21 へ。
-  // 前の headshot1 は音程の無いシャリ音で埋もれた。音源を強くしたぶん、音量は戻す
-  // (1.0 は「ちょっとうるさい」、0.6・0.4・0.28 でも「もう少し小さく」)
-  headshot: { file: "headshot2.mp3", volume: 0.2 },
+  // 2026-10-17: 本人の HS.mp3 (tools/raw のまま) に替えた (「これが HS にふさわしい」)。
+  // 前の headshot2 (tin.mp3 を +21 半音に上げて圧縮した物、tools/README.md) は 0.2 で決まっていた。
+  // HS.mp3 は平均で 6.6dB 小さいので、同じ大きさに聞こえるよう 0.2 × 2.1 ≒ 0.43
+  headshot: { file: "headshot3.mp3", volume: 0.43 },
   /**
    * 結果の画面の曲 (2026-10-17 本人、tools/raw/result.mp3 のまま)。11 秒あり、結果の画面
    * (7.6 秒) より長いので、画面を畳んだら止める (playJingle / stopJingle)
