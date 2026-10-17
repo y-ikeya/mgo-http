@@ -2249,9 +2249,16 @@ export class Game {
         clearTimeout(this.resultTimer);
         if (effect.to === "over") {
           this.resultTimer = setTimeout(() => {
-            if (this.replica.match?.phase === "over") this.setMenu(true);
+            if (this.replica.match?.phase !== "over") return;
+            this.setMenu(true);
+            // 結果の画面の曲。画面と一緒に出る (2026-10-17 本人)
+            this.audio.playJingle("result");
           }, GAME_SET_SECONDS * 1000);
-        } else if (this.menuOpen) this.setMenu(false);
+        } else {
+          // 結果の画面を畳んだら曲も止める (曲のほうが長い)
+          this.audio.stopJingle();
+          if (this.menuOpen) this.setMenu(false);
+        }
         break;
 
       case "team":

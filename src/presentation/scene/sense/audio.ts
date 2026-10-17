@@ -456,6 +456,11 @@ const UI_SOUNDS = {
   // 前の headshot1 は音程の無いシャリ音で埋もれた。音源を強くしたぶん、音量は戻す
   // (1.0 は「ちょっとうるさい」、0.6・0.4・0.28 でも「もう少し小さく」)
   headshot: { file: "headshot2.mp3", volume: 0.2 },
+  /**
+   * 結果の画面の曲 (2026-10-17 本人、tools/raw/result.mp3 のまま)。11 秒あり、結果の画面
+   * (7.6 秒) より長いので、画面を畳んだら止める (playJingle / stopJingle)
+   */
+  result: { file: "result1.mp3", volume: 0.5 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;
@@ -562,6 +567,27 @@ export class GameAudio {
     sound.setVolume(UI_SOUNDS[name].volume);
     sound.play();
   }
+
+  /**
+   * 曲を鳴らす。**枠は 1 つ、止められる** (結果の画面の曲)。続けて来たら前を止めて替える
+   */
+  playJingle(name: UiSoundName): void {
+    const buffer = this.uiBuffers.get(name);
+    if (!buffer || this.disposed) return;
+    if (!this.jingle) this.jingle = new THREE.Audio(this.listener);
+    const sound = this.jingle;
+    if (sound.isPlaying) sound.stop();
+    sound.setBuffer(buffer);
+    sound.setVolume(UI_SOUNDS[name].volume);
+    sound.play();
+  }
+
+  /** 曲を止める。鳴っていなければ何もしない */
+  stopJingle(): void {
+    if (this.jingle?.isPlaying) this.jingle.stop();
+  }
+
+  private jingle: THREE.Audio | null = null;
 
   playUi(name: UiSoundName): void {
     const buffer = this.uiBuffers.get(name);
