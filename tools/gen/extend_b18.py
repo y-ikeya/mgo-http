@@ -22,7 +22,7 @@ BOTTOM, TOP, ROOF = 9.85, 17.72, 17.27
 PARAPET = 0.25
 STEP_OUT, STEP_TOP = 0.3, 10.10
 BAY = 3.3          # 窓の間隔
-EDGE_MARGIN = 0.9  # 角から窓までの余白
+EDGE_MARGIN = 1.7  # 角から窓の真ん中までの余白。一番広い窓 (板 2.4m) の半分 + 0.5。0.9 では角から 0.3m はみ出して角に穴が開いた
 
 # 増築部分の外周 (反時計回り)。**b18 と b19 の間の路地 (x -3.88〜3.54、y -17.01〜-13.99) は
 # 残す** — 西の通りから入れる行き止まりの通り道 (本人 2026-10-17「元々あった通り道が消されてる」)。
@@ -31,6 +31,8 @@ EDGE_MARGIN = 0.9  # 角から窓までの余白
 OUTLINE = [(-3.88, -17.01), (-3.88, -20.46), (9.05, -20.46), (9.05, -18.99), (16.47, -18.99),
            (16.47, -13.12), (3.54, -13.12), (3.54, -13.99), (3.54, -17.01)]
 HIDDEN = {6}       # 見えない辺 (OUTLINE[i] → OUTLINE[i+1])
+# 窓を付けない辺。**東と南は遊ぶ人から見えない** (隣の建物との 2〜4m の隙間、本人 2026-10-17)
+NO_WINDOWS = {1, 2, 3, 4}
 REMOVE = ['concrete_building19', 'concrete_building19.001', 'concrete_building3.004']
 
 
@@ -64,7 +66,7 @@ def _edge_faces():
     """見える辺ごとの Face (facade.py の形: 軸・位置・外向き) と、壁に沿った範囲"""
     out = []
     for i in range(len(OUTLINE)):
-        if i in HIDDEN:
+        if i in HIDDEN or i in NO_WINDOWS:
             continue
         a, b = Vector(OUTLINE[i]), Vector(OUTLINE[(i + 1) % len(OUTLINE)])
         t = (b - a).normalized()
