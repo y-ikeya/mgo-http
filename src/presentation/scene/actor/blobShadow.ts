@@ -21,9 +21,9 @@ const RADIUS = 0.7
  * 固定の色との min なら、日なたの床はこの暗さまで落ち、これより暗い床は何も変わらない。
  * 日陰の地面と同じくらいの暗さに置く。**比べるのは露出・色調の補正の前の明るさ** なので、
  * 画面で見える日陰の色 (#3a2f1e くらい) よりずっと暗い値になる。環境光 (stage.ts の
- * AMBIENT_INTENSITY) を動かしたら、補正前の明るさで同じ割合だけ動かす (0.7 で #120e08、0.9 で #16110a)
+ * AMBIENT_INTENSITY) を動かしたら、補正前の明るさで同じ割合だけ動かす (0.7 で #120e08、0.9 で #16110a、1.2 で #1a150d)
  */
-export const SHADOW_COLOR = '#16110a'
+export const SHADOW_COLOR = '#1a150d'
 
 let sharedTexture: THREE.Texture | null = null
 
