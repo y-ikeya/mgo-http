@@ -145,12 +145,16 @@ def entry_dirt(body_name, tag):
     entries = find_entries(body)
     dg = bpy.context.evaluated_depsgraph_get()
     scene = bpy.context.scene
-    name = f'vis_decal_b{tag}_entry_dirt_nouv'
-    if name in bpy.data.objects:
-        o = bpy.data.objects[name]; me = o.data
-        bpy.data.objects.remove(o, do_unlink=True); bpy.data.meshes.remove(me)
-    bm = bmesh.new(); uv = bm.loops.layers.uv.new('UVMap')
-    for e in entries:
+    # 前に作った物を消す (入り口ごとの物 _1, _2 … と、まとめて 1 つだった頃の物)
+    prefix = f'vis_decal_b{tag}_entry_dirt'
+    for o in [o for o in bpy.data.objects if o.name.startswith(prefix)]:
+        me = o.data
+        bpy.data.objects.remove(o, do_unlink=True)
+        if me.users == 0:
+            bpy.data.meshes.remove(me)
+    made = []
+    for index, e in enumerate(entries):
+        bm = bmesh.new(); uv = bm.loops.layers.uv.new('UVMap')
         center, n, t = e['at'], e['normal'], e['along']
         # 道の幅は口の幅ではなく人が通る幅。広い口 (b3 の北は 9.4m) でも真ん中に 1 本
         half = min(e['width'] / 2, PATH_HALF)
@@ -185,14 +189,21 @@ def entry_dirt(body_name, tag):
                     vals = ((u0, s0), (u0, 0.0), (u1, 0.0), (u1, s1))
                 for loop, val in zip(f.loops, vals):
                     loop[uv].uv = val
-    bm.normal_update()
-    for f in bm.faces:
-        if f.normal.z < 0:
-            f.normal_flip()
-    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
-    o = bpy.data.objects.new(name, me)
-    scene.collection.objects.link(o)
-    me.materials.append(bpy.data.materials['decal_entry_dirt'])
+        bm.normal_update()
+        for f in bm.faces:
+            if f.normal.z < 0:
+                f.normal_flip()
+        # **入り口ごとに 1 つの物、中心点はその道の真ん中。** 動かす・回す・縮めるを入り口ごとに
+        # 手でできるように (本人 2026-10-17「中心点が離れたところにあると scale しにくい」)
+        mid = sum((v.co for v in bm.verts), Vector()) / len(bm.verts)
+        bmesh.ops.translate(bm, vec=-mid, verts=bm.verts)
+        name = f'{prefix}_{index + 1}_nouv'
+        me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+        o = bpy.data.objects.new(name, me)
+        o.location = mid
+        scene.collection.objects.link(o)
+        me.materials.append(bpy.data.materials['decal_entry_dirt'])
+        made.append(name)
     return [(round(e['at'].x, 2), round(e['at'].y, 2), round(e['width'], 2)) for e in entries]
 
 

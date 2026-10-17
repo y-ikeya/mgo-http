@@ -19,12 +19,17 @@ def step_grime(body_name, tag, top, cut):
     ns = {}
     exec(open('/Users/yuma/workspace/mgo2http/tools/gen/flush_band.py').read(), ns)
     body = bpy.data.objects[body_name]
-    pts = []
-    for p in ns['outline'](body, cut):
-        if not pts or (p - pts[-1]).length > 0.02:
-            pts.append(p)
-    if len(pts) > 1 and (pts[0] - pts[-1]).length < 0.02:
-        pts.pop()
+    # 段の輪は 1 つとは限らない (増築を合わせた b18 は 2 つ)
+    rings = []
+    for ring in ns['outline'](body, cut, all_loops=True):
+        pts = []
+        for p in ring:
+            if not pts or (p - pts[-1]).length > 0.02:
+                pts.append(p)
+        if len(pts) > 1 and (pts[0] - pts[-1]).length < 0.02:
+            pts.pop()
+        if len(pts) >= 3:
+            rings.append(pts)
     dg = bpy.context.evaluated_depsgraph_get()
     scene = bpy.context.scene
     name = f'vis_decal_b{tag}_step_grime_nouv'
@@ -39,8 +44,8 @@ def step_grime(body_name, tag, top, cut):
             l[uv].uv = t
 
     made = 0
-    for i in range(len(pts)):
-        a, c = pts[i], pts[(i + 1) % len(pts)]
+    edges = [(pts[i], pts[(i + 1) % len(pts)]) for pts in rings for i in range(len(pts))]
+    for a, c in edges:
         d = c - a
         length = d.length
         if length < 0.08:
