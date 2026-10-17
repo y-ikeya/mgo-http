@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { TOWARD_CAMERA } from '../util/depth'
+import { DRAW_LATER, TOWARD_CAMERA } from '../util/depth'
 
 /**
  * 人の足元の丸い影。
@@ -56,11 +56,10 @@ export class BlobShadow {
       transparent: true,
       opacity: OPACITY,
       depthWrite: false,
-      // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)。
-      // **汚れの板 (4) より強く寄せる** — 板の上でも影が負けないように (stage.ts の decal)
+      // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)
       polygonOffset: true,
-      polygonOffsetFactor: 8 * TOWARD_CAMERA,
-      polygonOffsetUnits: 8 * TOWARD_CAMERA,
+      polygonOffsetFactor: 2 * TOWARD_CAMERA,
+      polygonOffsetUnits: 2 * TOWARD_CAMERA,
     })
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
     this.mesh.rotation.x = -Math.PI / 2
@@ -69,8 +68,12 @@ export class BlobShadow {
     this.mesh.receiveShadow = false
     // 親のスキニングと同じ理由で、画面端で消えないように
     this.mesh.frustumCulled = false
-    // 汚れの板 (0) より後に描く。透ける物同士は描いた順に重なるので、後に描いた影が上に乗る
-    this.mesh.renderOrder = 2
+    /*
+     * **汚れの板 (0) より後に描く。** どちらも深さを書かないので、後に描いた物が上に乗る。
+     * 先に描くと泥の絵が影を塗りつぶして、泥の上に立つと影が消えた (2026-10-17 本人)。
+     * 向きは深さの持ち方で裏返る (util/depth.ts の DRAW_LATER)
+     */
+    this.mesh.renderOrder = DRAW_LATER
     this.set('stand')
     this.mesh.scale.set(this.target.x, this.target.z, 1)
   }

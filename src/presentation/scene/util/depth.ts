@@ -16,3 +16,13 @@ export const REVERSED_DEPTH: boolean =
 
 /** 手前へ寄せる polygonOffset の向き (倍率)。既定の深さでは -1、逆向きでは +1 */
 export const TOWARD_CAMERA = REVERSED_DEPTH ? 1 : -1
+
+/**
+ * 透ける物を**後に描かせる** renderOrder の向き (倍率)。既定の深さでは +1、逆向きでは −1。
+ *
+ * **three (r185) は深さが逆向きの時、透ける物の描く順の一覧を丸ごと逆にする**
+ * (`RenderList.sort` の `reversedDepth`)。奥→手前の並びを直すための逆転だが、renderOrder の
+ * 大小まで一緒に裏返る。足元の影に renderOrder 1 を付けて「汚れの板 (0) の後に描く」つもりが、
+ * 実際には先に描かれて泥の絵が上に乗った (2026-10-17 本人「デカールの下に影がでちゃってる」)
+ */
+export const DRAW_LATER = REVERSED_DEPTH ? -1 : 1

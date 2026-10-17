@@ -11,6 +11,7 @@
  *     ?col=1                 人が止まる面を水色で重ねる (?col=box 審判の箱 / ?col=all 両方。本番と同じ)
  *     ?rdepth=0              深さを既定の向きに戻す (逆向きが既定。util/depth.ts)
  *     ?place=x,y,z,yaw       その足元・向きで置く所の予告 (印と扇) を出す。置けなければ赤
+ *     ?blob=x,y,z            その足元に人の影 (足元の丸) を置く。汚れの板との重なりを見る
  *
  * --- なぜ要るか ---
  * 壁に斜めの帯が出た時、影マップの影なのか、焼き込んだ頂点色なのか、見えない当たりの
@@ -27,6 +28,7 @@ import { BlastFx } from '../../src/presentation/scene/fx/blastfx'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
 import { STEP_UP } from '../../src/domain/player/moving'
+import { BlobShadow } from '../../src/presentation/scene/actor/blobShadow'
 
 const query = new URLSearchParams(location.search)
 const stageName = (query.get('stage') ?? 'city') as StageName
@@ -145,6 +147,18 @@ async function diffFrames(): Promise<void> {
   document.body.appendChild(canvas)
   panel.textContent += `\ndiff: 2mm 動かして 12/255 以上変わった画素 ${hot} / ${w * h}`
   document.body.appendChild(panel)
+}
+
+// 人の足元の影。本番と同じ物 (BlobShadow) を、人の根の代わりの入れ物に付けて置く
+const blobAt = query.get('blob')?.split(',').map(Number)
+if (blobAt && blobAt.length === 3 && blobAt.every(Number.isFinite)) {
+  const root = new THREE.Group()
+  root.position.set(blobAt[0]!, blobAt[1]!, blobAt[2]!)
+  const blob = new BlobShadow().mesh
+  root.add(blob)
+  scene.add(root)
+  // 切り分け: ?blobro=N で影の描く順を変える
+  if (query.get('blobro') !== null) blob.renderOrder = Number(query.get('blobro'))
 }
 
 /*
