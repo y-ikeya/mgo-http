@@ -33,7 +33,9 @@ OUTLINE = [(-3.88, -17.01), (-3.88, -20.46), (9.05, -20.46), (9.05, -18.99), (16
 HIDDEN = {6}       # 見えない辺 (OUTLINE[i] → OUTLINE[i+1])
 # 窓を付けない辺。**東と南は遊ぶ人から見えない** (隣の建物との 2〜4m の隙間、本人 2026-10-17)
 NO_WINDOWS = {1, 2, 3, 4}
-REMOVE = ['concrete_building19', 'concrete_building19.001', 'concrete_building3.004']
+# concrete_building3.004 は残す — 路地の口の閉まりかけのシャッター (metal_shutter.007) の横の、
+# 壁待ちのための壁 (本人 2026-10-17)。一度消してしまった
+REMOVE = ['concrete_building19', 'concrete_building19.001']
 
 
 def _prism(bm, pts, z0, z1):
