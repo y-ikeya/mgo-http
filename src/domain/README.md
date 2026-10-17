@@ -208,6 +208,7 @@ E LOCATOR は半径 15m を 20 秒、1 秒ごとに見る。**壁は抜ける**�
 | locator | E.LOCATOR | weapon | 0.5 | × |
 | knife | KNIFE | weapon | 0.3 | × |
 | box | C.BOX | tool | 2 | × |
+| stealth | STEALTH | tool | 0 | × |
 | none | NONE | tool | 0 | × |
 <!-- /検査 -->
 

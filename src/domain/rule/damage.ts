@@ -36,8 +36,8 @@ export const MELEE_CONE_COS = Math.cos((60 * Math.PI) / 180)
  * 持ち替えが入るまでは正面 50 (2 回) にしてあった。銃を持ったまま一瞬で
  * 刺せる状態で即死にすると、代償が無いまま報酬だけが残る。
  */
-const MELEE_BACK_DAMAGE = MAX_HEALTH
-const MELEE_FRONT_DAMAGE = MAX_HEALTH
+export const MELEE_BACK_DAMAGE = MAX_HEALTH
+export const MELEE_FRONT_DAMAGE = MAX_HEALTH
 /**
  * 「背後から」と判定する内積の閾値。
  * 攻撃者と被害者が同じ向きを向いていれば背後を取っている。
