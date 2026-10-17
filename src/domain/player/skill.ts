@@ -278,6 +278,8 @@ export function canChooseSkills(phase: Phase, mode?: ModeSpec, ready = false, ro
   if (phase === 'ready' && ready) return false
   // **後攻のラウンドの前は組み替えない** (TSNE は先攻と後攻で 1 試合。2026-10-17 本人)
   if (mode?.sides && round > 1) return false
+  // ラウンドの合間も組み替えない (試合の途中)
+  if (phase === 'break') return false
   return phase !== 'playing'
 }
 

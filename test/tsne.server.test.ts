@@ -83,6 +83,10 @@ describe('TSNE', () => {
       await Bun.sleep(300)
     }
     await Bun.sleep(300)
+    // まず合間 (ROUND 1 OVER)。このラウンドは守る側 (赤) の勝ち
+    expect(match(a)?.phase).toBe('break')
+    expect(match(a)?.winner).toBe('red')
+    await Bun.sleep(4200)
     // 支度 (ready) を通らずに秒読みへ。攻守が入れ替わり、試合の札は同じ
     expect(match(a)?.phase).toBe('countdown')
     expect(match(a)?.round).toBe(2)
@@ -107,6 +111,6 @@ describe('TSNE', () => {
     expect(match(a)?.winner).toBe('draw')
     a.close()
     b.close()
-  }, 40000)
+  }, 50000)
 
 })

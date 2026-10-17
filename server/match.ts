@@ -64,6 +64,11 @@ const ASSEMBLE_MS = process.env.MGO2_ASSEMBLE_MS !== undefined ? Number(process.
 const READY_GRACE_MS = process.env.MGO2_READY_GRACE_MS !== undefined ? Number(process.env.MGO2_READY_GRACE_MS) : 3000
 
 /**
+ * ラウンドの合間 (ms)。「ROUND 1 OVER」を見せる時間。最後の 1 秒で画面が黒へ落ちる (Hud.tsx)
+ */
+export const ROUND_BREAK_MS = 4 * 1000
+
+/**
  * 決着してから次の支度が始まるまで (ms)。結果を読む時間。
  *
  * **結果の曲が鳴り終わるまで待つ** (2026-10-17 本人)。「試合終了」の帯 2.4 秒の後に結果の画面が
@@ -391,6 +396,7 @@ function startNextRound(room: RoomWorld, now: number): void {
   }
   room.phase = 'countdown'
   room.endsAt = now + COUNTDOWN_MS
+  room.winner = undefined
   broadcast(room, rosterMessage(room))
 }
 
@@ -403,7 +409,10 @@ function endRound(room: RoomWorld, now: number): void {
   if (room.mode.sides) {
     if (winner !== 'draw') room.roundWins[winner] += 1
     if (room.round < 2) {
-      startNextRound(room, now)
+      // 合間を挟んでから後攻へ (updateMatch の break)。winner はこのラウンドの勝ち
+      room.phase = 'break'
+      room.winner = winner
+      room.endsAt = now + ROUND_BREAK_MS
       return
     }
     const { blue, red } = room.roundWins
@@ -724,6 +733,9 @@ export function updateMatch(room: RoomWorld, now: number): void {
         if (canChoose(player.life)) player.lifeAt = now
       }
     }
+  } else if (room.phase === 'break' && now >= room.endsAt) {
+    // ラウンドの合間が明けた。攻守を入れ替えて後攻の秒読みへ
+    startNextRound(room, now)
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION_MS

@@ -77,11 +77,11 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   createEffect(() => {
     const now = phase()
     // 待合室 (ready) から試合 (countdown) へも同じく黒から明ける (2026-10-09 本人)。
-    // **TSNE の先攻から後攻へ** (playing → countdown) も。攻守が入れ替わって湧き地点へ飛ぶのを黒で隠す
+    // **TSNE の先攻から後攻へ** (合間 → countdown) も。攻守が入れ替わって湧き地点へ飛ぶのを黒で隠す
     if (
       (lastPhase === 'assembled' && now === 'ready') ||
       (lastPhase === 'ready' && now === 'countdown') ||
-      (lastPhase === 'playing' && now === 'countdown')
+      (lastPhase === 'break' && now === 'countdown')
     ) {
       setDawn(true)
       const timer = setTimeout(() => setDawn(false), 900)
@@ -94,7 +94,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * READY で縮んだ締め切りにも効き、誰かが取り消して締め切りが戻れば黒も引く
    */
   const standbyClosing = () =>
-    phase() === 'ready' && (props.stats?.match?.endsAt ?? Infinity) - now() <= STANDBY_BLACK_MS
+    (phase() === 'ready' || phase() === 'break') &&
+    (props.stats?.match?.endsAt ?? Infinity) - now() <= STANDBY_BLACK_MS
   /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
   const mode = () => props.stats?.match?.mode ?? 'TDM'
   const teams = () => MODES[mode()].teams
@@ -430,6 +431,22 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         出す長さも消え方も Orders が持つ。ここは段階と陣営を渡すだけ。
       */}
       <Orders mode={mode()} team={props.stats?.team} phase={phase()} />
+
+      {/*
+        ラウンドの合間 (TSNE の先攻が終わった)。「ROUND 1 OVER」と、このラウンドの勝ち負け。
+        最後の 1 秒で黒へ落ち (standbyClosing)、後攻の秒読みで明ける
+      */}
+      <Show when={phase() === 'break'}>
+        <div class="orders orders-solo hud-game-set">
+          <div class="orders-band">
+            <div class="orders-heading">ROUND {props.stats?.match?.round ?? 1} OVER</div>
+            <div class="orders-rule" />
+            <div class="orders-text">
+              {props.stats?.match?.winner === 'draw' ? 'DRAW' : won() ? 'ROUND WIN' : 'ROUND LOSE'}
+            </div>
+          </div>
+        </div>
+      </Show>
 
       {/* 決着の 1 段目。「試合終了」だけを指令と同じ帯で告げる */}
       <Show when={phase() === 'over' && !revealed()}>

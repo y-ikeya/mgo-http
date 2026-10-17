@@ -45,6 +45,11 @@ export type Phase =
   | 'ready'
   | 'countdown'
   | 'playing'
+  /**
+   * ラウンドの合間 (TSNE の先攻が終わった)。**「ROUND 1 OVER」を見せてから暗転して後攻へ**
+   * (2026-10-17 本人)。撃っても効かない。終わると攻守を入れ替えて秒読み (countdown)
+   */
+  | 'break'
   | 'over'
 
 /**
