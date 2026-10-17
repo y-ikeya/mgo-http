@@ -343,6 +343,8 @@ export interface MatchPlayer extends Player {
   /** 倒した数 / 倒された数。試合ごとに 0 に戻る */
   kills: number
   deaths: number
+  /** このラウンドで倒れた回数。復活の回数 (TSNE の lives) はこれで数える。ラウンドの頭で 0 */
+  roundDeaths: number
   /**
    * 与えたヘッドショットと、**受けた**ヘッドショット。
    *
@@ -450,6 +452,7 @@ export function newMatchPlayer(seed: {
     bot: false,
     kills: 0,
     deaths: 0,
+    roundDeaths: 0,
     stuns: 0,
     ready: false,
     stamina: MAX_STAMINA,
@@ -705,6 +708,7 @@ export function downedBy(
 ): Credit {
   const credit = creditOf(victim.id, killer ? killer.id : null)
   victim.deaths++
+  victim.roundDeaths++
   // 切れている間に倒された。戻ってきても続きは無い — 死んだので支度から
   victim.wasAlive = false
   // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる

@@ -582,7 +582,7 @@ function handleMessage(
      */
     case 'skills': {
       const before = JSON.stringify(player.skills)
-      if (!chooseSkills(player, message.skills, room.phase, room.mode)) {
+      if (!chooseSkills(player, message.skills, room.phase, room.mode, room.round)) {
         reject(player, `選べないスキル (${JSON.stringify(message.skills)})`)
       }
       /*

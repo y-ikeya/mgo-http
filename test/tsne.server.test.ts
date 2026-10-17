@@ -74,17 +74,39 @@ describe('TSNE', () => {
   }, 30000)
 
   // **最後に置く。** 試合が終わるので、後の試験は次の試合の支度 (10 秒の結果) を待つことになる
-  test('**復活なし。攻める側が全員倒れたら、守る側の勝ちで終わる**', async () => {
+  test('**1 試合 = 先攻と後攻。間に支度を挟まず攻守を入れ替え、勝ったラウンドで決まる**', async () => {
     const { a, b } = await twoInTsne()
-    for (let i = 0; i < 6 && match(a)?.phase === 'playing'; i++) {
+    const id = match(a)?.matchId
+    // 先攻: alice (青) が攻める。復活なしなので 1 度倒れたらラウンドが終わる
+    for (let i = 0; i < 6 && match(a)?.round === 1; i++) {
       b.send({ type: 'damage', id: 'bob', target: 'alice', kind: 'bullet', zone: 'HEAD', distance: 12 })
       await Bun.sleep(300)
     }
-    await Bun.sleep(400)
+    await Bun.sleep(300)
+    // 支度 (ready) を通らずに秒読みへ。攻守が入れ替わり、試合の札は同じ
+    expect(match(a)?.phase).toBe('countdown')
+    expect(match(a)?.round).toBe(2)
+    expect(match(a)?.attack).toBe('red')
+    expect(match(a)?.roundWins).toEqual({ blue: 0, red: 1 })
+    expect(match(a)?.matchId).toBe(id)
+    // 後攻: alice は守る側。殺傷の銃を選んで出る
+    a.send({ type: 'loadout', primary: 'rifle', support: 'grenade' })
+    await Bun.sleep(5200)
+    a.send({ type: 'spawn' })
+    b.send({ type: 'spawn' })
+    await Bun.sleep(3600)
+    expect(match(a)?.phase).toBe('playing')
+    for (let i = 0; i < 6 && match(a)?.phase === 'playing'; i++) {
+      a.send({ type: 'damage', id: 'alice', target: 'bob', kind: 'bullet', zone: 'HEAD', distance: 12 })
+      await Bun.sleep(300)
+    }
+    await Bun.sleep(300)
+    // 1 対 1 で引き分け
     expect(match(a)?.phase).toBe('over')
-    expect(match(a)?.winner).toBe('red')
+    expect(match(a)?.roundWins).toEqual({ blue: 1, red: 1 })
+    expect(match(a)?.winner).toBe('draw')
     a.close()
     b.close()
-  }, 30000)
+  }, 40000)
 
 })

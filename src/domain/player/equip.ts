@@ -204,9 +204,11 @@ export function chooseSkills(
   skills: unknown,
   phase: Phase,
   mode?: ModeSpec,
+  /** いま何ラウンド目か (TSNE は後攻の前に組み替えない) */
+  round = 1,
 ): boolean {
   // READY を押している間は受け付けない。**取り消してから直す**
-  if (!canChooseSkills(phase, mode, player.ready)) return false
+  if (!canChooseSkills(phase, mode, player.ready, round)) return false
   if (skills === null || typeof skills !== 'object') return false
   if (!isAffordable(skills as Skills)) return false
   player.skills = skills as Skills

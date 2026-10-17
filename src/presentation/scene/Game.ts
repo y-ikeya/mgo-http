@@ -3022,6 +3022,7 @@ export class Game {
       this.replica.match?.phase ?? "waiting",
       MODES[this.replica.mode],
       this.selfReady,
+      this.replica.match?.round ?? 1,
     );
   }
 

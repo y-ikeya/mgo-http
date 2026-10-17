@@ -316,6 +316,8 @@ export function matchState(room: Match): ServerMessage {
     attack: room.mode.sides ? room.attack : undefined,
     stealth: room.mode.sides ? stealthActive(room, Date.now()) : undefined,
     cautionUntil: cautionUntil(room, Date.now()) ?? undefined,
+    round: room.mode.sides ? room.round : undefined,
+    roundWins: room.mode.sides ? room.roundWins : undefined,
     endsAt: room.endsAt,
     sentAt: Date.now(),
     phase: room.phase,
@@ -357,6 +359,57 @@ export function fitToRoom(room: RoomWorld, player: MatchPlayer): void {
   fitLoadout(player, primariesOf(room.name, side), secondaryOf(room.name, side), supportsOf(room.name, side))
 }
 
+/**
+ * 後攻のラウンドへ。**支度 (スキル選び) を挟まず、攻守を入れ替えて秒読みから** (TSNE)。
+ *
+ * 試合の札・戦績はそのまま (1 試合の続き)。置いた物は片付ける — 前のラウンドの守る側の
+ * クレイモアが、次のラウンドでは攻める側の物として残ることになる。装備は側が変わったので
+ * 選び直す (支度の画面は出す。スキルの窓は出さない)
+ */
+function startNextRound(room: RoomWorld, now: number): void {
+  room.round += 1
+  swapSides(room)
+  room.revealedUntil = 0
+  room.grenades.length = 0
+  clearClaymores(room)
+  clearDecoys(room)
+  clearLocators(room)
+  for (const player of connected(room)) {
+    fitToRoom(room, player)
+    player.roundDeaths = 0
+    player.sleepUntil = 0
+    setLife(room, player, 'choosing', now)
+    player.health = MAX_HEALTH
+    player.concentratingSince = 0
+    sendHealth(room, player, 0, false)
+  }
+  room.phase = 'countdown'
+  room.endsAt = now + COUNTDOWN_MS
+  broadcast(room, rosterMessage(room))
+}
+
+/**
+ * ラウンドの決着。**後攻まで終わっていれば試合の決着** (勝ったラウンドが多い側、1 対 1 は引き分け)。
+ * まだなら後攻のラウンドへ。分かれない部屋はそのまま試合の決着
+ */
+function endRound(room: RoomWorld, now: number): void {
+  const winner = decideWinner(room)
+  if (room.mode.sides) {
+    if (winner !== 'draw') room.roundWins[winner] += 1
+    if (room.round < 2) {
+      startNextRound(room, now)
+      return
+    }
+    const { blue, red } = room.roundWins
+    room.winner = blue === red ? 'draw' : blue > red ? 'blue' : 'red'
+  } else {
+    room.winner = winner
+  }
+  room.phase = 'over'
+  room.endsAt = now + INTERMISSION_MS
+  finishMatch(room)
+}
+
 /** 全員を湧き地点へ戻して立たせる。段階が変わるたびに呼ぶ */
 export function resetPlayers(room: RoomWorld): void {
   /*
@@ -387,6 +440,7 @@ export function resetPlayers(room: RoomWorld): void {
     if (room.mode.sides) fitToRoom(room, player)
     player.kills = 0
     player.deaths = 0
+    player.roundDeaths = 0
     // 記録に残す分もここで戻す。**足したら必ずここにも足す** —
     // 戻し忘れると前の試合の数が次に混ざる
     player.headshots = 0
@@ -513,9 +567,12 @@ function enterReady(room: RoomWorld, now: number, afterMatch = false): void {
   room.blue = TICKETS
   room.red = TICKETS
   room.winner = undefined
-  // **攻守交代。** 試合を 1 つ終えるたびに必ず入れ替える (2026-10-17 本人)
+  // **攻守交代。** 試合を 1 つ終えるたびに必ず入れ替える (2026-10-17 本人)。
+  // 1 試合は先攻と後攻の 2 ラウンドなので、終わった時点で 1 度入れ替わっている。戻して同じ色から始める
   if (room.mode.sides && afterMatch) swapSides(room)
   room.revealedUntil = 0
+  room.round = 1
+  room.roundWins = { blue: 0, red: 0 }
   for (const player of room.players.values()) player.ready = false
   resetPlayers(room)
   if (room.mode.sides) standingCounts(room, now)
@@ -664,9 +721,12 @@ export function updateMatch(room: RoomWorld, now: number): void {
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION_MS
-    // ここで身元が決まる。以後この試合の記録は全部これに紐づく
-    room.matchId = crypto.randomUUID()
-    room.startedAt = now
+    // ここで身元が決まる。以後この試合の記録は全部これに紐づく。
+    // **後攻のラウンドは同じ試合の続き** なので発番し直さない
+    if (!(room.mode.sides && room.round > 1 && room.matchId)) {
+      room.matchId = crypto.randomUUID()
+      room.startedAt = now
+    }
     // まだ選んでいる人は出さない。秒読みに入った時から数えて 30 秒で打ち切る (上の countdown)
   }
   // 攻守に分かれる部屋は、まだ戦える人数を数え直してから決着を見る
@@ -675,16 +735,10 @@ export function updateMatch(room: RoomWorld, now: number): void {
     // 段階が変わった刻みでは決着を見ない (上の分岐で済んでいる)
   } else if (ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
-    room.phase = 'over'
-    room.winner = decideWinner(room)
-    room.endsAt = now + INTERMISSION_MS
-    finishMatch(room)
+    endRound(room, now)
   } else if (now >= room.endsAt) {
     // 時間切れ。陣営戦は多く残っているほう、個人戦は倒した数が一番多い人
-    room.phase = 'over'
-    room.winner = decideWinner(room)
-    room.endsAt = now + INTERMISSION_MS
-    finishMatch(room)
+    endRound(room, now)
   }
 
   // ステルスが解けた / 戻った瞬間にも配る。1 秒ごとの便を待つと、5 秒のうち最大 1 秒ずれる

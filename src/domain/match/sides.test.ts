@@ -60,7 +60,7 @@ describe('復活', () => {
   test('倒れた回数が復活の回数を超えたら終わり', () => {
     const player = newMatchPlayer({ id: 'a', name: 'a', team: 'blue', slot: 0, now: 0 })
     expect(canRespawn(player, 0)).toBe(true)
-    player.deaths = 1
+    player.roundDeaths = 1
     expect(canRespawn(player, 0)).toBe(false)
     expect(canRespawn(player, 1)).toBe(true)
     expect(canRespawn(player, null)).toBe(true)
@@ -80,7 +80,7 @@ describe('決着の数え方', () => {
     seat(match, 'c', 'red')
     a.sleepUntil = 10_000
     b.life = 'downed'
-    b.deaths = 1
+    b.roundDeaths = 1
     expect(isOut(a, 0, 5_000)).toBe(true)
     expect(isOut(b, 0, 5_000)).toBe(true)
     const seats = [...match.players.values()]
@@ -92,7 +92,7 @@ describe('決着の数え方', () => {
     const match = tsne()
     const a = seat(match, 'a', 'blue')
     a.life = 'downed'
-    a.deaths = 1
+    a.roundDeaths = 1
     expect(isOut(a, 1, 0)).toBe(false)
   })
 

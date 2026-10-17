@@ -257,7 +257,7 @@ function maxLevelOf(id: SkillId): SkillLevel {
  * 逆に空にすると、抜けて入り直しただけの人が丸腰になる。**持ち越すのが、
  * どちらにも寄らない形。**
  */
-export function canChooseSkills(phase: Phase, mode?: ModeSpec, ready = false): boolean {
+export function canChooseSkills(phase: Phase, mode?: ModeSpec, ready = false, round = 1): boolean {
   // **練習部屋はいつでも組み替えられる。** 相手が棒立ちの的なので、後出しに
   // なる相手が居ない。ここは効き目を試す場所で、試すたびに試合の切れ目を
   // 待たせると**確かめられない**
@@ -276,6 +276,8 @@ export function canChooseSkills(phase: Phase, mode?: ModeSpec, ready = false): b
    * 席に残った古い値で固めてしまわないようにする。
    */
   if (phase === 'ready' && ready) return false
+  // **後攻のラウンドの前は組み替えない** (TSNE は先攻と後攻で 1 試合。2026-10-17 本人)
+  if (mode?.sides && round > 1) return false
   return phase !== 'playing'
 }
 

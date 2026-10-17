@@ -1044,6 +1044,10 @@ export interface MatchMessage {
    * 受け取る側は endsAt と同じく手元の時計へ直す
    */
   cautionUntil?: number
+  /** いま何ラウンド目か (TSNE。1 = 先攻、2 = 後攻)。1 試合は 2 ラウンド */
+  round?: number
+  /** 色ごとに勝ったラウンドの数 (TSNE) */
+  roundWins?: Record<Team, number>
   /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
    *

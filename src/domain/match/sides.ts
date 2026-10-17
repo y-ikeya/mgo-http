@@ -3,7 +3,8 @@
  *
  * 決まりごと (2026-10-17 本人):
  *
- *     攻守       試合ごとに必ず入れ替わる
+ *     攻守       **1 試合 = 先攻と後攻の 2 ラウンド。** ラウンドの間で入れ替わり、間に支度
+ *                (スキル選び) は挟まない (2026-10-17 本人)。勝ったラウンドが多い側の勝ち、1 対 1 は引き分け
  *     復活       1 人が復活できる回数を部屋で決める (room.ts の lives、0 なら復活なし)
  *     勝ち負け   相手の側が**全員倒れたか眠った**ら勝ち。時間切れは守る側の勝ち
  *     ステルス   攻める側の体だけが見えなくなる (武器・影・置いた物は見える)。
@@ -45,11 +46,11 @@ export function swapSides(room: Match): void {
 /**
  * まだ復活できるか。
  *
- * 倒れた回数 (deaths) が復活の回数を超えたら終わり。0 なら 1 度倒れたら終わり。
+ * このラウンドで倒れた回数 (roundDeaths) が復活の回数を超えたら終わり。0 なら 1 度倒れたら終わり。
  * **null (部屋が決めていない) は何度でも。**
  */
 export function canRespawn(player: MatchPlayer, lives: number | null): boolean {
-  return lives === null || player.deaths <= lives
+  return lives === null || player.roundDeaths <= lives
 }
 
 /**
