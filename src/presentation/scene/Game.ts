@@ -1109,6 +1109,8 @@ export class Game {
   private attackTeam: Team | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
   private stealthOn = false;
+  /** 直前の通で STEALTH が解けていたか (CAUTION 中)。明けた音をその後だけ鳴らす */
+  private cautionSeen = false;
 
   /** 陣営のある部屋か。基地 (補給) があるのはそのとき */
   private teamsMode = false;
@@ -2492,6 +2494,12 @@ export class Game {
         if (this.stealthOn && message.stealth === false && message.phase === "playing") {
           this.audio.playUi("detectAlert");
         }
+        // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)
+        if (!this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen) {
+          this.audio.playUi("stealthSet");
+        }
+        // 戻った音は「解けていた」を見た後だけ。入室直後の最初の通 (false → true に見える) では鳴らさない
+        this.cautionSeen = message.stealth === false && message.phase === "playing";
         this.stealthOn = message.stealth === true;
         break;
 
@@ -4954,6 +4962,7 @@ export class Game {
       toSupport: this.input.tapped("toSupport") && !this.voiceMenuOpen(),
     };
 
+    const wasWearing = this.inv.wearingStealth;
     const events = this.inv.hand(intent, {
       canAct: canAct(this.life),
       choosing: this.loadoutBlocking,
@@ -4962,6 +4971,8 @@ export class Game {
       canWearBox: this.player.canWearBox,
     }, dt);
 
+    // 自分で STEALTH を着た (C・一覧)。湧いた時に着ているのは鳴らさない
+    if (!wasWearing && this.inv.wearingStealth) this.audio.playUi("stealthSet");
     // 一覧が受け取らなかったぶんは倍率へ回す
     this.wheelLeft = this.inv.browsing ? 0 : wheel;
     // 一覧を開いている間は、右スティックを視点ではなく一覧に使う

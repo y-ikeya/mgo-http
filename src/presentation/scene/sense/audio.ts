@@ -466,6 +466,12 @@ const UI_SOUNDS = {
    * 全員の画面に出るのと同じ (2026-10-17 本人、tools/raw/detectAlert.mp3 のまま)
    */
   detectAlert: { file: "detect_alert1.mp3", volume: 0.6 },
+  /**
+   * STEALTH が効き始めた。**自分で着た時** (自分にだけ) と、**CAUTION が明けて攻める側の
+   * STEALTH が戻った時** (部屋の全員に。暴かれた音と対) (2026-10-17 本人、tools/raw/stealthSet.mp3 のまま)
+   */
+  // 音源が暴かれた音より 7dB 小さいので、同じくらいに聞こえるよう 1.0
+  stealthSet: { file: "stealth_set1.mp3", volume: 1.0 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;
