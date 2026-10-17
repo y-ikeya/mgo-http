@@ -12,6 +12,7 @@
 # 何も問題なく見えるのに、ゲームに入れて初めて壊れているのが分かる、を減らす。
 
 import bpy
+import numpy as np
 import bmesh
 import sys
 import os
@@ -449,6 +450,67 @@ for obj, mesh in baked:
 if baked:
     print(f'  モディファイアを確定させた: {len(baked)} 個 (形 {len(baked_by_key)} 種類)')
 
+# --- 汚れの板を材質ごとに 1 つにまとめる ---------------------------------------
+#
+# 汚れの板 (vis_decal_*) は建物ごとに別の物で作ってあり、そのまま出すと物の数だけ
+# 描く回数が増える (city で 68 回)。three は勝手にまとめないので、ここで 1 つの物に
+# 合わせる。glTF は材質ごとに 1 つの塊になるので、**描く回数は材質の数 (6) になる**
+# (本人 2026-10-15)。.blend の側は建物ごとのまま (作り直しや消すのが楽)。
+#
+# 材質は**中身が同じなら 1 つに寄せる**。建物ごとに作った時に decal_streak.001 … と
+# 写しができていて、同じ画像を指す材質が 6 つあった。写しのままでは塊も 6 つに割れる。
+#
+# 合わせた物の名前は decal を含む — 画面の側が名前で深さの寄せ方を決めている (stage.ts)。
+def _material_key(mat):
+    if not mat.use_nodes or not mat.node_tree:
+        return ('plain', mat.name)
+    nodes = []
+    for node in mat.node_tree.nodes:
+        values = []
+        for socket in node.inputs:
+            if socket.is_linked or not hasattr(socket, 'default_value'):
+                continue
+            v = socket.default_value
+            try:
+                v = tuple(round(x, 4) for x in v)
+            except TypeError:
+                v = round(v, 4) if isinstance(v, float) else v
+            values.append((socket.name, v))
+        image = node.image.filepath if node.type == 'TEX_IMAGE' and node.image else None
+        nodes.append((node.type, image, tuple(values)))
+    links = tuple(sorted((l.from_node.type, l.from_socket.name, l.to_node.type, l.to_socket.name) for l in mat.node_tree.links))
+    return (getattr(mat, 'blend_method', None), tuple(sorted(nodes, key=str)), links)
+
+
+decals = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o.select_get() and 'vis_decal' in o.name]
+if len(decals) > 1:
+    canon = {}
+    for obj in decals:
+        for slot in obj.material_slots:
+            if slot.material:
+                slot.material = canon.setdefault(_material_key(slot.material), slot.material)
+    with bpy.context.temp_override(active_object=decals[0], object=decals[0], selected_objects=decals, selected_editable_objects=decals):
+        bpy.ops.object.join()
+    merged = decals[0]
+    merged.name = 'vis_decal_merged_nouv'
+    # 同じ材質が別の枠に入ったまま残るので、1 つの枠に寄せてから空いた枠を消す
+    mesh = merged.data
+    first = {}
+    remap = []
+    for i, mat in enumerate(mesh.materials):
+        remap.append(first.setdefault(mat.name if mat else None, i))
+    for poly in mesh.polygons:
+        poly.material_index = remap[poly.material_index]
+    for i in reversed(range(len(mesh.materials))):
+        if remap[i] != i:
+            mesh.materials.pop(index=i)
+            # 消した枠より後ろの番号を詰める
+            for poly in mesh.polygons:
+                if poly.material_index > i:
+                    poly.material_index -= 1
+    print(f'  汚れの板を合わせた: {len(decals)} 個 → 1 個 (材質 {len(mesh.materials)})')
+
+
 # --- 置き物の三角を落とす ----------------------------------------------------
 #
 # 木箱のような持ち込みの形は 1 つ 1,600 枚ほどある。壁や床は 12 枚。**置き物 1 つに
@@ -467,6 +529,13 @@ PROP_COLLAPSE_TO = 4000
 thinned = {}
 for obj in list(bpy.context.scene.objects):
     if obj.type != 'MESH' or not obj.select_get():
+        continue
+    # **汚れの板は間引かない。** 合わせた板は 400 枚を超えるので置き物と同じに扱われ、
+    # 平らな面を溶かされていた。入り口の踏み跡の道は地面に寝た板で、濃さを真ん中の線の
+    # 頂点の UV (v = 1) に持たせている — 溶かすと縁の頂点 (v = 0) だけが残り、道全体が
+    # 縁の薄さになって薄いシミに見えた (本人 2026-10-17「blender だと黒い模様が出てるのに
+    # three だと出ない」)。delimit UV は UV の島の境目しか守らない
+    if 'decal' in obj.name:
         continue
     mesh = obj.data
     if mesh.name in thinned:
@@ -1824,6 +1893,100 @@ def shrink_textures():
         print(f'  絵はそのまま: 上限 {MAX_TEXTURE} を超える物は無い')
 
 shrink_textures()
+
+
+# --- 色相・彩度・明度のノードを絵に焼き込む ---------------------------------------
+#
+# glTF は材質の中のノードを運べない。「絵 → 色相・彩度・明度 → 基本色」と繋いだ材質は、
+# 書き出すと**ノードが黙って落ちて素の絵の色**になる。city の土の床は明度 0.2 で暗くして
+# あったのに、ゲームでは素の明るさで出て、Blender のほうが黒く見えた (本人 2026-10-16)。
+# 絵の写しにノードと同じ計算を掛け、絵を直接基本色へ繋ぎ直す (.blend は変わらない)。
+#
+# 計算は Blender のノードと同じく**線形の色で** HSV を回す。絵は sRGB で持っているので
+# 線形へ戻してから掛け、sRGB へ戻して書く。
+def _srgb_to_linear(c):
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _linear_to_srgb(c):
+    return np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(np.maximum(c, 0), 1 / 2.4) - 0.055)
+
+
+def _apply_hsv(rgb, hue, sat, val):
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    mx = np.max(rgb, axis=-1); mn = np.min(rgb, axis=-1); d = mx - mn
+    h = np.zeros_like(mx)
+    nz = d > 1e-8
+    rc = np.where(nz, (mx - r) / np.where(nz, d, 1), 0)
+    gc = np.where(nz, (mx - g) / np.where(nz, d, 1), 0)
+    bc = np.where(nz, (mx - b) / np.where(nz, d, 1), 0)
+    h = np.where(r == mx, bc - gc, np.where(g == mx, 2 + rc - bc, 4 + gc - rc))
+    h = np.where(nz, (h / 6) % 1, 0)
+    s_ = np.where(mx > 1e-8, d / np.where(mx > 1e-8, mx, 1), 0)
+    v = mx
+    h = (h + hue - 0.5) % 1
+    s_ = np.clip(s_ * sat, 0, 1)
+    v = v * val
+    i = np.floor(h * 6).astype(np.int32) % 6
+    f = h * 6 - np.floor(h * 6)
+    p_ = v * (1 - s_); q = v * (1 - s_ * f); t = v * (1 - s_ * (1 - f))
+    out = np.stack([
+        np.choose(i, [v, q, p_, p_, t, v]),
+        np.choose(i, [t, v, v, q, p_, p_]),
+        np.choose(i, [p_, p_, t, v, v, q]),
+    ], axis=-1)
+    return out
+
+
+def bake_hsv_nodes():
+    baked = []
+    done = set()
+    for obj in bpy.context.scene.objects:
+        if obj.type != 'MESH' or not obj.select_get():
+            continue
+        for slot in obj.material_slots:
+            mat = slot.material
+            if not mat or not mat.use_nodes or mat.name in done:
+                continue
+            done.add(mat.name)
+            tree = mat.node_tree
+            for node in list(tree.nodes):
+                if node.type != 'HUE_SAT':
+                    continue
+                src = node.inputs['Color'].links
+                dst = [l for l in node.outputs['Color'].links if l.to_socket.name == 'Base Color']
+                if not src or not dst or src[0].from_node.type != 'TEX_IMAGE' or node.inputs['Factor'].is_linked:
+                    continue
+                tex = src[0].from_node
+                image = tex.image
+                if image is None:
+                    continue
+                hue = node.inputs['Hue'].default_value
+                sat = node.inputs['Saturation'].default_value
+                val = node.inputs['Value'].default_value
+                fac = node.inputs['Factor'].default_value
+                w, h = image.size
+                px = np.empty(w * h * 4, dtype=np.float32)
+                image.pixels.foreach_get(px)
+                px = px.reshape(-1, 4)
+                lin = _srgb_to_linear(px[:, :3])
+                out = _apply_hsv(lin, hue, sat, val)
+                out = lin + (out - lin) * fac
+                px[:, :3] = np.clip(_linear_to_srgb(out), 0, 1)
+                # 写しは新しく作る (image.copy() は縮める前の大きさで読み直してしまう)
+                copy = bpy.data.images.new(image.name + '_hsv', w, h, alpha=True)
+                copy.colorspace_settings.name = image.colorspace_settings.name
+                copy.pixels.foreach_set(px.ravel())
+                copy.file_format = 'JPEG'
+                copy.pack()
+                tex.image = copy
+                tree.links.new(tex.outputs['Color'], dst[0].to_socket)
+                baked.append((mat.name, image.name, round(hue, 3), round(sat, 3), round(val, 3)))
+    for row in baked:
+        print(f'  色相・彩度・明度を絵に焼き込んだ: {row[0]} ({row[1]}) H {row[2]} S {row[3]} V {row[4]}')
+
+
+bake_hsv_nodes()
 
 
 def patch_gltf_vertex_color():

@@ -38,6 +38,7 @@ import { MAX_FALL_SPEED, applyBlastDamage, applyCqc, applyDamage, reject} from '
 import { alertAims, alertShot } from './alert'
 import { relayAwareness, revealTo } from './aware'
 import {
+  fitToRoom,
   leaveRoom,
   matchState,
   recordSeat,
@@ -62,11 +63,15 @@ import {
   isRoomName,
   isRoomOpen,
   modeOf,
+  livesOf,
   primariesOf,
+  secondariesOf,
   secondaryOf,
+  supportsOf,
 } from '../src/domain/match/room'
+import { canRespawn, isStealthed, sideOf } from '../src/domain/match/sides'
 import { RECONNECT_GRACE_MS, assignTeam, connected, holdsChoosing, present, nextSlot } from '../src/domain/match/match'
-import { stampLocomotion, stampProtected } from '../src/infra/codec/snapshot'
+import { stampLocomotion, stampProtected, stampStealthed } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
 import { HELD } from '../src/domain/item/held'
 import { sensedBy } from '../src/sim/judge/claymore'
@@ -81,7 +86,7 @@ import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { MAX_STAMINA, recoverStamina } from '../src/domain/player/stamina'
 import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
-import { chooseLoadout, chooseSkills, fitLoadout } from '../src/domain/player/equip'
+import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
 
 
 /**
@@ -167,6 +172,8 @@ setInterval(() => {
           const view = new DataView(last.buffer, last.byteOffset, last.byteLength)
           stampLocomotion(view, 'away')
           stampProtected(view, false)
+          // 切れている間も体は残る。ステルスは今の状態で消し直す (切れる前に効いていた分を残さない)
+          stampStealthed(view, isStealthed(room, player, now))
           relayState(room, player, last)
         }
       }
@@ -214,7 +221,8 @@ setInterval(() => {
          * **決めるのはドメイン** (advanceLife)。尺も遷移先も遊びの数字なので、
          * ここは返ってきたことをやるだけ — 配るのも装備を配り直すのも権威の仕事。
          */
-        const effect = advanceLife(player.life, lifeElapsed(player, now))
+        // 復活の回数を使い切った人は倒れたまま (TSNE の lives)
+        const effect = advanceLife(player.life, lifeElapsed(player, now), canRespawn(player, livesOf(room.name)))
         if (effect?.kind === 'life') setLife(room, player, effect.to, now)
         else if (effect?.kind === 'spawn' && !holdsChoosing(room.phase)) spawn(room, player, now)
 
@@ -550,10 +558,12 @@ function handleMessage(
           message.primary,
           message.support,
           canChoose(player.life),
-          // その部屋に持ち込める銃だけ。**申告は信じない**
-          primariesOf(room.name),
+          // その部屋 (と側) に持ち込める物だけ。**申告は信じない**
+          primariesOf(room.name, sideOf(room, player.team)),
           message.secondary,
-          secondaryOf(room.name),
+          secondaryOf(room.name, sideOf(room, player.team)),
+          supportsOf(room.name, sideOf(room, player.team)),
+          secondariesOf(room.name, sideOf(room, player.team)),
         )
       ) {
         reject(
@@ -572,7 +582,7 @@ function handleMessage(
      */
     case 'skills': {
       const before = JSON.stringify(player.skills)
-      if (!chooseSkills(player, message.skills, room.phase, room.mode)) {
+      if (!chooseSkills(player, message.skills, room.phase, room.mode, room.round)) {
         reject(player, `選べないスキル (${JSON.stringify(message.skills)})`)
       }
       /*
@@ -834,6 +844,16 @@ function handleMessage(
         console.warn(`[遅延] ${player.name} を切る rtt=${Math.round(session.lag.rtt)}ms`)
         session.socket.close(LAG_CLOSE_CODE, '通信の遅れが大きすぎます')
       }
+      break
+    }
+
+    // 画面が詰まった。**ログに書くだけ** (遅延で切る前に何が起きていたかを後で読む)
+    case 'slowFrame': {
+      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : -1)
+      console.warn(
+        `[重い] ${player.name} ${n(message.ms)}ms 位置 (${n(message.x)}, ${n(message.z)}) 向き ${n(((message.yaw as number) * 180) / Math.PI)}° ` +
+          `描画 ${n(message.draws)} 回 / ${n(message.triangles)} 三角 heap ${n(message.heap)}MB ステージ ${room.stage.name}`,
+      )
       break
     }
 
@@ -1126,7 +1146,7 @@ const server = Bun.serve<Client>({
         room.players.set(joined.id, joined)
         sessions.set(joined.id, newSession(joined, socket))
         // その部屋に持ち込めない銃なら差し替える。**別の部屋から持って来られる**
-        fitLoadout(joined, primariesOf(room.name), secondaryOf(room.name))
+        fitToRoom(room, joined)
         restoreSkills(joined)
       }
 

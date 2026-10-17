@@ -23,7 +23,7 @@ import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
-import { CLIMB_TOP_TUNING } from "./soldier";
+import { CLIMB_TOP_TUNING, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import { DeathSlide } from "./deathSlide";
 import {
@@ -209,6 +209,8 @@ export class RemoteSoldier {
   }
   /** 壁越しに見せる身体。敬礼を交わした味方にだけ出す */
   private readonly glow: THREE.SkinnedMesh[] = [];
+  /** 体の形 (着ている物)。**ステルスで隠すのはこれだけ** — 武器・影・箱は別の物 */
+  private readonly bodies: THREE.SkinnedMesh[] = [];
   private ally = false;
   /** 敬礼を交わしたか。位置は届いていても、繋がるまでは映さない */
   private linked = false;
@@ -230,8 +232,6 @@ export class RemoteSoldier {
   private readonly aimDir = new THREE.Vector3();
   /** いま持っている銃 */
   private weaponKind: WeaponId = 'rifle';
-  /** 差し替えの最中。二重に走らせない */
-  private swapping = false;
   /** 取り付けの基準。最初の 1 回で決めて、持ち替えでも使い回す */
   private attachRef: {
     matrix: THREE.Matrix4;
@@ -306,11 +306,27 @@ export class RemoteSoldier {
   private setGhost(on: boolean): void {
     if (this.ghost === on) return;
     this.ghost = on;
+    this.applyBodyOpacity(true);
+  }
+
+  /**
+   * 体の濃さを掛け直す。**無敵の半透明 × STEALTH の消え具合。**
+   *
+   * @param force 透け方 (transparent) まで切り替える。毎コマの濃さだけなら要らない
+   */
+  private applyBodyOpacity(force = false): void {
+    const fading = this.stealthFade > 0
+    const opacity = (this.ghost ? 0.35 : 1) * (1 - this.stealthFade)
     for (const material of this.tinted) {
-      material.transparent = on || material.userData.wasTransparent === true;
-      material.opacity = on ? 0.35 : 1;
-      material.needsUpdate = true;
+      const transparent = this.ghost || fading || material.userData.wasTransparent === true
+      if (force || material.transparent !== transparent) {
+        material.transparent = transparent
+        material.needsUpdate = true
+      }
+      material.opacity = opacity
     }
+    // 消え切ったら描かない (透明でも描くと重なりの順で縁が残る)
+    for (const body of this.bodies) body.visible = this.stealthFade < 0.999
   }
 
   /** 位置が届いている回数 (通/秒)。診断の表示に使う */
@@ -600,12 +616,14 @@ export class RemoteSoldier {
 
     // 無敵の間は半透明。撃てない相手だと見て分かる必要がある
     this.setGhost(state.protectedNow)
+    // STEALTH (TSNE)。効いているかはサーバーが確かめて位置に乗せてくる
+    this.setStealthed(state.stealthed)
+    this.stepStealthFade(dt)
 
     // 銃を隠す場面は自機と同じドメインルールで当てる。片方だけだと、自分では納めているのに
     // 相手の画面には出たままになる。
     //   ダンボール         … 手が塞がっている
     //   手が空いている型   … 敬礼・転がり・受け身など (domain の emptyHanded)
-    //   拳銃を構えていない … ホルスターに納まっている
     //   ナイフを出している      … 銃は背中 (ナイフの型に銃を持たせない)
     const holstered =
       this.boxed ||
@@ -614,8 +632,8 @@ export class RemoteSoldier {
       // ぶら下がっている間は両手が縁に掛かっている
       state.locomotion === 'hang_drop' ||
       state.locomotion === 'hang' ||
-      state.locomotion === 'hang_climb' ||
-      (state.weapon === 'm9' && !state.aiming && !state.reloading)
+      state.locomotion === 'hang_climb'
+    // 拳銃も構えていない間ずっと手に持つ (soldier.ts と同じ)。STEALTH で体が消えても武器は見える
     if (this.weapon) this.weapon.visible = !holstered
 
     this.object.updateMatrixWorld(true);
@@ -715,6 +733,37 @@ export class RemoteSoldier {
     return this.linked;
   }
 
+  /** ステルスで体が見えなくなっているか (TSNE の攻める側) */
+  private stealthed = false;
+
+
+  /**
+   * ステルス。**体だけを隠す** (2026-10-17 本人)。
+   *
+   * 手に持った武器 (手の骨に付いている別の形)・足元の影・ダンボール・置いた物は
+   * 見えたまま。**光 (EE で抜かれた・味方のリンク) も出す** — 自分が当てた・繋いだ結果なので
+   * (2026-10-17 本人)。TARGET ALERT の霧はサーバーが出さない (server/alert.ts)
+   */
+  setStealthed(on: boolean): void {
+    this.stealthed = on;
+  }
+
+  /**
+   * STEALTH の消え具合 (0 = 見える、1 = 消えた)。**じわっと消え、すぐ現れる** (2026-10-17 本人
+   * 「一気に透明になるんじゃなくてじわっと消えて」)。現れる側は暴かれた瞬間が読めないと困るので速く
+   */
+  private stealthFade = 0;
+
+  private stepStealthFade(dt: number): void {
+    const target = this.stealthed ? 1 : 0
+    if (this.stealthFade === target) return
+    const step = dt / (this.stealthed ? STEALTH_FADE_OUT : STEALTH_FADE_IN)
+    this.stealthFade = target > this.stealthFade
+      ? Math.min(target, this.stealthFade + step)
+      : Math.max(target, this.stealthFade - step)
+    this.applyBodyOpacity()
+  }
+
   private applyGlow(): void {
     // 漏れている人は敵でも光る。味方は敬礼で繋いだときだけ
     const on = this.leaking || (this.ally && this.linked);
@@ -740,6 +789,8 @@ export class RemoteSoldier {
       if ((obj as THREE.SkinnedMesh).isSkinnedMesh) sources.push(obj as THREE.SkinnedMesh);
     });
 
+    this.bodies.push(...sources);
+    this.applyBodyOpacity(true);
     for (const source of sources) {
       const material = new MeshBasicNodeMaterial({
         color: ALLY_GLOW_TINT[this.team],
@@ -956,21 +1007,19 @@ export class RemoteSoldier {
    * 読み込みは共有のキャッシュに乗るので、2 回目以降は待ち時間が出ない。
    */
   private async equip(kind: WeaponId): Promise<void> {
-    if (kind === this.weaponKind || this.swapping) return;
+    if (kind === this.weaponKind) return;
     this.weaponKind = kind
     this.animator?.setPistol(kind === 'm9');
     const model = this.model;
     if (!model) return;
-
-    this.swapping = true;
-    try {
-      const old = this.weapon;
-      this.weapon = null;
-      old?.dispose();
-      await this.attachWeapon(model, kind);
-    } finally {
-      this.swapping = false;
-    }
+    /*
+     * 持ち替え中に次の持ち替えが来ても**捨てない。** 以前は読み込み中の間は無視していて、
+     * 最後の持ち替えが落ちると古い銃のまま残った。後から届いた古い読み込みは attachWeapon が捨てる
+     */
+    const old = this.weapon;
+    this.weapon = null;
+    old?.dispose();
+    await this.attachWeapon(model, kind);
   }
 
   private async attachWeapon(
@@ -987,6 +1036,15 @@ export class RemoteSoldier {
     if (this.disposed) {
       weapon.dispose();
       return;
+    }
+    // 読み込みの間に持ち替えていたら捨てる (遅く届いた古い銃が手に残らないように。soldier.ts と同じ)
+    if (kind !== this.weaponKind) {
+      weapon.dispose();
+      return;
+    }
+    if (this.weapon) {
+      this.weapon.dispose();
+      this.weapon = null;
     }
 
     // バインドポーズのままだと基準がずれるので、構えを 1 フレーム分適用する
@@ -1084,7 +1142,7 @@ export class RemoteSoldiers {
       // **控えを先に引く。** どのモデルを着るかは名前で決まり、モデルの
       // 読み込みは構築と同時に始まる。作ってから名前を入れたのでは間に合わない
       const known = this.pending.get(snapshot.id);
-      player = new RemoteSoldier(snapshot.id, this.scene, skinFor(known?.name));
+      player = new RemoteSoldier(snapshot.id, this.scene, skinFor(known?.name, snapshot.id));
       // 水面は部屋ごとに決まっている。作った所で配る
       player.setWaterY(this.waterY);
       this.players.set(snapshot.id, player);
@@ -1128,8 +1186,8 @@ export class RemoteSoldiers {
    * **失敗しても黙って捨てる。** これは前倒しでしかなく、本当に要るときは実体の
    * 側が同じ物を読んで、そこで例外を出す。ここで騒ぐと二重に出る。
    */
-  private warmSkin(name: string | undefined): void {
-    void loadSoldier(skinFor(name)).catch(() => {});
+  private warmSkin(name: string | undefined, id?: string): void {
+    void loadSoldier(skinFor(name, id)).catch(() => {});
   }
 
   /**
@@ -1141,7 +1199,7 @@ export class RemoteSoldiers {
    *
    */
   sync(id: string, entry: Player): void {
-    this.warmSkin(entry.name);
+    this.warmSkin(entry.name, id);
     const player = this.players.get(id);
     if (!player) {
       this.remember(id, { ...entry });
@@ -1449,6 +1507,7 @@ export class RemoteSoldiers {
     this.leader = id;
     this.applyLeaking();
   }
+
 
   /**
    * ENEMY EXPOSURE で抜いた相手。**何秒光るかだけ届く。**

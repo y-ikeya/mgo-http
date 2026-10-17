@@ -5,6 +5,7 @@
  *     ?over=win / lose / draw   決着したときの姿 (画面いっぱいの結果画面)
  */
 import { createSignal, onMount } from 'solid-js'
+import type { LookScale } from '../../src/infra/prefs/look'
 import { render } from 'solid-js/web'
 import Scoreboard from '../../src/presentation/ui/Scoreboard'
 import type { GameStats } from '../../src/presentation/scene/Game'
@@ -47,11 +48,13 @@ const open = new URLSearchParams(location.search).get('open') === '1'
 
 function Preview() {
   const [skills, setSkills] = createSignal<Skills>({ rifleMastery: 2, runner: 1 })
-  // ?tab=skills でスキルの板を開いた姿を写す (無頭では押せないので代わりに押す)
+  const [look, setLook] = createSignal<LookScale>({ mouseHip: 1, mouseAim: 0.8, padHip: 1.4, padAim: 1, listInvert: true })
+  // ?tab=skills / settings でその板を開いた姿を写す (無頭では押せないので代わりに押す)
   onMount(() => {
-    if (new URLSearchParams(location.search).get('tab') !== 'skills') return
+    const at = { skills: 1, settings: 2 }[new URLSearchParams(location.search).get('tab') ?? '']
+    if (at === undefined) return
     const tabs = document.querySelectorAll<HTMLButtonElement>('.score-tab')
-    tabs[1]?.click()
+    tabs[at]?.click()
   })
   return (
     <Scoreboard
@@ -63,6 +66,8 @@ function Preview() {
       onSkill={(id, level) => setSkills({ ...skills(), [id]: level || undefined })}
       onClose={() => {}}
       onLeave={() => {}}
+      lookScale={look()}
+      onLookScale={setLook}
     />
   )
 }

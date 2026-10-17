@@ -409,3 +409,11 @@ describe('TRAP MASTERY', () => {
     expect(isAffordable({ trapMastery: 1, awareness: 1, rifleMastery: 2 })).toBe(true)
   })
 })
+
+describe('TSNE の後攻の前', () => {
+  test('**スキルは組み替えない** (先攻と後攻で 1 試合)', () => {
+    expect(canChooseSkills('countdown', MODES.TSNE, false, 1)).toBe(true)
+    expect(canChooseSkills('countdown', MODES.TSNE, false, 2)).toBe(false)
+    expect(canChooseSkills('countdown', MODES.TDM, false, 2)).toBe(true)
+  })
+})

@@ -682,3 +682,82 @@ describe('持ち替えの音', () => {
     expect(events).not.toContainEqual({ kind: 'switched' })
   })
 })
+
+describe('STEALTH (TSNE の攻める側)', () => {
+  const attacker = () => new Inventory({ ...loadout, stealth: true })
+
+  test('**着ても手は武器のまま**。着たまま撃てる', () => {
+    const inv = attacker()
+    inv.toggle('tool')
+    expect(inv.switchTo('stealth')).toBe(true)
+    expect(inv.wearingStealth).toBe(true)
+    expect(inv.held).toBe('rifle')
+    expect(inv.tool).toBe('stealth')
+  })
+
+  test('道具のボタンを押すと次へ送って脱ぐ (STEALTH → NONE)', () => {
+    const inv = attacker()
+    inv.switchTo('stealth')
+    inv.toggle('tool')
+    expect(inv.wearingStealth).toBe(false)
+  })
+
+  test('持っていない人 (守る側) は着られない', () => {
+    const inv = make()
+    expect(inv.switchTo('stealth')).toBe(false)
+    expect(inv.wearingStealth).toBe(false)
+  })
+
+  test('**着た状態で湧く**。脱いでいても湧き直すと着ている', () => {
+    const inv = attacker()
+    expect(inv.wearingStealth).toBe(true)
+    inv.toggle('tool')
+    expect(inv.wearingStealth).toBe(false)
+    inv.refill({ ...loadout, stealth: true })
+    expect(inv.wearingStealth).toBe(true)
+  })
+
+  test('**湧き直さずに持たせる / 取り上げる** (側が分かる前に湧いていた時)', () => {
+    const inv = make()
+    inv.setStealthOwned(true)
+    // 渡された時点で着ている
+    expect(inv.wearingStealth).toBe(true)
+    inv.setStealthOwned(false)
+    expect(inv.wearingStealth).toBe(false)
+    expect(inv.switchTo('stealth')).toBe(false)
+  })
+})
+
+describe('道具の C (短押し) は武器と同じく往復', () => {
+  const attacker = () => new Inventory({ ...loadout, stealth: true })
+
+  test('STEALTH ⇄ NONE を往復する。**箱は出てこない**', () => {
+    const inv = attacker()
+    expect(inv.tool).toBe('stealth')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('none')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('stealth')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('none')
+  })
+
+  test('一覧で箱を選んだら、その後は 箱 ⇄ 直前の物 を往復する', () => {
+    const inv = attacker()
+    inv.switchTo('box'); settle(inv)
+    expect(inv.tool).toBe('box')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('stealth')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('box')
+  })
+
+  test('往復の相手がまだ無い守る側は、NONE から C.BOX へ', () => {
+    const inv = make()
+    expect(inv.tool).toBe('none')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('box')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('none')
+  })
+})

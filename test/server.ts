@@ -406,6 +406,7 @@ function snapshotOf(
     // 振りかぶっている間だけ立つ (FLAG2_WINDUP)
     holdingGrenade,
     protectedNow: false,
+    stealthed: false,
     slot: 0,
   } as PlayerSnapshot
 }

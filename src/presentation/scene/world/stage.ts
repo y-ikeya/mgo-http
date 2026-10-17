@@ -86,8 +86,13 @@ const GROUND_SKY_FLOOR = SKY_FLOOR
  * まだ明るすぎる」)。** city の庇を人の頭の上まで下げて、その下の日陰が明るく
  * 浮いていた。日陰の明るさはほぼこれだけで決まる (0 にすると真っ黒) ので、ここを下げる。
  * 日向は直射が大半なので、ほとんど変わらない
+ *
+ * **0.7 から 0.9、さらに 1.2 へ (2026-10-17 本人「建物の影も自分のももうちょっと薄くていい」「もっと明るく」)。** 建物の中は
+ * 空の見え方の焼き込み (bake_stage.py の FLOOR 0.06) で暗くしたので、外の日陰だけを少し戻す。
+ * 足元の影の濃さ (actor/blobShadow.ts の SUN_OPACITY) は「日なたを日陰の明るさまで落とす」値なので、
+ * ここを動かしたら合わせて見直す
  */
-const AMBIENT_INTENSITY = 0.7
+const AMBIENT_INTENSITY = 1.2
 /** 直射日光の強さ */
 const SUN_INTENSITY = 3.6
 /** 影の濃さ (0..1)。1 で完全に直射を遮る。0.88 では直射の 1 割強が影に漏れていた */
@@ -1152,6 +1157,26 @@ export function applyStageSun(sun: THREE.DirectionalLight, data: StageSun): void
   }
   sun.shadow.needsUpdate = true
 }
+
+/**
+ * 足元に日が当たっているかを答える物。**足元から太陽の向きへ線を引き、視線を止める面に当たれば日陰。**
+ *
+ * 人の足元の丸い影 (actor/blobShadow.ts) が、日の当たらない所で足さないのに使う。影の地図
+ * (staticShadow) は描く側 (GPU) にしか無いので線で測る。視線の面 (EYE_BIT) はガラスを通すので、
+ * 影を落とさないガラスと揃う。向きは**いま置いてある光から**取る (書き出しに太陽が無いステージがある)
+ */
+export function sunProbeOf(stage: Stage, sun: THREE.DirectionalLight): (x: number, y: number, z: number) => boolean {
+  const dir = new THREE.Vector3()
+  return (x, y, z) => {
+    const sight = stage.sightWorld
+    if (!sight) return true
+    dir.copy(sun.position).sub(sun.target.position).normalize()
+    return !sight.hit(x, y, z, x + dir.x * SUN_PROBE_REACH, y + dir.y * SUN_PROBE_REACH, z + dir.z * SUN_PROBE_REACH)
+  }
+}
+
+/** 日なたかを測る線の長さ (m)。街の一番高い建物の影が届く分 */
+const SUN_PROBE_REACH = 120
 
 export function loadStageLadders(name: StageName): Promise<Ladder[]> {
   const cached = stageLadders.get(name)

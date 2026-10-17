@@ -232,11 +232,14 @@ type LifeEffect =
  * 返ってきたことを実際にやるのも。
  *
  * @param elapsed その状態に入ってから経った時間 (ms)
+ * @param respawns まだ復活できるか (domain/match/sides.ts の canRespawn)
  */
-export function advanceLife(life: Life, elapsed: number): LifeEffect | null {
+export function advanceLife(life: Life, elapsed: number, respawns = true): LifeEffect | null {
   switch (life) {
-    // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る
+    // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る。
+    // **復活できない人は倒れたまま** (TSNE の lives)。試合が終わるまでその場でカメラだけ回せる
     case 'downed':
+      if (!respawns) return null
       return elapsed >= DOWN_DURATION * 1000 ? { kind: 'life', to: 'choosing' } : null
     // 決めないまま放っておかれた。相手の試合を止めないために打ち切る
     case 'choosing':

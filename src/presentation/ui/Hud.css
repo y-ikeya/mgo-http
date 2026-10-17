@@ -1534,3 +1534,49 @@
   background: rgba(255, 50, 30, 0.95);
   box-shadow: 0 0 3px rgba(255, 60, 30, 0.8);
 }
+
+
+/*
+ * CAUTION (MGO2)。試合の時計の下。敵が見えなくなってから左右から真ん中へ縮む
+ */
+.hud-caution {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  color: #ff5a3c;
+  pointer-events: none;
+}
+
+.hud-caution-label {
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  padding-left: 0.3em;
+}
+
+.hud-caution-track {
+  width: 220px;
+  height: 7px;
+  background: rgba(120, 30, 18, 0.55);
+  overflow: hidden;
+}
+
+.hud-caution-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #ff7a36;
+  /* 真ん中を軸に縮む = 左右から減っていく */
+  transform-origin: center;
+}
+
+.hud-caution-count {
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  padding-left: 0.2em;
+}

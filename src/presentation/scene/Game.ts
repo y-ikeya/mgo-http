@@ -39,6 +39,7 @@ import {
   loadStageSun,
   loadStageFx,
   applyStageSun,
+  sunProbeOf,
   loadStageLadders,
   STAGE_CODE,
   type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
@@ -74,6 +75,7 @@ import {
   canChoose,
   CHOOSE_FLOOR,
   CHOOSE_TIMEOUT,
+  DOWN_DURATION,
   isDowned,
   isSpawning,
   onBattlefield,
@@ -89,9 +91,15 @@ import {
   isHostile,
   isRoomName,
   primariesOf,
+  secondariesOf,
   secondaryOf,
+  supportsOf,
+  type RoomName,
+  type Side,
 } from "../../domain/match/room";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
+import { setSunProbe } from "./actor/blobShadow";
+import { STEALTH_BREAK_MS } from "../../domain/match/sides";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
@@ -144,6 +152,7 @@ import {
 import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
+import { loadLookScale, type LookScale } from "../../infra/prefs/look";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 /**
@@ -204,6 +213,10 @@ export interface GameStats {
   spread: number;
   /** その部屋で選べる主武器。**部屋が絞ることがある** */
   primaries: readonly WeaponId[];
+  /** 選べる副武器。**持たせない部屋は空、TSNE は側の 1 挺** */
+  secondaries: readonly WeaponId[];
+  /** 選べる support。**TSNE は側ごとに違う** */
+  supports: readonly SupportId[];
   /**
    * 次に湧いたときの主武器。**選ばれている物。**
    *
@@ -334,6 +347,10 @@ export interface GameStats {
   tool: HeldId
   /** その道具をいま手にしているか */
   toolInHand: boolean
+  /** STEALTH を着ているか (TSNE の攻める側)。手には持たない */
+  wearingStealth: boolean
+  /** CAUTION の残り (秒)。0 なら出さない。部屋で 1 つ、全員が同じ秒数 */
+  caution: number
   /** どちらの系統の一覧を開いているか。閉じていれば null */
   browsingFamily: 'weapon' | 'tool' | null
   /** 持ち替えの最中か。HUD を薄くするのに使う */
@@ -415,6 +432,10 @@ const STATS_INTERVAL = 0.1;
 const MAX_DT = 1 / 20;
 /** 弾が届く距離 (m)。何にも当たらなければここまで飛んで消える */
 const MAX_RANGE = 200;
+/** この長さを超えたコマを「詰まった」と記録する (ms)。300 では普段の揺れも拾いそうなので 500 (本人 2026-10-15)。遅延で切る境目は 600 */
+const SLOW_FRAME_MS = 500;
+/** 詰まりを知らせる間隔の下限 (ms) */
+const SLOW_FRAME_EVERY_MS = 5_000;
 
 
 /**
@@ -469,6 +490,8 @@ const HIT_FEEDBACK_DURATION = 0.6;
  */
 /** 屋根の下 (頭の上が全く開いていない) で露出に掛ける倍率 */
 const ADAPT_MAX = 1.8;
+/** CAUTION の長さ (秒)。バーの満タン。STEALTH が解けている長さ (domain/match/sides.ts の STEALTH_BREAK_MS) */
+export const CAUTION_SECONDS = STEALTH_BREAK_MS / 1000;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
 const ADAPT_OPEN = 0.75;
 /** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */
@@ -945,6 +968,7 @@ export class Game {
     primary: WeaponId | null
     secondary: WeaponId | null
     support: SupportId
+    stealth?: boolean
   } = {
     primary: "rifle",
     secondary: "m9",
@@ -955,6 +979,8 @@ export class Game {
     primary: "rifle" as WeaponId | null,
     secondary: "m9" as WeaponId | null,
     support: "grenade" as SupportId,
+    /** STEALTH を持つか。**TSNE の攻める側だけ** (applyArmory) */
+    stealth: false,
   };
   /** いまどちらの枠を持っているか */
 
@@ -1079,6 +1105,13 @@ export class Game {
 
   /** 自分の陣営。名簿で届くまでは青 */
   private selfTeam: Team = "blue";
+  /** 攻める色 (TSNE)。**分かれない部屋は null** */
+  private attackTeam: Team | null = null;
+  /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
+  private stealthOn = false;
+  /** 直前の通で STEALTH が解けていたか (CAUTION 中)。明けた音をその後だけ鳴らす */
+  private cautionSeen = false;
+
   /** 陣営のある部屋か。基地 (補給) があるのはそのとき */
   private teamsMode = false;
 
@@ -1245,9 +1278,15 @@ export class Game {
    * 一覧から消すだけでは足りない — 送ってくる側は止まらないので、
    * サーバーも同じ表で弾く (domain/player/equip.ts)。ここは見せ方の話。
    */
-  private readonly primaries: readonly WeaponId[];
+  private primaries: readonly WeaponId[];
   /** 副武器。**部屋が外していれば null** (ROOMS の secondary) */
-  private readonly secondary: WeaponId | null;
+  private secondary: WeaponId | null;
+  /** 選べる副武器の一覧 (domain/match/room.ts の secondariesOf) */
+  private secondaries: readonly WeaponId[] = CHOICES.secondary;
+  /** 選べる support (domain/match/room.ts の supportsOf) */
+  private supports: readonly SupportId[] = SUPPORTS;
+  /** 入った部屋。持ち込める物を側が変わるたびに引き直す */
+  private readonly roomName: RoomName | null;
 
   /**
    * @param privateRoom 自分だけの部屋に入る (練習 /training)。他の人とは出会わない
@@ -1255,6 +1294,10 @@ export class Game {
   constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
     // 倒れた体が下がる時、壁で止める。カメラと同じ網で見る (表裏を問わない)
     setSlideBlocker((origin, dir, max) => this.cameraWorld.distanceToObstruction(origin, dir, max));
+    // 前回選んだ感度から始める
+    const look = loadLookScale();
+    this.input.lookScale = look;
+    this.input.listInvert = look.listInvert;
     /*
      * **1 枚の頁で動く試合は 1 つだけ。** 前の物が残っていれば片付ける。
      *
@@ -1281,8 +1324,10 @@ export class Game {
     this.stageName = STAGES[
       isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall'
     ].name;
+    this.roomName = isRoomName(room) ? room : null;
     this.primaries = isRoomName(room) ? primariesOf(room) : CHOICES.primary;
     this.secondary = isRoomName(room) ? secondaryOf(room) : "m9";
+    this.secondaries = isRoomName(room) ? secondariesOf(room) : CHOICES.secondary;
     // 手元の装備も部屋に合わせる。**サーバーは外しているのにこちらだけ持つ**を防ぐ
     this.pendingLoadout.secondary = this.secondary;
     this.loadout.secondary = this.secondary;
@@ -1302,11 +1347,11 @@ export class Game {
     this.pendingLoadout.primary =
       lastPrimary && this.primaries.includes(lastPrimary) ? lastPrimary : (this.primaries[0] ?? null);
     const lastSecondary = last?.secondary as WeaponId | null | undefined;
-    if (this.secondary !== null && lastSecondary && CHOICES.secondary.includes(lastSecondary)) {
+    if (this.secondary !== null && lastSecondary && this.secondaries.includes(lastSecondary)) {
       this.pendingLoadout.secondary = lastSecondary;
     }
     const lastSupport = last?.support as SupportId | undefined;
-    if (lastSupport && SUPPORTS.includes(lastSupport)) this.pendingLoadout.support = lastSupport;
+    if (lastSupport && this.supports.includes(lastSupport)) this.pendingLoadout.support = lastSupport;
     this.loadout = { ...this.pendingLoadout };
     this.inv.refill(this.loadout);
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
@@ -1414,6 +1459,8 @@ export class Game {
     void Promise.all([this.stage.ready, loadStageSun(this.stageName)]).then(([, sunData]) => {
       if (sunData) applyStageSun(this.sun, sunData);
       fitShadowToStage(this.sun, this.stage);
+      // 人の足元の影は、日の当たる所でだけ足す (blobShadow.ts)
+      setSunProbe(sunProbeOf(this.stage, this.sun));
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
@@ -1655,6 +1702,7 @@ export class Game {
   }
 
   private tick(time: number): void {
+    this.noteSlowFrame(time - this.lastTime);
     const dt = Math.min((time - this.lastTime) / 1000, MAX_DT);
     this.lastTime = time;
 
@@ -1665,13 +1713,14 @@ export class Game {
     this.input.advance(dt);
 
     // 視点はマウスが唯一の駆動源。カメラを回してから移動方向を解決する。
-    const look = this.input.consumeLook(this.look);
+    // 感度は構えているかで使い分ける (設定画面の 4 本、infra/prefs/look.ts)
+    const look = this.input.consumeLook(this.look, this.follow.isAiming);
     // 動かせるときだけ視点を回す。
     //
     // 支度中 (装備画面) と倒れている間 (倒した相手を映している間) は、
     // 動かしても意味が無いどころか害になる — 裏で回った向きのまま湧く。
     // 読み捨てているのは、溜めておくと解けた瞬間に一気に飛ぶため。
-    if (canAct(this.life)) this.follow.addLook(look.x, look.y);
+    if (canAct(this.life) || this.lookingAround) this.follow.addLook(look.x, look.y);
 
     /*
      * 覗きながら傾く。**主観 (スコープ) のときだけ。**
@@ -1770,6 +1819,7 @@ export class Game {
     this.updateLoadoutKeys();
     this.syncLoadoutPointer();
     this.syncHeld();
+    this.releaseUnwornBox();
     this.inv.update(dt, this.input.firing);
     this.updateTrigger();
     this.updateZoom();
@@ -2071,6 +2121,40 @@ export class Game {
    * 補間するので、**間隔が一定でない**と補間の速度が揺れる。描画の速さは
    * 機械ごとに違うが、送る速さは揃えられる。
    */
+  /** 最後に詰まりを知らせた時刻 (ms)。続けて詰まった時に毎コマ送らない */
+  private slowReportedAt = 0;
+
+  /**
+   * 画面が詰まったら記録する。**コンソールとサーバーのログの両方へ。**
+   *
+   * 遅延で切られる人の多くは、回線ではなく描画の詰まりだった (2026-10-15。往復 1 秒は
+   * 東京の箱には遠すぎる)。ping の返事は描画と同じ流れで返すので、詰まりは遅れに
+   * 見える。**どこで・何を描いていて詰まったか**を残しておけば、重い所を探せる。
+   *
+   * 裏のタブ (描画が止まる) と、極端に長い間 (タブを戻した時) は数えない。
+   */
+  private noteSlowFrame(gap: number): void {
+    if (this.lastTime === 0 || gap < SLOW_FRAME_MS || gap > 10_000 || document.hidden) return;
+    const now = performance.now();
+    if (now - this.slowReportedAt < SLOW_FRAME_EVERY_MS) return;
+    this.slowReportedAt = now;
+    const p = this.player.position;
+    const info = (this.renderer as unknown as { info?: { render?: { drawCalls?: number; calls?: number; triangles?: number } } }).info?.render;
+    const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    const report = {
+      type: "slowFrame" as const,
+      ms: Math.round(gap),
+      x: p.x,
+      z: p.z,
+      yaw: this.follow.aimYaw,
+      draws: info?.drawCalls ?? info?.calls ?? 0,
+      triangles: info?.triangles ?? 0,
+      heap: memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0,
+    };
+    console.warn("[重い]", report);
+    this.net.send(report);
+  }
+
   /** 直前に位置を送った時刻と、その間隔の均し (ms)。名目は 1/64 秒 */
   private sentAt = 0;
   private sendGap = 0;
@@ -2091,6 +2175,12 @@ export class Game {
     snapshot.cameraYaw = this.follow.aimYaw;
     // 撃ち返せない時間は相手にも見せる。反撃の機会になる
     snapshot.reloading = this.reloadTimer > 0;
+    // STEALTH を着ているか。効いているかはサーバーが確かめて、効いていなければ消して配る
+    snapshot.stealthed = this.inv.wearingStealth;
+    // 自分の体は、効いている間だけ薄く見せる (他の人からは消えている)
+    this.player.setStealthed(
+      this.inv.wearingStealth && this.stealthOn && this.attackTeam !== null && this.attackTeam === this.selfTeam,
+    );
     this.net.send({ type: "state", snapshot });
   }
 
@@ -2161,15 +2251,24 @@ export class Game {
         clearTimeout(this.resultTimer);
         if (effect.to === "over") {
           this.resultTimer = setTimeout(() => {
-            if (this.replica.match?.phase === "over") this.setMenu(true);
+            if (this.replica.match?.phase !== "over") return;
+            this.setMenu(true);
+            // 結果の画面の曲。画面と一緒に出る (2026-10-17 本人)
+            this.audio.playJingle("result");
           }, GAME_SET_SECONDS * 1000);
-        } else if (this.menuOpen) this.setMenu(false);
+        } else {
+          // 結果の画面を畳んだら曲も止める (曲のほうが長い)
+          this.audio.stopJingle();
+          if (this.menuOpen) this.setMenu(false);
+        }
         break;
 
       case "team":
         // 誰が味方かは自分の所属が分かって初めて決まる
         this.remotes.setSelfTeam(effect.team);
         this.selfTeam = effect.team;
+        // 攻守に分かれる部屋は、色が変わると持ち込める物も変わる
+        this.applyArmory();
         // 波の色も陣営で決まる。仕切り直しで陣営が切り替わるので、置いてある分も塗り直す
         this.locators.setSelfTeam(effect.team);
         /*
@@ -2386,6 +2485,26 @@ export class Game {
       // 光らせるのは絵の仕事
       case "match":
         this.remotes.setLeaking(message.leader ?? null);
+        // 攻守の入れ替えとステルスの状態 (TSNE)。側が変われば持ち込める物も変わる
+        if (message.attack !== this.attackTeam) {
+          this.attackTeam = message.attack ?? null;
+          this.applyArmory();
+        }
+        // STEALTH が暴かれた瞬間 (効いていた → 解けた)。試合中だけ (CAUTION の始まり)
+        if (this.stealthOn && message.stealth === false && message.phase === "playing") {
+          this.audio.playUi("detectAlert");
+        }
+        // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)。**自分の STEALTH が戻った人にだけ** —
+        // 攻める側で、着ている (2026-10-17 本人「set 音は自分だけに聞こえるのでいい」)
+        if (
+          !this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen &&
+          message.attack === this.selfTeam && this.inv.wearingStealth
+        ) {
+          this.audio.playUi("stealthSet");
+        }
+        // 戻った音は「解けていた」を見た後だけ。入室直後の最初の通 (false → true に見える) では鳴らさない
+        this.cautionSeen = message.stealth === false && message.phase === "playing";
+        this.stealthOn = message.stealth === true;
         break;
 
       /*
@@ -2926,6 +3045,7 @@ export class Game {
       this.replica.match?.phase ?? "waiting",
       MODES[this.replica.mode],
       this.selfReady,
+      this.replica.match?.round ?? 1,
     );
   }
 
@@ -2958,12 +3078,12 @@ export class Game {
       return;
     }
     if (focus === "secondary") {
-      const next = this.stepChoice(CHOICES.secondary, this.secondary, step);
+      const next = this.stepChoice(this.secondaries, this.pendingLoadout.secondary, step);
       if (next) this.setSecondary(next);
       return;
     }
     if (focus === "support") {
-      const next = this.stepChoice(SUPPORTS, this.pendingLoadout.support, step);
+      const next = this.stepChoice(this.supports, this.pendingLoadout.support, step);
       if (next) this.setSupport(next);
       return;
     }
@@ -3110,11 +3230,11 @@ export class Game {
       if (this.input.slotPressed(i)) this.setLoadout(id);
     });
     // 副武器。**主武器の続き番号。** 持たせない部屋では番号ごと詰める
-    const seconds = this.secondary === null ? [] : CHOICES.secondary;
+    const seconds = this.secondaries;
     seconds.forEach((id, i) => {
       if (this.input.slotPressed(choices.length + i)) this.setSecondary(id);
     });
-    SUPPORTS.forEach((id, i) => {
+    this.supports.forEach((id, i) => {
       if (this.input.slotPressed(choices.length + seconds.length + i)) this.setSupport(id);
     });
   }
@@ -3165,13 +3285,23 @@ export class Game {
   private readonly killCamAt = new THREE.Vector3();
 
   /**
+   * **復活できずに倒れたまま** (TSNE の lives を使い切った)。
+   *
+   * 倒れる尺 (DOWN_DURATION) を過ぎても支度へ移らないのは、復活できない人だけ。
+   * 試合が終わるまで、倒れた場所でカメラだけ回せる (2026-10-17 本人)
+   */
+  private get lookingAround(): boolean {
+    return isDowned(this.life) && Date.now() - this.lifeAt > DOWN_DURATION * 1000;
+  }
+
+  /**
    * 倒した相手を映すか。映すなら killCamAt にその足元が入る。
    *
    * 相手が見つからない (自爆した、退出した) ときは映さない。
    * その場合は倒れた自分の体をそのまま映し続ける
    */
   private get killCamTarget(): THREE.Vector3 | null {
-    if (!isDowned(this.life) || !this.replica.killedBy) return null;
+    if (!isDowned(this.life) || !this.replica.killedBy || this.lookingAround) return null;
     const at = this.remotes.positionOf(this.replica.killedBy);
     if (!at) return null;
     return this.killCamAt.copy(at);
@@ -3302,6 +3432,35 @@ export class Game {
    *
    * 反映されるのは次に湧いたとき。いま持っている物は変わらない。
    */
+  /**
+   * 持ち込める物を、部屋と**いまの側**から引き直す (TSNE は攻める側と守る側で違う)。
+   *
+   * 選んでいる物が外れたら一覧の先頭へ丸める。サーバーも同じ表で丸める
+   * (server/match.ts の fitToRoom) ので、ここは見せ方を合わせるだけ
+   */
+  private applyArmory(): void {
+    if (!this.roomName) return;
+    const side: Side | null =
+      this.attackTeam === null ? null : this.selfTeam === this.attackTeam ? "attack" : "defence";
+    this.primaries = primariesOf(this.roomName, side);
+    this.secondary = secondaryOf(this.roomName, side);
+    this.secondaries = secondariesOf(this.roomName, side);
+    this.supports = supportsOf(this.roomName, side);
+    const pending = this.pendingLoadout;
+    if (pending.primary === null ? this.primaries.length > 0 : !this.primaries.includes(pending.primary)) {
+      pending.primary = this.primaries[0] ?? null;
+    }
+    if (pending.secondary === null ? this.secondaries.length > 0 : !this.secondaries.includes(pending.secondary)) {
+      pending.secondary = this.secondaries[0] ?? null;
+    }
+    if (!this.supports.includes(pending.support)) pending.support = this.supports[0] ?? pending.support;
+    // STEALTH は攻める側だけが持つ
+    pending.stealth = side === "attack";
+    // **いま持っている物にも反映する。** 側が分かる前に湧いていると入らないまま (待機中は湧き直さない)
+    this.loadout.stealth = pending.stealth;
+    this.inv.setStealthOwned(pending.stealth);
+  }
+
   setLoadout(primary: WeaponId | null): void {
     this.pendingLoadout.primary = primary;
     this.sendLoadout();
@@ -3386,6 +3545,12 @@ export class Game {
 
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
   onLoadout: ((next: { primary: WeaponId | null; support: SupportId }) => void) | null = null;
+
+  /** 視点の感度の倍率を差し替える (設定画面)。マウスとパッド、構えていない時と構えている時 */
+  setLookScale(scale: LookScale): void {
+    this.input.lookScale = { ...scale };
+    this.input.listInvert = scale.listInvert;
+  }
 
   /** 次に湧く時の装備 (画面の印の初めの値)。前回選んだ物か、一覧の先頭 */
   get chosenLoadout(): { primary: WeaponId | null; support: SupportId } {
@@ -4801,6 +4966,7 @@ export class Game {
       toSupport: this.input.tapped("toSupport") && !this.voiceMenuOpen(),
     };
 
+    const wasWearing = this.inv.wearingStealth;
     const events = this.inv.hand(intent, {
       canAct: canAct(this.life),
       choosing: this.loadoutBlocking,
@@ -4809,6 +4975,8 @@ export class Game {
       canWearBox: this.player.canWearBox,
     }, dt);
 
+    // 自分で STEALTH を着た (C・一覧)。湧いた時に着ているのは鳴らさない
+    if (!wasWearing && this.inv.wearingStealth) this.audio.playUi("stealthSet");
     // 一覧が受け取らなかったぶんは倍率へ回す
     this.wheelLeft = this.inv.browsing ? 0 : wheel;
     // 一覧を開いている間は、右スティックを視点ではなく一覧に使う
@@ -4862,6 +5030,20 @@ export class Game {
       { id: this.net.id, team: this.replica.team ?? "blue" } as never,
       { id, team: side } as never,
     );
+  }
+
+  /**
+   * **体が箱を脱いだのに、持ち物が箱のまま**を直す。
+   *
+   * 箱を脱ぐのは持ち物の側 (道具の切り替え) だけではない — Space (しゃがみの指) や
+   * 眠らされた時は体の側 (soldier の dropBox) が脱ぐ。持ち物は箱のままなので、左下の札は
+   * C.BOX、手は道具で塞がったまま銃が撃てなかった (本人 2026-10-16)。脱いだのは体なので、
+   * 持ち物を体に合わせる (取り上げられた時と同じ dropTool で武器へ戻す)
+   */
+  private releaseUnwornBox(): void {
+    if (!this.inv.usingTool || this.inv.held !== "box" || this.player.isBoxed) return;
+    this.inv.dropTool();
+    this.syncHeld();
   }
 
   private syncHeld(): void {
@@ -5371,6 +5553,8 @@ export class Game {
       spread: this.spread.degrees(this.weapon, this.skills),
       // 持ち込める主武器。**部屋が絞る**ことがある (ROOMS の primaries)
       primaries: this.primaries,
+      secondaries: this.secondaries,
+      supports: this.supports,
       /*
        * 次に湧いたときの装備。**画面が別に控えない。**
        *
@@ -5488,6 +5672,10 @@ export class Game {
       stunCharge: this.stunChargeNow,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
+      // STEALTH は手に持たないが、着ている間は道具のカードを点ける (武器のカードは暗くしない)
+      wearingStealth: this.inv.wearingStealth,
+      // CAUTION は部屋で 1 つ (サーバーが持つ)。手元の時計へ直した切れる時刻から
+      caution: Math.max(0, (this.replica.match?.cautionUntil ?? 0) - Date.now()) / 1000,
       browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物

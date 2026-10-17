@@ -109,8 +109,12 @@ def _move(p, walls):
     return Vector(((d1 * n2.y - d2 * n1.y) / det, (n1.x * d2 - n2.x * d1) / det, 0))
 
 
-def outline(body, z=13.0):  # 窓の上端より上、帯より下の高さで切ること
-    """1 階の外周 (z で輪切りにした一番大きな輪)。一直線上の点はまとめる"""
+def outline(body, z=13.0, all_loops=False):  # 窓の上端より上、帯より下の高さで切ること
+    """1 階の外周 (z で輪切りにした一番大きな輪)。一直線上の点はまとめる。
+
+    all_loops: 面積 1m² 以上の輪を全部返す (反時計回りに揃えて)。建物に増築を合わせた
+    本体 (b18) は段の輪が 2 つある
+    """
     bm = bmesh.new(); bm.from_mesh(body.data); bm.transform(body.matrix_world)
     res = bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, z), plane_no=(0, 0, 1))
     adj = {}
@@ -134,9 +138,15 @@ def outline(body, z=13.0):  # 窓の上端より上、帯より下の高さで�
             prev, cur = cur, nxt[0]; loop.append(cur); seen.add(cur)
         loops.append(loop)
     area = lambda l: 0.5 * sum(l[i][0] * l[(i + 1) % len(l)][1] - l[(i + 1) % len(l)][0] * l[i][1] for i in range(len(l)))
+    if all_loops:
+        return [_simplify(l if area(l) > 0 else l[::-1]) for l in loops if abs(area(l)) >= 1.0]
     loop = max(loops, key=lambda l: abs(area(l)))
     if area(loop) < 0:
         loop = loop[::-1]
+    return _simplify(loop)
+
+
+def _simplify(loop):
     ps = [Vector(p) for p in loop]
     changed = True
     while changed:

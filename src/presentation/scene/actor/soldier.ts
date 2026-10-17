@@ -73,11 +73,22 @@ export const PLAYER_RADIUS = CAPSULE_RADIUS
  * すべてこの値への倍率として掛かるので、姿勢や武器ごとに直して回る必要が無い。
  * 3.8 → 3.04 に落としてある (0.8 倍)。クリップの実測に近づいたぶん、
  * 速回しも収まる方向。
+ *
+ * 3.04 → 2.74 (0.9 倍、本人 2026-10-15「全体的に移動が速い」)。しゃがみ・構え・
+ * ダンボール・伏せも倍率で掛かっているので、全部が同じ割合で遅くなる。
+ * 走りの型の実測 (3.11) の 0.88 倍速で回る
  */
-const MOVE_SPEED = 3.04
+const MOVE_SPEED = 2.74
 
 /** 無敵の間の濃さ。消さずに薄くする — 居ることは見えていてよい */
 const GHOST_OPACITY = 0.35
+/**
+ * STEALTH で消え切るまで (秒)。**じわっと消える** (2026-10-17 本人「一気に透明になるんじゃなくて」)。
+ * 自分の体も他の人と同じく消える — 当たって 5 秒出ていることが自分の目でも読める
+ */
+export const STEALTH_FADE_OUT = 0.7
+/** 暴かれて現れ切るまで (秒)。現れる瞬間は読めないと困るので速く */
+export const STEALTH_FADE_IN = 0.15
 
 /**
  * 構えている間の移動速度の倍率。
@@ -940,6 +951,8 @@ export class Soldier {
       reloading: false,
       // 無敵かどうかはサーバーが書き込む。名乗る値ではない
       protectedNow: false,
+      // STEALTH を着ているかは呼ぶ側 (持ち物) が持っている。あちらで上書きする
+      stealthed: false,
       locomotion,
       locomotionAge: (time - this.locomotionSince) / 1000,
       aiming: this.aiming,
@@ -1282,13 +1295,40 @@ export class Soldier {
     if (!this.ghost) this.applyOpacity()
   }
 
+  /**
+   * ステルス (TSNE の攻める側)。**自分の体も消す** (他の人の画面と同じ見え方)。
+   *
+   * 当たって解けた 5 秒は体が出るので、出ている間が自分でも分かる。
+   * 手の武器は他の人からも見えているので消さない
+   */
+  setStealthed(on: boolean): void {
+    this.stealthed = on
+  }
+
+  private stealthed = false
+  /** 消え具合 (0 = 見える、1 = 消えた)。他の人の画面と同じ速さで追いかける (remoteSoldier.ts) */
+  private stealthFade = 0
+
+  private stepStealthFade(dt: number): void {
+    const target = this.stealthed ? 1 : 0
+    if (this.stealthFade === target) return
+    const step = dt / (this.stealthed ? STEALTH_FADE_OUT : STEALTH_FADE_IN)
+    this.stealthFade = target > this.stealthFade
+      ? Math.min(target, this.stealthFade + step)
+      : Math.max(target, this.stealthFade - step)
+    this.applyOpacity()
+  }
+
   private applyOpacity(): void {
     if (!this.model) return
     const opacity = this.ghost ? GHOST_OPACITY : this.fade
     this.model.traverse((obj) => {
       if (!isMesh(obj)) return
+      // 体 (骨で動く形) だけがステルスで薄くなる。手の武器は別の形
+      const body = (obj as THREE.SkinnedMesh).isSkinnedMesh === true
+      const value = body ? opacity * (1 - this.stealthFade) : opacity
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-      for (const material of materials) material.opacity = opacity
+      for (const material of materials) material.opacity = value
     })
   }
 
@@ -1685,7 +1725,8 @@ export class Soldier {
     // 押し直させることで、伏せて撃つのが**選んだ結果**になる。
     if (!aiming) this.aimLatched = false
     if (this.downed) {
-      const landed = this.downElapsed >= (this.animator?.sweepDuration ?? 1.5)
+      // 投げられている間は背中が着くまで (CQC_LAND_SECONDS)。転ぶ型の尺とは別
+      const landed = this.downElapsed >= (this.thrownFall ? CQC_LAND_SECONDS : (this.animator?.sweepDuration ?? 1.5))
       this.aiming = landed && aiming && !this.aimLatched
       return
     }
@@ -2887,7 +2928,7 @@ export class Soldier {
 
   /** もう起き上がれるか。表示に使う */
   get canStandUp(): boolean {
-    return this.downed_ && this.downElapsed >= DOWN_LOCK
+    return this.downed_ && !this.downLocked
   }
 
   /** 立ち上がりの最中か。この間は何も受け付けない */
@@ -2940,8 +2981,19 @@ export class Soldier {
    * 倒れた直後 (DOWN_LOCK) は受け付けない。飛ばされている最中に這い出せると、
    * 吹き飛ばされたこと自体が無くなる。
    */
+  /**
+   * 倒れた直後で、まだ何もできない間か。
+   *
+   * 爆風で転んだ時は DOWN_LOCK (0.35 秒) だが、**CQC で投げられている間は背中が着くまで**
+   * (CQC_LAND_SECONDS)。0.35 秒で解けていたので、投げられている最中にスティックを倒すと
+   * 宙で寝返り (prone_roll_down) が始まり、投げの型を捨ててその場でうねっていた (本人 2026-10-15)
+   */
+  private get downLocked(): boolean {
+    return this.downElapsed < (this.thrownFall ? CQC_LAND_SECONDS : DOWN_LOCK)
+  }
+
   private crawlFromDown(): void {
-    if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
+    if (!this.downed_ || this.standing || this.downLocked) return
     this.downed_ = false
     const span = this.animator?.proneRollDownDuration ?? 0
     if (span <= 0) {
@@ -2973,7 +3025,7 @@ export class Soldier {
    * 撃とうとしただけで勝手に起き上がってはいけない。
    */
   standUp(): void {
-    if (!this.downed_ || this.standing || this.downElapsed < DOWN_LOCK) return
+    if (!this.downed_ || this.standing || this.downLocked) return
     this.downed_ = false
     this.aiming = false
     this.standing = true
@@ -3090,6 +3142,7 @@ export class Soldier {
     this.lastWorld = world
     this.blob.set(this.isProne ? 'prone' : this.isCrouching ? 'crouch' : 'stand')
     this.blob.update(dt)
+    this.stepStealthFade(dt)
 
     // 倒れている間は入力を捨てる。重力と接地だけは回して、体が宙に浮かないようにする。
     if (this.down) moveDir = ZERO_MOVE
@@ -3771,6 +3824,10 @@ export class Soldier {
       // **表に聞く。** id を並べると、銃が増えたときにここだけ古くなる
       const gun = isGun(this.held)
       /*
+       * **片手の銃も手に持ったまま見せる** (2026-10-17 本人)。以前は腰に納めて、構えるか手を
+       * 掛けている間だけ抜いていたが、STEALTH で体が消えると拳銃を選んでいる間は何も見えなく
+       * なった (武器は見える、が成り立たない)。以下は納めていた頃の註釈:
+       *
        * 片手の銃は腰に納めておく。**構えるか、手を掛けている間だけ抜く。**
        *
        * 銃ごとの id で書いていた頃 ('m9' 決め打ち)、拳銃が 2 挺になった時点で
@@ -3784,12 +3841,11 @@ export class Soldier {
       const holstered =
         !gun ||
         barehanded ||
+        // ダンボールの中では出さない。**自分の画面だけ出ていて**、箱から銃がはみ出して
+        // 見えた (本人 2026-10-16)。相手の画面 (remoteSoldier.ts) は元から箱で納めている
+        this.boxed ||
         // ぶら下がっている間は両手が縁に掛かっている
-        this.hanging ||
-        (!isTwoHanded(this.held) &&
-          !this.aiming &&
-          !this.animator.reloading &&
-          !this.animator.bolting)
+        this.hanging
       // ナイフは持ち替えて出す。刺突中の一瞬だけではなくなった
       const knifeOut = (this.held === 'knife' || this.knifePreview) && !barehanded && !this.boxed
       if (this.knife) this.knife.visible = knifeOut
@@ -3854,6 +3910,9 @@ export class Soldier {
     this.placeholder = null
     this.object.add(model)
     this.model = model
+    // 読み込み前に受けた濃さ (無敵の半透明・STEALTH) を掛け直す。受けた時は体がまだ無く、素通りしている
+    // (リロードすると STEALTH を着て湧くのに体が見えていた。2026-10-17 本人)
+    this.applyOpacity()
     this.leftArmBone = findBoneBySuffix(model, 'LeftArm')
     this.rightArmBone = findBoneBySuffix(model, 'RightArm')
 
@@ -3948,6 +4007,20 @@ export class Soldier {
       return
     }
     if (this.disposed) return
+    /*
+     * **読み込みの間に持ち替えていたら捨てる。** 読み込みは非同期なので、湧いた直後の主武器
+     * (MOSIN) と持ち替えた拳銃 (M9) の 2 つが同時に読まれ、遅く届いたほうが手に付いて
+     * もう片方は消されずに残った — M9 を選んでいるのに MOSIN を持っていた (2026-10-17 本人)
+     */
+    if (kind !== this.weaponKind) {
+      weapon.dispose()
+      return
+    }
+    // 先に付いている物があれば外す (同じ物を 2 回読んだ時)
+    if (this.weapon) {
+      this.weapon.dispose()
+      this.weapon = null
+    }
 
     // バインドポーズ (T ポーズ) のままだと基準がずれるので、構えを 1 フレーム分適用する
     this.animator?.update(0)

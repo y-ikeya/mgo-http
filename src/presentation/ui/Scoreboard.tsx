@@ -7,6 +7,7 @@ import { useLevels } from '../../infra/api/levels'
 import type { Identity } from '../../infra/auth/session'
 import type { GameStats } from '../scene/Game'
 import { SkillList } from './SkillPanel'
+import { DEFAULT_LOOK_SCALE, LOOK_SCALE_MAX, LOOK_SCALE_MIN, type LookScale } from '../../infra/prefs/look'
 import './Scoreboard.css'
 
 /**
@@ -21,6 +22,15 @@ import './Scoreboard.css'
  * 全画面もここに置く。ブラウザは**ユーザーの操作からしか**全画面にさせて
  * くれないので、押す物が要る。カーソルが出ているのはこの画面だけ。
  */
+
+/** 設定のタブに並べる感度。左の名前と、持っている値の名前 */
+const LOOK_ROWS: { label: string; key: 'mouseHip' | 'mouseAim' | 'padHip' | 'padAim' }[] = [
+  { label: 'マウス', key: 'mouseHip' },
+  { label: 'マウス (構え)', key: 'mouseAim' },
+  { label: 'パッド', key: 'padHip' },
+  { label: 'パッド (構え)', key: 'padAim' },
+]
+
 export default function Scoreboard(props: {
   stats: GameStats | null
   identity: Identity
@@ -32,6 +42,9 @@ export default function Scoreboard(props: {
   /** 組み替えてよいか。練習部屋はいつでも開いている (domain/player/skill.ts) */
   skillsOpen: boolean
   onSkill: (id: SkillId, level: number) => void
+  /** 視点の感度 (設定のタブ)。マウスとパッド、構えていない時と構えている時 */
+  lookScale: LookScale
+  onLookScale: (next: LookScale) => void
 }) {
   /**
    * どの板を見ているか。**成績表とスキルを 1 枚に重ねる。**
@@ -39,7 +52,7 @@ export default function Scoreboard(props: {
    * どちらも「Tab を押して、撃ち合いを止めて見る物」なので、開き方を別に
    * するとキーが 2 つ要る。指を離している間に見る物はここに集める。
    */
-  const [tab, setTab] = createSignal<'board' | 'skills'>('board')
+  const [tab, setTab] = createSignal<'board' | 'skills' | 'settings'>('board')
   /** 決着したあとか。そのときは成績表がそのままリザルト画面になる */
   // 名前の横に出す Lv。通算から出るのでサーバーは知らない
   const levelFor = useLevels(
@@ -219,6 +232,19 @@ export default function Scoreboard(props: {
               <path d="M11 7h3.5M5 8.5l-1 3h2.2l.8-3M8.6 8.5l-.7 2.7" />
             </svg>
           </button>
+          <button
+            class="score-tab"
+            classList={{ 'score-tab-on': tab() === 'settings' }}
+            title="設定"
+            onClick={() => setTab('settings')}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 4h12M2 8h12M2 12h12" />
+              <circle cx="5" cy="4" r="1.6" />
+              <circle cx="10.5" cy="8" r="1.6" />
+              <circle cx="7" cy="12" r="1.6" />
+            </svg>
+          </button>
         </nav>
 
 
@@ -354,6 +380,45 @@ export default function Scoreboard(props: {
             <div class="score-skills-list">
               <SkillList skills={props.skills} open={props.skillsOpen} onSkill={props.onSkill} />
             </div>
+          </div>
+        </Show>
+
+        {/*
+          設定。**視点の感度を 4 本** (本人 2026-10-15)。マウスとパッドはちょうどよい速さが
+          大きく違うので分け、それぞれ構えていない時と構えている時を持つ。動かした瞬間から効く
+        */}
+        <Show when={tab() === 'settings'}>
+          <div class="score-settings">
+            <div class="score-settings-head">視点の感度</div>
+            <For each={LOOK_ROWS}>
+              {(row) => (
+                <label class="score-setting">
+                  <span class="score-setting-label">{row.label}</span>
+                  <input
+                    class="score-setting-range"
+                    type="range"
+                    min={LOOK_SCALE_MIN}
+                    max={LOOK_SCALE_MAX}
+                    step={0.05}
+                    value={props.lookScale[row.key]}
+                    onInput={(e) => props.onLookScale({ ...props.lookScale, [row.key]: Number(e.currentTarget.value) })}
+                  />
+                  <span class="score-setting-value">× {props.lookScale[row.key].toFixed(2)}</span>
+                </label>
+              )}
+            </For>
+            <div class="score-settings-head">武器の一覧</div>
+            <label class="score-setting score-setting-check">
+              <span class="score-setting-label">スティックの上下を逆に</span>
+              <input
+                type="checkbox"
+                checked={props.lookScale.listInvert}
+                onChange={(e) => props.onLookScale({ ...props.lookScale, listInvert: e.currentTarget.checked })}
+              />
+            </label>
+            <button class="score-leave score-settings-reset" onClick={() => props.onLookScale({ ...DEFAULT_LOOK_SCALE })}>
+              既定に戻す
+            </button>
           </div>
         </Show>
 

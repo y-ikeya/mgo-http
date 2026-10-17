@@ -90,6 +90,13 @@ export interface PlayerSnapshot {
    */
   protectedNow: boolean
   /**
+   * STEALTH で体が消えているか (TSNE の攻める側)。
+   *
+   * 送る側は「着ている」を立てる。効いているかはサーバーが確かめ、効いていなければ
+   * 消して配る (snapshot.ts の stampStealthed)。受け取った値が立っていれば体を隠す
+   */
+  stealthed: boolean
+  /**
    * 手榴弾を振りかぶって持っているか。
    *
    * サーバーが要る。**この状態で倒されると、足元に落ちて爆発する**ので、
@@ -816,6 +823,28 @@ export interface PongMessage {
 }
 
 /**
+ * 画面が詰まった (1 コマに SLOW_FRAME_MS (500ms) 以上かかった)。**診断のためだけ。**
+ *
+ * 遅延で切られる人の多くは回線ではなく描画の詰まりだった (2026-10-15)。ping の
+ * 返事は描画と同じ流れで返すので、1 コマが 0.6 秒を超えると遅れと区別が付かない。
+ * サーバーはログに書くだけで、遊びには何も効かない
+ */
+export interface SlowFrameEvent {
+  type: 'slowFrame'
+  /** そのコマにかかった時間 (ms) */
+  ms: number
+  /** 立っていた所と向き (three の座標、rad) */
+  x: number
+  z: number
+  yaw: number
+  /** 直前のコマの描画の量。何が重いかの手掛かり */
+  draws: number
+  triangles: number
+  /** JS の使用メモリ (MB)。Chrome だけ取れる。取れなければ 0 */
+  heap: number
+}
+
+/**
  * 自分の本当の値。**3 秒ごとに、1 人ずつ届く。**
  *
  * --- なぜ要るか ---
@@ -923,7 +952,7 @@ export interface RosterMessage {
  *   playing   … 試合中。ダメージが入るのはここだけ
  *   over      … 決着。結果を見せている
  */
-export type MatchPhase = 'waiting' | 'assembled' | 'ready' | 'countdown' | 'playing' | 'over'
+export type MatchPhase = 'waiting' | 'assembled' | 'ready' | 'countdown' | 'playing' | 'break' | 'over'
 
 /**
  * 部屋の一覧 (`GET /rooms`) が返す 1 部屋ぶん。
@@ -998,6 +1027,28 @@ export interface MatchMessage {
   blue: number
   red: number
   /**
+   * **攻める色** (攻める側と守る側に分かれる部屋だけ、TSNE)。試合ごとに入れ替わる。
+   *
+   * 分かれる部屋では blue / red は残機ではなく**まだ戦える人数**になる
+   * (倒れて復活できない人と眠っている人を除いた数)。
+   */
+  attack?: Team
+  /**
+   * 攻める側のステルスがいま効いているか。**変わった瞬間に配り直す**
+   * (1 秒ごとの便を待たない)。攻める側の誰かが当たると 5 秒解ける
+   */
+  stealth?: boolean
+  /**
+   * CAUTION が切れる時刻 (サーバーの時計)。**守る側の攻撃が攻める側に当たって STEALTH が
+   * 解けている間** (= stealth が false の間)。全員が同じ秒数を見る。出ていない時は無い。
+   * 受け取る側は endsAt と同じく手元の時計へ直す
+   */
+  cautionUntil?: number
+  /** いま何ラウンド目か (TSNE。1 = 先攻、2 = 後攻)。1 試合は 2 ラウンド */
+  round?: number
+  /** 色ごとに勝ったラウンドの数 (TSNE) */
+  roundWins?: Record<Team, number>
+  /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
    *
    * 離脱中の人も入っている (away)。リロードのあいだ行が消えると、
@@ -1040,8 +1091,15 @@ export interface MatchMessage {
   /**
    * 今の段階が終わる時刻 (Date.now)。残り時間はここから引いて出す。
    * waiting は人が揃うまで進まないので 0。
+   *
+   * **サーバーの時計の時刻。** 受け取った側はそのまま自分の時計と比べない —
+   * 下の sentAt との差 (残り) を、受け取った時刻に足して自分の時計へ直す
+   * (application/replica/match.ts)。手元の時計が 9 秒遅れていて、残り 9 秒で
+   * 試合が終わった (本人 2026-10-15)
    */
   endsAt: number
+  /** これを送った時刻 (サーバーの Date.now)。endsAt を手元の時計へ直すのに使う */
+  sentAt: number
   /**
    * 部屋の段階。
    *
@@ -1256,6 +1314,7 @@ export type ClientMessage =
   | ResupplyEvent
   | VoiceEvent
   | PongMessage
+  | SlowFrameEvent
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =

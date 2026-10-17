@@ -19,6 +19,12 @@
 /** 既定のモデル。public/models/<名前>.glb */
 export const DEFAULT_SKIN = 'soldier'
 
+/**
+ * 練習の的の見た目。**人と見分けが付くように、Mixamo の X Bot** (本人 2026-10-16)。
+ * 体は Raiden と同じ道で入れた (rebody → merge_all_clips → fit_height、頭の高さは宿主と同じ)
+ */
+export const TARGET_SKIN = 'soldier_xbot'
+
 const SKINS: Record<string, string> = {
   /*
    * Raiden。体ごと差し替えてある。
@@ -54,10 +60,18 @@ const SKINS: Record<string, string> = {
  * 見張りに載せ忘れる、が起きる。
  */
 export const SKIN_FILES: readonly string[] = [
-  ...new Set([DEFAULT_SKIN, ...Object.values(SKINS)]),
+  ...new Set([DEFAULT_SKIN, TARGET_SKIN, ...Object.values(SKINS)]),
 ]
 
-export function skinFor(name: string | undefined): string {
+/** 的の id の頭 (server/world.ts の placeTargets が付ける) */
+const TARGET_ID_PREFIX = 'target-'
+
+/**
+ * その人に着せるモデル。**的は id で見分ける** — 名前 (TARGET 1 …) は名簿が届くまで
+ * 分からないが、id は姿の最初の 1 通から分かる
+ */
+export function skinFor(name: string | undefined, id?: string): string {
+  if (id?.startsWith(TARGET_ID_PREFIX)) return TARGET_SKIN
   return (name && SKINS[name]) || DEFAULT_SKIN
 }
 
@@ -74,7 +88,7 @@ export function skinFor(name: string | undefined): string {
 export function selfSkin(name: string | undefined): string {
   const asked = new URLSearchParams(location.search).get('skin')
   // 知らない名前を渡されて 404 を読みに行かないよう、表にある物だけ通す
-  if (asked && (asked === DEFAULT_SKIN || Object.values(SKINS).includes(asked))) {
+  if (asked && SKIN_FILES.includes(asked)) {
     return asked
   }
   return skinFor(name)

@@ -45,6 +45,11 @@ export type Phase =
   | 'ready'
   | 'countdown'
   | 'playing'
+  /**
+   * ラウンドの合間 (TSNE の先攻が終わった)。**「ROUND 1 OVER」を見せてから暗転して後攻へ**
+   * (2026-10-17 本人)。撃っても効かない。終わると攻守を入れ替えて秒読み (countdown)
+   */
+  | 'break'
   | 'over'
 
 /**
@@ -70,18 +75,20 @@ export const ASSEMBLED_SECONDS = 5
 /**
  * 支度の打ち切り (lifecycle.ts の CHOOSE_TIMEOUT) を止めておく段階か。
  *
- * 揃った告知 (assembled)・支度 (ready)・秒読み (countdown) の間は**部屋の時計が
- * 湧かせる** — 始まった時に、まだ選んでいる人を出す。人ごとの 30 秒で先に湧かせると、締め切り
- * (60 秒) の前に待合室が閉じて、スキルを選んでいる途中で戦場に出された
- * (2026-10-09 本人)。打ち切りは試合中に倒れた人が相手を止めないための物
+ * 揃った告知 (assembled)・支度 (ready) の間は止める。人ごとの 30 秒で先に湧かせると、
+ * 締め切り (60 秒) の前に待合室が閉じて、スキルを選んでいる途中で戦場に出された
+ * (2026-10-09 本人)。
+ *
+ * **秒読み (countdown) からは止めない。** 武器を選ぶのはそこからで、30 秒で打ち切る
+ * (2026-10-15 本人)。秒読みに入る時に 30 秒の時計を 0 にしてある (server/match.ts)
  */
 export function holdsChoosing(phase: Phase): boolean {
-  return phase === 'assembled' || phase === 'ready' || phase === 'countdown'
+  return phase === 'assembled' || phase === 'ready'
 }
 
 /**
  * 決着の「GAME SET / 試合終了」だけを見せる長さ (秒)。勝敗と成績表はこの後に開く。
- * 結果を見せる時間 (server/match.ts の INTERMISSION_MS 10 秒) の頭に置く
+ * 結果を見せる時間 (server/match.ts の INTERMISSION_MS 14.5 秒) の頭に置く
  */
 export const GAME_SET_SECONDS = 2.4
 
@@ -128,6 +135,23 @@ export interface Match {
    * 試合の頭で陣営を切り直す時 (shuffleTeams) に書き直す
    */
   teamsOf: Map<string, Team>
+  /**
+   * **攻める色** (攻める側と守る側に分かれる部屋だけ)。試合ごとに入れ替わる (sides.ts)
+   */
+  attack: Team
+  /**
+   * 攻める側のステルスが解けている期限 (Date.now)。**攻める側の誰かが当たるたびに延びる**
+   * (sides.ts の disturbStealth)。**これが CAUTION** — 全員の画面に同じ秒数で出る
+   */
+  revealedUntil: number
+  /** 最後に配ったステルスの状態。変わった時だけ配り直すため */
+  stealthSent: boolean
+  /** 最後に配った revealedUntil (CAUTION の切れる時刻)。延びた時だけ配り直すため */
+  cautionSent: number
+  /** いま何ラウンド目か (攻める側と守る側に分かれる部屋。1 = 先攻、2 = 後攻) */
+  round: number
+  /** 色ごとに勝ったラウンドの数 */
+  roundWins: Record<Team, number>
 }
 
 export function newMatch(mode: Mode): Match {
@@ -145,6 +169,12 @@ export function newMatch(mode: Mode): Match {
     matchId: null,
     startedAt: 0,
     teamsOf: new Map(),
+    attack: 'blue',
+    revealedUntil: 0,
+    stealthSent: false,
+    cautionSent: 0,
+    round: 1,
+    roundWins: { blue: 0, red: 0 },
   }
 }
 

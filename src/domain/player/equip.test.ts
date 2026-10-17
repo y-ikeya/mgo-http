@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { SUPPORT_SPECS } from '../item/weapons'
+import { SUPPORT_SPECS, type SupportId } from '../item/weapons'
 import {
   canHold,
   chooseLoadout,
@@ -236,6 +236,32 @@ describe('部屋が絞る主武器', () => {
  * 突撃銃を選んだまま狙撃銃だけの部屋へ入れる。選び直さないまま湧くと、弾く
  * 仕掛け (chooseLoadout) を一度も通らずにその銃で戦場へ出てしまう。
  */
+/** 攻める側と守る側で縛りが違う部屋 (TSNE)。support と副武器も絞る */
+describe('側が絞る support と副武器', () => {
+  test('選べない support は弾く。**主武器も書き換えない**', () => {
+    const p = fresh()
+    chooseLoadout(p, 'mosin', 'decoy', true, ['mosin'], 'm9', 'm9', ['decoy', 'locator'], ['m9'])
+    expect(chooseLoadout(p, 'mosin', 'grenade', true, ['mosin'], 'm9', 'm9', ['decoy', 'locator'], ['m9'])).toBe(false)
+    expect(p.support).toBe('decoy')
+  })
+
+  test('選べない副武器は弾く。**主武器も書き換えない**', () => {
+    const p = fresh()
+    chooseLoadout(p, 'smg', 'grenade', true, ['smg', 'rifle'], 'm1911', 'm1911', ['grenade'], ['m1911'])
+    expect(chooseLoadout(p, 'rifle', 'grenade', true, ['smg', 'rifle'], 'm9', 'm1911', ['grenade'], ['m1911'])).toBe(false)
+    expect(p.primary).toBe('smg')
+    expect(p.secondary).toBe('m1911')
+  })
+
+  test('攻守が入れ替わったら、持てない support を持てる物へ丸める', () => {
+    const p = fresh()
+    p.support = 'grenade' as SupportId
+    fitLoadout(p, ['mosin'], 'm9', ['decoy', 'locator'])
+    expect(p.support).toBe('decoy')
+    expect(p.primary).toBe('mosin')
+  })
+})
+
 describe('部屋に合わせて丸める', () => {
   test('持ち込めない銃なら、持てるものへ替わる', () => {
     const p = fresh()

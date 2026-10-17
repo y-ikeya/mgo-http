@@ -452,10 +452,26 @@ const UI_SOUNDS = {
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
   switch: { file: "list_switch1.mp3", volume: 0.55 },
   /** 自分の弾が頭に入って倒した / 眠らせた。位置は持たない (自分への応え) */
-  // 2026-10-05: tin.mp3 (tools/raw) を +19 半音に上げて圧縮した物 (tools/README.md)。10-07 に +21 へ。
-  // 前の headshot1 は音程の無いシャリ音で埋もれた。音源を強くしたぶん、音量は戻す
-  // (1.0 は「ちょっとうるさい」、0.6・0.4・0.28 でも「もう少し小さく」)
-  headshot: { file: "headshot2.mp3", volume: 0.2 },
+  // 2026-10-17: 本人の HS.mp3 (tools/raw のまま) に替えた (「これが HS にふさわしい」)。
+  // 前の headshot2 (tin.mp3 を +21 半音に上げて圧縮した物、tools/README.md) は 0.2 で決まっていた。
+  // HS.mp3 は平均で 6.6dB 小さいので、同じ大きさに聞こえるよう 0.2 × 2.1 ≒ 0.43
+  headshot: { file: "headshot3.mp3", volume: 0.43 },
+  /**
+   * 結果の画面の曲 (2026-10-17 本人、tools/raw/result.mp3 のまま)。11.45 秒。**結果の画面は
+   * 曲が鳴り終わるまで開いている** (server/match.ts の INTERMISSION_MS)。畳んだら止める
+   */
+  result: { file: "result1.mp3", volume: 0.5 },
+  /**
+   * 攻める側の STEALTH が暴かれた (CAUTION が始まった)。**部屋の全員に同じく鳴る** — CAUTION が
+   * 全員の画面に出るのと同じ (2026-10-17 本人、tools/raw/detectAlert.mp3 のまま)
+   */
+  detectAlert: { file: "detect_alert1.mp3", volume: 0.6 },
+  /**
+   * STEALTH が効き始めた。**自分にだけ聞こえる** — 自分で着た時と、CAUTION が明けて自分の
+   * STEALTH が戻った時 (2026-10-17 本人、tools/raw/stealthSet.mp3 のまま)
+   */
+  // 音源が暴かれた音より 7dB 小さいので 1.0 にしたが「ちょっとでかすぎ」(2026-10-17 本人)。0.6、さらに「もう少し小さく」で 0.4
+  stealthSet: { file: "stealth_set1.mp3", volume: 0.4 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;
@@ -562,6 +578,27 @@ export class GameAudio {
     sound.setVolume(UI_SOUNDS[name].volume);
     sound.play();
   }
+
+  /**
+   * 曲を鳴らす。**枠は 1 つ、止められる** (結果の画面の曲)。続けて来たら前を止めて替える
+   */
+  playJingle(name: UiSoundName): void {
+    const buffer = this.uiBuffers.get(name);
+    if (!buffer || this.disposed) return;
+    if (!this.jingle) this.jingle = new THREE.Audio(this.listener);
+    const sound = this.jingle;
+    if (sound.isPlaying) sound.stop();
+    sound.setBuffer(buffer);
+    sound.setVolume(UI_SOUNDS[name].volume);
+    sound.play();
+  }
+
+  /** 曲を止める。鳴っていなければ何もしない */
+  stopJingle(): void {
+    if (this.jingle?.isPlaying) this.jingle.stop();
+  }
+
+  private jingle: THREE.Audio | null = null;
 
   playUi(name: UiSoundName): void {
     const buffer = this.uiBuffers.get(name);

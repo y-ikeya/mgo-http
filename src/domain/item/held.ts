@@ -41,7 +41,7 @@ export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator'
  * `none` は**道具を何も使っていない**という選択。手ぶらという意味ではない —
  * 道具の枠が空なだけで、手には武器がある (Inventory.held を参照)。
  */
-export type HeldId = WeaponId | ThrowId | 'knife' | 'box' | 'none'
+export type HeldId = WeaponId | ThrowId | 'knife' | 'box' | 'stealth' | 'none'
 
 /**
  * 系統。持ち替えの操作が別々に割り当たる (MGO2 の十字左右)。
@@ -203,7 +203,7 @@ interface HeldSpec {
  * クレイモアのどちらかだが、弾倉は撃った弾が溜まって増えるので、持って
  * いれば並びに現れる。だから武器系は 4 つのときも 5 つのときもある。
  */
-const TOOL_ORDER: Partial<Record<HeldId, number>> = { box: 0, none: 1 }
+const TOOL_ORDER: Partial<Record<HeldId, number>> = { box: 0, stealth: 1, none: 2 }
 
 const SLOT_ORDER: Record<Slot, number> = {
   primary: 0,
@@ -241,6 +241,14 @@ export const HELD: Record<HeldId, HeldSpec> = {
   box: { id: 'box', label: 'C.BOX', family: 'tool', slot: 'tool', weight: 2.0, shoots: false, twoHanded: false },
 
   /*
+   * STEALTH (TSNE の攻める側だけ、2026-10-17 本人)。**着る物で、手には持たない。**
+   *
+   * 選ぶと身に付き、手は武器のまま — 着たまま麻酔銃もナイフも使える (MGO2 と同じ)。
+   * 効いている間は体が消える (domain/match/sides.ts)。外すのは道具の一覧で別の物を選ぶ時
+   */
+  stealth: { id: 'stealth', label: 'STEALTH', family: 'tool', slot: 'tool', weight: 0, shoots: false, twoHanded: false },
+
+  /*
    * 道具を使っていない状態。
    *
    * **一覧に並ぶ選択肢として置く。** 「箱を降ろす」を別の操作にすると、道具が
@@ -263,6 +271,7 @@ export type Carried =
   | { id: ThrowId; count: number }
   | { id: 'knife' }
   | { id: 'box' }
+  | { id: 'stealth' }
   | { id: 'none' }
 
 /** その物を持っている間の移動の速さ (倍率) */
@@ -400,6 +409,8 @@ export interface Loadout {
    */
   secondary: WeaponId | null
   support: SupportKind
+  /** STEALTH を持つか。**TSNE の攻める側だけ** (domain/match/room.ts の armory) */
+  stealth?: boolean
 }
 
 /**
@@ -449,6 +460,7 @@ export function buildCarried(loadout: Loadout, ammoOf: (id: WeaponId) => { ammo:
     { id: loadout.support, count: SUPPORT_COUNT[loadout.support] },
     { id: 'knife' },
     { id: 'box' },
+    ...(loadout.stealth ? [{ id: 'stealth' } as const] : []),
     // 道具を使っていない状態。一覧に並べて、送るだけで戻れるようにする
     { id: 'none' },
   ]

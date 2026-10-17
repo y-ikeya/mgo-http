@@ -6,7 +6,7 @@ import { HELD, type HeldId, isSupport } from '../../domain/item/held'
 import { canThrowWith } from '../../domain/player/cqc'
 import { MODES } from '../../domain/match/room'
 import { isTranquilizer } from '../../domain/item/weapons'
-import type { GameStats } from '../scene/Game'
+import { CAUTION_SECONDS, type GameStats } from '../scene/Game'
 import Orders from './Orders'
 import './Hud.css'
 
@@ -76,8 +76,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   let lastPhase: string | undefined
   createEffect(() => {
     const now = phase()
-    // 待合室 (ready) から試合 (countdown) へも同じく黒から明ける (2026-10-09 本人)
-    if ((lastPhase === 'assembled' && now === 'ready') || (lastPhase === 'ready' && now === 'countdown')) {
+    // 待合室 (ready) から試合 (countdown) へも同じく黒から明ける (2026-10-09 本人)。
+    // **TSNE の先攻から後攻へ** (合間 → countdown) も。攻守が入れ替わって湧き地点へ飛ぶのを黒で隠す
+    if (
+      (lastPhase === 'assembled' && now === 'ready') ||
+      (lastPhase === 'ready' && now === 'countdown') ||
+      (lastPhase === 'break' && now === 'countdown')
+    ) {
       setDawn(true)
       const timer = setTimeout(() => setDawn(false), 900)
       onCleanup(() => clearTimeout(timer))
@@ -89,7 +94,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * READY で縮んだ締め切りにも効き、誰かが取り消して締め切りが戻れば黒も引く
    */
   const standbyClosing = () =>
-    phase() === 'ready' && (props.stats?.match?.endsAt ?? Infinity) - now() <= STANDBY_BLACK_MS
+    (phase() === 'ready' || phase() === 'break') &&
+    (props.stats?.match?.endsAt ?? Infinity) - now() <= STANDBY_BLACK_MS
   /** その部屋のルール。届く前は陣営戦として描く (いちばん普通の形) */
   const mode = () => props.stats?.match?.mode ?? 'TDM'
   const teams = () => MODES[mode()].teams
@@ -328,6 +334,24 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
+        CAUTION (MGO2)。**守る側の攻撃や CQC が攻める側に当たると出る** (攻める側全員の STEALTH が
+        解けている間)。自分も敵も同じ秒数を見る。当たった瞬間に満タンで、左右から真ん中へ縮み、
+        落ち合った所で 0 秒。数えていない時は出さない (2026-10-17 本人)
+      */}
+      <Show when={(props.stats?.caution ?? 0) > 0 && phase() === 'playing'}>
+        <div class="hud-caution">
+          <span class="hud-caution-label">CAUTION</span>
+          <span class="hud-caution-track">
+            <span
+              class="hud-caution-bar"
+              style={{ transform: `scaleX(${Math.min(1, (props.stats?.caution ?? 0) / CAUTION_SECONDS)})` }}
+            />
+          </span>
+          <span class="hud-caution-count">{String(Math.ceil(props.stats?.caution ?? 0)).padStart(2, '0')}</span>
+        </div>
+      </Show>
+
+      {/*
         自分が光っている (個人戦の 1 位)。**位置が全員に漏れている。**
 
         勝っていることの代償なので、隠さずに出す — 気づかないまま追われるのは
@@ -407,6 +431,22 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         出す長さも消え方も Orders が持つ。ここは段階と陣営を渡すだけ。
       */}
       <Orders mode={mode()} team={props.stats?.team} phase={phase()} />
+
+      {/*
+        ラウンドの合間 (TSNE の先攻が終わった)。「ROUND 1 OVER」と、このラウンドの勝ち負け。
+        最後の 1 秒で黒へ落ち (standbyClosing)、後攻の秒読みで明ける
+      */}
+      <Show when={phase() === 'break'}>
+        <div class="orders orders-solo hud-game-set">
+          <div class="orders-band">
+            <div class="orders-heading">ROUND {props.stats?.match?.round ?? 1} OVER</div>
+            <div class="orders-rule" />
+            <div class="orders-text">
+              {props.stats?.match?.winner === 'draw' ? 'DRAW' : won() ? 'ROUND WIN' : 'ROUND LOSE'}
+            </div>
+          </div>
+        </div>
+      </Show>
 
       {/* 決着の 1 段目。「試合終了」だけを指令と同じ帯で告げる */}
       <Show when={phase() === 'over' && !revealed()}>
@@ -874,7 +914,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         なる (MGO2 も道具は左下で、武器のカードは別に出ていた)。
       */}
       <Show when={props.stats?.tool}>
-        <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand }}>
+        <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand || props.stats?.wearingStealth }}>
           <div class="hud-tool-key">C</div>
           <div class="hud-tool-name">{HELD[shownTool()].label}</div>
         </div>

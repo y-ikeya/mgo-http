@@ -73,7 +73,17 @@ export function fitLoadout(
   player: MatchPlayer,
   allowed: readonly WeaponId[],
   secondary: WeaponId | null = 'm9',
+  /**
+   * 選べる support。**省けば全部。** 攻める側と守る側で違う (TSNE)。
+   * 攻守が入れ替わった試合の頭で、前の側の物を持ったまま出ないように
+   */
+  supports?: readonly SupportId[],
 ): void {
+  const supportFits = supports === undefined || supports.includes(player.support as SupportId)
+  if (!supportFits) {
+    player.support = supports[0]
+    player.grenades = SUPPORT_SPECS[supports[0]].count
+  }
   /*
    * **空の一覧は「銃を持たせない」。** 絞っていないことではない。
    *
@@ -84,7 +94,7 @@ export function fitLoadout(
   const fits = none
     ? player.primary === null
     : player.primary !== null && allowed.includes(player.primary)
-  if (fits && player.secondary === secondary) return
+  if (fits && supportFits && player.secondary === secondary) return
   if (!fits) player.primary = none ? null : allowed[0]
   player.secondary = secondary
   player.inventory.refill({
@@ -110,8 +120,17 @@ export function chooseLoadout(
    */
   secondary?: string,
   allowedSecondary?: WeaponId | null,
+  /** 選べる support。**省けば全部** (TSNE は側ごとに絞る) */
+  allowedSupports?: readonly SupportId[],
+  /** 選べる副武器。**省けば全部** (TSNE は側の 1 挺だけ) */
+  allowedSecondaries?: readonly WeaponId[],
 ): boolean {
   if (!isSupportChoice(support)) return false
+  if (allowedSupports && !allowedSupports.includes(support)) return false
+  // 副武器も先に見る。**半分だけ通さない** (主武器だけ書き換わって副武器で弾く、を作らない)
+  if (secondary !== undefined && allowedSecondaries && !allowedSecondaries.includes(secondary as WeaponId)) {
+    return false
+  }
   /*
    * **銃を持たない申告。** 部屋が 1 挺も許していないときだけ通す。
    *
@@ -185,9 +204,11 @@ export function chooseSkills(
   skills: unknown,
   phase: Phase,
   mode?: ModeSpec,
+  /** いま何ラウンド目か (TSNE は後攻の前に組み替えない) */
+  round = 1,
 ): boolean {
   // READY を押している間は受け付けない。**取り消してから直す**
-  if (!canChooseSkills(phase, mode, player.ready)) return false
+  if (!canChooseSkills(phase, mode, player.ready, round)) return false
   if (skills === null || typeof skills !== 'object') return false
   if (!isAffordable(skills as Skills)) return false
   player.skills = skills as Skills

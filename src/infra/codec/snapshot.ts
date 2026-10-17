@@ -207,6 +207,8 @@ const HELD_BITS: HeldId[] = [
   'locator',
   // M4 CUSTOM。**末尾に足す**
   'm4',
+  // STEALTH。**末尾に足す。** 着る物で手には持たないので、ここに乗ることは無い (表を欠かさないため)
+  'stealth',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 
@@ -226,6 +228,14 @@ const FLAG2_PROTECTED = 2
  * 足元で爆ぜる — サーバーはその判断にこれを使う。手にしているだけなら落ちない。
  */
 const FLAG2_WINDUP = 4
+/**
+ * **STEALTH で体が消えている** (TSNE の攻める側)。
+ *
+ * 送り主が立てるのは「STEALTH を着ている」まで。効いているか (攻める側か・戦場に立っているか・
+ * 当たって解けていないか) はサーバーが確かめて、効いていなければ消してから配る
+ * (stampStealthed)。守る側が名乗っても消えない
+ */
+const FLAG2_STEALTH = 8
 
 /** 位置を詰める。slot は送る側では 0 (サーバーが書き込む) */
 export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer {
@@ -254,7 +264,9 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
 
   view.setUint8(
     OFF_FLAGS2,
-    (snapshot.reloading ? FLAG2_RELOADING : 0) | (snapshot.holdingGrenade ? FLAG2_WINDUP : 0),
+    (snapshot.reloading ? FLAG2_RELOADING : 0) |
+      (snapshot.holdingGrenade ? FLAG2_WINDUP : 0) |
+      (snapshot.stealthed ? FLAG2_STEALTH : 0),
   )
   view.setUint8(OFF_HELD, HELD_INDEX.get(snapshot.held) ?? 0)
   view.setUint8(OFF_WEAPON, WEAPON_INDEX.get(snapshot.weapon) ?? 0)
@@ -290,7 +302,19 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     cameraYaw: (view.getUint16(OFF_CAMERA_YAW) / 65536) * Math.PI * 2,
     reloading: (view.getUint8(OFF_FLAGS2) & FLAG2_RELOADING) !== 0,
     protectedNow: (view.getUint8(OFF_FLAGS2) & FLAG2_PROTECTED) !== 0,
+    stealthed: (view.getUint8(OFF_FLAGS2) & FLAG2_STEALTH) !== 0,
   }
+}
+
+/**
+ * STEALTH が効いていなければ消す。中継するときにサーバーが呼ぶ。
+ *
+ * **立てはしない。** 着ていない人を消すことはサーバーには決められない (着ているかは本人が名乗る)。
+ * 効いてよい時だけ、名乗った値をそのまま通す
+ */
+export function stampStealthed(view: DataView, allowed: boolean): void {
+  if (allowed) return
+  view.setUint8(OFF_FLAGS2, view.getUint8(OFF_FLAGS2) & ~FLAG2_STEALTH)
 }
 
 /** 中継するときに送り主の番号を書き込む。中身は作り直さない */

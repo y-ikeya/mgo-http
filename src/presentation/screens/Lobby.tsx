@@ -31,6 +31,8 @@ const PHASE_LABEL: Record<MatchPhase, () => string> = {
   ready: () => t("lobby.ready"),
   countdown: () => t("lobby.countdown"),
   playing: () => t("lobby.playing"),
+  // ラウンドの合間も試合中 (部屋の一覧ではそう見せる)
+  break: () => t("lobby.playing"),
   over: () => t("lobby.over"),
 };
 

@@ -79,6 +79,11 @@ export interface Spot {
  */
 export interface TargetSpot extends Spot {
   stance?: 'crouch' | 'prone'
+  /**
+   * **走り続ける的。** 置き場とこの点の間を走って往復する (CQC の練習、本人 2026-10-15)。
+   * 間に物が無い所に置く (的は壁を見ずに真っ直ぐ走る)。立っている的だけ
+   */
+  patrol?: { x: number; z: number }
 }
 
 /**
@@ -230,6 +235,8 @@ const TRAINING: StageSpec = {
     { x: -12, z: -20, stance: 'crouch' },
     { x: -26, z: -12, stance: 'prone' },
     { x: -13, z: -2, stance: 'prone' },
+    // 走り続ける的 (CQC の練習)。立っている列の手前を東西に往復する
+    { x: -30, z: -30, patrol: { x: -16, z: -30 } },
   ],
 }
 
@@ -359,6 +366,9 @@ const LAB: StageSpec = {
     { x: -23.5, z: -10.55, y: 0.1 },
     // 塔の正面 (z = -18) に背中を付けて
     { x: 0, z: -17.55, y: 0.1 },
+    // 走り続ける的 (CQC の練習)。基地のすぐ脇を東西に、手前の的の脇を南北に往復する
+    { x: -16, z: 5, y: 0.1, patrol: { x: -4, z: 5 } },
+    { x: -20, z: 3, y: 0.1, patrol: { x: -20, z: -7 } },
   ],
 }
 

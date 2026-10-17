@@ -252,6 +252,8 @@ export interface MatchPlayer extends Player {
   held: HeldId
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
+  /** STEALTH を着ていると名乗っているか (位置の通の 1 bit)。効いているかは domain/match/sides.ts が見る */
+  wearingStealth: boolean
   /**
    * 切れたとき戦場に居たか。
    *
@@ -306,6 +308,10 @@ export interface MatchPlayer extends Player {
   homeY: number
   /** 的の構え。立っている / しゃがんでいる / 伏せている。人は使わない */
   homeStance: 'stand' | 'crouch' | 'prone'
+  /** 走り続ける的の、もう一方の端。null なら動かない。人は使わない */
+  patrolTo: { x: number; z: number } | null
+  /** いま向こうの端 (patrolTo) へ走っているか。false なら置き場 (home) へ戻っている */
+  patrolOut: boolean
   /**
    * 的が起き上がるまでの残り (秒)。0 なら立っている。
    *
@@ -337,6 +343,8 @@ export interface MatchPlayer extends Player {
   /** 倒した数 / 倒された数。試合ごとに 0 に戻る */
   kills: number
   deaths: number
+  /** このラウンドで倒れた回数。復活の回数 (TSNE の lives) はこれで数える。ラウンドの頭で 0 */
+  roundDeaths: number
   /**
    * 与えたヘッドショットと、**受けた**ヘッドショット。
    *
@@ -427,6 +435,8 @@ export function newMatchPlayer(seed: {
     homeZ: 0,
     homeY: 0,
     homeStance: 'stand',
+    patrolTo: null,
+    patrolOut: true,
     downLeft: 0,
     downThrown: false,
     downFromBehind: false,
@@ -437,10 +447,12 @@ export function newMatchPlayer(seed: {
     support: 'grenade',
     grenades: SUPPORT_SPECS.grenade.count,
     holdingGrenade: false,
+    wearingStealth: false,
     wasAlive: false,
     bot: false,
     kills: 0,
     deaths: 0,
+    roundDeaths: 0,
     stuns: 0,
     ready: false,
     stamina: MAX_STAMINA,
@@ -471,6 +483,8 @@ export function newBot(seed: {
   y?: number
   /** 構え。省けば立っている */
   stance?: 'stand' | 'crouch' | 'prone'
+  /** 走り続ける的のもう一方の端。省けば動かない */
+  patrol?: { x: number; z: number }
   now: number
 }): MatchPlayer {
   const bot = newMatchPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
@@ -483,6 +497,7 @@ export function newBot(seed: {
   bot.homeY = bot.y
   bot.homeZ = seed.z
   bot.homeStance = seed.stance ?? 'stand'
+  bot.patrolTo = seed.patrol ?? null
   bot.life = 'alive'
   // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
   bot.yaw = Math.PI
@@ -510,6 +525,7 @@ export function reviveBot(bot: MatchPlayer, now: number): void {
   bot.x = bot.homeX
   bot.y = bot.homeY
   bot.z = bot.homeZ
+  bot.patrolOut = true
 }
 
 /**
@@ -692,6 +708,7 @@ export function downedBy(
 ): Credit {
   const credit = creditOf(victim.id, killer ? killer.id : null)
   victim.deaths++
+  victim.roundDeaths++
   // 切れている間に倒された。戻ってきても続きは無い — 死んだので支度から
   victim.wasAlive = false
   // 自爆なら映すものが無い。空にしておくと画面は自分の体を映したままになる

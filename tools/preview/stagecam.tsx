@@ -11,6 +11,7 @@
  *     ?col=1                 人が止まる面を水色で重ねる (?col=box 審判の箱 / ?col=all 両方。本番と同じ)
  *     ?rdepth=0              深さを既定の向きに戻す (逆向きが既定。util/depth.ts)
  *     ?place=x,y,z,yaw       その足元・向きで置く所の予告 (印と扇) を出す。置けなければ赤
+ *     ?blob=x,y,z            その足元に人の影 (足元の丸) を置く。汚れの板との重なりを見る
  *
  * --- なぜ要るか ---
  * 壁に斜めの帯が出た時、影マップの影なのか、焼き込んだ頂点色なのか、見えない当たりの
@@ -19,7 +20,7 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { addColliderOverlay, applyStageSun, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { addColliderOverlay, applyStageSun, sunProbeOf, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
 import { EmptyBoxes } from '../../src/presentation/scene/actor/box'
 import { REVERSED_DEPTH } from '../../src/presentation/scene/util/depth'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
@@ -27,6 +28,7 @@ import { BlastFx } from '../../src/presentation/scene/fx/blastfx'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
 import { STEP_UP } from '../../src/domain/player/moving'
+import { BlobShadow, setSunProbe } from '../../src/presentation/scene/actor/blobShadow'
 
 const query = new URLSearchParams(location.search)
 const stageName = (query.get('stage') ?? 'city') as StageName
@@ -68,6 +70,8 @@ camera.lookAt(look)
 
 const [, sunData] = await Promise.all([stage.ready, loadStageSun(stageName)])
 if (sunData) applyStageSun(sun, sunData)
+// 人の足元の影 (日なたでだけ足す)。本番と同じ物
+setSunProbe(sunProbeOf(stage, sun))
 fitShadowToStage(sun, stage)
 
 if (query.get('vcol') === '0' || query.get('col') === 'raw') {
@@ -147,6 +151,21 @@ async function diffFrames(): Promise<void> {
   document.body.appendChild(panel)
 }
 
+// 人の足元の影。本番と同じ物 (BlobShadow) を、人の根の代わりの入れ物に付けて置く
+const blobAt = query.get('blob')?.split(',').map(Number)
+let blobShadow: BlobShadow | null = null
+if (blobAt && blobAt.length === 3 && blobAt.every(Number.isFinite)) {
+  const root = new THREE.Group()
+  root.position.set(blobAt[0]!, blobAt[1]!, blobAt[2]!)
+  blobShadow = new BlobShadow()
+  const blob = blobShadow.mesh
+  root.add(blob)
+  scene.add(root)
+  // 切り分け: ?blobro=N で影の描く順を変える
+  if (query.get('blobro') !== null) blob.renderOrder = Number(query.get('blobro'))
+
+}
+
 /*
  * ?blast=x,y,z … 街の中で爆発を起こし、前後のコマの時間を記録する (爆発で画面が止まる件の切り分け)。
  * 3 秒後に 1 度。結果は window.blastTimes とコンソールへ
@@ -174,6 +193,8 @@ function frame(): void {
     if (now - started > 2000 && times.length < 120) times.push(Math.round(dt * 1000))
     if (times.length === 120) { console.log('[blast] frame ms', times.join(' ')); times.push(-2) }
   }
+  // 足元の影の濃さ (日なたか) を追いかける
+  blobShadow?.update(dt)
   renderer.render(scene, camera)
   requestAnimationFrame(frame)
 }

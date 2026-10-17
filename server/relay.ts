@@ -13,7 +13,8 @@ import { isLeakedTo } from '../src/domain/player/player'
 import { STEP_UP } from '../src/domain/player/moving'
 import { type MatchPlayer, headHeightOf, isProtected, lifeElapsed } from '../src/domain/player/player'
 import { surfaceOf } from '../src/domain/stage'
-import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot } from '../src/infra/codec/snapshot'
+import { SNAPSHOT_BYTES, decodeSnapshot, isSnapshot, stampProtected, stampSlot, stampStealthed } from '../src/infra/codec/snapshot'
+import { isStealthed } from '../src/domain/match/sides'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { checkMove, checkMoveOnMesh } from '../src/sim/judge/motioncheck'
 import { cameraPoint, seesFromCamera, type Viewer } from '../src/sim/space/eyepoint'
@@ -151,6 +152,8 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   if (canHold(player, snapshot.held)) player.held = snapshot.held
   // 振りかぶって持っているか。倒された瞬間に足元へ落とすのに要る
   player.holdingGrenade = snapshot.holdingGrenade
+  // STEALTH を着ているか。効いているか (攻める側・解けていない) は isStealthed が見る
+  player.wearingStealth = snapshot.stealthed
   // 位置が届いた。どこに居るか分かったので支度に進める
   if (isJoining(player.life)) setLife(room, player, 'choosing')
   recordPose(player)
@@ -169,6 +172,8 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   stampSlot(view, player.slot)
   // 無敵かどうかはこちらが知っている。送り主に名乗らせない
   stampProtected(view, isProtected(player))
+  // STEALTH は効いている時だけ通す (攻める側・戦場に立っている・当たって解けていない。待機中も効く)
+  stampStealthed(view, isStealthed(room, player, now))
   // 切れたときに配り直せるよう、レプリカを取っておく。
   // bytes は受信バッファなので、持ち回すなら複製が要る
   sessionOf(player).lastPayload = new Uint8Array(bytes)

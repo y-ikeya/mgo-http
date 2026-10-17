@@ -9,7 +9,7 @@ import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
-import { CHOICES } from '../../domain/item/weapons'
+import { CHOICES, SUPPORTS } from '../../domain/item/weapons'
 import ReadyRoom from '../ui/ReadyRoom'
 import { selfSkin } from '../scene/actor/skin'
 import type { WeaponKind } from '../scene/arms/weapon'
@@ -18,6 +18,7 @@ import Blocked from '../ui/Blocked'
 import Leaving from '../ui/Leaving'
 import Stats from '../ui/Stats'
 import Loading from '../ui/Loading'
+import { loadLookScale, saveLookScale } from '../../infra/prefs/look'
 
 /**
  * 調整パネルを出すか。
@@ -149,6 +150,8 @@ export default function Play(props: {
   const [primary, setPrimary] = createSignal<WeaponId | null>('rifle')
   const [support, setSupport] = createSignal<SupportId>('grenade')
   const [game, setGame] = createSignal<Game | null>(null)
+  /** 視点の感度 (設定のタブ)。この端末に覚えてある値から始める */
+  const [lookScale, setLookScale] = createSignal(loadLookScale())
   /** 部屋を出るか尋ねている最中か。戻るを押した時だけ立つ */
   const [leaving, setLeaving] = createSignal(false)
   let container!: HTMLDivElement
@@ -342,6 +345,8 @@ export default function Play(props: {
           onSpawn={() => game()?.closeLoadout()}
           skills={stats()?.skills ?? {}}
           primaries={stats()?.primaries ?? CHOICES.primary}
+          secondaries={stats()?.secondaries ?? CHOICES.secondary}
+          supports={stats()?.supports ?? SUPPORTS}
           // **null は「持たない」。** ?? で埋めると拳銃へ戻る (null は nullish)
           secondary={stats() ? stats()!.secondary : 'm9'}
           /*
@@ -389,6 +394,12 @@ export default function Play(props: {
           onSkill={(id, level) => game()?.setSkill(id, level)}
           onClose={() => game()?.setMenu(false)}
           onLeave={leaveRoom}
+          lookScale={lookScale()}
+          onLookScale={(next) => {
+            setLookScale(next)
+            saveLookScale(next)
+            game()?.setLookScale(next)
+          }}
         />
       </Show>
 

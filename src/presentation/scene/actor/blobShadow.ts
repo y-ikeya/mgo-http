@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { TOWARD_CAMERA } from '../util/depth'
+import { DRAW_LATER, TOWARD_CAMERA } from '../util/depth'
 
 /**
  * 人の足元の丸い影。
@@ -12,8 +12,37 @@ import { TOWARD_CAMERA } from '../util/depth'
  * 人の根 (object) の子にして、位置と向きは親に任せる。姿勢で大きさだけ変える:
  * 伏せは向きに沿って長く、少し前 (頭の側) へ寄せる (伏せた体は中心の 0.5m 前に頭)。
  */
-const RADIUS = 0.55
-const OPACITY = 0.62
+const RADIUS = 0.6
+/**
+ * **日なたでの濃さ。** 下の色を何割落とすか (黒を重ねる)。日なたの地面を、すぐ横の建物の影と
+ * 同じ明るさまで落とす値に合わせる。模様 (砂の粒・タイルの目地) は残る。
+ *
+ * 固定の影の色と暗いほうを採る (min) 描き方を試したが、芯が影の色 1 色に置き換わって
+ * 地面の模様が消え、ベタ塗りに見えた (2026-10-17 本人「自分の影の色キモくない？ベタ塗り」)
+ */
+const SUN_OPACITY = 0.65
+/**
+ * **日の当たらない所での濃さ。** 建物の影の中・部屋の中は、もう日陰の明るさなので足さない。
+ *
+ * 黒を同じ濃さで重ねていた頃は、暗い床の上でさらに暗い丸が浮いた (「暗い影にもさらに暗さが
+ * 掛け合わさっていない？」)。影は「日の光を遮る物」なので、日の当たっていない所では何も遮らない
+ */
+const SHADE_OPACITY = 0
+/** 日なたかを測り直す間隔 (秒)。線 1 本なので軽いが、毎コマは要らない */
+const SUN_PROBE_EVERY = 0.1
+/** 足元のどれだけ上から線を引くか (m)。地面そのものに当たらないように */
+const SUN_PROBE_LIFT = 0.3
+
+/**
+ * その足元に日が当たっているか。**ステージが決まってから差し込む** (setSunProbe)。
+ * 届くまでは日なたとして扱う
+ */
+let sunlit: ((x: number, y: number, z: number) => boolean) | null = null
+
+/** 日なたかを答える物を差し込む。ステージと太陽が置けた所で 1 度 (stage.ts の sunProbeOf) */
+export function setSunProbe(probe: ((x: number, y: number, z: number) => boolean) | null): void {
+  sunlit = probe
+}
 
 let sharedTexture: THREE.Texture | null = null
 
@@ -25,8 +54,9 @@ function texture(): THREE.Texture {
   canvas.height = size
   const ctx = canvas.getContext('2d')!
   const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  // 芯を広く残し、縁だけぼかす
   gradient.addColorStop(0, 'rgba(0,0,0,1)')
-  gradient.addColorStop(0.55, 'rgba(0,0,0,0.75)')
+  gradient.addColorStop(0.5, 'rgba(0,0,0,0.9)')
   gradient.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, size, size)
@@ -41,13 +71,17 @@ export class BlobShadow {
   readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
   // 姿勢が変わっても形は一瞬で変えず、追いかける (ぱっと切り替わると影が跳ねて見える)
   private readonly target = { x: RADIUS * 2, z: RADIUS * 2, offset: 0 }
+  /** 目指す濃さ。日なたなら SUN_OPACITY、日の当たらない所なら SHADE_OPACITY */
+  private targetOpacity = SUN_OPACITY
+  private probeLeft = 0
+  private readonly at = new THREE.Vector3()
 
   constructor() {
     const material = new THREE.MeshBasicMaterial({
       map: texture(),
       color: 0x000000,
       transparent: true,
-      opacity: OPACITY,
+      opacity: SUN_OPACITY,
       depthWrite: false,
       // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)
       polygonOffset: true,
@@ -61,7 +95,12 @@ export class BlobShadow {
     this.mesh.receiveShadow = false
     // 親のスキニングと同じ理由で、画面端で消えないように
     this.mesh.frustumCulled = false
-    this.mesh.renderOrder = 1
+    /*
+     * **汚れの板 (0) より後に描く。** どちらも深さを書かないので、後に描いた物が上に乗る。
+     * 先に描くと泥の絵が影を塗りつぶして、泥の上に立つと影が消えた (2026-10-17 本人)。
+     * 向きは深さの持ち方で裏返る (util/depth.ts の DRAW_LATER)
+     */
+    this.mesh.renderOrder = DRAW_LATER
     this.set('stand')
     this.mesh.scale.set(this.target.x, this.target.z, 1)
   }
@@ -95,6 +134,15 @@ export class BlobShadow {
     s.x += (this.target.x - s.x) * k
     s.y += (this.target.z - s.y) * k   // 平面を倒しているので、奥行きは scale.y
     this.mesh.position.z += (this.target.offset - this.mesh.position.z) * k
+    // 日なたか。影の境をまたぐ時にぱっと変わらないよう、濃さも追いかける
+    this.probeLeft -= dt
+    if (this.probeLeft <= 0 && sunlit) {
+      this.probeLeft = SUN_PROBE_EVERY
+      this.mesh.getWorldPosition(this.at)
+      this.targetOpacity = sunlit(this.at.x, this.at.y + SUN_PROBE_LIFT, this.at.z) ? SUN_OPACITY : SHADE_OPACITY
+    }
+    const material = this.mesh.material
+    material.opacity += (this.targetOpacity - material.opacity) * (1 - Math.exp(-dt * 8))
   }
 
   set visible(value: boolean) {
