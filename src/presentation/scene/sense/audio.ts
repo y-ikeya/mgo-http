@@ -470,8 +470,8 @@ const UI_SOUNDS = {
    * STEALTH が効き始めた。**自分で着た時** (自分にだけ) と、**CAUTION が明けて攻める側の
    * STEALTH が戻った時** (部屋の全員に。暴かれた音と対) (2026-10-17 本人、tools/raw/stealthSet.mp3 のまま)
    */
-  // 音源が暴かれた音より 7dB 小さいので 1.0 にしたが「ちょっとでかすぎ」(2026-10-17 本人)。0.6
-  stealthSet: { file: "stealth_set1.mp3", volume: 0.6 },
+  // 音源が暴かれた音より 7dB 小さいので 1.0 にしたが「ちょっとでかすぎ」(2026-10-17 本人)。0.6、さらに「もう少し小さく」で 0.4
+  stealthSet: { file: "stealth_set1.mp3", volume: 0.4 },
 } as const;
 
 export type UiSoundName = keyof typeof UI_SOUNDS;
