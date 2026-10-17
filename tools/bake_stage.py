@@ -320,13 +320,12 @@ def bake(samples=SAMPLES):
         # メッシュが「変わった」扱いになって法線を全部計算し直す (頂点数の 2 乗)。
         # 土嚢 97 個を足したら書き出しが終わらなくなった。読んでから書く
         normals = [v.normal.copy() for v in mesh.vertices]
-        # 頂点ごとに、それを含む面の真ん中 (の平均)。縁の頂点を測り直す位置をそちらへ寄せる
-        centers = [Vector() for _ in mesh.vertices]
-        counts = [0] * len(mesh.vertices)
+        # 頂点ごとに、それを含む面の真ん中。縁の頂点を測り直す位置をそれぞれへ寄せる
+        centers = [[] for _ in mesh.vertices]
         for poly in mesh.polygons:
+            center = matrix @ poly.center
             for vi in poly.vertices:
-                centers[vi] += poly.center
-                counts[vi] += 1
+                centers[vi].append(center)
         colors = []
         for i, vertex in enumerate(mesh.vertices):
             world = matrix @ vertex.co
@@ -341,16 +340,23 @@ def bake(samples=SAMPLES):
             # 裏面は飛ばす) 外の空に届いた。建物 6 の 1 階は床 1 枚 (21m × 14m) で、部屋の隅が
             # 0.4 の明るさになった (2026-10-17 本人「なんでここ明るいの、部屋の一番奥だぞ」)。
             # 「埋まっているか」を線や近い面で判じる作りは、窓の口の面や自分の床に引っ張られて外れた。
-            # 外壁の頂点は寄せても外なので変わらない。面の途中の頂点は周りの面の真ん中の平均が
-            # 自分の位置なので寄せない。高さは変えない (下へ寄せると床に潜る)
-            if sky > 0.02 and counts[i]:
-                toward = matrix @ (centers[i] / counts[i]) - world
-                toward.z = 0.0
-                span = toward.length
-                if span > 1e-3:
+            # 外壁の頂点は寄せても外なので変わらない。高さは変えない (下へ寄せると床に潜る)
+            # 寄せる向きは**面ごとに**試す。平均を取ると、床の箱の長い側面の真ん中に引っ張られて
+            # 壁に沿って横へずれるだけになり、部屋の中へ出られなかった (建物 6 の南の壁際が 0.25)
+            if sky > 0.02:
+                for center in centers[i]:
+                    toward = center - world
+                    toward.z = 0.0
+                    span = toward.length
+                    if span <= 1e-3:
+                        continue
                     toward /= span
                     for step in INSET_STEPS:
                         sky = min(sky, sky_from(tree, origin + toward * min(step, span * 0.5), rays, up))
+                        if sky <= 0.02:
+                            break
+                    if sky <= 0.02:
+                        break
             value = FLOOR + (1.0 - FLOOR) * sky
             colors.extend((value, value, value, 1.0))
             total += 1
