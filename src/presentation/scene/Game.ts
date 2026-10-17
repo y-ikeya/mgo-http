@@ -3426,6 +3426,9 @@ export class Game {
     if (!this.supports.includes(pending.support)) pending.support = this.supports[0] ?? pending.support;
     // STEALTH は攻める側だけが持つ
     pending.stealth = side === "attack";
+    // **いま持っている物にも反映する。** 側が分かる前に湧いていると入らないまま (待機中は湧き直さない)
+    this.loadout.stealth = pending.stealth;
+    this.inv.setStealthOwned(pending.stealth);
   }
 
   setLoadout(primary: WeaponId | null): void {

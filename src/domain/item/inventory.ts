@@ -178,6 +178,28 @@ export class Inventory {
   private wearing = false
 
   /**
+   * STEALTH を持たせる / 取り上げる。**湧き直さずに。**
+   *
+   * 攻める側か守る側かは試合の状態の通で届く。それより先に湧いていると、持ち物は
+   * 「攻める側と分かっていない」まま組まれて STEALTH が入らない (待機中は湧き直さないので
+   * ずっと入らなかった。2026-10-17 本人「stealth が表示されない」)。弾数などは触らない
+   */
+  setStealthOwned(owned: boolean): void {
+    const has = this.items.some((item) => item.id === 'stealth')
+    if (owned && !has) {
+      // 道具の並び (C.BOX → STEALTH → NONE) を保つ。NONE の前へ
+      const at = this.items.findIndex((item) => item.id === 'none')
+      this.items.splice(at < 0 ? this.items.length : at, 0, { id: 'stealth' })
+    } else if (!owned && has) {
+      this.items = this.items.filter((item) => item.id !== 'stealth')
+      if (this.wearing) {
+        this.wearing = false
+        this.lastTool = 'none'
+      }
+    }
+  }
+
+  /**
    * いま手にある物。
    *
    * **`none` を選んでいるときは武器を返す。** あれは「道具を使っていない」という

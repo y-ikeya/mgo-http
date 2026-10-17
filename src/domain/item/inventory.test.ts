@@ -713,4 +713,14 @@ describe('STEALTH (TSNE の攻める側)', () => {
     inv.refill({ ...loadout, stealth: true })
     expect(inv.wearingStealth).toBe(false)
   })
+
+  test('**湧き直さずに持たせる / 取り上げる** (側が分かる前に湧いていた時)', () => {
+    const inv = make()
+    inv.setStealthOwned(true)
+    expect(inv.switchTo('stealth')).toBe(true)
+    expect(inv.wearingStealth).toBe(true)
+    inv.setStealthOwned(false)
+    expect(inv.wearingStealth).toBe(false)
+    expect(inv.switchTo('stealth')).toBe(false)
+  })
 })
