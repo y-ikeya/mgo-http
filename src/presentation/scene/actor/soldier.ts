@@ -3813,6 +3813,10 @@ export class Soldier {
       // **表に聞く。** id を並べると、銃が増えたときにここだけ古くなる
       const gun = isGun(this.held)
       /*
+       * **片手の銃も手に持ったまま見せる** (2026-10-17 本人)。以前は腰に納めて、構えるか手を
+       * 掛けている間だけ抜いていたが、STEALTH で体が消えると拳銃を選んでいる間は何も見えなく
+       * なった (武器は見える、が成り立たない)。以下は納めていた頃の註釈:
+       *
        * 片手の銃は腰に納めておく。**構えるか、手を掛けている間だけ抜く。**
        *
        * 銃ごとの id で書いていた頃 ('m9' 決め打ち)、拳銃が 2 挺になった時点で
@@ -3830,11 +3834,7 @@ export class Soldier {
         // 見えた (本人 2026-10-16)。相手の画面 (remoteSoldier.ts) は元から箱で納めている
         this.boxed ||
         // ぶら下がっている間は両手が縁に掛かっている
-        this.hanging ||
-        (!isTwoHanded(this.held) &&
-          !this.aiming &&
-          !this.animator.reloading &&
-          !this.animator.bolting)
+        this.hanging
       // ナイフは持ち替えて出す。刺突中の一瞬だけではなくなった
       const knifeOut = (this.held === 'knife' || this.knifePreview) && !barehanded && !this.boxed
       if (this.knife) this.knife.visible = knifeOut

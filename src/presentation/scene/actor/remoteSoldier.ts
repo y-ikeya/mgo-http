@@ -609,7 +609,6 @@ export class RemoteSoldier {
     // 相手の画面には出たままになる。
     //   ダンボール         … 手が塞がっている
     //   手が空いている型   … 敬礼・転がり・受け身など (domain の emptyHanded)
-    //   拳銃を構えていない … ホルスターに納まっている
     //   ナイフを出している      … 銃は背中 (ナイフの型に銃を持たせない)
     const holstered =
       this.boxed ||
@@ -618,8 +617,8 @@ export class RemoteSoldier {
       // ぶら下がっている間は両手が縁に掛かっている
       state.locomotion === 'hang_drop' ||
       state.locomotion === 'hang' ||
-      state.locomotion === 'hang_climb' ||
-      (state.weapon === 'm9' && !state.aiming && !state.reloading)
+      state.locomotion === 'hang_climb'
+    // 拳銃も構えていない間ずっと手に持つ (soldier.ts と同じ)。STEALTH で体が消えても武器は見える
     if (this.weapon) this.weapon.visible = !holstered
 
     this.object.updateMatrixWorld(true);
