@@ -723,18 +723,18 @@ export class RemoteSoldier {
    * ステルス。**体だけを隠す** (2026-10-17 本人)。
    *
    * 手に持った武器 (手の骨に付いている別の形)・足元の影・ダンボール・置いた物は
-   * 見えたまま。光 (味方の発光・漏れ) も消す — 光っていると体の形がそのまま出る
+   * 見えたまま。**光 (EE で抜かれた・味方のリンク) も出す** — 自分が当てた・繋いだ結果なので
+   * (2026-10-17 本人)。TARGET ALERT の霧はサーバーが出さない (server/alert.ts)
    */
   setStealthed(on: boolean): void {
     if (this.stealthed === on) return;
     this.stealthed = on;
     for (const body of this.bodies) body.visible = !on;
-    this.applyGlow();
   }
 
   private applyGlow(): void {
-    // 漏れている人は敵でも光る。味方は敬礼で繋いだときだけ。ステルス中は光らない
-    const on = !this.stealthed && (this.leaking || (this.ally && this.linked));
+    // 漏れている人は敵でも光る。味方は敬礼で繋いだときだけ
+    const on = this.leaking || (this.ally && this.linked);
     for (const mesh of this.glow) mesh.visible = on;
   }
 

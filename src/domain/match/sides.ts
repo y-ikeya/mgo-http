@@ -71,9 +71,14 @@ export function stealthActive(room: Match, now: number): boolean {
   return room.mode.sides && now >= room.revealedUntil
 }
 
-/** その人の体が見えなくなっているか。**攻める側で、戦場に立っている間だけ** (着ているかは本人が名乗る) */
+/** STEALTH が効いてよいか。**攻める側で、戦場に立っている間だけ** (着ているかは問わない。位置の通で消す時に使う) */
 export function isStealthed(room: Match, player: MatchPlayer, now: number): boolean {
   return stealthActive(room, now) && sideOf(room, player.team) === 'attack' && onBattlefield(player.life)
+}
+
+/** いま実際に体が消えているか。**効いてよくて、着ている** */
+export function isInvisible(room: Match, player: MatchPlayer, now: number): boolean {
+  return isStealthed(room, player, now) && player.wearingStealth
 }
 
 /**

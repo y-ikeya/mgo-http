@@ -152,6 +152,8 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   if (canHold(player, snapshot.held)) player.held = snapshot.held
   // 振りかぶって持っているか。倒された瞬間に足元へ落とすのに要る
   player.holdingGrenade = snapshot.holdingGrenade
+  // STEALTH を着ているか。効いているか (攻める側・解けていない) は isStealthed が見る
+  player.wearingStealth = snapshot.stealthed
   // 位置が届いた。どこに居るか分かったので支度に進める
   if (isJoining(player.life)) setLife(room, player, 'choosing')
   recordPose(player)

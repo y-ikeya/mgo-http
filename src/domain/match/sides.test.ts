@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { newMatch, type Match } from './match'
 import { newMatchPlayer, type MatchPlayer, type Team } from '../player/player'
 import {
-  STEALTH_BREAK_MS, canRespawn, disturbStealth, isOut, isStealthed, sideOf, standing, stealthActive, swapSides,
+  STEALTH_BREAK_MS, canRespawn, disturbStealth, isInvisible, isOut, isStealthed, sideOf, standing, stealthActive, swapSides,
 } from './sides'
 import { livesOf, primariesOf, secondariesOf, supportsOf } from './room'
 import { isTranquilizer } from '../item/weapons'
@@ -151,5 +151,18 @@ describe('ステルス', () => {
     disturbStealth(match, d, a, 1_000)
     disturbStealth(match, a, null, 1_000)
     expect(stealthActive(match, 1_000)).toBe(true)
+  })
+})
+
+describe('体が実際に消えているか', () => {
+  test('**効いてよくて、着ている時だけ**', () => {
+    const match = tsne()
+    const a = seat(match, 'a', 'blue')
+    expect(isInvisible(match, a, 0)).toBe(false)
+    a.wearingStealth = true
+    expect(isInvisible(match, a, 0)).toBe(true)
+    const d = seat(match, 'd', 'red')
+    d.wearingStealth = true
+    expect(isInvisible(match, d, 0)).toBe(false)
   })
 })

@@ -15,6 +15,10 @@
  *
  * どれも**申告は受けない**。位置も向きも弾道もサーバーが持っているので、
  * 「狙われた」と名乗る手段は無い。
+ *
+ * **STEALTH で消えている人の気配は出さない** (TSNE、2026-10-17 本人)。消えていても霧が
+ * 出ると、狙っただけで居場所が割れて透明の意味が無い。EE (当てた相手を抜く) と味方の
+ * リンクの光は出す — あちらは自分が当てた・繋いだ結果
  */
 
 import { HELD } from '../src/domain/item/held'
@@ -32,6 +36,7 @@ import {
 import { aimedAt, shotPassesNear } from '../src/sim/judge/alert'
 import { viewDirection } from '../src/sim/space/eyepoint'
 import { revealTo } from './aware'
+import { isInvisible } from '../src/domain/match/sides'
 import { seesPlayer, viewOf, visibleHead } from './relay'
 import { sessionOf } from './session'
 import type { RoomWorld } from './world'
@@ -39,6 +44,8 @@ import type { RoomWorld } from './world'
 /** 当てられた。**EE の鏡。** damage.ts の expose と同じ所から呼ばれる */
 export function alertHit(room: RoomWorld, victim: MatchPlayer, attacker: MatchPlayer): void {
   if (!alertTriggeredBy(victim.skills, 'hit')) return
+  // STEALTH で消えている人の気配は出さない (TSNE。2026-10-17 本人)
+  if (isInvisible(room, attacker, Date.now())) return
   revealTo(room, attacker, victim, ALERT_SECONDS)
 }
 
@@ -55,6 +62,8 @@ export function alertShot(
   to: readonly number[],
   now: number,
 ): void {
+  // STEALTH で消えている人の気配は出さない
+  if (isInvisible(room, shooter, now)) return
   for (const victim of connected(room)) {
     if (victim.id === shooter.id) continue
     if (!alertTriggeredBy(victim.skills, 'shot')) continue
@@ -83,6 +92,8 @@ export function alertShot(
 export function alertAims(room: RoomWorld, now: number): void {
   for (const attacker of connected(room)) {
     if (!attacker.aiming || !canAct(attacker.life)) continue
+    // STEALTH で消えている人の気配は出さない
+    if (isInvisible(room, attacker, now)) continue
     // 銃口。撃てない物 (手榴弾・ナイフ) を構えても銃口は無い
     if (!HELD[attacker.held]?.shoots) continue
 

@@ -252,6 +252,8 @@ export interface MatchPlayer extends Player {
   held: HeldId
   /** 手榴弾を振りかぶって持っているか。倒されたら足元に落ちる */
   holdingGrenade: boolean
+  /** STEALTH を着ていると名乗っているか (位置の通の 1 bit)。効いているかは domain/match/sides.ts が見る */
+  wearingStealth: boolean
   /**
    * 切れたとき戦場に居たか。
    *
@@ -443,6 +445,7 @@ export function newMatchPlayer(seed: {
     support: 'grenade',
     grenades: SUPPORT_SPECS.grenade.count,
     holdingGrenade: false,
+    wearingStealth: false,
     wasAlive: false,
     bot: false,
     kills: 0,
