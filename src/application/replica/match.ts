@@ -141,8 +141,12 @@ export function applyMatch(
        * 手元の時計のずれがそのまま残り時間のずれになる (9 秒遅れていて、残り 9 秒で
        * 終わった)。送ってから届くまでの遅れ (数十 ms) は残り時間に含まれたままになる
        */
-      replica.match =
-        message.endsAt > 0 ? { ...message, endsAt: now + (message.endsAt - message.sentAt) } : message
+      replica.match = {
+        ...message,
+        endsAt: message.endsAt > 0 ? now + (message.endsAt - message.sentAt) : message.endsAt,
+        // CAUTION も同じく手元の時計へ
+        cautionUntil: message.cautionUntil !== undefined ? now + (message.cautionUntil - message.sentAt) : undefined,
+      }
       return changed ? [{ kind: 'phase', to: message.phase, teams: MODES[message.mode].teams }] : []
     }
 

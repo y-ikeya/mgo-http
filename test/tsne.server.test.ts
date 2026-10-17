@@ -60,6 +60,21 @@ describe('TSNE', () => {
     b.close()
   }, 30000)
 
+  test('**CAUTION は部屋で 1 つ。両方の画面に同じ切れる時刻が届く**', async () => {
+    const { a, b } = await twoInTsne()
+    // 向かい合って立っている (12m)。互いに見えているので CAUTION が出ている
+    a.reset(); b.reset()
+    await Bun.sleep(600)
+    const ca = match(a)?.cautionUntil
+    const cb = match(b)?.cautionUntil
+    expect(ca).toBeGreaterThan(Date.now())
+    expect(cb).toBeGreaterThan(Date.now())
+    expect(Math.abs((ca ?? 0) - (cb ?? 0))).toBeLessThan(400)
+    a.close()
+    b.close()
+  }, 30000)
+
+  // **最後に置く。** 試合が終わるので、後の試験は次の試合の支度 (10 秒の結果) を待つことになる
   test('**復活なし。攻める側が全員倒れたら、守る側の勝ちで終わる**', async () => {
     const { a, b } = await twoInTsne()
     for (let i = 0; i < 6 && match(a)?.phase === 'playing'; i++) {
@@ -72,4 +87,5 @@ describe('TSNE', () => {
     a.close()
     b.close()
   }, 30000)
+
 })

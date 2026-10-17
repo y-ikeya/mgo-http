@@ -328,8 +328,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
-        CAUTION (MGO2)。**敵が画面に映ると出る。** 映っている間は満タンで、見えなくなってから
-        左右から真ん中へ縮み、落ち合った所で 0 秒 (2026-10-17 本人)
+        CAUTION (MGO2)。**部屋で 1 つ、自分も敵も同じ秒数を見る。** 誰かが敵を見ると満タンに戻り、
+        誰も見なくなってから左右から真ん中へ縮み、落ち合った所で 0 秒。数えていない時は出さない
+        (2026-10-17 本人)
       */}
       <Show when={(props.stats?.caution ?? 0) > 0 && phase() === 'playing'}>
         <div class="hud-caution">

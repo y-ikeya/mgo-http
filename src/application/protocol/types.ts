@@ -1039,6 +1039,11 @@ export interface MatchMessage {
    */
   stealth?: boolean
   /**
+   * CAUTION が切れる時刻 (サーバーの時計)。**部屋で 1 つ、全員が同じ秒数を見る。**
+   * 出ていない時は無い。受け取る側は endsAt と同じく手元の時計へ直す
+   */
+  cautionUntil?: number
+  /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
    *
    * 離脱中の人も入っている (away)。リロードのあいだ行が消えると、

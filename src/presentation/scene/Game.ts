@@ -99,6 +99,7 @@ import {
 } from "../../domain/match/room";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunProbe } from "./actor/blobShadow";
+import { CAUTION_MS } from "../../domain/match/sides";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
@@ -348,7 +349,7 @@ export interface GameStats {
   toolInHand: boolean
   /** STEALTH を着ているか (TSNE の攻める側)。手には持たない */
   wearingStealth: boolean
-  /** CAUTION の残り (秒)。0 なら出さない。敵が見えている間は満タン (CAUTION_SECONDS) */
+  /** CAUTION の残り (秒)。0 なら出さない。部屋で 1 つ、全員が同じ秒数 */
   caution: number
   /** どちらの系統の一覧を開いているか。閉じていれば null */
   browsingFamily: 'weapon' | 'tool' | null
@@ -489,8 +490,8 @@ const HIT_FEEDBACK_DURATION = 0.6;
  */
 /** 屋根の下 (頭の上が全く開いていない) で露出に掛ける倍率 */
 const ADAPT_MAX = 1.8;
-/** CAUTION の長さ (秒)。敵が見えなくなってから切れるまで */
-export const CAUTION_SECONDS = 5;
+/** CAUTION の長さ (秒)。バーの満タン。決めているのはサーバー (domain/match/sides.ts の CAUTION_MS) */
+export const CAUTION_SECONDS = CAUTION_MS / 1000;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
 const ADAPT_OPEN = 0.75;
 /** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */
@@ -1108,11 +1109,7 @@ export class Game {
   private attackTeam: Team | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
   private stealthOn = false;
-  /**
-   * CAUTION が切れる時刻 (performance.now)。**敵が画面に映っている間は満タンに戻し続け**、
-   * 見えなくなってから CAUTION_SECONDS で切れる (MGO2 の CAUTION。2026-10-17 本人)
-   */
-  private cautionUntil = 0;
+
   /** 陣営のある部屋か。基地 (補給) があるのはそのとき */
   private teamsMode = false;
 
@@ -1896,10 +1893,6 @@ export class Game {
     this.player.setGhost(isSpawning(this.life) || this.loadoutBlocking);
     // 壁で体が画面を塞いだら薄くする (最大で半分)
     this.player.setFade(1 - FADE_MAX * this.follow.crowding);
-    // CAUTION。敵が画面に映っていれば満タンに戻す (戦場に立っている間だけ)
-    if (canAct(this.life) && this.remotes.seesEnemy(this.follow.camera, (id, side) => this.hostileTo(id, side))) {
-      this.cautionUntil = performance.now() + CAUTION_SECONDS * 1000;
-    }
     this.updateRollContact();
     this.updateBoxContact();
     this.updateStab(dt);
@@ -5654,7 +5647,8 @@ export class Game {
       toolInHand: this.inv.usingTool,
       // STEALTH は手に持たないが、着ている間は道具のカードを点ける (武器のカードは暗くしない)
       wearingStealth: this.inv.wearingStealth,
-      caution: Math.max(0, this.cautionUntil - performance.now()) / 1000,
+      // CAUTION は部屋で 1 つ (サーバーが持つ)。手元の時計へ直した切れる時刻から
+      caution: Math.max(0, (this.replica.match?.cautionUntil ?? 0) - Date.now()) / 1000,
       browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物

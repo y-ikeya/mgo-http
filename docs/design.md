@@ -179,6 +179,10 @@ MGO2 の TSNE から**ブツ (ガーコ / ケロタン) を運ぶ所を外した
 **攻める側の誰かに敵の攻撃が当たると、攻める側全員の STEALTH が 5 秒解ける。** 解けて
 いる間にまた当たれば、そこから 5 秒を数え直す。弾・ナイフ・麻酔・爆風・CQC のどれでも。
 
+**CAUTION** (MGO2)。誰かが敵を見ると、時計の下に CAUTION とバーと秒数が出る。**部屋で 1 つ、自分も
+敵も同じ秒数を見る。** 誰かが見ている間は満タンに戻り続け、誰も見なくなってから 5 秒で左右から
+真ん中へ縮んで消える。数えていない時は出ない。STEALTH で消えている相手は「見えた」に数えない。
+
 決めごとは [src/domain/match/sides.ts](../src/domain/match/sides.ts)、持ち物の縛りは
 [src/domain/match/room.ts](../src/domain/match/room.ts) の `TSNE_ARMORY`。
 

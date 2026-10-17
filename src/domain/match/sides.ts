@@ -22,6 +22,22 @@ import type { Side } from './room'
 /** 当たってからステルスが戻るまで (ms) */
 export const STEALTH_BREAK_MS = 5000
 
+/** CAUTION の長さ (ms)。誰も敵を見なくなってから切れるまで */
+export const CAUTION_MS = 5000
+
+/**
+ * 敵を見た。**CAUTION を満タンに戻す** (攻める側と守る側に分かれる部屋の試合中だけ)。
+ *
+ * 見たかどうか (遮蔽) はサーバーが位置を配る時に決めている (server/relay.ts)。STEALTH で
+ * 消えている相手は、位置が届いていても見えていないので数えない
+ */
+export function noticeEnemy(room: Match, viewer: MatchPlayer, subject: MatchPlayer, now: number): void {
+  if (!room.mode.sides || room.phase !== 'playing') return
+  if (!canAct(viewer.life) || !canAct(subject.life)) return
+  if (isInvisible(room, subject, now)) return
+  room.cautionUntil = now + CAUTION_MS
+}
+
 /** その色の側。**側に分かれない部屋では null** */
 export function sideOf(room: Match, team: Team): Side | null {
   if (!room.mode.sides) return null
