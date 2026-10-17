@@ -259,19 +259,47 @@ def sky_reached(tree, origin, d):
     走った (窓の角ごとに暗い楔)。壁に貼った汚れの板や、土嚢のように重なった置き物も同じ。
     近すぎる当たりは食い込みと見て、その先から撃ち直す
     """
+    # 近い表面 (目の前の壁) を飛ばしたか。飛ばした後にその物の裏面に当たったら、壁を突き抜けた
+    skipped_front = False
     for _ in range(SKIP_MAX):
         loc, face_normal, _, dist = tree.ray_cast(origin, d, REACH)
         if loc is None:
             return True
+        front = face_normal.dot(d) <= 0
+        # **飛ばした表面の物を、裏から抜けたら遮る。** 壁際の床の頂点は壁にぴったり接していて、
+        # 斜めの光線が 30cm 以内で壁の表に当たる。近いので飛ばし、続けて壁の裏も「近い裏面」として
+        # 飛ばして建物の外へ抜け、空に届いていた — 部屋の隅ほど明るくなった (建物 3 の一番奥の床が
+        # 0.45、真ん中は 0.06。2026-10-17 本人「なんでここ明るい、部屋の一番奥だぞ」)。
+        # 窓枠に埋まった頂点は最初に裏面に当たるので、ここには来ない
+        if skipped_front and not front:
+            return False
         # **裏から当たった面は遮らない。** 面の向きと光線が同じ向きなら、その物の中 (地面の下・
         # 窓枠の中) から撃っている。建物の底の頂点は地面より 0.6m 下にあり、上へ飛ばした光線が
         # 地面の裏に当たって全部遮られ、真っ暗な底の頂点が壁の升目へ混ざって足元に楔が出た
         # 遠くの裏面は遮る。片面の板 (屋根) を下から見ると裏面なので、無条件に通すと
         # 部屋の床が屋根を素通りして空を見てしまった (abandonedRoom1 の床だけ真昼の明るさ)
-        if dist > NEAR_SKIP and (face_normal.dot(d) <= 0 or dist > BACKFACE_SKIP):
+        if dist > NEAR_SKIP and (front or dist > BACKFACE_SKIP):
             return False
+        if front:
+            skipped_front = True
         origin = loc + d * 0.01
     return False
+
+
+# 縁の頂点を、面の内側へ寄せて測り直す量 (m)。暗いほうを採る (bake の中の註釈)
+INSET_STEPS = (0.3, 0.6)
+
+
+def sky_from(tree, origin, rays, up):
+    """その点から空がどれだけ見えるか (0〜1)。上を向いた光線ほど重い"""
+    open_rays = 0.0
+    weight = 0.0
+    for d in rays:
+        w = max(0.0, d.dot(up)) + 0.35
+        weight += w
+        if sky_reached(tree, origin, d):
+            open_rays += w
+    return open_rays / weight if weight > 0 else 1.0
 
 
 def bake(samples=SAMPLES):
@@ -292,6 +320,13 @@ def bake(samples=SAMPLES):
         # メッシュが「変わった」扱いになって法線を全部計算し直す (頂点数の 2 乗)。
         # 土嚢 97 個を足したら書き出しが終わらなくなった。読んでから書く
         normals = [v.normal.copy() for v in mesh.vertices]
+        # 頂点ごとに、それを含む面の真ん中 (の平均)。縁の頂点を測り直す位置をそちらへ寄せる
+        centers = [Vector() for _ in mesh.vertices]
+        counts = [0] * len(mesh.vertices)
+        for poly in mesh.polygons:
+            for vi in poly.vertices:
+                centers[vi] += poly.center
+                counts[vi] += 1
         colors = []
         for i, vertex in enumerate(mesh.vertices):
             world = matrix @ vertex.co
@@ -299,15 +334,23 @@ def bake(samples=SAMPLES):
             if normal.length < 1e-6:
                 normal = up
             origin = world + normal * EPS
-            open_rays = 0
             rays = directions(normal, samples)
-            for d in rays:
-                if sky_reached(tree, origin, d):
-                    # 何にも当たらなければ空。**上を向いた光線ほど価値がある**ので
-                    # 天頂への近さで重みを付ける (空は上に広い)
-                    open_rays += max(0.0, d.dot(up)) + 0.35
-            weight = sum(max(0.0, d.dot(up)) + 0.35 for d in rays)
-            sky = open_rays / weight if weight > 0 else 1.0
+            sky = sky_from(tree, origin, rays, up)
+            # **縁の頂点は、面の内側へ寄せた所からも測って暗いほうを採る。** 床の箱が壁の足元まで
+            # 伸びていると、床の隅の頂点は壁の中にあり、線は壁の外側の面を裏から抜けて (近い
+            # 裏面は飛ばす) 外の空に届いた。建物 6 の 1 階は床 1 枚 (21m × 14m) で、部屋の隅が
+            # 0.4 の明るさになった (2026-10-17 本人「なんでここ明るいの、部屋の一番奥だぞ」)。
+            # 「埋まっているか」を線や近い面で判じる作りは、窓の口の面や自分の床に引っ張られて外れた。
+            # 外壁の頂点は寄せても外なので変わらない。面の途中の頂点は周りの面の真ん中の平均が
+            # 自分の位置なので寄せない。高さは変えない (下へ寄せると床に潜る)
+            if sky > 0.02 and counts[i]:
+                toward = matrix @ (centers[i] / counts[i]) - world
+                toward.z = 0.0
+                span = toward.length
+                if span > 1e-3:
+                    toward /= span
+                    for step in INSET_STEPS:
+                        sky = min(sky, sky_from(tree, origin + toward * min(step, span * 0.5), rays, up))
             value = FLOOR + (1.0 - FLOOR) * sky
             colors.extend((value, value, value, 1.0))
             total += 1
