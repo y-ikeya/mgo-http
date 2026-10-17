@@ -727,3 +727,37 @@ describe('STEALTH (TSNE の攻める側)', () => {
     expect(inv.switchTo('stealth')).toBe(false)
   })
 })
+
+describe('道具の C (短押し) は武器と同じく往復', () => {
+  const attacker = () => new Inventory({ ...loadout, stealth: true })
+
+  test('STEALTH ⇄ NONE を往復する。**箱は出てこない**', () => {
+    const inv = attacker()
+    expect(inv.tool).toBe('stealth')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('none')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('stealth')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('none')
+  })
+
+  test('一覧で箱を選んだら、その後は 箱 ⇄ 直前の物 を往復する', () => {
+    const inv = attacker()
+    inv.switchTo('box'); settle(inv)
+    expect(inv.tool).toBe('box')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('stealth')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('box')
+  })
+
+  test('往復の相手がまだ無い守る側は、NONE から C.BOX へ', () => {
+    const inv = make()
+    expect(inv.tool).toBe('none')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('box')
+    inv.toggle('tool'); settle(inv)
+    expect(inv.tool).toBe('none')
+  })
+})

@@ -165,6 +165,7 @@ export class Inventory {
      */
     this.wearing = loadout.stealth === true
     this.lastTool = this.wearing ? 'stealth' : 'none'
+    this.previousTool = null
     this.switchLeft = 0
     this.queued = null
   }
@@ -611,6 +612,20 @@ export class Inventory {
    * 勝手に動き続ける。
    */
   switchTo(id: HeldId): boolean {
+    /*
+     * 道具を選び直したら、**直前に選んでいた道具を覚える** (C の短押しの往復先)。武器の
+     * previousWeapon と同じ考え。一覧 (長押し) で選んでも、短押しで選んでも同じ
+     */
+    const before = this.tool
+    const switched = this.switchHand(id)
+    if (switched && HELD[id].family === 'tool' && this.tool !== before) this.previousTool = before
+    return switched
+  }
+
+  /** 直前に選んでいた道具 (C の短押しの往復先)。まだ無ければ null */
+  private previousTool: HeldId | null = null
+
+  private switchHand(id: HeldId): boolean {
     if (!find(this.items, id)) return false
     /*
      * **STEALTH は着る物。手には持たない。**
@@ -729,18 +744,22 @@ export class Inventory {
     if (family === 'weapon' && this.usingTool) {
       return this.switchTo(toggleId(this.items, this.weapon, this.previousWeapon))
     }
-    // 着ている STEALTH から道具の一覧を送る (STEALTH → NONE で脱ぐ)
-    if (family === 'tool' && this.wearing && HELD[this.current].family !== 'tool') {
-      return this.switchTo(cycleId(this.items, 'stealth', 1))
+    /*
+     * **道具も武器と同じく「いまの物 ⇄ 直前に選んだ物」を往復する** (2026-10-17 本人)。
+     *
+     * 以前は一覧を送っていた (C.BOX → STEALTH → NONE → …)。NONE から押すと必ず C.BOX が
+     * 出て、STEALTH を脱いでから戻ろうとすると箱を被った。往復の相手がまだ無い時は、
+     * 何か使っていれば NONE へ、何も使っていなければ STEALTH (攻める側) か C.BOX へ
+     */
+    if (family === 'tool') {
+      const now = this.tool
+      let target = this.previousTool
+      if (target === null || target === now || !find(this.items, target)) {
+        target = now !== 'none' ? 'none' : find(this.items, 'stealth') ? 'stealth' : 'box'
+      }
+      return this.switchTo(target)
     }
-    if (HELD[this.current].family !== family) {
-      const target = family === 'weapon' ? this.weapon : this.tool
-      // 道具の枠が none のまま入っても意味が無いので、そのときは箱へ
-      const enter = family === 'tool' && target === 'none' ? 'box' : target
-      return this.switchTo(enter)
-    }
-    // 道具は一覧を送る。箱 → none → 箱 …。「降ろす」を別の操作にしない
-    if (family === 'tool') return this.switchTo(cycleId(this.items, this.current, 1))
+    if (HELD[this.current].family !== family) return this.switchTo(this.weapon)
     // 武器は「直前の武器」と往復する。箱を挟んでも P90 ⇄ M9 が続く
     return this.switchTo(toggleId(this.items, this.current, this.previousWeapon))
   }
