@@ -43,6 +43,10 @@ const cases: Record<string, Partial<GameStats>> = {
   },
   boxed: { held: 'box', tool: 'box', toolInHand: true },
   // スタンナイフの充電。溜まっている途中 / 満ちた
+  // 輪郭: 麻酔の狙撃銃 (青) / 拳銃 (CQC の印と並ぶ) / 手榴弾 (数だけ)
+  mosin: { held: 'mosin', weaponHeld: 'mosin', equipped: 'mosin' as never, ammo: 5, magazine: 5, reserve: 15 },
+  pistol: { held: 'm9', weaponHeld: 'm9', equipped: 'm9' as never, ammo: 12, magazine: 12, reserve: 48 },
+  grenade: { held: 'grenade', weaponHeld: 'grenade', equipped: 'grenade' as never, grenades: 3 } as never,
   knifeCharging: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 0.45 },
   knifeCharged: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 1 },
   boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'm9', ammo: 10, magazine: 12, reserve: 48 },

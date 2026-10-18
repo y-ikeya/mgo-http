@@ -946,11 +946,25 @@
   background: rgba(219, 230, 242, 0.16);
 }
 
-/* ナイフの輪郭。銃の数字の段 (22px) に置く */
-.hud-weapon-art {
+/* 上の段。輪郭と弾の総数を右に寄せて並べる (左上は CQC の印) */
+.hud-weapon-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   height: 22px;
+}
+
+/* 武器の輪郭。殺傷は赤、麻酔は青 */
+.hud-weapon-art {
+  height: 26px;
   width: auto;
-  filter: url(#hud-outline);
+  margin: -2px 0;
+  filter: url(#hud-outline-lethal);
+}
+
+.hud-weapon-art-tranq {
+  filter: url(#hud-outline-tranq);
 }
 
 /* filter の定義だけを持つ。場所を取らない */

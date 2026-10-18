@@ -39,6 +39,12 @@ const BROWSE_SLIDE = 26
 /** 待合室を閉じる前に黒へ落とし始める (ms)。落ちきるのは CSS の transition (0.8 秒) */
 const STANDBY_BLACK_MS = 1000
 
+/** 影絵のある持ち物 (public/icons/<id>.png、tools/preview/icons.html で撮る) */
+const HUD_ART: ReadonlySet<HeldId> = new Set<HeldId>([
+  'smg', 'rifle', 'm4', 'sniper', 'mosin', 'shotgun', 'm9', 'm1911',
+  'grenade', 'claymore', 'decoy', 'locator', 'knife',
+])
+
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
   // 残り時間の表示だけは秒ごとに動かす。stats は 0.1 秒ごとに来るが、
@@ -150,6 +156,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   /** 麻酔銃を手にしているか。**色で殺傷と分ける** */
   const heldIsTranq = () => isTranquilizer(held())
   const heldIsGun = () => HELD[held()].shoots
+  /** 武器の影絵 (public/icons/<id>.png)。**無い物は出さない** (弾倉・箱・NONE) */
+  const artOf = (id: HeldId): string | null =>
+    HUD_ART.has(id) ? `${import.meta.env.BASE_URL}icons/${id}.png?v=2` : null
 
   /**
    * カードの大きい数字。**持っている弾の総数** (装填分 + 予備)。
@@ -791,24 +800,39 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <Show when={canThrowWith(held())}>
           <div class="hud-weapon-cqc">CQC</div>
         </Show>
-        <Show when={heldIsGun()}>
-          <div class="hud-weapon-spare">{heldTotal()}</div>
-        </Show>
         {/*
-          ナイフの輪郭 (MGO2 の STUN KNIFE のカード、2026-10-19 本人)。銃の数字の段に置く。
-          影絵 (public/icons/knife.png) の縁だけを SVG の filter で線にする
+          上の段。**武器の輪郭** (影絵の縁を線に) と、銃なら持っている弾の総数。
+          輪郭は MGO2 のカード (2026-10-19 本人)。殺傷は赤、麻酔は青 (装備画面の札と同じ色)
         */}
-        <Show when={held() === 'knife' && !props.stats?.browsing}>
-          <svg class="hud-weapon-filters" aria-hidden="true">
-            <filter id="hud-outline">
-              <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="grown" />
-              <feComposite in="grown" in2="SourceAlpha" operator="out" result="edge" />
-              <feFlood flood-color="#ff5a3c" />
-              <feComposite in2="edge" operator="in" />
-            </filter>
-          </svg>
-          <img class="hud-weapon-art" src={`${import.meta.env.BASE_URL}icons/knife.png?v=1`} alt="" />
-        </Show>
+        <svg class="hud-weapon-filters" aria-hidden="true">
+          <filter id="hud-outline-lethal">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="grown" />
+            <feComposite in="grown" in2="SourceAlpha" operator="out" result="edge" />
+            <feFlood flood-color="#ff5a3c" />
+            <feComposite in2="edge" operator="in" />
+          </filter>
+          <filter id="hud-outline-tranq">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="grown" />
+            <feComposite in="grown" in2="SourceAlpha" operator="out" result="edge" />
+            <feFlood flood-color="#7ab8ff" />
+            <feComposite in2="edge" operator="in" />
+          </filter>
+        </svg>
+        <div class="hud-weapon-top">
+          <Show when={artOf(held())}>
+            {(url) => (
+              <img
+                class="hud-weapon-art"
+                classList={{ 'hud-weapon-art-tranq': heldIsTranq() }}
+                src={url()}
+                alt=""
+              />
+            )}
+          </Show>
+          <Show when={heldIsGun()}>
+            <div class="hud-weapon-spare">{heldTotal()}</div>
+          </Show>
+        </div>
         <div class="hud-weapon-name">{heldLabel()}</div>
         <Show when={heldIsGun()}>
           <div class="hud-weapon-mag">
