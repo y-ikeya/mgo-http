@@ -25,6 +25,7 @@ import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
+import { isGun } from "../../../domain/item/held";
 import { DeathSlide } from "./deathSlide";
 import {
   advanceBoxLift,
@@ -628,7 +629,13 @@ export class RemoteSoldier {
     const holstered =
       this.boxed ||
       animator.barehanded ||
-      state.held === 'knife' ||
+      /*
+       * **手にあるのが銃でなければ隠す** (ナイフ・手榴弾・デコイ・クレイモア・E.LOCATOR)。
+       * 自分の画面 (soldier.ts の !gun) と同じ決まり。ナイフだけを名指ししていた頃は、デコイを
+       * 持っている相手が**最後に持っていた銃 (MOSIN) を持っているように見え**、STEALTH で
+       * 体が消えていても浮いた銃で位置が割れた (2026-10-17 本人と友達の TSNE)
+       */
+      !isGun(state.held) ||
       // ぶら下がっている間は両手が縁に掛かっている
       state.locomotion === 'hang_drop' ||
       state.locomotion === 'hang' ||
