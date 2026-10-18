@@ -145,6 +145,19 @@ const cases: Record<string, Partial<GameStats>> = {
       { label: 'DEATH', delta: -2, at: Date.now() },
     ],
   },
+  // 本人の場面 (2026-10-19): MOSIN / M9 / DECOY / KNIFE で M9 を指している。角のすぐ上が MOSIN (1 つ前)
+  browsingFour: {
+    browsingFamily: 'weapon',
+    browsing: {
+      items: [
+        { id: 'mosin', n: 20, loaded: 5, mag: 5 },
+        { id: 'm9', n: 60, loaded: 12, mag: 12 },
+        { id: 'decoy', n: 3, loaded: null, mag: null },
+        { id: 'knife', n: null, loaded: null, mag: null },
+      ],
+      at: 1,
+    },
+  } as never,
   browsingTool: {
     browsingFamily: 'tool',
     tool: 'none',

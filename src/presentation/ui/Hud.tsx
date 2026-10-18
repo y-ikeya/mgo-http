@@ -269,8 +269,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   const above = () => {
     const browsing = props.stats?.browsing
     if (!browsing) return []
-    const skip = new Set([browsing.at, nextAt()])
-    return browsing.items.filter((_, i) => !skip.has(i))
+    /*
+     * **角のすぐ上が 1 つ前、その上が 2 つ前 …。** 送る順と並びを揃える。
+     *
+     * 一覧の順のまま上から積んでいた頃は、角 (M9) のすぐ上に KNIFE、一番上に MOSIN が
+     * 並び、上へ送ると 1 つ前の MOSIN (一番上の札) が出てきた (2026-10-19 本人)。
+     * 列は上から描くので、遠い (前へ遡った) 物から並べる
+     */
+    const n = browsing.items.length
+    const out = []
+    for (let k = n - 2; k >= 1; k--) {
+      const i = (browsing.at - k + n) % n
+      if (i === nextAt()) continue
+      out.push(browsing.items[i]!)
+    }
+    return out
   }
 
   /** 眠りが明けるまで。眠っていなければ 0 */
