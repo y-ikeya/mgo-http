@@ -704,15 +704,16 @@
  * 3 か所に書いていた**のが原因なので、変数にして計算で出す。
  */
 :root {
-  --hud-card-w: 168px;
-  --hud-card-h: 74px;
+  /* 一回り大きく、角へ寄せる (2026-10-19 本人)。168 × 74 / 縁 22 だった */
+  --hud-card-w: 200px;
+  --hud-card-h: 88px;
   --hud-card-gap: 6px;
   /* 画面の縁からの余白 */
-  --hud-edge: 22px;
+  --hud-edge: 12px;
   /* 武器のカードの下端。**下に状態の行 (PRESS R など) が入る** */
-  --hud-weapon-bottom: 38px;
+  --hud-weapon-bottom: 28px;
   /* 道具のカードの下端。こちらの下には何も入らない */
-  --hud-tool-bottom: 20px;
+  --hud-tool-bottom: 12px;
 }
 
 .hud-browse {
@@ -858,7 +859,7 @@
 
 /* 持っている弾の総数 (装填分 + 予備)。内訳は下の目盛り */
 .hud-weapon-spare {
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1;
   letter-spacing: 0.06em;
   color: rgba(219, 230, 242, 0.85);
@@ -880,7 +881,7 @@
 }
 
 .hud-weapon-name {
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 0.14em;
   color: #f2f6fb;
 }
@@ -952,7 +953,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  height: 22px;
+  height: 26px;
 }
 
 /*
