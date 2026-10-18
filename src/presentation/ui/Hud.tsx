@@ -794,6 +794,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <Show when={heldIsGun()}>
           <div class="hud-weapon-spare">{heldTotal()}</div>
         </Show>
+        {/*
+          ナイフの輪郭 (MGO2 の STUN KNIFE のカード、2026-10-19 本人)。銃の数字の段に置く。
+          影絵 (public/icons/knife.png) の縁だけを SVG の filter で線にする
+        */}
+        <Show when={held() === 'knife' && !props.stats?.browsing}>
+          <svg class="hud-weapon-filters" aria-hidden="true">
+            <filter id="hud-outline">
+              <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="grown" />
+              <feComposite in="grown" in2="SourceAlpha" operator="out" result="edge" />
+              <feFlood flood-color="#ff5a3c" />
+              <feComposite in2="edge" operator="in" />
+            </filter>
+          </svg>
+          <img class="hud-weapon-art" src={`${import.meta.env.BASE_URL}icons/knife.png?v=1`} alt="" />
+        </Show>
         <div class="hud-weapon-name">{heldLabel()}</div>
         <Show when={heldIsGun()}>
           <div class="hud-weapon-mag">
@@ -809,11 +824,14 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           満ちたら明るくなる (構えて R2 / X で眠らせる刺突が出せる)。MGO2 と同じ置き方
         */}
         <Show when={props.stats?.weaponHeld === 'knife' && !props.stats?.browsing}>
-          <div
-            class="hud-weapon-charge"
-            classList={{ 'hud-weapon-charge-full': (props.stats?.stunCharge ?? 0) >= 1 }}
-          >
-            <div class="hud-weapon-charge-fill" style={{ width: `${Math.round((props.stats?.stunCharge ?? 0) * 100)}%` }} />
+          <div class="hud-weapon-charge-row">
+            <span class="hud-weapon-charge-label">CHARGE</span>
+            <div
+              class="hud-weapon-charge"
+              classList={{ 'hud-weapon-charge-full': (props.stats?.stunCharge ?? 0) >= 1 }}
+            >
+              <div class="hud-weapon-charge-fill" style={{ width: `${Math.round((props.stats?.stunCharge ?? 0) * 100)}%` }} />
+            </div>
           </div>
         </Show>
         {/* 投げ物は装填が無い。残りの数だけ */}

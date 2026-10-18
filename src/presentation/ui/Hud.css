@@ -919,12 +919,45 @@
  * スタンナイフの充電。弾の目盛り (hud-weapon-mag) と同じ帯に 1 本の棒。
  * 溜まっている間は鈍い青、満ちたら明るく光る — 使えるかを読まずに分かる
  */
-.hud-weapon-charge {
-  position: relative;
-  flex: 0 0 8px;
+/* 充電の行。「CHARGE」の文字と棒 (MGO2 の STUN KNIFE のカード) */
+.hud-weapon-charge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   margin-top: 2px;
+}
+
+.hud-weapon-charge-label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: rgba(219, 230, 242, 0.75);
+}
+
+.hud-weapon-charge-full .hud-weapon-charge-label,
+.hud-weapon-charge-row:has(.hud-weapon-charge-full) .hud-weapon-charge-label {
+  color: rgba(160, 225, 255, 0.98);
+}
+
+.hud-weapon-charge {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
   background: rgba(219, 230, 242, 0.16);
+}
+
+/* ナイフの輪郭。銃の数字の段 (22px) に置く */
+.hud-weapon-art {
+  height: 22px;
+  width: auto;
+  filter: url(#hud-outline);
+}
+
+/* filter の定義だけを持つ。場所を取らない */
+.hud-weapon-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
 }
 
 .hud-weapon-charge-fill {
