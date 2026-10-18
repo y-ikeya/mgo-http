@@ -955,12 +955,29 @@
   height: 22px;
 }
 
-/* 武器の輪郭。殺傷は赤、麻酔は青 */
+/*
+ * 武器の輪郭。**カードいっぱいに大きく、文字の後ろに** (MGO2 のカード。小さいと「しょぼい」
+ * 2026-10-19 本人)。殺傷は赤、麻酔は青
+ */
 .hud-weapon-art {
-  height: 26px;
-  width: auto;
-  margin: -2px 0;
+  position: absolute;
+  inset: 4px 10px 12px 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 16px);
+  object-fit: contain;
+  opacity: 0.85;
   filter: url(#hud-outline-lethal);
+  z-index: 0;
+}
+
+/* 文字と目盛りは輪郭の上 */
+.hud-weapon > :not(.hud-weapon-art):not(.hud-weapon-filters):not(.hud-weapon-cqc) {
+  position: relative;
+  z-index: 1;
+}
+
+.hud-weapon > .hud-weapon-cqc {
+  z-index: 1;
 }
 
 .hud-weapon-art-tranq {

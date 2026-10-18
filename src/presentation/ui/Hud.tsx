@@ -818,17 +818,17 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             <feComposite in2="edge" operator="in" />
           </filter>
         </svg>
+        <Show when={artOf(held())}>
+          {(url) => (
+            <img
+              class="hud-weapon-art"
+              classList={{ 'hud-weapon-art-tranq': heldIsTranq() }}
+              src={url()}
+              alt=""
+            />
+          )}
+        </Show>
         <div class="hud-weapon-top">
-          <Show when={artOf(held())}>
-            {(url) => (
-              <img
-                class="hud-weapon-art"
-                classList={{ 'hud-weapon-art-tranq': heldIsTranq() }}
-                src={url()}
-                alt=""
-              />
-            )}
-          </Show>
           <Show when={heldIsGun()}>
             <div class="hud-weapon-spare">{heldTotal()}</div>
           </Show>
