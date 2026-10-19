@@ -1,4 +1,6 @@
 import { WEAPONS, type WeaponId } from '../item/weapons'
+import { TSNE_SLEEP_SECONDS } from '../match/room'
+import { SLEEP_SECONDS } from './stamina'
 import {
   ALERT_AIM_RANGE,
   ALERT_AIM_WIDTH,
@@ -10,6 +12,7 @@ import {
   boxMoveScale,
   exposeSeconds,
   masteryJitterScale,
+  patSeconds,
   masteryRecoilScale,
   masteryRecoveryScale,
   masteryReloadScale,
@@ -17,6 +20,7 @@ import {
   masterySwayScale,
   runnerScale,
   setupSpeedScale,
+  sleepScale,
   stabSpeedScale,
   stunChargeSeconds,
   throwScale,
@@ -161,6 +165,23 @@ export function skillDetail(id: SkillId): SkillDetail {
           },
         ],
         notes: ['構えて R2 / X で眠らせる刺突。充電が満ちている時だけ'],
+      }
+    case 'quickRecovery':
+      return {
+        summary: '眠らされても早く起き、眠っている人を叩いて起こすのが強い',
+        effects: [
+          {
+            label: `自分の眠り (無しで ${SLEEP_SECONDS} 秒、TSNE は ${TSNE_SLEEP_SECONDS} 秒)`,
+            values: perLevel(id, sleepScale).map(
+              (v) => `${Math.round(v * SLEEP_SECONDS)} 秒 / ${Math.round(v * TSNE_SLEEP_SECONDS)} 秒`,
+            ),
+          },
+          {
+            label: `叩いて縮める (無しで ${patSeconds({})} 秒)`,
+            values: perLevel(id, patSeconds).map((v) => (Number.isFinite(v) ? `${v} 秒` : '1 回で起こす')),
+          },
+        ],
+        notes: ['しゃがんで、眠っている人の傍で G / △。味方でも敵でも起こせる'],
       }
   }
 }

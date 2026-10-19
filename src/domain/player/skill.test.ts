@@ -52,7 +52,7 @@ describe('4 コストの予算', () => {
   })
 
   test('**13 ある。** 2 つだと全員が両方取って選択が生まれない', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(13)
+    expect(Object.keys(SKILLS)).toHaveLength(14)
   })
 
   test('KNIFE MASTERY: 段で刺すのが速く、スタンナイフの充電が早い (素 20 秒)', () => {

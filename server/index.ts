@@ -78,7 +78,7 @@ import { sensedBy } from '../src/sim/judge/claymore'
 import { SENSE_HEIGHT, SENSOR_HEIGHT, TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
-import { costOf } from '../src/domain/player/skill'
+import { costOf, patSeconds } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { STAGES, inWater, waterOf } from '../src/domain/stage'
 import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
@@ -887,7 +887,7 @@ function handleMessage(
       if (!isAsleep(target.sleepUntil, now)) break
       // 位置は送られてきた姿の控え。届くまでの遅れぶん少し甘く見る
       if (Math.hypot(target.x - player.x, target.z - player.z) > PAT_RANGE + 0.75) break
-      const next = pat(target, now)
+      const next = pat(target, now, patSeconds(player.skills))
       if (next.patAt === target.patAt) break
       target.sleepUntil = next.sleepUntil
       target.patAt = next.patAt

@@ -6,6 +6,7 @@ import {
   PAT_INTERVAL_MS, pat,
 } from './stamina'
 import { TSNE_SLEEP_SECONDS } from '../match/room'
+import { patSeconds, sleepScale } from './skill'
 import { WEAPONS } from '../item/weapons'
 
 /**
@@ -201,5 +202,25 @@ describe('叩いて起こす', () => {
   test('起きている人は叩いても変わらない', () => {
     const awake = { sleepUntil: t0 - 1, patAt: 0 }
     expect(pat(awake, t0)).toBe(awake)
+  })
+})
+
+/** QUICK RECOVERY。**Lv3 なら 1 回叩けば起こせる** (TSNE の 450 秒でも)。自分の眠りも短い */
+describe('QUICK RECOVERY', () => {
+  const t0 = 1_000_000
+
+  test('Lv3 は TSNE の眠りたてでも 1 回で起こせる', () => {
+    const next = pat({ sleepUntil: t0 + TSNE_SLEEP_SECONDS * 1000, patAt: 0 }, t0, patSeconds({ quickRecovery: 3 }))
+    expect(isAsleep(next.sleepUntil, t0)).toBe(false)
+  })
+
+  test('段が上がるほど叩いて縮める量が増える。取っていなければ 20 秒', () => {
+    expect(patSeconds({})).toBe(20)
+    expect(patSeconds({ quickRecovery: 1 })).toBeLessThan(patSeconds({ quickRecovery: 2 }))
+  })
+
+  test('Lv3 は自分の眠りが半分', () => {
+    expect(sleepScale({})).toBe(1)
+    expect(sleepScale({ quickRecovery: 3 })).toBe(0.5)
   })
 })

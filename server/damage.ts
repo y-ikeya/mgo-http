@@ -27,7 +27,7 @@ import {
 } from '../src/domain/player/player'
 import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage, stunReadyAfter } from '../src/domain/rule/damage'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
-import { exposeSeconds, stunChargeSeconds } from '../src/domain/player/skill'
+import { exposeSeconds, sleepScale, stunChargeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
 import { drainStamina, isAsleep, wakeFloor } from '../src/domain/player/stamina'
 import {
@@ -564,8 +564,10 @@ function applyTranquilizer(
     return NOT_HURT
   }
 
-  victim.sleepUntil = now + room.mode.sleepSeconds * 1000
-  victim.wakeFloor = wakeFloor(now, room.mode.sleepSeconds)
+  // 眠る長さは眠らされる側の QUICK RECOVERY で縮む
+  const sleep = room.mode.sleepSeconds * sleepScale(victim.skills)
+  victim.sleepUntil = now + sleep * 1000
+  victim.wakeFloor = wakeFloor(now, sleep)
   victim.struggleAt = 0
   attacker.stuns++
   sendStamina(victim)
@@ -683,8 +685,9 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
   victim.stamina = drain.stamina
   victim.concentratingSince = 0
   if (drain.slept) {
-    victim.sleepUntil = now + room.mode.sleepSeconds * 1000
-    victim.wakeFloor = wakeFloor(now, room.mode.sleepSeconds)
+    const sleep = room.mode.sleepSeconds * sleepScale(victim.skills)
+    victim.sleepUntil = now + sleep * 1000
+    victim.wakeFloor = wakeFloor(now, sleep)
     victim.struggleAt = 0
     attacker.stuns++
     broadcast(room, {

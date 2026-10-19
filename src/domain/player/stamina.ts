@@ -223,9 +223,12 @@ export interface Patted {
   patAt: number
 }
 
-/** 叩かれた。**新しい起きる時刻と、叩かれた時刻**を返す。間が短すぎる叩きは効かない */
-export function pat(state: Patted, now: number): Patted {
+/**
+ * 叩かれた。**新しい起きる時刻と、叩かれた時刻**を返す。間が短すぎる叩きは効かない。
+ * seconds は叩く側の縮める秒数 (QUICK RECOVERY で伸びる。domain/player/skill.ts の patSeconds)
+ */
+export function pat(state: Patted, now: number, seconds = PAT_SECONDS): Patted {
   if (state.sleepUntil <= now) return state
   if (state.patAt > 0 && now - state.patAt < PAT_INTERVAL_MS) return state
-  return { sleepUntil: Math.max(now, state.sleepUntil - PAT_SECONDS * 1000), patAt: now }
+  return { sleepUntil: Math.max(now, state.sleepUntil - seconds * 1000), patAt: now }
 }
