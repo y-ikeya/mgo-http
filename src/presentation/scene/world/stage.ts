@@ -37,6 +37,7 @@ import { TriangleBvh } from '../../../sim/space/bvh'
 import type { SolidWorld } from '../../../sim/space/vision'
 import { isPathClear, SANE_HEIGHT, sightBlockers, solidBlockers } from '../../../sim/space/vision'
 import { TOWARD_CAMERA } from '../util/depth'
+import { loadSharedTexture } from '../util/texshare'
 import type { Ladder } from '../../../domain/stage'
 import type { StageBox } from '../../../sim/space/vision'
 import { arenaHalfOf } from '../../../sim/judge/motioncheck'
@@ -613,32 +614,25 @@ async function applyStructureTexture(
 ): Promise<void> {
   const prefix = SURFACE_TEXTURES[surface]
   if (!prefix) return
-  const loader = new THREE.TextureLoader()
-
-  const setup = (texture: THREE.Texture, srgb: boolean) => {
-    texture.wrapS = THREE.RepeatWrapping
-    texture.wrapT = THREE.RepeatWrapping
-    texture.anisotropy = GROUND_ANISOTROPY
-    if (srgb) texture.colorSpace = THREE.SRGBColorSpace
-    return texture
-  }
+  // 地面と同じ絵 (ground_*) を使う材質がある。1 回だけ読んで同じ物を貼る (util/texshare.ts)
+  const load = (file: string, srgb: boolean) => loadSharedTexture(asset.texture(file), srgb, GROUND_ANISOTROPY)
 
   try {
     const [diffuse, normal, roughness] = await Promise.all([
-      loader.loadAsync(asset.texture(`${prefix}_diff.jpg`)),
-      loader.loadAsync(asset.texture(`${prefix}_nor.jpg`)),
-      loader.loadAsync(asset.texture(`${prefix}_rough.jpg`)),
+      load(`${prefix}_diff.jpg`, true),
+      load(`${prefix}_nor.jpg`, false),
+      load(`${prefix}_rough.jpg`, false),
     ])
-    material.map = setup(diffuse, true)
+    material.map = diffuse
     // 切り分け用: ?nmap=0 で法線の絵を貼らない (壁のギラつきが法線の絵か見る)
-    if (DIAG.nmap) material.normalMap = setup(normal, false)
-    material.roughnessMap = setup(roughness, false)
+    if (DIAG.nmap) material.normalMap = normal
+    material.roughnessMap = roughness
     // マップ側の値を使うので、係数は 1 にして素通しにする
     material.color.setHex(0xffffff)
     material.roughness = 1
     // 金属だけ metalness のマップを持つ。コンクリートは非金属
     if (surface === 'metal') {
-      material.metalnessMap = setup(await loader.loadAsync(asset.texture(`${prefix}_metal.jpg`)), false)
+      material.metalnessMap = await load(`${prefix}_metal.jpg`, false)
       material.metalness = 1
     } else {
       material.metalness = 0
@@ -1255,29 +1249,24 @@ async function applySlopes(name: StageName, obstacles: Obstacle[]): Promise<void
  *
  * 読み込みに失敗しても単色のまま成立するので、握り潰してよい。
  */
-async function applyGroundTexture(material: THREE.MeshStandardMaterial): Promise<void> {
-  const loader = new THREE.TextureLoader()
+async function applyGroundTexture(material: THREE.MeshStandardMaterial, geometry: THREE.BufferGeometry): Promise<void> {
   const repeat = GROUND_SIZE / GROUND_TILE_SIZE
-
-  const setup = (texture: THREE.Texture, srgb: boolean) => {
-    texture.wrapS = THREE.RepeatWrapping
-    texture.wrapT = THREE.RepeatWrapping
-    texture.repeat.set(repeat, repeat)
-    texture.anisotropy = GROUND_ANISOTROPY
-    // 色として扱うのは diffuse だけ。法線と粗さは数値なので変換を掛けてはいけない。
-    if (srgb) texture.colorSpace = THREE.SRGBColorSpace
-    return texture
-  }
+  // 繰り返しは UV に持たせる。テクスチャの repeat に置くと、同じ絵を貼るコンクリートの箱と
+  // 共有できず、GPU に 2 枚ずつ載る (util/texshare.ts の loadSharedTexture)
+  const uv = geometry.getAttribute('uv')
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * repeat, uv.getY(i) * repeat)
+  uv.needsUpdate = true
+  const load = (file: string, srgb: boolean) => loadSharedTexture(asset.texture(file), srgb, GROUND_ANISOTROPY)
 
   try {
     const [diffuse, normal, roughness] = await Promise.all([
-      loader.loadAsync(asset.texture(`ground_diff.jpg`)),
-      loader.loadAsync(asset.texture(`ground_nor.jpg`)),
-      loader.loadAsync(asset.texture(`ground_rough.jpg`)),
+      load('ground_diff.jpg', true),
+      load('ground_nor.jpg', false),
+      load('ground_rough.jpg', false),
     ])
-    material.map = setup(diffuse, true)
-    material.normalMap = setup(normal, false)
-    material.roughnessMap = setup(roughness, false)
+    material.map = diffuse
+    material.normalMap = normal
+    material.roughnessMap = roughness
     // テクスチャの色をそのまま出す。掛け算の相手が濃いと全体が沈む。
     material.color.setHex(0xffffff)
     material.needsUpdate = true
@@ -1424,7 +1413,7 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   scene.add(ground)
   collidables.push(ground)
   // テクスチャは非同期。届くまでは単色のまま出しておく。
-  void applyGroundTexture(groundMaterial)
+  void applyGroundTexture(groundMaterial, ground.geometry)
   // 明暗は箱が届いてから。**歩く床がここ**なので、ここが平らだと効果が出ない
   void bakeGroundSky(name, ground.geometry)
 

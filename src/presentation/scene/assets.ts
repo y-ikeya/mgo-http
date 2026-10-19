@@ -3,6 +3,7 @@ import { missingClips } from './actor/animation'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { DEFAULT_SKIN } from './actor/skin'
+import { shareGltfTextures } from './util/texshare'
 import type { StageName } from '../../domain/stage'
 
 /**
@@ -72,7 +73,15 @@ function load(url: string): Promise<GLTF> {
   if (!pending) {
     // ステージの glb は gltfpack で meshopt 圧縮している (tools/export_stage.py)。
     // 兵士のモデルは圧縮していないが、decoder を渡しておいて困ることはない
-    pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url)
+    pending = new GLTFLoader()
+      .setMeshoptDecoder(MeshoptDecoder)
+      .loadAsync(url)
+      .then((gltf) => {
+        // 絵のずらしごとに複製されたテクスチャを 1 枚にまとめる (util/texshare.ts)。
+        // WebGPU は複製ごとに GPU へ載せるので、city では同じ絵が 540MB ぶん重なっていた
+        shareGltfTextures(gltf.scene)
+        return gltf
+      })
     cache.set(url, pending)
   }
   return pending
