@@ -25,8 +25,17 @@ const standing: BodyState = {
 }
 
 describe('できること', () => {
-  test('立っていれば一通りできる', () => {
-    for (const move of Object.keys(MOVES) as Move[]) expect(can(standing, move)).toBe(true)
+  test('立っていれば一通りできる (もがくのは眠っている間だけ)', () => {
+    for (const move of Object.keys(MOVES) as Move[]) {
+      if (move === 'struggle') continue
+      expect(can(standing, move)).toBe(true)
+    }
+  })
+
+  test('もがけるのは眠っている間だけ。倒れていたら眠っていても無理', () => {
+    expect(can(standing, 'struggle')).toBe(false)
+    expect(can({ ...standing, sleeping: true }, 'struggle')).toBe(true)
+    expect(can({ ...standing, sleeping: true, downed: true }, 'struggle')).toBe(false)
   })
 
   test('倒れたら何もできない (眠るだけは「もう倒れている」で弾く)', () => {

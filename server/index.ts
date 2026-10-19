@@ -83,7 +83,7 @@ import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { STAGES, inWater, waterOf } from '../src/domain/stage'
 import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
-import { MAX_STAMINA, recoverStamina } from '../src/domain/player/stamina'
+import { MAX_STAMINA, isAsleep, recoverStamina, struggle } from '../src/domain/player/stamina'
 import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
@@ -854,6 +854,22 @@ function handleMessage(
         `[重い] ${player.name} ${n(message.ms)}ms 位置 (${n(message.x)}, ${n(message.z)}) 向き ${n(((message.yaw as number) * 180) / Math.PI)}° ` +
           `描画 ${n(message.draws)} 回 / ${n(message.triangles)} 三角 heap ${n(message.heap)}MB ステージ ${room.stage.name}`,
       )
+      break
+    }
+
+    /*
+     * 眠っている間にもがいた (domain/player/stamina.ts の struggle)。**削る量も上限もここで決める。**
+     * 画面が送るのはもがいた量だけ。起きる時刻が変わったら本人に知らせる (起きるのは本人の画面)
+     */
+    case 'struggle': {
+      if (room.phase !== 'playing') break
+      const now = Date.now()
+      if (!isAsleep(player.sleepUntil, now)) break
+      const next = struggle(player, Number(message.units), player.wakeFloor, now, room.mode.sleepSeconds)
+      if (next.sleepUntil === player.sleepUntil) break
+      player.sleepUntil = next.sleepUntil
+      player.struggleAt = next.struggleAt
+      sendStamina(player)
       break
     }
 

@@ -845,6 +845,15 @@ export interface SlowFrameEvent {
 }
 
 /**
+ * 眠っている間にもがいた量 (左スティックの回転、W A S D の交互の連打)。1 で 1 回転。
+ * **削るのはサーバー** (domain/player/stamina.ts の struggle)。速さの上限もそちらで掛ける
+ */
+export interface StruggleEvent {
+  type: 'struggle'
+  units: number
+}
+
+/**
  * 遅れの兆し。**サーバーから届いた往復が限界 (LAG_LIMIT_MS) を超えていたら、直近 10 秒の
  * 画面の様子を送る。** 診断のためだけで、遊びには何も効かない。
  *
@@ -1351,6 +1360,7 @@ export type ClientMessage =
   | PongMessage
   | SlowFrameEvent
   | LagReportEvent
+  | StruggleEvent
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =

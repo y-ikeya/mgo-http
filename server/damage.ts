@@ -29,7 +29,7 @@ import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage, stunReadyAfter } from
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds, stunChargeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
-import { drainStamina, isAsleep } from '../src/domain/player/stamina'
+import { drainStamina, isAsleep, wakeFloor } from '../src/domain/player/stamina'
 import {
   CQC_FACING_COS,
   CQC_LAND_SECONDS,
@@ -565,6 +565,8 @@ function applyTranquilizer(
   }
 
   victim.sleepUntil = now + room.mode.sleepSeconds * 1000
+  victim.wakeFloor = wakeFloor(now, room.mode.sleepSeconds)
+  victim.struggleAt = 0
   attacker.stuns++
   sendStamina(victim)
   broadcast(room, {
@@ -682,6 +684,8 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
   victim.concentratingSince = 0
   if (drain.slept) {
     victim.sleepUntil = now + room.mode.sleepSeconds * 1000
+    victim.wakeFloor = wakeFloor(now, room.mode.sleepSeconds)
+    victim.struggleAt = 0
     attacker.stuns++
     broadcast(room, {
       type: 'stun',

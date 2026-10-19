@@ -384,6 +384,8 @@ export interface GameStats {
   asleep: boolean;
   /** 眠りの深さ。**1 が眠った瞬間、0 が起きた瞬間。** 画面の暗さがこれに従う */
   sleepDepth: number;
+  /** パッドで遊んでいるか。眠っている間の「もがいて起きる」案内の出し分け */
+  padActive: boolean;
   maxHealth: number;
   /** 倒れているか */
   dead: boolean;
@@ -443,6 +445,8 @@ function heapMB(): number {
   const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
   return memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
 }
+/** もがきを送る間隔 (ms)。毎コマ送らない */
+const STRUGGLE_SEND_MS = 200;
 /** 遅れの兆しに添える、直近のコマの記録の長さ (ms)。切るまでの 5 回ぶんより長く */
 const LAG_REPORT_WINDOW_MS = 10_000;
 /** 遅れの兆しを知らせる間隔の下限 (ms)。遅れている間は 1 秒ごとに ping が来る */
@@ -1722,6 +1726,7 @@ export class Game {
     // パッドはイベントを出さないので毎フレーム読みに行く。
     // 視点も移動もこの後の処理が読むので、フレームの先頭で更新しておく。
     this.input.pollGamepad(dt);
+    this.noteStruggle(time);
     // 押している時間を進める。**単押しと長押しの別はここで決まる** (infra/input)
     this.input.advance(dt);
 
@@ -2171,6 +2176,29 @@ export class Game {
     this.net.send(report);
   }
 
+  /** まだ送っていないもがき (左スティックの回転、W A S D の交互の連打) と、最後に送った時刻 (ms) */
+  private struggleOut = 0;
+  private struggleSentAt = 0;
+
+  /**
+   * 眠っている間にもがいた量を、**まとめてサーバーへ送る** (1/5 秒ごと)。
+   *
+   * 削るのはサーバー (domain/player/stamina.ts の struggle)。起きる時刻が変われば stamina の
+   * 知らせで返ってくる。眠っていない間に溜まった分は捨てる (歩いた WASD を持ち越さない)。
+   */
+  private noteStruggle(time: number): void {
+    const units = this.input.takeStruggle();
+    if (!can(this.player.body, "struggle")) {
+      this.struggleOut = 0;
+      return;
+    }
+    this.struggleOut += units;
+    if (this.struggleOut <= 0 || time - this.struggleSentAt < STRUGGLE_SEND_MS) return;
+    this.net.send({ type: "struggle", units: this.struggleOut });
+    this.struggleOut = 0;
+    this.struggleSentAt = time;
+  }
+
   /** 直前のコマの描画の量。描き終えた所で控える (tick の終わり) */
   private drawsLast = 0;
   private trianglesLast = 0;
@@ -2479,7 +2507,9 @@ export class Game {
       case "stamina": {
         this.stamina = message.stamina;
         const left = (message.sleepUntil - Date.now()) / 1000;
-        if (left > 0) this.player.sleep(left);
+        // もう眠っているなら残りだけ縮める (もがいて早まった)。倒れる動きをやり直さない
+        if (left > 0 && this.player.sleeping) this.player.shortenSleep(left);
+        else if (left > 0) this.player.sleep(left);
         else this.player.wake();
         break;
       }
@@ -5691,6 +5721,7 @@ export class Game {
       stamina: staminaBlur(this.stamina),
       shock: this.shock,
       asleep: this.player.sleeping,
+      padActive: this.input.activeDevice === "gamepad",
       sleepDepth: this.player.sleepDepth,
       health: this.player.health,
       maxHealth: MAX_HEALTH,

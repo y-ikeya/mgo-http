@@ -143,3 +143,47 @@ export function staminaBlur(stamina: number): number {
   const lost = 1 - Math.max(0, Math.min(1, stamina / MAX_STAMINA))
   return lost * lost
 }
+
+/*
+ * --- もがいて早く起きる ---
+ *
+ * 本人 2026-10-19「pad だと R3 (→ L3) スティックをクルクル回すことで早く起きられるとか欲しい」。
+ * 左スティックを 1 回転 (キーマウは W A S D の違うキーを交互に 4 回) で 1 回もがいたことにする。
+ * 眠っている間は歩けないので、左スティックと W A S D は空いている (右スティックとマウスは
+ * 見回しに使うので数えない — 見回しているだけで起きてしまう)。
+ *
+ * **数えるのはサーバー。** 画面はもがいた量を送るだけで、削るのはここ。速さに上限を置き、
+ * 眠りの 1/3 より早くは起きられない。
+ */
+
+/** 1 回もがくと、眠りのこれだけを削る (TSNE の 180 秒なら 1 秒) */
+export const STRUGGLE_SHARE = 1 / 180
+/** 1 秒にもがける回数の上限。速く回しても (送る量を偽っても) これ以上は削れない */
+export const STRUGGLE_RATE = 3
+/** 眠りのこれだけは必ず寝る (180 秒なら 60 秒) */
+export const STRUGGLE_FLOOR = 1 / 3
+
+/** 眠った時に決める、もがいても起きられない時刻 (ms) */
+export function wakeFloor(now: number, sleepSeconds: number): number {
+  return now + sleepSeconds * 1000 * STRUGGLE_FLOOR
+}
+
+export interface Struggle {
+  sleepUntil: number
+  /** 前にもがいた時刻 (ms)。速さの上限を測る */
+  struggleAt: number
+}
+
+/**
+ * もがいた。**新しい起きる時刻と、もがいた時刻**を返す。
+ *
+ * 前のもがきからの時間で上限を掛ける。一度に大きな数を送っても、経った時間ぶんしか効かない
+ * (眠ってから初めてのもがきは、1 秒ぶんまで)。
+ */
+export function struggle(state: Struggle, units: number, floor: number, now: number, sleepSeconds: number): Struggle {
+  if (!(units > 0) || !Number.isFinite(units) || state.sleepUntil <= now) return state
+  const since = state.struggleAt > 0 ? Math.min(1, (now - state.struggleAt) / 1000) : 1
+  const allowed = Math.min(units, Math.max(0, since) * STRUGGLE_RATE)
+  const cut = allowed * sleepSeconds * 1000 * STRUGGLE_SHARE
+  return { sleepUntil: Math.max(floor, state.sleepUntil - cut), struggleAt: now }
+}

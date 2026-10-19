@@ -564,6 +564,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           <span class="hud-asleep-word" style={{ opacity: `${props.stats?.sleepDepth ?? 0}` }}>
             SLEEP
           </span>
+          {/* もがいて早く起きる (domain/player/stamina.ts の struggle) */}
+          <span class="hud-asleep-hint">
+            {props.stats?.padActive ? 'ROTATE L STICK TO WAKE' : 'TAP W A S D TO WAKE'}
+          </span>
         </div>
       </Show>
 

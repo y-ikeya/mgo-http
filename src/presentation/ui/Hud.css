@@ -1341,6 +1341,14 @@
 }
 
 
+.hud-asleep-hint {
+  position: absolute;
+  top: calc(50% + 48px);
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  color: rgba(159, 196, 234, 0.7);
+}
+
 /*
  * --- 銃の色分け ---
  *

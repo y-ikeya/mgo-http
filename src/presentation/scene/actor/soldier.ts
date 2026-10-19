@@ -1126,6 +1126,15 @@ export class Soldier {
   }
 
   /**
+   * 眠りの残りを縮める (もがいて早まった。サーバーが決めた値)。**倒れる動きはやり直さない。**
+   * 眠りの深さ (画面の暗さ) は縮んだ残りに合わせて浅くなる — 起きるのが近いと見える
+   */
+  shortenSleep(seconds: number): void {
+    if (this.sleepLeft <= 0) return
+    this.sleepLeft = Math.min(this.sleepLeft, seconds)
+  }
+
+  /**
    * 眠りが明けた。**サーバーが決める。**
    *
    * **伏せた姿で起きる。** 眠っていた体は床にあるので、立った姿へ戻すと

@@ -73,6 +73,7 @@ export type Move =
   | 'throw'
   | 'place'
   | 'sleep'
+  | 'struggle'
   | 'cqc'
 
 interface Rule {
@@ -149,6 +150,11 @@ export const MOVES: Record<Move, Rule> = {
   // 麻酔で眠る。倒れている体には効かせない (もう倒れている)
   sleep: {
     needs: [],
+    not: ['dead', 'downed'],
+  },
+  // もがいて早く起きる (domain/player/stamina.ts の struggle)。**眠っている間だけ**
+  struggle: {
+    needs: ['sleeping'],
     not: ['dead', 'downed'],
   },
   /*

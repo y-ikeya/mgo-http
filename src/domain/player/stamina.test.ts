@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   MAX_STAMINA, SLEEP_SECONDS, STAMINA_RECOVER_DELAY,
   drainStamina, isAsleep, recoverStamina, sleepLeft, staminaBlur, staminaSwayScale,
+  STRUGGLE_RATE, struggle, wakeFloor,
 } from './stamina'
 import { WEAPONS } from '../item/weapons'
 
@@ -118,5 +119,42 @@ describe('スタミナの効き目', () => {
     expect(staminaBlur(one)).toBeLessThan(0.1)
     // 眠る一歩手前で一番濃い
     expect(staminaBlur(WEAPONS.m9.zone.BODY)).toBeGreaterThan(0.5)
+  })
+})
+
+/**
+ * もがいて早く起きる。**削る量と上限はサーバーが持つ** — 画面が送る量を偽っても、
+ * 経った時間ぶんしか効かず、眠りの 1/3 より早くは起きられない。
+ */
+describe('もがいて早く起きる', () => {
+  const now = 1_000_000
+  const sleep = 180
+
+  test('1 回転で眠りの 1/180 (180 秒なら 1 秒) 早まる', () => {
+    const until = now + sleep * 1000
+    const next = struggle({ sleepUntil: until, struggleAt: now - 1000 }, 1, wakeFloor(now - 1000, sleep), now, sleep)
+    expect(next.sleepUntil).toBe(until - 1000)
+  })
+
+  test('一度に大きな数を送っても、経った時間ぶんしか効かない', () => {
+    const until = now + sleep * 1000
+    const next = struggle({ sleepUntil: until, struggleAt: now - 500 }, 1000, 0, now, sleep)
+    expect(next.sleepUntil).toBe(until - 0.5 * STRUGGLE_RATE * 1000)
+  })
+
+  test('眠りの 1/3 より早くは起きられない', () => {
+    const start = now - 10_000
+    const floor = wakeFloor(start, sleep)
+    let state = { sleepUntil: start + sleep * 1000, struggleAt: 0 }
+    for (let t = start; t < start + 200_000; t += 200) state = struggle(state, 99, floor, t, sleep)
+    expect(state.sleepUntil).toBe(start + 60_000)
+  })
+
+  test('起きている間や、数でない量は何もしない', () => {
+    const awake = { sleepUntil: now - 1, struggleAt: 0 }
+    expect(struggle(awake, 1, 0, now, sleep)).toBe(awake)
+    const asleep = { sleepUntil: now + 5000, struggleAt: 0 }
+    expect(struggle(asleep, Number.NaN, 0, now, sleep)).toBe(asleep)
+    expect(struggle(asleep, -3, 0, now, sleep)).toBe(asleep)
   })
 })
