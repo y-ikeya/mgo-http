@@ -67,6 +67,32 @@ export function pointsOf(record: {
 }
 
 /**
+ * 個人戦の順位。**倒した数が多い順** (本人 2026-10-19「DM の賞はシンプルな kill 数でまず測るべき」)。
+ * 同じなら倒された数の少ない順。それも同じなら同じ順位 (0 を返す)。
+ *
+ * 点 (pointsOf) では並べない — 点は Lv のための経験値で、眠らせた数や自死の重みが混ざる。
+ * 個人戦の勝ちは「何人倒したか」で読めるほうがいい (光る 1 位 leaderOf も倒した数で決めている)
+ */
+export function dmOrder(a: { kills: number; deaths: number }, b: { kills: number; deaths: number }): number {
+  return b.kills - a.kills || a.deaths - b.deaths
+}
+
+/**
+ * 個人戦の決着を本人から見て。**1 位なら勝ち、1 位が並んだら引き分け、それ以外は負け**
+ */
+export function dmVerdict<T extends { id: string; kills: number; deaths: number }>(
+  scores: readonly T[],
+  self: string,
+): 'VICTORY' | 'DRAW' | 'DEFEAT' {
+  const ranked = [...scores].sort(dmOrder)
+  const top = ranked[0]
+  if (!top) return 'DRAW'
+  const tops = ranked.filter((p) => dmOrder(p, top) === 0)
+  if (!tops.some((p) => p.id === self)) return 'DEFEAT'
+  return tops.length > 1 ? 'DRAW' : 'VICTORY'
+}
+
+/**
  * Lv が 1 上がるのに要る点の刻み。
  *
  * Lv L に届く点は `LEVEL_STEP × L × (L-1)` — 上がるほど必要な点が増える。

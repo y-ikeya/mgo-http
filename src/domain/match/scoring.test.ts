@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  dmOrder,
+  dmVerdict,
   levelOf,
   levelProgress,
   pointsForLevel,
@@ -80,5 +82,21 @@ describe('Lv', () => {
     expect(levelProgress(pointsForLevel(3))).toBe(0)
     expect(levelProgress(pointsForLevel(4) - 1)).toBeGreaterThan(0.9)
     expect(levelProgress(pointsForLevel(4) - 1)).toBeLessThan(1)
+  })
+})
+
+/** 個人戦は**倒した数**で並べ、勝ちを決める (本人 2026-10-19) */
+describe('個人戦の順位', () => {
+  const p = (id: string, kills: number, deaths: number) => ({ id, kills, deaths })
+
+  test('倒した数が多い順。同じなら倒された数が少ない順', () => {
+    const ranked = [p('a', 3, 9), p('b', 5, 9), p('c', 5, 2)].sort(dmOrder).map((x) => x.id)
+    expect(ranked).toEqual(['c', 'b', 'a'])
+  })
+
+  test('1 位なら勝ち、1 位が並べば引き分け、それ以外は負け', () => {
+    expect(dmVerdict([p('a', 5, 1), p('b', 3, 1)], 'a')).toBe('VICTORY')
+    expect(dmVerdict([p('a', 5, 1), p('b', 3, 1)], 'b')).toBe('DEFEAT')
+    expect(dmVerdict([p('a', 5, 1), p('b', 5, 1)], 'b')).toBe('DRAW')
   })
 })

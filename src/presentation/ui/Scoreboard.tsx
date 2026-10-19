@@ -2,7 +2,7 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../../i18n'
 import { MODES } from '../../domain/match/room'
 import { SKILL_BUDGET, costOf, type SkillId, type Skills } from '../../domain/player/skill'
-import { pointsOf } from '../../domain/match/scoring'
+import { dmOrder, dmVerdict, pointsOf } from '../../domain/match/scoring'
 import { useLevels } from '../../infra/api/levels'
 import type { Identity } from '../../infra/auth/session'
 import type { GameStats } from '../scene/Game'
@@ -125,7 +125,14 @@ export default function Scoreboard(props: {
   /** 自分の陣営。勝ったかどうかの言い方を変えるのに使う */
   const mine = () => props.stats?.scores?.find((p) => p.id === props.selfId)?.team
   const verdict = () =>
-    winner() === 'draw' ? 'DRAW' : winner() === mine() ? 'VICTORY' : 'DEFEAT'
+    // 個人戦は陣営が無いので、倒した数の順位から出す (domain/match/scoring.ts の dmVerdict)
+    !teams()
+      ? dmVerdict(props.stats?.scores ?? [], props.selfId)
+      : winner() === 'draw'
+        ? 'DRAW'
+        : winner() === mine()
+          ? 'VICTORY'
+          : 'DEFEAT'
   /**
    * いま全画面か。
    *
@@ -163,15 +170,12 @@ export default function Scoreboard(props: {
   const teams = () => MODES[mode()].teams
 
   /**
-   * 個人戦の並び。**陣営で分けず、1 本の順位表にする。**
+   * 個人戦の並び。**陣営で分けず、1 本の順位表にする。倒した数の多い順** (dmOrder)。
    *
    * 分けて出すと「味方が居る」に読める。全員が敵なので、上から順に強い、が
    * そのまま読めるほうがいい。
    */
-  const ranking = () =>
-    [...(props.stats?.scores ?? [])].sort(
-      (a, b) => pointsOf(b) - pointsOf(a) || a.deaths - b.deaths,
-    )
+  const ranking = () => [...(props.stats?.scores ?? [])].sort(dmOrder)
 
   return (
     // 決着したら画面いっぱいに開く。**同じ板が結果画面を兼ねる**
