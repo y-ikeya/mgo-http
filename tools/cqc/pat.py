@@ -28,13 +28,34 @@ UP = {**LEAN, 'LeftArm': [('R', 15), ('F', 80)], 'LeftForeArm': [('R', 28)], 'Le
 HALF = {'Spine': [('R', -18), ('F', -8)], 'Spine1': [('R', -8)], 'LeftArm': [('R', 25), ('F', 45)],
         'LeftForeArm': [('R', 25)]}
 
-# 24fps。0.67 秒
+# 24fps。0.8 秒 (ゲームでは 0.6 倍で流す。animation.ts の PAT_RATE)
 KEYS = [(0, {}), (4, HALF), (7, UP), (9, DOWN), (11, UP), (13, DOWN), (16, HALF), (19, {})]
+
+# 叩いている間は**指を広げる** (本人 2026-10-19「叩いてる時の指は広げて」)。しゃがみの型では
+# 銃の前を握っている。指の骨を基準の姿勢 (開いた手) へ戻し、外側の指を少し開く
+FINGERS = ('Thumb', 'Index', 'Middle', 'Ring', 'Pinky')
+SPREAD = {'Index1': 8, 'Ring1': -6, 'Pinky1': -14}
+
+
+def open_hand():
+    from mathutils import Matrix
+    for pb in arm.pose.bones:
+        short = pb.name.replace(ns['P'] + 'LeftHand', '')
+        if pb.name.startswith(ns['P'] + 'LeftHand') and short.startswith(FINGERS):
+            pb.matrix_basis = Matrix.Identity(4)
+            if short in SPREAD:
+                pb.matrix_basis = Matrix.Rotation(radians(SPREAD[short]), 4, 'Z')
+    bpy.context.view_layer.update()
+
+
+from math import radians  # noqa: E402
 
 ns['new_action'](arm, 'pat')
 for frame, spec in KEYS:
     if spec:
         ns['set_pose'](arm, spec)
+        if spec is UP or spec is DOWN:
+            open_hand()
     else:
         ns['reset'](arm)
     ns['key'](arm, frame)
