@@ -203,7 +203,7 @@ export function struggle(state: Struggle, units: number, floor: number, now: num
  *
  * 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく」「味方も敵も両方
  * 起こせるべき」。しゃがんで
- * 「拾う・使う」のボタン。**3 回叩くと起きる**。叩いている間 (1 回 1.3 秒) は叩く側が動けず
+ * 「拾う・使う」のボタン。**3 回叩くと起きる**。叩いている間 (1 回 1.6 秒) は叩く側が動けず
  * 無防備になる — それが起こす代償。
  *
  * 数えるのは叩かれる側。2 人で叩いても速くはならない (叩く間の最短は叩かれる側で測る)。
@@ -213,7 +213,7 @@ export function struggle(state: Struggle, units: number, floor: number, now: num
 export const PAT_RANGE = 1.5
 /** 何回叩くと起きるか */
 export const PATS_TO_WAKE = 3
-/** 叩く間の最短 (ms)。型 1 本 (1.3 秒) より短く。ボタンの連打で縮めない */
+/** 叩く間の最短 (ms)。型 1 本 (1.6 秒) より短く。ボタンの連打で縮めない */
 export const PAT_INTERVAL_MS = 600
 /** これより間が空いたら数え直す (ms) */
 export const PAT_RESET_MS = 5000

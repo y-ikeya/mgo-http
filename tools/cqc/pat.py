@@ -28,8 +28,9 @@ UP = {**LEAN, 'LeftArm': [('R', 32), ('F', 80)], 'LeftForeArm': [('R', 28)], 'Le
 HALF = {'Spine': [('R', -18), ('F', -8)], 'Spine1': [('R', -8)], 'LeftArm': [('R', 25), ('F', 45)],
         'LeftForeArm': [('R', 25)]}
 
-# 24fps。0.8 秒 (ゲームでは 0.6 倍で流す。animation.ts の PAT_RATE)
-KEYS = [(0, {}), (4, HALF), (7, UP), (9, DOWN), (11, UP), (13, DOWN), (16, HALF), (19, {})]
+# 24fps。1.6 秒。**叩く 1 回を 5 コマ (0.2 秒) かける。** 2 コマで上げ下げしていた頃は、型全体を
+# 0.6 倍で流しても 1 回が 0.14 秒の素早いはたきに見えた (本人 2026-10-19「めっちゃ早く叩く」)
+KEYS = [(0, {}), (6, HALF), (11, UP), (16, DOWN), (21, UP), (26, DOWN), (32, HALF), (38, {})]
 
 # 叩いている間は**指を広げる** (本人 2026-10-19「叩いてる時の指は広げて」)。しゃがみの型では
 # 銃の前を握っている。指の骨を基準の姿勢 (開いた手) へ戻し、外側の指を少し開く
@@ -77,7 +78,7 @@ for frame, spec in KEYS:
     ns['key'](arm, frame)
 act = bpy.data.actions['pat']
 act.use_fake_user = True
-bpy.context.scene.frame_start, bpy.context.scene.frame_end = 0, 19
+bpy.context.scene.frame_start, bpy.context.scene.frame_end = 0, KEYS[-1][0]
 
 # 骨組みだけ選んで、この型だけを書き出す
 for o in bpy.context.selected_objects:

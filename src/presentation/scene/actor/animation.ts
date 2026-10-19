@@ -820,10 +820,10 @@ const PRONE_RISE_KEY = 'prone_rise'
 const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
 const PAT_KEY = 'pat'
 /**
- * 叩く型を流す速さ。型そのもの (0.8 秒) だと叩くのが早すぎた (本人 2026-10-19「もっとゆっくり」)。
- * 0.6 で 1.3 秒。他の人の画面も同じ入口 (playPat) を通るので同じ速さになる
+ * 叩く型を流す速さ。型 (1.6 秒、叩く 1 回が 0.2 秒) のまま。型が 0.8 秒だった頃は 0.6 倍にしていたが、
+ * 叩く 1 回が 2 コマしかなく速く見えたので、型の方を作り直した (tools/cqc/pat.py)
  */
-const PAT_RATE = 0.6
+const PAT_RATE = 1
 /**
  * 伏せ撃ち。**構えと発砲を同じクリップから作る。**
  *
