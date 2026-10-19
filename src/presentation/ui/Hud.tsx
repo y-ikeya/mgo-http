@@ -470,6 +470,20 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </div>
       </Show>
 
+      {/*
+        攻める側がターゲットを取った (TSNE)。**守る側にだけ**、指令と同じ黒い帯で 4 秒
+        (Game.ts の targetNotice)
+      */}
+      <Show when={props.stats?.targetNotice}>
+        <div class="orders orders-solo hud-game-set">
+          <div class="orders-band">
+            <div class="orders-heading">TARGET</div>
+            <div class="orders-rule" />
+            <div class="orders-text">{props.stats?.targetNotice}</div>
+          </div>
+        </div>
+      </Show>
+
       {/* 決着の 1 段目。「試合終了」だけを指令と同じ帯で告げる */}
       <Show when={phase() === 'over' && !revealed()}>
         <div class="orders orders-solo hud-game-set">
@@ -716,10 +730,13 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
       {/* 基地の上。同じ指が補給になる */}
       {/* 眠っている人を叩いて起こす (1 回で 20 秒縮む)。補給より先 (同じ指で叩くほうが勝つ) */}
-      <Show when={props.stats?.canPat}>
+      <Show when={props.stats?.canDropTarget}>
+        <div class="scope-hint">{t('hud.dropTargetHint')}</div>
+      </Show>
+      <Show when={props.stats?.canPat && !props.stats?.canDropTarget}>
         <div class="scope-hint">{t('hud.patHint')}</div>
       </Show>
-      <Show when={props.stats?.canResupply && !props.stats?.canPat}>
+      <Show when={props.stats?.canResupply && !props.stats?.canPat && !props.stats?.canDropTarget}>
         <div class="scope-hint">{t('hud.resupplyHint')}</div>
       </Show>
 

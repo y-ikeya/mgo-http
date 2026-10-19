@@ -10,6 +10,7 @@
 import { isSeated } from '../player/lifecycle'
 import type { MatchPlayer, Team } from '../player/player'
 import { MODES, type Mode, type ModeSpec } from './room'
+import type { Target } from './target'
 
 /**
  * 試合の段階。
@@ -152,6 +153,10 @@ export interface Match {
   round: number
   /** 色ごとに勝ったラウンドの数 */
   roundWins: Record<Team, number>
+  /** TSNE のターゲット (domain/match/target.ts)。ラウンドが始まった時に置く。無い部屋・無いステージは null */
+  target: Target | null
+  /** このラウンドで攻める側がターゲットを自陣まで運んだか。運んだら攻める側の勝ち */
+  targetDelivered: boolean
 }
 
 export function newMatch(mode: Mode): Match {
@@ -175,6 +180,8 @@ export function newMatch(mode: Mode): Match {
     cautionSent: 0,
     round: 1,
     roundWins: { blue: 0, red: 0 },
+    target: null,
+    targetDelivered: false,
   }
 }
 

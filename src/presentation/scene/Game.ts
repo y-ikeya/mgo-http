@@ -117,6 +117,7 @@ import { can, blocker } from "../../domain/player/moves";
 
 /** URL に ?debug が付いていれば、HUD に検証用の読み出しを出す */
 const DEBUG_HUD = new URLSearchParams(globalThis.location?.search ?? "").has("debug");
+import { TsneTarget, type TargetView } from "./world/tsneTarget";
 import { atBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
 import {
@@ -306,6 +307,10 @@ export interface GameStats {
   canResupply: boolean;
   /** 眠っている人の傍でしゃがんでいる。G / △ で叩いて起こせる (味方でも敵でも) */
   canPat: boolean;
+  /** 「{名前}がターゲットを取得した」(TSNE、守る側だけ)。出している間だけ */
+  targetNotice: string | null;
+  /** ターゲットを一覧で指している。G / △ で落とせる */
+  canDropTarget: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
   /**
@@ -447,6 +452,8 @@ function heapMB(): number {
   const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
   return memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
 }
+/** 「ターゲットを取得した」を出しておく長さ (ms) */
+const TARGET_NOTICE_MS = 4000;
 /** もがきを送る間隔 (ms)。毎コマ送らない */
 const STRUGGLE_SEND_MS = 200;
 /** 遅れの兆しに添える、直近のコマの記録の長さ (ms)。切るまでの 5 回ぶんより長く */
@@ -1124,6 +1131,11 @@ export class Game {
   private selfTeam: Team = "blue";
   /** 攻める色 (TSNE)。**分かれない部屋は null** */
   private attackTeam: Team | null = null;
+  /** TSNE のターゲットの見た目と、サーバーから届いた状態 (domain/match/target.ts)。無い部屋は null */
+  private tsneTarget!: TsneTarget;
+  private targetView: TargetView | null = null;
+  /** 「{名前}がターゲットを取得した」(守る側だけ) と、出した時刻 (ms) */
+  private targetNotice: { text: string; at: number } | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
   private stealthOn = false;
   /** 直前の通で STEALTH が解けていたか (CAUTION 中)。明けた音をその後だけ鳴らす */
@@ -1508,6 +1520,7 @@ export class Game {
     this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
     this.blast = new BlastFx(this.scene);
+    this.tsneTarget = new TsneTarget(this.scene);
     this.stunSparks = new StunSparks(this.scene);
     this.sensed = new Sensed(this.scene);
     this.casings = new Casings(this.scene);
@@ -2015,6 +2028,7 @@ export class Game {
       (at) => this.audio.play("locatorBeep", at),
     );
     this.blast.update(dt);
+    this.updateTsneTarget(dt);
     this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
@@ -2587,6 +2601,9 @@ export class Game {
       // 光らせるのは絵の仕事
       case "match":
         this.remotes.setLeaking(message.leader ?? null);
+        // ターゲット (TSNE)。運んでいるのが自分なら持ち物の一覧に並ぶ (選んで G / △ で落とす)
+        this.targetView = message.target ?? null;
+        this.inv.setTargetOwned(message.target?.carrier === this.net.id);
         // 攻守の入れ替えとステルスの状態 (TSNE)。側が変われば持ち込める物も変わる
         if (message.attack !== this.attackTeam) {
           this.attackTeam = message.attack ?? null;
@@ -2846,6 +2863,21 @@ export class Game {
         break;
 
       // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
+      /*
+       * 攻める側がターゲットを取った (TSNE)。**守る側にだけ**黒い帯で知らせる。攻める側は
+       * 頭の上に浮くので見れば分かる
+       */
+      case "targetTaken":
+        if (this.attackTeam !== null && this.selfTeam !== this.attackTeam) {
+          this.targetNotice = { text: `${message.byName}がターゲットを取得した`, at: Date.now() };
+        }
+        break;
+
+      // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
+      case "targetAt":
+        this.targetView = { x: message.x, y: message.y, z: message.z, carrier: message.carrier };
+        break;
+
       case "stun": {
         const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
         if (at) this.audio.play("stunOof", at);
@@ -3729,6 +3761,20 @@ export class Game {
    * **サーバーは検算していない** — 箱を被っているという申告自体が
    * こちら発なので、今の作りではここが素直。
    */
+  /**
+   * ターゲット (TSNE) を置く / 浮かせる。運ばれていれば運ぶ人の足元から (自分なら自分の位置、
+   * 見えている相手ならその姿、見えていなければ届いた位置)。**守る側の画面では光る**
+   */
+  private updateTsneTarget(dt: number): void {
+    const view = this.targetView;
+    let carrierAt: THREE.Vector3 | null = null;
+    if (view?.carrier) {
+      carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.positionOf(view.carrier);
+    }
+    const defending = this.attackTeam !== null && this.selfTeam !== this.attackTeam;
+    this.tsneTarget.update(dt, view, carrierAt, defending);
+  }
+
   /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */
   private patTarget(): string | null {
     if (!can(this.player.body, "pat")) return null;
@@ -5067,6 +5113,11 @@ export class Game {
      * 眠っている人 (味方でも敵でも) の傍でしゃがんでいれば、同じ指で**叩いて起こす** (1 回で 20 秒縮む。
      * domain/player/stamina.ts の pat)。補給・捨てるより先に食う (梯子と同じ)
      */
+    // ターゲット (TSNE) を一覧で指していれば、同じ指で落とす (落ちる位置はサーバーが決める)
+    if (this.inv.tool === "target" && this.input.tapped("drop")) {
+      this.net.send({ type: "dropTarget" });
+      return;
+    }
     const patTarget = this.patTarget();
     if (patTarget && this.input.tapped("drop")) {
       if (this.player.pat()) this.net.send({ type: "pat", target: patTarget });
@@ -5736,6 +5787,8 @@ export class Game {
       debug: DEBUG_HUD ? this.debugReadout() : null,
       canResupply: this.canResupply,
       canPat: this.patTarget() !== null,
+      targetNotice: this.targetNotice && now - this.targetNotice.at < TARGET_NOTICE_MS ? this.targetNotice.text : null,
+      canDropTarget: this.inv.tool === "target",
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
       stamina: staminaBlur(this.stamina),

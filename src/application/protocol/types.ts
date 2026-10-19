@@ -864,6 +864,14 @@ export interface PatEvent {
 }
 
 /**
+ * ターゲット (TSNE) を落とす。運んでいる人が持ち物の一覧から選んで落とした。
+ * 落ちた位置は運んでいた人の足元 (サーバーが決める。domain/match/target.ts)
+ */
+export interface DropTargetEvent {
+  type: 'dropTarget'
+}
+
+/**
  * 遅れの兆し。**サーバーから届いた往復が限界 (LAG_LIMIT_MS) を超えていたら、直近 10 秒の
  * 画面の様子を送る。** 診断のためだけで、遊びには何も効かない。
  *
@@ -1103,6 +1111,12 @@ export interface MatchMessage {
   /** 色ごとに勝ったラウンドの数 (TSNE) */
   roundWins?: Record<Team, number>
   /**
+   * ターゲット (TSNE、domain/match/target.ts)。置いてある / 落ちている位置と、運んでいる人。
+   * 運ばれている間の位置は運ぶ人の姿から取る (ここの x, y, z は 1 秒ごとの控え)。
+   * **変わった瞬間に配り直す** (取った・落ちた・戻った)
+   */
+  target?: { x: number; y: number; z: number; carrier: string | null }
+  /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
    *
    * 離脱中の人も入っている (away)。リロードのあいだ行が消えると、
@@ -1227,6 +1241,29 @@ export interface KillEvent {
  * 残機は減らず、体はその場に残る。倒した知らせ (KillEvent) と同じ形で流すと
  * 「倒された」と読まれるので、別の型にして受け取る側に区別させる。
  */
+/**
+ * 攻める側がターゲット (TSNE) を取った。**守る側の画面に「{名前}がターゲットを取得した」を黒い帯で出す**
+ */
+/**
+ * 運ばれているターゲット (TSNE) の位置。**運ばれている間だけ、1 秒に 10 回。**
+ * 守る側は運ぶ人が壁の裏に居ても位置が分かる (光って見える) ので、人の姿の便とは別に配る
+ * (人の姿は見えている相手の分しか届かない)
+ */
+export interface TargetAtMessage {
+  type: 'targetAt'
+  x: number
+  y: number
+  z: number
+  carrier: string
+}
+
+export interface TargetTakenEvent {
+  type: 'targetTaken'
+  by: string
+  byName: string
+  byTeam: Team
+}
+
 export interface StunEvent {
   type: 'stun'
   by: string
@@ -1372,10 +1409,13 @@ export type ClientMessage =
   | LagReportEvent
   | StruggleEvent
   | PatEvent
+  | DropTargetEvent
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =
   | StateMessage
+  | TargetTakenEvent
+  | TargetAtMessage
   | JoinEvent
   | LeaveEvent
   | RosterMessage

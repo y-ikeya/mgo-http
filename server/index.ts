@@ -78,6 +78,7 @@ import { sensedBy } from '../src/sim/judge/claymore'
 import { SENSE_HEIGHT, SENSOR_HEIGHT, TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
+import { dropTsneTarget } from './target'
 import { costOf, patSeconds } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { STAGES, inWater, waterOf } from '../src/domain/stage'
@@ -923,6 +924,11 @@ function handleMessage(
       broadcast(room, { type: 'voice', id: player.id, line: message.line, name: player.name, team: player.team })
       break
     }
+
+    // ターゲット (TSNE) を落とした。運んでいる本人だけが落とせる (server/target.ts)
+    case 'dropTarget':
+      if (dropTsneTarget(room, player, Date.now())) broadcast(room, matchState(room))
+      break
 
     default:
       // 見た目のもの (knock) は中身を見ずに流す

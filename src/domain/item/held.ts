@@ -41,7 +41,7 @@ export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator'
  * `none` は**道具を何も使っていない**という選択。手ぶらという意味ではない —
  * 道具の枠が空なだけで、手には武器がある (Inventory.held を参照)。
  */
-export type HeldId = WeaponId | ThrowId | 'knife' | 'box' | 'stealth' | 'none'
+export type HeldId = WeaponId | ThrowId | 'knife' | 'box' | 'stealth' | 'target' | 'none'
 
 /**
  * 系統。持ち替えの操作が別々に割り当たる (MGO2 の十字左右)。
@@ -249,6 +249,13 @@ export const HELD: Record<HeldId, HeldSpec> = {
   stealth: { id: 'stealth', label: 'STEALTH', family: 'tool', slot: 'tool', weight: 0, shoots: false, twoHanded: false },
 
   /*
+   * ターゲット (TSNE の攻める側が運んでいる間だけ、domain/match/target.ts)。**手には持たない** —
+   * 頭の上に浮いて付いてくる。一覧で選んで G / △ で落とす (2026-10-19 本人)。選んでも STEALTH は
+   * 着たまま、手は武器のまま
+   */
+  target: { id: 'target', label: 'TARGET', family: 'tool', slot: 'tool', weight: 0, shoots: false, twoHanded: false },
+
+  /*
    * 道具を使っていない状態。
    *
    * **一覧に並ぶ選択肢として置く。** 「箱を降ろす」を別の操作にすると、道具が
@@ -272,6 +279,7 @@ export type Carried =
   | { id: 'knife' }
   | { id: 'box' }
   | { id: 'stealth' }
+  | { id: 'target' }
   | { id: 'none' }
 
 /** その物を持っている間の移動の速さ (倍率) */

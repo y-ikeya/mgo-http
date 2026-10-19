@@ -85,6 +85,8 @@ export interface Terrain {
   arenaHalf: number
   /** 基地。書き出しが blend の meta_*base* から写した物。無ければ表 (STAGES) へ落ちる */
   bases: Partial<Record<Team, Spot>>
+  /** TSNE のターゲットの置き場所。書き出しが blend の空 target* から写した物。無ければ表 (STAGES) へ落ちる */
+  tsneTargets: Spot[]
   /** 空のダンボール (stage.json の fx の cbox)。触れたら揺らす (arms/cbox.ts) */
   cboxes: CboxProp[]
 }
@@ -109,6 +111,7 @@ function bare(name: StageName): Terrain {
     camera: [],
     arenaHalf: Number.POSITIVE_INFINITY,
     bases: {},
+    tsneTargets: STAGES[name].tsneTargets ?? [],
     cboxes: [],
   }
 }
@@ -126,6 +129,7 @@ async function load(name: StageName): Promise<Terrain> {
     const data = (await Bun.file(path).json()) as {
       boxes: StageBox[]
       bases?: Partial<Record<Team, Spot>>
+      tsneTargets?: Spot[]
       fx?: { kind: string; x: number; y: number; z: number; size: number; yaw?: number }[]
     }
     const solid = solidBlockers(data.boxes)
@@ -147,6 +151,7 @@ async function load(name: StageName): Promise<Terrain> {
       camera: mesh && mesh.camera.size > 0 ? mesh.camera : cameraBlockers(data.boxes),
       arenaHalf: half,
       bases: data.bases ?? {},
+      tsneTargets: data.tsneTargets?.map(({ x, y, z }) => ({ x, y, z })) ?? STAGES[name].tsneTargets ?? [],
       cboxes: (data.fx ?? [])
         .filter((f) => f.kind === 'cbox')
         .map((f) => ({ x: f.x, y: f.y, z: f.z, yaw: f.yaw ?? 0, size: f.size })),

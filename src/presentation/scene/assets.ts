@@ -43,6 +43,7 @@ const KNIFE_URL = asset.model('knife.glb')
 const CLAYMORE_URL = asset.model('claymore.glb')
 const GRENADE_URL = asset.model('grenade.glb')
 const LOCATOR_URL = asset.model('locator.glb')
+const TARGET_URL = asset.model('target.glb')
 
 const cache = new Map<string, Promise<GLTF>>()
 
@@ -166,6 +167,11 @@ export function loadClaymore(): Promise<GLTF> {
 
 export function loadGrenade(): Promise<GLTF> {
   return load(GRENADE_URL)
+}
+
+/** TSNE のターゲット (人形、tools/convert_target.py) */
+export function loadTarget(): Promise<GLTF> {
+  return load(TARGET_URL)
 }
 
 export function loadLocator(): Promise<GLTF> {
