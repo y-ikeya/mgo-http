@@ -21,14 +21,27 @@ import * as THREE from 'three'
  * 形を共有している物が別のずらしを使うなら、その形と材質は触らない (片方の UV が壊れる)。
  */
 export function shareGltfTextures(root: THREE.Object3D): { merged: number; kept: number } {
-  type Entry = { mesh: THREE.Mesh; material: THREE.Material; key: string | null }
+  /*
+   * ずらしと UV の組は**ここで控える。** 同じ材質を使う 2 つ目以降の物を焼く時には、材質の欄は
+   * もう共有の 1 枚 (ずらし無し) に差し替わっている — 材質から読み直すと、ずらし無しで焼いて
+   * 絵が引き伸ばされた (city の 211 個。2026-10-19 本人「めっちゃ画像が荒くなってる」)
+   */
+  type Entry = { mesh: THREE.Mesh; material: THREE.Material; key: string | null; matrix: THREE.Matrix3; channel: number }
   const entries: Entry[] = []
   root.traverse((obj) => {
     const mesh = obj as THREE.Mesh
     if (!mesh.isMesh) return
     // 1 つの形に複数の材質 (groups) は扱わない。UV を材質ごとに分けられない
     if (Array.isArray(mesh.material)) return
-    entries.push({ mesh, material: mesh.material, key: transformKey(mesh.material) })
+    const key = transformKey(mesh.material)
+    const first = textureSlots(mesh.material)[0]?.[1]
+    entries.push({
+      mesh,
+      material: mesh.material,
+      key,
+      matrix: first ? first.matrix.clone() : new THREE.Matrix3(),
+      channel: first ? first.channel : 0,
+    })
   })
 
   // 形と材質の組み合わせが食い違うものを、決まるまで外していく
@@ -54,12 +67,12 @@ export function shareGltfTextures(root: THREE.Object3D): { merged: number; kept:
   let merged = 0
   for (const e of ok) {
     const slots = textureSlots(e.material)
-    const channel = slots[0][1].channel
+    const channel = e.channel
     if (!baked.has(e.mesh.geometry)) {
       baked.add(e.mesh.geometry)
       // 2 本目以降の UV を使う材質は、1 本目へ移す。同じ絵を 1 本目で使う材質と共有できる
       // (欄が使う UV は Texture が持つので、組が違うと別の Texture = GPU に別の 1 枚になる)
-      if (e.key !== IDENTITY || channel !== 0) bakeUv(e.mesh.geometry, uvName(channel), 'uv', slots[0][1].matrix)
+      if (e.key !== IDENTITY || channel !== 0) bakeUv(e.mesh.geometry, uvName(channel), 'uv', e.matrix)
     }
     if (swapped.has(e.material)) continue
     swapped.add(e.material)
