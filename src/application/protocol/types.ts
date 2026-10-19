@@ -1242,13 +1242,24 @@ export interface KillEvent {
  * 「倒された」と読まれるので、別の型にして受け取る側に区別させる。
  */
 /**
- * 攻める側がターゲット (TSNE) を取った。**守る側の画面に「{名前}がターゲットを取得した」を黒い帯で出す**
+ * 攻める側がターゲット (TSNE) を取った。**全員の画面に「{名前}がターゲットを取得した」を帯で出す**
  */
 /**
  * 運ばれているターゲット (TSNE) の位置。**運ばれている間だけ、1 秒に 10 回。**
  * 守る側は運ぶ人が壁の裏に居ても位置が分かる (光って見える) ので、人の姿の便とは別に配る
  * (人の姿は見えている相手の分しか届かない)
  */
+/**
+ * 運んでいた人がターゲット (TSNE) を手放した (自分で落とした / 倒れた / 眠った)。
+ * **全員の画面に「{名前}がターゲットを手放した」を帯で出す**
+ */
+export interface TargetDroppedEvent {
+  type: 'targetDropped'
+  by: string
+  byName: string
+  byTeam: Team
+}
+
 export interface TargetAtMessage {
   type: 'targetAt'
   x: number
@@ -1415,6 +1426,7 @@ export type ClientMessage =
 export type ServerMessage =
   | StateMessage
   | TargetTakenEvent
+  | TargetDroppedEvent
   | TargetAtMessage
   | JoinEvent
   | LeaveEvent

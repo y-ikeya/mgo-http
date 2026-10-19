@@ -62,6 +62,7 @@ export function updateTsneTarget(room: RoomWorld, now: number): boolean {
     const carrier = room.players.get(target.carrier)
     if (!carrier || !canCarry(room, carrier, now)) {
       room.target = drop(target, carrier?.x ?? target.x, carrier?.y ?? target.y, carrier?.z ?? target.z, now)
+      if (carrier) announceDropped(room, carrier)
       return true
     }
     room.target = carryTo(target, carrier.x, carrier.y, carrier.z)
@@ -86,7 +87,7 @@ export function updateTsneTarget(room: RoomWorld, now: number): boolean {
   for (const player of room.players.values()) {
     if (!canCarry(room, player, now) || !touches(target, player.id, player.x, player.y, player.z, now)) continue
     room.target = take(target, player.id)
-    // 守る側の全員に知らせる (黒い帯)。攻める側の画面は頭の上に浮くので分かる
+    // 全員に知らせる (始まりの指令と同じ帯)
     broadcast(room, { type: 'targetTaken', by: player.id, byName: player.name, byTeam: player.team })
     return true
   }
@@ -98,5 +99,11 @@ export function dropTsneTarget(room: RoomWorld, player: MatchPlayer, now: number
   const target = room.target
   if (!target || target.carrier !== player.id || room.phase !== 'playing') return false
   room.target = drop(target, player.x, player.y, player.z, now)
+  announceDropped(room, player)
   return true
+}
+
+/** 「{名前}がターゲットを手放した」を全員へ */
+function announceDropped(room: RoomWorld, player: MatchPlayer): void {
+  broadcast(room, { type: 'targetDropped', by: player.id, byName: player.name, byTeam: player.team })
 }

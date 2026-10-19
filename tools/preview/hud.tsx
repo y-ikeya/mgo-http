@@ -67,6 +67,9 @@ const cases: Record<string, Partial<GameStats>> = {
   scoped: { scoped: true, equipped: 'sniper', held: 'sniper', weaponHeld: 'sniper', zoom: 'x6', ammo: 5, magazine: 5, reserve: 20 },
   // 眠っている。**縁が黒い** — 深さで覗き穴が狭まる
   asleep: { asleep: true, sleepDepth: 1, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
+  // ターゲット (TSNE) を取った / 手放した知らせ。始まりの指令と同じ帯 (?case=target / targetDropped)
+  target: { targetNotice: { text: 'kome27がターゲットを取得した', team: 'red', leaving: false } },
+  targetDropped: { targetNotice: { text: 'pepa1404がターゲットを手放した', team: 'blue', leaving: false } },
   dozing: { asleep: true, sleepDepth: 0.4, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
   // 麻酔の狙撃銃。**眼鏡の中身が違う** (目盛りの無い古い眼鏡)
   // M4 の主観 (ホロサイト)。画面の真ん中に輪と点だけ

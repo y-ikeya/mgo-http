@@ -308,8 +308,8 @@ export interface GameStats {
   canResupply: boolean;
   /** 眠っている人の傍でしゃがんでいる。G / △ で叩いて起こせる (味方でも敵でも) */
   canPat: boolean;
-  /** 「{名前}がターゲットを取得した」(TSNE、守る側だけ)。出している間だけ */
-  targetNotice: string | null;
+  /** 「{名前}がターゲットを取得した / 手放した」(TSNE、全員)。出している間だけ。leaving は退き始めた */
+  targetNotice: { text: string; team: Team; leaving: boolean } | null;
   /** ターゲットを一覧で指している。G / △ で落とせる */
   canDropTarget: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
@@ -453,8 +453,10 @@ function heapMB(): number {
   const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
   return memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
 }
-/** 「ターゲットを取得した」を出しておく長さ (ms) */
+/** 「ターゲットを取得した / 手放した」を出しておく長さ (ms) */
 const TARGET_NOTICE_MS = 4000;
+/** 最後のこれだけで、始まりの指令と同じく割れて退く (Orders.css の animation と揃える) */
+const TARGET_NOTICE_LEAVE_MS = 600;
 /**
  * 叩く型の 2 回目の手が下りるまで (ms)。型の 26 コマ目 (24fps、tools/cqc/pat.py の KEYS)。
  * 型を作り直したらここも合わせる
@@ -1140,8 +1142,8 @@ export class Game {
   /** TSNE のターゲットの見た目と、サーバーから届いた状態 (domain/match/target.ts)。無い部屋は null */
   private tsneTarget!: TsneTarget;
   private targetView: TargetView | null = null;
-  /** 「{名前}がターゲットを取得した」(守る側だけ) と、出した時刻 (ms) */
-  private targetNotice: { text: string; at: number } | null = null;
+  /** 「{名前}がターゲットを取得した / 手放した」(全員) と、その人の色、出した時刻 (ms) */
+  private targetNotice: { text: string; team: Team; at: number } | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
   private stealthOn = false;
   /** 直前の通で STEALTH が解けていたか (CAUTION 中)。明けた音をその後だけ鳴らす */
@@ -2892,13 +2894,14 @@ export class Game {
 
       // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
       /*
-       * 攻める側がターゲットを取った (TSNE)。**守る側にだけ**黒い帯で知らせる。攻める側は
-       * 頭の上に浮くので見れば分かる
+       * ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令と同じ帯で知らせる
+       * (本人 2026-10-19)。帯の色はその人の陣営
        */
       case "targetTaken":
-        if (this.attackTeam !== null && this.selfTeam !== this.attackTeam) {
-          this.targetNotice = { text: `${message.byName}がターゲットを取得した`, at: Date.now() };
-        }
+        this.targetNotice = { text: `${message.byName}がターゲットを取得した`, team: message.byTeam, at: Date.now() };
+        break;
+      case "targetDropped":
+        this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
         break;
 
       // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
@@ -5816,7 +5819,14 @@ export class Game {
       debug: DEBUG_HUD ? this.debugReadout() : null,
       canResupply: this.canResupply,
       canPat: this.patTarget() !== null,
-      targetNotice: this.targetNotice && now - this.targetNotice.at < TARGET_NOTICE_MS ? this.targetNotice.text : null,
+      targetNotice:
+        this.targetNotice && now - this.targetNotice.at < TARGET_NOTICE_MS
+          ? {
+              text: this.targetNotice.text,
+              team: this.targetNotice.team,
+              leaving: now - this.targetNotice.at >= TARGET_NOTICE_MS - TARGET_NOTICE_LEAVE_MS,
+            }
+          : null,
       canDropTarget: this.inv.tool === "target",
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**

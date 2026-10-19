@@ -144,6 +144,9 @@ describe('TSNE', () => {
     a.send({ type: 'dropTarget' })
     await Bun.sleep(300)
     expect(match(a)?.target?.carrier).toBeNull()
+    // 手放したことも全員に届く (取った方も、守る側だけでなく攻める側にも)
+    expect(b.got('targetDropped')).toBe(1)
+    expect(a.got('targetTaken')).toBeGreaterThanOrEqual(1)
     expect(await until(() => match(a)?.target?.carrier === 'alice', 3500)).toBe(true)
     // 自陣 (青の基地) まで運ぶと、攻める側 (青) の勝ち
     await a.walkTo(-18.41, 10.01, 49.09)

@@ -471,17 +471,22 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
-        攻める側がターゲットを取った (TSNE)。**守る側にだけ**、指令と同じ黒い帯で 4 秒
-        (Game.ts の targetNotice)
+        ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令 (Orders) と同じ帯で 4 秒。
+        色はその人の陣営、最後に同じく割れて退く (Game.ts の targetNotice)
       */}
       <Show when={props.stats?.targetNotice}>
-        <div class="orders orders-solo hud-game-set">
-          <div class="orders-band">
-            <div class="orders-heading">TARGET</div>
-            <div class="orders-rule" />
-            <div class="orders-text">{props.stats?.targetNotice}</div>
+        {(notice) => (
+          <div
+            class="orders"
+            classList={{ [`orders-${notice().team}`]: true, 'orders-leaving': notice().leaving }}
+          >
+            <div class="orders-band">
+              <div class="orders-heading">TARGET</div>
+              <div class="orders-rule" />
+              <div class="orders-text">{notice().text}</div>
+            </div>
           </div>
-        </div>
+        )}
       </Show>
 
       {/* 決着の 1 段目。「試合終了」だけを指令と同じ帯で告げる */}
