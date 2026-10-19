@@ -49,6 +49,7 @@ const open = new URLSearchParams(location.search).get('open') === '1'
 function Preview() {
   const [skills, setSkills] = createSignal<Skills>({ rifleMastery: 2, runner: 1 })
   const [look, setLook] = createSignal<LookScale>({ mouseHip: 1, mouseAim: 0.8, padHip: 1.4, padAim: 1, listInvert: true })
+  const [renderScale, setRenderScale] = createSignal(1)
   // ?tab=skills / settings でその板を開いた姿を写す (無頭では押せないので代わりに押す)
   onMount(() => {
     const at = { skills: 1, settings: 2 }[new URLSearchParams(location.search).get('tab') ?? '']
@@ -68,6 +69,8 @@ function Preview() {
       onLeave={() => {}}
       lookScale={look()}
       onLookScale={setLook}
+      renderScale={renderScale()}
+      onRenderScale={setRenderScale}
     />
   )
 }

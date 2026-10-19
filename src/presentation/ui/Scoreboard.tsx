@@ -8,6 +8,7 @@ import type { Identity } from '../../infra/auth/session'
 import type { GameStats } from '../scene/Game'
 import { SkillList } from './SkillPanel'
 import { DEFAULT_LOOK_SCALE, LOOK_SCALE_MAX, LOOK_SCALE_MIN, type LookScale } from '../../infra/prefs/look'
+import { RENDER_SCALE_MAX, RENDER_SCALE_MIN } from '../../infra/prefs/quality'
 import './Scoreboard.css'
 
 /**
@@ -45,6 +46,9 @@ export default function Scoreboard(props: {
   /** 視点の感度 (設定のタブ)。マウスとパッド、構えていない時と構えている時 */
   lookScale: LookScale
   onLookScale: (next: LookScale) => void
+  /** 画質 (設定のタブ)。描く細かさの倍率 (画面の 1 画素に何画素描くか) */
+  renderScale: number
+  onRenderScale: (next: number) => void
 }) {
   /**
    * どの板を見ているか。**成績表とスキルを 1 枚に重ねる。**
@@ -419,6 +423,24 @@ export default function Scoreboard(props: {
             <button class="score-leave score-settings-reset" onClick={() => props.onLookScale({ ...DEFAULT_LOOK_SCALE })}>
               既定に戻す
             </button>
+            {/*
+              画質。描く細かさの倍率。**右が細かい** (本人 2026-10-19)。重い機械 (内蔵 GPU、
+              高解像度の画面) で詰まって切られる人が左へ寄せる
+            */}
+            <div class="score-settings-head">画質</div>
+            <label class="score-setting">
+              <span class="score-setting-label">描く細かさ</span>
+              <input
+                class="score-setting-range"
+                type="range"
+                min={RENDER_SCALE_MIN}
+                max={RENDER_SCALE_MAX}
+                step={0.05}
+                value={props.renderScale}
+                onInput={(e) => props.onRenderScale(Number(e.currentTarget.value))}
+              />
+              <span class="score-setting-value">× {props.renderScale.toFixed(2)}</span>
+            </label>
           </div>
         </Show>
 

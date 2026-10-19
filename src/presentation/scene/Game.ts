@@ -154,6 +154,7 @@ import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
 import { loadLookScale, type LookScale } from "../../infra/prefs/look";
+import { loadRenderScale } from "../../infra/prefs/quality";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 /**
@@ -1385,7 +1386,8 @@ export class Game {
       // 逆向きの深さ (util/depth.ts)。遠くの薄い板が壁と食い合わない
       reversedDepthBuffer: REVERSED_DEPTH,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // 描く細かさは画質の設定から (setRenderScale)。画面の細かさより上は描かない
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, loadRenderScale()));
     // 切り分け用: ?shadow=0 で影を切る
     this.renderer.shadowMap.enabled = new URLSearchParams(location.search).get("shadow") !== "0";
     // three r185 で PCFSoftShadowMap は deprecated (内部で PCFShadowMap にフォールバックする)
@@ -3614,6 +3616,11 @@ export class Game {
 
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
   onLoadout: ((next: { primary: WeaponId | null; support: SupportId }) => void) | null = null;
+
+  /** 描く細かさを差し替える (設定画面の画質のバー)。動かした瞬間から効く */
+  setRenderScale(scale: number): void {
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, scale));
+  }
 
   /** 視点の感度の倍率を差し替える (設定画面)。マウスとパッド、構えていない時と構えている時 */
   setLookScale(scale: LookScale): void {

@@ -19,6 +19,7 @@ import Leaving from '../ui/Leaving'
 import Stats from '../ui/Stats'
 import Loading from '../ui/Loading'
 import { loadLookScale, saveLookScale } from '../../infra/prefs/look'
+import { loadRenderScale, saveRenderScale } from '../../infra/prefs/quality'
 
 /**
  * 調整パネルを出すか。
@@ -152,6 +153,8 @@ export default function Play(props: {
   const [game, setGame] = createSignal<Game | null>(null)
   /** 視点の感度 (設定のタブ)。この端末に覚えてある値から始める */
   const [lookScale, setLookScale] = createSignal(loadLookScale())
+  /** 画質 (設定のタブ)。描く細かさの倍率。この端末に覚えてある値から始める */
+  const [renderScale, setRenderScale] = createSignal(loadRenderScale())
   /** 部屋を出るか尋ねている最中か。戻るを押した時だけ立つ */
   const [leaving, setLeaving] = createSignal(false)
   let container!: HTMLDivElement
@@ -399,6 +402,12 @@ export default function Play(props: {
             setLookScale(next)
             saveLookScale(next)
             game()?.setLookScale(next)
+          }}
+          renderScale={renderScale()}
+          onRenderScale={(next) => {
+            setRenderScale(next)
+            saveRenderScale(next)
+            game()?.setRenderScale(next)
           }}
         />
       </Show>
