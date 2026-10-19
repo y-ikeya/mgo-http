@@ -715,7 +715,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/* 基地の上。同じ指が補給になる */}
-      {/* 眠っている人を叩いて起こす (1 回で眠りの 1/3 縮む)。補給より先 (同じ指で叩くほうが勝つ) */}
+      {/* 眠っている人を叩いて起こす (1 回で 20 秒縮む)。補給より先 (同じ指で叩くほうが勝つ) */}
       <Show when={props.stats?.canPat}>
         <div class="scope-hint">{t('hud.patHint')}</div>
       </Show>

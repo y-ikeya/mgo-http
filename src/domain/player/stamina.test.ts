@@ -170,32 +170,36 @@ describe('もがいて早く起きる', () => {
   })
 })
 
-/** 眠っている人を叩いて起こす。**1 回で眠りの 1/3 縮む。** 連打では縮めない */
+/** 眠っている人を叩いて起こす。**1 回で 20 秒縮む (どのルールでも)。** 連打では縮めない */
 describe('叩いて起こす', () => {
   const t0 = 1_000_000
+  /** 間を空けて叩き続けて、起きるまでの回数 */
+  const patsToWake = (sleep: number) => {
+    let state = { sleepUntil: t0 + sleep * 1000, patAt: 0 }
+    let n = 0
+    for (let t = t0; isAsleep(state.sleepUntil, t); t += 1600) {
+      state = pat(state, t)
+      n++
+    }
+    return n
+  }
 
-  test('普段 (60 秒) は 1 回で 20 秒縮む。眠りたてでも 3 回で起きる', () => {
-    let state = { sleepUntil: t0 + SLEEP_SECONDS * 1000, patAt: 0 }
-    state = pat(state, t0, SLEEP_SECONDS)
-    expect(state.sleepUntil).toBe(t0 + 40_000)
-    state = pat(state, t0 + 1600, SLEEP_SECONDS)
-    state = pat(state, t0 + 3200, SLEEP_SECONDS)
-    expect(isAsleep(state.sleepUntil, t0 + 3200)).toBe(false)
+  test('1 回で 20 秒縮む', () => {
+    expect(pat({ sleepUntil: t0 + 60_000, patAt: 0 }, t0).sleepUntil).toBe(t0 + 40_000)
   })
 
-  test('TSNE (450 秒) は 1 回で 150 秒縮む', () => {
-    const next = pat({ sleepUntil: t0 + TSNE_SLEEP_SECONDS * 1000, patAt: 0 }, t0, TSNE_SLEEP_SECONDS)
-    expect(next.sleepUntil).toBe(t0 + 300_000)
+  test('普段 (60 秒) は 3 回、TSNE (450 秒) は 20 回以上叩かないと起きない', () => {
+    expect(patsToWake(SLEEP_SECONDS)).toBe(3)
+    expect(patsToWake(TSNE_SLEEP_SECONDS)).toBeGreaterThan(20)
   })
 
   test('間が短すぎる叩きは効かない (ボタンの連打で縮めない)', () => {
-    const first = pat({ sleepUntil: t0 + 60_000, patAt: 0 }, t0, 60)
-    const quick = pat(first, t0 + PAT_INTERVAL_MS - 1, 60)
-    expect(quick).toBe(first)
+    const first = pat({ sleepUntil: t0 + 60_000, patAt: 0 }, t0)
+    expect(pat(first, t0 + PAT_INTERVAL_MS - 1)).toBe(first)
   })
 
   test('起きている人は叩いても変わらない', () => {
     const awake = { sleepUntil: t0 - 1, patAt: 0 }
-    expect(pat(awake, t0, 60)).toBe(awake)
+    expect(pat(awake, t0)).toBe(awake)
   })
 })
