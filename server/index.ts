@@ -237,7 +237,7 @@ setInterval(() => {
         /*
          * --- 眠りから醒める ---
          *
-         * 眠りが明けたらスタミナは満タンで起きる。**30 秒寝たのだから**、
+         * 眠りが明けたらスタミナは満タンで起きる。**しばらく寝たのだから**、
          * 残ったまま起こすと起きた瞬間にもう一度眠らされる。
          */
         if (player.sleepUntil > 0 && now >= player.sleepUntil) {
@@ -865,7 +865,7 @@ function handleMessage(
       if (room.phase !== 'playing') break
       const now = Date.now()
       if (!isAsleep(player.sleepUntil, now)) break
-      const next = struggle(player, Number(message.units), player.wakeFloor, now, room.mode.sleepSeconds)
+      const next = struggle(player, Number(message.units), player.wakeFloor, now)
       if (next.sleepUntil === player.sleepUntil) break
       player.sleepUntil = next.sleepUntil
       player.struggleAt = next.struggleAt

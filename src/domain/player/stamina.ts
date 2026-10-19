@@ -40,16 +40,16 @@
 export const MAX_STAMINA = 100
 
 /**
- * 眠っている長さ (秒)。
+ * 眠っている長さ (秒)。**何もしなかった時。** もがけば 1/3 まで縮む (下の struggle)。
  *
- * **長い。** 倒された人が湧き直すまで (倒れる 5 秒 + 支度) と同じくらいで、
- * 「一時的に無力化した」ではなく「その試合の一場面から消した」に近い重み。
- * 部屋のモードで変わる (domain/match/room.ts の sleepSeconds。TSNE は 180 秒)。
- *
+ * **長い。** 「一時的に無力化した」ではなく「その試合の一場面から消した」に近い重み。
  * 短くすると、眠らせても起きるのを待つ意味が無くなって**その場で仕留めるだけ**
  * の手になる。長いから、置いて先へ進むという選択が生まれる。
+ *
+ * 本人 2026-10-19「何もしなかったら 1min で、回して 20 秒」。
+ * 部屋のモードで変わる (domain/match/room.ts の sleepSeconds。TSNE は 450 秒)。
  */
-export const SLEEP_SECONDS = 30
+export const SLEEP_SECONDS = 60
 
 /**
  * 集中し始めてから、スタミナが戻り始めるまで (秒)。
@@ -148,6 +148,7 @@ export function staminaBlur(stamina: number): number {
  * --- もがいて早く起きる ---
  *
  * 本人 2026-10-19「pad だと R3 (→ L3) スティックをクルクル回すことで早く起きられるとか欲しい」。
+ * どのルールでも効く。
  * 左スティックを 1 回転 (キーマウは W A S D の違うキーを交互に 4 回) で 1 回もがいたことにする。
  * 眠っている間は歩けないので、左スティックと W A S D は空いている (右スティックとマウスは
  * 見回しに使うので数えない — 見回しているだけで起きてしまう)。
@@ -156,12 +157,21 @@ export function staminaBlur(stamina: number): number {
  * 眠りの 1/3 より早くは起きられない。
  */
 
-/** 1 回もがくと、眠りのこれだけを削る (TSNE の 180 秒なら 1 秒) */
-export const STRUGGLE_SHARE = 1 / 180
+/**
+ * 全力でもがき続けた時、眠りが 1 秒にどれだけ縮むか (秒)。2 なら時計の 3 倍の速さで醒める —
+ * 何もしなければ 60 秒 / 450 秒 (TSNE)、全力なら 20 秒 / 150 秒 (本人 2026-10-19)。
+ * 眠りの長さに依らない (1 回もがくと何秒縮むかは固定)
+ */
+export const STRUGGLE_SPEED = 2
 /** 1 秒にもがける回数の上限。速く回しても (送る量を偽っても) これ以上は削れない */
 export const STRUGGLE_RATE = 3
-/** 眠りのこれだけは必ず寝る (180 秒なら 60 秒) */
-export const STRUGGLE_FLOOR = 1 / 3
+/** 1 回もがくと縮む秒数 */
+export const STRUGGLE_SECONDS = STRUGGLE_SPEED / STRUGGLE_RATE
+/**
+ * 眠りのこれだけは必ず寝る。全力 (STRUGGLE_SPEED) で縮め続けると、ちょうどここで起きる
+ * (1 / (1 + 2) = 1/3)。速さの上限をすり抜けられても、これより早くは起きない
+ */
+export const STRUGGLE_FLOOR = 1 / (1 + STRUGGLE_SPEED)
 
 /** 眠った時に決める、もがいても起きられない時刻 (ms) */
 export function wakeFloor(now: number, sleepSeconds: number): number {
@@ -180,10 +190,10 @@ export interface Struggle {
  * 前のもがきからの時間で上限を掛ける。一度に大きな数を送っても、経った時間ぶんしか効かない
  * (眠ってから初めてのもがきは、1 秒ぶんまで)。
  */
-export function struggle(state: Struggle, units: number, floor: number, now: number, sleepSeconds: number): Struggle {
+export function struggle(state: Struggle, units: number, floor: number, now: number): Struggle {
   if (!(units > 0) || !Number.isFinite(units) || state.sleepUntil <= now) return state
   const since = state.struggleAt > 0 ? Math.min(1, (now - state.struggleAt) / 1000) : 1
   const allowed = Math.min(units, Math.max(0, since) * STRUGGLE_RATE)
-  const cut = allowed * sleepSeconds * 1000 * STRUGGLE_SHARE
+  const cut = allowed * STRUGGLE_SECONDS * 1000
   return { sleepUntil: Math.max(floor, state.sleepUntil - cut), struggleAt: now }
 }

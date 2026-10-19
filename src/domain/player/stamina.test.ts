@@ -2,8 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   MAX_STAMINA, SLEEP_SECONDS, STAMINA_RECOVER_DELAY,
   drainStamina, isAsleep, recoverStamina, sleepLeft, staminaBlur, staminaSwayScale,
-  STRUGGLE_RATE, struggle, wakeFloor,
+  STRUGGLE_RATE, STRUGGLE_SPEED, struggle, wakeFloor,
 } from './stamina'
+import { TSNE_SLEEP_SECONDS } from '../match/room'
 import { WEAPONS } from '../item/weapons'
 
 /**
@@ -128,33 +129,42 @@ describe('スタミナの効き目', () => {
  */
 describe('もがいて早く起きる', () => {
   const now = 1_000_000
-  const sleep = 180
 
-  test('1 回転で眠りの 1/180 (180 秒なら 1 秒) 早まる', () => {
-    const until = now + sleep * 1000
-    const next = struggle({ sleepUntil: until, struggleAt: now - 1000 }, 1, wakeFloor(now - 1000, sleep), now, sleep)
-    expect(next.sleepUntil).toBe(until - 1000)
+  test('1 回転で 2/3 秒早まる (全力の 1 秒 3 回転で 2 秒)', () => {
+    const until = now + 60_000
+    const next = struggle({ sleepUntil: until, struggleAt: now - 1000 }, 3, 0, now)
+    expect(next.sleepUntil).toBe(until - STRUGGLE_SPEED * 1000)
   })
 
   test('一度に大きな数を送っても、経った時間ぶんしか効かない', () => {
-    const until = now + sleep * 1000
-    const next = struggle({ sleepUntil: until, struggleAt: now - 500 }, 1000, 0, now, sleep)
-    expect(next.sleepUntil).toBe(until - 0.5 * STRUGGLE_RATE * 1000)
+    const until = now + 60_000
+    const next = struggle({ sleepUntil: until, struggleAt: now - 500 }, 1000, 0, now)
+    expect(next.sleepUntil).toBe(until - 0.5 * STRUGGLE_SPEED * 1000)
   })
 
-  test('眠りの 1/3 より早くは起きられない', () => {
-    const start = now - 10_000
-    const floor = wakeFloor(start, sleep)
-    let state = { sleepUntil: start + sleep * 1000, struggleAt: 0 }
-    for (let t = start; t < start + 200_000; t += 200) state = struggle(state, 99, floor, t, sleep)
-    expect(state.sleepUntil).toBe(start + 60_000)
+  // 本人 2026-10-19「何もしなかったら 1min で回して 20 秒」「TSNE はめっちゃ頑張って 150 秒、何もしなかったら 450 秒」
+  for (const [label, sleep, fastest] of [['普段', SLEEP_SECONDS, 20], ['TSNE', TSNE_SLEEP_SECONDS, 150]] as const) {
+    test(`${label}: 何もしなければ ${sleep} 秒、全力でもがき続けると ${fastest} 秒で起きる`, () => {
+      const start = now
+      const floor = wakeFloor(start, sleep)
+      let state = { sleepUntil: start + sleep * 1000, struggleAt: 0 }
+      let t = start
+      for (; isAsleep(state.sleepUntil, t); t += 100) state = struggle(state, STRUGGLE_RATE * 0.1, floor, t)
+      expect((t - start) / 1000).toBeCloseTo(fastest, 0)
+    })
+  }
+
+  test('速さの上限をすり抜けても、眠りの 1/3 より早くは起きられない', () => {
+    const floor = wakeFloor(now, 60)
+    const next = struggle({ sleepUntil: now + 60_000, struggleAt: now - 1000 }, 1e9, floor, now)
+    expect(next.sleepUntil).toBeGreaterThanOrEqual(floor)
   })
 
   test('起きている間や、数でない量は何もしない', () => {
     const awake = { sleepUntil: now - 1, struggleAt: 0 }
-    expect(struggle(awake, 1, 0, now, sleep)).toBe(awake)
+    expect(struggle(awake, 1, 0, now)).toBe(awake)
     const asleep = { sleepUntil: now + 5000, struggleAt: 0 }
-    expect(struggle(asleep, Number.NaN, 0, now, sleep)).toBe(asleep)
-    expect(struggle(asleep, -3, 0, now, sleep)).toBe(asleep)
+    expect(struggle(asleep, Number.NaN, 0, now)).toBe(asleep)
+    expect(struggle(asleep, -3, 0, now)).toBe(asleep)
   })
 })

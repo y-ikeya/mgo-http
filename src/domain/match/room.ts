@@ -91,8 +91,11 @@ export interface Armory {
   supports: readonly SupportId[]
 }
 
-/** TSNE の眠りの長さ (秒)。1 ラウンド 5 分のうち 3 分 (本人 2026-10-19「180 にして」) */
-export const TSNE_SLEEP_SECONDS = 180
+/**
+ * TSNE の眠りの長さ (秒)。**何もしなかったら 450 秒、めっちゃ頑張って 150 秒** (本人 2026-10-19)。
+ * 1 ラウンドは 5 分なので、何もしなければそのラウンドは起きない
+ */
+export const TSNE_SLEEP_SECONDS = 450
 
 export const MODES: Record<Mode, ModeSpec> = {
   DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false, sleepSeconds: SLEEP_SECONDS },
