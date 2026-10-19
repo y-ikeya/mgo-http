@@ -117,6 +117,7 @@ import { can, blocker } from "../../domain/player/moves";
 
 /** URL に ?debug が付いていれば、HUD に検証用の読み出しを出す */
 const DEBUG_HUD = new URLSearchParams(globalThis.location?.search ?? "").has("debug");
+import { toLocal } from "../../application/replica/clock";
 import { TsneTarget, type TargetView } from "./world/tsneTarget";
 import { atBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
@@ -2522,7 +2523,8 @@ export class Game {
        */
       case "stamina": {
         this.stamina = message.stamina;
-        const left = (message.sleepUntil - Date.now()) / 1000;
+        // 起きる時刻はサーバーの時計。手元の時計へ直してから比べる (application/replica/clock.ts)
+        const left = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
         // もう眠っているなら残りだけ縮める (もがいて早まった)。倒れる動きをやり直さない
         if (left > 0 && this.player.sleeping) this.player.shortenSleep(left);
         else if (left > 0) this.player.sleep(left);
@@ -2551,7 +2553,7 @@ export class Game {
       case "resume": {
         this.player.resumeAt(message.x, message.y, message.z, message.health);
         // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
-        const asleep = (message.sleepUntil - Date.now()) / 1000;
+        const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
         if (asleep > 0) this.player.sleep(asleep, true);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
