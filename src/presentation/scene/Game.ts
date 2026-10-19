@@ -5633,6 +5633,8 @@ export class Game {
   }
 
   private publishStats(dt: number): void {
+    // 眠っている間は音が遠のく (起きる前の 1/4 でぼんやり戻る。sense/audio.ts の setDrowse)
+    this.audio.setDrowse(this.player.sleeping ? this.player.sleepDepth : 0);
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.1;
     this.statsTimer += dt;
     if (this.statsTimer < STATS_INTERVAL || !this.onStats) return;

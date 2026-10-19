@@ -479,6 +479,13 @@ export type UiSoundName = keyof typeof UI_SOUNDS;
 /** 画面の音の枠。重ねて鳴ることは無いが、連続で開くので 2 つ持つ */
 const UI_POOL_SIZE = 2;
 
+/** 眠りの深さがこれを下回ると聞こえ始める (起きる前の 1/4) */
+const DROWSE_HEARS_FROM = 0.25;
+/** 聞こえ始めの籠もり (Hz)。これより高い音は抜ける */
+const DROWSE_MUFFLED_HZ = 300;
+/** 起きている時。人の耳の上限なので何も削らない */
+const DROWSE_OPEN_HZ = 20000;
+
 export class GameAudio {
   readonly listener = new THREE.AudioListener();
   /** 環境音。読み込めたら鳴り続ける */
@@ -537,6 +544,35 @@ export class GameAudio {
 
     void this.load();
   }
+
+  /**
+   * 眠っている間の聞こえ方。**深いうちは何も聞こえず、起きる前の 1/4 でぼんやり戻る**
+   * (本人 2026-10-19「眠ったばかりは聞こえなくて、最後起きる 1/4 くらいで音がぼんやり聞こえる」)。
+   *
+   * depth は眠りの深さ (1 が眠った瞬間、0 が起きた瞬間。soldier.ts の sleepDepth)。起きていれば 0。
+   * 全部の音 (足音・銃声・画面の音・街の音) が通る聞き手の出口で、音量と高い音を絞る。
+   * ぼんやり = 高い音が抜けて低い音だけ残る (水に潜った時と同じ考え方)。
+   */
+  setDrowse(depth: number): void {
+    const hearing = depth <= 0 ? 1 : Math.max(0, Math.min(1, 1 - depth / DROWSE_HEARS_FROM));
+    if (hearing === this.hearing) return;
+    this.hearing = hearing;
+    const context = this.listener.context;
+    if (!this.drowseFilter) {
+      this.drowseFilter = context.createBiquadFilter();
+      this.drowseFilter.type = "lowpass";
+      this.drowseFilter.frequency.value = DROWSE_OPEN_HZ;
+      this.listener.setFilter(this.drowseFilter);
+    }
+    // 戻り始めは籠もった低い音、起きる瞬間に元の音。音量は 2 乗で — 戻り始めは本当にかすか
+    const hz = DROWSE_MUFFLED_HZ * (DROWSE_OPEN_HZ / DROWSE_MUFFLED_HZ) ** hearing;
+    this.drowseFilter.frequency.setTargetAtTime(hz, context.currentTime, 0.1);
+    this.listener.gain.gain.setTargetAtTime(hearing * hearing, context.currentTime, 0.1);
+  }
+
+  /** 今どれだけ聞こえているか (0〜1)。1 なら起きている */
+  private hearing = 1;
+  private drowseFilter: BiquadFilterNode | null = null;
 
   /**
    * ブラウザはユーザー操作があるまで音を出せない。
