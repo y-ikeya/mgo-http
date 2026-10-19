@@ -101,31 +101,6 @@
 }
 },
 {
-"name": "concrete_building12",
-"min": [
--15.546,
-8.727,
--90.735
-],
-"max": [
-23.417,
-30.218,
--79.487
-],
-"top": {
-"h": 30.2178,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "concrete_building13",
 "min": [
 -49.492,
@@ -364,31 +339,6 @@
 ],
 "top": {
 "h": 19.5512,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
-"name": "concrete_building12.001",
-"min": [
--40.951,
-9.343,
--86.532
-],
-"max": [
--1.988,
-30.834,
--77.866
-],
-"top": {
-"h": 30.834,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -14848,6 +14798,333 @@
 }
 },
 {
+"name": "concrete_building12",
+"min": [
+-40.95,
+9.9,
+-90.73
+],
+"max": [
+23.42,
+21.58,
+-78.6
+],
+"top": {
+"h": 21.58,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building12_trim",
+"min": [
+-41.05,
+9.9,
+-90.83
+],
+"max": [
+23.52,
+21.98,
+-78.5
+],
+"top": {
+"h": 21.98,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_building12_frames",
+"min": [
+-41.01,
+10.75,
+-90.79
+],
+"max": [
+23.48,
+19.72,
+-78.54
+],
+"top": {
+"h": 19.72,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_building12_sashes",
+"min": [
+-40.77,
+10.9,
+-90.55
+],
+"max": [
+23.24,
+19.6,
+-78.78
+],
+"top": {
+"h": 19.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "glass_building12_panes_notexture",
+"min": [
+-40.71,
+10.9,
+-90.49
+],
+"max": [
+23.18,
+19.6,
+-78.84
+],
+"top": {
+"h": 19.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false
+}
+},
+{
+"name": "metal_building12_bars",
+"min": [
+-41.03,
+10.81,
+-90.81
+],
+"max": [
+23.5,
+12.49,
+-78.52
+],
+"top": {
+"h": 12.49,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_Door_b12_entry",
+"min": [
+-9.246,
+10.002,
+-78.592
+],
+"max": [
+-8.282,
+12.282,
+-78.521
+],
+"top": {
+"h": 12.2819,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_Door_b12_entry_frame",
+"min": [
+-9.345,
+9.997,
+-78.657
+],
+"max": [
+-8.193,
+12.38,
+-78.543
+],
+"top": {
+"h": 12.3798,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building12_bridge",
+"min": [
+-2.35,
+13.53,
+-78.81
+],
+"max": [
+-0.35,
+16.71,
+-73.36
+],
+"top": {
+"h": 16.71,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building12_bridge_trim",
+"min": [
+-2.45,
+13.53,
+-78.81
+],
+"max": [
+-0.25,
+17.01,
+-73.36
+],
+"top": {
+"h": 17.01,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_building12_bridge_frames",
+"min": [
+-2.41,
+14.2,
+-78.18
+],
+"max": [
+-0.29,
+15.97,
+-73.98
+],
+"top": {
+"h": 15.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_building12_bridge_sashes",
+"min": [
+-2.17,
+14.35,
+-78.03
+],
+"max": [
+-0.53,
+15.85,
+-74.13
+],
+"top": {
+"h": 15.85,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "glass_building12_bridge_panes_notexture",
+"min": [
+-2.11,
+14.35,
+-78.03
+],
+"max": [
+-0.59,
+15.85,
+-74.13
+],
+"top": {
+"h": 15.85,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -18.84,
@@ -14875,14 +15152,14 @@
 {
 "name": "wood_toolbox_red_boxcol",
 "min": [
-0.905,
+3.218,
 9.962,
--77.139
+-77.166
 ],
 "max": [
-1.763,
+4.076,
 10.262,
--76.055
+-76.082
 ],
 "top": {
 "h": 10.2624,
@@ -16042,9 +16319,9 @@
 "z": 49.09
 },
 "red": {
-"x": 1.33,
+"x": 3.65,
 "y": 10.01,
-"z": -76.6
+"z": -76.62
 }
 },
 "fx": [
