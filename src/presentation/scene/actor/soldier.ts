@@ -1639,6 +1639,11 @@ export class Soldier {
    * 眠っている人を叩く (しゃがんで左手でぽんぽん)。叩けたら true。
    * **起こすのはサーバー** (1 回で 20 秒縮む)。ここは型を流すだけ。叩いている最中は重ねない
    */
+  /** 眠っている人を叩く型を流している最中か */
+  get patting(): boolean {
+    return this.animator?.patting ?? false
+  }
+
   pat(): boolean {
     if (!can(this.body, 'pat') || this.animator?.patting) return false
     this.animator?.playPat()

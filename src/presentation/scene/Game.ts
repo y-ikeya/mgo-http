@@ -455,6 +455,11 @@ function heapMB(): number {
 }
 /** 「ターゲットを取得した」を出しておく長さ (ms) */
 const TARGET_NOTICE_MS = 4000;
+/**
+ * 叩く型の 2 回目の手が下りるまで (ms)。型の 26 コマ目 (24fps、tools/cqc/pat.py の KEYS)。
+ * 型を作り直したらここも合わせる
+ */
+const PAT_LANDS_MS = (26 / 24) * 1000;
 /** もがきを送る間隔 (ms)。毎コマ送らない */
 const STRUGGLE_SEND_MS = 200;
 /** 遅れの兆しに添える、直近のコマの記録の長さ (ms)。切るまでの 5 回ぶんより長く */
@@ -1743,6 +1748,7 @@ export class Game {
     // 視点も移動もこの後の処理が読むので、フレームの先頭で更新しておく。
     this.input.pollGamepad(dt);
     this.noteStruggle(time);
+    this.flushPat();
     // 押している時間を進める。**単押しと長押しの別はここで決まる** (infra/input)
     this.input.advance(dt);
 
@@ -2191,6 +2197,26 @@ export class Game {
     };
     console.warn("[重い]", report);
     this.net.send(report);
+  }
+
+  /** 叩いた相手と、効かせる時刻 (performance.now)。叩く型の 2 回目の手が下りた所で送る */
+  private pendingPat: { target: string; at: number } | null = null;
+
+  /**
+   * 叩いたことを、**手が下りた所で**サーバーへ送る (本人 2026-10-19「叩き終わったくらいのところで
+   * 効果が出るように、いま叩く前から効力出てる」)。叩く型が途中で止まったら (撃たれた・眠らされた)
+   * 送らない — 叩き切っていないのに起こさない
+   */
+  private flushPat(): void {
+    const pending = this.pendingPat;
+    if (!pending) return;
+    if (!this.player.patting) {
+      this.pendingPat = null;
+      return;
+    }
+    if (performance.now() < pending.at) return;
+    this.net.send({ type: "pat", target: pending.target });
+    this.pendingPat = null;
   }
 
   /** まだ送っていないもがき (左スティックの回転、W A S D の交互の連打) と、最後に送った時刻 (ms) */
@@ -5122,7 +5148,8 @@ export class Game {
     }
     const patTarget = this.patTarget();
     if (patTarget && this.input.tapped("drop")) {
-      if (this.player.pat()) this.net.send({ type: "pat", target: patTarget });
+      // **叩き終わった所で効かせる。** 押した瞬間に送ると、手が届く前から起き始めた (flushPat)
+      if (this.player.pat()) this.pendingPat = { target: patTarget, at: performance.now() + PAT_LANDS_MS };
       return;
     }
     // 基地の上では同じ指が補給になる。**捨てる判断より先に食う** (梯子と同じ)
