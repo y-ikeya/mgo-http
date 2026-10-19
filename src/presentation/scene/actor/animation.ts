@@ -820,6 +820,11 @@ const PRONE_RISE_KEY = 'prone_rise'
 const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
 const PAT_KEY = 'pat'
 /**
+ * 叩く型を流す速さ。型そのもの (0.8 秒) だと叩くのが早すぎた (本人 2026-10-19「もっとゆっくり」)。
+ * 0.6 で 1.3 秒。他の人の画面も同じ入口 (playPat) を通るので同じ速さになる
+ */
+const PAT_RATE = 0.6
+/**
  * 伏せ撃ち。**構えと発砲を同じクリップから作る。**
  *
  * 素材は発砲の 1 本 (0.87 秒)。頭で止めれば構えた 1 枚の姿勢になるので、
@@ -3580,7 +3585,7 @@ export class CharacterAnimator {
    * 型はしゃがみの姿で始まって終わるので、終わった先もしゃがみ
    */
   playPat(): void {
-    this.playWholeBody(PAT_KEY, 'pat')
+    this.playWholeBody(PAT_KEY, 'pat', PAT_RATE)
   }
 
   /** 叩く型を流している最中か */
