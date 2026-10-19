@@ -270,6 +270,8 @@ def wall_below(w):
 
 
 WINDOW_CLEAR = 1.5
+# 本体の下端 (世界の z)。雨だれをここより下へ垂らさない
+BOTTOM = min((b.matrix_world @ Vector(c)).z for b in BODIES for c in b.bound_box)
 STEP = 0.1      # 縦に 10cm ごとに区切る (b32 の窓の下の雨だれと同じ作り。焼いた明るさが縦に滑らかになる)
 
 
@@ -303,15 +305,20 @@ if WINDOWS and (not ONLY or 'streak' in ONLY):
         at, d = wall
         t = Vector((-d.y, d.x, 0)).normalized()
         c = w['c'].dot(t); top = w['z'] - 0.02
+        # 壁の下端より下へは垂らさない。渡り廊下 (b12_bridge) は 1m 下で壁が終わっていて、
+        # 宙に筋が浮いた
+        reach = top - BOTTOM - 0.1
+        if reach < 0.3:
+            continue
         if w['w'] <= 1.2:
-            h = random.uniform(1.0, 1.5)
+            h = min(random.uniform(1.0, 1.5), reach)
             window_streak(st if w['w'] >= 0.9 else nr, st_uv if w['w'] >= 0.9 else nr_uv, at, d, c, w['w'] - 0.04, top, h)
             made += 1
         else:
             for _ in range(random.randint(2, 3)):
                 sw = random.uniform(0.4, 0.7)
                 sc_ = random.uniform(c - w['w'] / 2 + sw / 2, c + w['w'] / 2 - sw / 2)
-                window_streak(nr, nr_uv, at, d, sc_, sw, top, random.uniform(0.8, 1.4))
+                window_streak(nr, nr_uv, at, d, sc_, sw, top, min(random.uniform(0.8, 1.4), reach))
                 made += 1
     # 1 つの物に 2 つの材質 (b32 と同じ)
     if len(st.faces):
