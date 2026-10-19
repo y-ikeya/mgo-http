@@ -1,6 +1,7 @@
 import type { MatchPlayer } from '../player/player'
 import { only, type Rotation } from '../stage'
 import { CHOICES, SUPPORTS, isTranquilizer, type SupportId, type WeaponId } from '../item/weapons'
+import { SLEEP_SECONDS } from '../player/stamina'
 
 /**
  * 部屋とルール。
@@ -66,6 +67,14 @@ export interface ModeSpec {
    * ステルスが付く。どちらの色が攻めるかは試合ごとに入れ替わる (match.ts の attack)。
    */
   sides: boolean
+  /**
+   * 眠らされてから起きるまで (秒)。普段は SLEEP_SECONDS (domain/player/stamina.ts)。
+   *
+   * **TSNE は長い** (本人 2026-10-19「stun からの復活はめっちゃ時間かかる。早く起きられたら
+   * 先攻不利になっちゃうから」)。復活の無い部屋で、眠らせるのが攻める側の倒し方。すぐ起きると
+   * 眠らせた手間が無駄になり、殺せる守る側だけが得をする。
+   */
+  sleepSeconds: number
 }
 
 /** 攻める側か守る側か。**色 (Team) とは別の問い** — 試合ごとに入れ替わる */
@@ -82,9 +91,12 @@ export interface Armory {
   supports: readonly SupportId[]
 }
 
+/** TSNE の眠りの長さ (秒)。1 ラウンド 5 分のうち 2 分。起きる前に決着が付くことが多い長さ */
+export const TSNE_SLEEP_SECONDS = 120
+
 export const MODES: Record<Mode, ModeSpec> = {
-  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false },
-  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false },
+  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false, sleepSeconds: SLEEP_SECONDS },
+  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS },
   /**
    * 潜入 / 防御 (2026-10-17 本人)。
    *
@@ -95,15 +107,15 @@ export const MODES: Record<Mode, ModeSpec> = {
    * 相手の側が全員倒れるか眠ったら勝ち。時間切れは守る側の勝ち。
    * 試合ごとに攻守が入れ替わる。
    */
-  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: true },
-  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false, sides: false },
+  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: true, sleepSeconds: TSNE_SLEEP_SECONDS },
+  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS },
   /**
    * 練習。**入る人は全員青**で、赤には棒立ちの的が並ぶ。
    *
    * 戦績に残さないのは、動かない相手を撃った数が記録に混ざると記録の意味が
    * 消えるため。ここで武器の距離感と当て方を確かめる。
    */
-  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false, sides: false },
+  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS },
 }
 
 /**
