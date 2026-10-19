@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { asset } from '../assets'
+import { particleMaterial } from './particles'
 import type { Surface } from '../../../domain/stage'
 
 /** トレーサーの表示時間 (秒)。弾道を目で追える最低限だけ残す */
@@ -108,9 +108,8 @@ const IMPACT_POOL = 256
  * 粒の絵は爆発と同じ 1 枚 (public/textures/particles.png)。行 0 が煙。
  */
 const SMOKE_POOL = 48
-/** 粒の絵の格子。blastfx.ts と同じ物を見ているので、割り方を変えたら両方直す */
+/** 粒の絵の格子の列の数 (particles.ts の格子) */
 const SMOKE_COLS = 4
-const SMOKE_ROWS = 4
 const SMOKE_ROW = 0
 
 /** 銃口の煙。**短い。** 残ると連射で銃口が煙に埋まる */
@@ -483,19 +482,11 @@ export class Shots {
     /*
      * 煙と火花。**弾が飛んだ跡と、当たった跡。**
      *
-     * 粒の絵は爆発と同じ 1 枚を使い回す (blastfx.ts と同じ格子)。粒ごとに
-     * テクスチャを複製するのは、格子のどのコマを出すかを offset で決めるため
-     * (共有すると全部が同じコマになる)。画像は共有されるので中身は増えない。
+     * 粒の絵は爆発と同じ 1 枚を共有する (particles.ts)。どのコマを出すかは材質の値で選ぶ
      */
-    const loader = new THREE.TextureLoader()
     for (let i = 0; i < SMOKE_POOL; i++) {
-      const texture = loader.load(asset.texture('particles.png'))
-      texture.colorSpace = THREE.SRGBColorSpace
-      texture.repeat.set(1 / SMOKE_COLS, 1 / SMOKE_ROWS)
-      texture.offset.set((i % SMOKE_COLS) / SMOKE_COLS, 1 - (SMOKE_ROW + 1) / SMOKE_ROWS)
       const sprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: texture,
+        particleMaterial(i % SMOKE_COLS, SMOKE_ROW, {
           transparent: true,
           opacity: 0,
           depthWrite: false,

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import { asset } from '../assets'
+import { particleMaterial, particleTexture, type ParticleMaterial } from './particles'
 
 /**
  * 爆発の見た目。
@@ -39,7 +39,6 @@ import { asset } from '../assets'
 
 /** 粒の絵。4x4 の格子で、行ごとに種類が変わる */
 const COLS = 4
-const ROWS = 4
 /** 行の意味。アトラスを作り直すときはこの順を守る */
 const ROW_SMOKE = 0
 const ROW_DUST = 1
@@ -51,7 +50,7 @@ const RADIUS = 7
 
 interface Puff {
   sprite: THREE.Sprite
-  material: THREE.SpriteMaterial
+  material: ParticleMaterial
   /** 速度 (m/s) */
   velocity: THREE.Vector3
   /** 残り時間 (秒) と、その初期値 */
@@ -204,40 +203,16 @@ export class BlastFx {
     this.scene = scene
     scene.add(this.group)
 
-    // 粒ごとに別のマテリアルを持たせる。
-    //
-    // 濃さを 1 つずつ変えるので共有できない。格子のどのコマを出すかは
-    // テクスチャの offset で決まるので、テクスチャも粒ごとに複製する
-    // (画像は共有されるので、複製しても中身は増えない)。
-    //
-    // **読み込む先を粒ごとに分ける。** 1 枚を読んで複製すると、複製した時点では
-    // 画像がまだ無く、届いた瞬間に 25 個ぶんの作り直しが走る。three r185 の
-    // WebGPU では、それが提出中のバッファの破棄になって以後ずっと描画が崩れる
-    // (箱の影が出ず、人の影が置き去りになる)。同じ URL なので HTTP は 1 回で済む。
-    const loader = new THREE.TextureLoader()
-    // 画像が届くと材質が組み直される。全部届いたら、もう 1 度見えない大きさで描かせる
+    // 粒ごとに別のマテリアルを持たせる。濃さを 1 つずつ変えるので共有できない。
+    // **絵は 1 枚を共有する** — どのコマを出すかは材質の値で選ぶ (particles.ts)。
+    // 画像が届くと材質が組み直される。届いたら、もう 1 度見えない大きさで描かせる
     // (起動時の下描きは画像の無い材質で組むので、最初の爆発で組み直しが走って止まっていた)
-    const total = RECIPE.reduce((sum, kind) => sum + kind.count, 0)
-    let loaded = 0
-    const onLoad = () => {
-      loaded++
-      if (loaded === total) this.warmFrames = WARM_FRAMES
-    }
+    particleTexture(() => {
+      this.warmFrames = WARM_FRAMES
+    })
     for (const kind of RECIPE) {
       for (let i = 0; i < kind.count; i++) {
-        const texture = loader.load(
-          asset.texture('particles.png'),
-          onLoad,
-          undefined,
-          (error) => console.warn('[爆発] particles.png が読めない', error),
-        )
-        texture.colorSpace = THREE.SRGBColorSpace
-        texture.repeat.set(1 / COLS, 1 / ROWS)
-        // 行は上から数える。UV は下からなので反転する
-        texture.offset.set((i % COLS) / COLS, 1 - (kind.row + 1) / ROWS)
-
-        const material = new THREE.SpriteMaterial({
-          map: texture,
+        const material = particleMaterial(i % COLS, kind.row, {
           transparent: true,
           opacity: 0,
           depthWrite: false,
@@ -570,7 +545,7 @@ export class BlastFx {
 
   dispose(): void {
     for (const puff of this.puffs) {
-      puff.material.map?.dispose()
+      // 絵は共有なので捨てない (particles.ts)
       puff.material.dispose()
     }
     this.ring.geometry.dispose()
