@@ -150,7 +150,7 @@ export type Locomotion =
   | 'claymore_windup'
   | 'claymore_place'
   /**
-   * 眠っている味方をしゃがんで叩く (左手でぽんぽん)。**全身の型** — しゃがんだまま前へかがむ。
+   * 眠っている人をしゃがんで叩く (左手でぽんぽん)。**全身の型** — しゃがんだまま前へかがむ。
    * 銃は右手で持ったまま。3 回叩くと起きる (domain/player/stamina.ts の pat)
    */
   | 'pat'

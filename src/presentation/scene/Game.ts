@@ -304,7 +304,7 @@ export interface GameStats {
   debug: { locomotion: string; flags: string; blocked: string; where: string } | null;
   /** 自分の基地の上に居る。G / △ で補給できる */
   canResupply: boolean;
-  /** 眠っている味方の傍でしゃがんでいる。G / △ で叩いて起こせる */
+  /** 眠っている人の傍でしゃがんでいる。G / △ で叩いて起こせる (味方でも敵でも) */
   canPat: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
@@ -3729,11 +3729,10 @@ export class Game {
    * **サーバーは検算していない** — 箱を被っているという申告自体が
    * こちら発なので、今の作りではここが素直。
    */
-  /** しゃがんで叩ける所で眠っている味方 (一番近い人)。居なければ null */
+  /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */
   private patTarget(): string | null {
     if (!can(this.player.body, "pat")) return null;
-    const near = this.remotes.sleepingNear(this.player.position, PAT_RANGE);
-    return near.find((other) => !this.hostileTo(other.id, other.side))?.id ?? null;
+    return this.remotes.sleepingNear(this.player.position, PAT_RANGE)[0]?.id ?? null;
   }
 
   private updateBoxContact(): void {
@@ -5065,7 +5064,7 @@ export class Game {
       return;
     }
     /*
-     * 眠っている味方の傍でしゃがんでいれば、同じ指で**叩いて起こす** (3 回で起きる。
+     * 眠っている人 (味方でも敵でも) の傍でしゃがんでいれば、同じ指で**叩いて起こす** (3 回で起きる。
      * domain/player/stamina.ts の pat)。補給・捨てるより先に食う (梯子と同じ)
      */
     const patTarget = this.patTarget();

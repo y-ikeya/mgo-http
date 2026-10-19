@@ -874,7 +874,7 @@ function handleMessage(
     }
 
     /*
-     * 眠っている味方を叩いた (domain/player/stamina.ts の pat)。**味方か・眠っているか・手が届くかは
+     * 眠っている人を叩いた (domain/player/stamina.ts の pat)。**眠っているか・手が届くかは
      * ここで見る** (画面の言い分は信じない)。3 回目で起こす — 明けた扱いにすると、次の刻みで
      * スタミナを満たして本人に知らせる (眠りから醒める所と同じ道)
      */
@@ -883,7 +883,8 @@ function handleMessage(
       const now = Date.now()
       const target = typeof message.target === 'string' ? room.players.get(message.target) : undefined
       if (!target || target === player || !canAct(player.life) || isAsleep(player.sleepUntil, now)) break
-      if (isHostile(room.mode, player, target) || !isAsleep(target.sleepUntil, now)) break
+      // **敵でも起こせる** (本人 2026-10-19「味方も敵も両方起こせるべき」)。起こすかどうかは叩く側が選ぶ
+      if (!isAsleep(target.sleepUntil, now)) break
       // 位置は送られてきた姿の控え。届くまでの遅れぶん少し甘く見る
       if (Math.hypot(target.x - player.x, target.z - player.z) > PAT_RANGE + 0.75) break
       const next = pat(target, now)

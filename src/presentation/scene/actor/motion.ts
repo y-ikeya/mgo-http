@@ -137,7 +137,7 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   // クレイモアを置く。かがむので上下を分けられない
   'claymore_windup',
   'claymore_place',
-  // 眠っている味方を叩く。前へかがむので上下を分けられない
+  // 眠っている人を叩く。前へかがむので上下を分けられない
   'pat',
 ])
 
@@ -262,7 +262,7 @@ export interface StanceInput {
   lean: -1 | 0 | 1
   /** クレイモアを置いている最中の姿勢。置いていなければ null */
   setting: 'claymore_windup' | 'claymore_place' | null
-  /** 眠っている味方を叩いている最中か (pat の型を流している間) */
+  /** 眠っている人を叩いている最中か (pat の型を流している間) */
   patting?: boolean
   /** 爆風で倒れているか */
   downed: boolean
@@ -409,7 +409,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
 
   // 敬礼。動けば解ける (解く操作は呼ぶ側が行う)
   if (input.saluting && !hasDirection(input)) return 'salute'
-  // 眠っている味方を叩く。動けばやめる (叩くのは止まっている時だけ)
+  // 眠っている人を叩く。動けばやめる (叩くのは止まっている時だけ)
   if (input.patting && !hasDirection(input)) return 'pat'
 
   // 刺突・設置・ローリングは全身動作。終わるまで移動モーションに戻さない

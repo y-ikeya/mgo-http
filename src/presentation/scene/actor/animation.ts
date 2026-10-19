@@ -107,7 +107,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
   prone_roll_down: 'prone_roll_down',
-  // 眠っている味方を叩く。全身の型なので上半身も同じクリップから取る
+  // 眠っている人を叩く。全身の型なので上半身も同じクリップから取る
   pat: 'pat',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
@@ -174,7 +174,7 @@ type UpperState =
   | 'prone_rise'
   // 仰向けからうつ伏せへ、横へ半回転する
   | 'prone_roll_down'
-  // 眠っている味方を叩く (全身の型)
+  // 眠っている人を叩く (全身の型)
   | 'pat'
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
@@ -1328,7 +1328,7 @@ export class CharacterAnimator {
   readonly proneRiseDuration: number = 0
   /** 仰向けからうつ伏せへ転がる尺 (秒)。0 ならクリップが無い */
   readonly proneRollDownDuration: number = 0
-  /** 眠っている味方を叩く型の尺 (秒)。0 ならクリップが無い */
+  /** 眠っている人を叩く型の尺 (秒)。0 ならクリップが無い */
   readonly patDuration: number = 0
   /** 敬礼の尺 (秒)。0 ならクリップが無い */
   readonly saluteDuration: number
@@ -3576,7 +3576,7 @@ export class CharacterAnimator {
   }
 
   /**
-   * 眠っている味方を叩く (左手でぽんぽん、しゃがんだまま)。**上下そろえて頭から流す。**
+   * 眠っている人を叩く (左手でぽんぽん、しゃがんだまま)。**上下そろえて頭から流す。**
    * 型はしゃがみの姿で始まって終わるので、終わった先もしゃがみ
    */
   playPat(): void {

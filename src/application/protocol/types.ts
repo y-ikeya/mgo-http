@@ -854,8 +854,8 @@ export interface StruggleEvent {
 }
 
 /**
- * 眠っている味方を叩いた (しゃがんで「拾う・使う」)。**起こすのはサーバー** — 味方か、眠っているか、
- * 手が届くか、間が短すぎないかを見て数え、3 回で起こす (domain/player/stamina.ts の pat)。
+ * 眠っている人を叩いた (しゃがんで「拾う・使う」。味方でも敵でも)。**起こすのはサーバー** — 眠って
+ * いるか、手が届くか、間が短すぎないかを見て数え、3 回で起こす (domain/player/stamina.ts の pat)。
  * 叩く動きは自分の姿 (locomotion 'pat') で他の人にも見える
  */
 export interface PatEvent {

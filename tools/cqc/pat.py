@@ -1,4 +1,4 @@
-# 眠っている味方をしゃがんでぽんぽん叩く型 (pat) を組んで、骨組みだけ glb に書き出す。
+# 眠っている人をしゃがんでぽんぽん叩く型 (pat) を組んで、骨組みだけ glb に書き出す。
 #
 #   Blender -b tools/raw/cqc.blend --python tools/cqc/pat.py
 #   → tools/raw/pat.glb (型は pat 1 本)。cqc.blend にも action 'pat' として残す

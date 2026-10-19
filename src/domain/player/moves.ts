@@ -159,7 +159,7 @@ export const MOVES: Record<Move, Rule> = {
     not: ['dead', 'downed'],
   },
   /*
-   * 眠っている味方を叩いて起こす (domain/player/stamina.ts の pat)。**しゃがんで、構えずに。**
+   * 眠っている人を叩いて起こす (domain/player/stamina.ts の pat)。**しゃがんで、構えずに。**
    * 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく」
    */
   pat: {

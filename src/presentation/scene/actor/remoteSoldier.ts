@@ -167,7 +167,7 @@ const PLAY_WHOLE_BODY: Record<
   // releaseSetup は振りかぶりを飛ばして始められるようになっている
   claymore_windup: (a) => a.playSetup(),
   claymore_place: (a) => a.releaseSetup(),
-  // 眠っている味方を叩く
+  // 眠っている人を叩く
   pat: (a) => a.playPat(),
 };
 

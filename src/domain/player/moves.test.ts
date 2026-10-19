@@ -32,7 +32,7 @@ describe('できること', () => {
     }
   })
 
-  test('眠っている味方を叩けるのは、しゃがんで構えていない時だけ', () => {
+  test('眠っている人を叩けるのは、しゃがんで構えていない時だけ', () => {
     expect(can(standing, 'pat')).toBe(false)
     expect(can({ ...standing, crouching: true }, 'pat')).toBe(true)
     expect(can({ ...standing, crouching: true, aiming: true }, 'pat')).toBe(false)
