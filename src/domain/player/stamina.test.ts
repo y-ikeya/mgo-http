@@ -3,7 +3,7 @@ import {
   MAX_STAMINA, SLEEP_SECONDS, STAMINA_RECOVER_DELAY,
   drainStamina, isAsleep, recoverStamina, sleepLeft, staminaBlur, staminaSwayScale,
   STRUGGLE_RATE, STRUGGLE_SPEED, struggle, wakeFloor,
-  PAT_INTERVAL_MS, PAT_RESET_MS, PATS_TO_WAKE, pat,
+  PAT_INTERVAL_MS, pat,
 } from './stamina'
 import { TSNE_SLEEP_SECONDS } from '../match/room'
 import { WEAPONS } from '../item/weapons'
@@ -170,33 +170,32 @@ describe('もがいて早く起きる', () => {
   })
 })
 
-/** 眠っている味方を叩いて起こす。**3 回で起きる。** 連打で縮めず、間が空けば数え直す */
+/** 眠っている人を叩いて起こす。**1 回で眠りの 1/3 縮む。** 連打では縮めない */
 describe('叩いて起こす', () => {
   const t0 = 1_000_000
 
-  test('間を空けて 3 回叩くと起きる', () => {
-    let state = { pats: 0, patAt: 0 }
-    const woke: boolean[] = []
-    for (let i = 0; i < PATS_TO_WAKE; i++) {
-      const next = pat(state, t0 + i * 800)
-      woke.push(next.wake)
-      state = next
-    }
-    expect(woke).toEqual([false, false, true])
+  test('普段 (60 秒) は 1 回で 20 秒縮む。眠りたてでも 3 回で起きる', () => {
+    let state = { sleepUntil: t0 + SLEEP_SECONDS * 1000, patAt: 0 }
+    state = pat(state, t0, SLEEP_SECONDS)
+    expect(state.sleepUntil).toBe(t0 + 40_000)
+    state = pat(state, t0 + 1600, SLEEP_SECONDS)
+    state = pat(state, t0 + 3200, SLEEP_SECONDS)
+    expect(isAsleep(state.sleepUntil, t0 + 3200)).toBe(false)
   })
 
-  test('間が短すぎる叩きは数えない (ボタンの連打で縮めない)', () => {
-    const first = pat({ pats: 0, patAt: 0 }, t0)
-    const quick = pat(first, t0 + PAT_INTERVAL_MS - 1)
-    expect(quick.pats).toBe(1)
-    expect(quick.patAt).toBe(t0)
+  test('TSNE (450 秒) は 1 回で 150 秒縮む', () => {
+    const next = pat({ sleepUntil: t0 + TSNE_SLEEP_SECONDS * 1000, patAt: 0 }, t0, TSNE_SLEEP_SECONDS)
+    expect(next.sleepUntil).toBe(t0 + 300_000)
   })
 
-  test('間が空いたら数え直す', () => {
-    const two = pat(pat({ pats: 0, patAt: 0 }, t0), t0 + 800)
-    expect(two.pats).toBe(2)
-    const later = pat(two, two.patAt + PAT_RESET_MS + 1)
-    expect(later.pats).toBe(1)
-    expect(later.wake).toBe(false)
+  test('間が短すぎる叩きは効かない (ボタンの連打で縮めない)', () => {
+    const first = pat({ sleepUntil: t0 + 60_000, patAt: 0 }, t0, 60)
+    const quick = pat(first, t0 + PAT_INTERVAL_MS - 1, 60)
+    expect(quick).toBe(first)
+  })
+
+  test('起きている人は叩いても変わらない', () => {
+    const awake = { sleepUntil: t0 - 1, patAt: 0 }
+    expect(pat(awake, t0, 60)).toBe(awake)
   })
 })

@@ -875,7 +875,7 @@ function handleMessage(
 
     /*
      * 眠っている人を叩いた (domain/player/stamina.ts の pat)。**眠っているか・手が届くかは
-     * ここで見る** (画面の言い分は信じない)。3 回目で起こす — 明けた扱いにすると、次の刻みで
+     * ここで見る** (画面の言い分は信じない)。1 回で眠りの 1/3 を縮める — 明けたら、次の刻みで
      * スタミナを満たして本人に知らせる (眠りから醒める所と同じ道)
      */
     case 'pat': {
@@ -887,10 +887,12 @@ function handleMessage(
       if (!isAsleep(target.sleepUntil, now)) break
       // 位置は送られてきた姿の控え。届くまでの遅れぶん少し甘く見る
       if (Math.hypot(target.x - player.x, target.z - player.z) > PAT_RANGE + 0.75) break
-      const next = pat(target, now)
-      target.pats = next.pats
+      const next = pat(target, now, room.mode.sleepSeconds)
+      if (next.patAt === target.patAt) break
+      target.sleepUntil = next.sleepUntil
       target.patAt = next.patAt
-      if (next.wake) target.sleepUntil = now
+      // 起きる時刻が早まった。本人の画面の数え直しのため知らせる (起きるのは次の刻みで同じ道)
+      sendStamina(target)
       break
     }
 

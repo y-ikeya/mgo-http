@@ -384,8 +384,7 @@ export interface MatchPlayer extends Player {
   wakeFloor: number
   /** 前にもがいた時刻 (ms)。もがく速さの上限を測る */
   struggleAt: number
-  /** 眠っている間に味方に続けて叩かれた回数と、最後に叩かれた時刻 (ms)。3 回で起きる (stamina.ts の pat) */
-  pats: number
+  /** 最後に叩かれた時刻 (ms)。叩く間の最短を測る (stamina.ts の pat) */
   patAt: number
   /** スタンナイフの充電が満ちる時刻 (ms)。湧いた時に今へ戻す (満ちた状態) */
   stunReadyAt: number
@@ -466,7 +465,6 @@ export function newMatchPlayer(seed: {
     sleepUntil: 0,
     wakeFloor: 0,
     struggleAt: 0,
-    pats: 0,
     patAt: 0,
     stunReadyAt: 0,
     headshots: 0,

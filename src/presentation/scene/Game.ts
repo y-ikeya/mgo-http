@@ -5064,7 +5064,7 @@ export class Game {
       return;
     }
     /*
-     * 眠っている人 (味方でも敵でも) の傍でしゃがんでいれば、同じ指で**叩いて起こす** (3 回で起きる。
+     * 眠っている人 (味方でも敵でも) の傍でしゃがんでいれば、同じ指で**叩いて起こす** (1 回で眠りの 1/3 縮む。
      * domain/player/stamina.ts の pat)。補給・捨てるより先に食う (梯子と同じ)
      */
     const patTarget = this.patTarget();

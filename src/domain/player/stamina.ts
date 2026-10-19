@@ -202,32 +202,29 @@ export function struggle(state: Struggle, units: number, floor: number, now: num
  * --- 眠っている人を叩いて起こす ---
  *
  * 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく」「味方も敵も両方
- * 起こせるべき」。しゃがんで
- * 「拾う・使う」のボタン。**3 回叩くと起きる**。叩いている間 (1 回 1.6 秒) は叩く側が動けず
- * 無防備になる — それが起こす代償。
- *
- * 数えるのは叩かれる側。2 人で叩いても速くはならない (叩く間の最短は叩かれる側で測る)。
+ * 起こせるべき」「default だと 1 回の叩きで 1/3 つまり 20s ぶんだけ起こせるように」。しゃがんで
+ * 「拾う・使う」のボタン。**1 回叩くと眠りの 1/3 が縮む** (普段の 60 秒なら 20 秒、TSNE の 450 秒なら
+ * 150 秒)。眠りたてでも 3 回で起きる。本人がもがいて縮めた後なら、もっと少なくて済む。
+ * もがきと違って床 (眠りの 1/3) は無い — 起こしに来てくれた人がいるのだから。
+ * 叩いている間 (1 回 1.6 秒) は叩く側が動けず無防備になる — それが起こす代償。
  */
 
 /** 叩ける距離 (m、水平)。しゃがんで手を伸ばして届くくらい */
 export const PAT_RANGE = 1.5
-/** 何回叩くと起きるか */
-export const PATS_TO_WAKE = 3
-/** 叩く間の最短 (ms)。型 1 本 (1.6 秒) より短く。ボタンの連打で縮めない */
+/** 1 回叩くと縮む、眠りの割合 */
+export const PAT_SHARE = 1 / 3
+/** 叩く間の最短 (ms)。型 1 本 (1.6 秒) より短く。ボタンの連打で縮めない。2 人で叩いても速くならない */
 export const PAT_INTERVAL_MS = 600
-/** これより間が空いたら数え直す (ms) */
-export const PAT_RESET_MS = 5000
 
-export interface Pats {
-  /** 続けて叩かれた回数 */
-  pats: number
+export interface Patted {
+  sleepUntil: number
   /** 最後に叩かれた時刻 (ms)。0 ならまだ */
   patAt: number
 }
 
-/** 叩かれた。**新しい数と、起きるか**を返す。間が短すぎる叩きは数えない */
-export function pat(state: Pats, now: number): Pats & { wake: boolean } {
-  if (state.patAt > 0 && now - state.patAt < PAT_INTERVAL_MS) return { ...state, wake: false }
-  const pats = state.patAt > 0 && now - state.patAt <= PAT_RESET_MS ? state.pats + 1 : 1
-  return { pats: pats >= PATS_TO_WAKE ? 0 : pats, patAt: now, wake: pats >= PATS_TO_WAKE }
+/** 叩かれた。**新しい起きる時刻と、叩かれた時刻**を返す。間が短すぎる叩きは効かない */
+export function pat(state: Patted, now: number, sleepSeconds: number): Patted {
+  if (state.sleepUntil <= now) return state
+  if (state.patAt > 0 && now - state.patAt < PAT_INTERVAL_MS) return state
+  return { sleepUntil: Math.max(now, state.sleepUntil - sleepSeconds * 1000 * PAT_SHARE), patAt: now }
 }
