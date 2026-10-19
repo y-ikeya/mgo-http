@@ -100,6 +100,7 @@ import {
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
+import { LAG_LIMIT_MS } from "../../domain/match/lag";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
@@ -436,6 +437,15 @@ const MAX_RANGE = 200;
 const SLOW_FRAME_MS = 500;
 /** 詰まりを知らせる間隔の下限 (ms) */
 const SLOW_FRAME_EVERY_MS = 5_000;
+/** JS の使用メモリ (MB)。Chrome だけ取れる。取れなければ 0 */
+function heapMB(): number {
+  const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+  return memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
+}
+/** 遅れの兆しに添える、直近のコマの記録の長さ (ms)。切るまでの 5 回ぶんより長く */
+const LAG_REPORT_WINDOW_MS = 10_000;
+/** 遅れの兆しを知らせる間隔の下限 (ms)。遅れている間は 1 秒ごとに ping が来る */
+const LAG_REPORT_EVERY_MS = 5_000;
 
 
 /**
@@ -1703,6 +1713,7 @@ export class Game {
 
   private tick(time: number): void {
     this.noteSlowFrame(time - this.lastTime);
+    this.noteFrame(time, time - this.lastTime);
     const dt = Math.min((time - this.lastTime) / 1000, MAX_DT);
     this.lastTime = time;
 
@@ -2009,6 +2020,11 @@ export class Game {
 
     if (this.post) this.post.render();
     else this.renderer.render(this.scene, this.follow.camera);
+    // **描き終えたここで読む。** 描画の量はコマの頭 (setAnimationLoop の中) で 0 に戻るので、
+    // 次のコマの頭で読むと毎回 0 だった (2026-10-17 のログが全部「描画 0 回 / 0 三角」)
+    const drawn = this.renderer.info.render;
+    this.drawsLast = drawn.drawCalls;
+    this.trianglesLast = drawn.triangles;
     this.publishStats(dt);
     this.input.endFrame();
   }
@@ -2139,19 +2155,71 @@ export class Game {
     if (now - this.slowReportedAt < SLOW_FRAME_EVERY_MS) return;
     this.slowReportedAt = now;
     const p = this.player.position;
-    const info = (this.renderer as unknown as { info?: { render?: { drawCalls?: number; calls?: number; triangles?: number } } }).info?.render;
-    const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     const report = {
       type: "slowFrame" as const,
       ms: Math.round(gap),
       x: p.x,
       z: p.z,
       yaw: this.follow.aimYaw,
-      draws: info?.drawCalls ?? info?.calls ?? 0,
-      triangles: info?.triangles ?? 0,
-      heap: memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0,
+      draws: this.drawsLast,
+      triangles: this.trianglesLast,
+      heap: heapMB(),
     };
     console.warn("[重い]", report);
+    this.net.send(report);
+  }
+
+  /** 直前のコマの描画の量。描き終えた所で控える (tick の終わり) */
+  private drawsLast = 0;
+  private trianglesLast = 0;
+  /** 直近 LAG_REPORT_WINDOW_MS ぶんのコマ。古い方から */
+  private frameLog: { at: number; ms: number; heap: number }[] = [];
+  /** 最後にタブが裏に回っていた時刻 (ms) */
+  private hiddenAt = -Infinity;
+  /** 最後に遅れの兆しを知らせた時刻 (ms) */
+  private lagReportedAt = -Infinity;
+
+  private noteFrame(time: number, gap: number): void {
+    if (document.hidden) this.hiddenAt = time;
+    if (this.lastTime === 0) return;
+    this.frameLog.push({ at: time, ms: gap, heap: heapMB() });
+    while (this.frameLog.length > 0 && this.frameLog[0].at < time - LAG_REPORT_WINDOW_MS) this.frameLog.shift();
+  }
+
+  /**
+   * サーバーから聞いた往復が限界を超えていたら、**直近 10 秒の画面の様子を送る。**
+   *
+   * 切られてからでは遅い。切られたら画面を読み直すので、手元の記録が消える。切るのは
+   * 限界を 5 回続けて超えてからなので、1 回目で送ればまだ繋がっている
+   * (protocol/types.ts の LagReportEvent)。
+   */
+  private noteLag(rtt: number): void {
+    if (rtt < LAG_LIMIT_MS) return;
+    const now = performance.now();
+    if (now - this.lagReportedAt < LAG_REPORT_EVERY_MS) return;
+    this.lagReportedAt = now;
+    const ms = this.frameLog.map((f) => f.ms).sort((a, b) => a - b);
+    const heaps = this.frameLog.map((f) => f.heap);
+    const at = (q: number) => (ms.length ? Math.round(ms[Math.min(ms.length - 1, Math.floor(ms.length * q))]) : 0);
+    const p = this.player.position;
+    const report = {
+      type: "lagReport" as const,
+      rtt,
+      frames: ms.length,
+      p50: at(0.5),
+      p90: at(0.9),
+      max: ms.length ? Math.round(ms[ms.length - 1]) : 0,
+      over100: ms.filter((m) => m > 100).length,
+      heapMin: heaps.length ? Math.min(...heaps) : 0,
+      heapMax: heaps.length ? Math.max(...heaps) : 0,
+      draws: this.drawsLast,
+      triangles: this.trianglesLast,
+      x: p.x,
+      z: p.z,
+      yaw: this.follow.aimYaw,
+      hidden: now - this.hiddenAt < LAG_REPORT_WINDOW_MS,
+    };
+    console.warn("[遅れ]", report);
     this.net.send(report);
   }
 
@@ -2795,6 +2863,7 @@ export class Game {
       case "ping":
         this.latency = message.rtt;
         this.net.send({ type: "pong", at: message.at });
+        this.noteLag(message.rtt);
         break;
 
       case "hidden":

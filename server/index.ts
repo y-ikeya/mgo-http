@@ -857,6 +857,18 @@ function handleMessage(
       break
     }
 
+    // 遅れの兆し。**ログに書くだけ。** 切る前の 10 秒に画面がどうだったかを、切られて読み直す前に聞いておく
+    case 'lagReport': {
+      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : -1)
+      console.warn(
+        `[遅れ] ${player.name} rtt=${n(message.rtt)}ms 直近 10 秒: ${n(message.frames)} コマ 中央 ${n(message.p50)}ms 9 割 ${n(message.p90)}ms ` +
+          `最長 ${n(message.max)}ms (100ms 超 ${n(message.over100)} 回) heap ${n(message.heapMin)}〜${n(message.heapMax)}MB ` +
+          `描画 ${n(message.draws)} 回 / ${n(message.triangles)} 三角 位置 (${n(message.x)}, ${n(message.z)}) ` +
+          `向き ${n(((message.yaw as number) * 180) / Math.PI)}°${message.hidden === true ? ' 裏のタブあり' : ''} ステージ ${room.stage.name}`,
+      )
+      break
+    }
+
     // スタンナイフの放電。見た目と音だけ。**名乗りは信じず**送り主の id を付けて流す
     case 'zap':
       if (!canAct(player.life)) break

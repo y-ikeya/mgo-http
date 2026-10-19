@@ -845,6 +845,41 @@ export interface SlowFrameEvent {
 }
 
 /**
+ * 遅れの兆し。**サーバーから届いた往復が限界 (LAG_LIMIT_MS) を超えていたら、直近 10 秒の
+ * 画面の様子を送る。** 診断のためだけで、遊びには何も効かない。
+ *
+ * 切られた後では遅い — 切られたら画面を読み直すので、手元の記録が消える (本人 2026-10-19)。
+ * 切るのは 5 回続いてからなので、1 回目で送ればまだ繋がっている。
+ *
+ * SlowFrameEvent は 1 コマ 500ms 以上を 5 秒に 1 回しか残さない。200〜400ms のコマが
+ * 続いて遅れが溜まった時は何も残らなかった (2026-10-17 の 9 回のうち 4 回)。
+ */
+export interface LagReportEvent {
+  type: 'lagReport'
+  /** サーバーから聞いた往復 (ms) */
+  rtt: number
+  /** 直近 10 秒のコマの数と、かかった時間 (ms) の中央・9 割・最長 */
+  frames: number
+  p50: number
+  p90: number
+  max: number
+  /** 100ms を超えたコマの数 */
+  over100: number
+  /** JS の使用メモリ (MB) の最小と最大。Chrome だけ取れる。取れなければ 0 */
+  heapMin: number
+  heapMax: number
+  /** 直前のコマの描画の量 */
+  draws: number
+  triangles: number
+  /** 立っていた所と向き (three の座標、rad) */
+  x: number
+  z: number
+  yaw: number
+  /** この 10 秒の間にタブが裏に回ったか */
+  hidden: boolean
+}
+
+/**
  * 自分の本当の値。**3 秒ごとに、1 人ずつ届く。**
  *
  * --- なぜ要るか ---
@@ -1315,6 +1350,7 @@ export type ClientMessage =
   | VoiceEvent
   | PongMessage
   | SlowFrameEvent
+  | LagReportEvent
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =
