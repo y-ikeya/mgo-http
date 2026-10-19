@@ -107,6 +107,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
   prone_roll_down: 'prone_roll_down',
+  // 眠っている味方を叩く。全身の型なので上半身も同じクリップから取る
+  pat: 'pat',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
   // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
@@ -172,6 +174,8 @@ type UpperState =
   | 'prone_rise'
   // 仰向けからうつ伏せへ、横へ半回転する
   | 'prone_roll_down'
+  // 眠っている味方を叩く (全身の型)
+  | 'pat'
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
   | 'death'
@@ -222,6 +226,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   prone_down: 'prone_down',
   prone_rise: 'prone_rise',
   prone_roll_down: 'prone_roll_down',
+  pat: 'pat',
   // 傾きは上半身も同じ止め絵。構えていても差し替えない (resolveUpperKey)
   lean_left: 'lean',
   lean_right: 'lean',
@@ -516,6 +521,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'prone_down',
   'prone_rise',
   'prone_roll_down',
+  // 叩く型。流し直すと押していないのに叩き続ける
+  'pat',
   // 倒れる / 起き上がる。留めておかないと、倒れた姿勢を保てず
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
@@ -811,6 +818,7 @@ const PRONE_RISE_KEY = 'prone_rise'
  * 足すなら、そこから割り直す (tools/README.md)。
  */
 const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
+const PAT_KEY = 'pat'
 /**
  * 伏せ撃ち。**構えと発砲を同じクリップから作る。**
  *
@@ -873,6 +881,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   PRONE_DOWN_KEY,
   PRONE_RISE_KEY,
   PRONE_ROLL_DOWN_KEY,
+  PAT_KEY,
   DEATH_KEY,
   HIT_KEY,
   SALUTE_KEY,
@@ -1319,6 +1328,8 @@ export class CharacterAnimator {
   readonly proneRiseDuration: number = 0
   /** 仰向けからうつ伏せへ転がる尺 (秒)。0 ならクリップが無い */
   readonly proneRollDownDuration: number = 0
+  /** 眠っている味方を叩く型の尺 (秒)。0 ならクリップが無い */
+  readonly patDuration: number = 0
   /** 敬礼の尺 (秒)。0 ならクリップが無い */
   readonly saluteDuration: number
 
@@ -1508,6 +1519,7 @@ export class CharacterAnimator {
       finished === this.upper.get(PRONE_DOWN_KEY) ||
       finished === this.upper.get(PRONE_RISE_KEY) ||
       finished === this.upper.get(PRONE_ROLL_DOWN_KEY) ||
+      finished === this.upper.get(PAT_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
@@ -1933,6 +1945,7 @@ export class CharacterAnimator {
       [PRONE_DOWN_KEY, 'prone_down'],
       [PRONE_RISE_KEY, 'prone_rise'],
       [PRONE_ROLL_DOWN_KEY, 'prone_roll_down'],
+      [PAT_KEY, 'pat'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -1942,6 +1955,7 @@ export class CharacterAnimator {
       // **流す速さで割った尺**を持つ。動けない時間を絵と一致させるため
       if (key === PRONE_DOWN_KEY) this.proneDownDuration = clip.duration
       else if (key === PRONE_ROLL_DOWN_KEY) this.proneRollDownDuration = clip.duration
+      else if (key === PAT_KEY) this.patDuration = clip.duration
       else this.proneRiseDuration = clip.duration / PRONE_RISE_RATE
     }
 
@@ -3210,6 +3224,7 @@ export class CharacterAnimator {
     if (this.upperState === 'prone_roll_down' && this.upper.has(PRONE_ROLL_DOWN_KEY)) {
       return PRONE_ROLL_DOWN_KEY
     }
+    if (this.upperState === 'pat' && this.upper.has(PAT_KEY)) return PAT_KEY
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
     //
@@ -3558,6 +3573,19 @@ export class CharacterAnimator {
    */
   playProneRollDown(): void {
     this.playWholeBody(PRONE_ROLL_DOWN_KEY, 'prone_roll_down')
+  }
+
+  /**
+   * 眠っている味方を叩く (左手でぽんぽん、しゃがんだまま)。**上下そろえて頭から流す。**
+   * 型はしゃがみの姿で始まって終わるので、終わった先もしゃがみ
+   */
+  playPat(): void {
+    this.playWholeBody(PAT_KEY, 'pat')
+  }
+
+  /** 叩く型を流している最中か */
+  get patting(): boolean {
+    return this.upperState === 'pat'
   }
 
   /**

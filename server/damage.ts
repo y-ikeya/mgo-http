@@ -567,6 +567,7 @@ function applyTranquilizer(
   victim.sleepUntil = now + room.mode.sleepSeconds * 1000
   victim.wakeFloor = wakeFloor(now, room.mode.sleepSeconds)
   victim.struggleAt = 0
+  victim.pats = 0
   attacker.stuns++
   sendStamina(victim)
   broadcast(room, {
@@ -686,6 +687,7 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
     victim.sleepUntil = now + room.mode.sleepSeconds * 1000
     victim.wakeFloor = wakeFloor(now, room.mode.sleepSeconds)
     victim.struggleAt = 0
+    victim.pats = 0
     attacker.stuns++
     broadcast(room, {
       type: 'stun',

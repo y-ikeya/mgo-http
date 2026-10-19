@@ -167,6 +167,8 @@ const PLAY_WHOLE_BODY: Record<
   // releaseSetup は振りかぶりを飛ばして始められるようになっている
   claymore_windup: (a) => a.playSetup(),
   claymore_place: (a) => a.releaseSetup(),
+  // 眠っている味方を叩く
+  pat: (a) => a.playPat(),
 };
 
 /**
@@ -283,6 +285,11 @@ export class RemoteSoldier {
   private locomotion: Locomotion = "idle";
 
   /** CQC を掛けられる姿勢か (立っているか)。domain/player/cqc.ts */
+  /** 眠っているか (送られてきた姿が sleep)。味方なら叩いて起こせる */
+  get asleep(): boolean {
+    return this.locomotion === "sleep";
+  }
+
   get throwable(): boolean {
     return canBeThrown(this.locomotion);
   }
@@ -1468,6 +1475,23 @@ export class RemoteSoldiers {
       found.push({ id: player.id, side: player.side });
     }
     return found;
+  }
+
+  /**
+   * 手の届く所で眠っている人。**近い順。** 味方かどうかはルールを知っている側 (Game) が決める
+   * (touching と同じ形)
+   */
+  sleepingNear(origin: THREE.Vector3, range: number): { id: string; side: Team }[] {
+    const found: { id: string; side: Team; distance: number }[] = [];
+    for (const player of this.players.values()) {
+      if (player.health <= 0 || !player.asleep) continue;
+      this.scratch.subVectors(player.object.position, origin);
+      this.scratch.y = 0;
+      const distance = this.scratch.length();
+      if (distance > range) continue;
+      found.push({ id: player.id, side: player.side, distance });
+    }
+    return found.sort((a, b) => a.distance - b.distance).map(({ id, side }) => ({ id, side }));
   }
 
   /** 指定の相手を怯ませる。誰の画面でも同じように見えるよう、撃った本人以外も呼ぶ */

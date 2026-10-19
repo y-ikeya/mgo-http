@@ -70,6 +70,7 @@ const JA = {
   'hud.scopeHint': 'Z / ホイールで覗く',
   'hud.climbHint': 'G / △ で梯子を登る',
   'hud.resupplyHint': 'G / △ で補給',
+  'hud.patHint': 'G / △ で叩いて起こす',
   'hud.standUpHint': '移動で匍匐 · Space で起き上がる',
   // --- 装備 ---
   'loadout.note': '装備を選んでください',
@@ -160,6 +161,7 @@ const EN: Record<Key, string> = {
   'hud.scopeHint': 'Z / wheel to scope',
   'hud.climbHint': 'G / △ to climb',
   'hud.resupplyHint': 'G / △ to resupply',
+  'hud.patHint': 'G / △ to wake them',
   'hud.standUpHint': 'MOVE TO CRAWL · SPACE TO GET UP',
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',

@@ -150,7 +150,7 @@ import {
   type ServerMessage,
   type Team,
 } from "../../application/protocol/types";
-import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
+import { MAX_STAMINA, PAT_RANGE, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
 import { loadLookScale, type LookScale } from "../../infra/prefs/look";
@@ -304,6 +304,8 @@ export interface GameStats {
   debug: { locomotion: string; flags: string; blocked: string; where: string } | null;
   /** 自分の基地の上に居る。G / △ で補給できる */
   canResupply: boolean;
+  /** 眠っている味方の傍でしゃがんでいる。G / △ で叩いて起こせる */
+  canPat: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
   /**
@@ -3727,6 +3729,13 @@ export class Game {
    * **サーバーは検算していない** — 箱を被っているという申告自体が
    * こちら発なので、今の作りではここが素直。
    */
+  /** しゃがんで叩ける所で眠っている味方 (一番近い人)。居なければ null */
+  private patTarget(): string | null {
+    if (!can(this.player.body, "pat")) return null;
+    const near = this.remotes.sleepingNear(this.player.position, PAT_RANGE);
+    return near.find((other) => !this.hostileTo(other.id, other.side))?.id ?? null;
+  }
+
   private updateBoxContact(): void {
     if (!this.player.isBoxed) return;
     // 止まっているなら当たりに行っていない。しきい値は箱の型が
@@ -5055,6 +5064,15 @@ export class Game {
       this.player.grabLadder();
       return;
     }
+    /*
+     * 眠っている味方の傍でしゃがんでいれば、同じ指で**叩いて起こす** (3 回で起きる。
+     * domain/player/stamina.ts の pat)。補給・捨てるより先に食う (梯子と同じ)
+     */
+    const patTarget = this.patTarget();
+    if (patTarget && this.input.tapped("drop")) {
+      if (this.player.pat()) this.net.send({ type: "pat", target: patTarget });
+      return;
+    }
     // 基地の上では同じ指が補給になる。**捨てる判断より先に食う** (梯子と同じ)
     if (this.canResupply && this.input.tapped("drop")) {
       this.net.send({ type: "resupply" });
@@ -5716,6 +5734,7 @@ export class Game {
       canClimb: this.player.ladderInReach,
       debug: DEBUG_HUD ? this.debugReadout() : null,
       canResupply: this.canResupply,
+      canPat: this.patTarget() !== null,
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
       stamina: staminaBlur(this.stamina),

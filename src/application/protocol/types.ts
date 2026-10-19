@@ -854,6 +854,16 @@ export interface StruggleEvent {
 }
 
 /**
+ * 眠っている味方を叩いた (しゃがんで「拾う・使う」)。**起こすのはサーバー** — 味方か、眠っているか、
+ * 手が届くか、間が短すぎないかを見て数え、3 回で起こす (domain/player/stamina.ts の pat)。
+ * 叩く動きは自分の姿 (locomotion 'pat') で他の人にも見える
+ */
+export interface PatEvent {
+  type: 'pat'
+  target: string
+}
+
+/**
  * 遅れの兆し。**サーバーから届いた往復が限界 (LAG_LIMIT_MS) を超えていたら、直近 10 秒の
  * 画面の様子を送る。** 診断のためだけで、遊びには何も効かない。
  *
@@ -1361,6 +1371,7 @@ export type ClientMessage =
   | SlowFrameEvent
   | LagReportEvent
   | StruggleEvent
+  | PatEvent
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =

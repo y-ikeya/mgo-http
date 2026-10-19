@@ -197,3 +197,36 @@ export function struggle(state: Struggle, units: number, floor: number, now: num
   const cut = allowed * STRUGGLE_SECONDS * 1000
   return { sleepUntil: Math.max(floor, state.sleepUntil - cut), struggleAt: now }
 }
+
+/*
+ * --- 眠っている味方を叩いて起こす ---
+ *
+ * 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく」。しゃがんで
+ * 「拾う・使う」のボタン。**3 回叩くと起きる**。叩いている間 (1 回 0.8 秒) は叩く側が動けず
+ * 無防備になる — それが起こす代償。
+ *
+ * 数えるのは叩かれる側。2 人で叩いても速くはならない (叩く間の最短は叩かれる側で測る)。
+ */
+
+/** 叩ける距離 (m、水平)。しゃがんで手を伸ばして届くくらい */
+export const PAT_RANGE = 1.5
+/** 何回叩くと起きるか */
+export const PATS_TO_WAKE = 3
+/** 叩く間の最短 (ms)。型 1 本 (0.8 秒) より少し短く。ボタンの連打で縮めない */
+export const PAT_INTERVAL_MS = 600
+/** これより間が空いたら数え直す (ms) */
+export const PAT_RESET_MS = 5000
+
+export interface Pats {
+  /** 続けて叩かれた回数 */
+  pats: number
+  /** 最後に叩かれた時刻 (ms)。0 ならまだ */
+  patAt: number
+}
+
+/** 叩かれた。**新しい数と、起きるか**を返す。間が短すぎる叩きは数えない */
+export function pat(state: Pats, now: number): Pats & { wake: boolean } {
+  if (state.patAt > 0 && now - state.patAt < PAT_INTERVAL_MS) return { ...state, wake: false }
+  const pats = state.patAt > 0 && now - state.patAt <= PAT_RESET_MS ? state.pats + 1 : 1
+  return { pats: pats >= PATS_TO_WAKE ? 0 : pats, patAt: now, wake: pats >= PATS_TO_WAKE }
+}

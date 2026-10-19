@@ -74,6 +74,7 @@ export type Move =
   | 'place'
   | 'sleep'
   | 'struggle'
+  | 'pat'
   | 'cqc'
 
 interface Rule {
@@ -156,6 +157,14 @@ export const MOVES: Record<Move, Rule> = {
   struggle: {
     needs: ['sleeping'],
     not: ['dead', 'downed'],
+  },
+  /*
+   * 眠っている味方を叩いて起こす (domain/player/stamina.ts の pat)。**しゃがんで、構えずに。**
+   * 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく」
+   */
+  pat: {
+    needs: ['onGround', 'crouching'],
+    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'inWater', 'aiming', 'landing'],
   },
   /*
    * CQC を掛ける (domain/player/cqc.ts)。**立って、構えずに。** 手に何を持って

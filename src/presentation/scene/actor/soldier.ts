@@ -1636,6 +1636,16 @@ export class Soldier {
   }
 
   /**
+   * 眠っている味方を叩く (しゃがんで左手でぽんぽん)。叩けたら true。
+   * **起こすのはサーバー** (3 回で起きる)。ここは型を流すだけ。叩いている最中は重ねない
+   */
+  pat(): boolean {
+    if (!can(this.body, 'pat') || this.animator?.patting) return false
+    this.animator?.playPat()
+    return true
+  }
+
+  /**
    * 敬礼を保つかどうか。押している間 true を渡す。
    * 短く押せば止まる位置に届く前に離れるので、そのまま一度だけ流れる。
    */
@@ -3179,6 +3189,8 @@ export class Soldier {
     // 銃を下ろして棒立ちになる時間があるからこそ、味方と繋がる手続きに
     // 意味が出る。挙げると決めたら、下ろし切るまでは無防備でいる。
     if (this.saluting) moveDir = ZERO_MOVE
+    // 眠っている味方を叩いている間も動かない (0.8 秒)。叩きながら滑っていくと手が空を切る
+    if (this.animator?.patting) moveDir = ZERO_MOVE
 
     // 箱を落とされた直後も同じ。**驚いている間は入力そのものを捨てる** —
     // 速さを 0 にするだけだと、体は動かないのに向きだけ入力どおりに変わる
@@ -4139,6 +4151,7 @@ export class Soldier {
       stabbing: this.stabbing,
       lean: this.lean,
       setting: this.animator?.setupLocomotion ?? null,
+      patting: this.animator?.patting ?? false,
       rolling: this.rolling,
       vaulting: this.vaulting,
       vaultingUp: this.vaultingUp,

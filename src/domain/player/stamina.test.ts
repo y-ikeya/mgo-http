@@ -3,6 +3,7 @@ import {
   MAX_STAMINA, SLEEP_SECONDS, STAMINA_RECOVER_DELAY,
   drainStamina, isAsleep, recoverStamina, sleepLeft, staminaBlur, staminaSwayScale,
   STRUGGLE_RATE, STRUGGLE_SPEED, struggle, wakeFloor,
+  PAT_INTERVAL_MS, PAT_RESET_MS, PATS_TO_WAKE, pat,
 } from './stamina'
 import { TSNE_SLEEP_SECONDS } from '../match/room'
 import { WEAPONS } from '../item/weapons'
@@ -166,5 +167,36 @@ describe('もがいて早く起きる', () => {
     const asleep = { sleepUntil: now + 5000, struggleAt: 0 }
     expect(struggle(asleep, Number.NaN, 0, now)).toBe(asleep)
     expect(struggle(asleep, -3, 0, now)).toBe(asleep)
+  })
+})
+
+/** 眠っている味方を叩いて起こす。**3 回で起きる。** 連打で縮めず、間が空けば数え直す */
+describe('叩いて起こす', () => {
+  const t0 = 1_000_000
+
+  test('間を空けて 3 回叩くと起きる', () => {
+    let state = { pats: 0, patAt: 0 }
+    const woke: boolean[] = []
+    for (let i = 0; i < PATS_TO_WAKE; i++) {
+      const next = pat(state, t0 + i * 800)
+      woke.push(next.wake)
+      state = next
+    }
+    expect(woke).toEqual([false, false, true])
+  })
+
+  test('間が短すぎる叩きは数えない (ボタンの連打で縮めない)', () => {
+    const first = pat({ pats: 0, patAt: 0 }, t0)
+    const quick = pat(first, t0 + PAT_INTERVAL_MS - 1)
+    expect(quick.pats).toBe(1)
+    expect(quick.patAt).toBe(t0)
+  })
+
+  test('間が空いたら数え直す', () => {
+    const two = pat(pat({ pats: 0, patAt: 0 }, t0), t0 + 800)
+    expect(two.pats).toBe(2)
+    const later = pat(two, two.patAt + PAT_RESET_MS + 1)
+    expect(later.pats).toBe(1)
+    expect(later.wake).toBe(false)
   })
 })

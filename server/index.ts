@@ -83,7 +83,7 @@ import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { STAGES, inWater, waterOf } from '../src/domain/stage'
 import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
-import { MAX_STAMINA, isAsleep, recoverStamina, struggle } from '../src/domain/player/stamina'
+import { MAX_STAMINA, PAT_RANGE, isAsleep, pat, recoverStamina, struggle } from '../src/domain/player/stamina'
 import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
@@ -870,6 +870,26 @@ function handleMessage(
       player.sleepUntil = next.sleepUntil
       player.struggleAt = next.struggleAt
       sendStamina(player)
+      break
+    }
+
+    /*
+     * 眠っている味方を叩いた (domain/player/stamina.ts の pat)。**味方か・眠っているか・手が届くかは
+     * ここで見る** (画面の言い分は信じない)。3 回目で起こす — 明けた扱いにすると、次の刻みで
+     * スタミナを満たして本人に知らせる (眠りから醒める所と同じ道)
+     */
+    case 'pat': {
+      if (room.phase !== 'playing') break
+      const now = Date.now()
+      const target = typeof message.target === 'string' ? room.players.get(message.target) : undefined
+      if (!target || target === player || !canAct(player.life) || isAsleep(player.sleepUntil, now)) break
+      if (isHostile(room.mode, player, target) || !isAsleep(target.sleepUntil, now)) break
+      // 位置は送られてきた姿の控え。届くまでの遅れぶん少し甘く見る
+      if (Math.hypot(target.x - player.x, target.z - player.z) > PAT_RANGE + 0.75) break
+      const next = pat(target, now)
+      target.pats = next.pats
+      target.patAt = next.patAt
+      if (next.wake) target.sleepUntil = now
       break
     }
 
