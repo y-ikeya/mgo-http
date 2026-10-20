@@ -35,7 +35,7 @@ import {
   stepLocators,
   throwLocator,
 } from './arms/locator'
-import { MAX_FALL_SPEED, applyBlastDamage, applyCqc, applyDamage, reject} from './damage'
+import { MAX_FALL_SPEED, applyBlastDamage, applyCqc, applyDamage, applyRoll, reject } from './damage'
 import { alertAims, alertShot } from './alert'
 import { relayAwareness, revealTo } from './aware'
 import {
@@ -944,8 +944,18 @@ function handleMessage(
       if (dropTsneTarget(room, player, Date.now())) broadcast(room, matchState(room))
       break
 
+    /*
+     * ローリングの体当たり。**スタミナと転倒はこちらで決める** (damage.ts の applyRoll)。
+     * 押しのけ (立っている相手) だけは今まで通り流す — 位置を動かすのは押された本人
+     */
+    case 'knock': {
+      const victim = room.players.get(message.hit)
+      if (victim && applyRoll(room, player, victim)) broadcast(room, message, player.id)
+      break
+    }
+
     default:
-      // 見た目のもの (knock) は中身を見ずに流す
+      // 見た目のものは中身を見ずに流す
       broadcast(room, message, player.id)
   }
 }

@@ -11,6 +11,7 @@
 
 import { HEAD_HEIGHT, VIEW_HEIGHT, leanShift, type Stance } from '../player/stance'
 import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
+import { MAX_STAMINA } from '../player/stamina'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
 export type HitZone = 'HEAD' | 'BODY' | 'LEGS'
@@ -50,10 +51,14 @@ export const BACKSTAB_DOT = 0.34
  */
 export const ROLL_HIT_RANGE = 1.1
 /**
- * ローリングで押しのける距離 (m)。
- * 倒すのではなく体勢を崩させる。ダメージは入れない。
+ * ローリングで押しのける距離 (m)。立っている相手だけ (しゃがんでいれば倒れる、伏せていれば当たらない)。
+ * 体力は削らない。
  */
 export const ROLL_KNOCKBACK = 0.8
+/**
+ * ローリングの体当たりで削るスタミナ。**1/8** (本人 2026-10-20)。立っていても、しゃがんで倒れても同じ
+ */
+export const ROLL_STAMINA = MAX_STAMINA / 8
 
 /**
  * ダンボールで走っていて敵にぶつかったと見なす距離 (m)。

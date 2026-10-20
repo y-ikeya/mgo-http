@@ -288,6 +288,11 @@ export class RemoteSoldier {
   private locomotion: Locomotion = "idle";
 
   /** CQC を掛けられる姿勢か (立っているか)。domain/player/cqc.ts */
+  /** 伏せているか (送られてきた姿が伏せ・這い)。ローリングが当たらない */
+  get prone(): boolean {
+    return /^(prone|crawl)/.test(this.locomotion);
+  }
+
   /** 眠っているか (送られてきた姿が sleep)。味方なら叩いて起こせる */
   get asleep(): boolean {
     return this.locomotion === "sleep";
@@ -1458,6 +1463,8 @@ export class RemoteSoldiers {
 
     for (const player of this.players.values()) {
       if (player.health <= 0 || exclude.has(player.id)) continue;
+      // 伏せている相手には当たらない (下を転がり抜ける。本人 2026-10-20)
+      if (player.prone) continue;
 
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;

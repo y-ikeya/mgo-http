@@ -1480,6 +1480,8 @@ export class Soldier {
   knockBack(x: number, z: number): void {
     this.object.position.x += x
     this.object.position.z += z
+    // 軽くよろける (撃たれた時の型)。しゃがんでいれば倒れる方 (knockdown) が来るのでここには来ない
+    this.animator?.playHit()
   }
 
   /**

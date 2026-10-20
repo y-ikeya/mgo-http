@@ -15,7 +15,7 @@ import {
 import { loseTicket } from '../src/domain/match/match'
 import { isHostile } from '../src/domain/match/room'
 import { disturbStealth } from '../src/domain/match/sides'
-import { canBeHurt, isSeated } from '../src/domain/player/lifecycle'
+import { canAct, canBeHurt, isSeated } from '../src/domain/player/lifecycle'
 import {
   downedBy,
   hurt,
@@ -25,7 +25,15 @@ import {
   type MatchPlayer,
   isProtected,
 } from '../src/domain/player/player'
-import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage, stunReadyAfter } from '../src/domain/rule/damage'
+import {
+  HIT_RULES,
+  KNOCK_TIME,
+  ROLL_HIT_RANGE,
+  ROLL_STAMINA,
+  type HitZone,
+  meleeDamage,
+  stunReadyAfter,
+} from '../src/domain/rule/damage'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds, sleepScale, stunChargeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
@@ -684,7 +692,22 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
   // 投げられたのも「当たった」。攻める側ならステルスが解ける (TSNE)。猫に釘付けなら解ける
   disturbStealth(room, victim, attacker, now)
   releaseTrapped(room, victim)
-  const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
+  drainBy(room, attacker, victim, CQC_STAMINA, 'CQC', now)
+}
+
+/**
+ * スタミナを削る (CQC・ローリングの体当たり)。**0 になったら眠る** — 麻酔と同じ長さ、
+ * 同じ知らせ (stun)。削った後の値は本人へ返す
+ */
+function drainBy(
+  room: RoomWorld,
+  attacker: MatchPlayer,
+  victim: MatchPlayer,
+  amount: number,
+  weapon: 'CQC' | 'ROLL',
+  now: number,
+): void {
+  const drain = drainStamina(victim.stamina, amount, false)
   victim.stamina = drain.stamina
   victim.concentratingSince = 0
   if (drain.slept) {
@@ -701,10 +724,48 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
       target: victim.id,
       targetName: victim.name,
       targetTeam: victim.team,
-      weapon: 'CQC',
+      weapon,
       head: false,
     })
     broadcast(room, matchState(room))
   }
   if (!victim.bot) sendStamina(victim)
 }
+
+/** 伏せている姿 (ローリングが当たらない) */
+const PRONE_POSE = /^(prone|crawl)/
+
+/**
+ * ローリングの体当たりが当たった (転がった側の申告、KnockEvent)。**位置と姿勢はこちらで確かめる。**
+ *
+ *     伏せている     何もしない (下を転がり抜ける)
+ *     しゃがんでいる 後ろへ倒れる (爆風の転倒と同じ。起き上がるまで無防備) + スタミナ 1/8
+ *     立っている     押しのけて軽くよろける (押すのは本人の手元) + スタミナ 1/8
+ *
+ * 味方には押しのけるだけ (スタミナは削らない)。本人 2026-10-20
+ *
+ * @returns 押しのけを本人へ流すか (倒した・何もしない時は流さない)
+ */
+export function applyRoll(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer): boolean {
+  if (!canAct(attacker.life) || !canBeHurt(victim.life)) return false
+  if (PRONE_POSE.test(victim.locomotion)) return false
+  // 申告の検算。体当たりの間合い (+ 通信のずれの余裕)
+  if (Math.hypot(victim.x - attacker.x, victim.z - attacker.z) > ROLL_HIT_RANGE + ROLL_HIT_SLACK) return false
+  if (Math.abs(victim.y - attacker.y) > 1.2) return false
+  if (room.phase !== 'playing' || !isHostile(room.mode, attacker, victim) || isProtected(victim)) return true
+  const now = Date.now()
+  if (isAsleep(victim.sleepUntil, now)) return false
+  disturbStealth(room, victim, attacker, now)
+  releaseTrapped(room, victim)
+  drainBy(room, attacker, victim, ROLL_STAMINA, 'ROLL', now)
+  // 眠ったなら倒れる型は眠りのほう
+  if (isAsleep(victim.sleepUntil, now)) return false
+  if (victim.crouching || victim.boxed) {
+    knockAway(room, victim, attacker.x, attacker.z)
+    return false
+  }
+  return true
+}
+
+/** 体当たりの申告を確かめる時の、距離の余裕 (m)。双方の位置は少し古い */
+const ROLL_HIT_SLACK = 0.8
