@@ -196,10 +196,11 @@ export function clearDolls(room: RoomWorld): void {
 /** 練習の猫が消えてから置き直すまで (ms) */
 const PRACTICE_RESTOCK_MS = 5000
 /**
- * 置き直すのは、この距離 (m) に誰も居ない時だけ。**目の前に戻して掛けない** — 撃ち抜いた猫が
- * その場に戻り、消したはずの所で掛かった (本人 2026-10-20)
+ * 置き直すのは、この距離 (m、高さも含む) に誰も居ない時だけ。**目の前に戻して掛けない** — 撃ち抜いた猫が
+ * その場に戻り、消したはずの所で掛かった (本人 2026-10-20)。円 (1.5m) より 1m 外。
+ * 4m・横だけだった頃は、塔の上 (4m 四方) や塔の真下に居る間ずっと戻らなかった
  */
-const PRACTICE_RESTOCK_CLEAR = 4
+const PRACTICE_RESTOCK_CLEAR = 2.5
 /** 練習の猫の持ち主。人ではない (的の陣営の物として置く) */
 const PRACTICE_OWNER = 'practice'
 /** 練習の猫を次に置ける時刻 (ms)。置き場所の番号ごと。無ければすぐ置く */
@@ -217,7 +218,8 @@ export function stockPracticeDolls(room: RoomWorld, now: number): void {
     if (room.dolls.some((doll) => doll.practice === i)) return
     if (now < (restockAt?.get(i) ?? 0)) return
     const crowded = connected(room).some(
-      (player) => Math.hypot(player.x - spot.x, player.z - spot.z) < PRACTICE_RESTOCK_CLEAR,
+      (player) =>
+        Math.hypot(player.x - spot.x, player.y - (spot.y ?? 0), player.z - spot.z) < PRACTICE_RESTOCK_CLEAR,
     )
     if (crowded) return
     room.dolls.push({
