@@ -181,6 +181,8 @@ export function updateTargets(room: RoomWorld, now: number): void {
     // 0 のまま送っていて、眠っている的の傍で画面を読み直すと倒れる所から流れた
     if (next !== bot.locomotion) botPoseSince.set(bot, now)
     bot.locomotion = next
+    // 箱を被った的は、座っている間だけ箱の中 (倒されたら箱が落ち、起き上がったらまた被る)
+    bot.boxed = bot.homeStance === 'box' && next === 'sit'
     recordPose(bot)
     relayState(room, bot, targetPayload(bot, now))
   }
@@ -266,7 +268,13 @@ function patrol(bot: MatchPlayer, now: number): void {
 const botPoseSince = new WeakMap<MatchPlayer, number>()
 
 /** 的が何もされていない時の姿。構えごと */
-const REST: Record<MatchPlayer['homeStance'], Locomotion> = { stand: 'idle', crouch: 'crouch_idle', prone: 'prone_idle' }
+const REST: Record<MatchPlayer['homeStance'], Locomotion> = {
+  stand: 'idle',
+  crouch: 'crouch_idle',
+  prone: 'prone_idle',
+  // 箱を被って座っている (人が箱の中で止まった時と同じ姿)
+  box: 'sit',
+}
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
 export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
@@ -286,12 +294,13 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         aiming: false,
         weapon: 'rifle',
         crouching: bot.homeStance === 'crouch' && bot.locomotion === 'crouch_idle',
-        boxed: false,
+        boxed: bot.boxed,
         reloading: false,
         protectedNow: false,
         stealthed: false,
         holdingGrenade: false,
-        held: 'rifle',
+        // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')
+        held: bot.boxed ? 'box' : 'rifle',
         concentrating: false,
         saluteHeld: false,
       },
