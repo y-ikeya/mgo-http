@@ -22,6 +22,7 @@ const standing: BodyState = {
   aiming: false,
   crouching: false,
   cqc: false,
+  trapped: false,
 }
 
 describe('できること', () => {
@@ -30,6 +31,15 @@ describe('できること', () => {
       if (move === 'struggle' || move === 'pat') continue
       expect(can(standing, move)).toBe(true)
     }
+  })
+
+  test('猫に釘付けの間は何もできない (眠らされることはある)', () => {
+    const trapped = { ...standing, trapped: true }
+    for (const move of Object.keys(MOVES) as Move[]) {
+      if (move === 'sleep' || move === 'struggle') continue
+      expect(can(trapped, move)).toBe(false)
+    }
+    expect(can(trapped, 'sleep')).toBe(true)
   })
 
   test('眠っている人を叩けるのは、しゃがんで構えていない時だけ', () => {

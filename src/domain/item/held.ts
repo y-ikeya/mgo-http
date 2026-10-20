@@ -33,7 +33,7 @@ import type { WeaponId } from './weapons'
 export type { WeaponId }
 
 /** 投げる物・置く物。support の枠に入る */
-export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator'
+export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator' | 'cat'
 
 /**
  * 手に持てる物すべて。
@@ -76,8 +76,8 @@ export function isGun(id: HeldId): id is WeaponId {
  * 判定も、置き切るまで動けないことも共通なので、**そこを分けない**ために
  * 述語で聞く。並べて書くと、3 つ目を足したときに直し漏れる。
  */
-export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
-  return id === 'claymore' || id === 'decoy'
+export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' | 'cat' {
+  return id === 'claymore' || id === 'decoy' || id === 'cat'
 }
 
 /**
@@ -93,6 +93,7 @@ export function isThrowable(id: HeldId): id is ThrowId {
     id === 'claymore' ||
     id === 'magazine' ||
     id === 'decoy' ||
+    id === 'cat' ||
     id === 'locator'
   )
 }
@@ -122,7 +123,7 @@ export function isThrownByHand(id: HeldId): id is 'grenade' | 'locator' {
  * なった)。述語で聞く。
  */
 export function isSupport(id: HeldId): id is SupportKind {
-  return id === 'grenade' || id === 'claymore' || id === 'decoy' || id === 'locator'
+  return id === 'grenade' || id === 'claymore' || id === 'decoy' || id === 'locator' || id === 'cat'
 }
 
 /**
@@ -233,6 +234,8 @@ export const HELD: Record<HeldId, HeldSpec> = {
   decoy: { id: 'decoy', label: 'DECOY', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
   // 投げて置く走査装置。手榴弾ほどの大きさ
   locator: { id: 'locator', label: 'E.LOCATOR', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
+  // 猫の置物。手に乗る大きさ
+  cat: { id: 'cat', label: 'CAT', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
 
   // 刺されば即死。代償は**銃をしまってから近づく**こと (docs/weapons.md)
   knife: { id: 'knife', label: 'KNIFE', family: 'weapon', slot: 'knife', weight: 0.3, shoots: false, twoHanded: false },
@@ -428,7 +431,7 @@ export interface Loadout {
  * ので、値をこちらへ持ってくると輪になる。型だけ写して、食い違ったら
  * 数の表 (SUPPORT_COUNT) が型検査で落ちるようにしてある。
  */
-export type SupportKind = 'grenade' | 'claymore' | 'decoy' | 'locator'
+export type SupportKind = 'grenade' | 'claymore' | 'decoy' | 'locator' | 'cat'
 
 /** 1 つの命で持てる投げ物の数 */
 const SUPPORT_COUNT: Record<SupportKind, number> = {
@@ -443,6 +446,7 @@ const SUPPORT_COUNT: Record<SupportKind, number> = {
    * (探して壊す) と、投げる側の手 (置き直す) が両方残る。
    */
   locator: 3,
+  cat: 3,
 }
 
 /**

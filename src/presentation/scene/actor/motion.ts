@@ -102,6 +102,8 @@ export type WholeBodyLocomotion =
   | 'claymore_windup'
   | 'claymore_place'
   | 'pat'
+  | 'trapped'
+  | 'trapped_out'
 
 export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>([
   'vault',
@@ -139,6 +141,9 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'claymore_place',
   // 眠っている人を叩く。前へかがむので上下を分けられない
   'pat',
+  // 猫に釘付け / 解けて戻る。しゃがみ込んで手を伸ばすので上下を分けられない
+  'trapped',
+  'trapped_out',
 ])
 
 /**
@@ -264,6 +269,8 @@ export interface StanceInput {
   setting: 'claymore_windup' | 'claymore_place' | null
   /** 眠っている人を叩いている最中か (pat の型を流している間) */
   patting?: boolean
+  /** 猫に釘付けになっている (in) / 解けて戻る途中 (out)。掛かっていなければ null (domain/item/cat.ts) */
+  trapped?: 'in' | 'out' | null
   /** 爆風で倒れているか */
   downed: boolean
   /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
@@ -362,6 +369,10 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
   if (input.downed) return input.thrown ? 'cqc_thrown' : 'sweep'
+
+  // 猫に釘付け。**伏せていても同じ型** (伏せの型は無い。本人 2026-10-20)
+  if (input.trapped === 'in') return 'trapped'
+  if (input.trapped === 'out') return 'trapped_out'
 
   // 箱が落ちて棒立ちになっている間。動けないので方向も速さも見ない
   if (input.bumped > 0) return 'bump'

@@ -55,6 +55,8 @@ export interface BodyState {
   crouching: boolean
   /** CQC で投げている / 空振りしている (domain/player/cqc.ts)。全身の型 */
   cqc: boolean
+  /** 猫に釘付けになっている (解けて戻る途中も。domain/item/cat.ts) */
+  trapped: boolean
 }
 
 export type Flag = keyof BodyState
@@ -84,8 +86,8 @@ interface Rule {
 
 /** 全身の型で体を占める動作。これらの最中は、他の全身の動作を始められない */
 const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing', 'cqc']
-/** 倒れている・眠っている。何もできない */
-const HELPLESS: readonly Flag[] = ['dead', 'downed', 'standingUp', 'sleeping']
+/** 倒れている・眠っている・猫に釘付け。何もできない */
+const HELPLESS: readonly Flag[] = ['dead', 'downed', 'standingUp', 'sleeping', 'trapped']
 
 export const MOVES: Record<Move, Rule> = {
   // 前へ転がる。伏せからは起き上がる一手を挟ませる。箱を落とされた直後は棒立ち
@@ -111,7 +113,7 @@ export const MOVES: Record<Move, Rule> = {
   // しゃがみの切り替え。倒れ・箱・伏せは呼ぶ側で別の動作 (起きる・脱ぐ・起き上がる) に振る
   crouch: {
     needs: ['onGround'],
-    not: ['dead', 'saluting', 'standingUp', 'vaulting', 'hanging', 'cqc'],
+    not: ['dead', 'saluting', 'standingUp', 'vaulting', 'hanging', 'cqc', 'trapped'],
   },
   // ナイフで刺す。伏せたままでも刺せる (prone_stab)
   stab: {

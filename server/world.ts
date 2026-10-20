@@ -11,6 +11,7 @@ import type { Life } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, enterLife, newBot } from '../src/domain/player/player'
 import type { ServerMessage } from '../src/application/protocol/types'
 import type { Claymore } from './arms/claymore'
+import type { Cat } from './arms/cat'
 import type { Decoy } from './arms/decoy'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
@@ -68,6 +69,8 @@ export interface RoomWorld extends Match {
   claymores: Claymore[]
   /** 置かれた decoy。**割れるまでそこに在る** */
   decoys: Decoy[]
+  /** 置かれた猫 (CAT)。**釘付けにして時間が経つか、撃ち抜かれるまでそこに在る** */
+  cats: Cat[]
   /**
    * 投げられた E LOCATOR。**飛んでいる間もここに在る。**
    *
@@ -136,6 +139,7 @@ export function roomOf(name: RoomName, key: string = name): RoomWorld {
       grenades: [],
       claymores: [],
       decoys: [],
+      cats: [],
       locators: [],
       dropped: [],
       stage: terrainOf(stage),
@@ -171,8 +175,21 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
     return
   }
   broadcast(room, { type: 'life', id: player.id, state: next })
-  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す
-  if (next !== 'alive' && next !== 'spawning') releaseCqc(room, player)
+  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す。猫に釘付けなら解く
+  if (next !== 'alive' && next !== 'spawning') {
+    releaseCqc(room, player)
+    releaseTrapped(room, player)
+  }
+}
+
+/**
+ * 猫に釘付けの人を解く (撃たれた・倒れた・投げられた。server/arms/cat.ts)。**猫は残る** —
+ * 他の人が掛かっていればそのまま、時間が来れば消える
+ */
+export function releaseTrapped(room: RoomWorld, player: MatchPlayer): void {
+  if (player.trappedBy === 0) return
+  player.trappedBy = 0
+  broadcast(room, { type: 'trapReleased', id: player.id })
 }
 
 /**

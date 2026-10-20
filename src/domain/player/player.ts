@@ -386,6 +386,8 @@ export interface MatchPlayer extends Player {
   struggleAt: number
   /** 最後に叩かれた時刻 (ms)。叩く間の最短を測る (stamina.ts の pat) */
   patAt: number
+  /** 釘付けにしている猫の番号 (server/arms/cat.ts)。0 なら掛かっていない */
+  trappedBy: number
   /** スタンナイフの充電が満ちる時刻 (ms)。湧いた時に今へ戻す (満ちた状態) */
   stunReadyAt: number
   /** 歩いた距離の積算。足音を出す間隔を決める */
@@ -466,6 +468,7 @@ export function newMatchPlayer(seed: {
     wakeFloor: 0,
     struggleAt: 0,
     patAt: 0,
+    trappedBy: 0,
     stunReadyAt: 0,
     headshots: 0,
     headDeaths: 0,

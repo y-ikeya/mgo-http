@@ -54,6 +54,7 @@ const CATEGORY: Record<WeaponId | SupportId, string> = {
   locator: 'PROJECTILE',
   claymore: 'TRAP',
   decoy: 'TRAP',
+  cat: 'TRAP',
 }
 
 /**

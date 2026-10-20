@@ -109,6 +109,9 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   prone_roll_down: 'prone_roll_down',
   // 眠っている人を叩く。全身の型なので上半身も同じクリップから取る
   pat: 'pat',
+  // 猫に釘付け / 解けて戻る。同じ型を順に流して止め、戻りは逆に流す (domain/item/cat.ts)
+  trapped: 'trapped',
+  trapped_out: 'trapped',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
   // しゃがんだまま刺す。**下半身はしゃがみのまま** — 立ちの刺突を流すと立ち上がる
@@ -176,6 +179,9 @@ type UpperState =
   | 'prone_roll_down'
   // 眠っている人を叩く (全身の型)
   | 'pat'
+  // 猫に釘付け / 解けて戻る (全身の型)
+  | 'trapped'
+  | 'trapped_out'
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
   | 'death'
@@ -227,6 +233,8 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   prone_rise: 'prone_rise',
   prone_roll_down: 'prone_roll_down',
   pat: 'pat',
+  trapped: 'trapped',
+  trapped_out: 'trapped',
   // 傾きは上半身も同じ止め絵。構えていても差し替えない (resolveUpperKey)
   lean_left: 'lean',
   lean_right: 'lean',
@@ -523,6 +531,9 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'prone_roll_down',
   // 叩く型。流し直すと押していないのに叩き続ける
   'pat',
+  // 猫に釘付け。手を伸ばした姿で止める (流し直すとしゃがみ込み直す)。戻りも 1 度きり
+  'trapped',
+  'trapped_out',
   // 倒れる / 起き上がる。留めておかないと、倒れた姿勢を保てず
   // 3 秒ごとに勝手に倒れ直す (伏せ撃ちの足場が消える)
   'sweep',
@@ -819,6 +830,9 @@ const PRONE_RISE_KEY = 'prone_rise'
  */
 const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
 const PAT_KEY = 'pat'
+/** 猫に釘付け (順に流して最後の姿で止める) と、解けて戻る (同じ型を逆に流す) */
+const TRAPPED_KEY = 'trapped'
+const TRAPPED_OUT_KEY = 'trapped_out'
 /**
  * 叩く型を流す速さ。型 (1.6 秒、叩く 1 回が 0.2 秒) のまま。型が 0.8 秒だった頃は 0.6 倍にしていたが、
  * 叩く 1 回が 2 コマしかなく速く見えたので、型の方を作り直した (tools/cqc/pat.py)
@@ -887,6 +901,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   PRONE_RISE_KEY,
   PRONE_ROLL_DOWN_KEY,
   PAT_KEY,
+  TRAPPED_KEY,
+  TRAPPED_OUT_KEY,
   DEATH_KEY,
   HIT_KEY,
   SALUTE_KEY,
@@ -1335,6 +1351,8 @@ export class CharacterAnimator {
   readonly proneRollDownDuration: number = 0
   /** 眠っている人を叩く型の尺 (秒)。0 ならクリップが無い */
   readonly patDuration: number = 0
+  /** 猫に釘付けになる型の尺 (秒)。解けて戻るのも同じ尺。0 ならクリップが無い */
+  readonly trappedDuration: number = 0
   /** 敬礼の尺 (秒)。0 ならクリップが無い */
   readonly saluteDuration: number
 
@@ -1525,6 +1543,8 @@ export class CharacterAnimator {
       finished === this.upper.get(PRONE_RISE_KEY) ||
       finished === this.upper.get(PRONE_ROLL_DOWN_KEY) ||
       finished === this.upper.get(PAT_KEY) ||
+      // 戻り切った。釘付け (TRAPPED_KEY) はここに入れない — 終わっても手を伸ばしたまま止まる
+      finished === this.upper.get(TRAPPED_OUT_KEY) ||
       finished === this.upper.get(HIT_KEY) ||
       finished === this.upper.get(SALUTE_KEY) ||
       finished === this.upper.get(BOLT_KEY) ||
@@ -1962,6 +1982,17 @@ export class CharacterAnimator {
       else if (key === PRONE_ROLL_DOWN_KEY) this.proneRollDownDuration = clip.duration
       else if (key === PAT_KEY) this.patDuration = clip.duration
       else this.proneRiseDuration = clip.duration / PRONE_RISE_RATE
+    }
+
+    // 猫に釘付け。同じ型から 2 つ (順に流して止める・逆に流して戻る)
+    const trapped = byName.get('trapped')
+    if (trapped) {
+      for (const key of [TRAPPED_KEY, TRAPPED_OUT_KEY]) {
+        const action = registerUpper(key, trapped)
+        action.setLoop(THREE.LoopOnce, 1)
+        action.clampWhenFinished = true
+      }
+      this.trappedDuration = trapped.duration
     }
 
     const bump = byName.get('bump')
@@ -3230,6 +3261,8 @@ export class CharacterAnimator {
       return PRONE_ROLL_DOWN_KEY
     }
     if (this.upperState === 'pat' && this.upper.has(PAT_KEY)) return PAT_KEY
+    if (this.upperState === 'trapped' && this.upper.has(TRAPPED_KEY)) return TRAPPED_KEY
+    if (this.upperState === 'trapped_out' && this.upper.has(TRAPPED_OUT_KEY)) return TRAPPED_OUT_KEY
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
     //
@@ -3594,6 +3627,19 @@ export class CharacterAnimator {
   }
 
   /**
+   * 猫に釘付けになる。しゃがみ込んで猫へ手を伸ばし、**伸ばし切った姿で止まる**
+   * (解けるまで。domain/item/cat.ts)
+   */
+  playTrapped(): void {
+    this.playWholeBody(TRAPPED_KEY, 'trapped')
+  }
+
+  /** 解けた。**同じ型を逆に流して**立ち上がる */
+  playTrappedOut(): void {
+    this.playWholeBody(TRAPPED_OUT_KEY, 'trapped_out', -1)
+  }
+
+  /**
    * 流している型を seconds ぶん進める。**途中から見た相手の型を合わせる。**
    *
    * 相手の姿には「その型になってからの秒数」が載っている (locomotionAge)。頭から
@@ -3611,6 +3657,11 @@ export class CharacterAnimator {
     if (!upper || !lower) return
     upper.reset().setEffectiveTimeScale(rate).play()
     lower.reset().setEffectiveTimeScale(rate).play()
+    // 逆に流すなら終わりから。頭 (0) から逆へ流すと、流す間もなく終わる
+    if (rate < 0) {
+      upper.time = upper.getClip().duration
+      lower.time = lower.getClip().duration
+    }
     this.upperState = state as UpperState
     this.locomotion = state
   }

@@ -23,6 +23,7 @@ import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
 import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
+import { placeCat, relayCats, shotHitsCat, updateCats } from './arms/cat'
 import { bumpCboxes } from './arms/cbox'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
@@ -205,6 +206,9 @@ setInterval(() => {
       const water = waterOf(room.stage.name)
       relayClaymores(room)
       relayDecoys(room)
+      // 置かれた猫。敵にも見せる。円に入った敵を釘付けにし、時間が来たら消す
+      relayCats(room)
+      updateCats(room, now)
       // 置かれた E LOCATOR。**飛ぶところを見ていない人にも見せる** (壊せるように)
       relayLocators(room)
       // 近くの敵の置き物・投げ物の気配 (AWARENESS)。**位置だけ、持つ人だけ**
@@ -626,6 +630,10 @@ function handleMessage(
       placeDecoy(room, player, Date.now())
       break
 
+    case 'cat':
+      placeCat(room, player)
+      break
+
     /*
      * ナイフを振った。**風船なので刃でも割れる。**
      *
@@ -733,6 +741,8 @@ function handleMessage(
        * 壊しに行くこと自体が既に位置を晒す動き (近づく・音を出す) になる。
        */
       shotHitsLocator(room, message.from, message.to)
+      // 弾道の上に猫があれば壊れる。釘付けの人も解ける
+      shotHitsCat(room, message.from, message.to)
       // 弾道のそばに TARGET ALERT (Lv2 以上) の人が居れば、撃った側が光る
       alertShot(room, player, message.from, message.to, Date.now())
       /*

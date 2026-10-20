@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "trapped.fbx#5": "trapped" },
+  "out": "trapped.glb",
+  "maxTexture": 64
+}

@@ -169,6 +169,9 @@ const PLAY_WHOLE_BODY: Record<
   claymore_place: (a) => a.releaseSetup(),
   // 眠っている人を叩く
   pat: (a) => a.playPat(),
+  // 猫に釘付け / 解けて戻る (逆に流す)
+  trapped: (a) => a.playTrapped(),
+  trapped_out: (a) => a.playTrappedOut(),
 };
 
 /**

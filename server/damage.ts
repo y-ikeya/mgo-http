@@ -46,7 +46,7 @@ import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
 import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, setLife } from './world'
+import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, releaseTrapped, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -417,6 +417,8 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
    */
   const band = shotgunBandFor(attacker, event)
   if (band === 'miss') return NOT_HURT
+  // 当たった。**猫に釘付けなら解ける** (麻酔でも。本人 2026-10-20「撃たれたら解ける」)
+  releaseTrapped(room, victim)
   const amount =
     band !== null
       ? band.damage
@@ -679,8 +681,9 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
   if (room.phase !== 'playing') return
   const now = Date.now()
   if (isAsleep(victim.sleepUntil, now)) return
-  // 投げられたのも「当たった」。攻める側ならステルスが解ける (TSNE)
+  // 投げられたのも「当たった」。攻める側ならステルスが解ける (TSNE)。猫に釘付けなら解ける
   disturbStealth(room, victim, attacker, now)
+  releaseTrapped(room, victim)
   const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
   victim.stamina = drain.stamina
   victim.concentratingSince = 0

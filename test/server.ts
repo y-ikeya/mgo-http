@@ -288,6 +288,8 @@ export class Client {
           this.cameraYaw,
           this.pitch,
           this.holdingLocator,
+          this.holdingCat,
+          this.boxed,
         ),
       ),
     )
@@ -335,6 +337,14 @@ export class Client {
   }
   private holdingLocator = false
 
+  /** CAT を手にする。**支度で選んでいなければ持てない** */
+  holdCat(holding: boolean): void {
+    this.holdingCat = holding
+  }
+  private holdingCat = false
+  /** ダンボールを被っているか。手にある物 (box) として送る (猫が効かない) */
+  boxed = false
+
   send(message: ClientMessage): void {
     if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message))
   }
@@ -374,6 +384,8 @@ function snapshotOf(
   cameraYaw = 0,
   pitch = 0,
   holdingLocator = false,
+  holdingCat = false,
+  boxed = false,
 ): PlayerSnapshot {
   return {
     id,
@@ -386,9 +398,12 @@ function snapshotOf(
     cameraYaw,
     aiming,
     crouching: false,
-    boxed: false,
+    boxed,
     // 振りかぶっているなら手にあるのも手榴弾。**両方そろって初めて落ちる**
-    held: holdingGrenade
+    // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')
+    held: boxed
+      ? ('box' as const)
+      : holdingGrenade
       ? ('grenade' as const)
       : holdingClaymore
         ? ('claymore' as const)
@@ -396,7 +411,9 @@ function snapshotOf(
           ? ('decoy' as const)
           : holdingLocator
             ? ('locator' as const)
-            : ('rifle' as const),
+            : holdingCat
+              ? ('cat' as const)
+              : ('rifle' as const),
     locomotion,
     locomotionAge: 0,
     concentrating: false,
@@ -422,7 +439,7 @@ export function spot(dx: number, dz: number): [number, number, number] {
 export async function twoPlayers(
   server: Server,
   /** 支度で選ぶ支援。**湧く前にしか選べない** (domain/player/equip.ts) */
-  support: 'grenade' | 'claymore' | 'decoy' = 'grenade',
+  support: 'grenade' | 'claymore' | 'decoy' | 'cat' = 'grenade',
   /**
    * 名乗る id。
    *

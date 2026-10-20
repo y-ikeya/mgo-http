@@ -42,7 +42,7 @@ const STANDBY_BLACK_MS = 1000
 /** 影絵のある持ち物 (public/icons/<id>.png、tools/preview/icons.html で撮る) */
 const HUD_ART: ReadonlySet<HeldId> = new Set<HeldId>([
   'smg', 'rifle', 'm4', 'sniper', 'mosin', 'shotgun', 'm9', 'm1911',
-  'grenade', 'claymore', 'decoy', 'locator', 'knife',
+  'grenade', 'claymore', 'decoy', 'locator', 'cat', 'knife',
 ])
 
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {

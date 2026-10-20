@@ -1061,6 +1061,7 @@ export class Soldier {
       aiming: this.aiming,
       crouching: this.crouching,
       cqc: this.cqcBusy,
+      trapped: this.trappedStage !== 'none',
     }
   }
 
@@ -1115,6 +1116,9 @@ export class Soldier {
      * 梯子の値打ちがここで効く。
      */
     this.releaseLadder()
+    // 釘付けのまま眠ったら、眠りが勝つ (倒れる型を流す)
+    this.trappedStage = 'none'
+    this.trappedOutLeft = 0
     this.sleepLeft = seconds
     this.sleepSpan = seconds
     this.dropBox()
@@ -1167,6 +1171,43 @@ export class Soldier {
   /** 箱が落ちて棒立ちになっている残り時間 (秒)。0 なら動ける */
   private bumpLeft = 0
 
+  /**
+   * 猫に釘付けになっている段 (domain/item/cat.ts)。in = 手を伸ばして止まっている、
+   * out = 解けて型を逆に流している (戻り切るまで動けない)。**掛かるも解けるもサーバーが決める**
+   */
+  private trappedStage: 'none' | 'in' | 'out' = 'none'
+  /** 解けて戻り切るまでの残り (秒) */
+  private trappedOutLeft = 0
+
+  /** 猫に釘付けか (戻る途中も)。呼ぶ側が操作を止めるのに使う */
+  get trapped(): boolean {
+    return this.trappedStage !== 'none'
+  }
+
+  /**
+   * 猫に釘付けになった。**その場でしゃがみ込み、猫へ手を伸ばして止まる。**
+   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く
+   */
+  trap(): void {
+    if (this.down || this.downed || this.sleepLeft > 0 || this.trappedStage === 'in') return
+    this.releaseLadder()
+    this.aiming = false
+    this.crouching = false
+    this.proneStage = 'none'
+    this.proneShiftLeft = 0
+    this.trappedStage = 'in'
+    this.trappedOutLeft = 0
+    this.animator?.playTrapped()
+  }
+
+  /** 解けた (猫が消えた・撃たれた)。**同じ型を逆に流して立ち上がり**、戻り切ったら動ける */
+  untrap(): void {
+    if (this.trappedStage !== 'in') return
+    this.trappedStage = 'out'
+    this.trappedOutLeft = this.animator?.trappedDuration || 2
+    this.animator?.playTrappedOut()
+  }
+
   /** いま箱を落とされて固まっている最中か。呼ぶ側が操作を止めるのに使う */
   get bumping(): boolean {
     /*
@@ -1181,7 +1222,8 @@ export class Soldier {
      * そこを渡るかどうかが賭けになるのが梯子の役目で、登りながら撃てると
      * 渡る危険が消える。
      */
-    return this.bumpLeft > 0 || this.sleepLeft > 0 || this.onLadder
+    // 猫に釘付けの間も同じ (戻り切るまで)
+    return this.bumpLeft > 0 || this.sleepLeft > 0 || this.onLadder || this.trappedStage !== 'none'
   }
 
   /**
@@ -1365,6 +1407,8 @@ export class Soldier {
     this.sleepLeft = 0
     this.sleepSpan = 0
     this.animator?.wakeFromSleep()
+    this.trappedStage = 'none'
+    this.trappedOutLeft = 0
     this.proneStage = 'none'
     this.proneShiftLeft = 0
     this.proneTurnOver = 0
@@ -1397,6 +1441,8 @@ export class Soldier {
     this.sleepLeft = 0
     this.sleepSpan = 0
     this.animator?.wakeFromSleep()
+    this.trappedStage = 'none'
+    this.trappedOutLeft = 0
     this.proneStage = 'none'
     this.proneShiftLeft = 0
     this.proneTurnOver = 0
@@ -3201,6 +3247,8 @@ export class Soldier {
     // 速さを 0 にするだけだと、体は動かないのに向きだけ入力どおりに変わる
     if (this.bumpLeft > 0) moveDir = ZERO_MOVE
     if (this.sleepLeft > 0) moveDir = ZERO_MOVE
+    // 猫に釘付けの間も (戻り切るまで)
+    if (this.trappedStage !== 'none') moveDir = ZERO_MOVE
 
     /*
      * 伏せている間は**前へしか這えない。**
@@ -3281,8 +3329,8 @@ export class Soldier {
       targetSpeed = 0
       this.currentSpeed = 0
     }
-    // 眠っている間は動かない。**慣性も残さない**
-    if (this.sleepLeft > 0) {
+    // 眠っている間・猫に釘付けの間は動かない。**慣性も残さない**
+    if (this.sleepLeft > 0 || this.trappedStage !== 'none') {
       targetSpeed = 0
       this.currentSpeed = 0
     }
@@ -3564,6 +3612,10 @@ export class Soldier {
     if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
+    if (this.trappedStage === 'out') {
+      this.trappedOutLeft -= dt
+      if (this.trappedOutLeft <= 0) this.trappedStage = 'none'
+    }
     /*
      * 繋ぎが終わったら次の段へ。
      *
@@ -4157,6 +4209,7 @@ export class Soldier {
       lean: this.lean,
       setting: this.animator?.setupLocomotion ?? null,
       patting: this.animator?.patting ?? false,
+      trapped: this.trappedStage === 'none' ? null : this.trappedStage,
       rolling: this.rolling,
       vaulting: this.vaulting,
       vaultingUp: this.vaultingUp,

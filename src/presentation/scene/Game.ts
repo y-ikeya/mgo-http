@@ -62,6 +62,7 @@ import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
 import { EmptyBoxes } from "./actor/box";
 import { REVERSED_DEPTH } from "./util/depth";
+import { Cats } from "./arms/cats";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { StunSparks } from "./fx/stunSparks";
@@ -812,6 +813,8 @@ export class Game {
   private placeSolid: StageBox[] = [];
   private readonly placeAt: PlaceSpot = { x: 0, y: 0, z: 0, ok: false };
   private readonly decoys: Decoys;
+  /** 置かれた猫 (CAT)。置いた本人には効く範囲の円も出る */
+  private readonly cats: Cats;
   /** 割れた場所の置き場。毎回作らない */
   private readonly popAt = new THREE.Vector3();
   private readonly blast: BlastFx;
@@ -1527,6 +1530,7 @@ export class Game {
     this.emptyBoxes = new EmptyBoxes(this.scene);
     this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
+    this.cats = new Cats(this.scene);
     this.blast = new BlastFx(this.scene);
     this.tsneTarget = new TsneTarget(this.scene);
     this.stunSparks = new StunSparks(this.scene);
@@ -1721,6 +1725,7 @@ export class Game {
     this.remotes.dispose();
     this.soundRing.dispose();
     this.locators.clear();
+    this.cats.clear();
     this.thrown.dispose();
     this.grenades.dispose();
     this.blast.dispose();
@@ -2374,6 +2379,7 @@ export class Game {
           this.grenades.clear();
           this.claymores.clear();
           this.decoys.clear();
+          this.cats.clear();
           this.locators.clear();
           this.sensed.clear();
         }
@@ -2820,6 +2826,29 @@ export class Game {
        * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
        * 撃たせる道具であると同時に、**見張る道具**でもある。
        */
+      /*
+       * 猫 (CAT)。置かれた (敵にも届く — 撃ち抜けるように)・誰かが掛かった・消えた・撃たれて解けた。
+       * **掛かるも解けるもサーバーが決める。** 自分が掛かったら体を止め、解けたら型を逆に流して戻る。
+       * 他の人の体は、その人から届く姿 (trapped / trapped_out) で動く
+       */
+      case "catPlaced": {
+        const mine = message.owner === this.net.id;
+        if (mine && !this.cats.has(message.id)) this.inv.spendOf("cat");
+        this.cats.place(message.id, message.at, message.yaw, mine);
+        break;
+      }
+      case "catSprung":
+        this.cats.sprung(message.id);
+        if (message.victims.includes(this.net.id)) this.player.trap();
+        break;
+      case "catGone":
+        this.cats.remove(message.id);
+        if (message.freed.includes(this.net.id)) this.player.untrap();
+        break;
+      case "trapReleased":
+        if (message.id === this.net.id) this.player.untrap();
+        break;
+
       case "decoyBumped":
         this.decoys.bump(message.id, message.dirX, message.dirZ);
         break;
@@ -5051,7 +5080,9 @@ export class Game {
     // 壁の中や縁の外は断られるので、送った時点で減らすと置けずに減る
     // **どちらを置いたかは構え始めに覚えてある。** 置き切るまでの間に
     // 持ち替えられても、流れていた型と知らせる先が食い違わない
-    this.net.send(this.setupHeld === "decoy" ? { type: "decoy" } : { type: "claymore" });
+    this.net.send(
+      this.setupHeld === "decoy" ? { type: "decoy" } : this.setupHeld === "cat" ? { type: "cat" } : { type: "claymore" },
+    );
   }
 
   /**

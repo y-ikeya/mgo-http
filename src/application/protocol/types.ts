@@ -483,6 +483,11 @@ export interface PlaceClaymoreEvent {
   type: 'claymore'
 }
 
+/** CAT (猫の置物) を置く。decoy と同じで**位置も向きも送らない** */
+export interface PlaceCatEvent {
+  type: 'cat'
+}
+
 /** 置かれたクレイモア。見えている人にだけ配る */
 export interface ClaymorePlaced {
   type: 'claymorePlaced'
@@ -580,6 +585,48 @@ export interface DecoyGone {
   at: [number, number, number]
   /** 撃たれて割れたなら音と破片を出す。仕切り直しで消えただけなら false */
   popped: boolean
+}
+
+/**
+ * 猫が置かれた。**敵にも配る** (撃てば壊せる物なので、見えていないと壊しようがない)。
+ * 釘付けになる円は**置いた本人にだけ**出す (受け取った側が owner で決める)
+ */
+export interface CatPlaced {
+  type: 'catPlaced'
+  id: number
+  /** 置いた人。本人が「置けた」ことを知り、円を出すのに要る */
+  owner: string
+  at: [number, number, number]
+  /** 正面の向き (rad) */
+  yaw: number
+}
+
+/**
+ * 猫に釘付けになった。全員へ。**掛かった人の体が型を流し始める合図** (本人は動けなくなる)。
+ * 解けるのは catGone (時間切れ・撃ち抜かれた) か trapReleased (撃たれた) で知らせる
+ */
+export interface CatSprung {
+  type: 'catSprung'
+  id: number
+  /** 掛かった人 (円に同時に入っていた敵の全員) */
+  victims: string[]
+}
+
+/** 猫が消えた。止まっていた人 (freed) は解ける */
+export interface CatGone {
+  type: 'catGone'
+  id: number
+  at: [number, number, number]
+  /** 撃ち抜かれて壊れたなら音と破片を出す。時間切れ・仕切り直しなら false */
+  broken: boolean
+  /** ここで解ける人 */
+  freed: string[]
+}
+
+/** 猫に釘付けになっていた人が、撃たれて解けた (猫は残る) */
+export interface TrapReleased {
+  type: 'trapReleased'
+  id: string
 }
 
 /**
@@ -1398,6 +1445,7 @@ export type ClientMessage =
   | SkillsEvent
   | PlaceClaymoreEvent
   | PlaceDecoyEvent
+  | PlaceCatEvent
   | LocatorThrow
   | DropWeaponEvent
   | PickUpEvent
@@ -1468,6 +1516,10 @@ export type ServerMessage =
   | DecoyBumped
   | CboxBumped
   | DecoyGone
+  | CatPlaced
+  | CatSprung
+  | CatGone
+  | TrapReleased
   | LocatorThrown
   | LocatorPlaced
   | LocatorGone
