@@ -2,7 +2,8 @@ import * as THREE from 'three'
 
 import { TRIGGER_COS, TRIGGER_RANGE } from '../../../domain/item/claymore'
 import { LURE_RADIUS } from '../../../domain/item/cat'
-import { ZONE_COLOR, ZONE_OPACITY } from './cats'
+import type { Team } from '../../../domain/player/player'
+import { zoneMaterial } from './cats'
 import type { PlaceSpot } from '../../../sim/judge/claymore'
 
 /**
@@ -39,8 +40,12 @@ export class PlacePreview {
   private readonly fanPoints: Float32Array
   private readonly rimPoints: Float32Array
   private readonly markMaterial: THREE.MeshBasicMaterial
-  /** CAT の効く範囲 (塗った円) */
+  /** CAT の効く範囲 (塗った円)。色は自分の陣営 (置いた後の円と同じ) */
   private readonly disc: THREE.Mesh
+  private readonly discMaterials: Record<Team, THREE.MeshBasicMaterial> = {
+    blue: zoneMaterial('blue'),
+    red: zoneMaterial('red'),
+  }
 
   constructor(scene: THREE.Scene) {
     // 露出に左右されない。狙いを付けるための印なので明るさが変わっても読めてほしい
@@ -98,13 +103,7 @@ export class PlacePreview {
 
     this.disc = new THREE.Mesh(
       new THREE.CircleGeometry(LURE_RADIUS, 48),
-      new THREE.MeshBasicMaterial({
-        color: ZONE_COLOR,
-        transparent: true,
-        opacity: ZONE_OPACITY,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
+      this.discMaterials.blue,
     )
     this.disc.rotation.x = -Math.PI / 2
     this.disc.visible = false
@@ -117,15 +116,19 @@ export class PlacePreview {
    * @param spot placeSpot の結果。ok でなければ赤い印だけ
    * @param yaw 置く人の向き。クレイモアの正面はこれと同じ (server/arms/claymore.ts)
    * @param zone 効く所の形。fan = クレイモアの扇、disc = CAT の円、null = 印だけ (decoy)
+   * @param team 自分の陣営。CAT の円の色
    */
-  show(spot: PlaceSpot, yaw: number, zone: 'fan' | 'disc' | null): void {
+  show(spot: PlaceSpot, yaw: number, zone: 'fan' | 'disc' | null, team: Team = 'blue'): void {
     const y = spot.y + LIFT
     this.mark.position.set(spot.x, y, spot.z)
     this.markMaterial.color.setHex(spot.ok ? OK_COLOR : NG_COLOR)
     this.mark.visible = true
 
     this.disc.visible = spot.ok && zone === 'disc'
-    if (this.disc.visible) this.disc.position.set(spot.x, y, spot.z)
+    if (this.disc.visible) {
+      this.disc.position.set(spot.x, y, spot.z)
+      this.disc.material = this.discMaterials[team]
+    }
 
     if (!spot.ok || zone !== 'fan') {
       this.fan.visible = false

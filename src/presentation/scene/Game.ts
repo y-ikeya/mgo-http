@@ -2842,7 +2842,7 @@ export class Game {
         if (mine && !this.cats.has(message.id)) this.inv.spendOf("cat");
         // 円は置いた本人と味方に出す (陣営で分かれない部屋では本人だけ)。敵には見えない
         const friendly = mine || (this.teamsMode && message.team === this.selfTeam);
-        this.cats.place(message.id, message.at, message.yaw, friendly);
+        this.cats.place(message.id, message.at, message.yaw, friendly, message.team);
         break;
       }
       case "catSprung": {
@@ -5020,6 +5020,7 @@ export class Game {
         spot,
         this.player.yaw,
         this.setupHeld === "claymore" ? "fan" : this.setupHeld === "cat" ? "disc" : null,
+        this.selfTeam,
       );
     } else {
       this.placePreview.hide();

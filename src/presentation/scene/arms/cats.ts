@@ -2,6 +2,8 @@ import * as THREE from 'three'
 import { loadCat } from '../assets'
 import { refreshStaticShadows } from '../world/staticShadow'
 import { LURE_RADIUS } from '../../../domain/item/cat'
+import type { Team } from '../../../domain/player/player'
+import { TEAM_COLOR } from '../world/stage'
 
 /**
  * 置かれた猫 (CAT)。**置物と、置いた本人にだけ見える円。**
@@ -13,12 +15,23 @@ import { LURE_RADIUS } from '../../../domain/item/cat'
  */
 
 /**
- * 効く範囲の色と濃さ。**縁ではなく円の中を塗る** (本人 2026-10-20「縁の中全部が 0.2 くらい」、見て 0.1 に)。
- * 明るい床 (検証場・練習場) でも浮く水色 (TSNE のターゲットの光りと同じ色)。
+ * 効く範囲の濃さ。**縁ではなく円の中を塗る** (本人 2026-10-20「縁の中全部が 0.2 くらい」、見て 0.08 に)。
+ * 色は**置いた人の陣営の色** (基地の枠と同じ TEAM_COLOR、露出に左右されない描き方も同じ)。
  * 置く前の予告 (placePreview.ts) も同じ物を使う
  */
-export const ZONE_COLOR = 0x8af4ff
-export const ZONE_OPACITY = 0.1
+export const ZONE_OPACITY = 0.08
+
+/** 効く範囲を塗る材質。陣営ごとに 1 つ */
+export function zoneMaterial(team: Team): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color: TEAM_COLOR[team],
+    transparent: true,
+    opacity: ZONE_OPACITY,
+    toneMapped: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+}
 /** 床から浮かせる量 (m)。床と重なってちらつかないように */
 const RING_LIFT = 0.03
 /** 消える時に薄くなっていく長さ (秒)。ぱっと消さない (本人 2026-10-20「グラデーションかかって消えて」) */
@@ -40,13 +53,10 @@ export class Cats {
   private readonly entries = new Map<number, Entry>()
   private readonly fading: Fading[] = []
   private readonly ringGeometry = new THREE.CircleGeometry(LURE_RADIUS, 48)
-  private readonly ringMaterial = new THREE.MeshBasicMaterial({
-    color: ZONE_COLOR,
-    transparent: true,
-    opacity: ZONE_OPACITY,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  })
+  private readonly ringMaterials: Record<Team, THREE.MeshBasicMaterial> = {
+    blue: zoneMaterial('blue'),
+    red: zoneMaterial('red'),
+  }
 
   private readonly scene: THREE.Scene
 
@@ -63,14 +73,14 @@ export class Cats {
     return this.entries.get(id)?.group.position ?? null
   }
 
-  /** 置く。friendly (置いた本人か味方) なら効く範囲の円も出す */
-  place(id: number, at: readonly number[], yaw: number, friendly: boolean): void {
+  /** 置く。friendly (置いた本人か味方) なら効く範囲の円も出す (置いた人の陣営 team の色) */
+  place(id: number, at: readonly number[], yaw: number, friendly: boolean, team: Team): void {
     if (this.entries.has(id)) return
     const group = new THREE.Group()
     group.position.set(at[0]!, at[1]!, at[2]!)
     let ring: THREE.Mesh | null = null
     if (friendly) {
-      ring = new THREE.Mesh(this.ringGeometry, this.ringMaterial)
+      ring = new THREE.Mesh(this.ringGeometry, this.ringMaterials[team])
       ring.rotation.x = -Math.PI / 2
       ring.position.y = RING_LIFT
       ring.renderOrder = 1
