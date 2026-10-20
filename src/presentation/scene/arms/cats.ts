@@ -13,13 +13,12 @@ import { LURE_RADIUS } from '../../../domain/item/cat'
  */
 
 /**
- * 円の色と濃さ。**うっすら** (本人 2026-10-20)。白の 0.07 では明るい床 (検証場・練習場) で
- * 見えなかったので、どちらの床でも浮く水色にする (TSNE のターゲットの光りと同じ色)
+ * 効く範囲の色と濃さ。**縁ではなく円の中を塗る** (本人 2026-10-20「縁の中全部が 0.2 くらい」)。
+ * 明るい床 (検証場・練習場) でも浮く水色 (TSNE のターゲットの光りと同じ色)。
+ * 置く前の予告 (placePreview.ts) も同じ物を使う
  */
-const RING_COLOR = 0x8af4ff
-const RING_OPACITY = 0.35
-/** 円の縁の太さ (m) */
-const RING_WIDTH = 0.06
+export const ZONE_COLOR = 0x8af4ff
+export const ZONE_OPACITY = 0.2
 /** 床から浮かせる量 (m)。床と重なってちらつかないように */
 const RING_LIFT = 0.03
 /** 消える時に薄くなっていく長さ (秒)。ぱっと消さない (本人 2026-10-20「グラデーションかかって消えて」) */
@@ -40,11 +39,11 @@ interface Fading {
 export class Cats {
   private readonly entries = new Map<number, Entry>()
   private readonly fading: Fading[] = []
-  private readonly ringGeometry = new THREE.RingGeometry(LURE_RADIUS - RING_WIDTH, LURE_RADIUS, 64)
+  private readonly ringGeometry = new THREE.CircleGeometry(LURE_RADIUS, 48)
   private readonly ringMaterial = new THREE.MeshBasicMaterial({
-    color: RING_COLOR,
+    color: ZONE_COLOR,
     transparent: true,
-    opacity: RING_OPACITY,
+    opacity: ZONE_OPACITY,
     depthWrite: false,
     side: THREE.DoubleSide,
   })

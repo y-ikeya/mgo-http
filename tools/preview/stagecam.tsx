@@ -98,7 +98,7 @@ if (placeRaw && placeRaw.length === 4 && placeRaw.every(Number.isFinite)) {
   const from = { x: placeRaw[0]!, y: placeRaw[1]!, z: placeRaw[2]!, yaw: placeRaw[3]! }
   const move = await loadStageMoveWorld(stageName)
   const spot = placeSpot(from, solid, STEP_UP, move?.surfaces ?? null)
-  new PlacePreview(scene).show(spot, from.yaw, true)
+  new PlacePreview(scene).show(spot, from.yaw, "fan")
   console.log(`[place] ${spot.x.toFixed(2)} ${spot.y.toFixed(2)} ${spot.z.toFixed(2)} ok=${spot.ok}`)
 }
 

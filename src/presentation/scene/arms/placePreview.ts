@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 
 import { TRIGGER_COS, TRIGGER_RANGE } from '../../../domain/item/claymore'
+import { LURE_RADIUS } from '../../../domain/item/cat'
+import { ZONE_COLOR, ZONE_OPACITY } from './cats'
 import type { PlaceSpot } from '../../../sim/judge/claymore'
 
 /**
@@ -12,7 +14,8 @@ import type { PlaceSpot } from '../../../sim/judge/claymore'
  * canPlaceAt) ので、弾かれる所では赤い印だけを出して、押しても置く型に入らない
  * ことを先に伝える。
  *
- * 扇はクレイモアだけ。decoy は見張らないので印だけ。
+ * 扇はクレイモアだけ。CAT は効く範囲の円 (置いた後に出る円と同じ物)。decoy は見張らないので印だけ。
+ * **置く前から効く所が見えないと、そこに置いてよいか分からない** (本人 2026-10-20)
  *
  * 数字はドメインから引く (TRIGGER_RANGE / TRIGGER_COS)。ここで別に持つと、
  * 見えている扇と実際に反応する扇が食い違う。
@@ -36,6 +39,8 @@ export class PlacePreview {
   private readonly fanPoints: Float32Array
   private readonly rimPoints: Float32Array
   private readonly markMaterial: THREE.MeshBasicMaterial
+  /** CAT の効く範囲 (塗った円) */
+  private readonly disc: THREE.Mesh
 
   constructor(scene: THREE.Scene) {
     // 露出に左右されない。狙いを付けるための印なので明るさが変わっても読めてほしい
@@ -90,6 +95,20 @@ export class PlacePreview {
     this.rim.visible = false
     this.rim.frustumCulled = false
     scene.add(this.rim)
+
+    this.disc = new THREE.Mesh(
+      new THREE.CircleGeometry(LURE_RADIUS, 48),
+      new THREE.MeshBasicMaterial({
+        color: ZONE_COLOR,
+        transparent: true,
+        opacity: ZONE_OPACITY,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    )
+    this.disc.rotation.x = -Math.PI / 2
+    this.disc.visible = false
+    scene.add(this.disc)
   }
 
   /**
@@ -97,15 +116,18 @@ export class PlacePreview {
    *
    * @param spot placeSpot の結果。ok でなければ赤い印だけ
    * @param yaw 置く人の向き。クレイモアの正面はこれと同じ (server/arms/claymore.ts)
-   * @param fan 扇を描くか (クレイモアだけ)
+   * @param zone 効く所の形。fan = クレイモアの扇、disc = CAT の円、null = 印だけ (decoy)
    */
-  show(spot: PlaceSpot, yaw: number, fan: boolean): void {
+  show(spot: PlaceSpot, yaw: number, zone: 'fan' | 'disc' | null): void {
     const y = spot.y + LIFT
     this.mark.position.set(spot.x, y, spot.z)
     this.markMaterial.color.setHex(spot.ok ? OK_COLOR : NG_COLOR)
     this.mark.visible = true
 
-    if (!spot.ok || !fan) {
+    this.disc.visible = spot.ok && zone === 'disc'
+    if (this.disc.visible) this.disc.position.set(spot.x, y, spot.z)
+
+    if (!spot.ok || zone !== 'fan') {
       this.fan.visible = false
       this.rim.visible = false
       return
@@ -144,6 +166,7 @@ export class PlacePreview {
 
   hide(): void {
     this.mark.visible = false
+    this.disc.visible = false
     this.fan.visible = false
     this.rim.visible = false
   }

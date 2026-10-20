@@ -5016,7 +5016,11 @@ export class Game {
     }
     // 構えている間だけ描く。置く型が流れ始めたら消す (置く所はもう決まった)
     if (spot && this.setupRelease <= 0) {
-      this.placePreview.show(spot, this.player.yaw, this.setupHeld === "claymore");
+      this.placePreview.show(
+        spot,
+        this.player.yaw,
+        this.setupHeld === "claymore" ? "fan" : this.setupHeld === "cat" ? "disc" : null,
+      );
     } else {
       this.placePreview.hide();
     }
