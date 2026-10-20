@@ -514,7 +514,14 @@ export class RemoteSoldier {
      * setLocomotion に任せると重みの補間で入るので、立ったまま寝ている絵に
      * なる (実測で腰 1.01m。playSleep なら 0.06m)。
      */
-    if (locomotion === 'sleep' && this.locomotion !== 'sleep') animator.playSleep();
+    if (locomotion === 'sleep' && this.locomotion !== 'sleep') {
+      animator.playSleep();
+      /*
+       * **途中から見えた相手は、その分だけ進めてから。** 全身の型と同じ (locomotionAge)。
+       * 進めないと、眠っている相手の傍で画面を読み直すと倒れる所から流れた (2026-10-20 本人)
+       */
+      animator.skipAhead(state.locomotionAge);
+    }
     if (locomotion !== 'sleep' && this.locomotion === 'sleep') animator.wakeFromSleep();
     this.locomotion = locomotion;
 

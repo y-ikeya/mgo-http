@@ -176,7 +176,11 @@ export function updateTargets(room: RoomWorld, now: number): void {
     // **見せている姿を、審判が見る姿にもする。** 送る姿だけ組み立てていた頃は、
     // 転んでいても眠っていても審判の中では立っていて、足元の的に真っ直ぐ前を
     // 刺しても刺さった (2026-10-08)
-    bot.locomotion = targetLocomotion(bot, now)
+    const next = targetLocomotion(bot, now)
+    // 姿が変わった時刻を控える。**途中から見えた人は、その分だけ型を進めて流す** (locomotionAge)。
+    // 0 のまま送っていて、眠っている的の傍で画面を読み直すと倒れる所から流れた
+    if (next !== bot.locomotion) botPoseSince.set(bot, now)
+    bot.locomotion = next
     recordPose(bot)
     relayState(room, bot, targetPayload(bot, now))
   }
@@ -258,6 +262,9 @@ function patrol(bot: MatchPlayer, now: number): void {
   bot.yaw = Math.atan2(-dx, -dz)
 }
 
+/** 的の姿が変わった時刻 (ms)。型の経過 (locomotionAge) を出すのに使う */
+const botPoseSince = new WeakMap<MatchPlayer, number>()
+
 /** 的が何もされていない時の姿。構えごと */
 const REST: Record<MatchPlayer['homeStance'], Locomotion> = { stand: 'idle', crouch: 'crouch_idle', prone: 'prone_idle' }
 
@@ -274,7 +281,7 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         yaw: bot.yaw,
         pitch: 0,
         cameraYaw: bot.yaw,
-        locomotionAge: 0,
+        locomotionAge: (now - (botPoseSince.get(bot) ?? now)) / 1000,
         locomotion: bot.locomotion,
         aiming: false,
         weapon: 'rifle',
