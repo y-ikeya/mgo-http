@@ -766,7 +766,21 @@ export class RemoteSoldier {
    */
   setStealthed(on: boolean): void {
     this.stealthed = on;
+    /*
+     * **初めて知らせを受けた時は、じわっと消さずにその場で決める。** 体は見える状態で
+     * 作られるので、STEALTH 中の相手でも消え切るまで (0.7 秒) 見えていた — 守る側が画面を
+     * 読み直すと、攻める側の姿が一瞬見えた (2026-10-20 本人)。じわっと消えるのは
+     * 目の前で着た時だけの演出
+     */
+    if (!this.stealthKnown) {
+      this.stealthKnown = true;
+      this.stealthFade = on ? 1 : 0;
+      this.applyBodyOpacity();
+    }
   }
+
+  /** STEALTH の知らせを一度でも受けたか */
+  private stealthKnown = false;
 
   /**
    * STEALTH の消え具合 (0 = 見える、1 = 消えた)。**じわっと消え、すぐ現れる** (2026-10-17 本人
