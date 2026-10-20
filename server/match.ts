@@ -201,7 +201,7 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
   // 猫に釘付け (掛かっている / 立ち上がっている途中)。眠りより後、転倒より先
   const trap = trapped(bot, now)
   if (trap) return trap
-  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : 'sweep'
+  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : bot.downRolled ? 'hit2back' : 'sweep'
   if (bot.downLeft > 0) return 'stand'
   return patrolling(bot, now) ? 'run_f' : REST[bot.homeStance]
 }

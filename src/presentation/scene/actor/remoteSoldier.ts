@@ -152,6 +152,7 @@ const PLAY_WHOLE_BODY: Record<
   cqc_throw: (a) => a.playCqc('cqc_throw'),
   cqc_miss: (a) => a.playCqc('cqc_miss'),
   cqc_thrown: (a) => a.playThrown(),
+  hit2back: (a) => a.playRollFall(),
   // 接続が切れた人。1 枚の静止ポーズ
   away: (a) => a.playAway(),
   // ダンボールで敵にぶつかって、箱が落ちた

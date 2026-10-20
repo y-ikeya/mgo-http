@@ -738,6 +738,8 @@ export class Soldier {
   private cqcRecoverLeft = 0
   /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
   private thrownFall = false
+  /** 倒れたのがローリングの体当たりでか。倒れている間に引く型が違う (hit2back) */
+  private rolledFall = false
   /** 投げられて倒れる向き。型に焼かれた移動をこの向きで辿る */
   private thrownYaw = 0
   /** 転がり始めたか。音を鳴らす側が 1 回だけ拾う */
@@ -3035,7 +3037,7 @@ export class Soldier {
    * 倒れる → (伏せたまま撃てる) → 立ち上がる、の 3 段。立ち上がりに入ったら
    * 中断できないので、そこが無防備な時間になる。
    */
-  knockDown(): void {
+  knockDown(rolled = false): void {
     if (this.down) return
     /*
      * 倒れている間は飛ばされない。**ただし CQC で投げられて背中が着く前は別** —
@@ -3056,7 +3058,10 @@ export class Soldier {
     // 押しっぱなしを引き継がせない。離して押し直すまで構えない
     this.aimLatched = true
     this.thrownFall = false
-    this.animator?.playSweep()
+    // ローリングの体当たり (しゃがんでいた所から) なら、爆風ほど飛ばない倒れ方
+    this.rolledFall = rolled
+    if (rolled) this.animator?.playRollFall()
+    else this.animator?.playSweep()
   }
 
   /**
@@ -4228,6 +4233,7 @@ export class Soldier {
       saluting,
       downed: this.downed,
       thrown: this.thrownFall,
+      rolled: this.rolledFall,
       cqc: this.animator?.cqcKind ?? null,
       standingUp: this.standing,
       bumped: this.bumpLeft,

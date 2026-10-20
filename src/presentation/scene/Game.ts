@@ -2977,7 +2977,10 @@ export class Game {
         break;
 
       case "knockdown":
-        this.player.knockDown();
+        // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
+        // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
+        if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
+        this.player.knockDown(message.distance !== undefined);
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
         this.player.knockPush(message.dirX, message.dirZ, message.distance);
         // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)

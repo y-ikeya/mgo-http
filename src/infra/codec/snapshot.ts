@@ -107,6 +107,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   // 猫に釘付けになる / 解けて戻る (domain/item/doll.ts)。**末尾に足す**
   'trapped',
   'trapped_out',
+  // ローリングの体当たりで後ろへ倒れる。**末尾に足す**
+  'hit2back',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

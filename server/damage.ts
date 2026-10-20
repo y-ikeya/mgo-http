@@ -192,6 +192,10 @@ function knockAway(
   victim.knockZ = (awayZ / reach) * scale
   if (victim.bot) {
     victim.downThrown = false
+    // 短く滑る (距離が付いている) のはローリングの体当たり。倒れる型が違う。
+    // 転がってきた相手のほうを向いて後ろへ倒れる (yaw θ で正面が (-sinθ, -cosθ)、押された先の逆)
+    victim.downRolled = distance !== undefined
+    if (victim.downRolled) victim.yaw = Math.atan2(awayX, awayZ)
     victim.knockLeft = KNOCK_TIME
     // 滑り終わってからも転んだまま。**時間で立ち上がる**
     victim.downLeft = TARGET_DOWN
@@ -685,6 +689,7 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
     // 倒れる型 (2.9 秒) を流し切ってから少し寝て、起き上がる
     victim.downLeft = TARGET_STAND + 3.5
     victim.downThrown = true
+    victim.downRolled = false
     return
   }
   sessionFor(victim)?.socket.send(

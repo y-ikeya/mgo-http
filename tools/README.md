@@ -343,6 +343,12 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
 
+ローリングの体当たりで後ろへ倒れる型 `hit2back` (1.93 秒、しゃがみから仰向けへ) は本人が落とした `tools/raw/Hit2Back.fbx`。
+腰が後ろへ 1.25m 動くので、横の移動だけ捨てて (`--in-place`) その場で倒れる型にする。滑るのはサーバーが決める距離 (0.5m):
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/hit2back.json
+    for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb hit2back.glb hit2back public/models/$s.glb --rotation-only --in-place; done
+
 猫に釘付けになる型 `trapped` (2.0 秒、立った所からしゃがみ込んで両手を猫へ伸ばす) は本人が落とした
 `tools/raw/trapped.fbx` の **5 本目** (他の 4 本は別の型)。素の姿勢が違うので `retarget_clip.py` で焼き直し、
 4 つの皮に足す。解けて戻るのは同じ型を逆に流す (animation.ts の playTrappedOut):

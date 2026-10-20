@@ -87,6 +87,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   cqc_throw: 'cqc_throw',
   cqc_miss: 'cqc_miss',
   cqc_thrown: 'cqc_thrown',
+  hit2back: 'hit2back',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
   /*
@@ -542,6 +543,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'cqc_miss',
   // 投げられて倒れた姿のまま留める (sweep と同じ)
   'cqc_thrown',
+  // ローリングで倒れた姿のまま留める (sweep と同じ)
+  'hit2back',
   'jump_up',
   'jump_down',
   'death',
@@ -662,6 +665,15 @@ const SWEEP_KEY = 'sweep'
  * — 上半身の状態も 'sweep' のまま、引く型だけが違う (fallKey)
  */
 const THROWN_KEY = 'cqc_thrown'
+/**
+ * ローリングの体当たりで後ろへ倒れる (tools/hit2back.json、Hit2Back.fbx)。**倒れた後は sweep と同じ扱い**。
+ * 腰の横の移動は取り込む時に捨ててある (merge_clip の --in-place)。滑るのはサーバーの距離 (0.5m)
+ */
+const ROLL_FALL_KEY = 'hit2back'
+/** 流す速さ。等倍 (1.93 秒) では遅かった (本人 2026-10-20「もう少し早く」) */
+const ROLL_FALL_RATE = 1.5
+/** 背中が着くまで (秒)。型の半ばで仰向けになる */
+const ROLL_FALL_LAND = 1.0 / ROLL_FALL_RATE
 /** CQC で投げる / 空振りする。全身の型 */
 const CQC_THROW_KEY = 'cqc_throw'
 /**
@@ -876,6 +888,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   PRONE_BOLT_KEY,
   SWEEP_KEY,
   THROWN_KEY,
+  ROLL_FALL_KEY,
   CQC_THROW_KEY,
   CQC_MISS_KEY,
   STAND_KEY,
@@ -1551,6 +1564,7 @@ export class CharacterAnimator {
       finished === this.upper.get(PRONE_BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(THROWN_KEY) ||
+      finished === this.upper.get(ROLL_FALL_KEY) ||
       finished === this.upper.get(CQC_THROW_KEY) ||
       finished === this.upper.get(CQC_MISS_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
@@ -1803,6 +1817,7 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [SWEEP_KEY, 'sweep'],
       [THROWN_KEY, 'cqc_thrown'],
+      [ROLL_FALL_KEY, 'hit2back'],
       [STAND_KEY, STAND_CLIP],
     ] as const) {
       const clip = byName.get(name)
@@ -3271,7 +3286,7 @@ export class CharacterAnimator {
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
     if (
       !this.aiming &&
-      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown') &&
+      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown' || this.locomotion === 'hit2back') &&
       this.upper.has(this.fallKey)
     ) {
       return this.fallKey
@@ -3967,6 +3982,23 @@ export class CharacterAnimator {
     // 背中が着くまで。サーバーがスタミナを減らすのも同じ時刻 (domain/player/cqc.ts)
     this.sweepDuration = CQC_LAND_SECONDS
     this.rootSampleValid = false
+  }
+
+  /**
+   * ローリングの体当たりで後ろへ倒れる (しゃがんでいた所から、型 Hit2Back)。**倒れた後は爆風で
+   * 倒れた時と同じ** (playSweep)。型が無ければ爆風の倒れ方で代わりにする
+   */
+  playRollFall(): void {
+    if (this.dead) return
+    const upper = this.upper.get(ROLL_FALL_KEY)
+    const lower = this.lower.get('hit2back')
+    if (!upper || !lower) return this.playSweep()
+    upper.reset().setEffectiveTimeScale(ROLL_FALL_RATE).play()
+    lower.reset().setEffectiveTimeScale(ROLL_FALL_RATE).play()
+    this.upperState = 'sweep'
+    this.locomotion = 'hit2back'
+    this.fallKey = ROLL_FALL_KEY
+    this.sweepDuration = ROLL_FALL_LAND
   }
 
   /**
