@@ -5,7 +5,7 @@ import { loadTarget } from '../assets'
 /**
  * TSNE のターゲット (人形) の見た目。**位置と誰が運んでいるかはサーバーが決める** (server/target.ts)。
  *
- *     置いてある / 落ちている   その場に立って、ゆっくり回る
+ *     置いてある / 落ちている   その場で 1m 浮いて、ゆっくり回る
  *     運ばれている             運ぶ人の頭の少し上に浮く — 守る側には運ぶ人の場所が分かる
  *     守る側の画面             **いつも光って見える (壁越しでも)**。守る物の場所は常に分かる
  *
@@ -14,6 +14,8 @@ import { loadTarget } from '../assets'
 
 /** 運ばれている時、足元からどれだけ上に浮かせるか (m)。立った人の頭 (1.7m) の少し上 */
 const CARRY_HEIGHT = 2.0
+/** 置いてある / 落ちている時に浮かせる高さ (m)。地面に転がすより目に付く (本人 2026-10-20) */
+const REST_HEIGHT = 1.0
 /** 回る速さ (rad/秒)。ゆっくり — 置いてあることが遠目に分かる程度 */
 const SPIN = 0.9
 /** 光りの色と濃さ */
@@ -81,7 +83,7 @@ export class TsneTarget {
     this.glow.visible = glowing
     const x = carrierAt ? carrierAt.x : view.x
     const z = carrierAt ? carrierAt.z : view.z
-    const y = (carrierAt ? carrierAt.y : view.y) + (view.carrier ? CARRY_HEIGHT : 0)
+    const y = (carrierAt ? carrierAt.y : view.y) + (view.carrier ? CARRY_HEIGHT : REST_HEIGHT)
     if (!this.placed) {
       this.object.position.set(x, y, z)
       this.placed = true
