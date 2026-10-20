@@ -452,7 +452,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
         出す長さも消え方も Orders が持つ。ここは段階と陣営を渡すだけ。
       */}
-      <Orders mode={mode()} team={props.stats?.team} phase={phase()} />
+      <Orders mode={mode()} team={props.stats?.team} phase={phase()} attack={props.stats?.match?.attack} />
 
       {/*
         ラウンドの合間 (TSNE の先攻が終わった)。「ROUND 1 OVER」と、このラウンドの勝ち負け。

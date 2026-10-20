@@ -131,6 +131,11 @@ const cases: Record<string, Partial<GameStats>> = {
     match: { phase: 'countdown', mode: 'TDM', blue: 0, red: 0, endsAt: Date.now() + 4000, present: 2, required: 2, players: [] },
     team: 'red',
   },
+  // TSNE の始まり。攻める側は「ターゲットを基地へ持ち帰れ」(?case=tsneCountdown)
+  tsneCountdown: {
+    match: { phase: 'countdown', mode: 'TSNE', attack: 'blue', blue: 1, red: 1, endsAt: Date.now() + 4000, present: 2, required: 2, players: [] },
+    team: 'blue',
+  },
   // 決着。「試合終了」の帯 → 2.4 秒後に勝敗 (?case=over)
   over: {
     match: { phase: 'over', mode: 'TDM', blue: 7, red: 0, winner: 'blue', endsAt: Date.now() + 10000, present: 2, required: 2, players: [] },

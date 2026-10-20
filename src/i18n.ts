@@ -97,6 +97,8 @@ const JA = {
   'orders.tdm.red': 'レッドチームを倒せ!',
   'orders.tdm.blue': 'ブルーチームを倒せ!',
   'orders.dm': '全員が敵だ。生き残れ!',
+  'orders.tsne.attack': 'ターゲットを基地へ持ち帰れ!',
+  'orders.tsne.defence': 'ターゲットを守り抜け!',
 
   // --- 遅れが直らない人 ---
   'lag.title': '通信の遅れが大きすぎます',
@@ -186,6 +188,8 @@ const EN: Record<Key, string> = {
   'orders.tdm.red': 'ELIMINATE THE RED TEAM!',
   'orders.tdm.blue': 'ELIMINATE THE BLUE TEAM!',
   'orders.dm': 'EVERYONE IS HOSTILE. SURVIVE!',
+  'orders.tsne.attack': 'BRING THE TARGET BACK TO BASE!',
+  'orders.tsne.defence': 'GUARD THE TARGET!',
 
   'lag.title': 'YOUR CONNECTION IS TOO SLOW',
   'lag.lede':

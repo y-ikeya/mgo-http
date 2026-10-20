@@ -26,6 +26,8 @@ export default function Orders(props: {
   team: Team | 0 | undefined
   /** 試合の段階。countdown の間だけ出して、playing で退く */
   phase: string | undefined
+  /** 攻める色 (TSNE)。攻める側と守る側で指令が変わる */
+  attack?: Team
 }) {
   const [showing, setShowing] = createSignal(false)
   /**
@@ -106,6 +108,8 @@ export default function Orders(props: {
   const order = () => {
     if (assembled()) return `${t('hud.assembledTitle')} — ${t('hud.assembledSub')}`
     if (!MODES[props.mode].teams) return t('orders.dm')
+    // TSNE はターゲットの取り合い (本人 2026-10-20「ターゲットを基地へ持ち帰れ」)
+    if (MODES[props.mode].sides) return props.team === props.attack ? t('orders.tsne.attack') : t('orders.tsne.defence')
     return props.team === 'red' ? t('orders.tdm.blue') : t('orders.tdm.red')
   }
 
