@@ -2784,7 +2784,10 @@ export class Game {
        */
       case "claymorePlaced": {
         const mine = message.owner === this.net.id && !this.claymores.has(message.id);
-        this.claymores.place(message.id, message.at, message.yaw);
+        // sensor に掛かる扇は置いた本人と味方に出す (猫の円と同じ)。敵には見えない
+        const friendly =
+          message.owner === this.net.id || (this.teamsMode && message.team === this.selfTeam);
+        this.claymores.place(message.id, message.at, message.yaw, friendly ? message.team : null);
         if (mine) this.inv.spendOf("claymore");
         break;
       }
