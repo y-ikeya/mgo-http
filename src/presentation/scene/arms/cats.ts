@@ -45,6 +45,11 @@ export class Cats {
     return this.entries.has(id)
   }
 
+  /** 置いてある所 (足元)。無ければ null */
+  positionOf(id: number): THREE.Vector3 | null {
+    return this.entries.get(id)?.group.position ?? null
+  }
+
   /** 置く。mine なら効く範囲の円も出す */
   place(id: number, at: readonly number[], yaw: number, mine: boolean): void {
     if (this.entries.has(id)) return

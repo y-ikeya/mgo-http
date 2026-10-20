@@ -17,6 +17,7 @@ import { type Placed, placeSpot } from '../../src/sim/judge/claymore'
 import { SHOT_HALF, SHOT_TOP, TRAP_SECONDS, inLure } from '../../src/domain/item/cat'
 import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
+import { STAGES } from '../../src/domain/stage'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast, freeFromTrap, hostileToOwner } from '../world'
 
@@ -31,6 +32,8 @@ export interface Cat extends Placed {
   sprungAt: number
   /** 掛かった人 */
   victims: string[]
+  /** 練習の部屋に置いた猫なら、ステージの置き場所の番号 (practiceCats)。置き直すのに使う */
+  practice?: number
 }
 
 let nextCatId = 1
@@ -128,6 +131,11 @@ export function shotHitsCat(room: RoomWorld, from: readonly number[], to: readon
 function removeCat(room: RoomWorld, cat: Cat, broken: boolean): void {
   const at = room.cats.indexOf(cat)
   if (at >= 0) room.cats.splice(at, 1)
+  if (cat.practice !== undefined) {
+    const restockAt = practiceRestockAt.get(room) ?? new Map<number, number>()
+    restockAt.set(cat.practice, Date.now() + PRACTICE_RESTOCK_MS)
+    practiceRestockAt.set(room, restockAt)
+  }
   const freed: string[] = []
   for (const id of cat.victims) {
     const player = room.players.get(id)
@@ -144,4 +152,36 @@ function removeCat(room: RoomWorld, cat: Cat, broken: boolean): void {
 export function clearCats(room: RoomWorld): void {
   for (const cat of [...room.cats]) removeCat(room, cat, false)
   for (const player of room.players.values()) player.trappedBy = 0
+}
+
+/** 練習の猫が消えてから置き直すまで (ms) */
+const PRACTICE_RESTOCK_MS = 5000
+/** 練習の猫の持ち主。人ではない (的の陣営の物として置く) */
+const PRACTICE_OWNER = 'practice'
+/** 練習の猫を次に置ける時刻 (ms)。置き場所の番号ごと。無ければすぐ置く */
+const practiceRestockAt = new WeakMap<RoomWorld, Map<number, number>>()
+
+/**
+ * 練習の部屋に猫を置いておく (ステージの practiceCats)。**自分で掛かって確かめるため**。
+ * 的と同じ陣営 (red) の物なので、自分 (blue) が近づくと掛かる。消えたら 5 秒で置き直す
+ */
+export function stockPracticeCats(room: RoomWorld, now: number): void {
+  const spots = STAGES[room.stage.name].practiceCats ?? []
+  const restockAt = practiceRestockAt.get(room)
+  spots.forEach((spot, i) => {
+    if (room.cats.some((cat) => cat.practice === i)) return
+    if (now < (restockAt?.get(i) ?? 0)) return
+    room.cats.push({
+      id: nextCatId++,
+      owner: PRACTICE_OWNER,
+      team: 'red',
+      x: spot.x,
+      y: spot.y ?? 0,
+      z: spot.z,
+      yaw: 0,
+      sprungAt: 0,
+      victims: [],
+      practice: i,
+    })
+  })
 }

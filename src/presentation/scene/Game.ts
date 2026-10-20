@@ -685,6 +685,11 @@ const CLAYMORE_PLACE_RATIO = 0.8;
  * 割れた**という絵なので、体の高さから出す。
  */
 const DECOY_POP_HEIGHT = 1.1;
+/**
+ * 猫に掛かってから声 (ohh) を出すまで (ms)。**しゃがみ終えて手を伸ばした所** — 型 trapped (2.0 秒) の
+ * 1.7 秒目あたりで腰が下り切る
+ */
+const CAT_OHH_MS = 1700;
 
 
 /**
@@ -2837,10 +2842,25 @@ export class Game {
         this.cats.place(message.id, message.at, message.yaw, mine);
         break;
       }
-      case "catSprung":
+      case "catSprung": {
         this.cats.sprung(message.id);
-        if (message.victims.includes(this.net.id)) this.player.trap();
+        const cat = this.cats.positionOf(message.id);
+        // 鳴き声は猫の所から。**近くの人にも届く** (誰かがそこで足止めされている)
+        if (cat) this.audio.play("catMeow", cat);
+        if (message.victims.includes(this.net.id)) {
+          const p = this.player.position;
+          // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
+          this.player.trap(cat ? Math.atan2(p.x - cat.x, p.z - cat.z) : undefined);
+        }
+        // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
+        for (const id of message.victims) {
+          setTimeout(() => {
+            const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
+            if (at) this.audio.play("ohh", at);
+          }, CAT_OHH_MS);
+        }
         break;
+      }
       case "catGone":
         this.cats.remove(message.id);
         if (message.freed.includes(this.net.id)) this.player.untrap();

@@ -23,7 +23,7 @@ import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
 import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
-import { placeCat, relayCats, shotHitsCat, updateCats } from './arms/cat'
+import { placeCat, relayCats, shotHitsCat, stockPracticeCats, updateCats } from './arms/cat'
 import { bumpCboxes } from './arms/cbox'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
@@ -201,7 +201,11 @@ setInterval(() => {
       }
 
       updateMatch(room, now)
-      if (room.mode.id === 'PRACTICE') updateTargets(room, now)
+      if (room.mode.id === 'PRACTICE') {
+        updateTargets(room, now)
+        // 練習の猫。自分で掛かって確かめる。消えたら置き直す
+        stockPracticeCats(room, now)
+      }
       // その部屋の水面。溺れの判定と手榴弾の沈みで同じ物を見る
       const water = waterOf(room.stage.name)
       relayClaymores(room)

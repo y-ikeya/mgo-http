@@ -1186,10 +1186,12 @@ export class Soldier {
 
   /**
    * 猫に釘付けになった。**その場でしゃがみ込み、猫へ手を伸ばして止まる。**
-   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く
+   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く。yaw は猫のほうの向き
    */
-  trap(): void {
+  trap(yaw?: number): void {
     if (this.down || this.downed || this.sleepLeft > 0 || this.trappedStage === 'in') return
+    // 猫のほうへ向き直る (手を伸ばす先が猫になる)
+    if (yaw !== undefined) this.yaw = yaw
     this.releaseLadder()
     this.aiming = false
     this.crouching = false
