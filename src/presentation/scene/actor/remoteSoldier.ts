@@ -649,7 +649,10 @@ export class RemoteSoldier {
       // ぶら下がっている間は両手が縁に掛かっている
       state.locomotion === 'hang_drop' ||
       state.locomotion === 'hang' ||
-      state.locomotion === 'hang_climb'
+      state.locomotion === 'hang_climb' ||
+      // 猫に釘付けの間 (戻る途中も)。両手を猫へ伸ばしている
+      state.locomotion === 'trapped' ||
+      state.locomotion === 'trapped_out'
     // 拳銃も構えていない間ずっと手に持つ (soldier.ts と同じ)。STEALTH で体が消えても武器は見える
     if (this.weapon) this.weapon.visible = !holstered
 

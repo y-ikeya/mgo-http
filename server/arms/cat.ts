@@ -156,6 +156,11 @@ export function clearCats(room: RoomWorld): void {
 
 /** 練習の猫が消えてから置き直すまで (ms) */
 const PRACTICE_RESTOCK_MS = 5000
+/**
+ * 置き直すのは、この距離 (m) に誰も居ない時だけ。**目の前に戻して掛けない** — 撃ち抜いた猫が
+ * その場に戻り、消したはずの所で掛かった (本人 2026-10-20)
+ */
+const PRACTICE_RESTOCK_CLEAR = 4
 /** 練習の猫の持ち主。人ではない (的の陣営の物として置く) */
 const PRACTICE_OWNER = 'practice'
 /** 練習の猫を次に置ける時刻 (ms)。置き場所の番号ごと。無ければすぐ置く */
@@ -164,6 +169,7 @@ const practiceRestockAt = new WeakMap<RoomWorld, Map<number, number>>()
 /**
  * 練習の部屋に猫を置いておく (ステージの practiceCats)。**自分で掛かって確かめるため**。
  * 的と同じ陣営 (red) の物なので、自分 (blue) が近づくと掛かる。消えたら 5 秒で置き直す
+ * (近くに人が居る間は待つ)
  */
 export function stockPracticeCats(room: RoomWorld, now: number): void {
   const spots = STAGES[room.stage.name].practiceCats ?? []
@@ -171,6 +177,10 @@ export function stockPracticeCats(room: RoomWorld, now: number): void {
   spots.forEach((spot, i) => {
     if (room.cats.some((cat) => cat.practice === i)) return
     if (now < (restockAt?.get(i) ?? 0)) return
+    const crowded = connected(room).some(
+      (player) => Math.hypot(player.x - spot.x, player.z - spot.z) < PRACTICE_RESTOCK_CLEAR,
+    )
+    if (crowded) return
     room.cats.push({
       id: nextCatId++,
       owner: PRACTICE_OWNER,

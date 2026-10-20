@@ -3925,9 +3925,12 @@ export class Soldier {
         // 見えた (本人 2026-10-16)。相手の画面 (remoteSoldier.ts) は元から箱で納めている
         this.boxed ||
         // ぶら下がっている間は両手が縁に掛かっている
-        this.hanging
+        this.hanging ||
+        // 猫に釘付けの間 (戻る途中も)。両手を猫へ伸ばしている (本人 2026-10-20「武器の表示はいらない」)
+        this.trappedStage !== 'none'
       // ナイフは持ち替えて出す。刺突中の一瞬だけではなくなった
-      const knifeOut = (this.held === 'knife' || this.knifePreview) && !barehanded && !this.boxed
+      const knifeOut =
+        (this.held === 'knife' || this.knifePreview) && !barehanded && !this.boxed && this.trappedStage === 'none'
       if (this.knife) this.knife.visible = knifeOut
       if (this.weapon) this.weapon.visible = !holstered
     }

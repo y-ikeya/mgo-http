@@ -2033,6 +2033,7 @@ export class Game {
     this.stageSparks?.update(dt);
     // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
     this.decoys.update(dt);
+    this.cats.update(dt);
     this.emptyBoxes.update(dt);
     // 手榴弾と同じ物理を同じ刻みで解く。止まったら点滅が始まる
     this.locators.update(

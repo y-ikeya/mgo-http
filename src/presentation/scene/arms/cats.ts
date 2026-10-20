@@ -18,14 +18,24 @@ const RING_OPACITY = 0.07
 const RING_WIDTH = 0.06
 /** 床から浮かせる量 (m)。床と重なってちらつかないように */
 const RING_LIFT = 0.03
+/** 消える時に薄くなっていく長さ (秒)。ぱっと消さない (本人 2026-10-20「グラデーションかかって消えて」) */
+const FADE_SECONDS = 0.6
 
 interface Entry {
   group: THREE.Group
   ring: THREE.Mesh | null
 }
 
+/** 薄くなりながら消えていく猫。材質は自分用に写して薄くする (形と材質は他の猫と共有なので) */
+interface Fading {
+  group: THREE.Group
+  materials: THREE.Material[]
+  left: number
+}
+
 export class Cats {
   private readonly entries = new Map<number, Entry>()
+  private readonly fading: Fading[] = []
   private readonly ringGeometry = new THREE.RingGeometry(LURE_RADIUS - RING_WIDTH, LURE_RADIUS, 64)
   private readonly ringMaterial = new THREE.MeshBasicMaterial({
     color: 0xffffff,
@@ -87,15 +97,50 @@ export class Cats {
     entry.ring = null
   }
 
-  remove(id: number): void {
+  /** 消す。**薄くなりながら** (FADE_SECONDS)。fade = false ならすぐ (試合の切れ目の片付け) */
+  remove(id: number, fade = true): void {
     const entry = this.entries.get(id)
     if (!entry) return
     this.entries.delete(id)
-    this.scene.remove(entry.group)
+    if (entry.ring) entry.group.remove(entry.ring)
+    if (!fade) {
+      this.scene.remove(entry.group)
+      refreshStaticShadows()
+      return
+    }
+    const materials: THREE.Material[] = []
+    entry.group.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.castShadow = false
+      const own = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((m) => {
+        const copy = m.clone()
+        copy.transparent = true
+        materials.push(copy)
+        return copy
+      })
+      mesh.material = Array.isArray(mesh.material) ? own : own[0]!
+    })
     refreshStaticShadows()
+    this.fading.push({ group: entry.group, materials, left: FADE_SECONDS })
+  }
+
+  /** 1 コマぶん。消えていく猫を薄くする */
+  update(dt: number): void {
+    for (let i = this.fading.length - 1; i >= 0; i--) {
+      const item = this.fading[i]!
+      item.left -= dt
+      const opacity = Math.max(0, item.left / FADE_SECONDS)
+      for (const m of item.materials) m.opacity = opacity
+      if (item.left > 0) continue
+      this.scene.remove(item.group)
+      for (const m of item.materials) m.dispose()
+      this.fading.splice(i, 1)
+    }
   }
 
   clear(): void {
-    for (const id of [...this.entries.keys()]) this.remove(id)
+    for (const id of [...this.entries.keys()]) this.remove(id, false)
+    this.update(FADE_SECONDS)
   }
 }
