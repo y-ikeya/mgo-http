@@ -8,7 +8,7 @@
  * こちらは「誰がどの猫に掛かっているか」(trappedBy) を持ち、解ける時を知らせる。
  */
 
-import { connected } from '../../src/domain/match/match'
+import { connected, present } from '../../src/domain/match/match'
 import { canAct } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
 import type { MatchPlayer, Team } from '../../src/domain/player/player'
@@ -72,6 +72,7 @@ export function relayCats(room: RoomWorld): void {
           type: 'catPlaced',
           id: cat.id,
           owner: cat.owner,
+          team: cat.team,
           at: [cat.x, cat.y, cat.z],
           yaw: cat.yaw,
         } satisfies ServerMessage),
@@ -94,7 +95,8 @@ export function updateCats(room: RoomWorld, now: number): void {
       continue
     }
     const victims: MatchPlayer[] = []
-    for (const player of connected(room)) {
+    // 的 (練習の bot) も掛かる (present は bot を含む)
+    for (const player of present(room)) {
       if (player.id === cat.owner || !hostileToOwner(room, cat.team, player)) continue
       if (!canAct(player.life) || player.boxed || player.trappedBy !== 0) continue
       // 解けたばかり (立ち上がっている途中 + 1 秒) は掛からない
@@ -106,7 +108,12 @@ export function updateCats(room: RoomWorld, now: number): void {
     if (victims.length === 0) continue
     cat.sprungAt = now
     cat.victims = victims.map((v) => v.id)
-    for (const victim of victims) victim.trappedBy = cat.id
+    for (const victim of victims) {
+      victim.trappedBy = cat.id
+      // 的 (bot) は猫のほうへ向き直らせる。人は本人の手元が向き直り、その向きが届く
+      // yaw θ で正面が (-sinθ, -cosθ)
+      if (victim.bot) victim.yaw = Math.atan2(victim.x - cat.x, victim.z - cat.z)
+    }
     broadcast(room, { type: 'catSprung', id: cat.id, victims: cat.victims })
   }
 }

@@ -229,3 +229,37 @@ describe('散弾で的を突き飛ばす', () => {
     // 湧くのを待って撃つので、既定の 5 秒では足りない
   }, 15000)
 })
+
+describe('練習部屋で猫', () => {
+  /**
+   * **的も猫に掛かる。** 的は人ではない (送る相手の一覧に居ない) ので、見落とすと掛からなかった
+   * (2026-10-20 本人「敵の前に cat 置いても charm されない」)
+   */
+  test('的の前に猫を置くと、的が釘付けになる', async () => {
+    // **自分用のサーバーで。** 共用のサーバーでは前の試験で的が転ばされ、動かされている
+    const own = await startServer()
+    const me = new Client(own, 'catter', [TARGET.x, 0, TARGET.z + 2.2], 'echo')
+    await me.ready()
+    me.live()
+    me.send({ type: 'loadout', primary: 'rifle', support: 'cat' })
+    await Bun.sleep(3400)
+    me.send({ type: 'spawn' })
+    await Bun.sleep(400)
+    me.holdCat(true)
+    me.sendState()
+    await Bun.sleep(120)
+    // 前 (-Z、的のほう) へ 0.9m に置く。的まで 1.3m で円 (1.5m) の中
+    me.send({ type: 'cat' })
+    await Bun.sleep(800)
+    const sprung = me.messages.find((m) => m.type === 'catSprung') as Extract<ServerMessage, { type: 'catSprung' }>
+    expect(sprung?.victims).toContain('target-0')
+    // 的の姿もしゃがみ込んで止まる型になる (的の姿はサーバーが決める)
+    await Bun.sleep(200)
+    const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
+    const slot = roster.players.find((p) => p.id === 'target-0')!.slot!
+    const bot = me.poses.get(slot)!
+    expect(bot.locomotion).toBe('trapped')
+    me.close()
+    own.stop()
+  }, 15000)
+})

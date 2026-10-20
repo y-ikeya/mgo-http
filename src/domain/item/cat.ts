@@ -38,6 +38,17 @@ export const IMMUNE_SECONDS = TRAPPED_CLIP_SECONDS + 1
 export const SHOT_HALF = 0.3
 export const SHOT_TOP = 0.4
 
+/**
+ * 釘付けの段。**掛かっている (in)・解けて立ち上がっている途中 (out)・どちらでもない (null)。**
+ * trappedBy は掛けている猫、trapFreeAt は解けた時刻 + IMMUNE_SECONDS (server/world.ts の freeFromTrap)。
+ * 的 (bot) の姿をサーバーが決めるのに使う (人の姿は本人の手元が決める)
+ */
+export function trapStage(trappedBy: number, trapFreeAt: number, now: number): 'in' | 'out' | null {
+  if (trappedBy !== 0) return 'in'
+  const releasedAt = trapFreeAt - IMMUNE_SECONDS * 1000
+  return trapFreeAt > 0 && now >= releasedAt && now - releasedAt < TRAPPED_CLIP_SECONDS * 1000 ? 'out' : null
+}
+
 export interface LureTarget {
   x: number
   y: number

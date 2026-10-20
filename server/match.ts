@@ -30,6 +30,7 @@ import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { clearClaymores } from './arms/claymore'
 import { clearCats } from './arms/cat'
+import { trapStage } from '../src/domain/item/cat'
 import { clearDecoys } from './arms/decoy'
 import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
@@ -195,21 +196,20 @@ export function updateTargets(room: RoomWorld, now: number): void {
  * 立つ、という絵になる。
  */
 export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
-  return isDowned(bot.life)
-    ? bot.downFromBehind
-      ? 'death_front'
-      : 'death_back'
-    : isAsleep(bot.sleepUntil, now)
-      ? 'sleep'
-      : bot.downLeft > TARGET_STAND
-        ? bot.downThrown
-          ? 'cqc_thrown'
-          : 'sweep'
-        : bot.downLeft > 0
-          ? 'stand'
-          : patrolling(bot, now)
-            ? 'run_f'
-            : REST[bot.homeStance]
+  if (isDowned(bot.life)) return bot.downFromBehind ? 'death_front' : 'death_back'
+  if (isAsleep(bot.sleepUntil, now)) return 'sleep'
+  // 猫に釘付け (掛かっている / 立ち上がっている途中)。眠りより後、転倒より先
+  const trap = trapped(bot, now)
+  if (trap) return trap
+  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : 'sweep'
+  if (bot.downLeft > 0) return 'stand'
+  return patrolling(bot, now) ? 'run_f' : REST[bot.homeStance]
+}
+
+/** 猫に釘付けの姿 (掛かっている / 立ち上がっている途中)。どちらでもなければ null */
+function trapped(bot: MatchPlayer, now: number): 'trapped' | 'trapped_out' | null {
+  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now)
+  return stage === 'in' ? 'trapped' : stage === 'out' ? 'trapped_out' : null
 }
 
 /**
@@ -220,7 +220,15 @@ const PATROL_SPEED = 2.74
 
 /** 的が走っている最中か。倒れている・眠っている・転んでいる・投げられている間は走らない */
 function patrolling(bot: MatchPlayer, now: number): boolean {
-  return bot.patrolTo !== null && !isDowned(bot.life) && !isAsleep(bot.sleepUntil, now) && bot.downLeft <= 0 && bot.knockLeft <= 0
+  return (
+    bot.patrolTo !== null &&
+    !isDowned(bot.life) &&
+    !isAsleep(bot.sleepUntil, now) &&
+    bot.downLeft <= 0 &&
+    bot.knockLeft <= 0 &&
+    // 猫に釘付けの間・立ち上がっている間は止まる
+    trapStage(bot.trappedBy, bot.trapFreeAt, now) === null
+  )
 }
 
 /**

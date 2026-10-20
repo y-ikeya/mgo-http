@@ -8,12 +8,16 @@ import { LURE_RADIUS } from '../../../domain/item/cat'
  *
  * 釘付けにするのも消すのもサーバー (server/arms/cat.ts)。ここは見せるだけ。
  * 円は効く範囲 (半径 1.5m、domain/item/cat.ts)。**敵には見えない** — 見えると避けて通られる。
- * 置いた本人にはうっすら見える (どこまで寄せれば掛かるかが分かる)。
+ * 置いた本人と味方にはうっすら見える (どこまで寄せれば掛かるかが分かる)。
  * 誰かが掛かったら円は消す (もう誰も掛からない)。
  */
 
-/** 円の濃さ。**うっすら** (本人 2026-10-20) */
-const RING_OPACITY = 0.07
+/**
+ * 円の色と濃さ。**うっすら** (本人 2026-10-20)。白の 0.07 では明るい床 (検証場・練習場) で
+ * 見えなかったので、どちらの床でも浮く水色にする (TSNE のターゲットの光りと同じ色)
+ */
+const RING_COLOR = 0x8af4ff
+const RING_OPACITY = 0.35
 /** 円の縁の太さ (m) */
 const RING_WIDTH = 0.06
 /** 床から浮かせる量 (m)。床と重なってちらつかないように */
@@ -38,7 +42,7 @@ export class Cats {
   private readonly fading: Fading[] = []
   private readonly ringGeometry = new THREE.RingGeometry(LURE_RADIUS - RING_WIDTH, LURE_RADIUS, 64)
   private readonly ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
+    color: RING_COLOR,
     transparent: true,
     opacity: RING_OPACITY,
     depthWrite: false,
@@ -60,13 +64,13 @@ export class Cats {
     return this.entries.get(id)?.group.position ?? null
   }
 
-  /** 置く。mine なら効く範囲の円も出す */
-  place(id: number, at: readonly number[], yaw: number, mine: boolean): void {
+  /** 置く。friendly (置いた本人か味方) なら効く範囲の円も出す */
+  place(id: number, at: readonly number[], yaw: number, friendly: boolean): void {
     if (this.entries.has(id)) return
     const group = new THREE.Group()
     group.position.set(at[0]!, at[1]!, at[2]!)
     let ring: THREE.Mesh | null = null
-    if (mine) {
+    if (friendly) {
       ring = new THREE.Mesh(this.ringGeometry, this.ringMaterial)
       ring.rotation.x = -Math.PI / 2
       ring.position.y = RING_LIFT

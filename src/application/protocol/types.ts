@@ -589,13 +589,15 @@ export interface DecoyGone {
 
 /**
  * 猫が置かれた。**敵にも配る** (撃てば壊せる物なので、見えていないと壊しようがない)。
- * 釘付けになる円は**置いた本人にだけ**出す (受け取った側が owner で決める)
+ * 釘付けになる円は**置いた本人と味方にだけ**出す (受け取った側が owner と team で決める)
  */
 export interface CatPlaced {
   type: 'catPlaced'
   id: number
   /** 置いた人。本人が「置けた」ことを知り、円を出すのに要る */
   owner: string
+  /** 置いた人の陣営。**味方にも円を出す**のに要る */
+  team: Team
   at: [number, number, number]
   /** 正面の向き (rad) */
   yaw: number
