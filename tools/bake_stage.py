@@ -313,25 +313,29 @@ def bake(samples=SAMPLES):
             continue
         if LAYER in mesh.color_attributes:
             mesh.color_attributes.remove(mesh.color_attributes[LAYER])
-        layer = mesh.color_attributes.new(name=LAYER, type=COLOR_TYPE, domain='POINT')
+        # **面の角ごとに焼く** (CORNER)。同じ頂点でも、壁の面の角と窓の口の内側の面の角は別の値を持つ。
+        # 頂点ごと (POINT) だった頃は、窓の角の頂点に口の内側の暗さが乗って、そこから壁の細長い
+        # 三角に沿って斜めの暗がりが伸びた (2026-10-20 本人「同じ面なのに光り方が違う」、建物 5)
+        layer = mesh.color_attributes.new(name=LAYER, type=COLOR_TYPE, domain='CORNER')
         matrix = obj.matrix_world
         normal_matrix = matrix.inverted_safe().transposed().to_3x3()
-        # **法線は先に全部読む。** 頂点ごとに vertex.normal を引くと、色を 1 つ書くたびに
-        # メッシュが「変わった」扱いになって法線を全部計算し直す (頂点数の 2 乗)。
-        # 土嚢 97 個を足したら書き出しが終わらなくなった。読んでから書く
-        normals = [v.normal.copy() for v in mesh.vertices]
-        # 頂点ごとに、それを含む面の真ん中。縁の頂点を測り直す位置をそれぞれへ寄せる
-        centers = [[] for _ in mesh.vertices]
+        # 面の向き (平らな法線) と真ん中を先に読む。**同じ頂点で同じ向きの面の角は 1 回だけ測る**
+        # (平らな壁の真ん中の頂点は 4 面に共有されるが、向きが同じなので値も同じ)
+        def facing(poly):
+            n = (normal_matrix @ poly.normal).normalized()
+            return n if n.length > 1e-6 else up
+        groups = {}
         for poly in mesh.polygons:
+            n = facing(poly)
+            key_n = (round(n.x, 2), round(n.y, 2), round(n.z, 2))
             center = matrix @ poly.center
             for vi in poly.vertices:
-                centers[vi].append(center)
-        colors = []
-        for i, vertex in enumerate(mesh.vertices):
-            world = matrix @ vertex.co
-            normal = (normal_matrix @ normals[i]).normalized()
-            if normal.length < 1e-6:
-                normal = up
+                entry = groups.setdefault((vi, key_n), {'n': n, 'centers': []})
+                entry['centers'].append(center)
+        values = {}
+        for (vi, key_n), entry in groups.items():
+            world = matrix @ mesh.vertices[vi].co
+            normal = entry['n']
             origin = world + normal * EPS
             rays = directions(normal, samples)
             sky = sky_from(tree, origin, rays, up)
@@ -339,12 +343,10 @@ def bake(samples=SAMPLES):
             # 伸びていると、床の隅の頂点は壁の中にあり、線は壁の外側の面を裏から抜けて (近い
             # 裏面は飛ばす) 外の空に届いた。建物 6 の 1 階は床 1 枚 (21m × 14m) で、部屋の隅が
             # 0.4 の明るさになった (2026-10-17 本人「なんでここ明るいの、部屋の一番奥だぞ」)。
-            # 「埋まっているか」を線や近い面で判じる作りは、窓の口の面や自分の床に引っ張られて外れた。
-            # 外壁の頂点は寄せても外なので変わらない。高さは変えない (下へ寄せると床に潜る)
-            # 寄せる向きは**面ごとに**試す。平均を取ると、床の箱の長い側面の真ん中に引っ張られて
-            # 壁に沿って横へずれるだけになり、部屋の中へ出られなかった (建物 6 の南の壁際が 0.25)
+            # 寄せるのは**同じ向きの面の内側だけ** — 角ごとに焼くので、窓の口の面の暗さは壁の角に来ない。
+            # 高さは変えない (下へ寄せると床に潜る)
             if sky > 0.02:
-                for center in centers[i]:
+                for center in entry['centers']:
                     toward = center - world
                     toward.z = 0.0
                     span = toward.length
@@ -357,14 +359,20 @@ def bake(samples=SAMPLES):
                             break
                     if sky <= 0.02:
                         break
-            value = FLOOR + (1.0 - FLOOR) * sky
-            colors.extend((value, value, value, 1.0))
+            values[(vi, key_n)] = FLOOR + (1.0 - FLOOR) * sky
             total += 1
+        colors = [0.0] * (len(mesh.loops) * 4)
+        for poly in mesh.polygons:
+            n = facing(poly)
+            key_n = (round(n.x, 2), round(n.y, 2), round(n.z, 2))
+            for li in poly.loop_indices:
+                value = values[(mesh.loops[li].vertex_index, key_n)]
+                colors[li * 4:li * 4 + 4] = (value, value, value, 1.0)
         # まとめて 1 度で書く
         layer.data.foreach_set('color', colors)
         # 切り分け用: BAKE_PROBE=物の名前 で、その物の真っ暗な頂点が何に遮られているかを出す
         if os.environ.get('BAKE_PROBE') == obj.name:
-            dark = [i for i in range(len(mesh.vertices)) if colors[i * 4] <= FLOOR + 0.01]
+            dark = sorted({mesh.loops[li].vertex_index for li in range(len(mesh.loops)) if colors[li * 4] <= FLOOR + 0.01})
             print(f'[bake] {obj.name}: 頂点 {len(mesh.vertices)} のうち真っ暗 {len(dark)}', flush=True)
             depsgraph = bpy.context.evaluated_depsgraph_get()
             probe_bm = bmesh.new()
@@ -378,6 +386,7 @@ def bake(samples=SAMPLES):
             probe_bm.free()
             # 外壁の頂点 (法線が南向き) を優先して、24 本の光線が何に当たるかを数える
             axis = Vector(tuple(float(x) for x in os.environ.get('BAKE_PROBE_NORMAL', '0,-1,0').split(',')))
+            normals = [v.normal.copy() for v in mesh.vertices]
             outer = [i for i in dark if (normal_matrix @ normals[i]).normalized().dot(axis) > 0.9]
             print(f'[bake]   うち法線 {tuple(axis)} 向き {len(outer)}', flush=True)
             for i in (outer or dark)[:6]:
