@@ -380,6 +380,16 @@ export interface MatchPlayer extends Player {
   stamina: number
   /** 眠りが明ける時刻 (ms)。0 なら眠っていない */
   sleepUntil: number
+  /** もがいても起きられない時刻 (ms)。眠った時に決める (domain/player/stamina.ts の struggle) */
+  wakeFloor: number
+  /** 前にもがいた時刻 (ms)。もがく速さの上限を測る */
+  struggleAt: number
+  /** 最後に叩かれた時刻 (ms)。叩く間の最短を測る (stamina.ts の pat) */
+  patAt: number
+  /** 釘付けにしている猫の番号 (server/arms/doll.ts)。0 なら掛かっていない */
+  trappedBy: number
+  /** この時刻 (ms) まではどの猫にも掛からない。解けた時に決める (domain/item/doll.ts の IMMUNE_SECONDS) */
+  trapFreeAt: number
   /** スタンナイフの充電が満ちる時刻 (ms)。湧いた時に今へ戻す (満ちた状態) */
   stunReadyAt: number
   /** 歩いた距離の積算。足音を出す間隔を決める */
@@ -457,6 +467,11 @@ export function newMatchPlayer(seed: {
     ready: false,
     stamina: MAX_STAMINA,
     sleepUntil: 0,
+    wakeFloor: 0,
+    struggleAt: 0,
+    patAt: 0,
+    trappedBy: 0,
+    trapFreeAt: 0,
     stunReadyAt: 0,
     headshots: 0,
     headDeaths: 0,

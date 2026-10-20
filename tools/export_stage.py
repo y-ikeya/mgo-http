@@ -1529,6 +1529,19 @@ for obj in bpy.context.scene.objects:
         print(f'  {obj.name}: 真下に床が無い。空の高さのまま')
     bases[team] = {'x': round(x, 2), 'y': round(floor if floor is not None else y, 2), 'z': round(z, 2)}
 
+# --- ターゲット (TSNE) ---------------------------------------------------------
+#
+# **名前が target で始まる空 (target1 / target2) がターゲットの置き場所。** 守る側の基地に近い
+# ほうが使われる (domain/match/target.ts)。高さは基地と同じく真下の床の天面に落とす
+tsne_targets = []
+for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
+    if obj.type != 'EMPTY' or not obj.name.lower().startswith('target'):
+        continue
+    x, y, z = to_gltf(obj.matrix_world.translation)
+    floor = floor_under(x, y, z)
+    tsne_targets.append({'name': obj.name, 'x': round(x, 2), 'y': round(floor if floor is not None else y, 2), 'z': round(z, 2)})
+    print(f'  ターゲット {obj.name}: ({x:.1f}, {tsne_targets[-1]["y"]:.1f}, {z:.1f})')
+
 # --- 太陽 ----------------------------------------------------------------------
 #
 # **光は Blender で決める。** Sun ランプ (名前が sun で始まる) の向き・色・強さを
@@ -1603,6 +1616,8 @@ for obj in bpy.context.scene.objects:
 json_path = os.path.join(root, 'public', 'models', stage_name + '.json')
 with open(json_path, 'w') as f:
     out = {'boxes': boxes, 'ladders': ladders, 'bases': bases}
+    if tsne_targets:
+        out['tsneTargets'] = tsne_targets
     if sun:
         out['sun'] = sun
     if fx:

@@ -13,6 +13,10 @@
 #     壁を別々の物で組んだ建物は 'body' に名前の並びを渡す (b6: concrete_wall6_east / north / south / west)。
 #     2026-10-09 に全棟 (b3 b5 b6 b9 b10 b15 b17 b18 b22 b24 b31 b32 sp1) をこれで作り直した。
 # 雨だれ: 壁の面ごとに 1〜3 本、壁の上端から 0.8〜1.6m 垂らす。細いので縞が半分の絵 (decal_streak_half)。
+#     窓のある建物は 'windows' に窓の中身の物 (ガラス・板) の名前を渡す — 屋根の縁ではなく窓の下から垂らす
+#     (b32 などの元からある建物と同じ)。'only': ['streak'] で雨だれだけ作り直せる。
+#     b18: {'body': 'concrete_building18', 'tag': '18', 'ground': 10.103, 'only': ['streak'],
+#           'windows': ['glass_building18_panes_notexture', 'wood_building18_boards']}
 # 角: tools/gen/edge_wear.py。
 import bpy, bmesh, random
 from mathutils import Vector
@@ -219,8 +223,120 @@ if not ONLY or 'grime' in ONLY:
         bpy.context.view_layer.update()
         print(o.name, 'flipped', _fix['fix_decal_normals'](o), 'faces', len(o.data.polygons))
 
-# 雨だれと角は乱数で作るので、'only' を渡した時は作り直さない
-if not ONLY:
+# 雨だれと角は乱数で作るので、'only' を渡した時は作り直さない ('only': ['streak'] なら雨だれだけ)
+WINDOWS = cfg.get('windows')
+
+
+def window_openings():
+    """窓の中身 (ガラス・板) の物から、窓 1 つずつの (下端の z, 幅の向き t, 中心, 幅)。
+    板は 1 枚ずつ別のかたまりなので、同じ窓の板は中心でまとめる"""
+    bu = {}
+    exec(open('/Users/yuma/workspace/mgo2http/tools/gen/board_up.py').read(), bu)
+    out = []
+    for name in WINDOWS:
+        for lo, hi, _, pts in bu['_components'](bpy.data.objects[name]):
+            v, u, _ = bu['_thin_axis'](pts)
+            c = (lo + hi) / 2
+            us = [p.dot(u) for p in pts]
+            # 板の窓の真下に 1 階の小窓がある所もある (b18 の東面) — 中心が近くても高さが離れていれば別の窓
+            for w in out:
+                if (w['c'].xy - c.xy).length < 0.5 and lo.z < w['top'] + 0.1 and hi.z > w['z'] - 0.1:
+                    w['z'] = min(w['z'], lo.z); w['top'] = max(w['top'], hi.z)
+                    break
+            else:
+                out.append({'z': lo.z, 'top': hi.z, 'v': v, 'u': u, 'c': c, 'w': max(us) - min(us)})
+    return out
+
+
+def wall_below(w):
+    """窓の下の壁の外の面 (面の上の点, 外向き)。壁の外が無い (埋もれた窓・中庭の床の上に浮いた窓) なら None。
+    本体は中の詰まった箱なので、外から戻る線だけが表の面に当たる"""
+    ev = body.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    Mi = body.matrix_world.inverted()
+    q = Vector((w['c'].x, w['c'].y, w['z'] - 0.3))
+    for s in (1, -1):
+        d = w['v'] * s
+        o = q + d * 0.6
+        ok, at, n, _ = ev.ray_cast(Mi @ o, (Mi.to_3x3() @ -d).normalized(), distance=1.2)
+        if ok and (body.matrix_world.to_3x3() @ n).normalized().dot(d) > 0.5:
+            at = body.matrix_world @ at
+            # 前が詰まっている壁 (隣の建物まで 1.5m 無い) は人から見えない
+            sc = bpy.context.scene
+            hit = sc.ray_cast(bpy.context.evaluated_depsgraph_get(), at + d * 0.05, d, distance=WINDOW_CLEAR)
+            if hit[0]:
+                return None
+            return at, d
+    return None
+
+
+WINDOW_CLEAR = 1.5
+# 本体の下端 (世界の z)。雨だれをここより下へ垂らさない
+BOTTOM = min((b.matrix_world @ Vector(c)).z for b in BODIES for c in b.bound_box)
+STEP = 0.1      # 縦に 10cm ごとに区切る (b32 の窓の下の雨だれと同じ作り。焼いた明るさが縦に滑らかになる)
+
+
+def window_streak(bm, uv, at, d, c, w, top, h):
+    t = Vector((-d.y, d.x, 0)).normalized()
+    p = at + t * (c - at.dot(t)) + d * E
+    p.z = 0
+    vmax = random.uniform(0.8, 1.0)
+    n = max(1, round(h / STEP))
+    for i in range(n):
+        z1 = top - h * i / n; z0 = top - h * (i + 1) / n
+        v1 = vmax * i / n; v0 = vmax * (i + 1) / n
+        quad(bm, uv, [p + t * (-w / 2) + Vector((0, 0, z0)), p + t * (w / 2) + Vector((0, 0, z0)),
+                      p + t * (w / 2) + Vector((0, 0, z1)), p + t * (-w / 2) + Vector((0, 0, z1))],
+             ((1, v0), (0, v0), (0, v1), (1, v1)))
+
+
+if WINDOWS and (not ONLY or 'streak' in ONLY):
+    # ---- 雨だれ (窓の下から)。他の建物 (b32 など) と同じく窓の下端の 2cm 下から垂らす。
+    # 本人 2026-10-19「ほかの building で屋根から垂れてるってことがなかった」。
+    # 幅 1m までの窓は窓の幅いっぱいに 1 本 (広い縞の絵)、板を打ち付けた広い窓は 2〜3 本 (細い縞の絵)
+    wide = bpy.data.materials['decal_streak']
+    st = bmesh.new(); st_uv = st.loops.layers.uv.new('UVMap')
+    nr = bmesh.new(); nr_uv = nr.loops.layers.uv.new('UVMap')
+    made = skipped = 0
+    for w in window_openings():
+        wall = wall_below(w)
+        if not wall:
+            skipped += 1
+            continue
+        at, d = wall
+        t = Vector((-d.y, d.x, 0)).normalized()
+        c = w['c'].dot(t); top = w['z'] - 0.02
+        # 壁の下端より下へは垂らさない。渡り廊下 (b12_bridge) は 1m 下で壁が終わっていて、
+        # 宙に筋が浮いた
+        reach = top - BOTTOM - 0.1
+        if reach < 0.3:
+            continue
+        if w['w'] <= 1.2:
+            h = min(random.uniform(1.0, 1.5), reach)
+            window_streak(st if w['w'] >= 0.9 else nr, st_uv if w['w'] >= 0.9 else nr_uv, at, d, c, w['w'] - 0.04, top, h)
+            made += 1
+        else:
+            for _ in range(random.randint(2, 3)):
+                sw = random.uniform(0.4, 0.7)
+                sc_ = random.uniform(c - w['w'] / 2 + sw / 2, c + w['w'] / 2 - sw / 2)
+                window_streak(nr, nr_uv, at, d, sc_, sw, top, min(random.uniform(0.8, 1.4), reach))
+                made += 1
+    # 1 つの物に 2 つの材質 (b32 と同じ)
+    if len(st.faces):
+        nr_me = bpy.data.meshes.new('_nr'); nr.to_mesh(nr_me); nr.free()
+        st_me = bpy.data.meshes.new('_st'); st.to_mesh(st_me); st.free()
+        st = bmesh.new(); st.from_mesh(st_me)
+        for f in st.faces: f.material_index = 0
+        k = len(st.faces); st.from_mesh(nr_me); st.faces.ensure_lookup_table()
+        for f in st.faces[k:]: f.material_index = 1
+        bpy.data.meshes.remove(nr_me); bpy.data.meshes.remove(st_me)
+        o = finish('vis_decal_b%s_streak_nouv' % TAG, st, wide)
+        o.data.materials.append(streak_mat)
+    else:
+        st.free()
+        finish('vis_decal_b%s_streak_nouv' % TAG, nr, streak_mat)
+    print('window streaks', made, 'windows without an outer wall', skipped)
+
+if not ONLY and not WINDOWS:
     # ---- 雨だれ (屋根の縁から)
     st = bmesh.new(); st_uv = st.loops.layers.uv.new('UVMap')
     dg = bpy.context.evaluated_depsgraph_get()
@@ -254,6 +370,8 @@ if not ONLY:
             quad(st, st_uv, pts, ((0, 1), (1, 1), (1, 0), (0, 0)))     # 絵は v=0 が濃い (上)
     finish('vis_decal_b%s_streak_nouv' % TAG, st, streak_mat)
 
+
+if not ONLY:
     # ---- 角
     exec(open('/Users/yuma/workspace/mgo2http/tools/gen/edge_wear.py').read(), {'__name__': 'edge'})
     _edge = {}

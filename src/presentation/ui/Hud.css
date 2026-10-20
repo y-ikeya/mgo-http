@@ -704,15 +704,16 @@
  * 3 か所に書いていた**のが原因なので、変数にして計算で出す。
  */
 :root {
-  --hud-card-w: 168px;
-  --hud-card-h: 74px;
+  /* 一回り大きく、角へ寄せる (2026-10-19 本人)。168 × 74 / 縁 22 だった */
+  --hud-card-w: 200px;
+  --hud-card-h: 88px;
   --hud-card-gap: 6px;
   /* 画面の縁からの余白 */
-  --hud-edge: 22px;
+  --hud-edge: 12px;
   /* 武器のカードの下端。**下に状態の行 (PRESS R など) が入る** */
-  --hud-weapon-bottom: 38px;
+  --hud-weapon-bottom: 28px;
   /* 道具のカードの下端。こちらの下には何も入らない */
-  --hud-tool-bottom: 20px;
+  --hud-tool-bottom: 12px;
 }
 
 .hud-browse {
@@ -858,7 +859,7 @@
 
 /* 持っている弾の総数 (装填分 + 予備)。内訳は下の目盛り */
 .hud-weapon-spare {
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1;
   letter-spacing: 0.06em;
   color: rgba(219, 230, 242, 0.85);
@@ -880,7 +881,7 @@
 }
 
 .hud-weapon-name {
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 0.14em;
   color: #f2f6fb;
 }
@@ -919,12 +920,76 @@
  * スタンナイフの充電。弾の目盛り (hud-weapon-mag) と同じ帯に 1 本の棒。
  * 溜まっている間は鈍い青、満ちたら明るく光る — 使えるかを読まずに分かる
  */
-.hud-weapon-charge {
-  position: relative;
-  flex: 0 0 8px;
+/* 充電の行。「CHARGE」の文字と棒 (MGO2 の STUN KNIFE のカード) */
+.hud-weapon-charge-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   margin-top: 2px;
+}
+
+.hud-weapon-charge-label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: rgba(219, 230, 242, 0.75);
+}
+
+.hud-weapon-charge-full .hud-weapon-charge-label,
+.hud-weapon-charge-row:has(.hud-weapon-charge-full) .hud-weapon-charge-label {
+  color: rgba(160, 225, 255, 0.98);
+}
+
+.hud-weapon-charge {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
   background: rgba(219, 230, 242, 0.16);
+}
+
+/* 上の段。輪郭と弾の総数を右に寄せて並べる (左上は CQC の印) */
+.hud-weapon-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 26px;
+}
+
+/*
+ * 武器の輪郭。**カードいっぱいに大きく、文字の後ろに** (MGO2 のカード。小さいと「しょぼい」
+ * 2026-10-19 本人)。殺傷は赤、麻酔は青
+ */
+.hud-weapon-art {
+  position: absolute;
+  inset: 4px 10px 12px 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 16px);
+  object-fit: contain;
+  opacity: 0.85;
+  filter: url(#hud-outline-lethal);
+  z-index: 0;
+}
+
+/* 文字と目盛りは輪郭の上 */
+.hud-weapon > :not(.hud-weapon-art):not(.hud-weapon-filters):not(.hud-weapon-cqc) {
+  position: relative;
+  z-index: 1;
+}
+
+.hud-weapon > .hud-weapon-cqc {
+  z-index: 1;
+}
+
+.hud-weapon-art-tranq {
+  filter: url(#hud-outline-tranq);
+}
+
+/* filter の定義だけを持つ。場所を取らない */
+.hud-weapon-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
 }
 
 .hud-weapon-charge-fill {
@@ -1275,6 +1340,14 @@
   transition: opacity 0.25s linear;
 }
 
+
+.hud-asleep-hint {
+  position: absolute;
+  top: calc(50% + 48px);
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  color: rgba(159, 196, 234, 0.7);
+}
 
 /*
  * --- 銃の色分け ---

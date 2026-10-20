@@ -134,5 +134,56 @@ if (view === 'x') {
 camera.lookAt(center)
 say(`size ${size.toArray().map((v) => v.toFixed(3)).join(',')} view ${view} half ${halfW.toFixed(3)}x${halfH.toFixed(3)}`)
 renderer.render(scene, camera)
+/*
+ * `?fill` … 形の内側の穴を塗りつぶす。**外の縁からつながっていない透明な所は内側。**
+ * 面を間引いた模型 (猫の置物、4000 面) は面の欠けが穴になって、影絵が縞模様に抜けた
+ * (2026-10-20 本人「縞模様まで再現しなくていい、塗りつぶしで」)
+ */
+if (query.has('fill')) fillHoles()
 say('rendered')
+
+function fillHoles(): void {
+  const gl = renderer.getContext()
+  const pixels = new Uint8Array(WIDTH * HEIGHT * 4)
+  gl.readPixels(0, 0, WIDTH, HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+  const solid = (i: number) => pixels[i * 4 + 3]! > 8
+  const outside = new Uint8Array(WIDTH * HEIGHT)
+  const stack: number[] = []
+  for (let x = 0; x < WIDTH; x++) stack.push(x, (HEIGHT - 1) * WIDTH + x)
+  for (let y = 0; y < HEIGHT; y++) stack.push(y * WIDTH, y * WIDTH + WIDTH - 1)
+  while (stack.length > 0) {
+    const i = stack.pop()!
+    if (outside[i] || solid(i)) continue
+    outside[i] = 1
+    const x = i % WIDTH
+    if (x > 0) stack.push(i - 1)
+    if (x < WIDTH - 1) stack.push(i + 1)
+    if (i >= WIDTH) stack.push(i - WIDTH)
+    if (i < WIDTH * (HEIGHT - 1)) stack.push(i + WIDTH)
+  }
+  // 塗った絵を 2D の板に描き直して、それを撮らせる (WebGL の板は上下が逆)
+  const canvas = document.createElement('canvas')
+  canvas.width = WIDTH
+  canvas.height = HEIGHT
+  const ctx = canvas.getContext('2d')!
+  const image = ctx.createImageData(WIDTH, HEIGHT)
+  for (let i = 0; i < WIDTH * HEIGHT; i++) {
+    const x = i % WIDTH
+    const y = HEIGHT - 1 - Math.floor(i / WIDTH)
+    const o = (y * WIDTH + x) * 4
+    image.data[o] = 255
+    image.data[o + 1] = 255
+    image.data[o + 2] = 255
+    // 外に接している画素だけ元の濃さ (縁のなめらかさ)。内側は欠けの縁の半透明も含めて塗る
+    const x0 = i % WIDTH
+    const edge =
+      (x0 > 0 && outside[i - 1]) ||
+      (x0 < WIDTH - 1 && outside[i + 1]) ||
+      (i >= WIDTH && outside[i - WIDTH]) ||
+      (i < WIDTH * (HEIGHT - 1) && outside[i + WIDTH])
+    image.data[o + 3] = outside[i] ? 0 : edge ? pixels[i * 4 + 3]! : 255
+  }
+  ctx.putImageData(image, 0, 0)
+  renderer.domElement.replaceWith(canvas)
+}
 ;(globalThis as unknown as { ready: boolean }).ready = true

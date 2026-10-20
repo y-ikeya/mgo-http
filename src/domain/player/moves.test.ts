@@ -22,11 +22,37 @@ const standing: BodyState = {
   aiming: false,
   crouching: false,
   cqc: false,
+  trapped: false,
 }
 
 describe('できること', () => {
-  test('立っていれば一通りできる', () => {
-    for (const move of Object.keys(MOVES) as Move[]) expect(can(standing, move)).toBe(true)
+  test('立っていれば一通りできる (もがくのは眠っている間だけ、叩くのはしゃがんでいる時だけ)', () => {
+    for (const move of Object.keys(MOVES) as Move[]) {
+      if (move === 'struggle' || move === 'pat') continue
+      expect(can(standing, move)).toBe(true)
+    }
+  })
+
+  test('猫に釘付けの間は何もできない (眠らされることはある)', () => {
+    const trapped = { ...standing, trapped: true }
+    for (const move of Object.keys(MOVES) as Move[]) {
+      if (move === 'sleep' || move === 'struggle') continue
+      expect(can(trapped, move)).toBe(false)
+    }
+    expect(can(trapped, 'sleep')).toBe(true)
+  })
+
+  test('眠っている人を叩けるのは、しゃがんで構えていない時だけ', () => {
+    expect(can(standing, 'pat')).toBe(false)
+    expect(can({ ...standing, crouching: true }, 'pat')).toBe(true)
+    expect(can({ ...standing, crouching: true, aiming: true }, 'pat')).toBe(false)
+    expect(can({ ...standing, crouching: true, sleeping: true }, 'pat')).toBe(false)
+  })
+
+  test('もがけるのは眠っている間だけ。倒れていたら眠っていても無理', () => {
+    expect(can(standing, 'struggle')).toBe(false)
+    expect(can({ ...standing, sleeping: true }, 'struggle')).toBe(true)
+    expect(can({ ...standing, sleeping: true, downed: true }, 'struggle')).toBe(false)
   })
 
   test('倒れたら何もできない (眠るだけは「もう倒れている」で弾く)', () => {

@@ -19,6 +19,7 @@ import {
   soleTeam,
 } from '../src/domain/match/match'
 import { livesOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
+import { clearTsneTarget, placeTsneTarget, updateTsneTarget } from './target'
 import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
 import { fitLoadout } from '../src/domain/player/equip'
 import { canChoose, isDowned, isSeated } from '../src/domain/player/lifecycle'
@@ -28,6 +29,8 @@ import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { clearClaymores } from './arms/claymore'
+import { clearDolls } from './arms/doll'
+import { trapStage } from '../src/domain/item/doll'
 import { clearDecoys } from './arms/decoy'
 import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
@@ -193,21 +196,20 @@ export function updateTargets(room: RoomWorld, now: number): void {
  * 立つ、という絵になる。
  */
 export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
-  return isDowned(bot.life)
-    ? bot.downFromBehind
-      ? 'death_front'
-      : 'death_back'
-    : isAsleep(bot.sleepUntil, now)
-      ? 'sleep'
-      : bot.downLeft > TARGET_STAND
-        ? bot.downThrown
-          ? 'cqc_thrown'
-          : 'sweep'
-        : bot.downLeft > 0
-          ? 'stand'
-          : patrolling(bot, now)
-            ? 'run_f'
-            : REST[bot.homeStance]
+  if (isDowned(bot.life)) return bot.downFromBehind ? 'death_front' : 'death_back'
+  if (isAsleep(bot.sleepUntil, now)) return 'sleep'
+  // 猫に釘付け (掛かっている / 立ち上がっている途中)。眠りより後、転倒より先
+  const trap = trapped(bot, now)
+  if (trap) return trap
+  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : 'sweep'
+  if (bot.downLeft > 0) return 'stand'
+  return patrolling(bot, now) ? 'run_f' : REST[bot.homeStance]
+}
+
+/** 猫に釘付けの姿 (掛かっている / 立ち上がっている途中)。どちらでもなければ null */
+function trapped(bot: MatchPlayer, now: number): 'trapped' | 'trapped_out' | null {
+  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now)
+  return stage === 'in' ? 'trapped' : stage === 'out' ? 'trapped_out' : null
 }
 
 /**
@@ -218,7 +220,15 @@ const PATROL_SPEED = 2.74
 
 /** 的が走っている最中か。倒れている・眠っている・転んでいる・投げられている間は走らない */
 function patrolling(bot: MatchPlayer, now: number): boolean {
-  return bot.patrolTo !== null && !isDowned(bot.life) && !isAsleep(bot.sleepUntil, now) && bot.downLeft <= 0 && bot.knockLeft <= 0
+  return (
+    bot.patrolTo !== null &&
+    !isDowned(bot.life) &&
+    !isAsleep(bot.sleepUntil, now) &&
+    bot.downLeft <= 0 &&
+    bot.knockLeft <= 0 &&
+    // 猫に釘付けの間・立ち上がっている間は止まる
+    trapStage(bot.trappedBy, bot.trapFreeAt, now) === null
+  )
 }
 
 /**
@@ -304,6 +314,8 @@ export function decideWinner(room: Match): Team | 'draw' {
    * **攻守に分かれる部屋は、両方残ったまま時間が来たら守る側の勝ち。**
    * blue / red はまだ戦える人数 (standingCounts)。片方が 0 なら下の通り相手の勝ち
    */
+  // **ターゲットを自陣まで運んだら攻める側の勝ち** (domain/match/target.ts)。人数より先に見る
+  if (room.mode.sides && room.targetDelivered) return room.attack
   if (room.mode.sides && room.blue > 0 && room.red > 0) {
     return room.attack === 'blue' ? 'red' : 'blue'
   }
@@ -329,6 +341,9 @@ export function matchState(room: Match): ServerMessage {
     cautionUntil: cautionUntil(room, Date.now()) ?? undefined,
     round: room.mode.sides ? room.round : undefined,
     roundWins: room.mode.sides ? room.roundWins : undefined,
+    target: room.target
+      ? { x: room.target.x, y: room.target.y, z: room.target.z, carrier: room.target.carrier }
+      : undefined,
     endsAt: room.endsAt,
     sentAt: Date.now(),
     phase: room.phase,
@@ -380,10 +395,12 @@ export function fitToRoom(room: RoomWorld, player: MatchPlayer): void {
 function startNextRound(room: RoomWorld, now: number): void {
   room.round += 1
   swapSides(room)
+  clearTsneTarget(room)
   room.revealedUntil = 0
   room.grenades.length = 0
   clearClaymores(room)
   clearDecoys(room)
+  clearDolls(room)
   clearLocators(room)
   for (const player of connected(room)) {
     fitToRoom(room, player)
@@ -437,6 +454,7 @@ export function resetPlayers(room: RoomWorld): void {
   room.grenades.length = 0
   clearClaymores(room)
   clearDecoys(room)
+  clearDolls(room)
   clearLocators(room)
   /*
    * **陣営を切り直す。** 入室で 1 回決めたきりだと、同じ面子が同じ側で
@@ -450,9 +468,13 @@ export function resetPlayers(room: RoomWorld): void {
    * 攻守交代 — 切り直すと、誰が攻めるかが毎回くじになる。入れ替えは enterReady
    */
   if (!room.mode.sides) shuffleTeams(room, Math.random)
-  for (const player of connected(room)) {
-    // 側が変われば持ち込める物も変わる。前の側の銃を持ったまま出さない
-    if (room.mode.sides) fitToRoom(room, player)
+  /*
+   * 試合ごとの数は**席を持っている全員**で戻す (戻りを待っている人も)。繋がっている人だけ
+   * 戻していた頃は、試合の合間にリロードした人の roundDeaths が前の試合のまま残り、TSNE では
+   * 次の試合の頭から「もう湧けない人」に数えられて、始まった途端にラウンドが終わった
+   * (2026-10-19、ターゲットの試験で出た)
+   */
+  for (const player of room.players.values()) {
     player.kills = 0
     player.deaths = 0
     player.roundDeaths = 0
@@ -462,6 +484,11 @@ export function resetPlayers(room: RoomWorld): void {
     player.headDeaths = 0
     player.suicides = 0
     player.killsByWeapon = {}
+    player.sleepUntil = 0
+  }
+  for (const player of connected(room)) {
+    // 側が変われば持ち込める物も変わる。前の側の銃を持ったまま出さない
+    if (room.mode.sides) fitToRoom(room, player)
     // 仕切り直しは支度から。いきなり湧かせない —
     // 前の試合の装備のまま次が始まるのは、選ぶ場面を 1 回飛ばすのと同じ
     setLife(room, player, 'choosing')
@@ -588,6 +615,7 @@ function enterReady(room: RoomWorld, now: number, afterMatch = false): void {
   room.revealedUntil = 0
   room.round = 1
   room.roundWins = { blue: 0, red: 0 }
+  clearTsneTarget(room)
   for (const player of room.players.values()) player.ready = false
   resetPlayers(room)
   if (room.mode.sides) standingCounts(room, now)
@@ -739,6 +767,8 @@ export function updateMatch(room: RoomWorld, now: number): void {
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION_MS
+    // ターゲットを守る側の陣地の近くに置く (TSNE。server/target.ts)
+    placeTsneTarget(room)
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく。
     // **後攻のラウンドは同じ試合の続き** なので発番し直さない
     if (!(room.mode.sides && room.round > 1 && room.matchId)) {
@@ -749,8 +779,13 @@ export function updateMatch(room: RoomWorld, now: number): void {
   }
   // 攻守に分かれる部屋は、まだ戦える人数を数え直してから決着を見る
   if (room.mode.sides && room.phase === 'playing') standingCounts(room, now)
+  // ターゲット (TSNE) を動かす。取った・落ちた・戻った・運び込んだ時はすぐ配る
+  const targetChanged = room.mode.sides && updateTsneTarget(room, now)
   if (room.phase !== 'playing' || previous !== 'playing') {
     // 段階が変わった刻みでは決着を見ない (上の分岐で済んでいる)
+  } else if (room.targetDelivered) {
+    // **運び込んだ。** 攻める側の勝ち (decideWinner)。時間を待たずにその場で終わる
+    endRound(room, now)
   } else if (ticketsGone(room)) {
     // **削り切った。** 残機が 0 になったら終わり。時間を待たずにその場で終わる
     endRound(room, now)
@@ -767,7 +802,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
   const cautionChanged = room.mode.sides && room.revealedUntil !== room.cautionSent
   if (cautionChanged) room.cautionSent = room.revealedUntil
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
-  if (previous !== room.phase || stealthChanged || cautionChanged || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
+  if (previous !== room.phase || stealthChanged || cautionChanged || targetChanged || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
     room.lastBroadcast = now
     broadcast(room, matchState(room))
   }

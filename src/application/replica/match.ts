@@ -17,6 +17,7 @@
  * 同じ状態を 2 通りで書くことになる。
  */
 
+import { newServerClock, observeClock, toLocal, type ServerClock } from './clock'
 import { MODES, type Mode } from '../../domain/match/room'
 import type { VoiceId } from '../../domain/player/voice'
 import { DEATH_POINTS, KILL_POINTS, STUN_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
@@ -81,6 +82,8 @@ export interface MatchReplica {
   voiceFeed: VoiceEntry[]
   pointFeed: PointEntry[]
   presenceFeed: PresenceEntry[]
+  /** サーバーの時計とのずれ (clock.ts)。終わる時刻を手元の時計へ直すのに使う */
+  clock: ServerClock
 }
 
 export function newMatchReplica(): MatchReplica {
@@ -94,6 +97,7 @@ export function newMatchReplica(): MatchReplica {
     voiceFeed: [],
     pointFeed: [],
     presenceFeed: [],
+    clock: newServerClock(),
   }
 }
 
@@ -139,16 +143,23 @@ export function applyMatch(
       /*
        * **終わる時刻を手元の時計へ直す。** サーバーの時刻のまま自分の時計と比べると、
        * 手元の時計のずれがそのまま残り時間のずれになる (9 秒遅れていて、残り 9 秒で
-       * 終わった)。送ってから届くまでの遅れ (数十 ms) は残り時間に含まれたままになる
+       * 終わった)。ずれは直近 30 秒で一番早く届いた報せで測る (clock.ts) — この 1 通が
+       * 遅れて届いても、その遅れで残り時間を延ばさない (残り 12 秒の表示で終わった)
        */
+      observeClock(replica.clock, message.sentAt, now)
       replica.match = {
         ...message,
-        endsAt: message.endsAt > 0 ? now + (message.endsAt - message.sentAt) : message.endsAt,
+        endsAt: message.endsAt > 0 ? toLocal(replica.clock, message.endsAt) : message.endsAt,
         // CAUTION も同じく手元の時計へ
-        cautionUntil: message.cautionUntil !== undefined ? now + (message.cautionUntil - message.sentAt) : undefined,
+        cautionUntil: message.cautionUntil !== undefined ? toLocal(replica.clock, message.cautionUntil) : undefined,
       }
       return changed ? [{ kind: 'phase', to: message.phase, teams: MODES[message.mode].teams }] : []
     }
+
+    // 往復を測る ping もサーバーの時刻を持っている。1 秒ごとに来るので時計のずれの測りに足す
+    case 'ping':
+      observeClock(replica.clock, message.at, now)
+      return []
 
     case 'roster': {
       const me = message.players.find((player) => player.id === selfId)

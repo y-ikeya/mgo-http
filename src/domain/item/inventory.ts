@@ -210,6 +210,24 @@ export class Inventory {
   }
 
   /**
+   * ターゲットを持たせる / 取り上げる (TSNE。運んでいるかはサーバーが決めて試合の状態で届く)。
+   * 一覧の NONE の前に並ぶ。**選んでも手は変えない** — 頭の上に浮いて付いてくる物なので
+   */
+  setTargetOwned(owned: boolean): void {
+    const has = this.items.some((item) => item.id === 'target')
+    if (owned && !has) {
+      const at = this.items.findIndex((item) => item.id === 'none')
+      this.items.splice(at < 0 ? this.items.length : at, 0, { id: 'target' })
+    } else if (!owned && has) {
+      this.items = this.items.filter((item) => item.id !== 'target')
+      this.pointingTarget = false
+    }
+  }
+
+  /** 一覧でターゲットを指しているか。G / △ で落とす (Game.ts) */
+  private pointingTarget = false
+
+  /**
    * いま手にある物。
    *
    * **`none` を選んでいるときは武器を返す。** あれは「道具を使っていない」という
@@ -243,6 +261,7 @@ export class Inventory {
 
   /** 道具系でいま選んでいる物。持っていなければ null */
   get tool(): HeldId {
+    if (this.pointingTarget) return 'target'
     if (HELD[this.current].family === 'tool') return this.current
     if (this.wearing) return 'stealth'
     return this.lastTool ?? 'none'
@@ -627,6 +646,15 @@ export class Inventory {
 
   private switchHand(id: HeldId): boolean {
     if (!find(this.items, id)) return false
+    /*
+     * **ターゲットは選ぶだけ。** 手も STEALTH もそのまま (頭の上に浮いている物を「これを落とす」と
+     * 指すだけ)。別の道具を選べば指すのをやめる
+     */
+    if (id === 'target') {
+      this.pointingTarget = true
+      return true
+    }
+    if (HELD[id].family === 'tool') this.pointingTarget = false
     /*
      * **STEALTH は着る物。手には持たない。**
      *

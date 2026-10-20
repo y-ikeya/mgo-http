@@ -25,6 +25,7 @@ import bpy
 import os
 import bmesh
 import math
+import random
 import sys
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
@@ -286,10 +287,6 @@ def sky_reached(tree, origin, d):
     return False
 
 
-# 縁の頂点を、面の内側へ寄せて測り直す量 (m)。暗いほうを採る (bake の中の註釈)
-INSET_STEPS = (0.3, 0.6)
-
-
 def sky_from(tree, origin, rays, up):
     """その点から空がどれだけ見えるか (0〜1)。上を向いた光線ほど重い"""
     open_rays = 0.0
@@ -313,58 +310,81 @@ def bake(samples=SAMPLES):
             continue
         if LAYER in mesh.color_attributes:
             mesh.color_attributes.remove(mesh.color_attributes[LAYER])
-        layer = mesh.color_attributes.new(name=LAYER, type=COLOR_TYPE, domain='POINT')
+        # **面の角ごとに焼く** (CORNER)。同じ頂点でも、壁の面の角と窓の口の内側の面の角は別の値を持つ。
+        # 頂点ごと (POINT) だった頃は、窓の角の頂点に口の内側の暗さが乗って、そこから壁の細長い
+        # 三角に沿って斜めの暗がりが伸びた (2026-10-20 本人「同じ面なのに光り方が違う」、建物 5)
+        layer = mesh.color_attributes.new(name=LAYER, type=COLOR_TYPE, domain='CORNER')
         matrix = obj.matrix_world
         normal_matrix = matrix.inverted_safe().transposed().to_3x3()
-        # **法線は先に全部読む。** 頂点ごとに vertex.normal を引くと、色を 1 つ書くたびに
-        # メッシュが「変わった」扱いになって法線を全部計算し直す (頂点数の 2 乗)。
-        # 土嚢 97 個を足したら書き出しが終わらなくなった。読んでから書く
-        normals = [v.normal.copy() for v in mesh.vertices]
-        # 頂点ごとに、それを含む面の真ん中。縁の頂点を測り直す位置をそれぞれへ寄せる
-        centers = [[] for _ in mesh.vertices]
-        for poly in mesh.polygons:
-            center = matrix @ poly.center
-            for vi in poly.vertices:
-                centers[vi].append(center)
-        colors = []
-        for i, vertex in enumerate(mesh.vertices):
-            world = matrix @ vertex.co
-            normal = (normal_matrix @ normals[i]).normalized()
-            if normal.length < 1e-6:
-                normal = up
-            origin = world + normal * EPS
-            rays = directions(normal, samples)
-            sky = sky_from(tree, origin, rays, up)
-            # **縁の頂点は、面の内側へ寄せた所からも測って暗いほうを採る。** 床の箱が壁の足元まで
-            # 伸びていると、床の隅の頂点は壁の中にあり、線は壁の外側の面を裏から抜けて (近い
-            # 裏面は飛ばす) 外の空に届いた。建物 6 の 1 階は床 1 枚 (21m × 14m) で、部屋の隅が
-            # 0.4 の明るさになった (2026-10-17 本人「なんでここ明るいの、部屋の一番奥だぞ」)。
-            # 「埋まっているか」を線や近い面で判じる作りは、窓の口の面や自分の床に引っ張られて外れた。
-            # 外壁の頂点は寄せても外なので変わらない。高さは変えない (下へ寄せると床に潜る)
-            # 寄せる向きは**面ごとに**試す。平均を取ると、床の箱の長い側面の真ん中に引っ張られて
-            # 壁に沿って横へずれるだけになり、部屋の中へ出られなかった (建物 6 の南の壁際が 0.25)
-            if sky > 0.02:
-                for center in centers[i]:
-                    toward = center - world
-                    toward.z = 0.0
-                    span = toward.length
-                    if span <= 1e-3:
-                        continue
-                    toward /= span
-                    for step in INSET_STEPS:
-                        sky = min(sky, sky_from(tree, origin + toward * min(step, span * 0.5), rays, up))
-                        if sky <= 0.02:
+        # **1 点で測らず、頂点が受け持つ広がりで測って平均する。** 頂点の値は隣の三角の上で線形に
+        # 混ざるので、値は「その頂点のまわりの平均」でなければならない。点で測ると、窓の角のように
+        # その点だけ暗い所の値が細長い三角に沿って伸び、平らな壁に斜めの楔が出た (建物 5・31 ほか
+        # どの建物のどの面にも。2026-10-20 本人「抜本解決しないと部分的になる」)。
+        # 光線 1 本ごとに撃つ所を変える: 頂点を含む三角 (同じ向きの面) の中に散らし、頂点からの
+        # 近さ (重心座標) で重みを付ける。面の上の点なので壁の外へは出ない (部屋の隅が外の空を見ない)
+        def facing(poly):
+            n = (normal_matrix @ poly.normal).normalized()
+            return n if n.length > 1e-6 else up
+        mesh.calc_loop_triangles()
+        poly_normal = [facing(poly) for poly in mesh.polygons]
+        world_co = [matrix @ v.co for v in mesh.vertices]
+        groups = {}
+        for tri in mesh.loop_triangles:
+            n = poly_normal[tri.polygon_index]
+            key_n = (round(n.x, 2), round(n.y, 2), round(n.z, 2))
+            a, b, c = (world_co[i] for i in tri.vertices)
+            area = (b - a).cross(c - a).length * 0.5
+            for k, vi in enumerate(tri.vertices):
+                entry = groups.setdefault((vi, key_n), {'n': n, 'tris': []})
+                if area > 1e-8:
+                    # 頂点を先頭に並べる (重心座標の 1 つ目がその頂点の重み)
+                    corners = (a, b, c)[k:] + (a, b, c)[:k]
+                    entry['tris'].append((area, corners))
+        values = {}
+        for (vi, key_n), entry in groups.items():
+            world = world_co[vi]
+            normal = entry['n']
+            # 撃つ所も散らすので、1 点で測っていた頃の倍の本数で均す
+            rays = directions(normal, samples * 2)
+            tris = entry['tris']
+            if not tris:
+                sky = sky_from(tree, world + normal * EPS, rays, up)
+            else:
+                rng = random.Random(vi * 2654435761 + hash(key_n))
+                total_area = sum(t[0] for t in tris)
+                open_rays = 0.0
+                weight = 0.0
+                for d in rays:
+                    # 面積で三角を選び、その中に一様に点を置く
+                    pick = rng.random() * total_area
+                    for area, (p0, p1, p2) in tris:
+                        pick -= area
+                        if pick <= 0:
                             break
-                    if sky <= 0.02:
-                        break
-            value = FLOOR + (1.0 - FLOOR) * sky
-            colors.extend((value, value, value, 1.0))
+                    u, v = rng.random(), rng.random()
+                    if u + v > 1.0:
+                        u, v = 1.0 - u, 1.0 - v
+                    own = 1.0 - u - v
+                    point = p0 * own + p1 * u + p2 * v
+                    w = (max(0.0, d.dot(up)) + 0.35) * own
+                    weight += w
+                    if sky_reached(tree, point + normal * EPS, d):
+                        open_rays += w
+                sky = open_rays / weight if weight > 0 else 1.0
+            values[(vi, key_n)] = FLOOR + (1.0 - FLOOR) * sky
             total += 1
+        colors = [0.0] * (len(mesh.loops) * 4)
+        for poly in mesh.polygons:
+            n = poly_normal[poly.index]
+            key_n = (round(n.x, 2), round(n.y, 2), round(n.z, 2))
+            for li in poly.loop_indices:
+                value = values[(mesh.loops[li].vertex_index, key_n)]
+                colors[li * 4:li * 4 + 4] = (value, value, value, 1.0)
         # まとめて 1 度で書く
         layer.data.foreach_set('color', colors)
         # 切り分け用: BAKE_PROBE=物の名前 で、その物の真っ暗な頂点が何に遮られているかを出す
         if os.environ.get('BAKE_PROBE') == obj.name:
-            dark = [i for i in range(len(mesh.vertices)) if colors[i * 4] <= FLOOR + 0.01]
+            dark = sorted({mesh.loops[li].vertex_index for li in range(len(mesh.loops)) if colors[li * 4] <= FLOOR + 0.01})
             print(f'[bake] {obj.name}: 頂点 {len(mesh.vertices)} のうち真っ暗 {len(dark)}', flush=True)
             depsgraph = bpy.context.evaluated_depsgraph_get()
             probe_bm = bmesh.new()
@@ -378,6 +398,7 @@ def bake(samples=SAMPLES):
             probe_bm.free()
             # 外壁の頂点 (法線が南向き) を優先して、24 本の光線が何に当たるかを数える
             axis = Vector(tuple(float(x) for x in os.environ.get('BAKE_PROBE_NORMAL', '0,-1,0').split(',')))
+            normals = [v.normal.copy() for v in mesh.vertices]
             outer = [i for i in dark if (normal_matrix @ normals[i]).normalized().dot(axis) > 0.9]
             print(f'[bake]   うち法線 {tuple(axis)} 向き {len(outer)}', flush=True)
             for i in (outer or dark)[:6]:

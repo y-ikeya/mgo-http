@@ -2,7 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import {
   MAX_STAMINA, SLEEP_SECONDS, STAMINA_RECOVER_DELAY,
   drainStamina, isAsleep, recoverStamina, sleepLeft, staminaBlur, staminaSwayScale,
+  STRUGGLE_RATE, STRUGGLE_SPEED, struggle, wakeFloor,
+  PAT_INTERVAL_MS, pat,
 } from './stamina'
+import { TSNE_SLEEP_SECONDS } from '../match/room'
+import { patSeconds, sleepScale } from './skill'
 import { WEAPONS } from '../item/weapons'
 
 /**
@@ -118,5 +122,105 @@ describe('スタミナの効き目', () => {
     expect(staminaBlur(one)).toBeLessThan(0.1)
     // 眠る一歩手前で一番濃い
     expect(staminaBlur(WEAPONS.m9.zone.BODY)).toBeGreaterThan(0.5)
+  })
+})
+
+/**
+ * もがいて早く起きる。**削る量と上限はサーバーが持つ** — 画面が送る量を偽っても、
+ * 経った時間ぶんしか効かず、眠りの 1/3 より早くは起きられない。
+ */
+describe('もがいて早く起きる', () => {
+  const now = 1_000_000
+
+  test('1 回転で 2/3 秒早まる (全力の 1 秒 3 回転で 2 秒)', () => {
+    const until = now + 60_000
+    const next = struggle({ sleepUntil: until, struggleAt: now - 1000 }, 3, 0, now)
+    expect(next.sleepUntil).toBe(until - STRUGGLE_SPEED * 1000)
+  })
+
+  test('一度に大きな数を送っても、経った時間ぶんしか効かない', () => {
+    const until = now + 60_000
+    const next = struggle({ sleepUntil: until, struggleAt: now - 500 }, 1000, 0, now)
+    expect(next.sleepUntil).toBe(until - 0.5 * STRUGGLE_SPEED * 1000)
+  })
+
+  // 本人 2026-10-19「何もしなかったら 1min で回して 20 秒」「TSNE はめっちゃ頑張って 150 秒、何もしなかったら 450 秒」
+  for (const [label, sleep, fastest] of [['普段', SLEEP_SECONDS, 20], ['TSNE', TSNE_SLEEP_SECONDS, 150]] as const) {
+    test(`${label}: 何もしなければ ${sleep} 秒、全力でもがき続けると ${fastest} 秒で起きる`, () => {
+      const start = now
+      const floor = wakeFloor(start, sleep)
+      let state = { sleepUntil: start + sleep * 1000, struggleAt: 0 }
+      let t = start
+      for (; isAsleep(state.sleepUntil, t); t += 100) state = struggle(state, STRUGGLE_RATE * 0.1, floor, t)
+      expect((t - start) / 1000).toBeCloseTo(fastest, 0)
+    })
+  }
+
+  test('速さの上限をすり抜けても、眠りの 1/3 より早くは起きられない', () => {
+    const floor = wakeFloor(now, 60)
+    const next = struggle({ sleepUntil: now + 60_000, struggleAt: now - 1000 }, 1e9, floor, now)
+    expect(next.sleepUntil).toBeGreaterThanOrEqual(floor)
+  })
+
+  test('起きている間や、数でない量は何もしない', () => {
+    const awake = { sleepUntil: now - 1, struggleAt: 0 }
+    expect(struggle(awake, 1, 0, now)).toBe(awake)
+    const asleep = { sleepUntil: now + 5000, struggleAt: 0 }
+    expect(struggle(asleep, Number.NaN, 0, now)).toBe(asleep)
+    expect(struggle(asleep, -3, 0, now)).toBe(asleep)
+  })
+})
+
+/** 眠っている人を叩いて起こす。**1 回で 20 秒縮む (どのルールでも)。** 連打では縮めない */
+describe('叩いて起こす', () => {
+  const t0 = 1_000_000
+  /** 間を空けて叩き続けて、起きるまでの回数 */
+  const patsToWake = (sleep: number) => {
+    let state = { sleepUntil: t0 + sleep * 1000, patAt: 0 }
+    let n = 0
+    for (let t = t0; isAsleep(state.sleepUntil, t); t += 1600) {
+      state = pat(state, t)
+      n++
+    }
+    return n
+  }
+
+  test('1 回で 20 秒縮む', () => {
+    expect(pat({ sleepUntil: t0 + 60_000, patAt: 0 }, t0).sleepUntil).toBe(t0 + 40_000)
+  })
+
+  test('普段 (60 秒) は 3 回、TSNE (450 秒) は 20 回以上叩かないと起きない', () => {
+    expect(patsToWake(SLEEP_SECONDS)).toBe(3)
+    expect(patsToWake(TSNE_SLEEP_SECONDS)).toBeGreaterThan(20)
+  })
+
+  test('間が短すぎる叩きは効かない (ボタンの連打で縮めない)', () => {
+    const first = pat({ sleepUntil: t0 + 60_000, patAt: 0 }, t0)
+    expect(pat(first, t0 + PAT_INTERVAL_MS - 1)).toBe(first)
+  })
+
+  test('起きている人は叩いても変わらない', () => {
+    const awake = { sleepUntil: t0 - 1, patAt: 0 }
+    expect(pat(awake, t0)).toBe(awake)
+  })
+})
+
+/** QUICK RECOVERY。**Lv3 なら 1 回叩けば起こせる** (TSNE の 450 秒でも)。自分の眠りも短い */
+describe('QUICK RECOVERY', () => {
+  const t0 = 1_000_000
+
+  test('Lv3 は TSNE の眠りたてでも 1 回で起こせる', () => {
+    const next = pat({ sleepUntil: t0 + TSNE_SLEEP_SECONDS * 1000, patAt: 0 }, t0, patSeconds({ quickRecovery: 3 }))
+    expect(isAsleep(next.sleepUntil, t0)).toBe(false)
+  })
+
+  test('段が上がるほど叩いて縮める量が増える。取っていなければ 20 秒', () => {
+    expect(patSeconds({})).toBe(20)
+    expect(patSeconds({ quickRecovery: 1 })).toBeLessThan(patSeconds({ quickRecovery: 2 }))
+  })
+
+  test('Lv3 は自分の眠りが半分', () => {
+    expect(sleepScale({})).toBe(1)
+    expect(sleepScale({ quickRecovery: 3 })).toBe(0.5)
   })
 })

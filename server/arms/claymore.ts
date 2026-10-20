@@ -15,6 +15,7 @@ import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { applyBlastDamage } from '../damage'
 import { dropGrenade } from './grenade'
 import { popDecoy } from './decoy'
+import { breakDoll } from './doll'
 import { sees } from '../relay'
 import { sessionOf } from '../session'
 import { type RoomWorld, broadcast, friendlyTeam, hostileToOwner } from '../world'
@@ -201,6 +202,10 @@ export function blastPlaced(room: RoomWorld, cx: number, cy: number, cz: number,
     room.decoys.splice(i, 1)
     popDecoy(room, decoy)
   }
+  // 人形 (DOLL) も壊れる。梯子の上に置かれた物へ、下から手榴弾を投げ込んで壊す
+  for (const doll of [...room.dolls]) {
+    if (reaches(room, cx, cy, cz, doll.x, doll.y + DOLL_MIDDLE, doll.z, radius)) breakDoll(room, doll)
+  }
   // 誘爆。1 つ爆ぜるたびに一覧が変わるので、毎回頭から探し直す
   for (;;) {
     const i = room.claymores.findIndex((c) => reaches(room, cx, cy, cz, c.x, c.y + SENSOR_HEIGHT, c.z, radius))
@@ -212,6 +217,8 @@ export function blastPlaced(room: RoomWorld, cx: number, cy: number, cz: number,
 
 /** DECOY の胸の高さ (m)。爆心から見る点 */
 const DECOY_CHEST = 0.9
+/** 人形 (DOLL) の真ん中の高さ (m)。爆心から見る点 */
+const DOLL_MIDDLE = 0.15
 
 /** 爆心から置き物へ届くか。距離の中で、線が通る */
 function reaches(room: RoomWorld, cx: number, cy: number, cz: number, x: number, y: number, z: number, radius: number): boolean {

@@ -9,6 +9,11 @@ export type InputDevice = 'auto' | 'keyboard' | 'gamepad'
  * 安物のパッドは中立でも 0.1 前後を返し続けるので、これを取らないと
  * 手を離しているのにキャラが歩き、視点が回り続ける。
  */
+/** もがきに数えるキー (眠っている間は歩けないので空いている) */
+const STRUGGLE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD'])
+/** もがきに数える左スティックの倒し具合。小さく揺らしても回したことにしない */
+const STRUGGLE_STICK = 0.6
+
 const STICK_DEADZONE = 0.12
 
 /**
@@ -115,6 +120,9 @@ type PadAction = keyof typeof PAD_BUTTONS
  * 「Space をどれだけ押したか」は遊びのルールでも描画でもないので、数えるのは
  * ここ。呼ぶ側は**意味だけ**受け取る (しゃがむのか、転がるのか)。
  */
+/** 右クリックの押下を、キーと同じ「押し始め」の控えに載せるための名前 (KeyboardEvent.code には無い名前) */
+const MOUSE_RIGHT = 'MouseRight'
+
 const BINDINGS = {
   /*
    * しゃがみ (単押し) と回避 (長押し)。どちらも「体を低くする」動作なので、
@@ -145,10 +153,12 @@ const BINDINGS = {
    */
   killStab: { keys: [], pad: 'swap' },
   /**
-   * ナイフを構えて眠らせる刺突 (スタンナイフ)。鍵盤は X。パッドは R2 (引き金)
-   * なので、ここにボタンは無い。充電が満ちていなければ振らない
+   * ナイフを構えて眠らせる刺突 (スタンナイフ)。**鍵盤は右クリック** (Mac のトラックパッドなら 2 本指)。
+   * ナイフを持っている間は右クリックを構えに使わず、構えは Shift (rightClickStuns)。
+   * X だった頃は手が遠かった (本人 2026-10-20)。パッドは R2 (引き金) なので、ここにボタンは無い。
+   * 充電が満ちていなければ振らない
    */
-  stunStab: { keys: ['KeyX'] },
+  stunStab: { keys: [MOUSE_RIGHT] },
   /** 道具の一覧。単押しでダンボール、押している間は一覧 */
   swapTool: { keys: ['KeyC'], pad: 'box' },
   drop: { keys: ['KeyG'], pad: 'drop' },
@@ -273,6 +283,12 @@ export class Input {
     // 実際に閉じるのは次の tick だが、その頃には「ユーザーの操作の最中」では
     // なくなっていて、ブラウザが掴ませてくれない。
     if (e.code === 'Tab' && !this.wantsLock) this.requestLock()
+    // もがく (眠っている間に早く起きる)。**前と違うキー**を押した時だけ数える — 押しっぱなしや
+    // 同じキーの連打では起きない。4 回で左スティック 1 回転ぶん
+    if (!this.pressed.has(e.code) && STRUGGLE_KEYS.has(e.code) && e.code !== this.struggleKey) {
+      this.struggleKey = e.code
+      this.struggleUnits += 0.25
+    }
     // keydown はキーリピートで繰り返し飛んでくるので、初回だけ立ち上がりとして記録する
     if (!this.pressed.has(e.code)) this.justPressed.add(e.code)
     this.pressed.add(e.code)
@@ -294,8 +310,22 @@ export class Input {
       return
     }
     if (e.button === 0) this.fireHeld = true
-    if (e.button === 2) this.aimHeld = true
+    if (e.button === 2) {
+      // ナイフを持っている間は構えではなく眠らせる刺突 (stunStab)。構えは Shift
+      if (this.rightClickStuns) {
+        this.justPressed.add(MOUSE_RIGHT)
+        this.lastUsed = 'keyboard'
+      } else {
+        this.aimHeld = true
+      }
+    }
   }
+
+  /**
+   * 右クリックを眠らせる刺突に使うか。**ナイフを持っている間だけ** (呼ぶ側が毎コマ立てる)。
+   * その間の構えは Shift (右クリックを構えと刺突で取り合わない)
+   */
+  rightClickStuns = false
 
   private readonly onMouseUp = (e: MouseEvent) => {
     if (e.button === 0) this.fireHeld = false
@@ -367,6 +397,20 @@ export class Input {
   /** パッドが繋がっているか */
   get gamepadConnected(): boolean {
     return this.padIndex !== null
+  }
+
+  /** もがいた量 (左スティックの回転、W A S D の交互の連打)。1 で 1 回転 */
+  private struggleUnits = 0
+  /** 最後にもがきに数えたキー。同じキーの連打は数えない */
+  private struggleKey = ''
+  /** 左スティックの前の角度。倒していなければ null */
+  private struggleAngle: number | null = null
+
+  /** 溜まったもがきを渡して 0 に戻す。眠っていない間も呼んで捨てる (起きる前の分を持ち越さない) */
+  takeStruggle(): number {
+    const units = this.struggleUnits
+    this.struggleUnits = 0
+    return units
   }
 
   attach(target: HTMLElement): void {
@@ -530,6 +574,22 @@ export class Input {
     const move = applyDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0)
     this.padMoveX = move.x
     this.padMoveZ = move.y
+
+    // もがく: 左スティックを大きく倒して回した角度。1 回転で 1 (眠っている間に早く起きる)
+    const sx = pad.axes[0] ?? 0
+    const sy = pad.axes[1] ?? 0
+    if (Math.hypot(sx, sy) > STRUGGLE_STICK) {
+      const angle = Math.atan2(sy, sx)
+      if (this.struggleAngle !== null) {
+        let d = angle - this.struggleAngle
+        if (d > Math.PI) d -= Math.PI * 2
+        if (d < -Math.PI) d += Math.PI * 2
+        this.struggleUnits += Math.abs(d) / (Math.PI * 2)
+      }
+      this.struggleAngle = angle
+    } else {
+      this.struggleAngle = null
+    }
 
     // 一覧を開いている間は、右スティックは一覧を送るためのもの。視点は止める
     this.listAxis = this.listMode ? (pad.axes[3] ?? 0) : 0

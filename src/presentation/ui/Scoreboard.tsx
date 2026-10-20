@@ -2,12 +2,13 @@ import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { t } from '../../i18n'
 import { MODES } from '../../domain/match/room'
 import { SKILL_BUDGET, costOf, type SkillId, type Skills } from '../../domain/player/skill'
-import { pointsOf } from '../../domain/match/scoring'
+import { dmOrder, dmVerdict, pointsOf } from '../../domain/match/scoring'
 import { useLevels } from '../../infra/api/levels'
 import type { Identity } from '../../infra/auth/session'
 import type { GameStats } from '../scene/Game'
 import { SkillList } from './SkillPanel'
 import { DEFAULT_LOOK_SCALE, LOOK_SCALE_MAX, LOOK_SCALE_MIN, type LookScale } from '../../infra/prefs/look'
+import { RENDER_SCALE_MAX, RENDER_SCALE_MIN } from '../../infra/prefs/quality'
 import './Scoreboard.css'
 
 /**
@@ -45,6 +46,9 @@ export default function Scoreboard(props: {
   /** 視点の感度 (設定のタブ)。マウスとパッド、構えていない時と構えている時 */
   lookScale: LookScale
   onLookScale: (next: LookScale) => void
+  /** 画質 (設定のタブ)。描く細かさの倍率 (画面の 1 画素に何画素描くか) */
+  renderScale: number
+  onRenderScale: (next: number) => void
 }) {
   /**
    * どの板を見ているか。**成績表とスキルを 1 枚に重ねる。**
@@ -121,7 +125,14 @@ export default function Scoreboard(props: {
   /** 自分の陣営。勝ったかどうかの言い方を変えるのに使う */
   const mine = () => props.stats?.scores?.find((p) => p.id === props.selfId)?.team
   const verdict = () =>
-    winner() === 'draw' ? 'DRAW' : winner() === mine() ? 'VICTORY' : 'DEFEAT'
+    // 個人戦は陣営が無いので、倒した数の順位から出す (domain/match/scoring.ts の dmVerdict)
+    !teams()
+      ? dmVerdict(props.stats?.scores ?? [], props.selfId)
+      : winner() === 'draw'
+        ? 'DRAW'
+        : winner() === mine()
+          ? 'VICTORY'
+          : 'DEFEAT'
   /**
    * いま全画面か。
    *
@@ -159,15 +170,12 @@ export default function Scoreboard(props: {
   const teams = () => MODES[mode()].teams
 
   /**
-   * 個人戦の並び。**陣営で分けず、1 本の順位表にする。**
+   * 個人戦の並び。**陣営で分けず、1 本の順位表にする。倒した数の多い順** (dmOrder)。
    *
    * 分けて出すと「味方が居る」に読める。全員が敵なので、上から順に強い、が
    * そのまま読めるほうがいい。
    */
-  const ranking = () =>
-    [...(props.stats?.scores ?? [])].sort(
-      (a, b) => pointsOf(b) - pointsOf(a) || a.deaths - b.deaths,
-    )
+  const ranking = () => [...(props.stats?.scores ?? [])].sort(dmOrder)
 
   return (
     // 決着したら画面いっぱいに開く。**同じ板が結果画面を兼ねる**
@@ -419,6 +427,24 @@ export default function Scoreboard(props: {
             <button class="score-leave score-settings-reset" onClick={() => props.onLookScale({ ...DEFAULT_LOOK_SCALE })}>
               既定に戻す
             </button>
+            {/*
+              画質。描く細かさの倍率。**右が細かい** (本人 2026-10-19)。重い機械 (内蔵 GPU、
+              高解像度の画面) で詰まって切られる人が左へ寄せる
+            */}
+            <div class="score-settings-head">画質</div>
+            <label class="score-setting">
+              <span class="score-setting-label">描く細かさ</span>
+              <input
+                class="score-setting-range"
+                type="range"
+                min={RENDER_SCALE_MIN}
+                max={RENDER_SCALE_MAX}
+                step={0.05}
+                value={props.renderScale}
+                onInput={(e) => props.onRenderScale(Number(e.currentTarget.value))}
+              />
+              <span class="score-setting-value">× {props.renderScale.toFixed(2)}</span>
+            </label>
           </div>
         </Show>
 

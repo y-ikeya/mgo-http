@@ -298,7 +298,7 @@ for m in rifle smg sniper mosin shotgun m9 grenade claymore locator soldier; do
 done
 ```
 
-`rifle`・`mosin`・`sniper` は `&flip` を付ける (模型が逆向きに寝ている)。それでも `rifle` は銃口が左に出たので、撮った後に左右を返してある (装備の画面で他と揃える。銃口は右)。`soldier` は `decoy.png` に名前を変えて置く (人形は兵士の模型そのもの)。`m1911.glb` は形が
+`doll` は `&fill` を付ける (面を間引いた模型で、欠けが影絵の穴になって縞模様に抜ける。内側の穴を塗りつぶす)。`rifle`・`mosin`・`sniper` は `&flip` を付ける (模型が逆向きに寝ている)。それでも `rifle` は銃口が左に出たので、撮った後に左右を返してある (装備の画面で他と揃える。銃口は右)。`soldier` は `decoy.png` に名前を変えて置く (人形は兵士の模型そのもの)。`m1911.glb` は形が
 数 cm の欠片しか入っていないので、`m1911.png` は `m9.png` の写し。
 
 ## 元データの置き場
@@ -342,6 +342,13 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_windup.json
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
+
+猫に釘付けになる型 `trapped` (2.0 秒、立った所からしゃがみ込んで両手を猫へ伸ばす) は本人が落とした
+`tools/raw/trapped.fbx` の **5 本目** (他の 4 本は別の型)。素の姿勢が違うので `retarget_clip.py` で焼き直し、
+4 つの皮に足す。解けて戻るのは同じ型を逆に流す (animation.ts の playTrappedOut):
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/trapped.json
+    for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb trapped.glb trapped public/models/$s.glb --rotation-only; done
 
 しゃがんだまま正面から倒される `crouch_death` は本人が Mixamo から Ch35 で落とした `tools/raw/CrouchFrontDeath.fbx`
 (72 コマ、しゃがみから後ろへ尻もちをついて仰向け)。Ch35 なので `convert_character.py` で直に写せる:

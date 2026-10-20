@@ -26,6 +26,7 @@
 import type { Phase } from '../match/match'
 import type { ModeSpec } from '../match/room'
 import type { WeaponId } from '../item/weapons'
+import { PAT_SECONDS } from './stamina'
 
 export type SkillId =
   | 'runner'
@@ -41,6 +42,7 @@ export type SkillId =
   | 'awareness'
   | 'trapMastery'
   | 'knifeMastery'
+  | 'quickRecovery'
 
 /** 取れるレベル。0 は「取っていない」 */
 type SkillLevel = 1 | 2 | 3
@@ -173,6 +175,17 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
     /*
      * **段に意味がある。** 速さも充電も段で伸びる (銃の mastery と同じ 3 段)。
      * ナイフは全員が持っているので、主武器を選ばなくても 1 枠で寄せられる
+     */
+    levels: 3,
+  },
+  quickRecovery: {
+    id: 'quickRecovery',
+    label: 'QUICK RECOVERY',
+    hint: '眠らされても早く起きる。**眠っている人を叩いて起こすのが強い** (Lv3 なら 1 回で起こせる)',
+    /*
+     * **段に意味がある。** 本人 2026-10-19「QuickRecovery っていうスキル、1〜3 まであって、3 だと
+     * 一回で他の人を起こせるし、自分の stun の回復も早い」。自分の眠りが短くなり、叩いて縮める
+     * 秒数が段で伸びる。TSNE の 450 秒は素では 23 回叩かないと起きない (domain/player/stamina.ts)
      */
     levels: 3,
   },
@@ -541,7 +554,27 @@ export function stunChargeSeconds(skills: Skills): number {
   return STUN_CHARGE[Math.min(levelOf(skills, 'knifeMastery'), STUN_CHARGE.length - 1)]!
 }
 
+/**
+ * 眠りの長さに掛ける倍率 (QUICK RECOVERY)。**取っていなければ 1** — 普段の 60 秒 / TSNE の 450 秒。
+ * Lv3 で半分 (30 秒 / 225 秒)
+ */
+export function sleepScale(skills: Skills): number {
+  return SLEEP_SCALE[Math.min(levelOf(skills, 'quickRecovery'), SLEEP_SCALE.length - 1)]!
+}
+
+/**
+ * 眠っている人を 1 回叩いて縮める秒数 (QUICK RECOVERY)。**叩く側の段で決まる。** 取っていなければ
+ * 20 秒 (PAT_SECONDS)。Lv3 は Infinity — 1 回で起こせる
+ */
+export function patSeconds(skills: Skills): number {
+  return PAT_POWER[Math.min(levelOf(skills, 'quickRecovery'), PAT_POWER.length - 1)]!
+}
+
 // --- 段ごとの値。添字が Lv で、0 は「取っていない」 ---
+
+const SLEEP_SCALE = [1, 0.8, 0.65, 0.5] as const
+// 普段の眠り (60 秒) なら Lv1 で 2 回、Lv2 から 1 回。TSNE (450 秒) なら 12 回 / 6 回 / 1 回
+const PAT_POWER = [PAT_SECONDS, 40, 80, Infinity] as const
 
 // Lv3 が 1.16 だった頃は Lv2 (1.1) の時点で「速すぎる」と実機で出た (2026-09-21)。
 // その Lv2 の速さを上限にして、下の段はその間を等分する

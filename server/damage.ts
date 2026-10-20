@@ -27,9 +27,9 @@ import {
 } from '../src/domain/player/player'
 import { HIT_RULES, KNOCK_TIME, type HitZone, meleeDamage, stunReadyAfter } from '../src/domain/rule/damage'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
-import { exposeSeconds, stunChargeSeconds } from '../src/domain/player/skill'
+import { exposeSeconds, sleepScale, stunChargeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
-import { SLEEP_SECONDS, drainStamina, isAsleep } from '../src/domain/player/stamina'
+import { drainStamina, isAsleep, wakeFloor } from '../src/domain/player/stamina'
 import {
   CQC_FACING_COS,
   CQC_LAND_SECONDS,
@@ -46,7 +46,7 @@ import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
 import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, setLife } from './world'
+import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, releaseTrapped, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -417,6 +417,8 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
    */
   const band = shotgunBandFor(attacker, event)
   if (band === 'miss') return NOT_HURT
+  // 当たった。**猫に釘付けなら解ける** (麻酔でも。本人 2026-10-20「撃たれたら解ける」)
+  releaseTrapped(room, victim)
   const amount =
     band !== null
       ? band.damage
@@ -564,7 +566,11 @@ function applyTranquilizer(
     return NOT_HURT
   }
 
-  victim.sleepUntil = now + SLEEP_SECONDS * 1000
+  // 眠る長さは眠らされる側の QUICK RECOVERY で縮む
+  const sleep = room.mode.sleepSeconds * sleepScale(victim.skills)
+  victim.sleepUntil = now + sleep * 1000
+  victim.wakeFloor = wakeFloor(now, sleep)
+  victim.struggleAt = 0
   attacker.stuns++
   sendStamina(victim)
   broadcast(room, {
@@ -675,13 +681,17 @@ function cqcLanded(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer):
   if (room.phase !== 'playing') return
   const now = Date.now()
   if (isAsleep(victim.sleepUntil, now)) return
-  // 投げられたのも「当たった」。攻める側ならステルスが解ける (TSNE)
+  // 投げられたのも「当たった」。攻める側ならステルスが解ける (TSNE)。猫に釘付けなら解ける
   disturbStealth(room, victim, attacker, now)
+  releaseTrapped(room, victim)
   const drain = drainStamina(victim.stamina, CQC_STAMINA, false)
   victim.stamina = drain.stamina
   victim.concentratingSince = 0
   if (drain.slept) {
-    victim.sleepUntil = now + SLEEP_SECONDS * 1000
+    const sleep = room.mode.sleepSeconds * sleepScale(victim.skills)
+    victim.sleepUntil = now + sleep * 1000
+    victim.wakeFloor = wakeFloor(now, sleep)
+    victim.struggleAt = 0
     attacker.stuns++
     broadcast(room, {
       type: 'stun',

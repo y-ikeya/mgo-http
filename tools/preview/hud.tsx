@@ -43,6 +43,10 @@ const cases: Record<string, Partial<GameStats>> = {
   },
   boxed: { held: 'box', tool: 'box', toolInHand: true },
   // スタンナイフの充電。溜まっている途中 / 満ちた
+  // 輪郭: 麻酔の狙撃銃 (青) / 拳銃 (CQC の印と並ぶ) / 手榴弾 (数だけ)
+  mosin: { held: 'mosin', weaponHeld: 'mosin', equipped: 'mosin' as never, ammo: 5, magazine: 5, reserve: 15 },
+  pistol: { held: 'm9', weaponHeld: 'm9', equipped: 'm9' as never, ammo: 12, magazine: 12, reserve: 48 },
+  grenade: { held: 'grenade', weaponHeld: 'grenade', equipped: 'grenade' as never, grenades: 3 } as never,
   knifeCharging: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 0.45 },
   knifeCharged: { held: 'knife', weaponHeld: 'knife', equipped: 'knife' as never, stunCharge: 1 },
   boxedPistol: { held: 'box', tool: 'box', toolInHand: true, weaponHeld: 'm9', ammo: 10, magazine: 12, reserve: 48 },
@@ -63,6 +67,9 @@ const cases: Record<string, Partial<GameStats>> = {
   scoped: { scoped: true, equipped: 'sniper', held: 'sniper', weaponHeld: 'sniper', zoom: 'x6', ammo: 5, magazine: 5, reserve: 20 },
   // 眠っている。**縁が黒い** — 深さで覗き穴が狭まる
   asleep: { asleep: true, sleepDepth: 1, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
+  // ターゲット (TSNE) を取った / 手放した知らせ。始まりの指令と同じ帯 (?case=target / targetDropped)
+  target: { targetNotice: { text: 'kome27がターゲットを取得した', team: 'red', leaving: false } },
+  targetDropped: { targetNotice: { text: 'pepa1404がターゲットを手放した', team: 'blue', leaving: false } },
   dozing: { asleep: true, sleepDepth: 0.4, stamina: 0, held: 'rifle', weaponHeld: 'rifle' },
   // 麻酔の狙撃銃。**眼鏡の中身が違う** (目盛りの無い古い眼鏡)
   // M4 の主観 (ホロサイト)。画面の真ん中に輪と点だけ
@@ -124,6 +131,11 @@ const cases: Record<string, Partial<GameStats>> = {
     match: { phase: 'countdown', mode: 'TDM', blue: 0, red: 0, endsAt: Date.now() + 4000, present: 2, required: 2, players: [] },
     team: 'red',
   },
+  // TSNE の始まり。攻める側は「ターゲットを基地へ持ち帰れ」(?case=tsneCountdown)
+  tsneCountdown: {
+    match: { phase: 'countdown', mode: 'TSNE', attack: 'blue', blue: 1, red: 1, endsAt: Date.now() + 4000, present: 2, required: 2, players: [] },
+    team: 'blue',
+  },
   // 決着。「試合終了」の帯 → 2.4 秒後に勝敗 (?case=over)
   over: {
     match: { phase: 'over', mode: 'TDM', blue: 7, red: 0, winner: 'blue', endsAt: Date.now() + 10000, present: 2, required: 2, players: [] },
@@ -141,6 +153,19 @@ const cases: Record<string, Partial<GameStats>> = {
       { label: 'DEATH', delta: -2, at: Date.now() },
     ],
   },
+  // 本人の場面 (2026-10-19): MOSIN / M9 / DECOY / KNIFE で M9 を指している。角のすぐ上が MOSIN (1 つ前)
+  browsingFour: {
+    browsingFamily: 'weapon',
+    browsing: {
+      items: [
+        { id: 'mosin', n: 20, loaded: 5, mag: 5 },
+        { id: 'm9', n: 60, loaded: 12, mag: 12 },
+        { id: 'decoy', n: 3, loaded: null, mag: null },
+        { id: 'knife', n: null, loaded: null, mag: null },
+      ],
+      at: 1,
+    },
+  } as never,
   browsingTool: {
     browsingFamily: 'tool',
     tool: 'none',

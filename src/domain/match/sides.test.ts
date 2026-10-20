@@ -41,7 +41,7 @@ describe('持ち込める物 (charlie)', () => {
     expect(primariesOf('charlie', 'attack').every(isTranquilizer)).toBe(true)
     expect(primariesOf('charlie', 'attack').length).toBeGreaterThan(0)
     expect(secondariesOf('charlie', 'attack')).toEqual(['m9'])
-    expect([...supportsOf('charlie', 'attack')].sort()).toEqual(['decoy', 'locator'])
+    expect([...supportsOf('charlie', 'attack')].sort()).toEqual(['decoy', 'doll', 'locator'])
   })
 
   test('守る側は殺傷の銃と M1911、手榴弾とクレイモア', () => {

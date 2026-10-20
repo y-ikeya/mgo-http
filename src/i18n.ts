@@ -70,6 +70,8 @@ const JA = {
   'hud.scopeHint': 'Z / ホイールで覗く',
   'hud.climbHint': 'G / △ で梯子を登る',
   'hud.resupplyHint': 'G / △ で補給',
+  'hud.patHint': 'G / △ で叩いて起こす',
+  'hud.dropTargetHint': 'G / △ でターゲットを落とす',
   'hud.standUpHint': '移動で匍匐 · Space で起き上がる',
   // --- 装備 ---
   'loadout.note': '装備を選んでください',
@@ -95,6 +97,8 @@ const JA = {
   'orders.tdm.red': 'レッドチームを倒せ!',
   'orders.tdm.blue': 'ブルーチームを倒せ!',
   'orders.dm': '全員が敵だ。生き残れ!',
+  'orders.tsne.attack': 'ターゲットを基地へ持ち帰れ!',
+  'orders.tsne.defence': 'ターゲットを守り抜け!',
 
   // --- 遅れが直らない人 ---
   'lag.title': '通信の遅れが大きすぎます',
@@ -160,6 +164,8 @@ const EN: Record<Key, string> = {
   'hud.scopeHint': 'Z / wheel to scope',
   'hud.climbHint': 'G / △ to climb',
   'hud.resupplyHint': 'G / △ to resupply',
+  'hud.patHint': 'G / △ to wake them',
+  'hud.dropTargetHint': 'G / △ to drop the target',
   'hud.standUpHint': 'MOVE TO CRAWL · SPACE TO GET UP',
   'loadout.note': 'Choose your loadout',
   'loadout.deployIn': 'Deploy in {n}',
@@ -182,6 +188,8 @@ const EN: Record<Key, string> = {
   'orders.tdm.red': 'ELIMINATE THE RED TEAM!',
   'orders.tdm.blue': 'ELIMINATE THE BLUE TEAM!',
   'orders.dm': 'EVERYONE IS HOSTILE. SURVIVE!',
+  'orders.tsne.attack': 'BRING THE TARGET BACK TO BASE!',
+  'orders.tsne.defence': 'GUARD THE TARGET!',
 
   'lag.title': 'YOUR CONNECTION IS TOO SLOW',
   'lag.lede':

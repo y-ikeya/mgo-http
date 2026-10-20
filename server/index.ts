@@ -23,6 +23,7 @@ import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
 import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
+import { placeDoll, relayDolls, shotHitsDoll, stockPracticeDolls, updateDolls } from './arms/doll'
 import { bumpCboxes } from './arms/cbox'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
@@ -78,12 +79,13 @@ import { sensedBy } from '../src/sim/judge/claymore'
 import { SENSE_HEIGHT, SENSOR_HEIGHT, TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
-import { costOf } from '../src/domain/player/skill'
+import { dropTsneTarget } from './target'
+import { costOf, patSeconds } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { STAGES, inWater, waterOf } from '../src/domain/stage'
 import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
-import { MAX_STAMINA, recoverStamina } from '../src/domain/player/stamina'
+import { MAX_STAMINA, PAT_RANGE, isAsleep, pat, recoverStamina, struggle } from '../src/domain/player/stamina'
 import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
@@ -199,11 +201,18 @@ setInterval(() => {
       }
 
       updateMatch(room, now)
-      if (room.mode.id === 'PRACTICE') updateTargets(room, now)
+      if (room.mode.id === 'PRACTICE') {
+        updateTargets(room, now)
+        // 練習の猫。自分で掛かって確かめる。消えたら置き直す
+        stockPracticeDolls(room, now)
+      }
       // その部屋の水面。溺れの判定と手榴弾の沈みで同じ物を見る
       const water = waterOf(room.stage.name)
       relayClaymores(room)
       relayDecoys(room)
+      // 置かれた猫。敵にも見せる。円に入った敵を釘付けにし、時間が来たら消す
+      relayDolls(room)
+      updateDolls(room, now)
       // 置かれた E LOCATOR。**飛ぶところを見ていない人にも見せる** (壊せるように)
       relayLocators(room)
       // 近くの敵の置き物・投げ物の気配 (AWARENESS)。**位置だけ、持つ人だけ**
@@ -237,7 +246,7 @@ setInterval(() => {
         /*
          * --- 眠りから醒める ---
          *
-         * 眠りが明けたらスタミナは満タンで起きる。**30 秒寝たのだから**、
+         * 眠りが明けたらスタミナは満タンで起きる。**しばらく寝たのだから**、
          * 残ったまま起こすと起きた瞬間にもう一度眠らされる。
          */
         if (player.sleepUntil > 0 && now >= player.sleepUntil) {
@@ -625,6 +634,10 @@ function handleMessage(
       placeDecoy(room, player, Date.now())
       break
 
+    case 'doll':
+      placeDoll(room, player)
+      break
+
     /*
      * ナイフを振った。**風船なので刃でも割れる。**
      *
@@ -732,6 +745,8 @@ function handleMessage(
        * 壊しに行くこと自体が既に位置を晒す動き (近づく・音を出す) になる。
        */
       shotHitsLocator(room, message.from, message.to)
+      // 弾道の上に猫があれば壊れる。釘付けの人も解ける
+      shotHitsDoll(room, message.from, message.to)
       // 弾道のそばに TARGET ALERT (Lv2 以上) の人が居れば、撃った側が光る
       alertShot(room, player, message.from, message.to, Date.now())
       /*
@@ -857,6 +872,57 @@ function handleMessage(
       break
     }
 
+    /*
+     * 眠っている間にもがいた (domain/player/stamina.ts の struggle)。**削る量も上限もここで決める。**
+     * 画面が送るのはもがいた量だけ。起きる時刻が変わったら本人に知らせる (起きるのは本人の画面)
+     */
+    case 'struggle': {
+      if (room.phase !== 'playing') break
+      const now = Date.now()
+      if (!isAsleep(player.sleepUntil, now)) break
+      const next = struggle(player, Number(message.units), player.wakeFloor, now)
+      if (next.sleepUntil === player.sleepUntil) break
+      player.sleepUntil = next.sleepUntil
+      player.struggleAt = next.struggleAt
+      sendStamina(player)
+      break
+    }
+
+    /*
+     * 眠っている人を叩いた (domain/player/stamina.ts の pat)。**眠っているか・手が届くかは
+     * ここで見る** (画面の言い分は信じない)。1 回で 20 秒縮める — 明けたら、次の刻みで
+     * スタミナを満たして本人に知らせる (眠りから醒める所と同じ道)
+     */
+    case 'pat': {
+      if (room.phase !== 'playing') break
+      const now = Date.now()
+      const target = typeof message.target === 'string' ? room.players.get(message.target) : undefined
+      if (!target || target === player || !canAct(player.life) || isAsleep(player.sleepUntil, now)) break
+      // **敵でも起こせる** (本人 2026-10-19「味方も敵も両方起こせるべき」)。起こすかどうかは叩く側が選ぶ
+      if (!isAsleep(target.sleepUntil, now)) break
+      // 位置は送られてきた姿の控え。届くまでの遅れぶん少し甘く見る
+      if (Math.hypot(target.x - player.x, target.z - player.z) > PAT_RANGE + 0.75) break
+      const next = pat(target, now, patSeconds(player.skills))
+      if (next.patAt === target.patAt) break
+      target.sleepUntil = next.sleepUntil
+      target.patAt = next.patAt
+      // 起きる時刻が早まった。本人の画面の数え直しのため知らせる (起きるのは次の刻みで同じ道)
+      sendStamina(target)
+      break
+    }
+
+    // 遅れの兆し。**ログに書くだけ。** 切る前の 10 秒に画面がどうだったかを、切られて読み直す前に聞いておく
+    case 'lagReport': {
+      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : -1)
+      console.warn(
+        `[遅れ] ${player.name} rtt=${n(message.rtt)}ms 直近 10 秒: ${n(message.frames)} コマ 中央 ${n(message.p50)}ms 9 割 ${n(message.p90)}ms ` +
+          `最長 ${n(message.max)}ms (100ms 超 ${n(message.over100)} 回) heap ${n(message.heapMin)}〜${n(message.heapMax)}MB ` +
+          `描画 ${n(message.draws)} 回 / ${n(message.triangles)} 三角 位置 (${n(message.x)}, ${n(message.z)}) ` +
+          `向き ${n(((message.yaw as number) * 180) / Math.PI)}°${message.hidden === true ? ' 裏のタブあり' : ''} ステージ ${room.stage.name}`,
+      )
+      break
+    }
+
     // スタンナイフの放電。見た目と音だけ。**名乗りは信じず**送り主の id を付けて流す
     case 'zap':
       if (!canAct(player.life)) break
@@ -872,6 +938,11 @@ function handleMessage(
       broadcast(room, { type: 'voice', id: player.id, line: message.line, name: player.name, team: player.team })
       break
     }
+
+    // ターゲット (TSNE) を落とした。運んでいる本人だけが落とせる (server/target.ts)
+    case 'dropTarget':
+      if (dropTsneTarget(room, player, Date.now())) broadcast(room, matchState(room))
+      break
 
     default:
       // 見た目のもの (knock) は中身を見ずに流す

@@ -243,6 +243,20 @@ describe('終わる時刻', () => {
     expect((replica.match?.endsAt ?? 0) - local).toBe(60_000)
   })
 
+  test('**遅れて届いた 1 通で残りを延ばさない** (届くのが 12 秒遅れても、一番早かった報せで直す)', () => {
+    const replica = newMatchReplica()
+    const server = 1_000_000
+    const offset = -9_000
+    const endsAt = server + 60_000
+    // 時間どおりに届いた 1 通
+    applyMatch(replica, matchMessage({ endsAt, sentAt: server }), SELF, server + offset)
+    // 10 秒後に送られた物が、12 秒遅れて届いた (画面が詰まっていた)
+    const late = server + 10_000 + offset + 12_000
+    applyMatch(replica, matchMessage({ endsAt, sentAt: server + 10_000 }), SELF, late)
+    // 手元の時計で、サーバーが終わる時刻に合っている
+    expect(replica.match?.endsAt).toBe(endsAt + offset)
+  })
+
   test('待っている間 (0) はそのまま 0', () => {
     const replica = newMatchReplica()
     applyMatch(replica, matchMessage({ phase: 'waiting', endsAt: 0, sentAt: 5 }), SELF, 123)

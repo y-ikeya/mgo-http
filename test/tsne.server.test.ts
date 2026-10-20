@@ -16,6 +16,15 @@ beforeAll(async () => {
 
 afterAll(() => server.stop())
 
+/** 条件が立つまで待つ (最大 ms)。位置の便が数通届くのを待つ所で使う */
+async function until(check: () => boolean, ms = 3000): Promise<boolean> {
+  for (let t = 0; t < ms; t += 100) {
+    if (check()) return true
+    await Bun.sleep(100)
+  }
+  return check()
+}
+
 const match = (client: Client) =>
   [...client.messages].reverse().find((m) => m.type === 'match') as
     | Extract<ServerMessage, { type: 'match' }>
@@ -112,5 +121,39 @@ describe('TSNE', () => {
     a.close()
     b.close()
   }, 50000)
+
+  // **前の試験が試合を終わらせた後に置く。** 結果の画面 (14.5 秒) が明けるのを待ってから入る
+  test('**ターゲット: 守る側の陣地の近くに置かれ、攻める側が触れると取り、自陣まで運べば攻める側の勝ち**', async () => {
+    await Bun.sleep(15500)
+    const { a, b } = await twoInTsne()
+    const home = match(a)?.target
+    expect(home?.carrier).toBeNull()
+    // 守る側 (赤) の基地に近い置き場所 (city の target2)
+    expect(home?.x).toBeCloseTo(-30.39, 1)
+    expect(home?.z).toBeCloseTo(-50.89, 1)
+    // 守る側が触れても何も起きない
+    await b.walkTo(home!.x + 0.3, home!.y, home!.z)
+    await Bun.sleep(300)
+    expect(match(a)?.target?.carrier).toBeNull()
+    // 攻める側が触れると取る。守る側に「取った」が届く
+    b.reset()
+    await a.walkTo(home!.x - 0.3, home!.y, home!.z)
+    expect(await until(() => match(a)?.target?.carrier === 'alice')).toBe(true)
+    expect(b.got('targetTaken')).toBe(1)
+    // 落とすとその場に落ちる。落とした本人は 2 秒拾い直せない
+    a.send({ type: 'dropTarget' })
+    await Bun.sleep(300)
+    expect(match(a)?.target?.carrier).toBeNull()
+    // 手放したことも全員に届く (取った方も、守る側だけでなく攻める側にも)
+    expect(b.got('targetDropped')).toBe(1)
+    expect(a.got('targetTaken')).toBeGreaterThanOrEqual(1)
+    expect(await until(() => match(a)?.target?.carrier === 'alice', 3500)).toBe(true)
+    // 自陣 (青の基地) まで運ぶと、攻める側 (青) の勝ち
+    await a.walkTo(-18.41, 10.01, 49.09)
+    expect(await until(() => match(a)?.phase === 'break')).toBe(true)
+    expect(match(a)?.winner).toBe('blue')
+    a.close()
+    b.close()
+  }, 60000)
 
 })

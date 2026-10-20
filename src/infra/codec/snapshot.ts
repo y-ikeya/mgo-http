@@ -102,6 +102,11 @@ export const LOCOMOTIONS: Locomotion[] = [
   'cqc_thrown',
   // しゃがんだまま倒れる。**末尾に足す**
   'crouch_death',
+  // 眠っている人を叩く。**末尾に足す**
+  'pat',
+  // 猫に釘付けになる / 解けて戻る (domain/item/doll.ts)。**末尾に足す**
+  'trapped',
+  'trapped_out',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -209,6 +214,10 @@ const HELD_BITS: HeldId[] = [
   'm4',
   // STEALTH。**末尾に足す。** 着る物で手には持たないので、ここに乗ることは無い (表を欠かさないため)
   'stealth',
+  // DOLL (猫の置物)。**末尾に足す**
+  'doll',
+  // TSNE のターゲット (持ち物の一覧から選んで落とす)。**末尾に足す**
+  'target',
 ]
 const HELD_INDEX = new Map(HELD_BITS.map((id, i) => [id, i]))
 

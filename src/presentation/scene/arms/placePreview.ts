@@ -1,6 +1,10 @@
 import * as THREE from 'three'
 
 import { TRIGGER_COS, TRIGGER_RANGE } from '../../../domain/item/claymore'
+import { LURE_RADIUS } from '../../../domain/item/doll'
+import type { Team } from '../../../domain/player/player'
+import { zoneMaterial } from './dolls'
+import { TEAM_COLOR } from '../world/stage'
 import type { PlaceSpot } from '../../../sim/judge/claymore'
 
 /**
@@ -12,7 +16,8 @@ import type { PlaceSpot } from '../../../sim/judge/claymore'
  * canPlaceAt) ので、弾かれる所では赤い印だけを出して、押しても置く型に入らない
  * ことを先に伝える。
  *
- * 扇はクレイモアだけ。decoy は見張らないので印だけ。
+ * 扇はクレイモアだけ。DOLL は効く範囲の円 (置いた後に出る円と同じ物)。decoy は見張らないので印だけ。
+ * **置く前から効く所が見えないと、そこに置いてよいか分からない** (本人 2026-10-20)
  *
  * 数字はドメインから引く (TRIGGER_RANGE / TRIGGER_COS)。ここで別に持つと、
  * 見えている扇と実際に反応する扇が食い違う。
@@ -36,6 +41,12 @@ export class PlacePreview {
   private readonly fanPoints: Float32Array
   private readonly rimPoints: Float32Array
   private readonly markMaterial: THREE.MeshBasicMaterial
+  /** DOLL の効く範囲 (塗った円)。色は自分の陣営 (置いた後の円と同じ)。クレイモアの扇も同じ材質 */
+  private readonly disc: THREE.Mesh
+  private readonly discMaterials: Record<Team, THREE.MeshBasicMaterial> = {
+    blue: zoneMaterial('blue'),
+    red: zoneMaterial('red'),
+  }
 
   constructor(scene: THREE.Scene) {
     // 露出に左右されない。狙いを付けるための印なので明るさが変わっても読めてほしい
@@ -64,17 +75,8 @@ export class PlacePreview {
     const index: number[] = []
     for (let i = 1; i <= ARC_STEPS; i++) index.push(0, i, i + 1)
     fanGeometry.setIndex(index)
-    this.fan = new THREE.Mesh(
-      fanGeometry,
-      new THREE.MeshBasicMaterial({
-        color: OK_COLOR,
-        transparent: true,
-        opacity: 0.18,
-        toneMapped: false,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
-    )
+    // 色と濃さは置いた後の扇 (claymores.ts) と同じ。陣営の色 (show で差し替える)
+    this.fan = new THREE.Mesh(fanGeometry, this.discMaterials.blue)
     this.fan.visible = false
     this.fan.frustumCulled = false
     scene.add(this.fan)
@@ -85,11 +87,19 @@ export class PlacePreview {
     rimGeometry.setAttribute('position', new THREE.BufferAttribute(this.rimPoints, 3))
     this.rim = new THREE.Line(
       rimGeometry,
-      new THREE.LineBasicMaterial({ color: OK_COLOR, transparent: true, opacity: 0.7, toneMapped: false }),
+      new THREE.LineBasicMaterial({ color: TEAM_COLOR.blue, transparent: true, opacity: 0.7, toneMapped: false }),
     )
     this.rim.visible = false
     this.rim.frustumCulled = false
     scene.add(this.rim)
+
+    this.disc = new THREE.Mesh(
+      new THREE.CircleGeometry(LURE_RADIUS, 48),
+      this.discMaterials.blue,
+    )
+    this.disc.rotation.x = -Math.PI / 2
+    this.disc.visible = false
+    scene.add(this.disc)
   }
 
   /**
@@ -97,15 +107,22 @@ export class PlacePreview {
    *
    * @param spot placeSpot の結果。ok でなければ赤い印だけ
    * @param yaw 置く人の向き。クレイモアの正面はこれと同じ (server/arms/claymore.ts)
-   * @param fan 扇を描くか (クレイモアだけ)
+   * @param zone 効く所の形。fan = クレイモアの扇、disc = DOLL の円、null = 印だけ (decoy)
+   * @param team 自分の陣営。扇と円の色
    */
-  show(spot: PlaceSpot, yaw: number, fan: boolean): void {
+  show(spot: PlaceSpot, yaw: number, zone: 'fan' | 'disc' | null, team: Team = 'blue'): void {
     const y = spot.y + LIFT
     this.mark.position.set(spot.x, y, spot.z)
     this.markMaterial.color.setHex(spot.ok ? OK_COLOR : NG_COLOR)
     this.mark.visible = true
 
-    if (!spot.ok || !fan) {
+    this.disc.visible = spot.ok && zone === 'disc'
+    if (this.disc.visible) {
+      this.disc.position.set(spot.x, y, spot.z)
+      this.disc.material = this.discMaterials[team]
+    }
+
+    if (!spot.ok || zone !== 'fan') {
       this.fan.visible = false
       this.rim.visible = false
       return
@@ -136,6 +153,9 @@ export class PlacePreview {
     this.rimPoints[last] = spot.x
     this.rimPoints[last + 1] = y
     this.rimPoints[last + 2] = spot.z
+    this.fan.material = this.discMaterials[team]
+    const rimMaterial = this.rim.material as THREE.LineBasicMaterial
+    rimMaterial.color.setHex(TEAM_COLOR[team])
     this.fan.geometry.attributes.position.needsUpdate = true
     this.rim.geometry.attributes.position.needsUpdate = true
     this.fan.visible = true
@@ -144,6 +164,7 @@ export class PlacePreview {
 
   hide(): void {
     this.mark.visible = false
+    this.disc.visible = false
     this.fan.visible = false
     this.rim.visible = false
   }

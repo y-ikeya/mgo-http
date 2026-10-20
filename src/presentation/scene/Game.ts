@@ -62,6 +62,7 @@ import { Grenades } from "./arms/grenades";
 import { Claymores } from "./arms/claymores";
 import { EmptyBoxes } from "./actor/box";
 import { REVERSED_DEPTH } from "./util/depth";
+import { Dolls } from "./arms/dolls";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { StunSparks } from "./fx/stunSparks";
@@ -100,6 +101,7 @@ import {
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
+import { LAG_LIMIT_MS } from "../../domain/match/lag";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
 import { weaponOf } from "../../domain/item/weapons";
@@ -116,6 +118,8 @@ import { can, blocker } from "../../domain/player/moves";
 
 /** URL に ?debug が付いていれば、HUD に検証用の読み出しを出す */
 const DEBUG_HUD = new URLSearchParams(globalThis.location?.search ?? "").has("debug");
+import { toLocal } from "../../application/replica/clock";
+import { TsneTarget, type TargetView } from "./world/tsneTarget";
 import { atBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
 import {
@@ -149,10 +153,11 @@ import {
   type ServerMessage,
   type Team,
 } from "../../application/protocol/types";
-import { MAX_STAMINA, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
+import { MAX_STAMINA, PAT_RANGE, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
 import { loadLookScale, type LookScale } from "../../infra/prefs/look";
+import { loadRenderScale } from "../../infra/prefs/quality";
 
 /** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
 /**
@@ -302,6 +307,12 @@ export interface GameStats {
   debug: { locomotion: string; flags: string; blocked: string; where: string } | null;
   /** 自分の基地の上に居る。G / △ で補給できる */
   canResupply: boolean;
+  /** 眠っている人の傍でしゃがんでいる。G / △ で叩いて起こせる (味方でも敵でも) */
+  canPat: boolean;
+  /** 「{名前}がターゲットを取得した / 手放した」(TSNE、全員)。出している間だけ。leaving は退き始めた */
+  targetNotice: { text: string; team: Team; leaving: boolean } | null;
+  /** ターゲットを一覧で指している。G / △ で落とせる */
+  canDropTarget: boolean;
   /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
   scores: MatchMessage["players"];
   /**
@@ -382,6 +393,8 @@ export interface GameStats {
   asleep: boolean;
   /** 眠りの深さ。**1 が眠った瞬間、0 が起きた瞬間。** 画面の暗さがこれに従う */
   sleepDepth: number;
+  /** パッドで遊んでいるか。眠っている間の「もがいて起きる」案内の出し分け */
+  padActive: boolean;
   maxHealth: number;
   /** 倒れているか */
   dead: boolean;
@@ -436,6 +449,26 @@ const MAX_RANGE = 200;
 const SLOW_FRAME_MS = 500;
 /** 詰まりを知らせる間隔の下限 (ms) */
 const SLOW_FRAME_EVERY_MS = 5_000;
+/** JS の使用メモリ (MB)。Chrome だけ取れる。取れなければ 0 */
+function heapMB(): number {
+  const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+  return memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
+}
+/** 「ターゲットを取得した / 手放した」を出しておく長さ (ms) */
+const TARGET_NOTICE_MS = 4000;
+/** 最後のこれだけで、始まりの指令と同じく割れて退く (Orders.css の animation と揃える) */
+const TARGET_NOTICE_LEAVE_MS = 600;
+/**
+ * 叩く型の 2 回目の手が下りるまで (ms)。型の 26 コマ目 (24fps、tools/cqc/pat.py の KEYS)。
+ * 型を作り直したらここも合わせる
+ */
+const PAT_LANDS_MS = (26 / 24) * 1000;
+/** もがきを送る間隔 (ms)。毎コマ送らない */
+const STRUGGLE_SEND_MS = 200;
+/** 遅れの兆しに添える、直近のコマの記録の長さ (ms)。切るまでの 5 回ぶんより長く */
+const LAG_REPORT_WINDOW_MS = 10_000;
+/** 遅れの兆しを知らせる間隔の下限 (ms)。遅れている間は 1 秒ごとに ping が来る */
+const LAG_REPORT_EVERY_MS = 5_000;
 
 
 /**
@@ -652,6 +685,11 @@ const CLAYMORE_PLACE_RATIO = 0.8;
  * 割れた**という絵なので、体の高さから出す。
  */
 const DECOY_POP_HEIGHT = 1.1;
+/**
+ * 猫に掛かってから声 (ohh) を出すまで (ms)。**しゃがみ終えて手を伸ばした所** — 型 trapped (2.0 秒) の
+ * 1.7 秒目あたりで腰が下り切る
+ */
+const DOLL_OHH_MS = 1700;
 
 
 /**
@@ -780,6 +818,8 @@ export class Game {
   private placeSolid: StageBox[] = [];
   private readonly placeAt: PlaceSpot = { x: 0, y: 0, z: 0, ok: false };
   private readonly decoys: Decoys;
+  /** 置かれた猫 (DOLL)。置いた本人には効く範囲の円も出る */
+  private readonly dolls: Dolls;
   /** 割れた場所の置き場。毎回作らない */
   private readonly popAt = new THREE.Vector3();
   private readonly blast: BlastFx;
@@ -1107,6 +1147,11 @@ export class Game {
   private selfTeam: Team = "blue";
   /** 攻める色 (TSNE)。**分かれない部屋は null** */
   private attackTeam: Team | null = null;
+  /** TSNE のターゲットの見た目と、サーバーから届いた状態 (domain/match/target.ts)。無い部屋は null */
+  private tsneTarget!: TsneTarget;
+  private targetView: TargetView | null = null;
+  /** 「{名前}がターゲットを取得した / 手放した」(全員) と、その人の色、出した時刻 (ms) */
+  private targetNotice: { text: string; team: Team; at: number } | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
   private stealthOn = false;
   /** 直前の通で STEALTH が解けていたか (CAUTION 中)。明けた音をその後だけ鳴らす */
@@ -1375,7 +1420,8 @@ export class Game {
       // 逆向きの深さ (util/depth.ts)。遠くの薄い板が壁と食い合わない
       reversedDepthBuffer: REVERSED_DEPTH,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // 描く細かさは画質の設定から (setRenderScale)。画面の細かさより上は描かない
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, loadRenderScale()));
     // 切り分け用: ?shadow=0 で影を切る
     this.renderer.shadowMap.enabled = new URLSearchParams(location.search).get("shadow") !== "0";
     // three r185 で PCFSoftShadowMap は deprecated (内部で PCFShadowMap にフォールバックする)
@@ -1489,7 +1535,9 @@ export class Game {
     this.emptyBoxes = new EmptyBoxes(this.scene);
     this.placePreview = new PlacePreview(this.scene);
     this.decoys = new Decoys(this.scene);
+    this.dolls = new Dolls(this.scene);
     this.blast = new BlastFx(this.scene);
+    this.tsneTarget = new TsneTarget(this.scene);
     this.stunSparks = new StunSparks(this.scene);
     this.sensed = new Sensed(this.scene);
     this.casings = new Casings(this.scene);
@@ -1682,6 +1730,7 @@ export class Game {
     this.remotes.dispose();
     this.soundRing.dispose();
     this.locators.clear();
+    this.dolls.clear();
     this.thrown.dispose();
     this.grenades.dispose();
     this.blast.dispose();
@@ -1703,12 +1752,15 @@ export class Game {
 
   private tick(time: number): void {
     this.noteSlowFrame(time - this.lastTime);
+    this.noteFrame(time, time - this.lastTime);
     const dt = Math.min((time - this.lastTime) / 1000, MAX_DT);
     this.lastTime = time;
 
     // パッドはイベントを出さないので毎フレーム読みに行く。
     // 視点も移動もこの後の処理が読むので、フレームの先頭で更新しておく。
     this.input.pollGamepad(dt);
+    this.noteStruggle(time);
+    this.flushPat();
     // 押している時間を進める。**単押しと長押しの別はここで決まる** (infra/input)
     this.input.advance(dt);
 
@@ -1981,6 +2033,7 @@ export class Game {
     this.stageSparks?.update(dt);
     // 人形が膨らむ (**下から立ち上がる**) のと、触られて揺れるの
     this.decoys.update(dt);
+    this.dolls.update(dt);
     this.emptyBoxes.update(dt);
     // 手榴弾と同じ物理を同じ刻みで解く。止まったら点滅が始まる
     this.locators.update(
@@ -1995,6 +2048,7 @@ export class Game {
       (at) => this.audio.play("locatorBeep", at),
     );
     this.blast.update(dt);
+    this.updateTsneTarget(dt);
     this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
@@ -2009,6 +2063,11 @@ export class Game {
 
     if (this.post) this.post.render();
     else this.renderer.render(this.scene, this.follow.camera);
+    // **描き終えたここで読む。** 描画の量はコマの頭 (setAnimationLoop の中) で 0 に戻るので、
+    // 次のコマの頭で読むと毎回 0 だった (2026-10-17 のログが全部「描画 0 回 / 0 三角」)
+    const drawn = this.renderer.info.render;
+    this.drawsLast = drawn.drawCalls;
+    this.trianglesLast = drawn.triangles;
     this.publishStats(dt);
     this.input.endFrame();
   }
@@ -2139,19 +2198,114 @@ export class Game {
     if (now - this.slowReportedAt < SLOW_FRAME_EVERY_MS) return;
     this.slowReportedAt = now;
     const p = this.player.position;
-    const info = (this.renderer as unknown as { info?: { render?: { drawCalls?: number; calls?: number; triangles?: number } } }).info?.render;
-    const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     const report = {
       type: "slowFrame" as const,
       ms: Math.round(gap),
       x: p.x,
       z: p.z,
       yaw: this.follow.aimYaw,
-      draws: info?.drawCalls ?? info?.calls ?? 0,
-      triangles: info?.triangles ?? 0,
-      heap: memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0,
+      draws: this.drawsLast,
+      triangles: this.trianglesLast,
+      heap: heapMB(),
     };
     console.warn("[重い]", report);
+    this.net.send(report);
+  }
+
+  /** 叩いた相手と、効かせる時刻 (performance.now)。叩く型の 2 回目の手が下りた所で送る */
+  private pendingPat: { target: string; at: number } | null = null;
+
+  /**
+   * 叩いたことを、**手が下りた所で**サーバーへ送る (本人 2026-10-19「叩き終わったくらいのところで
+   * 効果が出るように、いま叩く前から効力出てる」)。叩く型が途中で止まったら (撃たれた・眠らされた)
+   * 送らない — 叩き切っていないのに起こさない
+   */
+  private flushPat(): void {
+    const pending = this.pendingPat;
+    if (!pending) return;
+    if (!this.player.patting) {
+      this.pendingPat = null;
+      return;
+    }
+    if (performance.now() < pending.at) return;
+    this.net.send({ type: "pat", target: pending.target });
+    this.pendingPat = null;
+  }
+
+  /** まだ送っていないもがき (左スティックの回転、W A S D の交互の連打) と、最後に送った時刻 (ms) */
+  private struggleOut = 0;
+  private struggleSentAt = 0;
+
+  /**
+   * 眠っている間にもがいた量を、**まとめてサーバーへ送る** (1/5 秒ごと)。
+   *
+   * 削るのはサーバー (domain/player/stamina.ts の struggle)。起きる時刻が変われば stamina の
+   * 知らせで返ってくる。眠っていない間に溜まった分は捨てる (歩いた WASD を持ち越さない)。
+   */
+  private noteStruggle(time: number): void {
+    const units = this.input.takeStruggle();
+    if (!can(this.player.body, "struggle")) {
+      this.struggleOut = 0;
+      return;
+    }
+    this.struggleOut += units;
+    if (this.struggleOut <= 0 || time - this.struggleSentAt < STRUGGLE_SEND_MS) return;
+    this.net.send({ type: "struggle", units: this.struggleOut });
+    this.struggleOut = 0;
+    this.struggleSentAt = time;
+  }
+
+  /** 直前のコマの描画の量。描き終えた所で控える (tick の終わり) */
+  private drawsLast = 0;
+  private trianglesLast = 0;
+  /** 直近 LAG_REPORT_WINDOW_MS ぶんのコマ。古い方から */
+  private frameLog: { at: number; ms: number; heap: number }[] = [];
+  /** 最後にタブが裏に回っていた時刻 (ms) */
+  private hiddenAt = -Infinity;
+  /** 最後に遅れの兆しを知らせた時刻 (ms) */
+  private lagReportedAt = -Infinity;
+
+  private noteFrame(time: number, gap: number): void {
+    if (document.hidden) this.hiddenAt = time;
+    if (this.lastTime === 0) return;
+    this.frameLog.push({ at: time, ms: gap, heap: heapMB() });
+    while (this.frameLog.length > 0 && this.frameLog[0].at < time - LAG_REPORT_WINDOW_MS) this.frameLog.shift();
+  }
+
+  /**
+   * サーバーから聞いた往復が限界を超えていたら、**直近 10 秒の画面の様子を送る。**
+   *
+   * 切られてからでは遅い。切られたら画面を読み直すので、手元の記録が消える。切るのは
+   * 限界を 5 回続けて超えてからなので、1 回目で送ればまだ繋がっている
+   * (protocol/types.ts の LagReportEvent)。
+   */
+  private noteLag(rtt: number): void {
+    if (rtt < LAG_LIMIT_MS) return;
+    const now = performance.now();
+    if (now - this.lagReportedAt < LAG_REPORT_EVERY_MS) return;
+    this.lagReportedAt = now;
+    const ms = this.frameLog.map((f) => f.ms).sort((a, b) => a - b);
+    const heaps = this.frameLog.map((f) => f.heap);
+    const at = (q: number) => (ms.length ? Math.round(ms[Math.min(ms.length - 1, Math.floor(ms.length * q))]) : 0);
+    const p = this.player.position;
+    const report = {
+      type: "lagReport" as const,
+      rtt,
+      frames: ms.length,
+      p50: at(0.5),
+      p90: at(0.9),
+      max: ms.length ? Math.round(ms[ms.length - 1]) : 0,
+      over100: ms.filter((m) => m > 100).length,
+      heapMin: heaps.length ? Math.min(...heaps) : 0,
+      heapMax: heaps.length ? Math.max(...heaps) : 0,
+      draws: this.drawsLast,
+      triangles: this.trianglesLast,
+      x: p.x,
+      z: p.z,
+      yaw: this.follow.aimYaw,
+      hidden: now - this.hiddenAt < LAG_REPORT_WINDOW_MS,
+    };
+    console.warn("[遅れ]", report);
     this.net.send(report);
   }
 
@@ -2231,6 +2385,7 @@ export class Game {
           this.grenades.clear();
           this.claymores.clear();
           this.decoys.clear();
+          this.dolls.clear();
           this.locators.clear();
           this.sensed.clear();
         }
@@ -2408,8 +2563,11 @@ export class Game {
        */
       case "stamina": {
         this.stamina = message.stamina;
-        const left = (message.sleepUntil - Date.now()) / 1000;
-        if (left > 0) this.player.sleep(left);
+        // 起きる時刻はサーバーの時計。手元の時計へ直してから比べる (application/replica/clock.ts)
+        const left = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
+        // もう眠っているなら残りだけ縮める (もがいて早まった)。倒れる動きをやり直さない
+        if (left > 0 && this.player.sleeping) this.player.shortenSleep(left);
+        else if (left > 0) this.player.sleep(left);
         else this.player.wake();
         break;
       }
@@ -2435,7 +2593,7 @@ export class Game {
       case "resume": {
         this.player.resumeAt(message.x, message.y, message.z, message.health);
         // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
-        const asleep = (message.sleepUntil - Date.now()) / 1000;
+        const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
         if (asleep > 0) this.player.sleep(asleep, true);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
@@ -2485,6 +2643,9 @@ export class Game {
       // 光らせるのは絵の仕事
       case "match":
         this.remotes.setLeaking(message.leader ?? null);
+        // ターゲット (TSNE)。運んでいるのが自分なら持ち物の一覧に並ぶ (選んで G / △ で落とす)
+        this.targetView = message.target ?? null;
+        this.inv.setTargetOwned(message.target?.carrier === this.net.id);
         // 攻守の入れ替えとステルスの状態 (TSNE)。側が変われば持ち込める物も変わる
         if (message.attack !== this.attackTeam) {
           this.attackTeam = message.attack ?? null;
@@ -2623,7 +2784,10 @@ export class Game {
        */
       case "claymorePlaced": {
         const mine = message.owner === this.net.id && !this.claymores.has(message.id);
-        this.claymores.place(message.id, message.at, message.yaw);
+        // sensor に掛かる扇は置いた本人と味方に出す (猫の円と同じ)。敵には見えない
+        const friendly =
+          message.owner === this.net.id || (this.teamsMode && message.team === this.selfTeam);
+        this.claymores.place(message.id, message.at, message.yaw, friendly ? message.team : null);
         if (mine) this.inv.spendOf("claymore");
         break;
       }
@@ -2671,6 +2835,45 @@ export class Game {
        * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
        * 撃たせる道具であると同時に、**見張る道具**でもある。
        */
+      /*
+       * 猫 (DOLL)。置かれた (敵にも届く — 撃ち抜けるように)・誰かが掛かった・消えた・撃たれて解けた。
+       * **掛かるも解けるもサーバーが決める。** 自分が掛かったら体を止め、解けたら型を逆に流して戻る。
+       * 他の人の体は、その人から届く姿 (trapped / trapped_out) で動く
+       */
+      case "dollPlaced": {
+        const mine = message.owner === this.net.id;
+        if (mine && !this.dolls.has(message.id)) this.inv.spendOf("doll");
+        // 円は置いた本人と味方に出す (陣営で分かれない部屋では本人だけ)。敵には見えない
+        const friendly = mine || (this.teamsMode && message.team === this.selfTeam);
+        this.dolls.place(message.id, message.at, message.yaw, friendly, message.team);
+        break;
+      }
+      case "dollSprung": {
+        const doll = this.dolls.positionOf(message.id);
+        // 鳴き声は猫の所から。**近くの人にも届く** (誰かがそこで足止めされている)
+        if (doll) this.audio.play("catMeow", doll);
+        if (message.victims.includes(this.net.id)) {
+          const p = this.player.position;
+          // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
+          this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined);
+        }
+        // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
+        for (const id of message.victims) {
+          setTimeout(() => {
+            const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
+            if (at) this.audio.play("ohh", at);
+          }, DOLL_OHH_MS);
+        }
+        break;
+      }
+      case "dollGone":
+        this.dolls.remove(message.id);
+        if (message.freed.includes(this.net.id)) this.player.untrap();
+        break;
+      case "trapReleased":
+        if (message.id === this.net.id) this.player.untrap();
+        break;
+
       case "decoyBumped":
         this.decoys.bump(message.id, message.dirX, message.dirZ);
         break;
@@ -2744,6 +2947,22 @@ export class Game {
         break;
 
       // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
+      /*
+       * ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令と同じ帯で知らせる
+       * (本人 2026-10-19)。帯の色はその人の陣営
+       */
+      case "targetTaken":
+        this.targetNotice = { text: `${message.byName}がターゲットを取得した`, team: message.byTeam, at: Date.now() };
+        break;
+      case "targetDropped":
+        this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
+        break;
+
+      // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
+      case "targetAt":
+        this.targetView = { x: message.x, y: message.y, z: message.z, carrier: message.carrier };
+        break;
+
       case "stun": {
         const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
         if (at) this.audio.play("stunOof", at);
@@ -2795,6 +3014,7 @@ export class Game {
       case "ping":
         this.latency = message.rtt;
         this.net.send({ type: "pong", at: message.at });
+        this.noteLag(message.rtt);
         break;
 
       case "hidden":
@@ -3546,6 +3766,11 @@ export class Game {
   /** 選んだことを画面へ知らせる。Game は signal を持たないので、外から差し込む */
   onLoadout: ((next: { primary: WeaponId | null; support: SupportId }) => void) | null = null;
 
+  /** 描く細かさを差し替える (設定画面の画質のバー)。動かした瞬間から効く */
+  setRenderScale(scale: number): void {
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, scale));
+  }
+
   /** 視点の感度の倍率を差し替える (設定画面)。マウスとパッド、構えていない時と構えている時 */
   setLookScale(scale: LookScale): void {
     this.input.lookScale = { ...scale };
@@ -3621,6 +3846,26 @@ export class Game {
    * **サーバーは検算していない** — 箱を被っているという申告自体が
    * こちら発なので、今の作りではここが素直。
    */
+  /**
+   * ターゲット (TSNE) を置く / 浮かせる。運ばれていれば運ぶ人の足元から (自分なら自分の位置、
+   * 見えている相手ならその姿、見えていなければ届いた位置)。**守る側の画面では光る**
+   */
+  private updateTsneTarget(dt: number): void {
+    const view = this.targetView;
+    let carrierAt: THREE.Vector3 | null = null;
+    if (view?.carrier) {
+      carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.positionOf(view.carrier);
+    }
+    const defending = this.attackTeam !== null && this.selfTeam !== this.attackTeam;
+    this.tsneTarget.update(dt, view, carrierAt, defending);
+  }
+
+  /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */
+  private patTarget(): string | null {
+    if (!can(this.player.body, "pat")) return null;
+    return this.remotes.sleepingNear(this.player.position, PAT_RANGE)[0]?.id ?? null;
+  }
+
   private updateBoxContact(): void {
     if (!this.player.isBoxed) return;
     // 止まっているなら当たりに行っていない。しきい値は箱の型が
@@ -3820,6 +4065,8 @@ export class Game {
    * 持ち替えたこと自体が意味を失う。
    */
   private updateTrigger(): void {
+    // ナイフを持っている間、鍵盤の右クリックは眠らせる刺突 (構えは Shift)
+    this.input.rightClickStuns = this.inv.held === "knife";
     if (!canAct(this.life) || this.loadoutBlocking) return;
     if (this.inv.switching) return;
     if (this.updateCqc()) return;
@@ -3833,7 +4080,7 @@ export class Game {
      *
      * 構えて 2 通り (MGO2 のスタンナイフ):
      *   殺す刺突      パッド R1 / 鍵盤 左クリック
-     *   眠らせる刺突  パッド R2 / 鍵盤 X   (充電が満ちている時だけ)
+     *   眠らせる刺突  パッド R2 / 鍵盤 右クリック (充電が満ちている時だけ。構えは Shift)
      */
     const aiming = this.player.isAiming;
     const killTap = this.input.tapped("killStab");
@@ -4773,7 +5020,12 @@ export class Game {
     }
     // 構えている間だけ描く。置く型が流れ始めたら消す (置く所はもう決まった)
     if (spot && this.setupRelease <= 0) {
-      this.placePreview.show(spot, this.player.yaw, this.setupHeld === "claymore");
+      this.placePreview.show(
+        spot,
+        this.player.yaw,
+        this.setupHeld === "claymore" ? "fan" : this.setupHeld === "doll" ? "disc" : null,
+        this.selfTeam,
+      );
     } else {
       this.placePreview.hide();
     }
@@ -4860,7 +5112,9 @@ export class Game {
     // 壁の中や縁の外は断られるので、送った時点で減らすと置けずに減る
     // **どちらを置いたかは構え始めに覚えてある。** 置き切るまでの間に
     // 持ち替えられても、流れていた型と知らせる先が食い違わない
-    this.net.send(this.setupHeld === "decoy" ? { type: "decoy" } : { type: "claymore" });
+    this.net.send(
+      this.setupHeld === "decoy" ? { type: "decoy" } : this.setupHeld === "doll" ? { type: "doll" } : { type: "claymore" },
+    );
   }
 
   /**
@@ -4947,6 +5201,21 @@ export class Game {
      */
     if (!this.player.onLadder && this.player.ladderInReach && this.input.tapped("drop")) {
       this.player.grabLadder();
+      return;
+    }
+    /*
+     * 眠っている人 (味方でも敵でも) の傍でしゃがんでいれば、同じ指で**叩いて起こす** (1 回で 20 秒縮む。
+     * domain/player/stamina.ts の pat)。補給・捨てるより先に食う (梯子と同じ)
+     */
+    // ターゲット (TSNE) を一覧で指していれば、同じ指で落とす (落ちる位置はサーバーが決める)
+    if (this.inv.tool === "target" && this.input.tapped("drop")) {
+      this.net.send({ type: "dropTarget" });
+      return;
+    }
+    const patTarget = this.patTarget();
+    if (patTarget && this.input.tapped("drop")) {
+      // **叩き終わった所で効かせる。** 押した瞬間に送ると、手が届く前から起き始めた (flushPat)
+      if (this.player.pat()) this.pendingPat = { target: patTarget, at: performance.now() + PAT_LANDS_MS };
       return;
     }
     // 基地の上では同じ指が補給になる。**捨てる判断より先に食う** (梯子と同じ)
@@ -5510,6 +5779,8 @@ export class Game {
   }
 
   private publishStats(dt: number): void {
+    // 眠っている間は音が遠のく (起きる前の 1/4 でぼんやり戻る。sense/audio.ts の setDrowse)
+    this.audio.setDrowse(this.player.sleeping ? this.player.sleepDepth : 0);
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.1;
     this.statsTimer += dt;
     if (this.statsTimer < STATS_INTERVAL || !this.onStats) return;
@@ -5610,11 +5881,22 @@ export class Game {
       canClimb: this.player.ladderInReach,
       debug: DEBUG_HUD ? this.debugReadout() : null,
       canResupply: this.canResupply,
+      canPat: this.patTarget() !== null,
+      targetNotice:
+        this.targetNotice && now - this.targetNotice.at < TARGET_NOTICE_MS
+          ? {
+              text: this.targetNotice.text,
+              team: this.targetNotice.team,
+              leaving: now - this.targetNotice.at >= TARGET_NOTICE_MS - TARGET_NOTICE_LEAVE_MS,
+            }
+          : null,
+      canDropTarget: this.inv.tool === "target",
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
       stamina: staminaBlur(this.stamina),
       shock: this.shock,
       asleep: this.player.sleeping,
+      padActive: this.input.activeDevice === "gamepad",
       sleepDepth: this.player.sleepDepth,
       health: this.player.health,
       maxHealth: MAX_HEALTH,

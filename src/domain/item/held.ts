@@ -33,7 +33,7 @@ import type { WeaponId } from './weapons'
 export type { WeaponId }
 
 /** 投げる物・置く物。support の枠に入る */
-export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator'
+export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator' | 'doll'
 
 /**
  * 手に持てる物すべて。
@@ -41,7 +41,7 @@ export type ThrowId = 'grenade' | 'claymore' | 'magazine' | 'decoy' | 'locator'
  * `none` は**道具を何も使っていない**という選択。手ぶらという意味ではない —
  * 道具の枠が空なだけで、手には武器がある (Inventory.held を参照)。
  */
-export type HeldId = WeaponId | ThrowId | 'knife' | 'box' | 'stealth' | 'none'
+export type HeldId = WeaponId | ThrowId | 'knife' | 'box' | 'stealth' | 'target' | 'none'
 
 /**
  * 系統。持ち替えの操作が別々に割り当たる (MGO2 の十字左右)。
@@ -76,8 +76,8 @@ export function isGun(id: HeldId): id is WeaponId {
  * 判定も、置き切るまで動けないことも共通なので、**そこを分けない**ために
  * 述語で聞く。並べて書くと、3 つ目を足したときに直し漏れる。
  */
-export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' {
-  return id === 'claymore' || id === 'decoy'
+export function isPlaceable(id: HeldId): id is 'claymore' | 'decoy' | 'doll' {
+  return id === 'claymore' || id === 'decoy' || id === 'doll'
 }
 
 /**
@@ -93,6 +93,7 @@ export function isThrowable(id: HeldId): id is ThrowId {
     id === 'claymore' ||
     id === 'magazine' ||
     id === 'decoy' ||
+    id === 'doll' ||
     id === 'locator'
   )
 }
@@ -122,7 +123,7 @@ export function isThrownByHand(id: HeldId): id is 'grenade' | 'locator' {
  * なった)。述語で聞く。
  */
 export function isSupport(id: HeldId): id is SupportKind {
-  return id === 'grenade' || id === 'claymore' || id === 'decoy' || id === 'locator'
+  return id === 'grenade' || id === 'claymore' || id === 'decoy' || id === 'locator' || id === 'doll'
 }
 
 /**
@@ -233,6 +234,8 @@ export const HELD: Record<HeldId, HeldSpec> = {
   decoy: { id: 'decoy', label: 'DECOY', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
   // 投げて置く走査装置。手榴弾ほどの大きさ
   locator: { id: 'locator', label: 'E.LOCATOR', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
+  // 猫の置物。手に乗る大きさ
+  doll: { id: 'doll', label: 'DOLL', family: 'weapon', slot: 'support', weight: 0.5, shoots: false, twoHanded: false },
 
   // 刺されば即死。代償は**銃をしまってから近づく**こと (docs/weapons.md)
   knife: { id: 'knife', label: 'KNIFE', family: 'weapon', slot: 'knife', weight: 0.3, shoots: false, twoHanded: false },
@@ -247,6 +250,13 @@ export const HELD: Record<HeldId, HeldSpec> = {
    * 効いている間は体が消える (domain/match/sides.ts)。外すのは道具の一覧で別の物を選ぶ時
    */
   stealth: { id: 'stealth', label: 'STEALTH', family: 'tool', slot: 'tool', weight: 0, shoots: false, twoHanded: false },
+
+  /*
+   * ターゲット (TSNE の攻める側が運んでいる間だけ、domain/match/target.ts)。**手には持たない** —
+   * 頭の上に浮いて付いてくる。一覧で選んで G / △ で落とす (2026-10-19 本人)。選んでも STEALTH は
+   * 着たまま、手は武器のまま
+   */
+  target: { id: 'target', label: 'TARGET', family: 'tool', slot: 'tool', weight: 0, shoots: false, twoHanded: false },
 
   /*
    * 道具を使っていない状態。
@@ -272,6 +282,7 @@ export type Carried =
   | { id: 'knife' }
   | { id: 'box' }
   | { id: 'stealth' }
+  | { id: 'target' }
   | { id: 'none' }
 
 /** その物を持っている間の移動の速さ (倍率) */
@@ -420,7 +431,7 @@ export interface Loadout {
  * ので、値をこちらへ持ってくると輪になる。型だけ写して、食い違ったら
  * 数の表 (SUPPORT_COUNT) が型検査で落ちるようにしてある。
  */
-export type SupportKind = 'grenade' | 'claymore' | 'decoy' | 'locator'
+export type SupportKind = 'grenade' | 'claymore' | 'decoy' | 'locator' | 'doll'
 
 /** 1 つの命で持てる投げ物の数 */
 const SUPPORT_COUNT: Record<SupportKind, number> = {
@@ -435,6 +446,7 @@ const SUPPORT_COUNT: Record<SupportKind, number> = {
    * (探して壊す) と、投げる側の手 (置き直す) が両方残る。
    */
   locator: 3,
+  doll: 3,
 }
 
 /**

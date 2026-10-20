@@ -288,6 +288,8 @@ export class Client {
           this.cameraYaw,
           this.pitch,
           this.holdingLocator,
+          this.holdingDoll,
+          this.boxed,
         ),
       ),
     )
@@ -335,6 +337,14 @@ export class Client {
   }
   private holdingLocator = false
 
+  /** DOLL を手にする。**支度で選んでいなければ持てない** */
+  holdDoll(holding: boolean): void {
+    this.holdingDoll = holding
+  }
+  private holdingDoll = false
+  /** ダンボールを被っているか。手にある物 (box) として送る (猫が効かない) */
+  boxed = false
+
   send(message: ClientMessage): void {
     if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message))
   }
@@ -374,6 +384,8 @@ function snapshotOf(
   cameraYaw = 0,
   pitch = 0,
   holdingLocator = false,
+  holdingDoll = false,
+  boxed = false,
 ): PlayerSnapshot {
   return {
     id,
@@ -386,9 +398,12 @@ function snapshotOf(
     cameraYaw,
     aiming,
     crouching: false,
-    boxed: false,
+    boxed,
     // 振りかぶっているなら手にあるのも手榴弾。**両方そろって初めて落ちる**
-    held: holdingGrenade
+    // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')
+    held: boxed
+      ? ('box' as const)
+      : holdingGrenade
       ? ('grenade' as const)
       : holdingClaymore
         ? ('claymore' as const)
@@ -396,7 +411,9 @@ function snapshotOf(
           ? ('decoy' as const)
           : holdingLocator
             ? ('locator' as const)
-            : ('rifle' as const),
+            : holdingDoll
+              ? ('doll' as const)
+              : ('rifle' as const),
     locomotion,
     locomotionAge: 0,
     concentrating: false,
@@ -422,7 +439,7 @@ export function spot(dx: number, dz: number): [number, number, number] {
 export async function twoPlayers(
   server: Server,
   /** 支度で選ぶ支援。**湧く前にしか選べない** (domain/player/equip.ts) */
-  support: 'grenade' | 'claymore' | 'decoy' = 'grenade',
+  support: 'grenade' | 'claymore' | 'decoy' | 'doll' = 'grenade',
   /**
    * 名乗る id。
    *
@@ -431,15 +448,15 @@ export async function twoPlayers(
    * 効かない。装備を変える試験は別の id で入る。
    */
   names: [string, string] = ['alice', 'bob'],
+  /** b だけ別の支援を選ぶとき (a が置いた物を b が手榴弾で壊す、など) */
+  supportB: 'grenade' | 'claymore' | 'decoy' | 'doll' = support,
 ): Promise<{ a: Client; b: Client }> {
   const a = await new Client(server, names[0], spot(0, -6)).ready()
   const b = await new Client(server, names[1], spot(0, 6)).ready()
   a.live()
   b.live()
-  if (support !== 'grenade') {
-    a.send({ type: 'loadout', primary: 'rifle', support })
-    b.send({ type: 'loadout', primary: 'rifle', support })
-  }
+  if (support !== 'grenade') a.send({ type: 'loadout', primary: 'rifle', support })
+  if (supportB !== 'grenade') b.send({ type: 'loadout', primary: 'rifle', support: supportB })
   /*
    * 支度の段階を抜ける。**押さないと 60 秒待たされる。**
    *

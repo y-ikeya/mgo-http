@@ -150,6 +150,17 @@ export type Locomotion =
   | 'claymore_windup'
   | 'claymore_place'
   /**
+   * 眠っている人をしゃがんで叩く (左手でぽんぽん)。**全身の型** — しゃがんだまま前へかがむ。
+   * 銃は右手で持ったまま。3 回叩くと起きる (domain/player/stamina.ts の pat)
+   */
+  | 'pat'
+  /**
+   * 猫に釘付けになる (domain/item/doll.ts)。**全身の型** — しゃがみ込んで猫へ手を伸ばし、
+   * 伸ばした姿で止まる。trapped_out は同じ型を逆に流して戻る
+   */
+  | 'trapped'
+  | 'trapped_out'
+  /**
    * 接続が切れて、体だけ残っている姿。
    *
    * 自分でこの状態になることは無い — **サーバーが書き込む**。切れた人の

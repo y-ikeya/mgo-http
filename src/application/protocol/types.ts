@@ -483,6 +483,11 @@ export interface PlaceClaymoreEvent {
   type: 'claymore'
 }
 
+/** DOLL (猫の置物) を置く。decoy と同じで**位置も向きも送らない** */
+export interface PlaceDollEvent {
+  type: 'doll'
+}
+
 /** 置かれたクレイモア。見えている人にだけ配る */
 export interface ClaymorePlaced {
   type: 'claymorePlaced'
@@ -580,6 +585,50 @@ export interface DecoyGone {
   at: [number, number, number]
   /** 撃たれて割れたなら音と破片を出す。仕切り直しで消えただけなら false */
   popped: boolean
+}
+
+/**
+ * 猫が置かれた。**敵にも配る** (撃てば壊せる物なので、見えていないと壊しようがない)。
+ * 釘付けになる円は**置いた本人と味方にだけ**出す (受け取った側が owner と team で決める)
+ */
+export interface DollPlaced {
+  type: 'dollPlaced'
+  id: number
+  /** 置いた人。本人が「置けた」ことを知り、円を出すのに要る */
+  owner: string
+  /** 置いた人の陣営。**味方にも円を出す**のに要る */
+  team: Team
+  at: [number, number, number]
+  /** 正面の向き (rad) */
+  yaw: number
+}
+
+/**
+ * 猫に釘付けになった。全員へ。**掛かった人の体が型を流し始める合図** (本人は動けなくなる)。
+ * 解けるのは dollGone (時間切れ・撃ち抜かれた) か trapReleased (撃たれた) で知らせる
+ */
+export interface DollSprung {
+  type: 'dollSprung'
+  id: number
+  /** 今回掛かった人 (円に入っていた敵の全員)。**同じ猫で何度も来る** — 後から円に入った人のぶん */
+  victims: string[]
+}
+
+/** 猫が消えた。止まっていた人 (freed) は解ける */
+export interface DollGone {
+  type: 'dollGone'
+  id: number
+  at: [number, number, number]
+  /** 撃ち抜かれて壊れたなら音と破片を出す。時間切れ・仕切り直しなら false */
+  broken: boolean
+  /** ここで解ける人 */
+  freed: string[]
+}
+
+/** 猫に釘付けになっていた人が、撃たれて解けた (猫は残る) */
+export interface TrapReleased {
+  type: 'trapReleased'
+  id: string
 }
 
 /**
@@ -845,6 +894,68 @@ export interface SlowFrameEvent {
 }
 
 /**
+ * 眠っている間にもがいた量 (左スティックの回転、W A S D の交互の連打)。1 で 1 回転。
+ * **削るのはサーバー** (domain/player/stamina.ts の struggle)。速さの上限もそちらで掛ける
+ */
+export interface StruggleEvent {
+  type: 'struggle'
+  units: number
+}
+
+/**
+ * 眠っている人を叩いた (しゃがんで「拾う・使う」。味方でも敵でも)。**起こすのはサーバー** — 眠って
+ * いるか、手が届くか、間が短すぎないかを見て、1 回で 20 秒縮める (domain/player/stamina.ts の pat)。
+ * 叩く動きは自分の姿 (locomotion 'pat') で他の人にも見える
+ */
+export interface PatEvent {
+  type: 'pat'
+  target: string
+}
+
+/**
+ * ターゲット (TSNE) を落とす。運んでいる人が持ち物の一覧から選んで落とした。
+ * 落ちた位置は運んでいた人の足元 (サーバーが決める。domain/match/target.ts)
+ */
+export interface DropTargetEvent {
+  type: 'dropTarget'
+}
+
+/**
+ * 遅れの兆し。**サーバーから届いた往復が限界 (LAG_LIMIT_MS) を超えていたら、直近 10 秒の
+ * 画面の様子を送る。** 診断のためだけで、遊びには何も効かない。
+ *
+ * 切られた後では遅い — 切られたら画面を読み直すので、手元の記録が消える (本人 2026-10-19)。
+ * 切るのは 5 回続いてからなので、1 回目で送ればまだ繋がっている。
+ *
+ * SlowFrameEvent は 1 コマ 500ms 以上を 5 秒に 1 回しか残さない。200〜400ms のコマが
+ * 続いて遅れが溜まった時は何も残らなかった (2026-10-17 の 9 回のうち 4 回)。
+ */
+export interface LagReportEvent {
+  type: 'lagReport'
+  /** サーバーから聞いた往復 (ms) */
+  rtt: number
+  /** 直近 10 秒のコマの数と、かかった時間 (ms) の中央・9 割・最長 */
+  frames: number
+  p50: number
+  p90: number
+  max: number
+  /** 100ms を超えたコマの数 */
+  over100: number
+  /** JS の使用メモリ (MB) の最小と最大。Chrome だけ取れる。取れなければ 0 */
+  heapMin: number
+  heapMax: number
+  /** 直前のコマの描画の量 */
+  draws: number
+  triangles: number
+  /** 立っていた所と向き (three の座標、rad) */
+  x: number
+  z: number
+  yaw: number
+  /** この 10 秒の間にタブが裏に回ったか */
+  hidden: boolean
+}
+
+/**
  * 自分の本当の値。**3 秒ごとに、1 人ずつ届く。**
  *
  * --- なぜ要るか ---
@@ -1049,6 +1160,12 @@ export interface MatchMessage {
   /** 色ごとに勝ったラウンドの数 (TSNE) */
   roundWins?: Record<Team, number>
   /**
+   * ターゲット (TSNE、domain/match/target.ts)。置いてある / 落ちている位置と、運んでいる人。
+   * 運ばれている間の位置は運ぶ人の姿から取る (ここの x, y, z は 1 秒ごとの控え)。
+   * **変わった瞬間に配り直す** (取った・落ちた・戻った)
+   */
+  target?: { x: number; y: number; z: number; carrier: string | null }
+  /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
    *
    * 離脱中の人も入っている (away)。リロードのあいだ行が消えると、
@@ -1173,6 +1290,40 @@ export interface KillEvent {
  * 残機は減らず、体はその場に残る。倒した知らせ (KillEvent) と同じ形で流すと
  * 「倒された」と読まれるので、別の型にして受け取る側に区別させる。
  */
+/**
+ * 攻める側がターゲット (TSNE) を取った。**全員の画面に「{名前}がターゲットを取得した」を帯で出す**
+ */
+/**
+ * 運ばれているターゲット (TSNE) の位置。**運ばれている間だけ、1 秒に 10 回。**
+ * 守る側は運ぶ人が壁の裏に居ても位置が分かる (光って見える) ので、人の姿の便とは別に配る
+ * (人の姿は見えている相手の分しか届かない)
+ */
+/**
+ * 運んでいた人がターゲット (TSNE) を手放した (自分で落とした / 倒れた / 眠った)。
+ * **全員の画面に「{名前}がターゲットを手放した」を帯で出す**
+ */
+export interface TargetDroppedEvent {
+  type: 'targetDropped'
+  by: string
+  byName: string
+  byTeam: Team
+}
+
+export interface TargetAtMessage {
+  type: 'targetAt'
+  x: number
+  y: number
+  z: number
+  carrier: string
+}
+
+export interface TargetTakenEvent {
+  type: 'targetTaken'
+  by: string
+  byName: string
+  byTeam: Team
+}
+
 export interface StunEvent {
   type: 'stun'
   by: string
@@ -1296,6 +1447,7 @@ export type ClientMessage =
   | SkillsEvent
   | PlaceClaymoreEvent
   | PlaceDecoyEvent
+  | PlaceDollEvent
   | LocatorThrow
   | DropWeaponEvent
   | PickUpEvent
@@ -1315,10 +1467,17 @@ export type ClientMessage =
   | VoiceEvent
   | PongMessage
   | SlowFrameEvent
+  | LagReportEvent
+  | StruggleEvent
+  | PatEvent
+  | DropTargetEvent
 
 /** サーバー → クライアント。**覆せない事実**がここに乗る */
 export type ServerMessage =
   | StateMessage
+  | TargetTakenEvent
+  | TargetDroppedEvent
+  | TargetAtMessage
   | JoinEvent
   | LeaveEvent
   | RosterMessage
@@ -1359,6 +1518,10 @@ export type ServerMessage =
   | DecoyBumped
   | CboxBumped
   | DecoyGone
+  | DollPlaced
+  | DollSprung
+  | DollGone
+  | TrapReleased
   | LocatorThrown
   | LocatorPlaced
   | LocatorGone

@@ -25,6 +25,7 @@ import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
+import { isGun } from "../../../domain/item/held";
 import { DeathSlide } from "./deathSlide";
 import {
   advanceBoxLift,
@@ -166,6 +167,11 @@ const PLAY_WHOLE_BODY: Record<
   // releaseSetup は振りかぶりを飛ばして始められるようになっている
   claymore_windup: (a) => a.playSetup(),
   claymore_place: (a) => a.releaseSetup(),
+  // 眠っている人を叩く
+  pat: (a) => a.playPat(),
+  // 猫に釘付け / 解けて戻る (逆に流す)
+  trapped: (a) => a.playTrapped(),
+  trapped_out: (a) => a.playTrappedOut(),
 };
 
 /**
@@ -282,6 +288,11 @@ export class RemoteSoldier {
   private locomotion: Locomotion = "idle";
 
   /** CQC を掛けられる姿勢か (立っているか)。domain/player/cqc.ts */
+  /** 眠っているか (送られてきた姿が sleep)。味方なら叩いて起こせる */
+  get asleep(): boolean {
+    return this.locomotion === "sleep";
+  }
+
   get throwable(): boolean {
     return canBeThrown(this.locomotion);
   }
@@ -628,11 +639,20 @@ export class RemoteSoldier {
     const holstered =
       this.boxed ||
       animator.barehanded ||
-      state.held === 'knife' ||
+      /*
+       * **手にあるのが銃でなければ隠す** (ナイフ・手榴弾・デコイ・クレイモア・E.LOCATOR)。
+       * 自分の画面 (soldier.ts の !gun) と同じ決まり。ナイフだけを名指ししていた頃は、デコイを
+       * 持っている相手が**最後に持っていた銃 (MOSIN) を持っているように見え**、STEALTH で
+       * 体が消えていても浮いた銃で位置が割れた (2026-10-17 本人と友達の TSNE)
+       */
+      !isGun(state.held) ||
       // ぶら下がっている間は両手が縁に掛かっている
       state.locomotion === 'hang_drop' ||
       state.locomotion === 'hang' ||
-      state.locomotion === 'hang_climb'
+      state.locomotion === 'hang_climb' ||
+      // 猫に釘付けの間 (戻る途中も)。両手を猫へ伸ばしている
+      state.locomotion === 'trapped' ||
+      state.locomotion === 'trapped_out'
     // 拳銃も構えていない間ずっと手に持つ (soldier.ts と同じ)。STEALTH で体が消えても武器は見える
     if (this.weapon) this.weapon.visible = !holstered
 
@@ -1461,6 +1481,23 @@ export class RemoteSoldiers {
       found.push({ id: player.id, side: player.side });
     }
     return found;
+  }
+
+  /**
+   * 手の届く所で眠っている人。**近い順。** 味方かどうかはルールを知っている側 (Game) が決める
+   * (touching と同じ形)
+   */
+  sleepingNear(origin: THREE.Vector3, range: number): { id: string; side: Team }[] {
+    const found: { id: string; side: Team; distance: number }[] = [];
+    for (const player of this.players.values()) {
+      if (player.health <= 0 || !player.asleep) continue;
+      this.scratch.subVectors(player.object.position, origin);
+      this.scratch.y = 0;
+      const distance = this.scratch.length();
+      if (distance > range) continue;
+      found.push({ id: player.id, side: player.side, distance });
+    }
+    return found.sort((a, b) => a.distance - b.distance).map(({ id, side }) => ({ id, side }));
   }
 
   /** 指定の相手を怯ませる。誰の画面でも同じように見えるよう、撃った本人以外も呼ぶ */

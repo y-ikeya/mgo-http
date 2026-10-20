@@ -40,15 +40,16 @@
 export const MAX_STAMINA = 100
 
 /**
- * 眠っている長さ (秒)。
+ * 眠っている長さ (秒)。**何もしなかった時。** もがけば 1/3 まで縮む (下の struggle)。
  *
- * **長い。** 倒された人が湧き直すまで (倒れる 5 秒 + 支度) と同じくらいで、
- * 「一時的に無力化した」ではなく「その試合の一場面から消した」に近い重み。
- *
+ * **長い。** 「一時的に無力化した」ではなく「その試合の一場面から消した」に近い重み。
  * 短くすると、眠らせても起きるのを待つ意味が無くなって**その場で仕留めるだけ**
  * の手になる。長いから、置いて先へ進むという選択が生まれる。
+ *
+ * 本人 2026-10-19「何もしなかったら 1min で、回して 20 秒」。
+ * 部屋のモードで変わる (domain/match/room.ts の sleepSeconds。TSNE は 450 秒)。
  */
-export const SLEEP_SECONDS = 30
+export const SLEEP_SECONDS = 60
 
 /**
  * 集中し始めてから、スタミナが戻り始めるまで (秒)。
@@ -141,4 +142,93 @@ export function staminaSwayScale(stamina: number): number {
 export function staminaBlur(stamina: number): number {
   const lost = 1 - Math.max(0, Math.min(1, stamina / MAX_STAMINA))
   return lost * lost
+}
+
+/*
+ * --- もがいて早く起きる ---
+ *
+ * 本人 2026-10-19「pad だと R3 (→ L3) スティックをクルクル回すことで早く起きられるとか欲しい」。
+ * どのルールでも効く。
+ * 左スティックを 1 回転 (キーマウは W A S D の違うキーを交互に 4 回) で 1 回もがいたことにする。
+ * 眠っている間は歩けないので、左スティックと W A S D は空いている (右スティックとマウスは
+ * 見回しに使うので数えない — 見回しているだけで起きてしまう)。
+ *
+ * **数えるのはサーバー。** 画面はもがいた量を送るだけで、削るのはここ。速さに上限を置き、
+ * 眠りの 1/3 より早くは起きられない。
+ */
+
+/**
+ * 全力でもがき続けた時、眠りが 1 秒にどれだけ縮むか (秒)。2 なら時計の 3 倍の速さで醒める —
+ * 何もしなければ 60 秒 / 450 秒 (TSNE)、全力なら 20 秒 / 150 秒 (本人 2026-10-19)。
+ * 眠りの長さに依らない (1 回もがくと何秒縮むかは固定)
+ */
+export const STRUGGLE_SPEED = 2
+/** 1 秒にもがける回数の上限。速く回しても (送る量を偽っても) これ以上は削れない */
+export const STRUGGLE_RATE = 3
+/** 1 回もがくと縮む秒数 */
+export const STRUGGLE_SECONDS = STRUGGLE_SPEED / STRUGGLE_RATE
+/**
+ * 眠りのこれだけは必ず寝る。全力 (STRUGGLE_SPEED) で縮め続けると、ちょうどここで起きる
+ * (1 / (1 + 2) = 1/3)。速さの上限をすり抜けられても、これより早くは起きない
+ */
+export const STRUGGLE_FLOOR = 1 / (1 + STRUGGLE_SPEED)
+
+/** 眠った時に決める、もがいても起きられない時刻 (ms) */
+export function wakeFloor(now: number, sleepSeconds: number): number {
+  return now + sleepSeconds * 1000 * STRUGGLE_FLOOR
+}
+
+export interface Struggle {
+  sleepUntil: number
+  /** 前にもがいた時刻 (ms)。速さの上限を測る */
+  struggleAt: number
+}
+
+/**
+ * もがいた。**新しい起きる時刻と、もがいた時刻**を返す。
+ *
+ * 前のもがきからの時間で上限を掛ける。一度に大きな数を送っても、経った時間ぶんしか効かない
+ * (眠ってから初めてのもがきは、1 秒ぶんまで)。
+ */
+export function struggle(state: Struggle, units: number, floor: number, now: number): Struggle {
+  if (!(units > 0) || !Number.isFinite(units) || state.sleepUntil <= now) return state
+  const since = state.struggleAt > 0 ? Math.min(1, (now - state.struggleAt) / 1000) : 1
+  const allowed = Math.min(units, Math.max(0, since) * STRUGGLE_RATE)
+  const cut = allowed * STRUGGLE_SECONDS * 1000
+  return { sleepUntil: Math.max(floor, state.sleepUntil - cut), struggleAt: now }
+}
+
+/*
+ * --- 眠っている人を叩いて起こす ---
+ *
+ * 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく」「味方も敵も両方
+ * 起こせるべき」「default だと 1 回の叩きで 1/3 つまり 20s ぶんだけ起こせるように」「TSNE の場合は
+ * 結構叩かないといけない (20s しか削れないから 20 回以上)」。しゃがんで「拾う・使う」のボタン。
+ * **1 回叩くと 20 秒縮む。どのルールでも同じ** — 普段の 60 秒なら 3 回、TSNE の 450 秒なら 23 回。
+ * 本人がもがいて縮めた後なら、もっと少なくて済む。
+ * もがきと違って床 (眠りの 1/3) は無い — 起こしに来てくれた人がいるのだから。
+ * 叩いている間 (1 回 1.6 秒) は叩く側が動けず無防備になる — それが起こす代償。
+ */
+
+/** 叩ける距離 (m、水平)。しゃがんで手を伸ばして届くくらい */
+export const PAT_RANGE = 1.5
+/** 1 回叩くと縮む秒数。眠りの長さに依らない */
+export const PAT_SECONDS = 20
+/** 叩く間の最短 (ms)。型 1 本 (1.6 秒) より短く。ボタンの連打で縮めない。2 人で叩いても速くならない */
+export const PAT_INTERVAL_MS = 600
+
+export interface Patted {
+  sleepUntil: number
+  /** 最後に叩かれた時刻 (ms)。0 ならまだ */
+  patAt: number
+}
+
+/**
+ * 叩かれた。**新しい起きる時刻と、叩かれた時刻**を返す。間が短すぎる叩きは効かない。
+ * seconds は叩く側の縮める秒数 (QUICK RECOVERY で伸びる。domain/player/skill.ts の patSeconds)
+ */
+export function pat(state: Patted, now: number, seconds = PAT_SECONDS): Patted {
+  if (state.sleepUntil <= now) return state
+  if (state.patAt > 0 && now - state.patAt < PAT_INTERVAL_MS) return state
+  return { sleepUntil: Math.max(now, state.sleepUntil - seconds * 1000), patAt: now }
 }

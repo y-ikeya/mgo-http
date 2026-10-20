@@ -39,6 +39,12 @@ const BROWSE_SLIDE = 26
 /** 待合室を閉じる前に黒へ落とし始める (ms)。落ちきるのは CSS の transition (0.8 秒) */
 const STANDBY_BLACK_MS = 1000
 
+/** 影絵のある持ち物 (public/icons/<id>.png、tools/preview/icons.html で撮る) */
+const HUD_ART: ReadonlySet<HeldId> = new Set<HeldId>([
+  'smg', 'rifle', 'm4', 'sniper', 'mosin', 'shotgun', 'm9', 'm1911',
+  'grenade', 'claymore', 'decoy', 'locator', 'doll', 'knife',
+])
+
 export default function Hud(props: { stats: GameStats | null; selfId: string }) {
   const locked = () => props.stats?.locked ?? false
   // 残り時間の表示だけは秒ごとに動かす。stats は 0.1 秒ごとに来るが、
@@ -101,6 +107,11 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   const teams = () => MODES[mode()].teams
   /** 1 人でも成立する部屋か。**相手待ちを出さない** (練習・休憩) */
   const soloRoom = () => MODES[mode()].solo
+  /**
+   * 上部に残機を出すか。**攻める側と守る側に分かれる部屋 (TSNE) は出さない** — 勝ち負けは
+   * ターゲットを持ち帰れるかで決まり、残り敵兵数を争うわけではない (本人 2026-10-20)
+   */
+  const showScore = () => !MODES[mode()].sides
   const won = () => {
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner === props.stats?.team
@@ -150,6 +161,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   /** 麻酔銃を手にしているか。**色で殺傷と分ける** */
   const heldIsTranq = () => isTranquilizer(held())
   const heldIsGun = () => HELD[held()].shoots
+  /** 武器の影絵 (public/icons/<id>.png)。**無い物は出さない** (弾倉・箱・NONE) */
+  const artOf = (id: HeldId): string | null =>
+    HUD_ART.has(id) ? `${import.meta.env.BASE_URL}icons/${id}.png?v=2` : null
 
   /**
    * カードの大きい数字。**持っている弾の総数** (装填分 + 予備)。
@@ -260,8 +274,21 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   const above = () => {
     const browsing = props.stats?.browsing
     if (!browsing) return []
-    const skip = new Set([browsing.at, nextAt()])
-    return browsing.items.filter((_, i) => !skip.has(i))
+    /*
+     * **角のすぐ上が 1 つ前、その上が 2 つ前 …。** 送る順と並びを揃える。
+     *
+     * 一覧の順のまま上から積んでいた頃は、角 (M9) のすぐ上に KNIFE、一番上に MOSIN が
+     * 並び、上へ送ると 1 つ前の MOSIN (一番上の札) が出てきた (2026-10-19 本人)。
+     * 列は上から描くので、遠い (前へ遡った) 物から並べる
+     */
+    const n = browsing.items.length
+    const out = []
+    for (let k = n - 2; k >= 1; k--) {
+      const i = (browsing.at - k + n) % n
+      if (i === nextAt()) continue
+      out.push(browsing.items[i]!)
+    }
+    return out
   }
 
   /** 眠りが明けるまで。眠っていなければ 0 */
@@ -312,17 +339,23 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           */}
           <Show
             when={teams()}
-            fallback={<span class="hud-score hud-score-own">{props.stats?.match?.blue ?? 0}</span>}
+            fallback={
+              <Show when={showScore()}>
+                <span class="hud-score hud-score-own">{props.stats?.match?.blue ?? 0}</span>
+              </Show>
+            }
           >
-            <span
-              class="hud-score hud-score-blue"
-              classList={{ 'hud-score-own': props.stats?.team === 'blue' }}
-            >
-              {props.stats?.match?.blue ?? 0}
-            </span>
+            <Show when={showScore()}>
+              <span
+                class="hud-score hud-score-blue"
+                classList={{ 'hud-score-own': props.stats?.team === 'blue' }}
+              >
+                {props.stats?.match?.blue ?? 0}
+              </span>
+            </Show>
           </Show>
           <span class="hud-clock">{clock()}</span>
-          <Show when={teams()}>
+          <Show when={teams() && showScore()}>
             <span
               class="hud-score hud-score-red"
               classList={{ 'hud-score-own': props.stats?.team === 'red' }}
@@ -430,7 +463,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
 
         出す長さも消え方も Orders が持つ。ここは段階と陣営を渡すだけ。
       */}
-      <Orders mode={mode()} team={props.stats?.team} phase={phase()} />
+      <Orders mode={mode()} team={props.stats?.team} phase={phase()} attack={props.stats?.match?.attack} />
 
       {/*
         ラウンドの合間 (TSNE の先攻が終わった)。「ROUND 1 OVER」と、このラウンドの勝ち負け。
@@ -446,6 +479,25 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             </div>
           </div>
         </div>
+      </Show>
+
+      {/*
+        ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令 (Orders) と同じ帯で 4 秒。
+        色はその人の陣営、最後に同じく割れて退く (Game.ts の targetNotice)
+      */}
+      <Show when={props.stats?.targetNotice}>
+        {(notice) => (
+          <div
+            class="orders"
+            classList={{ [`orders-${notice().team}`]: true, 'orders-leaving': notice().leaving }}
+          >
+            <div class="orders-band">
+              <div class="orders-heading">TARGET</div>
+              <div class="orders-rule" />
+              <div class="orders-text">{notice().text}</div>
+            </div>
+          </div>
+        )}
       </Show>
 
       {/* 決着の 1 段目。「試合終了」だけを指令と同じ帯で告げる */}
@@ -541,6 +593,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <div class="hud-asleep" style={{ '--sleep-open': `${sleepOpen()}%` }}>
           <span class="hud-asleep-word" style={{ opacity: `${props.stats?.sleepDepth ?? 0}` }}>
             SLEEP
+          </span>
+          {/* もがいて早く起きる (domain/player/stamina.ts の struggle) */}
+          <span class="hud-asleep-hint">
+            {props.stats?.padActive ? 'ROTATE L STICK TO WAKE' : 'TAP W A S D TO WAKE'}
           </span>
         </div>
       </Show>
@@ -689,7 +745,14 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/* 基地の上。同じ指が補給になる */}
-      <Show when={props.stats?.canResupply}>
+      {/* 眠っている人を叩いて起こす (1 回で 20 秒縮む)。補給より先 (同じ指で叩くほうが勝つ) */}
+      <Show when={props.stats?.canDropTarget}>
+        <div class="scope-hint">{t('hud.dropTargetHint')}</div>
+      </Show>
+      <Show when={props.stats?.canPat && !props.stats?.canDropTarget}>
+        <div class="scope-hint">{t('hud.patHint')}</div>
+      </Show>
+      <Show when={props.stats?.canResupply && !props.stats?.canPat && !props.stats?.canDropTarget}>
         <div class="scope-hint">{t('hud.resupplyHint')}</div>
       </Show>
 
@@ -791,9 +854,39 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <Show when={canThrowWith(held())}>
           <div class="hud-weapon-cqc">CQC</div>
         </Show>
-        <Show when={heldIsGun()}>
-          <div class="hud-weapon-spare">{heldTotal()}</div>
+        {/*
+          上の段。**武器の輪郭** (影絵の縁を線に) と、銃なら持っている弾の総数。
+          輪郭は MGO2 のカード (2026-10-19 本人)。殺傷は赤、麻酔は青 (装備画面の札と同じ色)
+        */}
+        <svg class="hud-weapon-filters" aria-hidden="true">
+          <filter id="hud-outline-lethal">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="grown" />
+            <feComposite in="grown" in2="SourceAlpha" operator="out" result="edge" />
+            <feFlood flood-color="#ff5a3c" />
+            <feComposite in2="edge" operator="in" />
+          </filter>
+          <filter id="hud-outline-tranq">
+            <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="grown" />
+            <feComposite in="grown" in2="SourceAlpha" operator="out" result="edge" />
+            <feFlood flood-color="#7ab8ff" />
+            <feComposite in2="edge" operator="in" />
+          </filter>
+        </svg>
+        <Show when={artOf(held())}>
+          {(url) => (
+            <img
+              class="hud-weapon-art"
+              classList={{ 'hud-weapon-art-tranq': heldIsTranq() }}
+              src={url()}
+              alt=""
+            />
+          )}
         </Show>
+        <div class="hud-weapon-top">
+          <Show when={heldIsGun()}>
+            <div class="hud-weapon-spare">{heldTotal()}</div>
+          </Show>
+        </div>
         <div class="hud-weapon-name">{heldLabel()}</div>
         <Show when={heldIsGun()}>
           <div class="hud-weapon-mag">
@@ -806,14 +899,17 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </Show>
         {/*
           スタンナイフの充電。**弾の目盛りの場所に 1 本の棒。** 一定の時間で溜まり、
-          満ちたら明るくなる (構えて R2 / X で眠らせる刺突が出せる)。MGO2 と同じ置き方
+          満ちたら明るくなる (構えて R2 / 右クリックで眠らせる刺突が出せる)。MGO2 と同じ置き方
         */}
         <Show when={props.stats?.weaponHeld === 'knife' && !props.stats?.browsing}>
-          <div
-            class="hud-weapon-charge"
-            classList={{ 'hud-weapon-charge-full': (props.stats?.stunCharge ?? 0) >= 1 }}
-          >
-            <div class="hud-weapon-charge-fill" style={{ width: `${Math.round((props.stats?.stunCharge ?? 0) * 100)}%` }} />
+          <div class="hud-weapon-charge-row">
+            <span class="hud-weapon-charge-label">CHARGE</span>
+            <div
+              class="hud-weapon-charge"
+              classList={{ 'hud-weapon-charge-full': (props.stats?.stunCharge ?? 0) >= 1 }}
+            >
+              <div class="hud-weapon-charge-fill" style={{ width: `${Math.round((props.stats?.stunCharge ?? 0) * 100)}%` }} />
+            </div>
           </div>
         </Show>
         {/* 投げ物は装填が無い。残りの数だけ */}

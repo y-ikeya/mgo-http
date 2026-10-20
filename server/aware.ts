@@ -42,7 +42,7 @@ function sensibles(room: RoomWorld): Sensible[] {
   /*
    * **腕前のある人の物は気配にならない。**
    *
-   * 置く物 (クレイモア / DECOY / E LOCATOR) は TRAP MASTERY、投げ物 (手榴弾) は
+   * 置く物 (クレイモア / DECOY / DOLL / E LOCATOR) は TRAP MASTERY、投げ物 (手榴弾) は
    * THROWING MASTERY。席を立った人の物は、持ち主が分からないので素のまま (映る)
    */
   const hiddenBy = (owner: string, has: (skills: Skills) => boolean): boolean => {
@@ -57,6 +57,10 @@ function sensibles(room: RoomWorld): Sensible[] {
   for (const d of room.decoys) {
     if (hidden(d.owner)) continue
     out.push({ key: `decoy:${d.id}`, owner: d.owner, team: d.team, x: d.x, y: d.y, z: d.z })
+  }
+  for (const c of room.dolls) {
+    if (hidden(c.owner)) continue
+    out.push({ key: `doll:${c.id}`, owner: c.owner, team: c.team, x: c.x, y: c.y, z: c.z })
   }
   for (const l of room.locators) {
     if (!l.body.resting || hidden(l.owner)) continue

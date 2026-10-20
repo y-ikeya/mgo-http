@@ -65,9 +65,9 @@ function gunsIn(slot: 'primary' | 'secondary'): WeaponId[] {
  * 相手を騙す道具。交換になっているのが肝」と理屈まで書いていたが、**作り話だった**。
  * 本家では弾倉は選ぶものではない。
  */
-export type SupportId = 'grenade' | 'claymore' | 'decoy' | 'locator'
+export type SupportId = 'grenade' | 'claymore' | 'decoy' | 'locator' | 'doll'
 
-export const SUPPORTS: SupportId[] = ['grenade', 'claymore', 'decoy', 'locator']
+export const SUPPORTS: SupportId[] = ['grenade', 'claymore', 'decoy', 'locator', 'doll']
 
 interface SupportSpec {
   id: SupportId
@@ -126,6 +126,16 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
     count: 3,
     // 装備画面はそのまま出す。**強調の記法は効かない** (他の 2 つも素の文)
     hint: '自分そっくりの人形。撃った相手の位置が漏れる',
+  },
+  /*
+   * 猫の置物。**近づいた敵を釘付けにする** (domain/item/doll.ts)。半径 1.5m に入った敵は
+   * 8 秒動けない。CBOX を被った敵には効かない。撃てば壊れる
+   */
+  doll: {
+    id: 'doll',
+    label: 'DOLL',
+    count: 3,
+    hint: '置いた猫の傍に来た敵が釘付けになる。撃てば壊れる',
   },
 }
 
