@@ -227,7 +227,9 @@ function patrolling(bot: MatchPlayer, now: number): boolean {
     bot.downLeft <= 0 &&
     bot.knockLeft <= 0 &&
     // 猫に釘付けの間・立ち上がっている間は止まる
-    trapStage(bot.trappedBy, bot.trapFreeAt, now) === null
+    trapStage(bot.trappedBy, bot.trapFreeAt, now) === null &&
+    // 体当たりで怯んでいる間も止まる
+    now >= bot.staggerUntil
   )
 }
 

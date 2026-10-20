@@ -8,7 +8,7 @@ import {
   ladderAt,
   ladderGrip,
 } from '../../../domain/stage'
-import { BOX_BUMP_STUN, KNOCK_TIME, fallDamage, knockSpeed } from '../../../domain/rule/damage'
+import { BOX_BUMP_STUN, KNOCK_TIME, ROLL_STAGGER_SECONDS, fallDamage, knockSpeed } from '../../../domain/rule/damage'
 import { SkyLight } from '../world/skylight'
 import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance, COLLISION_HEIGHT, BODY_BOX } from '../../../domain/player/stance'
 import * as THREE from 'three'
@@ -1482,7 +1482,12 @@ export class Soldier {
     this.object.position.z += z
     // 軽くよろける (撃たれた時の型)。しゃがんでいれば倒れる方 (knockdown) が来るのでここには来ない
     this.animator?.playHit()
+    // 怯んで一瞬足が止まる。走っていても止まる
+    this.staggerLeft = ROLL_STAGGER_SECONDS
+    this.currentSpeed = 0
   }
+  /** 体当たりで怯んで足が止まっている残り (秒) */
+  private staggerLeft = 0
 
   /**
    * 爆風で吹き飛ばす。**向きだけ受けて、こちらが滑らせる。**
@@ -3257,6 +3262,8 @@ export class Soldier {
     if (this.sleepLeft > 0) moveDir = ZERO_MOVE
     // 猫に釘付けの間も (戻り切るまで)
     if (this.trappedStage !== 'none') moveDir = ZERO_MOVE
+    // 体当たりで怯んでいる間も
+    if (this.staggerLeft > 0) moveDir = ZERO_MOVE
 
     /*
      * 伏せている間は**前へしか這えない。**
@@ -3620,6 +3627,7 @@ export class Soldier {
     if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
+    if (this.staggerLeft > 0) this.staggerLeft -= dt
     if (this.trappedStage === 'out') {
       this.trappedOutLeft -= dt
       if (this.trappedOutLeft <= 0) this.trappedStage = 'none'

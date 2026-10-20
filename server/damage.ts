@@ -29,6 +29,8 @@ import {
   HIT_RULES,
   KNOCK_TIME,
   ROLL_HIT_RANGE,
+  ROLL_KNOCKBACK,
+  ROLL_STAGGER_SECONDS,
   ROLL_STAMINA,
   type HitZone,
   meleeDamage,
@@ -760,12 +762,30 @@ export function applyRoll(room: RoomWorld, attacker: MatchPlayer, victim: MatchP
   drainBy(room, attacker, victim, ROLL_STAMINA, 'ROLL', now)
   // 眠ったなら倒れる型は眠りのほう
   if (isAsleep(victim.sleepUntil, now)) return false
-  if (victim.crouching || victim.boxed) {
+  // 的 (bot) は crouching の旗を持たず、姿 (crouch_idle) でしゃがんでいる
+  if (victim.crouching || victim.boxed || CROUCH_POSE.test(victim.locomotion)) {
     knockAway(room, victim, attacker.x, attacker.z)
+    return false
+  }
+  /*
+   * 立っている的 (bot) はこちらで押しのける。**押しのけを動かす本人の画面が無い** ので、
+   * 流しても何も起きなかった (2026-10-20 本人「training の相手に」)
+   */
+  if (victim.bot) {
+    const awayX = victim.x - attacker.x
+    const awayZ = victim.z - attacker.z
+    const reach = Math.hypot(awayX, awayZ) || 1
+    victim.x += (awayX / reach) * ROLL_KNOCKBACK
+    victim.z += (awayZ / reach) * ROLL_KNOCKBACK
+    // 怯んで一瞬足が止まる (走る的も)
+    victim.staggerUntil = now + ROLL_STAGGER_SECONDS * 1000
     return false
   }
   return true
 }
+
+/** しゃがんでいる姿 (的は crouching の旗を持たないので姿で見る) */
+const CROUCH_POSE = /^crouch/
 
 /** 体当たりの申告を確かめる時の、距離の余裕 (m)。双方の位置は少し古い */
 const ROLL_HIT_SLACK = 0.8

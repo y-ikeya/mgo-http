@@ -59,6 +59,10 @@ export const ROLL_KNOCKBACK = 0.8
  * ローリングの体当たりで削るスタミナ。**1/8** (本人 2026-10-20)。立っていても、しゃがんで倒れても同じ
  */
 export const ROLL_STAMINA = MAX_STAMINA / 8
+/**
+ * 立っている相手が体当たりで怯んで足を止める長さ (秒)。**走っていても止まる** (本人 2026-10-20)
+ */
+export const ROLL_STAGGER_SECONDS = 0.5
 
 /**
  * ダンボールで走っていて敵にぶつかったと見なす距離 (m)。
