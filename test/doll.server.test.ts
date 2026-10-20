@@ -152,4 +152,21 @@ describe('DOLL', () => {
     const gone = b.last.get('dollGone') as { broken: boolean } | undefined
     expect(gone?.broken).toBe(true)
   }, 30000)
+
+  /** **読み直しで抜け出せない。** 入り直した時に釘付けの途中であることを返す (本人 2026-10-20) */
+  test('釘付けの途中で入り直すと、続きから釘付けのまま', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'doll', ['doll-a9', 'doll-b9'])
+    const at = await placed(a)
+    await walkInto(b, at)
+    expect(b.got('dollSprung')).toBe(1)
+    b.close()
+    await Bun.sleep(800)
+    // 円の中の、掛かった所から入り直す (walkInto と同じ所)
+    const back = await new Client(server, 'doll-b9', [at[0], at[1], at[2] + LURE_RADIUS - 0.3]).ready()
+    back.live()
+    await Bun.sleep(1200)
+    const resume = back.last.get('resume') as { trapped: boolean } | undefined
+    expect(resume?.trapped).toBe(true)
+  }, 30000)
 })

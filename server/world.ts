@@ -176,11 +176,13 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
     return
   }
   broadcast(room, { type: 'life', id: player.id, state: next })
-  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す。猫に釘付けなら解く
-  if (next !== 'alive' && next !== 'spawning') {
-    releaseCqc(room, player)
-    releaseTrapped(room, player)
-  }
+  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す
+  if (next !== 'alive' && next !== 'spawning') releaseCqc(room, player)
+  /*
+   * 人形に釘付けなら解く。**切れた (dropped) だけでは解かない** — 解くと、画面を読み直す
+   * だけで抜け出せた (本人 2026-10-20)。戻ってこなくても、人形が消える時にまとめて解ける
+   */
+  if (next !== 'alive' && next !== 'spawning' && next !== 'dropped') releaseTrapped(room, player)
 }
 
 /**

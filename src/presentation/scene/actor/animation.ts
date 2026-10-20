@@ -3628,10 +3628,12 @@ export class CharacterAnimator {
 
   /**
    * 猫に釘付けになる。しゃがみ込んで猫へ手を伸ばし、**伸ばし切った姿で止まる**
-   * (解けるまで。domain/item/doll.ts)
+   * (解けるまで。domain/item/doll.ts)。settled なら伸ばし切った姿から (読み直しの続き)
    */
-  playTrapped(): void {
+  playTrapped(settled = false): void {
     this.playWholeBody(TRAPPED_KEY, 'trapped')
+    // 読み直しの続き。しゃがみ込む動きを飛ばして、伸ばし切った姿 (型の終わり) から
+    if (settled) this.skipAhead(this.trappedDuration)
   }
 
   /** 解けた。**同じ型を逆に流して**立ち上がる */

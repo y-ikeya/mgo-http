@@ -1186,9 +1186,10 @@ export class Soldier {
 
   /**
    * 猫に釘付けになった。**その場でしゃがみ込み、猫へ手を伸ばして止まる。**
-   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く。yaw は猫のほうの向き
+   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く。yaw は猫のほうの向き。
+   * settled は読み直しの続き (しゃがみ込む動きを飛ばして、手を伸ばした姿から)
    */
-  trap(yaw?: number): void {
+  trap(yaw?: number, settled = false): void {
     if (this.down || this.downed || this.sleepLeft > 0 || this.trappedStage === 'in') return
     // 猫のほうへ向き直る (手を伸ばす先が猫になる)
     if (yaw !== undefined) this.yaw = yaw
@@ -1199,8 +1200,11 @@ export class Soldier {
     this.proneShiftLeft = 0
     this.trappedStage = 'in'
     this.trappedOutLeft = 0
-    this.animator?.playTrapped()
+    this.animator?.playTrapped(settled)
+    this.trappedSettled = settled
   }
+  /** 読み直しの続きで釘付けになった (模型が届いた時に、止まった姿から始め直す) */
+  private trappedSettled = false
 
   /** 解けた (猫が消えた・撃たれた)。**同じ型を逆に流して立ち上がり**、戻り切ったら動ける */
   untrap(): void {
@@ -3988,6 +3992,8 @@ export class Soldier {
     this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
     // 模型が届く前に眠らされていた (読み直しの続き)。寝ている姿から始める
     if (this.sleepLeft > 0) this.animator.playSleep(true)
+    // 同じく、釘付けの途中で読み直した。手を伸ばした姿から
+    else if (this.trappedStage === 'in') this.animator.playTrapped(this.trappedSettled)
 
     disposeTree(this.placeholder)
     this.placeholder = null

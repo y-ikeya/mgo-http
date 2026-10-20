@@ -2595,6 +2595,8 @@ export class Game {
         // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
         const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
         if (asleep > 0) this.player.sleep(asleep, true);
+        // 人形に釘付けの途中で読み直した。**しゃがみ込む動きは飛ばして**手を伸ばした姿から続ける
+        else if (message.trapped) this.player.trap(undefined, true);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;

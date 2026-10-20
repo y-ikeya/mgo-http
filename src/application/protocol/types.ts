@@ -786,6 +786,11 @@ export interface ResumeMessage {
    * サーバーは眠ったままなので撃てず動けず、本人には理由が見えない。
    */
   sleepUntil: number
+  /**
+   * 人形 (DOLL) に釘付けの途中か。**返さないと、読み直すだけで抜け出せた** (本人 2026-10-20)。
+   * 解けるのは今まで通り dollGone / trapReleased で知らせる
+   */
+  trapped: boolean
 }
 
 /**

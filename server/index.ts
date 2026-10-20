@@ -1248,6 +1248,7 @@ const server = Bun.serve<Client>({
             primary: resumed.primary,
             secondary: resumed.secondary,
             sleepUntil: resumed.sleepUntil,
+            trapped: resumed.trappedBy !== 0,
           } satisfies ServerMessage),
         )
       }
