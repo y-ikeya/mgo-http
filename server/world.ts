@@ -12,6 +12,7 @@ import { type MatchPlayer, type Team, enterLife, newBot } from '../src/domain/pl
 import type { ServerMessage } from '../src/application/protocol/types'
 import type { Claymore } from './arms/claymore'
 import type { Cat } from './arms/cat'
+import { IMMUNE_SECONDS } from '../src/domain/item/cat'
 import type { Decoy } from './arms/decoy'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
@@ -188,8 +189,14 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
  */
 export function releaseTrapped(room: RoomWorld, player: MatchPlayer): void {
   if (player.trappedBy === 0) return
-  player.trappedBy = 0
+  freeFromTrap(player, Date.now())
   broadcast(room, { type: 'trapReleased', id: player.id })
+}
+
+/** 解く。**しばらくはどの猫にも掛からない** (立ち上がる間 + 1 秒。IMMUNE_SECONDS) */
+export function freeFromTrap(player: MatchPlayer, now: number): void {
+  player.trappedBy = 0
+  player.trapFreeAt = now + IMMUNE_SECONDS * 1000
 }
 
 /**

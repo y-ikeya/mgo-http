@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { Client, startServer, twoPlayers, type Server } from './server'
-import { LURE_RADIUS, TRAP_SECONDS } from '../src/domain/item/cat'
+import { IMMUNE_SECONDS, LURE_RADIUS, TRAP_SECONDS } from '../src/domain/item/cat'
 
 /**
  * CAT (猫の置物)。**円に入った敵を釘付けにして、時間が来たら消える。**
@@ -104,4 +104,33 @@ describe('CAT', () => {
     expect(b.got('trapReleased')).toBe(1)
     expect(b.got('catGone')).toBe(0)
   }, 30000)
+
+  /**
+   * **解けたばかりは隣の猫に掛からない** (立ち上がる間 + 1 秒)。無いと、並べて置かれた所で
+   * 解けたそばから掛かり続けて動けない
+   */
+  test('解けてからしばらくは、隣の猫にも掛からない', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'cat', ['cat-a7', 'cat-b7'])
+    const first = await placed(a)
+    // 1m 横へずれて 2 匹目。円はほとんど重なる
+    a.moveTo(first[0] + 1, first[1], first[2] + 0.9)
+    await Bun.sleep(200)
+    a.send({ type: 'cat' })
+    await Bun.sleep(200)
+    expect(a.got('catPlaced')).toBe(2)
+    // 両方の円の中 (1 匹目から 0.9m、2 匹目から 1.35m)
+    await b.walkTo(first[0], first[1], first[2] + 0.9)
+    await Bun.sleep(200)
+    expect(b.got('catSprung')).toBe(1)
+    // 1 匹目が消えて解ける
+    await Bun.sleep(TRAP_SECONDS * 1000 + 200)
+    expect(b.got('catGone')).toBe(1)
+    // 2 匹目の円の中に居るが、すぐには掛からない
+    await Bun.sleep(IMMUNE_SECONDS * 1000 - 600)
+    expect(b.got('catSprung')).toBe(1)
+    // 間が過ぎたら掛かる
+    await Bun.sleep(900)
+    expect(b.got('catSprung')).toBe(2)
+  }, 40000)
 })

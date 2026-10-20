@@ -27,6 +27,12 @@ export const TRAPPED_CLIP_SECONDS = 2.0
 export const HOLD_SECONDS = 6
 /** 掛かってから猫が消えて解けるまで (秒)。型を流し切って、止まっている間 */
 export const TRAP_SECONDS = TRAPPED_CLIP_SECONDS + HOLD_SECONDS
+/**
+ * 解けてから、どの猫にも掛からない間 (秒)。**立ち上がる間 (型を逆に流す 2 秒) + 1 秒。**
+ * 無いと、猫を並べて置かれた所で解けたそばから隣の猫に掛かり、ずっと足止めされる
+ * (本人 2026-10-20「一度引っかかったら 1 秒くらい引っかからないように」)
+ */
+export const IMMUNE_SECONDS = TRAPPED_CLIP_SECONDS + 1
 
 /** 撃たれたときの当たり (m)。置物は高さ 0.3m・長さ 0.4m ほど。**少しだけ大きく** — 小さすぎて当たらない的にしない */
 export const SHOT_HALF = 0.3

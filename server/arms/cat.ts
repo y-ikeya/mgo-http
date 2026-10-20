@@ -18,7 +18,7 @@ import { SHOT_HALF, SHOT_TOP, TRAP_SECONDS, inLure } from '../../src/domain/item
 import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { sessionOf } from '../session'
-import { type RoomWorld, broadcast, hostileToOwner } from '../world'
+import { type RoomWorld, broadcast, freeFromTrap, hostileToOwner } from '../world'
 
 export { releaseTrapped } from '../world'
 
@@ -82,7 +82,7 @@ export function relayCats(room: RoomWorld): void {
  *
  * **申告は受けない。** 猫は止まっていて、人の位置は毎刻み届いている — 判定に要る物が
  * 両方こちらに在る。掛かるのは**置いた人の敵だけ**。CBOX を被っている人・眠っている人・
- * 既に別の猫に掛かっている人は掛からない。伏せていても掛かる。
+ * 既に別の猫に掛かっている人・解けたばかりの人は掛からない。伏せていても掛かる。
  */
 export function updateCats(room: RoomWorld, now: number): void {
   for (const cat of [...room.cats]) {
@@ -94,6 +94,8 @@ export function updateCats(room: RoomWorld, now: number): void {
     for (const player of connected(room)) {
       if (player.id === cat.owner || !hostileToOwner(room, cat.team, player)) continue
       if (!canAct(player.life) || player.boxed || player.trappedBy !== 0) continue
+      // 解けたばかり (立ち上がっている途中 + 1 秒) は掛からない
+      if (now < player.trapFreeAt) continue
       if (player.sleepUntil > now) continue
       if (!inLure(cat, player.x, player.y, player.z)) continue
       victims.push(player)
@@ -130,7 +132,7 @@ function removeCat(room: RoomWorld, cat: Cat, broken: boolean): void {
   for (const id of cat.victims) {
     const player = room.players.get(id)
     if (player && player.trappedBy === cat.id) {
-      player.trappedBy = 0
+      freeFromTrap(player, Date.now())
       freed.push(id)
     }
   }
