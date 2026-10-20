@@ -25,6 +25,7 @@ import bpy
 import os
 import bmesh
 import math
+import random
 import sys
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
@@ -286,10 +287,6 @@ def sky_reached(tree, origin, d):
     return False
 
 
-# 縁の頂点を、面の内側へ寄せて測り直す量 (m)。暗いほうを採る (bake の中の註釈)
-INSET_STEPS = (0.3, 0.6)
-
-
 def sky_from(tree, origin, rays, up):
     """その点から空がどれだけ見えるか (0〜1)。上を向いた光線ほど重い"""
     open_rays = 0.0
@@ -319,51 +316,66 @@ def bake(samples=SAMPLES):
         layer = mesh.color_attributes.new(name=LAYER, type=COLOR_TYPE, domain='CORNER')
         matrix = obj.matrix_world
         normal_matrix = matrix.inverted_safe().transposed().to_3x3()
-        # 面の向き (平らな法線) と真ん中を先に読む。**同じ頂点で同じ向きの面の角は 1 回だけ測る**
-        # (平らな壁の真ん中の頂点は 4 面に共有されるが、向きが同じなので値も同じ)
+        # **1 点で測らず、頂点が受け持つ広がりで測って平均する。** 頂点の値は隣の三角の上で線形に
+        # 混ざるので、値は「その頂点のまわりの平均」でなければならない。点で測ると、窓の角のように
+        # その点だけ暗い所の値が細長い三角に沿って伸び、平らな壁に斜めの楔が出た (建物 5・31 ほか
+        # どの建物のどの面にも。2026-10-20 本人「抜本解決しないと部分的になる」)。
+        # 光線 1 本ごとに撃つ所を変える: 頂点を含む三角 (同じ向きの面) の中に散らし、頂点からの
+        # 近さ (重心座標) で重みを付ける。面の上の点なので壁の外へは出ない (部屋の隅が外の空を見ない)
         def facing(poly):
             n = (normal_matrix @ poly.normal).normalized()
             return n if n.length > 1e-6 else up
+        mesh.calc_loop_triangles()
+        poly_normal = [facing(poly) for poly in mesh.polygons]
+        world_co = [matrix @ v.co for v in mesh.vertices]
         groups = {}
-        for poly in mesh.polygons:
-            n = facing(poly)
+        for tri in mesh.loop_triangles:
+            n = poly_normal[tri.polygon_index]
             key_n = (round(n.x, 2), round(n.y, 2), round(n.z, 2))
-            center = matrix @ poly.center
-            for vi in poly.vertices:
-                entry = groups.setdefault((vi, key_n), {'n': n, 'centers': []})
-                entry['centers'].append(center)
+            a, b, c = (world_co[i] for i in tri.vertices)
+            area = (b - a).cross(c - a).length * 0.5
+            for k, vi in enumerate(tri.vertices):
+                entry = groups.setdefault((vi, key_n), {'n': n, 'tris': []})
+                if area > 1e-8:
+                    # 頂点を先頭に並べる (重心座標の 1 つ目がその頂点の重み)
+                    corners = (a, b, c)[k:] + (a, b, c)[:k]
+                    entry['tris'].append((area, corners))
         values = {}
         for (vi, key_n), entry in groups.items():
-            world = matrix @ mesh.vertices[vi].co
+            world = world_co[vi]
             normal = entry['n']
-            origin = world + normal * EPS
-            rays = directions(normal, samples)
-            sky = sky_from(tree, origin, rays, up)
-            # **縁の頂点は、面の内側へ寄せた所からも測って暗いほうを採る。** 床の箱が壁の足元まで
-            # 伸びていると、床の隅の頂点は壁の中にあり、線は壁の外側の面を裏から抜けて (近い
-            # 裏面は飛ばす) 外の空に届いた。建物 6 の 1 階は床 1 枚 (21m × 14m) で、部屋の隅が
-            # 0.4 の明るさになった (2026-10-17 本人「なんでここ明るいの、部屋の一番奥だぞ」)。
-            # 寄せるのは**同じ向きの面の内側だけ** — 角ごとに焼くので、窓の口の面の暗さは壁の角に来ない。
-            # 高さは変えない (下へ寄せると床に潜る)
-            if sky > 0.02:
-                for center in entry['centers']:
-                    toward = center - world
-                    toward.z = 0.0
-                    span = toward.length
-                    if span <= 1e-3:
-                        continue
-                    toward /= span
-                    for step in INSET_STEPS:
-                        sky = min(sky, sky_from(tree, origin + toward * min(step, span * 0.5), rays, up))
-                        if sky <= 0.02:
+            # 撃つ所も散らすので、1 点で測っていた頃の倍の本数で均す
+            rays = directions(normal, samples * 2)
+            tris = entry['tris']
+            if not tris:
+                sky = sky_from(tree, world + normal * EPS, rays, up)
+            else:
+                rng = random.Random(vi * 2654435761 + hash(key_n))
+                total_area = sum(t[0] for t in tris)
+                open_rays = 0.0
+                weight = 0.0
+                for d in rays:
+                    # 面積で三角を選び、その中に一様に点を置く
+                    pick = rng.random() * total_area
+                    for area, (p0, p1, p2) in tris:
+                        pick -= area
+                        if pick <= 0:
                             break
-                    if sky <= 0.02:
-                        break
+                    u, v = rng.random(), rng.random()
+                    if u + v > 1.0:
+                        u, v = 1.0 - u, 1.0 - v
+                    own = 1.0 - u - v
+                    point = p0 * own + p1 * u + p2 * v
+                    w = (max(0.0, d.dot(up)) + 0.35) * own
+                    weight += w
+                    if sky_reached(tree, point + normal * EPS, d):
+                        open_rays += w
+                sky = open_rays / weight if weight > 0 else 1.0
             values[(vi, key_n)] = FLOOR + (1.0 - FLOOR) * sky
             total += 1
         colors = [0.0] * (len(mesh.loops) * 4)
         for poly in mesh.polygons:
-            n = facing(poly)
+            n = poly_normal[poly.index]
             key_n = (round(n.x, 2), round(n.y, 2), round(n.z, 2))
             for li in poly.loop_indices:
                 value = values[(mesh.loops[li].vertex_index, key_n)]
