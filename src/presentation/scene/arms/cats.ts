@@ -11,7 +11,7 @@ import { TEAM_COLOR } from '../world/stage'
  * 釘付けにするのも消すのもサーバー (server/arms/cat.ts)。ここは見せるだけ。
  * 円は効く範囲 (半径 1.5m、domain/item/cat.ts)。**敵には見えない** — 見えると避けて通られる。
  * 置いた本人と味方にはうっすら見える (どこまで寄せれば掛かるかが分かる)。
- * 誰かが掛かったら円は消す (もう誰も掛からない)。
+ * 円は猫が消えるまで出す (掛かった後も、後から入った敵は掛かる)。
  */
 
 /**
@@ -100,14 +100,6 @@ export class Cats {
       group.add(model)
       refreshStaticShadows() // 置いた物は影マップに焼き直す
     })
-  }
-
-  /** 誰かが掛かった。円を消す (もう誰も掛からない) */
-  sprung(id: number): void {
-    const entry = this.entries.get(id)
-    if (!entry?.ring) return
-    entry.group.remove(entry.ring)
-    entry.ring = null
   }
 
   /** 消す。**薄くなりながら** (FADE_SECONDS)。fade = false ならすぐ (試合の切れ目の片付け) */

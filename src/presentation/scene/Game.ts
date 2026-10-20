@@ -2849,7 +2849,6 @@ export class Game {
         break;
       }
       case "catSprung": {
-        this.cats.sprung(message.id);
         const cat = this.cats.positionOf(message.id);
         // 鳴き声は猫の所から。**近くの人にも届く** (誰かがそこで足止めされている)
         if (cat) this.audio.play("catMeow", cat);

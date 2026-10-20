@@ -610,7 +610,7 @@ export interface CatPlaced {
 export interface CatSprung {
   type: 'catSprung'
   id: number
-  /** 掛かった人 (円に同時に入っていた敵の全員) */
+  /** 今回掛かった人 (円に入っていた敵の全員)。**同じ猫で何度も来る** — 後から円に入った人のぶん */
   victims: string[]
 }
 

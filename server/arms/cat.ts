@@ -14,7 +14,7 @@ import { STEP_UP } from '../../src/domain/player/moving'
 import type { MatchPlayer, Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
 import { type Placed, placeSpot } from '../../src/sim/judge/claymore'
-import { SHOT_HALF, SHOT_TOP, TRAP_SECONDS, inLure } from '../../src/domain/item/cat'
+import { SHOT_HALF, SHOT_TOP, TRAPPED_CLIP_SECONDS, TRAP_SECONDS, inLure } from '../../src/domain/item/cat'
 import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { STAGES } from '../../src/domain/stage'
@@ -86,14 +86,20 @@ export function relayCats(room: RoomWorld): void {
  *
  * **申告は受けない。** 猫は止まっていて、人の位置は毎刻み届いている — 判定に要る物が
  * 両方こちらに在る。掛かるのは**置いた人の敵だけ**。CBOX を被っている人・眠っている人・
- * 既に別の猫に掛かっている人・解けたばかりの人は掛からない。伏せていても掛かる。
+ * 既に掛かっている人・解けたばかりの人は掛からない。伏せていても掛かる。
  */
 export function updateCats(room: RoomWorld, now: number): void {
   for (const cat of [...room.cats]) {
-    if (cat.sprungAt > 0) {
-      if (now - cat.sprungAt >= TRAP_SECONDS * 1000) removeCat(room, cat, false)
+    if (cat.sprungAt > 0 && now - cat.sprungAt >= TRAP_SECONDS * 1000) {
+      removeCat(room, cat, false)
       continue
     }
+    /*
+     * **掛かった後も、消えるまでは後から入った敵も掛かる** (1 匹に何人でも。本人 2026-10-20)。
+     * 解けるのは猫が消える時に全員まとめて。残りが型の尺より短ければ掛けない — しゃがみ込む
+     * 途中で解けて、逆に流すことになる
+     */
+    if (cat.sprungAt > 0 && TRAP_SECONDS * 1000 - (now - cat.sprungAt) < TRAPPED_CLIP_SECONDS * 1000) continue
     const victims: MatchPlayer[] = []
     // 的 (練習の bot) も掛かる (present は bot を含む)
     for (const player of present(room)) {
@@ -106,15 +112,16 @@ export function updateCats(room: RoomWorld, now: number): void {
       victims.push(player)
     }
     if (victims.length === 0) continue
-    cat.sprungAt = now
-    cat.victims = victims.map((v) => v.id)
+    if (cat.sprungAt === 0) cat.sprungAt = now
+    cat.victims.push(...victims.map((v) => v.id))
     for (const victim of victims) {
       victim.trappedBy = cat.id
       // 的 (bot) は猫のほうへ向き直らせる。人は本人の手元が向き直り、その向きが届く
       // yaw θ で正面が (-sinθ, -cosθ)
       if (victim.bot) victim.yaw = Math.atan2(victim.x - cat.x, victim.z - cat.z)
     }
-    broadcast(room, { type: 'catSprung', id: cat.id, victims: cat.victims })
+    // 知らせるのは今回掛かった人だけ (先に掛かった人の型を流し直さない)
+    broadcast(room, { type: 'catSprung', id: cat.id, victims: victims.map((v) => v.id) })
   }
 }
 
