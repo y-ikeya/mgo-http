@@ -12,6 +12,7 @@ import { connected, present } from '../../src/domain/match/match'
 import { canAct } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
 import type { MatchPlayer, Team } from '../../src/domain/player/player'
+import type { Locomotion } from '../../src/domain/player/locomotion'
 import type { ServerMessage } from '../../src/application/protocol/types'
 import { type Placed, placeSpot } from '../../src/sim/judge/claymore'
 import { SHOT_HALF, SHOT_TOP, TRAPPED_CLIP_SECONDS, TRAP_SECONDS, inLure } from '../../src/domain/item/doll'
@@ -37,6 +38,17 @@ export interface Doll extends Placed {
 }
 
 let nextDollId = 1
+
+/** 足場に立っていない姿。この間は人形に掛けない (updateDolls) */
+const OFF_FOOTING: ReadonlySet<string> = new Set<Locomotion>([
+  'climb',
+  'climb_top',
+  'hang',
+  'hang_drop',
+  'hang_climb',
+  'vault',
+  'vault_up',
+])
 
 /** 置く。**位置も向きもサーバーが決める** (decoy と同じ判定)。置けなければ数は減らさない */
 export function placeDoll(room: RoomWorld, from: MatchPlayer): void {
@@ -107,6 +119,10 @@ export function updateDolls(room: RoomWorld, now: number): void {
       if (!canAct(player.life) || player.boxed || player.trappedBy !== 0) continue
       // 解けたばかり (立ち上がっている途中 + 1 秒) は掛からない
       if (now < player.trapFreeAt) continue
+      // 足場に立っていない間は掛けない (梯子・登り切る途中・ぶら下がり・跳び越え)。登り切る型の
+      // 途中はまだ縁の外に居て、掛けると梯子から手が離れて下へ落ちた (本人 2026-10-20)。
+      // 床に立った所で掛かる
+      if (OFF_FOOTING.has(player.locomotion)) continue
       if (player.sleepUntil > now) continue
       if (!inLure(doll, player.x, player.y, player.z)) continue
       victims.push(player)

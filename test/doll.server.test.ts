@@ -169,4 +169,20 @@ describe('DOLL', () => {
     const resume = back.last.get('resume') as { trapped: boolean } | undefined
     expect(resume?.trapped).toBe(true)
   }, 30000)
+
+  /**
+   * **足場に立っていない間は掛からない。** 梯子を登り切る型の途中はまだ縁の外に居て、
+   * 掛けると梯子から手が離れて下へ落ちた (本人 2026-10-20)。床に立った所で掛かる
+   */
+  test('梯子を登り切る途中は掛からず、立ったら掛かる', async () => {
+    server = await startServer()
+    const { a, b } = await twoPlayers(server, 'doll', ['doll-a10', 'doll-b10'])
+    const at = await placed(a)
+    b.pose = 'climb_top'
+    await walkInto(b, at)
+    expect(b.got('dollSprung')).toBe(0)
+    b.pose = 'idle'
+    await Bun.sleep(300)
+    expect(b.got('dollSprung')).toBe(1)
+  }, 30000)
 })
