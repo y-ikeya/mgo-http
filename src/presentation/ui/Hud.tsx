@@ -107,6 +107,11 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   const teams = () => MODES[mode()].teams
   /** 1 人でも成立する部屋か。**相手待ちを出さない** (練習・休憩) */
   const soloRoom = () => MODES[mode()].solo
+  /**
+   * 上部に残機を出すか。**攻める側と守る側に分かれる部屋 (TSNE) は出さない** — 勝ち負けは
+   * ターゲットを持ち帰れるかで決まり、残り敵兵数を争うわけではない (本人 2026-10-20)
+   */
+  const showScore = () => !MODES[mode()].sides
   const won = () => {
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner === props.stats?.team
@@ -334,17 +339,23 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           */}
           <Show
             when={teams()}
-            fallback={<span class="hud-score hud-score-own">{props.stats?.match?.blue ?? 0}</span>}
+            fallback={
+              <Show when={showScore()}>
+                <span class="hud-score hud-score-own">{props.stats?.match?.blue ?? 0}</span>
+              </Show>
+            }
           >
-            <span
-              class="hud-score hud-score-blue"
-              classList={{ 'hud-score-own': props.stats?.team === 'blue' }}
-            >
-              {props.stats?.match?.blue ?? 0}
-            </span>
+            <Show when={showScore()}>
+              <span
+                class="hud-score hud-score-blue"
+                classList={{ 'hud-score-own': props.stats?.team === 'blue' }}
+              >
+                {props.stats?.match?.blue ?? 0}
+              </span>
+            </Show>
           </Show>
           <span class="hud-clock">{clock()}</span>
-          <Show when={teams()}>
+          <Show when={teams() && showScore()}>
             <span
               class="hud-score hud-score-red"
               classList={{ 'hud-score-own': props.stats?.team === 'red' }}
