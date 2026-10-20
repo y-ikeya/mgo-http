@@ -899,7 +899,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         </Show>
         {/*
           スタンナイフの充電。**弾の目盛りの場所に 1 本の棒。** 一定の時間で溜まり、
-          満ちたら明るくなる (構えて R2 / X で眠らせる刺突が出せる)。MGO2 と同じ置き方
+          満ちたら明るくなる (構えて R2 / 右クリックで眠らせる刺突が出せる)。MGO2 と同じ置き方
         */}
         <Show when={props.stats?.weaponHeld === 'knife' && !props.stats?.browsing}>
           <div class="hud-weapon-charge-row">

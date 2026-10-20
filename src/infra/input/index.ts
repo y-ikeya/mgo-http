@@ -120,6 +120,9 @@ type PadAction = keyof typeof PAD_BUTTONS
  * 「Space をどれだけ押したか」は遊びのルールでも描画でもないので、数えるのは
  * ここ。呼ぶ側は**意味だけ**受け取る (しゃがむのか、転がるのか)。
  */
+/** 右クリックの押下を、キーと同じ「押し始め」の控えに載せるための名前 (KeyboardEvent.code には無い名前) */
+const MOUSE_RIGHT = 'MouseRight'
+
 const BINDINGS = {
   /*
    * しゃがみ (単押し) と回避 (長押し)。どちらも「体を低くする」動作なので、
@@ -150,10 +153,12 @@ const BINDINGS = {
    */
   killStab: { keys: [], pad: 'swap' },
   /**
-   * ナイフを構えて眠らせる刺突 (スタンナイフ)。鍵盤は X。パッドは R2 (引き金)
-   * なので、ここにボタンは無い。充電が満ちていなければ振らない
+   * ナイフを構えて眠らせる刺突 (スタンナイフ)。**鍵盤は右クリック** (Mac のトラックパッドなら 2 本指)。
+   * ナイフを持っている間は右クリックを構えに使わず、構えは Shift (rightClickStuns)。
+   * X だった頃は手が遠かった (本人 2026-10-20)。パッドは R2 (引き金) なので、ここにボタンは無い。
+   * 充電が満ちていなければ振らない
    */
-  stunStab: { keys: ['KeyX'] },
+  stunStab: { keys: [MOUSE_RIGHT] },
   /** 道具の一覧。単押しでダンボール、押している間は一覧 */
   swapTool: { keys: ['KeyC'], pad: 'box' },
   drop: { keys: ['KeyG'], pad: 'drop' },
@@ -305,8 +310,22 @@ export class Input {
       return
     }
     if (e.button === 0) this.fireHeld = true
-    if (e.button === 2) this.aimHeld = true
+    if (e.button === 2) {
+      // ナイフを持っている間は構えではなく眠らせる刺突 (stunStab)。構えは Shift
+      if (this.rightClickStuns) {
+        this.justPressed.add(MOUSE_RIGHT)
+        this.lastUsed = 'keyboard'
+      } else {
+        this.aimHeld = true
+      }
+    }
   }
+
+  /**
+   * 右クリックを眠らせる刺突に使うか。**ナイフを持っている間だけ** (呼ぶ側が毎コマ立てる)。
+   * その間の構えは Shift (右クリックを構えと刺突で取り合わない)
+   */
+  rightClickStuns = false
 
   private readonly onMouseUp = (e: MouseEvent) => {
     if (e.button === 0) this.fireHeld = false

@@ -4065,6 +4065,8 @@ export class Game {
    * 持ち替えたこと自体が意味を失う。
    */
   private updateTrigger(): void {
+    // ナイフを持っている間、鍵盤の右クリックは眠らせる刺突 (構えは Shift)
+    this.input.rightClickStuns = this.inv.held === "knife";
     if (!canAct(this.life) || this.loadoutBlocking) return;
     if (this.inv.switching) return;
     if (this.updateCqc()) return;
@@ -4078,7 +4080,7 @@ export class Game {
      *
      * 構えて 2 通り (MGO2 のスタンナイフ):
      *   殺す刺突      パッド R1 / 鍵盤 左クリック
-     *   眠らせる刺突  パッド R2 / 鍵盤 X   (充電が満ちている時だけ)
+     *   眠らせる刺突  パッド R2 / 鍵盤 右クリック (充電が満ちている時だけ。構えは Shift)
      */
     const aiming = this.player.isAiming;
     const killTap = this.input.tapped("killStab");

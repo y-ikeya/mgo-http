@@ -164,7 +164,7 @@ export function skillDetail(id: SkillId): SkillDetail {
             values: perLevel(id, stunChargeSeconds).map(seconds),
           },
         ],
-        notes: ['構えて R2 / X で眠らせる刺突。充電が満ちている時だけ'],
+        notes: ['構えて R2 / 右クリック (構えは Shift) で眠らせる刺突。充電が満ちている時だけ'],
       }
     case 'quickRecovery':
       return {
