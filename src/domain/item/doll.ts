@@ -1,5 +1,7 @@
 /**
- * CAT (猫の置物)。**近づいた敵を釘付けにする置く道具。**
+ * DOLL (猫の置物)。**近づいた敵を釘付けにする置く道具。**
+ *
+ * 名前は DOLL (本人 2026-10-20「cat じゃなくて doll にしよう」)。形は猫なので、註では猫とも呼ぶ。
  *
  * 本人 2026-10-20:
  *
@@ -10,11 +12,11 @@
  *     効かない   CBOX を被った敵。伏せた敵には効く (伏せの型は無いので同じ型)
  *     壊す       撃ち抜けば猫は消え、円も消える (止まっていた人も解ける)
  *     解ける     止まっている間に撃たれたら解ける
- *     円         置いた本人にはうっすら見える。敵には見えない
+ *     円         置いた本人と味方にはうっすら見える (置く前の構えから)。敵には見えない
  *     数         3 匹。1 匹に何人でも掛かる (掛かった後も、消えるまでに円へ入った敵は掛かる)
  *     TSNE       攻める側だけ
  *
- * ここは決まりだけ。いつ問うかはサーバー (server/arms/cat.ts) が決める。
+ * ここは決まりだけ。いつ問うかはサーバー (server/arms/doll.ts) が決める。
  */
 
 /** 釘付けになる円の半径 (m、水平) */
@@ -56,6 +58,6 @@ export interface LureTarget {
 }
 
 /** その人が猫の円の中に居るか (高さも見る) */
-export function inLure(cat: LureTarget, x: number, y: number, z: number): boolean {
-  return Math.hypot(x - cat.x, z - cat.z) <= LURE_RADIUS && Math.abs(y - cat.y) <= LURE_HEIGHT
+export function inLure(doll: LureTarget, x: number, y: number, z: number): boolean {
+  return Math.hypot(x - doll.x, z - doll.z) <= LURE_RADIUS && Math.abs(y - doll.y) <= LURE_HEIGHT
 }

@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 
 import { TRIGGER_COS, TRIGGER_RANGE } from '../../../domain/item/claymore'
-import { LURE_RADIUS } from '../../../domain/item/cat'
+import { LURE_RADIUS } from '../../../domain/item/doll'
 import type { Team } from '../../../domain/player/player'
-import { zoneMaterial } from './cats'
+import { zoneMaterial } from './dolls'
 import { TEAM_COLOR } from '../world/stage'
 import type { PlaceSpot } from '../../../sim/judge/claymore'
 
@@ -16,7 +16,7 @@ import type { PlaceSpot } from '../../../sim/judge/claymore'
  * canPlaceAt) ので、弾かれる所では赤い印だけを出して、押しても置く型に入らない
  * ことを先に伝える。
  *
- * 扇はクレイモアだけ。CAT は効く範囲の円 (置いた後に出る円と同じ物)。decoy は見張らないので印だけ。
+ * 扇はクレイモアだけ。DOLL は効く範囲の円 (置いた後に出る円と同じ物)。decoy は見張らないので印だけ。
  * **置く前から効く所が見えないと、そこに置いてよいか分からない** (本人 2026-10-20)
  *
  * 数字はドメインから引く (TRIGGER_RANGE / TRIGGER_COS)。ここで別に持つと、
@@ -41,7 +41,7 @@ export class PlacePreview {
   private readonly fanPoints: Float32Array
   private readonly rimPoints: Float32Array
   private readonly markMaterial: THREE.MeshBasicMaterial
-  /** CAT の効く範囲 (塗った円)。色は自分の陣営 (置いた後の円と同じ)。クレイモアの扇も同じ材質 */
+  /** DOLL の効く範囲 (塗った円)。色は自分の陣営 (置いた後の円と同じ)。クレイモアの扇も同じ材質 */
   private readonly disc: THREE.Mesh
   private readonly discMaterials: Record<Team, THREE.MeshBasicMaterial> = {
     blue: zoneMaterial('blue'),
@@ -107,7 +107,7 @@ export class PlacePreview {
    *
    * @param spot placeSpot の結果。ok でなければ赤い印だけ
    * @param yaw 置く人の向き。クレイモアの正面はこれと同じ (server/arms/claymore.ts)
-   * @param zone 効く所の形。fan = クレイモアの扇、disc = CAT の円、null = 印だけ (decoy)
+   * @param zone 効く所の形。fan = クレイモアの扇、disc = DOLL の円、null = 印だけ (decoy)
    * @param team 自分の陣営。扇と円の色
    */
   show(spot: PlaceSpot, yaw: number, zone: 'fan' | 'disc' | null, team: Team = 'blue'): void {

@@ -1172,7 +1172,7 @@ export class Soldier {
   private bumpLeft = 0
 
   /**
-   * 猫に釘付けになっている段 (domain/item/cat.ts)。in = 手を伸ばして止まっている、
+   * 猫に釘付けになっている段 (domain/item/doll.ts)。in = 手を伸ばして止まっている、
    * out = 解けて型を逆に流している (戻り切るまで動けない)。**掛かるも解けるもサーバーが決める**
    */
   private trappedStage: 'none' | 'in' | 'out' = 'none'

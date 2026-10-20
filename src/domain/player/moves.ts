@@ -55,7 +55,7 @@ export interface BodyState {
   crouching: boolean
   /** CQC で投げている / 空振りしている (domain/player/cqc.ts)。全身の型 */
   cqc: boolean
-  /** 猫に釘付けになっている (解けて戻る途中も。domain/item/cat.ts) */
+  /** 猫に釘付けになっている (解けて戻る途中も。domain/item/doll.ts) */
   trapped: boolean
 }
 

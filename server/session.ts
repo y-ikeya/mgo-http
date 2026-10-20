@@ -63,7 +63,7 @@ export interface Session {
    */
   seenDecoys: Set<number>
   /** 見せた猫。一度見せた物をもう一度送らないために覚える (decoy と同じ) */
-  seenCats: Set<number>
+  seenDolls: Set<number>
   /**
    * 見せた E LOCATOR。
    *
@@ -183,7 +183,7 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     seen: new Set(),
     seenClaymores: new Set(),
     seenDecoys: new Set(),
-    seenCats: new Set(),
+    seenDolls: new Set(),
     seenLocators: new Set(),
     sensed: new Map(),
     revealed: new Map(),

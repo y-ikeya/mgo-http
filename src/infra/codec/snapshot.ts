@@ -104,7 +104,7 @@ export const LOCOMOTIONS: Locomotion[] = [
   'crouch_death',
   // 眠っている人を叩く。**末尾に足す**
   'pat',
-  // 猫に釘付けになる / 解けて戻る (domain/item/cat.ts)。**末尾に足す**
+  // 猫に釘付けになる / 解けて戻る (domain/item/doll.ts)。**末尾に足す**
   'trapped',
   'trapped_out',
 ]
@@ -214,8 +214,8 @@ const HELD_BITS: HeldId[] = [
   'm4',
   // STEALTH。**末尾に足す。** 着る物で手には持たないので、ここに乗ることは無い (表を欠かさないため)
   'stealth',
-  // CAT (猫の置物)。**末尾に足す**
-  'cat',
+  // DOLL (猫の置物)。**末尾に足す**
+  'doll',
   // TSNE のターゲット (持ち物の一覧から選んで落とす)。**末尾に足す**
   'target',
 ]

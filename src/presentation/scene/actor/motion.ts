@@ -269,7 +269,7 @@ export interface StanceInput {
   setting: 'claymore_windup' | 'claymore_place' | null
   /** 眠っている人を叩いている最中か (pat の型を流している間) */
   patting?: boolean
-  /** 猫に釘付けになっている (in) / 解けて戻る途中 (out)。掛かっていなければ null (domain/item/cat.ts) */
+  /** 猫に釘付けになっている (in) / 解けて戻る途中 (out)。掛かっていなければ null (domain/item/doll.ts) */
   trapped?: 'in' | 'out' | null
   /** 爆風で倒れているか */
   downed: boolean

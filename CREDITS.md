@@ -15,7 +15,7 @@
 | [Small price car](https://sketchfab.com/3d-models/small-price-car-67c84e4d30ae42fda22c0a0c7526df26) | 同上 | [Oliv1e](https://sketchfab.com/Oliv1e) | CC-BY 4.0 |
 | [P90 Final](https://sketchfab.com/3d-models/p90-final-cd59e752d0a34623a0e61a5623ee2762) | サブマシンガン (`public/models/smg.glb`) | [charles.cla](https://sketchfab.com/charles.cla) | CC-BY-**NC** 4.0 |
 | [M4 Carbine](https://sketchfab.com/3d-models/m4-carbine-b516a8416b1044a7839b4a89dc24ca38) | 突撃銃 M4 CUSTOM (`public/models/m4.glb`) | [SINNIK](https://sketchfab.com/sinnik) | CC-BY 4.0 |
-| [Cat in Motion 3d model free](https://sketchfab.com/3d-models/cat-in-motion-3d-model-free-baa1120483c844e6bce9744f3f868c63) | 猫の置物 CAT (`public/models/cat.glb`) | [iRahulRajput](https://sketchfab.com/rt699448) | CC-BY 4.0 |
+| [Cat in Motion 3d model free](https://sketchfab.com/3d-models/cat-in-motion-3d-model-free-baa1120483c844e6bce9744f3f868c63) | 猫の置物 DOLL (`public/models/doll.glb`) | [iRahulRajput](https://sketchfab.com/rt699448) | CC-BY 4.0 |
 
 そのまま貼る文言:
 

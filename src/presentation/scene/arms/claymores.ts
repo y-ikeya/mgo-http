@@ -3,7 +3,7 @@ import { loadClaymore } from '../assets'
 import { refreshStaticShadows } from '../world/staticShadow'
 import { TRIGGER_COS, TRIGGER_RANGE } from '../../../domain/item/claymore'
 import type { Team } from '../../../domain/player/player'
-import { zoneMaterial } from './cats'
+import { zoneMaterial } from './dolls'
 
 /**
  * 置かれたクレイモア。

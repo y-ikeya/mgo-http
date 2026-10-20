@@ -29,8 +29,8 @@ import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { clearClaymores } from './arms/claymore'
-import { clearCats } from './arms/cat'
-import { trapStage } from '../src/domain/item/cat'
+import { clearDolls } from './arms/doll'
+import { trapStage } from '../src/domain/item/doll'
 import { clearDecoys } from './arms/decoy'
 import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
@@ -400,7 +400,7 @@ function startNextRound(room: RoomWorld, now: number): void {
   room.grenades.length = 0
   clearClaymores(room)
   clearDecoys(room)
-  clearCats(room)
+  clearDolls(room)
   clearLocators(room)
   for (const player of connected(room)) {
     fitToRoom(room, player)
@@ -454,7 +454,7 @@ export function resetPlayers(room: RoomWorld): void {
   room.grenades.length = 0
   clearClaymores(room)
   clearDecoys(room)
-  clearCats(room)
+  clearDolls(room)
   clearLocators(room)
   /*
    * **陣営を切り直す。** 入室で 1 回決めたきりだと、同じ面子が同じ側で

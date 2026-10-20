@@ -54,7 +54,7 @@ const CATEGORY: Record<WeaponId | SupportId, string> = {
   locator: 'PROJECTILE',
   claymore: 'TRAP',
   decoy: 'TRAP',
-  cat: 'TRAP',
+  doll: 'TRAP',
 }
 
 /**
@@ -65,7 +65,7 @@ const CATEGORY: Record<WeaponId | SupportId, string> = {
 function Readout(props: { category: string | null; name: string | null; detail: string }) {
   return (
     <div class="loadout-readout">
-      <span class="loadout-readout-cat">
+      <span class="loadout-readout-doll">
         <small>category</small>
         {props.category ?? '—'}
       </span>

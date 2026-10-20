@@ -44,7 +44,7 @@ const CLAYMORE_URL = asset.model('claymore.glb')
 const GRENADE_URL = asset.model('grenade.glb')
 const LOCATOR_URL = asset.model('locator.glb')
 const TARGET_URL = asset.model('target.glb')
-const CAT_URL = asset.model('cat.glb')
+const DOLL_URL = asset.model('doll.glb')
 
 const cache = new Map<string, Promise<GLTF>>()
 
@@ -175,9 +175,9 @@ export function loadTarget(): Promise<GLTF> {
   return load(TARGET_URL)
 }
 
-/** CAT (猫の置物、tools/convert_target.py で縮めた物) */
-export function loadCat(): Promise<GLTF> {
-  return load(CAT_URL)
+/** DOLL (猫の置物、tools/convert_target.py で縮めた物) */
+export function loadDoll(): Promise<GLTF> {
+  return load(DOLL_URL)
 }
 
 export function loadLocator(): Promise<GLTF> {

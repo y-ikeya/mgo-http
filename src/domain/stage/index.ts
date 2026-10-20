@@ -141,10 +141,10 @@ interface StageSpec {
    */
   targets: TargetSpot[]
   /**
-   * 練習の部屋に置いておく猫 (CAT、domain/item/cat.ts)。**自分で掛かって確かめるため**
+   * 練習の部屋に置いておく猫 (DOLL、domain/item/doll.ts)。**自分で掛かって確かめるため**
    * (本人 2026-10-20)。的の陣営の物として置き、消えたら少しして置き直す。練習部屋以外では使われない
    */
-  practiceCats?: Spot[]
+  practiceDolls?: Spot[]
 }
 
 /**
@@ -250,7 +250,7 @@ const TRAINING: StageSpec = {
     { x: -30, z: -30, patrol: { x: -16, z: -30 } },
   ],
   // 高台を降りた南側。2 匹並べて円を重ねる (解けた後に隣で掛からないかも見られる)
-  practiceCats: [
+  practiceDolls: [
     { x: -27, z: -35 },
     { x: -25.8, z: -35 },
   ],
@@ -402,7 +402,7 @@ const LAB: StageSpec = {
   ],
   // 基地の南東の空いた床。2 匹並べて円を重ねる (解けた後に隣で掛からないかも見られる)。
   // (-6, -4) は空のダンボール (cbox_fx_cbox_1) の中で、猫が箱に埋もれて見えなかった
-  practiceCats: [
+  practiceDolls: [
     { x: -4, z: -7, y: 0.1 },
     { x: -2.8, z: -7, y: 0.1 },
   ],

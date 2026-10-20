@@ -1,15 +1,15 @@
 import * as THREE from 'three'
-import { loadCat } from '../assets'
+import { loadDoll } from '../assets'
 import { refreshStaticShadows } from '../world/staticShadow'
-import { LURE_RADIUS } from '../../../domain/item/cat'
+import { LURE_RADIUS } from '../../../domain/item/doll'
 import type { Team } from '../../../domain/player/player'
 import { TEAM_COLOR } from '../world/stage'
 
 /**
- * 置かれた猫 (CAT)。**置物と、置いた本人にだけ見える円。**
+ * 置かれた猫 (DOLL)。**置物と、置いた本人にだけ見える円。**
  *
- * 釘付けにするのも消すのもサーバー (server/arms/cat.ts)。ここは見せるだけ。
- * 円は効く範囲 (半径 1.5m、domain/item/cat.ts)。**敵には見えない** — 見えると避けて通られる。
+ * 釘付けにするのも消すのもサーバー (server/arms/doll.ts)。ここは見せるだけ。
+ * 円は効く範囲 (半径 1.5m、domain/item/doll.ts)。**敵には見えない** — 見えると避けて通られる。
  * 置いた本人と味方にはうっすら見える (どこまで寄せれば掛かるかが分かる)。
  * 円は猫が消えるまで出す (掛かった後も、後から入った敵は掛かる)。
  */
@@ -49,7 +49,7 @@ interface Fading {
   left: number
 }
 
-export class Cats {
+export class Dolls {
   private readonly entries = new Map<number, Entry>()
   private readonly fading: Fading[] = []
   private readonly ringGeometry = new THREE.CircleGeometry(LURE_RADIUS, 48)
@@ -88,7 +88,7 @@ export class Cats {
     }
     this.entries.set(id, { group, ring })
     this.scene.add(group)
-    void loadCat().then((gltf) => {
+    void loadDoll().then((gltf) => {
       if (this.entries.get(id)?.group !== group) return
       // 形と材質は共有のまま (消すときに dispose しない)
       const model = gltf.scene.clone(true)

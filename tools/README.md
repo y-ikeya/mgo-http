@@ -298,7 +298,7 @@ for m in rifle smg sniper mosin shotgun m9 grenade claymore locator soldier; do
 done
 ```
 
-`rifle`・`mosin`・`sniper` は `&flip` を付ける (模型が逆向きに寝ている)。それでも `rifle` は銃口が左に出たので、撮った後に左右を返してある (装備の画面で他と揃える。銃口は右)。`soldier` は `decoy.png` に名前を変えて置く (人形は兵士の模型そのもの)。`m1911.glb` は形が
+`doll` は `&fill` を付ける (面を間引いた模型で、欠けが影絵の穴になって縞模様に抜ける。内側の穴を塗りつぶす)。`rifle`・`mosin`・`sniper` は `&flip` を付ける (模型が逆向きに寝ている)。それでも `rifle` は銃口が左に出たので、撮った後に左右を返してある (装備の画面で他と揃える。銃口は右)。`soldier` は `decoy.png` に名前を変えて置く (人形は兵士の模型そのもの)。`m1911.glb` は形が
 数 cm の欠片しか入っていないので、`m1911.png` は `m9.png` の写し。
 
 ## 元データの置き場

@@ -233,7 +233,7 @@ describe('散弾で的を突き飛ばす', () => {
 describe('練習部屋で猫', () => {
   /**
    * **的も猫に掛かる。** 的は人ではない (送る相手の一覧に居ない) ので、見落とすと掛からなかった
-   * (2026-10-20 本人「敵の前に cat 置いても charm されない」)
+   * (2026-10-20 本人「敵の前に doll 置いても charm されない」)
    */
   test('的の前に猫を置くと、的が釘付けになる', async () => {
     // **自分用のサーバーで。** 共用のサーバーでは前の試験で的が転ばされ、動かされている
@@ -241,17 +241,17 @@ describe('練習部屋で猫', () => {
     const me = new Client(own, 'catter', [TARGET.x, 0, TARGET.z + 2.2], 'echo')
     await me.ready()
     me.live()
-    me.send({ type: 'loadout', primary: 'rifle', support: 'cat' })
+    me.send({ type: 'loadout', primary: 'rifle', support: 'doll' })
     await Bun.sleep(3400)
     me.send({ type: 'spawn' })
     await Bun.sleep(400)
-    me.holdCat(true)
+    me.holdDoll(true)
     me.sendState()
     await Bun.sleep(120)
     // 前 (-Z、的のほう) へ 0.9m に置く。的まで 1.3m で円 (1.5m) の中
-    me.send({ type: 'cat' })
+    me.send({ type: 'doll' })
     await Bun.sleep(800)
-    const sprung = me.messages.find((m) => m.type === 'catSprung') as Extract<ServerMessage, { type: 'catSprung' }>
+    const sprung = me.messages.find((m) => m.type === 'dollSprung') as Extract<ServerMessage, { type: 'dollSprung' }>
     expect(sprung?.victims).toContain('target-0')
     // 的の姿もしゃがみ込んで止まる型になる (的の姿はサーバーが決める)
     await Bun.sleep(200)

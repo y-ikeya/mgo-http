@@ -386,9 +386,9 @@ export interface MatchPlayer extends Player {
   struggleAt: number
   /** 最後に叩かれた時刻 (ms)。叩く間の最短を測る (stamina.ts の pat) */
   patAt: number
-  /** 釘付けにしている猫の番号 (server/arms/cat.ts)。0 なら掛かっていない */
+  /** 釘付けにしている猫の番号 (server/arms/doll.ts)。0 なら掛かっていない */
   trappedBy: number
-  /** この時刻 (ms) まではどの猫にも掛からない。解けた時に決める (domain/item/cat.ts の IMMUNE_SECONDS) */
+  /** この時刻 (ms) まではどの猫にも掛からない。解けた時に決める (domain/item/doll.ts の IMMUNE_SECONDS) */
   trapFreeAt: number
   /** スタンナイフの充電が満ちる時刻 (ms)。湧いた時に今へ戻す (満ちた状態) */
   stunReadyAt: number

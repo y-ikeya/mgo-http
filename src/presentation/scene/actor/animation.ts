@@ -109,7 +109,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   prone_roll_down: 'prone_roll_down',
   // 眠っている人を叩く。全身の型なので上半身も同じクリップから取る
   pat: 'pat',
-  // 猫に釘付け / 解けて戻る。同じ型を順に流して止め、戻りは逆に流す (domain/item/cat.ts)
+  // 猫に釘付け / 解けて戻る。同じ型を順に流して止め、戻りは逆に流す (domain/item/doll.ts)
   trapped: 'trapped',
   trapped_out: 'trapped',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
@@ -3628,7 +3628,7 @@ export class CharacterAnimator {
 
   /**
    * 猫に釘付けになる。しゃがみ込んで猫へ手を伸ばし、**伸ばし切った姿で止まる**
-   * (解けるまで。domain/item/cat.ts)
+   * (解けるまで。domain/item/doll.ts)
    */
   playTrapped(): void {
     this.playWholeBody(TRAPPED_KEY, 'trapped')

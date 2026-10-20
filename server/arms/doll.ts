@@ -1,8 +1,8 @@
 /**
- * CAT (猫の置物、サーバー側)。置く・配る・釘付けにする・消える・解く。
+ * DOLL (猫の置物、サーバー側)。置く・配る・釘付けにする・消える・解く。
  *
  * 置き方と配り方は decoy と同じ形を通す (置ける場所の判定・遮蔽で隠さず全員へ)。
- * 違うのは効き目で、**円に入った敵の体を止める** (domain/item/cat.ts)。
+ * 違うのは効き目で、**円に入った敵の体を止める** (domain/item/doll.ts)。
  *
  * 止まっている間の操作は本人の手元が止める (体の旗 trapped、domain/player/moves.ts)。
  * こちらは「誰がどの猫に掛かっているか」(trappedBy) を持ち、解ける時を知らせる。
@@ -14,7 +14,7 @@ import { STEP_UP } from '../../src/domain/player/moving'
 import type { MatchPlayer, Team } from '../../src/domain/player/player'
 import type { ServerMessage } from '../../src/application/protocol/types'
 import { type Placed, placeSpot } from '../../src/sim/judge/claymore'
-import { SHOT_HALF, SHOT_TOP, TRAPPED_CLIP_SECONDS, TRAP_SECONDS, inLure } from '../../src/domain/item/cat'
+import { SHOT_HALF, SHOT_TOP, TRAPPED_CLIP_SECONDS, TRAP_SECONDS, inLure } from '../../src/domain/item/doll'
 import { overflowing } from '../../src/domain/item/held'
 import { type StageBox, segmentHitsBox } from '../../src/sim/space/vision'
 import { STAGES } from '../../src/domain/stage'
@@ -24,7 +24,7 @@ import { type RoomWorld, broadcast, freeFromTrap, hostileToOwner } from '../worl
 export { releaseTrapped } from '../world'
 
 /** 置かれた猫。**置いた本人が死んでも残る** (decoy と同じ) */
-export interface Cat extends Placed {
+export interface Doll extends Placed {
   id: number
   owner: string
   team: Team
@@ -32,22 +32,22 @@ export interface Cat extends Placed {
   sprungAt: number
   /** 掛かった人 */
   victims: string[]
-  /** 練習の部屋に置いた猫なら、ステージの置き場所の番号 (practiceCats)。置き直すのに使う */
+  /** 練習の部屋に置いた猫なら、ステージの置き場所の番号 (practiceDolls)。置き直すのに使う */
   practice?: number
 }
 
-let nextCatId = 1
+let nextDollId = 1
 
 /** 置く。**位置も向きもサーバーが決める** (decoy と同じ判定)。置けなければ数は減らさない */
-export function placeCat(room: RoomWorld, from: MatchPlayer): void {
-  if (!canAct(from.life) || from.held !== 'cat' || from.grenades <= 0) return
+export function placeDoll(room: RoomWorld, from: MatchPlayer): void {
+  if (!canAct(from.life) || from.held !== 'doll' || from.grenades <= 0) return
   const spot = placeSpot(from, room.stage.solid, STEP_UP, room.stage.body)
   if (!spot.ok) return
   from.grenades--
   // 場に置ける数の上限 (PLACED_LIMIT)。溢れたら古いほうから黙って消す
-  for (const old of overflowing(room.cats, from.id)) removeCat(room, old, false)
-  room.cats.push({
-    id: nextCatId++,
+  for (const old of overflowing(room.dolls, from.id)) removeDoll(room, old, false)
+  room.dolls.push({
+    id: nextDollId++,
     owner: from.id,
     team: from.team,
     x: spot.x,
@@ -61,20 +61,20 @@ export function placeCat(room: RoomWorld, from: MatchPlayer): void {
 }
 
 /** 置かれた猫を配る。**敵にも見せる** — 見えないと撃ち抜けない */
-export function relayCats(room: RoomWorld): void {
+export function relayDolls(room: RoomWorld): void {
   for (const viewer of connected(room)) {
-    const seen = sessionOf(viewer).seenCats
-    for (const cat of room.cats) {
-      if (seen.has(cat.id)) continue
-      seen.add(cat.id)
+    const seen = sessionOf(viewer).seenDolls
+    for (const doll of room.dolls) {
+      if (seen.has(doll.id)) continue
+      seen.add(doll.id)
       sessionOf(viewer).socket.send(
         JSON.stringify({
-          type: 'catPlaced',
-          id: cat.id,
-          owner: cat.owner,
-          team: cat.team,
-          at: [cat.x, cat.y, cat.z],
-          yaw: cat.yaw,
+          type: 'dollPlaced',
+          id: doll.id,
+          owner: doll.owner,
+          team: doll.team,
+          at: [doll.x, doll.y, doll.z],
+          yaw: doll.yaw,
         } satisfies ServerMessage),
       )
     }
@@ -88,10 +88,10 @@ export function relayCats(room: RoomWorld): void {
  * 両方こちらに在る。掛かるのは**置いた人の敵だけ**。CBOX を被っている人・眠っている人・
  * 既に掛かっている人・解けたばかりの人は掛からない。伏せていても掛かる。
  */
-export function updateCats(room: RoomWorld, now: number): void {
-  for (const cat of [...room.cats]) {
-    if (cat.sprungAt > 0 && now - cat.sprungAt >= TRAP_SECONDS * 1000) {
-      removeCat(room, cat, false)
+export function updateDolls(room: RoomWorld, now: number): void {
+  for (const doll of [...room.dolls]) {
+    if (doll.sprungAt > 0 && now - doll.sprungAt >= TRAP_SECONDS * 1000) {
+      removeDoll(room, doll, false)
       continue
     }
     /*
@@ -99,29 +99,29 @@ export function updateCats(room: RoomWorld, now: number): void {
      * 解けるのは猫が消える時に全員まとめて。残りが型の尺より短ければ掛けない — しゃがみ込む
      * 途中で解けて、逆に流すことになる
      */
-    if (cat.sprungAt > 0 && TRAP_SECONDS * 1000 - (now - cat.sprungAt) < TRAPPED_CLIP_SECONDS * 1000) continue
+    if (doll.sprungAt > 0 && TRAP_SECONDS * 1000 - (now - doll.sprungAt) < TRAPPED_CLIP_SECONDS * 1000) continue
     const victims: MatchPlayer[] = []
     // 的 (練習の bot) も掛かる (present は bot を含む)
     for (const player of present(room)) {
-      if (player.id === cat.owner || !hostileToOwner(room, cat.team, player)) continue
+      if (player.id === doll.owner || !hostileToOwner(room, doll.team, player)) continue
       if (!canAct(player.life) || player.boxed || player.trappedBy !== 0) continue
       // 解けたばかり (立ち上がっている途中 + 1 秒) は掛からない
       if (now < player.trapFreeAt) continue
       if (player.sleepUntil > now) continue
-      if (!inLure(cat, player.x, player.y, player.z)) continue
+      if (!inLure(doll, player.x, player.y, player.z)) continue
       victims.push(player)
     }
     if (victims.length === 0) continue
-    if (cat.sprungAt === 0) cat.sprungAt = now
-    cat.victims.push(...victims.map((v) => v.id))
+    if (doll.sprungAt === 0) doll.sprungAt = now
+    doll.victims.push(...victims.map((v) => v.id))
     for (const victim of victims) {
-      victim.trappedBy = cat.id
+      victim.trappedBy = doll.id
       // 的 (bot) は猫のほうへ向き直らせる。人は本人の手元が向き直り、その向きが届く
       // yaw θ で正面が (-sinθ, -cosθ)
-      if (victim.bot) victim.yaw = Math.atan2(victim.x - cat.x, victim.z - cat.z)
+      if (victim.bot) victim.yaw = Math.atan2(victim.x - doll.x, victim.z - doll.z)
     }
     // 知らせるのは今回掛かった人だけ (先に掛かった人の型を流し直さない)
-    broadcast(room, { type: 'catSprung', id: cat.id, victims: victims.map((v) => v.id) })
+    broadcast(room, { type: 'dollSprung', id: doll.id, victims: victims.map((v) => v.id) })
   }
 }
 
@@ -129,42 +129,51 @@ export function updateCats(room: RoomWorld, now: number): void {
  * 撃ち抜かれた猫を壊す。**申告を増やさない** (shot の線分と当たりで見る。decoy と同じ)。
  * 敵味方を問わず壊れる (置物を撃てば壊れる)
  */
-export function shotHitsCat(room: RoomWorld, from: readonly number[], to: readonly number[]): void {
-  for (const cat of [...room.cats]) {
+export function shotHitsDoll(room: RoomWorld, from: readonly number[], to: readonly number[]): void {
+  for (const doll of [...room.dolls]) {
     const box: StageBox = {
-      name: 'cat',
-      min: [cat.x - SHOT_HALF, cat.y, cat.z - SHOT_HALF],
-      max: [cat.x + SHOT_HALF, cat.y + SHOT_TOP, cat.z + SHOT_HALF],
+      name: 'doll',
+      min: [doll.x - SHOT_HALF, doll.y, doll.z - SHOT_HALF],
+      max: [doll.x + SHOT_HALF, doll.y + SHOT_TOP, doll.z + SHOT_HALF],
     }
     if (!segmentHitsBox(from[0]!, from[1]!, from[2]!, to[0]!, to[1]!, to[2]!, box)) continue
-    removeCat(room, cat, true)
+    removeDoll(room, doll, true)
   }
 }
 
+/**
+ * 爆風で壊す (手榴弾・クレイモア。claymore.ts の blastPlaced から)。**撃ち抜いた時と同じく、止まっていた人も解ける。**
+ * 梯子を登り切った所に置かれた人形は、登りながらでは箱を被れず撃ちにくい — 上へ手榴弾を
+ * 投げ込むのが対抗の手 (本人 2026-10-20)
+ */
+export function breakDoll(room: RoomWorld, doll: Doll): void {
+  removeDoll(room, doll, true)
+}
+
 /** 消す。止まっていた人はここで解ける */
-function removeCat(room: RoomWorld, cat: Cat, broken: boolean): void {
-  const at = room.cats.indexOf(cat)
-  if (at >= 0) room.cats.splice(at, 1)
-  if (cat.practice !== undefined) {
+function removeDoll(room: RoomWorld, doll: Doll, broken: boolean): void {
+  const at = room.dolls.indexOf(doll)
+  if (at >= 0) room.dolls.splice(at, 1)
+  if (doll.practice !== undefined) {
     const restockAt = practiceRestockAt.get(room) ?? new Map<number, number>()
-    restockAt.set(cat.practice, Date.now() + PRACTICE_RESTOCK_MS)
+    restockAt.set(doll.practice, Date.now() + PRACTICE_RESTOCK_MS)
     practiceRestockAt.set(room, restockAt)
   }
   const freed: string[] = []
-  for (const id of cat.victims) {
+  for (const id of doll.victims) {
     const player = room.players.get(id)
-    if (player && player.trappedBy === cat.id) {
+    if (player && player.trappedBy === doll.id) {
       freeFromTrap(player, Date.now())
       freed.push(id)
     }
   }
-  broadcast(room, { type: 'catGone', id: cat.id, at: [cat.x, cat.y, cat.z], broken, freed })
-  for (const viewer of connected(room)) sessionOf(viewer).seenCats.delete(cat.id)
+  broadcast(room, { type: 'dollGone', id: doll.id, at: [doll.x, doll.y, doll.z], broken, freed })
+  for (const viewer of connected(room)) sessionOf(viewer).seenDolls.delete(doll.id)
 }
 
 /** 湧き直しや試合の切れ目で片付ける */
-export function clearCats(room: RoomWorld): void {
-  for (const cat of [...room.cats]) removeCat(room, cat, false)
+export function clearDolls(room: RoomWorld): void {
+  for (const doll of [...room.dolls]) removeDoll(room, doll, false)
   for (const player of room.players.values()) player.trappedBy = 0
 }
 
@@ -181,22 +190,22 @@ const PRACTICE_OWNER = 'practice'
 const practiceRestockAt = new WeakMap<RoomWorld, Map<number, number>>()
 
 /**
- * 練習の部屋に猫を置いておく (ステージの practiceCats)。**自分で掛かって確かめるため**。
+ * 練習の部屋に猫を置いておく (ステージの practiceDolls)。**自分で掛かって確かめるため**。
  * 的と同じ陣営 (red) の物なので、自分 (blue) が近づくと掛かる。消えたら 5 秒で置き直す
  * (近くに人が居る間は待つ)
  */
-export function stockPracticeCats(room: RoomWorld, now: number): void {
-  const spots = STAGES[room.stage.name].practiceCats ?? []
+export function stockPracticeDolls(room: RoomWorld, now: number): void {
+  const spots = STAGES[room.stage.name].practiceDolls ?? []
   const restockAt = practiceRestockAt.get(room)
   spots.forEach((spot, i) => {
-    if (room.cats.some((cat) => cat.practice === i)) return
+    if (room.dolls.some((doll) => doll.practice === i)) return
     if (now < (restockAt?.get(i) ?? 0)) return
     const crowded = connected(room).some(
       (player) => Math.hypot(player.x - spot.x, player.z - spot.z) < PRACTICE_RESTOCK_CLEAR,
     )
     if (crowded) return
-    room.cats.push({
-      id: nextCatId++,
+    room.dolls.push({
+      id: nextDollId++,
       owner: PRACTICE_OWNER,
       team: 'red',
       x: spot.x,

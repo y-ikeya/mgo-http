@@ -11,8 +11,8 @@ import type { Life } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, enterLife, newBot } from '../src/domain/player/player'
 import type { ServerMessage } from '../src/application/protocol/types'
 import type { Claymore } from './arms/claymore'
-import type { Cat } from './arms/cat'
-import { IMMUNE_SECONDS } from '../src/domain/item/cat'
+import type { Doll } from './arms/doll'
+import { IMMUNE_SECONDS } from '../src/domain/item/doll'
 import type { Decoy } from './arms/decoy'
 import type { Dropped } from './arms/drops'
 import type { Grenade } from './arms/grenade'
@@ -70,8 +70,8 @@ export interface RoomWorld extends Match {
   claymores: Claymore[]
   /** 置かれた decoy。**割れるまでそこに在る** */
   decoys: Decoy[]
-  /** 置かれた猫 (CAT)。**釘付けにして時間が経つか、撃ち抜かれるまでそこに在る** */
-  cats: Cat[]
+  /** 置かれた猫 (DOLL)。**釘付けにして時間が経つか、撃ち抜かれるまでそこに在る** */
+  dolls: Doll[]
   /**
    * 投げられた E LOCATOR。**飛んでいる間もここに在る。**
    *
@@ -140,7 +140,7 @@ export function roomOf(name: RoomName, key: string = name): RoomWorld {
       grenades: [],
       claymores: [],
       decoys: [],
-      cats: [],
+      dolls: [],
       locators: [],
       dropped: [],
       stage: terrainOf(stage),
@@ -184,7 +184,7 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
 }
 
 /**
- * 猫に釘付けの人を解く (撃たれた・倒れた・投げられた。server/arms/cat.ts)。**猫は残る** —
+ * 猫に釘付けの人を解く (撃たれた・倒れた・投げられた。server/arms/doll.ts)。**猫は残る** —
  * 他の人が掛かっていればそのまま、時間が来れば消える
  */
 export function releaseTrapped(room: RoomWorld, player: MatchPlayer): void {

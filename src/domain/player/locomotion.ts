@@ -155,7 +155,7 @@ export type Locomotion =
    */
   | 'pat'
   /**
-   * 猫に釘付けになる (domain/item/cat.ts)。**全身の型** — しゃがみ込んで猫へ手を伸ばし、
+   * 猫に釘付けになる (domain/item/doll.ts)。**全身の型** — しゃがみ込んで猫へ手を伸ばし、
    * 伸ばした姿で止まる。trapped_out は同じ型を逆に流して戻る
    */
   | 'trapped'

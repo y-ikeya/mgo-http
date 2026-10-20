@@ -23,7 +23,7 @@ import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
 
 import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
-import { placeCat, relayCats, shotHitsCat, stockPracticeCats, updateCats } from './arms/cat'
+import { placeDoll, relayDolls, shotHitsDoll, stockPracticeDolls, updateDolls } from './arms/doll'
 import { bumpCboxes } from './arms/cbox'
 import { SENSE_SECONDS as DECOY_SENSE_SECONDS } from '../src/domain/item/decoy'
 import { detonate, dropGrenade, throwGrenade } from './arms/grenade'
@@ -204,15 +204,15 @@ setInterval(() => {
       if (room.mode.id === 'PRACTICE') {
         updateTargets(room, now)
         // 練習の猫。自分で掛かって確かめる。消えたら置き直す
-        stockPracticeCats(room, now)
+        stockPracticeDolls(room, now)
       }
       // その部屋の水面。溺れの判定と手榴弾の沈みで同じ物を見る
       const water = waterOf(room.stage.name)
       relayClaymores(room)
       relayDecoys(room)
       // 置かれた猫。敵にも見せる。円に入った敵を釘付けにし、時間が来たら消す
-      relayCats(room)
-      updateCats(room, now)
+      relayDolls(room)
+      updateDolls(room, now)
       // 置かれた E LOCATOR。**飛ぶところを見ていない人にも見せる** (壊せるように)
       relayLocators(room)
       // 近くの敵の置き物・投げ物の気配 (AWARENESS)。**位置だけ、持つ人だけ**
@@ -634,8 +634,8 @@ function handleMessage(
       placeDecoy(room, player, Date.now())
       break
 
-    case 'cat':
-      placeCat(room, player)
+    case 'doll':
+      placeDoll(room, player)
       break
 
     /*
@@ -746,7 +746,7 @@ function handleMessage(
        */
       shotHitsLocator(room, message.from, message.to)
       // 弾道の上に猫があれば壊れる。釘付けの人も解ける
-      shotHitsCat(room, message.from, message.to)
+      shotHitsDoll(room, message.from, message.to)
       // 弾道のそばに TARGET ALERT (Lv2 以上) の人が居れば、撃った側が光る
       alertShot(room, player, message.from, message.to, Date.now())
       /*

@@ -288,7 +288,7 @@ const SOUNDS = {
    */
   balloonInflate: { file: "balloon_inflate1.mp3", reference: 2, max: 14 },
   /*
-   * 猫 (CAT) に誰かが掛かった時の鳴き声。猫の所で鳴る。**掛かった人だけでなく近くの人にも届く**
+   * 猫 (DOLL) に誰かが掛かった時の鳴き声。猫の所で鳴る。**掛かった人だけでなく近くの人にも届く**
    * (本人 2026-10-20) — 誰かがそこで足止めされている、が近くに居れば分かる
    */
   catMeow: { file: "cat_meow.mp3", reference: 3, max: 22 },
