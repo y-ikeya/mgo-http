@@ -289,8 +289,10 @@ describe('練習部屋でローリング', () => {
 
   test('しゃがんだ的は後ろへ倒れる', async () => {
     const index = TARGETS.findIndex((t) => t.stance === 'crouch')
-    const { pose } = await rollIntoTarget(index)
+    const { at, pose } = await rollIntoTarget(index)
     expect(pose.locomotion).toBe('sweep')
+    // 爆風ほどは飛ばない (滑るのは 0.5m)
+    expect(Math.hypot(pose.x - at.x, pose.z - at.z)).toBeLessThan(1)
   }, 20000)
 
   test('立っている的は押しのけられる', async () => {

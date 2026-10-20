@@ -2979,10 +2979,11 @@ export class Game {
       case "knockdown":
         this.player.knockDown();
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
-        this.player.knockPush(message.dirX, message.dirZ);
+        this.player.knockPush(message.dirX, message.dirZ, message.distance);
         // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
         this.loseHeldGrenade();
-        this.audio.play("blastScream", this.player.position);
+        // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
+        if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
         break;
 
       // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —

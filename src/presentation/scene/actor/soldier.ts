@@ -8,7 +8,14 @@ import {
   ladderAt,
   ladderGrip,
 } from '../../../domain/stage'
-import { BOX_BUMP_STUN, KNOCK_TIME, ROLL_STAGGER_SECONDS, fallDamage, knockSpeed } from '../../../domain/rule/damage'
+import {
+  BOX_BUMP_STUN,
+  KNOCK_DISTANCE,
+  KNOCK_TIME,
+  ROLL_STAGGER_SECONDS,
+  fallDamage,
+  knockSpeed,
+} from '../../../domain/rule/damage'
 import { SkyLight } from '../world/skylight'
 import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance, COLLISION_HEIGHT, BODY_BOX } from '../../../domain/player/stance'
 import * as THREE from 'three'
@@ -1496,12 +1503,15 @@ export class Soldier {
    * (壁を抜ける)。転がりと同じで、速度に直して移動の道へ通す。
    *
    * @param dirX 爆心から見た向き (単位ベクトル、水平)
+   * @param distance 滑る距離 (m)。爆風なら省く。ローリングで倒れた時は短い
    */
-  knockPush(dirX: number, dirZ: number): void {
+  knockPush(dirX: number, dirZ: number, distance = KNOCK_DISTANCE): void {
     const reach = Math.hypot(dirX, dirZ)
     if (reach < 1e-4) return
-    this.knockX = dirX / reach
-    this.knockZ = dirZ / reach
+    // 向きに距離の比を掛ける。滑らせる速さの式は爆風と同じ (的もサーバーで同じ形)
+    const scale = distance / KNOCK_DISTANCE
+    this.knockX = (dirX / reach) * scale
+    this.knockZ = (dirZ / reach) * scale
     this.knockLeft = KNOCK_TIME
   }
 

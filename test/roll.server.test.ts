@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { startServer, twoPlayers, type Server } from './server'
-import { ROLL_STAMINA } from '../src/domain/rule/damage'
+import { ROLL_FALL_DISTANCE, ROLL_STAMINA } from '../src/domain/rule/damage'
 import { MAX_STAMINA } from '../src/domain/player/stamina'
 
 /**
@@ -46,6 +46,8 @@ describe('ローリングの体当たり', () => {
     expect(b.got('knock')).toBe(0)
     // 転がってきた側 (-Z) から押されて、+Z へ倒れる
     expect((b.last.get('knockdown') as { dirZ: number }).dirZ).toBeGreaterThan(0.9)
+    // 爆風ほどは飛ばない (尻もちくらい)
+    expect((b.last.get('knockdown') as { distance?: number }).distance).toBe(ROLL_FALL_DISTANCE)
     expect((b.last.get('stamina') as { stamina: number }).stamina).toBe(MAX_STAMINA - ROLL_STAMINA)
   }, 30000)
 

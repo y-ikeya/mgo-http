@@ -27,7 +27,9 @@ import {
 } from '../src/domain/player/player'
 import {
   HIT_RULES,
+  KNOCK_DISTANCE,
   KNOCK_TIME,
+  ROLL_FALL_DISTANCE,
   ROLL_HIT_RANGE,
   ROLL_KNOCKBACK,
   ROLL_STAGGER_SECONDS,
@@ -171,14 +173,23 @@ export function exposeTo(
  * 2 か所に書いていた頃、散弾を足すときに片方だけ直すことになった。飛ばす形は
  * 1 つなので、呼び分けるのは「いつ飛ばすか」だけにする。
  */
-function knockAway(room: RoomWorld, victim: MatchPlayer, fromX: number, fromZ: number): void {
+function knockAway(
+  room: RoomWorld,
+  victim: MatchPlayer,
+  fromX: number,
+  fromZ: number,
+  /** 滑る距離 (m)。爆風なら省く (KNOCK_DISTANCE) */
+  distance?: number,
+): void {
   // 投げている / 投げられている CQC は取り消す。吹き飛ぶほうが強い
   cancelCqc(room, victim)
   const awayX = victim.x - fromX
   const awayZ = victim.z - fromZ
   const reach = Math.hypot(awayX, awayZ) || 1
-  victim.knockX = awayX / reach
-  victim.knockZ = awayZ / reach
+  // 向きに距離の比を掛けて持つ。滑らせる速さの式 (knockSpeed) は爆風と同じ物を通す
+  const scale = (distance ?? KNOCK_DISTANCE) / KNOCK_DISTANCE
+  victim.knockX = (awayX / reach) * scale
+  victim.knockZ = (awayZ / reach) * scale
   if (victim.bot) {
     victim.downThrown = false
     victim.knockLeft = KNOCK_TIME
@@ -189,8 +200,9 @@ function knockAway(room: RoomWorld, victim: MatchPlayer, fromX: number, fromZ: n
   sessionFor(victim)?.socket.send(
     JSON.stringify({
       type: 'knockdown',
-      dirX: victim.knockX,
-      dirZ: victim.knockZ,
+      dirX: awayX / reach,
+      dirZ: awayZ / reach,
+      ...(distance !== undefined ? { distance } : {}),
     } satisfies ServerMessage),
   )
 }
@@ -764,7 +776,7 @@ export function applyRoll(room: RoomWorld, attacker: MatchPlayer, victim: MatchP
   if (isAsleep(victim.sleepUntil, now)) return false
   // 的 (bot) は crouching の旗を持たず、姿 (crouch_idle) でしゃがんでいる
   if (victim.crouching || victim.boxed || CROUCH_POSE.test(victim.locomotion)) {
-    knockAway(room, victim, attacker.x, attacker.z)
+    knockAway(room, victim, attacker.x, attacker.z, ROLL_FALL_DISTANCE)
     return false
   }
   /*

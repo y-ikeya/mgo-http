@@ -366,6 +366,11 @@ export interface KnockDownEvent {
    */
   dirX: number
   dirZ: number
+  /**
+   * 滑る距離 (m)。省けば爆風の距離 (KNOCK_DISTANCE)。ローリングの体当たりで倒れた時は短い
+   * (ROLL_FALL_DISTANCE)。悲鳴も爆風の時だけ
+   */
+  distance?: number
 }
 
 /**
