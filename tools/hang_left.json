@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "BracedHangLeft.fbx": "hang_left" },
+  "out": "hang_left.glb",
+  "maxTexture": 64
+}

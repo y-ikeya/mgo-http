@@ -343,6 +343,12 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
 
+縁にぶら下がったまま横へ移る型 `hang_left` / `hang_right` (1.2 秒で 0.58m) は本人が落とした `tools/raw/BracedHangLeft.fbx` /
+`BracedHangRight.fbx`。腰の横の移動は捨てて、位置は soldier が縁に沿って動かす (縁が切れていれば移らない):
+
+    for side in left right; do $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/hang_$side.json; done
+    for side in left right; do for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb hang_$side.glb hang_$side public/models/$s.glb --rotation-only --in-place; done; done
+
 人形に釘付けのまま猫を撫で続ける型 `treat_cat` (6.57 秒、しゃがんだ姿で始まって終わるので繰り返せる) は本人が落とした
 `tools/raw/TreatCat.fbx` (Ch35 の模型ごと入っていて 140MB)。しゃがみ込む `trapped` の後に流す。腰の前後の揺れは捨てる:
 

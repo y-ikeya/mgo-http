@@ -82,6 +82,8 @@ export type WholeBodyLocomotion =
   | 'vault_up'
   | 'hang_drop'
   | 'hang_climb'
+  | 'hang_left'
+  | 'hang_right'
   // 梯子を登り切る。一度きりの型なので、流し始める者が要る (無いと T ポーズ)
   | 'climb_top'
   | 'death'
@@ -112,6 +114,9 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'vault_up',
   'hang_drop',
   'hang_climb',
+  // ぶら下がったまま横へ移る
+  'hang_left',
+  'hang_right',
   'climb_top',
   'roll',
   // 受け身。転がるので上半身だけ別の型は重ねられない
@@ -320,6 +325,8 @@ export interface StanceInput {
   hangClimbing: boolean
   /** 縁に手を掛けて待っている (落ち切った後)。hanging と一緒に true で来る */
   hangHolding: boolean
+  /** ぶら下がったまま横へ移っている向き。-1 左 / 1 右 / 0 移っていない */
+  hangShimmy?: -1 | 0 | 1
   onGround: boolean
   /**
    * 空中に居る時間 (秒)。0 なら接地している。
@@ -436,6 +443,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // しゃがんだままなら上半身だけ。立ちの刺突は全身の型なので立ち上がってしまう
   if (input.stabbing) return input.crouching ? 'crouch_stab' : 'stab'
   if (input.hangClimbing) return 'hang_climb'
+  if (input.hangShimmy) return input.hangShimmy < 0 ? 'hang_left' : 'hang_right'
   if (input.hangHolding) return 'hang'
   if (input.hanging) return 'hang_drop'
   if (input.cqc) return input.cqc

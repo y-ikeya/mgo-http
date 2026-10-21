@@ -46,6 +46,8 @@ const OFF_FOOTING: ReadonlySet<string> = new Set<Locomotion>([
   'hang',
   'hang_drop',
   'hang_climb',
+  'hang_left',
+  'hang_right',
   'vault',
   'vault_up',
 ])

@@ -111,6 +111,9 @@ export const LOCOMOTIONS: Locomotion[] = [
   'hit2back',
   // 人形に釘付けのまま猫を撫で続ける。**末尾に足す**
   'trapped_hold',
+  // ぶら下がったまま横へ移る。**末尾に足す**
+  'hang_left',
+  'hang_right',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

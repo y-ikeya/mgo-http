@@ -25,6 +25,12 @@ export const LURE_RADIUS = 1.5
 export const LURE_HEIGHT = 1.6
 /** 型 trapped の尺 (秒)。しゃがみ込んで手を伸ばし切るまで (public/models/soldier*.glb の trapped) */
 export const TRAPPED_CLIP_SECONDS = 2.0
+/**
+ * しゃがみ込み終える所 (秒)。trapped の型はこの後に両手を前へ伸ばすが、そこは流さずに撫でる型
+ * (TreatCat) へ移る (本人 2026-10-21「しゃがんだ後に一瞬手を伸ばしちゃってる」)。立ち上がる時も
+ * ここから逆に流す。型の 45 コマ目 (腰が下り切る) と、右手が前へ出始める 49 コマ目の間
+ */
+export const TRAPPED_CROUCH_SECONDS = 1.5
 /** 手を伸ばした姿で止まっている長さ (秒) */
 export const HOLD_SECONDS = 6
 /** 掛かってから猫が消えて解けるまで (秒)。型を流し切って、止まっている間 */
@@ -50,12 +56,12 @@ export function trapStage(
   trappedBy: number,
   trapFreeAt: number,
   now: number,
-  /** 掛かった時刻 (ms)。しゃがみ込む型 (TRAPPED_CLIP_SECONDS) の後は撫で続ける (hold) */
+  /** 掛かった時刻 (ms)。しゃがみ込み終えたら (TRAPPED_CROUCH_SECONDS) 撫で続ける (hold) */
   trappedAt = 0,
 ): 'in' | 'hold' | 'out' | null {
-  if (trappedBy !== 0) return now - trappedAt < TRAPPED_CLIP_SECONDS * 1000 ? 'in' : 'hold'
+  if (trappedBy !== 0) return now - trappedAt < TRAPPED_CROUCH_SECONDS * 1000 ? 'in' : 'hold'
   const releasedAt = trapFreeAt - IMMUNE_SECONDS * 1000
-  return trapFreeAt > 0 && now >= releasedAt && now - releasedAt < TRAPPED_CLIP_SECONDS * 1000 ? 'out' : null
+  return trapFreeAt > 0 && now >= releasedAt && now - releasedAt < TRAPPED_CROUCH_SECONDS * 1000 ? 'out' : null
 }
 
 export interface LureTarget {

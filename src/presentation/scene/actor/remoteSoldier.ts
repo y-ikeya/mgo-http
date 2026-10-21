@@ -1,3 +1,4 @@
+import { TRAPPED_CROUCH_SECONDS } from '../../../domain/item/doll';
 import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
 import { BlobShadow } from './blobShadow';
@@ -173,7 +174,11 @@ const PLAY_WHOLE_BODY: Record<
   // 猫に釘付け / 解けて戻る (逆に流す)
   trapped: (a) => a.playTrapped(),
   trapped_hold: (a) => a.playTrappedHold(),
-  trapped_out: (a) => a.playTrappedOut(),
+  // ぶら下がったまま横へ移る
+  hang_left: (a) => a.playHangShimmy(-1),
+  hang_right: (a) => a.playHangShimmy(1),
+  // しゃがみ込み終えた所から逆に流す (手を前へ伸ばす所は通らない)
+  trapped_out: (a) => a.playTrappedOut(TRAPPED_CROUCH_SECONDS),
 };
 
 /**
@@ -480,7 +485,13 @@ export class RemoteSoldier {
     this.sweptThisFrame = false;
     this.reloadStarted = false;
     // ぶら下がりの上半身は型が終わっても戻さない (掴んだまま)。抜けたときにここで戻す
-    if (locomotion !== this.locomotion && locomotion !== 'hang_drop' && locomotion !== 'hang_climb') {
+    if (
+      locomotion !== this.locomotion &&
+      locomotion !== 'hang_drop' &&
+      locomotion !== 'hang_climb' &&
+      locomotion !== 'hang_left' &&
+      locomotion !== 'hang_right'
+    ) {
       // 'hang' (待つ姿) もここを通る。落ちる型の上半身を止め絵へ渡すため
       animator.endHang();
     }
@@ -664,8 +675,11 @@ export class RemoteSoldier {
       state.locomotion === 'hang_drop' ||
       state.locomotion === 'hang' ||
       state.locomotion === 'hang_climb' ||
-      // 猫に釘付けの間 (戻る途中も)。両手を猫へ伸ばしている
+      state.locomotion === 'hang_left' ||
+      state.locomotion === 'hang_right' ||
+      // 猫に釘付けの間 (撫でている間・戻る途中も)。両手を猫へ伸ばしている
       state.locomotion === 'trapped' ||
+      state.locomotion === 'trapped_hold' ||
       state.locomotion === 'trapped_out'
     // 拳銃も構えていない間ずっと手に持つ (soldier.ts と同じ)。STEALTH で体が消えても武器は見える
     if (this.weapon) this.weapon.visible = !holstered

@@ -8,6 +8,7 @@ import {
   ladderAt,
   ladderGrip,
 } from '../../../domain/stage'
+import { TRAPPED_CROUCH_SECONDS } from '../../../domain/item/doll'
 import {
   BOX_BUMP_STUN,
   KNOCK_DISTANCE,
@@ -389,6 +390,12 @@ const HANG_NORMAL_REACH = 0.15
 /** 法線に沿って縁まで詰める刻みと上限 (m) */
 const HANG_EDGE_STEP = 0.05
 const HANG_EDGE_REACH = 0.6
+/** ぶら下がったまま 1 回で横へ移る量 (m)。型 (BracedHangLeft / Right) の腰の移動 */
+const HANG_SHIMMY_STEP = 0.58
+/** 横へ移る時に、縁が続いているかを見る縁の内側の深さ (m) */
+const HANG_SHIMMY_INSET = 0.15
+/** 縁が続いていると見なす高さの差 (m)。これより高低があれば縁が切れている */
+const HANG_SHIMMY_LEVEL = 0.15
 
 /**
  * 空中で進行方向を変えられる度合い (0 = 変えられない)。
@@ -767,7 +774,11 @@ export class Soldier {
   /** 跳び越える枠の上面の高さ (足元から)。跳んでいる間の当たりをそのすぐ上に置く */
   private vaultSillRise = 0
   /** ぶら下がりの段階。drop = 落ちて掴む途中、hang = 掴んで待つ、climb = 登る途中 */
-  private hangStage: 'none' | 'drop' | 'hang' | 'climb' = 'none'
+  private hangStage: 'none' | 'drop' | 'hang' | 'climb' | 'shimmy' = 'none'
+  /** 横へ移っている向き (-1 左 / 1 右)。hangStage が shimmy の間だけ意味を持つ */
+  private hangShimmySide: -1 | 1 = 1
+  /** 横へ移る先 (ぶら下がりの位置) */
+  private readonly hangShimmyTo = new THREE.Vector3()
   /** 縁から出た瞬間の向き。落ちる型の頭でここから壁向きへ回す */
   private hangTurnFrom = 0
   /**
@@ -1226,8 +1237,9 @@ export class Soldier {
   untrap(): void {
     if (this.trappedStage !== 'in' && this.trappedStage !== 'hold') return
     this.trappedStage = 'out'
-    this.trappedOutLeft = this.animator?.trappedDuration || 2
-    this.animator?.playTrappedOut()
+    // しゃがみ込み終えた所から逆に流す (手を伸ばす所は通らない)
+    this.trappedOutLeft = TRAPPED_CROUCH_SECONDS
+    this.animator?.playTrappedOut(TRAPPED_CROUCH_SECONDS)
   }
 
   /** いま箱を落とされて固まっている最中か。呼ぶ側が操作を止めるのに使う */
@@ -2003,6 +2015,12 @@ export class Soldier {
     this.stickForward = value
   }
 
+  /** 押している左右の量 (右が正)。**カメラを通さない** (ぶら下がりの横移動に使う) */
+  setStickSide(value: number): void {
+    this.stickSide = value
+  }
+  private stickSide = 0
+
   /**
    * 最後に受け取った地形。**掴む側を選ぶのに使う。**
    *
@@ -2696,6 +2714,41 @@ export class Soldier {
     this.rollYaw = this.yaw + delta
   }
 
+  /**
+   * ぶら下がったまま横へ移る。左右 (A / D) を押したとき。**縁が切れていれば移らない**
+   * (本人 2026-10-21「hang している辺が切れたらそれ以上は進めない」)。
+   *
+   * 移る途中 (半分) と移った先で、縁の内側に同じ高さの床があるか (縁が続いているか)、
+   * 体を置く所が空いているか (掴む時と同じ見方、beginHang) を見る
+   */
+  private beginHangShimmy(side: -1 | 1): void {
+    const world = this.lastWorld
+    if (!world) return
+    const top = this.hangTopY
+    const ox = this.hangOutX
+    const oz = this.hangOutZ
+    // 壁に向いた体の右 = (外向きの z, -外向きの x)。yaw θ で右は (cosθ, -sinθ)、θ = atan2(ox, oz)
+    const dx = oz * side * HANG_SHIMMY_STEP
+    const dz = -ox * side * HANG_SHIMMY_STEP
+    // 縁の点 = ぶら下がりの位置から壁へ HANG_OUT 戻った所
+    const edgeX = this.hangTo.x - ox * HANG_OUT
+    const edgeZ = this.hangTo.z - oz * HANG_OUT
+    const probe = this.vaultProbe
+    for (const t of [0.5, 1]) {
+      // 縁の内側に、縁と同じ高さの床がある (縁が続いている)
+      probe.set(edgeX + dx * t - ox * HANG_SHIMMY_INSET, top, edgeZ + dz * t - oz * HANG_SHIMMY_INSET)
+      const ground = world.groundHeight(probe, 0, top + HANG_LOOK_UP)
+      if (Math.abs(ground - top) > HANG_SHIMMY_LEVEL) return
+      // 体を置く所が空いている (曲がり角・張り出しに体が入らない)
+      probe.set(this.hangTo.x + dx * t, top, this.hangTo.z + dz * t)
+      if (world.groundHeight(probe, PLAYER_RADIUS, top + HANG_LOOK_UP) > this.hangTo.y - 0.05) return
+    }
+    this.hangStage = 'shimmy'
+    this.hangShimmySide = side
+    this.hangShimmyTo.set(this.hangTo.x + dx, this.hangTo.y, this.hangTo.z + dz)
+    this.animator?.playHangShimmy(side)
+  }
+
   /** ぶら下がりから登り始める。前 (W) を押したとき */
   private beginHangClimb(): void {
     this.hangStage = 'climb'
@@ -2746,6 +2799,19 @@ export class Soldier {
         this.faceChestTo(Math.atan2(this.hangOutX, this.hangOutZ))
         this.yaw = this.rollYaw
         if (this.stickForward > 0.5) this.beginHangClimb()
+        else if (Math.abs(this.stickSide) > 0.5) this.beginHangShimmy(this.stickSide > 0 ? 1 : -1)
+      } else if (this.hangStage === 'shimmy') {
+        // 縁に沿って横へ。型の進みに合わせて真っ直ぐ動かす (腰の横の移動は型から捨ててある)
+        const phase = animator.oneShotPhase(this.hangShimmySide < 0 ? 'hang_left' : 'hang_right')
+        this.position.lerpVectors(this.hangTo, this.hangShimmyTo, phase)
+        this.faceChestTo(Math.atan2(this.hangOutX, this.hangOutZ))
+        this.yaw = this.rollYaw
+        if (animator.oneShotDone(this.hangShimmySide < 0 ? 'hang_left' : 'hang_right')) {
+          this.hangStage = 'hang'
+          this.hangTo.copy(this.hangShimmyTo)
+          this.position.copy(this.hangTo)
+          animator.endHang()
+        }
       } else if (this.hangStage === 'climb') {
         /*
          * **先に上がって、それから前へ。** 上下は腰の上下の曲線 (戻さない)。前後は
@@ -3653,7 +3719,8 @@ export class Soldier {
     // しゃがみ込み終えたら、猫を撫で続ける (TreatCat)
     if (this.trappedStage === 'in') {
       this.trappedElapsed += dt
-      if (this.trappedElapsed >= (this.animator?.trappedDuration || 2)) {
+      // 型の終わり (手を前へ伸ばす) までは流さず、しゃがみ込み終えた所で移る
+      if (this.trappedElapsed >= TRAPPED_CROUCH_SECONDS) {
         this.trappedStage = 'hold'
         this.animator?.playTrappedHold()
       }
@@ -4269,6 +4336,7 @@ export class Soldier {
       hanging: this.hanging,
       hangClimbing: this.hangStage === 'climb',
       hangHolding: this.hangStage === 'hang' || this.hangStage === 'drop',
+      hangShimmy: this.hangStage === 'shimmy' ? this.hangShimmySide : 0,
       onGround: this.onGround,
       hardLand: this.hardLandTimer,
       landing: this.landingTimer,

@@ -133,6 +133,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   hang_climb: 'hang_climb',
   // 縁に手を掛けて待つ。落ちる型 (BracedHang) の最後の 1 枚で止める (LEAN_POSE_AT / FROZEN_CLIPS)
   hang: 'hang_drop',
+  hang_left: 'hang_left',
+  hang_right: 'hang_right',
   death: 'death',
   // 倒れる向き。**背後から撃たれたら前へ、正面からなら後ろへ**
   death_front: 'death_front',
@@ -173,6 +175,9 @@ type UpperState =
   | 'vault'
   | 'vault_up'
   | 'hang_drop'
+  // ぶら下がったまま横へ移る
+  | 'hang_left'
+  | 'hang_right'
   | 'hang_climb'
   // 伏せへの出入り
   | 'prone_down'
@@ -275,6 +280,8 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   hang_drop: 'hang_drop',
   hang_climb: 'hang_climb',
   hang: 'hang_drop',
+  hang_left: 'hang_left',
+  hang_right: 'hang_right',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, 'relaxed_run'],
@@ -516,6 +523,9 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'vault_up',
   'hang_drop',
   'hang_climb',
+  // ぶら下がったまま横へ移る。1 回ずつ
+  'hang_left',
+  'hang_right',
   /*
    * 落下の受け身。**ここに無くて、下半身だけループしていた。**
    *
@@ -797,6 +807,9 @@ const VAULT_UP_KEY = 'vault_up'
 const HANG_DROP_KEY = 'hang_drop'
 /** ぶら下がりから登る。終わればしゃがみへ */
 const HANG_CLIMB_KEY = 'hang_climb'
+/** ぶら下がったまま横へ移る (BracedHangLeft / Right、1.2 秒で 0.58m。腰の横の移動は捨ててある) */
+const HANG_LEFT_KEY = 'hang_left'
+const HANG_RIGHT_KEY = 'hang_right'
 const DEATH_KEY = 'death'
 /** 倒れる向き。撃たれた側から見て前か後ろか */
 const DEATH_FRONT_KEY = 'death_front'
@@ -909,6 +922,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   VAULT_UP_KEY,
   HANG_DROP_KEY,
   HANG_CLIMB_KEY,
+  HANG_LEFT_KEY,
+  HANG_RIGHT_KEY,
   BUMP_KEY,
   CLIMB_TOP_KEY,
   DEATH_FRONT_KEY,
@@ -1100,6 +1115,9 @@ const JUMP_BLEND_LAMBDA = 30
 /** ジャンプの 3 局面。ブレンドを速める判定に使う */
 const JUMP_STATES = new Set<Locomotion>(['jump_up', 'jump_loop', 'jump_down'])
 const UPPER_BLEND_LAMBDA = 16
+/** 釘付けの姿の間を繋ぐ速さ。普段 (12 / 16) の半分以下 — 0.6 秒ほどかけて寄せる */
+const TRAP_BLEND_LAMBDA = 5
+const TRAP_BLEND_STATES = new Set<Locomotion>(['trapped_hold', 'trapped_out'])
 /** これ以下の重みは 0 と見なす。使っていないクリップが微量に混ざり続けるのを防ぐ */
 const WEIGHT_EPSILON = 1e-3
 
@@ -1949,6 +1967,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [HANG_DROP_KEY, 'hang_drop'],
       [HANG_CLIMB_KEY, 'hang_climb'],
+      [HANG_LEFT_KEY, 'hang_left'],
+      [HANG_RIGHT_KEY, 'hang_right'],
       [CQC_THROW_KEY, 'cqc_throw'],
       [CQC_MISS_KEY, 'cqc_miss'],
     ] as const) {
@@ -2136,9 +2156,18 @@ export class CharacterAnimator {
       JUMP_STATES.has(this.locomotion) || JUMP_STATES.has(this.previousLocomotion)
         ? JUMP_BLEND_LAMBDA
         : LOWER_BLEND_LAMBDA
-    this.blend(this.lower, this.lowerWeights, this.resolveLowerKey(), lowerLambda, dt)
+    // 釘付けの間 (しゃがみ込む → 撫でる → 立ち上がる) はゆっくり繋ぐ。姿の差が大きく、
+    // 普段の速さでは切れ目が目立った (2026-10-21 本人「しゃがんだ後の切れ目が雑」)
+    const trapBlend = TRAP_BLEND_STATES.has(this.locomotion)
+    this.blend(this.lower, this.lowerWeights, this.resolveLowerKey(), trapBlend ? TRAP_BLEND_LAMBDA : lowerLambda, dt)
     this.previousLocomotion = this.locomotion
-    this.blend(this.upper, this.upperWeights, this.resolveUpperKey(), UPPER_BLEND_LAMBDA, dt)
+    this.blend(
+      this.upper,
+      this.upperWeights,
+      this.resolveUpperKey(),
+      trapBlend ? TRAP_BLEND_LAMBDA : UPPER_BLEND_LAMBDA,
+      dt,
+    )
     /*
      * 全身の型が決まっている動作では、照準由来の補正を掛けると崩れる。
      *
@@ -3272,6 +3301,8 @@ export class CharacterAnimator {
     if (this.upperState === 'cqc_miss' && this.upper.has(CQC_MISS_KEY)) return CQC_MISS_KEY
     if (this.upperState === 'hang_drop' && this.upper.has(HANG_DROP_KEY)) return HANG_DROP_KEY
     if (this.upperState === 'hang_climb' && this.upper.has(HANG_CLIMB_KEY)) return HANG_CLIMB_KEY
+    if (this.upperState === 'hang_left' && this.upper.has(HANG_LEFT_KEY)) return HANG_LEFT_KEY
+    if (this.upperState === 'hang_right' && this.upper.has(HANG_RIGHT_KEY)) return HANG_RIGHT_KEY
     // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
     if (this.upperState === 'bump' && this.upper.has(BUMP_KEY)) return BUMP_KEY
     // 梯子。**構えていても差し替えない** — 両手が塞がっている
@@ -3484,6 +3515,12 @@ export class CharacterAnimator {
     this.playOneShotWhole(HANG_DROP_KEY, 'hang_drop')
   }
 
+  /** ぶら下がったまま横へ移る。終わったら endHang で待つ姿へ戻す */
+  playHangShimmy(side: -1 | 1): void {
+    if (side < 0) this.playOneShotWhole(HANG_LEFT_KEY, 'hang_left')
+    else this.playOneShotWhole(HANG_RIGHT_KEY, 'hang_right')
+  }
+
   /** ぶら下がりから縁の上へ登る。終わればしゃがみの型へ渡る */
   playHangClimb(): void {
     this.playOneShotWhole(HANG_CLIMB_KEY, 'hang_climb')
@@ -3491,7 +3528,13 @@ export class CharacterAnimator {
 
   /** ぶら下がりを抜ける (手を離した / 登り切った後の念のため)。上半身を普段へ */
   endHang(): void {
-    if (this.upperState === 'hang_drop' || this.upperState === 'hang_climb') this.upperState = 'stance'
+    if (
+      this.upperState === 'hang_drop' ||
+      this.upperState === 'hang_climb' ||
+      this.upperState === 'hang_left' ||
+      this.upperState === 'hang_right'
+    )
+      this.upperState = 'stance'
   }
 
   /** ぶら下がっている (落ちる途中・登る途中も含む) */
@@ -3666,9 +3709,14 @@ export class CharacterAnimator {
     this.playWholeBody(TRAPPED_HOLD_KEY, 'trapped_hold')
   }
 
-  /** 解けた。**同じ型を逆に流して**立ち上がる */
-  playTrappedOut(): void {
+  /** 解けた。**同じ型を逆に流して**立ち上がる。from (秒) の所から頭へ */
+  playTrappedOut(from?: number): void {
     this.playWholeBody(TRAPPED_OUT_KEY, 'trapped_out', -1)
+    if (from === undefined) return
+    const upper = this.upper.get(TRAPPED_OUT_KEY)
+    const lower = this.lower.get('trapped_out')
+    if (upper) upper.time = Math.min(from, upper.getClip().duration)
+    if (lower) lower.time = Math.min(from, lower.getClip().duration)
   }
 
   /**
