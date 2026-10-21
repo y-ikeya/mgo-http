@@ -370,7 +370,9 @@ const ROOT_MOTION_HOLD: Partial<Record<Locomotion, { until: number; keep: number
  * 合わせた瞬間に差のぶん跳ねる。上下は型から抜き、位置のほうを型の上がり方
  * (vaultRise) に沿ってコードで上げる。
  */
-const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top'])
+// ぶら下がって横へ移る型 (hang_left / right) も。腰の高さを型のまま持っていると、待つ型 (hang_drop、
+// 上下を潰してある) との差のぶん体が上へずれた (2026-10-21 本人「左右移動する時に上がっちゃってる」)
+const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top', 'hang_left', 'hang_right'])
 /**
  * 倒れる型の**前後の移動を絵として残す**型 (deathSlide)。
  *
