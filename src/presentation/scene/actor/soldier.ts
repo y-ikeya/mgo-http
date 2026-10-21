@@ -259,12 +259,10 @@ const HARD_LAND_TIME = 2.03
  *
  * 型は Landing の脚 (足が着く 12 コマ目から、膝を曲げて沈み、立ち姿に戻る 34 コマ目まで)。
  * 0.16 秒だった頃は短すぎて着地が見えなかった (2026-10-21 本人「着地のモーションが消えた？」)。
- * **歩き出していれば沈む所 (LANDING_MOVING_HOLD) だけで切り上げる** — 長いまま歩くと、脚を
- * 曲げたまま滑って見える
+ * **この間は動けない** (本人 2026-10-21)。膝を曲げて受け止めている間に歩くと、脚を曲げたまま
+ * 滑って見えた
  */
 const LANDING_TIME = (34 - 12) / 30
-/** 着地の後に歩き出していたら、ここまでで着地の型を切り上げる (秒)。膝が一番沈む所の少し後 */
-const LANDING_MOVING_HOLD = 0.25
 /**
  * 軽い着地の型を出す落下速度の下限 (m/s)。**1m (5.9 m/s) から** (2026-10-21 本人。2m (8.4 m/s) だった)。
  *
@@ -3576,6 +3574,8 @@ export class Soldier {
      * 一緒に外れて**いた — 膝を突いたまま走り出せる形になっていた。
      */
     if (this.hardLandTimer > 0) moveDir = ZERO_MOVE
+    // 膝を曲げる軽い着地の間も (本人 2026-10-21「このモーション中は移動できないように」)
+    if (this.landingTimer > 0) moveDir = ZERO_MOVE
     // 手を離した / 跳び降りた落下は舵を切れない。着地したら普段へ
     if (this.steerlessFall) {
       if (this.mover.onGround || this.onLadder || this.inWater) this.steerlessFall = false
@@ -3907,6 +3907,8 @@ export class Soldier {
         this.animator?.playHardLand()
       } else {
         this.landingTimer = LANDING_TIME
+        // 走ってきた勢いで滑らない。受け止めている間は止まる
+        this.currentSpeed = 0
         this.animator?.playLanding()
       }
     }
@@ -3915,10 +3917,6 @@ export class Soldier {
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
     if (this.landingTimer > 0) this.landingTimer -= dt
-    // 歩き出していたら、沈む所を見せた後は着地の型を切り上げる
-    if (this.landingTimer > 0 && moveDir.lengthSq() > 0.01 && LANDING_TIME - this.landingTimer > LANDING_MOVING_HOLD) {
-      this.landingTimer = 0
-    }
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
     if (this.staggerLeft > 0) this.staggerLeft -= dt
