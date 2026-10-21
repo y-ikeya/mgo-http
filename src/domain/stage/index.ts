@@ -360,6 +360,7 @@ const CITY: StageSpec = {
 /**
  * UU (MGO2 の Urban Ultimatum)。**作りかけ** (2026-10-21〜)。本人が Blender で作っている
  * (tools/raw/stage_uu.blend、下絵は tools/raw/uu_map.jpg)。地上・2F・倉庫の屋上・ビル 3 棟。
+ * 縮尺は下絵 1 画素 0.325m (地図の中身で約 86m)。0.25m では MGO2 より狭かった (本人)
  *
  * 基地の値は json (meta_base*) と同じ。個人戦の湧き位置は、形ができるまで両基地の 2 点だけ
  */
@@ -368,12 +369,12 @@ const UU: StageSpec = {
   label: 'UU',
   ambience: 'city_loop1.mp3',
   bases: {
-    blue: { x: -12.81, z: 31.84 },
-    red: { x: 28.77, z: -15.43 },
+    blue: { x: -16.66, z: 41.4 },
+    red: { x: 37.41, z: -20.05 },
   },
   solo: [
-    { x: -12.81, z: 31.84 },
-    { x: 28.77, z: -15.43 },
+    { x: -16.66, z: 41.4 },
+    { x: 37.41, z: -20.05 },
   ],
   targets: [],
 }
