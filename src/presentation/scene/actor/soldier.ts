@@ -387,6 +387,8 @@ const HANG_CLIMB_RISE_DONE = 0.9
  */
 const HANG_NORMAL_SAMPLES = 24
 const HANG_NORMAL_REACH = 0.15
+/** 角か平らな壁かの見分け。2 つの面の外向きがこれより揃っていれば (25° 以内) 平らな壁 */
+const HANG_FLAT_COS = Math.cos((25 * Math.PI) / 180)
 /** 法線に沿って縁まで詰める刻みと上限 (m) */
 const HANG_EDGE_STEP = 0.05
 const HANG_EDGE_REACH = 0.6
@@ -427,6 +429,14 @@ function hangShimmyAt(phase: number): { side: number; up: number } {
   }
   return curve[curve.length - 1]!
 }
+/**
+ * ぶら下がった姿の手の開き (m、体の中心から片手まで)。**両手の下に縁が要る** — 中心だけで見ていて、
+ * 塔の角で右手が角の外の宙を掴んだ (2026-10-21 本人「右腕分だけ空中に浮いてる」)
+ */
+const HANG_HAND_SPAN = 0.32
+/** 掴む時に、両手が縁に乗る所までずらしてよい量 (m) と刻み */
+const HANG_FIT_REACH = 0.4
+const HANG_FIT_STEP = 0.04
 /** 横へ移る時に、縁が続いているかを見る縁の内側の深さ (m) */
 const HANG_SHIMMY_INSET = 0.15
 /** 縁が続いていると見なす高さの差 (m)。これより高低があれば縁が切れている */
@@ -2739,8 +2749,53 @@ export class Soldier {
       len = Math.hypot(sumX, sumZ)
       if (len < 1e-6) return
     }
-    const nx = sumX / len
-    const nz = sumZ / len
+    let nx = sumX / len
+    let nz = sumZ / len
+    /*
+     * **角では面を 1 つ選ぶ。** 出っ張った角では 2 つの面の両方が落ちて見え、平均は斜め (角の二等分)
+     * を向く。斜めにぶら下がって片手が角の外に出た (2026-10-21 本人「右腕分だけ空中に浮いてる」)。
+     * 床が残っている向きの範囲 (円弧) の両端が 2 つの面の縁の線なので、それぞれの面の外向きを出し、
+     * 出た向きに近いほうを採る。平らな壁では両端が一直線で、どちらも平均と同じ向きになる
+     */
+    {
+      const step = (Math.PI * 2) / HANG_NORMAL_SAMPLES
+      const solid: boolean[] = []
+      for (let i = 0; i < HANG_NORMAL_SAMPLES; i++) {
+        const angle = i * step
+        solid.push(!dropped(ex + Math.cos(angle) * HANG_NORMAL_REACH, ez + Math.sin(angle) * HANG_NORMAL_REACH))
+      }
+      // 床が残っている範囲の始まり (前が落ちていて、ここが残っている)
+      const first = solid.findIndex((s, i) => s && !solid[(i + HANG_NORMAL_SAMPLES - 1) % HANG_NORMAL_SAMPLES])
+      if (first >= 0) {
+        let count = 0
+        while (count < HANG_NORMAL_SAMPLES && solid[(first + count) % HANG_NORMAL_SAMPLES]) count++
+        // 両端は刻みの間を二分して詰める (刻み 15° のままだと面の向きが 7.5° ずれ、横へ移る時に
+        // 縁の内側を見る点が縁の外へ出て移れなかった)
+        const isSolid = (angle: number) =>
+          !dropped(ex + Math.cos(angle) * HANG_NORMAL_REACH, ez + Math.sin(angle) * HANG_NORMAL_REACH)
+        const boundary = (out: number, inside: number) => {
+          let lo = out
+          let hi = inside
+          for (let k = 0; k < 8; k++) {
+            const mid = (lo + hi) / 2
+            if (isSolid(mid)) hi = mid
+            else lo = mid
+          }
+          return (lo + hi) / 2
+        }
+        const a1 = boundary((first - 1) * step, first * step)
+        const a2 = boundary((first + count) * step, (first + count - 1) * step)
+        // 範囲の始まりの縁の線の外向きは −90°、終わりの線の外向きは +90° (残っている側の反対)
+        const candidates = [a1 - Math.PI / 2, a2 + Math.PI / 2].map((a) => ({ x: Math.cos(a), z: Math.sin(a) }))
+        const [c1, c2] = candidates as [{ x: number; z: number }, { x: number; z: number }]
+        // ほぼ同じ向きなら平らな壁。刻み (15°) のぶんずれるので、平均のほうが正確
+        if (c1.x * c2.x + c1.z * c2.z < HANG_FLAT_COS) {
+          const best = c1.x * dx0 + c1.z * dz0 >= c2.x * dx0 + c2.z * dz0 ? c1 : c2
+          nx = best.x
+          nz = best.z
+        }
+      }
+    }
     // 法線に沿って縁を詰め直す (斜めに出たぶん、出た向きで出した縁は法線方向に少し内側)
     {
       let found = false
@@ -2759,6 +2814,29 @@ export class Soldier {
       }
       ex = bx
       ez = bz
+    }
+    /*
+     * **両手が縁に乗るか。** 角の近くで掴むと片手が角の外に出る。両手の下に縁がある所まで縁に沿って
+     * ずらす (HANG_FIT_REACH まで)。ずらしても乗らない短い縁なら掴まない
+     */
+    {
+      const tx = nz
+      const tz = -nx
+      const onLedge = (x: number, z: number) => {
+        probe.set(x - nx * HANG_SHIMMY_INSET, top, z - nz * HANG_SHIMMY_INSET)
+        return Math.abs(world.groundHeight(probe, 0, top + HANG_LOOK_UP) - top) <= HANG_SHIMMY_LEVEL
+      }
+      const fits = (shift: number) =>
+        onLedge(ex + tx * (shift - HANG_HAND_SPAN), ez + tz * (shift - HANG_HAND_SPAN)) &&
+        onLedge(ex + tx * (shift + HANG_HAND_SPAN), ez + tz * (shift + HANG_HAND_SPAN))
+      let shift: number | null = null
+      for (let s = 0; s <= HANG_FIT_REACH + 1e-6 && shift === null; s += HANG_FIT_STEP) {
+        if (fits(s)) shift = s
+        else if (s > 0 && fits(-s)) shift = -s
+      }
+      if (shift === null) return
+      ex += tx * shift
+      ez += tz * shift
     }
     /*
      * **体を置く場所が空いているか。** ぶら下がりの位置 (縁の外、1.88m 下) に床や
@@ -2823,11 +2901,20 @@ export class Soldier {
     const edgeX = this.hangTo.x - ox * HANG_OUT
     const edgeZ = this.hangTo.z - oz * HANG_OUT
     const probe = this.vaultProbe
+    // 進む側の手の先 (体の中心から手の開きぶん)
+    const handX = oz * side * HANG_HAND_SPAN
+    const handZ = -ox * side * HANG_HAND_SPAN
     for (const t of [0.5, 1]) {
-      // 縁の内側に、縁と同じ高さの床がある (縁が続いている)
-      probe.set(edgeX + dx * t - ox * HANG_SHIMMY_INSET, top, edgeZ + dz * t - oz * HANG_SHIMMY_INSET)
-      const ground = world.groundHeight(probe, 0, top + HANG_LOOK_UP)
-      if (Math.abs(ground - top) > HANG_SHIMMY_LEVEL) return
+      // 縁の内側に、縁と同じ高さの床がある (縁が続いている)。**体の中心と進む側の手の両方で**
+      for (const hand of [0, 1]) {
+        probe.set(
+          edgeX + dx * t + handX * hand - ox * HANG_SHIMMY_INSET,
+          top,
+          edgeZ + dz * t + handZ * hand - oz * HANG_SHIMMY_INSET,
+        )
+        const ground = world.groundHeight(probe, 0, top + HANG_LOOK_UP)
+        if (Math.abs(ground - top) > HANG_SHIMMY_LEVEL) return
+      }
       // 体を置く所が空いている (曲がり角・張り出しに体が入らない)
       probe.set(this.hangTo.x + dx * t, top, this.hangTo.z + dz * t)
       if (world.groundHeight(probe, PLAYER_RADIUS, top + HANG_LOOK_UP) > this.hangTo.y - 0.05) return
