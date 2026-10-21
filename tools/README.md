@@ -349,8 +349,8 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     for side in left right; do $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/hang_$side.json; done
     for side in left right; do for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb hang_$side.glb hang_$side public/models/$s.glb --rotation-only --in-place; done; done
 
-人形に釘付けのまま猫を撫で続ける型 `treat_cat` (6.57 秒、しゃがんだ姿で始まって終わるので繰り返せる) は本人が落とした
-`tools/raw/TreatCat.fbx` (Ch35 の模型ごと入っていて 140MB)。しゃがみ込む `trapped` の後に流す。腰の前後の揺れは捨てる:
+人形に釘付けのまま猫を撫で続ける型 `treat_cat` (8.87 秒、しゃがんだ姿で始まって終わるので繰り返せる。足の向きを合わせた左右反転版) は本人が落とした
+`tools/raw/TreatCat.fbx`。しゃがみ込む `trapped` の後に流す。腰の前後の揺れは捨てる:
 
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/treat_cat.json
     for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb treat_cat.glb treat_cat public/models/$s.glb --rotation-only --in-place; done
