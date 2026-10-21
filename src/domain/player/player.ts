@@ -306,8 +306,8 @@ export interface MatchPlayer extends Player {
   homeZ: number
   /** 的の足元の高さ。地面が 0 ではないステージ (検証場は 0.1) で埋まらないように */
   homeY: number
-  /** 的の構え。立っている / しゃがんでいる / 伏せている / 箱を被っている。人は使わない */
-  homeStance: 'stand' | 'crouch' | 'prone' | 'box'
+  /** 的の構え。立っている / しゃがんでいる / 伏せている / 箱を被っている / 左右へ lean し続ける。人は使わない */
+  homeStance: 'stand' | 'crouch' | 'prone' | 'box' | 'lean'
   /** 走り続ける的の、もう一方の端。null なら動かない。人は使わない */
   patrolTo: { x: number; z: number } | null
   /** いま向こうの端 (patrolTo) へ走っているか。false なら置き場 (home) へ戻っている */
@@ -503,7 +503,7 @@ export function newBot(seed: {
   /** 足元の高さ。省けば 0 */
   y?: number
   /** 構え。省けば立っている */
-  stance?: 'stand' | 'crouch' | 'prone' | 'box'
+  stance?: 'stand' | 'crouch' | 'prone' | 'box' | 'lean'
   /** 走り続ける的のもう一方の端。省けば動かない */
   patrol?: { x: number; z: number }
   now: number

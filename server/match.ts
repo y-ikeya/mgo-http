@@ -209,8 +209,14 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
   if (trap) return trap
   if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : bot.downRolled ? 'hit2back' : 'sweep'
   if (bot.downLeft > 0) return 'stand'
-  return patrolling(bot, now) ? 'run_f' : REST[bot.homeStance]
+  if (patrolling(bot, now)) return 'run_f'
+  // 左右へ lean し続ける的。LEAN_SWAP_MS ごとに入れ替える (体の出し入れは型が受け持つ)
+  if (bot.homeStance === 'lean') return Math.floor(now / LEAN_SWAP_MS) % 2 === 0 ? 'lean_left' : 'lean_right'
+  return REST[bot.homeStance]
 }
+
+/** lean し続ける的が左右を入れ替える間隔 (ms) */
+const LEAN_SWAP_MS = 1500
 
 /** 猫に釘付けの姿 (掛かっている / 立ち上がっている途中)。どちらでもなければ null */
 function trapped(bot: MatchPlayer, now: number): 'trapped' | 'trapped_out' | null {
@@ -274,6 +280,8 @@ const REST: Record<MatchPlayer['homeStance'], Locomotion> = {
   prone: 'prone_idle',
   // 箱を被って座っている (人が箱の中で止まった時と同じ姿)
   box: 'sit',
+  // lean し続ける的の、どちらでもない時の姿 (targetLocomotion が左右を決める)
+  lean: 'idle',
 }
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
