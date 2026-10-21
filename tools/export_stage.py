@@ -80,31 +80,35 @@ def stair_plane(pts, lo, hi):
     見た目は段のまま。**足だけが坂を登る** — 段差 0.25m 以下を勝手に上がる
     仕掛け (moving.ts の STEP_UP) と同じで、絵と足取りは元から一致していない。
     """
-    span_x = hi[0] - lo[0]
-    span_z = hi[2] - lo[2]
-    axis = 0 if span_x >= span_z else 2
-    span = span_x if axis == 0 else span_z
-    if span < 0.5:
-        return None
+    def fit(axis):
+        """その向きに帯を切って、帯ごとの上端へ直線を通す。(傾き, 帯の中心, 上端, 平均) か None"""
+        span = hi[axis] - lo[axis]
+        if span < 0.5:
+            return None
+        tops = {}
+        for x, y, z in pts:
+            i = min(STAIR_BINS - 1, int(((x if axis == 0 else z) - lo[axis]) / span * STAIR_BINS))
+            tops[i] = max(tops.get(i, -1e9), y)
+        if len(tops) < 3:
+            return None
+        n = len(tops)
+        cs = [lo[axis] + (i + 0.5) / STAIR_BINS * span for i in tops]
+        ys = list(tops.values())
+        mean_c = sum(cs) / n
+        mean_y = sum(ys) / n
+        denom = sum((c - mean_c) ** 2 for c in cs)
+        if denom < 1e-9:
+            return None
+        grad = sum((c - mean_c) * (y - mean_y) for c, y in zip(cs, ys)) / denom
+        return grad, cs, ys, mean_c, mean_y
 
-    # 帯ごとの上端
-    tops = {}
-    for x, y, z in pts:
-        i = min(STAIR_BINS - 1, int((( x if axis == 0 else z) - lo[axis]) / span * STAIR_BINS))
-        tops[i] = max(tops.get(i, -1e9), y)
-    if len(tops) < 3:
+    # **進む向きは、高さが変わる向き。** 長い辺の向きと決め打ちしていて、長さより幅の広い
+    # 階段 (UU の stair1、幅 6.5m・長さ 4m) を横向きと取り違え、坂が付かなかった (2026-10-21)
+    fits = [(axis, fit(axis)) for axis in (0, 2)]
+    fits = [(axis, f) for axis, f in fits if f is not None]
+    if not fits:
         return None
-
-    # 最小二乗で直線を通す
-    n = len(tops)
-    cs = [lo[axis] + (i + 0.5) / STAIR_BINS * span for i in tops]
-    ys = list(tops.values())
-    mean_c = sum(cs) / n
-    mean_y = sum(ys) / n
-    denom = sum((c - mean_c) ** 2 for c in cs)
-    if denom < 1e-9:
-        return None
-    grad = sum((c - mean_c) * (y - mean_y) for c, y in zip(cs, ys)) / denom
+    axis, (grad, cs, ys, mean_c, mean_y) = max(fits, key=lambda af: abs(af[1][0]))
     if abs(grad) < 0.05:
         return None
 
