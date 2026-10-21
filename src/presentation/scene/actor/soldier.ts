@@ -392,6 +392,41 @@ const HANG_EDGE_STEP = 0.05
 const HANG_EDGE_REACH = 0.6
 /** ぶら下がったまま 1 回で横へ移る量 (m)。型 (BracedHangLeft / Right) の腰の移動 */
 const HANG_SHIMMY_STEP = 0.58
+/**
+ * 横へ移る型の腰の動き。**真横に等速ではない** — 持ち上げて弧を描く (2026-10-21 本人「若干重心が上に
+ * 移動するアーチ」)。元の型 (BracedHangRight) の腰を 3 コマごとに写した物で、型の進み (0..1) に対して
+ * 横の進み (0..1) と上がる量 (m)。型からは腰の動きを抜いてあるので (merge_clip の --in-place、
+ * VERTICAL_STRIP_CLIPS)、位置のほうをこの通りに動かす
+ */
+const HANG_SHIMMY_CURVE: readonly { at: number; side: number; up: number }[] = [
+  { at: 0 / 35, side: 0, up: 0 },
+  { at: 3 / 35, side: 0.147, up: 0.012 },
+  { at: 6 / 35, side: 0.316, up: 0.067 },
+  { at: 9 / 35, side: 0.448, up: 0.136 },
+  { at: 12 / 35, side: 0.521, up: 0.179 },
+  { at: 15 / 35, side: 0.54, up: 0.184 },
+  { at: 18 / 35, side: 0.55, up: 0.186 },
+  { at: 21 / 35, side: 0.595, up: 0.18 },
+  { at: 24 / 35, side: 0.669, up: 0.155 },
+  { at: 27 / 35, side: 0.75, up: 0.106 },
+  { at: 30 / 35, side: 0.843, up: 0.059 },
+  { at: 33 / 35, side: 0.941, up: 0.014 },
+  { at: 35 / 35, side: 1, up: 0 },
+]
+
+/** 型の進み (0..1) での腰の横の進みと上がる量 (HANG_SHIMMY_CURVE の間を直線で埋める) */
+function hangShimmyAt(phase: number): { side: number; up: number } {
+  const curve = HANG_SHIMMY_CURVE
+  if (phase <= 0) return curve[0]!
+  for (let i = 1; i < curve.length; i++) {
+    const b = curve[i]!
+    if (phase > b.at) continue
+    const a = curve[i - 1]!
+    const t = (phase - a.at) / (b.at - a.at)
+    return { side: a.side + (b.side - a.side) * t, up: a.up + (b.up - a.up) * t }
+  }
+  return curve[curve.length - 1]!
+}
 /** 横へ移る時に、縁が続いているかを見る縁の内側の深さ (m) */
 const HANG_SHIMMY_INSET = 0.15
 /** 縁が続いていると見なす高さの差 (m)。これより高低があれば縁が切れている */
@@ -2827,9 +2862,11 @@ export class Soldier {
         if (this.stickForward > 0.5) this.beginHangClimb()
         else if (Math.abs(this.stickSide) > 0.5) this.beginHangShimmy(this.stickSide > 0 ? 1 : -1)
       } else if (this.hangStage === 'shimmy') {
-        // 縁に沿って横へ。型の進みに合わせて真っ直ぐ動かす (腰の横の移動は型から捨ててある)
+        // 縁に沿って横へ。**元の型の腰の通りに**、持ち上げて弧を描いて動かす (HANG_SHIMMY_CURVE)
         const phase = animator.oneShotPhase(this.hangShimmySide < 0 ? 'hang_left' : 'hang_right')
-        this.position.lerpVectors(this.hangTo, this.hangShimmyTo, phase)
+        const arc = hangShimmyAt(phase)
+        this.position.lerpVectors(this.hangTo, this.hangShimmyTo, arc.side)
+        this.position.y += arc.up
         this.faceChestTo(Math.atan2(this.hangOutX, this.hangOutZ))
         this.yaw = this.rollYaw
         if (animator.oneShotDone(this.hangShimmySide < 0 ? 'hang_left' : 'hang_right')) {
