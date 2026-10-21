@@ -7,8 +7,8 @@
  *
  *     置く       ステージに猫の置物を置く (decoy と同じ置き方)
  *     効く所     猫の半径 1.5m の円。入ってきた敵は猫に釘付けになる (型 trapped)
- *     止まる     trapped の最後、手を伸ばした姿で 6 秒止まる。終わったら猫は消え、
- *                trapped を逆に流して動けるようになる
+ *     止まる     trapped でしゃがみ込んで手を伸ばし、6 秒猫を撫で続ける (型 TreatCat、本人 2026-10-21)。
+ *                終わったら猫は消え、trapped を逆に流して動けるようになる
  *     効かない   CBOX を被った敵。伏せた敵には効く (伏せの型は無いので同じ型)
  *     壊す       撃ち抜けば猫は消え、円も消える (止まっていた人も解ける)
  *     解ける     止まっている間に撃たれたら解ける
@@ -41,12 +41,19 @@ export const SHOT_HALF = 0.3
 export const SHOT_TOP = 0.4
 
 /**
- * 釘付けの段。**掛かっている (in)・解けて立ち上がっている途中 (out)・どちらでもない (null)。**
+ * 釘付けの段。**しゃがみ込んでいる (in)・撫で続けている (hold)・解けて立ち上がっている途中 (out)・
+ * どちらでもない (null)。**
  * trappedBy は掛けている猫、trapFreeAt は解けた時刻 + IMMUNE_SECONDS (server/world.ts の freeFromTrap)。
  * 的 (bot) の姿をサーバーが決めるのに使う (人の姿は本人の手元が決める)
  */
-export function trapStage(trappedBy: number, trapFreeAt: number, now: number): 'in' | 'out' | null {
-  if (trappedBy !== 0) return 'in'
+export function trapStage(
+  trappedBy: number,
+  trapFreeAt: number,
+  now: number,
+  /** 掛かった時刻 (ms)。しゃがみ込む型 (TRAPPED_CLIP_SECONDS) の後は撫で続ける (hold) */
+  trappedAt = 0,
+): 'in' | 'hold' | 'out' | null {
+  if (trappedBy !== 0) return now - trappedAt < TRAPPED_CLIP_SECONDS * 1000 ? 'in' : 'hold'
   const releasedAt = trapFreeAt - IMMUNE_SECONDS * 1000
   return trapFreeAt > 0 && now >= releasedAt && now - releasedAt < TRAPPED_CLIP_SECONDS * 1000 ? 'out' : null
 }

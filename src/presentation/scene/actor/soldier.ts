@@ -1184,7 +1184,9 @@ export class Soldier {
    * 猫に釘付けになっている段 (domain/item/doll.ts)。in = 手を伸ばして止まっている、
    * out = 解けて型を逆に流している (戻り切るまで動けない)。**掛かるも解けるもサーバーが決める**
    */
-  private trappedStage: 'none' | 'in' | 'out' = 'none'
+  private trappedStage: 'none' | 'in' | 'hold' | 'out' = 'none'
+  /** しゃがみ込み始めてからの経過 (秒)。型の尺を過ぎたら撫で続ける段 (hold) へ */
+  private trappedElapsed = 0
   /** 解けて戻り切るまでの残り (秒) */
   private trappedOutLeft = 0
 
@@ -1199,7 +1201,8 @@ export class Soldier {
    * settled は読み直しの続き (しゃがみ込む動きを飛ばして、手を伸ばした姿から)
    */
   trap(yaw?: number, settled = false): void {
-    if (this.down || this.downed || this.sleepLeft > 0 || this.trappedStage === 'in') return
+    if (this.down || this.downed || this.sleepLeft > 0) return
+    if (this.trappedStage === 'in' || this.trappedStage === 'hold') return
     // 猫のほうへ向き直る (手を伸ばす先が猫になる)
     if (yaw !== undefined) this.yaw = yaw
     this.releaseLadder()
@@ -1207,17 +1210,21 @@ export class Soldier {
     this.crouching = false
     this.proneStage = 'none'
     this.proneShiftLeft = 0
-    this.trappedStage = 'in'
     this.trappedOutLeft = 0
-    this.animator?.playTrapped(settled)
-    this.trappedSettled = settled
+    // 読み直しの続きなら、しゃがみ込む動きを飛ばして撫でている所から
+    if (settled) {
+      this.trappedStage = 'hold'
+      this.animator?.playTrappedHold()
+      return
+    }
+    this.trappedStage = 'in'
+    this.trappedElapsed = 0
+    this.animator?.playTrapped()
   }
-  /** 読み直しの続きで釘付けになった (模型が届いた時に、止まった姿から始め直す) */
-  private trappedSettled = false
 
   /** 解けた (猫が消えた・撃たれた)。**同じ型を逆に流して立ち上がり**、戻り切ったら動ける */
   untrap(): void {
-    if (this.trappedStage !== 'in') return
+    if (this.trappedStage !== 'in' && this.trappedStage !== 'hold') return
     this.trappedStage = 'out'
     this.trappedOutLeft = this.animator?.trappedDuration || 2
     this.animator?.playTrappedOut()
@@ -3643,6 +3650,14 @@ export class Soldier {
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
     if (this.staggerLeft > 0) this.staggerLeft -= dt
+    // しゃがみ込み終えたら、猫を撫で続ける (TreatCat)
+    if (this.trappedStage === 'in') {
+      this.trappedElapsed += dt
+      if (this.trappedElapsed >= (this.animator?.trappedDuration || 2)) {
+        this.trappedStage = 'hold'
+        this.animator?.playTrappedHold()
+      }
+    }
     if (this.trappedStage === 'out') {
       this.trappedOutLeft -= dt
       if (this.trappedOutLeft <= 0) this.trappedStage = 'none'
@@ -4018,7 +4033,8 @@ export class Soldier {
     // 模型が届く前に眠らされていた (読み直しの続き)。寝ている姿から始める
     if (this.sleepLeft > 0) this.animator.playSleep(true)
     // 同じく、釘付けの途中で読み直した。手を伸ばした姿から
-    else if (this.trappedStage === 'in') this.animator.playTrapped(this.trappedSettled)
+    else if (this.trappedStage === 'in') this.animator.playTrapped()
+    else if (this.trappedStage === 'hold') this.animator.playTrappedHold()
 
     disposeTree(this.placeholder)
     this.placeholder = null

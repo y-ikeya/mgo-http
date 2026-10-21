@@ -112,6 +112,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   pat: 'pat',
   // 猫に釘付け / 解けて戻る。同じ型を順に流して止め、戻りは逆に流す (domain/item/doll.ts)
   trapped: 'trapped',
+  trapped_hold: 'treat_cat',
   trapped_out: 'trapped',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
@@ -180,8 +181,9 @@ type UpperState =
   | 'prone_roll_down'
   // 眠っている人を叩く (全身の型)
   | 'pat'
-  // 猫に釘付け / 解けて戻る (全身の型)
+  // 猫に釘付け / 撫で続ける / 解けて戻る (全身の型)
   | 'trapped'
+  | 'trapped_hold'
   | 'trapped_out'
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
@@ -235,6 +237,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   prone_roll_down: 'prone_roll_down',
   pat: 'pat',
   trapped: 'trapped',
+  trapped_hold: 'treat_cat',
   trapped_out: 'trapped',
   // 傾きは上半身も同じ止め絵。構えていても差し替えない (resolveUpperKey)
   lean_left: 'lean',
@@ -844,6 +847,8 @@ const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
 const PAT_KEY = 'pat'
 /** 猫に釘付け (順に流して最後の姿で止める) と、解けて戻る (同じ型を逆に流す) */
 const TRAPPED_KEY = 'trapped'
+/** 釘付けのまま猫を撫で続ける (TreatCat、繰り返し)。しゃがみ込む型の後 */
+const TRAPPED_HOLD_KEY = 'trapped_hold'
 const TRAPPED_OUT_KEY = 'trapped_out'
 /**
  * 叩く型を流す速さ。型 (1.6 秒、叩く 1 回が 0.2 秒) のまま。型が 0.8 秒だった頃は 0.6 倍にしていたが、
@@ -2009,6 +2014,9 @@ export class CharacterAnimator {
       }
       this.trappedDuration = trapped.duration
     }
+    // 撫で続ける型は繰り返す (止まっている 6 秒の間ずっと)
+    const treat = byName.get('treat_cat')
+    if (treat) registerUpper(TRAPPED_HOLD_KEY, treat)
 
     const bump = byName.get('bump')
     if (bump) {
@@ -3277,6 +3285,7 @@ export class CharacterAnimator {
     }
     if (this.upperState === 'pat' && this.upper.has(PAT_KEY)) return PAT_KEY
     if (this.upperState === 'trapped' && this.upper.has(TRAPPED_KEY)) return TRAPPED_KEY
+    if (this.upperState === 'trapped_hold' && this.upper.has(TRAPPED_HOLD_KEY)) return TRAPPED_HOLD_KEY
     if (this.upperState === 'trapped_out' && this.upper.has(TRAPPED_OUT_KEY)) return TRAPPED_OUT_KEY
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
@@ -3643,12 +3652,18 @@ export class CharacterAnimator {
 
   /**
    * 猫に釘付けになる。しゃがみ込んで猫へ手を伸ばし、**伸ばし切った姿で止まる**
-   * (解けるまで。domain/item/doll.ts)。settled なら伸ばし切った姿から (読み直しの続き)
+   * (その後は撫で続ける playTrappedHold。domain/item/doll.ts)
    */
-  playTrapped(settled = false): void {
+  playTrapped(): void {
     this.playWholeBody(TRAPPED_KEY, 'trapped')
-    // 読み直しの続き。しゃがみ込む動きを飛ばして、伸ばし切った姿 (型の終わり) から
-    if (settled) this.skipAhead(this.trappedDuration)
+  }
+
+  /**
+   * しゃがみ込み終えて、手を伸ばした先の猫を撫で続ける (TreatCat、繰り返し)。型の重みが寄って
+   * 繋がるので、しゃがみ込む型の終わりから滑らかに移る
+   */
+  playTrappedHold(): void {
+    this.playWholeBody(TRAPPED_HOLD_KEY, 'trapped_hold')
   }
 
   /** 解けた。**同じ型を逆に流して**立ち上がる */

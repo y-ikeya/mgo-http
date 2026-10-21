@@ -172,6 +172,7 @@ const PLAY_WHOLE_BODY: Record<
   pat: (a) => a.playPat(),
   // 猫に釘付け / 解けて戻る (逆に流す)
   trapped: (a) => a.playTrapped(),
+  trapped_hold: (a) => a.playTrappedHold(),
   trapped_out: (a) => a.playTrappedOut(),
 };
 

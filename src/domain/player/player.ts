@@ -390,6 +390,8 @@ export interface MatchPlayer extends Player {
   patAt: number
   /** 釘付けにしている猫の番号 (server/arms/doll.ts)。0 なら掛かっていない */
   trappedBy: number
+  /** 掛かった時刻 (ms)。しゃがみ込む型の後は撫で続ける姿 (的の姿を決めるのに使う) */
+  trappedAt: number
   /** 体当たりで怯んで足が止まっている終わりの時刻 (ms)。的 (bot) の走りを止めるのに使う */
   staggerUntil: number
   /** この時刻 (ms) まではどの猫にも掛からない。解けた時に決める (domain/item/doll.ts の IMMUNE_SECONDS) */
@@ -476,6 +478,7 @@ export function newMatchPlayer(seed: {
     struggleAt: 0,
     patAt: 0,
     trappedBy: 0,
+    trappedAt: 0,
     trapFreeAt: 0,
     staggerUntil: 0,
     stunReadyAt: 0,

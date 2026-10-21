@@ -159,6 +159,8 @@ export type Locomotion =
    * 伸ばした姿で止まる。trapped_out は同じ型を逆に流して戻る
    */
   | 'trapped'
+  /** 人形に釘付けのまま、手を伸ばした先の猫を撫で続ける (型 TreatCat、繰り返し)。trapped の後 */
+  | 'trapped_hold'
   | 'trapped_out'
   /**
    * 接続が切れて、体だけ残っている姿。

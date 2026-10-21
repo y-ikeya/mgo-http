@@ -343,6 +343,12 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
 
+人形に釘付けのまま猫を撫で続ける型 `treat_cat` (6.57 秒、しゃがんだ姿で始まって終わるので繰り返せる) は本人が落とした
+`tools/raw/TreatCat.fbx` (Ch35 の模型ごと入っていて 140MB)。しゃがみ込む `trapped` の後に流す。腰の前後の揺れは捨てる:
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/treat_cat.json
+    for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb treat_cat.glb treat_cat public/models/$s.glb --rotation-only --in-place; done
+
 ローリングの体当たりで後ろへ倒れる型 `hit2back` (1.93 秒、しゃがみから仰向けへ) は本人が落とした `tools/raw/Hit2Back.fbx`。
 腰が後ろへ 1.25m 動くので、横の移動だけ捨てて (`--in-place`) その場で倒れる型にする。滑るのはサーバーが決める距離 (0.5m):
 

@@ -219,9 +219,9 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
 const LEAN_SWAP_MS = 1500
 
 /** 猫に釘付けの姿 (掛かっている / 立ち上がっている途中)。どちらでもなければ null */
-function trapped(bot: MatchPlayer, now: number): 'trapped' | 'trapped_out' | null {
-  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now)
-  return stage === 'in' ? 'trapped' : stage === 'out' ? 'trapped_out' : null
+function trapped(bot: MatchPlayer, now: number): 'trapped' | 'trapped_hold' | 'trapped_out' | null {
+  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now, bot.trappedAt)
+  return stage === 'in' ? 'trapped' : stage === 'hold' ? 'trapped_hold' : stage === 'out' ? 'trapped_out' : null
 }
 
 /**
