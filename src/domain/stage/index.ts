@@ -52,7 +52,7 @@ export {
   ladderGrip,
 } from './ladder'
 
-export type StageName = 'mall' | 'training' | 'raft' | 'city' | 'lab'
+export type StageName = 'mall' | 'training' | 'raft' | 'city' | 'lab' | 'uu'
 
 /**
  * 地面の上の 1 点。
@@ -358,6 +358,27 @@ const CITY: StageSpec = {
 }
 
 /**
+ * UU (MGO2 の Urban Ultimatum)。**作りかけ** (2026-10-21〜)。本人が Blender で作っている
+ * (tools/raw/stage_uu.blend、下絵は tools/raw/uu_map.jpg)。地上・2F・倉庫の屋上・ビル 3 棟。
+ *
+ * 基地の値は json (meta_base*) と同じ。個人戦の湧き位置は、形ができるまで両基地の 2 点だけ
+ */
+const UU: StageSpec = {
+  name: 'uu',
+  label: 'UU',
+  ambience: 'city_loop1.mp3',
+  bases: {
+    blue: { x: -12.81, z: 31.84 },
+    red: { x: 28.77, z: -15.43 },
+  },
+  solo: [
+    { x: -12.81, z: 31.84 },
+    { x: 28.77, z: -15.43 },
+  ],
+  targets: [],
+}
+
+/**
  * 検証場。**動作を試すための地形** (tools/make_lab.py が白紙から起こす)。
  *
  * 段の列 (0.25 / 0.45 / 0.9 / 1.2 / 1.5)、窓の壁、しゃがみでくぐる通路、
@@ -419,6 +440,7 @@ export const STAGES: Record<StageName, StageSpec> = {
   training: TRAINING,
   raft: RAFT,
   city: CITY,
+  uu: UU,
 }
 
 /**

@@ -213,7 +213,8 @@ const TSNE_ARMORY: Record<Side, Armory> = {
 }
 
 export const ROOMS: Record<RoomName, RoomSpec> = {
-  alpha: { mode: 'DM', stages: only('city') },
+  // UU を作っている間は UU で試す (2026-10-21 本人)。できたら city と交互に回す
+  alpha: { mode: 'DM', stages: only('uu') },
   bravo: { mode: 'TDM', stages: only('city') },
   charlie: { mode: 'TSNE', stages: only('city'), armory: TSNE_ARMORY, lives: 0 },
   delta: {

@@ -1,0 +1,117 @@
+{
+"boxes": [
+{
+"name": "concrete_base_ground",
+"min": [
+-50.0,
+-2.0,
+-50.0
+],
+"max": [
+50.0,
+0.0,
+50.0
+],
+"top": {
+"h": 0.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall2_1F",
+"min": [
+-35.777,
+-0.0,
+-39.227
+],
+"max": [
+38.326,
+3.521,
+39.189
+],
+"top": {
+"h": 3.5209,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_toolbox_blue_boxcol",
+"min": [
+-13.242,
+0.0,
+31.301
+],
+"max": [
+-12.384,
+0.3,
+32.384
+],
+"top": {
+"h": 0.3004,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "wood_toolbox_red_boxcol",
+"min": [
+28.345,
+0.0,
+-15.968
+],
+"max": [
+29.203,
+0.3,
+-14.884
+],
+"top": {
+"h": 0.3004,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+}
+],
+"ladders": [],
+"bases": {
+"blue": {
+"x": -12.81,
+"y": 0.0,
+"z": 31.84
+},
+"red": {
+"x": 28.77,
+"y": 0.0,
+"z": -15.43
+}
+}
+}
