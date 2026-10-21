@@ -132,34 +132,6 @@
 }
 },
 {
-"name": "concrete_stair2",
-"min": [
--3.45,
--0.773,
--2.15
-],
-"max": [
-3.45,
-2.127,
-2.15
-],
-"top": {
-"h": 2.3074,
-"dx": -0.42015,
-"dz": 0.0,
-"riser": 0.19,
-"foot": -0.77,
-"head": 2.32
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "concrete_building1",
 "min": [
 -15.776,
@@ -324,19 +296,19 @@
 {
 "name": "concrete_stair2.001",
 "min": [
--33.804,
+-30.171,
 0.1,
--21.515
+21.813
 ],
 "max": [
--29.504,
+-23.271,
 3.0,
--14.615
+26.113
 ],
 "top": {
 "h": 3.1808,
-"dx": 0.0,
-"dz": -0.42015,
+"dx": -0.42015,
+"dz": 0.0,
 "riser": 0.19,
 "foot": 0.1,
 "head": 3.19
@@ -502,6 +474,84 @@
 "riser": 0.18,
 "foot": 1.55,
 "head": 3.18
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair2.002",
+"min": [
+-33.804,
+0.1,
+-21.515
+],
+"max": [
+-29.504,
+3.0,
+-14.615
+],
+"top": {
+"h": 3.1808,
+"dx": 0.0,
+"dz": -0.42015,
+"riser": 0.19,
+"foot": 0.1,
+"head": 3.19
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_building2",
+"min": [
+0.105,
+2.937,
+21.532
+],
+"max": [
+11.602,
+17.937,
+32.422
+],
+"top": {
+"h": 17.9373,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall1_2F",
+"min": [
+-41.678,
+3.012,
+-47.912
+],
+"max": [
+41.267,
+8.643,
+47.477
+],
+"top": {
+"h": 8.643,
+"dx": 0.0,
+"dz": 0.0
 },
 "flags": {
 "draw": true,
