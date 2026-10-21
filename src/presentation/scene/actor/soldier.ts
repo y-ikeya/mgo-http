@@ -2922,7 +2922,8 @@ export class Soldier {
     this.hangStage = 'shimmy'
     this.hangShimmySide = side
     this.hangShimmyTo.set(this.hangTo.x + dx, this.hangTo.y, this.hangTo.z + dz)
-    this.animator?.playHangShimmy(side)
+    // FAST MOVE が効く (走る速さと同じ倍率)
+    this.animator?.playHangShimmy(side, runnerScale(this.skills))
   }
 
   /** ぶら下がりから登り始める。前 (W) を押したとき */

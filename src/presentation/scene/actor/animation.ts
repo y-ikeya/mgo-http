@@ -811,8 +811,11 @@ const HANG_DROP_KEY = 'hang_drop'
 const HANG_CLIMB_KEY = 'hang_climb'
 /** ぶら下がったまま横へ移る (BracedHangLeft / Right、1.2 秒で 0.58m。腰の横の移動は捨ててある) */
 const HANG_LEFT_KEY = 'hang_left'
-/** 横へ移る型を流す速さ。等倍 (1.2 秒) では遅かった (2026-10-21 本人「もう少し早く」) */
-const HANG_SHIMMY_RATE = 1.5
+/**
+ * 横へ移る型を流す速さ。等倍 (1.2 秒) では遅く、1.5 倍では速すぎた (2026-10-21 本人「1.1 倍くらい」)。
+ * FAST MOVE の倍率はこれに掛ける (playHangShimmy の scale)
+ */
+const HANG_SHIMMY_RATE = 1.1
 const HANG_RIGHT_KEY = 'hang_right'
 const DEATH_KEY = 'death'
 /** 倒れる向き。撃たれた側から見て前か後ろか */
@@ -3519,14 +3522,17 @@ export class CharacterAnimator {
     this.playOneShotWhole(HANG_DROP_KEY, 'hang_drop')
   }
 
-  /** ぶら下がったまま横へ移る。終わったら endHang で待つ姿へ戻す */
-  playHangShimmy(side: -1 | 1): void {
+  /**
+   * ぶら下がったまま横へ移る。終わったら endHang で待つ姿へ戻す。scale は FAST MOVE の倍率
+   * (相手の画面では分からないので 1)
+   */
+  playHangShimmy(side: -1 | 1, scale = 1): void {
     const key = side < 0 ? HANG_LEFT_KEY : HANG_RIGHT_KEY
     const name = side < 0 ? 'hang_left' : 'hang_right'
     this.playOneShotWhole(key, name)
     // 速めて流す。位置は型の進み (oneShotPhase) に合わせて動くので、移る速さも同じだけ上がる
-    this.upper.get(key)?.setEffectiveTimeScale(HANG_SHIMMY_RATE)
-    this.lower.get(name)?.setEffectiveTimeScale(HANG_SHIMMY_RATE)
+    this.upper.get(key)?.setEffectiveTimeScale(HANG_SHIMMY_RATE * scale)
+    this.lower.get(name)?.setEffectiveTimeScale(HANG_SHIMMY_RATE * scale)
   }
 
   /** ぶら下がりから縁の上へ登る。終わればしゃがみの型へ渡る */
