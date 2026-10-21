@@ -30,7 +30,8 @@ import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { clearClaymores } from './arms/claymore'
 import { clearDolls } from './arms/doll'
-import { trapStage } from '../src/domain/item/doll'
+import { TRAP_APPROACH_SECONDS, TRAP_REACH, trapStage } from '../src/domain/item/doll'
+import { WALK_TOP_SPEED } from '../src/domain/player/locomotion'
 import { clearDecoys } from './arms/decoy'
 import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
@@ -166,6 +167,7 @@ export function updateTargets(room: RoomWorld, now: number): void {
     }
 
     patrol(bot, now)
+    approachDoll(room, bot, now)
 
     if (isDowned(bot.life) && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
       reviveBot(bot, now)
@@ -218,9 +220,31 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
 /** lean し続ける的が左右を入れ替える間隔 (ms) */
 const LEAN_SWAP_MS = 1500
 
-/** 猫に釘付けの姿 (掛かっている / 立ち上がっている途中)。どちらでもなければ null */
-function trapped(bot: MatchPlayer, now: number): 'trapped' | 'trapped_hold' | 'trapped_out' | null {
-  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now, bot.trappedAt)
+/**
+ * 人形に掛かった的を、猫のほうへ歩かせる (手の届く所 TRAP_REACH まで、長くて TRAP_APPROACH_SECONDS)。
+ * 着いたらしゃがみ込み始める (trapCrouchAt)。人は本人の手元が歩く
+ */
+function approachDoll(room: RoomWorld, bot: MatchPlayer, now: number): void {
+  if (bot.trappedBy === 0 || bot.trapCrouchAt !== 0) return
+  const doll = room.dolls.find((d) => d.id === bot.trappedBy)
+  const dx = doll ? doll.x - bot.x : 0
+  const dz = doll ? doll.z - bot.z : 0
+  const distance = Math.hypot(dx, dz)
+  if (!doll || distance <= TRAP_REACH || now - bot.trappedAt >= TRAP_APPROACH_SECONDS * 1000) {
+    bot.trapCrouchAt = now
+    return
+  }
+  const step = Math.min(distance - TRAP_REACH, WALK_TOP_SPEED * TICK_SECONDS)
+  bot.x += (dx / distance) * step
+  bot.z += (dz / distance) * step
+  // 猫のほうを向いて歩く (向き 0 で -Z を向く)
+  bot.yaw = Math.atan2(-dx, -dz)
+}
+
+/** 猫に釘付けの姿 (寄っている / しゃがみ込む / 撫でる / 立ち上がる)。どれでもなければ null */
+function trapped(bot: MatchPlayer, now: number): 'walk' | 'trapped' | 'trapped_hold' | 'trapped_out' | null {
+  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now, bot.trapCrouchAt)
+  if (stage === 'approach') return 'walk'
   return stage === 'in' ? 'trapped' : stage === 'hold' ? 'trapped_hold' : stage === 'out' ? 'trapped_out' : null
 }
 

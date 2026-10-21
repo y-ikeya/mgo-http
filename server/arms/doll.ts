@@ -135,6 +135,7 @@ export function updateDolls(room: RoomWorld, now: number): void {
     for (const victim of victims) {
       victim.trappedBy = doll.id
       victim.trappedAt = now
+      victim.trapCrouchAt = 0
       // 的 (bot) は猫のほうへ向き直らせる。人は本人の手元が向き直り、その向きが届く
       // yaw θ で正面が (-sinθ, -cosθ)
       if (victim.bot) victim.yaw = Math.atan2(victim.x - doll.x, victim.z - doll.z)

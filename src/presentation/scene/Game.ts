@@ -2597,7 +2597,7 @@ export class Game {
         // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
         const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
         if (asleep > 0) this.player.sleep(asleep, true);
-        // 人形に釘付けの途中で読み直した。**しゃがみ込む動きは飛ばして**手を伸ばした姿から続ける
+        // 人形に釘付けの途中で読み直した。**寄る・しゃがみ込む動きは飛ばして**撫でている所から続ける
         else if (message.trapped) this.player.trap(undefined, true);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
@@ -2859,7 +2859,8 @@ export class Game {
         if (message.victims.includes(this.net.id)) {
           const p = this.player.position;
           // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
-          this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined);
+          // 猫のほうへ歩いて寄ってからしゃがみ込む (猫の足元を渡す)
+          this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined, false, doll ?? undefined);
         }
         // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
         for (const id of message.victims) {

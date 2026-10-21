@@ -8,7 +8,7 @@ import {
   ladderAt,
   ladderGrip,
 } from '../../../domain/stage'
-import { TRAPPED_CROUCH_SECONDS } from '../../../domain/item/doll'
+import { TRAPPED_CROUCH_SECONDS, TRAP_APPROACH_SECONDS, TRAP_REACH } from '../../../domain/item/doll'
 import {
   BOX_BUMP_STUN,
   KNOCK_DISTANCE,
@@ -1195,7 +1195,13 @@ export class Soldier {
    * 猫に釘付けになっている段 (domain/item/doll.ts)。in = 手を伸ばして止まっている、
    * out = 解けて型を逆に流している (戻り切るまで動けない)。**掛かるも解けるもサーバーが決める**
    */
-  private trappedStage: 'none' | 'in' | 'hold' | 'out' = 'none'
+  private trappedStage: 'none' | 'approach' | 'in' | 'hold' | 'out' = 'none'
+  /** 寄っていく猫の足元。approach の間だけ使う */
+  private readonly trapCat = new THREE.Vector3()
+  /** 寄る残り (秒)。尽きたら寄り切らなくてもしゃがみ込む (TRAP_APPROACH_SECONDS) */
+  private trapApproachLeft = 0
+  /** 寄る時に渡す入力 (猫の向き × 歩きの倒し具合) */
+  private readonly trapApproachMove = new THREE.Vector3()
   /** しゃがみ込み始めてからの経過 (秒)。型の尺を過ぎたら撫で続ける段 (hold) へ */
   private trappedElapsed = 0
   /** 解けて戻り切るまでの残り (秒) */
@@ -1207,13 +1213,13 @@ export class Soldier {
   }
 
   /**
-   * 猫に釘付けになった。**その場でしゃがみ込み、猫へ手を伸ばして止まる。**
-   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く。yaw は猫のほうの向き。
-   * settled は読み直しの続き (しゃがみ込む動きを飛ばして、手を伸ばした姿から)
+   * 猫に釘付けになった。**猫のほうへ 2 歩ほど歩いて寄り、しゃがみ込んで撫で続ける。**
+   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く。yaw は猫のほうの向き、cat は猫の足元
+   * (無ければその場でしゃがみ込む)。settled は読み直しの続き (撫でている所から)
    */
-  trap(yaw?: number, settled = false): void {
+  trap(yaw?: number, settled = false, cat?: THREE.Vector3): void {
     if (this.down || this.downed || this.sleepLeft > 0) return
-    if (this.trappedStage === 'in' || this.trappedStage === 'hold') return
+    if (this.trappedStage === 'approach' || this.trappedStage === 'in' || this.trappedStage === 'hold') return
     // 猫のほうへ向き直る (手を伸ばす先が猫になる)
     if (yaw !== undefined) this.yaw = yaw
     this.releaseLadder()
@@ -1228,6 +1234,21 @@ export class Soldier {
       this.animator?.playTrappedHold()
       return
     }
+    // まず猫のほうへ寄る (手の届く所まで)。もう届く所に居ればすぐしゃがみ込む
+    if (cat && Math.hypot(cat.x - this.position.x, cat.z - this.position.z) > TRAP_REACH) {
+      this.trappedStage = 'approach'
+      this.trapCat.copy(cat)
+      this.trapApproachLeft = TRAP_APPROACH_SECONDS
+      return
+    }
+    this.beginTrapCrouch()
+  }
+
+  /** 寄り終えた (または寄れなかった)。猫のほうを向いてしゃがみ込み始める */
+  private beginTrapCrouch(): void {
+    if (this.trappedStage === 'approach') {
+      this.yaw = Math.atan2(this.position.x - this.trapCat.x, this.position.z - this.trapCat.z)
+    }
     this.trappedStage = 'in'
     this.trappedElapsed = 0
     this.animator?.playTrapped()
@@ -1235,6 +1256,11 @@ export class Soldier {
 
   /** 解けた (猫が消えた・撃たれた)。**同じ型を逆に流して立ち上がり**、戻り切ったら動ける */
   untrap(): void {
+    // 寄っている途中ならまだしゃがんでいない。立ち上がる型は要らない
+    if (this.trappedStage === 'approach') {
+      this.trappedStage = 'none'
+      return
+    }
     if (this.trappedStage !== 'in' && this.trappedStage !== 'hold') return
     this.trappedStage = 'out'
     // しゃがみ込み終えた所から逆に流す (手を伸ばす所は通らない)
@@ -3348,8 +3374,21 @@ export class Soldier {
     // 速さを 0 にするだけだと、体は動かないのに向きだけ入力どおりに変わる
     if (this.bumpLeft > 0) moveDir = ZERO_MOVE
     if (this.sleepLeft > 0) moveDir = ZERO_MOVE
-    // 猫に釘付けの間も (戻り切るまで)
-    if (this.trappedStage !== 'none') moveDir = ZERO_MOVE
+    // 猫に釘付けの間も (戻り切るまで)。**寄っている間だけは猫のほうへ歩く** (入力の代わり)
+    if (this.trappedStage === 'approach') {
+      const dx = this.trapCat.x - this.position.x
+      const dz = this.trapCat.z - this.position.z
+      const distance = Math.hypot(dx, dz)
+      if (distance <= TRAP_REACH || this.trapApproachLeft <= 0) {
+        this.beginTrapCrouch()
+        moveDir = ZERO_MOVE
+      } else {
+        // 歩きの倒し具合 (WALK_STICK の少し手前) で渡す。普段の歩きの型・速さ・当たりがそのまま効く
+        moveDir = this.trapApproachMove.set((dx / distance) * WALK_STICK * 0.95, 0, (dz / distance) * WALK_STICK * 0.95)
+      }
+    } else if (this.trappedStage !== 'none') {
+      moveDir = ZERO_MOVE
+    }
     // 体当たりで怯んでいる間も
     if (this.staggerLeft > 0) moveDir = ZERO_MOVE
 
@@ -3433,7 +3472,7 @@ export class Soldier {
       this.currentSpeed = 0
     }
     // 眠っている間・猫に釘付けの間は動かない。**慣性も残さない**
-    if (this.sleepLeft > 0 || this.trappedStage !== 'none') {
+    if (this.sleepLeft > 0 || (this.trappedStage !== 'none' && this.trappedStage !== 'approach')) {
       targetSpeed = 0
       this.currentSpeed = 0
     }
@@ -3717,6 +3756,7 @@ export class Soldier {
     if (this.sleepLeft > 0) this.sleepLeft -= dt
     if (this.staggerLeft > 0) this.staggerLeft -= dt
     // しゃがみ込み終えたら、猫を撫で続ける (TreatCat)
+    if (this.trappedStage === 'approach') this.trapApproachLeft -= dt
     if (this.trappedStage === 'in') {
       this.trappedElapsed += dt
       // 型の終わり (手を前へ伸ばす) までは流さず、しゃがみ込み終えた所で移る
@@ -4329,7 +4369,8 @@ export class Soldier {
       lean: this.lean,
       setting: this.animator?.setupLocomotion ?? null,
       patting: this.animator?.patting ?? false,
-      trapped: this.trappedStage === 'none' ? null : this.trappedStage,
+      // 寄っている間は普段の歩き (型も歩き)
+      trapped: this.trappedStage === 'none' || this.trappedStage === 'approach' ? null : this.trappedStage,
       rolling: this.rolling,
       vaulting: this.vaulting,
       vaultingUp: this.vaultingUp,
