@@ -2621,6 +2621,34 @@ export class Soldier {
     return this.hangStage !== 'none'
   }
 
+  /**
+   * 読み直しの続きで、縁にぶら下がっていた。**次の update で縁を探して掴み直す** (地形はそこで届く)。
+   * yaw は体の向き (壁向き)
+   */
+  resumeHang(yaw: number): void {
+    this.pendingHangYaw = yaw
+  }
+  private pendingHangYaw: number | null = null
+
+  /**
+   * ぶら下がりの位置と向きから縁を割り出して掴み直す。掴む処理 (beginHang) で縁の点と壁の向きを
+   * 測り直し、落ちて掴む型は飛ばして待つ姿にする。縁が見つからなければ何もしない (落ちる)
+   */
+  private regrabHang(yaw: number): void {
+    // 壁向きの体の外向き = 正面の逆。yaw θ で正面は (-sinθ, -cosθ)
+    const outX = Math.sin(yaw)
+    const outZ = Math.cos(yaw)
+    const top = this.position.y + HANG_FEET_BELOW
+    const edge = this.vaultProbe.set(this.position.x - outX * HANG_OUT, top, this.position.z - outZ * HANG_OUT)
+    this.beginHang(edge.clone(), new THREE.Vector3(outX, 0, outZ))
+    if (this.hangStage !== 'drop') return
+    this.hangStage = 'hang'
+    this.position.copy(this.hangTo)
+    this.rollYaw = yaw
+    this.yaw = yaw
+    this.animator?.endHang()
+  }
+
   /** ぶら下がりから手を離す。そのまま落ちる (落下の処理は普段のまま) */
   releaseHang(): void {
     if (this.hangStage === 'none' || this.hangStage === 'climb') return
@@ -3374,6 +3402,11 @@ export class Soldier {
   ): void {
     this.aimPitch = aimPitch
     this.lastWorld = world
+    // 読み直しの続きでぶら下がっていた。地形が届いた所で掴み直す
+    if (this.pendingHangYaw !== null) {
+      this.regrabHang(this.pendingHangYaw)
+      this.pendingHangYaw = null
+    }
     this.blob.set(this.isProne ? 'prone' : this.isCrouching ? 'crouch' : 'stand')
     this.blob.update(dt)
     this.stepStealthFade(dt)

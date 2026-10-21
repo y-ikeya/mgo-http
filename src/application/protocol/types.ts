@@ -796,6 +796,12 @@ export interface ResumeMessage {
    * 解けるのは今まで通り dollGone / trapReleased で知らせる
    */
   trapped: boolean
+  /**
+   * 縁にぶら下がっていたか。**返さないと、読み直すと宙から落ちた** (本人 2026-10-21)。
+   * 手元は yaw (体の向き = 壁向き) から縁を探して掴み直す
+   */
+  hanging: boolean
+  yaw: number
 }
 
 /**

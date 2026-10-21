@@ -2599,6 +2599,8 @@ export class Game {
         if (asleep > 0) this.player.sleep(asleep, true);
         // 人形に釘付けの途中で読み直した。**寄る・しゃがみ込む動きは飛ばして**撫でている所から続ける
         else if (message.trapped) this.player.trap(undefined, true);
+        // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
+        else if (message.hanging) this.player.resumeHang(message.yaw);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
