@@ -51,6 +51,109 @@
 }
 },
 {
+"name": "concrete_stair1_a",
+"min": [
+-12.7,
+0.1,
+30.9
+],
+"max": [
+-6.2,
+1.55,
+34.9
+],
+"top": {
+"h": 1.55,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_floor_stair1_landing",
+"min": [
+-12.7,
+0.1,
+27.3
+],
+"max": [
+-6.2,
+1.55,
+30.9
+],
+"top": {
+"h": 1.55,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair1_b",
+"min": [
+-12.7,
+0.1,
+23.7
+],
+"max": [
+-6.2,
+3.0,
+27.3
+],
+"top": {
+"h": 3.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair2",
+"min": [
+-30.3,
+0.1,
+21.7
+],
+"max": [
+-23.4,
+3.0,
+26.0
+],
+"top": {
+"h": 3.121,
+"dx": -0.40585,
+"dz": 0.0,
+"riser": 0.24,
+"foot": 0.1,
+"head": 3.24
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,

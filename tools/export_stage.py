@@ -298,6 +298,12 @@ def place_toolboxes():
     with bpy.data.libraries.load(TOOLBOX_BLEND, link=False) as (src, dst):
         dst.objects = ['wood_toolbox']
     template = dst.objects[0]
+    # **隠した物も床として見る。** scene.ray_cast は画面で隠した物 (目のアイコンを閉じた物) を
+    # 素通りする。作業中に地面を隠したまま書き出すと、床が見つからず工具箱が印の高さ (宙) に
+    # 置かれた (UU、2026-10-21)。ここは書き出し用に読んだ複製なので、出しても .blend は変わらない
+    for obj in bpy.context.scene.objects:
+        if obj.hide_get():
+            obj.hide_set(False)
     depsgraph = bpy.context.evaluated_depsgraph_get()
     for marker in markers:
         at = marker.matrix_world.translation.copy()
