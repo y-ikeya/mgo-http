@@ -51,34 +51,6 @@
 }
 },
 {
-"name": "concrete_stair1_a",
-"min": [
--12.7,
-0.1,
-30.9
-],
-"max": [
--6.2,
-1.55,
-34.9
-],
-"top": {
-"h": 1.7588,
-"dx": 0.0,
-"dz": -0.35904,
-"riser": 0.24,
-"foot": 0.1,
-"head": 1.79
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true
-}
-},
-{
 "name": "concrete_floor_stair1_landing",
 "min": [
 -12.7,
@@ -104,6 +76,34 @@
 }
 },
 {
+"name": "concrete_stair1_a",
+"min": [
+-12.7,
+0.1,
+30.9
+],
+"max": [
+-6.2,
+1.55,
+34.9
+],
+"top": {
+"h": 1.681,
+"dx": 0.0,
+"dz": -0.34425,
+"riser": 0.18,
+"foot": 0.1,
+"head": 1.73
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "concrete_stair1_b",
 "min": [
 -12.7,
@@ -116,12 +116,12 @@
 27.3
 ],
 "top": {
-"h": 3.1328,
+"h": 3.1602,
 "dx": 0.0,
-"dz": -0.35724,
-"riser": 0.24,
+"dz": -0.39141,
+"riser": 0.18,
 "foot": 1.55,
-"head": 3.24
+"head": 3.18
 },
 "flags": {
 "draw": true,
@@ -144,12 +144,12 @@
 26.0
 ],
 "top": {
-"h": 3.121,
-"dx": -0.40585,
+"h": 3.1629,
+"dx": -0.41147,
 "dz": 0.0,
-"riser": 0.24,
-"foot": 0.1,
-"head": 3.24
+"riser": 0.19,
+"foot": 0.3,
+"head": 3.19
 },
 "flags": {
 "draw": true,
