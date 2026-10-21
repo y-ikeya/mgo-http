@@ -134,22 +134,22 @@
 {
 "name": "concrete_stair2",
 "min": [
--30.3,
-0.1,
-21.7
+-3.45,
+-0.773,
+-2.15
 ],
 "max": [
--23.4,
-3.0,
-26.0
+3.45,
+2.127,
+2.15
 ],
 "top": {
-"h": 3.1808,
+"h": 2.3074,
 "dx": -0.42015,
 "dz": 0.0,
 "riser": 0.19,
-"foot": 0.1,
-"head": 3.19
+"foot": -0.77,
+"head": 2.32
 },
 "flags": {
 "draw": true,
@@ -312,6 +312,196 @@
 "riser": 0.19,
 "foot": 0.1,
 "head": 3.19
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair2.001",
+"min": [
+-33.804,
+0.1,
+-21.515
+],
+"max": [
+-29.504,
+3.0,
+-14.615
+],
+"top": {
+"h": 3.1808,
+"dx": 0.0,
+"dz": -0.42015,
+"riser": 0.19,
+"foot": 0.1,
+"head": 3.19
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair6_a",
+"min": [
+23.97,
+0.1,
+8.29
+],
+"max": [
+27.2,
+1.55,
+12.83
+],
+"top": {
+"h": 1.6722,
+"dx": -0.42695,
+"dz": 0.0,
+"riser": 0.18,
+"foot": 0.1,
+"head": 1.73
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_floor_stair6_landing",
+"min": [
+21.77,
+0.1,
+8.29
+],
+"max": [
+23.97,
+1.55,
+12.83
+],
+"top": {
+"h": 1.55,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair6_b",
+"min": [
+18.57,
+0.1,
+8.29
+],
+"max": [
+21.77,
+3.0,
+12.83
+],
+"top": {
+"h": 3.1286,
+"dx": -0.43064,
+"dz": 0.0,
+"riser": 0.18,
+"foot": 1.55,
+"head": 3.18
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair7_a",
+"min": [
+13.6,
+0.1,
+-41.8
+],
+"max": [
+18.04,
+1.55,
+-39.2
+],
+"top": {
+"h": 1.6699,
+"dx": -0.30914,
+"dz": 0.0,
+"riser": 0.18,
+"foot": 0.1,
+"head": 1.73
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_floor_stair7_landing",
+"min": [
+11.8,
+0.1,
+-41.8
+],
+"max": [
+13.6,
+1.55,
+-36.75
+],
+"top": {
+"h": 1.55,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair7_b",
+"min": [
+13.6,
+0.1,
+-39.2
+],
+"max": [
+18.04,
+3.0,
+-36.75
+],
+"top": {
+"h": 1.7527,
+"dx": 0.30898,
+"dz": 0.0,
+"riser": 0.18,
+"foot": 1.55,
+"head": 3.18
 },
 "flags": {
 "draw": true,
