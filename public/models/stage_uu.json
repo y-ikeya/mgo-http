@@ -160,6 +160,31 @@
 }
 },
 {
+"name": "concrete_building1",
+"min": [
+-15.776,
+2.933,
+8.353
+],
+"max": [
+-3.701,
+14.933,
+19.574
+],
+"top": {
+"h": 14.9326,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
