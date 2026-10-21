@@ -63,8 +63,9 @@ def is_sandbag(name):
     return 'sand_bag' in name.lower()
 
 
-# 階段を何本の帯に割って上端を拾うか
+# 階段を何本の帯に割って上端を拾うか (最低)。帯の幅は STAIR_BIN_MAX (m) 以下にする
 STAIR_BINS = 12
+STAIR_BIN_MAX = 0.15
 
 
 def stair_plane(pts, lo, hi):
@@ -85,14 +86,18 @@ def stair_plane(pts, lo, hi):
         span = hi[axis] - lo[axis]
         if span < 0.5:
             return None
+        # **帯は段の奥行きより細かく。** 12 本で固定していた頃、長い階段 (UU の stair2、6.9m) では
+        # 帯 1 本 (0.58m) に段が 2 つ入り、一番低い帯の上端が 2 段目になって「下の床」を 1 段高く
+        # 見積もった。坂の板が地面から浮いて始まり、手前の端に足が掛かって上れなかった (2026-10-21)
+        bins = max(STAIR_BINS, int(math.ceil(span / STAIR_BIN_MAX)))
         tops = {}
         for x, y, z in pts:
-            i = min(STAIR_BINS - 1, int(((x if axis == 0 else z) - lo[axis]) / span * STAIR_BINS))
+            i = min(bins - 1, int(((x if axis == 0 else z) - lo[axis]) / span * bins))
             tops[i] = max(tops.get(i, -1e9), y)
         if len(tops) < 3:
             return None
         n = len(tops)
-        cs = [lo[axis] + (i + 0.5) / STAIR_BINS * span for i in tops]
+        cs = [lo[axis] + (i + 0.5) / bins * span for i in tops]
         ys = list(tops.values())
         mean_c = sum(cs) / n
         mean_y = sum(ys) / n
