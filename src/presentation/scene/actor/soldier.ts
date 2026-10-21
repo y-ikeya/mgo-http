@@ -257,10 +257,14 @@ const HARD_LAND_TIME = 2.03
 /**
  * 軽い着地 (jump_down、膝を曲げる) を出しておく時間 (秒)。
  *
- * クリップは 0.67 秒あるが、全部流すと着地のたびに膝を曲げた時間が長く残る。
- * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
+ * 型は Landing の脚 (足が着く 12 コマ目から、膝を曲げて沈み、立ち姿に戻る 34 コマ目まで)。
+ * 0.16 秒だった頃は短すぎて着地が見えなかった (2026-10-21 本人「着地のモーションが消えた？」)。
+ * **歩き出していれば沈む所 (LANDING_MOVING_HOLD) だけで切り上げる** — 長いまま歩くと、脚を
+ * 曲げたまま滑って見える
  */
-const LANDING_TIME = 0.16
+const LANDING_TIME = (34 - 12) / 30
+/** 着地の後に歩き出していたら、ここまでで着地の型を切り上げる (秒)。膝が一番沈む所の少し後 */
+const LANDING_MOVING_HOLD = 0.25
 /**
  * 軽い着地の型を出す落下速度の下限 (m/s)。2m (8.4 m/s) から。
  *
@@ -3910,6 +3914,10 @@ export class Soldier {
     this.landedSpeed = moved.landed ? moved.impactSpeed : 0
     if (this.hardLandTimer > 0) this.hardLandTimer -= dt
     if (this.landingTimer > 0) this.landingTimer -= dt
+    // 歩き出していたら、沈む所を見せた後は着地の型を切り上げる
+    if (this.landingTimer > 0 && moveDir.lengthSq() > 0.01 && LANDING_TIME - this.landingTimer > LANDING_MOVING_HOLD) {
+      this.landingTimer = 0
+    }
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
     if (this.staggerLeft > 0) this.staggerLeft -= dt

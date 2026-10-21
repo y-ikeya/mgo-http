@@ -143,7 +143,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   sleep: 'sleep',
   jump_up: 'jump_up',
   jump_loop: 'jump_loop',
-  jump_down: 'jump_down',
+  // 軽い着地は Landing の**脚だけ** (本人 2026-10-21「着地部分の leg だけ参考に」)。上半身は走りの腕のまま
+  jump_down: 'landing',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, `run_${d}`],
@@ -1121,6 +1122,8 @@ const JUMP_BLEND_LAMBDA = 30
 
 /** ジャンプの 3 局面。ブレンドを速める判定に使う */
 const JUMP_STATES = new Set<Locomotion>(['jump_up', 'jump_loop', 'jump_down'])
+/** 軽い着地の型 (Landing、30fps) で足が着くコマ (12 コマ目) の時刻 (秒) */
+const LANDING_TOUCHDOWN = 11 / 30
 const UPPER_BLEND_LAMBDA = 16
 /** 釘付けの姿の間を繋ぐ速さ。普段 (12 / 16) の半分以下 — 0.6 秒ほどかけて寄せる */
 const TRAP_BLEND_LAMBDA = 5
@@ -3760,11 +3763,15 @@ export class CharacterAnimator {
     this.locomotion = state
   }
 
-  /** 着地のモーション。頭から流す */
+  /**
+   * 着地のモーション。**足が着いた所 (LANDING_TOUCHDOWN) から流す** — Landing の頭 12 コマは空中で
+   * 落ちてくる所なので使わない。膝を曲げて沈み、立ち姿に戻るまで
+   */
   playLanding(): void {
     const action = this.lower.get('jump_down')
     if (!action) return
     action.reset().play()
+    action.time = Math.min(LANDING_TOUCHDOWN, action.getClip().duration)
     this.locomotion = 'jump_down'
   }
 

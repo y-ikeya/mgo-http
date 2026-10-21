@@ -343,6 +343,12 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
 
+軽い着地の脚 `landing` (2.07 秒。頭 12 コマは空中、12 コマ目で足が着き、16 コマ目で一番沈み、34 コマ目で立つ) は本人が
+落とした `tools/raw/Landing.fbx`。**脚だけ使う** (jump_down の下半身。上半身は走りの腕のまま)。足が着く所から流す:
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/landing.json
+    for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb landing.glb landing public/models/$s.glb --rotation-only --in-place; done
+
 縁にぶら下がったまま横へ移る型 `hang_left` / `hang_right` (1.2 秒で 0.58m) は本人が落とした `tools/raw/BracedHangLeft.fbx` /
 `BracedHangRight.fbx`。腰の横の移動は捨てて、位置は soldier が縁に沿って動かす (縁が切れていれば移らない):
 
