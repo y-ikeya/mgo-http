@@ -1994,6 +1994,111 @@
 }
 },
 {
+"name": "col_metal_handrail1_nobullet_noeye_nocamera",
+"min": [
+3.879,
+3.9,
+-29.613
+],
+"max": [
+14.377,
+4.95,
+-29.285
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail2_nobullet_noeye_nocamera",
+"min": [
+3.799,
+3.9,
+-29.574
+],
+"max": [
+3.92,
+4.95,
+-13.81
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail3_nobullet_noeye_nocamera",
+"min": [
+0.118,
+3.9,
+-13.87
+],
+"max": [
+3.839,
+4.95,
+-13.77
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_handrail_notexture",
+"min": [
+0.096,
+3.9,
+-29.595
+],
+"max": [
+14.398,
+4.97,
+-13.788
+],
+"top": {
+"h": 4.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
