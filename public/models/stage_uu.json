@@ -591,7 +591,7 @@
 "min": [
 9.536,
 3.848,
--32.394
+-34.109
 ],
 "max": [
 25.137,
@@ -723,11 +723,11 @@
 ],
 "max": [
 -4.914,
-9.9,
+9.294,
 2.645
 ],
 "top": {
-"h": 9.9,
+"h": 9.2941,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -819,12 +819,12 @@
 "min": [
 11.462,
 13.019,
--3.086
+-3.122
 ],
 "max": [
 11.589,
 19.825,
--1.629
+-1.166
 ],
 "top": {
 "h": 19.8249,
@@ -1065,6 +1065,331 @@
 }
 },
 {
+"name": "metal_laddercover1.002",
+"min": [
+11.453,
+13.019,
+-1.247
+],
+"max": [
+13.41,
+19.825,
+-1.12
+],
+"top": {
+"h": 19.8249,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_ladder_9",
+"min": [
+21.325,
+3.9,
+-33.542
+],
+"max": [
+21.365,
+20.178,
+-32.824
+],
+"top": {
+"h": 20.178,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_ladder_10",
+"min": [
+29.497,
+0.1,
+29.375
+],
+"max": [
+29.537,
+4.23,
+30.093
+],
+"top": {
+"h": 4.23,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "vis_metal_laddertop1_noeye",
+"min": [
+35.256,
+4.21,
+-16.408
+],
+"max": [
+35.296,
+4.95,
+-15.69
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop10_noeye",
+"min": [
+29.497,
+4.21,
+29.375
+],
+"max": [
+29.537,
+4.95,
+30.093
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop2_noeye",
+"min": [
+-35.009,
+17.317,
+19.868
+],
+"max": [
+-34.291,
+18.057,
+19.908
+],
+"top": {
+"h": 18.057,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop3_noeye",
+"min": [
+-21.965,
+17.317,
+2.439
+],
+"max": [
+-21.247,
+18.057,
+2.479
+],
+"top": {
+"h": 18.057,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop4_noeye",
+"min": [
+-6.172,
+10.21,
+-20.515
+],
+"max": [
+-6.132,
+10.95,
+-19.797
+],
+"top": {
+"h": 10.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop5_noeye",
+"min": [
+13.646,
+11.483,
+-2.397
+],
+"max": [
+13.686,
+12.223,
+-1.679
+],
+"top": {
+"h": 12.223,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop6_noeye",
+"min": [
+12.126,
+20.158,
+-3.146
+],
+"max": [
+12.844,
+20.898,
+-3.106
+],
+"top": {
+"h": 20.898,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop7_noeye",
+"min": [
+26.176,
+12.137,
+-14.026
+],
+"max": [
+26.216,
+12.877,
+-13.308
+],
+"top": {
+"h": 12.877,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop8_noeye",
+"min": [
+25.168,
+20.158,
+-21.699
+],
+"max": [
+25.208,
+20.898,
+-20.981
+],
+"top": {
+"h": 20.898,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
+"name": "vis_metal_laddertop9_noeye",
+"min": [
+21.325,
+20.158,
+-33.542
+],
+"max": [
+21.365,
+20.898,
+-32.824
+],
+"top": {
+"h": 20.898,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
@@ -1232,6 +1557,36 @@
 25.208,
 20.178,
 -20.981
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_9",
+"min": [
+21.325,
+3.9,
+-33.542
+],
+"max": [
+21.365,
+20.178,
+-32.824
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_10",
+"min": [
+29.497,
+0.1,
+29.375
+],
+"max": [
+29.537,
+4.23,
+30.093
 ],
 "axis": "x",
 "parts": 1
