@@ -3502,7 +3502,6 @@ export class Soldier {
       this.pendingHangYaw = null
     }
     this.blob.set(this.isProne ? 'prone' : this.isCrouching ? 'crouch' : 'stand')
-    this.blob.lifted = this.onLadder || this.hanging
     this.blob.update(dt)
     this.stepStealthFade(dt)
 
