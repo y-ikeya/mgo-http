@@ -1968,6 +1968,32 @@
 }
 },
 {
+"name": "defaultMaterial.003",
+"min": [
+18.33,
+0.1,
+0.779
+],
+"max": [
+20.33,
+1.663,
+2.126
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
