@@ -2519,6 +2519,58 @@
 }
 },
 {
+"name": "Box001_Material #0_0.002",
+"min": [
+-18.357,
+3.84,
+-28.44
+],
+"max": [
+-16.066,
+6.331,
+-23.744
+],
+"top": {
+"h": 6.3306,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.004",
+"min": [
+-26.112,
+3.865,
+-28.978
+],
+"max": [
+-24.112,
+5.428,
+-27.632
+],
+"top": {
+"h": 5.4275,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
