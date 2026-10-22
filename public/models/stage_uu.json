@@ -2099,6 +2099,189 @@
 }
 },
 {
+"name": "col_metal_handrail4_nobullet_noeye_nocamera",
+"min": [
+3.794,
+3.9,
+2.001
+],
+"max": [
+9.053,
+4.95,
+2.097
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail5_nobullet_noeye_nocamera",
+"min": [
+0.035,
+3.9,
+-11.603
+],
+"max": [
+3.828,
+4.95,
+-11.504
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail6_nobullet_noeye_nocamera",
+"min": [
+3.754,
+3.9,
+-11.544
+],
+"max": [
+3.867,
+4.95,
+2.041
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail7_nobullet_noeye_nocamera",
+"min": [
+11.897,
+3.9,
+2.025
+],
+"max": [
+23.372,
+4.95,
+2.141
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail8_nobullet_noeye_nocamera",
+"min": [
+9.0,
+3.9,
+2.057
+],
+"max": [
+9.093,
+4.95,
+6.754
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail9_nobullet_noeye_nocamera",
+"min": [
+11.831,
+3.9,
+2.065
+],
+"max": [
+11.937,
+4.95,
+6.783
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_handrail2_notexture",
+"min": [
+0.014,
+3.9,
+-11.585
+],
+"max": [
+23.394,
+4.97,
+6.805
+],
+"top": {
+"h": 4.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
