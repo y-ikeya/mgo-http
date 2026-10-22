@@ -67,12 +67,26 @@ function texture(): THREE.Texture {
 
 export type BlobStance = 'stand' | 'crouch' | 'prone'
 
+/**
+ * **足元に床が無い型。** 梯子を登っている間とぶら下がっている間は、体の真下が床ではないので
+ * 丸い影を出さない — 足元に付いたまま宙に浮いて見えた (2026-10-22 本人「梯子登ってる時に
+ * 自分のキャラの下の方に影が浮いてない？」)。他人の画面は送られてくる型でしか分からないので、型で決める
+ */
+const OFF_FLOOR = new Set(['climb', 'climb_top', 'hang', 'hang_drop', 'hang_climb', 'hang_left', 'hang_right'])
+
+/** その型で足元に床があるか (丸い影を出すか) */
+export function blobOnFloor(locomotion: string): boolean {
+  return !OFF_FLOOR.has(locomotion)
+}
+
 export class BlobShadow {
   readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
   // 姿勢が変わっても形は一瞬で変えず、追いかける (ぱっと切り替わると影が跳ねて見える)
   private readonly target = { x: RADIUS * 2, z: RADIUS * 2, offset: 0 }
   /** 目指す濃さ。日なたなら SUN_OPACITY、日の当たらない所なら SHADE_OPACITY */
   private targetOpacity = SUN_OPACITY
+  /** 足元に床が無い (梯子・ぶら下がり)。濃さを 0 へ追いかけて消す (blobOnFloor) */
+  lifted = false
   private probeLeft = 0
   private readonly at = new THREE.Vector3()
 
@@ -142,7 +156,8 @@ export class BlobShadow {
       this.targetOpacity = sunlit(this.at.x, this.at.y + SUN_PROBE_LIFT, this.at.z) ? SUN_OPACITY : SHADE_OPACITY
     }
     const material = this.mesh.material
-    material.opacity += (this.targetOpacity - material.opacity) * (1 - Math.exp(-dt * 8))
+    const target = this.lifted ? 0 : this.targetOpacity
+    material.opacity += (target - material.opacity) * (1 - Math.exp(-dt * 8))
   }
 
   set visible(value: boolean) {
