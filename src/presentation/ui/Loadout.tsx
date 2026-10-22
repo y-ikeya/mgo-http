@@ -171,7 +171,8 @@ export default function Loadout(props: {
       key: 'SECONDARY',
       focus: 'secondary' as const,
       ids: () => props.secondaries,
-      current: (): WeaponId | null => props.secondary ?? 'm9',
+      // 部屋が副武器を外していれば null — 「無し」と出す (M9 を出すと選べないのに持っているように読める)
+      current: (): WeaponId | null => props.secondary,
       pick: (id: WeaponId) => props.onSecondary(id),
     },
   ]
