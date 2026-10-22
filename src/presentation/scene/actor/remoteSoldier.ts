@@ -25,7 +25,7 @@ import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
-import { CLIMB_TOP_TUNING, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
+import { CLIMB_TOP_TUNING, LANDING_RATE, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import { isGun } from "../../../domain/item/held";
 import { DeathSlide } from "./deathSlide";
@@ -167,7 +167,7 @@ const PLAY_WHOLE_BODY: Record<
   // 吹き飛ばされた所から這い出す寝返り。**他人の画面でも転がる**
   prone_roll_down: (a) => a.playProneRollDown(),
   // 着地。ここだけは「全身だが専用の入口がある」ではなく元からこれ
-  jump_down: (a) => a.playLanding(),
+  jump_down: (a) => a.playLanding(LANDING_RATE),
   // クレイモア。構え始めと、置き切る所。**置く型から見え始めることがある**ので、
   // releaseSetup は振りかぶりを飛ばして始められるようになっている
   claymore_windup: (a) => a.playSetup(),

@@ -3781,10 +3781,10 @@ export class CharacterAnimator {
    * 着地のモーション。**足が着いた所 (LANDING_TOUCHDOWN) から流す** — Landing の頭 12 コマは空中で
    * 落ちてくる所なので使わない。膝を曲げて沈み、立ち姿に戻るまで
    */
-  playLanding(): void {
+  playLanding(rate = 1): void {
     const action = this.lower.get('jump_down')
     if (!action) return
-    action.reset().play()
+    action.reset().setEffectiveTimeScale(rate).play()
     action.time = Math.min(LANDING_TOUCHDOWN, action.getClip().duration)
     this.locomotion = 'jump_down'
   }

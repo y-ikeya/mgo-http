@@ -263,7 +263,12 @@ const HARD_LAND_TIME = 2.03
  * **この間は動けない** (本人 2026-10-21)。膝を曲げて受け止めている間に歩くと、脚を曲げたまま
  * 滑って見えた
  */
-const LANDING_TIME = (34 - 12) / 30
+/**
+ * 軽い着地の型を流す速さ。**2 倍** (2026-10-22 本人「もっと早くていい、今すごいゆっくりで隙がでかい」)。
+ * 動けない時間 (LANDING_TIME) も同じだけ縮む。他人の画面も同じ速さで流す (remoteSoldier.ts)
+ */
+export const LANDING_RATE = 2
+const LANDING_TIME = (34 - 12) / 30 / LANDING_RATE
 /**
  * 軽い着地の型を出す落下速度の下限 (m/s)。**1m (5.9 m/s) から** (2026-10-21 本人。2m (8.4 m/s) だった)。
  *
@@ -3987,7 +3992,7 @@ export class Soldier {
         this.landingTimer = LANDING_TIME
         // 走ってきた勢いで滑らない。受け止めている間は止まる
         this.currentSpeed = 0
-        this.animator?.playLanding()
+        this.animator?.playLanding(LANDING_RATE)
       }
     }
     // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
