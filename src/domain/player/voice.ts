@@ -11,7 +11,7 @@
 export const VOICE_LINES = [
   { id: 'goodluck', label: '幸運を祈る', sound: 'voiceGoodLuck' },
   { id: 'matane', label: 'じゃ！またね！', sound: 'voiceMatane' },
-  { id: 'sesshou', label: 'また無駄な折衝をしてしまった...', sound: 'voiceSesshou' },
+  { id: 'sesshou', label: 'また無駄な殺生をしてしまった...', sound: 'voiceSesshou' },
   { id: 'shinukato', label: '痛ぁ...死ぬかと思った', sound: 'voiceShinukato' },
   { id: 'yolo', label: 'よろしくお願いします！', sound: 'voiceYolo' },
   { id: 'grenade', label: 'グッグレネード！', sound: 'voiceGrenade' },
