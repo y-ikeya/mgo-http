@@ -3096,16 +3096,16 @@
 "name": "metal_kanban1",
 "min": [
 -14.601,
-10.08,
+10.595,
 -9.764
 ],
 "max": [
 -7.002,
-12.79,
+12.895,
 -9.422
 ],
 "top": {
-"h": 12.79,
+"h": 12.8952,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3143,6 +3143,292 @@
 "camera": false,
 "texture": false,
 "thrown": false
+}
+},
+{
+"name": "wood_box_box2_box_0",
+"min": [
+-17.387,
+8.225,
+-8.639
+],
+"max": [
+-16.373,
+9.051,
+-7.849
+],
+"top": {
+"h": 9.0507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box_box_0",
+"min": [
+-31.621,
+3.866,
+6.854
+],
+"max": [
+-30.624,
+5.855,
+7.932
+],
+"top": {
+"h": 5.8553,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.001",
+"min": [
+-18.369,
+8.225,
+-8.642
+],
+"max": [
+-17.348,
+9.056,
+-7.846
+],
+"top": {
+"h": 9.0562,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.003",
+"min": [
+-14.618,
+3.851,
+-3.6
+],
+"max": [
+-13.604,
+4.677,
+-2.81
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.004",
+"min": [
+-12.676,
+3.851,
+-3.6
+],
+"max": [
+-11.662,
+4.677,
+-2.81
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.005",
+"min": [
+-13.645,
+4.625,
+-3.6
+],
+"max": [
+-12.631,
+5.451,
+-2.81
+],
+"top": {
+"h": 5.4507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.006",
+"min": [
+-14.618,
+4.625,
+-3.6
+],
+"max": [
+-13.604,
+5.451,
+-2.81
+],
+"top": {
+"h": 5.4507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.007",
+"min": [
+-12.676,
+4.625,
+-3.6
+],
+"max": [
+-11.662,
+5.451,
+-2.81
+],
+"top": {
+"h": 5.4507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.008",
+"min": [
+-13.645,
+3.851,
+-4.357
+],
+"max": [
+-12.631,
+4.677,
+-3.567
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.009",
+"min": [
+-14.618,
+3.851,
+-4.357
+],
+"max": [
+-13.604,
+4.677,
+-3.567
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.010",
+"min": [
+-12.676,
+3.851,
+-4.357
+],
+"max": [
+-11.662,
+4.677,
+-3.567
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
 }
 },
 {
