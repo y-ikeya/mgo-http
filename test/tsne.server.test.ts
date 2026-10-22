@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Client, spot, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
+import { STAGES } from '../src/domain/stage'
 
 /**
  * 潜入 / 防御 (charlie、TSNE)。
@@ -128,9 +129,15 @@ describe('TSNE', () => {
     const { a, b } = await twoInTsne()
     const home = match(a)?.target
     expect(home?.carrier).toBeNull()
-    // 守る側 (赤) の基地に近い置き場所 (city の target2)
-    expect(home?.x).toBeCloseTo(-30.39, 1)
-    expect(home?.z).toBeCloseTo(-50.89, 1)
+    // 守る側 (赤) の基地に近い置き場所。**ステージは試合ごとに回る** (city → uu) ので、
+    // 前の試験で試合が進んでいれば uu。そのとき回っているステージの値で見る
+    const stage = STAGES[match(a)!.stage]
+    const red = stage.bases.red
+    const near = [...stage.tsneTargets!].sort(
+      (p, q) => Math.hypot(p.x - red.x, p.z - red.z) - Math.hypot(q.x - red.x, q.z - red.z),
+    )[0]
+    expect(home?.x).toBeCloseTo(near.x, 1)
+    expect(home?.z).toBeCloseTo(near.z, 1)
     // 守る側が触れても何も起きない
     await b.walkTo(home!.x + 0.3, home!.y, home!.z)
     await Bun.sleep(300)
@@ -149,7 +156,8 @@ describe('TSNE', () => {
     expect(a.got('targetTaken')).toBeGreaterThanOrEqual(1)
     expect(await until(() => match(a)?.target?.carrier === 'alice', 3500)).toBe(true)
     // 自陣 (青の基地) まで運ぶと、攻める側 (青) の勝ち
-    await a.walkTo(-18.41, 10.01, 49.09)
+    const blue = stage.bases.blue
+    await a.walkTo(blue.x, blue.y ?? 0, blue.z)
     expect(await until(() => match(a)?.phase === 'break')).toBe(true)
     expect(match(a)?.winner).toBe('blue')
     a.close()

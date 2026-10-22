@@ -30,13 +30,14 @@ import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { clearClaymores } from './arms/claymore'
 import { clearDolls } from './arms/doll'
-import { trapStage } from '../src/domain/item/doll'
+import { TRAP_APPROACH_SECONDS, TRAP_REACH, trapStage } from '../src/domain/item/doll'
+import { WALK_TOP_SPEED } from '../src/domain/player/locomotion'
 import { clearDecoys } from './arms/decoy'
 import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
-import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, setLife } from './world'
+import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, rotateStage, setLife } from './world'
 import { forgetPoses, recordPose } from './history'
 
 /** 1 試合の長さ (ms) */
@@ -166,6 +167,7 @@ export function updateTargets(room: RoomWorld, now: number): void {
     }
 
     patrol(bot, now)
+    approachDoll(room, bot, now)
 
     if (isDowned(bot.life) && lifeElapsed(bot, now) >= TARGET_RESPAWN) {
       reviveBot(bot, now)
@@ -176,7 +178,13 @@ export function updateTargets(room: RoomWorld, now: number): void {
     // **見せている姿を、審判が見る姿にもする。** 送る姿だけ組み立てていた頃は、
     // 転んでいても眠っていても審判の中では立っていて、足元の的に真っ直ぐ前を
     // 刺しても刺さった (2026-10-08)
-    bot.locomotion = targetLocomotion(bot, now)
+    const next = targetLocomotion(bot, now)
+    // 姿が変わった時刻を控える。**途中から見えた人は、その分だけ型を進めて流す** (locomotionAge)。
+    // 0 のまま送っていて、眠っている的の傍で画面を読み直すと倒れる所から流れた
+    if (next !== bot.locomotion) botPoseSince.set(bot, now)
+    bot.locomotion = next
+    // 箱を被った的は、座っている間だけ箱の中 (倒されたら箱が落ち、起き上がったらまた被る)
+    bot.boxed = bot.homeStance === 'box' && next === 'sit'
     recordPose(bot)
     relayState(room, bot, targetPayload(bot, now))
   }
@@ -201,15 +209,43 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
   // 猫に釘付け (掛かっている / 立ち上がっている途中)。眠りより後、転倒より先
   const trap = trapped(bot, now)
   if (trap) return trap
-  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : 'sweep'
+  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : bot.downRolled ? 'hit2back' : 'sweep'
   if (bot.downLeft > 0) return 'stand'
-  return patrolling(bot, now) ? 'run_f' : REST[bot.homeStance]
+  if (patrolling(bot, now)) return 'run_f'
+  // 左右へ lean し続ける的。LEAN_SWAP_MS ごとに入れ替える (体の出し入れは型が受け持つ)
+  if (bot.homeStance === 'lean') return Math.floor(now / LEAN_SWAP_MS) % 2 === 0 ? 'lean_left' : 'lean_right'
+  return REST[bot.homeStance]
 }
 
-/** 猫に釘付けの姿 (掛かっている / 立ち上がっている途中)。どちらでもなければ null */
-function trapped(bot: MatchPlayer, now: number): 'trapped' | 'trapped_out' | null {
-  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now)
-  return stage === 'in' ? 'trapped' : stage === 'out' ? 'trapped_out' : null
+/** lean し続ける的が左右を入れ替える間隔 (ms) */
+const LEAN_SWAP_MS = 1500
+
+/**
+ * 人形に掛かった的を、猫のほうへ歩かせる (手の届く所 TRAP_REACH まで、長くて TRAP_APPROACH_SECONDS)。
+ * 着いたらしゃがみ込み始める (trapCrouchAt)。人は本人の手元が歩く
+ */
+function approachDoll(room: RoomWorld, bot: MatchPlayer, now: number): void {
+  if (bot.trappedBy === 0 || bot.trapCrouchAt !== 0) return
+  const doll = room.dolls.find((d) => d.id === bot.trappedBy)
+  const dx = doll ? doll.x - bot.x : 0
+  const dz = doll ? doll.z - bot.z : 0
+  const distance = Math.hypot(dx, dz)
+  if (!doll || distance <= TRAP_REACH || now - bot.trappedAt >= TRAP_APPROACH_SECONDS * 1000) {
+    bot.trapCrouchAt = now
+    return
+  }
+  const step = Math.min(distance - TRAP_REACH, WALK_TOP_SPEED * TICK_SECONDS)
+  bot.x += (dx / distance) * step
+  bot.z += (dz / distance) * step
+  // 猫のほうを向いて歩く (向き 0 で -Z を向く)
+  bot.yaw = Math.atan2(-dx, -dz)
+}
+
+/** 猫に釘付けの姿 (寄っている / しゃがみ込む / 撫でる / 立ち上がる)。どれでもなければ null */
+function trapped(bot: MatchPlayer, now: number): 'walk' | 'trapped' | 'trapped_hold' | 'trapped_out' | null {
+  const stage = trapStage(bot.trappedBy, bot.trapFreeAt, now, bot.trapCrouchAt)
+  if (stage === 'approach') return 'walk'
+  return stage === 'in' ? 'trapped' : stage === 'hold' ? 'trapped_hold' : stage === 'out' ? 'trapped_out' : null
 }
 
 /**
@@ -227,7 +263,9 @@ function patrolling(bot: MatchPlayer, now: number): boolean {
     bot.downLeft <= 0 &&
     bot.knockLeft <= 0 &&
     // 猫に釘付けの間・立ち上がっている間は止まる
-    trapStage(bot.trappedBy, bot.trapFreeAt, now) === null
+    trapStage(bot.trappedBy, bot.trapFreeAt, now) === null &&
+    // 体当たりで怯んでいる間も止まる
+    now >= bot.staggerUntil
   )
 }
 
@@ -256,8 +294,19 @@ function patrol(bot: MatchPlayer, now: number): void {
   bot.yaw = Math.atan2(-dx, -dz)
 }
 
+/** 的の姿が変わった時刻 (ms)。型の経過 (locomotionAge) を出すのに使う */
+const botPoseSince = new WeakMap<MatchPlayer, number>()
+
 /** 的が何もされていない時の姿。構えごと */
-const REST: Record<MatchPlayer['homeStance'], Locomotion> = { stand: 'idle', crouch: 'crouch_idle', prone: 'prone_idle' }
+const REST: Record<MatchPlayer['homeStance'], Locomotion> = {
+  stand: 'idle',
+  crouch: 'crouch_idle',
+  prone: 'prone_idle',
+  // 箱を被って座っている (人が箱の中で止まった時と同じ姿)
+  box: 'sit',
+  // lean し続ける的の、どちらでもない時の姿 (targetLocomotion が左右を決める)
+  lean: 'idle',
+}
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
 export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
@@ -272,17 +321,18 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         yaw: bot.yaw,
         pitch: 0,
         cameraYaw: bot.yaw,
-        locomotionAge: 0,
+        locomotionAge: (now - (botPoseSince.get(bot) ?? now)) / 1000,
         locomotion: bot.locomotion,
         aiming: false,
         weapon: 'rifle',
         crouching: bot.homeStance === 'crouch' && bot.locomotion === 'crouch_idle',
-        boxed: false,
+        boxed: bot.boxed,
         reloading: false,
         protectedNow: false,
         stealthed: false,
         holdingGrenade: false,
-        held: 'rifle',
+        // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')
+        held: bot.boxed ? 'box' : 'rifle',
         concentrating: false,
         saluteHeld: false,
       },
@@ -325,7 +375,7 @@ export function decideWinner(room: Match): Team | 'draw' {
   return room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
 }
 
-export function matchState(room: Match): ServerMessage {
+export function matchState(room: RoomWorld): ServerMessage {
   // **光っている人**を送る。1 位かどうかではなく、位置が公になっているか
   const leader = leakingOf(room)
   return {
@@ -333,6 +383,7 @@ export function matchState(room: Match): ServerMessage {
     // いま走っている試合の札。URL と戦績の表で同じ物を指す
     matchId: room.matchId ?? undefined,
     mode: room.mode.id,
+    stage: room.stage.name,
     leader: leader?.id,
     blue: room.blue,
     red: room.red,
@@ -684,6 +735,8 @@ export function updateMatch(room: RoomWorld, now: number): void {
   // ここを人数で割り込ませると、不戦勝を出した次の刻みで待ちへ落ちて、
   // 勝ったことが画面に出ないまま消える
   if (room.phase === 'over') {
+    // 結果を見せ終えた。**次の試合は回す表の次のステージで** (TSNE は 2 ラウンドで 1 試合)
+    if (now >= room.endsAt) rotateStage(room)
     if (now < room.endsAt) {
       // まだ見せている最中
     } else if (enough) {

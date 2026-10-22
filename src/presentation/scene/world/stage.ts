@@ -1,4 +1,5 @@
 import { SKY_FLOOR } from './skylight'
+import { addMovingShadow, castStaticShadow, STATIC_SHADOW_LAYER } from './liveShadow'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
 import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
@@ -170,6 +171,17 @@ const LOOKS: Record<'clear' | 'dusty' | 'night', Look> = {
   },
 }
 const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dusty', lab: 'dusty' }
+/**
+ * 日陰の明るさ (天空光 AMBIENT_INTENSITY) をステージごとに何倍にするか。無ければ 1。
+ *
+ * **UU は 3 倍 (2026-10-22 本人「このステージの影の部分はもっと明るくていい」、2 倍でも
+ * 「建物の影に入った時の明度がもっと明るくていい」)。** 灰色のコンクリートの塊と壁だけで、
+ * 日陰の面が黒く沈んで形が読めなかった。影の濃さ (SHADOW_INTENSITY) を下げても、
+ * 日の当たらない向きの壁は明るくならない — 日陰の明るさはここで決まる
+ */
+const STAGE_AMBIENT: Partial<Record<StageName, number>> = { uu: 3 }
+/** いまのステージの天空光の倍率。buildStage が決めて、buildLights が読む */
+let ambientScale = 1
 /** いまの場の見え方。buildStage が決めて、空・霧・光・映り込みがこれを読む */
 let look: Look = LOOKS.clear
 /** ?look=clear / dusty / night で試せる。試写 (stagecam) は look が視点なので ?mood= で */
@@ -1172,6 +1184,46 @@ export function sunProbeOf(stage: Stage, sun: THREE.DirectionalLight): (x: numbe
 /** 日なたかを測る線の長さ (m)。街の一番高い建物の影が届く分 */
 const SUN_PROBE_REACH = 120
 
+/**
+ * **体の影が落ちる所。** 体から日の当たる向きの反対へ線を引いて、最初に当たった面
+ * (壁でも地面でも) の点と向きを返す。無ければ null。
+ *
+ * 梯子・ぶら下がりの間は足元に床が無いので、足元の丸い影をここへ映す (actor/blobShadow.ts)。
+ * 映さずに消していたら、TSNE で梯子の途中の人を影で見つける手がかりが無くなった (2026-10-22 本人)
+ */
+export function sunCastOf(stage: Stage, sun: THREE.DirectionalLight): (x: number, y: number, z: number) => ShadowLanding | null {
+  const dir = new THREE.Vector3()
+  const landing: ShadowLanding = { x: 0, y: 0, z: 0, nx: 0, ny: 1, nz: 0 }
+  return (x, y, z) => {
+    const sight = stage.sightWorld
+    if (!sight) return null
+    // 日が来る向きの反対 = 影が伸びる向き
+    dir.copy(sun.target.position).sub(sun.position).normalize()
+    const hit = sight.hit(x, y, z, x + dir.x * SHADOW_CAST_REACH, y + dir.y * SHADOW_CAST_REACH, z + dir.z * SHADOW_CAST_REACH)
+    if (!hit) return null
+    landing.x = x + dir.x * SHADOW_CAST_REACH * hit.t
+    landing.y = y + dir.y * SHADOW_CAST_REACH * hit.t
+    landing.z = z + dir.z * SHADOW_CAST_REACH * hit.t
+    landing.nx = hit.nx
+    landing.ny = hit.ny
+    landing.nz = hit.nz
+    return landing
+  }
+}
+
+/** 影が落ちた所と、その面の向き (体の側を向く) */
+export interface ShadowLanding {
+  x: number
+  y: number
+  z: number
+  nx: number
+  ny: number
+  nz: number
+}
+
+/** 体の影を探す線の長さ (m)。一番高い梯子 (屋上 20m) から地面へ斜めに落ちる分 */
+const SHADOW_CAST_REACH = 40
+
 export function loadStageLadders(name: StageName): Promise<Ladder[]> {
   const cached = stageLadders.get(name)
   if (cached) return cached
@@ -1370,6 +1422,7 @@ function createGlassMaterial(): THREE.MeshStandardMaterial {
 export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   // 場の見え方を先に決める。空・霧・光 (buildLights は後から呼ばれる) がこれを読む
   look = lookFor(name)
+  ambientScale = STAGE_AMBIENT[name] ?? 1
   scene.add(buildSky())
   // フォグは空の地平線側と同じ色にする。違うと遠景が地平線で不自然に切れる。
   // 開始距離を遠くしてあるのは、近すぎると中距離の遮蔽物まで白んで索敵の判断材料が減るため。
@@ -1446,7 +1499,7 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   for (const [x, z, w, h, d] of BLOCKS) {
     const block = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), blockMaterial)
     block.position.set(x, h / 2, z)
-    block.castShadow = true
+    castStaticShadow(block)
     block.receiveShadow = true
     blockout.add(block)
     collidables.push(block)
@@ -1620,6 +1673,8 @@ async function replaceWithModel(
 
   const collidables: THREE.Object3D[] = []
   const cameraBlockers: THREE.Object3D[] = []
+  // 弾は通すが投げた物は止める物 (金網、名前に blockthrow)。投げた物の世界にだけ足す
+  const throwStoppers: THREE.Object3D[] = []
   const obstacles: Obstacle[] = []
   const bounds = new THREE.Box3()
   // 材質ごとに 1 つずつ共有する。同じ材質の箱がいくつあっても増えない
@@ -1691,6 +1746,8 @@ async function replaceWithModel(
       const material = Array.isArray(obj.material) ? obj.material[0] : obj.material
       const blended = (material as THREE.Material | undefined)?.transparent === true
       obj.castShadow = !glass && !blended
+      // 街の影の地図に焼く (world/liveShadow.ts の層)
+      if (obj.castShadow) obj.layers.enable(STATIC_SHADOW_LAYER)
       obj.receiveShadow = !glass
       /*
        * 壁に貼った板の深さは素のまま比べる。polygonOffset で手前へ寄せていたが、
@@ -1736,6 +1793,7 @@ async function replaceWithModel(
 
     // 止める対象ごとに別の一覧へ。1 つのタグで全部を決めない
     if (flags.bullet) collidables.push(obj)
+    else if (flags.thrown) throwStoppers.push(obj)
     if (flags.camera) cameraBlockers.push(obj)
     if (!flags.player) return
     bounds.setFromObject(obj)
@@ -1765,7 +1823,7 @@ async function replaceWithModel(
    *
    * 57000 枚で 100ms 前後。地形が差し替わる瞬間なので、そこに乗せてよい。
    */
-  thrownWorld.rebuild(collidables)
+  thrownWorld.rebuild([...collidables, ...throwStoppers])
 
   let meshCount = 0
   model.traverse((obj) => {
@@ -1856,7 +1914,7 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   // これが日陰の明るさそのものになる。日陰は「光が無い場所」ではなく
   // 「直射が無く、空全体からの光だけが届く場所」なので、暗くはあっても黒くはならない。
   // 空の色と揃えてあるのは、青空の下の日陰が青みを帯びるのと同じ理屈。
-  const sky = new THREE.HemisphereLight(look.night?.ambientSky ?? look.horizon, look.ground, tuned('ambient', AMBIENT_INTENSITY) * (look.night?.ambientScale ?? 1))
+  const sky = new THREE.HemisphereLight(look.night?.ambientSky ?? look.horizon, look.ground, tuned('ambient', AMBIENT_INTENSITY * ambientScale) * (look.night?.ambientScale ?? 1))
   scene.add(sky)
   /*
    * **映り込みの環境。** 空の色の縦グラデーションを 1 枚、環境マップとして置く。
@@ -1889,22 +1947,20 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   sun.target.position.set(0, 0, 0)
   sun.castShadow = true
   /*
-   * **影マップは動かない物だけを 1 度焼く。** 太陽も枠も動かないので、街の影は
-   * 描き直す理由が無い。動く物 (人・箱・武器・投げ物) は影マップに入れず、人は
-   * 足元の丸い影で受ける (actor/blobShadow.ts)。置いた物が増減した時だけ
-   * world/staticShadow.ts 経由で needsUpdate を立てる
+   * **街の影の地図は 1 度だけ焼く。** 太陽も枠も動かないので描き直す理由が無い。置いた物が
+   * 増減した時だけ world/staticShadow.ts 経由で needsUpdate を立てる。人の影は別の小さな地図に
+   * 毎フレーム描く (world/liveShadow.ts の addMovingShadow、下で足す)
    */
-  // 切り分け用: ?shadow=live で毎フレーム描き直す (焼いた瞬間の物が写り込んでいないか見る)
-  sun.shadow.autoUpdate = new URLSearchParams(location.search).get('shadow') === 'live'
+  sun.shadow.autoUpdate = false
   sun.shadow.needsUpdate = true
   /*
-   * 影マップの画素数。
+   * 影マップの画素数。**2048** (2026-10-22 本人「影の細かさを 2048 に、なんなら 1024 でもいい」)。
    *
-   * 範囲を 45 から 65 へ広げたぶん、2048 のままだと 1m あたり 22.8 画素から
-   * 15.8 画素へ落ちる。4096 にすれば 31.5 画素で、**広げた上で前より細かい**。
-   * 1 枚だけなので、増えるのは 16MB ほど。
+   * 4096 だった (範囲を 45 → 65m に広げた時に上げた)。焼くのは 1 度なので毎フレームの重さは
+   * 変わらないが、GPU の上で 64MB → 16MB に減る。1 画素は UU で 7cm、city で 11cm と粗くなる。
+   * 縁のぼかし (PCF) の拾う点の数は細かさに依らないので、画面の重さも変わらない
    */
-  sun.shadow.mapSize.set(4096, 4096)
+  sun.shadow.mapSize.set(2048, 2048)
   /*
    * 影の自己遮蔽 (アクネ) を避ける。**設定していなかった。**
    *
@@ -1929,6 +1985,8 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   // 光を引いたぶん遠くなる (実測で 181 まで)
   cam.far = 240
   cam.updateProjectionMatrix()
+  // 人の影は別の小さな地図に毎フレーム描き、床は 2 枚の暗いほうを採る (world/liveShadow.ts)
+  addMovingShadow(sun)
 
   scene.add(sun)
   scene.add(sun.target)
@@ -1943,7 +2001,7 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
  * 枠の縁は光の向きに沿った直線で、地面の上では**斜めの線**として見えた
  * (縁の内側は影マップの丸めで僅かに暗く、外側は影が無い)。
  *
- * 枠を広げると 1m あたりの画素は落ちる (4096 / 幅)。city で 20 画素前後。
+ * 枠を広げると 1m あたりの画素は落ちる (2048 / 幅)。city で 9 画素前後。
  * これ以上広いステージになったら分割 (カスケード) を考える。
  */
 export function fitShadowToStage(sun: THREE.DirectionalLight, stage: Stage): void {

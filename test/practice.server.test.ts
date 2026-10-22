@@ -263,3 +263,43 @@ describe('練習部屋で猫', () => {
     own.stop()
   }, 15000)
 })
+
+describe('練習部屋でローリング', () => {
+  const TARGETS = STAGES[ROOMS.echo.stages.stages[0]].targets
+
+  /** 的の傍 (0.8m 手前) に立って、体当たりを申告する。的の姿を返す */
+  async function rollIntoTarget(index: number) {
+    const own = await startServer()
+    const at = TARGETS[index]!
+    const me = new Client(own, `roller-${index}`, [at.x, 0, at.z + 0.8], 'echo')
+    await me.ready()
+    me.live()
+    await Bun.sleep(3400)
+    me.send({ type: 'spawn' })
+    await Bun.sleep(600)
+    me.send({ type: 'knock', id: me.id, hit: `target-${index}`, x: 0, z: -0.8 })
+    await Bun.sleep(400)
+    const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
+    const slot = roster.players.find((p) => p.id === `target-${index}`)!.slot!
+    const pose = { ...me.poses.get(slot)! }
+    me.close()
+    own.stop()
+    return { at, pose }
+  }
+
+  test('しゃがんだ的は後ろへ倒れる', async () => {
+    const index = TARGETS.findIndex((t) => t.stance === 'crouch')
+    const { at, pose } = await rollIntoTarget(index)
+    // 爆風の倒れ方 (sweep) ではなく、後ろへ倒れる型 (Hit2Back)
+    expect(pose.locomotion).toBe('hit2back')
+    // 爆風ほどは飛ばない (滑るのは 0.5m)
+    expect(Math.hypot(pose.x - at.x, pose.z - at.z)).toBeLessThan(1)
+  }, 20000)
+
+  test('立っている的は押しのけられる', async () => {
+    const index = TARGETS.findIndex((t) => !t.stance && !t.patrol)
+    const { at, pose } = await rollIntoTarget(index)
+    // 転がってきた側 (+Z) から押されて -Z へ 0.8m
+    expect(pose.z).toBeLessThan(at.z - 0.5)
+  }, 20000)
+})

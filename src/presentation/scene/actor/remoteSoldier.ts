@@ -1,6 +1,8 @@
+import { TRAPPED_CROUCH_SECONDS } from '../../../domain/item/doll';
 import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
-import { BlobShadow } from './blobShadow';
+import { MOVING_SHADOW_LAYER } from '../world/liveShadow';
+import { BlobShadow, blobOnFloor } from './blobShadow';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import {
@@ -23,7 +25,7 @@ import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
 import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
-import { CLIMB_TOP_TUNING, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
+import { CLIMB_TOP_TUNING, LANDING_RATE, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
 import { isGun } from "../../../domain/item/held";
 import { DeathSlide } from "./deathSlide";
@@ -135,6 +137,8 @@ const PLAY_WHOLE_BODY: Record<
   // 梯子を登り切る。自分の側 (soldier.ts) と同じ速さで頭から流す。**流し始める者が
   // 居ないと重み 1 のまま止まった action に重みが集まって T ポーズ**になる
   climb_top: (a) => a.playClimbTop(CLIMB_TOP_TUNING.rate),
+  // 上から梯子へ降りて掴む。登り切りを終わりから逆に流す (soldier.ts の mountFromTop)
+  climb_mount: (a) => a.playClimbMount(CLIMB_TOP_TUNING.rate),
   // 落下の受け身。削られる高さから落ちた着地
   hard_land: (a) => a.playHardLand(),
   stab: (a) => a.playStab(),
@@ -152,6 +156,7 @@ const PLAY_WHOLE_BODY: Record<
   cqc_throw: (a) => a.playCqc('cqc_throw'),
   cqc_miss: (a) => a.playCqc('cqc_miss'),
   cqc_thrown: (a) => a.playThrown(),
+  hit2back: (a) => a.playRollFall(),
   // 接続が切れた人。1 枚の静止ポーズ
   away: (a) => a.playAway(),
   // ダンボールで敵にぶつかって、箱が落ちた
@@ -162,7 +167,7 @@ const PLAY_WHOLE_BODY: Record<
   // 吹き飛ばされた所から這い出す寝返り。**他人の画面でも転がる**
   prone_roll_down: (a) => a.playProneRollDown(),
   // 着地。ここだけは「全身だが専用の入口がある」ではなく元からこれ
-  jump_down: (a) => a.playLanding(),
+  jump_down: (a) => a.playLanding(LANDING_RATE),
   // クレイモア。構え始めと、置き切る所。**置く型から見え始めることがある**ので、
   // releaseSetup は振りかぶりを飛ばして始められるようになっている
   claymore_windup: (a) => a.playSetup(),
@@ -171,7 +176,12 @@ const PLAY_WHOLE_BODY: Record<
   pat: (a) => a.playPat(),
   // 猫に釘付け / 解けて戻る (逆に流す)
   trapped: (a) => a.playTrapped(),
-  trapped_out: (a) => a.playTrappedOut(),
+  trapped_hold: (a) => a.playTrappedHold(),
+  // ぶら下がったまま横へ移る
+  hang_left: (a) => a.playHangShimmy(-1),
+  hang_right: (a) => a.playHangShimmy(1),
+  // しゃがみ込み終えた所から逆に流す (手を前へ伸ばす所は通らない)
+  trapped_out: (a) => a.playTrappedOut(TRAPPED_CROUCH_SECONDS),
 };
 
 /**
@@ -288,6 +298,11 @@ export class RemoteSoldier {
   private locomotion: Locomotion = "idle";
 
   /** CQC を掛けられる姿勢か (立っているか)。domain/player/cqc.ts */
+  /** 伏せているか (送られてきた姿が伏せ・這い)。ローリングが当たらない */
+  get prone(): boolean {
+    return /^(prone|crawl)/.test(this.locomotion);
+  }
+
   /** 眠っているか (送られてきた姿が sleep)。味方なら叩いて起こせる */
   get asleep(): boolean {
     return this.locomotion === "sleep";
@@ -473,7 +488,13 @@ export class RemoteSoldier {
     this.sweptThisFrame = false;
     this.reloadStarted = false;
     // ぶら下がりの上半身は型が終わっても戻さない (掴んだまま)。抜けたときにここで戻す
-    if (locomotion !== this.locomotion && locomotion !== 'hang_drop' && locomotion !== 'hang_climb') {
+    if (
+      locomotion !== this.locomotion &&
+      locomotion !== 'hang_drop' &&
+      locomotion !== 'hang_climb' &&
+      locomotion !== 'hang_left' &&
+      locomotion !== 'hang_right'
+    ) {
       // 'hang' (待つ姿) もここを通る。落ちる型の上半身を止め絵へ渡すため
       animator.endHang();
     }
@@ -508,7 +529,14 @@ export class RemoteSoldier {
      * setLocomotion に任せると重みの補間で入るので、立ったまま寝ている絵に
      * なる (実測で腰 1.01m。playSleep なら 0.06m)。
      */
-    if (locomotion === 'sleep' && this.locomotion !== 'sleep') animator.playSleep();
+    if (locomotion === 'sleep' && this.locomotion !== 'sleep') {
+      animator.playSleep();
+      /*
+       * **途中から見えた相手は、その分だけ進めてから。** 全身の型と同じ (locomotionAge)。
+       * 進めないと、眠っている相手の傍で画面を読み直すと倒れる所から流れた (2026-10-20 本人)
+       */
+      animator.skipAhead(state.locomotionAge);
+    }
     if (locomotion !== 'sleep' && this.locomotion === 'sleep') animator.wakeFromSleep();
     this.locomotion = locomotion;
 
@@ -517,7 +545,8 @@ export class RemoteSoldier {
       ? null
       : this.footsteps.update(state.x, state.y, state.z, locomotion, true);
 
-    animator.setLocomotion(locomotion);
+    // 降りて掴む型は、画面の中では登り切りの逆 (状態は climb_top のまま)
+    animator.setLocomotion(locomotion === 'climb_mount' ? 'climb_top' : locomotion);
     /*
      * 梯子。**登っている分だけ絵を進める。** 手を止めれば絵も止まる。
      *
@@ -547,6 +576,7 @@ export class RemoteSoldier {
           ? "crouch"
           : "stand",
     );
+    this.blob.lifted = !blobOnFloor(state.locomotion);
     this.blob.update(dt);
     animator.setAimPitch(state.aiming && !this.serverDead && !prone ? state.pitch : 0);
     // 首はカメラの向きへ。**相手がどこを見ているかを渡す**。構え中は体が向いている
@@ -569,7 +599,7 @@ export class RemoteSoldier {
     if (this.model) this.deathSlide.update(animator, this.object, this.model);
     if (this.model) {
       this.object.updateMatrixWorld(true);
-      const frame = locomotion === "climb_top" ? animator.oneShotPhase("climb_top") * 120 + 1 : 0;
+      const frame = locomotion === "climb_top" || locomotion === "climb_mount" ? animator.oneShotPhase("climb_top") * 120 + 1 : 0;
       this.gripRight.apply(this.model, climbGripWeight("Right", frame));
       this.gripLeft.apply(this.model, climbGripWeight("Left", frame));
     }
@@ -650,8 +680,11 @@ export class RemoteSoldier {
       state.locomotion === 'hang_drop' ||
       state.locomotion === 'hang' ||
       state.locomotion === 'hang_climb' ||
-      // 猫に釘付けの間 (戻る途中も)。両手を猫へ伸ばしている
+      state.locomotion === 'hang_left' ||
+      state.locomotion === 'hang_right' ||
+      // 猫に釘付けの間 (撫でている間・戻る途中も)。両手を猫へ伸ばしている
       state.locomotion === 'trapped' ||
+      state.locomotion === 'trapped_hold' ||
       state.locomotion === 'trapped_out'
     // 拳銃も構えていない間ずっと手に持つ (soldier.ts と同じ)。STEALTH で体が消えても武器は見える
     if (this.weapon) this.weapon.visible = !holstered
@@ -766,7 +799,21 @@ export class RemoteSoldier {
    */
   setStealthed(on: boolean): void {
     this.stealthed = on;
+    /*
+     * **初めて知らせを受けた時は、じわっと消さずにその場で決める。** 体は見える状態で
+     * 作られるので、STEALTH 中の相手でも消え切るまで (0.7 秒) 見えていた — 守る側が画面を
+     * 読み直すと、攻める側の姿が一瞬見えた (2026-10-20 本人)。じわっと消えるのは
+     * 目の前で着た時だけの演出
+     */
+    if (!this.stealthKnown) {
+      this.stealthKnown = true;
+      this.stealthFade = on ? 1 : 0;
+      this.applyBodyOpacity();
+    }
   }
+
+  /** STEALTH の知らせを一度でも受けたか */
+  private stealthKnown = false;
 
   /**
    * STEALTH の消え具合 (0 = 見える、1 = 消えた)。**じわっと消え、すぐ現れる** (2026-10-17 本人
@@ -991,7 +1038,9 @@ export class RemoteSoldier {
     const cloned = new Map<THREE.Material, THREE.Material>();
     model.traverse((obj) => {
       if (!isMesh(obj)) return;
-      obj.castShadow = false;   // 影マップは動かない物だけ。人の影は足元の丸 (blob)
+      // 人も影を落とす (人の影の地図に毎フレーム描く、world/liveShadow.ts)
+      obj.castShadow = true;
+      obj.layers.enable(MOVING_SHADOW_LAYER);
       // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
       obj.receiveShadow = true;
       // スキニング後の姿勢はバウンディングボックスに出ないので視錐台カリングを切る
@@ -1444,6 +1493,8 @@ export class RemoteSoldiers {
 
     for (const player of this.players.values()) {
       if (player.health <= 0 || exclude.has(player.id)) continue;
+      // 伏せている相手には当たらない (下を転がり抜ける。本人 2026-10-20)
+      if (player.prone) continue;
 
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;

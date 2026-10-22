@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "TreatCat.fbx": "treat_cat" },
+  "out": "treat_cat.glb",
+  "maxTexture": 64
+}

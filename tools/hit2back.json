@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "Hit2Back.fbx": "hit2back" },
+  "out": "hit2back.glb",
+  "maxTexture": 64
+}

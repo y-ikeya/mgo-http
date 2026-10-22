@@ -1,6 +1,6 @@
 import type { Locomotion } from '../../domain/player/locomotion'
 import type { HitZone } from '../../domain/rule/damage'
-import type { Surface } from '../../domain/stage'
+import type { StageName, Surface } from '../../domain/stage'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import type { HeldId } from '../../domain/item/held'
 import type { Life } from '../../domain/player/lifecycle'
@@ -366,6 +366,11 @@ export interface KnockDownEvent {
    */
   dirX: number
   dirZ: number
+  /**
+   * 滑る距離 (m)。省けば爆風の距離 (KNOCK_DISTANCE)。ローリングの体当たりで倒れた時は短い
+   * (ROLL_FALL_DISTANCE)。悲鳴も爆風の時だけ
+   */
+  distance?: number
 }
 
 /**
@@ -786,6 +791,17 @@ export interface ResumeMessage {
    * サーバーは眠ったままなので撃てず動けず、本人には理由が見えない。
    */
   sleepUntil: number
+  /**
+   * 人形 (DOLL) に釘付けの途中か。**返さないと、読み直すだけで抜け出せた** (本人 2026-10-20)。
+   * 解けるのは今まで通り dollGone / trapReleased で知らせる
+   */
+  trapped: boolean
+  /**
+   * 縁にぶら下がっていたか。**返さないと、読み直すと宙から落ちた** (本人 2026-10-21)。
+   * 手元は yaw (体の向き = 壁向き) から縁を探して掴み直す
+   */
+  hanging: boolean
+  yaw: number
 }
 
 /**
@@ -1123,6 +1139,11 @@ export interface MatchMessage {
   matchId?: string
   /** その部屋のルール。陣営で分かれるか、何を表示するかがこれで決まる */
   mode: Mode
+  /**
+   * いま乗っているステージ。**試合の切れ目で変わる** (部屋の回す表、domain/match/room.ts)。
+   * 手元の地形と違えば、画面は暗転して組み直す (screens/Play.tsx)
+   */
+  stage: StageName
   /**
    * いま 1 位の人 (個人戦だけ)。**この人は光って位置が漏れる。**
    *

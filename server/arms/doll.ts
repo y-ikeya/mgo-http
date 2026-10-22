@@ -12,6 +12,7 @@ import { connected, present } from '../../src/domain/match/match'
 import { canAct } from '../../src/domain/player/lifecycle'
 import { STEP_UP } from '../../src/domain/player/moving'
 import type { MatchPlayer, Team } from '../../src/domain/player/player'
+import type { Locomotion } from '../../src/domain/player/locomotion'
 import type { ServerMessage } from '../../src/application/protocol/types'
 import { type Placed, placeSpot } from '../../src/sim/judge/claymore'
 import { SHOT_HALF, SHOT_TOP, TRAPPED_CLIP_SECONDS, TRAP_SECONDS, inLure } from '../../src/domain/item/doll'
@@ -37,6 +38,20 @@ export interface Doll extends Placed {
 }
 
 let nextDollId = 1
+
+/** 足場に立っていない姿。この間は人形に掛けない (updateDolls) */
+const OFF_FOOTING: ReadonlySet<string> = new Set<Locomotion>([
+  'climb',
+  'climb_top',
+  'climb_mount',
+  'hang',
+  'hang_drop',
+  'hang_climb',
+  'hang_left',
+  'hang_right',
+  'vault',
+  'vault_up',
+])
 
 /** 置く。**位置も向きもサーバーが決める** (decoy と同じ判定)。置けなければ数は減らさない */
 export function placeDoll(room: RoomWorld, from: MatchPlayer): void {
@@ -107,6 +122,10 @@ export function updateDolls(room: RoomWorld, now: number): void {
       if (!canAct(player.life) || player.boxed || player.trappedBy !== 0) continue
       // 解けたばかり (立ち上がっている途中 + 1 秒) は掛からない
       if (now < player.trapFreeAt) continue
+      // 足場に立っていない間は掛けない (梯子・登り切る途中・ぶら下がり・跳び越え)。登り切る型の
+      // 途中はまだ縁の外に居て、掛けると梯子から手が離れて下へ落ちた (本人 2026-10-20)。
+      // 床に立った所で掛かる
+      if (OFF_FOOTING.has(player.locomotion)) continue
       if (player.sleepUntil > now) continue
       if (!inLure(doll, player.x, player.y, player.z)) continue
       victims.push(player)
@@ -116,6 +135,8 @@ export function updateDolls(room: RoomWorld, now: number): void {
     doll.victims.push(...victims.map((v) => v.id))
     for (const victim of victims) {
       victim.trappedBy = doll.id
+      victim.trappedAt = now
+      victim.trapCrouchAt = 0
       // 的 (bot) は猫のほうへ向き直らせる。人は本人の手元が向き直り、その向きが届く
       // yaw θ で正面が (-sinθ, -cosθ)
       if (victim.bot) victim.yaw = Math.atan2(victim.x - doll.x, victim.z - doll.z)
@@ -180,10 +201,11 @@ export function clearDolls(room: RoomWorld): void {
 /** 練習の猫が消えてから置き直すまで (ms) */
 const PRACTICE_RESTOCK_MS = 5000
 /**
- * 置き直すのは、この距離 (m) に誰も居ない時だけ。**目の前に戻して掛けない** — 撃ち抜いた猫が
- * その場に戻り、消したはずの所で掛かった (本人 2026-10-20)
+ * 置き直すのは、この距離 (m、高さも含む) に誰も居ない時だけ。**目の前に戻して掛けない** — 撃ち抜いた猫が
+ * その場に戻り、消したはずの所で掛かった (本人 2026-10-20)。円 (1.5m) より 1m 外。
+ * 4m・横だけだった頃は、塔の上 (4m 四方) や塔の真下に居る間ずっと戻らなかった
  */
-const PRACTICE_RESTOCK_CLEAR = 4
+const PRACTICE_RESTOCK_CLEAR = 2.5
 /** 練習の猫の持ち主。人ではない (的の陣営の物として置く) */
 const PRACTICE_OWNER = 'practice'
 /** 練習の猫を次に置ける時刻 (ms)。置き場所の番号ごと。無ければすぐ置く */
@@ -201,7 +223,8 @@ export function stockPracticeDolls(room: RoomWorld, now: number): void {
     if (room.dolls.some((doll) => doll.practice === i)) return
     if (now < (restockAt?.get(i) ?? 0)) return
     const crowded = connected(room).some(
-      (player) => Math.hypot(player.x - spot.x, player.z - spot.z) < PRACTICE_RESTOCK_CLEAR,
+      (player) =>
+        Math.hypot(player.x - spot.x, player.y - (spot.y ?? 0), player.z - spot.z) < PRACTICE_RESTOCK_CLEAR,
     )
     if (crowded) return
     room.dolls.push({

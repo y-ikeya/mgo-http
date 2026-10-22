@@ -70,6 +70,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 梯子。全身の型なので上半身も同じクリップから取る
   climb: 'climb',
   climb_top: 'climb_top',
+  // 上から梯子へ降りて掴む。**画面の中では climb_top を逆に流す** (playClimbMount)。この行は表を欠かさないため
+  climb_mount: 'climb_top',
   sneak: 'sneak',
   sit: 'sit',
   salute: 'salute',
@@ -87,6 +89,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   cqc_throw: 'cqc_throw',
   cqc_miss: 'cqc_miss',
   cqc_thrown: 'cqc_thrown',
+  hit2back: 'hit2back',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
   /*
@@ -111,6 +114,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   pat: 'pat',
   // 猫に釘付け / 解けて戻る。同じ型を順に流して止め、戻りは逆に流す (domain/item/doll.ts)
   trapped: 'trapped',
+  trapped_hold: 'treat_cat',
   trapped_out: 'trapped',
   // 刺突は全身動作。上半身だけ切り出すと腰の向きが下半身と食い違う。
   stab: 'stab',
@@ -131,6 +135,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   hang_climb: 'hang_climb',
   // 縁に手を掛けて待つ。落ちる型 (BracedHang) の最後の 1 枚で止める (LEAN_POSE_AT / FROZEN_CLIPS)
   hang: 'hang_drop',
+  hang_left: 'hang_left',
+  hang_right: 'hang_right',
   death: 'death',
   // 倒れる向き。**背後から撃たれたら前へ、正面からなら後ろへ**
   death_front: 'death_front',
@@ -139,7 +145,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   sleep: 'sleep',
   jump_up: 'jump_up',
   jump_loop: 'jump_loop',
-  jump_down: 'jump_down',
+  // 軽い着地は Landing の**脚だけ** (本人 2026-10-21「着地部分の leg だけ参考に」)。上半身は走りの腕のまま
+  jump_down: 'landing',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, `run_${d}`],
@@ -171,6 +178,9 @@ type UpperState =
   | 'vault'
   | 'vault_up'
   | 'hang_drop'
+  // ぶら下がったまま横へ移る
+  | 'hang_left'
+  | 'hang_right'
   | 'hang_climb'
   // 伏せへの出入り
   | 'prone_down'
@@ -179,8 +189,9 @@ type UpperState =
   | 'prone_roll_down'
   // 眠っている人を叩く (全身の型)
   | 'pat'
-  // 猫に釘付け / 解けて戻る (全身の型)
+  // 猫に釘付け / 撫で続ける / 解けて戻る (全身の型)
   | 'trapped'
+  | 'trapped_hold'
   | 'trapped_out'
   // ダンボールで敵にぶつかって、箱が落ちた
   | 'bump'
@@ -234,6 +245,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   prone_roll_down: 'prone_roll_down',
   pat: 'pat',
   trapped: 'trapped',
+  trapped_hold: 'treat_cat',
   trapped_out: 'trapped',
   // 傾きは上半身も同じ止め絵。構えていても差し替えない (resolveUpperKey)
   lean_left: 'lean',
@@ -246,7 +258,9 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   claymore_place: 'claymore_place',
   jump_up: 'relaxed_run',
   jump_loop: 'relaxed_run',
-  jump_down: 'relaxed_run',
+  // 着地は止まって膝を曲げる間 (soldier の landingTimer で動けない)。**腕は振らない** — 走りの型のままだと、
+  // 走るボタンを押し続けた着地で足が止まっているのに手だけ振っていた (2026-10-22 本人)
+  jump_down: 'relaxed_idle',
   /*
    * 階段。**上半身は走りと同じ。**
    *
@@ -271,6 +285,8 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   hang_drop: 'hang_drop',
   hang_climb: 'hang_climb',
   hang: 'hang_drop',
+  hang_left: 'hang_left',
+  hang_right: 'hang_right',
   ...(Object.fromEntries(
     MOVE_DIRECTIONS.flatMap((d) => [
       [`run_${d}`, 'relaxed_run'],
@@ -359,7 +375,36 @@ const ROOT_MOTION_HOLD: Partial<Record<Locomotion, { until: number; keep: number
  * 合わせた瞬間に差のぶん跳ねる。上下は型から抜き、位置のほうを型の上がり方
  * (vaultRise) に沿ってコードで上げる。
  */
-const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top'])
+// ぶら下がって横へ移る型 (hang_left / right) も。腰の高さを型のまま持っていると、待つ型 (hang_drop、
+// 上下を潰してある) との差のぶん体が上へずれた (2026-10-21 本人「左右移動する時に上がっちゃってる」)
+const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top', 'hang_left', 'hang_right'])
+/**
+ * 上下を抜く型のうち、**位置を足の上がり方で上げ、膝の曲げ伸ばしは型に残す**型。
+ *
+ * 一段上へ乗る型は、足が前半 (尺の 45%) で段の上に着き、膝を曲げたまま乗ってから伸びる
+ * (腰は足の 0.5m 上 → 0.84m 上)。腰の曲線で位置を上げていたので、足が段の上に着くのは
+ * 型の終わりで、膝を伸ばす間に体ごと持ち上がって見えた (2026-10-23 本人「登った時は膝が
+ * 曲がっていて、最後に伸ばす時に重心を上に上げるものでは」)。
+ *
+ * 読み込みの時に型を骨に流して足の高さを測り (measureFootRise)、位置は足の曲線
+ * (footRise) で上げる。腰は「足からの高さ」を型のまま残し、終わりで立ちの高さに揃える
+ */
+const FOOT_RISE_CLIPS = new Set(['vault_up'])
+/** 足の高さを測る骨。一番低い物を足の高さとする (踵が上がっても爪先が着いている) */
+const FOOT_BONES = ['LeftFoot', 'LeftToeBase', 'RightFoot', 'RightToeBase'] as const
+/**
+ * 型ごとの測った結果。型は全員で共有しているので控えも共有 (rootMotionStore と同じ)。
+ * 1 人目が腰を潰す前に測る — 潰した後では足の高さが狂う
+ */
+const footRiseStore = new WeakMap<THREE.AnimationClip, FootRise>()
+interface FootRise {
+  /** 腰のトラックと同じ時刻 */
+  times: Float32Array
+  /** 足の上がり (0 = 頭、1 = 終わり)。一度上がった足は下がらない (跳ぶ途中で上下しない) */
+  rise: Float32Array
+  /** 腰のトラックの上下 (Z) に足す量 (トラックの単位)。終わりで 0 = 立ちの高さ */
+  hipZ: Float32Array
+}
 /**
  * 倒れる型の**前後の移動を絵として残す**型 (deathSlide)。
  *
@@ -414,6 +459,8 @@ const ROLL_TIME_SCALE = 1.32
  * --- 伏せたまま横へ転がるのも同じ ---
  * 半回転で**横へ 0.56m** 焼き込まれている。倍率を掛けないのは受け身と同じ
  * 理由で、寝た体が地面を擦って進む型なので、少しでも滑ると気づく。
+ *
+ * 一段上へ乗る型 (vault_up) は乗るたびに倍率が変わる (playVault の reach)
  */
 const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 /**
@@ -512,6 +559,9 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'vault_up',
   'hang_drop',
   'hang_climb',
+  // ぶら下がったまま横へ移る。1 回ずつ
+  'hang_left',
+  'hang_right',
   /*
    * 落下の受け身。**ここに無くて、下半身だけループしていた。**
    *
@@ -542,6 +592,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'cqc_miss',
   // 投げられて倒れた姿のまま留める (sweep と同じ)
   'cqc_thrown',
+  // ローリングで倒れた姿のまま留める (sweep と同じ)
+  'hit2back',
   'jump_up',
   'jump_down',
   'death',
@@ -613,7 +665,8 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   down_stair: 'run_unarmed',
   jump_up: 'run_unarmed',
   jump_loop: 'run_unarmed',
-  jump_down: 'run_unarmed',
+  // 着地は止まっているので腕を振らない (RELAXED_CLIPS の jump_down と同じ)
+  jump_down: 'pistol_relaxed',
   /*
    * 転がりの尻尾。**あの型は銃を構える形で終わる。**
    *
@@ -662,6 +715,15 @@ const SWEEP_KEY = 'sweep'
  * — 上半身の状態も 'sweep' のまま、引く型だけが違う (fallKey)
  */
 const THROWN_KEY = 'cqc_thrown'
+/**
+ * ローリングの体当たりで後ろへ倒れる (tools/hit2back.json、Hit2Back.fbx)。**倒れた後は sweep と同じ扱い**。
+ * 腰の横の移動は取り込む時に捨ててある (merge_clip の --in-place)。滑るのはサーバーの距離 (0.5m)
+ */
+const ROLL_FALL_KEY = 'hit2back'
+/** 流す速さ。等倍 (1.93 秒) では遅かった (本人 2026-10-20「もう少し早く」) */
+const ROLL_FALL_RATE = 1.5
+/** 背中が着くまで (秒)。型の半ばで仰向けになる */
+const ROLL_FALL_LAND = 1.0 / ROLL_FALL_RATE
 /** CQC で投げる / 空振りする。全身の型 */
 const CQC_THROW_KEY = 'cqc_throw'
 /**
@@ -782,6 +844,14 @@ const VAULT_UP_KEY = 'vault_up'
 const HANG_DROP_KEY = 'hang_drop'
 /** ぶら下がりから登る。終わればしゃがみへ */
 const HANG_CLIMB_KEY = 'hang_climb'
+/** ぶら下がったまま横へ移る (BracedHangLeft / Right、1.2 秒で 0.58m。腰の横の移動は捨ててある) */
+const HANG_LEFT_KEY = 'hang_left'
+/**
+ * 横へ移る型を流す速さ。等倍 (1.2 秒) では遅く、1.5 倍では速すぎた (2026-10-21 本人「1.1 倍くらい」)。
+ * FAST MOVE の倍率はこれに掛ける (playHangShimmy の scale)
+ */
+const HANG_SHIMMY_RATE = 1.1
+const HANG_RIGHT_KEY = 'hang_right'
 const DEATH_KEY = 'death'
 /** 倒れる向き。撃たれた側から見て前か後ろか */
 const DEATH_FRONT_KEY = 'death_front'
@@ -832,6 +902,8 @@ const PRONE_ROLL_DOWN_KEY = 'prone_roll_down'
 const PAT_KEY = 'pat'
 /** 猫に釘付け (順に流して最後の姿で止める) と、解けて戻る (同じ型を逆に流す) */
 const TRAPPED_KEY = 'trapped'
+/** 釘付けのまま猫を撫で続ける (TreatCat、繰り返し)。しゃがみ込む型の後 */
+const TRAPPED_HOLD_KEY = 'trapped_hold'
 const TRAPPED_OUT_KEY = 'trapped_out'
 /**
  * 叩く型を流す速さ。型 (1.6 秒、叩く 1 回が 0.2 秒) のまま。型が 0.8 秒だった頃は 0.6 倍にしていたが、
@@ -876,6 +948,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   PRONE_BOLT_KEY,
   SWEEP_KEY,
   THROWN_KEY,
+  ROLL_FALL_KEY,
   CQC_THROW_KEY,
   CQC_MISS_KEY,
   STAND_KEY,
@@ -891,6 +964,8 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   VAULT_UP_KEY,
   HANG_DROP_KEY,
   HANG_CLIMB_KEY,
+  HANG_LEFT_KEY,
+  HANG_RIGHT_KEY,
   BUMP_KEY,
   CLIMB_TOP_KEY,
   DEATH_FRONT_KEY,
@@ -1081,7 +1156,12 @@ const JUMP_BLEND_LAMBDA = 30
 
 /** ジャンプの 3 局面。ブレンドを速める判定に使う */
 const JUMP_STATES = new Set<Locomotion>(['jump_up', 'jump_loop', 'jump_down'])
+/** 軽い着地の型 (Landing、30fps) で足が着くコマ (12 コマ目) の時刻 (秒) */
+const LANDING_TOUCHDOWN = 11 / 30
 const UPPER_BLEND_LAMBDA = 16
+/** 釘付けの姿の間を繋ぐ速さ。普段 (12 / 16) の半分以下 — 0.6 秒ほどかけて寄せる */
+const TRAP_BLEND_LAMBDA = 5
+const TRAP_BLEND_STATES = new Set<Locomotion>(['trapped_hold', 'trapped_out'])
 /** これ以下の重みは 0 と見なす。使っていないクリップが微量に混ざり続けるのを防ぐ */
 const WEIGHT_EPSILON = 1e-3
 
@@ -1455,6 +1535,10 @@ export class CharacterAnimator {
   /** 前フレームに読んだルートモーションの値。差分を出すのに使う */
   private readonly lastRootSample = new THREE.Vector3()
   private rootSampleValid = false
+  /** 足の高さを測った型 (FOOT_RISE_CLIPS)。型の名前から */
+  private readonly footRises = new Map<string, FootRise>()
+  /** 乗る型 (vault_up) の焼かれた移動に掛ける倍率。playVault で決まる */
+  private vaultUpReach = 1
   /** 前回どこまで再生していたか。頭へ戻ったのを見つけるのに使う */
   private lastRootTime = 0
   /** 骨格のスケール (Armature の 0.01)。トラックの単位をメートルに直すのに使う */
@@ -1551,6 +1635,7 @@ export class CharacterAnimator {
       finished === this.upper.get(PRONE_BOLT_KEY) ||
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(THROWN_KEY) ||
+      finished === this.upper.get(ROLL_FALL_KEY) ||
       finished === this.upper.get(CQC_THROW_KEY) ||
       finished === this.upper.get(CQC_MISS_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
@@ -1603,6 +1688,10 @@ export class CharacterAnimator {
         }
         if (stored) this.rootMotion.set(clip.name, stored)
       }
+      if (rootBone && FOOT_RISE_CLIPS.has(clip.name) && !footRiseStore.has(clip)) {
+        const measured = measureFootRise(root, clip, rootBone)
+        if (measured) footRiseStore.set(clip, measured)
+      }
       if (rootBone) {
         stripRootMotion(
           clip,
@@ -1613,6 +1702,12 @@ export class CharacterAnimator {
             ? verticalResidual(clip, rootBone.name, restBase, VERTICAL_END_POSE[clip.name], clips)
             : undefined,
         )
+        const foot = footRiseStore.get(clip)
+        if (foot && restBase) {
+          keepKneeBend(clip, rootBone.name, restBase.z, foot)
+          // 流すのは上下に分けた写し (splitClip) なので、型からは引けない。名前で持つ
+          this.footRises.set(clip.name, foot)
+        }
       }
       byName.set(clip.name, clip)
     }
@@ -1803,6 +1898,7 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [SWEEP_KEY, 'sweep'],
       [THROWN_KEY, 'cqc_thrown'],
+      [ROLL_FALL_KEY, 'hit2back'],
       [STAND_KEY, STAND_CLIP],
     ] as const) {
       const clip = byName.get(name)
@@ -1929,6 +2025,8 @@ export class CharacterAnimator {
     for (const [key, name] of [
       [HANG_DROP_KEY, 'hang_drop'],
       [HANG_CLIMB_KEY, 'hang_climb'],
+      [HANG_LEFT_KEY, 'hang_left'],
+      [HANG_RIGHT_KEY, 'hang_right'],
       [CQC_THROW_KEY, 'cqc_throw'],
       [CQC_MISS_KEY, 'cqc_miss'],
     ] as const) {
@@ -1994,6 +2092,9 @@ export class CharacterAnimator {
       }
       this.trappedDuration = trapped.duration
     }
+    // 撫で続ける型は繰り返す (止まっている 6 秒の間ずっと)
+    const treat = byName.get('treat_cat')
+    if (treat) registerUpper(TRAPPED_HOLD_KEY, treat)
 
     const bump = byName.get('bump')
     if (bump) {
@@ -2113,9 +2214,18 @@ export class CharacterAnimator {
       JUMP_STATES.has(this.locomotion) || JUMP_STATES.has(this.previousLocomotion)
         ? JUMP_BLEND_LAMBDA
         : LOWER_BLEND_LAMBDA
-    this.blend(this.lower, this.lowerWeights, this.resolveLowerKey(), lowerLambda, dt)
+    // 釘付けの間 (しゃがみ込む → 撫でる → 立ち上がる) はゆっくり繋ぐ。姿の差が大きく、
+    // 普段の速さでは切れ目が目立った (2026-10-21 本人「しゃがんだ後の切れ目が雑」)
+    const trapBlend = TRAP_BLEND_STATES.has(this.locomotion)
+    this.blend(this.lower, this.lowerWeights, this.resolveLowerKey(), trapBlend ? TRAP_BLEND_LAMBDA : lowerLambda, dt)
     this.previousLocomotion = this.locomotion
-    this.blend(this.upper, this.upperWeights, this.resolveUpperKey(), UPPER_BLEND_LAMBDA, dt)
+    this.blend(
+      this.upper,
+      this.upperWeights,
+      this.resolveUpperKey(),
+      trapBlend ? TRAP_BLEND_LAMBDA : UPPER_BLEND_LAMBDA,
+      dt,
+    )
     /*
      * 全身の型が決まっている動作では、照準由来の補正を掛けると崩れる。
      *
@@ -2859,6 +2969,15 @@ export class CharacterAnimator {
     this.playWholeBody(CLIMB_TOP_KEY, 'climb_top', rate)
   }
 
+  /**
+   * 上端の上の床から梯子へ**降りて掴む**。登り切りの型を終わりから逆に流す。
+   * 状態は climb_top のまま (腰の曲線 riseProgress / forwardProgress も climb_top で引く)。
+   * 外へ伝える型だけ climb_mount (soldier / remoteSoldier)
+   */
+  playClimbMount(rate: number): void {
+    this.playWholeBody(CLIMB_TOP_KEY, 'climb_top', -rate)
+  }
+
   /** 手に何も出ていない持ち物か (投げ物・設置物) */
   setHandsEmpty(empty: boolean): void {
     this.handsEmpty = empty
@@ -3249,6 +3368,8 @@ export class CharacterAnimator {
     if (this.upperState === 'cqc_miss' && this.upper.has(CQC_MISS_KEY)) return CQC_MISS_KEY
     if (this.upperState === 'hang_drop' && this.upper.has(HANG_DROP_KEY)) return HANG_DROP_KEY
     if (this.upperState === 'hang_climb' && this.upper.has(HANG_CLIMB_KEY)) return HANG_CLIMB_KEY
+    if (this.upperState === 'hang_left' && this.upper.has(HANG_LEFT_KEY)) return HANG_LEFT_KEY
+    if (this.upperState === 'hang_right' && this.upper.has(HANG_RIGHT_KEY)) return HANG_RIGHT_KEY
     // 箱が落ちた反応も中断させない。**上だけ構えに戻ると、銃を構えたまま驚く**
     if (this.upperState === 'bump' && this.upper.has(BUMP_KEY)) return BUMP_KEY
     // 梯子。**構えていても差し替えない** — 両手が塞がっている
@@ -3262,6 +3383,7 @@ export class CharacterAnimator {
     }
     if (this.upperState === 'pat' && this.upper.has(PAT_KEY)) return PAT_KEY
     if (this.upperState === 'trapped' && this.upper.has(TRAPPED_KEY)) return TRAPPED_KEY
+    if (this.upperState === 'trapped_hold' && this.upper.has(TRAPPED_HOLD_KEY)) return TRAPPED_HOLD_KEY
     if (this.upperState === 'trapped_out' && this.upper.has(TRAPPED_OUT_KEY)) return TRAPPED_OUT_KEY
 
     // 伏せている間、構えていなければ倒れた姿勢のまま。
@@ -3271,7 +3393,7 @@ export class CharacterAnimator {
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
     if (
       !this.aiming &&
-      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown') &&
+      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown' || this.locomotion === 'hit2back') &&
       this.upper.has(this.fallKey)
     ) {
       return this.fallKey
@@ -3403,8 +3525,10 @@ export class CharacterAnimator {
    *
    * 焼き込まれた移動 (2.06m) を辿る (ROOT_MOTION_CLIPS)。腰の上下は型に残して
    * あるので、跳ぶ絵は型が持っている — 位置のほうは床の高さのまま動く。
+   *
+   * @param reach 乗る型 (up) の焼かれた移動に掛ける倍率。乗る物の縁までの距離で soldier が決める
    */
-  playVault(up = false): void {
+  playVault(up = false, reach = 1): void {
     if (this.dead) return
     const name = up ? 'vault_up' : 'vault'
     const upper = this.upper.get(up ? VAULT_UP_KEY : VAULT_KEY)
@@ -3414,6 +3538,7 @@ export class CharacterAnimator {
     lower.reset().play()
     this.upperState = name
     this.locomotion = name
+    this.vaultUpReach = up ? reach : 1
     this.rootSampleValid = false
   }
 
@@ -3449,7 +3574,9 @@ export class CharacterAnimator {
    * 位置をこれに沿って上げれば、足の運びと体の上がり方が合う。
    */
   vaultRise(): number {
-    return this.riseProgress('vault_up')
+    // 足の上がり方で上げる (FOOT_RISE_CLIPS)。測れなかった時は腰の曲線
+    const foot = this.footRise('vault_up')
+    return foot ?? this.riseProgress('vault_up')
   }
 
   /**
@@ -3460,6 +3587,19 @@ export class CharacterAnimator {
     this.playOneShotWhole(HANG_DROP_KEY, 'hang_drop')
   }
 
+  /**
+   * ぶら下がったまま横へ移る。終わったら endHang で待つ姿へ戻す。scale は FAST MOVE の倍率
+   * (相手の画面では分からないので 1)
+   */
+  playHangShimmy(side: -1 | 1, scale = 1): void {
+    const key = side < 0 ? HANG_LEFT_KEY : HANG_RIGHT_KEY
+    const name = side < 0 ? 'hang_left' : 'hang_right'
+    this.playOneShotWhole(key, name)
+    // 速めて流す。位置は型の進み (oneShotPhase) に合わせて動くので、移る速さも同じだけ上がる
+    this.upper.get(key)?.setEffectiveTimeScale(HANG_SHIMMY_RATE * scale)
+    this.lower.get(name)?.setEffectiveTimeScale(HANG_SHIMMY_RATE * scale)
+  }
+
   /** ぶら下がりから縁の上へ登る。終わればしゃがみの型へ渡る */
   playHangClimb(): void {
     this.playOneShotWhole(HANG_CLIMB_KEY, 'hang_climb')
@@ -3467,7 +3607,13 @@ export class CharacterAnimator {
 
   /** ぶら下がりを抜ける (手を離した / 登り切った後の念のため)。上半身を普段へ */
   endHang(): void {
-    if (this.upperState === 'hang_drop' || this.upperState === 'hang_climb') this.upperState = 'stance'
+    if (
+      this.upperState === 'hang_drop' ||
+      this.upperState === 'hang_climb' ||
+      this.upperState === 'hang_left' ||
+      this.upperState === 'hang_right'
+    )
+      this.upperState = 'stance'
   }
 
   /** ぶら下がっている (落ちる途中・登る途中も含む) */
@@ -3558,6 +3704,14 @@ export class CharacterAnimator {
   }
 
   /** 腰の軌道の 1 成分 (0 = 横、1 = 前後、2 = 上下) を頭〜終わりで 0..1 に */
+  /** 足の上がり (0〜1)。足を測った型 (FOOT_RISE_CLIPS) でなければ null */
+  private footRise(name: Locomotion): number | null {
+    const action = this.lower.get(name)
+    const foot = this.footRises.get(LOWER_CLIPS[name])
+    if (!action || !foot) return null
+    return sampleScalar(foot.times, foot.rise, action.time)
+  }
+
   private trackProgress(name: Locomotion, component: 0 | 1 | 2): number {
     const stored = this.rootMotion.get(name)
     const action = this.lower.get(name)
@@ -3628,15 +3782,28 @@ export class CharacterAnimator {
 
   /**
    * 猫に釘付けになる。しゃがみ込んで猫へ手を伸ばし、**伸ばし切った姿で止まる**
-   * (解けるまで。domain/item/doll.ts)
+   * (その後は撫で続ける playTrappedHold。domain/item/doll.ts)
    */
   playTrapped(): void {
     this.playWholeBody(TRAPPED_KEY, 'trapped')
   }
 
-  /** 解けた。**同じ型を逆に流して**立ち上がる */
-  playTrappedOut(): void {
+  /**
+   * しゃがみ込み終えて、手を伸ばした先の猫を撫で続ける (TreatCat、繰り返し)。型の重みが寄って
+   * 繋がるので、しゃがみ込む型の終わりから滑らかに移る
+   */
+  playTrappedHold(): void {
+    this.playWholeBody(TRAPPED_HOLD_KEY, 'trapped_hold')
+  }
+
+  /** 解けた。**同じ型を逆に流して**立ち上がる。from (秒) の所から頭へ */
+  playTrappedOut(from?: number): void {
     this.playWholeBody(TRAPPED_OUT_KEY, 'trapped_out', -1)
+    if (from === undefined) return
+    const upper = this.upper.get(TRAPPED_OUT_KEY)
+    const lower = this.lower.get('trapped_out')
+    if (upper) upper.time = Math.min(from, upper.getClip().duration)
+    if (lower) lower.time = Math.min(from, lower.getClip().duration)
   }
 
   /**
@@ -3666,11 +3833,15 @@ export class CharacterAnimator {
     this.locomotion = state
   }
 
-  /** 着地のモーション。頭から流す */
-  playLanding(): void {
+  /**
+   * 着地のモーション。**足が着いた所 (LANDING_TOUCHDOWN) から流す** — Landing の頭 12 コマは空中で
+   * 落ちてくる所なので使わない。膝を曲げて沈み、立ち姿に戻るまで
+   */
+  playLanding(rate = 1): void {
     const action = this.lower.get('jump_down')
     if (!action) return
-    action.reset().play()
+    action.reset().setEffectiveTimeScale(rate).play()
+    action.time = Math.min(LANDING_TOUCHDOWN, action.getClip().duration)
     this.locomotion = 'jump_down'
   }
 
@@ -3968,6 +4139,23 @@ export class CharacterAnimator {
   }
 
   /**
+   * ローリングの体当たりで後ろへ倒れる (しゃがんでいた所から、型 Hit2Back)。**倒れた後は爆風で
+   * 倒れた時と同じ** (playSweep)。型が無ければ爆風の倒れ方で代わりにする
+   */
+  playRollFall(): void {
+    if (this.dead) return
+    const upper = this.upper.get(ROLL_FALL_KEY)
+    const lower = this.lower.get('hit2back')
+    if (!upper || !lower) return this.playSweep()
+    upper.reset().setEffectiveTimeScale(ROLL_FALL_RATE).play()
+    lower.reset().setEffectiveTimeScale(ROLL_FALL_RATE).play()
+    this.upperState = 'sweep'
+    this.locomotion = 'hit2back'
+    this.fallKey = ROLL_FALL_KEY
+    this.sweepDuration = ROLL_FALL_LAND
+  }
+
+  /**
    * CQC を掛ける (throw) / 空振りする (miss)。全身の型で、焼かれた移動を辿る。
    * 跳び越えと同じく、終わるまで操作は効かない (cqcBusy)
    */
@@ -4100,7 +4288,7 @@ export class CharacterAnimator {
 
     // トラック空間は X/Y が水平、Z が上下 (Armature の +90°X 回転のため)。
     // モデル空間では armature ローカルの +Y が前方 (+Z) に対応する。
-    const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1)
+    const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1) * (name === 'vault_up' ? this.vaultUpReach : 1)
     const hold = ROOT_MOTION_HOLD[name]
     if (hold) {
       /*
@@ -4445,6 +4633,68 @@ function verticalResidual(
   const clipSpan = track.values[track.values.length - 1] - track.values[2]
   if (Math.abs(clipSpan) < 1e-3) return 0
   return (end.z - rest.z) / clipSpan
+}
+
+/**
+ * 型を骨に流して、腰のトラックの時刻ごとに**足の高さ**を測る (FOOT_RISE_CLIPS)。
+ *
+ * 一時の mixer で模型を動かすので、本物の mixer が型を流す前 (Animator の頭) に 1 度だけ呼ぶ。
+ * 高さは模型の空間 (m) で測り、腰のトラックの単位へは腰の上下の比で直す (縮尺を持ち込まない)
+ */
+function measureFootRise(root: THREE.Object3D, clip: THREE.AnimationClip, rootBone: THREE.Bone): FootRise | null {
+  const track = clip.tracks.find((t) => t.name.endsWith('.position') && sameNode(t.name, rootBone.name))
+  const feet = FOOT_BONES.map((name) => findBoneBySuffix(root, name))
+  if (!track || feet.some((b) => !b)) return null
+  const n = track.times.length
+  const footY = new Float32Array(n)
+  const hipY = new Float32Array(n)
+  const mixer = new THREE.AnimationMixer(root)
+  const action = mixer.clipAction(clip)
+  action.play()
+  const at = new THREE.Vector3()
+  for (let i = 0; i < n; i++) {
+    action.time = track.times[i]
+    mixer.update(0)
+    root.updateMatrixWorld(true)
+    let low = Infinity
+    for (const bone of feet) low = Math.min(low, root.worldToLocal(bone!.getWorldPosition(at)).y)
+    // 一度上がった足は下がらない。跳ぶ途中で両足が浮いて下がって見えるのを位置に持ち込まない
+    footY[i] = i > 0 ? Math.max(footY[i - 1], low) : low
+    hipY[i] = root.worldToLocal(rootBone.getWorldPosition(at)).y
+  }
+  action.stop()
+  mixer.uncacheRoot(root)
+  const footSpan = footY[n - 1] - footY[0]
+  const hipSpan = hipY[n - 1] - hipY[0]
+  const trackSpan = track.values[track.values.length - 1] - track.values[2]
+  if (footSpan < 1e-3 || Math.abs(hipSpan) < 1e-3) return null
+  const toTrack = trackSpan / hipSpan
+  const rise = new Float32Array(n)
+  const hipZ = new Float32Array(n)
+  const endAboveFeet = hipY[n - 1] - footY[n - 1]
+  for (let i = 0; i < n; i++) {
+    rise[i] = Math.min(1, Math.max(0, (footY[i] - footY[0]) / footSpan))
+    hipZ[i] = (hipY[i] - footY[i] - endAboveFeet) * toTrack
+  }
+  return { times: Float32Array.from(track.times), rise, hipZ }
+}
+
+/** 腰の上下を「足からの高さ」で残す (FOOT_RISE_CLIPS)。潰した後に上書きするので何度呼んでも同じ */
+function keepKneeBend(clip: THREE.AnimationClip, rootBoneName: string, restZ: number, foot: FootRise): void {
+  const track = clip.tracks.find((t) => t.name.endsWith('.position') && sameNode(t.name, rootBoneName))
+  if (!track || track.times.length !== foot.times.length) return
+  for (let i = 0; i < foot.hipZ.length; i++) track.values[i * 3 + 2] = restZ + foot.hipZ[i]
+}
+
+/** 時刻の並びに沿った値を線形に読む */
+function sampleScalar(times: Float32Array, values: Float32Array, t: number): number {
+  const n = times.length
+  if (t <= times[0]) return values[0]
+  if (t >= times[n - 1]) return values[n - 1]
+  let i = 1
+  while (times[i] < t) i++
+  const k = (t - times[i - 1]) / (times[i] - times[i - 1])
+  return values[i - 1] + (values[i] - values[i - 1]) * k
 }
 
 /** そのクリップの腰の水平位置 (先頭フレーム)。全クリップを揃える基準に使う */

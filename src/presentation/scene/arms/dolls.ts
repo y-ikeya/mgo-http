@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { castStaticShadow } from '../world/liveShadow'
 import { loadDoll } from '../assets'
 import { refreshStaticShadows } from '../world/staticShadow'
 import { LURE_RADIUS } from '../../../domain/item/doll'
@@ -94,9 +95,7 @@ export class Dolls {
       const model = gltf.scene.clone(true)
       // 模型の正面は +Z。置いた本人のほうへ向ける (yaw は -Z 正面の向き)
       model.rotation.y = yaw + Math.PI
-      model.traverse((o) => {
-        if ((o as THREE.Mesh).isMesh) o.castShadow = true
-      })
+      castStaticShadow(model)
       group.add(model)
       refreshStaticShadows() // 置いた物は影マップに焼き直す
     })

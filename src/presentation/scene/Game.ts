@@ -3,6 +3,8 @@ import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/w
 import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
+import { followMovingShadow } from "./world/liveShadow";
+import { addMaskedShadows } from "./world/fenceShadow";
 import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
@@ -40,6 +42,7 @@ import {
   loadStageFx,
   applyStageSun,
   sunProbeOf,
+  sunCastOf,
   loadStageLadders,
   STAGE_CODE,
   type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
@@ -99,7 +102,7 @@ import {
   type Side,
 } from "../../domain/match/room";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
-import { setSunProbe } from "./actor/blobShadow";
+import { setSunCaster, setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
 import { LAG_LIMIT_MS } from "../../domain/match/lag";
 import type { HitZone } from "../../domain/rule/damage";
@@ -1317,6 +1320,10 @@ export class Game {
 
   /** 乗っているステージ。**部屋が決める** (ROOMS) */
   private readonly stageName: StageName;
+  /** 乗っているステージ。画面がサーバーの配るステージと比べて、違えば組み直す */
+  get currentStage(): StageName {
+    return this.stageName;
+  }
   /**
    * 持ち込める主武器。**部屋が決める** (ROOMS の primaries)。
    *
@@ -1336,7 +1343,11 @@ export class Game {
   /**
    * @param privateRoom 自分だけの部屋に入る (練習 /training)。他の人とは出会わない
    */
-  constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
+  /**
+   * @param stage 乗るステージ。**試合の切れ目でサーバーが替えた時に渡す** (screens/Play.tsx が組み直す)。
+   *   無ければ部屋の回す表の先頭
+   */
+  constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false, stage?: StageName) {
     // 倒れた体が下がる時、壁で止める。カメラと同じ網で見る (表裏を問わない)
     setSlideBlocker((origin, dir, max) => this.cameraWorld.distanceToObstruction(origin, dir, max));
     // 前回選んだ感度から始める
@@ -1362,12 +1373,13 @@ export class Game {
      * サーバーに訊かないのは、画面を組み始める時点でまだ 1 通も届いていない
      * ため。同じ表をこちらも読むので食い違わない。
      *
-     * **試合ごとに切り替えるようになったら、ここがサーバーからの通に変わる**
-     * (回す表は既に domain/stage に在る)。そのときは地形を
-     * 読み直す道が要る。
+     * **試合ごとに切り替わる部屋では、サーバーが配る試合の状態 (match) に今のステージが載る。**
+     * 手元と違えば画面が暗転して、そのステージを渡して作り直す (screens/Play.tsx)。
+     * 地形を差し替える道を Game の中に持たないのは、地形を前提に組んだ物 (当たり・影・
+     * 空・音・人) が多く、捨てて作り直すほうが取りこぼしが無いため
      */
     this.stageName = STAGES[
-      isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall'
+      stage ?? (isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall')
     ].name;
     this.roomName = isRoomName(room) ? room : null;
     this.primaries = isRoomName(room) ? primariesOf(room) : CHOICES.primary;
@@ -1507,6 +1519,9 @@ export class Game {
       fitShadowToStage(this.sun, this.stage);
       // 人の足元の影は、日の当たる所でだけ足す (blobShadow.ts)
       setSunProbe(sunProbeOf(this.stage, this.sun));
+      setSunCaster(sunCastOf(this.stage, this.sun));
+      // 網目の物 (金網) の影は床へ網目の絵を貼って落とす。影の地図から外した分を焼き直す (world/fenceShadow.ts)
+      if (addMaskedShadows(this.scene, this.sun, sunProbeOf(this.stage, this.sun))) this.sun.shadow.needsUpdate = true;
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
@@ -1798,6 +1813,8 @@ export class Game {
       .addScaledVector(this.rightVec, axis.x);
     // 梯子の上下は**カメラを通さない生の値**で決める (体の向きに依らない)
     this.player.setStickForward(-axis.z);
+    // ぶら下がりの横移動も同じく生の値 (体から見た左右)
+    this.player.setStickSide(axis.x);
 
     // 装備を組んでいる間は動けない。
     //
@@ -2061,6 +2078,8 @@ export class Game {
       return false;
     });
 
+    // 人の影の地図を自分の周りへ寄せる (world/liveShadow.ts)
+    followMovingShadow(this.sun, this.player.position.x, this.player.position.y, this.player.position.z);
     if (this.post) this.post.render();
     else this.renderer.render(this.scene, this.follow.camera);
     // **描き終えたここで読む。** 描画の量はコマの頭 (setAnimationLoop の中) で 0 に戻るので、
@@ -2595,6 +2614,10 @@ export class Game {
         // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
         const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
         if (asleep > 0) this.player.sleep(asleep, true);
+        // 人形に釘付けの途中で読み直した。**寄る・しゃがみ込む動きは飛ばして**撫でている所から続ける
+        else if (message.trapped) this.player.trap(undefined, true);
+        // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
+        else if (message.hanging) this.player.resumeHang(message.yaw);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
@@ -2855,7 +2878,8 @@ export class Game {
         if (message.victims.includes(this.net.id)) {
           const p = this.player.position;
           // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
-          this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined);
+          // 猫のほうへ歩いて寄ってからしゃがみ込む (猫の足元を渡す)
+          this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined, false, doll ?? undefined);
         }
         // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
         for (const id of message.victims) {
@@ -2975,12 +2999,16 @@ export class Game {
         break;
 
       case "knockdown":
-        this.player.knockDown();
+        // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
+        // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
+        if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
+        this.player.knockDown(message.distance !== undefined);
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
-        this.player.knockPush(message.dirX, message.dirZ);
+        this.player.knockPush(message.dirX, message.dirZ, message.distance);
         // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
         this.loseHeldGrenade();
-        this.audio.play("blastScream", this.player.position);
+        // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
+        if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
         break;
 
       // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —

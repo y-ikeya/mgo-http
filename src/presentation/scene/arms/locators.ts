@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { castStaticShadow } from '../world/liveShadow'
 import { refreshStaticShadows } from '../world/staticShadow'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
 import { materialOpacity, normalView, positionView } from 'three/tsl'
@@ -354,9 +355,7 @@ export class Locators {
       const centre = box.getCenter(new THREE.Vector3())
       this.offset.set(-centre.x, -box.min.y, -centre.z)
       this.halfWidth = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2
-      model.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) obj.castShadow = true
-      })
+      castStaticShadow(model)
       const lamp = model.getObjectByName(LAMP_NAME)
       if (lamp) {
         // 灯の向き。**袋の中心から見た向き**なので、ずらした後の座標で測る
@@ -588,7 +587,7 @@ export class Locators {
         new THREE.BoxGeometry(FALLBACK_HALF * 2, FALLBACK_HALF * 2, FALLBACK_HALF * 2),
         new THREE.MeshStandardMaterial({ color: 0x23282a, roughness: 0.6, metalness: 0.4 }),
       )
-      box.castShadow = true
+      castStaticShadow(box)
       item.group.add(box)
       return
     }

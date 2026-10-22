@@ -78,6 +78,11 @@ export type Locomotion =
    */
   | 'climb_top'
   /**
+   * 上端の上の床から梯子へ**降りて掴む**。登り切り (climb_top) を逆に流す一度きりの型。
+   * 終わりで梯子を掴んだ姿になる (2026-10-22 本人「上から G で滑らかに梯子に掴まれないか」)
+   */
+  | 'climb_mount'
+  /**
    * 麻酔で眠っている。
    *
    * 倒れている (death) とは別物。**体はそこに在り続け、30 秒で起きる。**
@@ -136,6 +141,12 @@ export type Locomotion =
   | 'hang_drop'
   /** 縁に手を掛けて待つ。登る型の頭の 1 枚で止める (壁向き、手が前) */
   | 'hang'
+  /**
+   * 縁にぶら下がったまま横へ移る (型 BracedHangLeft / Right、1 回で 0.58m)。左右は体から見て。
+   * 縁が切れていれば移らない (本人 2026-10-21)
+   */
+  | 'hang_left'
+  | 'hang_right'
   /** ぶら下がりから縁の上へ登り、しゃがみで復帰する */
   | 'hang_climb'
   // 敬礼。全身の型なので上下を分けない
@@ -159,6 +170,8 @@ export type Locomotion =
    * 伸ばした姿で止まる。trapped_out は同じ型を逆に流して戻る
    */
   | 'trapped'
+  /** 人形に釘付けのまま、手を伸ばした先の猫を撫で続ける (型 TreatCat、繰り返し)。trapped の後 */
+  | 'trapped_hold'
   | 'trapped_out'
   /**
    * 接続が切れて、体だけ残っている姿。
@@ -182,6 +195,11 @@ export type Locomotion =
   | 'cqc_throw'
   | 'cqc_miss'
   | 'cqc_thrown'
+  /**
+   * ローリングの体当たりで後ろへ倒れる (しゃがんでいた相手。型 Hit2Back)。仰向けで終わり、
+   * そのまま倒れている間の姿になる (cqc_thrown と同じ扱い)。爆風 (sweep) ほど飛ばない
+   */
+  | 'hit2back'
   /**
    * 伏せている。**しゃがみの下にもう一段。**
    *
@@ -277,6 +295,7 @@ export function emptyHanded(locomotion: Locomotion): boolean {
     // 梯子。**両手が塞がっている** — 銃を出すと梯子を握らずに登って見える
     locomotion === 'climb' ||
     locomotion === 'climb_top' ||
+    locomotion === 'climb_mount' ||
     locomotion === 'sleep' ||
     locomotion === 'away' ||
     locomotion === 'death' ||

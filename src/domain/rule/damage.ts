@@ -11,6 +11,7 @@
 
 import { HEAD_HEIGHT, VIEW_HEIGHT, leanShift, type Stance } from '../player/stance'
 import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
+import { MAX_STAMINA } from '../player/stamina'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
 export type HitZone = 'HEAD' | 'BODY' | 'LEGS'
@@ -50,10 +51,23 @@ export const BACKSTAB_DOT = 0.34
  */
 export const ROLL_HIT_RANGE = 1.1
 /**
- * ローリングで押しのける距離 (m)。
- * 倒すのではなく体勢を崩させる。ダメージは入れない。
+ * ローリングで押しのける距離 (m)。立っている相手だけ (しゃがんでいれば倒れる、伏せていれば当たらない)。
+ * 体力は削らない。
  */
 export const ROLL_KNOCKBACK = 0.8
+/**
+ * ローリングの体当たりで削るスタミナ。**1/8** (本人 2026-10-20)。立っていても、しゃがんで倒れても同じ
+ */
+export const ROLL_STAMINA = MAX_STAMINA / 8
+/**
+ * 立っている相手が体当たりで怯んで足を止める長さ (秒)。**走っていても止まる** (本人 2026-10-20)
+ */
+export const ROLL_STAGGER_SECONDS = 0.5
+/**
+ * しゃがんだ相手が体当たりで後ろへ倒れる時に滑る距離 (m)。**爆風 (3m) より遥かに短い** —
+ * 爆風と同じだけ飛んで「飛びすぎ」だった (本人 2026-10-20)。尻もちをつくくらい
+ */
+export const ROLL_FALL_DISTANCE = 0.5
 
 /**
  * ダンボールで走っていて敵にぶつかったと見なす距離 (m)。
@@ -315,7 +329,7 @@ export const HIT_RULES = {
  * 5m 飛ぶ人が並ぶ)。爆心から離れれば**そもそも転ばない** (item/grenade.ts の
  * KNOCK_NEAR) ので、そこで強弱は付いている。
  */
-const KNOCK_DISTANCE = 3
+export const KNOCK_DISTANCE = 3
 
 /**
  * 飛んでいる時間 (秒)。

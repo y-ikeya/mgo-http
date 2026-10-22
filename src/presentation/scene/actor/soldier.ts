@@ -1,5 +1,6 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { BlobShadow } from './blobShadow'
+import { MOVING_SHADOW_LAYER } from '../world/liveShadow'
 import { boxMoveScale, runnerScale, setupSpeedScale, stabSpeedScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
@@ -8,7 +9,15 @@ import {
   ladderAt,
   ladderGrip,
 } from '../../../domain/stage'
-import { BOX_BUMP_STUN, KNOCK_TIME, fallDamage, knockSpeed } from '../../../domain/rule/damage'
+import { TRAPPED_CROUCH_SECONDS, TRAP_APPROACH_SECONDS, TRAP_REACH } from '../../../domain/item/doll'
+import {
+  BOX_BUMP_STUN,
+  KNOCK_DISTANCE,
+  KNOCK_TIME,
+  ROLL_STAGGER_SECONDS,
+  fallDamage,
+  knockSpeed,
+} from '../../../domain/rule/damage'
 import { SkyLight } from '../world/skylight'
 import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance, COLLISION_HEIGHT, BODY_BOX } from '../../../domain/player/stance'
 import * as THREE from 'three'
@@ -249,16 +258,24 @@ const HARD_LAND_TIME = 2.03
 /**
  * 軽い着地 (jump_down、膝を曲げる) を出しておく時間 (秒)。
  *
- * クリップは 0.67 秒あるが、全部流すと着地のたびに膝を曲げた時間が長く残る。
- * 衝撃を受け止める瞬間だけ見せてすぐ移動へ返す。
+ * 型は Landing の脚 (足が着く 12 コマ目から、膝を曲げて沈み、立ち姿に戻る 34 コマ目まで)。
+ * 0.16 秒だった頃は短すぎて着地が見えなかった (2026-10-21 本人「着地のモーションが消えた？」)。
+ * **この間は動けない** (本人 2026-10-21)。膝を曲げて受け止めている間に歩くと、脚を曲げたまま
+ * 滑って見えた
  */
-const LANDING_TIME = 0.16
 /**
- * 軽い着地の型を出す落下速度の下限 (m/s)。2m (8.4 m/s) から。
+ * 軽い着地の型を流す速さ。**2 倍** (2026-10-22 本人「もっと早くていい、今すごいゆっくりで隙がでかい」)。
+ * 動けない時間 (LANDING_TIME) も同じだけ縮む。他人の画面も同じ速さで流す (remoteSoldier.ts)
+ */
+export const LANDING_RATE = 2
+const LANDING_TIME = (34 - 12) / 30 / LANDING_RATE
+/**
+ * 軽い着地の型を出す落下速度の下限 (m/s)。**1m (5.9 m/s) から** (2026-10-21 本人。2m (8.4 m/s) だった)。
  *
  * 落ちる速さは落ちる時の重力 (9.8 × FALL_GRAVITY_SCALE 1.8 = 17.6 m/s²) で決まる:
  * 段 1 つ (0.25m) で 3.0、跳躍の高さ (0.6m) で 4.6、肩の高さ (1.4m) で 7.0。
- * それらで膝を曲げると一段降りるたびに屈んで見えるので拾わない。
+ * 段と跳躍で膝を曲げると一段降りるたびに屈んで見えるので拾わない。肩の高さの箱から
+ * 飛び降りた時と、ぶら下がりから手を離した時 (1m ほど) は拾う
  * 削られる高さ (FALL_SAFE_SPEED 12 = 4.1m) はこの上で、そちらは受け身 (hard_land)。
  *
  * **型は接地した瞬間 (moved.landed) にだけ始める。** 2026-10-06 の朝に「空中で膝が
@@ -266,7 +283,7 @@ const LANDING_TIME = 0.16
  * (524261b〜4f07536) だけで、均しは外れている。いまは物理と絵が同じ高さなので、
  * 接地で始めれば足が着いてから曲がる。
  */
-const LANDING_MIN_SPEED = 8.4
+const LANDING_MIN_SPEED = 5.9
 
 /*
  * 跳び越え (vault)。**転がりの代わりに出る。**
@@ -288,10 +305,26 @@ const VAULT_MAX = 1.2
 const VAULT_REACHES = [0.4, 0.55, 0.7, 0.85, 1.0] as const
 /**
  * 着地を探す距離 (m)。**枠から先**の長さ。近いほうは「枠のすぐ先の箱」(乗る)、
- * 遠いほうは「越えた先の床」(越える)。型は越えるときに 2.06m、乗るときに 1.13m 進む
+ * 遠いほうは「越えた先の床」(越える)。型は越えるときに 2.06m、乗るときに縁から VAULT_UP_ONTO だけ乗った所まで進む
  */
 const VAULT_LANDING_NEAR = 0.8
+/** 乗る型 (vault_up) に焼かれた前への移動 (m) */
+const VAULT_UP_BAKED = 1.13
+/**
+ * 乗った後、**縁からどれだけ上に入るか** (m、体の中心)。焼かれた通り 1.13m 進むと、体を付けて
+ * 乗った最初の一歩が大きすぎた (2026-10-23 本人「最初の一歩目デカすぎ、距離は 2/3 でいい」)。
+ * 一律に 2/3 (0.75m) にすると、少し離れて押した時に縁に届かず落ちたので、進む量は
+ * 縁までの距離 + これにする。体を付けて押せば 0.35 + 0.4 = 0.75m (2/3)
+ */
+const VAULT_UP_ONTO = 0.4
+/** 縁までの距離を探す刻み (m) */
+const VAULT_EDGE_STEP = 0.05
 const VAULT_LANDING_FAR = 1.3
+/**
+ * 奥行きの浅い台に乗る時に見る、もっと手前の距離 (m、枠の上面を見つけた所から先)。**どちらも**
+ * 枠と同じ高さなら乗れる。点で見るので、2 か所の間 (0.2m) より薄い窓枠・手すりでは揃わない
+ */
+const VAULT_LANDING_SHALLOW = [0.0, 0.2] as const
 /** 障害の上に要る隙間 (m)。屈んで越えるので身長より低くてよい */
 const VAULT_HEADROOM = 1.0
 /** 枠の上に体を置いたとき、これ以上押し戻されたら塞がっている (m)。窓の鉄棒・格子 */
@@ -379,9 +412,60 @@ const HANG_CLIMB_RISE_DONE = 0.9
  */
 const HANG_NORMAL_SAMPLES = 24
 const HANG_NORMAL_REACH = 0.15
+/** 角か平らな壁かの見分け。2 つの面の外向きがこれより揃っていれば (25° 以内) 平らな壁 */
+const HANG_FLAT_COS = Math.cos((25 * Math.PI) / 180)
 /** 法線に沿って縁まで詰める刻みと上限 (m) */
 const HANG_EDGE_STEP = 0.05
 const HANG_EDGE_REACH = 0.6
+/** ぶら下がったまま 1 回で横へ移る量 (m)。型 (BracedHangLeft / Right) の腰の移動 */
+const HANG_SHIMMY_STEP = 0.58
+/**
+ * 横へ移る型の腰の動き。**真横に等速ではない** — 持ち上げて弧を描く (2026-10-21 本人「若干重心が上に
+ * 移動するアーチ」)。元の型 (BracedHangRight) の腰を 3 コマごとに写した物で、型の進み (0..1) に対して
+ * 横の進み (0..1) と上がる量 (m)。型からは腰の動きを抜いてあるので (merge_clip の --in-place、
+ * VERTICAL_STRIP_CLIPS)、位置のほうをこの通りに動かす
+ */
+const HANG_SHIMMY_CURVE: readonly { at: number; side: number; up: number }[] = [
+  { at: 0 / 35, side: 0, up: 0 },
+  { at: 3 / 35, side: 0.147, up: 0.012 },
+  { at: 6 / 35, side: 0.316, up: 0.067 },
+  { at: 9 / 35, side: 0.448, up: 0.136 },
+  { at: 12 / 35, side: 0.521, up: 0.179 },
+  { at: 15 / 35, side: 0.54, up: 0.184 },
+  { at: 18 / 35, side: 0.55, up: 0.186 },
+  { at: 21 / 35, side: 0.595, up: 0.18 },
+  { at: 24 / 35, side: 0.669, up: 0.155 },
+  { at: 27 / 35, side: 0.75, up: 0.106 },
+  { at: 30 / 35, side: 0.843, up: 0.059 },
+  { at: 33 / 35, side: 0.941, up: 0.014 },
+  { at: 35 / 35, side: 1, up: 0 },
+]
+
+/** 型の進み (0..1) での腰の横の進みと上がる量 (HANG_SHIMMY_CURVE の間を直線で埋める) */
+function hangShimmyAt(phase: number): { side: number; up: number } {
+  const curve = HANG_SHIMMY_CURVE
+  if (phase <= 0) return curve[0]!
+  for (let i = 1; i < curve.length; i++) {
+    const b = curve[i]!
+    if (phase > b.at) continue
+    const a = curve[i - 1]!
+    const t = (phase - a.at) / (b.at - a.at)
+    return { side: a.side + (b.side - a.side) * t, up: a.up + (b.up - a.up) * t }
+  }
+  return curve[curve.length - 1]!
+}
+/**
+ * ぶら下がった姿の手の開き (m、体の中心から片手まで)。**両手の下に縁が要る** — 中心だけで見ていて、
+ * 塔の角で右手が角の外の宙を掴んだ (2026-10-21 本人「右腕分だけ空中に浮いてる」)
+ */
+const HANG_HAND_SPAN = 0.32
+/** 掴む時に、両手が縁に乗る所までずらしてよい量 (m) と刻み */
+const HANG_FIT_REACH = 0.4
+const HANG_FIT_STEP = 0.04
+/** 横へ移る時に、縁が続いているかを見る縁の内側の深さ (m) */
+const HANG_SHIMMY_INSET = 0.15
+/** 縁が続いていると見なす高さの差 (m)。これより高低があれば縁が切れている */
+const HANG_SHIMMY_LEVEL = 0.15
 
 /**
  * 空中で進行方向を変えられる度合い (0 = 変えられない)。
@@ -442,8 +526,11 @@ export const CLIMB_TOP_TUNING = {
    * 型の上下をそのまま (引き伸ばさずに) 辿れる
    */
   lead: 1.46,
-  /** 前へ渡る量 (m)。**素材の腰が前へ進む量** (1.35m) */
-  step: 1.35,
+  /**
+   * 前へ渡る量 (m)。素材の腰が前へ進む量は 1.35m だが、**その 2/3 の 0.9m** (2026-10-22 本人
+   * 「登り終わったあと前に歩きすぎ」)。腰の前後の曲線 (forwardProgress) の形はそのまま、届く先だけ縮める
+   */
+  step: 0.9,
   /** 床があるかを踏んでみる距離 (m)。梯子の際では屋上か空かを読み違える */
   probe: 0.8,
 }
@@ -453,6 +540,11 @@ const ZERO_MOVE = new THREE.Vector3()
 const LADDER_TOP_REACH = 0.6
 /** 上から掴んだ時の足元 (上端から何 m 下)。登り切りの入り口 (lead) より下 */
 const LADDER_TOP_MOUNT = CLIMB_TOP_TUNING.lead + 0.1
+/**
+ * 足元がこれより上 (上端から何 m 以内) なら**上端の上の床に立っている**。掴むと上から降り始める。
+ * 床は上端の 0.33m 下 (梯子は床から 0.33m 上まで伸ばして置く)。登っている途中の体はここより下
+ */
+const LADDER_TOP_STAND = 0.8
 
 /**
  * プレイヤーキャラクター。
@@ -731,6 +823,8 @@ export class Soldier {
   private cqcRecoverLeft = 0
   /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
   private thrownFall = false
+  /** 倒れたのがローリングの体当たりでか。倒れている間に引く型が違う (hit2back) */
+  private rolledFall = false
   /** 投げられて倒れる向き。型に焼かれた移動をこの向きで辿る */
   private thrownYaw = 0
   /** 転がり始めたか。音を鳴らす側が 1 回だけ拾う */
@@ -758,7 +852,11 @@ export class Soldier {
   /** 跳び越える枠の上面の高さ (足元から)。跳んでいる間の当たりをそのすぐ上に置く */
   private vaultSillRise = 0
   /** ぶら下がりの段階。drop = 落ちて掴む途中、hang = 掴んで待つ、climb = 登る途中 */
-  private hangStage: 'none' | 'drop' | 'hang' | 'climb' = 'none'
+  private hangStage: 'none' | 'drop' | 'hang' | 'climb' | 'shimmy' = 'none'
+  /** 横へ移っている向き (-1 左 / 1 右)。hangStage が shimmy の間だけ意味を持つ */
+  private hangShimmySide: -1 | 1 = 1
+  /** 横へ移る先 (ぶら下がりの位置) */
+  private readonly hangShimmyTo = new THREE.Vector3()
   /** 縁から出た瞬間の向き。落ちる型の頭でここから壁向きへ回す */
   private hangTurnFrom = 0
   /**
@@ -848,6 +946,11 @@ export class Soldier {
   /** 登り切りで、型の腰の曲線がどこまで進んだか (上下 / 前後、0..1)。戻さない */
   private climbRise = 0
   private climbAhead = 0
+  /**
+   * 上から梯子へ**降りて掴んでいる**最中 (登り切りの型を逆に流している)。終われば
+   * この梯子を side の側で掴む。順に登り切っている間は null
+   */
+  private climbMount: { ladder: Ladder; side: 1 | -1 } | null = null
   /** 掴む側を確かめるときの置き場。毎回作らない */
   private readonly climbProbe = new THREE.Vector3()
   private moveSpeed = MOVE_SPEED
@@ -1175,7 +1278,15 @@ export class Soldier {
    * 猫に釘付けになっている段 (domain/item/doll.ts)。in = 手を伸ばして止まっている、
    * out = 解けて型を逆に流している (戻り切るまで動けない)。**掛かるも解けるもサーバーが決める**
    */
-  private trappedStage: 'none' | 'in' | 'out' = 'none'
+  private trappedStage: 'none' | 'approach' | 'in' | 'hold' | 'out' = 'none'
+  /** 寄っていく猫の足元。approach の間だけ使う */
+  private readonly trapCat = new THREE.Vector3()
+  /** 寄る残り (秒)。尽きたら寄り切らなくてもしゃがみ込む (TRAP_APPROACH_SECONDS) */
+  private trapApproachLeft = 0
+  /** 寄る時に渡す入力 (猫の向き × 歩きの倒し具合) */
+  private readonly trapApproachMove = new THREE.Vector3()
+  /** しゃがみ込み始めてからの経過 (秒)。型の尺を過ぎたら撫で続ける段 (hold) へ */
+  private trappedElapsed = 0
   /** 解けて戻り切るまでの残り (秒) */
   private trappedOutLeft = 0
 
@@ -1185,11 +1296,13 @@ export class Soldier {
   }
 
   /**
-   * 猫に釘付けになった。**その場でしゃがみ込み、猫へ手を伸ばして止まる。**
-   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く。yaw は猫のほうの向き
+   * 猫に釘付けになった。**猫のほうへ 2 歩ほど歩いて寄り、しゃがみ込んで撫で続ける。**
+   * 伏せていても同じ型 (伏せの型は無い)。構えも梯子も解く。yaw は猫のほうの向き、cat は猫の足元
+   * (無ければその場でしゃがみ込む)。settled は読み直しの続き (撫でている所から)
    */
-  trap(yaw?: number): void {
-    if (this.down || this.downed || this.sleepLeft > 0 || this.trappedStage === 'in') return
+  trap(yaw?: number, settled = false, cat?: THREE.Vector3): void {
+    if (this.down || this.downed || this.sleepLeft > 0) return
+    if (this.trappedStage === 'approach' || this.trappedStage === 'in' || this.trappedStage === 'hold') return
     // 猫のほうへ向き直る (手を伸ばす先が猫になる)
     if (yaw !== undefined) this.yaw = yaw
     this.releaseLadder()
@@ -1197,17 +1310,45 @@ export class Soldier {
     this.crouching = false
     this.proneStage = 'none'
     this.proneShiftLeft = 0
-    this.trappedStage = 'in'
     this.trappedOutLeft = 0
+    // 読み直しの続きなら、しゃがみ込む動きを飛ばして撫でている所から
+    if (settled) {
+      this.trappedStage = 'hold'
+      this.animator?.playTrappedHold()
+      return
+    }
+    // まず猫のほうへ寄る (手の届く所まで)。もう届く所に居ればすぐしゃがみ込む
+    if (cat && Math.hypot(cat.x - this.position.x, cat.z - this.position.z) > TRAP_REACH) {
+      this.trappedStage = 'approach'
+      this.trapCat.copy(cat)
+      this.trapApproachLeft = TRAP_APPROACH_SECONDS
+      return
+    }
+    this.beginTrapCrouch()
+  }
+
+  /** 寄り終えた (または寄れなかった)。猫のほうを向いてしゃがみ込み始める */
+  private beginTrapCrouch(): void {
+    if (this.trappedStage === 'approach') {
+      this.yaw = Math.atan2(this.position.x - this.trapCat.x, this.position.z - this.trapCat.z)
+    }
+    this.trappedStage = 'in'
+    this.trappedElapsed = 0
     this.animator?.playTrapped()
   }
 
   /** 解けた (猫が消えた・撃たれた)。**同じ型を逆に流して立ち上がり**、戻り切ったら動ける */
   untrap(): void {
-    if (this.trappedStage !== 'in') return
+    // 寄っている途中ならまだしゃがんでいない。立ち上がる型は要らない
+    if (this.trappedStage === 'approach') {
+      this.trappedStage = 'none'
+      return
+    }
+    if (this.trappedStage !== 'in' && this.trappedStage !== 'hold') return
     this.trappedStage = 'out'
-    this.trappedOutLeft = this.animator?.trappedDuration || 2
-    this.animator?.playTrappedOut()
+    // しゃがみ込み終えた所から逆に流す (手を伸ばす所は通らない)
+    this.trappedOutLeft = TRAPPED_CROUCH_SECONDS
+    this.animator?.playTrappedOut(TRAPPED_CROUCH_SECONDS)
   }
 
   /** いま箱を落とされて固まっている最中か。呼ぶ側が操作を止めるのに使う */
@@ -1476,7 +1617,14 @@ export class Soldier {
   knockBack(x: number, z: number): void {
     this.object.position.x += x
     this.object.position.z += z
+    // 軽くよろける (撃たれた時の型)。しゃがんでいれば倒れる方 (knockdown) が来るのでここには来ない
+    this.animator?.playHit()
+    // 怯んで一瞬足が止まる。走っていても止まる
+    this.staggerLeft = ROLL_STAGGER_SECONDS
+    this.currentSpeed = 0
   }
+  /** 体当たりで怯んで足が止まっている残り (秒) */
+  private staggerLeft = 0
 
   /**
    * 爆風で吹き飛ばす。**向きだけ受けて、こちらが滑らせる。**
@@ -1485,12 +1633,15 @@ export class Soldier {
    * (壁を抜ける)。転がりと同じで、速度に直して移動の道へ通す。
    *
    * @param dirX 爆心から見た向き (単位ベクトル、水平)
+   * @param distance 滑る距離 (m)。爆風なら省く。ローリングで倒れた時は短い
    */
-  knockPush(dirX: number, dirZ: number): void {
+  knockPush(dirX: number, dirZ: number, distance = KNOCK_DISTANCE): void {
     const reach = Math.hypot(dirX, dirZ)
     if (reach < 1e-4) return
-    this.knockX = dirX / reach
-    this.knockZ = dirZ / reach
+    // 向きに距離の比を掛ける。滑らせる速さの式は爆風と同じ (的もサーバーで同じ形)
+    const scale = distance / KNOCK_DISTANCE
+    this.knockX = (dirX / reach) * scale
+    this.knockZ = (dirZ / reach) * scale
     this.knockLeft = KNOCK_TIME
   }
 
@@ -1973,6 +2124,12 @@ export class Soldier {
     this.stickForward = value
   }
 
+  /** 押している左右の量 (右が正)。**カメラを通さない** (ぶら下がりの横移動に使う) */
+  setStickSide(value: number): void {
+    this.stickSide = value
+  }
+  private stickSide = 0
+
   /**
    * 最後に受け取った地形。**掴む側を選ぶのに使う。**
    *
@@ -2030,6 +2187,18 @@ export class Soldier {
     const ladder = ladderAt(this.ladders, p.x, p.y, p.z, PLAYER_HEIGHT)
     if (!ladder) return false
     /*
+     * **上端の上 (登り切った先の床) に立って掴んだら、外側へ回って上から降り始める。**
+     *
+     * 登り切った先の床は梯子の裏 (壁の側) にある。居る側のまま掴むと、裏から床の高さで
+     * 掴んですぐ登り切りの型に入っていた (2026-10-22 本人「梯子の裏から G を押すと裏なのに
+     * 登ろうとしてる、特に登り切った後の場所で」)。縁から歩いて出た時と同じ掴み方にする
+     */
+    if (p.y > ladder.max[1] - LADDER_TOP_STAND) {
+      const middle = ladder.axis === 'x' ? (ladder.min[0] + ladder.max[0]) / 2 : (ladder.min[2] + ladder.max[2]) / 2
+      const across = (ladder.axis === 'x' ? p.x : p.z) - middle
+      return this.mountFromTop(ladder, across > 0 ? -1 : 1, p.x, p.z)
+    }
+    /*
      * **居る側から登る。** 回り込ませない。
      *
      * 地形を見て空いている側を選ぼうとしたことがあるが、梯子そのものが壁
@@ -2086,8 +2255,43 @@ export class Soldier {
     // 歩いて出た先の側 (屋上の反対) に立つ
     const out = ladder.axis === 'x' ? heading.x : heading.z
     if (Math.abs(out) < 0.2) return false
-    const side: 1 | -1 = out > 0 ? 1 : -1
-    const grip = ladderGrip(ladder, edge.x, edge.z, side)
+    return this.mountFromTop(ladder, out > 0 ? 1 : -1, edge.x, edge.z)
+  }
+
+  /**
+   * 梯子の上端を**上から掴む**。side の側 (屋上の反対 = 梯子の外側) に立って梯子を向き、
+   * 上端から LADDER_TOP_MOUNT 下を掴む。縁から歩いて出た時 (grabLadderFromTop) と、
+   * 上端の上の床で掴んだ時 (grabLadder) の両方がここを通る
+   */
+  private mountFromTop(ladder: Ladder, side: 1 | -1, x: number, z: number): boolean {
+    const grip = ladderGrip(ladder, x, z, side)
+    /*
+     * **登り切りの型を逆に流して降りる** (2026-10-22 本人「上から G で滑らかに梯子に掴まれないか」)。
+     *
+     * 登り切りは「掴んだ所 (climbFrom) → 床 (climbTo)」を腰の曲線に沿って渡る。逆は同じ 2 点を
+     * 進み具合 1 → 0 で戻る — 今立っている床から、登り切りが始まる高さの掴む所へ。終われば
+     * 梯子を掴む (advanceClimbTop)。型が読めていなければ今まで通り掴む所へ直に移る
+     */
+    const span = this.animator?.climbTopDuration ?? 0
+    const mountY = ladder.max[1] - CLIMB_TOP_TUNING.lead
+    if (span > 0 && mountY > ladder.min[1]) {
+      this.climbFrom.set(grip.x, mountY, grip.z)
+      this.climbTo.copy(this.position)
+      this.climbMount = { ladder, side }
+      this.climbTopLeft = span / CLIMB_TOP_TUNING.rate
+      this.climbRise = 1
+      this.climbAhead = 1
+      this.climbing = null
+      this.yaw = grip.yaw
+      this.climbYaw = grip.yaw
+      this.velocityY = 0
+      this.mover.airX = 0
+      this.mover.airZ = 0
+      this.crouching = false
+      this.aiming = false
+      this.animator?.playClimbMount(CLIMB_TOP_TUNING.rate)
+      return true
+    }
     this.climbSide = side
     this.climbing = ladder
     this.position.set(grip.x, Math.max(ladder.min[1], ladder.max[1] - LADDER_TOP_MOUNT), grip.z)
@@ -2118,6 +2322,7 @@ export class Soldier {
     if (!this.climbing && this.climbTopLeft <= 0) return
     this.climbing = null
     this.climbTopLeft = 0
+    this.climbMount = null
     this.velocityY = 0
   }
 
@@ -2291,12 +2496,27 @@ export class Soldier {
     this.climbTopLeft = Math.max(0, this.climbTopLeft - dt)
     const animator = this.animator
     const done = this.climbTopLeft <= 0
-    this.climbRise = done ? 1 : Math.max(this.climbRise, animator?.riseProgress('climb_top') ?? 1)
-    this.climbAhead = done ? 1 : Math.max(this.climbAhead, animator?.forwardProgress('climb_top') ?? 1)
+    if (this.climbMount) {
+      // 逆に流している (上から降りて掴む)。進み具合は 1 → 0、**進めた分は戻さない** (一番戻った所を保つ)
+      this.climbRise = done ? 0 : Math.min(this.climbRise, animator?.riseProgress('climb_top') ?? 0)
+      this.climbAhead = done ? 0 : Math.min(this.climbAhead, animator?.forwardProgress('climb_top') ?? 0)
+    } else {
+      this.climbRise = done ? 1 : Math.max(this.climbRise, animator?.riseProgress('climb_top') ?? 1)
+      this.climbAhead = done ? 1 : Math.max(this.climbAhead, animator?.forwardProgress('climb_top') ?? 1)
+    }
     this.position.y = this.climbFrom.y + (this.climbTo.y - this.climbFrom.y) * this.climbRise
     this.position.x = this.climbFrom.x + (this.climbTo.x - this.climbFrom.x) * this.climbAhead
     this.position.z = this.climbFrom.z + (this.climbTo.z - this.climbFrom.z) * this.climbAhead
     this.velocityY = 0
+    if (done && this.climbMount) {
+      // 降り切った。**梯子を掴む** — 前を押したままでも一度離すまで登り返さない
+      const { ladder, side } = this.climbMount
+      this.climbMount = null
+      this.climbing = ladder
+      this.climbSide = side
+      this.climbUpLatched = true
+      this.animator?.setClimbRate(0)
+    }
   }
 
   /** 伏せ切っているか。入り / 出 / 転がりの最中は false */
@@ -2512,6 +2732,34 @@ export class Soldier {
     return this.hangStage !== 'none'
   }
 
+  /**
+   * 読み直しの続きで、縁にぶら下がっていた。**次の update で縁を探して掴み直す** (地形はそこで届く)。
+   * yaw は体の向き (壁向き)
+   */
+  resumeHang(yaw: number): void {
+    this.pendingHangYaw = yaw
+  }
+  private pendingHangYaw: number | null = null
+
+  /**
+   * ぶら下がりの位置と向きから縁を割り出して掴み直す。掴む処理 (beginHang) で縁の点と壁の向きを
+   * 測り直し、落ちて掴む型は飛ばして待つ姿にする。縁が見つからなければ何もしない (落ちる)
+   */
+  private regrabHang(yaw: number): void {
+    // 壁向きの体の外向き = 正面の逆。yaw θ で正面は (-sinθ, -cosθ)
+    const outX = Math.sin(yaw)
+    const outZ = Math.cos(yaw)
+    const top = this.position.y + HANG_FEET_BELOW
+    const edge = this.vaultProbe.set(this.position.x - outX * HANG_OUT, top, this.position.z - outZ * HANG_OUT)
+    this.beginHang(edge.clone(), new THREE.Vector3(outX, 0, outZ))
+    if (this.hangStage !== 'drop') return
+    this.hangStage = 'hang'
+    this.position.copy(this.hangTo)
+    this.rollYaw = yaw
+    this.yaw = yaw
+    this.animator?.endHang()
+  }
+
   /** ぶら下がりから手を離す。そのまま落ちる (落下の処理は普段のまま) */
   releaseHang(): void {
     if (this.hangStage === 'none' || this.hangStage === 'climb') return
@@ -2602,8 +2850,53 @@ export class Soldier {
       len = Math.hypot(sumX, sumZ)
       if (len < 1e-6) return
     }
-    const nx = sumX / len
-    const nz = sumZ / len
+    let nx = sumX / len
+    let nz = sumZ / len
+    /*
+     * **角では面を 1 つ選ぶ。** 出っ張った角では 2 つの面の両方が落ちて見え、平均は斜め (角の二等分)
+     * を向く。斜めにぶら下がって片手が角の外に出た (2026-10-21 本人「右腕分だけ空中に浮いてる」)。
+     * 床が残っている向きの範囲 (円弧) の両端が 2 つの面の縁の線なので、それぞれの面の外向きを出し、
+     * 出た向きに近いほうを採る。平らな壁では両端が一直線で、どちらも平均と同じ向きになる
+     */
+    {
+      const step = (Math.PI * 2) / HANG_NORMAL_SAMPLES
+      const solid: boolean[] = []
+      for (let i = 0; i < HANG_NORMAL_SAMPLES; i++) {
+        const angle = i * step
+        solid.push(!dropped(ex + Math.cos(angle) * HANG_NORMAL_REACH, ez + Math.sin(angle) * HANG_NORMAL_REACH))
+      }
+      // 床が残っている範囲の始まり (前が落ちていて、ここが残っている)
+      const first = solid.findIndex((s, i) => s && !solid[(i + HANG_NORMAL_SAMPLES - 1) % HANG_NORMAL_SAMPLES])
+      if (first >= 0) {
+        let count = 0
+        while (count < HANG_NORMAL_SAMPLES && solid[(first + count) % HANG_NORMAL_SAMPLES]) count++
+        // 両端は刻みの間を二分して詰める (刻み 15° のままだと面の向きが 7.5° ずれ、横へ移る時に
+        // 縁の内側を見る点が縁の外へ出て移れなかった)
+        const isSolid = (angle: number) =>
+          !dropped(ex + Math.cos(angle) * HANG_NORMAL_REACH, ez + Math.sin(angle) * HANG_NORMAL_REACH)
+        const boundary = (out: number, inside: number) => {
+          let lo = out
+          let hi = inside
+          for (let k = 0; k < 8; k++) {
+            const mid = (lo + hi) / 2
+            if (isSolid(mid)) hi = mid
+            else lo = mid
+          }
+          return (lo + hi) / 2
+        }
+        const a1 = boundary((first - 1) * step, first * step)
+        const a2 = boundary((first + count) * step, (first + count - 1) * step)
+        // 範囲の始まりの縁の線の外向きは −90°、終わりの線の外向きは +90° (残っている側の反対)
+        const candidates = [a1 - Math.PI / 2, a2 + Math.PI / 2].map((a) => ({ x: Math.cos(a), z: Math.sin(a) }))
+        const [c1, c2] = candidates as [{ x: number; z: number }, { x: number; z: number }]
+        // ほぼ同じ向きなら平らな壁。刻み (15°) のぶんずれるので、平均のほうが正確
+        if (c1.x * c2.x + c1.z * c2.z < HANG_FLAT_COS) {
+          const best = c1.x * dx0 + c1.z * dz0 >= c2.x * dx0 + c2.z * dz0 ? c1 : c2
+          nx = best.x
+          nz = best.z
+        }
+      }
+    }
     // 法線に沿って縁を詰め直す (斜めに出たぶん、出た向きで出した縁は法線方向に少し内側)
     {
       let found = false
@@ -2622,6 +2915,29 @@ export class Soldier {
       }
       ex = bx
       ez = bz
+    }
+    /*
+     * **両手が縁に乗るか。** 角の近くで掴むと片手が角の外に出る。両手の下に縁がある所まで縁に沿って
+     * ずらす (HANG_FIT_REACH まで)。ずらしても乗らない短い縁なら掴まない
+     */
+    {
+      const tx = nz
+      const tz = -nx
+      const onLedge = (x: number, z: number) => {
+        probe.set(x - nx * HANG_SHIMMY_INSET, top, z - nz * HANG_SHIMMY_INSET)
+        return Math.abs(world.groundHeight(probe, 0, top + HANG_LOOK_UP) - top) <= HANG_SHIMMY_LEVEL
+      }
+      const fits = (shift: number) =>
+        onLedge(ex + tx * (shift - HANG_HAND_SPAN), ez + tz * (shift - HANG_HAND_SPAN)) &&
+        onLedge(ex + tx * (shift + HANG_HAND_SPAN), ez + tz * (shift + HANG_HAND_SPAN))
+      let shift: number | null = null
+      for (let s = 0; s <= HANG_FIT_REACH + 1e-6 && shift === null; s += HANG_FIT_STEP) {
+        if (fits(s)) shift = s
+        else if (s > 0 && fits(-s)) shift = -s
+      }
+      if (shift === null) return
+      ex += tx * shift
+      ez += tz * shift
     }
     /*
      * **体を置く場所が空いているか。** ぶら下がりの位置 (縁の外、1.88m 下) に床や
@@ -2664,6 +2980,51 @@ export class Soldier {
     let delta = wallYaw - chest
     delta = Math.atan2(Math.sin(delta), Math.cos(delta))
     this.rollYaw = this.yaw + delta
+  }
+
+  /**
+   * ぶら下がったまま横へ移る。左右 (A / D) を押したとき。**縁が切れていれば移らない**
+   * (本人 2026-10-21「hang している辺が切れたらそれ以上は進めない」)。
+   *
+   * 移る途中 (半分) と移った先で、縁の内側に同じ高さの床があるか (縁が続いているか)、
+   * 体を置く所が空いているか (掴む時と同じ見方、beginHang) を見る
+   */
+  private beginHangShimmy(side: -1 | 1): void {
+    const world = this.lastWorld
+    if (!world) return
+    const top = this.hangTopY
+    const ox = this.hangOutX
+    const oz = this.hangOutZ
+    // 壁に向いた体の右 = (外向きの z, -外向きの x)。yaw θ で右は (cosθ, -sinθ)、θ = atan2(ox, oz)
+    const dx = oz * side * HANG_SHIMMY_STEP
+    const dz = -ox * side * HANG_SHIMMY_STEP
+    // 縁の点 = ぶら下がりの位置から壁へ HANG_OUT 戻った所
+    const edgeX = this.hangTo.x - ox * HANG_OUT
+    const edgeZ = this.hangTo.z - oz * HANG_OUT
+    const probe = this.vaultProbe
+    // 進む側の手の先 (体の中心から手の開きぶん)
+    const handX = oz * side * HANG_HAND_SPAN
+    const handZ = -ox * side * HANG_HAND_SPAN
+    for (const t of [0.5, 1]) {
+      // 縁の内側に、縁と同じ高さの床がある (縁が続いている)。**体の中心と進む側の手の両方で**
+      for (const hand of [0, 1]) {
+        probe.set(
+          edgeX + dx * t + handX * hand - ox * HANG_SHIMMY_INSET,
+          top,
+          edgeZ + dz * t + handZ * hand - oz * HANG_SHIMMY_INSET,
+        )
+        const ground = world.groundHeight(probe, 0, top + HANG_LOOK_UP)
+        if (Math.abs(ground - top) > HANG_SHIMMY_LEVEL) return
+      }
+      // 体を置く所が空いている (曲がり角・張り出しに体が入らない)
+      probe.set(this.hangTo.x + dx * t, top, this.hangTo.z + dz * t)
+      if (world.groundHeight(probe, PLAYER_RADIUS, top + HANG_LOOK_UP) > this.hangTo.y - 0.05) return
+    }
+    this.hangStage = 'shimmy'
+    this.hangShimmySide = side
+    this.hangShimmyTo.set(this.hangTo.x + dx, this.hangTo.y, this.hangTo.z + dz)
+    // FAST MOVE が効く (走る速さと同じ倍率)
+    this.animator?.playHangShimmy(side, runnerScale(this.skills))
   }
 
   /** ぶら下がりから登り始める。前 (W) を押したとき */
@@ -2716,6 +3077,21 @@ export class Soldier {
         this.faceChestTo(Math.atan2(this.hangOutX, this.hangOutZ))
         this.yaw = this.rollYaw
         if (this.stickForward > 0.5) this.beginHangClimb()
+        else if (Math.abs(this.stickSide) > 0.5) this.beginHangShimmy(this.stickSide > 0 ? 1 : -1)
+      } else if (this.hangStage === 'shimmy') {
+        // 縁に沿って横へ。**元の型の腰の通りに**、持ち上げて弧を描いて動かす (HANG_SHIMMY_CURVE)
+        const phase = animator.oneShotPhase(this.hangShimmySide < 0 ? 'hang_left' : 'hang_right')
+        const arc = hangShimmyAt(phase)
+        this.position.lerpVectors(this.hangTo, this.hangShimmyTo, arc.side)
+        this.position.y += arc.up
+        this.faceChestTo(Math.atan2(this.hangOutX, this.hangOutZ))
+        this.yaw = this.rollYaw
+        if (animator.oneShotDone(this.hangShimmySide < 0 ? 'hang_left' : 'hang_right')) {
+          this.hangStage = 'hang'
+          this.hangTo.copy(this.hangShimmyTo)
+          this.position.copy(this.hangTo)
+          animator.endHang()
+        }
       } else if (this.hangStage === 'climb') {
         /*
          * **先に上がって、それから前へ。** 上下は腰の上下の曲線 (戻さない)。前後は
@@ -2772,7 +3148,8 @@ export class Soldier {
       this.vaultFromY = this.position.y
       this.vaultToY = ahead.landing
     }
-    this.animator?.playVault(ahead.kind === 'up')
+    // 乗る型は縁から VAULT_UP_ONTO 入った所まで進む
+    this.animator?.playVault(ahead.kind === 'up', (ahead.edge + VAULT_UP_ONTO) / VAULT_UP_BAKED)
     return true
   }
 
@@ -2783,7 +3160,7 @@ export class Soldier {
    * あればその上面が返り、無ければ床が返る (差 0)。壁なら線が壁の中から
    * 始まって床か 0 を返すので、跳べる高さには入らない。
    */
-  private vaultAhead(): { kind: 'over' | 'up'; landing: number; yaw: number; top: number } | null {
+  private vaultAhead(): { kind: 'over' | 'up'; landing: number; yaw: number; top: number; edge: number } | null {
     const world = this.lastWorld
     if (!world) return null
     const feetY = this.position.y
@@ -2833,6 +3210,15 @@ export class Soldier {
       }
     }
     if (Number.isNaN(top)) return null
+    // 縁までの距離 (体の中心から)。上の探し方は体の輪で見るので、点で手前から刻んで取り直す
+    let edge = reachAt
+    for (let d = 0; d < reachAt + PLAYER_RADIUS; d += VAULT_EDGE_STEP) {
+      probe.set(this.position.x + fx * d, feetY, this.position.z + fz * d)
+      if (okRise(world.groundHeight(probe, 0, allow))) {
+        edge = d
+        break
+      }
+    }
     // 枠の上に体が通る隙間
     if (world.ceilingHeight(probe, PLAYER_RADIUS, top) < top + VAULT_HEADROOM) return null
     /*
@@ -2865,21 +3251,51 @@ export class Soldier {
     const nearAt = reachAt + VAULT_LANDING_NEAR
     probe.set(this.position.x + fx * nearAt, feetY, this.position.z + fz * nearAt)
     const near = world.groundHeight(probe, PLAYER_RADIUS, allow)
-    if (Math.abs(near - top) <= VAULT_SAME_LEVEL) {
-      if (world.ceilingHeight(probe, 0, near) < near + PLAYER_HEIGHT) return null
-      return { kind: 'up', landing: near, yaw, top }
+    // 頭の上が塞がっていても**そこで諦めない** — 積んだ箱の 2 段目の下だった。他の候補 (下の奥行きの浅い台) を見る
+    if (Math.abs(near - top) <= VAULT_SAME_LEVEL && world.ceilingHeight(probe, 0, near) >= near + PLAYER_HEIGHT) {
+      return { kind: 'up', landing: near, yaw, top, edge }
     }
     // 無ければ越えた先の床。**低いのは構わない** (外へ跳び出すのも跳び越え)
     const farAt = reachAt + VAULT_LANDING_FAR
     probe.set(this.position.x + fx * farAt, feetY, this.position.z + fz * farAt)
     const far = world.groundHeight(probe, PLAYER_RADIUS, allow)
-    if (far <= feetY + STEP_UP) {
-      if (world.ceilingHeight(probe, 0, feetY) < feetY + PLAYER_HEIGHT) return null
-      return { kind: 'over', landing: far, yaw, top }
+    /*
+     * **奥行きの浅い台に乗る。** 上の 2 か所 (縁から 0.8m・1.3m 先) は奥行きの浅い台を飛び越して
+     * 見る。積んだ木箱 (1 段目の空いた所の奥行き 0.76m、その奥に 2 段目) では 0.8m 先がもう 2 段目の
+     * 下で、乗れる床が無いと見て何も起きなかった。2 段目 (奥行き 0.79m) は奥が 2F の縁の外で、
+     * 越えて地面へ跳び出すと読んで、当たりに押し戻された (2026-10-23 本人「wood の box に登れない」)。
+     * 前へ進む量 (0.75m、animation.ts の ROOT_DISTANCE_SCALE) が余っても、奥の箱の面で当たりに止められる
+     */
+    const shallow = (): number => {
+      let landing = Number.NaN
+      for (const extra of VAULT_LANDING_SHALLOW) {
+        const at = reachAt + extra
+        probe.set(this.position.x + fx * at, feetY, this.position.z + fz * at)
+        const h = world.groundHeight(probe, 0, allow)
+        if (Math.abs(h - top) > VAULT_SAME_LEVEL) return Number.NaN
+        if (world.ceilingHeight(probe, 0, h) < h + PLAYER_HEIGHT) return Number.NaN
+        landing = Number.isNaN(landing) ? h : Math.max(landing, h)
+      }
+      return landing
     }
-    if (Math.abs(far - top) > VAULT_SAME_LEVEL) return null
-    if (world.ceilingHeight(probe, 0, far) < far + PLAYER_HEIGHT) return null
-    return { kind: 'up', landing: far, yaw, top }
+    if (far <= feetY + STEP_UP) {
+      // 越えた先が高い所から落ちる (縁の外) なら、乗れる台に乗るほうを先に採る。窓から外へ跳ぶのは
+      // 窓枠が薄く台と読まないので今まで通り
+      if (far < feetY - VAULT_MAX) {
+        const up = shallow()
+        if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top, edge }
+        probe.set(this.position.x + fx * farAt, feetY, this.position.z + fz * farAt)
+      }
+      if (world.ceilingHeight(probe, 0, feetY) < feetY + PLAYER_HEIGHT) return null
+      return { kind: 'over', landing: far, yaw, top, edge }
+    }
+    if (Math.abs(far - top) <= VAULT_SAME_LEVEL && world.ceilingHeight(probe, 0, far) >= far + PLAYER_HEIGHT) {
+      return { kind: 'up', landing: far, yaw, top, edge }
+    }
+    // 上の 2 か所で乗れる床が無ければ、手前の浅い台
+    const up = shallow()
+    if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top, edge }
+    return null
   }
 
   /**
@@ -3014,7 +3430,7 @@ export class Soldier {
    * 倒れる → (伏せたまま撃てる) → 立ち上がる、の 3 段。立ち上がりに入ったら
    * 中断できないので、そこが無防備な時間になる。
    */
-  knockDown(): void {
+  knockDown(rolled = false): void {
     if (this.down) return
     /*
      * 倒れている間は飛ばされない。**ただし CQC で投げられて背中が着く前は別** —
@@ -3035,7 +3451,10 @@ export class Soldier {
     // 押しっぱなしを引き継がせない。離して押し直すまで構えない
     this.aimLatched = true
     this.thrownFall = false
-    this.animator?.playSweep()
+    // ローリングの体当たり (しゃがんでいた所から) なら、爆風ほど飛ばない倒れ方
+    this.rolledFall = rolled
+    if (rolled) this.animator?.playRollFall()
+    else this.animator?.playSweep()
   }
 
   /**
@@ -3212,7 +3631,13 @@ export class Soldier {
   ): void {
     this.aimPitch = aimPitch
     this.lastWorld = world
+    // 読み直しの続きでぶら下がっていた。地形が届いた所で掴み直す
+    if (this.pendingHangYaw !== null) {
+      this.regrabHang(this.pendingHangYaw)
+      this.pendingHangYaw = null
+    }
     this.blob.set(this.isProne ? 'prone' : this.isCrouching ? 'crouch' : 'stand')
+    this.blob.lifted = this.onLadder || this.hanging
     this.blob.update(dt)
     this.stepStealthFade(dt)
 
@@ -3249,8 +3674,23 @@ export class Soldier {
     // 速さを 0 にするだけだと、体は動かないのに向きだけ入力どおりに変わる
     if (this.bumpLeft > 0) moveDir = ZERO_MOVE
     if (this.sleepLeft > 0) moveDir = ZERO_MOVE
-    // 猫に釘付けの間も (戻り切るまで)
-    if (this.trappedStage !== 'none') moveDir = ZERO_MOVE
+    // 猫に釘付けの間も (戻り切るまで)。**寄っている間だけは猫のほうへ歩く** (入力の代わり)
+    if (this.trappedStage === 'approach') {
+      const dx = this.trapCat.x - this.position.x
+      const dz = this.trapCat.z - this.position.z
+      const distance = Math.hypot(dx, dz)
+      if (distance <= TRAP_REACH || this.trapApproachLeft <= 0) {
+        this.beginTrapCrouch()
+        moveDir = ZERO_MOVE
+      } else {
+        // 歩きの倒し具合 (WALK_STICK の少し手前) で渡す。普段の歩きの型・速さ・当たりがそのまま効く
+        moveDir = this.trapApproachMove.set((dx / distance) * WALK_STICK * 0.95, 0, (dz / distance) * WALK_STICK * 0.95)
+      }
+    } else if (this.trappedStage !== 'none') {
+      moveDir = ZERO_MOVE
+    }
+    // 体当たりで怯んでいる間も
+    if (this.staggerLeft > 0) moveDir = ZERO_MOVE
 
     /*
      * 伏せている間は**前へしか這えない。**
@@ -3273,6 +3713,8 @@ export class Soldier {
      * 一緒に外れて**いた — 膝を突いたまま走り出せる形になっていた。
      */
     if (this.hardLandTimer > 0) moveDir = ZERO_MOVE
+    // 膝を曲げる軽い着地の間も (本人 2026-10-21「このモーション中は移動できないように」)
+    if (this.landingTimer > 0) moveDir = ZERO_MOVE
     // 手を離した / 跳び降りた落下は舵を切れない。着地したら普段へ
     if (this.steerlessFall) {
       if (this.mover.onGround || this.onLadder || this.inWater) this.steerlessFall = false
@@ -3332,7 +3774,7 @@ export class Soldier {
       this.currentSpeed = 0
     }
     // 眠っている間・猫に釘付けの間は動かない。**慣性も残さない**
-    if (this.sleepLeft > 0 || this.trappedStage !== 'none') {
+    if (this.sleepLeft > 0 || (this.trappedStage !== 'none' && this.trappedStage !== 'approach')) {
       targetSpeed = 0
       this.currentSpeed = 0
     }
@@ -3483,7 +3925,7 @@ export class Soldier {
      * 一段上へ乗る跳び越え。**位置を型の上がり方に沿って持ち上げる。**
      *
      * 跳んでいる間は上下を止めてある (stepOver) ので、ここで床から乗る先まで
-     * 型の腰の曲線 (vaultRise) の通りに上げる。型が終わった時点で乗る先の
+     * 型の足の上がり方 (vaultRise) の通りに上げる。型が終わった時点で乗る先の
      * 高さに居るので、普段の接地に戻っても跳ねない。
      */
     if (this.vaultingUp && this.animator) {
@@ -3604,7 +4046,9 @@ export class Soldier {
         this.animator?.playHardLand()
       } else {
         this.landingTimer = LANDING_TIME
-        this.animator?.playLanding()
+        // 走ってきた勢いで滑らない。受け止めている間は止まる
+        this.currentSpeed = 0
+        this.animator?.playLanding(LANDING_RATE)
       }
     }
     // 落ちた速さを外へ渡す。**量はここで決めない** — 体力を持っているのは
@@ -3614,6 +4058,17 @@ export class Soldier {
     if (this.landingTimer > 0) this.landingTimer -= dt
     if (this.bumpLeft > 0) this.bumpLeft -= dt
     if (this.sleepLeft > 0) this.sleepLeft -= dt
+    if (this.staggerLeft > 0) this.staggerLeft -= dt
+    // しゃがみ込み終えたら、猫を撫で続ける (TreatCat)
+    if (this.trappedStage === 'approach') this.trapApproachLeft -= dt
+    if (this.trappedStage === 'in') {
+      this.trappedElapsed += dt
+      // 型の終わり (手を前へ伸ばす) までは流さず、しゃがみ込み終えた所で移る
+      if (this.trappedElapsed >= TRAPPED_CROUCH_SECONDS) {
+        this.trappedStage = 'hold'
+        this.animator?.playTrappedHold()
+      }
+    }
     if (this.trappedStage === 'out') {
       this.trappedOutLeft -= dt
       if (this.trappedOutLeft <= 0) this.trappedStage = 'none'
@@ -3751,7 +4206,9 @@ export class Soldier {
         this.animator.setMoveSpeed(animationSpeed)
         this.appliedAnimationSpeed = animationSpeed
       }
-      this.animator.setLocomotion(this.resolveLocomotion(moveDir))
+      // 降りて掴む型は、画面の中では登り切りの逆 (状態は climb_top のまま)。外へは climb_mount と伝える
+      const resolved = this.resolveLocomotion(moveDir)
+      this.animator.setLocomotion(resolved === 'climb_mount' ? 'climb_top' : resolved)
       // 構えていないときに体が照準の上下へ傾くと、ただ歩いているのに前後に折れて見える
       /*
        * 上体を照準の上下へ傾けるのは**立っている体の話**。
@@ -3966,7 +4423,9 @@ export class Soldier {
     model.rotation.y = MODEL_YAW_OFFSET
     model.traverse((obj) => {
       if (isMesh(obj)) {
-        obj.castShadow = false   // 影マップは動かない物だけ。人の影は足元の丸 (blob)
+        // 人も影を落とす (人の影の地図に毎フレーム描く、world/liveShadow.ts)
+        obj.castShadow = true
+        obj.layers.enable(MOVING_SHADOW_LAYER)
         // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
         obj.receiveShadow = true
         // スキニング後の実際の姿勢はバウンディングボックスに反映されないため、
@@ -3988,6 +4447,9 @@ export class Soldier {
     this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
     // 模型が届く前に眠らされていた (読み直しの続き)。寝ている姿から始める
     if (this.sleepLeft > 0) this.animator.playSleep(true)
+    // 同じく、釘付けの途中で読み直した。手を伸ばした姿から
+    else if (this.trappedStage === 'in') this.animator.playTrapped()
+    else if (this.trappedStage === 'hold') this.animator.playTrappedHold()
 
     disposeTree(this.placeholder)
     this.placeholder = null
@@ -4202,25 +4664,28 @@ export class Soldier {
       saluting,
       downed: this.downed,
       thrown: this.thrownFall,
+      rolled: this.rolledFall,
       cqc: this.animator?.cqcKind ?? null,
       standingUp: this.standing,
       bumped: this.bumpLeft,
       asleep: this.sleepLeft > 0,
       // 梯子。掴んでいる間と、登り切る型の最中
-      climbing: this.climbing ? 'climb' : this.climbTopLeft > 0 ? 'climb_top' : null,
+      climbing: this.climbing ? 'climb' : this.climbTopLeft > 0 ? (this.climbMount ? 'climb_mount' : 'climb_top') : null,
       prone: this.proneStage === 'prone',
       proneShift: this.proneShifting,
       stabbing: this.stabbing,
       lean: this.lean,
       setting: this.animator?.setupLocomotion ?? null,
       patting: this.animator?.patting ?? false,
-      trapped: this.trappedStage === 'none' ? null : this.trappedStage,
+      // 寄っている間は普段の歩き (型も歩き)
+      trapped: this.trappedStage === 'none' || this.trappedStage === 'approach' ? null : this.trappedStage,
       rolling: this.rolling,
       vaulting: this.vaulting,
       vaultingUp: this.vaultingUp,
       hanging: this.hanging,
       hangClimbing: this.hangStage === 'climb',
       hangHolding: this.hangStage === 'hang' || this.hangStage === 'drop',
+      hangShimmy: this.hangStage === 'shimmy' ? this.hangShimmySide : 0,
       onGround: this.onGround,
       hardLand: this.hardLandTimer,
       landing: this.landingTimer,

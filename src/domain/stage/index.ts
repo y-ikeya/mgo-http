@@ -7,7 +7,7 @@
  * ステージをどんな順で回すかを決める」だからで、そこへ向かうときに
  * 「欄を表に変える」改修を後からやると、読む側が全部変わる。
  *
- *     いま      各部屋 stages が 1 枚の fixed
+ *     いま      ほとんどの部屋は 1 枚の fixed。bravo / charlie は city と UU を試合ごとに交互 (cycle)
  *     この先    部屋を作るときに stages と order を選ばせる
  *
  * 変わるのは ROOMS を作る場所だけで済むようにしてある。
@@ -52,7 +52,7 @@ export {
   ladderGrip,
 } from './ladder'
 
-export type StageName = 'mall' | 'training' | 'raft' | 'city' | 'lab'
+export type StageName = 'mall' | 'training' | 'raft' | 'city' | 'lab' | 'uu'
 
 /**
  * 地面の上の 1 点。
@@ -75,10 +75,12 @@ export interface Spot {
  * 練習の的の置き場。**姿勢も持つ。** 省けば立っている。
  *
  * しゃがんだ的・伏せた的は、低い頭を狙う練習と、CQC が掛からない相手
- * (立っている相手にしか掛からない) を確かめるため (本人 2026-10-14)
+ * (立っている相手にしか掛からない) を確かめるため (本人 2026-10-14)。
+ * 箱 (box) は CBOX を被った的。ローリングで倒すのを確かめるため (本人 2026-10-20)。
+ * lean は立ったまま左右へ体を出し入れし続ける的 (本人 2026-10-21)
  */
 export interface TargetSpot extends Spot {
-  stance?: 'crouch' | 'prone'
+  stance?: 'crouch' | 'prone' | 'box' | 'lean'
   /**
    * **走り続ける的。** 置き場とこの点の間を走って往復する (CQC の練習、本人 2026-10-15)。
    * 間に物が無い所に置く (的は壁を見ずに真っ直ぐ走る)。立っている的だけ
@@ -356,6 +358,42 @@ const CITY: StageSpec = {
 }
 
 /**
+ * UU (MGO2 の Urban Ultimatum)。2026-10-21 から本人が Blender で作っていて、**外構の原型ができた**
+ * (2026-10-22、建物の中はまだ)。delta (砂部屋) で使う。
+ *
+ * 形は tools/raw/stage_uu.blend、下絵は tools/raw/uu_map.jpg。地上・2F・倉庫の屋上・ビル 3 棟。
+ * 縮尺は下絵 1 画素 0.26m (地図の中身で約 69m)。0.25m では MGO2 より狭かった、0.325m (1.3 倍) では
+ * 広すぎた (2026-10-22 本人「全体的に 0.8 倍」)。**縮めたのは横だけ**で高さは変えていない。人の大きさで
+ * 決まる物 (梯子の幅・フェンスの高さ・コンテナ) は大きさを保ち、置き場所だけ寄せた。急になった階段は
+ * 上の端を残して傾き 0.58 になる長さで作り直した
+ * **1 階を囲む壁は一律 3.6m、その上に厚み 0.3m の 2F の床 (concrete_2F_ground)** (本人、実物の見た目から
+ * 3m を改めた)。2F の床・階段の上端 = 3.9m、踊り場 = 2.0m。地面の上面は 0.1
+ *
+ * 基地の値は json (meta_base*) と同じ。個人戦の湧き位置は、形ができるまで両基地の 2 点だけ
+ */
+const UU: StageSpec = {
+  name: 'uu',
+  label: 'UU',
+  ambience: 'city_loop1.mp3',
+  // 地面の上面は 0.1 (コード側の仮の地面 y=0 と重ねない。重ねると床がちらついた、2026-10-21 本人)
+  bases: {
+    blue: { x: -13.33, z: 33.12, y: 0.1 },
+    red: { x: 29.93, z: -16.04, y: 0.1 },
+  },
+  // blend の空 meta_target1 (building1 の屋上) / meta_target2 (building3 の屋上、赤の陣地の近く)。
+  // 控えが無いと、json を読まない時 (地形なしの試験) に UU の TSNE でターゲットが出なかった
+  tsneTargets: [
+    { x: -7.91, z: 11.88, y: 15.57 },
+    { x: 9.61, z: -17.21, y: 19.05 },
+  ],
+  solo: [
+    { x: -13.33, z: 33.12, y: 0.1 },
+    { x: 29.93, z: -16.04, y: 0.1 },
+  ],
+  targets: [],
+}
+
+/**
  * 検証場。**動作を試すための地形** (tools/make_lab.py が白紙から起こす)。
  *
  * 段の列 (0.25 / 0.45 / 0.9 / 1.2 / 1.5)、窓の壁、しゃがみでくぐる通路、
@@ -380,9 +418,11 @@ const LAB: StageSpec = {
   // 足元は地面の上面 (0.1)。省くと 0 に立って 10cm 埋まった
   targets: [
     { x: -18, z: 0, y: 0.1 },
-    { x: 4, z: -30, y: 0.1 },
+    // 立ったまま左右へ lean を繰り返す的 (2026-10-21 本人)。立った的だった所
+    { x: 4, z: -30, y: 0.1, stance: 'lean' },
     // 低い的。手元の /training はこの検証場なので、ここにも置く (2026-10-14)。それぞれの立った的の両脇
-    { x: -18, z: -3, y: 0.1, stance: 'crouch' },
+    // CBOX を被った的 (2026-10-20 本人「一つの enemy の代わりに CBox に入った enemy」)。しゃがんだ的だった所
+    { x: -18, z: -3, y: 0.1, stance: 'box' },
     { x: -18, z: 3, y: 0.1, stance: 'prone' },
     { x: 1.5, z: -30, y: 0.1, stance: 'crouch' },
     { x: 6.5, z: -30, y: 0.1, stance: 'prone' },
@@ -400,11 +440,12 @@ const LAB: StageSpec = {
     { x: -16, z: 5, y: 0.1, patrol: { x: -4, z: 5 } },
     { x: -20, z: 3, y: 0.1, patrol: { x: -20, z: -7 } },
   ],
-  // 基地の南東の空いた床。2 匹並べて円を重ねる (解けた後に隣で掛からないかも見られる)。
-  // (-6, -4) は空のダンボール (cbox_fx_cbox_1) の中で、猫が箱に埋もれて見えなかった
+  // 1 匹は基地の南東の空いた床 ((-6, -4) は空のダンボールの中で、猫が箱に埋もれて見えなかった)。
+  // もう 1 匹は**塔の上、梯子を登り切った所** (本人 2026-10-20)。登りながらは箱を被れないので、
+  // 登り切った瞬間に掛かる。塔の床は高さ 6m (concrete_tower)、梯子は東の面 (x 2.05)
   practiceDolls: [
     { x: -4, z: -7, y: 0.1 },
-    { x: -2.8, z: -7, y: 0.1 },
+    { x: 0.6, z: -20, y: 6.0 },
   ],
 }
 
@@ -414,6 +455,7 @@ export const STAGES: Record<StageName, StageSpec> = {
   training: TRAINING,
   raft: RAFT,
   city: CITY,
+  uu: UU,
 }
 
 /**
@@ -460,9 +502,14 @@ export interface Rotation {
   order: RotationOrder
 }
 
-/** 1 枚だけを回す。いまの部屋は全部これ */
+/** 1 枚だけを回す */
 export function only(stage: StageName): Rotation {
   return { stages: [stage], order: 'fixed' }
+}
+
+/** 並べた順に 1 試合ずつ回す。部屋ができて最初の試合は先頭 */
+export function cycle(...stages: StageName[]): Rotation {
+  return { stages, order: 'cycle' }
 }
 
 /**

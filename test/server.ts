@@ -290,6 +290,7 @@ export class Client {
           this.holdingLocator,
           this.holdingDoll,
           this.boxed,
+          this.crouching,
         ),
       ),
     )
@@ -344,6 +345,8 @@ export class Client {
   private holdingDoll = false
   /** ダンボールを被っているか。手にある物 (box) として送る (猫が効かない) */
   boxed = false
+  /** しゃがんでいるか。位置に乗せて送る (ローリングで倒れる) */
+  crouching = false
 
   send(message: ClientMessage): void {
     if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message))
@@ -386,6 +389,7 @@ function snapshotOf(
   holdingLocator = false,
   holdingDoll = false,
   boxed = false,
+  crouching = false,
 ): PlayerSnapshot {
   return {
     id,
@@ -397,7 +401,7 @@ function snapshotOf(
     pitch,
     cameraYaw,
     aiming,
-    crouching: false,
+    crouching,
     boxed,
     // 振りかぶっているなら手にあるのも手榴弾。**両方そろって初めて落ちる**
     // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')

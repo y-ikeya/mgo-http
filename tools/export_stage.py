@@ -63,8 +63,9 @@ def is_sandbag(name):
     return 'sand_bag' in name.lower()
 
 
-# 階段を何本の帯に割って上端を拾うか
+# 階段を何本の帯に割って上端を拾うか (最低)。帯の幅は STAIR_BIN_MAX (m) 以下にする
 STAIR_BINS = 12
+STAIR_BIN_MAX = 0.15
 
 
 def stair_plane(pts, lo, hi):
@@ -80,31 +81,39 @@ def stair_plane(pts, lo, hi):
     見た目は段のまま。**足だけが坂を登る** — 段差 0.25m 以下を勝手に上がる
     仕掛け (moving.ts の STEP_UP) と同じで、絵と足取りは元から一致していない。
     """
-    span_x = hi[0] - lo[0]
-    span_z = hi[2] - lo[2]
-    axis = 0 if span_x >= span_z else 2
-    span = span_x if axis == 0 else span_z
-    if span < 0.5:
-        return None
+    def fit(axis):
+        """その向きに帯を切って、帯ごとの上端へ直線を通す。(傾き, 帯の中心, 上端, 平均) か None"""
+        span = hi[axis] - lo[axis]
+        if span < 0.5:
+            return None
+        # **帯は段の奥行きより細かく。** 12 本で固定していた頃、長い階段 (UU の stair2、6.9m) では
+        # 帯 1 本 (0.58m) に段が 2 つ入り、一番低い帯の上端が 2 段目になって「下の床」を 1 段高く
+        # 見積もった。坂の板が地面から浮いて始まり、手前の端に足が掛かって上れなかった (2026-10-21)
+        bins = max(STAIR_BINS, int(math.ceil(span / STAIR_BIN_MAX)))
+        tops = {}
+        for x, y, z in pts:
+            i = min(bins - 1, int(((x if axis == 0 else z) - lo[axis]) / span * bins))
+            tops[i] = max(tops.get(i, -1e9), y)
+        if len(tops) < 3:
+            return None
+        n = len(tops)
+        cs = [lo[axis] + (i + 0.5) / bins * span for i in tops]
+        ys = list(tops.values())
+        mean_c = sum(cs) / n
+        mean_y = sum(ys) / n
+        denom = sum((c - mean_c) ** 2 for c in cs)
+        if denom < 1e-9:
+            return None
+        grad = sum((c - mean_c) * (y - mean_y) for c, y in zip(cs, ys)) / denom
+        return grad, cs, ys, mean_c, mean_y
 
-    # 帯ごとの上端
-    tops = {}
-    for x, y, z in pts:
-        i = min(STAIR_BINS - 1, int((( x if axis == 0 else z) - lo[axis]) / span * STAIR_BINS))
-        tops[i] = max(tops.get(i, -1e9), y)
-    if len(tops) < 3:
+    # **進む向きは、高さが変わる向き。** 長い辺の向きと決め打ちしていて、長さより幅の広い
+    # 階段 (UU の stair1、幅 6.5m・長さ 4m) を横向きと取り違え、坂が付かなかった (2026-10-21)
+    fits = [(axis, fit(axis)) for axis in (0, 2)]
+    fits = [(axis, f) for axis, f in fits if f is not None]
+    if not fits:
         return None
-
-    # 最小二乗で直線を通す
-    n = len(tops)
-    cs = [lo[axis] + (i + 0.5) / STAIR_BINS * span for i in tops]
-    ys = list(tops.values())
-    mean_c = sum(cs) / n
-    mean_y = sum(ys) / n
-    denom = sum((c - mean_c) ** 2 for c in cs)
-    if denom < 1e-9:
-        return None
-    grad = sum((c - mean_c) * (y - mean_y) for c, y in zip(cs, ys)) / denom
+    axis, (grad, cs, ys, mean_c, mean_y) = max(fits, key=lambda af: abs(af[1][0]))
     if abs(grad) < 0.05:
         return None
 
@@ -175,6 +184,9 @@ def flags_of(obj):
     for word in FLAG_WORDS:
         if word in name:
             flags[word[2:]] = False
+    # 投げた物を止めるか。既定は弾と同じ。弾は通すが投げた物は止める金網は blockthrow
+    # (src/domain/stage/flags.ts と揃える)
+    flags['thrown'] = flags['bullet'] or 'blockthrow' in name
     return flags
 
 
@@ -298,6 +310,12 @@ def place_toolboxes():
     with bpy.data.libraries.load(TOOLBOX_BLEND, link=False) as (src, dst):
         dst.objects = ['wood_toolbox']
     template = dst.objects[0]
+    # **隠した物も床として見る。** scene.ray_cast は画面で隠した物 (目のアイコンを閉じた物) を
+    # 素通りする。作業中に地面を隠したまま書き出すと、床が見つからず工具箱が印の高さ (宙) に
+    # 置かれた (UU、2026-10-21)。ここは書き出し用に読んだ複製なので、出しても .blend は変わらない
+    for obj in bpy.context.scene.objects:
+        if obj.hide_get():
+            obj.hide_set(False)
     depsgraph = bpy.context.evaluated_depsgraph_get()
     for marker in markers:
         at = marker.matrix_world.translation.copy()
@@ -901,12 +919,16 @@ def box_triangles_of(obj):
 # 材質は足音と着弾に要る。箱では Obstacle.surface が持っていたので、
 # 三角へ移すときに一緒に連れて行かないと**木の床から石の音**が鳴る。
 #
-#   bit0 視線  bit1 弾/投擲  bit2 人  bit3 カメラ  bit4-5 材質
+#   bit0 視線  bit1 弾/投擲  bit2 人  bit3 カメラ  bit4-5 材質  bit6 投擲だけ
+#
+# bit6 は**弾は通すが投げた物は止める**面 (金網のフェンス、名前に blockthrow)。投げた物の
+# 世界は bit1 | bit6 で拾う (src/sim/space/stagemesh.ts の MESH_THROWN)
 EYE_BIT = 1
 BULLET_BIT = 2
 PLAYER_BIT = 4
 CAMERA_BIT = 8
 SURFACE_SHIFT = 4
+THROWN_BIT = 64
 #
 # --- 人が当たる形は、細かい物では代用する ---
 #
@@ -1342,9 +1364,10 @@ for obj in bpy.context.scene.objects:
         | (BULLET_BIT if flags['bullet'] else 0)
         | (PLAYER_BIT if flags['player'] else 0)
         | (CAMERA_BIT if flags['camera'] else 0)
+        | (THROWN_BIT if flags['thrown'] and not flags['bullet'] else 0)
         | (SURFACE_IDS[surface_of(obj.name)] << SURFACE_SHIFT)
     )
-    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT)
+    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT | THROWN_BIT)
 
     # --- 階段は人の層だけ坂で受ける ---
     #
@@ -1393,12 +1416,12 @@ for obj in bpy.context.scene.objects:
             ramped_stairs.append(obj.name)
 
     # 何も止めないなら出さない。飾りはここで落ちる
-    if mark & (EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT) == 0:
+    if mark & (EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT | THROWN_BIT) == 0:
         continue
     tris = triangles_of(obj)
     if not tris:
         continue
-    hit_mark = mark & (EYE_BIT | BULLET_BIT)
+    hit_mark = mark & (EYE_BIT | BULLET_BIT | THROWN_BIT)
     body_mark = mark & (PLAYER_BIT | CAMERA_BIT)
     count = len(tris) // 9
 
@@ -1532,13 +1555,22 @@ for obj in bpy.context.scene.objects:
 # --- ターゲット (TSNE) ---------------------------------------------------------
 #
 # **名前が target で始まる空 (target1 / target2) がターゲットの置き場所。** 守る側の基地に近い
-# ほうが使われる (domain/match/target.ts)。高さは基地と同じく真下の床の天面に落とす
+# ほうが使われる (domain/match/target.ts)。高さは基地と同じく真下の床の天面に落とす。
+# 基地の印 (meta_base*) と同じく **meta_ を前に付けた名前 (meta_target1) も受ける** (UU はこちらで置いた)
 tsne_targets = []
 for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
-    if obj.type != 'EMPTY' or not obj.name.lower().startswith('target'):
+    lower = obj.name.lower()
+    if obj.type != 'EMPTY' or not (lower.startswith('target') or lower.startswith('meta_target')):
         continue
     x, y, z = to_gltf(obj.matrix_world.translation)
-    floor = floor_under(x, y, z)
+    # **床は本物の形へ真下に線を引いて取る** (工具箱と同じ)。箱の天面 (floor_under) では、屋上が 2 段の
+    # 建物 (UU の building5) を坂と読み違えた天面で見て、その上の別の箱 (2F の壁の外枠) の高さに置いた
+    for other in bpy.context.scene.objects:
+        if other.hide_get():
+            other.hide_set(False)
+    at = obj.matrix_world.translation
+    hit, where, *_ = bpy.context.scene.ray_cast(bpy.context.evaluated_depsgraph_get(), at + Vector((0, 0, 1.0)), Vector((0, 0, -1.0)))
+    floor = where.z if hit else floor_under(x, y, z)
     tsne_targets.append({'name': obj.name, 'x': round(x, 2), 'y': round(floor if floor is not None else y, 2), 'z': round(z, 2)})
     print(f'  ターゲット {obj.name}: ({x:.1f}, {tsne_targets[-1]["y"]:.1f}, {z:.1f})')
 

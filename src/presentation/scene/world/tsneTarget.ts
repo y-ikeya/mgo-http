@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { castMovingShadow } from './liveShadow'
 
 import { loadTarget } from '../assets'
 
@@ -42,10 +43,7 @@ export class TsneTarget {
     scene.add(this.object)
     void loadTarget().then((gltf) => {
       const model = gltf.scene.clone(true)
-      model.traverse((o) => {
-        const mesh = o as THREE.Mesh
-        if (mesh.isMesh) mesh.castShadow = true
-      })
+      castMovingShadow(model)
       this.object.add(model)
       // 光り。同じ形を少し大きくして、深さを見ずに最後に描く
       const halo = gltf.scene.clone(true)

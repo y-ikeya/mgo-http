@@ -89,8 +89,7 @@ export interface RoomWorld extends Match {
    * ステージを回すようになった時点で、それは「どの部屋も同じ地形」を
    * 前提にした形だった。
    *
-   * 回す表 (domain/stage) から選び直すのは試合の切れ目で、
-   * いまはどの部屋も 1 枚だけの fixed なので変わらない。
+   * 回す表 (domain/stage) から選び直すのは試合の切れ目 (rotateStage)。
    */
   stage: Terrain
 }
@@ -151,6 +150,19 @@ export function roomOf(name: RoomName, key: string = name): RoomWorld {
   return room
 }
 
+/**
+ * **試合の切れ目でステージを回す** (部屋の回す表。1 枚だけの部屋は変わらない)。
+ *
+ * 結果を見せ終えた所 (over の終わり) で呼ぶ。配る試合の状態 (match) にステージが載るので、
+ * 画面はそれを見て暗転して組み直す (screens/Play.tsx)。人は次の支度で新しい基地へ立つ
+ */
+export function rotateStage(room: RoomWorld): void {
+  const next = nextStage(ROOMS[room.name].stages, room.stage.name, Math.random())
+  if (next === room.stage.name) return
+  room.stage = terrainOf(next)
+  console.log(`[部屋] ${room.key}: 次の試合は ${next}`)
+}
+
 /** 部屋の全員へ。except を渡すとその 1 人を除く */
 export function broadcast(room: RoomWorld, message: ServerMessage, except?: string): void {
   const payload = JSON.stringify(message)
@@ -176,11 +188,13 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
     return
   }
   broadcast(room, { type: 'life', id: player.id, state: next })
-  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す。猫に釘付けなら解く
-  if (next !== 'alive' && next !== 'spawning') {
-    releaseCqc(room, player)
-    releaseTrapped(room, player)
-  }
+  // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す
+  if (next !== 'alive' && next !== 'spawning') releaseCqc(room, player)
+  /*
+   * 人形に釘付けなら解く。**切れた (dropped) だけでは解かない** — 解くと、画面を読み直す
+   * だけで抜け出せた (本人 2026-10-20)。戻ってこなくても、人形が消える時にまとめて解ける
+   */
+  if (next !== 'alive' && next !== 'spawning' && next !== 'dropped') releaseTrapped(room, player)
 }
 
 /**
@@ -234,6 +248,7 @@ export function releaseCqc(room: RoomWorld, attacker: MatchPlayer): void {
   if (victim.bot) {
     victim.downLeft = 0
     victim.downThrown = false
+    victim.downRolled = false
     return
   }
   sessionFor(victim)?.socket.send(JSON.stringify({ type: 'released' } satisfies ServerMessage))

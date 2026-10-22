@@ -343,6 +343,30 @@ Game の CLAYMORE_PLACE_RATIO (0.8) は後の方。
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/claymore_place.json
     for c in claymore_windup claymore_place; do for g in soldier soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb $c.glb $c public/models/$g.glb; done; done
 
+軽い着地の脚 `landing` (2.07 秒。頭 12 コマは空中、12 コマ目で足が着き、16 コマ目で一番沈み、34 コマ目で立つ) は本人が
+落とした `tools/raw/Landing.fbx`。**脚だけ使う** (jump_down の下半身。上半身は走りの腕のまま)。足が着く所から流す:
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/landing.json
+    for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb landing.glb landing public/models/$s.glb --rotation-only --in-place; done
+
+縁にぶら下がったまま横へ移る型 `hang_left` / `hang_right` (1.2 秒で 0.58m) は本人が落とした `tools/raw/BracedHangLeft.fbx` /
+`BracedHangRight.fbx`。腰の横の移動は捨てて、位置は soldier が縁に沿って動かす (縁が切れていれば移らない):
+
+    for side in left right; do $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/hang_$side.json; done
+    for side in left right; do for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb hang_$side.glb hang_$side public/models/$s.glb --rotation-only --in-place; done; done
+
+人形に釘付けのまま猫を撫で続ける型 `treat_cat` (8.87 秒、しゃがんだ姿で始まって終わるので繰り返せる。足の向きを合わせた左右反転版) は本人が落とした
+`tools/raw/TreatCat.fbx`。しゃがみ込む `trapped` の後に流す。腰の前後の揺れは捨てる:
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/treat_cat.json
+    for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb treat_cat.glb treat_cat public/models/$s.glb --rotation-only --in-place; done
+
+ローリングの体当たりで後ろへ倒れる型 `hit2back` (1.93 秒、しゃがみから仰向けへ) は本人が落とした `tools/raw/Hit2Back.fbx`。
+腰が後ろへ 1.25m 動くので、横の移動だけ捨てて (`--in-place`) その場で倒れる型にする。滑るのはサーバーが決める距離 (0.5m):
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/hit2back.json
+    for s in soldier soldier_nanashi soldier_raiden soldier_xbot; do bun tools/merge_clip.js public/models/$s.glb hit2back.glb hit2back public/models/$s.glb --rotation-only --in-place; done
+
 猫に釘付けになる型 `trapped` (2.0 秒、立った所からしゃがみ込んで両手を猫へ伸ばす) は本人が落とした
 `tools/raw/trapped.fbx` の **5 本目** (他の 4 本は別の型)。素の姿勢が違うので `retarget_clip.py` で焼き直し、
 4 つの皮に足す。解けて戻るのは同じ型を逆に流す (animation.ts の playTrappedOut):

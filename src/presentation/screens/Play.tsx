@@ -6,6 +6,7 @@ import { Game, type GameStats } from '../scene/Game'
 import { ensureFresh, type Identity } from '../../infra/auth/session'
 import type { WeaponTarget } from '../scene/arms/weapon'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
+import type { StageName } from '../../domain/stage'
 import Calibrator from '../ui/Calibrator'
 import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
@@ -202,13 +203,18 @@ export default function Play(props: {
   onCleanup(() => {
     alive = false
   })
-  onMount(async () => {
+  /**
+   * 試合を組み立てて繋ぐ。**ステージを替える時もここを通る** (下の createEffect)。
+   *
+   * @param stage 乗るステージ。無ければ部屋の回す表の先頭
+   */
+  const mount = async (stage?: StageName) => {
     // 繋ぐ前に、期限が近ければ token を取り直す (裏に回っていた間に切れていることがある)
     const identity = (await ensureFresh()) ?? props.identity
     // 取り直している間に画面を離れていたら作らない
     if (!alive) return
     // 練習 (/training) は自分だけの部屋。他の人と出会わない
-    const instance = new Game(container, identity, roomName(), training)
+    const instance = new Game(container, identity, roomName(), training, stage)
     // 描画器の初期化 (WebGPU のアダプタ取得) を待つので非同期
     instance.onLoadout = (next) => {
       setPrimary(next.primary)
@@ -218,6 +224,32 @@ export default function Play(props: {
     instance.onLoadout(instance.chosenLoadout)
     void instance.start(setStats)
     setGame(instance)
+  }
+  onMount(() => void mount())
+
+  /*
+   * **試合の切れ目でステージが替わった** (bravo / charlie は city と UU を交互に回す)。
+   *
+   * サーバーが配る試合の状態に今のステージが載る。手元と違えば**暗転して組み直す** — 覆い
+   * (Loading) を出し、今の試合を捨てて、そのステージで作り直す。地形を前提に組んだ物
+   * (当たり・影・空・音・人) が多いので、差し替えるより捨てて作るほうが取りこぼしが無い
+   * (2026-10-22 本人「暗転しちゃって、spinner とか出して loading 風景出していいよ」)。
+   *
+   * 席は繋ぎ直しの猶予 (RECONNECT_GRACE_MS 30 秒) の間は空けて待たれるので、組み直して
+   * 繋ぎ直せば同じ席に戻る。替わるのは結果を見せ終えて支度へ入る所なので、試合は壊れない
+   */
+  let restaging = false
+  createEffect(() => {
+    const want = stats()?.match?.stage
+    const current = game()
+    if (!want || !current || restaging || want === current.currentStage) return
+    restaging = true
+    setStats(null)
+    current.dispose()
+    setGame(null)
+    void mount(want).finally(() => {
+      restaging = false
+    })
   })
 
   /**

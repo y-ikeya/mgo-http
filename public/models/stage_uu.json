@@ -1,0 +1,3665 @@
+{
+"boxes": [
+{
+"name": "concrete_base_ground",
+"min": [
+-70.0,
+-1.9,
+-70.0
+],
+"max": [
+70.0,
+0.1,
+70.0
+],
+"top": {
+"h": 0.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall2_1F",
+"min": [
+-37.208,
+-0.0,
+-40.672
+],
+"max": [
+39.859,
+3.6,
+40.756
+],
+"top": {
+"h": 3.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_floor_stair1_landing",
+"min": [
+-10.16,
+0.1,
+22.236
+],
+"max": [
+-4.96,
+2.0,
+25.116
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair1_a",
+"min": [
+-10.16,
+0.1,
+25.116
+],
+"max": [
+-4.96,
+2.0,
+28.392
+],
+"top": {
+"h": 2.1597,
+"dx": 0.0,
+"dz": -0.5697,
+"riser": 0.19,
+"foot": 0.1,
+"head": 2.19
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair1_b",
+"min": [
+-10.16,
+0.1,
+18.96
+],
+"max": [
+-4.96,
+3.9,
+22.236
+],
+"top": {
+"h": 4.0597,
+"dx": 0.0,
+"dz": -0.5697,
+"riser": 0.19,
+"foot": 2.0,
+"head": 4.09
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_building1",
+"min": [
+-12.621,
+3.9,
+6.656
+],
+"max": [
+-2.96,
+15.568,
+15.659
+],
+"top": {
+"h": 15.5678,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair3_a",
+"min": [
+-10.56,
+0.1,
+-2.748
+],
+"max": [
+-4.88,
+2.0,
+0.528
+],
+"top": {
+"h": 2.1597,
+"dx": 0.0,
+"dz": -0.5697,
+"riser": 0.19,
+"foot": 0.1,
+"head": 2.19
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair3_b",
+"min": [
+-10.56,
+0.1,
+-6.024
+],
+"max": [
+-4.88,
+3.9,
+-2.748
+],
+"top": {
+"h": 4.0524,
+"dx": 0.0,
+"dz": -0.56993,
+"riser": 0.19,
+"foot": 2.0,
+"head": 4.09
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair4",
+"min": [
+-24.304,
+0.1,
+-33.84
+],
+"max": [
+-17.752,
+3.9,
+-30.08
+],
+"top": {
+"h": 4.0685,
+"dx": -0.57345,
+"dz": 0.0,
+"riser": 0.2,
+"foot": 0.1,
+"head": 4.1
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair5",
+"min": [
+-12.352,
+0.1,
+-28.44
+],
+"max": [
+-5.52,
+3.9,
+-26.504
+],
+"top": {
+"h": 4.0685,
+"dx": -0.55215,
+"dz": 0.0,
+"riser": 0.19,
+"foot": 0.1,
+"head": 4.09
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair2.001",
+"min": [
+-24.137,
+0.1,
+17.45
+],
+"max": [
+-17.585,
+3.9,
+20.89
+],
+"top": {
+"h": 4.0685,
+"dx": -0.57345,
+"dz": 0.0,
+"riser": 0.2,
+"foot": 0.1,
+"head": 4.1
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair6_a",
+"min": [
+19.892,
+0.1,
+6.632
+],
+"max": [
+23.168,
+2.0,
+10.264
+],
+"top": {
+"h": 2.1524,
+"dx": -0.56993,
+"dz": 0.0,
+"riser": 0.19,
+"foot": 0.1,
+"head": 2.19
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_floor_stair6_landing",
+"min": [
+18.132,
+0.1,
+6.632
+],
+"max": [
+19.892,
+2.0,
+10.264
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair6_b",
+"min": [
+14.856,
+0.1,
+6.632
+],
+"max": [
+18.132,
+3.9,
+10.264
+],
+"top": {
+"h": 4.0524,
+"dx": -0.56993,
+"dz": 0.0,
+"riser": 0.19,
+"foot": 2.0,
+"head": 4.09
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair7_a",
+"min": [
+10.88,
+0.1,
+-33.44
+],
+"max": [
+14.432,
+2.0,
+-31.36
+],
+"top": {
+"h": 2.1501,
+"dx": -0.52052,
+"dz": 0.0,
+"riser": 0.19,
+"foot": 0.1,
+"head": 2.19
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_floor_stair7_landing",
+"min": [
+9.44,
+0.1,
+-33.44
+],
+"max": [
+10.88,
+2.0,
+-29.4
+],
+"top": {
+"h": 2.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair7_b",
+"min": [
+10.88,
+0.1,
+-31.36
+],
+"max": [
+14.432,
+3.9,
+-29.4
+],
+"top": {
+"h": 2.1939,
+"dx": 0.52071,
+"dz": 0.0,
+"riser": 0.19,
+"foot": 2.0,
+"head": 4.09
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair2.002",
+"min": [
+-26.215,
+0.1,
+-17.212
+],
+"max": [
+-24.179,
+3.9,
+-10.66
+],
+"top": {
+"h": 4.0685,
+"dx": 0.0,
+"dz": -0.57345,
+"riser": 0.2,
+"foot": 0.1,
+"head": 4.1
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_building2",
+"min": [
+0.084,
+3.837,
+17.225
+],
+"max": [
+9.282,
+18.837,
+25.938
+],
+"top": {
+"h": 18.8373,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall1_2F",
+"min": [
+-37.208,
+3.9,
+-40.512
+],
+"max": [
+39.879,
+9.543,
+40.787
+],
+"top": {
+"h": 9.543,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_2F_ground",
+"min": [
+-35.284,
+3.6,
+-39.088
+],
+"max": [
+32.523,
+3.9,
+28.169
+],
+"top": {
+"h": 3.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_1",
+"min": [
+28.201,
+0.1,
+-13.199
+],
+"max": [
+28.241,
+4.23,
+-12.48
+],
+"top": {
+"h": 4.23,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_building3",
+"min": [
+7.629,
+3.848,
+-27.288
+],
+"max": [
+20.11,
+19.046,
+-0.797
+],
+"top": {
+"h": 19.0462,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube",
+"min": [
+-2.172,
+3.855,
+24.453
+],
+"max": [
+9.045,
+5.355,
+27.69
+],
+"top": {
+"h": 5.3549,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair8",
+"min": [
+9.016,
+3.9,
+24.536
+],
+"max": [
+14.0,
+5.35,
+27.12
+],
+"top": {
+"h": 5.4428,
+"dx": -0.28277,
+"dz": 0.0,
+"riser": 0.12,
+"foot": 3.9,
+"head": 5.47
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_building4",
+"min": [
+-28.51,
+3.583,
+0.327
+],
+"max": [
+-15.665,
+17.007,
+17.454
+],
+"top": {
+"h": 17.0066,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_2",
+"min": [
+-28.079,
+3.9,
+15.89
+],
+"max": [
+-27.361,
+17.337,
+15.93
+],
+"top": {
+"h": 17.337,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_building5",
+"min": [
+-18.361,
+3.9,
+-23.786
+],
+"max": [
+-3.931,
+10.287,
+2.116
+],
+"top": {
+"h": 9.2796,
+"dx": 0.41411,
+"dz": 0.00083,
+"thick": 11.363
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_laddercover1",
+"min": [
+-16.037,
+8.225,
+0.941
+],
+"max": [
+-15.909,
+16.794,
+2.155
+],
+"top": {
+"h": 16.7936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_3",
+"min": [
+-17.644,
+8.22,
+1.947
+],
+"max": [
+-16.925,
+17.337,
+1.987
+],
+"top": {
+"h": 17.3366,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.001",
+"min": [
+-24.198,
+3.887,
+-30.006
+],
+"max": [
+-18.35,
+7.099,
+-11.474
+],
+"top": {
+"h": 7.0993,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_laddercover1.001",
+"min": [
+9.157,
+12.271,
+-2.527
+],
+"max": [
+9.284,
+19.078,
+-0.897
+],
+"top": {
+"h": 19.0778,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.002",
+"min": [
+9.147,
+3.827,
+-2.602
+],
+"max": [
+10.836,
+10.939,
+-0.751
+],
+"top": {
+"h": 10.9389,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.003",
+"min": [
+20.072,
+3.747,
+-9.89
+],
+"max": [
+21.039,
+18.972,
+-8.218
+],
+"top": {
+"h": 18.9724,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.004",
+"min": [
+20.072,
+3.747,
+-20.026
+],
+"max": [
+21.039,
+18.972,
+-18.354
+],
+"top": {
+"h": 18.9724,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.005",
+"min": [
+20.063,
+11.627,
+-18.486
+],
+"max": [
+20.861,
+11.816,
+-9.851
+],
+"top": {
+"h": 11.8163,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_4",
+"min": [
+-4.942,
+3.9,
+-16.484
+],
+"max": [
+-4.902,
+9.624,
+-15.765
+],
+"top": {
+"h": 9.6241,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_5",
+"min": [
+10.913,
+3.9,
+-1.99
+],
+"max": [
+10.953,
+11.269,
+-1.271
+],
+"top": {
+"h": 11.2689,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_6",
+"min": [
+9.629,
+10.939,
+-2.521
+],
+"max": [
+10.347,
+19.376,
+-2.481
+],
+"top": {
+"h": 19.3762,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_7",
+"min": [
+20.937,
+3.9,
+-11.293
+],
+"max": [
+20.977,
+12.157,
+-10.574
+],
+"top": {
+"h": 12.157,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_8",
+"min": [
+20.13,
+11.816,
+-17.431
+],
+"max": [
+20.17,
+19.376,
+-16.713
+],
+"top": {
+"h": 19.3762,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_laddercover1.002",
+"min": [
+9.294,
+12.271,
+-1.011
+],
+"max": [
+10.924,
+19.078,
+-0.883
+],
+"top": {
+"h": 19.0778,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_9",
+"min": [
+17.056,
+3.9,
+-26.906
+],
+"max": [
+17.096,
+19.376,
+-26.187
+],
+"top": {
+"h": 19.3762,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_ladder_10",
+"min": [
+23.594,
+0.1,
+23.428
+],
+"max": [
+23.634,
+4.23,
+24.147
+],
+"top": {
+"h": 4.23,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_laddertop1_noeye",
+"min": [
+28.201,
+4.21,
+-13.199
+],
+"max": [
+28.241,
+4.95,
+-12.48
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop10_noeye",
+"min": [
+23.594,
+4.21,
+23.428
+],
+"max": [
+23.634,
+4.95,
+24.147
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop2_noeye",
+"min": [
+-28.079,
+17.317,
+15.89
+],
+"max": [
+-27.361,
+18.057,
+15.93
+],
+"top": {
+"h": 18.057,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop3_noeye",
+"min": [
+-17.644,
+17.317,
+1.947
+],
+"max": [
+-16.925,
+18.057,
+1.987
+],
+"top": {
+"h": 18.0566,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop4_noeye",
+"min": [
+-4.942,
+9.604,
+-16.484
+],
+"max": [
+-4.902,
+10.344,
+-15.765
+],
+"top": {
+"h": 10.3441,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop5_noeye",
+"min": [
+10.913,
+11.249,
+-1.99
+],
+"max": [
+10.953,
+11.989,
+-1.271
+],
+"top": {
+"h": 11.9889,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop6_noeye",
+"min": [
+9.629,
+19.356,
+-2.521
+],
+"max": [
+10.347,
+20.096,
+-2.481
+],
+"top": {
+"h": 20.0962,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop7_noeye",
+"min": [
+20.937,
+12.137,
+-11.293
+],
+"max": [
+20.977,
+12.877,
+-10.574
+],
+"top": {
+"h": 12.877,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop8_noeye",
+"min": [
+20.13,
+19.356,
+-17.431
+],
+"max": [
+20.17,
+20.096,
+-16.713
+],
+"top": {
+"h": 20.0962,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_laddertop9_noeye",
+"min": [
+17.056,
+19.356,
+-26.906
+],
+"max": [
+17.096,
+20.096,
+-26.187
+],
+"top": {
+"h": 20.0962,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "concrete_wall",
+"min": [
+-12.383,
+3.9,
+-26.536
+],
+"max": [
+0.137,
+6.3,
+-13.884
+],
+"top": {
+"h": 6.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall2",
+"min": [
+-4.905,
+3.9,
+-11.518
+],
+"max": [
+0.132,
+6.3,
+-2.71
+],
+"top": {
+"h": 6.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall2.001",
+"min": [
+-15.994,
+3.888,
+-2.852
+],
+"max": [
+-10.571,
+6.288,
+-2.622
+],
+"top": {
+"h": 6.2881,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall2.002",
+"min": [
+-9.528,
+3.876,
+6.624
+],
+"max": [
+8.969,
+6.676,
+8.738
+],
+"top": {
+"h": 6.676,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall2.003",
+"min": [
+11.947,
+-0.387,
+6.588
+],
+"max": [
+23.17,
+6.288,
+6.873
+],
+"top": {
+"h": 6.2881,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.006",
+"min": [
+16.215,
+3.933,
+11.262
+],
+"max": [
+28.272,
+7.938,
+22.782
+],
+"top": {
+"h": 7.9375,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall2.004",
+"min": [
+14.439,
+3.888,
+-36.929
+],
+"max": [
+16.552,
+5.188,
+-31.287
+],
+"top": {
+"h": 5.1881,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.007",
+"min": [
+11.64,
+19.02,
+-23.379
+],
+"max": [
+17.673,
+21.02,
+-4.952
+],
+"top": {
+"h": 21.0204,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.008",
+"min": [
+-25.87,
+17.007,
+2.075
+],
+"max": [
+-20.255,
+19.007,
+15.443
+],
+"top": {
+"h": 19.0066,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.009",
+"min": [
+-16.239,
+16.771,
+2.068
+],
+"max": [
+-14.592,
+17.202,
+15.845
+],
+"top": {
+"h": 17.2023,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_fence1_nobullet_noeye_nocamera_blockthrow",
+"min": [
+23.458,
+3.9,
+-29.347
+],
+"max": [
+23.458,
+5.9,
+2.083
+],
+"top": {
+"h": 5.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial",
+"min": [
+-0.054,
+0.1,
+5.426
+],
+"max": [
+1.946,
+1.663,
+6.773
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.001",
+"min": [
+-27.333,
+0.1,
+-6.159
+],
+"max": [
+-25.986,
+1.663,
+-4.159
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "Box001_Material #0_0",
+"min": [
+20.019,
+3.84,
+-25.798
+],
+"max": [
+22.31,
+6.331,
+-20.052
+],
+"top": {
+"h": 6.3306,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "Box001_Material #0_0.001",
+"min": [
+20.019,
+3.84,
+-18.335
+],
+"max": [
+22.31,
+6.331,
+-12.589
+],
+"top": {
+"h": 6.3306,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_fence1_frame_notexture",
+"min": [
+23.425,
+3.9,
+-29.382
+],
+"max": [
+23.492,
+5.93,
+2.118
+],
+"top": {
+"h": 5.9192,
+"dx": 0.32492,
+"dz": -0.0,
+"thick": 2.0408
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "metal_fence2_nobullet_noeye_nocamera_blockthrow",
+"min": [
+16.504,
+3.9,
+-29.347
+],
+"max": [
+23.458,
+5.9,
+-29.347
+],
+"top": {
+"h": 5.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_fence2_frame_notexture",
+"min": [
+16.471,
+3.9,
+-29.382
+],
+"max": [
+23.458,
+5.93,
+-29.312
+],
+"top": {
+"h": 5.9186,
+"dx": 0.0,
+"dz": 0.32493,
+"thick": 2.0414
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "concrete_wall2.005",
+"min": [
+8.746,
+3.886,
+24.535
+],
+"max": [
+14.001,
+6.593,
+24.654
+],
+"top": {
+"h": 6.5929,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.002",
+"min": [
+19.162,
+0.1,
+24.399
+],
+"max": [
+21.162,
+1.663,
+25.746
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.003",
+"min": [
+18.33,
+0.1,
+0.779
+],
+"max": [
+20.33,
+1.663,
+2.126
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "col_metal_handrail1_nobullet_noeye_nocamera",
+"min": [
+3.879,
+3.9,
+-29.613
+],
+"max": [
+14.377,
+4.95,
+-29.285
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail2_nobullet_noeye_nocamera",
+"min": [
+3.799,
+3.9,
+-29.574
+],
+"max": [
+3.92,
+4.95,
+-13.81
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail3_nobullet_noeye_nocamera",
+"min": [
+0.118,
+3.9,
+-13.87
+],
+"max": [
+3.839,
+4.95,
+-13.77
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_handrail_notexture",
+"min": [
+0.096,
+3.9,
+-29.595
+],
+"max": [
+14.398,
+4.97,
+-13.788
+],
+"top": {
+"h": 4.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail4_nobullet_noeye_nocamera",
+"min": [
+3.794,
+3.9,
+2.001
+],
+"max": [
+9.053,
+4.95,
+2.097
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail5_nobullet_noeye_nocamera",
+"min": [
+0.035,
+3.9,
+-11.603
+],
+"max": [
+3.828,
+4.95,
+-11.504
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail6_nobullet_noeye_nocamera",
+"min": [
+3.754,
+3.9,
+-11.544
+],
+"max": [
+3.867,
+4.95,
+2.041
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail7_nobullet_noeye_nocamera",
+"min": [
+11.897,
+3.9,
+2.025
+],
+"max": [
+23.372,
+4.95,
+2.141
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail8_nobullet_noeye_nocamera",
+"min": [
+9.0,
+3.9,
+2.057
+],
+"max": [
+9.093,
+4.95,
+6.754
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail9_nobullet_noeye_nocamera",
+"min": [
+11.831,
+3.9,
+2.065
+],
+"max": [
+11.937,
+4.95,
+6.783
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_handrail2_notexture",
+"min": [
+0.014,
+3.9,
+-11.585
+],
+"max": [
+23.394,
+4.97,
+6.805
+],
+"top": {
+"h": 4.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail10_nobullet_noeye_nocamera",
+"min": [
+23.473,
+3.9,
+2.178
+],
+"max": [
+23.565,
+4.95,
+10.319
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail11_nobullet_noeye_nocamera",
+"min": [
+14.794,
+3.9,
+10.278
+],
+"max": [
+23.525,
+4.95,
+10.359
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail12_nobullet_noeye_nocamera",
+"min": [
+10.88,
+2.0,
+-31.34
+],
+"max": [
+14.43,
+4.95,
+-31.26
+],
+"top": {
+"h": 3.05,
+"dx": 0.53521,
+"dz": -0.0,
+"thick": 1.05
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail13_nobullet_noeye_nocamera",
+"min": [
+10.3,
+2.0,
+-31.34
+],
+"max": [
+10.88,
+3.05,
+-31.26
+],
+"top": {
+"h": 3.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail14_nobullet_noeye_nocamera",
+"min": [
+14.43,
+0.1,
+-33.42
+],
+"max": [
+14.87,
+1.15,
+-33.34
+],
+"top": {
+"h": 1.15,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail15_nobullet_noeye_nocamera",
+"min": [
+10.88,
+0.1,
+-33.42
+],
+"max": [
+14.43,
+3.05,
+-33.34
+],
+"top": {
+"h": 3.05,
+"dx": -0.53521,
+"dz": 0.0,
+"thick": 1.05
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail16_nobullet_noeye_nocamera",
+"min": [
+9.5,
+2.0,
+-33.42
+],
+"max": [
+10.88,
+3.05,
+-33.34
+],
+"top": {
+"h": 3.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail17_nobullet_noeye_nocamera",
+"min": [
+9.46,
+2.0,
+-33.38
+],
+"max": [
+9.54,
+3.05,
+-29.45
+],
+"top": {
+"h": 3.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_handrail3_notexture",
+"min": [
+9.478,
+0.1,
+-33.402
+],
+"max": [
+23.547,
+4.97,
+10.341
+],
+"top": {
+"h": 4.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "Box001_Material #0_0.002",
+"min": [
+-18.357,
+3.84,
+-28.44
+],
+"max": [
+-16.066,
+6.331,
+-23.744
+],
+"top": {
+"h": 6.3306,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.004",
+"min": [
+-26.112,
+3.865,
+-28.978
+],
+"max": [
+-24.112,
+5.428,
+-27.632
+],
+"top": {
+"h": 5.4275,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "col_metal_handrail18_nobullet_noeye_nocamera",
+"min": [
+7.689,
+19.046,
+-21.903
+],
+"max": [
+9.282,
+20.096,
+-21.813
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail19_nobullet_noeye_nocamera",
+"min": [
+9.242,
+19.046,
+-25.855
+],
+"max": [
+9.327,
+20.096,
+-21.853
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail20_nobullet_noeye_nocamera",
+"min": [
+9.287,
+19.046,
+-25.895
+],
+"max": [
+12.877,
+20.096,
+-25.81
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail21_nobullet_noeye_nocamera",
+"min": [
+12.837,
+19.046,
+-27.228
+],
+"max": [
+12.919,
+20.096,
+-25.849
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail22_nobullet_noeye_nocamera",
+"min": [
+12.879,
+19.046,
+-27.267
+],
+"max": [
+16.921,
+20.096,
+-27.181
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail23_nobullet_noeye_nocamera",
+"min": [
+16.881,
+19.046,
+-27.221
+],
+"max": [
+16.961,
+20.096,
+-27.147
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail24_nobullet_noeye_nocamera",
+"min": [
+16.879,
+19.046,
+-25.947
+],
+"max": [
+16.959,
+20.096,
+-25.843
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail25_nobullet_noeye_nocamera",
+"min": [
+16.919,
+19.046,
+-25.883
+],
+"max": [
+19.961,
+20.096,
+-25.798
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail26_nobullet_noeye_nocamera",
+"min": [
+19.921,
+19.046,
+-25.838
+],
+"max": [
+20.032,
+20.096,
+-17.671
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail27_nobullet_noeye_nocamera",
+"min": [
+19.956,
+19.046,
+-16.472
+],
+"max": [
+20.089,
+20.096,
+-2.561
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail28_nobullet_noeye_nocamera",
+"min": [
+17.43,
+19.046,
+-2.601
+],
+"max": [
+20.05,
+20.096,
+-2.497
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail29_nobullet_noeye_nocamera",
+"min": [
+17.384,
+19.046,
+-2.537
+],
+"max": [
+17.471,
+20.096,
+-0.857
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail30_nobullet_noeye_nocamera",
+"min": [
+12.976,
+19.046,
+-0.897
+],
+"max": [
+17.424,
+20.096,
+-0.817
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail31_nobullet_noeye_nocamera",
+"min": [
+12.936,
+19.046,
+-2.64
+],
+"max": [
+13.026,
+20.096,
+-0.857
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail32_nobullet_noeye_nocamera",
+"min": [
+10.589,
+19.046,
+-2.693
+],
+"max": [
+12.986,
+20.096,
+-2.6
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail33_nobullet_noeye_nocamera",
+"min": [
+9.202,
+19.046,
+-2.701
+],
+"max": [
+9.389,
+20.096,
+-2.62
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail34_nobullet_noeye_nocamera",
+"min": [
+9.162,
+19.046,
+-8.382
+],
+"max": [
+9.291,
+20.096,
+-2.661
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail35_nobullet_noeye_nocamera",
+"min": [
+7.697,
+19.046,
+-8.422
+],
+"max": [
+9.251,
+20.096,
+-8.327
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail36_nobullet_noeye_nocamera",
+"min": [
+7.649,
+19.046,
+-21.863
+],
+"max": [
+7.738,
+20.096,
+-8.367
+],
+"top": {
+"h": 20.096,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_handrail4_notexture",
+"min": [
+7.667,
+19.046,
+-27.249
+],
+"max": [
+20.071,
+20.116,
+-0.835
+],
+"top": {
+"h": 20.116,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "metal_kanban1",
+"min": [
+-14.601,
+10.595,
+-9.764
+],
+"max": [
+-7.002,
+12.895,
+-9.422
+],
+"top": {
+"h": 12.8952,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_kanban1_frame_notexture",
+"min": [
+-12.991,
+10.262,
+-10.403
+],
+"max": [
+-8.612,
+12.69,
+-9.559
+],
+"top": {
+"h": 12.69,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "wood_box_box2_box_0",
+"min": [
+-17.387,
+8.225,
+-8.639
+],
+"max": [
+-16.373,
+9.051,
+-7.849
+],
+"top": {
+"h": 9.0507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box_box_0",
+"min": [
+-31.621,
+3.866,
+6.854
+],
+"max": [
+-30.624,
+5.855,
+7.932
+],
+"top": {
+"h": 5.8553,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.001",
+"min": [
+-18.369,
+8.225,
+-8.642
+],
+"max": [
+-17.348,
+9.056,
+-7.846
+],
+"top": {
+"h": 9.0562,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.003",
+"min": [
+-14.618,
+3.851,
+-3.6
+],
+"max": [
+-13.604,
+4.677,
+-2.81
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.004",
+"min": [
+-12.676,
+3.851,
+-3.6
+],
+"max": [
+-11.662,
+4.677,
+-2.81
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.005",
+"min": [
+-13.645,
+4.625,
+-3.6
+],
+"max": [
+-12.631,
+5.451,
+-2.81
+],
+"top": {
+"h": 5.4507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.006",
+"min": [
+-14.618,
+4.625,
+-3.6
+],
+"max": [
+-13.604,
+5.451,
+-2.81
+],
+"top": {
+"h": 5.4507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.007",
+"min": [
+-12.676,
+4.625,
+-3.6
+],
+"max": [
+-11.662,
+5.451,
+-2.81
+],
+"top": {
+"h": 5.4507,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.008",
+"min": [
+-13.645,
+3.851,
+-4.357
+],
+"max": [
+-12.631,
+4.677,
+-3.567
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.009",
+"min": [
+-14.618,
+3.851,
+-4.357
+],
+"max": [
+-13.604,
+4.677,
+-3.567
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.010",
+"min": [
+-12.676,
+3.851,
+-4.357
+],
+"max": [
+-11.662,
+4.677,
+-3.567
+],
+"top": {
+"h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_toolbox_blue_boxcol",
+"min": [
+-13.755,
+0.1,
+32.574
+],
+"max": [
+-12.896,
+0.4,
+33.658
+],
+"top": {
+"h": 0.4004,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_toolbox_red_boxcol",
+"min": [
+29.496,
+0.1,
+-16.585
+],
+"max": [
+30.354,
+0.4,
+-15.501
+],
+"top": {
+"h": 0.4004,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+}
+],
+"ladders": [
+{
+"name": "metal_ladder_1",
+"min": [
+28.201,
+0.1,
+-13.199
+],
+"max": [
+28.241,
+4.23,
+-12.48
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_2",
+"min": [
+-28.079,
+3.9,
+15.89
+],
+"max": [
+-27.361,
+17.337,
+15.93
+],
+"axis": "z",
+"parts": 1
+},
+{
+"name": "metal_ladder_3",
+"min": [
+-17.644,
+8.22,
+1.947
+],
+"max": [
+-16.925,
+17.337,
+1.987
+],
+"axis": "z",
+"parts": 1
+},
+{
+"name": "metal_ladder_4",
+"min": [
+-4.942,
+3.9,
+-16.484
+],
+"max": [
+-4.902,
+9.624,
+-15.765
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_5",
+"min": [
+10.913,
+3.9,
+-1.99
+],
+"max": [
+10.953,
+11.269,
+-1.271
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_6",
+"min": [
+9.629,
+10.939,
+-2.521
+],
+"max": [
+10.347,
+19.376,
+-2.481
+],
+"axis": "z",
+"parts": 1
+},
+{
+"name": "metal_ladder_7",
+"min": [
+20.937,
+3.9,
+-11.293
+],
+"max": [
+20.977,
+12.157,
+-10.574
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_8",
+"min": [
+20.13,
+11.816,
+-17.431
+],
+"max": [
+20.17,
+19.376,
+-16.713
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_9",
+"min": [
+17.056,
+3.9,
+-26.906
+],
+"max": [
+17.096,
+19.376,
+-26.187
+],
+"axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_10",
+"min": [
+23.594,
+0.1,
+23.428
+],
+"max": [
+23.634,
+4.23,
+24.147
+],
+"axis": "x",
+"parts": 1
+}
+],
+"bases": {
+"blue": {
+"x": -13.33,
+"y": 0.1,
+"z": 33.12
+},
+"red": {
+"x": 29.93,
+"y": 0.1,
+"z": -16.04
+}
+},
+"tsneTargets": [
+{
+"name": "meta_target1",
+"x": -7.91,
+"y": 15.57,
+"z": 11.88
+},
+{
+"name": "meta_target2",
+"x": 9.61,
+"y": 19.05,
+"z": -17.21
+}
+]
+}

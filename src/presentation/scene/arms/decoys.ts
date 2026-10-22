@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { castStaticShadow } from '../world/liveShadow'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { loadSoldier } from '../assets'
 import { refreshStaticShadows } from '../world/staticShadow'
@@ -206,9 +207,7 @@ export class Decoys {
     const box = new THREE.Box3().setFromObject(model)
     model.position.y -= box.min.y
 
-    model.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) obj.castShadow = true
-    })
+    castStaticShadow(model)
     entry.body.add(model)
   }
 

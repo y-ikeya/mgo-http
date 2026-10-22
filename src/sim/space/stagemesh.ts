@@ -27,6 +27,11 @@ export const MESH_BULLET = 2
 export const MESH_PLAYER = 4
 export const MESH_CAMERA = 8
 /**
+ * 投げた物だけを止める (弾は通す。金網)。**弾を止める面は投げた物も止める**ので、投げた物の
+ * 世界は MESH_BULLET | MESH_THROWN で拾う。材質 (4〜5 ビット) の上の空きを使う
+ */
+export const MESH_THROWN = 64
+/**
  * 材質は上位 2 ビット。**番号の意味はここでは決めない。**
  *
  * どの番号が木でどれが石かは遊びの話 (domain/stage/surface.ts の

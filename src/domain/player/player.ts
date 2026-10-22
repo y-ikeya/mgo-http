@@ -306,8 +306,8 @@ export interface MatchPlayer extends Player {
   homeZ: number
   /** 的の足元の高さ。地面が 0 ではないステージ (検証場は 0.1) で埋まらないように */
   homeY: number
-  /** 的の構え。立っている / しゃがんでいる / 伏せている。人は使わない */
-  homeStance: 'stand' | 'crouch' | 'prone'
+  /** 的の構え。立っている / しゃがんでいる / 伏せている / 箱を被っている / 左右へ lean し続ける。人は使わない */
+  homeStance: 'stand' | 'crouch' | 'prone' | 'box' | 'lean'
   /** 走り続ける的の、もう一方の端。null なら動かない。人は使わない */
   patrolTo: { x: number; z: number } | null
   /** いま向こうの端 (patrolTo) へ走っているか。false なら置き場 (home) へ戻っている */
@@ -325,6 +325,8 @@ export interface MatchPlayer extends Player {
   downLeft: number
   /** 的が倒れているのが CQC で投げられたからか。倒れている姿が違う (cqc_thrown) */
   downThrown: boolean
+  /** 的が倒れているのがローリングの体当たりでか。倒れている姿が違う (hit2back) */
+  downRolled: boolean
   /**
    * 倒された時、撃った相手が背後に居たか。**倒れる向きに出る。**
    *
@@ -388,6 +390,12 @@ export interface MatchPlayer extends Player {
   patAt: number
   /** 釘付けにしている猫の番号 (server/arms/doll.ts)。0 なら掛かっていない */
   trappedBy: number
+  /** 猫へ寄り終えてしゃがみ込み始めた時刻 (ms)。0 ならまだ寄っている (的の姿と歩きを決めるのに使う) */
+  trapCrouchAt: number
+  /** 掛かった時刻 (ms)。寄る長さの上限 (TRAP_APPROACH_SECONDS) を測る */
+  trappedAt: number
+  /** 体当たりで怯んで足が止まっている終わりの時刻 (ms)。的 (bot) の走りを止めるのに使う */
+  staggerUntil: number
   /** この時刻 (ms) まではどの猫にも掛からない。解けた時に決める (domain/item/doll.ts の IMMUNE_SECONDS) */
   trapFreeAt: number
   /** スタンナイフの充電が満ちる時刻 (ms)。湧いた時に今へ戻す (満ちた状態) */
@@ -449,6 +457,7 @@ export function newMatchPlayer(seed: {
     patrolOut: true,
     downLeft: 0,
     downThrown: false,
+    downRolled: false,
     downFromBehind: false,
     weapon: 'rifle',
     primary: 'rifle',
@@ -471,7 +480,10 @@ export function newMatchPlayer(seed: {
     struggleAt: 0,
     patAt: 0,
     trappedBy: 0,
+    trappedAt: 0,
+    trapCrouchAt: 0,
     trapFreeAt: 0,
+    staggerUntil: 0,
     stunReadyAt: 0,
     headshots: 0,
     headDeaths: 0,
@@ -497,7 +509,7 @@ export function newBot(seed: {
   /** 足元の高さ。省けば 0 */
   y?: number
   /** 構え。省けば立っている */
-  stance?: 'stand' | 'crouch' | 'prone'
+  stance?: 'stand' | 'crouch' | 'prone' | 'box' | 'lean'
   /** 走り続ける的のもう一方の端。省けば動かない */
   patrol?: { x: number; z: number }
   now: number

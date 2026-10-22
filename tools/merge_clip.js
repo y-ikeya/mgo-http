@@ -36,6 +36,14 @@ const noRoot = args.includes('--no-root')
  * 4cm 高い所に立つ — そこから刺す型へ渡ると落差が目立った。既存の型の
  * 先頭の腰の高さに合わせて平行移動する。
  */
+/*
+ * --in-place … 腰の**横の移動だけ**捨てる (上下は残す)。先頭の位置のまま、その場で倒れる型にする。
+ *
+ * 倒れる型 (Hit2Back) は腰が後ろへ 1.25m 動く。そのまま載せると体の見た目と実際の位置
+ * (当たり・カメラの基準) がずれ、起き上がる型へ渡る所で前へ跳ねる。--no-root だと腰の高さまで
+ * 捨てて、倒れても腰が立った高さに残る。上の軸は既存の idle の腰で見分ける (一番大きい成分)
+ */
+const inPlace = args.includes('--in-place')
 const hipsFromAt = args.indexOf('--hips-from')
 const hipsFrom = hipsFromAt >= 0 ? args[hipsFromAt + 1] : null
 const [destPath, srcPath, clipName, outPath] = args.filter(
@@ -160,6 +168,20 @@ for (const channel of animation.channels) {
     samplers.push({ input: samplers[channel.sampler].input, output, interpolation: source.interpolation })
     sampler = samplers.length - 1
     console.log(`${clipName}: 腰を ${hipsFrom} の高さへ (${shift.map((v) => v.toFixed(2)).join(', ')})`)
+  }
+  if (inPlace && channel.target.path === 'translation' && name.endsWith('Hips')) {
+    const rest = hipsFirstFrame(dest, 'idle')
+    const up = rest.map(Math.abs).indexOf(Math.max(...rest.map(Math.abs)))
+    const source = animation.samplers[sampler]
+    const output = copyAccessor(source.output, (floats) => {
+      for (let axis = 0; axis < 3; axis++) {
+        if (axis === up) continue
+        for (let i = 3 + axis; i < floats.length; i += 3) floats[i] = floats[axis]
+      }
+    })
+    samplers.push({ input: samplers[sampler].input, output, interpolation: source.interpolation })
+    sampler = samplers.length - 1
+    console.log(`${clipName}: 腰の横の移動を捨てる (上は ${'xyz'[up]} 軸)`)
   }
   channels.push({ sampler, target: { node: target, path: channel.target.path } })
 }

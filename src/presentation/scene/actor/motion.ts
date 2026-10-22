@@ -82,8 +82,12 @@ export type WholeBodyLocomotion =
   | 'vault_up'
   | 'hang_drop'
   | 'hang_climb'
+  | 'hang_left'
+  | 'hang_right'
   // 梯子を登り切る。一度きりの型なので、流し始める者が要る (無いと T ポーズ)
   | 'climb_top'
+  // 上から梯子へ降りて掴む (登り切りを逆に流す)
+  | 'climb_mount'
   | 'death'
   | 'death_front'
   | 'death_back'
@@ -94,6 +98,7 @@ export type WholeBodyLocomotion =
   | 'cqc_throw'
   | 'cqc_miss'
   | 'cqc_thrown'
+  | 'hit2back'
   | 'away'
   | 'bump'
   | 'prone_down'
@@ -103,6 +108,7 @@ export type WholeBodyLocomotion =
   | 'claymore_place'
   | 'pat'
   | 'trapped'
+  | 'trapped_hold'
   | 'trapped_out'
 
 export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>([
@@ -110,7 +116,11 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'vault_up',
   'hang_drop',
   'hang_climb',
+  // ぶら下がったまま横へ移る
+  'hang_left',
+  'hang_right',
   'climb_top',
+  'climb_mount',
   'roll',
   // 受け身。転がるので上半身だけ別の型は重ねられない
   'hard_land',
@@ -127,6 +137,8 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'cqc_throw',
   'cqc_miss',
   'cqc_thrown',
+  // ローリングの体当たりで後ろへ倒れる
+  'hit2back',
   // 切れた人の姿。上半身だけ別の型を重ねると、銃を構えたまま固まる
   'away',
   // ダンボールで敵にぶつかった反応。上だけ構えに戻ると、銃を構えたまま驚く
@@ -143,6 +155,7 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'pat',
   // 猫に釘付け / 解けて戻る。しゃがみ込んで手を伸ばすので上下を分けられない
   'trapped',
+  'trapped_hold',
   'trapped_out',
 ])
 
@@ -257,7 +270,7 @@ export interface StanceInput {
    * 眠りの次に強い。掴んでいる間は歩きも伏せも無いし、登り切る型は途中で
    * 止められない (掴む物が無い所を通るので、手を離せると宙に浮く)。
    */
-  climbing: 'climb' | 'climb_top' | null
+  climbing: 'climb' | 'climb_top' | 'climb_mount' | null
   boxed: boolean
   crouching: boolean
   aiming: boolean
@@ -269,12 +282,14 @@ export interface StanceInput {
   setting: 'claymore_windup' | 'claymore_place' | null
   /** 眠っている人を叩いている最中か (pat の型を流している間) */
   patting?: boolean
-  /** 猫に釘付けになっている (in) / 解けて戻る途中 (out)。掛かっていなければ null (domain/item/doll.ts) */
-  trapped?: 'in' | 'out' | null
+  /** 猫に釘付けで、しゃがみ込んでいる (in) / 撫でている (hold) / 解けて戻る途中 (out)。掛かっていなければ null */
+  trapped?: 'in' | 'hold' | 'out' | null
   /** 爆風で倒れているか */
   downed: boolean
   /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
   thrown?: boolean
+  /** 倒れたのがローリングの体当たりでか。倒れている間に引く型が違う (hit2back) */
+  rolled?: boolean
   /** CQC で投げている / 空振りしている最中の型。していなければ null */
   cqc?: 'cqc_throw' | 'cqc_miss' | null
   /**
@@ -313,6 +328,8 @@ export interface StanceInput {
   hangClimbing: boolean
   /** 縁に手を掛けて待っている (落ち切った後)。hanging と一緒に true で来る */
   hangHolding: boolean
+  /** ぶら下がったまま横へ移っている向き。-1 左 / 1 右 / 0 移っていない */
+  hangShimmy?: -1 | 0 | 1
   onGround: boolean
   /**
    * 空中に居る時間 (秒)。0 なら接地している。
@@ -368,10 +385,11 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.climbing) return input.climbing
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
-  if (input.downed) return input.thrown ? 'cqc_thrown' : 'sweep'
+  if (input.downed) return input.thrown ? 'cqc_thrown' : input.rolled ? 'hit2back' : 'sweep'
 
   // 猫に釘付け。**伏せていても同じ型** (伏せの型は無い。本人 2026-10-20)
   if (input.trapped === 'in') return 'trapped'
+  if (input.trapped === 'hold') return 'trapped_hold'
   if (input.trapped === 'out') return 'trapped_out'
 
   // 箱が落ちて棒立ちになっている間。動けないので方向も速さも見ない
@@ -428,6 +446,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   // しゃがんだままなら上半身だけ。立ちの刺突は全身の型なので立ち上がってしまう
   if (input.stabbing) return input.crouching ? 'crouch_stab' : 'stab'
   if (input.hangClimbing) return 'hang_climb'
+  if (input.hangShimmy) return input.hangShimmy < 0 ? 'hang_left' : 'hang_right'
   if (input.hangHolding) return 'hang'
   if (input.hanging) return 'hang_drop'
   if (input.cqc) return input.cqc
