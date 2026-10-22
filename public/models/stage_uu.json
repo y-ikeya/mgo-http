@@ -1707,12 +1707,12 @@
 {
 "name": "metal_fence1_nobullet_noeye_nocamera_blockthrow",
 "min": [
-29.293,
+29.323,
 3.9,
 -36.684
 ],
 "max": [
-29.353,
+29.323,
 5.9,
 2.604
 ],
@@ -1728,6 +1728,138 @@
 "eye": false,
 "camera": false,
 "thrown": true
+}
+},
+{
+"name": "defaultMaterial",
+"min": [
+0.183,
+0.1,
+6.951
+],
+"max": [
+2.183,
+1.663,
+8.298
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.001",
+"min": [
+-33.998,
+0.1,
+-7.448
+],
+"max": [
+-32.651,
+1.663,
+-5.448
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "Box001_Material #0_0",
+"min": [
+25.035,
+3.84,
+-30.779
+],
+"max": [
+27.326,
+6.331,
+-25.034
+],
+"top": {
+"h": 6.3306,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "Box001_Material #0_0.001",
+"min": [
+25.035,
+3.84,
+-22.951
+],
+"max": [
+27.326,
+6.331,
+-17.205
+],
+"top": {
+"h": 6.3306,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_fence1_frame_notexture",
+"min": [
+29.29,
+3.9,
+-36.719
+],
+"max": [
+29.356,
+5.93,
+2.639
+],
+"top": {
+"h": 5.9408,
+"dx": -0.32492,
+"dz": -0.0,
+"thick": 2.0408
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
 }
 },
 {
