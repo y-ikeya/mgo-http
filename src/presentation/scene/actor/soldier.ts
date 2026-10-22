@@ -309,6 +309,11 @@ const VAULT_REACHES = [0.4, 0.55, 0.7, 0.85, 1.0] as const
  */
 const VAULT_LANDING_NEAR = 0.8
 const VAULT_LANDING_FAR = 1.3
+/**
+ * 奥行きの浅い台に乗る時に見る、もっと手前の距離 (m、枠の上面を見つけた所から先)。**どちらも**
+ * 枠と同じ高さなら乗れる。点で見るので、2 か所の間 (0.2m) より薄い窓枠・手すりでは揃わない
+ */
+const VAULT_LANDING_SHALLOW = [0.0, 0.2] as const
 /** 障害の上に要る隙間 (m)。屈んで越えるので身長より低くてよい */
 const VAULT_HEADROOM = 1.0
 /** 枠の上に体を置いたとき、これ以上押し戻されたら塞がっている (m)。窓の鉄棒・格子 */
@@ -3225,21 +3230,51 @@ export class Soldier {
     const nearAt = reachAt + VAULT_LANDING_NEAR
     probe.set(this.position.x + fx * nearAt, feetY, this.position.z + fz * nearAt)
     const near = world.groundHeight(probe, PLAYER_RADIUS, allow)
-    if (Math.abs(near - top) <= VAULT_SAME_LEVEL) {
-      if (world.ceilingHeight(probe, 0, near) < near + PLAYER_HEIGHT) return null
+    // 頭の上が塞がっていても**そこで諦めない** — 積んだ箱の 2 段目の下だった。他の候補 (下の奥行きの浅い台) を見る
+    if (Math.abs(near - top) <= VAULT_SAME_LEVEL && world.ceilingHeight(probe, 0, near) >= near + PLAYER_HEIGHT) {
       return { kind: 'up', landing: near, yaw, top }
     }
     // 無ければ越えた先の床。**低いのは構わない** (外へ跳び出すのも跳び越え)
     const farAt = reachAt + VAULT_LANDING_FAR
     probe.set(this.position.x + fx * farAt, feetY, this.position.z + fz * farAt)
     const far = world.groundHeight(probe, PLAYER_RADIUS, allow)
+    /*
+     * **奥行きの浅い台に乗る。** 上の 2 か所 (縁から 0.8m・1.3m 先) は奥行きの浅い台を飛び越して
+     * 見る。積んだ木箱 (1 段目の空いた所の奥行き 0.76m、その奥に 2 段目) では 0.8m 先がもう 2 段目の
+     * 下で、乗れる床が無いと見て何も起きなかった。2 段目 (奥行き 0.79m) は奥が 2F の縁の外で、
+     * 越えて地面へ跳び出すと読んで、当たりに押し戻された (2026-10-23 本人「wood の box に登れない」)。
+     * 前へ進む量は型のまま (1.13m) だが、奥の箱の面で当たりに止められる
+     */
+    const shallow = (): number => {
+      let landing = Number.NaN
+      for (const extra of VAULT_LANDING_SHALLOW) {
+        const at = reachAt + extra
+        probe.set(this.position.x + fx * at, feetY, this.position.z + fz * at)
+        const h = world.groundHeight(probe, 0, allow)
+        if (Math.abs(h - top) > VAULT_SAME_LEVEL) return Number.NaN
+        if (world.ceilingHeight(probe, 0, h) < h + PLAYER_HEIGHT) return Number.NaN
+        landing = Number.isNaN(landing) ? h : Math.max(landing, h)
+      }
+      return landing
+    }
     if (far <= feetY + STEP_UP) {
+      // 越えた先が高い所から落ちる (縁の外) なら、乗れる台に乗るほうを先に採る。窓から外へ跳ぶのは
+      // 窓枠が薄く台と読まないので今まで通り
+      if (far < feetY - VAULT_MAX) {
+        const up = shallow()
+        if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top }
+        probe.set(this.position.x + fx * farAt, feetY, this.position.z + fz * farAt)
+      }
       if (world.ceilingHeight(probe, 0, feetY) < feetY + PLAYER_HEIGHT) return null
       return { kind: 'over', landing: far, yaw, top }
     }
-    if (Math.abs(far - top) > VAULT_SAME_LEVEL) return null
-    if (world.ceilingHeight(probe, 0, far) < far + PLAYER_HEIGHT) return null
-    return { kind: 'up', landing: far, yaw, top }
+    if (Math.abs(far - top) <= VAULT_SAME_LEVEL && world.ceilingHeight(probe, 0, far) >= far + PLAYER_HEIGHT) {
+      return { kind: 'up', landing: far, yaw, top }
+    }
+    // 上の 2 か所で乗れる床が無ければ、手前の浅い台
+    const up = shallow()
+    if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top }
+    return null
   }
 
   /**
