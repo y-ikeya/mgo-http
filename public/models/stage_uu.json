@@ -3093,6 +3093,59 @@
 }
 },
 {
+"name": "metal_kanban1",
+"min": [
+-14.601,
+10.08,
+-9.764
+],
+"max": [
+-7.002,
+12.79,
+-9.422
+],
+"top": {
+"h": 12.79,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_kanban1_frame_notexture",
+"min": [
+-12.991,
+10.262,
+-10.403
+],
+"max": [
+-8.612,
+12.69,
+-9.559
+],
+"top": {
+"h": 12.69,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
