@@ -564,7 +564,7 @@
 {
 "name": "concrete_2F_ground",
 "min": [
--15.873,
+-44.104,
 3.6,
 -48.861
 ],
@@ -690,6 +690,56 @@
 }
 },
 {
+"name": "concrete_building4",
+"min": [
+-35.637,
+3.583,
+0.409
+],
+"max": [
+-19.581,
+17.007,
+21.818
+],
+"top": {
+"h": 17.0066,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_ladder_2",
+"min": [
+-35.009,
+3.9,
+19.868
+],
+"max": [
+-34.291,
+17.337,
+19.908
+],
+"top": {
+"h": 17.337,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
@@ -754,6 +804,21 @@
 -15.69
 ],
 "axis": "x",
+"parts": 1
+},
+{
+"name": "metal_ladder_2",
+"min": [
+-35.009,
+3.9,
+19.868
+],
+"max": [
+-34.291,
+17.337,
+19.908
+],
+"axis": "z",
 "parts": 1
 }
 ],
