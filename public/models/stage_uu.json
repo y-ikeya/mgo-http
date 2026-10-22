@@ -1415,6 +1415,232 @@
 }
 },
 {
+"name": "concrete_wall2",
+"min": [
+-6.131,
+3.9,
+-14.398
+],
+"max": [
+0.165,
+6.7,
+-3.388
+],
+"top": {
+"h": 6.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall2.001",
+"min": [
+-19.993,
+3.888,
+-3.565
+],
+"max": [
+-13.214,
+6.688,
+-3.277
+],
+"top": {
+"h": 6.6881,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall2.002",
+"min": [
+-12.072,
+3.888,
+5.82
+],
+"max": [
+11.239,
+6.688,
+8.466
+],
+"top": {
+"h": 6.6881,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall2.003",
+"min": [
+14.934,
+-0.387,
+8.235
+],
+"max": [
+27.222,
+6.688,
+8.592
+],
+"top": {
+"h": 6.6881,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_cube.006",
+"min": [
+20.268,
+3.933,
+14.078
+],
+"max": [
+35.341,
+7.938,
+28.477
+],
+"top": {
+"h": 7.9375,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_wall2.004",
+"min": [
+18.044,
+3.888,
+-46.161
+],
+"max": [
+20.69,
+5.188,
+-39.051
+],
+"top": {
+"h": 5.1881,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_cube.007",
+"min": [
+14.55,
+19.846,
+-29.224
+],
+"max": [
+22.092,
+21.846,
+-6.189
+],
+"top": {
+"h": 21.8462,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_cube.008",
+"min": [
+-32.338,
+17.007,
+2.594
+],
+"max": [
+-25.318,
+19.007,
+19.304
+],
+"top": {
+"h": 19.0066,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_cube.009",
+"min": [
+-20.464,
+16.771,
+2.584
+],
+"max": [
+-18.406,
+17.202,
+19.806
+],
+"top": {
+"h": 16.8694,
+"dx": 0.163,
+"dz": 0.0,
+"thick": 0.1013
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
