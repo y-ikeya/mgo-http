@@ -942,7 +942,7 @@ export class Soldier {
     this.object.add(this.placeholder)
     this.box = createCardboardBox()
     this.object.add(this.box)
-    this.object.add(this.blob.mesh)
+    this.blob.attach(this.object)
   }
 
   /**

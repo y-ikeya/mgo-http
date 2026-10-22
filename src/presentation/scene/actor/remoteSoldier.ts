@@ -392,7 +392,7 @@ export class RemoteSoldier {
     this.skin = skin;
     this.box = createCardboardBox();
     this.object.add(this.box);
-    this.object.add(this.blob.mesh);
+    this.blob.attach(this.object);
     scene.add(this.object);
     void this.load();
   }
