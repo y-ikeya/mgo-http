@@ -173,10 +173,12 @@ const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dust
 /**
  * 日陰の明るさ (天空光 AMBIENT_INTENSITY) をステージごとに何倍にするか。無ければ 1。
  *
- * **UU は 2 倍 (2026-10-22 本人「このステージの影の部分はもっと明るくていい」)。** 灰色の
- * コンクリートの塊と壁だけで、日陰の面が黒く沈んで形が読めなかった
+ * **UU は 3 倍 (2026-10-22 本人「このステージの影の部分はもっと明るくていい」、2 倍でも
+ * 「建物の影に入った時の明度がもっと明るくていい」)。** 灰色のコンクリートの塊と壁だけで、
+ * 日陰の面が黒く沈んで形が読めなかった。影の濃さ (SHADOW_INTENSITY) を下げても、
+ * 日の当たらない向きの壁は明るくならない — 日陰の明るさはここで決まる
  */
-const STAGE_AMBIENT: Partial<Record<StageName, number>> = { uu: 2 }
+const STAGE_AMBIENT: Partial<Record<StageName, number>> = { uu: 3 }
 /** いまのステージの天空光の倍率。buildStage が決めて、buildLights が読む */
 let ambientScale = 1
 /** いまの場の見え方。buildStage が決めて、空・霧・光・映り込みがこれを読む */
