@@ -28,6 +28,12 @@ export interface SurfaceFlags {
   eye: boolean
   /** カメラを止める (寄せて壁抜けを防ぐ) */
   camera: boolean
+  /**
+   * 投げた物 (手榴弾・薬莢) を止める。**既定は弾と同じ。** 弾は通すが投げた物は通さない物
+   * (金網のフェンス: 網目は弾より大きく手榴弾より小さい) は名前に `blockthrow` を付ける。
+   * 無ければ弾と同じ (この欄より前に書き出した json には無い)
+   */
+  thrown?: boolean
 }
 
 const SOLID: SurfaceFlags = {
@@ -36,6 +42,7 @@ const SOLID: SurfaceFlags = {
   bullet: true,
   eye: true,
   camera: true,
+  thrown: true,
 }
 
 /**
@@ -45,6 +52,7 @@ const SOLID: SurfaceFlags = {
  *   fence_nobullet       弾だけ通す
  *   bush_noplayer_nobullet  人と弾は通し、視線は止める
  *   glass_noeye          見通せるが弾は止める
+ *   fence_nobullet_blockthrow  弾は通すが手榴弾は止める (金網)
  *   trigger_nodraw       描画しない
  *
  * 昔の 2 つのタグも受ける。意味は今の挙動に合わせてあるので、
@@ -86,6 +94,7 @@ export function flagsOf(name: string): SurfaceFlags {
   if (name.includes('nobullet')) flags.bullet = false
   if (name.includes('noeye')) flags.eye = false
   if (name.includes('nocamera')) flags.camera = false
+  flags.thrown = flags.bullet || name.includes('blockthrow')
 
   return flags
 }

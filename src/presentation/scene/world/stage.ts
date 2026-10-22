@@ -1673,6 +1673,8 @@ async function replaceWithModel(
 
   const collidables: THREE.Object3D[] = []
   const cameraBlockers: THREE.Object3D[] = []
+  // 弾は通すが投げた物は止める物 (金網、名前に blockthrow)。投げた物の世界にだけ足す
+  const throwStoppers: THREE.Object3D[] = []
   const obstacles: Obstacle[] = []
   const bounds = new THREE.Box3()
   // 材質ごとに 1 つずつ共有する。同じ材質の箱がいくつあっても増えない
@@ -1791,6 +1793,7 @@ async function replaceWithModel(
 
     // 止める対象ごとに別の一覧へ。1 つのタグで全部を決めない
     if (flags.bullet) collidables.push(obj)
+    else if (flags.thrown) throwStoppers.push(obj)
     if (flags.camera) cameraBlockers.push(obj)
     if (!flags.player) return
     bounds.setFromObject(obj)
@@ -1820,7 +1823,7 @@ async function replaceWithModel(
    *
    * 57000 枚で 100ms 前後。地形が差し替わる瞬間なので、そこに乗せてよい。
    */
-  thrownWorld.rebuild(collidables)
+  thrownWorld.rebuild([...collidables, ...throwStoppers])
 
   let meshCount = 0
   model.traverse((obj) => {

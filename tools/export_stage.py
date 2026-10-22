@@ -184,6 +184,9 @@ def flags_of(obj):
     for word in FLAG_WORDS:
         if word in name:
             flags[word[2:]] = False
+    # 投げた物を止めるか。既定は弾と同じ。弾は通すが投げた物は止める金網は blockthrow
+    # (src/domain/stage/flags.ts と揃える)
+    flags['thrown'] = flags['bullet'] or 'blockthrow' in name
     return flags
 
 
@@ -916,12 +919,16 @@ def box_triangles_of(obj):
 # 材質は足音と着弾に要る。箱では Obstacle.surface が持っていたので、
 # 三角へ移すときに一緒に連れて行かないと**木の床から石の音**が鳴る。
 #
-#   bit0 視線  bit1 弾/投擲  bit2 人  bit3 カメラ  bit4-5 材質
+#   bit0 視線  bit1 弾/投擲  bit2 人  bit3 カメラ  bit4-5 材質  bit6 投擲だけ
+#
+# bit6 は**弾は通すが投げた物は止める**面 (金網のフェンス、名前に blockthrow)。投げた物の
+# 世界は bit1 | bit6 で拾う (src/sim/space/stagemesh.ts の MESH_THROWN)
 EYE_BIT = 1
 BULLET_BIT = 2
 PLAYER_BIT = 4
 CAMERA_BIT = 8
 SURFACE_SHIFT = 4
+THROWN_BIT = 64
 #
 # --- 人が当たる形は、細かい物では代用する ---
 #
@@ -1357,9 +1364,10 @@ for obj in bpy.context.scene.objects:
         | (BULLET_BIT if flags['bullet'] else 0)
         | (PLAYER_BIT if flags['player'] else 0)
         | (CAMERA_BIT if flags['camera'] else 0)
+        | (THROWN_BIT if flags['thrown'] and not flags['bullet'] else 0)
         | (SURFACE_IDS[surface_of(obj.name)] << SURFACE_SHIFT)
     )
-    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT)
+    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT | THROWN_BIT)
 
     # --- 階段は人の層だけ坂で受ける ---
     #
@@ -1408,12 +1416,12 @@ for obj in bpy.context.scene.objects:
             ramped_stairs.append(obj.name)
 
     # 何も止めないなら出さない。飾りはここで落ちる
-    if mark & (EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT) == 0:
+    if mark & (EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT | THROWN_BIT) == 0:
         continue
     tris = triangles_of(obj)
     if not tris:
         continue
-    hit_mark = mark & (EYE_BIT | BULLET_BIT)
+    hit_mark = mark & (EYE_BIT | BULLET_BIT | THROWN_BIT)
     body_mark = mark & (PLAYER_BIT | CAMERA_BIT)
     count = len(tris) // 9
 

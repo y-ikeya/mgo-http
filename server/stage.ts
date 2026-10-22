@@ -28,7 +28,7 @@ import {
   type SolidWorld,
   type StageBox,
 } from '../src/sim/space/vision'
-import { decodeStageMesh, meshSubset, MESH_EYE, MESH_BULLET, MESH_PLAYER, MESH_CAMERA } from '../src/sim/space/stagemesh'
+import { decodeStageMesh, meshSubset, MESH_EYE, MESH_BULLET, MESH_PLAYER, MESH_CAMERA, MESH_THROWN } from '../src/sim/space/stagemesh'
 import type { CameraBlocker } from '../src/sim/space/eyepoint'
 import { TriangleBvh } from '../src/sim/space/bvh'
 
@@ -197,7 +197,7 @@ async function loadMesh(
     return {
       sight: new TriangleBvh(meshSubset(mesh, MESH_EYE)),
       camera: new TriangleBvh(meshSubset(mesh, MESH_CAMERA)),
-      thrown: new TriangleBvh(meshSubset(mesh, MESH_BULLET)),
+      thrown: new TriangleBvh(meshSubset(mesh, MESH_BULLET | MESH_THROWN)),
       body: new TriangleBvh(meshSubset(mesh, MESH_PLAYER)),
     }
   } catch {
