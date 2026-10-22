@@ -4,6 +4,7 @@ import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
 import { followMovingShadow } from "./world/liveShadow";
+import { addMaskedShadows } from "./world/fenceShadow";
 import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
@@ -1519,6 +1520,8 @@ export class Game {
       // 人の足元の影は、日の当たる所でだけ足す (blobShadow.ts)
       setSunProbe(sunProbeOf(this.stage, this.sun));
       setSunCaster(sunCastOf(this.stage, this.sun));
+      // 網目の物 (金網) の影は床へ網目の絵を貼って落とす。影の地図から外した分を焼き直す (world/fenceShadow.ts)
+      if (addMaskedShadows(this.scene, this.sun, sunProbeOf(this.stage, this.sun))) this.sun.shadow.needsUpdate = true;
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
