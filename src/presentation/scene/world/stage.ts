@@ -1183,6 +1183,46 @@ export function sunProbeOf(stage: Stage, sun: THREE.DirectionalLight): (x: numbe
 /** 日なたかを測る線の長さ (m)。街の一番高い建物の影が届く分 */
 const SUN_PROBE_REACH = 120
 
+/**
+ * **体の影が落ちる所。** 体から日の当たる向きの反対へ線を引いて、最初に当たった面
+ * (壁でも地面でも) の点と向きを返す。無ければ null。
+ *
+ * 梯子・ぶら下がりの間は足元に床が無いので、足元の丸い影をここへ映す (actor/blobShadow.ts)。
+ * 映さずに消していたら、TSNE で梯子の途中の人を影で見つける手がかりが無くなった (2026-10-22 本人)
+ */
+export function sunCastOf(stage: Stage, sun: THREE.DirectionalLight): (x: number, y: number, z: number) => ShadowLanding | null {
+  const dir = new THREE.Vector3()
+  const landing: ShadowLanding = { x: 0, y: 0, z: 0, nx: 0, ny: 1, nz: 0 }
+  return (x, y, z) => {
+    const sight = stage.sightWorld
+    if (!sight) return null
+    // 日が来る向きの反対 = 影が伸びる向き
+    dir.copy(sun.target.position).sub(sun.position).normalize()
+    const hit = sight.hit(x, y, z, x + dir.x * SHADOW_CAST_REACH, y + dir.y * SHADOW_CAST_REACH, z + dir.z * SHADOW_CAST_REACH)
+    if (!hit) return null
+    landing.x = x + dir.x * SHADOW_CAST_REACH * hit.t
+    landing.y = y + dir.y * SHADOW_CAST_REACH * hit.t
+    landing.z = z + dir.z * SHADOW_CAST_REACH * hit.t
+    landing.nx = hit.nx
+    landing.ny = hit.ny
+    landing.nz = hit.nz
+    return landing
+  }
+}
+
+/** 影が落ちた所と、その面の向き (体の側を向く) */
+export interface ShadowLanding {
+  x: number
+  y: number
+  z: number
+  nx: number
+  ny: number
+  nz: number
+}
+
+/** 体の影を探す線の長さ (m)。一番高い梯子 (屋上 20m) から地面へ斜めに落ちる分 */
+const SHADOW_CAST_REACH = 40
+
 export function loadStageLadders(name: StageName): Promise<Ladder[]> {
   const cached = stageLadders.get(name)
   if (cached) return cached

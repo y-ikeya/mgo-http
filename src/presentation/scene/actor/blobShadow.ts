@@ -44,6 +44,21 @@ export function setSunProbe(probe: ((x: number, y: number, z: number) => boolean
   sunlit = probe
 }
 
+/** 体の影が落ちる所 (面の点と向き)。足元に床が無い間だけ使う */
+type ShadowCaster = (x: number, y: number, z: number) => { x: number; y: number; z: number; nx: number; ny: number; nz: number } | null
+let caster: ShadowCaster | null = null
+
+/** 影の落ちる所を答える物を差し込む。setSunProbe と同じ所で 1 度 (stage.ts の sunCastOf) */
+export function setSunCaster(cast: ShadowCaster | null): void {
+  caster = cast
+}
+
+/** 体の影を落とす高さ (足元から、m)。体の真ん中 */
+const BODY_CENTER = 0.9
+/** 映した面から浮かせる量 (m)。面と同じ深さで描くと、ちらつく */
+const LANDING_LIFT = 0.02
+const PLANE_FACING = new THREE.Vector3(0, 0, 1)
+
 let sharedTexture: THREE.Texture | null = null
 
 function texture(): THREE.Texture {
@@ -68,9 +83,11 @@ function texture(): THREE.Texture {
 export type BlobStance = 'stand' | 'crouch' | 'prone'
 
 /**
- * **足元に床が無い型。** 梯子を登っている間とぶら下がっている間は、体の真下が床ではないので
- * 丸い影を出さない — 足元に付いたまま宙に浮いて見えた (2026-10-22 本人「梯子登ってる時に
- * 自分のキャラの下の方に影が浮いてない？」)。他人の画面は送られてくる型でしか分からないので、型で決める
+ * **足元に床が無い型。** 梯子を登っている間とぶら下がっている間は、体の真下が床ではない。
+ * 丸い影を足元に付けたままだと宙に浮いて見えた (2026-10-22 本人「梯子登ってる時に自分の
+ * キャラの下の方に影が浮いてない？」) ので、**日の向きに沿って壁や地面へ映す** (BlobShadow.lifted)。
+ * 消すだけにすると、TSNE で梯子の途中の人を影で見つけられなくなる (同日 本人)。
+ * 他人の画面は送られてくる型でしか分からないので、型で決める
  */
 const OFF_FLOOR = new Set(['climb', 'climb_top', 'hang', 'hang_drop', 'hang_climb', 'hang_left', 'hang_right'])
 
@@ -85,10 +102,18 @@ export class BlobShadow {
   private readonly target = { x: RADIUS * 2, z: RADIUS * 2, offset: 0 }
   /** 目指す濃さ。日なたなら SUN_OPACITY、日の当たらない所なら SHADE_OPACITY */
   private targetOpacity = SUN_OPACITY
-  /** 足元に床が無い (梯子・ぶら下がり)。濃さを 0 へ追いかけて消す (blobOnFloor) */
+  /**
+   * 足元に床が無い (梯子・ぶら下がり、blobOnFloor)。**体から日の向きに沿って、最初に当たる
+   * 壁や地面へ映す。** 体が日陰にあれば影は出ない (地面の時と同じ)
+   */
   lifted = false
   private probeLeft = 0
   private readonly at = new THREE.Vector3()
+  /** 映す先が見つかったか (足元に床が無い間だけ見る) */
+  private landed = false
+  private readonly landingAt = new THREE.Vector3()
+  private readonly landingNormal = new THREE.Vector3()
+  private readonly parentQuat = new THREE.Quaternion()
 
   constructor() {
     const material = new THREE.MeshBasicMaterial({
@@ -147,17 +172,57 @@ export class BlobShadow {
     const s = this.mesh.scale
     s.x += (this.target.x - s.x) * k
     s.y += (this.target.z - s.y) * k   // 平面を倒しているので、奥行きは scale.y
-    this.mesh.position.z += (this.target.offset - this.mesh.position.z) * k
-    // 日なたか。影の境をまたぐ時にぱっと変わらないよう、濃さも追いかける
+    if (this.lifted) {
+      this.project()
+    } else {
+      // 足元へ戻す (映していた向きを解く)
+      this.mesh.rotation.set(-Math.PI / 2, 0, 0)
+      this.mesh.position.x = 0
+      this.mesh.position.y = 0.02
+      this.mesh.position.z += (this.target.offset - this.mesh.position.z) * k
+    }
+    // 日なたか。影の境をまたぐ時にぱっと変わらないよう、濃さも追いかける。
+    // **映している間は体の所で測る** — 映した先は体の影の中なので、そこで測ると必ず日陰になる
     this.probeLeft -= dt
     if (this.probeLeft <= 0 && sunlit) {
       this.probeLeft = SUN_PROBE_EVERY
-      this.mesh.getWorldPosition(this.at)
-      this.targetOpacity = sunlit(this.at.x, this.at.y + SUN_PROBE_LIFT, this.at.z) ? SUN_OPACITY : SHADE_OPACITY
+      if (this.lifted) this.bodyCenter(this.at)
+      else {
+        this.mesh.getWorldPosition(this.at)
+        this.at.y += SUN_PROBE_LIFT
+      }
+      this.targetOpacity = sunlit(this.at.x, this.at.y, this.at.z) ? SUN_OPACITY : SHADE_OPACITY
     }
     const material = this.mesh.material
-    const target = this.lifted ? 0 : this.targetOpacity
+    const target = this.lifted && !this.landed ? 0 : this.targetOpacity
     material.opacity += (target - material.opacity) * (1 - Math.exp(-dt * 8))
+  }
+
+  /** 体の真ん中 (世界の座標)。親 (人の根) は足元にある */
+  private bodyCenter(out: THREE.Vector3): THREE.Vector3 {
+    const parent = this.mesh.parent
+    if (parent) parent.getWorldPosition(out)
+    else out.set(0, 0, 0)
+    out.y += BODY_CENTER
+    return out
+  }
+
+  /**
+   * 体の影を、日の向きに沿って最初に当たる面へ映す。**毎コマ** (梯子を登る間は動き続ける)。
+   * 線 1 本なので軽い
+   */
+  private project(): void {
+    const parent = this.mesh.parent
+    const hit = parent && caster ? caster(...this.bodyCenter(this.at).toArray()) : null
+    this.landed = hit !== null
+    if (!hit || !parent) return
+    this.landingNormal.set(hit.nx, hit.ny, hit.nz).normalize()
+    this.landingAt.set(hit.x, hit.y, hit.z).addScaledVector(this.landingNormal, LANDING_LIFT)
+    // 世界の置き場所と向きを、親 (人の根) から見た値へ直す
+    parent.updateWorldMatrix(true, false)
+    this.mesh.position.copy(parent.worldToLocal(this.landingAt))
+    parent.getWorldQuaternion(this.parentQuat).invert()
+    this.mesh.quaternion.setFromUnitVectors(PLANE_FACING, this.landingNormal).premultiply(this.parentQuat)
   }
 
   set visible(value: boolean) {

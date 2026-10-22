@@ -40,6 +40,7 @@ import {
   loadStageFx,
   applyStageSun,
   sunProbeOf,
+  sunCastOf,
   loadStageLadders,
   STAGE_CODE,
   type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
@@ -99,7 +100,7 @@ import {
   type Side,
 } from "../../domain/match/room";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
-import { setSunProbe } from "./actor/blobShadow";
+import { setSunCaster, setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
 import { LAG_LIMIT_MS } from "../../domain/match/lag";
 import type { HitZone } from "../../domain/rule/damage";
@@ -1516,6 +1517,7 @@ export class Game {
       fitShadowToStage(this.sun, this.stage);
       // 人の足元の影は、日の当たる所でだけ足す (blobShadow.ts)
       setSunProbe(sunProbeOf(this.stage, this.sun));
+      setSunCaster(sunCastOf(this.stage, this.sun));
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
