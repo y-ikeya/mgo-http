@@ -754,10 +754,10 @@
 2.116
 ],
 "top": {
-"h": 9.2796,
+"h": 9.1371,
 "dx": 0.41411,
 "dz": 0.00083,
-"thick": 11.363
+"thick": 11.2205
 },
 "flags": {
 "draw": true,
@@ -829,11 +829,11 @@
 ],
 "max": [
 -18.35,
-7.099,
+6.884,
 -11.474
 ],
 "top": {
-"h": 7.0993,
+"h": 6.8844,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -2546,32 +2546,6 @@
 }
 },
 {
-"name": "defaultMaterial.004",
-"min": [
--26.112,
-3.865,
--28.978
-],
-"max": [
--24.112,
-5.428,
--27.632
-],
-"top": {
-"h": 5.4275,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "col_metal_handrail18_nobullet_noeye_nocamera",
 "min": [
 7.689,
@@ -3419,6 +3393,318 @@
 ],
 "top": {
 "h": 4.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box_box_0.001",
+"min": [
+-4.715,
+3.866,
+6.749
+],
+"max": [
+-3.718,
+5.855,
+7.826
+],
+"top": {
+"h": 5.8553,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.002",
+"min": [
+-25.195,
+3.838,
+-28.641
+],
+"max": [
+-24.18,
+4.664,
+-27.85
+],
+"top": {
+"h": 4.6636,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.011",
+"min": [
+-26.167,
+3.838,
+-28.641
+],
+"max": [
+-25.153,
+4.664,
+-27.85
+],
+"top": {
+"h": 4.6636,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "Box001_Material #0_0.003",
+"min": [
+-27.1,
+3.84,
+-27.858
+],
+"max": [
+-24.199,
+5.466,
+-25.151
+],
+"top": {
+"h": 5.4655,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.012",
+"min": [
+-24.959,
+5.423,
+-27.079
+],
+"max": [
+-24.168,
+6.249,
+-26.064
+],
+"top": {
+"h": 6.2493,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.013",
+"min": [
+-24.962,
+5.423,
+-26.11
+],
+"max": [
+-24.171,
+6.249,
+-25.095
+],
+"top": {
+"h": 6.2493,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.014",
+"min": [
+-19.055,
+6.851,
+-22.855
+],
+"max": [
+-18.264,
+7.677,
+-21.841
+],
+"top": {
+"h": 7.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.015",
+"min": [
+-19.058,
+6.851,
+-21.886
+],
+"max": [
+-18.268,
+7.677,
+-20.872
+],
+"top": {
+"h": 7.6767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.016",
+"min": [
+-19.055,
+7.639,
+-22.855
+],
+"max": [
+-18.264,
+8.465,
+-21.841
+],
+"top": {
+"h": 8.4649,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.017",
+"min": [
+-19.058,
+7.639,
+-21.886
+],
+"max": [
+-18.268,
+8.465,
+-20.872
+],
+"top": {
+"h": 8.4649,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.018",
+"min": [
+-19.805,
+6.854,
+-22.855
+],
+"max": [
+-19.015,
+7.68,
+-21.841
+],
+"top": {
+"h": 7.6796,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_0.019",
+"min": [
+-19.808,
+6.854,
+-21.886
+],
+"max": [
+-19.018,
+7.68,
+-20.872
+],
+"top": {
+"h": 7.6796,
 "dx": 0.0,
 "dz": 0.0
 },
