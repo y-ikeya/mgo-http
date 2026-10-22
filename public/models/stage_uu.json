@@ -740,6 +740,81 @@
 }
 },
 {
+"name": "concrete_building5",
+"min": [
+-22.951,
+3.905,
+-29.733
+],
+"max": [
+-6.24,
+9.905,
+2.645
+],
+"top": {
+"h": 9.9052,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "Cube",
+"min": [
+-20.03,
+8.225,
+1.055
+],
+"max": [
+-19.903,
+16.794,
+2.512
+],
+"top": {
+"h": 16.7936,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "metal_ladder_3",
+"min": [
+-21.965,
+8.51,
+2.439
+],
+"max": [
+-21.247,
+17.337,
+2.479
+],
+"top": {
+"h": 17.337,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
@@ -817,6 +892,21 @@
 -34.291,
 17.337,
 19.908
+],
+"axis": "z",
+"parts": 1
+},
+{
+"name": "metal_ladder_3",
+"min": [
+-21.965,
+8.51,
+2.439
+],
+"max": [
+-21.247,
+17.337,
+2.479
 ],
 "axis": "z",
 "parts": 1
