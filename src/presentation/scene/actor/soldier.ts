@@ -942,7 +942,7 @@ export class Soldier {
     this.object.add(this.placeholder)
     this.box = createCardboardBox()
     this.object.add(this.box)
-    this.blob.attach(this.object)
+    this.object.add(this.blob.mesh)
   }
 
   /**
@@ -3502,6 +3502,7 @@ export class Soldier {
       this.pendingHangYaw = null
     }
     this.blob.set(this.isProne ? 'prone' : this.isCrouching ? 'crouch' : 'stand')
+    this.blob.lifted = this.onLadder || this.hanging
     this.blob.update(dt)
     this.stepStealthFade(dt)
 

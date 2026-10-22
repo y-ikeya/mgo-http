@@ -1,7 +1,7 @@
 import { TRAPPED_CROUCH_SECONDS } from '../../../domain/item/doll';
 import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
-import { BlobShadow } from './blobShadow';
+import { BlobShadow, blobOnFloor } from './blobShadow';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
 import {
@@ -392,7 +392,7 @@ export class RemoteSoldier {
     this.skin = skin;
     this.box = createCardboardBox();
     this.object.add(this.box);
-    this.blob.attach(this.object);
+    this.object.add(this.blob.mesh);
     scene.add(this.object);
     void this.load();
   }
@@ -572,6 +572,7 @@ export class RemoteSoldier {
           ? "crouch"
           : "stand",
     );
+    this.blob.lifted = !blobOnFloor(state.locomotion);
     this.blob.update(dt);
     animator.setAimPitch(state.aiming && !this.serverDead && !prone ? state.pitch : 0);
     // 首はカメラの向きへ。**相手がどこを見ているかを渡す**。構え中は体が向いている

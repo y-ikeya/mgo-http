@@ -20,7 +20,7 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { addColliderOverlay, applyStageSun, sunCastOf, sunProbeOf, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
+import { addColliderOverlay, applyStageSun, sunProbeOf, buildLights, buildStage, fitShadowToStage, loadStageBoxes, loadStageFx, loadStageMoveWorld, loadStageSun, type StageName } from '../../src/presentation/scene/world/stage'
 import { EmptyBoxes } from '../../src/presentation/scene/actor/box'
 import { REVERSED_DEPTH } from '../../src/presentation/scene/util/depth'
 import { PlacePreview } from '../../src/presentation/scene/arms/placePreview'
@@ -28,7 +28,7 @@ import { BlastFx } from '../../src/presentation/scene/fx/blastfx'
 import { placeSpot } from '../../src/sim/judge/claymore'
 import { solidBlockers } from '../../src/sim/space/vision'
 import { STEP_UP } from '../../src/domain/player/moving'
-import { BlobShadow, setSunCaster, setSunProbe } from '../../src/presentation/scene/actor/blobShadow'
+import { BlobShadow, setSunProbe } from '../../src/presentation/scene/actor/blobShadow'
 
 const query = new URLSearchParams(location.search)
 const stageName = (query.get('stage') ?? 'city') as StageName
@@ -72,7 +72,6 @@ const [, sunData] = await Promise.all([stage.ready, loadStageSun(stageName)])
 if (sunData) applyStageSun(sun, sunData)
 // 人の足元の影 (日なたでだけ足す)。本番と同じ物
 setSunProbe(sunProbeOf(stage, sun))
-setSunCaster(sunCastOf(stage, sun))
 fitShadowToStage(sun, stage)
 
 if (query.get('vcol') === '0' || query.get('col') === 'raw') {
@@ -159,8 +158,12 @@ if (blobAt && blobAt.length === 3 && blobAt.every(Number.isFinite)) {
   const root = new THREE.Group()
   root.position.set(blobAt[0]!, blobAt[1]!, blobAt[2]!)
   blobShadow = new BlobShadow()
-  blobShadow.attach(root)
+  const blob = blobShadow.mesh
+  root.add(blob)
   scene.add(root)
+  // 切り分け: ?blobro=N で影の描く順を変える
+  if (query.get('blobro') !== null) blob.renderOrder = Number(query.get('blobro'))
+
 }
 
 /*

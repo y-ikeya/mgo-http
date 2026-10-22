@@ -2,19 +2,15 @@ import * as THREE from 'three'
 import { DRAW_LATER, TOWARD_CAMERA } from '../util/depth'
 
 /**
- * 人の影。**体の 3 か所 (足元・腰・胸) から日の向きに沿って落とす、ぼやっとした丸。**
+ * 人の足元の丸い影。
  *
  * 太陽の影マップは動かない物だけを 1 度焼く (world/staticShadow.ts) ので、人は
- * 影マップに入らない。代わりに柔らかい丸を貼る。毎フレーム影マップを描き直す代償
- * (街を光の視点からも全部描く) に比べて十分に安い。
+ * 影マップに入らない。代わりに足元へ柔らかい丸を敷く。壁に伸びる影は出ないが、
+ * 毎フレーム影マップを描き直す代償 (街を光の視点からも全部描く) に比べて
+ * 十分に安く、地面に立っている手応えはこれで足りる。
  *
- * 3 か所それぞれから日の来る向きの反対へ線を引き、最初に当たった面へ貼る
- * (2026-10-22 本人)。平らな所では足元から日の反対側へ伸びる人らしい影になり、高台の
- * 縁では**足の側は上の床に残って、上の側から順に下の階へこぼれる** — 1 点から 1 枚を
- * 落としていた頃は、縁で影がまとめて壁を滑り落ちて見えた (「シュッとスライド」)。
- * 壁際・梯子・ぶら下がりでは壁へ落ちる。足元が一番濃く、胸が一番薄い (本人)。
- *
- * 体が日陰にあれば出さない。姿勢で高さと大きさを変える: 伏せは体の向きに沿って長く、少し後ろへ寄せる。
+ * 人の根 (object) の子にして、位置と向きは親に任せる。姿勢で大きさだけ変える:
+ * 伏せは向きに沿って長く、少し前 (頭の側) へ寄せる (伏せた体は中心の 0.5m 前に頭)。
  */
 const RADIUS = 0.6
 /**
@@ -34,6 +30,8 @@ const SUN_OPACITY = 0.65
 const SHADE_OPACITY = 0
 /** 日なたかを測り直す間隔 (秒)。線 1 本なので軽いが、毎コマは要らない */
 const SUN_PROBE_EVERY = 0.1
+/** 足元のどれだけ上から線を引くか (m)。地面そのものに当たらないように */
+const SUN_PROBE_LIFT = 0.3
 
 /**
  * その足元に日が当たっているか。**ステージが決まってから差し込む** (setSunProbe)。
@@ -55,24 +53,11 @@ export function setSunCaster(cast: ShadowCaster | null): void {
   caster = cast
 }
 
-/**
- * 影を落とす 3 か所。**足元・腰・胸。**
- *
- *     height   足元からの高さ (m)。姿勢ごと
- *     size     丸の大きさ (姿勢の形 target に掛ける)
- *     weight   濃さ (日なたの濃さ SUN_OPACITY に掛ける)。重なった所は掛け合わさって濃くなるので控えめに
- */
-const SAMPLES = [
-  { height: { stand: 0.2, crouch: 0.15, prone: 0.08 }, size: 0.85, weight: 0.85 },
-  { height: { stand: 0.9, crouch: 0.55, prone: 0.18 }, size: 0.7, weight: 0.5 },
-  { height: { stand: 1.4, crouch: 0.85, prone: 0.28 }, size: 0.55, weight: 0.3 },
-] as const
-/** 日なたかを測る高さ (足元から、m)。体の真ん中。姿勢で変える */
-const BODY_CENTER = { stand: 0.9, crouch: 0.55, prone: 0.25 } as const
+/** 体の影を落とす高さ (足元から、m)。体の真ん中 */
+const BODY_CENTER = 0.9
 /** 映した面から浮かせる量 (m)。面と同じ深さで描くと、ちらつく */
 const LANDING_LIFT = 0.02
-const FORWARD = new THREE.Vector3(0, 0, -1)
-const SIDEWAYS = new THREE.Vector3(1, 0, 0)
+const PLANE_FACING = new THREE.Vector3(0, 0, 1)
 
 let sharedTexture: THREE.Texture | null = null
 
@@ -97,77 +82,75 @@ function texture(): THREE.Texture {
 
 export type BlobStance = 'stand' | 'crouch' | 'prone'
 
-/** 1 か所ぶんの丸 */
-interface Patch {
-  readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
-  readonly sample: (typeof SAMPLES)[number]
-  /** 落ちる面が見つかったか。無ければ出さない (線の届く先が空) */
-  landed: boolean
+/**
+ * **足元に床が無い型。** 梯子を登っている間とぶら下がっている間は、体の真下が床ではない。
+ * 丸い影を足元に付けたままだと宙に浮いて見えた (2026-10-22 本人「梯子登ってる時に自分の
+ * キャラの下の方に影が浮いてない？」) ので、**日の向きに沿って壁や地面へ映す** (BlobShadow.lifted)。
+ * 消すだけにすると、TSNE で梯子の途中の人を影で見つけられなくなる (同日 本人)。
+ * 他人の画面は送られてくる型でしか分からないので、型で決める
+ */
+const OFF_FLOOR = new Set(['climb', 'climb_top', 'hang', 'hang_drop', 'hang_climb', 'hang_left', 'hang_right'])
+
+/** その型で足元に床があるか (丸い影を出すか) */
+export function blobOnFloor(locomotion: string): boolean {
+  return !OFF_FLOOR.has(locomotion)
 }
 
 export class BlobShadow {
-  private readonly patches: Patch[]
+  readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
   // 姿勢が変わっても形は一瞬で変えず、追いかける (ぱっと切り替わると影が跳ねて見える)
   private readonly target = { x: RADIUS * 2, z: RADIUS * 2, offset: 0 }
-  private stance: BlobStance = 'stand'
-  /** 今の形 (target を追いかける) */
-  private readonly shape = { x: RADIUS * 2, z: RADIUS * 2, offset: 0 }
   /** 目指す濃さ。日なたなら SUN_OPACITY、日の当たらない所なら SHADE_OPACITY */
   private targetOpacity = SUN_OPACITY
+  /**
+   * 足元に床が無い (梯子・ぶら下がり、blobOnFloor)。**体から日の向きに沿って、最初に当たる
+   * 壁や地面へ映す。** 体が日陰にあれば影は出ない (地面の時と同じ)
+   */
+  lifted = false
   private probeLeft = 0
   private readonly at = new THREE.Vector3()
+  /** 映す先が見つかったか (足元に床が無い間だけ見る) */
+  private landed = false
   private readonly landingAt = new THREE.Vector3()
-  private readonly normal = new THREE.Vector3()
-  private readonly ahead = new THREE.Vector3()
-  private readonly side = new THREE.Vector3()
-  private readonly basis = new THREE.Matrix4()
+  private readonly landingNormal = new THREE.Vector3()
   private readonly parentQuat = new THREE.Quaternion()
-  private readonly inverseQuat = new THREE.Quaternion()
-  private parent: THREE.Object3D | null = null
 
   constructor() {
-    this.patches = SAMPLES.map((sample) => {
-      const material = new THREE.MeshBasicMaterial({
-        map: texture(),
-        color: 0x000000,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        // 面と同じ深さなので、比べ合いで面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)
-        polygonOffset: true,
-        polygonOffsetFactor: 2 * TOWARD_CAMERA,
-        polygonOffsetUnits: 2 * TOWARD_CAMERA,
-      })
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
-      mesh.castShadow = false
-      mesh.receiveShadow = false
-      // 親のスキニングと同じ理由で、画面端で消えないように
-      mesh.frustumCulled = false
-      /*
-       * **汚れの板 (0) より後に描く。** どちらも深さを書かないので、後に描いた物が上に乗る。
-       * 先に描くと泥の絵が影を塗りつぶして、泥の上に立つと影が消えた (2026-10-17 本人)。
-       * 向きは深さの持ち方で裏返る (util/depth.ts の DRAW_LATER)
-       */
-      mesh.renderOrder = DRAW_LATER
-      return { mesh, sample, landed: false }
+    const material = new THREE.MeshBasicMaterial({
+      map: texture(),
+      color: 0x000000,
+      transparent: true,
+      opacity: SUN_OPACITY,
+      depthWrite: false,
+      // 地面と同じ深さなので、比べ合いで地面に勝つ側へ寄せる (向きは深さの持ち方で裏返る。util/depth.ts)
+      polygonOffset: true,
+      polygonOffsetFactor: 2 * TOWARD_CAMERA,
+      polygonOffsetUnits: 2 * TOWARD_CAMERA,
     })
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
+    this.mesh.rotation.x = -Math.PI / 2
+    this.mesh.position.y = 0.02
+    this.mesh.castShadow = false
+    this.mesh.receiveShadow = false
+    // 親のスキニングと同じ理由で、画面端で消えないように
+    this.mesh.frustumCulled = false
+    /*
+     * **汚れの板 (0) より後に描く。** どちらも深さを書かないので、後に描いた物が上に乗る。
+     * 先に描くと泥の絵が影を塗りつぶして、泥の上に立つと影が消えた (2026-10-17 本人)。
+     * 向きは深さの持ち方で裏返る (util/depth.ts の DRAW_LATER)
+     */
+    this.mesh.renderOrder = DRAW_LATER
     this.set('stand')
-  }
-
-  /** 人の根 (足元) に付ける。置き場所と向きは毎コマ世界の座標から直す */
-  attach(parent: THREE.Object3D): void {
-    this.parent = parent
-    for (const patch of this.patches) parent.add(patch.mesh)
+    this.mesh.scale.set(this.target.x, this.target.z, 1)
   }
 
   /**
-   * 姿勢に合わせた形の目標。
+   * 姿勢に合わせた形の目標。親の向きの前が −z。
    *
    * 伏せた体は位置の 0.95m 後ろから 0.65m 前まで (domain/player/stance.ts の PRONE_BODY) なので、
    * 楕円は長さ 1.9m を位置の少し後ろ (+0.15) に置く
    */
   set(stance: BlobStance): void {
-    this.stance = stance
     if (stance === 'prone') {
       this.target.x = 1.0
       this.target.z = 1.9
@@ -186,83 +169,69 @@ export class BlobShadow {
   /** 目標へなだらかに寄せる。0.15 秒ほどで追いつく */
   update(dt: number): void {
     const k = 1 - Math.exp(-dt * 10)
-    this.shape.x += (this.target.x - this.shape.x) * k
-    this.shape.z += (this.target.z - this.shape.z) * k
-    this.shape.offset += (this.target.offset - this.shape.offset) * k
-    const parent = this.parent
-    if (parent) {
-      parent.updateWorldMatrix(true, false)
-      parent.getWorldQuaternion(this.parentQuat)
-      this.inverseQuat.copy(this.parentQuat).invert()
+    const s = this.mesh.scale
+    s.x += (this.target.x - s.x) * k
+    s.y += (this.target.z - s.y) * k   // 平面を倒しているので、奥行きは scale.y
+    if (this.lifted) {
+      this.project()
+    } else {
+      // 足元へ戻す (映していた向きを解く)
+      this.mesh.rotation.set(-Math.PI / 2, 0, 0)
+      this.mesh.position.x = 0
+      this.mesh.position.y = 0.02
+      this.mesh.position.z += (this.target.offset - this.mesh.position.z) * k
     }
-    for (const patch of this.patches) this.project(patch)
-    // 体が日なたか。**体の所で測る** — 影の落ちた先は体の影の中なので、そこで測ると必ず日陰になる。
-    // 影の境をまたぐ時にぱっと変わらないよう、濃さも追いかける
+    // 日なたか。影の境をまたぐ時にぱっと変わらないよう、濃さも追いかける。
+    // **映している間は体の所で測る** — 映した先は体の影の中なので、そこで測ると必ず日陰になる
     this.probeLeft -= dt
     if (this.probeLeft <= 0 && sunlit) {
       this.probeLeft = SUN_PROBE_EVERY
-      this.bodyPoint(BODY_CENTER[this.stance], this.at)
+      if (this.lifted) this.bodyCenter(this.at)
+      else {
+        this.mesh.getWorldPosition(this.at)
+        this.at.y += SUN_PROBE_LIFT
+      }
       this.targetOpacity = sunlit(this.at.x, this.at.y, this.at.z) ? SUN_OPACITY : SHADE_OPACITY
     }
-    const fade = 1 - Math.exp(-dt * 8)
-    for (const patch of this.patches) {
-      const material = patch.mesh.material
-      const target = patch.landed ? this.targetOpacity * patch.sample.weight : 0
-      material.opacity += (target - material.opacity) * fade
-    }
+    const material = this.mesh.material
+    const target = this.lifted && !this.landed ? 0 : this.targetOpacity
+    material.opacity += (target - material.opacity) * (1 - Math.exp(-dt * 8))
   }
 
-  /** 体のその高さの点 (世界の座標)。親 (人の根) は足元にある */
-  private bodyPoint(height: number, out: THREE.Vector3): THREE.Vector3 {
-    if (this.parent) this.parent.getWorldPosition(out)
+  /** 体の真ん中 (世界の座標)。親 (人の根) は足元にある */
+  private bodyCenter(out: THREE.Vector3): THREE.Vector3 {
+    const parent = this.mesh.parent
+    if (parent) parent.getWorldPosition(out)
     else out.set(0, 0, 0)
-    out.y += height
+    out.y += BODY_CENTER
     return out
   }
 
   /**
-   * その 1 か所の影を、日の向きに沿って最初に当たる面へ貼る。**毎コマ** (動き続けるので)。線 1 本。
-   *
-   * 板の向きは、法線を面に、縦 (伏せで長い向き) を**体の前を面へ倒した向き**に合わせる。
-   * 地面なら今までの「寝かせた板」と同じ向きになる
+   * 体の影を、日の向きに沿って最初に当たる面へ映す。**毎コマ** (梯子を登る間は動き続ける)。
+   * 線 1 本なので軽い
    */
-  private project(patch: Patch): void {
-    const parent = this.parent
-    if (!parent || !caster) {
-      patch.landed = false
-      return
-    }
-    const hit = caster(...this.bodyPoint(patch.sample.height[this.stance], this.at).toArray())
-    patch.landed = hit !== null
-    if (!hit) return
-    const mesh = patch.mesh
-    this.normal.set(hit.nx, hit.ny, hit.nz).normalize()
-    // 体の前を面へ倒す。体の前と法線が揃う面なら横を使う
-    this.ahead.copy(FORWARD).applyQuaternion(this.parentQuat)
-    this.ahead.addScaledVector(this.normal, -this.ahead.dot(this.normal))
-    if (this.ahead.lengthSq() < 1e-6) this.ahead.copy(SIDEWAYS).applyQuaternion(this.parentQuat)
-    this.ahead.normalize()
-    this.side.crossVectors(this.ahead, this.normal)
-    this.basis.makeBasis(this.side, this.ahead, this.normal)
-    mesh.quaternion.setFromRotationMatrix(this.basis).premultiply(this.inverseQuat)
-    mesh.scale.set(this.shape.x * patch.sample.size, this.shape.z * patch.sample.size, 1)
-    // 置き場所。面から少し浮かせ、姿勢の寄せ (後ろが +) を面の上で足す
-    this.landingAt
-      .set(hit.x, hit.y, hit.z)
-      .addScaledVector(this.normal, LANDING_LIFT)
-      .addScaledVector(this.ahead, -this.shape.offset)
-    mesh.position.copy(parent.worldToLocal(this.landingAt))
+  private project(): void {
+    const parent = this.mesh.parent
+    const hit = parent && caster ? caster(...this.bodyCenter(this.at).toArray()) : null
+    this.landed = hit !== null
+    if (!hit || !parent) return
+    this.landingNormal.set(hit.nx, hit.ny, hit.nz).normalize()
+    this.landingAt.set(hit.x, hit.y, hit.z).addScaledVector(this.landingNormal, LANDING_LIFT)
+    // 世界の置き場所と向きを、親 (人の根) から見た値へ直す
+    parent.updateWorldMatrix(true, false)
+    this.mesh.position.copy(parent.worldToLocal(this.landingAt))
+    parent.getWorldQuaternion(this.parentQuat).invert()
+    this.mesh.quaternion.setFromUnitVectors(PLANE_FACING, this.landingNormal).premultiply(this.parentQuat)
   }
 
   set visible(value: boolean) {
-    for (const patch of this.patches) patch.mesh.visible = value
+    this.mesh.visible = value
   }
 
   dispose(): void {
-    for (const patch of this.patches) {
-      patch.mesh.geometry.dispose()
-      patch.mesh.material.dispose()
-      patch.mesh.removeFromParent()
-    }
+    this.mesh.geometry.dispose()
+    this.mesh.material.dispose()
+    this.mesh.removeFromParent()
   }
 }
