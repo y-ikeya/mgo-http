@@ -256,7 +256,9 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   claymore_place: 'claymore_place',
   jump_up: 'relaxed_run',
   jump_loop: 'relaxed_run',
-  jump_down: 'relaxed_run',
+  // 着地は止まって膝を曲げる間 (soldier の landingTimer で動けない)。**腕は振らない** — 走りの型のままだと、
+  // 走るボタンを押し続けた着地で足が止まっているのに手だけ振っていた (2026-10-22 本人)
+  jump_down: 'relaxed_idle',
   /*
    * 階段。**上半身は走りと同じ。**
    *
@@ -632,7 +634,8 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   down_stair: 'run_unarmed',
   jump_up: 'run_unarmed',
   jump_loop: 'run_unarmed',
-  jump_down: 'run_unarmed',
+  // 着地は止まっているので腕を振らない (RELAXED_CLIPS の jump_down と同じ)
+  jump_down: 'pistol_relaxed',
   /*
    * 転がりの尻尾。**あの型は銃を構える形で終わる。**
    *
