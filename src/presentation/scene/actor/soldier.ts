@@ -519,6 +519,11 @@ const ZERO_MOVE = new THREE.Vector3()
 const LADDER_TOP_REACH = 0.6
 /** 上から掴んだ時の足元 (上端から何 m 下)。登り切りの入り口 (lead) より下 */
 const LADDER_TOP_MOUNT = CLIMB_TOP_TUNING.lead + 0.1
+/**
+ * 足元がこれより上 (上端から何 m 以内) なら**上端の上の床に立っている**。掴むと上から降り始める。
+ * 床は上端の 0.33m 下 (梯子は床から 0.33m 上まで伸ばして置く)。登っている途中の体はここより下
+ */
+const LADDER_TOP_STAND = 0.8
 
 /**
  * プレイヤーキャラクター。
@@ -2156,6 +2161,18 @@ export class Soldier {
     const ladder = ladderAt(this.ladders, p.x, p.y, p.z, PLAYER_HEIGHT)
     if (!ladder) return false
     /*
+     * **上端の上 (登り切った先の床) に立って掴んだら、外側へ回って上から降り始める。**
+     *
+     * 登り切った先の床は梯子の裏 (壁の側) にある。居る側のまま掴むと、裏から床の高さで
+     * 掴んですぐ登り切りの型に入っていた (2026-10-22 本人「梯子の裏から G を押すと裏なのに
+     * 登ろうとしてる、特に登り切った後の場所で」)。縁から歩いて出た時と同じ掴み方にする
+     */
+    if (p.y > ladder.max[1] - LADDER_TOP_STAND) {
+      const middle = ladder.axis === 'x' ? (ladder.min[0] + ladder.max[0]) / 2 : (ladder.min[2] + ladder.max[2]) / 2
+      const across = (ladder.axis === 'x' ? p.x : p.z) - middle
+      return this.mountFromTop(ladder, across > 0 ? -1 : 1, p.x, p.z)
+    }
+    /*
      * **居る側から登る。** 回り込ませない。
      *
      * 地形を見て空いている側を選ぼうとしたことがあるが、梯子そのものが壁
@@ -2212,8 +2229,16 @@ export class Soldier {
     // 歩いて出た先の側 (屋上の反対) に立つ
     const out = ladder.axis === 'x' ? heading.x : heading.z
     if (Math.abs(out) < 0.2) return false
-    const side: 1 | -1 = out > 0 ? 1 : -1
-    const grip = ladderGrip(ladder, edge.x, edge.z, side)
+    return this.mountFromTop(ladder, out > 0 ? 1 : -1, edge.x, edge.z)
+  }
+
+  /**
+   * 梯子の上端を**上から掴む**。side の側 (屋上の反対 = 梯子の外側) に立って梯子を向き、
+   * 上端から LADDER_TOP_MOUNT 下を掴む。縁から歩いて出た時 (grabLadderFromTop) と、
+   * 上端の上の床で掴んだ時 (grabLadder) の両方がここを通る
+   */
+  private mountFromTop(ladder: Ladder, side: 1 | -1, x: number, z: number): boolean {
+    const grip = ladderGrip(ladder, x, z, side)
     this.climbSide = side
     this.climbing = ladder
     this.position.set(grip.x, Math.max(ladder.min[1], ladder.max[1] - LADDER_TOP_MOUNT), grip.z)
