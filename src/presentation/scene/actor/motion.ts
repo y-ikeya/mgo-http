@@ -86,6 +86,8 @@ export type WholeBodyLocomotion =
   | 'hang_right'
   // 梯子を登り切る。一度きりの型なので、流し始める者が要る (無いと T ポーズ)
   | 'climb_top'
+  // 上から梯子へ降りて掴む (登り切りを逆に流す)
+  | 'climb_mount'
   | 'death'
   | 'death_front'
   | 'death_back'
@@ -118,6 +120,7 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'hang_left',
   'hang_right',
   'climb_top',
+  'climb_mount',
   'roll',
   // 受け身。転がるので上半身だけ別の型は重ねられない
   'hard_land',
@@ -267,7 +270,7 @@ export interface StanceInput {
    * 眠りの次に強い。掴んでいる間は歩きも伏せも無いし、登り切る型は途中で
    * 止められない (掴む物が無い所を通るので、手を離せると宙に浮く)。
    */
-  climbing: 'climb' | 'climb_top' | null
+  climbing: 'climb' | 'climb_top' | 'climb_mount' | null
   boxed: boolean
   crouching: boolean
   aiming: boolean

@@ -70,6 +70,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   // 梯子。全身の型なので上半身も同じクリップから取る
   climb: 'climb',
   climb_top: 'climb_top',
+  // 上から梯子へ降りて掴む。**画面の中では climb_top を逆に流す** (playClimbMount)。この行は表を欠かさないため
+  climb_mount: 'climb_top',
   sneak: 'sneak',
   sit: 'sit',
   salute: 'salute',
@@ -2922,6 +2924,15 @@ export class CharacterAnimator {
    */
   playClimbTop(rate: number): void {
     this.playWholeBody(CLIMB_TOP_KEY, 'climb_top', rate)
+  }
+
+  /**
+   * 上端の上の床から梯子へ**降りて掴む**。登り切りの型を終わりから逆に流す。
+   * 状態は climb_top のまま (腰の曲線 riseProgress / forwardProgress も climb_top で引く)。
+   * 外へ伝える型だけ climb_mount (soldier / remoteSoldier)
+   */
+  playClimbMount(rate: number): void {
+    this.playWholeBody(CLIMB_TOP_KEY, 'climb_top', -rate)
   }
 
   /** 手に何も出ていない持ち物か (投げ物・設置物) */

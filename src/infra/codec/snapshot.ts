@@ -114,6 +114,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   // ぶら下がったまま横へ移る。**末尾に足す**
   'hang_left',
   'hang_right',
+  // 上から梯子へ降りて掴む (登り切りの逆)。**末尾に足す**
+  'climb_mount',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

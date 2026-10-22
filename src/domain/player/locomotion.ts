@@ -78,6 +78,11 @@ export type Locomotion =
    */
   | 'climb_top'
   /**
+   * 上端の上の床から梯子へ**降りて掴む**。登り切り (climb_top) を逆に流す一度きりの型。
+   * 終わりで梯子を掴んだ姿になる (2026-10-22 本人「上から G で滑らかに梯子に掴まれないか」)
+   */
+  | 'climb_mount'
+  /**
    * 麻酔で眠っている。
    *
    * 倒れている (death) とは別物。**体はそこに在り続け、30 秒で起きる。**
@@ -290,6 +295,7 @@ export function emptyHanded(locomotion: Locomotion): boolean {
     // 梯子。**両手が塞がっている** — 銃を出すと梯子を握らずに登って見える
     locomotion === 'climb' ||
     locomotion === 'climb_top' ||
+    locomotion === 'climb_mount' ||
     locomotion === 'sleep' ||
     locomotion === 'away' ||
     locomotion === 'death' ||

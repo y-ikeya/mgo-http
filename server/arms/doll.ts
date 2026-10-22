@@ -43,6 +43,7 @@ let nextDollId = 1
 const OFF_FOOTING: ReadonlySet<string> = new Set<Locomotion>([
   'climb',
   'climb_top',
+  'climb_mount',
   'hang',
   'hang_drop',
   'hang_climb',

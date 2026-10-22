@@ -90,7 +90,7 @@ export type BlobStance = 'stand' | 'crouch' | 'prone'
  * 消すだけにすると、TSNE で梯子の途中の人を影で見つけられなくなる (同日 本人)。
  * 他人の画面は送られてくる型でしか分からないので、型で決める
  */
-const OFF_FLOOR = new Set(['climb', 'climb_top', 'hang', 'hang_drop', 'hang_climb', 'hang_left', 'hang_right'])
+const OFF_FLOOR = new Set(['climb', 'climb_top', 'climb_mount', 'hang', 'hang_drop', 'hang_climb', 'hang_left', 'hang_right'])
 
 /** その型で足元に床があるか (丸い影を出すか) */
 export function blobOnFloor(locomotion: string): boolean {

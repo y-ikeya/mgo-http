@@ -925,6 +925,11 @@ export class Soldier {
   /** 登り切りで、型の腰の曲線がどこまで進んだか (上下 / 前後、0..1)。戻さない */
   private climbRise = 0
   private climbAhead = 0
+  /**
+   * 上から梯子へ**降りて掴んでいる**最中 (登り切りの型を逆に流している)。終われば
+   * この梯子を side の側で掴む。順に登り切っている間は null
+   */
+  private climbMount: { ladder: Ladder; side: 1 | -1 } | null = null
   /** 掴む側を確かめるときの置き場。毎回作らない */
   private readonly climbProbe = new THREE.Vector3()
   private moveSpeed = MOVE_SPEED
@@ -2239,6 +2244,33 @@ export class Soldier {
    */
   private mountFromTop(ladder: Ladder, side: 1 | -1, x: number, z: number): boolean {
     const grip = ladderGrip(ladder, x, z, side)
+    /*
+     * **登り切りの型を逆に流して降りる** (2026-10-22 本人「上から G で滑らかに梯子に掴まれないか」)。
+     *
+     * 登り切りは「掴んだ所 (climbFrom) → 床 (climbTo)」を腰の曲線に沿って渡る。逆は同じ 2 点を
+     * 進み具合 1 → 0 で戻る — 今立っている床から、登り切りが始まる高さの掴む所へ。終われば
+     * 梯子を掴む (advanceClimbTop)。型が読めていなければ今まで通り掴む所へ直に移る
+     */
+    const span = this.animator?.climbTopDuration ?? 0
+    const mountY = ladder.max[1] - CLIMB_TOP_TUNING.lead
+    if (span > 0 && mountY > ladder.min[1]) {
+      this.climbFrom.set(grip.x, mountY, grip.z)
+      this.climbTo.copy(this.position)
+      this.climbMount = { ladder, side }
+      this.climbTopLeft = span / CLIMB_TOP_TUNING.rate
+      this.climbRise = 1
+      this.climbAhead = 1
+      this.climbing = null
+      this.yaw = grip.yaw
+      this.climbYaw = grip.yaw
+      this.velocityY = 0
+      this.mover.airX = 0
+      this.mover.airZ = 0
+      this.crouching = false
+      this.aiming = false
+      this.animator?.playClimbMount(CLIMB_TOP_TUNING.rate)
+      return true
+    }
     this.climbSide = side
     this.climbing = ladder
     this.position.set(grip.x, Math.max(ladder.min[1], ladder.max[1] - LADDER_TOP_MOUNT), grip.z)
@@ -2269,6 +2301,7 @@ export class Soldier {
     if (!this.climbing && this.climbTopLeft <= 0) return
     this.climbing = null
     this.climbTopLeft = 0
+    this.climbMount = null
     this.velocityY = 0
   }
 
@@ -2442,12 +2475,27 @@ export class Soldier {
     this.climbTopLeft = Math.max(0, this.climbTopLeft - dt)
     const animator = this.animator
     const done = this.climbTopLeft <= 0
-    this.climbRise = done ? 1 : Math.max(this.climbRise, animator?.riseProgress('climb_top') ?? 1)
-    this.climbAhead = done ? 1 : Math.max(this.climbAhead, animator?.forwardProgress('climb_top') ?? 1)
+    if (this.climbMount) {
+      // 逆に流している (上から降りて掴む)。進み具合は 1 → 0、**進めた分は戻さない** (一番戻った所を保つ)
+      this.climbRise = done ? 0 : Math.min(this.climbRise, animator?.riseProgress('climb_top') ?? 0)
+      this.climbAhead = done ? 0 : Math.min(this.climbAhead, animator?.forwardProgress('climb_top') ?? 0)
+    } else {
+      this.climbRise = done ? 1 : Math.max(this.climbRise, animator?.riseProgress('climb_top') ?? 1)
+      this.climbAhead = done ? 1 : Math.max(this.climbAhead, animator?.forwardProgress('climb_top') ?? 1)
+    }
     this.position.y = this.climbFrom.y + (this.climbTo.y - this.climbFrom.y) * this.climbRise
     this.position.x = this.climbFrom.x + (this.climbTo.x - this.climbFrom.x) * this.climbAhead
     this.position.z = this.climbFrom.z + (this.climbTo.z - this.climbFrom.z) * this.climbAhead
     this.velocityY = 0
+    if (done && this.climbMount) {
+      // 降り切った。**梯子を掴む** — 前を押したままでも一度離すまで登り返さない
+      const { ladder, side } = this.climbMount
+      this.climbMount = null
+      this.climbing = ladder
+      this.climbSide = side
+      this.climbUpLatched = true
+      this.animator?.setClimbRate(0)
+    }
   }
 
   /** 伏せ切っているか。入り / 出 / 転がりの最中は false */
@@ -4097,7 +4145,9 @@ export class Soldier {
         this.animator.setMoveSpeed(animationSpeed)
         this.appliedAnimationSpeed = animationSpeed
       }
-      this.animator.setLocomotion(this.resolveLocomotion(moveDir))
+      // 降りて掴む型は、画面の中では登り切りの逆 (状態は climb_top のまま)。外へは climb_mount と伝える
+      const resolved = this.resolveLocomotion(moveDir)
+      this.animator.setLocomotion(resolved === 'climb_mount' ? 'climb_top' : resolved)
       // 構えていないときに体が照準の上下へ傾くと、ただ歩いているのに前後に折れて見える
       /*
        * 上体を照準の上下へ傾けるのは**立っている体の話**。
@@ -4559,7 +4609,7 @@ export class Soldier {
       bumped: this.bumpLeft,
       asleep: this.sleepLeft > 0,
       // 梯子。掴んでいる間と、登り切る型の最中
-      climbing: this.climbing ? 'climb' : this.climbTopLeft > 0 ? 'climb_top' : null,
+      climbing: this.climbing ? 'climb' : this.climbTopLeft > 0 ? (this.climbMount ? 'climb_mount' : 'climb_top') : null,
       prone: this.proneStage === 'prone',
       proneShift: this.proneShifting,
       stabbing: this.stabbing,

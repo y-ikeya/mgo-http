@@ -137,6 +137,8 @@ const PLAY_WHOLE_BODY: Record<
   // 梯子を登り切る。自分の側 (soldier.ts) と同じ速さで頭から流す。**流し始める者が
   // 居ないと重み 1 のまま止まった action に重みが集まって T ポーズ**になる
   climb_top: (a) => a.playClimbTop(CLIMB_TOP_TUNING.rate),
+  // 上から梯子へ降りて掴む。登り切りを終わりから逆に流す (soldier.ts の mountFromTop)
+  climb_mount: (a) => a.playClimbMount(CLIMB_TOP_TUNING.rate),
   // 落下の受け身。削られる高さから落ちた着地
   hard_land: (a) => a.playHardLand(),
   stab: (a) => a.playStab(),
@@ -543,7 +545,8 @@ export class RemoteSoldier {
       ? null
       : this.footsteps.update(state.x, state.y, state.z, locomotion, true);
 
-    animator.setLocomotion(locomotion);
+    // 降りて掴む型は、画面の中では登り切りの逆 (状態は climb_top のまま)
+    animator.setLocomotion(locomotion === 'climb_mount' ? 'climb_top' : locomotion);
     /*
      * 梯子。**登っている分だけ絵を進める。** 手を止めれば絵も止まる。
      *
@@ -596,7 +599,7 @@ export class RemoteSoldier {
     if (this.model) this.deathSlide.update(animator, this.object, this.model);
     if (this.model) {
       this.object.updateMatrixWorld(true);
-      const frame = locomotion === "climb_top" ? animator.oneShotPhase("climb_top") * 120 + 1 : 0;
+      const frame = locomotion === "climb_top" || locomotion === "climb_mount" ? animator.oneShotPhase("climb_top") * 120 + 1 : 0;
       this.gripRight.apply(this.model, climbGripWeight("Right", frame));
       this.gripLeft.apply(this.model, climbGripWeight("Left", frame));
     }
