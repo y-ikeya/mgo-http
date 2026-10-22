@@ -379,6 +379,33 @@ const ROOT_MOTION_HOLD: Partial<Record<Locomotion, { until: number; keep: number
 // 上下を潰してある) との差のぶん体が上へずれた (2026-10-21 本人「左右移動する時に上がっちゃってる」)
 const VERTICAL_STRIP_CLIPS = new Set(['vault_up', 'hang_drop', 'hang_climb', 'climb_top', 'hang_left', 'hang_right'])
 /**
+ * 上下を抜く型のうち、**位置を足の上がり方で上げ、膝の曲げ伸ばしは型に残す**型。
+ *
+ * 一段上へ乗る型は、足が前半 (尺の 45%) で段の上に着き、膝を曲げたまま乗ってから伸びる
+ * (腰は足の 0.5m 上 → 0.84m 上)。腰の曲線で位置を上げていたので、足が段の上に着くのは
+ * 型の終わりで、膝を伸ばす間に体ごと持ち上がって見えた (2026-10-23 本人「登った時は膝が
+ * 曲がっていて、最後に伸ばす時に重心を上に上げるものでは」)。
+ *
+ * 読み込みの時に型を骨に流して足の高さを測り (measureFootRise)、位置は足の曲線
+ * (footRise) で上げる。腰は「足からの高さ」を型のまま残し、終わりで立ちの高さに揃える
+ */
+const FOOT_RISE_CLIPS = new Set(['vault_up'])
+/** 足の高さを測る骨。一番低い物を足の高さとする (踵が上がっても爪先が着いている) */
+const FOOT_BONES = ['LeftFoot', 'LeftToeBase', 'RightFoot', 'RightToeBase'] as const
+/**
+ * 型ごとの測った結果。型は全員で共有しているので控えも共有 (rootMotionStore と同じ)。
+ * 1 人目が腰を潰す前に測る — 潰した後では足の高さが狂う
+ */
+const footRiseStore = new WeakMap<THREE.AnimationClip, FootRise>()
+interface FootRise {
+  /** 腰のトラックと同じ時刻 */
+  times: Float32Array
+  /** 足の上がり (0 = 頭、1 = 終わり)。一度上がった足は下がらない (跳ぶ途中で上下しない) */
+  rise: Float32Array
+  /** 腰のトラックの上下 (Z) に足す量 (トラックの単位)。終わりで 0 = 立ちの高さ */
+  hipZ: Float32Array
+}
+/**
  * 倒れる型の**前後の移動を絵として残す**型 (deathSlide)。
  *
  * 型は倒れながら下がる (後ろへ倒れる型で 1.0m、前へ倒れる型で 2.3m)。位置はコードが
@@ -1508,6 +1535,8 @@ export class CharacterAnimator {
   /** 前フレームに読んだルートモーションの値。差分を出すのに使う */
   private readonly lastRootSample = new THREE.Vector3()
   private rootSampleValid = false
+  /** 足の高さを測った型 (FOOT_RISE_CLIPS)。型の名前から */
+  private readonly footRises = new Map<string, FootRise>()
   /** 乗る型 (vault_up) の焼かれた移動に掛ける倍率。playVault で決まる */
   private vaultUpReach = 1
   /** 前回どこまで再生していたか。頭へ戻ったのを見つけるのに使う */
@@ -1659,6 +1688,10 @@ export class CharacterAnimator {
         }
         if (stored) this.rootMotion.set(clip.name, stored)
       }
+      if (rootBone && FOOT_RISE_CLIPS.has(clip.name) && !footRiseStore.has(clip)) {
+        const measured = measureFootRise(root, clip, rootBone)
+        if (measured) footRiseStore.set(clip, measured)
+      }
       if (rootBone) {
         stripRootMotion(
           clip,
@@ -1669,6 +1702,12 @@ export class CharacterAnimator {
             ? verticalResidual(clip, rootBone.name, restBase, VERTICAL_END_POSE[clip.name], clips)
             : undefined,
         )
+        const foot = footRiseStore.get(clip)
+        if (foot && restBase) {
+          keepKneeBend(clip, rootBone.name, restBase.z, foot)
+          // 流すのは上下に分けた写し (splitClip) なので、型からは引けない。名前で持つ
+          this.footRises.set(clip.name, foot)
+        }
       }
       byName.set(clip.name, clip)
     }
@@ -3535,7 +3574,9 @@ export class CharacterAnimator {
    * 位置をこれに沿って上げれば、足の運びと体の上がり方が合う。
    */
   vaultRise(): number {
-    return this.riseProgress('vault_up')
+    // 足の上がり方で上げる (FOOT_RISE_CLIPS)。測れなかった時は腰の曲線
+    const foot = this.footRise('vault_up')
+    return foot ?? this.riseProgress('vault_up')
   }
 
   /**
@@ -3663,6 +3704,14 @@ export class CharacterAnimator {
   }
 
   /** 腰の軌道の 1 成分 (0 = 横、1 = 前後、2 = 上下) を頭〜終わりで 0..1 に */
+  /** 足の上がり (0〜1)。足を測った型 (FOOT_RISE_CLIPS) でなければ null */
+  private footRise(name: Locomotion): number | null {
+    const action = this.lower.get(name)
+    const foot = this.footRises.get(LOWER_CLIPS[name])
+    if (!action || !foot) return null
+    return sampleScalar(foot.times, foot.rise, action.time)
+  }
+
   private trackProgress(name: Locomotion, component: 0 | 1 | 2): number {
     const stored = this.rootMotion.get(name)
     const action = this.lower.get(name)
@@ -4584,6 +4633,68 @@ function verticalResidual(
   const clipSpan = track.values[track.values.length - 1] - track.values[2]
   if (Math.abs(clipSpan) < 1e-3) return 0
   return (end.z - rest.z) / clipSpan
+}
+
+/**
+ * 型を骨に流して、腰のトラックの時刻ごとに**足の高さ**を測る (FOOT_RISE_CLIPS)。
+ *
+ * 一時の mixer で模型を動かすので、本物の mixer が型を流す前 (Animator の頭) に 1 度だけ呼ぶ。
+ * 高さは模型の空間 (m) で測り、腰のトラックの単位へは腰の上下の比で直す (縮尺を持ち込まない)
+ */
+function measureFootRise(root: THREE.Object3D, clip: THREE.AnimationClip, rootBone: THREE.Bone): FootRise | null {
+  const track = clip.tracks.find((t) => t.name.endsWith('.position') && sameNode(t.name, rootBone.name))
+  const feet = FOOT_BONES.map((name) => findBoneBySuffix(root, name))
+  if (!track || feet.some((b) => !b)) return null
+  const n = track.times.length
+  const footY = new Float32Array(n)
+  const hipY = new Float32Array(n)
+  const mixer = new THREE.AnimationMixer(root)
+  const action = mixer.clipAction(clip)
+  action.play()
+  const at = new THREE.Vector3()
+  for (let i = 0; i < n; i++) {
+    action.time = track.times[i]
+    mixer.update(0)
+    root.updateMatrixWorld(true)
+    let low = Infinity
+    for (const bone of feet) low = Math.min(low, root.worldToLocal(bone!.getWorldPosition(at)).y)
+    // 一度上がった足は下がらない。跳ぶ途中で両足が浮いて下がって見えるのを位置に持ち込まない
+    footY[i] = i > 0 ? Math.max(footY[i - 1], low) : low
+    hipY[i] = root.worldToLocal(rootBone.getWorldPosition(at)).y
+  }
+  action.stop()
+  mixer.uncacheRoot(root)
+  const footSpan = footY[n - 1] - footY[0]
+  const hipSpan = hipY[n - 1] - hipY[0]
+  const trackSpan = track.values[track.values.length - 1] - track.values[2]
+  if (footSpan < 1e-3 || Math.abs(hipSpan) < 1e-3) return null
+  const toTrack = trackSpan / hipSpan
+  const rise = new Float32Array(n)
+  const hipZ = new Float32Array(n)
+  const endAboveFeet = hipY[n - 1] - footY[n - 1]
+  for (let i = 0; i < n; i++) {
+    rise[i] = Math.min(1, Math.max(0, (footY[i] - footY[0]) / footSpan))
+    hipZ[i] = (hipY[i] - footY[i] - endAboveFeet) * toTrack
+  }
+  return { times: Float32Array.from(track.times), rise, hipZ }
+}
+
+/** 腰の上下を「足からの高さ」で残す (FOOT_RISE_CLIPS)。潰した後に上書きするので何度呼んでも同じ */
+function keepKneeBend(clip: THREE.AnimationClip, rootBoneName: string, restZ: number, foot: FootRise): void {
+  const track = clip.tracks.find((t) => t.name.endsWith('.position') && sameNode(t.name, rootBoneName))
+  if (!track || track.times.length !== foot.times.length) return
+  for (let i = 0; i < foot.hipZ.length; i++) track.values[i * 3 + 2] = restZ + foot.hipZ[i]
+}
+
+/** 時刻の並びに沿った値を線形に読む */
+function sampleScalar(times: Float32Array, values: Float32Array, t: number): number {
+  const n = times.length
+  if (t <= times[0]) return values[0]
+  if (t >= times[n - 1]) return values[n - 1]
+  let i = 1
+  while (times[i] < t) i++
+  const k = (t - times[i - 1]) / (times[i] - times[i - 1])
+  return values[i - 1] + (values[i] - values[i - 1]) * k
 }
 
 /** そのクリップの腰の水平位置 (先頭フレーム)。全クリップを揃える基準に使う */
