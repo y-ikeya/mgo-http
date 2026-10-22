@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { castMovingShadow } from '../world/liveShadow'
 import { BUMP_SETTLE } from '../../../domain/item/cbox'
 import { asset } from '../assets'
 import { damp } from '../util/math'
@@ -359,10 +360,7 @@ export class EmptyBoxes {
   /** @param y 置く床の高さ (箱の底) */
   place(x: number, y: number, z: number, yaw: number, size = 1): void {
     const box = template().clone(true)
-    box.traverse((obj) => {
-      const mesh = obj as THREE.Mesh
-      if (mesh.isMesh) mesh.castShadow = true
-    })
+    castMovingShadow(box)
     const h = tuning.height * size
     box.scale.set(tuning.width * size, h, tuning.depth * size)
     box.position.set(0, h / 2, 0)

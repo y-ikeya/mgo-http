@@ -1,4 +1,5 @@
 import { SKY_FLOOR } from './skylight'
+import { addMovingShadow, castStaticShadow, STATIC_SHADOW_LAYER } from './liveShadow'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
 import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
@@ -1498,7 +1499,7 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   for (const [x, z, w, h, d] of BLOCKS) {
     const block = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), blockMaterial)
     block.position.set(x, h / 2, z)
-    block.castShadow = true
+    castStaticShadow(block)
     block.receiveShadow = true
     blockout.add(block)
     collidables.push(block)
@@ -1743,6 +1744,8 @@ async function replaceWithModel(
       const material = Array.isArray(obj.material) ? obj.material[0] : obj.material
       const blended = (material as THREE.Material | undefined)?.transparent === true
       obj.castShadow = !glass && !blended
+      // 街の影の地図に焼く (world/liveShadow.ts の層)
+      if (obj.castShadow) obj.layers.enable(STATIC_SHADOW_LAYER)
       obj.receiveShadow = !glass
       /*
        * 壁に貼った板の深さは素のまま比べる。polygonOffset で手前へ寄せていたが、
@@ -1941,13 +1944,11 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   sun.target.position.set(0, 0, 0)
   sun.castShadow = true
   /*
-   * **影マップは動かない物だけを 1 度焼く。** 太陽も枠も動かないので、街の影は
-   * 描き直す理由が無い。動く物 (人・箱・武器・投げ物) は影マップに入れず、人は
-   * 足元の丸い影で受ける (actor/blobShadow.ts)。置いた物が増減した時だけ
-   * world/staticShadow.ts 経由で needsUpdate を立てる
+   * **街の影の地図は 1 度だけ焼く。** 太陽も枠も動かないので描き直す理由が無い。置いた物が
+   * 増減した時だけ world/staticShadow.ts 経由で needsUpdate を立てる。人の影は別の小さな地図に
+   * 毎フレーム描く (world/liveShadow.ts の addMovingShadow、下で足す)
    */
-  // 切り分け用: ?shadow=live で毎フレーム描き直す (焼いた瞬間の物が写り込んでいないか見る)
-  sun.shadow.autoUpdate = new URLSearchParams(location.search).get('shadow') === 'live'
+  sun.shadow.autoUpdate = false
   sun.shadow.needsUpdate = true
   /*
    * 影マップの画素数。
@@ -1981,6 +1982,8 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   // 光を引いたぶん遠くなる (実測で 181 まで)
   cam.far = 240
   cam.updateProjectionMatrix()
+  // 人の影は別の小さな地図に毎フレーム描き、床は 2 枚の暗いほうを採る (world/liveShadow.ts)
+  addMovingShadow(sun)
 
   scene.add(sun)
   scene.add(sun.target)

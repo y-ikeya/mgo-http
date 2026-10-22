@@ -3,6 +3,7 @@ import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/w
 import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
+import { followMovingShadow } from "./world/liveShadow";
 import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
@@ -2074,6 +2075,8 @@ export class Game {
       return false;
     });
 
+    // 人の影の地図を自分の周りへ寄せる (world/liveShadow.ts)
+    followMovingShadow(this.sun, this.player.position.x, this.player.position.y, this.player.position.z);
     if (this.post) this.post.render();
     else this.renderer.render(this.scene, this.follow.camera);
     // **描き終えたここで読む。** 描画の量はコマの頭 (setAnimationLoop の中) で 0 に戻るので、

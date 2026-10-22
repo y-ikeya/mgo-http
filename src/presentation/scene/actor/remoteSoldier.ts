@@ -1,6 +1,7 @@
 import { TRAPPED_CROUCH_SECONDS } from '../../../domain/item/doll';
 import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
+import { MOVING_SHADOW_LAYER } from '../world/liveShadow';
 import { BlobShadow, blobOnFloor } from './blobShadow';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
@@ -1034,7 +1035,9 @@ export class RemoteSoldier {
     const cloned = new Map<THREE.Material, THREE.Material>();
     model.traverse((obj) => {
       if (!isMesh(obj)) return;
-      obj.castShadow = false;   // 影マップは動かない物だけ。人の影は足元の丸 (blob)
+      // 人も影を落とす (人の影の地図に毎フレーム描く、world/liveShadow.ts)
+      obj.castShadow = true;
+      obj.layers.enable(MOVING_SHADOW_LAYER);
       // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
       obj.receiveShadow = true;
       // スキニング後の姿勢はバウンディングボックスに出ないので視錐台カリングを切る

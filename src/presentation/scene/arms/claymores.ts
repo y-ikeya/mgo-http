@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { castStaticShadow } from '../world/liveShadow'
 import { loadClaymore } from '../assets'
 import { refreshStaticShadows } from '../world/staticShadow'
 import { TRIGGER_COS, TRIGGER_RANGE } from '../../../domain/item/claymore'
@@ -85,9 +86,7 @@ export class Claymores {
     this.scene = scene
     void loadClaymore().then((gltf) => {
       this.model = gltf.scene
-      this.model.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) obj.castShadow = true
-      })
+      castStaticShadow(this.model)
       // 間に合わなかったぶんを本物に差し替える
       for (const [id, entry] of [...this.live]) {
         this.scene.remove(entry.mesh)

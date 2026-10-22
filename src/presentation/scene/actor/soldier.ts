@@ -1,5 +1,6 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { BlobShadow } from './blobShadow'
+import { MOVING_SHADOW_LAYER } from '../world/liveShadow'
 import { boxMoveScale, runnerScale, setupSpeedScale, stabSpeedScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
@@ -4286,7 +4287,9 @@ export class Soldier {
     model.rotation.y = MODEL_YAW_OFFSET
     model.traverse((obj) => {
       if (isMesh(obj)) {
-        obj.castShadow = false   // 影マップは動かない物だけ。人の影は足元の丸 (blob)
+        // 人も影を落とす (人の影の地図に毎フレーム描く、world/liveShadow.ts)
+        obj.castShadow = true
+        obj.layers.enable(MOVING_SHADOW_LAYER)
         // 建物の影に入ったら日は当たらない。受けないと屋内でも日向の明るさになる
         obj.receiveShadow = true
         // スキニング後の実際の姿勢はバウンディングボックスに反映されないため、

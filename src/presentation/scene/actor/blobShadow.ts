@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { DRAW_LATER, TOWARD_CAMERA } from '../util/depth'
+import { LIVE_PLAYER_SHADOWS } from '../world/liveShadow'
 
 /**
  * 人の足元の丸い影。
@@ -140,6 +141,8 @@ export class BlobShadow {
      * 向きは深さの持ち方で裏返る (util/depth.ts の DRAW_LATER)
      */
     this.mesh.renderOrder = DRAW_LATER
+    // 人も本物の影を落とす間は出さない (二重になる。world/liveShadow.ts)
+    this.mesh.visible = !LIVE_PLAYER_SHADOWS
     this.set('stand')
     this.mesh.scale.set(this.target.x, this.target.z, 1)
   }
