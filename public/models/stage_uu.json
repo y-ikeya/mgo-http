@@ -1863,6 +1863,60 @@
 }
 },
 {
+"name": "metal_fence2_nobullet_noeye_nocamera_blockthrow",
+"min": [
+20.63,
+3.9,
+-36.684
+],
+"max": [
+29.323,
+5.9,
+-36.684
+],
+"top": {
+"h": 5.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_fence2_frame_notexture",
+"min": [
+20.597,
+3.9,
+-36.719
+],
+"max": [
+29.323,
+5.93,
+-36.649
+],
+"top": {
+"h": 5.9186,
+"dx": 0.0,
+"dz": 0.32489,
+"thick": 2.0414
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
