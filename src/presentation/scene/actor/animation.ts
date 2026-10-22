@@ -432,6 +432,8 @@ const ROLL_TIME_SCALE = 1.32
  * --- 伏せたまま横へ転がるのも同じ ---
  * 半回転で**横へ 0.56m** 焼き込まれている。倍率を掛けないのは受け身と同じ
  * 理由で、寝た体が地面を擦って進む型なので、少しでも滑ると気づく。
+ *
+ * 一段上へ乗る型 (vault_up) は乗るたびに倍率が変わる (playVault の reach)
  */
 const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 /**
@@ -1506,6 +1508,8 @@ export class CharacterAnimator {
   /** 前フレームに読んだルートモーションの値。差分を出すのに使う */
   private readonly lastRootSample = new THREE.Vector3()
   private rootSampleValid = false
+  /** 乗る型 (vault_up) の焼かれた移動に掛ける倍率。playVault で決まる */
+  private vaultUpReach = 1
   /** 前回どこまで再生していたか。頭へ戻ったのを見つけるのに使う */
   private lastRootTime = 0
   /** 骨格のスケール (Armature の 0.01)。トラックの単位をメートルに直すのに使う */
@@ -3482,8 +3486,10 @@ export class CharacterAnimator {
    *
    * 焼き込まれた移動 (2.06m) を辿る (ROOT_MOTION_CLIPS)。腰の上下は型に残して
    * あるので、跳ぶ絵は型が持っている — 位置のほうは床の高さのまま動く。
+   *
+   * @param reach 乗る型 (up) の焼かれた移動に掛ける倍率。乗る物の縁までの距離で soldier が決める
    */
-  playVault(up = false): void {
+  playVault(up = false, reach = 1): void {
     if (this.dead) return
     const name = up ? 'vault_up' : 'vault'
     const upper = this.upper.get(up ? VAULT_UP_KEY : VAULT_KEY)
@@ -3493,6 +3499,7 @@ export class CharacterAnimator {
     lower.reset().play()
     this.upperState = name
     this.locomotion = name
+    this.vaultUpReach = up ? reach : 1
     this.rootSampleValid = false
   }
 
@@ -4232,7 +4239,7 @@ export class CharacterAnimator {
 
     // トラック空間は X/Y が水平、Z が上下 (Armature の +90°X 回転のため)。
     // モデル空間では armature ローカルの +Y が前方 (+Z) に対応する。
-    const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1)
+    const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1) * (name === 'vault_up' ? this.vaultUpReach : 1)
     const hold = ROOT_MOTION_HOLD[name]
     if (hold) {
       /*

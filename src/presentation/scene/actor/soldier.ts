@@ -305,9 +305,20 @@ const VAULT_MAX = 1.2
 const VAULT_REACHES = [0.4, 0.55, 0.7, 0.85, 1.0] as const
 /**
  * 着地を探す距離 (m)。**枠から先**の長さ。近いほうは「枠のすぐ先の箱」(乗る)、
- * 遠いほうは「越えた先の床」(越える)。型は越えるときに 2.06m、乗るときに 1.13m 進む
+ * 遠いほうは「越えた先の床」(越える)。型は越えるときに 2.06m、乗るときに縁から VAULT_UP_ONTO だけ乗った所まで進む
  */
 const VAULT_LANDING_NEAR = 0.8
+/** 乗る型 (vault_up) に焼かれた前への移動 (m) */
+const VAULT_UP_BAKED = 1.13
+/**
+ * 乗った後、**縁からどれだけ上に入るか** (m、体の中心)。焼かれた通り 1.13m 進むと、体を付けて
+ * 乗った最初の一歩が大きすぎた (2026-10-23 本人「最初の一歩目デカすぎ、距離は 2/3 でいい」)。
+ * 一律に 2/3 (0.75m) にすると、少し離れて押した時に縁に届かず落ちたので、進む量は
+ * 縁までの距離 + これにする。体を付けて押せば 0.35 + 0.4 = 0.75m (2/3)
+ */
+const VAULT_UP_ONTO = 0.4
+/** 縁までの距離を探す刻み (m) */
+const VAULT_EDGE_STEP = 0.05
 const VAULT_LANDING_FAR = 1.3
 /**
  * 奥行きの浅い台に乗る時に見る、もっと手前の距離 (m、枠の上面を見つけた所から先)。**どちらも**
@@ -3137,7 +3148,8 @@ export class Soldier {
       this.vaultFromY = this.position.y
       this.vaultToY = ahead.landing
     }
-    this.animator?.playVault(ahead.kind === 'up')
+    // 乗る型は縁から VAULT_UP_ONTO 入った所まで進む
+    this.animator?.playVault(ahead.kind === 'up', (ahead.edge + VAULT_UP_ONTO) / VAULT_UP_BAKED)
     return true
   }
 
@@ -3148,7 +3160,7 @@ export class Soldier {
    * あればその上面が返り、無ければ床が返る (差 0)。壁なら線が壁の中から
    * 始まって床か 0 を返すので、跳べる高さには入らない。
    */
-  private vaultAhead(): { kind: 'over' | 'up'; landing: number; yaw: number; top: number } | null {
+  private vaultAhead(): { kind: 'over' | 'up'; landing: number; yaw: number; top: number; edge: number } | null {
     const world = this.lastWorld
     if (!world) return null
     const feetY = this.position.y
@@ -3198,6 +3210,15 @@ export class Soldier {
       }
     }
     if (Number.isNaN(top)) return null
+    // 縁までの距離 (体の中心から)。上の探し方は体の輪で見るので、点で手前から刻んで取り直す
+    let edge = reachAt
+    for (let d = 0; d < reachAt + PLAYER_RADIUS; d += VAULT_EDGE_STEP) {
+      probe.set(this.position.x + fx * d, feetY, this.position.z + fz * d)
+      if (okRise(world.groundHeight(probe, 0, allow))) {
+        edge = d
+        break
+      }
+    }
     // 枠の上に体が通る隙間
     if (world.ceilingHeight(probe, PLAYER_RADIUS, top) < top + VAULT_HEADROOM) return null
     /*
@@ -3232,7 +3253,7 @@ export class Soldier {
     const near = world.groundHeight(probe, PLAYER_RADIUS, allow)
     // 頭の上が塞がっていても**そこで諦めない** — 積んだ箱の 2 段目の下だった。他の候補 (下の奥行きの浅い台) を見る
     if (Math.abs(near - top) <= VAULT_SAME_LEVEL && world.ceilingHeight(probe, 0, near) >= near + PLAYER_HEIGHT) {
-      return { kind: 'up', landing: near, yaw, top }
+      return { kind: 'up', landing: near, yaw, top, edge }
     }
     // 無ければ越えた先の床。**低いのは構わない** (外へ跳び出すのも跳び越え)
     const farAt = reachAt + VAULT_LANDING_FAR
@@ -3243,7 +3264,7 @@ export class Soldier {
      * 見る。積んだ木箱 (1 段目の空いた所の奥行き 0.76m、その奥に 2 段目) では 0.8m 先がもう 2 段目の
      * 下で、乗れる床が無いと見て何も起きなかった。2 段目 (奥行き 0.79m) は奥が 2F の縁の外で、
      * 越えて地面へ跳び出すと読んで、当たりに押し戻された (2026-10-23 本人「wood の box に登れない」)。
-     * 前へ進む量は型のまま (1.13m) だが、奥の箱の面で当たりに止められる
+     * 前へ進む量 (0.75m、animation.ts の ROOT_DISTANCE_SCALE) が余っても、奥の箱の面で当たりに止められる
      */
     const shallow = (): number => {
       let landing = Number.NaN
@@ -3262,18 +3283,18 @@ export class Soldier {
       // 窓枠が薄く台と読まないので今まで通り
       if (far < feetY - VAULT_MAX) {
         const up = shallow()
-        if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top }
+        if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top, edge }
         probe.set(this.position.x + fx * farAt, feetY, this.position.z + fz * farAt)
       }
       if (world.ceilingHeight(probe, 0, feetY) < feetY + PLAYER_HEIGHT) return null
-      return { kind: 'over', landing: far, yaw, top }
+      return { kind: 'over', landing: far, yaw, top, edge }
     }
     if (Math.abs(far - top) <= VAULT_SAME_LEVEL && world.ceilingHeight(probe, 0, far) >= far + PLAYER_HEIGHT) {
-      return { kind: 'up', landing: far, yaw, top }
+      return { kind: 'up', landing: far, yaw, top, edge }
     }
     // 上の 2 か所で乗れる床が無ければ、手前の浅い台
     const up = shallow()
-    if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top }
+    if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top, edge }
     return null
   }
 
