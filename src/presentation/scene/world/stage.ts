@@ -170,6 +170,15 @@ const LOOKS: Record<'clear' | 'dusty' | 'night', Look> = {
   },
 }
 const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dusty', lab: 'dusty' }
+/**
+ * 日陰の明るさ (天空光 AMBIENT_INTENSITY) をステージごとに何倍にするか。無ければ 1。
+ *
+ * **UU は 2 倍 (2026-10-22 本人「このステージの影の部分はもっと明るくていい」)。** 灰色の
+ * コンクリートの塊と壁だけで、日陰の面が黒く沈んで形が読めなかった
+ */
+const STAGE_AMBIENT: Partial<Record<StageName, number>> = { uu: 2 }
+/** いまのステージの天空光の倍率。buildStage が決めて、buildLights が読む */
+let ambientScale = 1
 /** いまの場の見え方。buildStage が決めて、空・霧・光・映り込みがこれを読む */
 let look: Look = LOOKS.clear
 /** ?look=clear / dusty / night で試せる。試写 (stagecam) は look が視点なので ?mood= で */
@@ -1370,6 +1379,7 @@ function createGlassMaterial(): THREE.MeshStandardMaterial {
 export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   // 場の見え方を先に決める。空・霧・光 (buildLights は後から呼ばれる) がこれを読む
   look = lookFor(name)
+  ambientScale = STAGE_AMBIENT[name] ?? 1
   scene.add(buildSky())
   // フォグは空の地平線側と同じ色にする。違うと遠景が地平線で不自然に切れる。
   // 開始距離を遠くしてあるのは、近すぎると中距離の遮蔽物まで白んで索敵の判断材料が減るため。
@@ -1856,7 +1866,7 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   // これが日陰の明るさそのものになる。日陰は「光が無い場所」ではなく
   // 「直射が無く、空全体からの光だけが届く場所」なので、暗くはあっても黒くはならない。
   // 空の色と揃えてあるのは、青空の下の日陰が青みを帯びるのと同じ理屈。
-  const sky = new THREE.HemisphereLight(look.night?.ambientSky ?? look.horizon, look.ground, tuned('ambient', AMBIENT_INTENSITY) * (look.night?.ambientScale ?? 1))
+  const sky = new THREE.HemisphereLight(look.night?.ambientSky ?? look.horizon, look.ground, tuned('ambient', AMBIENT_INTENSITY * ambientScale) * (look.night?.ambientScale ?? 1))
   scene.add(sky)
   /*
    * **映り込みの環境。** 空の色の縦グラデーションを 1 枚、環境マップとして置く。
