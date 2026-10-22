@@ -1917,6 +1917,58 @@
 }
 },
 {
+"name": "concrete_wall2.005",
+"min": [
+10.933,
+3.886,
+30.668
+],
+"max": [
+17.501,
+6.593,
+30.818
+],
+"top": {
+"h": 6.5929,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.002",
+"min": [
+24.202,
+0.1,
+30.667
+],
+"max": [
+26.202,
+1.663,
+32.013
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
