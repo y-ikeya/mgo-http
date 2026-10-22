@@ -564,14 +564,14 @@
 {
 "name": "concrete_2F_ground",
 "min": [
-0.155,
+-15.873,
 3.6,
 -48.861
 ],
 "max": [
 40.654,
 3.9,
-28.479
+35.211
 ],
 "top": {
 "h": 3.9,
@@ -627,6 +627,59 @@
 "h": 19.4229,
 "dx": 0.0,
 "dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_cube",
+"min": [
+-2.715,
+3.855,
+30.567
+],
+"max": [
+11.307,
+5.355,
+34.613
+],
+"top": {
+"h": 5.3549,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
+"name": "concrete_stair8",
+"min": [
+11.27,
+3.9,
+30.67
+],
+"max": [
+17.5,
+5.35,
+33.9
+],
+"top": {
+"h": 5.4755,
+"dx": -0.22074,
+"dz": 0.0,
+"riser": 0.18,
+"foot": 3.9,
+"head": 5.53
 },
 "flags": {
 "draw": true,
