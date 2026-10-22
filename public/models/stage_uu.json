@@ -22,7 +22,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -47,7 +48,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -72,7 +74,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -100,7 +103,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -128,7 +132,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -136,15 +141,15 @@
 "min": [
 -15.776,
 3.9,
-8.353
+8.32
 ],
 "max": [
 -3.701,
-15.833,
+15.568,
 19.574
 ],
 "top": {
-"h": 15.8326,
+"h": 15.5678,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -153,7 +158,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -181,7 +187,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -209,7 +216,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -237,7 +245,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -265,7 +274,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -293,7 +303,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -321,7 +332,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -346,7 +358,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -374,7 +387,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -402,7 +416,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -427,7 +442,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -455,7 +471,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -483,7 +500,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -508,7 +526,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -533,7 +552,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -558,7 +578,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -583,7 +604,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -608,7 +630,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -633,7 +656,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -661,7 +685,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -686,7 +711,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -711,7 +737,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -736,7 +763,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -761,23 +789,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
 "name": "metal_ladder_3",
 "min": [
 -21.965,
-8.51,
+8.2,
 2.439
 ],
 "max": [
 -21.247,
-17.337,
+17.027,
 2.479
 ],
 "top": {
-"h": 17.337,
+"h": 17.027,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -786,7 +815,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -811,7 +841,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -836,7 +867,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -861,7 +893,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -886,7 +919,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -911,7 +945,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -936,7 +971,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -961,7 +997,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -986,7 +1023,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1011,7 +1049,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1036,7 +1075,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1061,7 +1101,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1086,7 +1127,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1111,7 +1153,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1136,7 +1179,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1161,7 +1205,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1186,7 +1231,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1211,23 +1257,24 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
 "name": "vis_metal_laddertop3_noeye",
 "min": [
 -21.965,
-17.317,
+16.875,
 2.439
 ],
 "max": [
 -21.247,
-18.057,
+17.615,
 2.479
 ],
 "top": {
-"h": 18.057,
+"h": 17.6154,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1236,7 +1283,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1261,7 +1309,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1286,7 +1335,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1311,7 +1361,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1336,7 +1387,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1361,7 +1413,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1386,7 +1439,8 @@
 "player": false,
 "bullet": false,
 "eye": false,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -1411,7 +1465,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1436,7 +1491,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1461,15 +1517,16 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
 "name": "concrete_wall2.002",
 "min": [
--12.072,
+-7.666,
 3.888,
-5.82
+8.268
 ],
 "max": [
 11.239,
@@ -1486,7 +1543,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1511,7 +1569,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1536,20 +1595,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
 "name": "concrete_wall2.004",
 "min": [
-18.044,
+20.492,
 3.888,
 -46.161
 ],
 "max": [
 20.69,
 5.188,
--39.051
+-40.395
 ],
 "top": {
 "h": 5.1881,
@@ -1561,7 +1621,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1586,7 +1647,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1611,25 +1673,26 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
 "name": "concrete_cube.009",
 "min": [
--20.464,
+-20.298,
 16.771,
 2.584
 ],
 "max": [
--18.406,
+-18.24,
 17.202,
 19.806
 ],
 "top": {
 "h": 16.8694,
 "dx": 0.163,
-"dz": 0.0,
+"dz": -0.0,
 "thick": 0.1013
 },
 "flags": {
@@ -1637,7 +1700,34 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_fence1_nobullet_noeye_nocamera_blockthrow",
+"min": [
+29.293,
+3.9,
+-36.684
+],
+"max": [
+29.353,
+5.9,
+2.604
+],
+"top": {
+"h": 5.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": true
 }
 },
 {
@@ -1662,7 +1752,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1687,7 +1778,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 }
 ],
@@ -1726,12 +1818,12 @@
 "name": "metal_ladder_3",
 "min": [
 -21.965,
-8.51,
+8.2,
 2.439
 ],
 "max": [
 -21.247,
-17.337,
+17.027,
 2.479
 ],
 "axis": "z",
