@@ -1390,6 +1390,31 @@
 }
 },
 {
+"name": "concrete_wall",
+"min": [
+-15.478,
+3.9,
+-33.17
+],
+"max": [
+0.171,
+6.7,
+-17.356
+],
+"top": {
+"h": 6.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -17.086,
