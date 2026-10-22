@@ -1555,13 +1555,22 @@ for obj in bpy.context.scene.objects:
 # --- ターゲット (TSNE) ---------------------------------------------------------
 #
 # **名前が target で始まる空 (target1 / target2) がターゲットの置き場所。** 守る側の基地に近い
-# ほうが使われる (domain/match/target.ts)。高さは基地と同じく真下の床の天面に落とす
+# ほうが使われる (domain/match/target.ts)。高さは基地と同じく真下の床の天面に落とす。
+# 基地の印 (meta_base*) と同じく **meta_ を前に付けた名前 (meta_target1) も受ける** (UU はこちらで置いた)
 tsne_targets = []
 for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
-    if obj.type != 'EMPTY' or not obj.name.lower().startswith('target'):
+    lower = obj.name.lower()
+    if obj.type != 'EMPTY' or not (lower.startswith('target') or lower.startswith('meta_target')):
         continue
     x, y, z = to_gltf(obj.matrix_world.translation)
-    floor = floor_under(x, y, z)
+    # **床は本物の形へ真下に線を引いて取る** (工具箱と同じ)。箱の天面 (floor_under) では、屋上が 2 段の
+    # 建物 (UU の building5) を坂と読み違えた天面で見て、その上の別の箱 (2F の壁の外枠) の高さに置いた
+    for other in bpy.context.scene.objects:
+        if other.hide_get():
+            other.hide_set(False)
+    at = obj.matrix_world.translation
+    hit, where, *_ = bpy.context.scene.ray_cast(bpy.context.evaluated_depsgraph_get(), at + Vector((0, 0, 1.0)), Vector((0, 0, -1.0)))
+    floor = where.z if hit else floor_under(x, y, z)
     tsne_targets.append({'name': obj.name, 'x': round(x, 2), 'y': round(floor if floor is not None else y, 2), 'z': round(z, 2)})
     print(f'  ターゲット {obj.name}: ({x:.1f}, {tsne_targets[-1]["y"]:.1f}, {z:.1f})')
 
