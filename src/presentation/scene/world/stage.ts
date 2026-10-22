@@ -1954,13 +1954,13 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
   sun.shadow.autoUpdate = false
   sun.shadow.needsUpdate = true
   /*
-   * 影マップの画素数。
+   * 影マップの画素数。**2048** (2026-10-22 本人「影の細かさを 2048 に、なんなら 1024 でもいい」)。
    *
-   * 範囲を 45 から 65 へ広げたぶん、2048 のままだと 1m あたり 22.8 画素から
-   * 15.8 画素へ落ちる。4096 にすれば 31.5 画素で、**広げた上で前より細かい**。
-   * 1 枚だけなので、増えるのは 16MB ほど。
+   * 4096 だった (範囲を 45 → 65m に広げた時に上げた)。焼くのは 1 度なので毎フレームの重さは
+   * 変わらないが、GPU の上で 64MB → 16MB に減る。1 画素は UU で 7cm、city で 11cm と粗くなる。
+   * 縁のぼかし (PCF) の拾う点の数は細かさに依らないので、画面の重さも変わらない
    */
-  sun.shadow.mapSize.set(4096, 4096)
+  sun.shadow.mapSize.set(2048, 2048)
   /*
    * 影の自己遮蔽 (アクネ) を避ける。**設定していなかった。**
    *
@@ -2001,7 +2001,7 @@ export function buildLights(scene: THREE.Scene): THREE.DirectionalLight {
  * 枠の縁は光の向きに沿った直線で、地面の上では**斜めの線**として見えた
  * (縁の内側は影マップの丸めで僅かに暗く、外側は影が無い)。
  *
- * 枠を広げると 1m あたりの画素は落ちる (4096 / 幅)。city で 20 画素前後。
+ * 枠を広げると 1m あたりの画素は落ちる (2048 / 幅)。city で 9 画素前後。
  * これ以上広いステージになったら分割 (カスケード) を考える。
  */
 export function fitShadowToStage(sun: THREE.DirectionalLight, stage: Stage): void {

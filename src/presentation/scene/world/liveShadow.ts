@@ -10,7 +10,7 @@ import type { Node } from 'three/webgpu'
  * 「太陽との間に体があるか」を見るので、縁では足の側が上の床に、上の側が下の階に落ちる。
  *
  * --- 影の地図を 2 枚に分ける ---
- * 街の影の地図 (4096²、ステージ全体) は 1 度だけ焼く (staticShadow.ts)。毎フレーム描き直すと、
+ * 街の影の地図 (2048²、ステージ全体) は 1 度だけ焼く (staticShadow.ts)。毎フレーム描き直すと、
  * 街を 1 つにまとめても (三角 52 万) city で 120 → 55fps に落ちた。
  *
  * 人の影は**別の小さな地図** (MOVING_MAP_SIZE²、自分の周り MOVING_RADIUS m) に、人だけを毎フレーム
@@ -27,8 +27,8 @@ export const LIVE_PLAYER_SHADOWS = true
 
 /** 人の影の地図が写す範囲 (自分から m)。この外の人は影を落とさない */
 const MOVING_RADIUS = 30
-/** 人の影の地図の画素数。60m を 2048 で 1 画素 2.9cm (街の地図とほぼ同じ細かさ) */
-const MOVING_MAP_SIZE = 2048
+/** 人の影の地図の画素数。60m を 1024 で 1 画素 5.9cm (街の地図 2048 とほぼ同じ細かさ、2026-10-22 本人) */
+const MOVING_MAP_SIZE = 1024
 
 /** 街・置いた物。**動かない**ので街の地図に焼く (置いた / 消えた時に焼き直す、staticShadow.ts) */
 export function castStaticShadow(root: THREE.Object3D): void {
