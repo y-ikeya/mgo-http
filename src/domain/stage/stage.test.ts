@@ -63,6 +63,15 @@ describe('部屋の割り当て', () => {
     expect(nextStage(ROOMS.echo.stages, null, 0)).toBe('training')
   })
 
+  test('**bravo と charlie は試合ごとに city と UU を交互に。** 最初の試合は city', () => {
+    for (const room of ['bravo', 'charlie'] as const) {
+      const first = nextStage(ROOMS[room].stages, null, 0.5)
+      const second = nextStage(ROOMS[room].stages, first, 0.5)
+      const third = nextStage(ROOMS[room].stages, second, 0.5)
+      expect([first, second, third]).toEqual(['city', 'uu', 'city'])
+    }
+  })
+
   test('全部の部屋に表がある', () => {
     for (const room of ROOM_NAMES) {
       expect(ROOMS[room].stages.stages.length).toBeGreaterThan(0)

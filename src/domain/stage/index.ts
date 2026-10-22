@@ -7,7 +7,7 @@
  * ステージをどんな順で回すかを決める」だからで、そこへ向かうときに
  * 「欄を表に変える」改修を後からやると、読む側が全部変わる。
  *
- *     いま      各部屋 stages が 1 枚の fixed
+ *     いま      ほとんどの部屋は 1 枚の fixed。bravo / charlie は city と UU を試合ごとに交互 (cycle)
  *     この先    部屋を作るときに stages と order を選ばせる
  *
  * 変わるのは ROOMS を作る場所だけで済むようにしてある。
@@ -493,9 +493,14 @@ export interface Rotation {
   order: RotationOrder
 }
 
-/** 1 枚だけを回す。いまの部屋は全部これ */
+/** 1 枚だけを回す */
 export function only(stage: StageName): Rotation {
   return { stages: [stage], order: 'fixed' }
+}
+
+/** 並べた順に 1 試合ずつ回す。部屋ができて最初の試合は先頭 */
+export function cycle(...stages: StageName[]): Rotation {
+  return { stages, order: 'cycle' }
 }
 
 /**

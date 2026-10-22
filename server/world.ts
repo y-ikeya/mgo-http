@@ -89,8 +89,7 @@ export interface RoomWorld extends Match {
    * ステージを回すようになった時点で、それは「どの部屋も同じ地形」を
    * 前提にした形だった。
    *
-   * 回す表 (domain/stage) から選び直すのは試合の切れ目で、
-   * いまはどの部屋も 1 枚だけの fixed なので変わらない。
+   * 回す表 (domain/stage) から選び直すのは試合の切れ目 (rotateStage)。
    */
   stage: Terrain
 }
@@ -149,6 +148,19 @@ export function roomOf(name: RoomName, key: string = name): RoomWorld {
     rooms.set(key, room)
   }
   return room
+}
+
+/**
+ * **試合の切れ目でステージを回す** (部屋の回す表。1 枚だけの部屋は変わらない)。
+ *
+ * 結果を見せ終えた所 (over の終わり) で呼ぶ。配る試合の状態 (match) にステージが載るので、
+ * 画面はそれを見て暗転して組み直す (screens/Play.tsx)。人は次の支度で新しい基地へ立つ
+ */
+export function rotateStage(room: RoomWorld): void {
+  const next = nextStage(ROOMS[room.name].stages, room.stage.name, Math.random())
+  if (next === room.stage.name) return
+  room.stage = terrainOf(next)
+  console.log(`[部屋] ${room.key}: 次の試合は ${next}`)
 }
 
 /** 部屋の全員へ。except を渡すとその 1 人を除く */

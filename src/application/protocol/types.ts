@@ -1,6 +1,6 @@
 import type { Locomotion } from '../../domain/player/locomotion'
 import type { HitZone } from '../../domain/rule/damage'
-import type { Surface } from '../../domain/stage'
+import type { StageName, Surface } from '../../domain/stage'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import type { HeldId } from '../../domain/item/held'
 import type { Life } from '../../domain/player/lifecycle'
@@ -1139,6 +1139,11 @@ export interface MatchMessage {
   matchId?: string
   /** その部屋のルール。陣営で分かれるか、何を表示するかがこれで決まる */
   mode: Mode
+  /**
+   * いま乗っているステージ。**試合の切れ目で変わる** (部屋の回す表、domain/match/room.ts)。
+   * 手元の地形と違えば、画面は暗転して組み直す (screens/Play.tsx)
+   */
+  stage: StageName
   /**
    * いま 1 位の人 (個人戦だけ)。**この人は光って位置が漏れる。**
    *

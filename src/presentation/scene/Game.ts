@@ -1317,6 +1317,10 @@ export class Game {
 
   /** 乗っているステージ。**部屋が決める** (ROOMS) */
   private readonly stageName: StageName;
+  /** 乗っているステージ。画面がサーバーの配るステージと比べて、違えば組み直す */
+  get currentStage(): StageName {
+    return this.stageName;
+  }
   /**
    * 持ち込める主武器。**部屋が決める** (ROOMS の primaries)。
    *
@@ -1336,7 +1340,11 @@ export class Game {
   /**
    * @param privateRoom 自分だけの部屋に入る (練習 /training)。他の人とは出会わない
    */
-  constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false) {
+  /**
+   * @param stage 乗るステージ。**試合の切れ目でサーバーが替えた時に渡す** (screens/Play.tsx が組み直す)。
+   *   無ければ部屋の回す表の先頭
+   */
+  constructor(container: HTMLElement, identity: Identity, room: string, privateRoom = false, stage?: StageName) {
     // 倒れた体が下がる時、壁で止める。カメラと同じ網で見る (表裏を問わない)
     setSlideBlocker((origin, dir, max) => this.cameraWorld.distanceToObstruction(origin, dir, max));
     // 前回選んだ感度から始める
@@ -1362,12 +1370,13 @@ export class Game {
      * サーバーに訊かないのは、画面を組み始める時点でまだ 1 通も届いていない
      * ため。同じ表をこちらも読むので食い違わない。
      *
-     * **試合ごとに切り替えるようになったら、ここがサーバーからの通に変わる**
-     * (回す表は既に domain/stage に在る)。そのときは地形を
-     * 読み直す道が要る。
+     * **試合ごとに切り替わる部屋では、サーバーが配る試合の状態 (match) に今のステージが載る。**
+     * 手元と違えば画面が暗転して、そのステージを渡して作り直す (screens/Play.tsx)。
+     * 地形を差し替える道を Game の中に持たないのは、地形を前提に組んだ物 (当たり・影・
+     * 空・音・人) が多く、捨てて作り直すほうが取りこぼしが無いため
      */
     this.stageName = STAGES[
-      isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall'
+      stage ?? (isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall')
     ].name;
     this.roomName = isRoomName(room) ? room : null;
     this.primaries = isRoomName(room) ? primariesOf(room) : CHOICES.primary;

@@ -37,7 +37,7 @@ import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
-import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, setLife } from './world'
+import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, rotateStage, setLife } from './world'
 import { forgetPoses, recordPose } from './history'
 
 /** 1 試合の長さ (ms) */
@@ -375,7 +375,7 @@ export function decideWinner(room: Match): Team | 'draw' {
   return room.blue === room.red ? 'draw' : room.blue > room.red ? 'blue' : 'red'
 }
 
-export function matchState(room: Match): ServerMessage {
+export function matchState(room: RoomWorld): ServerMessage {
   // **光っている人**を送る。1 位かどうかではなく、位置が公になっているか
   const leader = leakingOf(room)
   return {
@@ -383,6 +383,7 @@ export function matchState(room: Match): ServerMessage {
     // いま走っている試合の札。URL と戦績の表で同じ物を指す
     matchId: room.matchId ?? undefined,
     mode: room.mode.id,
+    stage: room.stage.name,
     leader: leader?.id,
     blue: room.blue,
     red: room.red,
@@ -734,6 +735,8 @@ export function updateMatch(room: RoomWorld, now: number): void {
   // ここを人数で割り込ませると、不戦勝を出した次の刻みで待ちへ落ちて、
   // 勝ったことが画面に出ないまま消える
   if (room.phase === 'over') {
+    // 結果を見せ終えた。**次の試合は回す表の次のステージで** (TSNE は 2 ラウンドで 1 試合)
+    if (now >= room.endsAt) rotateStage(room)
     if (now < room.endsAt) {
       // まだ見せている最中
     } else if (enough) {
