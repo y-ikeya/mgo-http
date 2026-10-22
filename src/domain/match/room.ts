@@ -213,13 +213,13 @@ const TSNE_ARMORY: Record<Side, Armory> = {
 }
 
 export const ROOMS: Record<RoomName, RoomSpec> = {
-  // UU を作っている間は UU で試す (2026-10-21 本人)。できたら city と交互に回す
-  alpha: { mode: 'DM', stages: only('uu') },
+  alpha: { mode: 'DM', stages: only('city') },
   bravo: { mode: 'TDM', stages: only('city') },
   charlie: { mode: 'TSNE', stages: only('city'), armory: TSNE_ARMORY, lives: 0 },
   delta: {
     mode: 'TDM',
-    stages: only('raft'),
+    // 砂部屋は UU (2026-10-22 本人)。筏 (raft) は練習で作ったもので、いまはどの部屋でも使わない
+    stages: only('uu'),
     note: '砂部屋',
     /*
      * **狙撃銃だけ。** 副武器も外すので、詰められたらナイフしか残らない。
