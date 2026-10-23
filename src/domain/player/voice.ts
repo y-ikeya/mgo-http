@@ -17,6 +17,7 @@ export const VOICE_LINES = [
   { id: 'grenade', label: 'グッグレネード！', sound: 'voiceGrenade' },
   { id: 'stomach', label: 'うぅ...お腹痛い...', sound: 'voiceStomach' },
   { id: 'sumimasen', label: 'すみません', sound: 'voiceSumimasen' },
+  { id: 'nn', label: 'ん？', sound: 'voiceNn' },
 ] as const
 
 export type VoiceId = (typeof VOICE_LINES)[number]['id']
@@ -27,7 +28,7 @@ export type VoiceId = (typeof VOICE_LINES)[number]['id']
  */
 export const VOICE_CATEGORIES = [
   { id: 'greet', label: '挨拶', lines: ['goodluck', 'matane', 'yolo', 'sumimasen'] },
-  { id: 'surprise', label: '驚き', lines: ['shinukato', 'grenade'] },
+  { id: 'surprise', label: '驚き', lines: ['shinukato', 'grenade', 'nn'] },
   { id: 'taunt', label: '煽り', lines: ['sesshou'] },
   { id: 'other', label: 'その他', lines: ['stomach'] },
 ] as const satisfies readonly { id: string; label: string; lines: readonly VoiceId[] }[]

@@ -456,6 +456,8 @@ const UI_SOUNDS = {
   voiceGrenade: { file: "voice_grenade1.mp3", volume: 0.45 },
   voiceStomach: { file: "voice_stomach1.mp3", volume: 0.45 },
   voiceSumimasen: { file: "voice_sumimasen1.mp3", volume: 0.45 },
+  // 素材のピークが他の声より 5dB 低い (-5.5dB / 他は -0.3dB)。ファイルは本人のまま、ここで揃える
+  voiceNn: { file: "voice_nn1.mp3", volume: 0.8 },
   /** 持ち物の一覧が出た。**押さえ続けて出るので、出た瞬間が要る** */
   browse: { file: "clang1.mp3", volume: 0.55 },
   /** 一覧の上下で選び目が動いた。1 段ごとに 1 回 */
