@@ -380,11 +380,11 @@ const UU: StageSpec = {
     blue: { x: -13.33, z: 33.12, y: 0.1 },
     red: { x: 29.93, z: -16.04, y: 0.1 },
   },
-  // blend の空 meta_target1 (building1 の屋上) / meta_target2 (building3 の屋上、赤の陣地の近く)。
+  // blend の空 meta_target1 (building1 の屋上) / meta_target2 (building_white の屋上、赤の陣地の近く)。
   // 控えが無いと、json を読まない時 (地形なしの試験) に UU の TSNE でターゲットが出なかった
   tsneTargets: [
-    { x: -7.91, z: 11.88, y: 15.57 },
-    { x: 9.61, z: -17.21, y: 19.05 },
+    { x: -7.91, z: 11.88, y: 14.38 },
+    { x: 9.61, z: -17.21, y: 18.24 },
   ],
   solo: [
     { x: -13.33, z: 33.12, y: 0.1 },
