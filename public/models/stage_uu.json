@@ -4058,19 +4058,19 @@
 }
 },
 {
-"name": "concrete_cube.010",
+"name": "concrete_roof",
 "min": [
--14.094,
-15.874,
-12.371
+-12.571,
+7.597,
+15.619
 ],
 "max": [
--12.447,
-16.306,
-26.148
+-8.082,
+8.369,
+17.338
 ],
 "top": {
-"h": 16.3057,
+"h": 8.3692,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4212,6 +4212,32 @@
 "eye": false,
 "camera": false,
 "thrown": false
+}
+},
+{
+"name": "concrete_roof.001",
+"min": [
+2.399,
+7.597,
+16.356
+],
+"max": [
+6.888,
+8.369,
+18.075
+],
+"top": {
+"h": 8.3692,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
 }
 },
 {
