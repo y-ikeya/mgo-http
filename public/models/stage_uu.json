@@ -954,16 +954,16 @@
 "name": "concrete_cube.005",
 "min": [
 20.063,
-11.047,
+11.648,
 -18.486
 ],
 "max": [
 20.861,
-11.227,
+11.828,
 -9.851
 ],
 "top": {
-"h": 11.2274,
+"h": 11.8281,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1058,16 +1058,16 @@
 "name": "metal_ladder_7",
 "min": [
 20.937,
-3.9,
+3.876,
 -11.293
 ],
 "max": [
 20.977,
-11.557,
+11.865,
 -10.574
 ],
 "top": {
-"h": 11.557,
+"h": 11.8647,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1084,16 +1084,16 @@
 "name": "metal_ladder_8",
 "min": [
 20.13,
-11.227,
+11.741,
 -17.431
 ],
 "max": [
 20.17,
-18.569,
+18.656,
 -16.713
 ],
 "top": {
-"h": 18.569,
+"h": 18.6557,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1370,16 +1370,16 @@
 "name": "vis_metal_laddertop7_noeye",
 "min": [
 20.937,
-11.537,
+11.889,
 -11.293
 ],
 "max": [
 20.977,
-12.277,
+12.629,
 -10.574
 ],
 "top": {
-"h": 12.277,
+"h": 12.6286,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3770,6 +3770,110 @@
 }
 },
 {
+"name": "wood_box_box2_box_nouv.021",
+"min": [
+-6.948,
+0.929,
+34.001
+],
+"max": [
+-5.933,
+1.756,
+34.792
+],
+"top": {
+"h": 1.7564,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.022",
+"min": [
+-5.931,
+0.929,
+34.001
+],
+"max": [
+-4.917,
+1.756,
+34.792
+],
+"top": {
+"h": 1.7564,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.023",
+"min": [
+-6.948,
+0.1,
+33.999
+],
+"max": [
+-5.933,
+0.927,
+34.79
+],
+"top": {
+"h": 0.9272,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.024",
+"min": [
+-5.931,
+0.1,
+33.999
+],
+"max": [
+-4.917,
+0.927,
+34.79
+],
+"top": {
+"h": 0.9272,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
@@ -3809,6 +3913,344 @@
 ],
 "top": {
 "h": 0.4004,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_a_south",
+"min": [
+6.26,
+0.1,
+-12.48
+],
+"max": [
+13.76,
+0.97,
+-12.43
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_a_north",
+"min": [
+6.26,
+0.1,
+-13.83
+],
+"max": [
+13.76,
+0.97,
+-13.78
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_crank_south",
+"min": [
+13.71,
+0.1,
+-12.18
+],
+"max": [
+15.41,
+0.97,
+-12.13
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_crank_north",
+"min": [
+13.71,
+0.1,
+-16.34
+],
+"max": [
+15.41,
+0.97,
+-16.29
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_crank_west_s",
+"min": [
+13.71,
+0.1,
+-12.48
+],
+"max": [
+13.76,
+0.97,
+-12.13
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_crank_west_n",
+"min": [
+13.71,
+0.1,
+-16.34
+],
+"max": [
+13.76,
+0.97,
+-13.78
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_crank_east_s",
+"min": [
+15.36,
+0.1,
+-14.69
+],
+"max": [
+15.41,
+0.97,
+-12.13
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_crank_east_n",
+"min": [
+15.36,
+0.1,
+-16.34
+],
+"max": [
+15.41,
+0.97,
+-15.99
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_b_south",
+"min": [
+15.36,
+0.1,
+-14.69
+],
+"max": [
+29.9,
+0.97,
+-14.64
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_b_north",
+"min": [
+15.36,
+0.1,
+-16.04
+],
+"max": [
+29.9,
+0.97,
+-15.99
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_a_top",
+"min": [
+6.26,
+0.92,
+-13.83
+],
+"max": [
+13.76,
+0.97,
+-12.43
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_crank_top",
+"min": [
+13.71,
+0.92,
+-16.34
+],
+"max": [
+15.41,
+0.97,
+-12.13
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct_b_top",
+"min": [
+15.36,
+0.92,
+-16.04
+],
+"max": [
+29.9,
+0.97,
+-14.64
+],
+"top": {
+"h": 0.97,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3917,12 +4359,12 @@
 "name": "metal_ladder_7",
 "min": [
 20.937,
-3.9,
+3.876,
 -11.293
 ],
 "max": [
 20.977,
-11.557,
+11.865,
 -10.574
 ],
 "axis": "x",
@@ -3932,12 +4374,12 @@
 "name": "metal_ladder_8",
 "min": [
 20.13,
-11.227,
+11.741,
 -17.431
 ],
 "max": [
 20.17,
-18.569,
+18.656,
 -16.713
 ],
 "axis": "x",
