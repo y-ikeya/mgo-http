@@ -4262,6 +4262,84 @@
 "camera": true,
 "thrown": true
 }
+},
+{
+"name": "metal_duct2_south",
+"min": [
+-4.926,
+0.1,
+36.32
+],
+"max": [
+18.015,
+0.97,
+36.37
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct2_north",
+"min": [
+-4.926,
+0.1,
+34.97
+],
+"max": [
+18.015,
+0.97,
+35.02
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_duct2_top",
+"min": [
+-4.926,
+0.92,
+34.97
+],
+"max": [
+18.015,
+0.97,
+36.37
+],
+"top": {
+"h": 0.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
 }
 ],
 "ladders": [
