@@ -1,5 +1,6 @@
 import { SKY_FLOOR } from './skylight'
 import { addMovingShadow, castStaticShadow, STATIC_SHADOW_LAYER } from './liveShadow'
+import { instanceRepeats } from './instancing'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
 import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
@@ -1833,6 +1834,13 @@ async function replaceWithModel(
     console.warn('[Stage] stage.glb にメッシュが無い。ブロックアウトのまま続行する')
     return false
   }
+
+  // 土嚢・木箱は同じ形をまとめて 1 回で描く。元の物は判定のために見えないまま残す
+  instanceRepeats(model, (mesh) => {
+    let name = mesh.name
+    for (let up = mesh.parent; up && up !== model; up = up.parent) name = `${up.name}/${name}`
+    return name
+  })
 
   // 描画だけのモデル (vis_ ばかりの環境など) でも表示はする。
   // 判定が 0 個でも「読めていない」わけではない。
