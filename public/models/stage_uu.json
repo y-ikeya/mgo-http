@@ -4058,6 +4058,163 @@
 }
 },
 {
+"name": "concrete_cube.010",
+"min": [
+-14.094,
+15.874,
+12.371
+],
+"max": [
+-12.447,
+16.306,
+26.148
+],
+"top": {
+"h": 16.3057,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_handrail6_notexture",
+"min": [
+-12.552,
+3.9,
+16.498
+],
+"max": [
+-4.91,
+4.97,
+28.127
+],
+"top": {
+"h": 4.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail39_nobullet_noeye_nocamera",
+"min": [
+-12.575,
+3.9,
+16.52
+],
+"max": [
+-12.485,
+4.95,
+28.105
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail40_nobullet_noeye_nocamera",
+"min": [
+-12.53,
+3.9,
+28.06
+],
+"max": [
+-10.034,
+4.95,
+28.15
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail41_nobullet_noeye_nocamera",
+"min": [
+-10.079,
+3.9,
+19.45
+],
+"max": [
+-9.989,
+4.95,
+28.105
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_handrail42_nobullet_noeye_nocamera",
+"min": [
+-4.977,
+3.9,
+19.62
+],
+"max": [
+-4.887,
+4.95,
+24.51
+],
+"top": {
+"h": 4.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
