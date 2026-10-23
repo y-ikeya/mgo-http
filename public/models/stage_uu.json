@@ -1945,12 +1945,12 @@
 {
 "name": "defaultMaterial.002",
 "min": [
-19.162,
+19.244,
 0.1,
 24.399
 ],
 "max": [
-21.162,
+21.244,
 1.663,
 25.746
 ],
@@ -4228,6 +4228,188 @@
 ],
 "top": {
 "h": 8.3692,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.029",
+"min": [
+18.206,
+0.914,
+24.566
+],
+"max": [
+19.22,
+1.741,
+25.357
+],
+"top": {
+"h": 1.7414,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.030",
+"min": [
+18.202,
+2.538,
+24.552
+],
+"max": [
+19.216,
+3.366,
+25.343
+],
+"top": {
+"h": 3.3656,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.031",
+"min": [
+21.272,
+0.1,
+24.566
+],
+"max": [
+22.286,
+0.927,
+25.357
+],
+"top": {
+"h": 0.9272,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.032",
+"min": [
+18.197,
+1.716,
+24.554
+],
+"max": [
+19.211,
+2.543,
+25.345
+],
+"top": {
+"h": 2.5429,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.033",
+"min": [
+18.206,
+0.914,
+25.362
+],
+"max": [
+19.22,
+1.741,
+26.153
+],
+"top": {
+"h": 1.7414,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.034",
+"min": [
+18.202,
+0.087,
+25.347
+],
+"max": [
+19.216,
+0.914,
+26.139
+],
+"top": {
+"h": 0.9142,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.035",
+"min": [
+18.197,
+1.716,
+25.35
+],
+"max": [
+19.211,
+2.543,
+26.141
+],
+"top": {
+"h": 2.5429,
 "dx": 0.0,
 "dz": 0.0
 },
