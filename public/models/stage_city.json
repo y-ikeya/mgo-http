@@ -22,7 +22,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -47,7 +48,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -72,7 +74,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -97,7 +100,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -122,7 +126,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -147,7 +152,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -172,7 +178,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -197,7 +204,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -222,7 +230,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -247,7 +256,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -272,7 +282,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -297,7 +308,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -322,7 +334,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -347,7 +360,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -372,7 +386,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -397,7 +412,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -422,7 +438,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -447,7 +464,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -472,7 +490,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -497,23 +516,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
 "name": "concrete_building11.001",
 "min": [
 -25.11,
--8.096,
+9.636,
 -51.868
 ],
 "max": [
 -16.212,
-18.394,
+18.938,
 -44.15
 ],
 "top": {
-"h": 18.3943,
+"h": 18.938,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -522,7 +542,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -547,7 +568,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -572,7 +594,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -597,7 +620,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -622,7 +646,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -647,7 +672,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -672,7 +698,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -697,7 +724,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -722,7 +750,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -747,7 +776,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -772,7 +802,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -797,7 +828,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -822,7 +854,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -838,9 +871,9 @@
 -25.67
 ],
 "top": {
-"h": 10.1984,
+"h": 10.2022,
 "dx": 0.0,
-"dz": 0.37053,
+"dz": 0.35621,
 "riser": 0.15,
 "foot": 10.06,
 "head": 11.71
@@ -850,7 +883,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -866,9 +900,9 @@
 -25.897
 ],
 "top": {
-"h": 13.335,
+"h": 13.2768,
 "dx": 0.0,
-"dz": -0.37053,
+"dz": -0.35621,
 "riser": 0.15,
 "foot": 11.6,
 "head": 13.25
@@ -878,7 +912,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -903,7 +938,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -919,9 +955,9 @@
 -25.67
 ],
 "top": {
-"h": 13.2345,
+"h": 13.2384,
 "dx": 0.0,
-"dz": 0.37053,
+"dz": 0.35621,
 "riser": 0.15,
 "foot": 13.1,
 "head": 14.75
@@ -931,7 +967,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -947,9 +984,9 @@
 -25.897
 ],
 "top": {
-"h": 16.2081,
+"h": 16.1499,
 "dx": 0.0,
-"dz": -0.37053,
+"dz": -0.35621,
 "riser": 0.15,
 "foot": 14.47,
 "head": 16.12
@@ -959,7 +996,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -984,7 +1022,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1009,7 +1048,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1034,7 +1074,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1059,7 +1100,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1084,7 +1126,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1109,7 +1152,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1134,7 +1178,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1159,7 +1204,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1184,7 +1230,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1209,7 +1256,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1234,23 +1282,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box",
+"name": "wood_box_nouv",
 "min": [
--18.818,
+-18.819,
 9.881,
 -13.25
 ],
 "max": [
 -17.714,
-11.035,
+11.036,
 -11.834
 ],
 "top": {
-"h": 11.0347,
+"h": 11.0364,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1259,20 +1308,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.001",
+"name": "wood_box_nouv.001",
 "min": [
 -17.437,
 9.973,
 -29.964
 ],
 "max": [
--16.114,
+-16.113,
 12.132,
--28.535
+-28.534
 ],
 "top": {
 "h": 12.1323,
@@ -1284,7 +1334,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1309,23 +1360,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.002",
+"name": "wood_box_nouv.002",
 "min": [
--18.818,
-10.992,
+-18.819,
+10.991,
 -13.25
 ],
 "max": [
 -17.714,
-12.145,
+12.147,
 -11.834
 ],
 "top": {
-"h": 12.1453,
+"h": 12.1468,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1334,23 +1386,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.003",
+"name": "wood_box_nouv.003",
 "min": [
-10.336,
+10.335,
 9.946,
 -22.236
 ],
 "max": [
 11.44,
-11.1,
+11.101,
 -20.82
 ],
 "top": {
-"h": 11.0997,
+"h": 11.1015,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1359,23 +1412,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.004",
+"name": "wood_box_nouv.004",
 "min": [
-10.336,
-11.057,
+10.335,
+11.056,
 -22.236
 ],
 "max": [
 11.44,
-12.21,
+12.212,
 -20.82
 ],
 "top": {
-"h": 12.2103,
+"h": 12.2118,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1384,23 +1438,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.005",
+"name": "wood_box_nouv.005",
 "min": [
--40.079,
+-40.08,
 15.9,
--25.315
+-25.284
 ],
 "max": [
 -38.975,
-16.859,
--24.046
+16.86,
+-24.015
 ],
 "top": {
-"h": 16.8588,
+"h": 16.8603,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1409,23 +1464,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.006",
+"name": "wood_box_nouv.006",
 "min": [
--40.079,
+-40.08,
 15.915,
--26.524
+-26.555
 ],
 "max": [
 -38.975,
-16.873,
--25.255
+16.875,
+-25.286
 ],
 "top": {
-"h": 16.8735,
+"h": 16.875,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1434,7 +1490,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1459,7 +1516,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1484,20 +1542,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.007",
+"name": "wood_box_nouv.007",
 "min": [
 -16.398,
 9.973,
 -36.031
 ],
 "max": [
--15.076,
+-15.074,
 12.132,
--34.923
+-34.922
 ],
 "top": {
 "h": 12.1323,
@@ -1509,20 +1568,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.008",
+"name": "wood_box_nouv.008",
 "min": [
--15.121,
+-15.122,
 9.973,
 -36.031
 ],
 "max": [
--13.799,
+-13.798,
 12.132,
--34.923
+-34.922
 ],
 "top": {
 "h": 12.1323,
@@ -1534,23 +1594,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.009",
+"name": "wood_box_nouv.009",
 "min": [
-12.688,
+12.682,
 9.936,
--32.868
+-32.863
 ],
 "max": [
-14.41,
-11.025,
--31.158
+14.404,
+11.026,
+-31.152
 ],
 "top": {
-"h": 11.0246,
+"h": 11.0262,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1559,23 +1620,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.010",
+"name": "wood_box_nouv.010",
 "min": [
-13.649,
+13.654,
 9.953,
--33.759
+-33.765
 ],
 "max": [
-15.37,
-11.041,
--32.049
+15.376,
+11.043,
+-32.054
 ],
 "top": {
-"h": 11.0412,
+"h": 11.0429,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1584,7 +1646,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -1609,23 +1672,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.011",
+"name": "wood_box_nouv.011",
 "min": [
 -5.499,
 10.143,
--10.181
+-10.182
 ],
 "max": [
 -4.597,
-11.297,
+11.299,
 -8.971
 ],
 "top": {
-"h": 11.2968,
+"h": 11.2986,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1634,23 +1698,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.012",
+"name": "wood_box_nouv.012",
 "min": [
 -5.22,
-11.254,
--10.204
+11.301,
+-10.205
 ],
 "max": [
 -4.317,
-12.407,
+12.456,
 -8.993
 ],
 "top": {
-"h": 12.4075,
+"h": 12.4559,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1659,48 +1724,51 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.013",
+"name": "wood_box_nouv.013",
 "min": [
 -9.212,
-9.922,
--5.233
+9.921,
+-5.235
 ],
 "max": [
--7.475,
+-7.474,
 11.408,
 -0.663
 ],
 "top": {
-"h": 11.4082,
-"dx": 0.0,
-"dz": 0.0
+"h": 11.351,
+"dx": -0.0,
+"dz": 0.01256,
+"thick": 1.4303
 },
 "flags": {
 "draw": true,
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.014",
+"name": "wood_box_nouv.014",
 "min": [
 -9.115,
-11.303,
--4.654
+11.41,
+-4.655
 ],
 "max": [
 -7.561,
-11.869,
+11.977,
 -3.441
 ],
 "top": {
-"h": 11.8691,
+"h": 11.9774,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1709,20 +1777,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.015",
+"name": "wood_box_nouv.015",
 "min": [
 -27.677,
 9.973,
 28.485
 ],
 "max": [
--26.355,
+-26.353,
 12.132,
-29.914
+29.915
 ],
 "top": {
 "h": 12.1323,
@@ -1734,20 +1803,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.016",
+"name": "wood_box_nouv.016",
 "min": [
 -36.729,
 9.955,
 6.639
 ],
 "max": [
--35.407,
+-35.405,
 12.114,
-8.069
+8.07
 ],
 "top": {
 "h": 12.1144,
@@ -1759,23 +1829,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.017",
+"name": "wood_box_nouv.017",
 "min": [
--48.146,
+-48.147,
 15.132,
 -23.96
 ],
 "max": [
 -47.042,
-15.971,
+15.973,
 -22.692
 ],
 "top": {
-"h": 15.9713,
+"h": 15.9726,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1784,23 +1855,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.018",
+"name": "wood_box_nouv.018",
 "min": [
--49.363,
+-49.376,
 12.865,
 -19.579
 ],
 "max": [
--48.205,
-13.687,
+-48.217,
+13.688,
 -18.31
 ],
 "top": {
-"h": 13.687,
+"h": 13.6883,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1809,23 +1881,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.019",
+"name": "wood_box_nouv.019",
 "min": [
--48.226,
+-48.215,
 12.868,
 -19.579
 ],
 "max": [
--47.068,
-13.69,
+-47.056,
+13.691,
 -18.31
 ],
 "top": {
-"h": 13.6902,
+"h": 13.6915,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1834,23 +1907,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.020",
+"name": "wood_box_nouv.020",
 "min": [
--49.405,
-13.619,
+-49.406,
+13.69,
 -19.606
 ],
 "max": [
 -48.247,
-14.441,
+14.513,
 -18.337
 ],
 "top": {
-"h": 14.441,
+"h": 14.5133,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1859,23 +1933,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.021",
+"name": "wood_box_nouv.021",
 "min": [
--23.636,
+-23.637,
 9.86,
 5.463
 ],
 "max": [
 -22.532,
-11.013,
+11.015,
 6.88
 ],
 "top": {
-"h": 11.0132,
+"h": 11.0149,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1884,23 +1959,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.022",
+"name": "wood_box_nouv.022",
 "min": [
--23.636,
+-23.637,
 10.97,
 5.463
 ],
 "max": [
 -22.532,
-12.124,
+12.125,
 6.88
 ],
 "top": {
-"h": 12.1238,
+"h": 12.1253,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1909,20 +1985,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.023",
+"name": "wood_box_nouv.023",
 "min": [
--22.256,
-9.947,
-10.109
+-22.305,
+9.946,
+10.177
 ],
 "max": [
--20.933,
+-20.981,
 12.106,
-11.538
+11.607
 ],
 "top": {
 "h": 12.106,
@@ -1934,20 +2011,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.024",
+"name": "wood_box_nouv.024",
 "min": [
--22.256,
-9.905,
-8.813
+-22.305,
+9.904,
+8.745
 ],
 "max": [
--20.933,
+-20.981,
 12.064,
-10.242
+10.175
 ],
 "top": {
 "h": 12.064,
@@ -1959,20 +2037,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.025",
+"name": "wood_box_nouv.025",
 "min": [
--21.028,
-9.905,
+-20.93,
+9.904,
 10.062
 ],
 "max": [
--19.705,
+-19.606,
 12.064,
-11.492
+11.493
 ],
 "top": {
 "h": 12.064,
@@ -1984,7 +2063,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2010,7 +2090,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2036,7 +2117,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2061,7 +2143,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2087,7 +2170,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2113,7 +2197,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2139,7 +2224,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2165,7 +2251,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2191,7 +2278,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2216,7 +2304,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2242,7 +2331,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2267,7 +2357,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2293,7 +2384,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2319,7 +2411,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2345,7 +2438,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2370,7 +2464,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2396,7 +2491,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2422,7 +2518,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2448,7 +2545,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2474,7 +2572,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2500,7 +2599,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2526,7 +2626,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2552,7 +2653,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2577,7 +2679,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2603,7 +2706,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2628,7 +2732,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2654,7 +2759,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2680,7 +2786,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2706,7 +2813,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2731,7 +2839,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2757,7 +2866,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2783,7 +2893,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2809,7 +2920,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2834,7 +2946,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2859,7 +2972,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2885,7 +2999,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2911,7 +3026,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2937,7 +3053,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2963,7 +3080,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -2989,7 +3107,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3015,7 +3134,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3041,7 +3161,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3067,7 +3188,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3093,7 +3215,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3118,7 +3241,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3144,7 +3268,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3170,7 +3295,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3196,7 +3322,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3222,7 +3349,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3248,20 +3376,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.026",
+"name": "wood_box_nouv.026",
 "min": [
 -8.164,
 9.84,
 9.411
 ],
 "max": [
--6.841,
+-6.84,
 11.999,
-10.84
+10.841
 ],
 "top": {
 "h": 11.9992,
@@ -3273,20 +3402,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.027",
+"name": "wood_box_nouv.027",
 "min": [
 -6.896,
 9.84,
 9.411
 ],
 "max": [
--5.574,
+-5.572,
 11.999,
-10.84
+10.841
 ],
 "top": {
 "h": 11.9992,
@@ -3298,7 +3428,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3323,7 +3454,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3348,7 +3480,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3373,7 +3506,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3398,7 +3532,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3424,7 +3559,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3449,7 +3585,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3475,7 +3612,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3501,7 +3639,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3527,7 +3666,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3553,7 +3693,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3579,7 +3720,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3604,7 +3746,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3630,7 +3773,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3655,7 +3799,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3681,7 +3826,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3706,7 +3852,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3732,7 +3879,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3758,7 +3906,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3784,7 +3933,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3810,7 +3960,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3836,7 +3987,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3862,7 +4014,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3887,7 +4040,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3913,7 +4067,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3938,7 +4093,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3964,7 +4120,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -3989,7 +4146,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4015,7 +4173,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4041,7 +4200,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4066,7 +4226,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4091,7 +4252,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4117,7 +4279,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4143,7 +4306,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4169,7 +4333,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4195,7 +4360,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4221,7 +4387,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4247,7 +4414,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4273,7 +4441,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4299,7 +4468,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4324,7 +4494,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4350,7 +4521,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4376,7 +4548,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4401,7 +4574,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4427,7 +4601,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4453,7 +4628,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4479,7 +4655,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4505,7 +4682,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4531,7 +4709,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4556,7 +4735,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4582,7 +4762,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4608,7 +4789,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4633,7 +4815,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4659,7 +4842,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4685,7 +4869,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4710,7 +4895,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4735,7 +4921,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4760,7 +4947,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4785,20 +4973,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.028",
+"name": "wood_box_nouv.028",
 "min": [
 -43.71,
-9.969,
+9.968,
 26.48
 ],
 "max": [
--42.386,
+-42.385,
 12.128,
-27.909
+27.91
 ],
 "top": {
 "h": 12.1284,
@@ -4810,7 +4999,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4835,7 +5025,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4860,7 +5051,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4885,7 +5077,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4910,7 +5103,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4935,7 +5129,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -4960,20 +5155,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.029",
+"name": "wood_box_nouv.029",
 "min": [
 -9.236,
 9.973,
 -45.741
 ],
 "max": [
--7.914,
+-7.912,
 12.132,
--44.634
+-44.633
 ],
 "top": {
 "h": 12.1323,
@@ -4985,20 +5181,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.030",
+"name": "wood_box_nouv.030",
 "min": [
 -7.96,
 9.973,
 -45.741
 ],
 "max": [
--6.637,
+-6.636,
 12.132,
--44.634
+-44.633
 ],
 "top": {
 "h": 12.1323,
@@ -5010,7 +5207,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5035,7 +5233,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5060,7 +5259,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5085,7 +5285,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5110,7 +5311,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5135,7 +5337,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5160,7 +5363,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5185,7 +5389,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5211,7 +5416,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5237,7 +5443,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5263,7 +5470,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5289,7 +5497,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5315,7 +5524,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5341,7 +5551,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5367,7 +5578,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5392,7 +5604,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5418,7 +5631,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5443,7 +5657,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5469,7 +5684,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5495,7 +5711,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5521,7 +5738,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5546,7 +5764,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5572,7 +5791,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5598,7 +5818,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5624,7 +5845,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5649,7 +5871,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5674,7 +5897,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5700,7 +5924,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5726,7 +5951,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5752,7 +5978,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5778,7 +6005,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5804,7 +6032,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5830,7 +6059,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5856,7 +6086,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5882,7 +6113,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5907,7 +6139,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5933,7 +6166,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5959,7 +6193,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -5985,7 +6220,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6011,7 +6247,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6036,7 +6273,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6062,7 +6300,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6088,7 +6327,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6114,7 +6354,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6140,7 +6381,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6166,7 +6408,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6192,7 +6435,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6217,7 +6461,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6243,7 +6488,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6268,7 +6514,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6294,7 +6541,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6320,7 +6568,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6345,7 +6594,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6371,7 +6621,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6397,7 +6648,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6423,7 +6675,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6449,7 +6702,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6475,7 +6729,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6501,7 +6756,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6527,7 +6783,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6552,7 +6809,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6578,7 +6836,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6603,7 +6862,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6629,7 +6889,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6655,7 +6916,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6681,7 +6943,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6706,7 +6969,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6732,7 +6996,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6758,7 +7023,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6784,7 +7050,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6809,7 +7076,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6834,7 +7102,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6860,7 +7129,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6886,7 +7156,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6912,7 +7183,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6938,7 +7210,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6964,7 +7237,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -6990,7 +7264,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7016,7 +7291,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7042,7 +7318,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7067,7 +7344,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7093,7 +7371,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7119,7 +7398,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7145,7 +7425,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7171,7 +7452,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7196,7 +7478,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7221,7 +7504,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7246,7 +7530,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7272,7 +7557,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7298,7 +7584,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7324,7 +7611,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7350,7 +7638,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7376,7 +7665,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7402,7 +7692,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7428,7 +7719,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7453,7 +7745,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7479,7 +7772,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7504,7 +7798,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7530,7 +7825,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7556,7 +7852,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7582,7 +7879,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7607,7 +7905,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7633,7 +7932,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7659,7 +7959,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7685,7 +7986,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7710,7 +8012,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7735,7 +8038,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7761,7 +8065,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7787,7 +8092,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7813,7 +8119,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7839,7 +8146,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7865,7 +8173,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7891,7 +8200,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7917,7 +8227,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7943,7 +8254,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7968,7 +8280,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -7994,7 +8307,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8020,7 +8334,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8046,7 +8361,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8072,7 +8388,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8098,7 +8415,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8124,7 +8442,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8150,7 +8469,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8176,7 +8496,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8202,7 +8523,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8228,7 +8550,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8254,7 +8577,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8280,7 +8604,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8305,7 +8630,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8331,7 +8657,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8357,7 +8684,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8382,7 +8710,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8408,7 +8737,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8434,7 +8764,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8460,7 +8791,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8486,7 +8818,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8512,7 +8845,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8537,7 +8871,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8563,7 +8898,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8589,7 +8925,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8614,7 +8951,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8640,7 +8978,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8666,20 +9005,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.031",
+"name": "wood_box_nouv.031",
 "min": [
 -29.057,
 9.973,
 -61.969
 ],
 "max": [
--27.734,
+-27.733,
 12.132,
--60.539
+-60.538
 ],
 "top": {
 "h": 12.1323,
@@ -8691,20 +9031,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.032",
+"name": "wood_box_nouv.032",
 "min": [
 -18.466,
 9.973,
 -74.364
 ],
 "max": [
--17.143,
+-17.142,
 12.132,
--72.935
+-72.934
 ],
 "top": {
 "h": 12.1323,
@@ -8716,7 +9057,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8741,7 +9083,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8766,7 +9109,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8791,7 +9135,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8816,7 +9161,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8841,20 +9187,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.033",
+"name": "wood_box_nouv.033",
 "min": [
 5.645,
 9.84,
 33.727
 ],
 "max": [
-6.968,
+6.969,
 11.999,
-35.156
+35.158
 ],
 "top": {
 "h": 11.9992,
@@ -8866,20 +9213,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.034",
+"name": "wood_box_nouv.034",
 "min": [
 8.554,
 9.84,
 40.939
 ],
 "max": [
-9.877,
+9.878,
 11.999,
-42.368
+42.369
 ],
 "top": {
 "h": 11.9992,
@@ -8891,20 +9239,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.035",
+"name": "wood_box_nouv.035",
 "min": [
-9.815,
+9.814,
 9.84,
 40.939
 ],
 "max": [
-11.137,
+11.138,
 11.999,
-42.368
+42.369
 ],
 "top": {
 "h": 11.9992,
@@ -8916,23 +9265,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.036",
+"name": "wood_box_nouv.036",
 "min": [
-14.269,
+14.268,
 9.896,
 40.954
 ],
 "max": [
 15.373,
-11.049,
+11.051,
 42.37
 ],
 "top": {
-"h": 11.0491,
+"h": 11.0509,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -8941,7 +9291,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8966,7 +9317,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -8991,7 +9343,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9017,7 +9370,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9043,7 +9397,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9068,7 +9423,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9094,7 +9450,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9120,7 +9477,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9146,7 +9504,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9172,7 +9531,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9197,7 +9557,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9223,7 +9584,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9248,7 +9610,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9274,7 +9637,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9300,7 +9664,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9325,7 +9690,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9350,7 +9716,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9375,7 +9742,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9400,7 +9768,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9425,20 +9794,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.037",
+"name": "wood_box_nouv.037",
 "min": [
 7.689,
 9.84,
 58.77
 ],
 "max": [
-9.012,
+9.013,
 11.999,
-60.199
+60.2
 ],
 "top": {
 "h": 11.9992,
@@ -9450,7 +9820,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9476,7 +9847,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9502,7 +9874,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9528,7 +9901,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9554,7 +9928,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9580,7 +9955,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9606,7 +9982,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9631,7 +10008,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9657,7 +10035,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9682,7 +10061,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9708,7 +10088,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9734,7 +10115,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9759,7 +10141,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9785,7 +10168,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9811,7 +10195,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9836,7 +10221,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9862,7 +10248,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9888,7 +10275,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9914,7 +10302,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9940,7 +10329,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9965,7 +10355,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -9991,7 +10382,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10016,7 +10408,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10042,7 +10435,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10068,7 +10462,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10093,23 +10488,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.038",
+"name": "wood_box_nouv.038",
 "min": [
-6.488,
+6.487,
 9.896,
-53.476
+53.477
 ],
 "max": [
 7.591,
-11.049,
+11.051,
 54.893
 ],
 "top": {
-"h": 11.0491,
+"h": 11.0509,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -10118,23 +10514,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.039",
+"name": "wood_box_nouv.039",
 "min": [
-6.488,
+6.487,
 9.896,
-54.824
+54.823
 ],
 "max": [
 7.591,
-11.049,
+11.051,
 56.24
 ],
 "top": {
-"h": 11.0491,
+"h": 11.0509,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -10143,7 +10540,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10168,7 +10566,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10193,7 +10592,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10218,23 +10618,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.040",
+"name": "wood_box_nouv.040",
 "min": [
-10.914,
+10.881,
 9.881,
--26.917
+-26.95
 ],
 "max": [
-12.692,
-11.035,
--25.131
+12.66,
+11.036,
+-25.163
 ],
 "top": {
-"h": 11.0347,
+"h": 11.0364,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -10243,23 +10644,24 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.041",
+"name": "wood_box_nouv.041",
 "min": [
-11.807,
+11.839,
 9.881,
--25.935
+-25.902
 ],
 "max": [
-13.585,
-11.035,
--24.149
+13.617,
+11.036,
+-24.116
 ],
 "top": {
-"h": 11.0347,
+"h": 11.0364,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -10268,7 +10670,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10293,7 +10696,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10318,7 +10722,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10343,7 +10748,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10368,7 +10774,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10393,7 +10800,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10418,7 +10826,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10443,7 +10852,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10468,7 +10878,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10493,7 +10904,8 @@
 "player": true,
 "bullet": false,
 "eye": false,
-"camera": true
+"camera": true,
+"thrown": false
 }
 },
 {
@@ -10518,7 +10930,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10543,7 +10956,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10568,7 +10982,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10593,7 +11008,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10618,7 +11034,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10643,7 +11060,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10668,7 +11086,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10693,7 +11112,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10718,7 +11138,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10743,7 +11164,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10768,7 +11190,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10793,7 +11216,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10818,7 +11242,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10843,7 +11268,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10868,7 +11294,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10893,7 +11320,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10918,7 +11346,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10943,7 +11372,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10968,7 +11398,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -10993,7 +11424,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11018,7 +11450,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11044,7 +11477,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -11069,7 +11503,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11094,7 +11529,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11119,7 +11555,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11144,7 +11581,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11169,7 +11607,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11195,7 +11634,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -11220,7 +11660,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11245,7 +11686,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11270,32 +11712,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
-}
-},
-{
-"name": "vis_decal_b5_cracks_nouv",
-"min": [
--35.514,
-11.042,
--13.284
-],
-"max": [
--18.746,
-17.677,
-2.754
-],
-"top": {
-"h": 17.677,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -11320,7 +11738,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11345,7 +11764,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11370,7 +11790,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11395,7 +11816,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11420,7 +11842,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11445,7 +11868,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11470,7 +11894,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11496,7 +11921,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -11521,7 +11947,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11546,7 +11973,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11572,7 +12000,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -11597,7 +12026,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11622,7 +12052,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11647,7 +12078,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11672,7 +12104,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11697,7 +12130,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11722,7 +12156,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11747,7 +12182,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11772,7 +12208,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11797,7 +12234,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11822,7 +12260,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11847,7 +12286,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11872,7 +12312,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11897,7 +12338,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11922,7 +12364,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11947,7 +12390,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11972,7 +12416,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -11997,7 +12442,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12022,7 +12468,8 @@
 "player": true,
 "bullet": false,
 "eye": false,
-"camera": true
+"camera": true,
+"thrown": false
 }
 },
 {
@@ -12047,7 +12494,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12072,7 +12520,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12097,7 +12546,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12122,7 +12572,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12148,7 +12599,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12173,7 +12625,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12198,7 +12651,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12223,7 +12677,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12248,7 +12703,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12273,7 +12729,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12299,7 +12756,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -12324,7 +12782,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12349,7 +12808,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12374,7 +12834,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12399,7 +12860,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12425,7 +12887,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -12450,7 +12913,8 @@
 "player": false,
 "bullet": false,
 "eye": true,
-"camera": false
+"camera": false,
+"thrown": false
 }
 },
 {
@@ -12475,7 +12939,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12500,7 +12965,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12525,7 +12991,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12550,7 +13017,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12575,7 +13043,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12600,7 +13069,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12625,7 +13095,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12651,7 +13122,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -12676,7 +13148,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12701,7 +13174,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12726,7 +13200,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12751,7 +13226,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12776,7 +13252,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12801,7 +13278,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12827,7 +13305,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -12852,7 +13331,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12877,7 +13357,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12902,7 +13383,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12928,7 +13410,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -12953,7 +13436,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -12978,7 +13462,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13003,7 +13488,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13029,7 +13515,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -13054,7 +13541,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13079,7 +13567,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13104,7 +13593,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13129,7 +13619,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13155,7 +13646,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -13180,7 +13672,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13205,7 +13698,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13230,7 +13724,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13255,7 +13750,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13280,7 +13776,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13306,7 +13803,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13332,7 +13830,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13357,7 +13856,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13382,7 +13882,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13407,7 +13908,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13432,7 +13934,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13457,7 +13960,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13483,7 +13987,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -13508,7 +14013,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13533,7 +14039,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13559,7 +14066,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -13584,7 +14092,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13609,7 +14118,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13634,7 +14144,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13659,7 +14170,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13685,7 +14197,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -13710,7 +14223,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13735,7 +14249,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13760,7 +14275,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13785,7 +14301,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13811,7 +14328,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -13836,7 +14354,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13861,7 +14380,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13886,7 +14406,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13911,7 +14432,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13936,7 +14458,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13961,7 +14484,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -13986,7 +14510,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14011,7 +14536,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14036,7 +14562,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14061,7 +14588,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14086,7 +14614,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14111,7 +14640,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14136,7 +14666,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14161,7 +14692,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14186,7 +14718,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14211,7 +14744,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14236,7 +14770,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14261,7 +14796,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14286,20 +14822,21 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "wood_box.042",
+"name": "wood_box_nouv.042",
 "min": [
 -7.301,
-13.915,
+13.914,
 -50.166
 ],
 "max": [
--5.978,
+-5.977,
 16.074,
--48.736
+-48.735
 ],
 "top": {
 "h": 16.0738,
@@ -14311,7 +14848,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14337,7 +14875,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -14362,7 +14901,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14387,7 +14927,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14412,7 +14953,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14438,7 +14980,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -14463,7 +15006,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14488,7 +15032,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14513,7 +15058,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14539,7 +15085,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -14564,7 +15111,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14590,7 +15138,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -14615,7 +15164,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14641,7 +15191,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -14666,7 +15217,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14692,7 +15244,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -14717,7 +15270,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14743,7 +15297,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -14768,7 +15323,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14794,7 +15350,8 @@
 "bullet": false,
 "eye": true,
 "camera": false,
-"texture": false
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -14819,7 +15376,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14844,7 +15402,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14869,7 +15428,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14894,7 +15454,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14920,7 +15481,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -14945,7 +15507,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14970,7 +15533,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -14995,7 +15559,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15020,7 +15585,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15045,7 +15611,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15070,7 +15637,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15095,7 +15663,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15121,7 +15690,8 @@
 "bullet": true,
 "eye": true,
 "camera": true,
-"texture": false
+"texture": false,
+"thrown": true
 }
 },
 {
@@ -15146,7 +15716,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15171,7 +15742,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15196,7 +15768,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15221,7 +15794,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15246,7 +15820,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15271,7 +15846,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15296,7 +15872,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15321,7 +15898,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15346,7 +15924,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15371,7 +15950,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15396,7 +15976,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15421,7 +16002,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15446,7 +16028,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15471,7 +16054,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15496,7 +16080,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15521,7 +16106,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15546,7 +16132,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15571,7 +16158,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15596,7 +16184,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15621,7 +16210,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15646,7 +16236,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15671,7 +16262,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15696,7 +16288,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15721,7 +16314,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15746,7 +16340,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15771,7 +16366,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15796,7 +16392,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15821,7 +16418,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15846,7 +16444,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15871,7 +16470,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15896,7 +16496,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15922,7 +16523,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15947,7 +16549,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15973,7 +16576,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -15998,7 +16602,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16024,7 +16629,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16050,7 +16656,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16075,7 +16682,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16100,7 +16708,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16125,7 +16734,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16150,7 +16760,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16175,7 +16786,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16200,7 +16812,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16225,7 +16838,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16250,7 +16864,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 },
 {
@@ -16276,7 +16891,8 @@
 "player": true,
 "bullet": true,
 "eye": true,
-"camera": true
+"camera": true,
+"thrown": true
 }
 }
 ],
@@ -16328,13 +16944,13 @@
 {
 "name": "target1",
 "x": 1.93,
-"y": 10.01,
+"y": 10.02,
 "z": 13.41
 },
 {
 "name": "target2",
 "x": -30.39,
-"y": 10.01,
+"y": 10.0,
 "z": -50.89
 }
 ],
