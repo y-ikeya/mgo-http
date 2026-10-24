@@ -3233,7 +3233,36 @@ export class Soldier {
       world.resolveHorizontal(probe, PLAYER_RADIUS, top, VAULT_BODY_HEIGHT)
       return Math.hypot(probe.x - bx, probe.z - bz) < VAULT_CLEAR_PUSH
     }
-    if (!clearAt(reachAt) || !clearAt(reachAt + VAULT_CLEAR_STEP)) return null
+    if (!clearAt(reachAt)) return null
+    const yaw = Math.atan2(-fx, -fz)
+    /*
+     * **奥行きの浅い台に乗る。** 上の 2 か所 (縁から 0.8m・1.3m 先) は奥行きの浅い台を飛び越して
+     * 見る。積んだ木箱 (1 段目の空いた所の奥行き 0.76m、その奥に 2 段目) では 0.8m 先がもう 2 段目の
+     * 下で、乗れる床が無いと見て何も起きなかった。2 段目 (奥行き 0.79m) は奥が 2F の縁の外で、
+     * 越えて地面へ跳び出すと読んで、当たりに押し戻された (2026-10-23 本人「wood の box に登れない」)。
+     * 前へ進む量 (縁から VAULT_UP_ONTO) が余っても、奥の箱の面で当たりに止められる
+     */
+    const shallow = (): number => {
+      let landing = Number.NaN
+      for (const extra of VAULT_LANDING_SHALLOW) {
+        const at = reachAt + extra
+        probe.set(this.position.x + fx * at, feetY, this.position.z + fz * at)
+        const h = world.groundHeight(probe, 0, allow)
+        if (Math.abs(h - top) > VAULT_SAME_LEVEL) return Number.NaN
+        if (world.ceilingHeight(probe, 0, h) < h + PLAYER_HEIGHT) return Number.NaN
+        landing = Number.isNaN(landing) ? h : Math.max(landing, h)
+      }
+      return landing
+    }
+    /*
+     * 少し先 (VAULT_CLEAR_STEP) が塞がっていたら、**手前の浅い台に乗る**のだけ見る。積んだ木箱の段
+     * (1 段目の上が奥行き 0.76m、その奥に 2 段目) では、0.4m 先の体が 2 段目に 5cm 押された。元の木箱は
+     * 縁が不揃いで内側にあり通っていたが、外形どおりの箱に置き換えて登れなくなった (2026-10-23)
+     */
+    if (!clearAt(reachAt + VAULT_CLEAR_STEP)) {
+      const up = shallow()
+      return Number.isNaN(up) ? null : { kind: 'up', landing: up, yaw, top, edge }
+    }
     /*
      * 向こう側。**先の床の高さで越えるか乗るかが決まる。**
      *
@@ -3241,7 +3270,6 @@ export class Soldier {
      *   枠の上面と同じ高さ    → 一段上へ乗る (vault_up)。箱の上や続いている床
      *   その間・それより高い  → 跳ばない (着地する所が無い)
      */
-    const yaw = Math.atan2(-fx, -fz)
     /*
      * 天井は**点で**見る。体の輪で見ると、着地点が箱の縁に掛かったときに輪が
      * 箱の中から箱の上面を「天井」として拾い、越えられる窓が越えられなくなった
@@ -3259,25 +3287,6 @@ export class Soldier {
     const farAt = reachAt + VAULT_LANDING_FAR
     probe.set(this.position.x + fx * farAt, feetY, this.position.z + fz * farAt)
     const far = world.groundHeight(probe, PLAYER_RADIUS, allow)
-    /*
-     * **奥行きの浅い台に乗る。** 上の 2 か所 (縁から 0.8m・1.3m 先) は奥行きの浅い台を飛び越して
-     * 見る。積んだ木箱 (1 段目の空いた所の奥行き 0.76m、その奥に 2 段目) では 0.8m 先がもう 2 段目の
-     * 下で、乗れる床が無いと見て何も起きなかった。2 段目 (奥行き 0.79m) は奥が 2F の縁の外で、
-     * 越えて地面へ跳び出すと読んで、当たりに押し戻された (2026-10-23 本人「wood の box に登れない」)。
-     * 前へ進む量 (0.75m、animation.ts の ROOT_DISTANCE_SCALE) が余っても、奥の箱の面で当たりに止められる
-     */
-    const shallow = (): number => {
-      let landing = Number.NaN
-      for (const extra of VAULT_LANDING_SHALLOW) {
-        const at = reachAt + extra
-        probe.set(this.position.x + fx * at, feetY, this.position.z + fz * at)
-        const h = world.groundHeight(probe, 0, allow)
-        if (Math.abs(h - top) > VAULT_SAME_LEVEL) return Number.NaN
-        if (world.ceilingHeight(probe, 0, h) < h + PLAYER_HEIGHT) return Number.NaN
-        landing = Number.isNaN(landing) ? h : Math.max(landing, h)
-      }
-      return landing
-    }
     if (far <= feetY + STEP_UP) {
       // 越えた先が高い所から落ちる (縁の外) なら、乗れる台に乗るほうを先に採る。窓から外へ跳ぶのは
       // 窓枠が薄く台と読まないので今まで通り
