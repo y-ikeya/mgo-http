@@ -3201,6 +3201,22 @@ export class Soldier {
     const faceX = -Math.sin(this.yaw)
     const faceZ = -Math.cos(this.yaw)
     if (faceX * fx + faceZ * fz < Math.cos(VAULT_MAX_ANGLE)) return null
+    /*
+     * **向きを集めた平均で跳べなければ、向いている方向でもう一度見る。** 壁の向こうにも跳べる
+     * 高さの床があると、その向きまで数えて平均が斜めに倒れ、斜めに探した体が壁に当たって
+     * 跳べなかった (壁と手すりの間の 0.73m の上がり口、2026-10-25 本人「box の段から 2F へ」)
+     */
+    return this.vaultAlong(fx, fz) ?? this.vaultAlong(faceX, faceZ)
+  }
+
+  /** 決めた向き (fx, fz) に沿って、跳べる枠と着地を探す (vaultAhead) */
+  private vaultAlong(fx: number, fz: number): { kind: 'over' | 'up'; landing: number; yaw: number; top: number; edge: number } | null {
+    const world = this.lastWorld
+    if (!world) return null
+    const feetY = this.position.y
+    const probe = this.vaultProbe
+    const allow = feetY + VAULT_MAX - STEP_UP
+    const okRise = (h: number) => h - feetY >= VAULT_MIN && h - feetY <= VAULT_MAX
 
     // 枠の向きに沿って、一番近い所で枠の上面を取る
     let top = Number.NaN
