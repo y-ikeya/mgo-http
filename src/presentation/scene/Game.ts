@@ -45,6 +45,7 @@ import {
   sunCastOf,
   loadStageLadders,
   STAGE_CODE,
+  TEAM_COLOR,
   type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
 import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
 import { type StageBox, solidBlockers } from "../../sim/space/vision";
@@ -3887,7 +3888,7 @@ export class Game {
    */
   /**
    * ターゲット (TSNE) を置く / 浮かせる。運ばれていれば運ぶ人の足元から (自分なら自分の位置、
-   * 見えている相手ならその姿、見えていなければ届いた位置)。**守る側の画面では光る**
+   * 見えている相手ならその姿、見えていなければ届いた位置)。**どちらの画面でも攻める側の色で光る**
    */
   private updateTsneTarget(dt: number): void {
     const view = this.targetView;
@@ -3896,8 +3897,9 @@ export class Game {
       // 見えていない相手は姿が最後の場所に止まっている。その時は届いた位置 (targetAt) で浮かせる
       carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.livePositionOf(view.carrier);
     }
-    const defending = this.attackTeam !== null && this.selfTeam !== this.attackTeam;
-    this.tsneTarget.update(dt, view, carrierAt, defending);
+    // 攻める側にも守る側にも光って見える。色は攻める側のチーム色
+    const glow = this.attackTeam === null ? null : TEAM_COLOR[this.attackTeam];
+    this.tsneTarget.update(dt, view, carrierAt, glow);
   }
 
   /**
