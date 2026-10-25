@@ -4553,59 +4553,6 @@
 }
 },
 {
-"name": "metal_watertank",
-"min": [
--2.054,
-4.25,
--19.706
-],
-"max": [
--0.054,
-5.938,
--17.706
-],
-"top": {
-"h": 5.9382,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_watertank_hatch",
-"min": [
--1.684,
-4.542,
--17.726
-],
-"max": [
--1.424,
-4.802,
--17.666
-],
-"top": {
-"h": 4.8192,
-"dx": -0.13164,
-"dz": 0.0,
-"thick": 0.26
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "concrete_watertank_base",
 "min": [
 -2.004,
@@ -4725,6 +4672,85 @@
 "h": 1.9549,
 "dx": 0.0,
 "dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.005",
+"min": [
+-13.96,
+0.1,
+8.491
+],
+"max": [
+-12.613,
+1.663,
+10.491
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank",
+"min": [
+-2.054,
+4.25,
+-19.706
+],
+"max": [
+-0.054,
+6.75,
+-17.706
+],
+"top": {
+"h": 6.75,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_hatch",
+"min": [
+-1.684,
+4.745,
+-17.726
+],
+"max": [
+-1.424,
+5.005,
+-17.666
+],
+"top": {
+"h": 5.0221,
+"dx": -0.13166,
+"dz": 0.0,
+"thick": 0.26
 },
 "flags": {
 "draw": true,
