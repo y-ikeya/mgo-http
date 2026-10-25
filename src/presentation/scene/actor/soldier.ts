@@ -1,6 +1,6 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
 import { BlobShadow } from './blobShadow'
-import { MOVING_SHADOW_LAYER } from '../world/liveShadow'
+import { castMovingShadow, MOVING_SHADOW_LAYER } from '../world/liveShadow'
 import { boxMoveScale, runnerScale, setupSpeedScale, stabSpeedScale, type Skills } from '../../../domain/player/skill'
 import { isGun, isPlaceable, isThrowable, isTwoHanded, type HeldId } from '../../../domain/item/held'
 import {
@@ -4607,6 +4607,8 @@ export class Soldier {
     const ref = this.attachRef
     weapon.attachTo(rightHand, ref.right, ref.left, ref.matrix)
     this.drawLast(weapon.object)
+    // 手に持っている間は人と同じく影を落とす (落ちている銃は落とさない、weapon.ts)
+    castMovingShadow(weapon.object)
     this.weapon = weapon
     // 持ち替えたときは、いまの姿勢に合わせ直す (立ち / しゃがみで握りが違う)
     weapon.applyStance(this.weaponStance)
