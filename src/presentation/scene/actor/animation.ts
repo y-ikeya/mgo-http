@@ -1640,6 +1640,9 @@ export class CharacterAnimator {
       finished === this.upper.get(CQC_MISS_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
       finished === this.upper.get(THROW_RELEASE_KEY) ||
+      // 伏せの振り切りも。戻さないと投げの状態のまま残り、構えを押したままの次の
+      // ピンが抜けなかった (throwFollowingThrough が立ったまま)
+      finished === this.upper.get(PRONE_THROW_RELEASE_KEY) ||
       finished === this.upper.get(SETUP_RELEASE_KEY)
     ) {
       this.upperState = 'stance'
@@ -4018,6 +4021,14 @@ export class CharacterAnimator {
   cancelReload(): void {
     if (this.upperState !== 'reload') return
     this.upperState = 'stance'
+  }
+
+  /**
+   * 放した後の振り切り (後半の型) を流している最中か。流れ終わると構えへ戻る (finished)。
+   * 構えを押したままでも、この間は次の振りかぶりを始めない (Game の updateGrenade)
+   */
+  get throwFollowingThrough(): boolean {
+    return this.upperState === 'throw' && this.pair !== null && !this.pair.held
   }
 
   /** 振りかぶりが終わるまであと何秒か。軽く叩いただけなら残っている */

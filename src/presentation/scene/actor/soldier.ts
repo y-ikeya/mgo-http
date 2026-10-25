@@ -1771,6 +1771,11 @@ export class Soldier {
   }
 
   /** 振りかぶりが終わるまであと何秒か。軽く叩いただけなら残っている */
+  /** 投げた後の振り切りを流している最中か (animation.ts の throwFollowingThrough) */
+  get throwFollowingThrough(): boolean {
+    return this.animator?.throwFollowingThrough ?? false
+  }
+
   get throwWindupLeft(): number {
     return this.animator?.throwWindupLeft ?? 0
   }
