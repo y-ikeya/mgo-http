@@ -45,6 +45,7 @@ import {
   sunCastOf,
   loadStageLadders,
   STAGE_CODE,
+  TEAM_COLOR,
   type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
 import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
 import { type StageBox, solidBlockers } from "../../sim/space/vision";
@@ -365,6 +366,8 @@ export interface GameStats {
   wearingStealth: boolean
   /** CAUTION の残り (秒)。0 なら出さない。部屋で 1 つ、全員が同じ秒数 */
   caution: number
+  /** 落ちたターゲット (TSNE) が置き場所へ戻るまでの残り (秒)。落ちていなければ 0 */
+  targetReturn: number
   /** どちらの系統の一覧を開いているか。閉じていれば null */
   browsingFamily: 'weapon' | 'tool' | null
   /** 持ち替えの最中か。HUD を薄くするのに使う */
@@ -528,6 +531,13 @@ const HIT_FEEDBACK_DURATION = 0.6;
 const ADAPT_MAX = 1.8;
 /** CAUTION の長さ (秒)。バーの満タン。STEALTH が解けている長さ (domain/match/sides.ts の STEALTH_BREAK_MS) */
 export const CAUTION_SECONDS = STEALTH_BREAK_MS / 1000;
+/**
+ * 弾倉を投げてから次を構えられるまで (ms)。振りかぶりの型が無いので、手榴弾の
+ * 「振り切ってからピンを抜く」(約 1.3 秒) に当たる間をここで置く
+ */
+const MAGAZINE_REARM_MS = 1000;
+/** 時計の音を鳴らし始める残りの秒。10 秒から 1 秒まで 10 回 */
+const CLOCK_TICK_FROM = 10;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
 const ADAPT_OPEN = 0.75;
 /** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */
@@ -1153,6 +1163,8 @@ export class Game {
   /** TSNE のターゲットの見た目と、サーバーから届いた状態 (domain/match/target.ts)。無い部屋は null */
   private tsneTarget!: TsneTarget;
   private targetView: TargetView | null = null;
+  /** 最後に時計の音を鳴らした残りの秒 (updateClockTick)。0 なら数えていない */
+  private clockTickSecond = 0;
   /** 「{名前}がターゲットを取得した / 手放した」(全員) と、その人の色、出した時刻 (ms) */
   private targetNotice: { text: string; team: Team; at: number } | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
@@ -2066,6 +2078,7 @@ export class Game {
     );
     this.blast.update(dt);
     this.updateTsneTarget(dt);
+    this.updateClockTick();
     this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
@@ -2981,6 +2994,10 @@ export class Game {
       case "targetDropped":
         this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
         break;
+      case "targetDelivered":
+        this.targetNotice = { text: `${message.byName}がターゲットを運び込んだ`, team: message.byTeam, at: Date.now() };
+        this.audio.playUi("goal");
+        break;
 
       // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
       case "targetAt":
@@ -3876,16 +3893,38 @@ export class Game {
    */
   /**
    * ターゲット (TSNE) を置く / 浮かせる。運ばれていれば運ぶ人の足元から (自分なら自分の位置、
-   * 見えている相手ならその姿、見えていなければ届いた位置)。**守る側の画面では光る**
+   * 見えている相手ならその姿、見えていなければ届いた位置)。**どちらの画面でも攻める側の色で光る**
    */
   private updateTsneTarget(dt: number): void {
     const view = this.targetView;
     let carrierAt: THREE.Vector3 | null = null;
     if (view?.carrier) {
-      carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.positionOf(view.carrier);
+      // 見えていない相手は姿が最後の場所に止まっている。その時は届いた位置 (targetAt) で浮かせる
+      carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.livePositionOf(view.carrier);
     }
-    const defending = this.attackTeam !== null && this.selfTeam !== this.attackTeam;
-    this.tsneTarget.update(dt, view, carrierAt, defending);
+    // 攻める側にも守る側にも光って見える。色は攻める側のチーム色
+    const glow = this.attackTeam === null ? null : TEAM_COLOR[this.attackTeam];
+    this.tsneTarget.update(dt, view, carrierAt, glow);
+  }
+
+  /**
+   * 試合の残り 10 秒から、1 秒ごとに時計の音 (10 回)。**どのルールでも** (2026-10-25 本人)。
+   * 残りの秒が変わった瞬間に 1 回。試合中でなければ数え直す
+   */
+  private updateClockTick(): void {
+    const match = this.replica.match;
+    if (!match || match.phase !== "playing" || !(match.endsAt > 0)) {
+      this.clockTickSecond = 0;
+      return;
+    }
+    const left = Math.ceil((match.endsAt - Date.now()) / 1000);
+    if (left < 1 || left > CLOCK_TICK_FROM) {
+      this.clockTickSecond = 0;
+      return;
+    }
+    if (left === this.clockTickSecond) return;
+    this.clockTickSecond = left;
+    this.audio.playUi("clockTick");
   }
 
   /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */
@@ -4710,6 +4749,8 @@ export class Game {
 
   /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */
   private rolledThisHold = false;
+  /** 次の弾倉を構えられる時刻 (performance.now)。投げてから MAGAZINE_REARM_MS */
+  private magazineReadyAt = 0;
 
   /**
    * 投げる構えと、離したときの投擲。
@@ -4733,6 +4774,12 @@ export class Game {
     const release = held && this.throwAiming && pulled;
 
     if (held && !release) {
+      /*
+       * **投げてすぐは構え直さない。** 弾倉には振りかぶりの型が無いので、構えを押したままだと
+       * 投げた次のコマにはもう構えていて、引き金を連打するだけで投げ続けられた。手榴弾の
+       * 「振り切ってからピンを抜く」に当たる間を置く (2026-10-25 本人「mag とかの投擲も同じだよね？」)
+       */
+      if (!this.throwAiming && performance.now() < this.magazineReadyAt) return;
       this.follow.aimOrigin(this.aimOrigin);
       this.follow.aimDirection(this.aimDir);
       this.thrown.showPreview(
@@ -4754,6 +4801,7 @@ export class Game {
     if (!release || !canThrow) return;
 
     this.inv.spend();
+    this.magazineReadyAt = performance.now() + MAGAZINE_REARM_MS;
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
     this.thrown.throwFrom(this.aimOrigin, this.aimDir);
@@ -4886,6 +4934,13 @@ export class Game {
        * 新しい振りかぶりを重ねてはいけない。
        */
       if (this.grenadeRelease > 0) return;
+      /*
+       * **振り切りが流れ終わるまで、次のピンを抜かない。** 手を離れた瞬間に次の振りかぶりを
+       * 頭から流していたので、構えを押したままだと振り切りが打ち切られてピンを抜く動きが
+       * 見えないまま構え終わり、続けざまに投げられた (2026-10-25 本人「L2 押しっぱで次の球が
+       * すぐ投げられる、再度ピンを抜くモーションをしてくれないと連続で投げられる」)
+       */
+      if (!this.grenadeAiming && this.player.throwFollowingThrough) return;
 
       // 構えた瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
       // 落下点はその間ずっと見える — どこへ落とすかを見てから放せるように
@@ -5986,6 +6041,8 @@ export class Game {
       wearingStealth: this.inv.wearingStealth,
       // CAUTION は部屋で 1 つ (サーバーが持つ)。手元の時計へ直した切れる時刻から
       caution: Math.max(0, (this.replica.match?.cautionUntil ?? 0) - Date.now()) / 1000,
+      // 落ちたターゲットが戻るまで。取り直すと消え、次に落とすと 30 秒から (サーバーが持つ)
+      targetReturn: Math.max(0, (this.replica.match?.target?.returnsAt ?? 0) - Date.now()) / 1000,
       browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物

@@ -1,7 +1,7 @@
 import { TRAPPED_CROUCH_SECONDS } from '../../../domain/item/doll';
 import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from "./armIk";
 import { SkyLight } from '../world/skylight';
-import { MOVING_SHADOW_LAYER } from '../world/liveShadow';
+import { castMovingShadow, MOVING_SHADOW_LAYER } from '../world/liveShadow';
 import { BlobShadow, blobOnFloor } from './blobShadow';
 import * as THREE from "three";
 import { MeshBasicNodeMaterial } from "three/webgpu";
@@ -351,8 +351,18 @@ export class RemoteSoldier {
       }
       material.opacity = opacity
     }
-    // 消え切ったら描かない (透明でも描くと重なりの順で縁が残る)
-    for (const body of this.bodies) body.visible = this.stealthFade < 0.999
+    /*
+     * 消え切ったら画面には描かない (透明でも描くと重なりの順で縁が残る)。**影は落とし続ける** —
+     * 隠すと影ごと消え、守る側に STEALTH 中の相手の影が見えなかった (2026-10-25 本人)。
+     * 足元の影は見えたままにする作り (setStealthed)。画面のカメラが見る層 0 からだけ外し、
+     * 人の影の地図の層 (MOVING_SHADOW_LAYER) には残す
+     */
+    const shown = this.stealthFade < 0.999
+    for (const body of this.bodies) {
+      body.visible = true
+      if (shown) body.layers.enable(0)
+      else body.layers.disable(0)
+    }
   }
 
   /** 位置が届いている回数 (通/秒)。診断の表示に使う */
@@ -1138,6 +1148,8 @@ export class RemoteSoldier {
     }
     const ref = this.attachRef;
     weapon.attachTo(rightHand, ref.right, ref.left, ref.matrix);
+    // 手に持っている間は人と同じく影を落とす (落ちている銃は落とさない、weapon.ts)
+    castMovingShadow(weapon.object);
     this.weapon = weapon;
   }
 }
@@ -1578,6 +1590,18 @@ export class RemoteSoldiers {
   /** 今いる場所。倒れていなくても音を鳴らす先が要るとき用 */
   positionOf(id: string): THREE.Vector3 | null {
     return this.players.get(id)?.object.position ?? null;
+  }
+
+  /**
+   * **位置が届いている間だけ**今いる場所。隠している (位置が途切れた) 人は null。
+   *
+   * positionOf は見えなくなった人の**最後に見えた場所**を返す。運ばれている物 (TSNE の
+   * ターゲット) をそこへ付けると、運ぶ人が見えない間ずっとその場に止まって見えた
+   * (2026-10-25 本人「相手の画面だと target が動かない」)。null なら呼ぶ側が別便の位置を使う
+   */
+  livePositionOf(id: string): THREE.Vector3 | null {
+    const player = this.players.get(id);
+    return player && player.object.visible ? player.object.position : null;
   }
 
   /** その人の右手のワールド座標 (スタンナイフの放電の出所)。見えていなければ null */

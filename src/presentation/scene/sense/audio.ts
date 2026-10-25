@@ -468,6 +468,13 @@ const UI_SOUNDS = {
   // HS.mp3 は平均で 6.6dB 小さいので、同じ大きさに聞こえるよう 0.2 × 2.1 ≒ 0.43
   headshot: { file: "headshot3.mp3", volume: 0.43 },
   /**
+   * TSNE でターゲットを自陣まで運び込んだ (2026-10-25 本人の goal.mp3)。全員に鳴らす。
+   * 素材のピークが -14dB と小さいので、ここで上げる
+   */
+  goal: { file: "goal1.mp3", volume: 2.0 },
+  /** 試合の残り 10 秒から 1 秒ごとに 10 回 (2026-10-25 本人の clockTick.mp3、どのルールでも) */
+  clockTick: { file: "clock_tick1.mp3", volume: 0.6 },
+  /**
    * 結果の画面の曲 (2026-10-17 本人、tools/raw/result.mp3 のまま)。11.45 秒。**結果の画面は
    * 曲が鳴り終わるまで開いている** (server/match.ts の INTERMISSION_MS)。畳んだら止める
    */

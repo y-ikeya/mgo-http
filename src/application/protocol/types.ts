@@ -1185,7 +1185,17 @@ export interface MatchMessage {
    * 運ばれている間の位置は運ぶ人の姿から取る (ここの x, y, z は 1 秒ごとの控え)。
    * **変わった瞬間に配り直す** (取った・落ちた・戻った)
    */
-  target?: { x: number; y: number; z: number; carrier: string | null }
+  target?: {
+    x: number
+    y: number
+    z: number
+    carrier: string | null
+    /**
+     * 落ちている間だけ、置き場所へ戻る時刻 (サーバーの時計、受け取った側が手元の時計へ直す)。
+     * 画面に戻るまでのカウントダウンを出す (domain/match/target.ts の TARGET_RETURN_MS)
+     */
+    returnsAt?: number
+  }
   /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
    *
@@ -1323,6 +1333,17 @@ export interface KillEvent {
  * 運んでいた人がターゲット (TSNE) を手放した (自分で落とした / 倒れた / 眠った)。
  * **全員の画面に「{名前}がターゲットを手放した」を帯で出す**
  */
+/**
+ * 攻める側がターゲット (TSNE) を自陣まで運び込んだ。**全員の画面で goal の音を鳴らし、
+ * 「{名前}がターゲットを運び込んだ」を帯で出す**。勝ち負けはこの後の match が配る
+ */
+export interface TargetDeliveredEvent {
+  type: 'targetDelivered'
+  by: string
+  byName: string
+  byTeam: Team
+}
+
 export interface TargetDroppedEvent {
   type: 'targetDropped'
   by: string
@@ -1498,6 +1519,7 @@ export type ServerMessage =
   | StateMessage
   | TargetTakenEvent
   | TargetDroppedEvent
+  | TargetDeliveredEvent
   | TargetAtMessage
   | JoinEvent
   | LeaveEvent

@@ -21,6 +21,7 @@ import {
 import { livesOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
 import { clearTsneTarget, placeTsneTarget, updateTsneTarget } from './target'
 import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
+import { targetReturnsAt } from '../src/domain/match/target'
 import { fitLoadout } from '../src/domain/player/equip'
 import { canChoose, isDowned, isSeated } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
@@ -393,7 +394,13 @@ export function matchState(room: RoomWorld): ServerMessage {
     round: room.mode.sides ? room.round : undefined,
     roundWins: room.mode.sides ? room.roundWins : undefined,
     target: room.target
-      ? { x: room.target.x, y: room.target.y, z: room.target.z, carrier: room.target.carrier }
+      ? {
+          x: room.target.x,
+          y: room.target.y,
+          z: room.target.z,
+          carrier: room.target.carrier,
+          returnsAt: targetReturnsAt(room.target) ?? undefined,
+        }
       : undefined,
     endsAt: room.endsAt,
     sentAt: Date.now(),

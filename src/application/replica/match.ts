@@ -152,6 +152,13 @@ export function applyMatch(
         endsAt: message.endsAt > 0 ? toLocal(replica.clock, message.endsAt) : message.endsAt,
         // CAUTION も同じく手元の時計へ
         cautionUntil: message.cautionUntil !== undefined ? toLocal(replica.clock, message.cautionUntil) : undefined,
+        // ターゲットが置き場所へ戻る時刻も
+        target: message.target
+          ? {
+              ...message.target,
+              returnsAt: message.target.returnsAt !== undefined ? toLocal(replica.clock, message.target.returnsAt) : undefined,
+            }
+          : undefined,
       }
       return changed ? [{ kind: 'phase', to: message.phase, teams: MODES[message.mode].teams }] : []
     }

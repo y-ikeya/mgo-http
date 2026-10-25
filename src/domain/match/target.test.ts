@@ -9,6 +9,7 @@ import {
   returnIfIdle,
   take,
   targetHomeFor,
+  targetReturnsAt,
   touches,
 } from './target'
 
@@ -55,5 +56,16 @@ describe('ターゲット', () => {
     const dropped = drop(take(placeTarget(home), 'a'), 50, 1, 60, 1000)
     const again = take(dropped, 'b')
     expect(returnIfIdle(again, 1000 + TARGET_RETURN_MS * 2)).toBe(again)
+  })
+
+  test('**戻るまでのカウントダウンは落ちている間だけ。取り直すと消え、次に落とした時は 30 秒から**', () => {
+    const home = { x: 0, z: 0, y: 0 }
+    expect(targetReturnsAt(placeTarget(home))).toBeNull()
+    const first = drop(take(placeTarget(home), 'a'), 5, 0, 5, 1000)
+    expect(targetReturnsAt(first)).toBe(1000 + TARGET_RETURN_MS)
+    const retaken = take(first, 'a')
+    expect(targetReturnsAt(retaken)).toBeNull()
+    const second = drop(retaken, 9, 0, 9, 21_000)
+    expect(targetReturnsAt(second)).toBe(21_000 + TARGET_RETURN_MS)
   })
 })
