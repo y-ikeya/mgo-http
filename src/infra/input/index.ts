@@ -564,7 +564,9 @@ export class Input {
 
     if (this.device === 'keyboard') return
 
-    const pad = this.padIndex === null ? null : navigator.getGamepads?.()[this.padIndex]
+    const pads = navigator.getGamepads?.() ?? []
+    this.followTouchedPad(pads)
+    const pad = this.padIndex === null ? null : pads[this.padIndex]
     if (!pad?.connected) return
 
     this.padPressed = pad.buttons.map((b) => b.pressed || b.value > 0.5)
@@ -640,6 +642,24 @@ export class Input {
   private readonly onPadDisconnected = (e: GamepadEvent) => {
     if (this.padIndex === e.gamepad.index) this.padIndex = null
     this.findPad()
+  }
+
+  /**
+   * **触られたパッドへ乗り換える。** 今のパッドが触られていなくて、別のパッドのボタンかスティックが
+   * 動いていれば、そちらを読む。
+   *
+   * 最初に見つかった 1 つだけを読んでいたので、2 つ繋ぐ (DualSense と PS4 のコントローラー) と
+   * 使っていない方を読み続けて、手元のパッドが効かなかった (2026-10-25 本人)
+   */
+  private followTouchedPad(pads: readonly (Gamepad | null)[]): void {
+    const current = this.padIndex === null ? null : pads[this.padIndex]
+    if (current?.connected && padTouched(current)) return
+    for (const pad of pads) {
+      if (pad?.connected && pad.index !== this.padIndex && padTouched(pad)) {
+        this.padIndex = pad.index
+        return
+      }
+    }
   }
 
   /** 繋がっているパッドを探す。最初に見つかったものを使う */
@@ -877,6 +897,19 @@ export class Input {
  * 軸ごとに切ると斜め方向の遊びが正方形になり、対角線だけ利きが変わる。
  * 長さで判定して、残りを 0..1 へ引き伸ばす。
  */
+/**
+ * パッドを乗り換えるほど触られたか (ボタン、またはスティックを半分以上)。
+ * 遊びで判じると、スティックが少し流れるパッドが「触られた」ままになって乗り換えを奪う
+ */
+const PAD_TOUCH_STICK = 0.5
+function padTouched(pad: Gamepad): boolean {
+  if (pad.buttons.some((b) => b.pressed || b.value > 0.5)) return true
+  return (
+    Math.hypot(pad.axes[0] ?? 0, pad.axes[1] ?? 0) >= PAD_TOUCH_STICK ||
+    Math.hypot(pad.axes[2] ?? 0, pad.axes[3] ?? 0) >= PAD_TOUCH_STICK
+  )
+}
+
 function applyDeadzone(x: number, y: number): { x: number; y: number } {
   const magnitude = Math.hypot(x, y)
   if (magnitude < STICK_DEADZONE) return { x: 0, y: 0 }
