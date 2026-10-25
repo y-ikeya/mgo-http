@@ -3882,7 +3882,8 @@ export class Game {
     const view = this.targetView;
     let carrierAt: THREE.Vector3 | null = null;
     if (view?.carrier) {
-      carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.positionOf(view.carrier);
+      // 見えていない相手は姿が最後の場所に止まっている。その時は届いた位置 (targetAt) で浮かせる
+      carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.livePositionOf(view.carrier);
     }
     const defending = this.attackTeam !== null && this.selfTeam !== this.attackTeam;
     this.tsneTarget.update(dt, view, carrierAt, defending);

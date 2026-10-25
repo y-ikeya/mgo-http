@@ -1580,6 +1580,18 @@ export class RemoteSoldiers {
     return this.players.get(id)?.object.position ?? null;
   }
 
+  /**
+   * **位置が届いている間だけ**今いる場所。隠している (位置が途切れた) 人は null。
+   *
+   * positionOf は見えなくなった人の**最後に見えた場所**を返す。運ばれている物 (TSNE の
+   * ターゲット) をそこへ付けると、運ぶ人が見えない間ずっとその場に止まって見えた
+   * (2026-10-25 本人「相手の画面だと target が動かない」)。null なら呼ぶ側が別便の位置を使う
+   */
+  livePositionOf(id: string): THREE.Vector3 | null {
+    const player = this.players.get(id);
+    return player && player.object.visible ? player.object.position : null;
+  }
+
   /** その人の右手のワールド座標 (スタンナイフの放電の出所)。見えていなければ null */
   handOf(id: string, out: THREE.Vector3): THREE.Vector3 | null {
     return this.players.get(id)?.handWorld(out) ?? null;
