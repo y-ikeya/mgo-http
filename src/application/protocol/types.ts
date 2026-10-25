@@ -1333,6 +1333,17 @@ export interface KillEvent {
  * 運んでいた人がターゲット (TSNE) を手放した (自分で落とした / 倒れた / 眠った)。
  * **全員の画面に「{名前}がターゲットを手放した」を帯で出す**
  */
+/**
+ * 攻める側がターゲット (TSNE) を自陣まで運び込んだ。**全員の画面で goal の音を鳴らし、
+ * 「{名前}がターゲットを運び込んだ」を帯で出す**。勝ち負けはこの後の match が配る
+ */
+export interface TargetDeliveredEvent {
+  type: 'targetDelivered'
+  by: string
+  byName: string
+  byTeam: Team
+}
+
 export interface TargetDroppedEvent {
   type: 'targetDropped'
   by: string
@@ -1508,6 +1519,7 @@ export type ServerMessage =
   | StateMessage
   | TargetTakenEvent
   | TargetDroppedEvent
+  | TargetDeliveredEvent
   | TargetAtMessage
   | JoinEvent
   | LeaveEvent

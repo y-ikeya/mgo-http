@@ -530,6 +530,8 @@ const HIT_FEEDBACK_DURATION = 0.6;
 const ADAPT_MAX = 1.8;
 /** CAUTION の長さ (秒)。バーの満タン。STEALTH が解けている長さ (domain/match/sides.ts の STEALTH_BREAK_MS) */
 export const CAUTION_SECONDS = STEALTH_BREAK_MS / 1000;
+/** 時計の音を鳴らし始める残りの秒。10 秒から 1 秒まで 10 回 */
+const CLOCK_TICK_FROM = 10;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
 const ADAPT_OPEN = 0.75;
 /** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */
@@ -1155,6 +1157,8 @@ export class Game {
   /** TSNE のターゲットの見た目と、サーバーから届いた状態 (domain/match/target.ts)。無い部屋は null */
   private tsneTarget!: TsneTarget;
   private targetView: TargetView | null = null;
+  /** 最後に時計の音を鳴らした残りの秒 (updateClockTick)。0 なら数えていない */
+  private clockTickSecond = 0;
   /** 「{名前}がターゲットを取得した / 手放した」(全員) と、その人の色、出した時刻 (ms) */
   private targetNotice: { text: string; team: Team; at: number } | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
@@ -2068,6 +2072,7 @@ export class Game {
     );
     this.blast.update(dt);
     this.updateTsneTarget(dt);
+    this.updateClockTick();
     this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
@@ -2983,6 +2988,10 @@ export class Game {
       case "targetDropped":
         this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
         break;
+      case "targetDelivered":
+        this.targetNotice = { text: `${message.byName}がターゲットを運び込んだ`, team: message.byTeam, at: Date.now() };
+        this.audio.playUi("goal");
+        break;
 
       // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
       case "targetAt":
@@ -3889,6 +3898,26 @@ export class Game {
     }
     const defending = this.attackTeam !== null && this.selfTeam !== this.attackTeam;
     this.tsneTarget.update(dt, view, carrierAt, defending);
+  }
+
+  /**
+   * 試合の残り 10 秒から、1 秒ごとに時計の音 (10 回)。**どのルールでも** (2026-10-25 本人)。
+   * 残りの秒が変わった瞬間に 1 回。試合中でなければ数え直す
+   */
+  private updateClockTick(): void {
+    const match = this.replica.match;
+    if (!match || match.phase !== "playing" || !(match.endsAt > 0)) {
+      this.clockTickSecond = 0;
+      return;
+    }
+    const left = Math.ceil((match.endsAt - Date.now()) / 1000);
+    if (left < 1 || left > CLOCK_TICK_FROM) {
+      this.clockTickSecond = 0;
+      return;
+    }
+    if (left === this.clockTickSecond) return;
+    this.clockTickSecond = left;
+    this.audio.playUi("clockTick");
   }
 
   /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */

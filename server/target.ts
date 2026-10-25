@@ -68,6 +68,8 @@ export function updateTsneTarget(room: RoomWorld, now: number): boolean {
     room.target = carryTo(target, carrier.x, carrier.y, carrier.z)
     if (atBase(carrier.x, carrier.y, carrier.z, baseOf(room, room.attack))) {
       room.targetDelivered = true
+      // 全員の画面で goal を鳴らす。勝ち負けはこの後の match で配られる
+      broadcast(room, { type: 'targetDelivered', by: carrier.id, byName: carrier.name, byTeam: carrier.team })
       return true
     }
     // 運ばれている位置を 1 秒に 10 回配る (人の姿は見えている相手の分しか届かないので別便)
