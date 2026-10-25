@@ -79,6 +79,7 @@ import { sensedBy } from '../src/sim/judge/claymore'
 import { SENSE_HEIGHT, SENSOR_HEIGHT, TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
+import { noteTickStart, reportSlow, SLOW_MESSAGE_MS, SLOW_TICK_MS } from './slow'
 import { dropTsneTarget } from './target'
 import { costOf, patSeconds } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
@@ -145,12 +146,20 @@ const LIMBO_MS = 100
  * 居座って、いま詰まっているかが読めなくなる。
  */
 const tickCost = { total: 0, count: 0, worst: 0, windowFrom: 0, average: 0, lastWorst: 0 }
+/** 前の刻みが始まった時刻。刻みの外で止まっていたかを読む (slow.ts) */
+let previousTickAt = 0
+const heapMb = () => Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
 
 setInterval(() => {
   const startedAt = performance.now()
+  noteTickStart(startedAt, previousTickAt, TICK_MS, heapMb)
+  previousTickAt = startedAt
+  // 部屋ごとの重さ。刻みが重かった時だけ内訳として出す
+  const roomCosts: string[] = []
   try {
     const now = Date.now()
     for (const room of rooms.values()) {
+      const roomStartedAt = performance.now()
       // 自分の本当の値を 1 人ずつ配る。**予測を直すため**で、普段は一致している
       sendSelf(room, now)
       // 往復の時間を測る。**遅れすぎている人には席を空けてもらう** (pong の枝)
@@ -382,6 +391,8 @@ setInterval(() => {
           detonateClaymore(room, claymore!)
         }
       }
+      const roomCost = performance.now() - roomStartedAt
+      if (roomCost >= 1) roomCosts.push(`${room.key}(${room.stage.name} ${room.players.size}人) ${roomCost.toFixed(1)}ms`)
     }
   } catch (error) {
     console.error('[刻み] 例外。この刻みは捨てる', error)
@@ -391,6 +402,9 @@ setInterval(() => {
    * 詰まっているのに平均が下がる。
    */
   const cost = performance.now() - startedAt
+  if (cost >= SLOW_TICK_MS) {
+    reportSlow('tick', () => `[刻み重い] ${cost.toFixed(1)}ms 内訳 ${roomCosts.join(' / ') || '-'} heap ${heapMb()}MB`)
+  }
   tickCost.total += cost
   tickCost.count += 1
   if (cost > tickCost.worst) tickCost.worst = cost
@@ -1267,8 +1281,17 @@ const server = Bun.serve<Client>({
     },
 
     message(socket, raw) {
+      const startedAt = performance.now()
       try {
         handleMessage(socket, raw)
+        const cost = performance.now() - startedAt
+        if (cost >= SLOW_MESSAGE_MS) {
+          reportSlow('message', () => {
+            const room = rooms.get(socket.data.roomKey)
+            const kind = typeof raw === 'string' ? String(JSON.parse(raw).type) : '位置'
+            return `[通信重い] ${cost.toFixed(1)}ms ${kind} ${socket.data.id} ${room ? `${room.key}(${room.stage.name})` : ''}`
+          })
+        }
       } catch (error) {
         // **1 通の躓きでサーバーを落とさない。** 落ちると全部屋の全員が切れる
         console.error(`[通] ${socket.data.id} の 1 通で例外`, error)
