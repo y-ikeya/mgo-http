@@ -365,6 +365,8 @@ export interface GameStats {
   wearingStealth: boolean
   /** CAUTION の残り (秒)。0 なら出さない。部屋で 1 つ、全員が同じ秒数 */
   caution: number
+  /** 落ちたターゲット (TSNE) が置き場所へ戻るまでの残り (秒)。落ちていなければ 0 */
+  targetReturn: number
   /** どちらの系統の一覧を開いているか。閉じていれば null */
   browsingFamily: 'weapon' | 'tool' | null
   /** 持ち替えの最中か。HUD を薄くするのに使う */
@@ -5987,6 +5989,8 @@ export class Game {
       wearingStealth: this.inv.wearingStealth,
       // CAUTION は部屋で 1 つ (サーバーが持つ)。手元の時計へ直した切れる時刻から
       caution: Math.max(0, (this.replica.match?.cautionUntil ?? 0) - Date.now()) / 1000,
+      // 落ちたターゲットが戻るまで。取り直すと消え、次に落とすと 30 秒から (サーバーが持つ)
+      targetReturn: Math.max(0, (this.replica.match?.target?.returnsAt ?? 0) - Date.now()) / 1000,
       browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物

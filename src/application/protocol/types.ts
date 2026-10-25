@@ -1185,7 +1185,17 @@ export interface MatchMessage {
    * 運ばれている間の位置は運ぶ人の姿から取る (ここの x, y, z は 1 秒ごとの控え)。
    * **変わった瞬間に配り直す** (取った・落ちた・戻った)
    */
-  target?: { x: number; y: number; z: number; carrier: string | null }
+  target?: {
+    x: number
+    y: number
+    z: number
+    carrier: string | null
+    /**
+     * 落ちている間だけ、置き場所へ戻る時刻 (サーバーの時計、受け取った側が手元の時計へ直す)。
+     * 画面に戻るまでのカウントダウンを出す (domain/match/target.ts の TARGET_RETURN_MS)
+     */
+    returnsAt?: number
+  }
   /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。
    *

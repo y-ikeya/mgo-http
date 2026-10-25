@@ -7,6 +7,7 @@ import { canThrowWith } from '../../domain/player/cqc'
 import { MODES } from '../../domain/match/room'
 import { isTranquilizer } from '../../domain/item/weapons'
 import { CAUTION_SECONDS, type GameStats } from '../scene/Game'
+import { TARGET_RETURN_MS } from '../../domain/match/target'
 import Orders from './Orders'
 import './Hud.css'
 
@@ -381,6 +382,24 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             />
           </span>
           <span class="hud-caution-count">{String(Math.ceil(props.stats?.caution ?? 0)).padStart(2, '0')}</span>
+        </div>
+      </Show>
+
+      {/*
+        落ちたターゲット (TSNE) が置き場所へ戻るまで。**攻める側も守る側も同じ秒数を見る。**
+        少しずつ運んでは落とす作戦を、戻るまでの残りが見えることで縛る。取り直すと消え、
+        次に落とした時はまた 30 秒から (2026-10-25 本人)
+      */}
+      <Show when={(props.stats?.targetReturn ?? 0) > 0 && phase() === 'playing'}>
+        <div class="hud-caution hud-target-return">
+          <span class="hud-caution-label">TARGET RETURN</span>
+          <span class="hud-caution-track">
+            <span
+              class="hud-caution-bar"
+              style={{ transform: `scaleX(${Math.min(1, (props.stats?.targetReturn ?? 0) / (TARGET_RETURN_MS / 1000))})` }}
+            />
+          </span>
+          <span class="hud-caution-count">{String(Math.ceil(props.stats?.targetReturn ?? 0)).padStart(2, '0')}</span>
         </div>
       </Show>
 

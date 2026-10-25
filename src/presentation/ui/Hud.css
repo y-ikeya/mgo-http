@@ -1653,3 +1653,19 @@
   letter-spacing: 0.2em;
   padding-left: 0.2em;
 }
+
+/*
+ * 落ちたターゲット (TSNE) が戻るまで。CAUTION と同じ形で、その下に。色はターゲットの光り
+ */
+.hud-target-return {
+  top: 112px;
+  color: #8af4ff;
+}
+
+.hud-target-return .hud-caution-track {
+  background: rgba(20, 80, 96, 0.55);
+}
+
+.hud-target-return .hud-caution-bar {
+  background: #8af4ff;
+}

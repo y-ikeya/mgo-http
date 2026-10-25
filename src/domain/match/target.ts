@@ -92,6 +92,16 @@ export function carryTo(target: Target, x: number, y: number, z: number): Target
   return { ...target, x, y, z }
 }
 
+/**
+ * 置き場所へ戻る時刻。**落ちている間だけ** (運ばれている・置き場所にある間は null)。
+ * 取り直すと droppedAt が消えるので数え直しになり、次に落とした時はまた 30 秒から
+ * (2026-10-25 本人「ちびちび持って進む作戦を防ぐ、画面にカウントダウン」)
+ */
+export function targetReturnsAt(target: Target): number | null {
+  if (target.carrier || target.droppedAt === 0) return null
+  return target.droppedAt + TARGET_RETURN_MS
+}
+
 /** 落ちたまま 30 秒経ったら置き場所へ戻す。戻したら新しい物、そのままなら同じ物 */
 export function returnIfIdle(target: Target, now: number): Target {
   if (target.carrier || target.droppedAt === 0 || now - target.droppedAt < TARGET_RETURN_MS) return target
