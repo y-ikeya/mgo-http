@@ -531,6 +531,11 @@ const HIT_FEEDBACK_DURATION = 0.6;
 const ADAPT_MAX = 1.8;
 /** CAUTION の長さ (秒)。バーの満タン。STEALTH が解けている長さ (domain/match/sides.ts の STEALTH_BREAK_MS) */
 export const CAUTION_SECONDS = STEALTH_BREAK_MS / 1000;
+/**
+ * 弾倉を投げてから次を構えられるまで (ms)。振りかぶりの型が無いので、手榴弾の
+ * 「振り切ってからピンを抜く」(約 1.3 秒) に当たる間をここで置く
+ */
+const MAGAZINE_REARM_MS = 1000;
 /** 時計の音を鳴らし始める残りの秒。10 秒から 1 秒まで 10 回 */
 const CLOCK_TICK_FROM = 10;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
@@ -4744,6 +4749,8 @@ export class Game {
 
   /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */
   private rolledThisHold = false;
+  /** 次の弾倉を構えられる時刻 (performance.now)。投げてから MAGAZINE_REARM_MS */
+  private magazineReadyAt = 0;
 
   /**
    * 投げる構えと、離したときの投擲。
@@ -4767,6 +4774,12 @@ export class Game {
     const release = held && this.throwAiming && pulled;
 
     if (held && !release) {
+      /*
+       * **投げてすぐは構え直さない。** 弾倉には振りかぶりの型が無いので、構えを押したままだと
+       * 投げた次のコマにはもう構えていて、引き金を連打するだけで投げ続けられた。手榴弾の
+       * 「振り切ってからピンを抜く」に当たる間を置く (2026-10-25 本人「mag とかの投擲も同じだよね？」)
+       */
+      if (!this.throwAiming && performance.now() < this.magazineReadyAt) return;
       this.follow.aimOrigin(this.aimOrigin);
       this.follow.aimDirection(this.aimDir);
       this.thrown.showPreview(
@@ -4788,6 +4801,7 @@ export class Game {
     if (!release || !canThrow) return;
 
     this.inv.spend();
+    this.magazineReadyAt = performance.now() + MAGAZINE_REARM_MS;
     this.follow.aimOrigin(this.aimOrigin);
     this.follow.aimDirection(this.aimDir);
     this.thrown.throwFrom(this.aimOrigin, this.aimDir);
