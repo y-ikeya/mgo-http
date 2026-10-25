@@ -1733,12 +1733,12 @@
 {
 "name": "defaultMaterial",
 "min": [
--0.054,
+0.602,
 0.1,
 5.426
 ],
 "max": [
-1.946,
+2.602,
 1.663,
 6.773
 ],
@@ -4410,6 +4410,58 @@
 ],
 "top": {
 "h": 2.5706,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "defaultMaterial.004",
+"min": [
+-2.407,
+0.1,
+5.426
+],
+"max": [
+-0.407,
+1.663,
+6.773
+],
+"top": {
+"h": 1.6629,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_wall3",
+"min": [
+18.081,
+3.9,
+24.866
+],
+"max": [
+18.171,
+5.907,
+26.866
+],
+"top": {
+"h": 5.9067,
 "dx": 0.0,
 "dz": 0.0
 },
