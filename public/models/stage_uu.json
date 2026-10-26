@@ -560,16 +560,16 @@
 "name": "concrete_2F_ground",
 "min": [
 -35.284,
-3.6,
+3.61,
 -39.088
 ],
 "max": [
 32.523,
-3.9,
+4.035,
 28.169
 ],
 "top": {
-"h": 3.9,
+"h": 4.035,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3148,12 +3148,12 @@
 {
 "name": "wood_box_box_box_nouv",
 "min": [
--31.621,
+-31.8,
 3.865,
 6.854
 ],
 "max": [
--30.623,
+-30.802,
 5.855,
 7.932
 ],
@@ -4553,58 +4553,6 @@
 }
 },
 {
-"name": "concrete_watertank_base",
-"min": [
--2.004,
-3.9,
--18.206
-],
-"max": [
--0.104,
-4.25,
--17.856
-],
-"top": {
-"h": 4.25,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_watertank_base.001",
-"min": [
--2.004,
-3.9,
--19.556
-],
-"max": [
--0.104,
-4.25,
--19.206
-],
-"top": {
-"h": 4.25,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "wood_box_box2_box_nouv.039",
 "min": [
 0.126,
@@ -4711,17 +4659,17 @@
 {
 "name": "metal_watertank",
 "min": [
--2.054,
-4.25,
--19.706
+-2.682,
+4.644,
+-20.184
 ],
 "max": [
--0.054,
-6.75,
--17.706
+-0.048,
+7.937,
+-17.55
 ],
 "top": {
-"h": 6.75,
+"h": 7.9366,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4737,20 +4685,228 @@
 {
 "name": "metal_watertank_hatch",
 "min": [
--1.684,
-4.745,
--17.726
+-2.194,
+5.296,
+-17.576
 ],
 "max": [
--1.424,
-5.005,
--17.666
+-1.852,
+5.638,
+-17.497
 ],
 "top": {
-"h": 5.0221,
-"dx": -0.13166,
+"h": 5.6609,
+"dx": -0.13165,
 "dz": 0.0,
-"thick": 0.26
+"thick": 0.3424
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_cube.010",
+"min": [
+-33.262,
+3.9,
+-20.527
+],
+"max": [
+-30.18,
+6.3,
+8.718
+],
+"top": {
+"h": 6.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.042",
+"min": [
+-30.191,
+3.9,
+-12.296
+],
+"max": [
+-29.177,
+4.727,
+-11.505
+],
+"top": {
+"h": 4.7272,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.043",
+"min": [
+-30.191,
+3.9,
+-11.503
+],
+"max": [
+-29.177,
+4.727,
+-10.712
+],
+"top": {
+"h": 4.7272,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.044",
+"min": [
+-30.191,
+4.729,
+-11.503
+],
+"max": [
+-29.177,
+5.556,
+-10.712
+],
+"top": {
+"h": 5.5564,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_leg.000",
+"min": [
+-2.582,
+3.924,
+-17.8
+],
+"max": [
+-2.432,
+4.664,
+-17.65
+],
+"top": {
+"h": 4.664,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_leg.001",
+"min": [
+-0.298,
+3.924,
+-17.8
+],
+"max": [
+-0.148,
+4.664,
+-17.65
+],
+"top": {
+"h": 4.664,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_leg.002",
+"min": [
+-2.582,
+3.924,
+-20.084
+],
+"max": [
+-2.432,
+4.664,
+-19.934
+],
+"top": {
+"h": 4.664,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_leg.003",
+"min": [
+-0.298,
+3.924,
+-20.084
+],
+"max": [
+-0.148,
+4.664,
+-19.934
+],
+"top": {
+"h": 4.664,
+"dx": 0.0,
+"dz": 0.0
 },
 "flags": {
 "draw": true,
