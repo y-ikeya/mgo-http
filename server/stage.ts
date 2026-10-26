@@ -14,7 +14,7 @@
  * 読むのは起動時に 1 回だけで、切り替わっても読み直さない。
  */
 
-import { STAGES, type Spot, type StageName } from '../src/domain/stage'
+import { STAGES, type Spot, type StageName, type Zone } from '../src/domain/stage'
 import type { Team } from '../src/domain/player/player'
 import { arenaHalfOf } from '../src/sim/judge/motioncheck'
 import { boxSolid } from '../src/sim/judge/ballistic'
@@ -87,6 +87,10 @@ export interface Terrain {
   bases: Partial<Record<Team, Spot>>
   /** TSNE のターゲットの置き場所。書き出しが blend の空 target* から写した物。無ければ表 (STAGES) へ落ちる */
   tsneTargets: Spot[]
+  /** CAP の target の置き場所 (blend の meta_cap_target*)。無いステージでは CAP の決まりは働かない */
+  capTargets: Spot[]
+  /** CAP の設置ポイント。**その陣営が運び込む所** (blend の meta_cap_base_blue / _red) */
+  capGoals: Partial<Record<Team, Zone>>
   /** 空のダンボール (stage.json の fx の cbox)。触れたら揺らす (arms/cbox.ts) */
   cboxes: CboxProp[]
 }
@@ -112,6 +116,8 @@ function bare(name: StageName): Terrain {
     arenaHalf: Number.POSITIVE_INFINITY,
     bases: {},
     tsneTargets: STAGES[name].tsneTargets ?? [],
+    capTargets: [],
+    capGoals: {},
     cboxes: [],
   }
 }
@@ -130,6 +136,8 @@ async function load(name: StageName): Promise<Terrain> {
       boxes: StageBox[]
       bases?: Partial<Record<Team, Spot>>
       tsneTargets?: Spot[]
+      capTargets?: Spot[]
+      capGoals?: Partial<Record<Team, Zone>>
       fx?: { kind: string; x: number; y: number; z: number; size: number; yaw?: number }[]
     }
     const solid = solidBlockers(data.boxes)
@@ -152,6 +160,8 @@ async function load(name: StageName): Promise<Terrain> {
       arenaHalf: half,
       bases: data.bases ?? {},
       tsneTargets: data.tsneTargets?.map(({ x, y, z }) => ({ x, y, z })) ?? STAGES[name].tsneTargets ?? [],
+      capTargets: data.capTargets ?? [],
+      capGoals: data.capGoals ?? {},
       cboxes: (data.fx ?? [])
         .filter((f) => f.kind === 'cbox')
         .map((f) => ({ x: f.x, y: f.y, z: f.z, yaw: f.yaw ?? 0, size: f.size })),

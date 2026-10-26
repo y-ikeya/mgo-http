@@ -297,7 +297,12 @@ TOOLBOX_BLEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'props'
 
 def is_base_marker(obj):
     lower = obj.name.lower()
-    return obj.type == 'EMPTY' and lower.startswith('meta_') and 'base' in lower
+    # CAP の設置ポイント (meta_cap_base_*) は基地ではない。湧く所でも補給できる所でもない
+    return obj.type == 'EMPTY' and lower.startswith('meta_') and 'base' in lower and not lower.startswith(CAP_PREFIX)
+
+
+# CAP の印 (下の「CAP」の節)。基地の印と名前が似ているので、ここで分ける
+CAP_PREFIX = 'meta_cap'
 
 
 def place_toolboxes():
@@ -1574,6 +1579,43 @@ for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
     tsne_targets.append({'name': obj.name, 'x': round(x, 2), 'y': round(floor if floor is not None else y, 2), 'z': round(z, 2)})
     print(f'  ターゲット {obj.name}: ({x:.1f}, {tsne_targets[-1]["y"]:.1f}, {z:.1f})')
 
+# --- CAP ----------------------------------------------------------------------
+#
+# **target の初期位置と、陣営ごとの設置ポイント。** domain/match/capture.ts が読む。
+#
+#   meta_cap_target*       target を置く所。高さは TSNE のターゲットと同じく真下の床に落とす
+#   meta_cap_base_blue     青が target を運び込む所 (red も同じ)。**Empty の立方体の大きさが広さ**
+#                          (display size × scale、回転は見ない)。高さは真下の床
+#
+# 設置ポイントは**相手の陣地の近く**に置く (2026-10-26 本人「見やすくて敵の陣地からも近い
+# ところに置いた方が面白い。敵は respawn したらすぐに base に向かえるし、自分は油断できない」)
+cap_targets = []
+cap_goals = {}
+for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
+    lower = obj.name.lower()
+    if obj.type != 'EMPTY' or not lower.startswith(CAP_PREFIX):
+        continue
+    for other in bpy.context.scene.objects:
+        if other.hide_get():
+            other.hide_set(False)
+    at = obj.matrix_world.translation
+    hit, where, *_ = bpy.context.scene.ray_cast(bpy.context.evaluated_depsgraph_get(), at + Vector((0, 0, 1.0)), Vector((0, 0, -1.0)))
+    x, y, z = to_gltf(at)
+    floor = round(where.z if hit else y, 2)
+    if lower.startswith(CAP_PREFIX + '_target'):
+        cap_targets.append({'x': round(x, 2), 'y': floor, 'z': round(z, 2)})
+        print(f'  CAP の target {obj.name}: ({x:.1f}, {floor:.1f}, {z:.1f})')
+    elif lower.startswith(CAP_PREFIX + '_base'):
+        team = 'blue' if 'blue' in lower else 'red' if 'red' in lower else None
+        if team is None:
+            print(f'  {obj.name}: 陣営が読めない (blue / red を名前に入れる)')
+            continue
+        scale = obj.matrix_world.to_scale()
+        size = obj.empty_display_size
+        # Blender の x / y が glTF の x / z
+        cap_goals[team] = {'x': round(x, 2), 'y': floor, 'z': round(z, 2), 'halfX': round(abs(scale.x) * size, 2), 'halfZ': round(abs(scale.y) * size, 2)}
+        print(f'  CAP の設置ポイント {team}: ({x:.1f}, {floor:.1f}, {z:.1f}) {2 * cap_goals[team]["halfX"]:.1f} × {2 * cap_goals[team]["halfZ"]:.1f}m')
+
 # --- 太陽 ----------------------------------------------------------------------
 #
 # **光は Blender で決める。** Sun ランプ (名前が sun で始まる) の向き・色・強さを
@@ -1650,6 +1692,10 @@ with open(json_path, 'w') as f:
     out = {'boxes': boxes, 'ladders': ladders, 'bases': bases}
     if tsne_targets:
         out['tsneTargets'] = tsne_targets
+    if cap_targets:
+        out['capTargets'] = cap_targets
+    if cap_goals:
+        out['capGoals'] = cap_goals
     if sun:
         out['sun'] = sun
     if fx:

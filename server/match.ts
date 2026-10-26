@@ -20,6 +20,8 @@ import {
 } from '../src/domain/match/match'
 import { livesOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
 import { clearTsneTarget, placeTsneTarget, updateTsneTarget } from './target'
+import { captureView, placeCapture, updateCapture } from './capture'
+import { captureWinner } from '../src/domain/match/capture'
 import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
 import { targetReturnsAt } from '../src/domain/match/target'
 import { fitLoadout } from '../src/domain/player/equip'
@@ -361,6 +363,8 @@ export function ticketsGone(room: Match): boolean {
  */
 export function decideWinner(room: Match): Team | 'draw' {
   if (!room.mode.teams) return 'draw'
+  // **CAP はカウントで決まる** (先に 0 / 時間切れは多く減らした側)。残機は見ない
+  if (room.mode.capture) return (room.capture && captureWinner(room.capture, true)) ?? 'draw'
   /*
    * **攻守に分かれる部屋は、両方残ったまま時間が来たら守る側の勝ち。**
    * blue / red はまだ戦える人数 (standingCounts)。片方が 0 なら下の通り相手の勝ち
@@ -402,6 +406,7 @@ export function matchState(room: RoomWorld): ServerMessage {
           returnsAt: targetReturnsAt(room.target) ?? undefined,
         }
       : undefined,
+    capture: captureView(room),
     endsAt: room.endsAt,
     sentAt: Date.now(),
     phase: room.phase,
@@ -674,6 +679,7 @@ function enterReady(room: RoomWorld, now: number, afterMatch = false): void {
   room.round = 1
   room.roundWins = { blue: 0, red: 0 }
   clearTsneTarget(room)
+  room.capture = null
   for (const player of room.players.values()) player.ready = false
   resetPlayers(room)
   if (room.mode.sides) standingCounts(room, now)
@@ -827,8 +833,9 @@ export function updateMatch(room: RoomWorld, now: number): void {
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION_MS
-    // ターゲットを守る側の陣地の近くに置く (TSNE。server/target.ts)
+    // ターゲットを守る側の陣地の近くに置く (TSNE。server/target.ts)。CAP は取り合う所に置いて、カウントを 60 秒ずつに
     placeTsneTarget(room)
+    placeCapture(room, now)
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく。
     // **後攻のラウンドは同じ試合の続き** なので発番し直さない
     if (!(room.mode.sides && room.round > 1 && room.matchId)) {
@@ -840,9 +847,14 @@ export function updateMatch(room: RoomWorld, now: number): void {
   // 攻守に分かれる部屋は、まだ戦える人数を数え直してから決着を見る
   if (room.mode.sides && room.phase === 'playing') standingCounts(room, now)
   // ターゲット (TSNE) を動かす。取った・落ちた・戻った・運び込んだ時はすぐ配る
-  const targetChanged = room.mode.sides && updateTsneTarget(room, now)
+  const targetChanged = (room.mode.sides || room.mode.capture) && updateTsneTarget(room, now)
+  // CAP のカウント (server/capture.ts)。持った人が自陣の設置ポイントに居る間だけ減る
+  const capture = updateCapture(room, now)
   if (room.phase !== 'playing' || previous !== 'playing') {
     // 段階が変わった刻みでは決着を見ない (上の分岐で済んでいる)
+  } else if (room.mode.capture) {
+    // **CAP はカウントで決まる。** 先に 0 にしたか、時間切れで差が付いていれば終わり (並んだらサドンデスで続ける)
+    if (capture.winner) endRound(room, now)
   } else if (room.targetDelivered) {
     // **運び込んだ。** 攻める側の勝ち (decideWinner)。時間を待たずにその場で終わる
     endRound(room, now)
@@ -862,7 +874,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
   const cautionChanged = room.mode.sides && room.revealedUntil !== room.cautionSent
   if (cautionChanged) room.cautionSent = room.revealedUntil
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
-  if (previous !== room.phase || stealthChanged || cautionChanged || targetChanged || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
+  if (previous !== room.phase || stealthChanged || cautionChanged || targetChanged || capture.changed || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
     room.lastBroadcast = now
     broadcast(room, matchState(room))
   }

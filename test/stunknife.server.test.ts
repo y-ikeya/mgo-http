@@ -16,7 +16,7 @@ beforeAll(async () => {
 })
 afterAll(() => server.stop())
 
-const [FIRST, SECOND] = STAGES[ROOMS.echo.stages.stages[0]].targets
+const [FIRST, SECOND] = STAGES[ROOMS.golf.stages.stages[0]].targets
 
 function targets(me: Client): { id: string; slot: number }[] {
   const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
@@ -31,7 +31,7 @@ function stab(me: Client, target: { id: string }, stun: boolean) {
 
 test('眠らせる刺突は 1 回で眠り、充電が満ちるまで次は効かない', async () => {
   // 1 体目の正面 1m に立つ (的は +z を向いている)
-  const me = new Client(server, 'stun1', [FIRST!.x, 0, FIRST!.z + 1], 'echo')
+  const me = new Client(server, 'stun1', [FIRST!.x, 0, FIRST!.z + 1], 'golf')
   await me.ready()
   me.live()
   await Bun.sleep(3400)
@@ -59,7 +59,7 @@ test('眠らせる刺突は 1 回で眠り、充電が満ちるまで次は効�
 }, 50_000)
 
 test('眠っている的は、しゃがんで見下ろさないと刺せない', async () => {
-  const me = new Client(server, 'stun2', [SECOND!.x, 0, SECOND!.z + 1], 'echo')
+  const me = new Client(server, 'stun2', [SECOND!.x, 0, SECOND!.z + 1], 'golf')
   await me.ready()
   me.live()
   await Bun.sleep(3400)

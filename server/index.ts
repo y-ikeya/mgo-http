@@ -87,7 +87,7 @@ import { STAGES, inWater, waterOf } from '../src/domain/stage'
 import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { MAX_STAMINA, PAT_RANGE, isAsleep, pat, recoverStamina, struggle } from '../src/domain/player/stamina'
-import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
+import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, downSeconds, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
 
@@ -240,7 +240,8 @@ setInterval(() => {
          * ここは返ってきたことをやるだけ — 配るのも装備を配り直すのも権威の仕事。
          */
         // 復活の回数を使い切った人は倒れたまま (TSNE の lives)
-        const effect = advanceLife(player.life, lifeElapsed(player, now), canRespawn(player, livesOf(room.name)))
+        // 倒れたままの時間は、倒されるたびに延びる部屋がある (CAP。lifecycle.ts の downSeconds)
+        const effect = advanceLife(player.life, lifeElapsed(player, now), canRespawn(player, livesOf(room.name)), downSeconds(player.deaths, room.mode.downGrows))
         if (effect?.kind === 'life') setLife(room, player, effect.to, now)
         else if (effect?.kind === 'spawn' && !holdsChoosing(room.phase)) spawn(room, player, now)
 
@@ -1056,9 +1057,9 @@ const server = Bun.serve<Client>({
     }
 
     // --- 練習で入る部屋 ---
-    // 手元のサーバーなら検証場 (foxtrot)、公開のサーバーは更地の練習場 (echo)。画面の /training が訊く
+    // 手元のサーバーなら検証場 (foxtrot)、公開のサーバーは更地の練習場 (golf)。画面の /training が訊く
     if (url.pathname === '/training') {
-      const room = isRoomOpen('foxtrot', LOCAL_ROOMS) ? 'foxtrot' : 'echo'
+      const room = isRoomOpen('foxtrot', LOCAL_ROOMS) ? 'foxtrot' : 'golf'
       return Response.json({ room }, { headers: CORS })
     }
 
@@ -1082,8 +1083,9 @@ const server = Bun.serve<Client>({
           phase: room?.phase ?? 'waiting',
           // 誰が居るか。入る前に見せる
           roster: here.map((p) => ({ id: p.id, name: p.name, team: p.team })),
-          blue: room?.blue ?? 0,
-          red: room?.red ?? 0,
+          // CAP は残機ではなくカウント (残り秒)
+          blue: room?.capture ? Math.ceil(room.capture.count.blue / 1000) : (room?.blue ?? 0),
+          red: room?.capture ? Math.ceil(room.capture.count.red / 1000) : (room?.red ?? 0),
           // 残り時間はこちらで秒に直す。時計を合わせる話を持ち込まない
           remaining: room?.endsAt ? Math.max(0, Math.round((room.endsAt - Date.now()) / 1000)) : 0,
         } satisfies RoomSummary

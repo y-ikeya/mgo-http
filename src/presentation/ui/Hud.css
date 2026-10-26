@@ -1669,3 +1669,32 @@
 .hud-target-return .hud-caution-bar {
   background: #8af4ff;
 }
+
+/* CAP: いまカウントを進めている陣営の数字。脈打つ */
+.hud-score-holding {
+  animation: hud-score-holding 0.8s ease-in-out infinite;
+}
+
+@keyframes hud-score-holding {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* CAP の時間切れで並んだ。CAUTION と同じ場所に */
+.hud-sudden-death {
+  color: #ffd25a;
+}
+
+/* 倒れたまま、支度に移るまで (CAP)。CAUTION と同じ形。色は白 */
+.hud-respawn {
+  top: 160px;
+  color: #e8ecf2;
+}
+
+.hud-respawn .hud-caution-track {
+  background: rgba(60, 64, 72, 0.6);
+}
+
+.hud-respawn .hud-caution-bar {
+  background: #e8ecf2;
+}

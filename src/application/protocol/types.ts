@@ -740,6 +740,8 @@ export interface LifeEvent {
   type: 'life'
   id: string
   state: Life
+  /** 倒れた時 (downed) だけ。倒れたままでいる秒数 (CAP は倒されるたびに延びる。lifecycle.ts の downSeconds) */
+  downFor?: number
 }
 
 /**
@@ -1195,6 +1197,18 @@ export interface MatchMessage {
      * 画面に戻るまでのカウントダウンを出す (domain/match/target.ts の TARGET_RETURN_MS)
      */
     returnsAt?: number
+  }
+  /**
+   * CAP のカウント (domain/match/capture.ts)。CAP の部屋で試合が始まってから。
+   * 残りは**秒** (小数)。0 にした側の勝ち
+   */
+  capture?: {
+    blue: number
+    red: number
+    /** 時間切れで並んだ。先にカウントを進めた側の勝ち */
+    suddenDeath: boolean
+    /** いまカウントを進めている陣営。居なければ null */
+    holding: Team | null
   }
   /**
    * 部屋に居る全員と、その戦績。成績表はこれだけで描ける。

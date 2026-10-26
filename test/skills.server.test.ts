@@ -63,7 +63,7 @@ async function withRecording(): Promise<{ server: Server; stub: Recorder }> {
 describe('スキルの保存', () => {
   test('**練習部屋で選び直した分が書かれる。** 試合が終わらなくても', async () => {
     const { server, stub } = await withRecording()
-    const solo = new Client(server, 'ike', [0, 0, 0], 'echo')
+    const solo = new Client(server, 'ike', [0, 0, 0], 'golf')
     await solo.ready()
     solo.live()
     // 試合が始まるのを待つ。ここで書かれていた頃は、まだ何も選んでいない
@@ -82,7 +82,7 @@ describe('スキルの保存', () => {
 
   test('効いている物が本人へ返る', async () => {
     const { server } = await withRecording()
-    const solo = new Client(server, 'ike', [0, 0, 0], 'echo')
+    const solo = new Client(server, 'ike', [0, 0, 0], 'golf')
     await solo.ready()
     solo.live()
     await Bun.sleep(600)
@@ -96,7 +96,7 @@ describe('スキルの保存', () => {
 
   test('**同じ物を送り直しても書き直さない。** 段を触るたびに往復が増える', async () => {
     const { server, stub } = await withRecording()
-    const solo = new Client(server, 'ike', [0, 0, 0], 'echo')
+    const solo = new Client(server, 'ike', [0, 0, 0], 'golf')
     await solo.ready()
     solo.live()
     await Bun.sleep(600)
@@ -112,7 +112,7 @@ describe('スキルの保存', () => {
 
   test('予算を超えた選択は書かれない。**弾いた物を残さない**', async () => {
     const { server, stub } = await withRecording()
-    const solo = new Client(server, 'ike', [0, 0, 0], 'echo')
+    const solo = new Client(server, 'ike', [0, 0, 0], 'golf')
     await solo.ready()
     solo.live()
     await Bun.sleep(600)

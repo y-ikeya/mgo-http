@@ -4,7 +4,7 @@ import { instanceRepeats } from './instancing'
 import { swayingGrassMaterial } from './grass'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
-import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
+import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot, type Zone } from '../../../domain/stage'
 import { decodeStageMesh, meshSubset, MESH_CAMERA, MESH_EYE, MESH_PLAYER, type StageMesh } from '../../../sim/space/stagemesh'
 import { MeshMoveWorld } from '../../../sim/space/meshworld'
 import { PLAYER_HEIGHT, STEP_UP } from '../../../domain/player/moving'
@@ -1100,6 +1100,88 @@ export function loadStageBases(name: StageName): Promise<Partial<Record<Team, Sp
     })
   stageBases.set(name, pending)
   return pending
+}
+
+/**
+ * CAP の設置ポイント。**箱と同じ json から読む** (blend の meta_cap_base_blue / _red)。無いステージは空
+ */
+const stageCapGoals = new Map<StageName, Promise<Partial<Record<Team, Zone>>>>()
+
+export function loadStageCapGoals(name: StageName): Promise<Partial<Record<Team, Zone>>> {
+  const cached = stageCapGoals.get(name)
+  if (cached) return cached
+  const pending = fetch(asset.model(`stage_${name}.json`))
+    .then((res) => res.json() as Promise<{ capGoals?: Partial<Record<Team, Zone>> }>)
+    .then((data) => data.capGoals ?? {})
+    .catch((error) => {
+      console.warn(`[Stage] stage_${name}.json が読めない (設置ポイント)`, error)
+      return {}
+    })
+  stageCapGoals.set(name, pending)
+  return pending
+}
+
+/** 設置ポイントに立てる光の柱の高さ (m)。2F の床からでも、隣の建物の屋上からでも見える */
+const CAP_PILLAR_HEIGHT = 6
+const CAP_PILLAR_OPACITY = 0.05
+
+/**
+ * 柱の透け方。**下が濃く、上へ行くほど消える** (2026-10-27 本人「柱の上の方はグラデーションで消して」)。
+ * alphaMap は緑の値を見る。v = 0 (足元) が白、v = 1 (てっぺん) が黒
+ */
+let capPillarFade: THREE.Texture | null = null
+function pillarFade(): THREE.Texture {
+  if (capPillarFade) return capPillarFade
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 64
+  const context = canvas.getContext('2d')!
+  const gradient = context.createLinearGradient(0, 0, 0, 64)
+  gradient.addColorStop(0, '#000')
+  gradient.addColorStop(1, '#fff')
+  context.fillStyle = gradient
+  context.fillRect(0, 0, 1, 64)
+  capPillarFade = new THREE.CanvasTexture(canvas)
+  return capPillarFade
+}
+const CAP_FILL_OPACITY = 0.18
+
+/**
+ * CAP の設置ポイント。**見やすく** (2026-10-26 本人「設置ポイントは見やすくて敵の陣地からも近いところに」)。
+ *
+ * 基地の枠と同じ 4m 四方なので、枠だけだと見分けが付かない。枠に加えて床を薄く塗り、
+ * 陣営の色の光の柱を立てる。柱は深さを書かない (中に立った人も透けて見える)
+ */
+export function buildCapGoals(goals: Partial<Record<Team, Zone>>): THREE.Object3D {
+  const group = new THREE.Group()
+  for (const [team, goal] of Object.entries(goals) as [Team, Zone][]) {
+    const color = TEAM_COLOR[team]
+    const flat = (opacity: number) =>
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity, toneMapped: false, side: THREE.DoubleSide, depthWrite: false })
+    const frame = new THREE.Mesh(frameGeometry(goal.halfX, BASE_LINE * 1.5), flat(0.8))
+    frame.scale.z = goal.halfZ / goal.halfX
+    frame.position.set(goal.x, goal.y + BASE_Y, goal.z)
+    const fill = new THREE.Mesh(new THREE.PlaneGeometry(goal.halfX * 2, goal.halfZ * 2), flat(CAP_FILL_OPACITY))
+    fill.rotation.x = -Math.PI / 2
+    fill.position.set(goal.x, goal.y + BASE_Y * 0.5, goal.z)
+    // **柱は外の面だけ。** 両面を描くと、中に立った人の画面が柱の内側で塗り潰される。
+    // 蓋の無い 4 面の筒 (上下の面があるとグラデーションが蓋に乗る)。45° 回すと四角になる
+    const pillarMaterial = flat(CAP_PILLAR_OPACITY)
+    pillarMaterial.side = THREE.FrontSide
+    pillarMaterial.alphaMap = pillarFade()
+    const radius = Math.SQRT2
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, CAP_PILLAR_HEIGHT, 4, 1, true), pillarMaterial)
+    tube.rotation.y = Math.PI / 4
+    tube.frustumCulled = false
+    // 縦横の違う設置ポイントでも四角のまま伸ばす (回した物を直に伸ばすと菱形になる)
+    const pillar = new THREE.Group()
+    pillar.add(tube)
+    pillar.scale.set(goal.halfX, 1, goal.halfZ)
+    pillar.position.set(goal.x, goal.y + CAP_PILLAR_HEIGHT / 2, goal.z)
+    for (const mesh of [frame, fill]) mesh.frustumCulled = false
+    group.add(frame, fill, pillar)
+  }
+  return group
 }
 
 /** stage.json の太陽 (Blender の Sun ランプから。tools/export_stage.py) */

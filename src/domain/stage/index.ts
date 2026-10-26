@@ -72,6 +72,18 @@ export interface Spot {
 }
 
 /**
+ * 床に敷いた四角い場所。**CAP の設置ポイント** (domain/match/capture.ts)。
+ * 中心は床の上、広さは中心から x / z へ半分ずつ (回さない)
+ */
+export interface Zone {
+  x: number
+  y: number
+  z: number
+  halfX: number
+  halfZ: number
+}
+
+/**
  * 練習の的の置き場。**姿勢も持つ。** 省けば立っている。
  *
  * しゃがんだ的・伏せた的は、低い頭を狙う練習と、CQC が掛からない相手
@@ -397,7 +409,7 @@ const UU: StageSpec = {
  * 検証場。**動作を試すための地形** (tools/make_lab.py が白紙から起こす)。
  *
  * 段の列 (0.25 / 0.45 / 0.9 / 1.2 / 1.5)、窓の壁、しゃがみでくぐる通路、
- * 階段と 3m の床 (縁からぶら下がる・梯子)、堀、低い遮蔽。echo の部屋で使う。
+ * 階段と 3m の床 (縁からぶら下がる・梯子)、堀、低い遮蔽。foxtrot の部屋で使う。
  * 基地の値は json (meta_base*) と同じ。地面の上面は 0.1 (コード側の仮の地面 y=0 と重ねない)。
  */
 const LAB: StageSpec = {

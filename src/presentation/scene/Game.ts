@@ -46,7 +46,7 @@ import {
   loadStageLadders,
   STAGE_CODE,
   TEAM_COLOR,
-  type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
+  type Stage, addColliderOverlay, buildCapGoals, colliderOverlayOn, loadStageBases, loadStageBoxes, loadStageCapGoals } from "./world/stage";
 import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
 import { type StageBox, solidBlockers } from "../../sim/space/vision";
 import { PlacePreview } from "./arms/placePreview";
@@ -369,6 +369,12 @@ export interface GameStats {
   caution: number
   /** 落ちたターゲット (TSNE) が置き場所へ戻るまでの残り (秒)。落ちていなければ 0 */
   targetReturn: number
+  /**
+   * 倒れたまま、復活の支度に移るまでの残り (秒)。**倒されるたびに延びる部屋 (CAP) でだけ** 0 より大きい。
+   * downFor はその満タン (今回の倒れたままの秒数)
+   */
+  downLeft: number
+  downFor: number
   /** どちらの系統の一覧を開いているか。閉じていれば null */
   browsingFamily: 'weapon' | 'tool' | null
   /** 持ち替えの最中か。HUD を薄くするのに使う */
@@ -1471,6 +1477,13 @@ export class Game {
     this.player.showCollider(colliderOverlayOn());
     void loadStageBases(this.stageName).then((bases) => {
       this.stageBases = bases;
+    });
+    // CAP の設置ポイント。CAP の部屋でだけ見せる (updateTsneTarget)
+    void loadStageCapGoals(this.stageName).then((goals) => {
+      if (this.disposed) return;
+      this.capGoals = buildCapGoals(goals);
+      this.capGoals.visible = false;
+      this.scene.add(this.capGoals);
     });
     void loadStageBoxes(this.stageName).then((boxes) => {
       this.placeSolid = solidBlockers(boxes);
@@ -3052,7 +3065,11 @@ export class Game {
       // ここから出る。推し量る側の判断はどこにも残さない
       // 他人のぶんはレプリカが受け取っている (sync / died)
       case "life":
-        if (message.id === this.net.id) this.setLife(message.state);
+        if (message.id === this.net.id) {
+          // 倒れたままでいる秒数 (CAP は倒されるたびに延びる)。残りを画面に出し、過ぎたら復活できない人と読む
+          if (message.state === "downed") this.downFor = message.downFor ?? DOWN_DURATION;
+          this.setLife(message.state);
+        }
         break;
 
       // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
@@ -3566,7 +3583,19 @@ export class Game {
    * 試合が終わるまで、倒れた場所でカメラだけ回せる (2026-10-17 本人)
    */
   private get lookingAround(): boolean {
-    return isDowned(this.life) && Date.now() - this.lifeAt > DOWN_DURATION * 1000;
+    return isDowned(this.life) && Date.now() - this.lifeAt > this.downFor * 1000;
+  }
+
+  /** 倒れたままでいる秒数。倒れた知らせ (life) に載って届く (CAP は倒されるたびに延びる) */
+  private downFor = DOWN_DURATION;
+
+  /** CAP の設置ポイントの印 (光の柱と床の塗り)。読めるまで null */
+  private capGoals: THREE.Object3D | null = null;
+
+  /** その人の陣営 (成績表の名簿から)。分からなければ null */
+  private teamOfId(id: string): Team | null {
+    if (id === this.net.id) return this.selfTeam;
+    return this.replica.match?.players.find((p) => p.id === id)?.team ?? null;
   }
 
   /**
@@ -3912,8 +3941,14 @@ export class Game {
       // 見えていない相手は姿が最後の場所に止まっている。その時は届いた位置 (targetAt) で浮かせる
       carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.livePositionOf(view.carrier);
     }
-    // 攻める側にも守る側にも光って見える。色は攻める側のチーム色
-    const glow = this.attackTeam === null ? null : TEAM_COLOR[this.attackTeam];
+    // 攻める側にも守る側にも光って見える。色は攻める側のチーム色。
+    // **CAP は両陣営が取り合う**ので、運んでいる人の陣営の色 (置いてある・落ちている間は白)
+    const capture = MODES[this.replica.mode].capture;
+    if (this.capGoals) this.capGoals.visible = capture;
+    const carrierTeam = view?.carrier ? this.teamOfId(view.carrier) : null;
+    const glow = capture
+      ? (carrierTeam ? TEAM_COLOR[carrierTeam] : 0xffffff)
+      : this.attackTeam === null ? null : TEAM_COLOR[this.attackTeam];
     this.tsneTarget.update(dt, view, carrierAt, glow);
   }
 
@@ -6053,6 +6088,11 @@ export class Game {
       caution: Math.max(0, (this.replica.match?.cautionUntil ?? 0) - Date.now()) / 1000,
       // 落ちたターゲットが戻るまで。取り直すと消え、次に落とすと 30 秒から (サーバーが持つ)
       targetReturn: Math.max(0, (this.replica.match?.target?.returnsAt ?? 0) - Date.now()) / 1000,
+      downLeft:
+        MODES[this.replica.mode].downGrows && isDowned(this.life)
+          ? Math.max(0, this.downFor - (Date.now() - this.lifeAt) / 1000)
+          : 0,
+      downFor: this.downFor,
       browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物

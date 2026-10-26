@@ -110,6 +110,8 @@ export default function Orders(props: {
     if (!MODES[props.mode].teams) return t('orders.dm')
     // TSNE はターゲットの取り合い (本人 2026-10-20「ターゲットを基地へ持ち帰れ」)
     if (MODES[props.mode].sides) return props.team === props.attack ? t('orders.tsne.attack') : t('orders.tsne.defence')
+    // CAP は target の取り合い (domain/match/capture.ts)。自陣の設置ポイントで持ち続ける
+    if (MODES[props.mode].capture) return t('orders.cap')
     return props.team === 'red' ? t('orders.tdm.blue') : t('orders.tdm.red')
   }
 
