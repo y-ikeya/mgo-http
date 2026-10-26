@@ -217,7 +217,7 @@ export class MeshMoveWorld implements MoveWorld {
     const limit = feetY + this.stepUp + STEP_TOUCH
     const from = feetY + height - 0.05
     const blockedAt = (x: number, z: number) => {
-      const y = this.probe(x, z, from, from)
+      const y = this.probe(x, z, from, from, from)
       return y !== null && y > limit
     }
     /*
@@ -296,7 +296,8 @@ export class MeshMoveWorld implements MoveWorld {
      * 体が浮く (半径 0.35m・傾き 1/4 の坂で 7cm)。箱のときも高さは中心で
      * 引いていた (topAt)。周りを見るのは「乗っているか」を決めるため。
      */
-    const center = this.probe(position.x, position.z, from, limit)
+    const low = feetY + this.stepUp + 0.05
+    const center = this.probe(position.x, position.z, from, limit, low)
     if (center !== null) return center
 
     /*
@@ -310,7 +311,7 @@ export class MeshMoveWorld implements MoveWorld {
       const angle = ((i - 1) / (GROUND_SAMPLES - 1)) * Math.PI * 2
       const x = position.x + Math.cos(angle) * radius * 0.8
       const z = position.z + Math.sin(angle) * radius * 0.8
-      const y = this.probe(x, z, from, limit)
+      const y = this.probe(x, z, from, limit, low)
       if (y !== null && y > best) best = y
     }
     return best
@@ -324,19 +325,33 @@ export class MeshMoveWorld implements MoveWorld {
   private riseAhead(position: Vec3, radius: number, feetY: number): number {
     const from = feetY + Math.max(PROBE_UP, this.stepUp + 0.05)
     const limit = feetY + this.stepUp
+    const low = feetY + this.stepUp + 0.05
     let rise = 0
     for (let i = 0; i < SLOPE_SAMPLES; i++) {
       const angle = (i / SLOPE_SAMPLES) * Math.PI * 2
       const x = position.x + Math.cos(angle) * radius
       const z = position.z + Math.sin(angle) * radius
-      const y = this.probe(x, z, from, limit)
+      const y = this.probe(x, z, from, limit, low)
       if (y !== null && y - feetY > rise) rise = y - feetY
     }
     return rise
   }
 
-  /** その 1 点で足が着く高さ。段差より上にしか無ければ null */
-  private probe(x: number, z: number, from: number, limit: number): number | null {
+  /**
+   * その 1 点で足が着く高さ。段差より上にしか無ければ null。
+   *
+   * **線は頭の上の面より下から下ろす。** 始点は足元 + PROBE_UP だが、その間に
+   * 天井 (物の下面) があると、線が先に下面に当たって「段差より上」で捨てられ、
+   * 床が見つからない (0 が返る)。貯水槽の下 (床から 0.60m、土の上からは 0.585m)
+   * に伏せで潜ると、頭の位置で床が消えて「縁の外へ出た」と読み、起き上がって
+   * しゃがみに戻った (2026-10-26)。足元の少し上 (low) から上へ線を引き、当たれば
+   * そのすぐ下から下ろす
+   */
+  private probe(x: number, z: number, from: number, limit: number, low: number): number | null {
+    if (from > low) {
+      const ceiling = this.solid.hit(x, low, z, x, from, z)
+      if (ceiling) from = low + ceiling.t * (from - low) - 0.001
+    }
     const found = this.solid.hit(x, from, z, x, from - PROBE_DOWN, z)
     if (!found) return null
     const y = from - found.t * PROBE_DOWN
