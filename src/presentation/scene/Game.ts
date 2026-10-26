@@ -2197,6 +2197,8 @@ export class Game {
     ceilingHeight: (position, radius, feetY) =>
       this.stage.moveWorld?.ceilingHeight(position, radius, feetY) ??
       ceilingHeight(position, radius, this.stage.obstacles, feetY),
+    // 足音と同じ箱の名前から引く (網の材質は着弾の見た目用で、砂を持たない)
+    surfaceAt: (position, feetY) => surfaceAt(position, 0, this.stage.obstacles, feetY, STEP_UP),
   };
 
   /**

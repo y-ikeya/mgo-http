@@ -37,7 +37,7 @@ import { PLAYER_HEIGHT as BODY_HEIGHT, PLAYER_RADIUS as DOMAIN_RADIUS, STEP_UP }
 import { can, type BodyState } from '../../../domain/player/moves'
 import { CQC_LAND_SECONDS, CQC_MISS_RECOVERY, CQC_PAIR_DISTANCE } from '../../../domain/player/cqc'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
-import type { Water } from '../../../domain/stage'
+import type { Surface, Water } from '../../../domain/stage'
 import {
   climbSurge,
   crawlSurge,
@@ -490,6 +490,8 @@ export interface PlayerWorld {
   groundHeight(position: THREE.Vector3, radius: number, feetY: number): number
   /** その位置で頭がぶつかる高さ。何も無ければ Infinity */
   ceilingHeight(position: THREE.Vector3, radius: number, feetY: number): number
+  /** その位置で足が乗る面の材質 (点で見る)。無い世界 (試写) では跳び越えが材質を見ない */
+  surfaceAt?(position: THREE.Vector3, feetY: number): Surface
 }
 
 /**
@@ -3274,6 +3276,17 @@ export class Soldier {
         landing = Number.isNaN(landing) ? h : Math.max(landing, h)
       }
       return landing
+    }
+    /*
+     * **木の箱には乗る。** 箱の奥行き (0.79m) は越えた先 (縁から 0.8m) より短く、先の床が低いので
+     * 越える型になっていた (2026-10-26 本人「wood box に対しても飛び越えるモーション出ちゃってる」)。
+     * 奥行きで分けると土嚢 (0.6〜1.1m) も乗るほうに入るので、材質で分ける。乗れる奥行き
+     * (VAULT_LANDING_SHALLOW の 2 か所) が無い木の柵・手すりは今まで通り越える
+     */
+    probe.set(this.position.x + fx * (edge + VAULT_EDGE_STEP), feetY, this.position.z + fz * (edge + VAULT_EDGE_STEP))
+    if (world.surfaceAt?.(probe, top) === 'wood') {
+      const up = shallow()
+      if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top, edge }
     }
     /*
      * 少し先 (VAULT_CLEAR_STEP) が塞がっていたら、**手前の浅い台に乗る**のだけ見る。積んだ木箱の段
