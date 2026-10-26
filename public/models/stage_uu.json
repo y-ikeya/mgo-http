@@ -4972,17 +4972,17 @@
 {
 "name": "sand_soil_ground_2f",
 "min": [
--2.855,
-3.894,
-7.058
+-5.978,
+-0.032,
+-2.151
 ],
 "max": [
-9.101,
-3.959,
-11.359
+5.978,
+0.033,
+2.151
 ],
 "top": {
-"h": 3.959,
+"h": 0.0325,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -5362,14 +5362,66 @@
 {
 "name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.002",
 "min": [
-4.32,
-3.939,
-6.302
+4.285,
+3.944,
+6.202
 ],
 "max": [
-10.047,
+10.012,
+5.067,
+12.083
+],
+"top": {
+"h": 5.067,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "sand_soil_ground_2f.001",
+"min": [
+-2.704,
+3.894,
+-26.358
+],
+"max": [
+0.005,
+3.959,
+-20.221
+],
+"top": {
+"h": 3.959,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.003",
+"min": [
+-3.111,
+3.939,
+-23.59
+],
+"max": [
+0.396,
 5.062,
-12.183
+-19.989
 ],
 "top": {
 "h": 5.0624,
@@ -5383,6 +5435,58 @@
 "eye": false,
 "camera": false,
 "thrown": false
+}
+},
+{
+"name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.004",
+"min": [
+-3.098,
+3.939,
+-26.472
+],
+"max": [
+0.408,
+5.062,
+-22.871
+],
+"top": {
+"h": 5.0624,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "sand_soil_ground_2f.002",
+"min": [
+-2.868,
+3.894,
+6.784
+],
+"max": [
+9.038,
+3.959,
+11.385
+],
+"top": {
+"h": 3.959,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
 }
 },
 {
