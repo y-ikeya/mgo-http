@@ -5310,14 +5310,14 @@
 {
 "name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.000",
 "min": [
--3.821,
+-3.279,
 3.939,
-6.297
+6.679
 ],
 "max": [
-2.086,
+1.871,
 5.059,
-12.193
+11.819
 ],
 "top": {
 "h": 5.0589,
@@ -5336,14 +5336,14 @@
 {
 "name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.001",
 "min": [
-0.407,
+0.666,
 3.939,
-6.306
+6.618
 ],
 "max": [
-6.011,
+5.739,
 5.031,
-11.985
+11.759
 ],
 "top": {
 "h": 5.0308,
@@ -5362,14 +5362,14 @@
 {
 "name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.002",
 "min": [
-4.285,
+4.519,
 3.944,
-6.202
+6.625
 ],
 "max": [
-10.012,
+9.484,
 5.067,
-12.083
+11.723
 ],
 "top": {
 "h": 5.067,
