@@ -723,7 +723,7 @@ function projectWorldUv(mesh: THREE.Mesh, tile: number): void {
  * ドームのメッシュにして toneMapped を切ると、露出と無関係に指定した色がそのまま出る。
  * 空は「光源」ではなく「背景」なので、露出に振り回されないほうが扱いやすい。
  *
- * @param sunDirection 太陽の向き (正規化前でよい)。平行光と揃えると影の向きと一致する
+ * 太陽の向きは skySun (書き出しに太陽があればその向き、無ければ SUN_DIRECTION)
  */
 /**
  * その向きの空の色。**空そのものと、水面の映り込みが同じ式を読む。**
@@ -734,12 +734,11 @@ function projectWorldUv(mesh: THREE.Mesh, tile: number): void {
 function skyColorAt(
   dir: Node<'vec3'>,
   coverage: Node<'float'>,
-  sunDirection: THREE.Vector3,
 ): Node<'vec3'> {
   const zenith = uniform(new THREE.Color(look.zenith))
   const horizon = uniform(new THREE.Color(look.horizon))
   const sunColor = uniform(new THREE.Color(look.sun))
-  const sunDir = uniform(sunDirection.clone().normalize())
+  const sunDir = skySun
 
   // --- 雲のための雑音 ---
   // テクスチャを持たずに済ませる。空は毎フレーム全画面を覆うので、
@@ -838,9 +837,9 @@ function skyColorAt(
  * scene.background に色を入れるとクリアカラーになって階調が作れず、
  * テクスチャを入れるとトーンマッピングを通って露出 3.0 で白く飛ぶ。
  */
-function buildSky(sunDirection = SUN_DIRECTION): THREE.Mesh {
+function buildSky(): THREE.Mesh {
   const coverage = uniform(CLOUD_COVERAGE)
-  let color = skyColorAt(normalize(positionLocal), coverage, sunDirection)
+  let color = skyColorAt(normalize(positionLocal), coverage)
 
   // 階調の段差を散らす。空はなだらかな面が広いので、
   // 8 bit で出すと縞が見える。1/255 未満の雑音を足すと目立たなくなる。
@@ -899,6 +898,11 @@ const WATER_MIRROR_SAMPLES = 4
 
 /** 太陽の向き。空と水面で同じ物を見る (buildSky の既定と揃える) */
 const SUN_DIRECTION = new THREE.Vector3(18, 30, 12)
+/**
+ * 空に描く太陽の向き (正規化済み)。**書き出しに太陽があればそちらへ替わる** (applyStageSun)。
+ * 替えないと、Blender で日を動かしても空の明るい所だけが元の向きに残り、影とずれる
+ */
+const skySun = uniform(SUN_DIRECTION.clone().normalize())
 
 /**
  * 水面。**堀の中に 1 枚敷くだけ。**
@@ -1156,6 +1160,7 @@ export function applyStageSun(sun: THREE.DirectionalLight, data: StageSun): void
   if (dir.lengthSq() < 1e-6) return
   dir.normalize()
   sun.position.copy(sun.target.position).addScaledVector(dir, SUN_DISTANCE)
+  skySun.value.copy(dir)
   sun.color.setRGB(data.color[0], data.color[1], data.color[2], THREE.LinearSRGBColorSpace)
   sun.intensity = tuned('sun', SUN_INTENSITY) * (data.strength / BLENDER_SUN_REFERENCE)
   // 夜は月明かり。色は見た目の表、強さは昼の何分の 1 か
