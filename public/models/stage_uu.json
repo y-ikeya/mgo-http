@@ -4452,16 +4452,16 @@
 "name": "concrete_wall3",
 "min": [
 18.081,
-3.9,
+4.329,
 24.866
 ],
 "max": [
 18.171,
-5.907,
+5.9,
 26.866
 ],
 "top": {
-"h": 5.9067,
+"h": 5.9003,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4915,6 +4915,396 @@
 "eye": true,
 "camera": true,
 "thrown": true
+}
+},
+{
+"name": "concrete_wall3.002",
+"min": [
+18.081,
+3.944,
+24.866
+],
+"max": [
+18.171,
+4.151,
+26.866
+],
+"top": {
+"h": 4.1509,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.000",
+"min": [
+17.606,
+0.08,
+32.74
+],
+"max": [
+23.659,
+1.321,
+38.401
+],
+"top": {
+"h": 1.3205,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.001",
+"min": [
+17.423,
+0.08,
+28.34
+],
+"max": [
+23.812,
+1.334,
+33.981
+],
+"top": {
+"h": 1.334,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.002",
+"min": [
+17.633,
+0.08,
+24.118
+],
+"max": [
+23.724,
+1.316,
+29.535
+],
+"top": {
+"h": 1.3156,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.003",
+"min": [
+22.511,
+0.08,
+32.676
+],
+"max": [
+28.497,
+1.338,
+38.534
+],
+"top": {
+"h": 1.3383,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.004",
+"min": [
+22.401,
+0.08,
+28.426
+],
+"max": [
+28.495,
+1.318,
+34.043
+],
+"top": {
+"h": 1.3185,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.005",
+"min": [
+22.518,
+0.08,
+24.027
+],
+"max": [
+28.447,
+1.309,
+29.609
+],
+"top": {
+"h": 1.3086,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.006",
+"min": [
+27.441,
+0.08,
+32.867
+],
+"max": [
+33.533,
+1.343,
+38.32
+],
+"top": {
+"h": 1.3429,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.007",
+"min": [
+27.34,
+0.08,
+28.384
+],
+"max": [
+33.389,
+1.326,
+33.924
+],
+"top": {
+"h": 1.3263,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_nouv_noplayer_nobullet_noeye_nocamera.008",
+"min": [
+27.188,
+0.08,
+24.131
+],
+"max": [
+33.512,
+1.325,
+29.666
+],
+"top": {
+"h": 1.3252,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "sand_soil_ground",
+"min": [
+18.112,
+0.05,
+24.617
+],
+"max": [
+32.894,
+0.115,
+37.849
+],
+"top": {
+"h": 0.115,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "sand_soil_ground_2f",
+"min": [
+-2.855,
+3.894,
+7.058
+],
+"max": [
+9.101,
+3.959,
+11.359
+],
+"top": {
+"h": 3.959,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.000",
+"min": [
+-3.209,
+3.924,
+6.505
+],
+"max": [
+1.644,
+5.161,
+11.942
+],
+"top": {
+"h": 5.161,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.001",
+"min": [
+0.491,
+3.924,
+6.343
+],
+"max": [
+5.577,
+5.138,
+11.88
+],
+"top": {
+"h": 5.1381,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "grass_meadow_2f_nouv_noplayer_nobullet_noeye_nocamera.002",
+"min": [
+4.685,
+3.924,
+6.374
+],
+"max": [
+9.756,
+5.168,
+11.742
+],
+"top": {
+"h": 5.1684,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
 }
 },
 {
