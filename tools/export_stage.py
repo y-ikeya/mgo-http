@@ -1771,6 +1771,18 @@ def has_image(obj):
     return False
 
 
+def texel_of(obj):
+    """1 タイルの実寸 (m)。**絵の実寸に合わせたい材質は custom property `texel` に書く**
+
+    無ければ TEXEL。Poly Haven の絵は 1 枚の実寸が絵ごとに違う (しっくい 3.2m、
+    レンガ 2m)。2m に揃えると模様の大きさが絵ごとにずれる
+    """
+    for slot in obj.material_slots:
+        if slot.material and 'texel' in slot.material:
+            return float(slot.material['texel'])
+    return TEXEL
+
+
 def reproject(obj, uv=True):
     """ワールド座標の立方投影で UV を張り直す。**scale がいくつでも伸びない**
 
@@ -1791,13 +1803,14 @@ def reproject(obj, uv=True):
     flipped = sum(1 for f, n in zip(bm.faces, before) if f.normal.dot(n) < 0)
     layer = bm.loops.layers.uv.verify()
     mw = obj.matrix_world
+    texel = texel_of(obj)
     for face in bm.faces if uv else ():
         n = (mw.to_3x3() @ face.normal)
         axis = max(range(3), key=lambda i: abs(n[i]))
         u_axis, v_axis = PROJECT_AXES[axis]
         for loop in face.loops:
             world = mw @ loop.vert.co
-            loop[layer].uv = (world[u_axis] / TEXEL, world[v_axis] / TEXEL)
+            loop[layer].uv = (world[u_axis] / texel, world[v_axis] / texel)
     bm.to_mesh(mesh)
     bm.free()
     return flipped
