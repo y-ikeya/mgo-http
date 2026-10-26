@@ -1,6 +1,7 @@
 import { SKY_FLOOR } from './skylight'
 import { addMovingShadow, castStaticShadow, STATIC_SHADOW_LAYER } from './liveShadow'
 import { instanceRepeats } from './instancing'
+import { swayingGrassMaterial } from './grass'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
 import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot } from '../../../domain/stage'
@@ -1721,6 +1722,11 @@ async function replaceWithModel(
       for (const material of new Set(replaced)) material.dispose()
       // ガラスは絵を貼らないので UV を作り直す意味が無い
       if (surface !== 'glass') projectWorldUv(obj, SURFACE_TILE[surface])
+    }
+
+    // 草むら (名前に grass_) は近くを人が通ると揺れる材質に替える (world/grass.ts)
+    if (name.includes('grass_') && (current as THREE.MeshStandardMaterial)?.map) {
+      obj.material = swayingGrassMaterial(current as THREE.MeshStandardMaterial)
     }
 
     const flags = flagsOf(name)

@@ -124,6 +124,7 @@ import { can, blocker } from "../../domain/player/moves";
 const DEBUG_HUD = new URLSearchParams(globalThis.location?.search ?? "").has("debug");
 import { toLocal } from "../../application/replica/clock";
 import { TsneTarget, type TargetView } from "./world/tsneTarget";
+import { pushGrass } from "./world/grass";
 import { atBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
 import {
@@ -810,6 +811,8 @@ export class Game {
   private readonly stage: Stage;
   private readonly sun: THREE.DirectionalLight;
   private readonly remotes: RemoteSoldiers;
+  /** 草むらを押す人の足元。毎コマ詰め直す (world/grass.ts) */
+  private readonly grassPushers = new Map<string, THREE.Vector3>();
   /** 足元に出る音の輪。聞こえた方向に山が立つ */
   private readonly soundRing: SoundRing;
   /** 血を落とす先の控え。**使い回す** — 渡された位置を書き換えないため */
@@ -2079,6 +2082,11 @@ export class Game {
     this.blast.update(dt);
     this.updateTsneTarget(dt);
     this.updateClockTick();
+    // 草むらを押す人。自分が先頭
+    this.grassPushers.clear();
+    this.grassPushers.set(this.net.id, this.player.position);
+    this.remotes.addLivePositions(this.grassPushers);
+    pushGrass(dt, this.grassPushers);
     this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {

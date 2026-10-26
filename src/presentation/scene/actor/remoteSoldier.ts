@@ -1604,6 +1604,11 @@ export class RemoteSoldiers {
     return player && player.object.visible ? player.object.position : null;
   }
 
+  /** 位置が届いている人の足元を out に足す (草を押す人。world/grass.ts) */
+  addLivePositions(out: Map<string, THREE.Vector3>): void {
+    for (const [id, player] of this.players) if (player.object.visible) out.set(id, player.object.position);
+  }
+
   /** その人の右手のワールド座標 (スタンナイフの放電の出所)。見えていなければ null */
   handOf(id: string, out: THREE.Vector3): THREE.Vector3 | null {
     return this.players.get(id)?.handWorld(out) ?? null;
