@@ -215,6 +215,19 @@ const RAY_RING: readonly [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 const UP = new THREE.Vector3(0, 1, 0)
 /** 押し出しの均し (1/秒)。12 で 0.08 秒ほど。速すぎると暴れが残り、遅いと壁の裏が見える */
 const PUSH_LAMBDA = 12
+/**
+ * **頭の上が低い所では主観に寄せる** (2026-10-27 本人「prone で duct に入ったり貯水槽や bench の
+ * 下に入った時は主観ばりに camera が player に近づいていい。そうしないと自分の姿で醜くなる」)。
+ *
+ * 姿勢では分けない (姿勢ごとのカメラは崩れる)。**足元から真上に、この高さまでに天井があるか**で
+ * 決める — 伏せでしか入れない所 (ダクト・貯水槽の下 0.6m・ベンチの下) は全部これに掛かる
+ */
+const LOW_CEILING = 1.2
+/** 低い天井の下でのカメラの距離 (m)。頭のすぐ後ろ。体は寄りで薄くなる (crowding) */
+const TIGHT_DISTANCE = 0.15
+/** 主観へ寄る・戻る速さ (1/秒)。構えの出入りと同じ */
+const TIGHT_LAMBDA = AIM_LAMBDA
+
 /** カメラがこれより体に寄ったら、体を薄くし始める距離 (m) */
 const CROWD_NEAR = 1.4
 /** 薄さの追従の速さ (1/s)。壁際で明滅させない */
@@ -365,6 +378,9 @@ export class FollowCamera {
   private sideCollapse = 0
   /** 体が画面を塞いでいる度合い (0〜1)。均してある */
   private crowd = 0
+  /** 低い天井の下に居る度合い (0〜1)。1 で主観寄り (TIGHT_DISTANCE、肩のずれなし) */
+  private tight = 0
+  private readonly tightFrom = new THREE.Vector3()
 
   /**
    * 体が画面を塞いでいる度合い (0〜1)。**体を薄くする量。**
@@ -599,15 +615,25 @@ export class FollowCamera {
     }
 
     const target = this.aiming ? this.aimView : HIP_VIEW
-    this.distance = damp(this.distance, target.distance, AIM_LAMBDA, dt)
+    // 頭の上が低い所 (伏せでしか入れない所) に居るか。足元の少し上から真上へ線を引く
+    let low = false
+    if (world) {
+      this.tightFrom.set(player.position.x, player.position.y + 0.1, player.position.z)
+      low = world.distanceToObstruction(this.tightFrom, UP, LOW_CEILING) < LOW_CEILING - 0.1
+    }
+    this.tight = damp(this.tight, low ? 1 : 0, TIGHT_LAMBDA, dt)
+    // 覗く銃 (距離 0) はそのまま。それ以外は低い天井の下で頭のすぐ後ろへ
+    const wantDistance = target.distance > 0 ? target.distance + (Math.min(target.distance, TIGHT_DISTANCE) - target.distance) * this.tight : target.distance
+    this.distance = damp(this.distance, wantDistance, AIM_LAMBDA, dt)
     /*
      * 腰だめの肩のずれは**いま持っている銃の構えと同じ**にする。カメラを構えの
      * 線の上に置くのが目的なので、銃ごとに違う肩のずれ (weapons.ts の aimShoulder)
      * に追従させる。覗く銃 (shoulder 0) なら真後ろ。URL で ?cams= が来ていればそれ
      */
-    const shoulder = this.aiming || HIP_SHOULDER_TUNED !== null ? target.shoulder : this.aimView.shoulder
+    // 低い天井の下では肩越しをやめて頭の真後ろ (主観寄り)
+    const shoulder = (this.aiming || HIP_SHOULDER_TUNED !== null ? target.shoulder : this.aimView.shoulder) * (1 - this.tight)
     this.shoulder = damp(this.shoulder, shoulder, AIM_LAMBDA, dt)
-    this.lift = damp(this.lift, target.lift, AIM_LAMBDA, dt)
+    this.lift = damp(this.lift, target.lift * (1 - this.tight), AIM_LAMBDA, dt)
     this.pitchDown = damp(this.pitchDown, target.pitchDown, AIM_LAMBDA, dt)
     this.leanOffset = damp(this.leanOffset, this.leanTarget, AIM_LAMBDA, dt)
     if (this.holdDistance > 0) {
