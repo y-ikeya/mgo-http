@@ -9,7 +9,7 @@ TSNE のターゲット (人形) を、この game の規約へ直す。
 **色は絵に焼く** — 画面のコードで材質の色を上書きしない (ステージの壁と同じ、Blender の明度で)。
 猫の置物 (support の DOLL、Sketchfab「Doll in Motion」、CREDITS.md) も同じ手順で縮めている。
 
-元は本人が Tripo で作った人形 (~/Downloads/nezu、2026-10-19)。**200 万面・絵 2048 が 4 枚**で、
+元は本人が Tripo で作った人形 (tools/raw/nezu、2026-10-19)。**200 万面・絵 2048 が 4 枚**で、
 頭の上に浮かせる小道具には重すぎる。
 
 - 面を 6,000 ほどに間引く (Decimate の collapse)
