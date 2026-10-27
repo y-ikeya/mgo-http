@@ -6218,6 +6218,150 @@
 }
 },
 {
+"name": "vis_metal_stair3_handrail_w_notexture",
+"min": [
+-10.525,
+0.28,
+-5.95
+],
+"max": [
+-10.475,
+4.825,
+0.5
+],
+"top": {
+"h": 4.9105,
+"dx": 0.0,
+"dz": -0.57465,
+"riser": 0.69,
+"foot": 0.55,
+"head": 5.51
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_stair3_handrail_w_nobullet_noeye_nocamera",
+"min": [
+-10.53,
+0.102,
+-5.95
+],
+"max": [
+-10.47,
+4.8,
+0.5
+],
+"top": {
+"h": 4.8428,
+"dx": 0.0,
+"dz": -0.57117,
+"riser": 1.8,
+"foot": -0.6,
+"head": 6.6
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_stair3_handrail_e_notexture",
+"min": [
+-4.965,
+0.28,
+-5.95
+],
+"max": [
+-4.915,
+4.825,
+0.5
+],
+"top": {
+"h": 4.9105,
+"dx": 0.0,
+"dz": -0.57465,
+"riser": 0.69,
+"foot": 0.55,
+"head": 5.51
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "col_metal_stair3_handrail_e_nobullet_noeye_nocamera",
+"min": [
+-4.97,
+0.102,
+-5.95
+],
+"max": [
+-4.91,
+4.8,
+0.5
+],
+"top": {
+"h": 4.8428,
+"dx": 0.0,
+"dz": -0.57117,
+"riser": 1.8,
+"foot": -0.6,
+"head": 6.6
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "concrete_wall2_1F_stairside",
+"min": [
+-4.88,
+0.1,
+-6.02
+],
+"max": [
+-4.68,
+3.66,
+-2.74
+],
+"top": {
+"h": 3.66,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
