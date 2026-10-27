@@ -480,12 +480,12 @@
 "min": [
 -26.215,
 0.1,
--17.212
+-17.313
 ],
 "max": [
 -24.179,
 3.9,
--10.66
+-10.762
 ],
 "top": {
 "h": 4.0685,
@@ -5477,6 +5477,734 @@
 ],
 "top": {
 "h": 3.959,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box_box_nouv.003",
+"min": [
+27.268,
+3.865,
+-18.245
+],
+"max": [
+28.266,
+5.855,
+-17.167
+],
+"top": {
+"h": 5.8553,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_entrance_pillar.000",
+"min": [
+2.4,
+3.894,
+16.4
+],
+"max": [
+2.85,
+7.6,
+17.23
+],
+"top": {
+"h": 7.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_entrance_pillar.001",
+"min": [
+6.44,
+3.894,
+16.4
+],
+"max": [
+6.89,
+7.6,
+17.23
+],
+"top": {
+"h": 7.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_entrance_step",
+"min": [
+2.4,
+3.894,
+16.4
+],
+"max": [
+6.89,
+4.094,
+18.05
+],
+"top": {
+"h": 4.094,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_entrance_header",
+"min": [
+2.56,
+6.694,
+17.75
+],
+"max": [
+6.64,
+7.6,
+18.05
+],
+"top": {
+"h": 7.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_entrance_frame.000_noplayer_nobullet_noeye_nocamera",
+"min": [
+2.7,
+4.094,
+17.97
+],
+"max": [
+2.77,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.001_noplayer_nobullet_noeye_nocamera",
+"min": [
+4.47,
+4.094,
+17.97
+],
+"max": [
+4.54,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.002_noplayer_nobullet_noeye_nocamera",
+"min": [
+2.7,
+6.624,
+17.97
+],
+"max": [
+4.54,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.003_noplayer_nobullet_noeye_nocamera",
+"min": [
+2.7,
+4.094,
+17.97
+],
+"max": [
+4.54,
+4.164,
+18.03
+],
+"top": {
+"h": 4.164,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.004_noplayer_nobullet_noeye_nocamera",
+"min": [
+3.585,
+4.094,
+17.97
+],
+"max": [
+3.655,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "glass_entrance_pane.000_noplayer_nobullet_noeye_nocamera",
+"min": [
+2.77,
+4.164,
+17.995
+],
+"max": [
+3.585,
+6.624,
+18.015
+],
+"top": {
+"h": 6.624,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "glass_entrance_pane.001_noplayer_nobullet_noeye_nocamera",
+"min": [
+3.655,
+4.164,
+17.995
+],
+"max": [
+4.47,
+6.624,
+18.015
+],
+"top": {
+"h": 6.624,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_handle.005_noplayer_nobullet_noeye_nocamera",
+"min": [
+3.485,
+4.944,
+17.92
+],
+"max": [
+3.515,
+5.344,
+17.97
+],
+"top": {
+"h": 5.344,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_handle.006_noplayer_nobullet_noeye_nocamera",
+"min": [
+3.725,
+4.944,
+17.92
+],
+"max": [
+3.755,
+5.344,
+17.97
+],
+"top": {
+"h": 5.344,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_handle.007_noplayer_nobullet_noeye_nocamera",
+"min": [
+2.82,
+4.154,
+17.94
+],
+"max": [
+4.42,
+5.154,
+17.97
+],
+"top": {
+"h": 5.154,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.008_noplayer_nobullet_noeye_nocamera",
+"min": [
+4.66,
+4.094,
+17.97
+],
+"max": [
+4.73,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.009_noplayer_nobullet_noeye_nocamera",
+"min": [
+6.43,
+4.094,
+17.97
+],
+"max": [
+6.5,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.010_noplayer_nobullet_noeye_nocamera",
+"min": [
+4.66,
+6.624,
+17.97
+],
+"max": [
+6.5,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.011_noplayer_nobullet_noeye_nocamera",
+"min": [
+4.66,
+4.094,
+17.97
+],
+"max": [
+6.5,
+4.164,
+18.03
+],
+"top": {
+"h": 4.164,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_frame.012_noplayer_nobullet_noeye_nocamera",
+"min": [
+5.545,
+4.094,
+17.97
+],
+"max": [
+5.615,
+6.694,
+18.03
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "glass_entrance_pane.002_noplayer_nobullet_noeye_nocamera",
+"min": [
+4.73,
+4.164,
+17.995
+],
+"max": [
+5.545,
+6.624,
+18.015
+],
+"top": {
+"h": 6.624,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "glass_entrance_pane.003_noplayer_nobullet_noeye_nocamera",
+"min": [
+5.615,
+4.164,
+17.995
+],
+"max": [
+6.43,
+6.624,
+18.015
+],
+"top": {
+"h": 6.624,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_handle.013_noplayer_nobullet_noeye_nocamera",
+"min": [
+5.445,
+4.944,
+17.92
+],
+"max": [
+5.475,
+5.344,
+17.97
+],
+"top": {
+"h": 5.344,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_handle.014_noplayer_nobullet_noeye_nocamera",
+"min": [
+5.685,
+4.944,
+17.92
+],
+"max": [
+5.715,
+5.344,
+17.97
+],
+"top": {
+"h": 5.344,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_entrance_handle.015_noplayer_nobullet_noeye_nocamera",
+"min": [
+4.78,
+4.154,
+17.94
+],
+"max": [
+6.38,
+5.154,
+17.97
+],
+"top": {
+"h": 5.154,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "concrete_entrance_mullion",
+"min": [
+4.54,
+4.094,
+17.95
+],
+"max": [
+4.66,
+6.694,
+18.05
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_entrance_jamb.000",
+"min": [
+2.56,
+4.094,
+17.9
+],
+"max": [
+2.7,
+6.694,
+18.05
+],
+"top": {
+"h": 6.694,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_entrance_jamb.001",
+"min": [
+6.5,
+4.094,
+17.9
+],
+"max": [
+6.64,
+6.694,
+18.05
+],
+"top": {
+"h": 6.694,
 "dx": 0.0,
 "dz": 0.0
 },
