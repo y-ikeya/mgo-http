@@ -1174,6 +1174,9 @@ export class Game {
   private targetView: TargetView | null = null;
   /** 最後に時計の音を鳴らした残りの秒 (updateClockTick)。0 なら数えていない */
   private clockTickSecond = 0;
+  /** 最後に見た CAP のカウント (便ごとに別の物が届く) と、それが届いた手元の時刻 */
+  private captureSeen: unknown = undefined;
+  private captureSeenAt = 0;
   /** 「{名前}がターゲットを取得した / 手放した」(全員) と、その人の色、出した時刻 (ms) */
   private targetNotice: { text: string; team: Team; at: number } | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
@@ -3962,8 +3965,24 @@ export class Game {
       this.clockTickSecond = 0;
       return;
     }
-    const left = Math.ceil((match.endsAt - Date.now()) / 1000);
-    if (left < 1 || left > CLOCK_TICK_FROM) {
+    const clockLeft = Math.ceil((match.endsAt - Date.now()) / 1000);
+    /*
+     * **CAP のカウントも残り 10 秒から鳴らす** (2026-10-28 本人「cap も base に入ってカウントダウンが進んで
+     * 残り 10s とかの時に clockTick を流したほうがいい」)。カウントが進んでいる間だけ (設置ポイントを出る・落とすと止まる)。
+     * カウントは 1 秒ごとの便でしか届かないので、届いた時刻から手元で減らす (便の揺れで抜けたり 2 度鳴ったりしない)。
+     * 時計と重なったら残りの少ない方で 1 秒に 1 度
+     */
+    const capture = match.capture;
+    if (capture !== this.captureSeen) {
+      this.captureSeen = capture;
+      this.captureSeenAt = Date.now();
+    }
+    const countLeft = capture?.holding
+      ? Math.ceil(capture[capture.holding] - (Date.now() - this.captureSeenAt) / 1000)
+      : Infinity;
+    const inRange = (n: number) => n >= 1 && n <= CLOCK_TICK_FROM;
+    const left = Math.min(inRange(clockLeft) ? clockLeft : Infinity, inRange(countLeft) ? countLeft : Infinity);
+    if (!Number.isFinite(left)) {
       this.clockTickSecond = 0;
       return;
     }
