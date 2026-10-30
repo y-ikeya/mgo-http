@@ -3370,7 +3370,7 @@ export class Soldier {
 
   /**
    * 構えた所から一歩下がる (step_back、下半身だけ)。**下がっている間は銃を下ろす** (setAiming)。
-   * 型に焼かれた移動 (後ろへ 0.68m) を辿る。できるかは表 (moves.ts の step)
+   * 型に焼かれた移動を辿る (0.7m・1 秒、domain/player/step.ts)。できるかは表 (moves.ts の step)
    *
    * @returns 下がり始めた
    */

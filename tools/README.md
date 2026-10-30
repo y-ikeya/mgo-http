@@ -451,7 +451,7 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 
 ### 一歩下がる型 (step_back)
 
-構えたまま後ろを押しながら転がりの指 (Space 長押し / ×) で、転がらずに一歩下がる (0.68m、0.96 秒)。
+構えたまま後ろを押しながら転がりの指 (Space 長押し / ×) で、転がらずに一歩下がる (0.7m、1 秒。立ちもしゃがみも同じ、domain/player/step.ts)。
 **下半身だけ**流し、下がっている間は銃を下ろす (上半身は立ちの脱力)。本人が落とした `tools/raw/StepBackward.fbx` (Mixamo のボクシングの
 後退り) を `tools/step_back.json` で retarget_clip に通した。型の上半身は拳の構えなので使わない:
 
@@ -460,7 +460,7 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
     for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb step_back.glb step_back public/models/$g.glb --rotation-only; done
 
 しゃがんでいる時は `crouch_step_back` (本人の `tools/raw/CrouchBackwards.fbx`、Downloads では ChrouchBackwards.fbx)。
-半ばしゃがんだ姿から後ろへ跳んで膝を突く型で、1.16m 下がる。膝を突き終わる 1.1 秒で切る (後ろ 0.5 秒は止まった姿)。
+半ばしゃがんだ姿から後ろへ跳んで膝を突く型で、型のままだと 1.16m。膝を突き終わる 1.1 秒 (型の時間) までを流し、速さと移動の倍率で 0.7m・1 秒に合わせる。立ちの型 (0.68m・0.96 秒) も同じく合わせる。
 `tools/crouch_step_back.json` を同じ手順で通す。
 
 ### CQC の型 (cqc_throw / cqc_miss / cqc_thrown)

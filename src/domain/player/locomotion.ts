@@ -202,11 +202,11 @@ export type Locomotion =
   | 'hit2back'
   /**
    * 構えた所から一歩下がる (型 StepBackward、下半身だけ。下がっている間は銃を下ろす)。
-   * 構えて後ろを押しながら転がりの指。0.68m 下がる。CQC の間合いから外れるのに使う (2026-10-30 本人)
+   * 構えて後ろを押しながら転がりの指。0.7m を 1 秒で下がる (domain/player/step.ts)。CQC の間合いから外れるのに使う (2026-10-30 本人)
    */
   | 'step_back'
   /**
-   * しゃがんだまま一歩下がる (型 CrouchBackwards、下半身だけ)。後ろへ跳んで膝を突く。1.16m 下がる。
+   * しゃがんだまま一歩下がる (型 CrouchBackwards、下半身だけ)。後ろへ跳んで膝を突く。距離と時間は立ちと同じ (step.ts)。
    * 名前が crouch_ で始まるので構えの高さはしゃがみ (stance.ts)
    */
   | 'crouch_step_back'

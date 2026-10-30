@@ -4,6 +4,7 @@ import { isBone } from '../util/guards'
 import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
 import { ROLL_TIME_SCALE } from '../../../domain/player/poseCurve'
+import { STEP_BACK_DISTANCE, STEP_BACK_SECONDS } from '../../../domain/player/step'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
 import {
   CROUCH_WALK_TOP_SPEED,
@@ -364,7 +365,7 @@ const ROOT_MOTION_CLIPS = new Set([
   'cqc_thrown',
   // CQC の出だしのフック。踏み込んで戻る (投げに移るまでと、空振りの全部)
   'cqc_hook',
-  // 構えたまま一歩下がる (0.68m)。しゃがみは 1.16m
+  // 構えた所から一歩下がる。距離は立ちもしゃがみも 0.7m に合わせる (playStepBack)
   'step_back',
   'crouch_step_back',
 ])
@@ -762,7 +763,7 @@ const CQC_HOOK_KEY = 'cqc_hook'
  * 当たった直後なので、繋ぐと拳が当たって投げに入る形になる
  */
 const CQC_HOOK_CUT = 11 / 24
-/** しゃがんで下がる型 (crouch_step_back) の、膝を突き終わるまで (秒)。後ろは止まった姿 */
+/** しゃがんで下がる型 (crouch_step_back) の、膝を突き終わるまで (秒、型の時間)。後ろは止まった姿 */
 const CROUCH_STEP_BACK_SECONDS = 1.1
 /**
  * 吹き飛ばされる型の再生速度。
@@ -4318,7 +4319,7 @@ export class CharacterAnimator {
 
   /**
    * 構えた所から一歩下がる。**下半身だけ** — 下がっている間は銃を下ろすので、上半身は
-   * 脱力の型 (RELAXED_CLIPS の step_back)。焼かれた移動 (後ろへ 0.68m) を辿る
+   * 脱力の型 (RELAXED_CLIPS の step_back)。焼かれた移動を辿り、0.7m・1 秒に合わせる (step.ts)
    *
    * @returns 型の尺 (秒)。型が無い皮では 0
    */
@@ -4327,12 +4328,37 @@ export class CharacterAnimator {
     const state = crouching ? 'crouch_step_back' : 'step_back'
     const lower = this.lower.get(state)
     if (!lower) return 0
-    lower.reset().setEffectiveTimeScale(1).play()
+    // 立ちもしゃがみも同じ時間 (STEP_BACK_SECONDS) で流し切る。しゃがみの型は膝を突き終わった後、
+    // 同じ姿で 0.5 秒止まっているので、そこまで (CROUCH_STEP_BACK_SECONDS) を流す
+    lower.reset().setEffectiveTimeScale(this.stepBackEnd(state, lower) / STEP_BACK_SECONDS).play()
     this.locomotion = state
     this.rootSampleValid = false
-    // しゃがみの型は下がり切って膝を突いた後、同じ姿で 0.6 秒止まっている。そこは待たせない
-    return crouching ? Math.min(lower.getClip().duration, CROUCH_STEP_BACK_SECONDS) : lower.getClip().duration
+    return STEP_BACK_SECONDS
   }
+
+  /** 下がる型を流し切る、型の時刻 (秒) */
+  private stepBackEnd(state: string, action: THREE.AnimationAction): number {
+    const duration = action.getClip().duration
+    return state === 'crouch_step_back' ? Math.min(duration, CROUCH_STEP_BACK_SECONDS) : duration
+  }
+
+  /**
+   * 下がる型の移動の倍率。**型に焼かれた距離を STEP_BACK_DISTANCE へ合わせる** —
+   * 流し切るまでの腰の水平の移動を測って割る (型を差し替えても距離は変わらない)
+   */
+  private stepBackScale(state: string, stored: RootMotionTrack, action: THREE.AnimationAction): number {
+    const cached = this.stepBackScales.get(state)
+    if (cached !== undefined) return cached
+    sampleVectorTrack(stored.times, stored.values, 0, this.scratchVector2)
+    const x0 = this.scratchVector2.x
+    const y0 = this.scratchVector2.y
+    sampleVectorTrack(stored.times, stored.values, this.stepBackEnd(state, action), this.scratchVector2)
+    const travel = Math.hypot(this.scratchVector2.x - x0, this.scratchVector2.y - y0) * this.skeletonScale
+    const scale = travel > 1e-3 ? STEP_BACK_DISTANCE / travel : 1
+    this.stepBackScales.set(state, scale)
+    return scale
+  }
+  private readonly stepBackScales = new Map<string, number>()
 
   /** ローリングを頭から再生する。全身動作なので上下を同時に流す */
   playRoll(): void {
@@ -4399,7 +4425,11 @@ export class CharacterAnimator {
 
     // トラック空間は X/Y が水平、Z が上下 (Armature の +90°X 回転のため)。
     // モデル空間では armature ローカルの +Y が前方 (+Z) に対応する。
-    const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1) * (name === 'vault_up' ? this.vaultUpReach : 1)
+    const scale =
+      this.skeletonScale *
+      (ROOT_DISTANCE_SCALE[name] ?? 1) *
+      (name === 'vault_up' ? this.vaultUpReach : 1) *
+      (name === 'step_back' || name === 'crouch_step_back' ? this.stepBackScale(name, stored, action) : 1)
     const hold = name === CQC_HOOK_KEY ? undefined : ROOT_MOTION_HOLD[name]
     if (hold) {
       /*
