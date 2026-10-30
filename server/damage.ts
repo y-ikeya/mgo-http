@@ -58,7 +58,7 @@ import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
 import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, releaseTrapped, setLife } from './world'
+import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, releaseCqc, releaseTrapped, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -597,6 +597,8 @@ function applyTranquilizer(
   victim.sleepUntil = now + sleep * 1000
   victim.wakeFloor = wakeFloor(now, sleep)
   victim.struggleAt = 0
+  // CQC で投げている途中に眠らされたら、相手を放す (倒された時と同じ。world.ts の releaseCqc)
+  releaseCqc(room, victim)
   attacker.stuns++
   sendStamina(victim)
   broadcast(room, {
@@ -734,6 +736,8 @@ function drainBy(
     victim.sleepUntil = now + sleep * 1000
     victim.wakeFloor = wakeFloor(now, sleep)
     victim.struggleAt = 0
+    // 投げている途中に眠らされたら放す (上の弾の眠りと同じ)
+    releaseCqc(room, victim)
     attacker.stuns++
     broadcast(room, {
       type: 'stun',
