@@ -152,6 +152,11 @@ export type Locomotion =
   // 敬礼。全身の型なので上下を分けない
   | 'salute'
   /**
+   * しゃがんだまま敬礼する (型 MilitarySignalingCrouch、右手で合図)。押している間は手を上げ下げし続ける。
+   * 名前が crouch_ で始まるので構えの高さはしゃがみ (stance.ts)
+   */
+  | 'crouch_salute'
+  /**
    * クレイモアを構える / 置く。**全身の型**。
    *
    * かがんで置くので、上半身だけ切り出すと腰の向きが下半身と食い違う
@@ -299,6 +304,7 @@ export const CROUCH_WALK_TOP_SPEED = 0.9
 export function emptyHanded(locomotion: Locomotion): boolean {
   return (
     locomotion === 'salute' ||
+    locomotion === 'crouch_salute' ||
     locomotion === 'roll' ||
     locomotion === 'hard_land' ||
     locomotion === 'bump' ||

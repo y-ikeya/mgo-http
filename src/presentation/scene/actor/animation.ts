@@ -77,6 +77,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   sneak: 'sneak',
   sit: 'sit',
   salute: 'salute',
+  crouch_salute: 'salute_crouch',
   // 接続が切れた人の姿。全身 1 枚の静止ポーズ
   away: 'away',
   // クレイモア。かがむ全身の型なので、上半身も同じクリップから取る
@@ -262,6 +263,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   lean_crouch_left: 'lean_crouch',
   lean_crouch_right: 'lean_crouch',
   salute: 'salute',
+  crouch_salute: 'salute_crouch',
   away: 'away',
   claymore_windup: 'claymore_windup',
   claymore_place: 'claymore_place',
@@ -619,6 +621,7 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   // 眠り。**最後の姿勢で止める** — 流し直すと眠っている間ずっと倒れ直す
   'sleep',
   'salute',
+  'crouch_salute',
   // クレイモアを置く型。**構えは最後のフレームで止める** —
   // 一度だけにしないと 1.77 秒で頭から流れ直して、かがむ動作を繰り返す
   'claymore_windup',
@@ -969,6 +972,19 @@ const SALUTE_KEY = 'salute'
  * 早すぎるとまだ上げている途中、遅いと下ろし始めた姿勢で固まる。
  */
 const SALUTE_HOLD_PHASE = 0.45
+/**
+ * しゃがんだ敬礼 (salute_crouch、MilitarySignalingCrouch)。**5 秒の型のうち使うのは手を挙げてから下ろすまで。**
+ * 実測 (右手の高さ): 0.75 秒まで構えて待ち、1.05 秒で挙がり切り、上げ下げして 2.05 秒から下ろし、
+ * 2.4 秒で下り切る。後ろは止まった姿。
+ *
+ * **押している間は上げ下げを続ける** (本人 2026-10-30「手を上げたり下げたいしてるところを敬礼ボタン
+ * 長押しで機能させる」) — 上げ下げの山 2 つ (1.47 秒と 1.88 秒、ほぼ同じ姿) の間を回す。
+ * 離したら続きを流して下ろす。短く押せば挙げて 1 往復して下ろす
+ */
+const SALUTE_CROUCH_KEY = 'salute_crouch'
+const SALUTE_CROUCH_START = 0.75
+const SALUTE_CROUCH_LOOP: readonly [number, number] = [1.47, 1.88]
+const SALUTE_CROUCH_END = 2.55
 const relaxedKey = (state: Locomotion) => `relaxed:${state}`
 /** 一度だけ流す上半身。起動時から回さず、始める側で play する */
 const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
@@ -2195,6 +2211,12 @@ export class CharacterAnimator {
       action.setLoop(THREE.LoopOnce, 1)
       action.clampWhenFinished = true
     }
+    const saluteCrouch = byName.get('salute_crouch')
+    if (saluteCrouch) {
+      const action = registerUpper(SALUTE_CROUCH_KEY, saluteCrouch)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
     this.saluteDuration = salute?.duration ?? 0
 
     // 怯みは上半身だけ。走りながら上体だけが跳ねる形になり、被弾で足が止まらない。
@@ -3058,18 +3080,28 @@ export class CharacterAnimator {
    * クリップが無ければ何も起きない。Mixamo の Salute を取り込むまでは
    * 押しても反応しないが、仕組みだけ先に通してある。
    */
-  playSalute(): void {
+  playSalute(crouching = false): void {
     if (this.dead) return
-    const upper = this.upper.get(SALUTE_KEY)
-    const lower = this.lower.get('salute')
+    // しゃがんでいればしゃがんだ合図の型。型が無い皮は立った敬礼
+    this.saluteCrouch = crouching && this.upper.has(SALUTE_CROUCH_KEY) && this.lower.has('crouch_salute')
+    const upper = this.upper.get(this.saluteCrouch ? SALUTE_CROUCH_KEY : SALUTE_KEY)
+    const lower = this.lower.get(this.saluteCrouch ? 'crouch_salute' : 'salute')
     if (!upper || !lower) return
     upper.setEffectiveTimeScale(1)
     lower.setEffectiveTimeScale(1)
     upper.reset().play()
     lower.reset().play()
+    // 構えて待っている頭は飛ばして、手を挙げる所から
+    if (this.saluteCrouch) {
+      upper.time = SALUTE_CROUCH_START
+      lower.time = SALUTE_CROUCH_START
+    }
     this.upperState = 'salute'
-    this.locomotion = 'salute'
+    this.locomotion = this.saluteCrouch ? 'crouch_salute' : 'salute'
   }
+
+  /** いま流している敬礼がしゃがんだ合図か */
+  private saluteCrouch = false
 
   /** 敬礼をやめる。動いたら途中でも解ける */
   cancelSalute(): void {
@@ -3088,6 +3120,10 @@ export class CharacterAnimator {
    */
   private updateSalute(): void {
     if (this.upperState !== 'salute') return
+    if (this.saluteCrouch) {
+      this.updateSaluteCrouch()
+      return
+    }
     const upper = this.upper.get(SALUTE_KEY)
     const lower = this.lower.get('salute')
     if (!upper || !lower) return
@@ -3096,6 +3132,23 @@ export class CharacterAnimator {
     const scale = hold ? 0 : 1
     upper.setEffectiveTimeScale(scale)
     lower.setEffectiveTimeScale(scale)
+  }
+
+  /**
+   * しゃがんだ合図。押している間は上げ下げの山から山へ戻して回し、離したら続きを流して
+   * 下ろし切った所 (SALUTE_CROUCH_END) で普段の姿へ戻す (型の後ろの止まった姿は流さない)
+   */
+  private updateSaluteCrouch(): void {
+    const upper = this.upper.get(SALUTE_CROUCH_KEY)
+    const lower = this.lower.get('crouch_salute')
+    if (!upper || !lower) return
+    const [loopFrom, loopTo] = SALUTE_CROUCH_LOOP
+    if (this.saluteHeld && upper.time >= loopTo) {
+      const back = upper.time - (loopTo - loopFrom)
+      upper.time = back
+      lower.time = back
+    }
+    if (!this.saluteHeld && upper.time >= SALUTE_CROUCH_END) this.upperState = 'stance'
   }
 
   /** リロード中か。銃を抜いたままにするのに使う */
@@ -3349,6 +3402,7 @@ export class CharacterAnimator {
       if (this.upper.has(DEATH_KEY)) return DEATH_KEY
     }
     if (this.upperState === 'hit' && this.upper.has(HIT_KEY)) return HIT_KEY
+    if (this.upperState === 'salute' && this.saluteCrouch && this.upper.has(SALUTE_CROUCH_KEY)) return SALUTE_CROUCH_KEY
     if (this.upperState === 'salute' && this.upper.has(SALUTE_KEY)) return SALUTE_KEY
     if (this.upperState === 'stab') {
       if (this.locomotion === 'prone_stab' && this.upper.has(PRONE_STAB_KEY)) return PRONE_STAB_KEY

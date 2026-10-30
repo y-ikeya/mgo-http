@@ -149,6 +149,7 @@ const PLAY_WHOLE_BODY: Record<
   death_front: (a) => a.playDeath(true),
   death_back: (a) => a.playDeath(false),
   salute: (a) => a.playSalute(),
+  crouch_salute: (a) => a.playSalute(true),
   // 爆風で倒れる / 起き上がる
   sweep: (a) => a.playSweep(),
   stand: (a) => a.playStand(),
@@ -556,7 +557,8 @@ export class RemoteSoldier {
       animator.playStepBack(true);
     }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
-    if (this.locomotion === "salute" && locomotion !== "salute") {
+    const wasSaluting = this.locomotion === "salute" || this.locomotion === "crouch_salute";
+    if (wasSaluting && locomotion !== "salute" && locomotion !== "crouch_salute") {
       animator.cancelSalute();
     }
     /*
@@ -600,7 +602,7 @@ export class RemoteSoldier {
     }
     // 敬礼を保っているかは送られてくる。再生位置は送らず、同じドメインルールで止める
     animator.setSaluteHeld(state.saluteHeld)
-    this.saluting = locomotion === 'salute' && state.saluteHeld
+    this.saluting = (locomotion === 'salute' || locomotion === 'crouch_salute') && state.saluteHeld
     animator.setAiming(state.aiming && !this.serverDead);
     // 伏せている間は上体を傾けない。腹這いでは背骨の回転面が横倒しなので、
     // 同じ角度を当てると体が起き上がって見える (player.ts に理由)

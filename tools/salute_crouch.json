@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "MilitarySignalingCrouch.fbx": "salute_crouch" },
+  "out": "salute_crouch.glb",
+  "maxTexture": 64
+}

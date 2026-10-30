@@ -1839,7 +1839,8 @@ export class Soldier {
    */
   salute(): void {
     if (!can(this.body, 'salute')) return
-    this.animator?.playSalute()
+    // しゃがんでいればしゃがんだまま右手で合図する (salute_crouch)
+    this.animator?.playSalute(this.crouching)
   }
 
   /**
@@ -1874,7 +1875,7 @@ export class Soldier {
 
   /** いま手を挙げているか。味方とのリンクの成立を見るのに使う */
   get isSaluting(): boolean {
-    return this.saluteHeld && this.locomotion === 'salute'
+    return this.saluteHeld && (this.locomotion === 'salute' || this.locomotion === 'crouch_salute')
   }
 
   setSaluteHeld(held: boolean): void {

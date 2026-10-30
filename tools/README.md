@@ -458,11 +458,18 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/step_back.json
     bun tools/merge_clip.js public/models/soldier.glb step_back.glb step_back public/models/soldier.glb
-    for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb step_back.glb step_back public/models/$g.glb --rotation-only; done
+    for g in soldier_raiden soldier_nanashi soldier_xbot; do bun tools/merge_clip.js public/models/$g.glb step_back.glb step_back public/models/$g.glb --rotation-only; done
 
 しゃがんでいる時は `crouch_step_back` (本人の `tools/raw/CrouchBackwards.fbx`、Downloads では ChrouchBackwards.fbx)。
 半ばしゃがんだ姿から後ろへ跳んで膝を突く型で、型のままだと 1.16m。膝を突き終わる 1.1 秒 (型の時間) までを流し、速さと移動の倍率で 0.7m・1 秒に合わせる。立ちの型 (0.68m・0.96 秒) も同じく合わせる。
 `tools/crouch_step_back.json` を同じ手順で通す。
+
+### しゃがんだ敬礼 (salute_crouch)
+
+しゃがんでいる時の敬礼は右手の合図 (本人の `tools/raw/MilitarySignalingCrouch.fbx`、Downloads では
+MilitarySignalingChrouch.fbx、5 秒)。`tools/salute_crouch.json` を retarget_clip に通し、4 つの皮へ
+(雷電・名無し・X Bot は `--rotation-only`)。使うのは 0.75〜2.55 秒 (手を挙げる → 上げ下げ → 下ろす) で、
+**押している間は上げ下げの山 2 つ (1.47 秒と 1.88 秒) の間を回す** (animation.ts の SALUTE_CROUCH_*)。
 
 ### CQC の型 (cqc_throw / cqc_miss / cqc_thrown)
 

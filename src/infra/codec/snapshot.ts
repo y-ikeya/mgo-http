@@ -120,6 +120,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   'step_back',
   // しゃがんだまま一歩下がる。**末尾に足す**
   'crouch_step_back',
+  // しゃがんだまま敬礼する。**末尾に足す**
+  'crouch_salute',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))

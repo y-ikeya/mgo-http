@@ -92,6 +92,7 @@ export type WholeBodyLocomotion =
   | 'death_front'
   | 'death_back'
   | 'salute'
+  | 'crouch_salute'
   | 'jump_down'
   | 'sweep'
   | 'stand'
@@ -130,6 +131,8 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'death_front',
   'death_back',
   'salute',
+  // しゃがんだまま敬礼 (右手の合図)。脚もしゃがみの型の中
+  'crouch_salute',
   'jump_down',
   'sweep',
   'stand',
@@ -439,7 +442,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   }
 
   // 敬礼。動けば解ける (解く操作は呼ぶ側が行う)
-  if (input.saluting && !hasDirection(input)) return 'salute'
+  if (input.saluting && !hasDirection(input)) return input.crouching ? 'crouch_salute' : 'salute'
   // 眠っている人を叩く。動けばやめる (叩くのは止まっている時だけ)
   if (input.patting && !hasDirection(input)) return 'pat'
 
