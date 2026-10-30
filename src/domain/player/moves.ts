@@ -95,10 +95,11 @@ const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing
 const HELPLESS: readonly Flag[] = ['dead', 'downed', 'standingUp', 'sleeping', 'trapped']
 
 export const MOVES: Record<Move, Rule> = {
-  // 前へ転がる。伏せからは起き上がる一手を挟ませる。箱を落とされた直後は棒立ち
+  // 前へ転がる。伏せからは起き上がる一手を挟ませる。箱を落とされた直後は棒立ち。
+  // **構えている間は転がらない** (本人 2026-10-30)。構えて後ろなら一歩下がる (step)
   roll: {
     needs: ['onGround'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder'],
+    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'aiming'],
   },
   // 窓枠を跳び越える / 一段上へ乗る。転がりと同じ縛り
   vault: {

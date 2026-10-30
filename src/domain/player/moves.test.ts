@@ -122,4 +122,9 @@ describe('一歩下がる', () => {
     expect(can(body, 'cqc')).toBe(false)
     expect(can(body, 'aim')).toBe(false)
   })
+
+  test('**構えている間は転がらない** (後ろを押していれば下がる、押していなければ何も起きない)', () => {
+    expect(can({ ...standing, aiming: true }, 'roll')).toBe(false)
+    expect(can(standing, 'roll')).toBe(true)
+  })
 })

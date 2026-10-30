@@ -4794,15 +4794,20 @@ export class Game {
       if (!this.rolledThisHold) {
         this.rolledThisHold = true;
         /*
-         * **構えたまま後ろを押していれば、転がらずに一歩下がる** (step_back、下半身だけ)。
-         * CQC の間合いから出る (2026-10-30 本人)。下がっている間は銃を下ろす。できなければ (しゃがみ等) 転がる
+         * **構えている間は転がらない** (本人 2026-10-30「狙ってる最中のローリングは無効にしていいよ」、
+         * 動作の表の roll)。後ろを押していれば一歩下がる (step_back、下半身だけ) — CQC の間合いから
+         * 出る。下がっている間は銃を下ろす。後ろを押していなければ何も起きない
          */
-        this.steppedThisHold = this.player.isAiming && this.pushingBack() && this.player.stepBack();
-        // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
-        if (!this.steppedThisHold && !this.cocking) this.player.roll();
+        this.aimedThisHold = this.player.isAiming;
+        if (this.aimedThisHold) {
+          if (this.pushingBack()) this.player.stepBack();
+        } else if (!this.cocking) {
+          // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
+          this.player.roll();
+        }
       }
-      // 下がっただけなら伏せない (押したまま転がり切ると伏せる、の対象は転がり)
-      if (this.steppedThisHold) return;
+      // 構えていた押下では伏せない (押したまま転がり切ると伏せる、の対象は転がり)
+      if (this.aimedThisHold) return;
       /*
        * **押したまま転がり切ると、立たずに伏せる。**
        *
@@ -4819,11 +4824,11 @@ export class Game {
 
     // 離した。次の押下でまた転がれる
     this.rolledThisHold = false;
-    this.steppedThisHold = false;
+    this.aimedThisHold = false;
   }
 
-  /** この押下で一歩下がったか。下がった時は、押したままでも伏せない */
-  private steppedThisHold = false;
+  /** この押下を構えたまま始めたか。転がらない (下がるか何もしない) ので、押したままでも伏せない */
+  private aimedThisHold = false;
 
   /** 体の後ろ側へ移動を入れているか (体の向きから 45° 以内の後ろ) */
   private pushingBack(): boolean {
