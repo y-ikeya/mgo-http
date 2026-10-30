@@ -1777,19 +1777,11 @@ export class CharacterAnimator {
       this.lowerClipNames.set(key, clip.name)
     }
     /*
-     * **ナイフの構えは全身。** 立ち止まって構えた間だけ、下半身もこの型から
-     * 取る (resolveLowerKey)。半身の構えで腰が 90° 横を向いているので、
-     * 上半身だけ乗せると腰の基準合わせ (alignSpineToUpperClip) がその 90° を
-     * 捻れと読んで上体を回してしまう。全身なら上下が同じ型で補正が掛からない。
+     * **ナイフの構えは上半身だけ。** 立ち止まっても動いても、上半身は knife_idle、脚は立ち・走りの型
+     * (2026-10-30 本人「knife かかえて動いてる時の格好と静止してる時でなんか違う」→ 動いている時の形に揃える)。
+     * 前は立ち止まった間だけ全身をこの型にしていて、半身の構え (腰が 90° 横) と、動いた時の正面向きの
+     * 構えで格好が変わっていた
      */
-    const knifeClip = byName.get('knife_idle')
-    if (knifeClip) {
-      const key = relaxedLowerKey('idle', knifeClip.name)
-      const action = this.mixer.clipAction(splitClip(knifeClip, 'lower', key))
-      action.play()
-      this.lower.set(key, action)
-      this.lowerClipNames.set(key, knifeClip.name)
-    }
 
     // --- 上半身レイヤー ---
     // 構えは idle の上半身。移動中も銃を構えた姿勢を保つ。
@@ -2271,16 +2263,10 @@ export class CharacterAnimator {
       prone
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
     this.lookYaw = damp(this.lookYaw, this.lookYawTarget, LOOK_YAW_LAMBDA, dt)
-    /*
-     * **ナイフの構えでは腰を正面へ戻さない。** 半身の構えなので腰は 90° 横を
-     * 向いていて、それを正面へ寄せると全身が 75° 回って刃が横を向く
-     * (実測: 頭の向きが拳銃の構えと 70° ずれた)。刃と顔は素材のままで
-     * 照準の方を向いている。
-     */
-    const knifeStance = this.knife && this.aiming && this.locomotion === 'idle'
+    // ナイフの構えも同じ (立ち止まっても上半身だけ knife_idle、脚は立ちの型。下の resolveLowerKey の注)
     this.hipSquare = damp(
       this.hipSquare,
-      this.aiming && !committed && !knifeStance ? AIM_HIP_SQUARE : 0,
+      this.aiming && !committed ? AIM_HIP_SQUARE : 0,
       AIM_HIP_LAMBDA,
       dt,
     )
@@ -2830,11 +2816,6 @@ export class CharacterAnimator {
    * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
    */
   private resolveLowerKey(): string {
-    // ナイフを立って構えている。上半身と同じ型で全身にする
-    if (this.knife && this.aiming && this.locomotion === 'idle') {
-      const key = relaxedLowerKey('idle', 'knife_idle')
-      if (this.lower.has(key)) return key
-    }
     // 伏せてナイフを構えている。prone_stab の頭の 1 枚で全身
     if (this.knife && this.aiming && this.locomotion === 'prone_idle') {
       const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
