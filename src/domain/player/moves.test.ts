@@ -97,3 +97,10 @@ describe('できること', () => {
     expect(blocker(standing, 'roll')).toBeNull()
   })
 })
+
+describe('持ち替え', () => {
+  test('**CQC の最中は持ち替えられない** (投げている間に長物へ替えて、倒した相手へすぐ構えられないように)', () => {
+    expect(can({ ...standing, cqc: true }, 'swap')).toBe(false)
+    expect(can(standing, 'swap')).toBe(true)
+  })
+})

@@ -55,6 +55,11 @@ export interface HandContext {
   /** ボルトを送っている最中か */
   cocking: boolean
   /**
+   * 体が持ち替えられる状態か (domain/player/moves.ts の swap。CQC の最中は替えられない)。
+   * 無ければ替えられる
+   */
+  canSwap?: boolean
+  /**
    * いま箱を被れる体勢か。
    *
    * **転がり中・空中・刺突中・倒れている間は被れない。** 体の側で弾いていた
@@ -484,7 +489,9 @@ export class Inventory {
     this.wearable = ctx.canWearBox
     // 行動できない / 支度中は、押していたことごと忘れる。
     // 覚えていると、湧いた瞬間に一覧が開いていたり持ち替えが走ったりする
-    if (!ctx.canAct || ctx.choosing) {
+    // 持ち替えられない体の間 (CQC) も同じく忘れる。押したまま投げ終えた瞬間に替わると、
+    // 塞いだ意味が無い
+    if (!ctx.canAct || ctx.choosing || ctx.canSwap === false) {
       this.browse = null
       this.heldFor.weapon = 0
       this.heldFor.tool = 0

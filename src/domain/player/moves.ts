@@ -78,6 +78,7 @@ export type Move =
   | 'struggle'
   | 'pat'
   | 'cqc'
+  | 'swap'
 
 interface Rule {
   needs: readonly Flag[]
@@ -175,6 +176,16 @@ export const MOVES: Record<Move, Rule> = {
   cqc: {
     needs: ['onGround'],
     not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'crouching', 'onLadder', 'inWater', 'aiming', 'landing'],
+  },
+  /*
+   * 持ち替える。**CQC の最中はできない** — 投げている間に長物へ替えておけば、倒した相手へ
+   * 構えた時には照準がもう合わせやすい (2026-10-30 本人「これができると倒れた後に
+   * カーソル合わせやすくなっちゃう」)。猫に釘付けの間も何もできない (他の動作と同じ)。
+   * 構えたまま・ボルトを送っている間は持ち物の側 (inventory の hand) が見る
+   */
+  swap: {
+    needs: [],
+    not: ['dead', 'trapped', 'cqc'],
   },
 }
 

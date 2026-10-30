@@ -5391,6 +5391,7 @@ export class Game {
       choosing: this.loadoutBlocking,
       aiming: this.player.isAiming,
       cocking: this.cocking,
+      canSwap: can(this.player.body, "swap"),
       canWearBox: this.player.canWearBox,
     }, dt);
 
