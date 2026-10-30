@@ -979,7 +979,9 @@ const SALUTE_HOLD_PHASE = 0.45
  *
  * **押している間は上げ下げを続ける** (本人 2026-10-30「手を上げたり下げたいしてるところを敬礼ボタン
  * 長押しで機能させる」) — 上げ下げの山 2 つ (1.47 秒と 1.88 秒、ほぼ同じ姿) の間を回す。
- * 離したら続きを流して下ろす。短く押せば挙げて 1 往復して下ろす
+ * 離したら続きを流して下ろす。短く押せば挙げて 1 往復して下ろす。
+ *
+ * **流すのは上半身だけ** — 脚はしゃがみの型のまま (resolveLowerKey)
  */
 const SALUTE_CROUCH_KEY = 'salute_crouch'
 const SALUTE_CROUCH_START = 0.75
@@ -2885,6 +2887,8 @@ export class CharacterAnimator {
    */
   private resolveLowerKey(): string {
     if (this.hooking) return CQC_HOOK_KEY
+    // しゃがんだ合図は**上半身だけ**。型の脚は膝を突き直して動きすぎた (本人 2026-10-31「足が動きすぎ」)
+    if (this.locomotion === 'crouch_salute' && this.lower.has('crouch_idle')) return 'crouch_idle'
     // 伏せてナイフを構えている。prone_stab の頭の 1 枚で全身
     if (this.knife && this.aiming && this.locomotion === 'prone_idle') {
       const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
