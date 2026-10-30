@@ -206,6 +206,11 @@ export type Locomotion =
    */
   | 'step_back'
   /**
+   * しゃがんだまま一歩下がる (型 CrouchBackwards、下半身だけ)。後ろへ跳んで膝を突く。1.16m 下がる。
+   * 名前が crouch_ で始まるので構えの高さはしゃがみ (stance.ts)
+   */
+  | 'crouch_step_back'
+  /**
    * 伏せている。**しゃがみの下にもう一段。**
    *
    * 止まっている姿と這っている姿を分ける。ダンボールの sneak / sit と同じ理由で、

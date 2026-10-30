@@ -552,6 +552,9 @@ export class RemoteSoldier {
     if (locomotion === "step_back" && this.locomotion !== "step_back") {
       animator.playStepBack();
     }
+    if (locomotion === "crouch_step_back" && this.locomotion !== "crouch_step_back") {
+      animator.playStepBack(true);
+    }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
     if (this.locomotion === "salute" && locomotion !== "salute") {
       animator.cancelSalute();

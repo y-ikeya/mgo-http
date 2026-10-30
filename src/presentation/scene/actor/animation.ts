@@ -93,6 +93,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   hit2back: 'hit2back',
   // 構えた所から一歩下がる。下半身だけ (上は銃を下ろした脱力)。焼かれた移動を辿る (ROOT_MOTION_CLIPS)
   step_back: 'step_back',
+  // しゃがんだまま一歩下がる。後ろへ跳んで膝を突く
+  crouch_step_back: 'crouch_step_back',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
   /*
@@ -226,6 +228,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
   // 一歩下がる間は銃を下ろす。型の上半身は拳の構え (ボクシング) なので使わず、立ちの脱力を乗せる
   step_back: 'relaxed_idle',
+  crouch_step_back: 'knee_relaxed',
   // 歩きは長物を提げた型。上下とも同じクリップ (RELAXED_LOWER_STATES)
   walk: 'walk',
   // しゃがみ歩きはしゃがみ走りと同じ上半身
@@ -361,8 +364,9 @@ const ROOT_MOTION_CLIPS = new Set([
   'cqc_thrown',
   // CQC の出だしのフック。踏み込んで戻る (投げに移るまでと、空振りの全部)
   'cqc_hook',
-  // 構えたまま一歩下がる (0.68m)
+  // 構えたまま一歩下がる (0.68m)。しゃがみは 1.16m
   'step_back',
+  'crouch_step_back',
 ])
 /**
  * 焼かれた移動を**この割合まで止めておく**型。止めた分は残りで取り返す (総距離は同じ)。
@@ -598,6 +602,7 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'cqc_miss',
   // 一歩下がる。流し直すと下がり続ける
   'step_back',
+  'crouch_step_back',
   // 投げられて倒れた姿のまま留める (sweep と同じ)
   'cqc_thrown',
   // ローリングで倒れた姿のまま留める (sweep と同じ)
@@ -657,6 +662,7 @@ const PISTOL_RELOAD_RATE = 1.7
 const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   idle: 'pistol_relaxed',
   step_back: 'pistol_relaxed',
+  crouch_step_back: 'pistol_relaxed',
   // 手ぶらの歩き (拳銃は納めている、ナイフ・投げ物も同じ表)
   walk: 'walk_unarmed',
   // しゃがみ歩きはしゃがみ走りと同じ手ぶらの型
@@ -756,6 +762,8 @@ const CQC_HOOK_KEY = 'cqc_hook'
  * 当たった直後なので、繋ぐと拳が当たって投げに入る形になる
  */
 const CQC_HOOK_CUT = 11 / 24
+/** しゃがんで下がる型 (crouch_step_back) の、膝を突き終わるまで (秒)。後ろは止まった姿 */
+const CROUCH_STEP_BACK_SECONDS = 1.1
 /**
  * 吹き飛ばされる型の再生速度。
  *
@@ -4314,14 +4322,16 @@ export class CharacterAnimator {
    *
    * @returns 型の尺 (秒)。型が無い皮では 0
    */
-  playStepBack(): number {
+  playStepBack(crouching = false): number {
     if (this.dead) return 0
-    const lower = this.lower.get('step_back')
+    const state = crouching ? 'crouch_step_back' : 'step_back'
+    const lower = this.lower.get(state)
     if (!lower) return 0
     lower.reset().setEffectiveTimeScale(1).play()
-    this.locomotion = 'step_back'
+    this.locomotion = state
     this.rootSampleValid = false
-    return lower.getClip().duration
+    // しゃがみの型は下がり切って膝を突いた後、同じ姿で 0.6 秒止まっている。そこは待たせない
+    return crouching ? Math.min(lower.getClip().duration, CROUCH_STEP_BACK_SECONDS) : lower.getClip().duration
   }
 
   /** ローリングを頭から再生する。全身動作なので上下を同時に流す */

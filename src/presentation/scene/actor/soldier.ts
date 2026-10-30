@@ -3376,7 +3376,8 @@ export class Soldier {
    */
   stepBack(): boolean {
     if (!can(this.body, 'step') || !this.animator) return false
-    const duration = this.animator.playStepBack()
+    // しゃがんでいればしゃがみの型 (後ろへ跳んで膝を突く)。しゃがみは解かない
+    const duration = this.animator.playStepBack(this.crouching)
     if (duration <= 0) return false
     this.stepLeft = duration
     this.stepYaw = this.yaw

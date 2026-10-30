@@ -194,12 +194,12 @@ export const MOVES: Record<Move, Rule> = {
   },
   /*
    * 構えたまま一歩下がる (step_back)。**構えて後ろを押しながら転がりの指** — 構えていなければ
-   * 転がる。型が立ちの型なので、しゃがみ・伏せ・箱からは出ない (2026-10-30 本人「ちょっとだけ
-   * 後退りできるからCQCとかを避けるのに使う」)
+   * 転がる。伏せ・箱からは出ない。しゃがんでいればしゃがみの型 (crouch_step_back) で下がる
+   * (2026-10-30 本人「ちょっとだけ後退りできるからCQCとかを避けるのに使う」「chrouchのときはこれして」)
    */
   step: {
     needs: ['onGround', 'aiming'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'crouching', 'onLadder', 'inWater', 'landing'],
+    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'inWater', 'landing'],
   },
 }
 

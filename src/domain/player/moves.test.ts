@@ -107,10 +107,11 @@ describe('持ち替え', () => {
 })
 
 describe('一歩下がる', () => {
-  test('**構えて立っている時だけ。** 構えていなければ転がる (呼ぶ側)、しゃがみ・伏せ・箱からは出ない', () => {
+  test('**構えている時だけ。** 構えていなければ転がる (呼ぶ側)、伏せ・箱からは出ない', () => {
     expect(can({ ...standing, aiming: true }, 'step')).toBe(true)
     expect(can(standing, 'step')).toBe(false)
-    expect(can({ ...standing, aiming: true, crouching: true }, 'step')).toBe(false)
+    // しゃがんでいればしゃがみの型で下がる
+    expect(can({ ...standing, aiming: true, crouching: true }, 'step')).toBe(true)
     expect(can({ ...standing, aiming: true, prone: true }, 'step')).toBe(false)
     expect(can({ ...standing, aiming: true, boxed: true }, 'step')).toBe(false)
   })

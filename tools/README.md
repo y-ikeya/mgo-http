@@ -459,6 +459,10 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
     bun tools/merge_clip.js public/models/soldier.glb step_back.glb step_back public/models/soldier.glb
     for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb step_back.glb step_back public/models/$g.glb --rotation-only; done
 
+しゃがんでいる時は `crouch_step_back` (本人の `tools/raw/CrouchBackwards.fbx`、Downloads では ChrouchBackwards.fbx)。
+半ばしゃがんだ姿から後ろへ跳んで膝を突く型で、1.16m 下がる。膝を突き終わる 1.1 秒で切る (後ろ 0.5 秒は止まった姿)。
+`tools/crouch_step_back.json` を同じ手順で通す。
+
 ### CQC の型 (cqc_throw / cqc_miss / cqc_thrown)
 
 本人と Blender で組んだ型 (`tools/raw/cqc.blend`、24fps、70 コマ)。投げる側 `attacker` の

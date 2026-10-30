@@ -455,7 +455,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.vaultingUp) return 'vault_up'
   if (input.vaulting) return 'vault'
   if (input.rolling) return 'roll'
-  if (input.stepping) return 'step_back'
+  if (input.stepping) return input.crouching ? 'crouch_step_back' : 'step_back'
 
   // 覗きながら傾く。**止まっている間だけ。** 立ちとしゃがみで型が違う (伏せには無い)。
   // 主観かどうかは呼ぶ側が見る。傾いたまましゃがみと立ちは行き来できる
