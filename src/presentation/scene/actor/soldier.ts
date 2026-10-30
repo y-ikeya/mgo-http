@@ -4221,6 +4221,12 @@ export class Soldier {
     } else if (this.cqcRecoverLeft > 0) {
       // 空振りの後の棒立ち。向きも変えられない
       targetYaw = this.yaw
+    } else if (this.stepLeft > 0) {
+      /*
+       * 一歩下がっている間は**前を向いたまま。** 銃を下ろすので構えの向きは追わないが、
+       * 進行方向 (後ろ) へ向き直ると振り返って歩く形になる (本人 2026-10-30「体の向きはまえむきながらstepしてよ」)
+       */
+      targetYaw = this.stepYaw
     } else if (!this.aiming && !this.throwing) {
       // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ) を向くので、その逆算
       targetYaw =
