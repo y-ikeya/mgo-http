@@ -457,6 +457,15 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 `cqc_miss` は cqc.blend の別の action (22 コマ): 左のフックが伸び切る 11 コマまでは投げと同じで、
 そこから左手だけ構えへ引き戻す (右手は振らない)。
 
+2026-10-30 から、投げも空振りも出だしは左のフック `cqc_hook` (本人が落とした `tools/raw/Hook.fbx`、
+Mixamo、`tools/cqc_hook.json` で retarget_clip に通した)。掛かったらフックの 11/24 秒で投げの型の**同じ時刻**へ
+移り (投げの時の流れは前のまま)、掛からなければフックを振り抜いて構えへ戻るまで流す (それが隙。
+animation.ts の CQC_HOOK_CUT)。`cqc_miss` は使っていない (フックの型が無い皮だけが使う):
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/cqc_hook.json
+    bun tools/merge_clip.js public/models/soldier.glb cqc_hook.glb cqc_hook public/models/soldier.glb
+    for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb cqc_hook.glb cqc_hook public/models/$g.glb --rotation-only; done
+
 組むときの道具は `tools/cqc/` (pose.py = 体の向きで骨を回す、legs.py = つま先を床に留めて
 脚を解き直す)。元にした素材は Boxing / LightHitToHead / SweepFall (`tools/cqc/*.json` で
 retarget_clip に通した)。試写は `tools/preview/cqc.html` (2 人並べて型の移動も辿る)。

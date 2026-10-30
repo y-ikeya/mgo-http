@@ -355,6 +355,8 @@ const ROOT_MOTION_CLIPS = new Set([
   'cqc_throw',
   'cqc_miss',
   'cqc_thrown',
+  // CQC の出だしのフック。踏み込んで戻る (投げに移るまでと、空振りの全部)
+  'cqc_hook',
 ])
 /**
  * 焼かれた移動を**この割合まで止めておく**型。止めた分は残りで取り返す (総距離は同じ)。
@@ -732,6 +734,20 @@ const CQC_THROW_KEY = 'cqc_throw'
 const CQC_RATE = 1.2
 const CQC_MISS_KEY = 'cqc_miss'
 /**
+ * CQC の出だし。**投げも空振りも左のフックから入る** (tools/cqc_hook.json、Hook.fbx)。
+ * 掛かったら振り抜く前に投げへ移り (CQC_HOOK_CUT)、掛からなければ振り抜いて構えへ戻るまで
+ * 流す — 振り抜いた後が隙になる (2026-10-30 本人「CQCがすかったらmotionをつづける(隙になる)」)
+ */
+const CQC_HOOK_KEY = 'cqc_hook'
+/**
+ * フックから投げへ移る、型の時刻 (秒、型の時間)。**投げの型も同じ時刻から流す**ので、
+ * 投げの時の流れ (投げられる側と合わせた時刻、背中が着く CQC_LAND_SECONDS) は前と変わらない。
+ *
+ * フックの 12 コマ目 (24fps) — 拳が顔の前を横切る直前。投げの型の同じ時刻は左の拳が
+ * 当たった直後なので、繋ぐと拳が当たって投げに入る形になる
+ */
+const CQC_HOOK_CUT = 11 / 24
+/**
  * 吹き飛ばされる型の再生速度。
  *
  * クリップは 3.07 秒だが、**飛ばされて落ちるのは最初の 0.92 秒**で、
@@ -949,6 +965,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   ROLL_FALL_KEY,
   CQC_THROW_KEY,
   CQC_MISS_KEY,
+  CQC_HOOK_KEY,
   STAND_KEY,
   THROW_WINDUP_KEY,
   THROW_RELEASE_KEY,
@@ -1636,6 +1653,8 @@ export class CharacterAnimator {
       finished === this.upper.get(ROLL_FALL_KEY) ||
       finished === this.upper.get(CQC_THROW_KEY) ||
       finished === this.upper.get(CQC_MISS_KEY) ||
+      // 空振りのフックを振り抜いた (投げならその前に投げの型へ移っている)
+      finished === this.upper.get(CQC_HOOK_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
       finished === this.upper.get(THROW_RELEASE_KEY) ||
       // 伏せの振り切りも。戻さないと投げの状態のまま残り、構えを押したままの次の
@@ -1744,6 +1763,15 @@ export class CharacterAnimator {
       if (state === 'jump_loop') this.jumpLoopDuration = clip.duration
       this.lower.set(state, action)
       this.lowerClipNames.set(state, clip.name)
+    }
+    // CQC の出だしのフック。体の状態 (locomotion) ではなく cqc_throw / cqc_miss の頭に流す型なので表の外
+    const hook = byName.get(CQC_HOOK_KEY)
+    if (hook) {
+      const action = this.mixer.clipAction(splitClip(hook, 'lower'))
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+      this.lower.set(CQC_HOOK_KEY, action)
+      this.lowerClipNames.set(CQC_HOOK_KEY, hook.name)
     }
 
     /*
@@ -2022,6 +2050,7 @@ export class CharacterAnimator {
       [HANG_RIGHT_KEY, 'hang_right'],
       [CQC_THROW_KEY, 'cqc_throw'],
       [CQC_MISS_KEY, 'cqc_miss'],
+      [CQC_HOOK_KEY, 'cqc_hook'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -2192,6 +2221,7 @@ export class CharacterAnimator {
     this.releaseRollIfSettling()
     this.updateSalute()
     this.updateThrow()
+    this.updateCqcHook()
 
     // 前フレームの上乗せを取り消してから mixer を回す。
     // three が書き込みを省略した回でも、ボーンが素のアニメ値から始まることを保証する。
@@ -2814,6 +2844,7 @@ export class CharacterAnimator {
    * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
    */
   private resolveLowerKey(): string {
+    if (this.hooking) return CQC_HOOK_KEY
     // 伏せてナイフを構えている。prone_stab の頭の 1 枚で全身
     if (this.knife && this.aiming && this.locomotion === 'prone_idle') {
       const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
@@ -3346,6 +3377,7 @@ export class CharacterAnimator {
     if (this.upperState === 'vault' && this.upper.has(VAULT_KEY)) return VAULT_KEY
     if (this.upperState === 'vault_up' && this.upper.has(VAULT_UP_KEY)) return VAULT_UP_KEY
     // CQC も同じ。上だけ構えに戻ると、銃を構えたまま足を払う
+    if (this.hooking) return CQC_HOOK_KEY
     if (this.upperState === 'cqc_throw' && this.upper.has(CQC_THROW_KEY)) return CQC_THROW_KEY
     if (this.upperState === 'cqc_miss' && this.upper.has(CQC_MISS_KEY)) return CQC_MISS_KEY
     if (this.upperState === 'hang_drop' && this.upper.has(HANG_DROP_KEY)) return HANG_DROP_KEY
@@ -4151,14 +4183,68 @@ export class CharacterAnimator {
    */
   playCqc(kind: 'cqc_throw' | 'cqc_miss'): void {
     if (this.dead) return
-    const upper = this.upper.get(kind === 'cqc_throw' ? CQC_THROW_KEY : CQC_MISS_KEY)
-    const lower = this.lower.get(kind)
+    // どちらもフックから入る。フックの型が無い皮は前の型 (投げ / 空振り) を頭から
+    const hookUpper = this.upper.get(CQC_HOOK_KEY)
+    const hookLower = this.lower.get(CQC_HOOK_KEY)
+    this.cqcHookOn = !!hookUpper && !!hookLower
+    const upper = this.cqcHookOn ? hookUpper : this.upper.get(kind === 'cqc_throw' ? CQC_THROW_KEY : CQC_MISS_KEY)
+    const lower = this.cqcHookOn ? hookLower : this.lower.get(kind)
     if (!upper || !lower) return
     upper.reset().setEffectiveTimeScale(CQC_RATE).play()
     lower.reset().setEffectiveTimeScale(CQC_RATE).play()
     this.upperState = kind
     this.locomotion = kind
     this.rootSampleValid = false
+  }
+
+  /** フックを流している最中か (投げに移る前、または空振り) */
+  private cqcHookOn = false
+  private get hooking(): boolean {
+    return this.cqcHookOn && (this.upperState === 'cqc_throw' || this.upperState === 'cqc_miss')
+  }
+
+  /**
+   * 掛かった CQC が、フックを振り抜く前の時刻 (CQC_HOOK_CUT) に来たら投げの型へ移る。
+   * **投げの型はフックと同じ時刻から流す** — 投げの時の流れは前と同じ。型の重みの補間で繋がる
+   */
+  private updateCqcHook(): void {
+    if (!this.hooking || this.upperState !== 'cqc_throw') return
+    const hook = this.lower.get(CQC_HOOK_KEY)
+    const upper = this.upper.get(CQC_THROW_KEY)
+    const lower = this.lower.get('cqc_throw')
+    if (!hook || hook.time < CQC_HOOK_CUT || !upper || !lower) return
+    const at = hook.time
+    upper.reset().setEffectiveTimeScale(CQC_RATE).play()
+    lower.reset().setEffectiveTimeScale(CQC_RATE).play()
+    upper.time = at
+    lower.time = at
+    this.cqcHookOn = false
+    /*
+     * 踏み込みはフックで進んだぶんを引いて、投げの型の残りを辿る。投げの型はこの時刻までに
+     * フックより少し多く進んでいる (0.25m と 0.18m) ので、差を次のコマで足す —
+     * 投げ切った時の 2 人の間合いが前と同じになる
+     */
+    const stored = this.rootMotion.get('cqc_throw')
+    const hookStored = this.rootMotion.get(CQC_HOOK_KEY)
+    if (stored && hookStored && this.rootSampleValid) {
+      sampleVectorTrack(stored.times, stored.values, at, this.scratchVector)
+      sampleVectorTrack(stored.times, stored.values, 0, this.scratchVector2)
+      const throwX = this.scratchVector.x - this.scratchVector2.x
+      const throwY = this.scratchVector.y - this.scratchVector2.y
+      sampleVectorTrack(hookStored.times, hookStored.values, this.lastRootTime, this.scratchVector2)
+      const hookX = this.scratchVector2.x
+      const hookY = this.scratchVector2.y
+      sampleVectorTrack(hookStored.times, hookStored.values, 0, this.scratchVector2)
+      // 次のコマの差 = 投げの今 - (投げの今 - (投げの進み - フックの進み))
+      this.lastRootSample.set(
+        this.scratchVector.x - (throwX - (hookX - this.scratchVector2.x)),
+        this.scratchVector.y - (throwY - (hookY - this.scratchVector2.y)),
+        0,
+      )
+      this.lastRootTime = at
+    } else {
+      this.rootSampleValid = false
+    }
   }
 
   /**
@@ -4240,7 +4326,7 @@ export class CharacterAnimator {
   consumeRootMotion(out: THREE.Vector3): boolean {
     // **いま流れている全身の型から引く。** roll だけを見ていたので、
     // 受け身は焼かれた移動を持っているのに誰も読まなかった
-    const name = this.locomotion
+    const name = this.hooking ? CQC_HOOK_KEY : this.locomotion
     if (!ROOT_MOTION_CLIPS.has(name)) return false
     const stored = this.rootMotion.get(name)
     const action = this.lower.get(name)
@@ -4279,7 +4365,7 @@ export class CharacterAnimator {
     // トラック空間は X/Y が水平、Z が上下 (Armature の +90°X 回転のため)。
     // モデル空間では armature ローカルの +Y が前方 (+Z) に対応する。
     const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1) * (name === 'vault_up' ? this.vaultUpReach : 1)
-    const hold = ROOT_MOTION_HOLD[name]
+    const hold = name === CQC_HOOK_KEY ? undefined : ROOT_MOTION_HOLD[name]
     if (hold) {
       /*
        * **前半は焼かれた移動の keep 倍だけ進み、残りは境目から早回しで辿る。**
