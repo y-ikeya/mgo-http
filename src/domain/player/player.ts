@@ -404,6 +404,11 @@ export interface MatchPlayer extends Player {
   footsteps: Footsteps
   /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
   locomotion: Locomotion
+  /**
+   * いまの locomotion に入ってからの秒数 (状態の知らせの locomotionAge)。眠って倒れていく途中の
+   * 高さを見るのに使う (domain/player/stance.ts の stanceAt)
+   */
+  locomotionAge: number
   /** 持っている銃。威力と連射の上限をこれで引く */
   weapon: WeaponId
 }
@@ -475,6 +480,7 @@ export function newMatchPlayer(seed: {
     stuns: 0,
     ready: false,
     stamina: MAX_STAMINA,
+    locomotionAge: 0,
     sleepUntil: 0,
     wakeFloor: 0,
     struggleAt: 0,

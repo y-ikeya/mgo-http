@@ -23,7 +23,7 @@ import { canBeStabbed } from "../../../domain/rule/damage";
 import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
+import { leanOf, stanceAt, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING, LANDING_RATE, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
@@ -319,8 +319,15 @@ export class RemoteSoldier {
    * 各所で判定を組み立てると、サーバー側のドメインルールとだんだんずれる。
    */
   stabbableFrom(aimPitch: number, attacker: Stance): boolean {
-    return canBeStabbed(stanceOf(this.locomotion), aimPitch, attacker);
+    // 眠って倒れていく途中はまだ高い。サーバーと同じ式 (stanceAt)
+    return canBeStabbed(stanceAt(this.locomotion, this.locomotionAge()), aimPitch, attacker);
   }
+  /** いまの locomotion に入ってからの秒数 (最後の知らせの値に、届いてからの時間を足す) */
+  private locomotionAge(): number {
+    return this.ageAtState + (performance.now() - this.stateAt) / 1000;
+  }
+  private ageAtState = 0;
+  private stateAt = 0;
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
   /** 直前のリロード状態。始まった瞬間だけ型を流すのに使う */
@@ -493,6 +500,9 @@ export class RemoteSoldier {
         ? "idle"
         : state.locomotion;
 
+    // その動きに入ってからの秒数。眠って倒れていく途中の高さを見る (stabbableFrom)
+    this.ageAtState = state.locomotionAge;
+    this.stateAt = performance.now();
     // 全身モーションは重みの補間では出せない。状態が切り替わった瞬間に頭から流す。
     this.rollStarted = false;
     this.sweptThisFrame = false;

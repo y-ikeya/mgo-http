@@ -186,6 +186,7 @@ export function updateTargets(room: RoomWorld, now: number): void {
     // 0 のまま送っていて、眠っている的の傍で画面を読み直すと倒れる所から流れた
     if (next !== bot.locomotion) botPoseSince.set(bot, now)
     bot.locomotion = next
+    bot.locomotionAge = (now - (botPoseSince.get(bot) ?? now)) / 1000
     // 箱を被った的は、座っている間だけ箱の中 (倒されたら箱が落ち、起き上がったらまた被る)
     bot.boxed = bot.homeStance === 'box' && next === 'sit'
     recordPose(bot)

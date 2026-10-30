@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { stanceOf, HEAD_HEIGHT, leanOf, leanShift, LEAN_SHIFT } from './stance'
+import { stanceOf, stanceAt, SLEEP_STAND_SECONDS, SLEEP_KNEEL_SECONDS, HEAD_HEIGHT, leanOf, leanShift, LEAN_SHIFT } from './stance'
 
 /**
  * 構えは**遊びに効く**ので domain に居る。頭の高さが遮蔽の判定に入り、
@@ -52,3 +52,19 @@ describe('傾き (lean)', () => {
     expect(leanShift(1, 'crouch', 0).x).toBeCloseTo(LEAN_SHIFT.crouch.right)
   })
 })
+
+describe('眠って倒れていく途中の高さ (stanceAt)', () => {
+  test('**眠った直後はまだ立っている**。膝をついたらしゃがみ、寝転んだら伏せ', () => {
+    expect(stanceAt('sleep', 0)).toBe('stand')
+    expect(stanceAt('sleep', SLEEP_STAND_SECONDS - 0.05)).toBe('stand')
+    expect(stanceAt('sleep', SLEEP_STAND_SECONDS)).toBe('crouch')
+    expect(stanceAt('sleep', SLEEP_KNEEL_SECONDS)).toBe('prone')
+    expect(stanceAt('sleep', 10)).toBe('prone')
+  })
+
+  test('眠り以外は経過を見ない', () => {
+    expect(stanceAt('prone_idle', 0)).toBe(stanceOf('prone_idle'))
+    expect(stanceAt('crouch_idle', 0)).toBe(stanceOf('crouch_idle'))
+  })
+})
+
