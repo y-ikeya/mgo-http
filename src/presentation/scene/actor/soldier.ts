@@ -4375,7 +4375,10 @@ export class Soldier {
         const pitch = this.proneStage === 'none' ? this.aimPitch : 0
         this.aimDir.set(-Math.sin(this.yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(this.yaw) * Math.cos(pitch))
         this.weapon.alignTo(this.aimDir, this.aimTrimWeight)
-        this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
+        // 左手を銃へ付いていかせるのは**銃を持っている時だけ** (両手で支える物)。ナイフでも働いていて、
+        // ナイフを照準へ回した分だけ左手が引っ張られていた (2026-10-30 本人「knife 構えてる時に左手って
+        // IK してる？してない方がいい」)。ナイフの左手は型のまま
+        if (isGun(this.held)) this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
       }
       // 姿勢がどれだけ速く変わっているか。散布に効かせる
       this.stanceRateValue = dt > 0 ? Math.abs(this.weaponStance - before) / dt : 0
