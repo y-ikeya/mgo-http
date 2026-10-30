@@ -872,11 +872,6 @@ const HARD_LAND_KEY = 'hard_land'
 const VAULT_KEY = 'vault'
 /** 一段上へ乗る。上下は型から抜いてコードで上げる (高さが物ごとに違う) */
 const VAULT_UP_KEY = 'vault_up'
-/**
- * 跳び越える型 (vault) の再生速度。等倍はゆっくりすぎた (本人 2026-10-30「1.3倍速でもいいわ」→「やっぱ1.2ばいで」)。
- * 焼かれた移動も同じ速さで辿るので、跳ぶ距離は変わらず早く着く。乗る型 (vault_up) は等倍のまま
- */
-const VAULT_RATE = 1.2
 /** 縁から落ちてぶら下がる。**終わっても戻さない** (掴んだまま待つ) */
 const HANG_DROP_KEY = 'hang_drop'
 /** ぶら下がりから登る。終わればしゃがみへ */
@@ -3571,9 +3566,9 @@ export class CharacterAnimator {
     const upper = this.upper.get(up ? VAULT_UP_KEY : VAULT_KEY)
     const lower = this.lower.get(name)
     if (!upper || !lower) return
-    const rate = up ? 1 : VAULT_RATE
-    upper.reset().setEffectiveTimeScale(rate).play()
-    lower.reset().setEffectiveTimeScale(rate).play()
+    // 跳び越える型 (vault) は**ファイルの側で 1.2 倍速にしてある** (tools/retime_clip.js、本人 2026-10-30)
+    upper.reset().play()
+    lower.reset().play()
     this.upperState = name
     this.locomotion = name
     this.vaultUpReach = up ? reach : 1
