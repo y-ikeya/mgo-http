@@ -452,7 +452,7 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 ### 一歩下がる型 (step_back)
 
 構えたまま後ろを押しながら転がりの指 (Space 長押し / ×) で、転がらずに一歩下がる (0.68m、0.96 秒)。
-**下半身だけ**流し、上半身は構えのまま。本人が落とした `tools/raw/StepBackward.fbx` (Mixamo のボクシングの
+**下半身だけ**流し、下がっている間は銃を下ろす (上半身は立ちの脱力)。本人が落とした `tools/raw/StepBackward.fbx` (Mixamo のボクシングの
 後退り) を `tools/step_back.json` で retarget_clip に通した。型の上半身は拳の構えなので使わない:
 
     $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/step_back.json

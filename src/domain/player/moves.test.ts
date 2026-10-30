@@ -115,11 +115,11 @@ describe('一歩下がる', () => {
     expect(can({ ...standing, aiming: true, boxed: true }, 'step')).toBe(false)
   })
 
-  test('下がっている間は転がれず、もう一度下がれず、CQC も掛けられない。撃つ (構える) のは通す', () => {
+  test('下がっている間は転がれず、もう一度下がれず、CQC も掛けられず、構えられない (銃を下ろす)', () => {
     const body = { ...standing, aiming: true, stepping: true }
     expect(can(body, 'step')).toBe(false)
     expect(can(body, 'roll')).toBe(false)
     expect(can(body, 'cqc')).toBe(false)
-    expect(can(body, 'aim')).toBe(true)
+    expect(can(body, 'aim')).toBe(false)
   })
 })

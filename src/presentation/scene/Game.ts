@@ -4795,7 +4795,7 @@ export class Game {
         this.rolledThisHold = true;
         /*
          * **構えたまま後ろを押していれば、転がらずに一歩下がる** (step_back、下半身だけ)。
-         * 照準を外さずに CQC の間合いから出る (2026-10-30 本人)。できなければ (しゃがみ等) 転がる
+         * CQC の間合いから出る (2026-10-30 本人)。下がっている間は銃を下ろす。できなければ (しゃがみ等) 転がる
          */
         this.steppedThisHold = this.player.isAiming && this.pushingBack() && this.player.stepBack();
         // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ

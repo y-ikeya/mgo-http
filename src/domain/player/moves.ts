@@ -143,7 +143,7 @@ export const MOVES: Record<Move, Rule> = {
   // 構える。全身の型の最中は構えの上半身を乗せられない
   aim: {
     needs: [],
-    not: [...HELPLESS, 'saluting', 'rolling', 'vaulting', 'hanging', 'cqc'],
+    not: [...HELPLESS, 'saluting', 'rolling', 'vaulting', 'hanging', 'cqc', 'stepping'],
   },
   // 投げる (手榴弾・デコイ)。梯子と箱は両手が塞がっている。転がりは全身の型
   throw: {

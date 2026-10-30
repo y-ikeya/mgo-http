@@ -91,7 +91,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   cqc_miss: 'cqc_miss',
   cqc_thrown: 'cqc_thrown',
   hit2back: 'hit2back',
-  // 構えたまま一歩下がる。下半身だけ (上は構えのまま)。焼かれた移動を辿る (ROOT_MOTION_CLIPS)
+  // 構えた所から一歩下がる。下半身だけ (上は銃を下ろした脱力)。焼かれた移動を辿る (ROOT_MOTION_CLIPS)
   step_back: 'step_back',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
@@ -224,7 +224,7 @@ type UpperState =
  */
 const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
-  // 一歩下がる途中で構えを解いた。型の上半身は拳の構え (ボクシング) なので、立ちの脱力を乗せる
+  // 一歩下がる間は銃を下ろす。型の上半身は拳の構え (ボクシング) なので使わず、立ちの脱力を乗せる
   step_back: 'relaxed_idle',
   // 歩きは長物を提げた型。上下とも同じクリップ (RELAXED_LOWER_STATES)
   walk: 'walk',
@@ -4309,8 +4309,8 @@ export class CharacterAnimator {
   }
 
   /**
-   * 構えたまま一歩下がる。**下半身だけ** — 上半身は構えのまま (locomotion を見て上を決める
-   * 所に step_back は無いので、構えの型が乗る)。焼かれた移動 (後ろへ 0.68m) を辿る
+   * 構えた所から一歩下がる。**下半身だけ** — 下がっている間は銃を下ろすので、上半身は
+   * 脱力の型 (RELAXED_CLIPS の step_back)。焼かれた移動 (後ろへ 0.68m) を辿る
    *
    * @returns 型の尺 (秒)。型が無い皮では 0
    */
