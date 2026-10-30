@@ -296,11 +296,13 @@ export const TARGET_DOWN = 2.0 + TARGET_STAND
 export function placeTargets(room: RoomWorld): void {
   const now = Date.now()
   STAGES[room.stage.name].targets.forEach((at, i) => {
+    // 青の的は味方 (練習の人はいつも青)。名前で見分けられるように ALLY と呼ぶ
+    const team = at.team ?? 'red'
     const bot = newBot({
       id: `target-${i}`,
-      name: `TARGET ${i + 1}`,
+      name: team === 'blue' ? `ALLY ${i + 1}` : `TARGET ${i + 1}`,
       slot: nextSlot(room),
-      team: 'red',
+      team,
       x: at.x,
       z: at.z,
       // 地面が 0 でないステージで埋まらないように (検証場の地面は 0.1)

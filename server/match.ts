@@ -310,6 +310,8 @@ const REST: Record<MatchPlayer['homeStance'], Locomotion> = {
   box: 'sit',
   // lean し続ける的の、どちらでもない時の姿 (targetLocomotion が左右を決める)
   lean: 'idle',
+  // 敬礼したまま立つ (味方の的)。手は挙げたまま (saluteHeld)
+  salute: 'salute',
 }
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
@@ -338,7 +340,8 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')
         held: bot.boxed ? 'box' : 'rifle',
         concentrating: false,
-        saluteHeld: false,
+        // 敬礼の的は手を挙げたまま。下ろすと型の終わりで手が下りる
+        saluteHeld: bot.locomotion === 'salute',
       },
       bot.slot,
     ),
