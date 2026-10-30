@@ -4793,9 +4793,16 @@ export class Game {
       // 長押しが成立した。**1 回の押下につき 1 度だけ転がる**
       if (!this.rolledThisHold) {
         this.rolledThisHold = true;
+        /*
+         * **構えたまま後ろを押していれば、転がらずに一歩下がる** (step_back、下半身だけ)。
+         * 照準を外さずに CQC の間合いから出る (2026-10-30 本人)。できなければ (しゃがみ等) 転がる
+         */
+        this.steppedThisHold = this.player.isAiming && this.pushingBack() && this.player.stepBack();
         // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
-        if (!this.cocking) this.player.roll();
+        if (!this.steppedThisHold && !this.cocking) this.player.roll();
       }
+      // 下がっただけなら伏せない (押したまま転がり切ると伏せる、の対象は転がり)
+      if (this.steppedThisHold) return;
       /*
        * **押したまま転がり切ると、立たずに伏せる。**
        *
@@ -4812,6 +4819,19 @@ export class Game {
 
     // 離した。次の押下でまた転がれる
     this.rolledThisHold = false;
+    this.steppedThisHold = false;
+  }
+
+  /** この押下で一歩下がったか。下がった時は、押したままでも伏せない */
+  private steppedThisHold = false;
+
+  /** 体の後ろ側へ移動を入れているか (体の向きから 45° 以内の後ろ) */
+  private pushingBack(): boolean {
+    const length = Math.hypot(this.moveDir.x, this.moveDir.z);
+    if (length < 0.3) return false;
+    const yaw = this.player.yaw;
+    const forward = (this.moveDir.x * -Math.sin(yaw) + this.moveDir.z * -Math.cos(yaw)) / length;
+    return forward < -Math.SQRT1_2;
   }
 
   /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */

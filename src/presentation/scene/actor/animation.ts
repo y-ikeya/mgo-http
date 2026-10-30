@@ -91,6 +91,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   cqc_miss: 'cqc_miss',
   cqc_thrown: 'cqc_thrown',
   hit2back: 'hit2back',
+  // 構えたまま一歩下がる。下半身だけ (上は構えのまま)。焼かれた移動を辿る (ROOT_MOTION_CLIPS)
+  step_back: 'step_back',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
   /*
@@ -222,6 +224,8 @@ type UpperState =
  */
 const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
+  // 一歩下がる途中で構えを解いた。型の上半身は拳の構え (ボクシング) なので、立ちの脱力を乗せる
+  step_back: 'relaxed_idle',
   // 歩きは長物を提げた型。上下とも同じクリップ (RELAXED_LOWER_STATES)
   walk: 'walk',
   // しゃがみ歩きはしゃがみ走りと同じ上半身
@@ -357,6 +361,8 @@ const ROOT_MOTION_CLIPS = new Set([
   'cqc_thrown',
   // CQC の出だしのフック。踏み込んで戻る (投げに移るまでと、空振りの全部)
   'cqc_hook',
+  // 構えたまま一歩下がる (0.68m)
+  'step_back',
 ])
 /**
  * 焼かれた移動を**この割合まで止めておく**型。止めた分は残りで取り返す (総距離は同じ)。
@@ -590,6 +596,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'stand',
   'cqc_throw',
   'cqc_miss',
+  // 一歩下がる。流し直すと下がり続ける
+  'step_back',
   // 投げられて倒れた姿のまま留める (sweep と同じ)
   'cqc_thrown',
   // ローリングで倒れた姿のまま留める (sweep と同じ)
@@ -648,6 +656,7 @@ const PISTOL_RELOAD_RATE = 1.7
  */
 const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   idle: 'pistol_relaxed',
+  step_back: 'pistol_relaxed',
   // 手ぶらの歩き (拳銃は納めている、ナイフ・投げ物も同じ表)
   walk: 'walk_unarmed',
   // しゃがみ歩きはしゃがみ走りと同じ手ぶらの型
@@ -4297,6 +4306,22 @@ export class CharacterAnimator {
     lower.reset().play()
     this.upperState = 'stab'
     this.locomotion = prone ? 'prone_stab' : 'stab'
+  }
+
+  /**
+   * 構えたまま一歩下がる。**下半身だけ** — 上半身は構えのまま (locomotion を見て上を決める
+   * 所に step_back は無いので、構えの型が乗る)。焼かれた移動 (後ろへ 0.68m) を辿る
+   *
+   * @returns 型の尺 (秒)。型が無い皮では 0
+   */
+  playStepBack(): number {
+    if (this.dead) return 0
+    const lower = this.lower.get('step_back')
+    if (!lower) return 0
+    lower.reset().setEffectiveTimeScale(1).play()
+    this.locomotion = 'step_back'
+    this.rootSampleValid = false
+    return lower.getClip().duration
   }
 
   /** ローリングを頭から再生する。全身動作なので上下を同時に流す */

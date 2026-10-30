@@ -23,12 +23,13 @@ const standing: BodyState = {
   crouching: false,
   cqc: false,
   trapped: false,
+  stepping: false,
 }
 
 describe('できること', () => {
-  test('立っていれば一通りできる (もがくのは眠っている間だけ、叩くのはしゃがんでいる時だけ)', () => {
+  test('立っていれば一通りできる (もがくのは眠っている間だけ、叩くのはしゃがんでいる時だけ、下がるのは構えている時だけ)', () => {
     for (const move of Object.keys(MOVES) as Move[]) {
-      if (move === 'struggle' || move === 'pat') continue
+      if (move === 'struggle' || move === 'pat' || move === 'step') continue
       expect(can(standing, move)).toBe(true)
     }
   })
@@ -102,5 +103,23 @@ describe('持ち替え', () => {
   test('**CQC の最中は持ち替えられない** (投げている間に長物へ替えて、倒した相手へすぐ構えられないように)', () => {
     expect(can({ ...standing, cqc: true }, 'swap')).toBe(false)
     expect(can(standing, 'swap')).toBe(true)
+  })
+})
+
+describe('一歩下がる', () => {
+  test('**構えて立っている時だけ。** 構えていなければ転がる (呼ぶ側)、しゃがみ・伏せ・箱からは出ない', () => {
+    expect(can({ ...standing, aiming: true }, 'step')).toBe(true)
+    expect(can(standing, 'step')).toBe(false)
+    expect(can({ ...standing, aiming: true, crouching: true }, 'step')).toBe(false)
+    expect(can({ ...standing, aiming: true, prone: true }, 'step')).toBe(false)
+    expect(can({ ...standing, aiming: true, boxed: true }, 'step')).toBe(false)
+  })
+
+  test('下がっている間は転がれず、もう一度下がれず、CQC も掛けられない。撃つ (構える) のは通す', () => {
+    const body = { ...standing, aiming: true, stepping: true }
+    expect(can(body, 'step')).toBe(false)
+    expect(can(body, 'roll')).toBe(false)
+    expect(can(body, 'cqc')).toBe(false)
+    expect(can(body, 'aim')).toBe(true)
   })
 })

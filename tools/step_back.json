@@ -1,0 +1,7 @@
+{
+  "dir": "tools/raw",
+  "character": "Shooter Pack/Ch35_nonPBR.fbx",
+  "clips": { "StepBackward.fbx": "step_back" },
+  "out": "step_back.glb",
+  "maxTexture": 64
+}

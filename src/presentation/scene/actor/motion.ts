@@ -292,6 +292,8 @@ export interface StanceInput {
   rolled?: boolean
   /** CQC で投げている / 空振りしている最中の型。していなければ null */
   cqc?: 'cqc_throw' | 'cqc_miss' | null
+  /** 構えたまま一歩下がっている最中か (step_back、下半身だけの型) */
+  stepping?: boolean
   /**
    * 起き上がっている最中か。
    *
@@ -453,6 +455,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.vaultingUp) return 'vault_up'
   if (input.vaulting) return 'vault'
   if (input.rolling) return 'roll'
+  if (input.stepping) return 'step_back'
 
   // 覗きながら傾く。**止まっている間だけ。** 立ちとしゃがみで型が違う (伏せには無い)。
   // 主観かどうかは呼ぶ側が見る。傾いたまましゃがみと立ちは行き来できる

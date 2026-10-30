@@ -548,6 +548,10 @@ export class RemoteSoldier {
     if (locomotion === "crouch_stab" && this.locomotion !== "crouch_stab") {
       animator.playStab();
     }
+    // 構えたまま一歩下がる。下半身だけの一度きりの型なので、入った瞬間に頭から流す
+    if (locomotion === "step_back" && this.locomotion !== "step_back") {
+      animator.playStepBack();
+    }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
     if (this.locomotion === "salute" && locomotion !== "salute") {
       animator.cancelSalute();

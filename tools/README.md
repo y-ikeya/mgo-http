@@ -449,6 +449,16 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=tempo=0.2414:pitchq=quality,equalizer=f=2977:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
 ```
 
+### 一歩下がる型 (step_back)
+
+構えたまま後ろを押しながら転がりの指 (Space 長押し / ×) で、転がらずに一歩下がる (0.68m、0.96 秒)。
+**下半身だけ**流し、上半身は構えのまま。本人が落とした `tools/raw/StepBackward.fbx` (Mixamo のボクシングの
+後退り) を `tools/step_back.json` で retarget_clip に通した。型の上半身は拳の構えなので使わない:
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/step_back.json
+    bun tools/merge_clip.js public/models/soldier.glb step_back.glb step_back public/models/soldier.glb
+    for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb step_back.glb step_back public/models/$g.glb --rotation-only; done
+
 ### CQC の型 (cqc_throw / cqc_miss / cqc_thrown)
 
 本人と Blender で組んだ型 (`tools/raw/cqc.blend`、24fps、70 コマ)。投げる側 `attacker` の

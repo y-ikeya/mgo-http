@@ -1166,6 +1166,7 @@ export class Soldier {
       aiming: this.aiming,
       crouching: this.crouching,
       cqc: this.cqcBusy,
+      stepping: this.stepLeft > 0,
       trapped: this.trappedStage !== 'none',
     }
   }
@@ -3352,6 +3353,31 @@ export class Soldier {
     return this.animator?.rollShowing ?? false
   }
 
+  /** 一歩下がり終えるまでの秒。0 なら下がっていない */
+  private stepLeft = 0
+  /** 下がる向き (踏み出した時の体の向き)。下がっている間に照準を回しても真っ直ぐ下がる */
+  private stepYaw = 0
+
+  /** 構えたまま一歩下がっている最中か */
+  get stepping(): boolean {
+    return this.stepLeft > 0
+  }
+
+  /**
+   * 構えたまま一歩下がる (step_back、下半身だけ)。**構えは解かない** — 下がりながら撃てる。
+   * 型に焼かれた移動 (後ろへ 0.68m) を辿る。できるかは表 (moves.ts の step)
+   *
+   * @returns 下がり始めた
+   */
+  stepBack(): boolean {
+    if (!can(this.body, 'step') || !this.animator) return false
+    const duration = this.animator.playStepBack()
+    if (duration <= 0) return false
+    this.stepLeft = duration
+    this.stepYaw = this.yaw
+    return true
+  }
+
   /**
    * 前方へ転がる。接地しているときだけ。
    *
@@ -3865,7 +3891,8 @@ export class Soldier {
     }
     // CQC で投げられて倒れている間も、型に焼かれた移動 (後ろへ 0.7m) を辿る
     const thrownSliding = this.downed_ && this.thrownFall
-    const tumbling = overrideX === undefined && (this.rolling || proneRolling || thrownSliding)
+    const stepping = this.stepLeft > 0
+    const tumbling = overrideX === undefined && (this.rolling || proneRolling || thrownSliding || stepping)
     // 空振りの後の棒立ち。動けない
     if (overrideX === undefined && this.cqcRecoverLeft > 0) {
       overrideX = 0
@@ -3879,6 +3906,8 @@ export class Soldier {
         // モデルは 180° 回してあるので yaw + π の回転になる。
         const yaw = thrownSliding
           ? this.thrownYaw
+          : stepping
+            ? this.stepYaw
           : proneRolling
             ? this.yaw
             : this.rolling
@@ -4155,6 +4184,7 @@ export class Soldier {
     if (this.downed_) this.downElapsed += dt
     // CQC の型が終わった。**空振りなら棒立ちの隙へ** (CQC_MISS_RECOVERY)
     if (this.cqcRecoverLeft > 0) this.cqcRecoverLeft = Math.max(0, this.cqcRecoverLeft - dt)
+    if (this.stepLeft > 0) this.stepLeft = Math.max(0, this.stepLeft - dt)
     if (this.cqcStarted && !(this.animator?.cqcBusy ?? false)) {
       if (this.cqcStarted === 'cqc_miss') this.cqcRecoverLeft = CQC_MISS_RECOVERY
       this.cqcStarted = null
@@ -4714,6 +4744,7 @@ export class Soldier {
       thrown: this.thrownFall,
       rolled: this.rolledFall,
       cqc: this.animator?.cqcKind ?? null,
+      stepping: this.stepLeft > 0,
       standingUp: this.standing,
       bumped: this.bumpLeft,
       asleep: this.sleepLeft > 0,

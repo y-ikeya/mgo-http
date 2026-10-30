@@ -91,6 +91,8 @@ const STANDING = new Set<Locomotion>([
   'lean_right',
   'up_stair',
   'down_stair',
+  // 下がっている間も掛かる。**避けるのは間合いの外へ出ることで**、下がる型そのものは盾ではない
+  'step_back',
   ...MOVE_DIRECTIONS.map((d) => `run_${d}` as Locomotion),
 ])
 

@@ -57,6 +57,8 @@ export interface BodyState {
   cqc: boolean
   /** 猫に釘付けになっている (解けて戻る途中も。domain/item/doll.ts) */
   trapped: boolean
+  /** 構えたまま一歩下がっている (step_back) */
+  stepping: boolean
 }
 
 export type Flag = keyof BodyState
@@ -79,6 +81,7 @@ export type Move =
   | 'pat'
   | 'cqc'
   | 'swap'
+  | 'step'
 
 interface Rule {
   needs: readonly Flag[]
@@ -86,7 +89,8 @@ interface Rule {
 }
 
 /** 全身の型で体を占める動作。これらの最中は、他の全身の動作を始められない */
-const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing', 'cqc']
+// 下がる (stepping) は下半身だけの型だが、足を使っている間は転がる・跳ぶ・掛けるを重ねない
+const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing', 'cqc', 'stepping']
 /** 倒れている・眠っている・猫に釘付け。何もできない */
 const HELPLESS: readonly Flag[] = ['dead', 'downed', 'standingUp', 'sleeping', 'trapped']
 
@@ -109,17 +113,17 @@ export const MOVES: Record<Move, Rule> = {
   // 伏せる。刺突は全身の型なので、伏せに入る型と同時には流せない
   prone: {
     needs: ['onGround'],
-    not: [...HELPLESS, 'boxed', 'stabbing', 'vaulting', 'hanging', 'onLadder', 'prone', 'cqc'],
+    not: [...HELPLESS, 'boxed', 'stabbing', 'vaulting', 'hanging', 'onLadder', 'prone', 'cqc', 'stepping'],
   },
   // しゃがみの切り替え。倒れ・箱・伏せは呼ぶ側で別の動作 (起きる・脱ぐ・起き上がる) に振る
   crouch: {
     needs: ['onGround'],
-    not: ['dead', 'saluting', 'standingUp', 'vaulting', 'hanging', 'cqc', 'trapped'],
+    not: ['dead', 'saluting', 'standingUp', 'vaulting', 'hanging', 'cqc', 'trapped', 'stepping'],
   },
   // ナイフで刺す。伏せたままでも刺せる (prone_stab)
   stab: {
     needs: [],
-    not: [...HELPLESS, 'boxed', 'saluting', 'bumping', 'rolling', 'vaulting', 'hanging', 'onLadder', 'cqc'],
+    not: [...HELPLESS, 'boxed', 'saluting', 'bumping', 'rolling', 'vaulting', 'hanging', 'onLadder', 'cqc', 'stepping'],
   },
   // 敬礼。構えている間はしない
   salute: {
@@ -186,6 +190,15 @@ export const MOVES: Record<Move, Rule> = {
   swap: {
     needs: [],
     not: ['dead', 'trapped', 'cqc'],
+  },
+  /*
+   * 構えたまま一歩下がる (step_back)。**構えて後ろを押しながら転がりの指** — 構えていなければ
+   * 転がる。型が立ちの型なので、しゃがみ・伏せ・箱からは出ない (2026-10-30 本人「ちょっとだけ
+   * 後退りできるからCQCとかを避けるのに使う」)
+   */
+  step: {
+    needs: ['onGround', 'aiming'],
+    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'crouching', 'onLadder', 'inWater', 'landing'],
   },
 }
 
