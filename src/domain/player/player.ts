@@ -81,6 +81,13 @@ export interface Pose {
    * どちらの真偽も立たない。構えを 1 つ持てば全部言える (stance.ts)。
    */
   stance: Stance
+  /**
+   * いまの locomotion と、それに入ってからの秒数。**型の途中の体の位置**を引くのに要る
+   * (poseCurve.ts の zoneAt)。倒れていく・転がっている間は、部位が姿勢ごとの高さに無い。
+   * 無ければ姿勢ごとの高さで見る
+   */
+  locomotion?: string
+  age?: number
 }
 
 /**

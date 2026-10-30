@@ -4652,6 +4652,7 @@ export class Game {
   };
   private readonly targetPose = {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
+    locomotion: "idle", age: 0,
   };
 
   /** 目の慣れを使うか (?adapt=0 で切る)。いま掛けている倍率 */
@@ -4709,6 +4710,8 @@ export class Game {
     this.targetPose.z = at.z;
     this.targetPose.stance = target.stance;
     this.targetPose.lean = target.leaning;
+    // 倒れていく・転がっている途中の体の位置 (審判と同じ表)
+    target.motionInto(this.targetPose);
     // 弾道の膨らみ。審判は申告の距離と銃の性能から同じ式で出す (server/damage.ts)
     const sag = bulletSag(distance, this.weapon.bulletSpeed, this.weapon.bulletGravity);
     if (zoneExposed(this.eyePose, this.targetPose, zone, sight, HIT_RULES, sag)) return true;
@@ -4722,7 +4725,7 @@ export class Game {
 
     // 止める場所。目から部位への中心線が最初に当たる所
     const eyeY = me.y + HIT_RULES.headHeight(this.player.stance);
-    const [tx, ty, tz] = zonePoint(this.targetPose, zone, HIT_RULES.headHeight(target.stance));
+    const [tx, ty, tz] = zonePoint(this.targetPose, zone, HIT_RULES);
     const block = sight.hit(me.x, eyeY, me.z, tx, ty, tz);
     if (block) {
       this.hitPoint.set(

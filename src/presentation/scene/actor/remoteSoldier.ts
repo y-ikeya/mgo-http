@@ -322,6 +322,15 @@ export class RemoteSoldier {
     // 眠って倒れていく途中はまだ高い。サーバーと同じ式 (stanceAt)
     return canBeStabbed(stanceAt(this.locomotion, this.locomotionAge()), aimPitch, attacker);
   }
+  /**
+   * 弾の当たりを見る姿に、向きと型の途中の時間を書く (審判の姿の記録と同じ項目)。
+   * 倒れていく・転がっている体の部位は、型の時間で引く (poseCurve.ts)
+   */
+  motionInto(pose: { yaw: number; locomotion?: string; age?: number }): void {
+    pose.yaw = this.yaw;
+    pose.locomotion = this.locomotion;
+    pose.age = this.locomotionAge();
+  }
   /** いまの locomotion に入ってからの秒数 (最後の知らせの値に、届いてからの時間を足す) */
   private locomotionAge(): number {
     return this.ageAtState + (performance.now() - this.stateAt) / 1000;

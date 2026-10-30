@@ -3,6 +3,7 @@ import { CQC_LAND_SECONDS } from '../../../domain/player/cqc'
 import { isBone } from '../util/guards'
 import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
+import { ROLL_TIME_SCALE } from '../../../domain/player/poseCurve'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
 import {
   CROUCH_WALK_TOP_SPEED,
@@ -436,9 +437,6 @@ const VERTICAL_END_POSE: Record<string, string> = { hang_climb: LOWER_CLIPS.crou
  * 補っていたら、**足も一緒に滑って**見えた。前後は他と同じく潰す。
  */
 const SIDEWAYS_CLIPS = new Set(['lean', 'lean_crouch'])
-
-/** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
-const ROLL_TIME_SCALE = 1.32
 
 /**
  * 全身で転がる型が、クリップに焼かれた移動をどれだけ辿るか。

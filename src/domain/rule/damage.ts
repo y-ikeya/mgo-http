@@ -12,6 +12,7 @@
 import { HEAD_HEIGHT, VIEW_HEIGHT, leanShift, type Stance } from '../player/stance'
 import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
 import { MAX_STAMINA } from '../player/stamina'
+import { zoneAt } from '../player/poseCurve'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
 export type HitZone = 'HEAD' | 'BODY' | 'LEGS'
@@ -308,6 +309,8 @@ export const HIT_RULES = {
   headHeight: (stance: Stance) => HEAD_HEIGHT[stance],
   zoneRadius: (zone: HitZone) => ZONE_RADIUS[zone],
   zoneSpan: (zone: HitZone) => ZONE_SPAN[zone],
+  // 型の途中 (眠って倒れていく、転がっている) の部位の位置。表は player/poseCurves.ts
+  zoneAt,
   // カメラの注視点。幅の真ん中 (可視の判定は幅の両端で引くが、ここは 1 点でよい)
   viewHeight: (stance: Stance) => (VIEW_HEIGHT[stance][0] + VIEW_HEIGHT[stance][1]) / 2,
   // 傾きの横ずれ。sim (hitcheck) は domain の値を直に引かないので、ここから渡す

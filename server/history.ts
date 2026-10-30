@@ -37,6 +37,8 @@ const emptyPose = (): Pose => ({
   yaw: 0,
   pitch: 0,
   stance: stanceOf('idle'),
+  locomotion: 'idle',
+  age: 0,
 })
 
 const tracks = new Map<string, PoseTrack<Pose>>()
@@ -75,6 +77,9 @@ export function recordPose(player: MatchPlayer): void {
     slot.cameraYaw = player.cameraYaw
     slot.aiming = player.aiming
     slot.lean = leanOf(player.locomotion)
+    // 倒れていく・転がっている体の部位の位置を、型の時間で引く (poseCurve.ts)
+    slot.locomotion = player.locomotion
+    slot.age = player.locomotionAge
   })
 }
 
