@@ -168,6 +168,8 @@ describe('繋ぎ直し', () => {
     if (resume?.type !== 'resume') throw new Error('resume が来ていない')
     expect(resume.health).toBeLessThan(100)
     expect(resume.magazine.rifle).toBeLessThan(30)
+    // スタンナイフの充電も続きから返す (読み直した画面だけ満タンに見えないように)
+    expect(typeof resume.stunReadyAt).toBe('number')
 
     back.close()
     a.close()

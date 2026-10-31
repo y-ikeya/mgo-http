@@ -2657,6 +2657,8 @@ export class Game {
         else if (message.trapped) this.player.trap(undefined, true);
         // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
         else if (message.hanging) this.player.resumeHang(message.yaw);
+        // スタンナイフの充電も続きから (審判と同じ時計)。読み直しで満タンにはならない
+        this.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;

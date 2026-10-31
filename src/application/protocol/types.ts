@@ -804,6 +804,11 @@ export interface ResumeMessage {
    */
   hanging: boolean
   yaw: number
+  /**
+   * スタンナイフの充電が満ちる時刻 (Date.now 基準)。**返さないと、読み直した画面だけ満タンに
+   * 見えた** — 審判は前の充電のままなので、振ってバチバチ光るのに眠らない (本人 2026-10-31)
+   */
+  stunReadyAt: number
 }
 
 /**

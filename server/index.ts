@@ -1277,6 +1277,7 @@ const server = Bun.serve<Client>({
             trapped: resumed.trappedBy !== 0,
             hanging: resumed.locomotion.startsWith('hang'),
             yaw: resumed.yaw,
+            stunReadyAt: resumed.stunReadyAt,
           } satisfies ServerMessage),
         )
       }
