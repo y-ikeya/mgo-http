@@ -59,6 +59,8 @@ export interface BodyState {
   trapped: boolean
   /** 構えたまま一歩下がっている (step_back) */
   stepping: boolean
+  /** 撃たれて怯んでいる (FLINCH_SECONDS)。動けず、構えられず、転がれず、箱も被れない */
+  flinching: boolean
 }
 
 export type Flag = keyof BodyState
@@ -93,18 +95,20 @@ interface Rule {
 const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing', 'cqc', 'stepping']
 /** 倒れている・眠っている・猫に釘付け。何もできない */
 const HELPLESS: readonly Flag[] = ['dead', 'downed', 'standingUp', 'sleeping', 'trapped']
+/** 怯んでいる間に塞ぐ動作に足す (動作ごとに書く。眠る・叩かれるのは止めない) */
+const FLINCH: readonly Flag[] = ['flinching']
 
 export const MOVES: Record<Move, Rule> = {
   // 前へ転がる。伏せからは起き上がる一手を挟ませる。箱を落とされた直後は棒立ち。
   // **構えている間は転がらない** (本人 2026-10-30)。構えて後ろなら一歩下がる (step)
   roll: {
     needs: ['onGround'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'aiming'],
+    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'aiming'],
   },
   // 窓枠を跳び越える / 一段上へ乗る。転がりと同じ縛り
   vault: {
     needs: ['onGround'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder'],
+    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder'],
   },
   // 歩いて縁から出たときに縁へ掴まる。転がり・跳び越え・梯子・水・伏せからは落ちる
   hang: {
@@ -124,7 +128,7 @@ export const MOVES: Record<Move, Rule> = {
   // ナイフで刺す。伏せたままでも刺せる (prone_stab)
   stab: {
     needs: [],
-    not: [...HELPLESS, 'boxed', 'saluting', 'bumping', 'rolling', 'vaulting', 'hanging', 'onLadder', 'cqc', 'stepping'],
+    not: [...HELPLESS, ...FLINCH, 'boxed', 'saluting', 'bumping', 'rolling', 'vaulting', 'hanging', 'onLadder', 'cqc', 'stepping'],
   },
   // 敬礼。構えている間はしない
   salute: {
@@ -139,12 +143,12 @@ export const MOVES: Record<Move, Rule> = {
   // ダンボールを被る。箱はしゃがんだ体に被せてあるので伏せたままは被れない
   box: {
     needs: ['onGround'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'bumping', 'prone', 'saluting', 'onLadder'],
+    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'bumping', 'prone', 'saluting', 'onLadder'],
   },
   // 構える。全身の型の最中は構えの上半身を乗せられない
   aim: {
     needs: [],
-    not: [...HELPLESS, 'saluting', 'rolling', 'vaulting', 'hanging', 'cqc', 'stepping'],
+    not: [...HELPLESS, ...FLINCH, 'saluting', 'rolling', 'vaulting', 'hanging', 'cqc', 'stepping'],
   },
   // 投げる (手榴弾・デコイ)。梯子と箱は両手が塞がっている。転がりは全身の型
   throw: {
@@ -180,7 +184,7 @@ export const MOVES: Record<Move, Rule> = {
    */
   cqc: {
     needs: ['onGround'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'crouching', 'onLadder', 'inWater', 'aiming', 'landing'],
+    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'crouching', 'onLadder', 'inWater', 'aiming', 'landing'],
   },
   /*
    * 持ち替える。**CQC の最中はできない** — 投げている間に長物へ替えておけば、倒した相手へ
@@ -199,7 +203,7 @@ export const MOVES: Record<Move, Rule> = {
    */
   step: {
     needs: ['onGround', 'aiming'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'inWater', 'landing'],
+    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'inWater', 'landing'],
   },
 }
 

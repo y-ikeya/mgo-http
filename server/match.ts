@@ -27,7 +27,7 @@ import { targetReturnsAt } from '../src/domain/match/target'
 import { fitLoadout } from '../src/domain/player/equip'
 import { canChoose, isDowned, isSeated } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
-import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
+import { KNOCK_TIME, MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
@@ -342,6 +342,8 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         concentrating: false,
         // 敬礼の的は手を挙げたまま。下ろすと型の終わりで手が下りる
         saluteHeld: bot.locomotion === 'salute',
+        // 散弾で飛ばされた (滑る時間が爆風より短い)。見ている側も転ぶ型を速く流す
+        fastFall: bot.knockTime > 0 && bot.knockTime < KNOCK_TIME,
       },
       bot.slot,
     ),

@@ -35,6 +35,7 @@ import {
   ROLL_HIT_RANGE,
   ROLL_KNOCKBACK,
   ROLL_STAGGER_SECONDS,
+  FLINCH_SECONDS,
   ROLL_STAMINA,
   type HitZone,
   meleeDamage,
@@ -509,6 +510,8 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
     const wants = band ? band.flinch : event.kind === 'bullet' && event.zone === 'HEAD'
     const flinch = wants && !session.flinchedThisShot
     if (flinch) session.flinchedThisShot = true
+    // 的は足を止める (人は本人の画面が止める、soldier の flinchLeft)。走り続ける的が仰け反ったまま走っていた
+    if (flinch && victim.bot) victim.staggerUntil = Math.max(victim.staggerUntil, Date.now() + FLINCH_SECONDS * 1000)
     // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。
     // 遠くから頭を撃たれた人が、そのまま何事もなく投げ切るのはおかしい
 

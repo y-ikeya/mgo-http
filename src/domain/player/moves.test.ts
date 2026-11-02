@@ -24,6 +24,7 @@ const standing: BodyState = {
   cqc: false,
   trapped: false,
   stepping: false,
+  flinching: false,
 }
 
 describe('できること', () => {
@@ -127,5 +128,13 @@ describe('一歩下がる', () => {
   test('**構えている間は転がらない** (後ろを押していれば下がる、押していなければ何も起きない)', () => {
     expect(can({ ...standing, aiming: true }, 'roll')).toBe(false)
     expect(can(standing, 'roll')).toBe(true)
+  })
+})
+
+describe('撃たれて仰け反っている間', () => {
+  test('**動けず (呼ぶ側)、構えられず、転がれず、箱も被れず、刺せず、掛けられない**', () => {
+    const body = { ...standing, flinching: true }
+    for (const move of ['aim', 'roll', 'vault', 'box', 'stab', 'cqc'] as Move[]) expect(can(body, move)).toBe(false)
+    expect(can({ ...body, aiming: true }, 'step')).toBe(false)
   })
 })

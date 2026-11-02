@@ -15,6 +15,7 @@ import {
   KNOCK_DISTANCE,
   KNOCK_TIME,
   ROLL_STAGGER_SECONDS,
+  FLINCH_SECONDS,
   fallDamage,
   knockSpeed,
 } from '../../../domain/rule/damage'
@@ -1070,6 +1071,7 @@ export class Soldier {
       held: this.held,
       concentrating: this.isConcentrating,
       saluteHeld: this.saluteHeld,
+      fastFall: this.downed_ && this.fallRate > 1,
       /*
        * **手榴弾を振りかぶっている間だけ。**
        *
@@ -1167,6 +1169,7 @@ export class Soldier {
       crouching: this.crouching,
       cqc: this.cqcBusy,
       stepping: this.stepLeft > 0,
+      flinching: this.flinchLeft > 0,
       trapped: this.trappedStage !== 'none',
     }
   }
@@ -1413,7 +1416,12 @@ export class Soldier {
     this.health = health
 
     if (health > 0) {
-      if (flinch) this.animator?.playHit()
+      if (flinch) {
+        this.animator?.playHit()
+        // 仰け反っている間は足も手も止まる (FLINCH_SECONDS、動作の表の flinching)
+        this.flinchLeft = FLINCH_SECONDS
+        this.currentSpeed = 0
+      }
       return false
     }
     if (!wasAlive) return false
@@ -1628,6 +1636,8 @@ export class Soldier {
   }
   /** 体当たりで怯んで足が止まっている残り (秒) */
   private staggerLeft = 0
+  /** 撃たれて仰け反っている残り (秒)。足も手も止まる */
+  private flinchLeft = 0
 
   /**
    * 爆風で吹き飛ばす。**向きだけ受けて、こちらが滑らせる。**
@@ -1947,6 +1957,11 @@ export class Soldier {
     }
     // 一歩下がっている間は銃を下ろす (本人 2026-10-30「構えを下ろしていい」)。下がりながら撃つ逃げ方にはしない
     if (this.stepLeft > 0) {
+      this.aiming = false
+      return
+    }
+    // 撃たれて仰け反っている間は銃を下ろす (FLINCH_SECONDS)。押したままなら明けた所で構え直す
+    if (this.flinchLeft > 0) {
       this.aiming = false
       return
     }
@@ -3510,6 +3525,9 @@ export class Soldier {
    * 中断できないので、そこが無防備な時間になる。
    */
   /** @param rate 転ぶ型の速さ。散弾で飛ばされた時は速い (SHOTGUN_KNOCK_RATE) */
+  /** 転ぶ型を何倍で流しているか。散弾で飛ばされた時は速い。見ている側へも送る (fastFall) */
+  private fallRate = 1
+
   knockDown(rolled = false, rate = 1): void {
     if (this.down) return
     /*
@@ -3533,6 +3551,7 @@ export class Soldier {
     this.thrownFall = false
     // ローリングの体当たり (しゃがんでいた所から) なら、爆風ほど飛ばない倒れ方
     this.rolledFall = rolled
+    this.fallRate = rolled ? 1 : rate
     if (rolled) this.animator?.playRollFall()
     else this.animator?.playSweep(rate)
   }
@@ -3769,8 +3788,8 @@ export class Soldier {
     } else if (this.trappedStage !== 'none') {
       moveDir = ZERO_MOVE
     }
-    // 体当たりで怯んでいる間も
-    if (this.staggerLeft > 0) moveDir = ZERO_MOVE
+    // 体当たりで怯んでいる間も、撃たれて仰け反っている間も
+    if (this.staggerLeft > 0 || this.flinchLeft > 0) moveDir = ZERO_MOVE
 
     /*
      * 伏せている間は**前へしか這えない。**
@@ -4196,6 +4215,7 @@ export class Soldier {
     // CQC の型が終わった。**空振りなら棒立ちの隙へ** (CQC_MISS_RECOVERY)
     if (this.cqcRecoverLeft > 0) this.cqcRecoverLeft = Math.max(0, this.cqcRecoverLeft - dt)
     if (this.stepLeft > 0) this.stepLeft = Math.max(0, this.stepLeft - dt)
+    if (this.flinchLeft > 0) this.flinchLeft = Math.max(0, this.flinchLeft - dt)
     if (this.cqcStarted && !(this.animator?.cqcBusy ?? false)) {
       if (this.cqcStarted === 'cqc_miss') this.cqcRecoverLeft = CQC_MISS_RECOVERY
       this.cqcStarted = null

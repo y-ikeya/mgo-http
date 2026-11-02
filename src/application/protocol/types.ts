@@ -134,6 +134,11 @@ export interface PlayerSnapshot {
    * 同じドメインルールで止めるほうが小さいし、途中で取りこぼしても次で復帰する。
    */
   saluteHeld: boolean
+  /**
+   * 散弾で飛ばされて、転ぶ型を速く流している (SHOTGUN_KNOCK_RATE)。**見ている側も同じ速さで流す** —
+   * locomotion は爆風と同じ sweep なので、これが無いと他人の画面だけ等倍で倒れた
+   */
+  fastFall?: boolean
 }
 
 export interface StateMessage {

@@ -19,7 +19,7 @@ import {
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CharacterAnimator, findBoneBySuffix } from "./animation";
 import type { Locomotion } from "../../../domain/player/locomotion";
-import { canBeStabbed } from "../../../domain/rule/damage";
+import { SHOTGUN_KNOCK_RATE, canBeStabbed } from "../../../domain/rule/damage";
 import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
@@ -533,7 +533,9 @@ export class RemoteSoldier {
       animator.releaseThrown();
     }
     if (locomotion !== this.locomotion && isWholeBody(locomotion)) {
-      PLAY_WHOLE_BODY[locomotion](animator);
+      // 散弾で飛ばされた人は転ぶ型が速い (本人の画面と同じ速さ)
+      if (locomotion === "sweep" && state.fastFall) animator.playSweep(SHOTGUN_KNOCK_RATE);
+      else PLAY_WHOLE_BODY[locomotion](animator);
       // 型の途中から見えた相手は、その分だけ進めてから流す (届くまでの遅れの分も含む)
       animator.skipAhead(state.locomotionAge);
       // 叫んだこと・回り始めたことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
