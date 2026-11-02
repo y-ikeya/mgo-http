@@ -51,6 +51,12 @@ const SKINS: Record<string, string> = {
    * rebody.py が向きを測ってから合わせるようにしてある。
    */
   nanashi: 'soldier_nanashi',
+  /*
+   * kome。Mixamo の MocapGuy (本人が落とした T-Pose.fbx → tools/raw/MocapGuy.fbx)。Raiden と同じ道
+   * (rebody → merge_all_clips → fit_height、頭 1.4609m・爪先は宿主と同じ)。
+   * **rebody は --nohead で通す** — T ポーズの腕が「顎から上」に入って頭の骨へ寄せられ、腕が翼のように伸びた
+   */
+  kome: 'soldier_kome',
 }
 
 /**
