@@ -73,7 +73,7 @@ import { StunSparks } from "./fx/stunSparks";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, KNOCK_TIME, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_RATE, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
 import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
@@ -3047,9 +3047,14 @@ export class Game {
         // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
         // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
         if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
-        this.player.knockDown(message.distance !== undefined);
+        // 散弾は爆風より短く速く飛ぶ (domain/rule/damage.ts の SHOTGUN_KNOCK_*)
+        this.player.knockDown(message.distance !== undefined, message.shotgun ? SHOTGUN_KNOCK_RATE : 1);
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
-        this.player.knockPush(message.dirX, message.dirZ, message.distance);
+        if (message.shotgun) {
+          this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, KNOCK_TIME / SHOTGUN_KNOCK_RATE);
+        } else {
+          this.player.knockPush(message.dirX, message.dirZ, message.distance);
+        }
         // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
         this.loseHeldGrenade();
         // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)

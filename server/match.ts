@@ -149,7 +149,7 @@ export function updateTargets(room: RoomWorld, now: number): void {
      */
     if (bot.knockLeft > 0) {
       const step = Math.min(bot.knockLeft, TICK_SECONDS)
-      const speed = knockSpeed(bot.knockLeft)
+      const speed = knockSpeed(bot.knockLeft, bot.knockTime || undefined)
       bot.x += bot.knockX * speed * step
       bot.z += bot.knockZ * speed * step
       bot.knockLeft = Math.max(0, bot.knockLeft - TICK_SECONDS)

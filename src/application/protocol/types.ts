@@ -371,6 +371,11 @@ export interface KnockDownEvent {
    * (ROLL_FALL_DISTANCE)。悲鳴も爆風の時だけ
    */
   distance?: number
+  /**
+   * 散弾で飛ばされた。距離は SHOTGUN_KNOCK_DISTANCE、滑る時間と転ぶ型は SHOTGUN_KNOCK_RATE 倍速
+   * (domain/rule/damage.ts)。省けば爆風 (またはローリング)
+   */
+  shotgun?: true
 }
 
 /**

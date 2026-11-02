@@ -28,6 +28,8 @@ import {
 import {
   HIT_RULES,
   KNOCK_DISTANCE,
+  SHOTGUN_KNOCK_DISTANCE,
+  SHOTGUN_KNOCK_RATE,
   KNOCK_TIME,
   ROLL_FALL_DISTANCE,
   ROLL_HIT_RANGE,
@@ -180,6 +182,8 @@ function knockAway(
   fromZ: number,
   /** 滑る距離 (m)。爆風なら省く (KNOCK_DISTANCE) */
   distance?: number,
+  /** 散弾で飛ばされた。短く速く滑る (SHOTGUN_KNOCK_DISTANCE / SHOTGUN_KNOCK_RATE) */
+  shotgun = false,
 ): void {
   // 投げている / 投げられている CQC は取り消す。吹き飛ぶほうが強い
   cancelCqc(room, victim)
@@ -187,7 +191,7 @@ function knockAway(
   const awayZ = victim.z - fromZ
   const reach = Math.hypot(awayX, awayZ) || 1
   // 向きに距離の比を掛けて持つ。滑らせる速さの式 (knockSpeed) は爆風と同じ物を通す
-  const scale = (distance ?? KNOCK_DISTANCE) / KNOCK_DISTANCE
+  const scale = (shotgun ? SHOTGUN_KNOCK_DISTANCE : (distance ?? KNOCK_DISTANCE)) / KNOCK_DISTANCE
   victim.knockX = (awayX / reach) * scale
   victim.knockZ = (awayZ / reach) * scale
   if (victim.bot) {
@@ -196,7 +200,8 @@ function knockAway(
     // 転がってきた相手のほうを向いて後ろへ倒れる (yaw θ で正面が (-sinθ, -cosθ)、押された先の逆)
     victim.downRolled = distance !== undefined
     if (victim.downRolled) victim.yaw = Math.atan2(awayX, awayZ)
-    victim.knockLeft = KNOCK_TIME
+    victim.knockTime = shotgun ? KNOCK_TIME / SHOTGUN_KNOCK_RATE : KNOCK_TIME
+    victim.knockLeft = victim.knockTime
     // 滑り終わってからも転んだまま。**時間で立ち上がる**
     victim.downLeft = TARGET_DOWN
     return
@@ -207,6 +212,7 @@ function knockAway(
       dirX: awayX / reach,
       dirZ: awayZ / reach,
       ...(distance !== undefined ? { distance } : {}),
+      ...(shotgun ? { shotgun: true as const } : {}),
     } satisfies ServerMessage),
   )
 }
@@ -255,7 +261,7 @@ function pushIfShotgun(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlay
   if (session.pushedThisShot) return
   session.pushedThisShot = true
   if (!isSeated(victim.life)) return
-  knockAway(room, victim, attacker.x, attacker.z)
+  knockAway(room, victim, attacker.x, attacker.z, undefined, true)
 }
 
 export function applyBlastDamage(

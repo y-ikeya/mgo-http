@@ -191,7 +191,10 @@ describe('散弾で的を突き飛ばす', () => {
     await Bun.sleep(500)
 
     const after = me.poses.get(target.slot)!
-    expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeGreaterThan(1)
+    // 爆風 (3m) の 2/3 = 2m (2026-11-02 本人「吹っ飛びすぎ」)。刻みの分だけ緩く見る
+    const slid = Math.hypot(after.x - before.x, after.z - before.z)
+    expect(slid).toBeGreaterThan(1.6)
+    expect(slid).toBeLessThan(2.4)
     // 滑るだけでなく転ぶ。**時間で立ち上がる** (server/match.ts)
     expect(after.locomotion).toBe('sweep')
     me.close()

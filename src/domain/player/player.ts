@@ -301,6 +301,8 @@ export interface MatchPlayer extends Player {
   knockX: number
   knockZ: number
   knockLeft: number
+  /** 滑り切るまでの時間 (秒)。爆風は KNOCK_TIME、散弾はそれより短い */
+  knockTime: number
   /**
    * 的が最初に置かれた場所。**倒れて戻るときだけここへ返る。**
    *
@@ -461,6 +463,7 @@ export function newMatchPlayer(seed: {
     knockX: 0,
     knockZ: 0,
     knockLeft: 0,
+    knockTime: 0,
     homeX: 0,
     homeZ: 0,
     homeY: 0,

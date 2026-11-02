@@ -4198,17 +4198,19 @@ export class CharacterAnimator {
     this.standDuration = this.standClipDuration / this.standRate
   }
 
-  playSweep(): void {
+  /** @param rate 転ぶ型を何倍で流すか。散弾で飛ばされた時は速い (SHOTGUN_KNOCK_RATE) */
+  playSweep(rate = 1): void {
     if (this.dead) return
     const upper = this.upper.get(SWEEP_KEY)
     const lower = this.lower.get('sweep')
     if (!upper || !lower) return
-    upper.reset().setEffectiveTimeScale(this.sweepRate).play()
-    lower.reset().setEffectiveTimeScale(this.sweepRate).play()
+    const scale = this.sweepRate * rate
+    upper.reset().setEffectiveTimeScale(scale).play()
+    lower.reset().setEffectiveTimeScale(scale).play()
     this.upperState = 'sweep'
     this.locomotion = 'sweep'
     this.fallKey = SWEEP_KEY
-    this.sweepDuration = SWEEP_LAND / this.sweepRate
+    this.sweepDuration = SWEEP_LAND / scale
   }
 
   /**

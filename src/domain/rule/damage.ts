@@ -351,7 +351,17 @@ export const KNOCK_TIME = 0.42
  *
  * @param left 残り時間 (秒)
  */
-export function knockSpeed(left: number): number {
+export function knockSpeed(left: number, time = KNOCK_TIME): number {
   if (left <= 0) return 0
-  return ((2 * KNOCK_DISTANCE) / KNOCK_TIME) * (left / KNOCK_TIME)
+  return ((2 * KNOCK_DISTANCE) / time) * (left / time)
 }
+
+/**
+ * 散弾で吹き飛ぶ距離 (m) と速さ。**爆風より短く、速く** (本人 2026-11-02「shotgun で撃たれた時に
+ * 吹っ飛びすぎ、いまの 2/3 くらいの距離で、もうすこし speed up」)。
+ *
+ * 速さは滑る時間 (KNOCK_TIME を割る) と転ぶ型の再生速度の両方に掛ける — 片方だけ速めると、
+ * 体が着く前に滑り終わる / 滑っている間に寝転び終わる
+ */
+export const SHOTGUN_KNOCK_DISTANCE = (KNOCK_DISTANCE * 2) / 3
+export const SHOTGUN_KNOCK_RATE = 1.3

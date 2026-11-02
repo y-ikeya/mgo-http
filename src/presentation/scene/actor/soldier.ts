@@ -1638,15 +1638,18 @@ export class Soldier {
    * @param dirX 爆心から見た向き (単位ベクトル、水平)
    * @param distance 滑る距離 (m)。爆風なら省く。ローリングで倒れた時は短い
    */
-  knockPush(dirX: number, dirZ: number, distance = KNOCK_DISTANCE): void {
+  knockPush(dirX: number, dirZ: number, distance = KNOCK_DISTANCE, time = KNOCK_TIME): void {
     const reach = Math.hypot(dirX, dirZ)
     if (reach < 1e-4) return
     // 向きに距離の比を掛ける。滑らせる速さの式は爆風と同じ (的もサーバーで同じ形)
     const scale = distance / KNOCK_DISTANCE
     this.knockX = (dirX / reach) * scale
     this.knockZ = (dirZ / reach) * scale
-    this.knockLeft = KNOCK_TIME
+    this.knockTime = time
+    this.knockLeft = time
   }
+  /** 滑り切るまでの時間 (秒)。散弾は爆風より短い */
+  private knockTime = KNOCK_TIME
 
   /** リロードモーションの尺 (秒)。モデル未着なら 0 */
   /**
@@ -3506,7 +3509,8 @@ export class Soldier {
    * 倒れる → (伏せたまま撃てる) → 立ち上がる、の 3 段。立ち上がりに入ったら
    * 中断できないので、そこが無防備な時間になる。
    */
-  knockDown(rolled = false): void {
+  /** @param rate 転ぶ型の速さ。散弾で飛ばされた時は速い (SHOTGUN_KNOCK_RATE) */
+  knockDown(rolled = false, rate = 1): void {
     if (this.down) return
     /*
      * 倒れている間は飛ばされない。**ただし CQC で投げられて背中が着く前は別** —
@@ -3530,7 +3534,7 @@ export class Soldier {
     // ローリングの体当たり (しゃがんでいた所から) なら、爆風ほど飛ばない倒れ方
     this.rolledFall = rolled
     if (rolled) this.animator?.playRollFall()
-    else this.animator?.playSweep()
+    else this.animator?.playSweep(rate)
   }
 
   /**
@@ -3879,7 +3883,7 @@ export class Soldier {
       this.knockLeft = Math.max(0, this.knockLeft - dt)
       // 速さの式はドメインルール。**的も同じ式で滑る** (server/match.ts) ので、
       // ここで別に持つと同じ爆風で飛ぶ距離が変わる
-      const speed = knockSpeed(this.knockLeft)
+      const speed = knockSpeed(this.knockLeft, this.knockTime)
       overrideX = this.knockX * speed
       overrideZ = this.knockZ * speed
     }
