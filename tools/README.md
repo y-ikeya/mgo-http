@@ -464,6 +464,17 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 半ばしゃがんだ姿から後ろへ跳んで膝を突く型で、型のままだと 1.16m。膝を突き終わる 1.1 秒 (型の時間) までを流し、速さと移動の倍率で 0.7m・1 秒に合わせる。立ちの型 (0.68m・0.96 秒) も同じく合わせる。
 `tools/crouch_step_back.json` を同じ手順で通す。
 
+### 小物の画像は 512px まで (2026-11-02)
+
+武器・道具の画像を 512px に縮めてある (smg / locator / m1911 / m4 / shotgun / claymore)。画面では数十〜数百 px の物で、
+GPU には 1 画素 4 バイトで載るので、E LOCATOR の 4096px 1 枚で 85MB 食っていた (6 つで 229MB → 37MB)。
+新しく入れた物も同じく縮める:
+
+    npx @gltf-transform/cli resize <in.glb> <out.glb> --width 512 --height 512
+
+smg.glb は画像が JPEG なのに mimeType が image/png になっていて、resize が寸法を読めずに止まった。
+JSON の mimeType を中身に合わせてから通した。
+
 ### しゃがんだ敬礼 (salute_crouch)
 
 しゃがんでいる時の敬礼は右手の合図 (本人の `tools/raw/MilitarySignalingCrouch.fbx`、Downloads では
