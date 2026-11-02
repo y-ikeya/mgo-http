@@ -464,6 +464,19 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 半ばしゃがんだ姿から後ろへ跳んで膝を突く型で、型のままだと 1.16m。膝を突き終わる 1.1 秒 (型の時間) までを流し、速さと移動の倍率で 0.7m・1 秒に合わせる。立ちの型 (0.68m・0.96 秒) も同じく合わせる。
 `tools/crouch_step_back.json` を同じ手順で通す。
 
+### 体の glb は dedup を通す (2026-11-02)
+
+Pages は **1 ファイル 25 MiB まで**。型を足し続けて soldier_raiden.glb が 25.11 MiB になった。中身の 8.6MB が
+glTF の JSON で、型 100 本 × 骨ごとに accessor と bufferView を 1 つずつ持っていた (4.6 万個)。同じ時刻の列が
+大量に重なっているので、まとめると JSON が半分になる:
+
+    npx @gltf-transform/cli dedup public/models/<体>.glb public/models/<体>.glb
+
+5 つの皮に通して soldier 17.7 → 12.6 / 雷電 25.1 → 18.2 / 名無し 21.6 → 18.2 / X Bot 8.8 → 6.7 / kome 8.1 → 6.4 MiB。
+全部の型の全チャンネル (時刻と値)・メッシュ・骨の束ね方がバイト単位で同じことを確かめてある。
+**型を足したら (merge_clip / retime_clip --as) もう一度通す。** 通した後は時刻の列を型どうしで分け合うので、
+`retime_clip.js` の上書き (--as なし) は「他の型も使っている」で止まる — 速さを変えるなら --as で写しを作る。
+
 ### 小物の画像は 512px まで (2026-11-02)
 
 武器・道具の画像を 512px に縮めてある (smg / locator / m1911 / m4 / shotgun / claymore)。画面では数十〜数百 px の物で、
