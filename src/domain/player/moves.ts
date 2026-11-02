@@ -15,6 +15,8 @@
  * 「できるか」ではなく「そこにあるか」なので、呼ぶ側が地形に聞く。
  */
 
+import { MOVE_RULES } from './movesTable'
+
 /** 体の状態。soldier が持っている旗を 1 つにまとめた物 */
 export interface BodyState {
   /** 足が地面に着いている */
@@ -61,6 +63,10 @@ export interface BodyState {
   stepping: boolean
   /** 撃たれて怯んでいる (FLINCH_SECONDS)。動けず、構えられず、転がれず、箱も被れない */
   flinching: boolean
+  /** 伏せて這っている (止まって伏せているだけなら立たない) */
+  crawling: boolean
+  /** 伏せへの出入り・寝返りの型の最中 (prone_down / prone_rise / prone_roll_down) */
+  proneShifting: boolean
 }
 
 export type Flag = keyof BodyState
@@ -84,128 +90,19 @@ export type Move =
   | 'cqc'
   | 'swap'
   | 'step'
+  | 'fire'
+  | 'reload'
 
-interface Rule {
+export interface Rule {
   needs: readonly Flag[]
   not: readonly Flag[]
 }
 
-/** 全身の型で体を占める動作。これらの最中は、他の全身の動作を始められない */
-// 下がる (stepping) は下半身だけの型だが、足を使っている間は転がる・跳ぶ・掛けるを重ねない
-const WHOLE_BODY: readonly Flag[] = ['rolling', 'vaulting', 'hanging', 'stabbing', 'cqc', 'stepping']
-/** 倒れている・眠っている・猫に釘付け。何もできない */
-const HELPLESS: readonly Flag[] = ['dead', 'downed', 'standingUp', 'sleeping', 'trapped']
-/** 怯んでいる間に塞ぐ動作に足す (動作ごとに書く。眠る・叩かれるのは止めない) */
-const FLINCH: readonly Flag[] = ['flinching']
-
-export const MOVES: Record<Move, Rule> = {
-  // 前へ転がる。伏せからは起き上がる一手を挟ませる。箱を落とされた直後は棒立ち。
-  // **構えている間は転がらない** (本人 2026-10-30)。構えて後ろなら一歩下がる (step)
-  roll: {
-    needs: ['onGround'],
-    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'aiming'],
-  },
-  // 窓枠を跳び越える / 一段上へ乗る。転がりと同じ縛り
-  vault: {
-    needs: ['onGround'],
-    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder'],
-  },
-  // 歩いて縁から出たときに縁へ掴まる。転がり・跳び越え・梯子・水・伏せからは落ちる
-  hang: {
-    needs: [],
-    not: [...HELPLESS, ...WHOLE_BODY, 'onLadder', 'inWater', 'prone', 'boxed'],
-  },
-  // 伏せる。刺突は全身の型なので、伏せに入る型と同時には流せない
-  prone: {
-    needs: ['onGround'],
-    not: [...HELPLESS, 'boxed', 'stabbing', 'vaulting', 'hanging', 'onLadder', 'prone', 'cqc', 'stepping'],
-  },
-  // しゃがみの切り替え。倒れ・箱・伏せは呼ぶ側で別の動作 (起きる・脱ぐ・起き上がる) に振る
-  crouch: {
-    needs: ['onGround'],
-    not: ['dead', 'saluting', 'standingUp', 'vaulting', 'hanging', 'cqc', 'trapped', 'stepping'],
-  },
-  // ナイフで刺す。伏せたままでも刺せる (prone_stab)
-  stab: {
-    needs: [],
-    not: [...HELPLESS, ...FLINCH, 'boxed', 'saluting', 'bumping', 'rolling', 'vaulting', 'hanging', 'onLadder', 'cqc', 'stepping'],
-  },
-  // 敬礼。構えている間はしない
-  salute: {
-    needs: [],
-    not: [...HELPLESS, 'boxed', 'rolling', 'stabbing', 'vaulting', 'hanging', 'aiming', 'bumping', 'onLadder', 'cqc'],
-  },
-  // 梯子を掴む。受け身の最中は掴めない
-  ladder: {
-    needs: [],
-    not: [...HELPLESS, 'onLadder', 'boxed', 'rolling', 'vaulting', 'hanging', 'prone', 'saluting', 'bumping', 'landing', 'cqc'],
-  },
-  // ダンボールを被る。箱はしゃがんだ体に被せてあるので伏せたままは被れない
-  box: {
-    needs: ['onGround'],
-    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'bumping', 'prone', 'saluting', 'onLadder'],
-  },
-  // 構える。全身の型の最中は構えの上半身を乗せられない
-  aim: {
-    needs: [],
-    not: [...HELPLESS, ...FLINCH, 'saluting', 'rolling', 'vaulting', 'hanging', 'cqc', 'stepping'],
-  },
-  // 投げる (手榴弾・デコイ)。梯子と箱は両手が塞がっている。転がりは全身の型
-  throw: {
-    needs: [],
-    not: [...HELPLESS, 'boxed', 'onLadder', 'rolling', 'vaulting', 'hanging', 'cqc'],
-  },
-  // 置く (クレイモア)。投げると同じ
-  place: {
-    needs: [],
-    not: [...HELPLESS, 'boxed', 'onLadder', 'rolling', 'vaulting', 'hanging', 'cqc'],
-  },
-  // 麻酔で眠る。倒れている体には効かせない (もう倒れている)
-  sleep: {
-    needs: [],
-    not: ['dead', 'downed'],
-  },
-  // もがいて早く起きる (domain/player/stamina.ts の struggle)。**眠っている間だけ**
-  struggle: {
-    needs: ['sleeping'],
-    not: ['dead', 'downed'],
-  },
-  /*
-   * 眠っている人を叩いて起こす (domain/player/stamina.ts の pat)。**しゃがんで、構えずに。**
-   * 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく」
-   */
-  pat: {
-    needs: ['onGround', 'crouching'],
-    not: [...HELPLESS, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'inWater', 'aiming', 'landing'],
-  },
-  /*
-   * CQC を掛ける (domain/player/cqc.ts)。**立って、構えずに。** 手に何を持って
-   * いるか (長物では掛けられない) は体ではなく持ち物の話なので canThrowWith に聞く
-   */
-  cqc: {
-    needs: ['onGround'],
-    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'crouching', 'onLadder', 'inWater', 'aiming', 'landing'],
-  },
-  /*
-   * 持ち替える。**CQC の最中はできない** — 投げている間に長物へ替えておけば、倒した相手へ
-   * 構えた時には照準がもう合わせやすい (2026-10-30 本人「これができると倒れた後に
-   * カーソル合わせやすくなっちゃう」)。猫に釘付けの間も何もできない (他の動作と同じ)。
-   * 構えたまま・ボルトを送っている間は持ち物の側 (inventory の hand) が見る
-   */
-  swap: {
-    needs: [],
-    not: ['dead', 'trapped', 'cqc'],
-  },
-  /*
-   * 構えたまま一歩下がる (step_back)。**構えて後ろを押しながら転がりの指** — 構えていなければ
-   * 転がる。伏せ・箱からは出ない。しゃがんでいればしゃがみの型 (crouch_step_back) で下がる
-   * (2026-10-30 本人「ちょっとだけ後退りできるからCQCとかを避けるのに使う」「chrouchのときはこれして」)
-   */
-  step: {
-    needs: ['onGround', 'aiming'],
-    not: [...HELPLESS, ...FLINCH, ...WHOLE_BODY, 'boxed', 'saluting', 'bumping', 'prone', 'onLadder', 'inWater', 'landing'],
-  },
-}
+/**
+ * 表の中身。**正はスプレッドシート** (tools/moves_sheet.ts、2026-11-02 本人「その表を見ながらそれを正としながら実装をする」)。
+ * 升目を変えたいときはシートを直して `bun tools/moves_sheet.ts import`。理由はシートの「メモ」の行と movesTable.ts の注
+ */
+export const MOVES: Record<Move, Rule> = MOVE_RULES
 
 /** その動作を始められるか */
 export function can(body: BodyState, move: Move): boolean {

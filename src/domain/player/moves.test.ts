@@ -25,12 +25,14 @@ const standing: BodyState = {
   trapped: false,
   stepping: false,
   flinching: false,
+  crawling: false,
+  proneShifting: false,
 }
 
 describe('できること', () => {
   test('立っていれば一通りできる (もがくのは眠っている間だけ、叩くのはしゃがんでいる時だけ、下がるのは構えている時だけ)', () => {
     for (const move of Object.keys(MOVES) as Move[]) {
-      if (move === 'struggle' || move === 'pat' || move === 'step') continue
+      if (move === 'struggle' || move === 'pat' || move === 'step' || move === 'fire') continue
       expect(can(standing, move)).toBe(true)
     }
   })
@@ -136,5 +138,41 @@ describe('撃たれて仰け反っている間', () => {
     const body = { ...standing, flinching: true }
     for (const move of ['aim', 'roll', 'vault', 'box', 'stab', 'cqc'] as Move[]) expect(can(body, move)).toBe(false)
     expect(can({ ...body, aiming: true }, 'step')).toBe(false)
+  })
+})
+
+describe('撃つ・弾倉を替える (体の側の条件)', () => {
+  test('**構えていなければ撃てない。** 転がり・跳び越え・ぶら下がり・CQC・這い・着地・刺している間も', () => {
+    expect(can({ ...standing, aiming: true }, 'fire')).toBe(true)
+    expect(can(standing, 'fire')).toBe(false)
+    for (const busy of ['rolling', 'vaulting', 'hanging', 'cqc', 'crawling', 'landing', 'stabbing'] as const) {
+      expect(can({ ...standing, aiming: true, [busy]: true }, 'fire')).toBe(false)
+    }
+  })
+
+  test('**爆風で倒れている間は撃てる** (伏せ撃ち)', () => {
+    expect(can({ ...standing, aiming: true, downed: true }, 'fire')).toBe(true)
+  })
+
+  test('弾倉は、這い・伏せへの出入り・転がり・箱の中では替えられない', () => {
+    expect(can(standing, 'reload')).toBe(true)
+    for (const busy of ['crawling', 'proneShifting', 'rolling', 'boxed', 'vaulting', 'hanging', 'cqc', 'stabbing'] as const) {
+      expect(can({ ...standing, [busy]: true }, 'reload')).toBe(false)
+    }
+  })
+})
+
+describe('シートと表', () => {
+  test('**moves.csv (シートの写し) と表が同じ。** シートを取り込んだのに作り直し忘れた / 表を手で直した、を捕まえる', async () => {
+    const { parseCsv, readSheet } = await import('../../../tools/moves_sheet')
+    const csv = await Bun.file(new URL('./moves.csv', import.meta.url)).text()
+    const sheet = readSheet(parseCsv(csv))
+    const fromSheet = Object.fromEntries(sheet.moves.map((m) => [m.id, { needs: [...m.needs].sort(), not: [...m.not].sort() }]))
+    const fromCode: Record<string, { needs: string[]; not: string[] }> = Object.fromEntries(
+      Object.entries(MOVES).map(([id, r]) => [id, { needs: [...r.needs].sort(), not: [...r.not].sort() }]),
+    )
+    expect(fromCode).toEqual(fromSheet)
+    // 体の状態の行は、BodyState の旗と同じだけある
+    expect(sheet.flags.map((f) => f.id).sort()).toEqual(Object.keys(standing).sort())
   })
 })

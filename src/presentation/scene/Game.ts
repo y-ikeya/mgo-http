@@ -4394,13 +4394,11 @@ export class Game {
      */
     const firing = this.inv.canShoot(this.weapon, {
       held: this.input.firing,
-      aiming: this.player.isAiming,
+      // 体の条件 (構えている・転がり / 這い / 着地などでない) は動作の表 (moves.ts の fire)
+      body: can(this.player.body, "fire"),
       life: this.life,
       reloading: this.reloadTimer > 0,
       stabbing: this.stabTimer > 0,
-      rolling: this.player.rolling,
-      crawling: this.player.crawling,
-      landing: this.player.landing,
       ammo: this.ammo,
     });
     this.player.setFiring(firing);
@@ -4450,19 +4448,18 @@ export class Game {
    * 弾は入らない。押し直しになるが、**別のことを始めたのは本人**。
    */
   private reloadBroken(): boolean {
-    if (this.player.rolling || this.player.isBoxed) return true;
-    // 伏せて動く / 姿勢をまたぐ。装填の型は姿勢ごとに違う (animation.ts の reloadKey)
-    if (this.player.crawling || this.player.isProne !== this.reloadProne) return true;
+    // 体が替えられない状態になった (転がる・箱・這う…、動作の表の reload)
+    if (!can(this.player.body, "reload")) return true;
+    // 姿勢をまたぐ。装填の型は姿勢ごとに違う (animation.ts の reloadKey)
+    if (this.player.isProne !== this.reloadProne) return true;
     // 替えている銃を持っていない。**手にある物に弾が入ってしまう**
     return this.weapon.id !== this.reloadWeapon;
   }
 
   private startReload(): void {
-    if (this.reloadTimer > 0 || this.stabTimer > 0 || this.player.rolling)
-      return;
-    // 這いながらは弾倉を替えられない。撃つのと同じ (domain/item/inventory.ts)。
-    // 伏せへの出入りの最中も同じ — 型が全身で決まっているので手が塞がっている
-    if (this.player.crawling || this.player.proneShifting) return;
+    if (this.reloadTimer > 0 || this.stabTimer > 0) return;
+    // 体の条件 (転がり・這い・伏せへの出入り・箱…) は動作の表 (moves.ts の reload)
+    if (!can(this.player.body, "reload")) return;
     // どの姿勢で始めたかを控える。**途中で姿勢が変わったら中断する**
     this.reloadProne = this.player.isProne;
     this.reloadWeapon = this.weapon.id;

@@ -95,35 +95,17 @@ type HandEvent =
 export interface ShootContext {
   /** 引き金が引かれているか。装置の話 (input) をここで受ける */
   held: boolean
-  /** 構えているか。**構えていないと撃てない** */
-  aiming: boolean
+  /**
+   * 体が撃てる状態か (domain/player/moves.ts の fire: 構えている・転がり / 跳び越え / ぶら下がり /
+   * CQC / 這い / 着地で堪えている間でない)。**体の条件は動作の表が持つ** — ここは持ち物の条件だけ
+   */
+  body: boolean
   /** 生死。倒れている間や湧く前は撃てない */
   life: Life
   /** 装填中か */
   reloading: boolean
   /** ナイフを振っている最中か */
   stabbing: boolean
-  /** 転がっている最中か */
-  rolling: boolean
-  /**
-   * 削られる高さから落ちて、堪えている最中か。
-   *
-   * **全身で堪えている間は撃てない。** 膝を突いて衝撃を逃がしている体が、
-   * 同時に銃を構えて撃つのは形として無理がある。高い所から飛び降りて
-   * 詰めるのが只にならない、という代償にもなっている。
-   */
-  landing: boolean
-  /**
-   * 伏せて這っている最中か。**這いながらは撃てない。**
-   *
-   * 伏せは一番見つかりにくく、一番安定して撃てる姿勢。そのまま動きながら
-   * 撃てると、**低いまま詰めて低いまま撃つ**が全部の場面で最善になる。
-   * 止まれば撃てる、という一手を挟むことで「進むか撃つか」の選択が残る。
-   *
-   * 立ちとしゃがみで動き撃ちができるのは、あちらは散布が開くから
-   * (domain/item/spread.ts)。伏せは散布でも代償を作れない。
-   */
-  crawling: boolean
   /** 弾倉に残っている弾。**空撃ちはここで止まる** */
   ammo: number
 }
@@ -315,10 +297,9 @@ export class Inventory {
   canShoot(weapon: WeaponSpec, ctx: ShootContext): boolean {
     if (!this.handReady) return false
     if (!ctx.held || !this.trigger.pulled(weapon.auto)) return false
-    if (!ctx.aiming) return false
+    if (!ctx.body) return false
     if (!canAct(ctx.life)) return false
-    if (ctx.reloading || ctx.stabbing || ctx.rolling || ctx.crawling) return false
-    if (ctx.landing) return false
+    if (ctx.reloading || ctx.stabbing) return false
     return ctx.ammo > 0
   }
 

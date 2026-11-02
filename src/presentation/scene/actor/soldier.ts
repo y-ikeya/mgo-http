@@ -1169,6 +1169,8 @@ export class Soldier {
       cqc: this.cqcBusy,
       stepping: this.stepLeft > 0,
       flinching: this.flinchLeft > 0,
+      crawling: this.crawling,
+      proneShifting: this.proneShifting !== null,
       trapped: this.trappedStage !== 'none',
     }
   }

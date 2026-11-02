@@ -68,13 +68,10 @@ describe('引き金', () => {
 describe('撃てるか', () => {
   const ready: ShootContext = {
     held: true,
-    aiming: true,
+    body: true,
     life: 'alive',
     reloading: false,
     stabbing: false,
-    rolling: false,
-    crawling: false,
-    landing: false,
     ammo: 30,
   }
 
@@ -95,8 +92,8 @@ describe('撃てるか', () => {
     expect(make().canShoot(WEAPONS.rifle, { ...ready, held: false })).toBe(false)
   })
 
-  test('構えていなければ撃てない', () => {
-    expect(make().canShoot(WEAPONS.rifle, { ...ready, aiming: false })).toBe(false)
+  test('体が撃てる状態でなければ撃てない (構えていない・転がり・這い・着地…、domain/player/moves.ts の fire)', () => {
+    expect(make().canShoot(WEAPONS.rifle, { ...ready, body: false })).toBe(false)
   })
 
   test('倒れていれば撃てない', () => {
@@ -104,13 +101,10 @@ describe('撃てるか', () => {
   })
 
   /**
-   * **装填・刺突・転がり・匍匐は、撃つことと排他。** そこが選択の代償になる。
-   *
-   * 匍匐だけ毛色が違う。あちらは「動作の最中だから」ではなく、**伏せは
-   * 動きながら撃てる姿勢ではない**という決めごと — 一番見つかりにくく一番
-   * 安定して撃てる姿勢が動き撃ちまでできると、低いまま詰めるのが常に最善になる。
+   * **装填・刺突は、撃つことと排他。** そこが選択の代償になる。体の状態 (転がり・匍匐・着地) は
+   * 動作の表 (moves.ts の fire) が持つ — 試験は moves.test.ts
    */
-  for (const busy of ['reloading', 'stabbing', 'rolling', 'crawling', 'landing'] as const) {
+  for (const busy of ['reloading', 'stabbing'] as const) {
     test(`${busy} の間は撃てない`, () => {
       expect(make().canShoot(WEAPONS.rifle, { ...ready, [busy]: true })).toBe(false)
     })
