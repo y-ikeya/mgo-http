@@ -122,6 +122,8 @@ export const LOCOMOTIONS: Locomotion[] = [
   'crouch_step_back',
   // しゃがんだまま敬礼する。**末尾に足す**
   'crouch_salute',
+  // 散弾で飛ばされて倒れる。**末尾に足す**
+  'shotgun_sweep',
 ]
 
 const LOCOMOTION_INDEX = new Map(LOCOMOTIONS.map((name, i) => [name, i]))
@@ -193,8 +195,6 @@ const FLAG_AIMING = 1
 const FLAG_CROUCHING = 2
 const FLAG_CONCENTRATING = 8
 const FLAG_SALUTE = 16
-/** 散弾で飛ばされて、転ぶ型を速く流している。**空いていた 32 を使う** */
-const FLAG_FAST_FALL = 32
 /**
  * 提げている銃の番号。**末尾に足す** — 変えると古い版が別の銃として読む。
  *
@@ -283,7 +283,6 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
   if (snapshot.crouching) flags |= FLAG_CROUCHING
   if (snapshot.concentrating) flags |= FLAG_CONCENTRATING
   if (snapshot.saluteHeld) flags |= FLAG_SALUTE
-  if (snapshot.fastFall) flags |= FLAG_FAST_FALL
   view.setUint8(OFF_FLAGS, flags)
 
   const turns = snapshot.cameraYaw / (Math.PI * 2)
@@ -323,7 +322,6 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     boxed: held === 'box',
     concentrating: (flags & FLAG_CONCENTRATING) !== 0,
     saluteHeld: (flags & FLAG_SALUTE) !== 0,
-    fastFall: (flags & FLAG_FAST_FALL) !== 0,
     weapon: WEAPON_BITS[view.getUint8(OFF_WEAPON)] ?? 'rifle',
     // **振りかぶっているか。** 手にしているだけでは立たない
     holdingGrenade: (view.getUint8(OFF_FLAGS2) & FLAG2_WINDUP) !== 0,

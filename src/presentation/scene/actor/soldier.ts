@@ -1071,7 +1071,6 @@ export class Soldier {
       held: this.held,
       concentrating: this.isConcentrating,
       saluteHeld: this.saluteHeld,
-      fastFall: this.downed_ && this.fallRate > 1,
       /*
        * **手榴弾を振りかぶっている間だけ。**
        *
@@ -3524,11 +3523,11 @@ export class Soldier {
    * 倒れる → (伏せたまま撃てる) → 立ち上がる、の 3 段。立ち上がりに入ったら
    * 中断できないので、そこが無防備な時間になる。
    */
-  /** @param rate 転ぶ型の速さ。散弾で飛ばされた時は速い (SHOTGUN_KNOCK_RATE) */
-  /** 転ぶ型を何倍で流しているか。散弾で飛ばされた時は速い。見ている側へも送る (fastFall) */
-  private fallRate = 1
+  /** 倒れたのが散弾でか。倒れている間に引く型が違う (shotgun_sweep、速く焼いた写し) */
+  private shotgunFall = false
 
-  knockDown(rolled = false, rate = 1): void {
+  /** @param shotgun 散弾で飛ばされた (転ぶ型が速い shotgun_sweep) */
+  knockDown(rolled = false, shotgun = false): void {
     if (this.down) return
     /*
      * 倒れている間は飛ばされない。**ただし CQC で投げられて背中が着く前は別** —
@@ -3551,9 +3550,9 @@ export class Soldier {
     this.thrownFall = false
     // ローリングの体当たり (しゃがんでいた所から) なら、爆風ほど飛ばない倒れ方
     this.rolledFall = rolled
-    this.fallRate = rolled ? 1 : rate
+    this.shotgunFall = !rolled && shotgun
     if (rolled) this.animator?.playRollFall()
-    else this.animator?.playSweep(rate)
+    else this.animator?.playSweep(this.shotgunFall)
   }
 
   /**
@@ -4780,6 +4779,7 @@ export class Soldier {
       downed: this.downed,
       thrown: this.thrownFall,
       rolled: this.rolledFall,
+      shotgunFall: this.shotgunFall,
       cqc: this.animator?.cqcKind ?? null,
       stepping: this.stepLeft > 0,
       standingUp: this.standing,

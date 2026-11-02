@@ -73,7 +73,7 @@ import { StunSparks } from "./fx/stunSparks";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { BOX_BUMP_RANGE, fallDamage, KNOCK_TIME, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_RATE, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
 import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
@@ -3048,10 +3048,10 @@ export class Game {
         // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
         if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
         // 散弾は爆風より短く速く飛ぶ (domain/rule/damage.ts の SHOTGUN_KNOCK_*)
-        this.player.knockDown(message.distance !== undefined, message.shotgun ? SHOTGUN_KNOCK_RATE : 1);
+        this.player.knockDown(message.distance !== undefined, message.shotgun === true);
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
         if (message.shotgun) {
-          this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, KNOCK_TIME / SHOTGUN_KNOCK_RATE);
+          this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME);
         } else {
           this.player.knockPush(message.dirX, message.dirZ, message.distance);
         }

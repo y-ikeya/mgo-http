@@ -1,7 +1,11 @@
 // クリップ 1 本の**速さをファイルの側で変える。**
 //
-// 使い方: bun tools/retime_clip.js <.glb> <クリップ名> <倍率>
+// 使い方: bun tools/retime_clip.js <.glb> <クリップ名> <倍率> [--as <新しい名前>]
 //   例:   bun tools/retime_clip.js public/models/soldier.glb vault 1.2
+//         bun tools/retime_clip.js public/models/soldier.glb sweep 1.6 --as sweep_shotgun
+//
+// --as を付けると**元の型は残して、速くした写しを別の名前で足す** (同じ型を等倍でも使う時。
+// 爆風の sweep と散弾の sweep_shotgun)。姿勢の値 (output) は元と分け合い、時刻だけ新しく持つ。
 //
 // 倍率 1.2 なら、キーの時刻を全部 1/1.2 にする (尺が 1/1.2 になり、1.2 倍速で流したのと同じ)。
 //
@@ -13,7 +17,10 @@
 //
 // 時刻の accessor を他の型と分け合っていたら書き換えない (他の型まで速くなる)。
 
-const [path, clipName, rateText] = process.argv.slice(2)
+const args = process.argv.slice(2)
+const asAt = args.indexOf('--as')
+const copyName = asAt >= 0 ? args[asAt + 1] : null
+const [path, clipName, rateText] = asAt >= 0 ? args.filter((_, i) => i !== asAt && i !== asAt + 1) : args
 const rate = Number(rateText)
 if (!path || !clipName || !(rate > 0)) {
   console.error('使い方: bun tools/retime_clip.js <.glb> <クリップ名> <倍率>')
@@ -24,12 +31,46 @@ const bytes = new Uint8Array(await Bun.file(path).arrayBuffer())
 const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 const jsonLength = view.getUint32(12, true)
 const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)))
-const bin = bytes.subarray(20 + jsonLength + 8)
+const bin = bytes.subarray(20 + jsonLength + 8, 20 + jsonLength + 8 + view.getUint32(20 + jsonLength, true))
 
-const anim = json.animations?.find((a) => a.name === clipName)
+let anim = json.animations?.find((a) => a.name === clipName)
 if (!anim) {
   console.error(`${clipName} が ${path} に無い`)
   process.exit(1)
+}
+
+/** 足した時刻の値。書き出す時に bin の末尾へ付ける */
+const appended = []
+let binLength = bin.length
+if (copyName) {
+  if (json.animations.some((a) => a.name === copyName)) {
+    console.error(`${copyName} はもう ${path} に在る`)
+    process.exit(1)
+  }
+  // 時刻の accessor だけ写しを作る (bin の末尾に足す)。output は元と分け合う
+  const copies = new Map()
+  for (const input of new Set(anim.samplers.map((s) => s.input))) {
+    const acc = json.accessors[input]
+    const bv = json.bufferViews[acc.bufferView]
+    const offset = (bv.byteOffset ?? 0) + (acc.byteOffset ?? 0)
+    const data = new Float32Array(bin.slice(offset, offset + acc.count * 4).buffer)
+    const pad = (4 - (binLength % 4)) % 4
+    if (pad) appended.push(new Uint8Array(pad))
+    binLength += pad
+    json.bufferViews.push({ buffer: 0, byteOffset: binLength, byteLength: data.byteLength })
+    appended.push(new Uint8Array(data.buffer))
+    binLength += data.byteLength
+    json.accessors.push({ ...acc, bufferView: json.bufferViews.length - 1, byteOffset: 0 })
+    copies.set(input, json.accessors.length - 1)
+  }
+  const copy = {
+    ...anim,
+    name: copyName,
+    samplers: anim.samplers.map((s) => ({ ...s, input: copies.get(s.input) })),
+    channels: anim.channels.map((c) => ({ ...c, target: { ...c.target } })),
+  }
+  json.animations.push(copy)
+  anim = copy
 }
 
 const inputs = new Set(anim.samplers.map((s) => s.input))
@@ -45,11 +86,21 @@ for (const other of json.animations) {
 
 let before = 0
 let after = 0
-for (const index of inputs) {
+// 写しの時刻は bin の末尾 (appended) に在る。元の bin と続けて 1 枚にしてから書き換える
+const whole = new Uint8Array(binLength)
+whole.set(bin)
+{
+  let at = bin.length
+  for (const part of appended) {
+    whole.set(part, at)
+    at += part.length
+  }
+}
+for (const index of new Set(anim.samplers.map((s) => s.input))) {
   const acc = json.accessors[index]
   const bv = json.bufferViews[acc.bufferView]
   const offset = (bv.byteOffset ?? 0) + (acc.byteOffset ?? 0)
-  const times = new Float32Array(bin.buffer, bin.byteOffset + offset, acc.count)
+  const times = new Float32Array(whole.buffer, offset, acc.count)
   before = Math.max(before, times[acc.count - 1])
   for (let i = 0; i < times.length; i++) times[i] /= rate
   after = Math.max(after, times[acc.count - 1])
@@ -58,12 +109,17 @@ for (const index of inputs) {
   if (acc.max) acc.max = [times[acc.count - 1]]
 }
 
-// JSON を書き戻す。長さが変わるので、glb を組み直す (4 バイト境界に空白で詰める)
+// JSON と bin を書き戻す。どちらも長さが変わるので、glb を組み直す (4 バイト境界に詰める)
+let binOut = whole
+if (binOut.length % 4) {
+  binOut = new Uint8Array(binOut.length + ((4 - (binOut.length % 4)) % 4))
+  binOut.set(whole)
+}
+json.buffers[0].byteLength = binOut.length
 let text = JSON.stringify(json)
 while (text.length % 4) text += ' '
 const jsonBytes = new TextEncoder().encode(text)
-const binChunk = bytes.subarray(20 + jsonLength) // 長さ・種別ごと
-const total = 12 + 8 + jsonBytes.length + binChunk.length
+const total = 12 + 8 + jsonBytes.length + 8 + binOut.length
 const out = new Uint8Array(total)
 const outView = new DataView(out.buffer)
 out.set(bytes.subarray(0, 12))
@@ -71,6 +127,8 @@ outView.setUint32(8, total, true)
 outView.setUint32(12, jsonBytes.length, true)
 outView.setUint32(16, 0x4e4f534a, true) // JSON
 out.set(jsonBytes, 20)
-out.set(binChunk, 20 + jsonBytes.length)
+outView.setUint32(20 + jsonBytes.length, binOut.length, true)
+outView.setUint32(24 + jsonBytes.length, 0x004e4942, true) // BIN
+out.set(binOut, 28 + jsonBytes.length)
 await Bun.write(path, out)
-console.info(`${path} の ${clipName}: ${before.toFixed(3)} 秒 → ${after.toFixed(3)} 秒 (×${rate})`)
+console.info(`${path} の ${clipName}${copyName ? ` → ${copyName}` : ''}: ${before.toFixed(3)} 秒 → ${after.toFixed(3)} 秒 (×${rate})`)

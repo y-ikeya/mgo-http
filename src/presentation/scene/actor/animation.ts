@@ -93,6 +93,8 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   cqc_miss: 'cqc_miss',
   cqc_thrown: 'cqc_thrown',
   hit2back: 'hit2back',
+  // 散弾で飛ばされて倒れる。爆風の sweep を 1.6 倍に焼いた写し (tools/retime_clip.js --as)
+  shotgun_sweep: 'sweep_shotgun',
   // 構えた所から一歩下がる。下半身だけ (上は銃を下ろした脱力)。焼かれた移動を辿る (ROOT_MOTION_CLIPS)
   step_back: 'step_back',
   // しゃがんだまま一歩下がる。後ろへ跳んで膝を突く
@@ -610,6 +612,8 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'cqc_thrown',
   // ローリングで倒れた姿のまま留める (sweep と同じ)
   'hit2back',
+  // 散弾で倒れた姿のまま留める (sweep と同じ)
+  'shotgun_sweep',
   'jump_up',
   'jump_down',
   'death',
@@ -739,6 +743,13 @@ const THROWN_KEY = 'cqc_thrown'
  * 腰の横の移動は取り込む時に捨ててある (merge_clip の --in-place)。滑るのはサーバーの距離 (0.5m)
  */
 const ROLL_FALL_KEY = 'hit2back'
+/**
+ * 散弾で飛ばされて倒れる。**爆風の sweep を 1.6 倍に焼いた写し** (sweep_shotgun、tools/retime_clip.js の --as)。
+ * 倒れた後は sweep と同じ扱い。滑る時間 (SHOTGUN_KNOCK_TIME) も同じだけ短い
+ */
+const SWEEP_SHOTGUN_KEY = 'sweep_shotgun'
+/** 背中が着くまで (秒)。焼いた倍率 1.6 で爆風の着地を割った値 */
+const SWEEP_SHOTGUN_LAND = 0.92 / 1.6
 /** 流す速さ。等倍 (1.93 秒) では遅かった (本人 2026-10-20「もう少し早く」) */
 const ROLL_FALL_RATE = 1.5
 /** 背中が着くまで (秒)。型の半ばで仰向けになる */
@@ -999,6 +1010,7 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   SWEEP_KEY,
   THROWN_KEY,
   ROLL_FALL_KEY,
+  SWEEP_SHOTGUN_KEY,
   CQC_THROW_KEY,
   CQC_MISS_KEY,
   CQC_HOOK_KEY,
@@ -1687,6 +1699,7 @@ export class CharacterAnimator {
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(THROWN_KEY) ||
       finished === this.upper.get(ROLL_FALL_KEY) ||
+      finished === this.upper.get(SWEEP_SHOTGUN_KEY) ||
       finished === this.upper.get(CQC_THROW_KEY) ||
       finished === this.upper.get(CQC_MISS_KEY) ||
       // 空振りのフックを振り抜いた (投げならその前に投げの型へ移っている)
@@ -1956,6 +1969,7 @@ export class CharacterAnimator {
       [SWEEP_KEY, 'sweep'],
       [THROWN_KEY, 'cqc_thrown'],
       [ROLL_FALL_KEY, 'hit2back'],
+      [SWEEP_SHOTGUN_KEY, 'sweep_shotgun'],
       [STAND_KEY, STAND_CLIP],
     ] as const) {
       const clip = byName.get(name)
@@ -3483,7 +3497,10 @@ export class CharacterAnimator {
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
     if (
       !this.aiming &&
-      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown' || this.locomotion === 'hit2back') &&
+      (this.locomotion === 'sweep' ||
+        this.locomotion === 'shotgun_sweep' ||
+        this.locomotion === 'cqc_thrown' ||
+        this.locomotion === 'hit2back') &&
       this.upper.has(this.fallKey)
     ) {
       return this.fallKey
@@ -4198,19 +4215,19 @@ export class CharacterAnimator {
     this.standDuration = this.standClipDuration / this.standRate
   }
 
-  /** @param rate 転ぶ型を何倍で流すか。散弾で飛ばされた時は速い (SHOTGUN_KNOCK_RATE) */
-  playSweep(rate = 1): void {
+  /** @param shotgun 散弾で飛ばされた。速く焼いた写し (shotgun_sweep) を流す。型が無い皮は爆風の型 */
+  playSweep(shotgun = false): void {
     if (this.dead) return
-    const upper = this.upper.get(SWEEP_KEY)
-    const lower = this.lower.get('sweep')
+    const fast = shotgun && this.upper.has(SWEEP_SHOTGUN_KEY) && this.lower.has('shotgun_sweep')
+    const upper = this.upper.get(fast ? SWEEP_SHOTGUN_KEY : SWEEP_KEY)
+    const lower = this.lower.get(fast ? 'shotgun_sweep' : 'sweep')
     if (!upper || !lower) return
-    const scale = this.sweepRate * rate
-    upper.reset().setEffectiveTimeScale(scale).play()
-    lower.reset().setEffectiveTimeScale(scale).play()
+    upper.reset().setEffectiveTimeScale(this.sweepRate).play()
+    lower.reset().setEffectiveTimeScale(this.sweepRate).play()
     this.upperState = 'sweep'
-    this.locomotion = 'sweep'
-    this.fallKey = SWEEP_KEY
-    this.sweepDuration = SWEEP_LAND / scale
+    this.locomotion = fast ? 'shotgun_sweep' : 'sweep'
+    this.fallKey = fast ? SWEEP_SHOTGUN_KEY : SWEEP_KEY
+    this.sweepDuration = (fast ? SWEEP_SHOTGUN_LAND : SWEEP_LAND) / this.sweepRate
   }
 
   /**

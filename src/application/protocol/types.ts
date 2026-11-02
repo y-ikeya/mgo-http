@@ -134,11 +134,6 @@ export interface PlayerSnapshot {
    * 同じドメインルールで止めるほうが小さいし、途中で取りこぼしても次で復帰する。
    */
   saluteHeld: boolean
-  /**
-   * 散弾で飛ばされて、転ぶ型を速く流している (SHOTGUN_KNOCK_RATE)。**見ている側も同じ速さで流す** —
-   * locomotion は爆風と同じ sweep なので、これが無いと他人の画面だけ等倍で倒れた
-   */
-  fastFall?: boolean
 }
 
 export interface StateMessage {
@@ -377,8 +372,8 @@ export interface KnockDownEvent {
    */
   distance?: number
   /**
-   * 散弾で飛ばされた。距離は SHOTGUN_KNOCK_DISTANCE、滑る時間と転ぶ型は SHOTGUN_KNOCK_RATE 倍速
-   * (domain/rule/damage.ts)。省けば爆風 (またはローリング)
+   * 散弾で飛ばされた。距離は SHOTGUN_KNOCK_DISTANCE、滑る時間は SHOTGUN_KNOCK_TIME、転ぶ型は
+   * shotgun_sweep (domain/rule/damage.ts)。省けば爆風 (またはローリング)
    */
   shotgun?: true
 }

@@ -336,6 +336,8 @@ export interface MatchPlayer extends Player {
   downThrown: boolean
   /** 的が倒れているのがローリングの体当たりでか。倒れている姿が違う (hit2back) */
   downRolled: boolean
+  /** 的が倒れているのが散弾でか。倒れている姿が違う (shotgun_sweep) */
+  downShotgun: boolean
   /**
    * 倒された時、撃った相手が背後に居たか。**倒れる向きに出る。**
    *
@@ -473,6 +475,7 @@ export function newMatchPlayer(seed: {
     downLeft: 0,
     downThrown: false,
     downRolled: false,
+    downShotgun: false,
     downFromBehind: false,
     weapon: 'rifle',
     primary: 'rifle',

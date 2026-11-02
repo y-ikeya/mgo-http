@@ -250,6 +250,7 @@ export function releaseCqc(room: RoomWorld, attacker: MatchPlayer): void {
     victim.downLeft = 0
     victim.downThrown = false
     victim.downRolled = false
+    victim.downShotgun = false
     return
   }
   sessionFor(victim)?.socket.send(JSON.stringify({ type: 'released' } satisfies ServerMessage))

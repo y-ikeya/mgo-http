@@ -29,7 +29,7 @@ import {
   HIT_RULES,
   KNOCK_DISTANCE,
   SHOTGUN_KNOCK_DISTANCE,
-  SHOTGUN_KNOCK_RATE,
+  SHOTGUN_KNOCK_TIME,
   KNOCK_TIME,
   ROLL_FALL_DISTANCE,
   ROLL_HIT_RANGE,
@@ -183,7 +183,7 @@ function knockAway(
   fromZ: number,
   /** 滑る距離 (m)。爆風なら省く (KNOCK_DISTANCE) */
   distance?: number,
-  /** 散弾で飛ばされた。短く速く滑る (SHOTGUN_KNOCK_DISTANCE / SHOTGUN_KNOCK_RATE) */
+  /** 散弾で飛ばされた。短く速く滑る (SHOTGUN_KNOCK_DISTANCE / SHOTGUN_KNOCK_TIME) */
   shotgun = false,
 ): void {
   // 投げている / 投げられている CQC は取り消す。吹き飛ぶほうが強い
@@ -201,7 +201,8 @@ function knockAway(
     // 転がってきた相手のほうを向いて後ろへ倒れる (yaw θ で正面が (-sinθ, -cosθ)、押された先の逆)
     victim.downRolled = distance !== undefined
     if (victim.downRolled) victim.yaw = Math.atan2(awayX, awayZ)
-    victim.knockTime = shotgun ? KNOCK_TIME / SHOTGUN_KNOCK_RATE : KNOCK_TIME
+    victim.downShotgun = shotgun
+    victim.knockTime = shotgun ? SHOTGUN_KNOCK_TIME : KNOCK_TIME
     victim.knockLeft = victim.knockTime
     // 滑り終わってからも転んだまま。**時間で立ち上がる**
     victim.downLeft = TARGET_DOWN
@@ -701,6 +702,7 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
     victim.downLeft = TARGET_STAND + 3.5
     victim.downThrown = true
     victim.downRolled = false
+    victim.downShotgun = false
     return
   }
   sessionFor(victim)?.socket.send(

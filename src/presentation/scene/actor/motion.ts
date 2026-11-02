@@ -100,6 +100,7 @@ export type WholeBodyLocomotion =
   | 'cqc_miss'
   | 'cqc_thrown'
   | 'hit2back'
+  | 'shotgun_sweep'
   | 'away'
   | 'bump'
   | 'prone_down'
@@ -142,6 +143,8 @@ export const WHOLE_BODY: ReadonlySet<Locomotion> = new Set<WholeBodyLocomotion>(
   'cqc_thrown',
   // ローリングの体当たりで後ろへ倒れる
   'hit2back',
+  // 散弾で飛ばされて倒れる (爆風の型を速く焼いた写し)
+  'shotgun_sweep',
   // 切れた人の姿。上半身だけ別の型を重ねると、銃を構えたまま固まる
   'away',
   // ダンボールで敵にぶつかった反応。上だけ構えに戻ると、銃を構えたまま驚く
@@ -291,6 +294,8 @@ export interface StanceInput {
   downed: boolean
   /** 倒れたのが CQC で投げられたからか。倒れている間に引く型が違う (cqc_thrown) */
   thrown?: boolean
+  /** 倒れたのが散弾でか。倒れている間に引く型が違う (shotgun_sweep) */
+  shotgunFall?: boolean
   /** 倒れたのがローリングの体当たりでか。倒れている間に引く型が違う (hit2back) */
   rolled?: boolean
   /** CQC で投げている / 空振りしている最中の型。していなければ null */
@@ -390,7 +395,7 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (input.climbing) return input.climbing
   // 爆風で倒れている間。起き上がりは中断できないので、倒れているより先に見る
   if (input.standingUp) return 'stand'
-  if (input.downed) return input.thrown ? 'cqc_thrown' : input.rolled ? 'hit2back' : 'sweep'
+  if (input.downed) return input.thrown ? 'cqc_thrown' : input.rolled ? 'hit2back' : input.shotgunFall ? 'shotgun_sweep' : 'sweep'
 
   // 猫に釘付け。**伏せていても同じ型** (伏せの型は無い。本人 2026-10-20)
   if (input.trapped === 'in') return 'trapped'

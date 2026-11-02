@@ -196,7 +196,7 @@ describe('散弾で的を突き飛ばす', () => {
     expect(slid).toBeGreaterThan(1.6)
     expect(slid).toBeLessThan(2.4)
     // 滑るだけでなく転ぶ。**時間で立ち上がる** (server/match.ts)
-    expect(after.locomotion).toBe('sweep')
+    expect(after.locomotion).toBe('shotgun_sweep')
     me.close()
   })
 

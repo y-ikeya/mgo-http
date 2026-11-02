@@ -206,6 +206,10 @@ export type Locomotion =
    */
   | 'hit2back'
   /**
+   * 散弾で飛ばされて倒れる。**爆風 (sweep) と同じ型を 1.6 倍に焼いた写し** (sweep_shotgun)。倒れた後は sweep と同じ扱い
+   */
+  | 'shotgun_sweep'
+  /**
    * 構えた所から一歩下がる (型 StepBackward、下半身だけ。下がっている間は銃を下ろす)。
    * 構えて後ろを押しながら転がりの指。0.7m を 1 秒で下がる (domain/player/step.ts)。CQC の間合いから外れるのに使う (2026-10-30 本人)
    */
