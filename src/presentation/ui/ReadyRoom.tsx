@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import type { LoadoutFocus } from '../scene/Game'
-import { READY_HOLD } from '../../application/loadoutInput'
+import { READY_HOLD } from '../../application/loadout/input'
 import { Portrait } from '../scene/portrait'
 import type { WeaponKind } from '../scene/arms/weapon'
 import { SKILLS, SKILL_BUDGET, costOf, type SkillId, type Skills } from '../../domain/player/skill'

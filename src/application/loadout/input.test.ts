@@ -9,7 +9,7 @@ import {
   stepLoadoutInput,
   type LoadoutKeys,
   type LoadoutScene,
-} from './loadoutInput'
+} from './input'
 
 /** 何も押していない 1 フレーム */
 const idle: LoadoutKeys = { up: false, down: false, left: false, right: false, confirm: false, confirmHeld: false, slot: null }

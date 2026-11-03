@@ -87,7 +87,7 @@ import {
   onBattlefield,
   type Life,
 } from "../../domain/player/lifecycle";
-import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
+import { roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
 import { isGun, isThrowable, type HeldId } from "../../domain/item/held";
@@ -96,10 +96,6 @@ import {
   ROOMS,
   isHostile,
   isRoomName,
-  primariesOf,
-  secondariesOf,
-  secondaryOf,
-  supportsOf,
   type RoomName,
   type Side,
 } from "../../domain/match/room";
@@ -112,7 +108,7 @@ import {
   openBriefing as openBriefingInput,
   stepLoadoutInput,
   type LoadoutKeys,
-} from "../../application/loadoutInput";
+} from "../../application/loadout/input";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunCaster, setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
@@ -170,6 +166,17 @@ import {
 import { MAX_STAMINA, PAT_RANGE, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
+import {
+  chooseLoadout,
+  fitArmory,
+  newLoadoutChoice,
+  resumeLoadout,
+  spawnLoadout,
+  stepChoice,
+  type Loadout,
+  type LoadoutChoice,
+  type LoadoutEffect,
+} from "../../application/loadout/choice";
 import { loadLookScale, type LookScale } from "../../infra/prefs/look";
 import { loadRenderScale } from "../../infra/prefs/quality";
 
@@ -968,40 +975,18 @@ export class Game {
    * 銃を置いてくるわけではないので、残りはそのまま残る。
    */
   /**
-   * 湧き地点で組んだ装備。
-   *
-   * 銃を並べて順に持ち替えるのではなく、**枠に何を入れるかを選ぶ**。
-   * 狙撃銃を主に選んだなら、詰められたときに突撃銃は無い — その代わり副武器がある。
-   * 選んだこと自体が手になる。
-   *
-   * 替えられるのは湧くときだけ。試合中に持ち物を組み替えられると、
-   * 状況ごとに最適な物へ乗り換えるだけになって、選ぶ意味が消える。
+   * 装備の選び (application/loadout/choice.ts)。次に湧く時の装備 (pending)、いま持っている装備
+   * (held)、持ち込める物 (armory)。**選ぶ・丸める・確定するはあちらが決める**
    */
-  /**
-   * 湧き地点で組んだ装備。
-   *
-   * 副武器は**部屋が外すことがある** (ROOMS の secondary)。null を持てないと、
-   * サーバーは外しているのに手元にだけ拳銃が残る。
-   */
-  private loadout: {
-    /** 主武器。**銃を外した部屋では null** (domain/match/room.ts の primaries) */
-    primary: WeaponId | null
-    secondary: WeaponId | null
-    support: SupportId
-    stealth?: boolean
-  } = {
-    primary: "rifle",
-    secondary: "m9",
-    support: "grenade",
-  };
+  private choice: LoadoutChoice = newLoadoutChoice(null, null);
+  /** 湧いた時に確定した装備 */
+  private get loadout(): Loadout {
+    return this.choice.held;
+  }
   /** 次に湧いたときの装備。試合中に変えても、いま持っている物は変わらない */
-  private pendingLoadout = {
-    primary: "rifle" as WeaponId | null,
-    secondary: "m9" as WeaponId | null,
-    support: "grenade" as SupportId,
-    /** STEALTH を持つか。**TSNE の攻める側だけ** (applyArmory) */
-    stealth: false,
-  };
+  private get pendingLoadout(): Loadout {
+    return this.choice.pending;
+  }
   /** いまどちらの枠を持っているか */
 
   /**
@@ -1313,13 +1298,21 @@ export class Game {
    * 一覧から消すだけでは足りない — 送ってくる側は止まらないので、
    * サーバーも同じ表で弾く (domain/player/equip.ts)。ここは見せ方の話。
    */
-  private primaries: readonly WeaponId[];
+  private get primaries(): readonly WeaponId[] {
+    return this.choice.armory.primaries;
+  }
   /** 副武器。**部屋が外していれば null** (ROOMS の secondary) */
-  private secondary: WeaponId | null;
+  private get secondary(): WeaponId | null {
+    return this.choice.armory.secondary;
+  }
   /** 選べる副武器の一覧 (domain/match/room.ts の secondariesOf) */
-  private secondaries: readonly WeaponId[] = CHOICES.secondary;
+  private get secondaries(): readonly WeaponId[] {
+    return this.choice.armory.secondaries;
+  }
   /** 選べる support (domain/match/room.ts の supportsOf) */
-  private supports: readonly SupportId[] = SUPPORTS;
+  private get supports(): readonly SupportId[] {
+    return this.choice.armory.supports;
+  }
   /** 入った部屋。持ち込める物を側が変わるたびに引き直す */
   private readonly roomName: RoomName | null;
 
@@ -1365,34 +1358,11 @@ export class Game {
       stage ?? (isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall')
     ].name;
     this.roomName = isRoomName(room) ? room : null;
-    this.primaries = isRoomName(room) ? primariesOf(room) : CHOICES.primary;
-    this.secondary = isRoomName(room) ? secondaryOf(room) : "m9";
-    this.secondaries = isRoomName(room) ? secondariesOf(room) : CHOICES.secondary;
-    // 手元の装備も部屋に合わせる。**サーバーは外しているのにこちらだけ持つ**を防ぐ
-    this.pendingLoadout.secondary = this.secondary;
-    this.loadout.secondary = this.secondary;
     /*
-     * 持ち込めない銃を選んだ状態で開かない。**サーバーも同じ表で丸める**
-     * (domain/player/equip.ts の fitLoadout)。
-     *
-     * **一覧が空なら銃を持たない部屋。** ナイフだけになる。
+     * **前回選んだ物から始める。初めてなら一覧の先頭** (本人 2026-10-14)。部屋で持ち込めない物は
+     * 先頭へ丸める (サーバーも同じ表で丸める、domain/player/equip.ts)。一覧が空なら銃を持たない部屋
      */
-    /*
-     * **前回選んだ物から始める。初めてなら一覧の先頭 (P90)** (本人 2026-10-14)。
-     * 部屋で持ち込めない物は先頭へ丸める。繋ぎ直した時はサーバーが覚えている物が
-     * 後から届いて上書きする (そちらのほうが新しい)
-     */
-    const last = loadLastLoadout();
-    const lastPrimary = last?.primary as WeaponId | null | undefined;
-    this.pendingLoadout.primary =
-      lastPrimary && this.primaries.includes(lastPrimary) ? lastPrimary : (this.primaries[0] ?? null);
-    const lastSecondary = last?.secondary as WeaponId | null | undefined;
-    if (this.secondary !== null && lastSecondary && this.secondaries.includes(lastSecondary)) {
-      this.pendingLoadout.secondary = lastSecondary;
-    }
-    const lastSupport = last?.support as SupportId | undefined;
-    if (lastSupport && this.supports.includes(lastSupport)) this.pendingLoadout.support = lastSupport;
-    this.loadout = { ...this.pendingLoadout };
+    this.choice = newLoadoutChoice(this.roomName, loadLastLoadout());
     this.inv.refill(this.loadout);
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room, privateRoom);
@@ -2657,8 +2627,7 @@ export class Game {
         this.melee.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
-        this.loadout.support = message.support;
-        this.loadout.primary = message.primary;
+        resumeLoadout(this.choice, message);
         /*
          * **持ち物を組み直す。**
          *
@@ -2670,9 +2639,6 @@ export class Game {
         // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
         // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
         this.inv.restore(message.magazine, message.reserve, message.grenades);
-        this.pendingLoadout.support = message.support;
-        this.pendingLoadout.primary = message.primary;
-        this.pendingLoadout.secondary = message.secondary;
         this.onLoadout?.(this.pendingLoadout);
         // 銃を持たない部屋では持ち替えない。手にあるのはナイフ
         if (message.primary) void this.player.equip(message.primary);
@@ -3346,36 +3312,13 @@ export class Game {
     return rows[focusAt(this.loadoutInput, rows.length)] ?? "primary";
   }
 
-  /**
-   * 一覧の中を隣へ送る。**端では回る。**
-   *
-   * 選び直すのは「送った先の物」で、決定の一手間は無い。数字キーで押したのと
-   * 同じ形にしてある — 一手間を挟むと、選んだのに効いていない状態が生まれて、
-   * READY を押すまで気づけない。
-   */
-  private stepChoice<T>(list: readonly T[], current: T | null, step: number): T | null {
-    if (list.length === 0) return null;
-    const at = current === null ? 0 : list.indexOf(current);
-    const from = at < 0 ? 0 : at;
-    return list[(from + step + list.length) % list.length] ?? null;
-  }
-
   /** 支度の画面を左右に送る。指している枠によって送る物が変わる */
   private stepLoadout(step: number): void {
     const focus = this.loadoutFocus;
-    if (focus === "primary") {
-      const next = this.stepChoice(this.primaries, this.pendingLoadout.primary, step);
-      if (next) this.setLoadout(next);
-      return;
-    }
-    if (focus === "secondary") {
-      const next = this.stepChoice(this.secondaries, this.pendingLoadout.secondary, step);
-      if (next) this.setSecondary(next);
-      return;
-    }
-    if (focus === "support") {
-      const next = this.stepChoice(this.supports, this.pendingLoadout.support, step);
-      if (next) this.setSupport(next);
+    if (focus === "primary" || focus === "secondary" || focus === "support") {
+      // 送った先を選ぶ。**端では回る** (application/loadout/choice.ts の stepChoice)
+      const next = stepChoice(this.choice, focus, step);
+      if (next) this.performLoadout(chooseLoadout(this.choice, focus, next, this.canChooseLoadout));
       return;
     }
     /*
@@ -3694,20 +3637,6 @@ export class Game {
   }
 
   /**
-   * 選び直した装備を、待たずに反映してよい場面なら反映する。
-   *
-   * 組めるのは湧くときだけなので、その場面では**すぐ**効かせる。
-   * 次の湧きを待つと、支度の間に選び直した分が 1 試合ぶん遅れて効く。
-   * サーバーも同じドメインルールで手榴弾を配っているので、ここを揃えないと
-   * 画面には 3 個あるのに投げられない、が起きる。
-   */
-  private applyLoadoutNow(): void {
-    if (!this.canChooseLoadout) return;
-    this.loadout = { ...this.pendingLoadout };
-    this.refillFromLoadout();
-  }
-
-  /**
    * 次に湧いたときの装備を決める。
    *
    * 反映されるのは次に湧いたとき。いま持っている物は変わらない。
@@ -3719,33 +3648,33 @@ export class Game {
    * (server/match.ts の fitToRoom) ので、ここは見せ方を合わせるだけ
    */
   private applyArmory(): void {
-    if (!this.roomName) return;
     const side: Side | null =
       this.attackTeam === null ? null : this.selfTeam === this.attackTeam ? "attack" : "defence";
-    this.primaries = primariesOf(this.roomName, side);
-    this.secondary = secondaryOf(this.roomName, side);
-    this.secondaries = secondariesOf(this.roomName, side);
-    this.supports = supportsOf(this.roomName, side);
-    const pending = this.pendingLoadout;
-    if (pending.primary === null ? this.primaries.length > 0 : !this.primaries.includes(pending.primary)) {
-      pending.primary = this.primaries[0] ?? null;
+    this.performLoadout(fitArmory(this.choice, this.roomName, side));
+  }
+
+  /** 装備の選びが返してきたことをする (送る・配り直す・画面へ知らせる・STEALTH) */
+  private performLoadout(effects: LoadoutEffect[]): void {
+    for (const effect of effects) {
+      switch (effect.kind) {
+        case "send":
+          this.sendLoadout();
+          break;
+        case "refill":
+          this.refillFromLoadout();
+          break;
+        case "chosen":
+          this.onLoadout?.(this.pendingLoadout);
+          break;
+        case "stealth":
+          this.inv.setStealthOwned(effect.owned);
+          break;
+      }
     }
-    if (pending.secondary === null ? this.secondaries.length > 0 : !this.secondaries.includes(pending.secondary)) {
-      pending.secondary = this.secondaries[0] ?? null;
-    }
-    if (!this.supports.includes(pending.support)) pending.support = this.supports[0] ?? pending.support;
-    // STEALTH は攻める側だけが持つ
-    pending.stealth = side === "attack";
-    // **いま持っている物にも反映する。** 側が分かる前に湧いていると入らないまま (待機中は湧き直さない)
-    this.loadout.stealth = pending.stealth;
-    this.inv.setStealthOwned(pending.stealth);
   }
 
   setLoadout(primary: WeaponId | null): void {
-    this.pendingLoadout.primary = primary;
-    this.sendLoadout();
-    this.applyLoadoutNow();
-    this.onLoadout?.(this.pendingLoadout);
+    this.performLoadout(chooseLoadout(this.choice, "primary", primary, this.canChooseLoadout));
   }
 
   /**
@@ -3803,11 +3732,7 @@ export class Game {
   }
 
   setSecondary(secondary: WeaponId): void {
-    if (this.secondary === null) return;
-    this.pendingLoadout.secondary = secondary;
-    this.sendLoadout();
-    this.applyLoadoutNow();
-    this.onLoadout?.(this.pendingLoadout);
+    this.performLoadout(chooseLoadout(this.choice, "secondary", secondary, this.canChooseLoadout));
   }
 
   /**
@@ -3835,10 +3760,7 @@ export class Game {
    * 伝えないと弾倉を選んでも手榴弾が配られる。
    */
   setSupport(support: SupportId): void {
-    this.pendingLoadout.support = support;
-    this.sendLoadout();
-    this.applyLoadoutNow();
-    this.onLoadout?.(this.pendingLoadout);
+    this.performLoadout(chooseLoadout(this.choice, "support", support, this.canChooseLoadout));
   }
 
   /**
@@ -3882,7 +3804,7 @@ export class Game {
    */
   private respawnSelf(): void {
     // 湧くときに装備が確定する。試合中に組み替えても、ここまで反映されない
-    this.loadout = { ...this.pendingLoadout };
+    spawnLoadout(this.choice);
 
     if (this.loadout.primary) void this.player.equip(this.loadout.primary);
     this.player.respawn();
