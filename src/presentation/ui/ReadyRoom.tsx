@@ -96,7 +96,7 @@ export default function ReadyRoom(props: {
           <span class="loadout-title">STAND BY</span>
           <span class="loadout-note">開始まで 残り {props.left} 秒</span>
           <button class="readyroom-rules" onClick={() => props.onRules()}>
-            ルール
+            RULES
           </button>
         </header>
 

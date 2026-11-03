@@ -5,7 +5,7 @@
  *     ?skill=knifeMastery   詳しく出す技 (パッドで指している扱い)
  *     ?ready                自分が READY 済み
  *     ?hold=0.5             長押しの途中
- *     ?brief=TDM&room=delta&at=1   ルールの説明を上に重ねる (ui/Briefing.tsx)
+ *     ?brief=TDM&room=delta  ルールの説明を上に重ねる (&lang=en で英語) (ui/Briefing.tsx)
  */
 import { render } from 'solid-js/web'
 import ReadyRoom from '../../src/presentation/ui/ReadyRoom'
@@ -67,8 +67,8 @@ render(
 
 const brief = query.get('brief')
 if (brief) {
-  const pages = briefingOf(brief as never, { room: (query.get('room') ?? 'bravo') as never, tickets: 20 })
+  const briefing = briefingOf(brief as never, { room: (query.get('room') ?? 'bravo') as never, tickets: 20 })
   const host = document.body.appendChild(document.createElement('div'))
   Object.assign(host.style, { position: 'fixed', inset: '0' })
-  render(() => <Briefing pages={pages} at={Number(query.get('at') ?? '0')} left={42} onNext={() => {}} />, host)
+  if (briefing) render(() => <Briefing briefing={briefing} left={42} onClose={() => {}} />, host)
 }

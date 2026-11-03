@@ -50,11 +50,6 @@
   gap: 16px;
 }
 
-.briefing-count {
-  color: rgba(180, 200, 165, 0.7);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 
 .briefing-ok {
   min-width: 180px;

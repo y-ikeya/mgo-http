@@ -373,10 +373,9 @@ export default function Play(props: {
       <Show when={stats()?.loadoutOpen && stats()?.match?.phase === 'ready' && stats()?.briefing}>
         {(briefing) => (
           <Briefing
-            pages={briefing().pages}
-            at={briefing().at}
+            briefing={briefing()}
             left={stats()?.loadoutLeft ?? 0}
-            onNext={() => game()?.nextBriefing()}
+            onClose={() => game()?.closeBriefing()}
           />
         )}
       </Show>

@@ -106,7 +106,7 @@ import {
   type RoomName,
   type Side,
 } from "../../domain/match/room";
-import { briefingOf, type BriefingPage } from "../../domain/match/briefing";
+import { briefingOf, type Briefing } from "../../domain/match/briefing";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunCaster, setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
@@ -275,7 +275,7 @@ export interface GameStats {
   /** READY の長押しの進み (0〜1)。鍵盤とパッドで押している分 */
   readyHold: number;
   /** 試合の前のルールの説明。開いていなければ null (domain/match/briefing.ts) */
-  briefing: { pages: BriefingPage[]; at: number } | null;
+  briefing: Briefing | null;
   /** 装備の画面が自動で閉じるまで (秒) */
   loadoutLeft: number;
   /** OK が効くようになるまで (秒)。0 なら押せる */
@@ -3496,17 +3496,18 @@ export class Game {
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
     /*
-     * ルールの説明が開いている間は、Enter / × で次の枚へ。左右でもめくれる。
-     * スキルも READY も触らせない — 説明を閉じた押下は、離すまで READY の長押しに数えない
+     * ルールの説明が開いている間は、Enter / × で閉じる。スキルも READY も触らせない —
+     * 閉じた押下は、離すまで READY の長押しに数えない
      */
-    if (this.briefing.length) {
-      if (this.input.tapped("spawn") || this.input.tapped("menuRight")) {
-        this.nextBriefing();
-        if (!this.briefing.length) this.readyReleaseWait = true;
+    if (this.briefing) {
+      if (this.input.tapped("spawn")) {
+        this.closeBriefing();
+        this.readyReleaseWait = true;
       }
-      if (this.input.tapped("menuLeft")) this.previousBriefing();
       this.input.tapped("menuUp");
       this.input.tapped("menuDown");
+      this.input.tapped("menuLeft");
+      this.input.tapped("menuRight");
       return;
     }
     /*
@@ -3847,32 +3848,18 @@ export class Game {
   private briefedMode: Mode | null = null;
   /** 説明に差し込む残機 (支度に入った時の match の blue) */
   private briefTickets = 0;
-  /** 出している説明。空なら閉じている */
-  private briefing: BriefingPage[] = [];
-  /** いま何枚目か */
-  private briefingAt = 0;
+  /** 出している説明。null なら閉じている */
+  private briefing: Briefing | null = null;
 
-  /** 説明を頭から開く。待合室のルールのボタンからも */
+  /** 説明を開く。待合室のルールのボタンからも */
   openBriefing(): void {
     const mode = this.replica.match?.mode ?? this.briefedMode;
     if (!this.roomName || !mode) return;
     this.briefing = briefingOf(mode, { room: this.roomName, tickets: this.briefTickets });
-    this.briefingAt = 0;
   }
 
-  /** 次の枚へ。最後の枚なら閉じる */
-  nextBriefing(): void {
-    if (this.briefingAt + 1 < this.briefing.length) {
-      this.briefingAt += 1;
-    } else {
-      this.briefing = [];
-      this.briefingAt = 0;
-    }
-  }
-
-  /** 前の枚へ */
-  private previousBriefing(): void {
-    if (this.briefingAt > 0) this.briefingAt -= 1;
+  closeBriefing(): void {
+    this.briefing = null;
   }
 
   setReady(ready: boolean): void {
@@ -6201,7 +6188,7 @@ export class Game {
       menuOpen: this.menuOpen,
       loadoutOpen: this.loadoutBlocking,
       readyHold: this.readyHoldRatio,
-      briefing: this.briefing.length ? { pages: this.briefing, at: this.briefingAt } : null,
+      briefing: this.briefing,
       /*
        * 残り秒。**支度の段階では試合が始まるまでを出す。**
        *
