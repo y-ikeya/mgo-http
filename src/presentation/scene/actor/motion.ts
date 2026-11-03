@@ -494,6 +494,14 @@ export function resolveLocomotion(input: StanceInput): Locomotion {
   if (!input.onGround && input.airborneFor >= AIR_MOTION_DELAY && input.velocityY > 0) {
     return 'jump_up'
   }
+  /*
+   * **足を動かしていないまま落ちている間は滞空の型** (jump_loop)。走って段から落ちるのは上の通り
+   * 走りのまま。柵を跳び越えた先へ落ちる・縁から手を離すのは舵が効かない (スティックが 0) ので、
+   * 移動の型だと**棒立ちのまま落ちていた** (2026-11-03 本人「棒立ちで落下してるの違和感」)
+   */
+  if (!input.onGround && input.airborneFor >= AIR_MOTION_DELAY && !hasDirection(input)) {
+    return 'jump_loop'
+  }
   // 階段の間は専用の型。**坂は含まない** (段差が無いので走りで足りる)
   if (input.stairFor > 0) return input.stairDown ? 'down_stair' : 'up_stair'
   // 削られる高さから落ちた着地は受け身。ただの着地より長く、転がり切るまで続く
