@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { Client, startServer, type Server } from './server'
+import { Client, spawnAlive, startServer, waitFor, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { STAGES } from '../src/domain/stage'
 import { ROOMS } from '../src/domain/match/room'
 import { stunChargeSeconds } from '../src/domain/player/skill'
+import { SLEEP_KNEEL_SECONDS } from '../src/domain/player/stance'
 
 /**
  * スタンナイフ。**眠らせる刺突は 1 回で眠る。充電が満ちるまで次は効かない。**
@@ -34,9 +35,8 @@ test('眠らせる刺突は 1 回で眠り、充電が満ちるまで次は効�
   const me = new Client(server, 'stun1', [FIRST!.x, 0, FIRST!.z + 1], 'golf')
   await me.ready()
   me.live()
-  await Bun.sleep(3400)
-  me.send({ type: 'spawn' })
-  await Bun.sleep(3600)
+  await spawnAlive(me)
+  await waitFor(() => me.last.has('roster') && targets(me).length >= 2, '的が名簿に揃う')
   const [first, second] = targets(me)
 
   stab(me, first!, true)
@@ -62,14 +62,20 @@ test('眠っている的は、しゃがんで見下ろさないと刺せない',
   const me = new Client(server, 'stun2', [SECOND!.x, 0, SECOND!.z + 1], 'golf')
   await me.ready()
   me.live()
-  await Bun.sleep(3400)
-  me.send({ type: 'spawn' })
-  await Bun.sleep(3600)
+  await spawnAlive(me)
+  await waitFor(() => me.last.has('roster') && targets(me).length >= 2, '的が名簿に揃う')
   const target = targets(me)[1]!
   // 先の試験が眠らせていなければ眠らせる (起きるのは 30 秒後)
   stab(me, target, true)
   await Bun.sleep(400)
   expect(me.poses.get(target.slot)?.locomotion).toBe('sleep')
+  /*
+   * **倒れ切るまで待つ。** 眠った直後はまだ立った/屈んだ高さとして扱われ
+   * (stance.ts の stanceAt、SLEEP_KNEEL_SECONDS まで)、その間は真っ直ぐ
+   * 前の刺突も届いてしまう — 「届かない」を見るのは倒れ切ってから。
+   * 前は開始手順の眠り (7 秒) が偶然これを兼ねていた
+   */
+  await Bun.sleep(SLEEP_KNEEL_SECONDS * 1000 + 400)
 
   // 真っ直ぐ前を見たまま殺す刺突。寝ている体には届かない
   me.pitch = 0

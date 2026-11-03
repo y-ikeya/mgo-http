@@ -94,7 +94,7 @@ import { STAGES, inWater, waterOf } from '../src/domain/stage'
 import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { MAX_STAMINA, PAT_RANGE, isAsleep, pat, recoverStamina, struggle } from '../src/domain/player/stamina'
-import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, downSeconds, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
+import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, SPAWN_PROTECT, downSeconds, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
 import type { ClientMessage, RoomSummary, ServerMessage } from '../src/application/protocol/types'
 import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
 
@@ -112,6 +112,22 @@ import { chooseLoadout, chooseSkills } from '../src/domain/player/equip'
 const PORT = Number(process.env.PORT ?? 8787)
 /** 手元だけの部屋 (domain/match/room.ts の local) を開くか。package.json の server だけが立てる */
 const LOCAL_ROOMS = process.env.MGO2_LOCAL_ROOMS === '1'
+/**
+ * 支度の床 (ms)。**試験だけ 0 にする** (MGO2_CHOOSE_FLOOR_MS)。
+ *
+ * 床そのものは遊びの数字 (CHOOSE_FLOOR) で、既定はそちらから取る。試験が
+ * 1 件ごとに 3 秒待つと開始手順だけで統合試験が膨らむので、ASSEMBLE_MS と
+ * 同じ形で試験のときだけ外す。床が実際に効くことは、長さを戻した試験
+ * (test/spawntiming) が見る
+ */
+const CHOOSE_FLOOR_MS = process.env.MGO2_CHOOSE_FLOOR_MS !== undefined ? Number(process.env.MGO2_CHOOSE_FLOOR_MS) : CHOOSE_FLOOR * 1000
+/**
+ * 湧き無敵の長さ (秒)。**試験だけ 0 にする** (MGO2_SPAWN_PROTECT_MS)。
+ *
+ * 既定は domain の SPAWN_PROTECT。advanceLife が回す側から受け取る形
+ * (down と同じ) なので、ここで ms から秒へ直して渡す
+ */
+const SPAWN_PROTECT_SECONDS = process.env.MGO2_SPAWN_PROTECT_MS !== undefined ? Number(process.env.MGO2_SPAWN_PROTECT_MS) / 1000 : SPAWN_PROTECT
 
 /**
  * サーバーの刻み (ms)。64Hz。
@@ -248,7 +264,7 @@ setInterval(() => {
          */
         // 復活の回数を使い切った人は倒れたまま (TSNE の lives)
         // 倒れたままの時間は、倒されるたびに延びる部屋がある (CAP。lifecycle.ts の downSeconds)
-        const effect = advanceLife(player.life, lifeElapsed(player, now), canRespawn(player, livesOf(room.name)), downSeconds(player.deaths, room.mode.downGrows))
+        const effect = advanceLife(player.life, lifeElapsed(player, now), canRespawn(player, livesOf(room.name)), downSeconds(player.deaths, room.mode.downGrows), SPAWN_PROTECT_SECONDS)
         if (effect?.kind === 'life') setLife(room, player, effect.to, now)
         else if (effect?.kind === 'spawn' && !holdsChoosing(room.phase)) spawn(room, player, now)
 
@@ -638,7 +654,7 @@ function handleMessage(
     // 湧いて装備画面が消えていた。ただし早く選んだぶん早く戻れる、には
     // しない (CHOOSE_FLOOR)。選ぶのが速いことは腕前ではない
     case 'spawn':
-      if (canChoose(player.life) && lifeElapsed(player, Date.now()) >= CHOOSE_FLOOR * 1000) {
+      if (canChoose(player.life) && lifeElapsed(player, Date.now()) >= CHOOSE_FLOOR_MS) {
         spawn(room, player)
       }
       break

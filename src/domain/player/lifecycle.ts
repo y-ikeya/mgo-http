@@ -252,8 +252,12 @@ type LifeEffect =
  * @param elapsed その状態に入ってから経った時間 (ms)
  * @param respawns まだ復活できるか (domain/match/sides.ts の canRespawn)
  * @param down 倒れたままでいる秒数 (downSeconds)。省けば DOWN_DURATION
+ * @param protect 湧いてから撃たれるようになるまで (秒)。省けば SPAWN_PROTECT。
+ *   down と同じく**回す側が渡す**形にしてある — 統合試験が無敵の明けを
+ *   待たずに済むよう、サーバーが試験のときだけ 0 を渡す。長さそのものは
+ *   ここの既定値で確かめる (lifecycle.test.ts)
  */
-export function advanceLife(life: Life, elapsed: number, respawns = true, down = DOWN_DURATION): LifeEffect | null {
+export function advanceLife(life: Life, elapsed: number, respawns = true, down = DOWN_DURATION, protect = SPAWN_PROTECT): LifeEffect | null {
   switch (life) {
     // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る。
     // **復活できない人は倒れたまま** (TSNE の lives)。試合が終わるまでその場でカメラだけ回せる
@@ -264,7 +268,7 @@ export function advanceLife(life: Life, elapsed: number, respawns = true, down =
     case 'choosing':
       return elapsed >= CHOOSE_TIMEOUT * 1000 ? { kind: 'spawn' } : null
     case 'spawning':
-      return elapsed >= SPAWN_PROTECT * 1000 ? { kind: 'life', to: 'alive' } : null
+      return elapsed >= protect * 1000 ? { kind: 'life', to: 'alive' } : null
     default:
       return null
   }

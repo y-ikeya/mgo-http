@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { Client, spot, startServer, type Server } from './server'
+import { beginMatch, Client, spawnAlive, spot, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { STAGES } from '../src/domain/stage'
 
@@ -37,16 +37,9 @@ async function twoInTsne(): Promise<{ a: Client; b: Client }> {
   const b = await new Client(server, 'bob', spot(0, 6), 'charlie').ready()
   a.live()
   b.live()
-  await Bun.sleep(400)
-  a.send({ type: 'ready', ready: true })
-  b.send({ type: 'ready', ready: true })
-  await Bun.sleep(3400)
-  // 守る側は殺傷の銃を選ぶ (名乗る銃と揃える)
+  // 守る側は殺傷の銃を選ぶ (名乗る銃と揃える)。**湧く前に選ぶ**
   b.send({ type: 'loadout', primary: 'rifle', support: 'grenade' })
-  await Bun.sleep(200)
-  a.send({ type: 'spawn' })
-  b.send({ type: 'spawn' })
-  await Bun.sleep(3600)
+  await beginMatch(a, b)
   return { a, b }
 }
 
@@ -72,6 +65,12 @@ describe('TSNE', () => {
 
   test('**守る側の攻撃が当たると CAUTION。両方の画面に同じ切れる時刻が届く**', async () => {
     const { a, b } = await twoInTsne()
+    /*
+     * 前の試験が出した CAUTION (5 秒) が残っていることがある。開始手順が
+     * 実時間で待っていた頃は、その間に切れていた — 「出ていない」を見る
+     * 前に、切れるまで待つ
+     */
+    expect(await until(() => match(a)?.cautionUntil === undefined, 10_000)).toBe(true)
     expect(match(a)?.cautionUntil).toBeUndefined()
     b.send({ type: 'damage', id: 'bob', target: 'alice', kind: 'bullet', zone: 'BODY', distance: 12 })
     await Bun.sleep(400)
@@ -96,19 +95,20 @@ describe('TSNE', () => {
     // まず合間 (ROUND 1 OVER)。このラウンドは守る側 (赤) の勝ち
     expect(match(a)?.phase).toBe('break')
     expect(match(a)?.winner).toBe('red')
-    await Bun.sleep(4200)
-    // 支度 (ready) を通らずに秒読みへ。攻守が入れ替わり、試合の札は同じ
-    expect(match(a)?.phase).toBe('countdown')
-    expect(match(a)?.round).toBe(2)
+    /*
+     * 支度 (ready) を通らずに次のラウンドへ。攻守が入れ替わり、試合の札は同じ。
+     *
+     * 試験では秒読みが 0 なので、countdown の段階は一瞬で過ぎる。ここで
+     * 見るのは**ready を押さずに round 2 が始まる**ことで、段階の名前では
+     * ない (秒読みの長さは test/matchstart が戻して見る)
+     */
+    expect(await until(() => match(a)?.round === 2 && match(a)?.phase === 'playing', 10_000)).toBe(true)
     expect(match(a)?.attack).toBe('red')
     expect(match(a)?.roundWins).toEqual({ blue: 0, red: 1 })
     expect(match(a)?.matchId).toBe(id)
     // 後攻: alice は守る側。殺傷の銃を選んで出る
     a.send({ type: 'loadout', primary: 'rifle', support: 'grenade' })
-    await Bun.sleep(5200)
-    a.send({ type: 'spawn' })
-    b.send({ type: 'spawn' })
-    await Bun.sleep(3600)
+    await spawnAlive(a, b)
     expect(match(a)?.phase).toBe('playing')
     for (let i = 0; i < 6 && match(a)?.phase === 'playing'; i++) {
       a.send({ type: 'damage', id: 'alice', target: 'bob', kind: 'bullet', zone: 'HEAD', distance: 12 })

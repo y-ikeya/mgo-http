@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { Client, spot, startServer, type Server } from './server'
+import { beginMatch, Client, spot, startServer, type Server } from './server'
 import { DEPLOY_SECONDS } from '../src/domain/item/decoy'
 import type { Skills } from '../src/domain/player/skill'
 
@@ -32,13 +32,7 @@ async function twoWithSkills(
   b.send({ type: 'loadout', primary: 'rifle', support })
   if (skills.a) a.send({ type: 'skills', skills: skills.a })
   if (skills.b) b.send({ type: 'skills', skills: skills.b })
-  await Bun.sleep(400)
-  a.send({ type: 'ready', ready: true })
-  b.send({ type: 'ready', ready: true })
-  await Bun.sleep(3400)
-  a.send({ type: 'spawn' })
-  b.send({ type: 'spawn' })
-  await Bun.sleep(3600)
+  await beginMatch(a, b)
   a.reset()
   b.reset()
   return { a, b }

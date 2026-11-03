@@ -14,7 +14,8 @@ afterEach(() => {
 })
 
 test('始まっても選んでいる人は出さず、OK を押した人から出る', async () => {
-  server = await startServer()
+  // 秒読みの長さそのものを見るので、ここだけ試験の既定 (0) から本物の 5 秒へ戻す
+  server = await startServer({ MGO2_COUNTDOWN_MS: '5000' })
   const a = await new Client(server, 'ms-a', spot(0, -6)).ready()
   const b = await new Client(server, 'ms-b', spot(0, 6)).ready()
   a.live()

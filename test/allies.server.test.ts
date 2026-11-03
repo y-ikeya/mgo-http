@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { Client, startServer, type Server } from './server'
+import { Client, spawnAlive, startServer, waitFor, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
@@ -19,10 +19,15 @@ test('**青の味方が 3 人立ち、1 人は敬礼したまま。** 撃って�
   await me.ready()
   me.live()
   me.send({ type: 'loadout', primary: 'rifle', secondary: 'm9', support: 'grenade' })
-  await Bun.sleep(3400)
   me.claimedWeapon = 'rifle'
-  me.send({ type: 'spawn' })
-  await Bun.sleep(800)
+  // 支度の床が明けて湧き、味方の的が名簿と姿で揃うまで (固定の眠りの代わり)
+  await spawnAlive(me)
+  await waitFor(() => {
+    const r = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }> | undefined
+    if (!r) return false
+    const standing = r.players.filter((p) => p.id.startsWith('target-') && p.name.startsWith('ALLY'))
+    return standing.length === 3 && standing.every((p) => me.poses.has(p.slot!))
+  }, '味方の的が立つ')
   const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
   const allies = roster.players.filter((p) => p.id.startsWith('target-') && p.name.startsWith('ALLY'))
   expect(allies.length).toBe(3)

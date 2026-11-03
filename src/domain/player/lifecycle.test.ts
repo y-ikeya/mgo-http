@@ -40,6 +40,11 @@ describe('時間で進む遷移', () => {
     expect(at('spawning', SPAWN_PROTECT)).toEqual({ kind: 'life', to: 'alive' })
   })
 
+  test('**無敵の長さは回す側が渡せる。** 統合試験が 0 で回すための口 (down と同じ形)', () => {
+    expect(advanceLife('spawning', 0, true, DOWN_DURATION, 0)).toEqual({ kind: 'life', to: 'alive' })
+    expect(advanceLife('spawning', 500, true, DOWN_DURATION, 1)).toBeNull()
+  })
+
   /**
    * **時計では動かない状態がある。**
    *

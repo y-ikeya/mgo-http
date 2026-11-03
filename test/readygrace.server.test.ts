@@ -4,6 +4,8 @@ import { Client, spot, startServer, type Server } from './server'
 /**
  * **全員の READY が揃っても少し待つ。** その間に誰かが取り消せば支度へ戻る
  * (server/match.ts の READY_GRACE_MS)。試験の既定は 0 なので、ここだけ長さを戻す。
+ * 秒読みも戻す — 既定 (0) のままだと、待ちが明けた瞬間に始まってしまい、
+ * 「数え始めた」段階を見られない
  */
 let server: Server | null = null
 afterEach(() => {
@@ -16,7 +18,7 @@ function lastPhase(client: Client): string | undefined {
 }
 
 test('揃ってもすぐ始まらず、取り消せば支度に戻り、また揃えば待ってから始まる', async () => {
-  server = await startServer({ MGO2_READY_GRACE_MS: '1500' })
+  server = await startServer({ MGO2_READY_GRACE_MS: '1500', MGO2_COUNTDOWN_MS: '5000' })
   const a = await new Client(server, 'rg-a', spot(0, -6)).ready()
   const b = await new Client(server, 'rg-b', spot(0, 6)).ready()
   a.live()
