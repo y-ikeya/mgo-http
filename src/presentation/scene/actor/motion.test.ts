@@ -104,12 +104,9 @@ describe('階段', () => {
     )
   })
 
-  test('**走って落ちれば移動の型のまま。** 足を動かしていない落下 (柵を越えた先・手を離した) だけ滞空の型', () => {
+  test('**落ちている間は移動の型のまま。** 滞空のループは出さない', () => {
     const falling = { ...base, onGround: false, velocityY: -6, airborneFor: 0.5 } as StanceInput
-    // スティックが 0 (舵の効かない落下)。棒立ちで落ちない (2026-11-03 本人)
-    expect(resolveLocomotion(falling)).toBe('jump_loop')
-    // 浮いた直後 (段を下りる 1 段ぶん) はまだ出さない
-    expect(resolveLocomotion({ ...falling, airborneFor: 0.1 } as StanceInput)).not.toBe('jump_loop')
+    expect(resolveLocomotion(falling)).not.toBe('jump_loop')
     // 走って落ちれば走ったまま (前へ倒していれば前進の型)
     expect(
       resolveLocomotion({ ...falling, actualSpeed: 5, dirZ: -1, yaw: 0 } as StanceInput),
