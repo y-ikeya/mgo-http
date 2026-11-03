@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { Client, spot, startServer, type Server } from './server'
+import { beginMatch, Client, spot, startServer, type Server } from './server'
 import type { Skills } from '../src/domain/player/skill'
 
 /**
@@ -32,14 +32,7 @@ async function twoWithSkills(
   b.live()
   if (skills.a) a.send({ type: 'skills', skills: skills.a })
   if (skills.b) b.send({ type: 'skills', skills: skills.b })
-  await Bun.sleep(400)
-  a.send({ type: 'ready', ready: true })
-  b.send({ type: 'ready', ready: true })
-  await Bun.sleep(3400)
-  a.send({ type: 'spawn' })
-  b.send({ type: 'spawn' })
-  // 無敵 (3 秒) が切れて alive になるまで
-  await Bun.sleep(3600)
+  await beginMatch(a, b)
   a.reset()
   b.reset()
   return { a, b }

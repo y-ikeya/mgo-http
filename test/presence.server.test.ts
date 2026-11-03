@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
-import { Client, startServer, twoPlayers, type Server, spot } from './server'
+import { beginMatch, Client, startServer, twoPlayers, type Server, spot } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
@@ -112,13 +112,7 @@ describe('繋ぎ直し', () => {
     a.live()
     b.live()
     b.send({ type: 'skills', skills: { runner: 1 } })
-    await Bun.sleep(400)
-    a.send({ type: 'ready', ready: true })
-    b.send({ type: 'ready', ready: true })
-    await Bun.sleep(3400)
-    a.send({ type: 'spawn' })
-    b.send({ type: 'spawn' })
-    await Bun.sleep(1000)
+    await beginMatch(a, b)
 
     b.close()
     await Bun.sleep(800)

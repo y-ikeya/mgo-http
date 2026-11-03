@@ -90,8 +90,13 @@ export const INTERMISSION_MS = 14.5 * 1000
  *
  * 全員を湧き地点へ戻してから始める。戻す瞬間にいきなり撃ち合いが始まると、
  * 画面が切り替わった側が一方的に不利になる。
+ *
+ * **試験だけ 0 にする** (MGO2_COUNTDOWN_MS)。ASSEMBLE_MS と同じ理由で、数えの
+ * 長さそのものは domain ではなくここの数字を見る試験 (test/matchstart) が
+ * env で戻して確かめる。試験が毎回 5 秒待つと、試合の開始手順だけで
+ * 統合試験の大半の時間が消える
  */
-export const COUNTDOWN_MS = 5 * 1000
+export const COUNTDOWN_MS = process.env.MGO2_COUNTDOWN_MS !== undefined ? Number(process.env.MGO2_COUNTDOWN_MS) : 5 * 1000
 
 /** 試合の状態を配る間隔 (ms)。残り時間の表示に要る */
 /** 刻み 1 回ぶんの秒。**index.ts の TICK_MS と揃える** */

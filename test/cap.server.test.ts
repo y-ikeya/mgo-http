@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { Client, spot, startServer, type Server } from './server'
+import { beginMatch, Client, spawnAlive, spot, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
@@ -33,14 +33,7 @@ async function twoInCap(): Promise<{ a: Client; b: Client }> {
   const b = await new Client(server, 'cap-b', spot(0, 6), 'echo').ready()
   a.live()
   b.live()
-  await Bun.sleep(400)
-  a.send({ type: 'ready', ready: true })
-  b.send({ type: 'ready', ready: true })
-  await Bun.sleep(3400)
-  await Bun.sleep(200)
-  a.send({ type: 'spawn' })
-  b.send({ type: 'spawn' })
-  await Bun.sleep(3600)
+  await beginMatch(a, b)
   return { a, b }
 }
 
@@ -61,10 +54,9 @@ describe('CAP', () => {
     await Bun.sleep(1200)
     expect({ blue: match(a)?.blue, red: match(a)?.red }).toEqual(tickets)
 
-    // 倒れたまま 5 秒 → 支度 (選び終えても 3 秒は湧けない) → 出る → 湧いて 3 秒は撃たれない
-    await Bun.sleep(4000 + 3500)
-    a.send({ type: 'spawn' })
-    await Bun.sleep(3600)
+    // 倒れたまま 5 秒 → 支度 → 出て alive に戻る (床と無敵は試験では 0。
+    // 長さそのものは domain と test/spawntiming が見る)
+    await spawnAlive(a)
 
     // 2 回目: 8 秒
     for (let i = 0; i < 6 && downs(a, 'cap-a').length < 2; i++) {

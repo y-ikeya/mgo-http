@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { Client, startServer, type Server } from './server'
+import { Client, spawnAlive, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { STAGES } from '../src/domain/stage'
 import { ROOMS } from '../src/domain/match/room'
@@ -27,11 +27,9 @@ async function shooter(id: string): Promise<Client> {
   me.live()
   // **湧く前に選ぶ。** 走っている試合では持ち替えられない (domain/player/equip.ts)
   me.send({ type: 'loadout', primary: 'rifle', secondary: 'm9', support: 'grenade' })
-  await Bun.sleep(3400)
   // **麻酔銃を持っていると名乗る。** 名乗った銃でサーバーが効き目を決める
   me.claimedWeapon = 'm9'
-  me.send({ type: 'spawn' })
-  await Bun.sleep(600)
+  await spawnAlive(me)
   return me
 }
 

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { Client, spot, startServer, type Server } from './server'
+import { beginMatch, Client, spot, startServer, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
@@ -22,14 +22,8 @@ async function twoInDM(): Promise<{ a: Client; b: Client }> {
   const b = await new Client(server, 'bob', spot(0, 6), 'alpha').ready()
   a.live()
   b.live()
-  // 支度の段階を抜ける。押さないと 60 秒待たされる (test/server.ts の twoPlayers に注)
-  await Bun.sleep(400)
-  a.send({ type: 'ready', ready: true })
-  b.send({ type: 'ready', ready: true })
-  await Bun.sleep(3400)
-  a.send({ type: 'spawn' })
-  b.send({ type: 'spawn' })
-  await Bun.sleep(3600)
+  // 支度の段階を抜ける。押さないと 60 秒待たされる (test/server.ts の beginMatch)
+  await beginMatch(a, b)
   return { a, b }
 }
 

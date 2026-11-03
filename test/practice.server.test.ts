@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { Client, startServer, type Server } from './server'
+import { Client, spawnAlive, startServer, waitFor, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { STAGES } from '../src/domain/stage'
 import { ROOMS } from '../src/domain/match/room'
@@ -58,11 +58,9 @@ describe('練習部屋', () => {
 
   test('倒すと数秒で戻ってくる', async () => {
     const shooter = await enterPractice('shooter')
-    // 支度に入ってから 3 秒 (CHOOSE_FLOOR) 待たないと湧けない。
-    // **選ぶのが速いことは腕前ではない**、という規則がここにも効く
-    await Bun.sleep(3400)
-    shooter.send({ type: 'spawn' })
-    await Bun.sleep(400)
+    // 支度の床 (CHOOSE_FLOOR) が明けてから湧く。試験では床は 0
+    // (test/server.ts)。床が効くことは test/spawntiming が戻して見る
+    await spawnAlive(shooter)
 
     // **頭に当てたと申告する。** 位置は的のすぐ手前なので、遮蔽も距離も通る
     shooter.send({
@@ -81,8 +79,11 @@ describe('練習部屋', () => {
     )
     expect(downed).toBe(true)
 
-    // 戻るまで待つ (3 秒 + 余白)
-    await Bun.sleep(3600)
+    // 戻るまで待つ (TARGET_RESPAWN 3 秒)
+    await waitFor(
+      () => shooter.messages.some((m) => m.type === 'life' && m.id === 'target-0' && m.state === 'alive'),
+      '的が戻る',
+    )
     const revived = shooter.messages.some(
       (m) => m.type === 'life' && m.id === 'target-0' && m.state === 'alive',
     )
@@ -98,15 +99,16 @@ describe('練習部屋', () => {
 describe('練習部屋で爆風', () => {
   test('手榴弾で倒しても的は戻ってくる', async () => {
     const shooter = await enterPractice('bomber')
-    await Bun.sleep(3400)
-    shooter.send({ type: 'spawn' })
-    await Bun.sleep(400)
+    await spawnAlive(shooter)
     shooter.reset()
 
     // 的の足元へ投げる。**すぐ下へ**投げれば爆風が両方に入る
     shooter.send({ type: 'grenade', dir: [0, -1, 0] })
-    // 信管 (3 秒) + 余白
-    await Bun.sleep(4000)
+    // 信管 (3 秒) が切れて、的に届くまで
+    await waitFor(
+      () => shooter.messages.some((m) => m.type === 'health' && m.id === 'target-0'),
+      '爆風が的に届く',
+    )
 
     const hurt = shooter.messages.filter(
       (m) => m.type === 'health' && m.id === 'target-0',
@@ -168,10 +170,18 @@ describe('散弾で的を突き飛ばす', () => {
     client.live()
     // **湧く前に選ぶ。** 走っている試合では持ち替えられない (domain/player/equip.ts)
     client.send({ type: 'loadout', primary: 'shotgun', support: 'grenade' })
-    await Bun.sleep(3400)
     client.claimedWeapon = 'shotgun'
-    client.send({ type: 'spawn' })
-    await Bun.sleep(600)
+    await spawnAlive(client)
+    /*
+     * **的の姿が 1 通届くまで待つ。** 撃つ前と後で姿を比べる試験なので、
+     * 届いていない所から比べると「比べる物が無い」まま落ちる。前は湧きの
+     * 眠り (3.4 + 0.6 秒) がこれを兼ねていて、速くしたら表に出た
+     */
+    await waitFor(() => {
+      const roster = client.last.get('roster') as Extract<ServerMessage, { type: 'roster' }> | undefined
+      const found = roster?.players.find((p) => p.id === MINE_ID)
+      return found?.slot !== undefined && client.poses.has(found.slot)
+    }, '的の姿が届く')
     return client
   }
 
@@ -245,9 +255,7 @@ describe('練習部屋で猫', () => {
     await me.ready()
     me.live()
     me.send({ type: 'loadout', primary: 'rifle', support: 'doll' })
-    await Bun.sleep(3400)
-    me.send({ type: 'spawn' })
-    await Bun.sleep(400)
+    await spawnAlive(me)
     me.holdDoll(true)
     me.sendState()
     await Bun.sleep(120)
@@ -277,9 +285,7 @@ describe('練習部屋でローリング', () => {
     const me = new Client(own, `roller-${index}`, [at.x, 0, at.z + 0.8], 'golf')
     await me.ready()
     me.live()
-    await Bun.sleep(3400)
-    me.send({ type: 'spawn' })
-    await Bun.sleep(600)
+    await spawnAlive(me)
     // 転がっている姿で申告する (サーバーは転がっていない人の体当たりを通さない)
     me.pose = 'roll'
     await Bun.sleep(100)
