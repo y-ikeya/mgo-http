@@ -1166,7 +1166,8 @@ export class Soldier {
       saluting: this.saluting,
       stabbing: this.stabbing,
       rolling: this.animator?.rolling ?? false,
-      vaulting: this.vaulting,
+      // 跳び越えの姿のまま落ちている間も、構える・撃つ・転がるは跳び越えと同じく塞ぐ
+      vaulting: this.vaulting || this.animator?.vaultFallHeld != null,
       hanging: this.hanging,
       onLadder: this.onLadder,
       prone: this.proneStage !== 'none',
@@ -3833,8 +3834,11 @@ export class Soldier {
     if (this.landingTimer > 0) moveDir = ZERO_MOVE
     // 手を離した / 跳び降りた落下は舵を切れない。着地したら普段へ
     if (this.steerlessFall) {
-      if (this.mover.onGround || this.onLadder || this.inWater) this.steerlessFall = false
-      else moveDir = ZERO_MOVE
+      if (this.mover.onGround || this.onLadder || this.inWater) {
+        this.steerlessFall = false
+        // 跳び越えの姿のまま落ちていたら、着いた所で普段へ
+        this.animator?.releaseVaultFall()
+      } else moveDir = ZERO_MOVE
     }
     // 傾いている間は動けない。傾きながらの移動は作らない
     if (this.lean !== 0) moveDir = ZERO_MOVE
@@ -4078,7 +4082,8 @@ export class Soldier {
         fellFromVault = true
         // 跳び降りも舵は切れない。着地までスティックを効かせない
         this.steerlessFall = true
-        this.animator?.endVault()
+        // 型は切らずに最後まで流し、その姿のまま落ちる (着地で畳む)
+        this.animator?.holdVaultFall()
         this.mover.onGround = false
         this.velocityY = 0
         // 跳んだ向きの勢いは枠から離れるぶんだけ持ち越す (VAULT_FALL_CARRY)。遠くへ飛んでいかない
@@ -4815,8 +4820,9 @@ export class Soldier {
       // 寄っている間は普段の歩き (型も歩き)
       trapped: this.trappedStage === 'none' || this.trappedStage === 'approach' ? null : this.trappedStage,
       rolling: this.rolling,
-      vaulting: this.vaulting,
-      vaultingUp: this.vaultingUp,
+      // 跳び越えの姿のまま落ちている間も、見せる姿は跳び越え (他の人の画面も同じ型のまま)
+      vaulting: this.vaulting || this.animator?.vaultFallHeld != null,
+      vaultingUp: this.vaultingUp || this.animator?.vaultFallHeld === 'vault_up',
       hanging: this.hanging,
       hangClimbing: this.hangStage === 'climb',
       hangHolding: this.hangStage === 'hang' || this.hangStage === 'drop',
