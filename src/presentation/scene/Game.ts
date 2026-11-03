@@ -105,6 +105,15 @@ import {
   type Side,
 } from "../../domain/match/room";
 import { briefingOf, type Briefing } from "../../domain/match/briefing";
+import {
+  closeBriefing as closeBriefingInput,
+  focusAt,
+  holdRatio,
+  newLoadoutInput,
+  openBriefing as openBriefingInput,
+  stepLoadoutInput,
+  type LoadoutKeys,
+} from "../../application/loadoutInput";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunCaster, setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
@@ -512,8 +521,6 @@ const AIM_SETTLE_SECONDS = 0.6;
 const MUZZLE_MIN_HEIGHT = 0.15;
 /** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
 const MUZZLE_HYSTERESIS = 1.08;
-/** READY に入るまで押し続ける時間 (秒)。画面のボタンも同じ長さ (ReadyRoom.tsx) */
-export const READY_HOLD = 0.6;
 /** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
 const FALLBACK_STAB_DURATION = 1.9;
 
@@ -3314,7 +3321,7 @@ export class Game {
    * 番号で持つのは、並ぶ物が窓によって変わるから (装備 3 つ / スキル 5 つ)。
    * 外へ出すときは名前に直す — GameStats の loadoutFocus を見よ。
    */
-  private loadoutAt = 0;
+  private readonly loadoutInput = newLoadoutInput();
 
   /**
    * いま並んでいる枠。**上から順に。**
@@ -3351,7 +3358,7 @@ export class Game {
   /** いま指している枠。窓が切り替わって番号が余ったら先頭へ戻す */
   private get loadoutFocus(): LoadoutFocus {
     const rows = this.loadoutRows;
-    return rows[Math.min(this.loadoutAt, rows.length - 1)] ?? "primary";
+    return rows[focusAt(this.loadoutInput, rows.length)] ?? "primary";
   }
 
   /**
@@ -3457,100 +3464,59 @@ export class Game {
     return !solid.clear(me.x, y, me.z, tx, y, tz);
   }
 
-  /** 長押しで READY にした押下を、まだ離していない */
-  private readyReleaseWait = false;
-
-  /** READY を押し始めた時刻 (performance.now)。0 なら押していない */
-  private readyHoldSince = 0;
-
   /** READY の長押しの進み (0〜1)。画面の READY のボタンが満ちていく */
   private get readyHoldRatio(): number {
-    if (this.readyHoldSince === 0) return 0;
-    return Math.min(1, (performance.now() - this.readyHoldSince) / (READY_HOLD * 1000));
+    return holdRatio(this.loadoutInput, performance.now());
   }
 
+  /**
+   * 支度の画面の鍵盤とパッド。**何をするかは状態機械が決める** (application/loadoutInput.ts)。
+   * ここは押下を集めて渡し、返ってきたことをする
+   */
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
-    /*
-     * ルールの説明が開いている間は、Enter / × で閉じる。スキルも READY も触らせない —
-     * 閉じた押下は、離すまで READY の長押しに数えない
-     */
-    if (this.briefing) {
-      if (this.input.tapped("spawn")) {
-        this.closeBriefing();
-        this.readyReleaseWait = true;
-      }
-      this.input.tapped("menuUp");
-      this.input.tapped("menuDown");
-      this.input.tapped("menuLeft");
-      this.input.tapped("menuRight");
-      return;
-    }
-    /*
-     * 十字キーと矢印キー。**上下で枠、左右でその中。**
-     *
-     * パッドしか無い人はここを通らないと何も選べない。数字キーは残してある —
-     * 一発で名指しできるほうが速いので、鍵盤ではそちらが本筋。
-     */
-    const rows = this.loadoutRows;
-    if (this.input.tapped("menuDown")) this.loadoutAt = (this.loadoutAt + 1) % rows.length;
-    if (this.input.tapped("menuUp")) {
-      this.loadoutAt = (this.loadoutAt + rows.length - 1) % rows.length;
-    }
-    if (this.input.tapped("menuRight")) this.stepLoadout(1);
-    if (this.input.tapped("menuLeft")) this.stepLoadout(-1);
-    /*
-     * Enter。**支度の段階では READY の切り替え、それ以外は湧く。**
-     *
-     * 同じキーに 2 つの意味を持たせているのは、押す場所が同じだから — 画面の
-     * 一番下のボタンが「READY」から「OK」に変わるだけで、位置も操作も同じ。
-     * 別のキーにすると、始まる前と後で押す指が変わる。
-     */
-    if (this.replica.match?.phase === "ready") {
-      /*
-       * **READY は長押し** (READY_HOLD)。1 押しで入っていた頃は、スキルを選んで
-       * いるつもりの × で READY になり、相手が先に押していると支度が終わった
-       * (2026-10-09 本人)。取り消しは 1 押しで — 外すのは急いでいい
-       */
-      /*
-       * 長押しで READY にした、その押下を離すまでは取り消しを読まない。
-       * 離した瞬間が 1 押しとして立ち、押し続けて離すと解除されていた
-       */
-      if (this.readyReleaseWait) {
-        if (!this.input.down("spawn")) this.readyReleaseWait = false;
-      } else if (this.selfReady) {
-        this.readyHoldSince = 0;
-        if (this.input.tapped("spawn")) this.setReady(false);
-      } else if (this.input.down("spawn")) {
-        const now = performance.now();
-        if (this.readyHoldSince === 0) this.readyHoldSince = now;
-        if (now - this.readyHoldSince >= READY_HOLD * 1000) {
-          this.readyHoldSince = 0;
-          this.readyReleaseWait = true;
-          this.setReady(true);
-        }
-      } else {
-        this.readyHoldSince = 0;
-      }
-      // 押した瞬間の立ち上がりは食っておく (長押しの途中で湧く側へ漏らさない)
-      this.input.tapped("spawn");
-    } else if (this.input.tapped("spawn")) {
-      this.requestSpawn();
-    }
-    // **番号は並び順から出す。** 主武器が 1 から、投擲はその続き。
+    // **番号は並び順から出す。** 主武器が 1 から、副武器・投擲はその続き。
     // 直に書くと、銃が 1 挺増えたときに番号が重なる (P90 を足して実際に重なった)
-    const choices = this.primaries;
-    choices.forEach((id, i) => {
-      if (this.input.slotPressed(i)) this.setLoadout(id);
+    const slots = [
+      ...this.primaries.map((id) => () => this.setLoadout(id)),
+      ...this.secondaries.map((id) => () => this.setSecondary(id)),
+      ...this.supports.map((id) => () => this.setSupport(id)),
+    ];
+    let slot: number | null = null;
+    slots.forEach((_, i) => {
+      if (this.input.slotPressed(i) && slot === null) slot = i;
     });
-    // 副武器。**主武器の続き番号。** 持たせない部屋では番号ごと詰める
-    const seconds = this.secondaries;
-    seconds.forEach((id, i) => {
-      if (this.input.slotPressed(choices.length + i)) this.setSecondary(id);
-    });
-    this.supports.forEach((id, i) => {
-      if (this.input.slotPressed(choices.length + seconds.length + i)) this.setSupport(id);
-    });
+    // 立ち上がりはどれも毎フレーム読んで食う (説明を閉じた押下などを次へ漏らさない)
+    const keys: LoadoutKeys = {
+      up: this.input.tapped("menuUp"),
+      down: this.input.tapped("menuDown"),
+      left: this.input.tapped("menuLeft"),
+      right: this.input.tapped("menuRight"),
+      confirm: this.input.tapped("spawn"),
+      confirmHeld: this.input.down("spawn"),
+      slot,
+    };
+    const scene = {
+      ready: this.replica.match?.phase === "ready",
+      rows: this.loadoutRows.length,
+      selfReady: this.selfReady,
+    };
+    for (const effect of stepLoadoutInput(this.loadoutInput, keys, scene, performance.now())) {
+      switch (effect.kind) {
+        case "step":
+          this.stepLoadout(effect.step);
+          break;
+        case "ready":
+          this.setReady(effect.ready);
+          break;
+        case "spawn":
+          this.requestSpawn();
+          break;
+        case "slot":
+          slots[effect.index]?.();
+          break;
+      }
+    }
   }
 
   /**
@@ -3823,18 +3789,21 @@ export class Game {
   }
   /** 最後に出した説明の中身 (モード・残機・ステージ)。待合室のボタンで開き直す時に使う */
   private lastBrief: Extract<MatchEffect, { kind: "brief" }> | null = null;
-  /** 出している説明。null なら閉じている */
-  private briefing: Briefing | null = null;
+  /** 出している説明。閉じていれば null。開いているかは支度の入力が持つ (loadoutInput.briefing) */
+  private get briefing(): Briefing | null {
+    if (!this.loadoutInput.briefing || !this.roomName || !this.lastBrief) return null;
+    const { mode, tickets, stage } = this.lastBrief;
+    return briefingOf(mode, { room: this.roomName, tickets, stage });
+  }
 
   /** 説明を開く。待合室のルールのボタンからも */
   openBriefing(): void {
-    if (!this.roomName || !this.lastBrief) return;
-    const { mode, tickets, stage } = this.lastBrief;
-    this.briefing = briefingOf(mode, { room: this.roomName, tickets, stage });
+    if (this.lastBrief) openBriefingInput(this.loadoutInput);
   }
 
+  /** 説明を閉じる (画面の OK)。押したままの押下は READY の長押しに数えない */
   closeBriefing(): void {
-    this.briefing = null;
+    closeBriefingInput(this.loadoutInput);
   }
 
   setReady(ready: boolean): void {
