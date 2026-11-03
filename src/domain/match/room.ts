@@ -207,7 +207,12 @@ interface RoomSpec {
    * (カメラだけ回せる)。様子を見て 1・2・3 と変える (2026-10-17 本人)。
    */
   lives?: number
+  /** **1 試合の長さ (分)。** 省けば MATCH_MINUTES */
+  minutes?: number
 }
+
+/** 1 試合の長さ (分) の既定。TSNE は 1 ラウンドがこれ */
+export const MATCH_MINUTES = 5
 
 /**
  * TSNE の持ち込み。**殺すか眠らせるかで側が分かれる。**
@@ -250,6 +255,8 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
      */
     primaries: ['sniper', 'mosin'],
     secondary: null,
+    // 10 分 (2026-11-03 本人「制限時間を10minとかに変えてくれない？」)
+    minutes: 10,
   },
   // CAP は UU で (2026-10-26 本人「一旦ステージは UU だけでいい」)。練習部屋だった所を譲った (練習は golf へ)
   echo: { mode: 'CAP', stages: only('uu') },
@@ -297,6 +304,11 @@ export function secondariesOf(room: RoomName, side: Side | null = null): readonl
 export function supportsOf(room: RoomName, side: Side | null = null): readonly SupportId[] {
   const armory = side ? ROOMS[room].armory?.[side] : undefined
   return armory?.supports ?? SUPPORTS
+}
+
+/** その部屋の 1 試合の長さ (ms) */
+export function matchMsOf(room: RoomName): number {
+  return (ROOMS[room].minutes ?? MATCH_MINUTES) * 60 * 1000
 }
 
 /** 1 人が復活できる回数。**null は何度でも** */

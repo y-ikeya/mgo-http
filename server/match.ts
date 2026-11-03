@@ -18,7 +18,7 @@ import {
   shuffleTeams,
   soleTeam,
 } from '../src/domain/match/match'
-import { livesOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
+import { livesOf, matchMsOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
 import { clearTsneTarget, placeTsneTarget, updateTsneTarget } from './target'
 import { captureView, placeCapture, updateCapture } from './capture'
 import { captureWinner } from '../src/domain/match/capture'
@@ -43,9 +43,6 @@ import { sessionFor, sessionOf, sessions } from './session'
 import { closeMatch, recordPlayer } from './stats'
 import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, rotateStage, setLife } from './world'
 import { forgetPoses, recordPose } from './history'
-
-/** 1 試合の長さ (ms) */
-export const MATCH_DURATION_MS = 5 * 60 * 1000
 
 /**
  * 陣営ごとの残機。TDM の勝敗はこれの削り合いで決まる。
@@ -875,7 +872,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
     startNextRound(room, now)
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
-    room.endsAt = now + MATCH_DURATION_MS
+    room.endsAt = now + matchMsOf(room.name)
     // ターゲットを守る側の陣地の近くに置く (TSNE。server/target.ts)。CAP は取り合う所に置いて、カウントを 60 秒ずつに
     placeTsneTarget(room)
     placeCapture(room, now)
