@@ -130,7 +130,7 @@ describe('背中のすぐ後ろの薄い壁', () => {
 
   for (const front of [0.3, 0.45, 0.6]) {
     test(`壁が背中から ${front}m でも、カメラは壁の手前に居る`, () => {
-      const follow = new FollowCamera()
+      const follow = new FollowCamera(1)
       const world = wallWorld(front)
       for (let i = 0; i < 300; i++) follow.update(1 / 60, player, world as never)
       expect(follow.camera.position.z).toBeLessThan(front)
