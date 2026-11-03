@@ -1655,6 +1655,8 @@ export class CharacterAnimator {
      * ことが多いので、そこで必ず出ていた。
      */
     if (this.upperState === 'death') return
+    // 跳び越えの姿のまま落ちている。型が終わっても最後の姿で留める (releaseVaultFall まで)
+    if (this.vaultFallHeld && finished === this.upper.get(this.vaultFallHeld === 'vault' ? VAULT_KEY : VAULT_UP_KEY)) return
 
     /*
      * **いま上半身を動かしている物が終わったときだけ畳む。**
@@ -2900,6 +2902,8 @@ export class CharacterAnimator {
    * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
    */
   private resolveLowerKey(): string {
+    // 跳び越えの姿のまま落ちている (holdVaultFall)。脚も型の最後の姿で留める
+    if (this.vaultFallHeld && this.lower.has(this.vaultFallHeld)) return this.vaultFallHeld
     if (this.hooking) return CQC_HOOK_KEY
     // しゃがんだ合図は**上半身だけ**。型の脚は膝を突き直して動きすぎた (本人 2026-10-31「足が動きすぎ」)
     if (this.locomotion === 'crouch_salute' && this.lower.has('crouch_idle')) return 'crouch_idle'
@@ -3660,6 +3664,31 @@ export class CharacterAnimator {
     if (this.upperState === 'vault' || this.upperState === 'vault_up') this.upperState = 'stance'
   }
 
+  /**
+   * 跳び越えた先へ落ちる間、**跳び越えの型を最後まで流してその姿のまま落ちる** (2026-11-03 本人
+   * 「飛び越えた時の最後の pose のまま落ちればいい」)。型を切って普段の姿に戻すと棒立ちで落ち、
+   * 滞空の型 (jump_loop) は脚が気持ち悪かった。
+   *
+   * 姿は跳び越えのままだが、**動きの縛り (vaulting) は解く** — 上下を止める・型の移動を辿るのは
+   * 跳んでいる間だけで、落ちる間は重力で落ちる。着地 (releaseVaultFall) で普段へ戻す
+   */
+  holdVaultFall(): void {
+    if (this.upperState === 'vault' || this.upperState === 'vault_up') this.vaultFallHold = this.upperState
+  }
+
+  /** 落ち切った。跳び越えの姿を畳む */
+  releaseVaultFall(): void {
+    if (!this.vaultFallHold) return
+    if (this.upperState === this.vaultFallHold) this.upperState = 'stance'
+    this.vaultFallHold = null
+  }
+
+  /** 跳び越えの姿のまま落ちている最中か (どちらの型か)。落ちていなければ null */
+  get vaultFallHeld(): 'vault' | 'vault_up' | null {
+    return this.vaultFallHold && this.upperState === this.vaultFallHold ? this.vaultFallHold : null
+  }
+  private vaultFallHold: 'vault' | 'vault_up' | null = null
+
   /** 上半身が普段の状態か (一度きりの全身の型・刺突・投げなどを流していない) */
   get upperFree(): boolean {
     return this.upperState === 'stance'
@@ -3667,7 +3696,7 @@ export class CharacterAnimator {
 
   /** 跳び越え (越える / 乗る) の最中か。型が終わるまで操作は効かない */
   get vaulting(): boolean {
-    return this.upperState === 'vault' || this.upperState === 'vault_up'
+    return (this.upperState === 'vault' || this.upperState === 'vault_up') && this.vaultFallHeld === null
   }
 
   /** 一段上へ乗る跳び越えの最中か */

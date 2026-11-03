@@ -17,7 +17,7 @@ PAGES_PROJECT := mgohttp
 
 SSH := ssh -i $(SERVER_KEY) $(SERVER_USER)@$(SERVER_HOST)
 
-.PHONY: help dev serve serve-alt build test check docs deploy deploy-web deploy-server setup-server push-env logs status ssh restart
+.PHONY: help dev serve serve-alt build test check docs deploy deploy-web deploy-server setup-server push-env logs status health ssh restart
 
 help:
 	@echo '手元で動かす'
@@ -40,6 +40,7 @@ help:
 	@echo ''
 	@echo '様子を見る'
 	@echo '  make status         本番が生きているか'
+	@echo '  make health         本番の部屋の詳しい様子 (箱の上で直に聞く。外の /health は数だけ)'
 	@echo '  make logs           サーバーのログ (末尾 50 行)'
 	@echo '  make ssh            サーバーに入る'
 	@echo '  make restart        サーバーを再起動'
@@ -169,6 +170,11 @@ status:
 	@printf 'クライアント '; curl -s -m 10 -o /dev/null -w '%{http_code}\n' https://mgohttp.pepaga.me/
 	@printf '常駐       '; $(SSH) 'systemctl is-active mgohttp'
 	@printf 'コミット   '; $(SSH) 'cd $(SERVER_DIR) && git log --oneline -1'
+
+# 部屋の中の詳しい様子 (名前・位置・誰が誰を見ているか)。**外の /health は数だけ** —
+# 詳しい行は Caddy を通らない手元からだけ返すので、箱の上で直に聞く (server/index.ts の healthDetailAllowed)
+health:
+	$(SSH) 'curl -s -m 10 http://localhost:8787/health'
 
 logs:
 	$(SSH) 'sudo journalctl -u mgohttp -n 50 --no-pager'

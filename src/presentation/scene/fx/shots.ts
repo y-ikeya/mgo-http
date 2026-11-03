@@ -695,15 +695,37 @@ export class Shots {
     this.muzzle(from, this.muzzleDir.subVectors(to, from))
 
     if (!normal) return
+    this.hole(to, normal, 1, impactColor, surface, true)
+  }
 
+  /**
+   * 弾痕を 1 つ。**曳光は引かない。**
+   *
+   * 散弾は粒ごとに小さな痕を残す (2026-11-03 本人「shotgun があたった弾痕は複数の小さな点」)。
+   * 曳光は 1 発に 1 本 (fire)、痕は当たった粒の数だけここで足す。煙・火花は 1 発に 1 回で足りる
+   * (粒ごとに出すと 8 つ重なって白く膨らむ)
+   *
+   * @param scale 痕の大きさ (IMPACT_RADIUS に掛ける)
+   * @param effects 煙・火花も出すか
+   */
+  hole(
+    to: THREE.Vector3,
+    normal: THREE.Vector3,
+    scale: number,
+    impactColor = 0xffd9a0,
+    surface?: Surface,
+    effects = false,
+  ): void {
     const impact = this.impacts[this.impactNext]
     ;(impact.material as THREE.MeshBasicMaterial).color.setHex(impactColor)
     // 面と完全に同一平面だと Z ファイティングするので法線方向へ僅かに浮かせる
     impact.position.copy(to).addScaledVector(normal, 0.01)
     impact.lookAt(this.lookTarget.copy(impact.position).add(normal))
+    impact.scale.setScalar(scale)
     impact.visible = true
     this.impactLife[this.impactNext] = IMPACT_LIFE
     this.impactNext = (this.impactNext + 1) % IMPACT_POOL
+    if (!effects) return
 
     /*
      * 当たった跡。**金属は弾け、それ以外は削れる。**

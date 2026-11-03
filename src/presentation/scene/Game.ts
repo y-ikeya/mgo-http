@@ -545,6 +545,10 @@ export const CAUTION_SECONDS = STEALTH_BREAK_MS / 1000;
 const MAGAZINE_REARM_MS = 1000;
 /** 時計の音を鳴らし始める残りの秒。10 秒から 1 秒まで 10 回 */
 const CLOCK_TICK_FROM = 10;
+/** エンジンの音を締め切りの何 ms 前から鳴らすか。素材 (engine1.mp3) の長さ 2.9 秒 */
+const ENGINE_LEAD_MS = 2900;
+/** 散弾の粒の痕の大きさ (普通の弾痕に対して)。小さな点が散らばって見える (2026-11-03 本人) */
+const PELLET_HOLE_SCALE = 0.45;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
 const ADAPT_OPEN = 0.75;
 /** 慣れる速さ (1/s)。暗い所へ入った時 / 明るい所へ出た時。明るさへの慣れが速いのは目と同じ */
@@ -2098,6 +2102,7 @@ export class Game {
     this.blast.update(dt);
     this.updateTsneTarget(dt);
     this.updateClockTick();
+    this.updateEngine();
     // 草むらを押す人。自分が先頭
     this.grassPushers.clear();
     this.grassPushers.set(this.net.id, this.player.position);
@@ -3797,6 +3802,8 @@ export class Game {
    */
   setReady(ready: boolean): void {
     this.net.send({ type: "ready", ready });
+    // 決めた手応え。武器を選んだ時と同じ「かちゃ」(2026-11-03 本人)。取り消しでは鳴らさない
+    if (ready) this.audio.playUi("switch");
   }
 
   /** 自分が READY を押しているか。**名簿が答え** (押した瞬間には変わらない) */
@@ -3998,6 +4005,22 @@ export class Game {
     this.clockTickSecond = left;
     this.audio.playUi("clockTick");
   }
+
+  /**
+   * 試合が始まる暗転の前にエンジンの音 (2026-11-03 本人「試合が開始する暗転まえは engine」)。
+   * 待合室 (ready) とラウンドの合間 (break) の締め切りの ENGINE_LEAD_MS 前に 1 回 — 鳴り終わりが暗転の明け
+   * (試合の始まり) に重なる。締め切りごとに 1 回だけ (誰かが READY を取り消して締め切りが延びても、次の締め切りでまた鳴る)
+   */
+  private updateEngine(): void {
+    const match = this.replica.match;
+    if (!match || (match.phase !== "ready" && match.phase !== "break") || !(match.endsAt > 0)) return;
+    const left = match.endsAt - Date.now();
+    if (left <= 0 || left > ENGINE_LEAD_MS || this.engineFor === match.endsAt) return;
+    this.engineFor = match.endsAt;
+    this.audio.playUi("engine");
+  }
+  /** エンジンを鳴らした締め切り (endsAt)。同じ締め切りで 2 度鳴らさない */
+  private engineFor = 0;
 
   /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */
   private patTarget(): string | null {
@@ -4514,6 +4537,8 @@ export class Game {
     this.pelletBase.copy(this.aimDir);
     let hitPlayer: { player: RemoteSoldier; zone: HitZone; distance: number } | null = null;
     let hitTerrain: THREE.Intersection | null = null;
+    // 散弾の粒が地形に残す痕 (粒ごとに小さく)。人に当たった粒は痕を残さない (血で残す)
+    let pelletHoles = 0;
 
     for (let i = 0; i < pellets; i++) {
       if (pellets > 1) {
@@ -4524,6 +4549,12 @@ export class Game {
       this.firePellet();
       if (!hitPlayer && this.pelletHit.player) hitPlayer = this.pelletHit.player;
       if (!hitTerrain && this.pelletHit.terrain) hitTerrain = this.pelletHit.terrain;
+      if (pellets > 1 && this.pelletHit.terrain && !this.pelletHit.player) {
+        const hole = this.pelletHoleAt(pelletHoles++);
+        hole.point.copy(this.hitPoint);
+        hole.normal.copy(this.hitNormal);
+        hole.surface = surfaceOfHit(this.pelletHit.terrain.object);
+      }
     }
 
     // トレーサーだけは銃口から描く。判定は照準線、見た目は銃口という TPS 共通の割り切り。
@@ -4555,11 +4586,17 @@ export class Game {
       this.hitPoint,
       // **人に当たったら痕を出さない。** 痕はワールドに置くので、当たった
       // 相手が動いた後もその場に浮いてしまう。削られたことは血で残す (applyHealth)
-      hitPlayer || splashed ? null : hitTerrain ? this.hitNormal : null,
+      // 散弾は曳光だけ。痕は下で粒ごとに小さく残す
+      pellets > 1 || hitPlayer || splashed ? null : hitTerrain ? this.hitNormal : null,
       IMPACT_WORLD,
       // **当たった物の名前から引く。** 音を鳴らすのと同じ引き方 (playImpact)
       hitTerrain ? surfaceOfHit(hitTerrain.object) : undefined,
     );
+    // 散弾は地形に当たった粒の数だけ小さな痕。煙・火花は最初の 1 つだけ
+    for (let i = 0; i < pelletHoles; i++) {
+      const hole = this.pelletHoles[i];
+      this.shots.hole(hole.point, hole.normal, PELLET_HOLE_SCALE, IMPACT_WORLD, hole.surface, i === 0);
+    }
     // 金属に当たった音。**材質は当たった面の名前から引く** (地形と同じ決めごと)
     if (!hitPlayer && !splashed && hitTerrain) this.playImpact(hitTerrain, this.hitPoint);
     this.shotCount++;
@@ -4581,6 +4618,15 @@ export class Game {
       this.skills,
     );
     this.follow.addRecoil(kickPitch, kickYaw);
+  }
+
+  /** 散弾の粒の痕の控え。1 発ごとに使い回す */
+  private readonly pelletHoles: { point: THREE.Vector3; normal: THREE.Vector3; surface: ReturnType<typeof surfaceOfHit> }[] = [];
+  private pelletHoleAt(index: number) {
+    while (this.pelletHoles.length <= index) {
+      this.pelletHoles.push({ point: new THREE.Vector3(), normal: new THREE.Vector3(), surface: undefined as never });
+    }
+    return this.pelletHoles[index];
   }
 
   /** 粒 1 つぶんの道と、当たったことの申告。散弾以外は 1 発 = 1 粒 */
