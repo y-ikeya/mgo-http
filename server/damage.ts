@@ -28,11 +28,14 @@ import {
 import {
   HIT_RULES,
   KNOCK_DISTANCE,
+  SHOTGUN_KNOCK_DISTANCE,
+  SHOTGUN_KNOCK_TIME,
   KNOCK_TIME,
   ROLL_FALL_DISTANCE,
   ROLL_HIT_RANGE,
   ROLL_KNOCKBACK,
   ROLL_STAGGER_SECONDS,
+  FLINCH_SECONDS,
   ROLL_STAMINA,
   type HitZone,
   meleeDamage,
@@ -58,7 +61,7 @@ import { bulletSag } from '../src/sim/judge/bullet'
 import { matchState } from './match'
 import { bearingTo, isBehind, sendHealth, sendStamina } from './relay'
 import { sessionFor, sessionOf } from './session'
-import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, releaseTrapped, setLife } from './world'
+import { TARGET_DOWN, TARGET_STAND, type RoomWorld, broadcast, cancelCqc, releaseCqc, releaseTrapped, setLife } from './world'
 
 /**
  * 爆風のダメージを 1 人に入れる。
@@ -180,6 +183,8 @@ function knockAway(
   fromZ: number,
   /** 滑る距離 (m)。爆風なら省く (KNOCK_DISTANCE) */
   distance?: number,
+  /** 散弾で飛ばされた。短く速く滑る (SHOTGUN_KNOCK_DISTANCE / SHOTGUN_KNOCK_TIME) */
+  shotgun = false,
 ): void {
   // 投げている / 投げられている CQC は取り消す。吹き飛ぶほうが強い
   cancelCqc(room, victim)
@@ -187,7 +192,7 @@ function knockAway(
   const awayZ = victim.z - fromZ
   const reach = Math.hypot(awayX, awayZ) || 1
   // 向きに距離の比を掛けて持つ。滑らせる速さの式 (knockSpeed) は爆風と同じ物を通す
-  const scale = (distance ?? KNOCK_DISTANCE) / KNOCK_DISTANCE
+  const scale = (shotgun ? SHOTGUN_KNOCK_DISTANCE : (distance ?? KNOCK_DISTANCE)) / KNOCK_DISTANCE
   victim.knockX = (awayX / reach) * scale
   victim.knockZ = (awayZ / reach) * scale
   if (victim.bot) {
@@ -196,7 +201,9 @@ function knockAway(
     // 転がってきた相手のほうを向いて後ろへ倒れる (yaw θ で正面が (-sinθ, -cosθ)、押された先の逆)
     victim.downRolled = distance !== undefined
     if (victim.downRolled) victim.yaw = Math.atan2(awayX, awayZ)
-    victim.knockLeft = KNOCK_TIME
+    victim.downShotgun = shotgun
+    victim.knockTime = shotgun ? SHOTGUN_KNOCK_TIME : KNOCK_TIME
+    victim.knockLeft = victim.knockTime
     // 滑り終わってからも転んだまま。**時間で立ち上がる**
     victim.downLeft = TARGET_DOWN
     return
@@ -207,6 +214,7 @@ function knockAway(
       dirX: awayX / reach,
       dirZ: awayZ / reach,
       ...(distance !== undefined ? { distance } : {}),
+      ...(shotgun ? { shotgun: true as const } : {}),
     } satisfies ServerMessage),
   )
 }
@@ -255,7 +263,7 @@ function pushIfShotgun(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlay
   if (session.pushedThisShot) return
   session.pushedThisShot = true
   if (!isSeated(victim.life)) return
-  knockAway(room, victim, attacker.x, attacker.z)
+  knockAway(room, victim, attacker.x, attacker.z, undefined, true)
 }
 
 export function applyBlastDamage(
@@ -503,6 +511,8 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
     const wants = band ? band.flinch : event.kind === 'bullet' && event.zone === 'HEAD'
     const flinch = wants && !session.flinchedThisShot
     if (flinch) session.flinchedThisShot = true
+    // 的は足を止める (人は本人の画面が止める、soldier の flinchLeft)。走り続ける的が仰け反ったまま走っていた
+    if (flinch && victim.bot) victim.staggerUntil = Math.max(victim.staggerUntil, Date.now() + FLINCH_SECONDS * 1000)
     // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。
     // 遠くから頭を撃たれた人が、そのまま何事もなく投げ切るのはおかしい
 
@@ -597,6 +607,8 @@ function applyTranquilizer(
   victim.sleepUntil = now + sleep * 1000
   victim.wakeFloor = wakeFloor(now, sleep)
   victim.struggleAt = 0
+  // CQC で投げている途中に眠らされたら、相手を放す (倒された時と同じ。world.ts の releaseCqc)
+  releaseCqc(room, victim)
   attacker.stuns++
   sendStamina(victim)
   broadcast(room, {
@@ -690,6 +702,7 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
     victim.downLeft = TARGET_STAND + 3.5
     victim.downThrown = true
     victim.downRolled = false
+    victim.downShotgun = false
     return
   }
   sessionFor(victim)?.socket.send(
@@ -734,6 +747,8 @@ function drainBy(
     victim.sleepUntil = now + sleep * 1000
     victim.wakeFloor = wakeFloor(now, sleep)
     victim.struggleAt = 0
+    // 投げている途中に眠らされたら放す (上の弾の眠りと同じ)
+    releaseCqc(room, victim)
     attacker.stuns++
     broadcast(room, {
       type: 'stun',
@@ -768,6 +783,8 @@ const PRONE_POSE = /^(prone|crawl)/
 export function applyRoll(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer): boolean {
   if (!canAct(attacker.life) || !canBeHurt(victim.life)) return false
   if (PRONE_POSE.test(victim.locomotion)) return false
+  // **転がっている人だけ。** CQC の踏み込み・跳び越えで当たった申告は通さない (本人 2026-11-03)
+  if (attacker.locomotion !== 'roll') return false
   // 申告の検算。体当たりの間合い (+ 通信のずれの余裕)
   if (Math.hypot(victim.x - attacker.x, victim.z - attacker.z) > ROLL_HIT_RANGE + ROLL_HIT_SLACK) return false
   if (Math.abs(victim.y - attacker.y) > 1.2) return false

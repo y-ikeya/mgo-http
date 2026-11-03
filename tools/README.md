@@ -111,6 +111,7 @@ UV も箱の大きさに合わせてゲーム側で作り直している (Blende
 | `soldier.json` | **どの FBX がどのクリップになったか**の対応表。32 本ぶん |
 | `bake_stage.py` | ステージに**空の見え方**を焼く (頂点色)。単体で回すと .blend に保存する。書き出しに `-- --bake [試行回数]` を付ければ読み込んだ複製に焼いて .blend は触らない (city は 20 秒ほど)。形を共有している物 (Alt+D) は焼かれず一様の明るさ |
 | `merge_clip.js` | 既存の glb にクリップだけ追加する。全体を作り直さずに済む |
+| `retime_clip.js` | クリップ 1 本の速さをファイルの側で変える (キーの時刻を 1/倍率)。`vault` は 1.2 倍にしてある (2026-10-30)。`--as <名前>` で元を残して速い写しを足す — 散弾で倒れる `sweep_shotgun` は `sweep` の 1.6 倍 (2026-11-02、全部の皮) |
 | `split_clip.js` | **クリップを 2 本に割る。** 境目の姿勢は補間して両方に入れる |
 
 ```
@@ -429,7 +430,7 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 曲線に沿って動かす (soldier.ts の hangMovement)。ぶら下がっている間は地形の当たりを
 取らない (梯子と同じ)。
 
-雷電と名無しへは同じ物を `--rotation-only` を足して入れる。`knife_idle` は半身の構えで腰が 90° 横を向いているが、手と頭は他の構えと同じ方を向いているので回してはいけない。上半身だけ乗せると腰の基準合わせで捻れるため、ゲームでは立ち止まって構えた間だけ全身で使う。
+雷電と名無しへは同じ物を `--rotation-only` を足して入れる。`knife_idle` は半身の構えで腰が 90° 横を向いているが、手と頭は他の構えと同じ方を向いているので回してはいけない。ゲームでは立ち止まっても動いても上半身だけ乗せる (2026-10-30 から。前は立ち止まった間だけ全身で使っていて、動くと格好が変わった)。
 
 ### 頭を抜いた音 (headshot3.mp3)
 
@@ -449,6 +450,56 @@ Mixamo の 41 コマ) なので `convert_character.py` で直に写せる。腰�
 ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=tempo=0.2414:pitchq=quality,equalizer=f=2977:t=q:w=2:g=7,acompressor=threshold=-34dB:ratio=12:attack=1:release=200:makeup=16,alimiter=limit=0.95:attack=1:release=50,afade=t=out:st=0.9:d=0.37:curve=qsin" -ar 48000 -ac 2 -b:a 192k public/audio/headshot2.mp3
 ```
 
+### 一歩下がる型 (step_back)
+
+構えたまま後ろを押しながら転がりの指 (Space 長押し / ×) で、転がらずに一歩下がる (0.7m、1 秒。立ちもしゃがみも同じ、domain/player/step.ts)。
+**下半身だけ**流し、下がっている間は銃を下ろす (上半身は立ちの脱力)。本人が落とした `tools/raw/StepBackward.fbx` (Mixamo のボクシングの
+後退り) を `tools/step_back.json` で retarget_clip に通した。型の上半身は拳の構えなので使わない:
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/step_back.json
+    bun tools/merge_clip.js public/models/soldier.glb step_back.glb step_back public/models/soldier.glb
+    for g in soldier_raiden soldier_nanashi soldier_xbot; do bun tools/merge_clip.js public/models/$g.glb step_back.glb step_back public/models/$g.glb --rotation-only; done
+
+しゃがんでいる時は `crouch_step_back` (本人の `tools/raw/CrouchBackwards.fbx`、Downloads では ChrouchBackwards.fbx)。
+半ばしゃがんだ姿から後ろへ跳んで膝を突く型で、型のままだと 1.16m。膝を突き終わる 1.1 秒 (型の時間) までを流し、速さと移動の倍率で 0.7m・1 秒に合わせる。立ちの型 (0.68m・0.96 秒) も同じく合わせる。
+`tools/crouch_step_back.json` を同じ手順で通す。
+
+### 体の glb は dedup を通す (2026-11-02)
+
+Pages は **1 ファイル 25 MiB まで**。型を足し続けて soldier_raiden.glb が 25.11 MiB になった。中身の 8.6MB が
+glTF の JSON で、型 100 本 × 骨ごとに accessor と bufferView を 1 つずつ持っていた (4.6 万個)。同じ時刻の列が
+大量に重なっているので、まとめると JSON が半分になる:
+
+    npx @gltf-transform/cli dedup public/models/<体>.glb public/models/<体>.glb
+
+5 つの皮に通して soldier 17.7 → 12.6 / 雷電 25.1 → 18.2 / 名無し 21.6 → 18.2 / X Bot 8.8 → 6.7 / kome 8.1 → 6.4 MiB。
+全部の型の全チャンネル (時刻と値)・メッシュ・骨の束ね方がバイト単位で同じことを確かめてある。
+**型の骨の位置・大きさは腰だけ** (`bun tools/strip_bone_moves.js <体>.glb` → prune → dedup)。腰以外の骨の位置と大きさの
+軌道は骨の長さを毎コマ書いているだけだった (soldier 12001 本 / 雷電 10451 本 / 名無し 1419 本)。外すと骨の長さは
+その体の素の値に戻る。soldier と名無しは頭も爪先も変わらない。**雷電には通さない** — 宿主の骨の長さで動いていて、
+外すと雷電本来の骨の長さに戻り (頭 1.487m)、銃の握り (soldier の手で合わせた値) がずれて M9 などが高く付いた
+(2026-11-02 本人、雷電だけ戻した)。
+**型を足したら (merge_clip / retime_clip --as) もう一度通す。** 通した後は時刻の列を型どうしで分け合うので、
+`retime_clip.js` の上書き (--as なし) は「他の型も使っている」で止まる — 速さを変えるなら --as で写しを作る。
+
+### 小物の画像は 512px まで (2026-11-02)
+
+武器・道具の画像を 512px に縮めてある (smg / locator / m1911 / m4 / shotgun / claymore)。画面では数十〜数百 px の物で、
+GPU には 1 画素 4 バイトで載るので、E LOCATOR の 4096px 1 枚で 85MB 食っていた (6 つで 229MB → 37MB)。
+新しく入れた物も同じく縮める:
+
+    npx @gltf-transform/cli resize <in.glb> <out.glb> --width 512 --height 512
+
+smg.glb は画像が JPEG なのに mimeType が image/png になっていて、resize が寸法を読めずに止まった。
+JSON の mimeType を中身に合わせてから通した。
+
+### しゃがんだ敬礼 (salute_crouch)
+
+しゃがんでいる時の敬礼は右手の合図 (本人の `tools/raw/MilitarySignalingCrouch.fbx`、Downloads では
+MilitarySignalingChrouch.fbx、5 秒)。`tools/salute_crouch.json` を retarget_clip に通し、4 つの皮へ
+(雷電・名無し・X Bot は `--rotation-only`)。使うのは 0.75〜2.55 秒 (手を挙げる → 上げ下げ → 下ろす) で、
+**押している間は上げ下げの山 2 つ (1.47 秒と 1.88 秒) の間を回す** (animation.ts の SALUTE_CROUCH_*)。
+
 ### CQC の型 (cqc_throw / cqc_miss / cqc_thrown)
 
 本人と Blender で組んだ型 (`tools/raw/cqc.blend`、24fps、70 コマ)。投げる側 `attacker` の
@@ -456,6 +507,15 @@ ffmpeg -i tools/raw/tin.mp3 -af "asetrate=161452,aresample=48000,rubberband=temp
 (export_animation_mode=ACTIVE_ACTIONS)、名前を付け直して 3 つの皮に merge した。空振り
 `cqc_miss` は cqc.blend の別の action (22 コマ): 左のフックが伸び切る 11 コマまでは投げと同じで、
 そこから左手だけ構えへ引き戻す (右手は振らない)。
+
+2026-10-30 から、投げも空振りも出だしは左のフック `cqc_hook` (本人が落とした `tools/raw/Hook.fbx`、
+Mixamo、`tools/cqc_hook.json` で retarget_clip に通した)。掛かったらフックの 11/24 秒で投げの型の**同じ時刻**へ
+移り (投げの時の流れは前のまま)、掛からなければフックを振り抜いて構えへ戻るまで流す (それが隙。
+animation.ts の CQC_HOOK_CUT)。`cqc_miss` は使っていない (フックの型が無い皮だけが使う):
+
+    $BLENDER -b --factory-startup --python tools/retarget_clip.py -- tools/cqc_hook.json
+    bun tools/merge_clip.js public/models/soldier.glb cqc_hook.glb cqc_hook public/models/soldier.glb
+    for g in soldier_raiden soldier_nanashi; do bun tools/merge_clip.js public/models/$g.glb cqc_hook.glb cqc_hook public/models/$g.glb --rotation-only; done
 
 組むときの道具は `tools/cqc/` (pose.py = 体の向きで骨を回す、legs.py = つま先を床に留めて
 脚を解き直す)。元にした素材は Boxing / LightHitToHead / SweepFall (`tools/cqc/*.json` で

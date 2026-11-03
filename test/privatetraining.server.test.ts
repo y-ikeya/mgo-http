@@ -4,7 +4,7 @@ import type { ServerMessage } from '../src/application/protocol/types'
 
 /**
  * 練習 (/training) は**自分だけの部屋。** 同じ練習の部屋に入っても他の人と出会わない。
- * 普通に echo へ入った人どうしは今までどおり同じ部屋。
+ * 普通に golf へ入った人どうしは今までどおり同じ部屋。
  */
 let server: Server
 beforeAll(async () => {
@@ -18,23 +18,23 @@ function people(client: Client): string[] {
 }
 
 test('自分だけの練習部屋どうしは名簿に互いが居ない', async () => {
-  const a = await new Client(server, 'pt-a', [0, 0, 0], 'echo', { privateRoom: true }).ready()
-  const b = await new Client(server, 'pt-b', [0, 0, 0], 'echo', { privateRoom: true }).ready()
+  const a = await new Client(server, 'pt-a', [0, 0, 0], 'golf', { privateRoom: true }).ready()
+  const b = await new Client(server, 'pt-b', [0, 0, 0], 'golf', { privateRoom: true }).ready()
   a.live()
   b.live()
   await Bun.sleep(500)
   expect(people(a)).toEqual(['pt-a'])
   expect(people(b)).toEqual(['pt-b'])
-  // 一覧には出ない (共有の echo は空のまま)
+  // 一覧には出ない (共有の golf は空のまま)
   const rooms = (await (await fetch(`http://localhost:${server.port}/rooms`)).json()) as { name: string; players: number }[]
-  expect(rooms.find((r) => r.name === 'echo')?.players ?? 0).toBe(0)
+  expect(rooms.find((r) => r.name === 'golf')?.players ?? 0).toBe(0)
   a.close()
   b.close()
 }, 20_000)
 
-test('共有の echo に入った人どうしは今までどおり同じ部屋', async () => {
-  const a = await new Client(server, 'pt-c', [0, 0, 0], 'echo').ready()
-  const b = await new Client(server, 'pt-d', [0, 0, 0], 'echo').ready()
+test('共有の golf に入った人どうしは今までどおり同じ部屋', async () => {
+  const a = await new Client(server, 'pt-c', [0, 0, 0], 'golf').ready()
+  const b = await new Client(server, 'pt-d', [0, 0, 0], 'golf').ready()
   a.live()
   b.live()
   await Bun.sleep(500)

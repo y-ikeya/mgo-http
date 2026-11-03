@@ -27,11 +27,42 @@ import type { Locomotion } from './locomotion'
 export type Stance = 'stand' | 'crouch' | 'box' | 'prone' | 'down'
 
 /** そのモーションのときの構え */
+/**
+ * 眠りの型 (sleep) の、**倒れていく途中の高さ**。眠ってからの秒数で分ける (soldier.glb の sleep を実測)。
+ *
+ *     0〜1.4 秒   立ったままふらつく (頭 1.4〜1.5m)          → 立ち
+ *     〜2.6 秒    膝をついて崩れていく (頭 0.7〜1.1m)         → しゃがみ
+ *     それ以降    寝転んでいる (頭 0.3m 以下)                 → 伏せ
+ *
+ * 眠った瞬間から伏せにしていた頃は、まだ立っている相手に真っ直ぐ構えて刺しても
+ * 刺さらなかった (2026-10-30 本人「感電して倒れてる最中の相手にナイフを平行で構えて挿しても当たらない」)
+ */
+export const SLEEP_STAND_SECONDS = 1.4
+export const SLEEP_KNEEL_SECONDS = 2.6
+
+/**
+ * その動きに入ってから age 秒の姿勢。**倒れていく途中の高さを見るのは眠りだけ**
+ * (ほかは stanceOf と同じ)。age は状態の知らせの locomotionAge
+ */
+export function stanceAt(locomotion: Locomotion, age: number): Stance {
+  if (locomotion === 'sleep') {
+    if (age < SLEEP_STAND_SECONDS) return 'stand'
+    if (age < SLEEP_KNEEL_SECONDS) return 'crouch'
+  }
+  return stanceOf(locomotion)
+}
+
 export function stanceOf(locomotion: Locomotion): Stance {
   if (locomotion === 'death' || locomotion === 'death_front' || locomotion === 'death_back')
     return 'down'
   // 爆風で倒れている間。起き上がりの途中も含めて低い姿勢として扱う
-  if (locomotion === 'sweep' || locomotion === 'cqc_thrown' || locomotion === 'hit2back' || locomotion === 'stand')
+  if (
+    locomotion === 'sweep' ||
+    locomotion === 'shotgun_sweep' ||
+    locomotion === 'cqc_thrown' ||
+    locomotion === 'hit2back' ||
+    locomotion === 'stand'
+  )
     return 'prone'
   if (locomotion === 'sneak' || locomotion === 'sit') return 'box'
   // ダンボールが落ちた直後。棒立ちなので、頭は立ちの高さに戻っている

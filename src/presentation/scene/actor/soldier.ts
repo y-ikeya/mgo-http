@@ -15,6 +15,7 @@ import {
   KNOCK_DISTANCE,
   KNOCK_TIME,
   ROLL_STAGGER_SECONDS,
+  FLINCH_SECONDS,
   fallDamage,
   knockSpeed,
 } from '../../../domain/rule/damage'
@@ -37,7 +38,7 @@ import { PLAYER_HEIGHT as BODY_HEIGHT, PLAYER_RADIUS as DOMAIN_RADIUS, STEP_UP }
 import { can, type BodyState } from '../../../domain/player/moves'
 import { CQC_LAND_SECONDS, CQC_MISS_RECOVERY, CQC_PAIR_DISTANCE } from '../../../domain/player/cqc'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
-import type { Water } from '../../../domain/stage'
+import type { Surface, Water } from '../../../domain/stage'
 import {
   climbSurge,
   crawlSurge,
@@ -490,6 +491,8 @@ export interface PlayerWorld {
   groundHeight(position: THREE.Vector3, radius: number, feetY: number): number
   /** その位置で頭がぶつかる高さ。何も無ければ Infinity */
   ceilingHeight(position: THREE.Vector3, radius: number, feetY: number): number
+  /** その位置で足が乗る面の材質 (点で見る)。無い世界 (試写) では跳び越えが材質を見ない */
+  surfaceAt?(position: THREE.Vector3, feetY: number): Surface
 }
 
 /**
@@ -1164,6 +1167,10 @@ export class Soldier {
       aiming: this.aiming,
       crouching: this.crouching,
       cqc: this.cqcBusy,
+      stepping: this.stepLeft > 0,
+      flinching: this.flinchLeft > 0,
+      crawling: this.crawling,
+      proneShifting: this.proneShifting !== null,
       trapped: this.trappedStage !== 'none',
     }
   }
@@ -1410,7 +1417,12 @@ export class Soldier {
     this.health = health
 
     if (health > 0) {
-      if (flinch) this.animator?.playHit()
+      if (flinch) {
+        this.animator?.playHit()
+        // 仰け反っている間は足も手も止まる (FLINCH_SECONDS、動作の表の flinching)
+        this.flinchLeft = FLINCH_SECONDS
+        this.currentSpeed = 0
+      }
       return false
     }
     if (!wasAlive) return false
@@ -1625,6 +1637,8 @@ export class Soldier {
   }
   /** 体当たりで怯んで足が止まっている残り (秒) */
   private staggerLeft = 0
+  /** 撃たれて仰け反っている残り (秒)。足も手も止まる */
+  private flinchLeft = 0
 
   /**
    * 爆風で吹き飛ばす。**向きだけ受けて、こちらが滑らせる。**
@@ -1635,15 +1649,18 @@ export class Soldier {
    * @param dirX 爆心から見た向き (単位ベクトル、水平)
    * @param distance 滑る距離 (m)。爆風なら省く。ローリングで倒れた時は短い
    */
-  knockPush(dirX: number, dirZ: number, distance = KNOCK_DISTANCE): void {
+  knockPush(dirX: number, dirZ: number, distance = KNOCK_DISTANCE, time = KNOCK_TIME): void {
     const reach = Math.hypot(dirX, dirZ)
     if (reach < 1e-4) return
     // 向きに距離の比を掛ける。滑らせる速さの式は爆風と同じ (的もサーバーで同じ形)
     const scale = distance / KNOCK_DISTANCE
     this.knockX = (dirX / reach) * scale
     this.knockZ = (dirZ / reach) * scale
-    this.knockLeft = KNOCK_TIME
+    this.knockTime = time
+    this.knockLeft = time
   }
+  /** 滑り切るまでの時間 (秒)。散弾は爆風より短い */
+  private knockTime = KNOCK_TIME
 
   /** リロードモーションの尺 (秒)。モデル未着なら 0 */
   /**
@@ -1836,7 +1853,8 @@ export class Soldier {
    */
   salute(): void {
     if (!can(this.body, 'salute')) return
-    this.animator?.playSalute()
+    // しゃがんでいればしゃがんだまま右手で合図する (salute_crouch)
+    this.animator?.playSalute(this.crouching)
   }
 
   /**
@@ -1871,7 +1889,7 @@ export class Soldier {
 
   /** いま手を挙げているか。味方とのリンクの成立を見るのに使う */
   get isSaluting(): boolean {
-    return this.saluteHeld && this.locomotion === 'salute'
+    return this.saluteHeld && (this.locomotion === 'salute' || this.locomotion === 'crouch_salute')
   }
 
   setSaluteHeld(held: boolean): void {
@@ -1935,6 +1953,16 @@ export class Soldier {
     }
     // CQC の型と、空振りの後の棒立ちの間も構えられない。**空振りの隙はここ**
     if (this.cqcBusy) {
+      this.aiming = false
+      return
+    }
+    // 一歩下がっている間は銃を下ろす (本人 2026-10-30「構えを下ろしていい」)。下がりながら撃つ逃げ方にはしない
+    if (this.stepLeft > 0) {
+      this.aiming = false
+      return
+    }
+    // 撃たれて仰け反っている間は銃を下ろす (FLINCH_SECONDS)。押したままなら明けた所で構え直す
+    if (this.flinchLeft > 0) {
       this.aiming = false
       return
     }
@@ -2663,6 +2691,14 @@ export class Soldier {
     return this.animator?.rollDuration ?? 0
   }
 
+  /**
+   * **転がりそのもの**の最中か (跳び越え・ぶら下がり・CQC を混ぜない)。体当たりで相手を倒すのはこれだけ —
+   * 混ぜた rolling で見ていたので、CQC の空振りのフックで踏み込んだ先のしゃがんだ相手が倒れた (本人 2026-11-03)
+   */
+  get rollingOnly(): boolean {
+    return this.animator?.rolling ?? false
+  }
+
   /** ローリング中か。この間は撃てず、方向も変えられない */
   get rolling(): boolean {
     // 跳び越えも転がりと同じ縛り (撃てず、向きも変えられず、重ねて始められない)
@@ -3201,6 +3237,22 @@ export class Soldier {
     const faceX = -Math.sin(this.yaw)
     const faceZ = -Math.cos(this.yaw)
     if (faceX * fx + faceZ * fz < Math.cos(VAULT_MAX_ANGLE)) return null
+    /*
+     * **向きを集めた平均で跳べなければ、向いている方向でもう一度見る。** 壁の向こうにも跳べる
+     * 高さの床があると、その向きまで数えて平均が斜めに倒れ、斜めに探した体が壁に当たって
+     * 跳べなかった (壁と手すりの間の 0.73m の上がり口、2026-10-25 本人「box の段から 2F へ」)
+     */
+    return this.vaultAlong(fx, fz) ?? this.vaultAlong(faceX, faceZ)
+  }
+
+  /** 決めた向き (fx, fz) に沿って、跳べる枠と着地を探す (vaultAhead) */
+  private vaultAlong(fx: number, fz: number): { kind: 'over' | 'up'; landing: number; yaw: number; top: number; edge: number } | null {
+    const world = this.lastWorld
+    if (!world) return null
+    const feetY = this.position.y
+    const probe = this.vaultProbe
+    const allow = feetY + VAULT_MAX - STEP_UP
+    const okRise = (h: number) => h - feetY >= VAULT_MIN && h - feetY <= VAULT_MAX
 
     // 枠の向きに沿って、一番近い所で枠の上面を取る
     let top = Number.NaN
@@ -3258,6 +3310,17 @@ export class Soldier {
         landing = Number.isNaN(landing) ? h : Math.max(landing, h)
       }
       return landing
+    }
+    /*
+     * **木の箱には乗る。** 箱の奥行き (0.79m) は越えた先 (縁から 0.8m) より短く、先の床が低いので
+     * 越える型になっていた (2026-10-26 本人「wood box に対しても飛び越えるモーション出ちゃってる」)。
+     * 奥行きで分けると土嚢 (0.6〜1.1m) も乗るほうに入るので、材質で分ける。乗れる奥行き
+     * (VAULT_LANDING_SHALLOW の 2 か所) が無い木の柵・手すりは今まで通り越える
+     */
+    probe.set(this.position.x + fx * (edge + VAULT_EDGE_STEP), feetY, this.position.z + fz * (edge + VAULT_EDGE_STEP))
+    if (world.surfaceAt?.(probe, top) === 'wood') {
+      const up = shallow()
+      if (!Number.isNaN(up)) return { kind: 'up', landing: up, yaw, top, edge }
     }
     /*
      * 少し先 (VAULT_CLEAR_STEP) が塞がっていたら、**手前の浅い台に乗る**のだけ見る。積んだ木箱の段
@@ -3321,6 +3384,32 @@ export class Soldier {
    */
   get rollShowing(): boolean {
     return this.animator?.rollShowing ?? false
+  }
+
+  /** 一歩下がり終えるまでの秒。0 なら下がっていない */
+  private stepLeft = 0
+  /** 下がる向き (踏み出した時の体の向き)。下がっている間に照準を回しても真っ直ぐ下がる */
+  private stepYaw = 0
+
+  /** 構えたまま一歩下がっている最中か */
+  get stepping(): boolean {
+    return this.stepLeft > 0
+  }
+
+  /**
+   * 構えた所から一歩下がる (step_back、下半身だけ)。**下がっている間は銃を下ろす** (setAiming)。
+   * 型に焼かれた移動を辿る (0.7m・1 秒、domain/player/step.ts)。できるかは表 (moves.ts の step)
+   *
+   * @returns 下がり始めた
+   */
+  stepBack(): boolean {
+    if (!can(this.body, 'step') || !this.animator) return false
+    // しゃがんでいればしゃがみの型 (後ろへ跳んで膝を突く)。しゃがみは解かない
+    const duration = this.animator.playStepBack(this.crouching)
+    if (duration <= 0) return false
+    this.stepLeft = duration
+    this.stepYaw = this.yaw
+    return true
   }
 
   /**
@@ -3444,7 +3533,11 @@ export class Soldier {
    * 倒れる → (伏せたまま撃てる) → 立ち上がる、の 3 段。立ち上がりに入ったら
    * 中断できないので、そこが無防備な時間になる。
    */
-  knockDown(rolled = false): void {
+  /** 倒れたのが散弾でか。倒れている間に引く型が違う (shotgun_sweep、速く焼いた写し) */
+  private shotgunFall = false
+
+  /** @param shotgun 散弾で飛ばされた (転ぶ型が速い shotgun_sweep) */
+  knockDown(rolled = false, shotgun = false): void {
     if (this.down) return
     /*
      * 倒れている間は飛ばされない。**ただし CQC で投げられて背中が着く前は別** —
@@ -3467,8 +3560,9 @@ export class Soldier {
     this.thrownFall = false
     // ローリングの体当たり (しゃがんでいた所から) なら、爆風ほど飛ばない倒れ方
     this.rolledFall = rolled
+    this.shotgunFall = !rolled && shotgun
     if (rolled) this.animator?.playRollFall()
-    else this.animator?.playSweep()
+    else this.animator?.playSweep(this.shotgunFall)
   }
 
   /**
@@ -3703,8 +3797,8 @@ export class Soldier {
     } else if (this.trappedStage !== 'none') {
       moveDir = ZERO_MOVE
     }
-    // 体当たりで怯んでいる間も
-    if (this.staggerLeft > 0) moveDir = ZERO_MOVE
+    // 体当たりで怯んでいる間も、撃たれて仰け反っている間も
+    if (this.staggerLeft > 0 || this.flinchLeft > 0) moveDir = ZERO_MOVE
 
     /*
      * 伏せている間は**前へしか這えない。**
@@ -3817,7 +3911,7 @@ export class Soldier {
       this.knockLeft = Math.max(0, this.knockLeft - dt)
       // 速さの式はドメインルール。**的も同じ式で滑る** (server/match.ts) ので、
       // ここで別に持つと同じ爆風で飛ぶ距離が変わる
-      const speed = knockSpeed(this.knockLeft)
+      const speed = knockSpeed(this.knockLeft, this.knockTime)
       overrideX = this.knockX * speed
       overrideZ = this.knockZ * speed
     }
@@ -3836,7 +3930,8 @@ export class Soldier {
     }
     // CQC で投げられて倒れている間も、型に焼かれた移動 (後ろへ 0.7m) を辿る
     const thrownSliding = this.downed_ && this.thrownFall
-    const tumbling = overrideX === undefined && (this.rolling || proneRolling || thrownSliding)
+    const stepping = this.stepLeft > 0
+    const tumbling = overrideX === undefined && (this.rolling || proneRolling || thrownSliding || stepping)
     // 空振りの後の棒立ち。動けない
     if (overrideX === undefined && this.cqcRecoverLeft > 0) {
       overrideX = 0
@@ -3850,6 +3945,8 @@ export class Soldier {
         // モデルは 180° 回してあるので yaw + π の回転になる。
         const yaw = thrownSliding
           ? this.thrownYaw
+          : stepping
+            ? this.stepYaw
           : proneRolling
             ? this.yaw
             : this.rolling
@@ -4126,6 +4223,8 @@ export class Soldier {
     if (this.downed_) this.downElapsed += dt
     // CQC の型が終わった。**空振りなら棒立ちの隙へ** (CQC_MISS_RECOVERY)
     if (this.cqcRecoverLeft > 0) this.cqcRecoverLeft = Math.max(0, this.cqcRecoverLeft - dt)
+    if (this.stepLeft > 0) this.stepLeft = Math.max(0, this.stepLeft - dt)
+    if (this.flinchLeft > 0) this.flinchLeft = Math.max(0, this.flinchLeft - dt)
     if (this.cqcStarted && !(this.animator?.cqcBusy ?? false)) {
       if (this.cqcStarted === 'cqc_miss') this.cqcRecoverLeft = CQC_MISS_RECOVERY
       this.cqcStarted = null
@@ -4157,6 +4256,12 @@ export class Soldier {
     } else if (this.cqcRecoverLeft > 0) {
       // 空振りの後の棒立ち。向きも変えられない
       targetYaw = this.yaw
+    } else if (this.stepLeft > 0) {
+      /*
+       * 一歩下がっている間は**前を向いたまま。** 銃を下ろすので構えの向きは追わないが、
+       * 進行方向 (後ろ) へ向き直ると振り返って歩く形になる (本人 2026-10-30「体の向きはまえむきながらstepしてよ」)
+       */
+      targetYaw = this.stepYaw
     } else if (!this.aiming && !this.throwing) {
       // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ) を向くので、その逆算
       targetYaw =
@@ -4346,7 +4451,10 @@ export class Soldier {
         const pitch = this.proneStage === 'none' ? this.aimPitch : 0
         this.aimDir.set(-Math.sin(this.yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(this.yaw) * Math.cos(pitch))
         this.weapon.alignTo(this.aimDir, this.aimTrimWeight)
-        this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
+        // 左手を銃へ付いていかせるのは**銃を持っている時だけ** (両手で支える物)。ナイフでも働いていて、
+        // ナイフを照準へ回した分だけ左手が引っ張られていた (2026-10-30 本人「knife 構えてる時に左手って
+        // IK してる？してない方がいい」)。ナイフの左手は型のまま
+        if (isGun(this.held)) this.leftArm.apply(this.model, this.weapon, this.rightArm.moved)
       }
       // 姿勢がどれだけ速く変わっているか。散布に効かせる
       this.stanceRateValue = dt > 0 ? Math.abs(this.weaponStance - before) / dt : 0
@@ -4681,7 +4789,9 @@ export class Soldier {
       downed: this.downed,
       thrown: this.thrownFall,
       rolled: this.rolledFall,
+      shotgunFall: this.shotgunFall,
       cqc: this.animator?.cqcKind ?? null,
+      stepping: this.stepLeft > 0,
       standingUp: this.standing,
       bumped: this.bumpLeft,
       asleep: this.sleepLeft > 0,

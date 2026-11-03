@@ -113,6 +113,16 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * ターゲットを持ち帰れるかで決まり、残り敵兵数を争うわけではない (本人 2026-10-20)
    */
   const showScore = () => !MODES[mode()].sides
+  /**
+   * 上部の数字。**CAP は残機ではなくカウント** (残り秒、0 にした側が勝ち。domain/match/capture.ts)
+   */
+  const capture = () => props.stats?.match?.capture
+  const scoreOf = (team: 'blue' | 'red') => {
+    const counts = capture()
+    return counts ? Math.ceil(counts[team]) : (props.stats?.match?.[team] ?? 0)
+  }
+  /** いまカウントを進めている陣営の数字を脈打たせる (target を持った人が設置ポイントに居る) */
+  const holding = (team: 'blue' | 'red') => capture()?.holding === team
   const won = () => {
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner === props.stats?.team
@@ -349,9 +359,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             <Show when={showScore()}>
               <span
                 class="hud-score hud-score-blue"
-                classList={{ 'hud-score-own': props.stats?.team === 'blue' }}
+                classList={{ 'hud-score-own': props.stats?.team === 'blue', 'hud-score-holding': holding('blue') }}
               >
-                {props.stats?.match?.blue ?? 0}
+                {scoreOf('blue')}
               </span>
             </Show>
           </Show>
@@ -359,9 +369,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           <Show when={teams() && showScore()}>
             <span
               class="hud-score hud-score-red"
-              classList={{ 'hud-score-own': props.stats?.team === 'red' }}
+              classList={{ 'hud-score-own': props.stats?.team === 'red', 'hud-score-holding': holding('red') }}
             >
-              {props.stats?.match?.red ?? 0}
+              {scoreOf('red')}
             </span>
           </Show>
         </div>
@@ -400,6 +410,32 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             />
           </span>
           <span class="hud-caution-count">{String(Math.ceil(props.stats?.targetReturn ?? 0)).padStart(2, '0')}</span>
+        </div>
+      </Show>
+
+      {/*
+        CAP の時間切れで並んだ。**先にカウントを進めた側の勝ち** (domain/match/capture.ts)
+      */}
+      <Show when={capture()?.suddenDeath && phase() === 'playing'}>
+        <div class="hud-caution hud-sudden-death">
+          <span class="hud-caution-label">SUDDEN DEATH</span>
+        </div>
+      </Show>
+
+      {/*
+        倒れたまま、支度に移るまでの残り。**倒されるたびに延びる部屋 (CAP) だけ**。延びていくのが
+        見えることで、倒されてもすぐ戻って特攻すればいい、を思い留まらせる (2026-10-26 本人)
+      */}
+      <Show when={(props.stats?.downLeft ?? 0) > 0}>
+        <div class="hud-caution hud-respawn">
+          <span class="hud-caution-label">RESPAWN</span>
+          <span class="hud-caution-track">
+            <span
+              class="hud-caution-bar"
+              style={{ transform: `scaleX(${Math.min(1, (props.stats?.downLeft ?? 0) / Math.max(1, props.stats?.downFor ?? 1))})` }}
+            />
+          </span>
+          <span class="hud-caution-count">{String(Math.ceil(props.stats?.downLeft ?? 0)).padStart(2, '0')}</span>
         </div>
       </Show>
 

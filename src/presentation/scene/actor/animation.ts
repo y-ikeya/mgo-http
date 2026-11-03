@@ -3,6 +3,8 @@ import { CQC_LAND_SECONDS } from '../../../domain/player/cqc'
 import { isBone } from '../util/guards'
 import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
+import { ROLL_TIME_SCALE } from '../../../domain/player/poseCurve'
+import { STEP_BACK_DISTANCE, STEP_BACK_SECONDS } from '../../../domain/player/step'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
 import {
   CROUCH_WALK_TOP_SPEED,
@@ -75,6 +77,7 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   sneak: 'sneak',
   sit: 'sit',
   salute: 'salute',
+  crouch_salute: 'salute_crouch',
   // 接続が切れた人の姿。全身 1 枚の静止ポーズ
   away: 'away',
   // クレイモア。かがむ全身の型なので、上半身も同じクリップから取る
@@ -90,6 +93,12 @@ const LOWER_CLIPS: Record<Locomotion, string> = {
   cqc_miss: 'cqc_miss',
   cqc_thrown: 'cqc_thrown',
   hit2back: 'hit2back',
+  // 散弾で飛ばされて倒れる。爆風の sweep を 1.6 倍に焼いた写し (tools/retime_clip.js --as)
+  shotgun_sweep: 'sweep_shotgun',
+  // 構えた所から一歩下がる。下半身だけ (上は銃を下ろした脱力)。焼かれた移動を辿る (ROOT_MOTION_CLIPS)
+  step_back: 'step_back',
+  // しゃがんだまま一歩下がる。後ろへ跳んで膝を突く
+  crouch_step_back: 'crouch_step_back',
   // ダンボールで敵にぶつかった型。全身なので上半身も同じクリップから取る
   bump: 'bump',
   /*
@@ -221,6 +230,9 @@ type UpperState =
  */
 const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   idle: 'relaxed_idle',
+  // 一歩下がる間は銃を下ろす。型の上半身は拳の構え (ボクシング) なので使わず、立ちの脱力を乗せる
+  step_back: 'relaxed_idle',
+  crouch_step_back: 'knee_relaxed',
   // 歩きは長物を提げた型。上下とも同じクリップ (RELAXED_LOWER_STATES)
   walk: 'walk',
   // しゃがみ歩きはしゃがみ走りと同じ上半身
@@ -253,6 +265,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   lean_crouch_left: 'lean_crouch',
   lean_crouch_right: 'lean_crouch',
   salute: 'salute',
+  crouch_salute: 'salute_crouch',
   away: 'away',
   claymore_windup: 'claymore_windup',
   claymore_place: 'claymore_place',
@@ -354,6 +367,11 @@ const ROOT_MOTION_CLIPS = new Set([
   'cqc_throw',
   'cqc_miss',
   'cqc_thrown',
+  // CQC の出だしのフック。踏み込んで戻る (投げに移るまでと、空振りの全部)
+  'cqc_hook',
+  // 構えた所から一歩下がる。距離は立ちもしゃがみも 0.7m に合わせる (playStepBack)
+  'step_back',
+  'crouch_step_back',
 ])
 /**
  * 焼かれた移動を**この割合まで止めておく**型。止めた分は残りで取り返す (総距離は同じ)。
@@ -436,9 +454,6 @@ const VERTICAL_END_POSE: Record<string, string> = { hang_climb: LOWER_CLIPS.crou
  * 補っていたら、**足も一緒に滑って**見えた。前後は他と同じく潰す。
  */
 const SIDEWAYS_CLIPS = new Set(['lean', 'lean_crouch'])
-
-/** ローリングの再生速度。クリップのままだと転がりが緩慢に見える */
-const ROLL_TIME_SCALE = 1.32
 
 /**
  * 全身で転がる型が、クリップに焼かれた移動をどれだけ辿るか。
@@ -590,10 +605,15 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   'stand',
   'cqc_throw',
   'cqc_miss',
+  // 一歩下がる。流し直すと下がり続ける
+  'step_back',
+  'crouch_step_back',
   // 投げられて倒れた姿のまま留める (sweep と同じ)
   'cqc_thrown',
   // ローリングで倒れた姿のまま留める (sweep と同じ)
   'hit2back',
+  // 散弾で倒れた姿のまま留める (sweep と同じ)
+  'shotgun_sweep',
   'jump_up',
   'jump_down',
   'death',
@@ -605,6 +625,7 @@ const ONE_SHOT_LOWER = new Set<Locomotion>([
   // 眠り。**最後の姿勢で止める** — 流し直すと眠っている間ずっと倒れ直す
   'sleep',
   'salute',
+  'crouch_salute',
   // クレイモアを置く型。**構えは最後のフレームで止める** —
   // 一度だけにしないと 1.77 秒で頭から流れ直して、かがむ動作を繰り返す
   'claymore_windup',
@@ -648,6 +669,8 @@ const PISTOL_RELOAD_RATE = 1.7
  */
 const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   idle: 'pistol_relaxed',
+  step_back: 'pistol_relaxed',
+  crouch_step_back: 'pistol_relaxed',
   // 手ぶらの歩き (拳銃は納めている、ナイフ・投げ物も同じ表)
   walk: 'walk_unarmed',
   // しゃがみ歩きはしゃがみ走りと同じ手ぶらの型
@@ -720,6 +743,13 @@ const THROWN_KEY = 'cqc_thrown'
  * 腰の横の移動は取り込む時に捨ててある (merge_clip の --in-place)。滑るのはサーバーの距離 (0.5m)
  */
 const ROLL_FALL_KEY = 'hit2back'
+/**
+ * 散弾で飛ばされて倒れる。**爆風の sweep を 1.6 倍に焼いた写し** (sweep_shotgun、tools/retime_clip.js の --as)。
+ * 倒れた後は sweep と同じ扱い。滑る時間 (SHOTGUN_KNOCK_TIME) も同じだけ短い
+ */
+const SWEEP_SHOTGUN_KEY = 'sweep_shotgun'
+/** 背中が着くまで (秒)。焼いた倍率 1.6 で爆風の着地を割った値 */
+const SWEEP_SHOTGUN_LAND = 0.92 / 1.6
 /** 流す速さ。等倍 (1.93 秒) では遅かった (本人 2026-10-20「もう少し早く」) */
 const ROLL_FALL_RATE = 1.5
 /** 背中が着くまで (秒)。型の半ばで仰向けになる */
@@ -733,6 +763,22 @@ const CQC_THROW_KEY = 'cqc_throw'
  */
 const CQC_RATE = 1.2
 const CQC_MISS_KEY = 'cqc_miss'
+/**
+ * CQC の出だし。**投げも空振りも左のフックから入る** (tools/cqc_hook.json、Hook.fbx)。
+ * 掛かったら振り抜く前に投げへ移り (CQC_HOOK_CUT)、掛からなければ振り抜いて構えへ戻るまで
+ * 流す — 振り抜いた後が隙になる (2026-10-30 本人「CQCがすかったらmotionをつづける(隙になる)」)
+ */
+const CQC_HOOK_KEY = 'cqc_hook'
+/**
+ * フックから投げへ移る、型の時刻 (秒、型の時間)。**投げの型も同じ時刻から流す**ので、
+ * 投げの時の流れ (投げられる側と合わせた時刻、背中が着く CQC_LAND_SECONDS) は前と変わらない。
+ *
+ * フックの 12 コマ目 (24fps) — 拳が顔の前を横切る直前。投げの型の同じ時刻は左の拳が
+ * 当たった直後なので、繋ぐと拳が当たって投げに入る形になる
+ */
+const CQC_HOOK_CUT = 11 / 24
+/** しゃがんで下がる型 (crouch_step_back) の、膝を突き終わるまで (秒、型の時間)。後ろは止まった姿 */
+const CROUCH_STEP_BACK_SECONDS = 1.1
 /**
  * 吹き飛ばされる型の再生速度。
  *
@@ -937,6 +983,21 @@ const SALUTE_KEY = 'salute'
  * 早すぎるとまだ上げている途中、遅いと下ろし始めた姿勢で固まる。
  */
 const SALUTE_HOLD_PHASE = 0.45
+/**
+ * しゃがんだ敬礼 (salute_crouch、MilitarySignalingCrouch)。**5 秒の型のうち使うのは手を挙げてから下ろすまで。**
+ * 実測 (右手の高さ): 0.75 秒まで構えて待ち、1.05 秒で挙がり切り、上げ下げして 2.05 秒から下ろし、
+ * 2.4 秒で下り切る。後ろは止まった姿。
+ *
+ * **押している間は上げ下げを続ける** (本人 2026-10-30「手を上げたり下げたいしてるところを敬礼ボタン
+ * 長押しで機能させる」) — 上げ下げの山 2 つ (1.47 秒と 1.88 秒、ほぼ同じ姿) の間を回す。
+ * 離したら続きを流して下ろす。短く押せば挙げて 1 往復して下ろす。
+ *
+ * **流すのは上半身だけ** — 脚はしゃがみの型のまま (resolveLowerKey)
+ */
+const SALUTE_CROUCH_KEY = 'salute_crouch'
+const SALUTE_CROUCH_START = 0.75
+const SALUTE_CROUCH_LOOP: readonly [number, number] = [1.47, 1.88]
+const SALUTE_CROUCH_END = 2.55
 const relaxedKey = (state: Locomotion) => `relaxed:${state}`
 /** 一度だけ流す上半身。起動時から回さず、始める側で play する */
 const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
@@ -949,8 +1010,10 @@ const UPPER_ONE_SHOT: ReadonlySet<string> = new Set([
   SWEEP_KEY,
   THROWN_KEY,
   ROLL_FALL_KEY,
+  SWEEP_SHOTGUN_KEY,
   CQC_THROW_KEY,
   CQC_MISS_KEY,
+  CQC_HOOK_KEY,
   STAND_KEY,
   THROW_WINDUP_KEY,
   THROW_RELEASE_KEY,
@@ -1636,8 +1699,11 @@ export class CharacterAnimator {
       finished === this.upper.get(SWEEP_KEY) ||
       finished === this.upper.get(THROWN_KEY) ||
       finished === this.upper.get(ROLL_FALL_KEY) ||
+      finished === this.upper.get(SWEEP_SHOTGUN_KEY) ||
       finished === this.upper.get(CQC_THROW_KEY) ||
       finished === this.upper.get(CQC_MISS_KEY) ||
+      // 空振りのフックを振り抜いた (投げならその前に投げの型へ移っている)
+      finished === this.upper.get(CQC_HOOK_KEY) ||
       finished === this.upper.get(STAND_KEY) ||
       finished === this.upper.get(THROW_RELEASE_KEY) ||
       // 伏せの振り切りも。戻さないと投げの状態のまま残り、構えを押したままの次の
@@ -1747,6 +1813,15 @@ export class CharacterAnimator {
       this.lower.set(state, action)
       this.lowerClipNames.set(state, clip.name)
     }
+    // CQC の出だしのフック。体の状態 (locomotion) ではなく cqc_throw / cqc_miss の頭に流す型なので表の外
+    const hook = byName.get(CQC_HOOK_KEY)
+    if (hook) {
+      const action = this.mixer.clipAction(splitClip(hook, 'lower'))
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+      this.lower.set(CQC_HOOK_KEY, action)
+      this.lowerClipNames.set(CQC_HOOK_KEY, hook.name)
+    }
 
     /*
      * **構えていない間の下半身。上半身と同じクリップから取る。**
@@ -1777,19 +1852,11 @@ export class CharacterAnimator {
       this.lowerClipNames.set(key, clip.name)
     }
     /*
-     * **ナイフの構えは全身。** 立ち止まって構えた間だけ、下半身もこの型から
-     * 取る (resolveLowerKey)。半身の構えで腰が 90° 横を向いているので、
-     * 上半身だけ乗せると腰の基準合わせ (alignSpineToUpperClip) がその 90° を
-     * 捻れと読んで上体を回してしまう。全身なら上下が同じ型で補正が掛からない。
+     * **ナイフの構えは上半身だけ。** 立ち止まっても動いても、上半身は knife_idle、脚は立ち・走りの型
+     * (2026-10-30 本人「knife かかえて動いてる時の格好と静止してる時でなんか違う」→ 動いている時の形に揃える)。
+     * 前は立ち止まった間だけ全身をこの型にしていて、半身の構え (腰が 90° 横) と、動いた時の正面向きの
+     * 構えで格好が変わっていた
      */
-    const knifeClip = byName.get('knife_idle')
-    if (knifeClip) {
-      const key = relaxedLowerKey('idle', knifeClip.name)
-      const action = this.mixer.clipAction(splitClip(knifeClip, 'lower', key))
-      action.play()
-      this.lower.set(key, action)
-      this.lowerClipNames.set(key, knifeClip.name)
-    }
 
     // --- 上半身レイヤー ---
     // 構えは idle の上半身。移動中も銃を構えた姿勢を保つ。
@@ -1902,6 +1969,7 @@ export class CharacterAnimator {
       [SWEEP_KEY, 'sweep'],
       [THROWN_KEY, 'cqc_thrown'],
       [ROLL_FALL_KEY, 'hit2back'],
+      [SWEEP_SHOTGUN_KEY, 'sweep_shotgun'],
       [STAND_KEY, STAND_CLIP],
     ] as const) {
       const clip = byName.get(name)
@@ -2032,6 +2100,7 @@ export class CharacterAnimator {
       [HANG_RIGHT_KEY, 'hang_right'],
       [CQC_THROW_KEY, 'cqc_throw'],
       [CQC_MISS_KEY, 'cqc_miss'],
+      [CQC_HOOK_KEY, 'cqc_hook'],
     ] as const) {
       const clip = byName.get(name)
       if (!clip) continue
@@ -2158,6 +2227,12 @@ export class CharacterAnimator {
       action.setLoop(THREE.LoopOnce, 1)
       action.clampWhenFinished = true
     }
+    const saluteCrouch = byName.get('salute_crouch')
+    if (saluteCrouch) {
+      const action = registerUpper(SALUTE_CROUCH_KEY, saluteCrouch)
+      action.setLoop(THREE.LoopOnce, 1)
+      action.clampWhenFinished = true
+    }
     this.saluteDuration = salute?.duration ?? 0
 
     // 怯みは上半身だけ。走りながら上体だけが跳ねる形になり、被弾で足が止まらない。
@@ -2202,6 +2277,7 @@ export class CharacterAnimator {
     this.releaseRollIfSettling()
     this.updateSalute()
     this.updateThrow()
+    this.updateCqcHook()
 
     // 前フレームの上乗せを取り消してから mixer を回す。
     // three が書き込みを省略した回でも、ボーンが素のアニメ値から始まることを保証する。
@@ -2271,16 +2347,10 @@ export class CharacterAnimator {
       prone
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
     this.lookYaw = damp(this.lookYaw, this.lookYawTarget, LOOK_YAW_LAMBDA, dt)
-    /*
-     * **ナイフの構えでは腰を正面へ戻さない。** 半身の構えなので腰は 90° 横を
-     * 向いていて、それを正面へ寄せると全身が 75° 回って刃が横を向く
-     * (実測: 頭の向きが拳銃の構えと 70° ずれた)。刃と顔は素材のままで
-     * 照準の方を向いている。
-     */
-    const knifeStance = this.knife && this.aiming && this.locomotion === 'idle'
+    // ナイフの構えも同じ (立ち止まっても上半身だけ knife_idle、脚は立ちの型。下の resolveLowerKey の注)
     this.hipSquare = damp(
       this.hipSquare,
-      this.aiming && !committed && !knifeStance ? AIM_HIP_SQUARE : 0,
+      this.aiming && !committed ? AIM_HIP_SQUARE : 0,
       AIM_HIP_LAMBDA,
       dt,
     )
@@ -2830,11 +2900,9 @@ export class CharacterAnimator {
    * ごとの型が要る。脱力中は体が進行方向を向くので前走りしか使わない。
    */
   private resolveLowerKey(): string {
-    // ナイフを立って構えている。上半身と同じ型で全身にする
-    if (this.knife && this.aiming && this.locomotion === 'idle') {
-      const key = relaxedLowerKey('idle', 'knife_idle')
-      if (this.lower.has(key)) return key
-    }
+    if (this.hooking) return CQC_HOOK_KEY
+    // しゃがんだ合図は**上半身だけ**。型の脚は膝を突き直して動きすぎた (本人 2026-10-31「足が動きすぎ」)
+    if (this.locomotion === 'crouch_salute' && this.lower.has('crouch_idle')) return 'crouch_idle'
     // 伏せてナイフを構えている。prone_stab の頭の 1 枚で全身
     if (this.knife && this.aiming && this.locomotion === 'prone_idle') {
       const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
@@ -3030,18 +3098,28 @@ export class CharacterAnimator {
    * クリップが無ければ何も起きない。Mixamo の Salute を取り込むまでは
    * 押しても反応しないが、仕組みだけ先に通してある。
    */
-  playSalute(): void {
+  playSalute(crouching = false): void {
     if (this.dead) return
-    const upper = this.upper.get(SALUTE_KEY)
-    const lower = this.lower.get('salute')
+    // しゃがんでいればしゃがんだ合図の型。型が無い皮は立った敬礼
+    this.saluteCrouch = crouching && this.upper.has(SALUTE_CROUCH_KEY) && this.lower.has('crouch_salute')
+    const upper = this.upper.get(this.saluteCrouch ? SALUTE_CROUCH_KEY : SALUTE_KEY)
+    const lower = this.lower.get(this.saluteCrouch ? 'crouch_salute' : 'salute')
     if (!upper || !lower) return
     upper.setEffectiveTimeScale(1)
     lower.setEffectiveTimeScale(1)
     upper.reset().play()
     lower.reset().play()
+    // 構えて待っている頭は飛ばして、手を挙げる所から
+    if (this.saluteCrouch) {
+      upper.time = SALUTE_CROUCH_START
+      lower.time = SALUTE_CROUCH_START
+    }
     this.upperState = 'salute'
-    this.locomotion = 'salute'
+    this.locomotion = this.saluteCrouch ? 'crouch_salute' : 'salute'
   }
+
+  /** いま流している敬礼がしゃがんだ合図か */
+  private saluteCrouch = false
 
   /** 敬礼をやめる。動いたら途中でも解ける */
   cancelSalute(): void {
@@ -3060,6 +3138,10 @@ export class CharacterAnimator {
    */
   private updateSalute(): void {
     if (this.upperState !== 'salute') return
+    if (this.saluteCrouch) {
+      this.updateSaluteCrouch()
+      return
+    }
     const upper = this.upper.get(SALUTE_KEY)
     const lower = this.lower.get('salute')
     if (!upper || !lower) return
@@ -3068,6 +3150,23 @@ export class CharacterAnimator {
     const scale = hold ? 0 : 1
     upper.setEffectiveTimeScale(scale)
     lower.setEffectiveTimeScale(scale)
+  }
+
+  /**
+   * しゃがんだ合図。押している間は上げ下げの山から山へ戻して回し、離したら続きを流して
+   * 下ろし切った所 (SALUTE_CROUCH_END) で普段の姿へ戻す (型の後ろの止まった姿は流さない)
+   */
+  private updateSaluteCrouch(): void {
+    const upper = this.upper.get(SALUTE_CROUCH_KEY)
+    const lower = this.lower.get('crouch_salute')
+    if (!upper || !lower) return
+    const [loopFrom, loopTo] = SALUTE_CROUCH_LOOP
+    if (this.saluteHeld && upper.time >= loopTo) {
+      const back = upper.time - (loopTo - loopFrom)
+      upper.time = back
+      lower.time = back
+    }
+    if (!this.saluteHeld && upper.time >= SALUTE_CROUCH_END) this.upperState = 'stance'
   }
 
   /** リロード中か。銃を抜いたままにするのに使う */
@@ -3321,6 +3420,7 @@ export class CharacterAnimator {
       if (this.upper.has(DEATH_KEY)) return DEATH_KEY
     }
     if (this.upperState === 'hit' && this.upper.has(HIT_KEY)) return HIT_KEY
+    if (this.upperState === 'salute' && this.saluteCrouch && this.upper.has(SALUTE_CROUCH_KEY)) return SALUTE_CROUCH_KEY
     if (this.upperState === 'salute' && this.upper.has(SALUTE_KEY)) return SALUTE_KEY
     if (this.upperState === 'stab') {
       if (this.locomotion === 'prone_stab' && this.upper.has(PRONE_STAB_KEY)) return PRONE_STAB_KEY
@@ -3367,6 +3467,7 @@ export class CharacterAnimator {
     if (this.upperState === 'vault' && this.upper.has(VAULT_KEY)) return VAULT_KEY
     if (this.upperState === 'vault_up' && this.upper.has(VAULT_UP_KEY)) return VAULT_UP_KEY
     // CQC も同じ。上だけ構えに戻ると、銃を構えたまま足を払う
+    if (this.hooking) return CQC_HOOK_KEY
     if (this.upperState === 'cqc_throw' && this.upper.has(CQC_THROW_KEY)) return CQC_THROW_KEY
     if (this.upperState === 'cqc_miss' && this.upper.has(CQC_MISS_KEY)) return CQC_MISS_KEY
     if (this.upperState === 'hang_drop' && this.upper.has(HANG_DROP_KEY)) return HANG_DROP_KEY
@@ -3396,7 +3497,10 @@ export class CharacterAnimator {
     // 吹き飛ばされる型は最終姿勢で留まっているので、それをそのまま使う。
     if (
       !this.aiming &&
-      (this.locomotion === 'sweep' || this.locomotion === 'cqc_thrown' || this.locomotion === 'hit2back') &&
+      (this.locomotion === 'sweep' ||
+        this.locomotion === 'shotgun_sweep' ||
+        this.locomotion === 'cqc_thrown' ||
+        this.locomotion === 'hit2back') &&
       this.upper.has(this.fallKey)
     ) {
       return this.fallKey
@@ -3537,6 +3641,7 @@ export class CharacterAnimator {
     const upper = this.upper.get(up ? VAULT_UP_KEY : VAULT_KEY)
     const lower = this.lower.get(name)
     if (!upper || !lower) return
+    // 跳び越える型 (vault) は**ファイルの側で 1.2 倍速にしてある** (tools/retime_clip.js、本人 2026-10-30)
     upper.reset().play()
     lower.reset().play()
     this.upperState = name
@@ -4110,17 +4215,19 @@ export class CharacterAnimator {
     this.standDuration = this.standClipDuration / this.standRate
   }
 
-  playSweep(): void {
+  /** @param shotgun 散弾で飛ばされた。速く焼いた写し (shotgun_sweep) を流す。型が無い皮は爆風の型 */
+  playSweep(shotgun = false): void {
     if (this.dead) return
-    const upper = this.upper.get(SWEEP_KEY)
-    const lower = this.lower.get('sweep')
+    const fast = shotgun && this.upper.has(SWEEP_SHOTGUN_KEY) && this.lower.has('shotgun_sweep')
+    const upper = this.upper.get(fast ? SWEEP_SHOTGUN_KEY : SWEEP_KEY)
+    const lower = this.lower.get(fast ? 'shotgun_sweep' : 'sweep')
     if (!upper || !lower) return
     upper.reset().setEffectiveTimeScale(this.sweepRate).play()
     lower.reset().setEffectiveTimeScale(this.sweepRate).play()
     this.upperState = 'sweep'
-    this.locomotion = 'sweep'
-    this.fallKey = SWEEP_KEY
-    this.sweepDuration = SWEEP_LAND / this.sweepRate
+    this.locomotion = fast ? 'shotgun_sweep' : 'sweep'
+    this.fallKey = fast ? SWEEP_SHOTGUN_KEY : SWEEP_KEY
+    this.sweepDuration = (fast ? SWEEP_SHOTGUN_LAND : SWEEP_LAND) / this.sweepRate
   }
 
   /**
@@ -4172,14 +4279,68 @@ export class CharacterAnimator {
    */
   playCqc(kind: 'cqc_throw' | 'cqc_miss'): void {
     if (this.dead) return
-    const upper = this.upper.get(kind === 'cqc_throw' ? CQC_THROW_KEY : CQC_MISS_KEY)
-    const lower = this.lower.get(kind)
+    // どちらもフックから入る。フックの型が無い皮は前の型 (投げ / 空振り) を頭から
+    const hookUpper = this.upper.get(CQC_HOOK_KEY)
+    const hookLower = this.lower.get(CQC_HOOK_KEY)
+    this.cqcHookOn = !!hookUpper && !!hookLower
+    const upper = this.cqcHookOn ? hookUpper : this.upper.get(kind === 'cqc_throw' ? CQC_THROW_KEY : CQC_MISS_KEY)
+    const lower = this.cqcHookOn ? hookLower : this.lower.get(kind)
     if (!upper || !lower) return
     upper.reset().setEffectiveTimeScale(CQC_RATE).play()
     lower.reset().setEffectiveTimeScale(CQC_RATE).play()
     this.upperState = kind
     this.locomotion = kind
     this.rootSampleValid = false
+  }
+
+  /** フックを流している最中か (投げに移る前、または空振り) */
+  private cqcHookOn = false
+  private get hooking(): boolean {
+    return this.cqcHookOn && (this.upperState === 'cqc_throw' || this.upperState === 'cqc_miss')
+  }
+
+  /**
+   * 掛かった CQC が、フックを振り抜く前の時刻 (CQC_HOOK_CUT) に来たら投げの型へ移る。
+   * **投げの型はフックと同じ時刻から流す** — 投げの時の流れは前と同じ。型の重みの補間で繋がる
+   */
+  private updateCqcHook(): void {
+    if (!this.hooking || this.upperState !== 'cqc_throw') return
+    const hook = this.lower.get(CQC_HOOK_KEY)
+    const upper = this.upper.get(CQC_THROW_KEY)
+    const lower = this.lower.get('cqc_throw')
+    if (!hook || hook.time < CQC_HOOK_CUT || !upper || !lower) return
+    const at = hook.time
+    upper.reset().setEffectiveTimeScale(CQC_RATE).play()
+    lower.reset().setEffectiveTimeScale(CQC_RATE).play()
+    upper.time = at
+    lower.time = at
+    this.cqcHookOn = false
+    /*
+     * 踏み込みはフックで進んだぶんを引いて、投げの型の残りを辿る。投げの型はこの時刻までに
+     * フックより少し多く進んでいる (0.25m と 0.18m) ので、差を次のコマで足す —
+     * 投げ切った時の 2 人の間合いが前と同じになる
+     */
+    const stored = this.rootMotion.get('cqc_throw')
+    const hookStored = this.rootMotion.get(CQC_HOOK_KEY)
+    if (stored && hookStored && this.rootSampleValid) {
+      sampleVectorTrack(stored.times, stored.values, at, this.scratchVector)
+      sampleVectorTrack(stored.times, stored.values, 0, this.scratchVector2)
+      const throwX = this.scratchVector.x - this.scratchVector2.x
+      const throwY = this.scratchVector.y - this.scratchVector2.y
+      sampleVectorTrack(hookStored.times, hookStored.values, this.lastRootTime, this.scratchVector2)
+      const hookX = this.scratchVector2.x
+      const hookY = this.scratchVector2.y
+      sampleVectorTrack(hookStored.times, hookStored.values, 0, this.scratchVector2)
+      // 次のコマの差 = 投げの今 - (投げの今 - (投げの進み - フックの進み))
+      this.lastRootSample.set(
+        this.scratchVector.x - (throwX - (hookX - this.scratchVector2.x)),
+        this.scratchVector.y - (throwY - (hookY - this.scratchVector2.y)),
+        0,
+      )
+      this.lastRootTime = at
+    } else {
+      this.rootSampleValid = false
+    }
   }
 
   /**
@@ -4234,6 +4395,49 @@ export class CharacterAnimator {
     this.locomotion = prone ? 'prone_stab' : 'stab'
   }
 
+  /**
+   * 構えた所から一歩下がる。**下半身だけ** — 下がっている間は銃を下ろすので、上半身は
+   * 脱力の型 (RELAXED_CLIPS の step_back)。焼かれた移動を辿り、0.7m・1 秒に合わせる (step.ts)
+   *
+   * @returns 型の尺 (秒)。型が無い皮では 0
+   */
+  playStepBack(crouching = false): number {
+    if (this.dead) return 0
+    const state = crouching ? 'crouch_step_back' : 'step_back'
+    const lower = this.lower.get(state)
+    if (!lower) return 0
+    // 立ちもしゃがみも同じ時間 (STEP_BACK_SECONDS) で流し切る。しゃがみの型は膝を突き終わった後、
+    // 同じ姿で 0.5 秒止まっているので、そこまで (CROUCH_STEP_BACK_SECONDS) を流す
+    lower.reset().setEffectiveTimeScale(this.stepBackEnd(state, lower) / STEP_BACK_SECONDS).play()
+    this.locomotion = state
+    this.rootSampleValid = false
+    return STEP_BACK_SECONDS
+  }
+
+  /** 下がる型を流し切る、型の時刻 (秒) */
+  private stepBackEnd(state: string, action: THREE.AnimationAction): number {
+    const duration = action.getClip().duration
+    return state === 'crouch_step_back' ? Math.min(duration, CROUCH_STEP_BACK_SECONDS) : duration
+  }
+
+  /**
+   * 下がる型の移動の倍率。**型に焼かれた距離を STEP_BACK_DISTANCE へ合わせる** —
+   * 流し切るまでの腰の水平の移動を測って割る (型を差し替えても距離は変わらない)
+   */
+  private stepBackScale(state: string, stored: RootMotionTrack, action: THREE.AnimationAction): number {
+    const cached = this.stepBackScales.get(state)
+    if (cached !== undefined) return cached
+    sampleVectorTrack(stored.times, stored.values, 0, this.scratchVector2)
+    const x0 = this.scratchVector2.x
+    const y0 = this.scratchVector2.y
+    sampleVectorTrack(stored.times, stored.values, this.stepBackEnd(state, action), this.scratchVector2)
+    const travel = Math.hypot(this.scratchVector2.x - x0, this.scratchVector2.y - y0) * this.skeletonScale
+    const scale = travel > 1e-3 ? STEP_BACK_DISTANCE / travel : 1
+    this.stepBackScales.set(state, scale)
+    return scale
+  }
+  private readonly stepBackScales = new Map<string, number>()
+
   /** ローリングを頭から再生する。全身動作なので上下を同時に流す */
   playRoll(): void {
     if (this.dead) return
@@ -4261,7 +4465,7 @@ export class CharacterAnimator {
   consumeRootMotion(out: THREE.Vector3): boolean {
     // **いま流れている全身の型から引く。** roll だけを見ていたので、
     // 受け身は焼かれた移動を持っているのに誰も読まなかった
-    const name = this.locomotion
+    const name = this.hooking ? CQC_HOOK_KEY : this.locomotion
     if (!ROOT_MOTION_CLIPS.has(name)) return false
     const stored = this.rootMotion.get(name)
     const action = this.lower.get(name)
@@ -4299,8 +4503,12 @@ export class CharacterAnimator {
 
     // トラック空間は X/Y が水平、Z が上下 (Armature の +90°X 回転のため)。
     // モデル空間では armature ローカルの +Y が前方 (+Z) に対応する。
-    const scale = this.skeletonScale * (ROOT_DISTANCE_SCALE[name] ?? 1) * (name === 'vault_up' ? this.vaultUpReach : 1)
-    const hold = ROOT_MOTION_HOLD[name]
+    const scale =
+      this.skeletonScale *
+      (ROOT_DISTANCE_SCALE[name] ?? 1) *
+      (name === 'vault_up' ? this.vaultUpReach : 1) *
+      (name === 'step_back' || name === 'crouch_step_back' ? this.stepBackScale(name, stored, action) : 1)
+    const hold = name === CQC_HOOK_KEY ? undefined : ROOT_MOTION_HOLD[name]
     if (hold) {
       /*
        * **前半は焼かれた移動の keep 倍だけ進み、残りは境目から早回しで辿る。**

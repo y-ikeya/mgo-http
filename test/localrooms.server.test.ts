@@ -35,7 +35,7 @@ test('手元のサーバーでは練習 (/training) が foxtrot を開く。一�
   expect(await trainingRoom(server)).toBe('foxtrot')
 }, 30000)
 
-test('公開のサーバーでは練習は echo', async () => {
+test('公開のサーバーでは練習は golf', async () => {
   server = await startServer({ MGO2_LOCAL_ROOMS: '0' })
-  expect(await trainingRoom(server)).toBe('echo')
+  expect(await trainingRoom(server)).toBe('golf')
 }, 30000)

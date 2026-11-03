@@ -81,6 +81,13 @@ export interface Pose {
    * どちらの真偽も立たない。構えを 1 つ持てば全部言える (stance.ts)。
    */
   stance: Stance
+  /**
+   * いまの locomotion と、それに入ってからの秒数。**型の途中の体の位置**を引くのに要る
+   * (poseCurve.ts の zoneAt)。倒れていく・転がっている間は、部位が姿勢ごとの高さに無い。
+   * 無ければ姿勢ごとの高さで見る
+   */
+  locomotion?: string
+  age?: number
 }
 
 /**
@@ -294,6 +301,8 @@ export interface MatchPlayer extends Player {
   knockX: number
   knockZ: number
   knockLeft: number
+  /** 滑り切るまでの時間 (秒)。爆風は KNOCK_TIME、散弾はそれより短い */
+  knockTime: number
   /**
    * 的が最初に置かれた場所。**倒れて戻るときだけここへ返る。**
    *
@@ -307,7 +316,7 @@ export interface MatchPlayer extends Player {
   /** 的の足元の高さ。地面が 0 ではないステージ (検証場は 0.1) で埋まらないように */
   homeY: number
   /** 的の構え。立っている / しゃがんでいる / 伏せている / 箱を被っている / 左右へ lean し続ける。人は使わない */
-  homeStance: 'stand' | 'crouch' | 'prone' | 'box' | 'lean'
+  homeStance: 'stand' | 'crouch' | 'prone' | 'box' | 'lean' | 'salute'
   /** 走り続ける的の、もう一方の端。null なら動かない。人は使わない */
   patrolTo: { x: number; z: number } | null
   /** いま向こうの端 (patrolTo) へ走っているか。false なら置き場 (home) へ戻っている */
@@ -327,6 +336,8 @@ export interface MatchPlayer extends Player {
   downThrown: boolean
   /** 的が倒れているのがローリングの体当たりでか。倒れている姿が違う (hit2back) */
   downRolled: boolean
+  /** 的が倒れているのが散弾でか。倒れている姿が違う (shotgun_sweep) */
+  downShotgun: boolean
   /**
    * 倒された時、撃った相手が背後に居たか。**倒れる向きに出る。**
    *
@@ -404,6 +415,11 @@ export interface MatchPlayer extends Player {
   footsteps: Footsteps
   /** いまどの動きの中に居るか。足音の間隔と、他の人に見せる姿勢に効く */
   locomotion: Locomotion
+  /**
+   * いまの locomotion に入ってからの秒数 (状態の知らせの locomotionAge)。眠って倒れていく途中の
+   * 高さを見るのに使う (domain/player/stance.ts の stanceAt)
+   */
+  locomotionAge: number
   /** 持っている銃。威力と連射の上限をこれで引く */
   weapon: WeaponId
 }
@@ -449,6 +465,7 @@ export function newMatchPlayer(seed: {
     knockX: 0,
     knockZ: 0,
     knockLeft: 0,
+    knockTime: 0,
     homeX: 0,
     homeZ: 0,
     homeY: 0,
@@ -458,6 +475,7 @@ export function newMatchPlayer(seed: {
     downLeft: 0,
     downThrown: false,
     downRolled: false,
+    downShotgun: false,
     downFromBehind: false,
     weapon: 'rifle',
     primary: 'rifle',
@@ -475,6 +493,7 @@ export function newMatchPlayer(seed: {
     stuns: 0,
     ready: false,
     stamina: MAX_STAMINA,
+    locomotionAge: 0,
     sleepUntil: 0,
     wakeFloor: 0,
     struggleAt: 0,
@@ -509,7 +528,7 @@ export function newBot(seed: {
   /** 足元の高さ。省けば 0 */
   y?: number
   /** 構え。省けば立っている */
-  stance?: 'stand' | 'crouch' | 'prone' | 'box' | 'lean'
+  stance?: 'stand' | 'crouch' | 'prone' | 'box' | 'lean' | 'salute'
   /** 走り続ける的のもう一方の端。省けば動かない */
   patrol?: { x: number; z: number }
   now: number

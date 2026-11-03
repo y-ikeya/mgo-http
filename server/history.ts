@@ -17,7 +17,7 @@
 
 import { framesFor, PoseTrack } from '../src/sim/judge/history'
 import type { MatchPlayer, Pose } from '../src/domain/player/player'
-import { leanOf, stanceOf } from '../src/domain/player/stance'
+import { leanOf, stanceAt, stanceOf } from '../src/domain/player/stance'
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { SNAPSHOT_INTERVAL } from '../src/application/protocol/types'
 
@@ -37,6 +37,8 @@ const emptyPose = (): Pose => ({
   yaw: 0,
   pitch: 0,
   stance: stanceOf('idle'),
+  locomotion: 'idle',
+  age: 0,
 })
 
 const tracks = new Map<string, PoseTrack<Pose>>()
@@ -69,11 +71,15 @@ export function recordPose(player: MatchPlayer): void {
     // ナイフが刺さる姿勢かの判定に要る。**遡って照合するので履歴に持つ** —
     // 「いまの姿勢」で見ると、刺した瞬間は立っていた相手が
     // 爆風で転んだ直後に届いた申告を弾いてしまう
-    slot.stance = stanceOf(player.locomotion)
+    // 眠って倒れていく途中は、まだ高い (stanceAt)
+    slot.stance = stanceAt(player.locomotion, player.locomotionAge)
     // 撃った線をカメラから引き直すのに要る (hitcheck.ts の zoneExposed)
     slot.cameraYaw = player.cameraYaw
     slot.aiming = player.aiming
     slot.lean = leanOf(player.locomotion)
+    // 倒れていく・転がっている体の部位の位置を、型の時間で引く (poseCurve.ts)
+    slot.locomotion = player.locomotion
+    slot.age = player.locomotionAge
   })
 }
 

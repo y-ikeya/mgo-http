@@ -52,6 +52,11 @@ export interface HitRules {
   zoneRadius(zone: HitZone): number
   /** その部位の縦の幅 (頭の高さに対する比率、下端と上端)。胴と脚は筒なので球では足りない */
   zoneSpan(zone: HitZone): readonly [number, number]
+  /**
+   * 型の途中の部位の位置 (高さは足元から、前は体の正面へ m)。表の無い型は null で、
+   * 上の高さと比率で見る。倒れていく・転がっている体は姿勢ごとの高さに無い
+   */
+  zoneAt?(locomotion: string, age: number, zone: HitZone): { up: number; forward: number; low: number; high: number } | null
   /** その構えに刃が通るか */
   /** 刺さる構えか。倒れた相手には、刺す側が屈んで見下ろしているときだけ (attacker は刺す側の構え) */
   canBeStabbed(stance: string, aimPitch: number, attacker: string): boolean
@@ -178,9 +183,47 @@ function isArcClear(
 }
 
 
-/** その姿勢での部位の位置 */
-export function zonePoint(pose: Pose, zone: HitZone, head: number): [number, number, number] {
-  return [pose.x, pose.y + head * ZONE_RATIO[zone], pose.z]
+/**
+ * その姿での部位の中心と、縦の筒の下端・上端 (半径は含まない)。
+ *
+ * 型の途中 (眠って倒れていく、転がっている) は表から引く — 画面の体がそこに在る。
+ * それ以外は姿勢の頭の高さに比率を掛ける
+ */
+export function zoneShape(
+  pose: Pose,
+  zone: HitZone,
+  rules: Pick<HitRules, 'headHeight' | 'zoneSpan' | 'zoneAt'>,
+): { x: number; y: number; z: number; bottom: number; top: number } {
+  const shape = pose.locomotion ? rules.zoneAt?.(pose.locomotion, pose.age ?? 0, zone) : null
+  if (shape) {
+    const [fx, fz] = forwardOf(pose.yaw)
+    return {
+      x: pose.x + fx * shape.forward,
+      y: pose.y + shape.up,
+      z: pose.z + fz * shape.forward,
+      bottom: pose.y + shape.low,
+      top: pose.y + shape.high,
+    }
+  }
+  const head = rules.headHeight(pose.stance)
+  const [low, high] = rules.zoneSpan(zone)
+  return {
+    x: pose.x,
+    y: pose.y + head * ZONE_RATIO[zone],
+    z: pose.z,
+    bottom: pose.y + head * low,
+    top: pose.y + head * high,
+  }
+}
+
+/** その姿での部位の中心 */
+export function zonePoint(
+  pose: Pose,
+  zone: HitZone,
+  rules: Pick<HitRules, 'headHeight' | 'zoneSpan' | 'zoneAt'>,
+): [number, number, number] {
+  const shape = zoneShape(pose, zone, rules)
+  return [shape.x, shape.y, shape.z]
 }
 
 /** yaw から前方向 (XZ)。ローカル -Z が前 */
@@ -237,7 +280,8 @@ export function zoneExposed(
   attacker = leaned(attacker, rules)
   target = leaned(target, rules)
   const head = rules.headHeight(attacker.stance)
-  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
+  const shape = zoneShape(target, zone, rules)
+  const [tx, ty, tz] = [shape.x, shape.y, shape.z]
 
   // 攻撃者から相手へ向かう線に直交する向き。ここへ肩の幅だけずらす
   const dx = tx - attacker.x
@@ -258,10 +302,8 @@ export function zoneExposed(
    * になった (梯子の脇の看板の隙間で実測)。
    */
   const r = rules.zoneRadius(zone)
-  const targetHead = rules.headHeight(target.stance)
-  const [low, high] = rules.zoneSpan(zone)
-  const bottom = target.y + targetHead * low - r
-  const top = target.y + targetHead * high + r
+  const bottom = shape.bottom - r
+  const top = shape.top + r
   const targets: [number, number, number][] = [
     [tx, ty, tz],
     [tx, top, tz],
@@ -303,8 +345,8 @@ export function zoneExposed(
     rules.viewHeight(attacker.stance),
   )
   if (!reaches(cam.x, cam.y, cam.z)) return false
-  const targetEyeY = target.y + rules.headHeight(target.stance)
-  return hasLineOfSight(target.x, targetEyeY, target.z, attacker.x, attacker.y, attacker.z, head, world)
+  const eye = zoneShape(target, 'HEAD', rules)
+  return hasLineOfSight(eye.x, eye.y, eye.z, attacker.x, attacker.y, attacker.z, head, world)
 }
 
 /**
@@ -323,7 +365,7 @@ function verifyPose(
   attacker = leaned(attacker, rules)
   target = leaned(target, rules)
   const zone: HitZone = claim.zone ?? 'BODY'
-  const [tx, ty, tz] = zonePoint(target, zone, rules.headHeight(target.stance))
+  const [tx, ty, tz] = zonePoint(target, zone, rules)
   const eyeY = attacker.y + rules.headHeight(attacker.stance)
   const actual = Math.hypot(tx - attacker.x, ty - eyeY, tz - attacker.z)
 

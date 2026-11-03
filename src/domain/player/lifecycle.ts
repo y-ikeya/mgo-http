@@ -89,6 +89,24 @@ export type Life =
 export const DOWN_DURATION = 5
 
 /**
+ * **倒されるたびに延びる** 部屋 (CAP、ModeSpec の downGrows) で、1 回ごとに足す秒数と上限 (秒)。
+ *
+ * 倒されてもすぐ戻って特攻すればいい、を抑える (2026-10-26 本人「倒れてる時間を長くして欲しい」)。
+ * 1 回目は普段と同じ 5 秒、2 回目 8 秒、3 回目 11 秒 … 6 回目以降は 20 秒
+ */
+export const DOWN_GROWTH = 3
+export const DOWN_MAX = 20
+
+/**
+ * 倒れたままでいる秒数。**この試合で倒された回数** (いま倒れた分を含む) から。
+ * 延びない部屋は DOWN_DURATION のまま
+ */
+export function downSeconds(deaths: number, grows: boolean): number {
+  if (!grows) return DOWN_DURATION
+  return Math.min(DOWN_MAX, DOWN_DURATION + DOWN_GROWTH * Math.max(0, deaths - 1))
+}
+
+/**
  * 選び終えても、ここまでは湧けない (秒)。
  *
  * 倒された直後に戻ってこられると、撃ち合いに勝った側が休めない。
@@ -233,14 +251,15 @@ type LifeEffect =
  *
  * @param elapsed その状態に入ってから経った時間 (ms)
  * @param respawns まだ復活できるか (domain/match/sides.ts の canRespawn)
+ * @param down 倒れたままでいる秒数 (downSeconds)。省けば DOWN_DURATION
  */
-export function advanceLife(life: Life, elapsed: number, respawns = true): LifeEffect | null {
+export function advanceLife(life: Life, elapsed: number, respawns = true, down = DOWN_DURATION): LifeEffect | null {
   switch (life) {
     // 倒れる尺が終わったら支度へ。ここで初めて装備画面が出る。
     // **復活できない人は倒れたまま** (TSNE の lives)。試合が終わるまでその場でカメラだけ回せる
     case 'downed':
       if (!respawns) return null
-      return elapsed >= DOWN_DURATION * 1000 ? { kind: 'life', to: 'choosing' } : null
+      return elapsed >= down * 1000 ? { kind: 'life', to: 'choosing' } : null
     // 決めないまま放っておかれた。相手の試合を止めないために打ち切る
     case 'choosing':
       return elapsed >= CHOOSE_TIMEOUT * 1000 ? { kind: 'spawn' } : null

@@ -7,7 +7,7 @@
 import { type Match, connected, newMatch, nextSlot } from '../src/domain/match/match'
 import { ROOMS, type RoomName } from '../src/domain/match/room'
 import { STAGES, nextStage } from '../src/domain/stage'
-import type { Life } from '../src/domain/player/lifecycle'
+import { downSeconds, type Life } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, enterLife, newBot } from '../src/domain/player/player'
 import type { ServerMessage } from '../src/application/protocol/types'
 import type { Claymore } from './arms/claymore'
@@ -187,7 +187,8 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
     if (before !== next) console.warn(`[状態] ${player.name}: ${before} → ${next} は通れない`)
     return
   }
-  broadcast(room, { type: 'life', id: player.id, state: next })
+  // 倒れた時は倒れたままでいる秒数も (CAP は倒されるたびに延びる。画面が残りを出す)
+  broadcast(room, { type: 'life', id: player.id, state: next, downFor: next === 'downed' ? downSeconds(player.deaths, room.mode.downGrows) : undefined })
   // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す
   if (next !== 'alive' && next !== 'spawning') releaseCqc(room, player)
   /*
@@ -214,7 +215,7 @@ export function freeFromTrap(player: MatchPlayer, now: number): void {
 }
 
 /**
- * CQC で投げている相手を**放す**。背中が地面に着く前に投げた側が倒れた・抜けた時。
+ * CQC で投げている相手を**放す**。背中が地面に着く前に投げた側が倒れた・眠らされた・抜けた時。
  *
  * 相手は倒れかけの所から立ち直り、スタミナは減らない (着いた時の始末を取り消す)。
  * 人には本人へ released を送る (倒れているのは本人の画面なので)。的はこちらで立たせる
@@ -249,6 +250,7 @@ export function releaseCqc(room: RoomWorld, attacker: MatchPlayer): void {
     victim.downLeft = 0
     victim.downThrown = false
     victim.downRolled = false
+    victim.downShotgun = false
     return
   }
   sessionFor(victim)?.socket.send(JSON.stringify({ type: 'released' } satisfies ServerMessage))
@@ -295,11 +297,13 @@ export const TARGET_DOWN = 2.0 + TARGET_STAND
 export function placeTargets(room: RoomWorld): void {
   const now = Date.now()
   STAGES[room.stage.name].targets.forEach((at, i) => {
+    // 青の的は味方 (練習の人はいつも青)。名前で見分けられるように ALLY と呼ぶ
+    const team = at.team ?? 'red'
     const bot = newBot({
       id: `target-${i}`,
-      name: `TARGET ${i + 1}`,
+      name: team === 'blue' ? `ALLY ${i + 1}` : `TARGET ${i + 1}`,
       slot: nextSlot(room),
-      team: 'red',
+      team,
       x: at.x,
       z: at.z,
       // 地面が 0 でないステージで埋まらないように (検証場の地面は 0.1)

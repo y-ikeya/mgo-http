@@ -60,7 +60,7 @@ describe('回す順', () => {
 
 describe('部屋の割り当て', () => {
   test('**練習は訓練場。** 遮蔽が無いので、外したのが腕か地形かが分かれる', () => {
-    expect(nextStage(ROOMS.echo.stages, null, 0)).toBe('training')
+    expect(nextStage(ROOMS.golf.stages, null, 0)).toBe('training')
   })
 
   test('**bravo と charlie は試合ごとに city と UU を交互に。** 最初の試合は city', () => {
@@ -115,7 +115,7 @@ describe('ステージの点', () => {
 
   /** **練習部屋のステージには的が要る。** 無いと撃つ物が何も無い */
   test('練習を回す部屋のステージには的がある', () => {
-    for (const stage of ROOMS.echo.stages.stages) {
+    for (const stage of ROOMS.golf.stages.stages) {
       expect(STAGES[stage].targets.length).toBeGreaterThan(0)
     }
   })

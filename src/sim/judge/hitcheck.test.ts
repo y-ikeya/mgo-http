@@ -352,3 +352,42 @@ describe('胴は球ではなく筒で見る', () => {
     expect(verdict.ok).toBe(false)
   })
 })
+
+describe('型の途中の体 (眠って倒れていく、転がっている)', () => {
+  /*
+   * 表を引く道だけを見る。**表そのもの (測った値) は持ち込まない** — 眠った直後は
+   * 頭が高く、1 秒後には地面にある、という形だけ
+   */
+  const CURVE_RULES = {
+    ...RULES,
+    zoneAt: (locomotion: string, age: number, zone: string) => {
+      if (locomotion !== 'sleep') return null
+      const up = age < 1 ? 1.4 : 0.1
+      return zone === 'HEAD' ? { up, forward: 0.5, low: up, high: up } : { up: up * 0.7, forward: 0.3, low: 0.05, high: up }
+    },
+  }
+  const LOW_WALL: StageBox[] = [{ name: 'concrete_low', min: [-2, 0, 2.7], max: [2, 0.7, 2.9] }]
+
+  /** 撃つ側に背を向けて眠る (向こうへ倒れる)。手前へ倒れると頭が壁より前に出る */
+  function sleeper(age: number, yaw = Math.PI): Pose[] {
+    return history([0, 3], 'prone', yaw).map((pose) => ({ ...pose, locomotion: 'sleep', age }))
+  }
+  const headShot = (target: Pose[]) =>
+    verifyHit(history([0, 0], 'stand'), target, { kind: 'bullet', zone: 'HEAD', distance: 3 }, boxSight(LOW_WALL), WINDOW, CURVE_RULES)
+
+  test('**倒れていく途中の頭は、まだ壁の上にある。** 伏せの高さで見ていた頃は壁の裏だった', () => {
+    expect(headShot(sleeper(0.2)).ok).toBe(true)
+  })
+
+  test('倒れきった頭は壁の裏', () => {
+    expect(headShot(sleeper(2)).ok).toBe(false)
+  })
+
+  test('**倒れる向きも見る。** 手前へ倒れた頭は壁より前にあるので通る', () => {
+    expect(headShot(sleeper(2, 0)).ok).toBe(true)
+  })
+
+  test('表の無い型は、姿勢の高さで見る (伏せた頭は壁の裏)', () => {
+    expect(headShot(history([0, 3], 'prone').map((pose) => ({ ...pose, locomotion: 'prone_idle', age: 0.2 }))).ok).toBe(false)
+  })
+})

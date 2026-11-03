@@ -5,7 +5,7 @@ import { STAGES } from '../src/domain/stage'
 import { ROOMS } from '../src/domain/match/room'
 
 /**
- * 練習部屋 (echo)。
+ * 練習部屋 (golf)。
  *
  * 見たいのは 3 つ: **1 人で入れること**、的が並んでいること、倒すと戻ること。
  * どれもサーバーだけで決まる話なので、画面を出さずに確かめられる。
@@ -24,13 +24,13 @@ afterAll(() => server.stop())
  * ここは座標を写して書いていて、的を東棟へ移したときに置き去りになった
  * (的まで 45m になり、当たりの申告が届かなくなる)。写さずに元から採る。
  *
- * **echo が乗るステージから引く。** 部屋とステージの結び付きが変わっても、
+ * **golf が乗るステージから引く。** 部屋とステージの結び付きが変わっても、
  * ここは黙って追随する。
  */
-const TARGET = STAGES[ROOMS.echo.stages.stages[0]].targets[0]
+const TARGET = STAGES[ROOMS.golf.stages.stages[0]].targets[0]
 
 async function enterPractice(id: string): Promise<Client> {
-  const client = new Client(server, id, [TARGET.x, 0, TARGET.z + 3], 'echo')
+  const client = new Client(server, id, [TARGET.x, 0, TARGET.z + 3], 'golf')
   await client.ready()
   client.live()
   return client
@@ -51,7 +51,7 @@ describe('練習部屋', () => {
     await Bun.sleep(400)
     const roster = solo.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
     const targets = roster.players.filter((p) => p.id.startsWith('target-'))
-    expect(targets.length).toBe(STAGES[ROOMS.echo.stages.stages[0]].targets.length)
+    expect(targets.length).toBe(STAGES[ROOMS.golf.stages.stages[0]].targets.length)
     expect(targets.every((t) => t.team === 'red')).toBe(true)
     solo.close()
   })
@@ -158,12 +158,12 @@ describe('散弾で的を突き飛ばす', () => {
    * **前の試験が触っていない的を使う。** 同じサーバーを 1 本で使い回すので、
    * 倒したり吹き飛ばしたりした的をもう一度使うと、始まりの位置が違う。
    */
-  const MINE = STAGES[ROOMS.echo.stages.stages[0]].targets[2]
+  const MINE = STAGES[ROOMS.golf.stages.stages[0]].targets[2]
   const MINE_ID = 'target-2'
 
   /** 的の 3m 手前に立って、散弾銃を持って湧く */
   async function shooter(): Promise<Client> {
-    const client = new Client(server, 'sg', [MINE.x, 0, MINE.z + 3], 'echo')
+    const client = new Client(server, 'sg', [MINE.x, 0, MINE.z + 3], 'golf')
     await client.ready()
     client.live()
     // **湧く前に選ぶ。** 走っている試合では持ち替えられない (domain/player/equip.ts)
@@ -191,9 +191,12 @@ describe('散弾で的を突き飛ばす', () => {
     await Bun.sleep(500)
 
     const after = me.poses.get(target.slot)!
-    expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeGreaterThan(1)
+    // 爆風 (3m) の 2/3 = 2m (2026-11-02 本人「吹っ飛びすぎ」)。刻みの分だけ緩く見る
+    const slid = Math.hypot(after.x - before.x, after.z - before.z)
+    expect(slid).toBeGreaterThan(1.6)
+    expect(slid).toBeLessThan(2.4)
     // 滑るだけでなく転ぶ。**時間で立ち上がる** (server/match.ts)
-    expect(after.locomotion).toBe('sweep')
+    expect(after.locomotion).toBe('shotgun_sweep')
     me.close()
   })
 
@@ -238,7 +241,7 @@ describe('練習部屋で猫', () => {
   test('的の前に猫を置くと、的が釘付けになる', async () => {
     // **自分用のサーバーで。** 共用のサーバーでは前の試験で的が転ばされ、動かされている
     const own = await startServer()
-    const me = new Client(own, 'catter', [TARGET.x, 0, TARGET.z + 2.2], 'echo')
+    const me = new Client(own, 'catter', [TARGET.x, 0, TARGET.z + 2.2], 'golf')
     await me.ready()
     me.live()
     me.send({ type: 'loadout', primary: 'rifle', support: 'doll' })
@@ -265,18 +268,21 @@ describe('練習部屋で猫', () => {
 })
 
 describe('練習部屋でローリング', () => {
-  const TARGETS = STAGES[ROOMS.echo.stages.stages[0]].targets
+  const TARGETS = STAGES[ROOMS.golf.stages.stages[0]].targets
 
   /** 的の傍 (0.8m 手前) に立って、体当たりを申告する。的の姿を返す */
   async function rollIntoTarget(index: number) {
     const own = await startServer()
     const at = TARGETS[index]!
-    const me = new Client(own, `roller-${index}`, [at.x, 0, at.z + 0.8], 'echo')
+    const me = new Client(own, `roller-${index}`, [at.x, 0, at.z + 0.8], 'golf')
     await me.ready()
     me.live()
     await Bun.sleep(3400)
     me.send({ type: 'spawn' })
     await Bun.sleep(600)
+    // 転がっている姿で申告する (サーバーは転がっていない人の体当たりを通さない)
+    me.pose = 'roll'
+    await Bun.sleep(100)
     me.send({ type: 'knock', id: me.id, hit: `target-${index}`, x: 0, z: -0.8 })
     await Bun.sleep(400)
     const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>

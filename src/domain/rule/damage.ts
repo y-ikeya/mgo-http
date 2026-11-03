@@ -12,6 +12,7 @@
 import { HEAD_HEIGHT, VIEW_HEIGHT, leanShift, type Stance } from '../player/stance'
 import { DISTANCE_SLACK, DISTANCE_SLACK_RATE, MELEE_SLACK } from './lag'
 import { MAX_STAMINA } from '../player/stamina'
+import { zoneAt } from '../player/poseCurve'
 
 /** 命中部位。判定の形は hitbox.ts が持つが、名前と倍率はここ */
 export type HitZone = 'HEAD' | 'BODY' | 'LEGS'
@@ -63,6 +64,14 @@ export const ROLL_STAMINA = MAX_STAMINA / 8
  * 立っている相手が体当たりで怯んで足を止める長さ (秒)。**走っていても止まる** (本人 2026-10-20)
  */
 export const ROLL_STAGGER_SECONDS = 0.5
+
+/**
+ * 撃たれて怯んだ (頭に当たって倒れなかった / 散弾の 8〜16m) 時に、**足も手も止まる長さ** (秒)。
+ * この間は動けず、構えられず、転がれず、箱も被れない (domain/player/moves.ts の flinching)。
+ * 型 (hit) は 1.6 秒あるが、頭の仰け反りの所だけ止める (本人 2026-11-02「怯んでる時は構えられないし
+ * 移動もできないし、ダンボール被ることもローリングもできないようになってる？」「走ってて怯ませてもそのまま走ってる」)
+ */
+export const FLINCH_SECONDS = 0.6
 /**
  * しゃがんだ相手が体当たりで後ろへ倒れる時に滑る距離 (m)。**爆風 (3m) より遥かに短い** —
  * 爆風と同じだけ飛んで「飛びすぎ」だった (本人 2026-10-20)。尻もちをつくくらい
@@ -308,6 +317,8 @@ export const HIT_RULES = {
   headHeight: (stance: Stance) => HEAD_HEIGHT[stance],
   zoneRadius: (zone: HitZone) => ZONE_RADIUS[zone],
   zoneSpan: (zone: HitZone) => ZONE_SPAN[zone],
+  // 型の途中 (眠って倒れていく、転がっている) の部位の位置。表は player/poseCurves.ts
+  zoneAt,
   // カメラの注視点。幅の真ん中 (可視の判定は幅の両端で引くが、ここは 1 点でよい)
   viewHeight: (stance: Stance) => (VIEW_HEIGHT[stance][0] + VIEW_HEIGHT[stance][1]) / 2,
   // 傾きの横ずれ。sim (hitcheck) は domain の値を直に引かないので、ここから渡す
@@ -348,7 +359,17 @@ export const KNOCK_TIME = 0.42
  *
  * @param left 残り時間 (秒)
  */
-export function knockSpeed(left: number): number {
+export function knockSpeed(left: number, time = KNOCK_TIME): number {
   if (left <= 0) return 0
-  return ((2 * KNOCK_DISTANCE) / KNOCK_TIME) * (left / KNOCK_TIME)
+  return ((2 * KNOCK_DISTANCE) / time) * (left / time)
 }
+
+/**
+ * 散弾で吹き飛ぶ距離 (m) と、滑り切るまでの時間 (秒)。**爆風より短く、速く** (本人 2026-11-02「shotgun で
+ * 撃たれた時に吹っ飛びすぎ、いまの 2/3 くらいの距離で、もうすこし speed up」→「宙に浮いてる感じが少しだけする」)。
+ *
+ * 時間は爆風 (KNOCK_TIME) の 1.6 分の 1。転ぶ型も**同じだけ速くした写し** (sweep_shotgun、tools/retime_clip.js の
+ * --as で 1.6 倍に焼いた) を流す — 片方だけ速めると、体が着く前に滑り終わる / 滑っている間に寝転び終わる
+ */
+export const SHOTGUN_KNOCK_DISTANCE = (KNOCK_DISTANCE * 2) / 3
+export const SHOTGUN_KNOCK_TIME = KNOCK_TIME / 1.6

@@ -19,7 +19,7 @@ import type { RoomSummary } from '../../application/protocol/types'
  */
 /**
  * 練習 (/training) で入る部屋。**サーバーが決める** — 手元のサーバーなら検証場
- * (foxtrot)、公開のサーバーは更地の練習場 (echo)。一覧には foxtrot を出さないので、
+ * (foxtrot)、公開のサーバーは更地の練習場 (golf)。どちらも一覧には出さないので、
  * 一覧から探すのではなく訊く
  */
 export async function fetchTrainingRoom(signal?: AbortSignal): Promise<string> {

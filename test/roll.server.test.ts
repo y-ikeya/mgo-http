@@ -20,12 +20,14 @@ afterEach(() => {
 
 describe('ローリングの体当たり', () => {
   /** a が b のすぐ傍 (0.8m) まで寄って、当たったと申告する */
-  async function rollInto(name: string, pose: { crouching?: boolean; locomotion?: string }) {
+  async function rollInto(name: string, pose: { crouching?: boolean; locomotion?: string }, attacker = 'roll') {
     server = await startServer()
     const { a, b } = await twoPlayers(server, 'grenade', [`roll-a-${name}`, `roll-b-${name}`])
     b.crouching = pose.crouching ?? false
     if (pose.locomotion) b.pose = pose.locomotion
     await a.walkTo(0, 0, 6 - 0.8)
+    // 転がっている姿で申告する (サーバーは転がっていない人の体当たりを通さない)
+    a.pose = attacker
     await Bun.sleep(300)
     b.reset()
     a.send({ type: 'knock', id: a.id, hit: b.id, x: 0, z: 0.8 })
@@ -56,5 +58,11 @@ describe('ローリングの体当たり', () => {
     expect(b.got('knock')).toBe(0)
     expect(b.got('knockdown')).toBe(0)
     expect(b.got('stamina')).toBe(0)
+  }, 30000)
+
+  test('**転がっていない人の申告は通さない** — CQC の空振りの踏み込みでしゃがんだ相手が倒れていた (本人 2026-11-03)', async () => {
+    const b = await rollInto('cqc', { crouching: true, locomotion: 'crouch_idle' }, 'cqc_miss')
+    expect(b.got('knockdown')).toBe(0)
+    expect(b.got('knock')).toBe(0)
   }, 30000)
 })

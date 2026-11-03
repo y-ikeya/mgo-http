@@ -70,7 +70,7 @@ describe('部屋の設定', () => {
 
   test('省いてあれば拳銃。**外すと書いた部屋だけ無くなる**', () => {
     expect(secondaryOf('alpha')).toBe('m9')
-    expect(secondaryOf('echo')).toBe('m9')
+    expect(secondaryOf('golf')).toBe('m9')
   })
 
   test('**絞っていない部屋は全部持ち込める。** 省いた = 制限なし', () => {

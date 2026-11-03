@@ -20,6 +20,8 @@ import {
 } from '../src/domain/match/match'
 import { livesOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
 import { clearTsneTarget, placeTsneTarget, updateTsneTarget } from './target'
+import { captureView, placeCapture, updateCapture } from './capture'
+import { captureWinner } from '../src/domain/match/capture'
 import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
 import { targetReturnsAt } from '../src/domain/match/target'
 import { fitLoadout } from '../src/domain/player/equip'
@@ -33,6 +35,7 @@ import { clearClaymores } from './arms/claymore'
 import { clearDolls } from './arms/doll'
 import { TRAP_APPROACH_SECONDS, TRAP_REACH, trapStage } from '../src/domain/item/doll'
 import { WALK_TOP_SPEED } from '../src/domain/player/locomotion'
+import { PLAYER_RADIUS } from '../src/domain/player/moving'
 import { clearDecoys } from './arms/decoy'
 import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
@@ -147,9 +150,8 @@ export function updateTargets(room: RoomWorld, now: number): void {
      */
     if (bot.knockLeft > 0) {
       const step = Math.min(bot.knockLeft, TICK_SECONDS)
-      const speed = knockSpeed(bot.knockLeft)
-      bot.x += bot.knockX * speed * step
-      bot.z += bot.knockZ * speed * step
+      const speed = knockSpeed(bot.knockLeft, bot.knockTime || undefined)
+      slideBot(room, bot, bot.knockX * speed * step, bot.knockZ * speed * step)
       bot.knockLeft = Math.max(0, bot.knockLeft - TICK_SECONDS)
     }
     if (bot.downLeft > 0) bot.downLeft = Math.max(0, bot.downLeft - TICK_SECONDS)
@@ -184,12 +186,47 @@ export function updateTargets(room: RoomWorld, now: number): void {
     // 0 のまま送っていて、眠っている的の傍で画面を読み直すと倒れる所から流れた
     if (next !== bot.locomotion) botPoseSince.set(bot, now)
     bot.locomotion = next
+    bot.locomotionAge = (now - (botPoseSince.get(bot) ?? now)) / 1000
     // 箱を被った的は、座っている間だけ箱の中 (倒されたら箱が落ち、起き上がったらまた被る)
     bot.boxed = bot.homeStance === 'box' && next === 'sit'
     recordPose(bot)
     relayState(room, bot, targetPayload(bot, now))
   }
 }
+
+/**
+ * 吹き飛ばされた的を 1 刻みぶん滑らせる。**壁で止める。**
+ *
+ * 人は自分の画面で滑り、押し戻し (resolveHorizontal) が壁の手前で止める。的には画面が無いので
+ * サーバーが動かすが、壁を見ていなかった — 壁際の的を飛ばすと壁の中に埋まった (本人 2026-11-03、
+ * foxtrot の TARGET 7 など)。人が止まる三角 (stage.body) に、膝と腰の高さで体の半径ぶん先まで線を
+ * 引き、当たったら手前で止まって滑るのをやめる
+ */
+function slideBot(room: RoomWorld, bot: MatchPlayer, dx: number, dz: number): void {
+  const length = Math.hypot(dx, dz)
+  const world = room.stage.body
+  if (length < 1e-6 || !world) {
+    bot.x += dx
+    bot.z += dz
+    return
+  }
+  const ux = dx / length
+  const uz = dz / length
+  const reach = length + PLAYER_RADIUS
+  let free = length
+  for (const height of SLIDE_PROBE_HEIGHTS) {
+    const y = bot.y + height
+    const hit = world.hit(bot.x, y, bot.z, bot.x + ux * reach, y, bot.z + uz * reach)
+    if (hit) free = Math.min(free, Math.max(0, hit.t * reach - PLAYER_RADIUS))
+  }
+  bot.x += ux * free
+  bot.z += uz * free
+  // 壁に当たった。残りは滑らない (押し当てたまま倒れる)
+  if (free < length) bot.knockLeft = 0
+}
+
+/** 滑る的の体を見る高さ (m、足元から)。膝 (低い塀) と腰 (壁) */
+const SLIDE_PROBE_HEIGHTS = [0.3, 0.9] as const
 
 /*
  * 的の姿。倒れた / 眠っている / 転んでいる / 起き上がっている / 立っている。
@@ -210,7 +247,7 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
   // 猫に釘付け (掛かっている / 立ち上がっている途中)。眠りより後、転倒より先
   const trap = trapped(bot, now)
   if (trap) return trap
-  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : bot.downRolled ? 'hit2back' : 'sweep'
+  if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : bot.downRolled ? 'hit2back' : bot.downShotgun ? 'shotgun_sweep' : 'sweep'
   if (bot.downLeft > 0) return 'stand'
   if (patrolling(bot, now)) return 'run_f'
   // 左右へ lean し続ける的。LEAN_SWAP_MS ごとに入れ替える (体の出し入れは型が受け持つ)
@@ -307,6 +344,8 @@ const REST: Record<MatchPlayer['homeStance'], Locomotion> = {
   box: 'sit',
   // lean し続ける的の、どちらでもない時の姿 (targetLocomotion が左右を決める)
   lean: 'idle',
+  // 敬礼したまま立つ (味方の的)。手は挙げたまま (saluteHeld)
+  salute: 'salute',
 }
 
 /** 的の姿を 1 通ぶん組み立てる。人が送ってくるものと同じ形 */
@@ -335,7 +374,8 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')
         held: bot.boxed ? 'box' : 'rifle',
         concentrating: false,
-        saluteHeld: false,
+        // 敬礼の的は手を挙げたまま。下ろすと型の終わりで手が下りる
+        saluteHeld: bot.locomotion === 'salute',
       },
       bot.slot,
     ),
@@ -361,6 +401,8 @@ export function ticketsGone(room: Match): boolean {
  */
 export function decideWinner(room: Match): Team | 'draw' {
   if (!room.mode.teams) return 'draw'
+  // **CAP はカウントで決まる** (先に 0 / 時間切れは多く減らした側)。残機は見ない
+  if (room.mode.capture) return (room.capture && captureWinner(room.capture, true)) ?? 'draw'
   /*
    * **攻守に分かれる部屋は、両方残ったまま時間が来たら守る側の勝ち。**
    * blue / red はまだ戦える人数 (standingCounts)。片方が 0 なら下の通り相手の勝ち
@@ -402,6 +444,7 @@ export function matchState(room: RoomWorld): ServerMessage {
           returnsAt: targetReturnsAt(room.target) ?? undefined,
         }
       : undefined,
+    capture: captureView(room),
     endsAt: room.endsAt,
     sentAt: Date.now(),
     phase: room.phase,
@@ -674,6 +717,7 @@ function enterReady(room: RoomWorld, now: number, afterMatch = false): void {
   room.round = 1
   room.roundWins = { blue: 0, red: 0 }
   clearTsneTarget(room)
+  room.capture = null
   for (const player of room.players.values()) player.ready = false
   resetPlayers(room)
   if (room.mode.sides) standingCounts(room, now)
@@ -827,8 +871,9 @@ export function updateMatch(room: RoomWorld, now: number): void {
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
     room.endsAt = now + MATCH_DURATION_MS
-    // ターゲットを守る側の陣地の近くに置く (TSNE。server/target.ts)
+    // ターゲットを守る側の陣地の近くに置く (TSNE。server/target.ts)。CAP は取り合う所に置いて、カウントを 60 秒ずつに
     placeTsneTarget(room)
+    placeCapture(room, now)
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく。
     // **後攻のラウンドは同じ試合の続き** なので発番し直さない
     if (!(room.mode.sides && room.round > 1 && room.matchId)) {
@@ -840,9 +885,14 @@ export function updateMatch(room: RoomWorld, now: number): void {
   // 攻守に分かれる部屋は、まだ戦える人数を数え直してから決着を見る
   if (room.mode.sides && room.phase === 'playing') standingCounts(room, now)
   // ターゲット (TSNE) を動かす。取った・落ちた・戻った・運び込んだ時はすぐ配る
-  const targetChanged = room.mode.sides && updateTsneTarget(room, now)
+  const targetChanged = (room.mode.sides || room.mode.capture) && updateTsneTarget(room, now)
+  // CAP のカウント (server/capture.ts)。持った人が自陣の設置ポイントに居る間だけ減る
+  const capture = updateCapture(room, now)
   if (room.phase !== 'playing' || previous !== 'playing') {
     // 段階が変わった刻みでは決着を見ない (上の分岐で済んでいる)
+  } else if (room.mode.capture) {
+    // **CAP はカウントで決まる。** 先に 0 にしたか、時間切れで差が付いていれば終わり (並んだらサドンデスで続ける)
+    if (capture.winner) endRound(room, now)
   } else if (room.targetDelivered) {
     // **運び込んだ。** 攻める側の勝ち (decideWinner)。時間を待たずにその場で終わる
     endRound(room, now)
@@ -862,7 +912,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
   const cautionChanged = room.mode.sides && room.revealedUntil !== room.cautionSent
   if (cautionChanged) room.cautionSent = room.revealedUntil
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
-  if (previous !== room.phase || stealthChanged || cautionChanged || targetChanged || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
+  if (previous !== room.phase || stealthChanged || cautionChanged || targetChanged || capture.changed || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
     room.lastBroadcast = now
     broadcast(room, matchState(room))
   }

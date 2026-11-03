@@ -9,13 +9,13 @@ import './Lobby.css'
  * 練習 (/training)。**自分だけの練習部屋へそのまま入る。**
  *
  * 入る部屋はサーバーに訊く (GET /training)。手元のサーバーなら検証場 (foxtrot、
- * 段・窓・梯子・的が揃っている)、公開しているサーバーは更地の練習場 (echo)。
+ * 段・窓・梯子・的が揃っている)、公開しているサーバーは更地の練習場 (golf)。
  */
 async function trainingRoom(): Promise<string> {
   try {
     return await fetchTrainingRoom()
   } catch {
-    return 'echo'
+    return 'golf'
   }
 }
 

@@ -26,10 +26,18 @@ function defenceOf(room: RoomWorld): Team {
   return room.attack === 'blue' ? 'red' : 'blue'
 }
 
-/** ラウンドの始まりに置く。**守る側の基地に近いほうの置き場所** */
+/**
+ * ラウンドの始まりに置く。TSNE は**守る側の基地に近いほうの置き場所**、CAP は meta_cap_target
+ * (両陣営の取り合い。domain/match/capture.ts)
+ */
 export function placeTsneTarget(room: RoomWorld): void {
   room.targetDelivered = false
   room.target = null
+  if (room.mode.capture) {
+    const home = room.stage.capTargets[0]
+    if (home) room.target = placeTarget(home)
+    return
+  }
   if (!room.mode.sides) return
   const home = targetHomeFor(room.stage.tsneTargets, baseOf(room, defenceOf(room)))
   if (home) room.target = placeTarget(home)
@@ -41,9 +49,10 @@ export function clearTsneTarget(room: RoomWorld): void {
   room.targetDelivered = false
 }
 
-/** 運べる人か (攻める側で、立っていて、眠っていない) */
+/** 運べる人か (立っていて、眠っていない。TSNE は攻める側だけ、CAP は両陣営) */
 function canCarry(room: RoomWorld, player: MatchPlayer, now: number): boolean {
-  return player.team === room.attack && canAct(player.life) && !isAsleep(player.sleepUntil, now)
+  if (!room.mode.capture && player.team !== room.attack) return false
+  return canAct(player.life) && !isAsleep(player.sleepUntil, now)
 }
 
 /**
@@ -66,7 +75,8 @@ export function updateTsneTarget(room: RoomWorld, now: number): boolean {
       return true
     }
     room.target = carryTo(target, carrier.x, carrier.y, carrier.z)
-    if (atBase(carrier.x, carrier.y, carrier.z, baseOf(room, room.attack))) {
+    // CAP は運び込んでも終わらない (設置ポイントに居る間だけカウントが減る。server/capture.ts)
+    if (!room.mode.capture && atBase(carrier.x, carrier.y, carrier.z, baseOf(room, room.attack))) {
       room.targetDelivered = true
       // 全員の画面で goal を鳴らす。勝ち負けはこの後の match で配られる
       broadcast(room, { type: 'targetDelivered', by: carrier.id, byName: carrier.name, byTeam: carrier.team })

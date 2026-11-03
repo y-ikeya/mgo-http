@@ -152,6 +152,11 @@ export type Locomotion =
   // 敬礼。全身の型なので上下を分けない
   | 'salute'
   /**
+   * しゃがんだまま敬礼する (型 MilitarySignalingCrouch、右手で合図)。押している間は手を上げ下げし続ける。
+   * 名前が crouch_ で始まるので構えの高さはしゃがみ (stance.ts)
+   */
+  | 'crouch_salute'
+  /**
    * クレイモアを構える / 置く。**全身の型**。
    *
    * かがんで置くので、上半身だけ切り出すと腰の向きが下半身と食い違う
@@ -200,6 +205,20 @@ export type Locomotion =
    * そのまま倒れている間の姿になる (cqc_thrown と同じ扱い)。爆風 (sweep) ほど飛ばない
    */
   | 'hit2back'
+  /**
+   * 散弾で飛ばされて倒れる。**爆風 (sweep) と同じ型を 1.6 倍に焼いた写し** (sweep_shotgun)。倒れた後は sweep と同じ扱い
+   */
+  | 'shotgun_sweep'
+  /**
+   * 構えた所から一歩下がる (型 StepBackward、下半身だけ。下がっている間は銃を下ろす)。
+   * 構えて後ろを押しながら転がりの指。0.7m を 1 秒で下がる (domain/player/step.ts)。CQC の間合いから外れるのに使う (2026-10-30 本人)
+   */
+  | 'step_back'
+  /**
+   * しゃがんだまま一歩下がる (型 CrouchBackwards、下半身だけ)。後ろへ跳んで膝を突く。距離と時間は立ちと同じ (step.ts)。
+   * 名前が crouch_ で始まるので構えの高さはしゃがみ (stance.ts)
+   */
+  | 'crouch_step_back'
   /**
    * 伏せている。**しゃがみの下にもう一段。**
    *
@@ -289,6 +308,7 @@ export const CROUCH_WALK_TOP_SPEED = 0.9
 export function emptyHanded(locomotion: Locomotion): boolean {
   return (
     locomotion === 'salute' ||
+    locomotion === 'crouch_salute' ||
     locomotion === 'roll' ||
     locomotion === 'hard_land' ||
     locomotion === 'bump' ||

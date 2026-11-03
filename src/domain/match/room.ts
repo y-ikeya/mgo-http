@@ -12,7 +12,7 @@ import { SLEEP_SECONDS } from '../player/stamina'
  *
  * 名前と割り当ては docs/design.md の 2。
  */
-export const ROOM_NAMES = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot'] as const
+export const ROOM_NAMES = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf'] as const
 
 export type RoomName = (typeof ROOM_NAMES)[number]
 
@@ -22,10 +22,11 @@ export type RoomName = (typeof ROOM_NAMES)[number]
  *     DM        全員が敵の個人戦
  *     TDM       2 陣営。倒すと相手の残機が減る
  *     TSNE      潜入 / 防御。攻める側 (非殺傷 + ナイフ + ステルス) と守る側 (殺傷) に分かれる
+ *     CAP       target を 1 つ取り合い、自陣の設置ポイントへ運んで持ち続ける (domain/match/capture.ts)
  *     INT       休憩。戦績に残らない
  *     PRACTICE  練習。棒立ちの的を撃つ
  */
-export type Mode = 'DM' | 'TDM' | 'TSNE' | 'INT' | 'PRACTICE'
+export type Mode = 'DM' | 'TDM' | 'TSNE' | 'CAP' | 'INT' | 'PRACTICE'
 
 export interface ModeSpec {
   id: Mode
@@ -75,6 +76,16 @@ export interface ModeSpec {
    * 眠らせた手間が無駄になり、殺せる守る側だけが得をする。
    */
   sleepSeconds: number
+  /**
+   * **target を取り合って設置ポイントで持ち続けるか** (CAP)。勝ち負けは残機ではなく
+   * カウントで決まる (domain/match/capture.ts)。倒しても残機は減らない
+   */
+  capture: boolean
+  /**
+   * **倒されるたびに倒れたままの時間が延びるか** (CAP)。延び方は domain/player/lifecycle.ts の downSeconds。
+   * 倒されてもすぐ戻って特攻すればいい、を抑える (2026-10-26 本人「倒れてる時間を長くして欲しい」)
+   */
+  downGrows: boolean
 }
 
 /** 攻める側か守る側か。**色 (Team) とは別の問い** — 試合ごとに入れ替わる */
@@ -98,8 +109,8 @@ export interface Armory {
 export const TSNE_SLEEP_SECONDS = 450
 
 export const MODES: Record<Mode, ModeSpec> = {
-  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false, sleepSeconds: SLEEP_SECONDS },
-  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS },
+  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
+  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
   /**
    * 潜入 / 防御 (2026-10-17 本人)。
    *
@@ -110,15 +121,20 @@ export const MODES: Record<Mode, ModeSpec> = {
    * 相手の側が全員倒れるか眠ったら勝ち。時間切れは守る側の勝ち。
    * 試合ごとに攻守が入れ替わる。
    */
-  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: true, sleepSeconds: TSNE_SLEEP_SECONDS },
-  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS },
+  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: true, sleepSeconds: TSNE_SLEEP_SECONDS, capture: false, downGrows: false },
+  /**
+   * キャプチャー (2026-10-26 本人、MGO2 の CAP)。target 1 つを両陣営で取り合い、**自陣の設置ポイント**
+   * (相手の陣地の近く) へ運んで持ったまま留まる。何度でも復活できるが、倒されるたびに倒れたままの時間が延びる
+   */
+  CAP: { id: 'CAP', label: 'キャプチャー', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: true, downGrows: true },
+  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
   /**
    * 練習。**入る人は全員青**で、赤には棒立ちの的が並ぶ。
    *
    * 戦績に残さないのは、動かない相手を撃った数が記録に混ざると記録の意味が
    * 消えるため。ここで武器の距離感と当て方を確かめる。
    */
-  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS },
+  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
 }
 
 /**
@@ -235,11 +251,17 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
     primaries: ['sniper', 'mosin'],
     secondary: null,
   },
-  // 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**
-  echo: { mode: 'PRACTICE', stages: only('training') },
+  // CAP は UU で (2026-10-26 本人「一旦ステージは UU だけでいい」)。練習部屋だった所を譲った (練習は golf へ)
+  echo: { mode: 'CAP', stages: only('uu') },
   // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある。
   // 作る側の道具なので公開しない (2026-10-07 本人)
   foxtrot: { mode: 'PRACTICE', stages: only('lab'), local: true, unlisted: true },
+  /*
+   * 練習は更地。**遮蔽が無いので、外したのが腕なのか地形なのかが分かれる**。
+   * **唯一の練習部屋。一覧には出さず、/training だけが開く** (2026-10-26 本人「/training は残しておいて」。
+   * echo を CAP に譲った)
+   */
+  golf: { mode: 'PRACTICE', stages: only('training'), unlisted: true },
 }
 
 /**

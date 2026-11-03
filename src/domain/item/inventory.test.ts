@@ -761,3 +761,23 @@ describe('道具の C (短押し) は武器と同じく往復', () => {
     expect(inv.tool).toBe('none')
   })
 })
+
+describe('持ち替えられない体 (CQC の最中)', () => {
+  test('**押しても替わらず、押していたことも忘れる** — 投げ終えた瞬間に替わらない', () => {
+    // 塞いでいなければ、押して離すと替わる
+    const free = make()
+    const first = free.held
+    free.hand(press({ browse: { weapon: true, tool: false } }), FREE, 0.05)
+    free.hand(press({}), FREE, 0.05)
+    expect(free.held).not.toBe(first)
+
+    const inv = make()
+    const before = inv.held
+    inv.hand(press({ browse: { weapon: true, tool: false } }), { ...FREE, canSwap: false }, 0.05)
+    inv.hand(press({}), { ...FREE, canSwap: false }, 0.05)
+    expect(inv.held).toBe(before)
+    // 投げ終えた。離した後なので何も起きない
+    inv.hand(press({}), FREE, 0.05)
+    expect(inv.held).toBe(before)
+  })
+})

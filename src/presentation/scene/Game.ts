@@ -46,7 +46,7 @@ import {
   loadStageLadders,
   STAGE_CODE,
   TEAM_COLOR,
-  type Stage, addColliderOverlay, colliderOverlayOn, loadStageBases, loadStageBoxes } from "./world/stage";
+  type Stage, addColliderOverlay, buildCapGoals, colliderOverlayOn, loadStageBases, loadStageBoxes, loadStageCapGoals } from "./world/stage";
 import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
 import { type StageBox, solidBlockers } from "../../sim/space/vision";
 import { PlacePreview } from "./arms/placePreview";
@@ -73,7 +73,7 @@ import { StunSparks } from "./fx/stunSparks";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
 import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
@@ -124,6 +124,7 @@ import { can, blocker } from "../../domain/player/moves";
 const DEBUG_HUD = new URLSearchParams(globalThis.location?.search ?? "").has("debug");
 import { toLocal } from "../../application/replica/clock";
 import { TsneTarget, type TargetView } from "./world/tsneTarget";
+import { pushGrass } from "./world/grass";
 import { atBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
 import {
@@ -368,6 +369,12 @@ export interface GameStats {
   caution: number
   /** 落ちたターゲット (TSNE) が置き場所へ戻るまでの残り (秒)。落ちていなければ 0 */
   targetReturn: number
+  /**
+   * 倒れたまま、復活の支度に移るまでの残り (秒)。**倒されるたびに延びる部屋 (CAP) でだけ** 0 より大きい。
+   * downFor はその満タン (今回の倒れたままの秒数)
+   */
+  downLeft: number
+  downFor: number
   /** どちらの系統の一覧を開いているか。閉じていれば null */
   browsingFamily: 'weapon' | 'tool' | null
   /** 持ち替えの最中か。HUD を薄くするのに使う */
@@ -810,6 +817,8 @@ export class Game {
   private readonly stage: Stage;
   private readonly sun: THREE.DirectionalLight;
   private readonly remotes: RemoteSoldiers;
+  /** 草むらを押す人の足元。毎コマ詰め直す (world/grass.ts) */
+  private readonly grassPushers = new Map<string, THREE.Vector3>();
   /** 足元に出る音の輪。聞こえた方向に山が立つ */
   private readonly soundRing: SoundRing;
   /** 血を落とす先の控え。**使い回す** — 渡された位置を書き換えないため */
@@ -1165,6 +1174,9 @@ export class Game {
   private targetView: TargetView | null = null;
   /** 最後に時計の音を鳴らした残りの秒 (updateClockTick)。0 なら数えていない */
   private clockTickSecond = 0;
+  /** 最後に見た CAP のカウント (便ごとに別の物が届く) と、それが届いた手元の時刻 */
+  private captureSeen: unknown = undefined;
+  private captureSeenAt = 0;
   /** 「{名前}がターゲットを取得した / 手放した」(全員) と、その人の色、出した時刻 (ms) */
   private targetNotice: { text: string; team: Team; at: number } | null = null;
   /** 攻める側のステルスがいま効いているか (試合の状態の通で届く。当たると 5 秒解ける) */
@@ -1468,6 +1480,13 @@ export class Game {
     this.player.showCollider(colliderOverlayOn());
     void loadStageBases(this.stageName).then((bases) => {
       this.stageBases = bases;
+    });
+    // CAP の設置ポイント。CAP の部屋でだけ見せる (updateTsneTarget)
+    void loadStageCapGoals(this.stageName).then((goals) => {
+      if (this.disposed) return;
+      this.capGoals = buildCapGoals(goals);
+      this.capGoals.visible = false;
+      this.scene.add(this.capGoals);
     });
     void loadStageBoxes(this.stageName).then((boxes) => {
       this.placeSolid = solidBlockers(boxes);
@@ -2079,6 +2098,11 @@ export class Game {
     this.blast.update(dt);
     this.updateTsneTarget(dt);
     this.updateClockTick();
+    // 草むらを押す人。自分が先頭
+    this.grassPushers.clear();
+    this.grassPushers.set(this.net.id, this.player.position);
+    this.remotes.addLivePositions(this.grassPushers);
+    pushGrass(dt, this.grassPushers);
     this.stunSparks.update(dt);
     this.sensed.update(dt);
     this.casings.update(dt, this.stage.thrownWorld, this.stage.water, (at) => {
@@ -2197,6 +2221,8 @@ export class Game {
     ceilingHeight: (position, radius, feetY) =>
       this.stage.moveWorld?.ceilingHeight(position, radius, feetY) ??
       ceilingHeight(position, radius, this.stage.obstacles, feetY),
+    // 足音と同じ箱の名前から引く (網の材質は着弾の見た目用で、砂を持たない)
+    surfaceAt: (position, feetY) => surfaceAt(position, 0, this.stage.obstacles, feetY, STEP_UP),
   };
 
   /**
@@ -2631,6 +2657,8 @@ export class Game {
         else if (message.trapped) this.player.trap(undefined, true);
         // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
         else if (message.hanging) this.player.resumeHang(message.yaw);
+        // スタンナイフの充電も続きから (審判と同じ時計)。読み直しで満タンにはならない
+        this.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
@@ -3019,9 +3047,14 @@ export class Game {
         // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
         // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
         if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
-        this.player.knockDown(message.distance !== undefined);
+        // 散弾は爆風より短く速く飛ぶ (domain/rule/damage.ts の SHOTGUN_KNOCK_*)
+        this.player.knockDown(message.distance !== undefined, message.shotgun === true);
         // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
-        this.player.knockPush(message.dirX, message.dirZ, message.distance);
+        if (message.shotgun) {
+          this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME);
+        } else {
+          this.player.knockPush(message.dirX, message.dirZ, message.distance);
+        }
         // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
         this.loseHeldGrenade();
         // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
@@ -3042,7 +3075,11 @@ export class Game {
       // ここから出る。推し量る側の判断はどこにも残さない
       // 他人のぶんはレプリカが受け取っている (sync / died)
       case "life":
-        if (message.id === this.net.id) this.setLife(message.state);
+        if (message.id === this.net.id) {
+          // 倒れたままでいる秒数 (CAP は倒されるたびに延びる)。残りを画面に出し、過ぎたら復活できない人と読む
+          if (message.state === "downed") this.downFor = message.downFor ?? DOWN_DURATION;
+          this.setLife(message.state);
+        }
         break;
 
       // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
@@ -3556,7 +3593,19 @@ export class Game {
    * 試合が終わるまで、倒れた場所でカメラだけ回せる (2026-10-17 本人)
    */
   private get lookingAround(): boolean {
-    return isDowned(this.life) && Date.now() - this.lifeAt > DOWN_DURATION * 1000;
+    return isDowned(this.life) && Date.now() - this.lifeAt > this.downFor * 1000;
+  }
+
+  /** 倒れたままでいる秒数。倒れた知らせ (life) に載って届く (CAP は倒されるたびに延びる) */
+  private downFor = DOWN_DURATION;
+
+  /** CAP の設置ポイントの印 (光の柱と床の塗り)。読めるまで null */
+  private capGoals: THREE.Object3D | null = null;
+
+  /** その人の陣営 (成績表の名簿から)。分からなければ null */
+  private teamOfId(id: string): Team | null {
+    if (id === this.net.id) return this.selfTeam;
+    return this.replica.match?.players.find((p) => p.id === id)?.team ?? null;
   }
 
   /**
@@ -3857,7 +3906,8 @@ export class Game {
    * 通り道にいる相手を順に弾いていく形になる。
    */
   private updateRollContact(): void {
-    const rolling = this.player.rolling;
+    // 転がりだけ。跳び越え・ぶら下がり・CQC の踏み込みで当たっても倒さない
+    const rolling = this.player.rollingOnly;
     // 転がり始めに履歴を空にする。同じ相手を何度も弾かないため。
     if (rolling && !this.wasRolling) this.rolledInto.clear();
     this.wasRolling = rolling;
@@ -3902,8 +3952,14 @@ export class Game {
       // 見えていない相手は姿が最後の場所に止まっている。その時は届いた位置 (targetAt) で浮かせる
       carrierAt = view.carrier === this.net.id ? this.player.position : this.remotes.livePositionOf(view.carrier);
     }
-    // 攻める側にも守る側にも光って見える。色は攻める側のチーム色
-    const glow = this.attackTeam === null ? null : TEAM_COLOR[this.attackTeam];
+    // 攻める側にも守る側にも光って見える。色は攻める側のチーム色。
+    // **CAP は両陣営が取り合う**ので、運んでいる人の陣営の色 (置いてある・落ちている間は白)
+    const capture = MODES[this.replica.mode].capture;
+    if (this.capGoals) this.capGoals.visible = capture;
+    const carrierTeam = view?.carrier ? this.teamOfId(view.carrier) : null;
+    const glow = capture
+      ? (carrierTeam ? TEAM_COLOR[carrierTeam] : 0xffffff)
+      : this.attackTeam === null ? null : TEAM_COLOR[this.attackTeam];
     this.tsneTarget.update(dt, view, carrierAt, glow);
   }
 
@@ -3917,8 +3973,24 @@ export class Game {
       this.clockTickSecond = 0;
       return;
     }
-    const left = Math.ceil((match.endsAt - Date.now()) / 1000);
-    if (left < 1 || left > CLOCK_TICK_FROM) {
+    const clockLeft = Math.ceil((match.endsAt - Date.now()) / 1000);
+    /*
+     * **CAP のカウントも残り 10 秒から鳴らす** (2026-10-28 本人「cap も base に入ってカウントダウンが進んで
+     * 残り 10s とかの時に clockTick を流したほうがいい」)。カウントが進んでいる間だけ (設置ポイントを出る・落とすと止まる)。
+     * カウントは 1 秒ごとの便でしか届かないので、届いた時刻から手元で減らす (便の揺れで抜けたり 2 度鳴ったりしない)。
+     * 時計と重なったら残りの少ない方で 1 秒に 1 度
+     */
+    const capture = match.capture;
+    if (capture !== this.captureSeen) {
+      this.captureSeen = capture;
+      this.captureSeenAt = Date.now();
+    }
+    const countLeft = capture?.holding
+      ? Math.ceil(capture[capture.holding] - (Date.now() - this.captureSeenAt) / 1000)
+      : Infinity;
+    const inRange = (n: number) => n >= 1 && n <= CLOCK_TICK_FROM;
+    const left = Math.min(inRange(clockLeft) ? clockLeft : Infinity, inRange(countLeft) ? countLeft : Infinity);
+    if (!Number.isFinite(left)) {
       this.clockTickSecond = 0;
       return;
     }
@@ -4323,13 +4395,11 @@ export class Game {
      */
     const firing = this.inv.canShoot(this.weapon, {
       held: this.input.firing,
-      aiming: this.player.isAiming,
+      // 体の条件 (構えている・転がり / 這い / 着地などでない) は動作の表 (moves.ts の fire)
+      body: can(this.player.body, "fire"),
       life: this.life,
       reloading: this.reloadTimer > 0,
       stabbing: this.stabTimer > 0,
-      rolling: this.player.rolling,
-      crawling: this.player.crawling,
-      landing: this.player.landing,
       ammo: this.ammo,
     });
     this.player.setFiring(firing);
@@ -4379,19 +4449,18 @@ export class Game {
    * 弾は入らない。押し直しになるが、**別のことを始めたのは本人**。
    */
   private reloadBroken(): boolean {
-    if (this.player.rolling || this.player.isBoxed) return true;
-    // 伏せて動く / 姿勢をまたぐ。装填の型は姿勢ごとに違う (animation.ts の reloadKey)
-    if (this.player.crawling || this.player.isProne !== this.reloadProne) return true;
+    // 体が替えられない状態になった (転がる・箱・這う…、動作の表の reload)
+    if (!can(this.player.body, "reload")) return true;
+    // 姿勢をまたぐ。装填の型は姿勢ごとに違う (animation.ts の reloadKey)
+    if (this.player.isProne !== this.reloadProne) return true;
     // 替えている銃を持っていない。**手にある物に弾が入ってしまう**
     return this.weapon.id !== this.reloadWeapon;
   }
 
   private startReload(): void {
-    if (this.reloadTimer > 0 || this.stabTimer > 0 || this.player.rolling)
-      return;
-    // 這いながらは弾倉を替えられない。撃つのと同じ (domain/item/inventory.ts)。
-    // 伏せへの出入りの最中も同じ — 型が全身で決まっているので手が塞がっている
-    if (this.player.crawling || this.player.proneShifting) return;
+    if (this.reloadTimer > 0 || this.stabTimer > 0) return;
+    // 体の条件 (転がり・這い・伏せへの出入り・箱…) は動作の表 (moves.ts の reload)
+    if (!can(this.player.body, "reload")) return;
     // どの姿勢で始めたかを控える。**途中で姿勢が変わったら中断する**
     this.reloadProne = this.player.isProne;
     this.reloadWeapon = this.weapon.id;
@@ -4588,6 +4657,7 @@ export class Game {
   };
   private readonly targetPose = {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
+    locomotion: "idle", age: 0,
   };
 
   /** 目の慣れを使うか (?adapt=0 で切る)。いま掛けている倍率 */
@@ -4645,6 +4715,8 @@ export class Game {
     this.targetPose.z = at.z;
     this.targetPose.stance = target.stance;
     this.targetPose.lean = target.leaning;
+    // 倒れていく・転がっている途中の体の位置 (審判と同じ表)
+    target.motionInto(this.targetPose);
     // 弾道の膨らみ。審判は申告の距離と銃の性能から同じ式で出す (server/damage.ts)
     const sag = bulletSag(distance, this.weapon.bulletSpeed, this.weapon.bulletGravity);
     if (zoneExposed(this.eyePose, this.targetPose, zone, sight, HIT_RULES, sag)) return true;
@@ -4658,7 +4730,7 @@ export class Game {
 
     // 止める場所。目から部位への中心線が最初に当たる所
     const eyeY = me.y + HIT_RULES.headHeight(this.player.stance);
-    const [tx, ty, tz] = zonePoint(this.targetPose, zone, HIT_RULES.headHeight(target.stance));
+    const [tx, ty, tz] = zonePoint(this.targetPose, zone, HIT_RULES);
     const block = sight.hit(me.x, eyeY, me.z, tx, ty, tz);
     if (block) {
       this.hitPoint.set(
@@ -4726,9 +4798,21 @@ export class Game {
       // 長押しが成立した。**1 回の押下につき 1 度だけ転がる**
       if (!this.rolledThisHold) {
         this.rolledThisHold = true;
-        // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
-        if (!this.cocking) this.player.roll();
+        /*
+         * **構えている間は転がらない** (本人 2026-10-30「狙ってる最中のローリングは無効にしていいよ」、
+         * 動作の表の roll)。後ろを押していれば一歩下がる (step_back、下半身だけ) — CQC の間合いから
+         * 出る。下がっている間は銃を下ろす。後ろを押していなければ何も起きない
+         */
+        this.aimedThisHold = this.player.isAiming;
+        if (this.aimedThisHold) {
+          if (this.pushingBack()) this.player.stepBack();
+        } else if (!this.cocking) {
+          // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
+          this.player.roll();
+        }
       }
+      // 構えていた押下では伏せない (押したまま転がり切ると伏せる、の対象は転がり)
+      if (this.aimedThisHold) return;
       /*
        * **押したまま転がり切ると、立たずに伏せる。**
        *
@@ -4745,6 +4829,19 @@ export class Game {
 
     // 離した。次の押下でまた転がれる
     this.rolledThisHold = false;
+    this.aimedThisHold = false;
+  }
+
+  /** この押下を構えたまま始めたか。転がらない (下がるか何もしない) ので、押したままでも伏せない */
+  private aimedThisHold = false;
+
+  /** 体の後ろ側へ移動を入れているか (体の向きから 45° 以内の後ろ) */
+  private pushingBack(): boolean {
+    const length = Math.hypot(this.moveDir.x, this.moveDir.z);
+    if (length < 0.3) return false;
+    const yaw = this.player.yaw;
+    const forward = (this.moveDir.x * -Math.sin(yaw) + this.moveDir.z * -Math.cos(yaw)) / length;
+    return forward < -Math.SQRT1_2;
   }
 
   /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */
@@ -5324,6 +5421,7 @@ export class Game {
       choosing: this.loadoutBlocking,
       aiming: this.player.isAiming,
       cocking: this.cocking,
+      canSwap: can(this.player.body, "swap"),
       canWearBox: this.player.canWearBox,
     }, dt);
 
@@ -6043,6 +6141,11 @@ export class Game {
       caution: Math.max(0, (this.replica.match?.cautionUntil ?? 0) - Date.now()) / 1000,
       // 落ちたターゲットが戻るまで。取り直すと消え、次に落とすと 30 秒から (サーバーが持つ)
       targetReturn: Math.max(0, (this.replica.match?.target?.returnsAt ?? 0) - Date.now()) / 1000,
+      downLeft:
+        MODES[this.replica.mode].downGrows && isDowned(this.life)
+          ? Math.max(0, this.downFor - (Date.now() - this.lifeAt) / 1000)
+          : 0,
+      downFor: this.downFor,
       browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,
       // **持ち物を見る。** 選択ではなく実際に持っている物

@@ -11,6 +11,7 @@ import { isSeated } from '../player/lifecycle'
 import type { MatchPlayer, Team } from '../player/player'
 import { MODES, type Mode, type ModeSpec } from './room'
 import type { Target } from './target'
+import type { Capture } from './capture'
 
 /**
  * 試合の段階。
@@ -157,6 +158,8 @@ export interface Match {
   target: Target | null
   /** このラウンドで攻める側がターゲットを自陣まで運んだか。運んだら攻める側の勝ち */
   targetDelivered: boolean
+  /** CAP のカウント (domain/match/capture.ts)。試合が始まった時に置く。CAP でない部屋は null */
+  capture: Capture | null
 }
 
 export function newMatch(mode: Mode): Match {
@@ -182,6 +185,7 @@ export function newMatch(mode: Mode): Match {
     roundWins: { blue: 0, red: 0 },
     target: null,
     targetDelivered: false,
+    capture: null,
   }
 }
 
@@ -303,6 +307,8 @@ export function shuffleTeams(room: Match, roll: () => number): void {
  * どちらで死んでも自陣の損は同じで、敵の得も同じ (ゼロ)。
  */
 export function loseTicket(room: Match, team: Team): void {
+  // **CAP は残機で決まらない** (カウント。domain/match/capture.ts)。倒しても減らさない
+  if (room.mode.capture) return
   /*
    * **個人戦は部屋で 1 つの残機を削る。**
    *

@@ -23,7 +23,7 @@ import { canBeStabbed } from "../../../domain/rule/damage";
 import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
 import { loadSoldier } from "../assets";
 import { DEFAULT_SKIN, skinFor } from "./skin";
-import { leanOf, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
+import { leanOf, stanceAt, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING, LANDING_RATE, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
 import { weaponOf, type WeaponId } from "../../../domain/item/weapons";
@@ -149,6 +149,7 @@ const PLAY_WHOLE_BODY: Record<
   death_front: (a) => a.playDeath(true),
   death_back: (a) => a.playDeath(false),
   salute: (a) => a.playSalute(),
+  crouch_salute: (a) => a.playSalute(true),
   // 爆風で倒れる / 起き上がる
   sweep: (a) => a.playSweep(),
   stand: (a) => a.playStand(),
@@ -157,6 +158,7 @@ const PLAY_WHOLE_BODY: Record<
   cqc_miss: (a) => a.playCqc('cqc_miss'),
   cqc_thrown: (a) => a.playThrown(),
   hit2back: (a) => a.playRollFall(),
+  shotgun_sweep: (a) => a.playSweep(true),
   // 接続が切れた人。1 枚の静止ポーズ
   away: (a) => a.playAway(),
   // ダンボールで敵にぶつかって、箱が落ちた
@@ -319,8 +321,24 @@ export class RemoteSoldier {
    * 各所で判定を組み立てると、サーバー側のドメインルールとだんだんずれる。
    */
   stabbableFrom(aimPitch: number, attacker: Stance): boolean {
-    return canBeStabbed(stanceOf(this.locomotion), aimPitch, attacker);
+    // 眠って倒れていく途中はまだ高い。サーバーと同じ式 (stanceAt)
+    return canBeStabbed(stanceAt(this.locomotion, this.locomotionAge()), aimPitch, attacker);
   }
+  /**
+   * 弾の当たりを見る姿に、向きと型の途中の時間を書く (審判の姿の記録と同じ項目)。
+   * 倒れていく・転がっている体の部位は、型の時間で引く (poseCurve.ts)
+   */
+  motionInto(pose: { yaw: number; locomotion?: string; age?: number }): void {
+    pose.yaw = this.yaw;
+    pose.locomotion = this.locomotion;
+    pose.age = this.locomotionAge();
+  }
+  /** いまの locomotion に入ってからの秒数 (最後の知らせの値に、届いてからの時間を足す) */
+  private locomotionAge(): number {
+    return this.ageAtState + (performance.now() - this.stateAt) / 1000;
+  }
+  private ageAtState = 0;
+  private stateAt = 0;
   /** 足音の勘定。自機と同じ式を、補間された位置に対して回す */
   private readonly footsteps = new Footsteps();
   /** 直前のリロード状態。始まった瞬間だけ型を流すのに使う */
@@ -493,6 +511,9 @@ export class RemoteSoldier {
         ? "idle"
         : state.locomotion;
 
+    // その動きに入ってからの秒数。眠って倒れていく途中の高さを見る (stabbableFrom)
+    this.ageAtState = state.locomotionAge;
+    this.stateAt = performance.now();
     // 全身モーションは重みの補間では出せない。状態が切り替わった瞬間に頭から流す。
     this.rollStarted = false;
     this.sweptThisFrame = false;
@@ -518,7 +539,7 @@ export class RemoteSoldier {
       animator.skipAhead(state.locomotionAge);
       // 叫んだこと・回り始めたことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
       this.rollStarted = locomotion === "roll";
-      this.sweptThisFrame = locomotion === "sweep";
+      this.sweptThisFrame = locomotion === "sweep" || locomotion === "shotgun_sweep";
     }
     /*
      * しゃがんだまま刺す。
@@ -529,8 +550,16 @@ export class RemoteSoldier {
     if (locomotion === "crouch_stab" && this.locomotion !== "crouch_stab") {
       animator.playStab();
     }
+    // 構えたまま一歩下がる。下半身だけの一度きりの型なので、入った瞬間に頭から流す
+    if (locomotion === "step_back" && this.locomotion !== "step_back") {
+      animator.playStepBack();
+    }
+    if (locomotion === "crouch_step_back" && this.locomotion !== "crouch_step_back") {
+      animator.playStepBack(true);
+    }
     // 敬礼から抜けたら畳む。playSalute で入った状態は自分では戻らない
-    if (this.locomotion === "salute" && locomotion !== "salute") {
+    const wasSaluting = this.locomotion === "salute" || this.locomotion === "crouch_salute";
+    if (wasSaluting && locomotion !== "salute" && locomotion !== "crouch_salute") {
       animator.cancelSalute();
     }
     /*
@@ -574,7 +603,7 @@ export class RemoteSoldier {
     }
     // 敬礼を保っているかは送られてくる。再生位置は送らず、同じドメインルールで止める
     animator.setSaluteHeld(state.saluteHeld)
-    this.saluting = locomotion === 'salute' && state.saluteHeld
+    this.saluting = (locomotion === 'salute' || locomotion === 'crouch_salute') && state.saluteHeld
     animator.setAiming(state.aiming && !this.serverDead);
     // 伏せている間は上体を傾けない。腹這いでは背骨の回転面が横倒しなので、
     // 同じ角度を当てると体が起き上がって見える (player.ts に理由)
@@ -1602,6 +1631,11 @@ export class RemoteSoldiers {
   livePositionOf(id: string): THREE.Vector3 | null {
     const player = this.players.get(id);
     return player && player.object.visible ? player.object.position : null;
+  }
+
+  /** 位置が届いている人の足元を out に足す (草を押す人。world/grass.ts) */
+  addLivePositions(out: Map<string, THREE.Vector3>): void {
+    for (const [id, player] of this.players) if (player.object.visible) out.set(id, player.object.position);
   }
 
   /** その人の右手のワールド座標 (スタンナイフの放電の出所)。見えていなければ null */

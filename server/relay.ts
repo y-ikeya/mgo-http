@@ -136,6 +136,7 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   // 振りかぶり (投げ物を構えている) も構え。客のカメラは銃と同じに寄っているので、見える判定の目もそちら
   player.aiming = snapshot.aiming || snapshot.holdingGrenade
   player.locomotion = snapshot.locomotion
+  player.locomotionAge = snapshot.locomotionAge
   // 持っている銃。威力と連射の上限をこれで引く
   /*
    * **手にある物は申告だが、持てない物は受け取らない。**

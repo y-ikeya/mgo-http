@@ -19,10 +19,10 @@ beforeAll(async () => {
 
 afterAll(() => server.stop())
 
-const TARGET = STAGES[ROOMS.echo.stages.stages[0]].targets[0]
+const TARGET = STAGES[ROOMS.golf.stages.stages[0]].targets[0]
 
 async function shooter(id: string): Promise<Client> {
-  const me = new Client(server, id, [TARGET.x, 0, TARGET.z + 3], 'echo')
+  const me = new Client(server, id, [TARGET.x, 0, TARGET.z + 3], 'golf')
   await me.ready()
   me.live()
   // **湧く前に選ぶ。** 走っている試合では持ち替えられない (domain/player/equip.ts)
