@@ -35,6 +35,7 @@ import { clearClaymores } from './arms/claymore'
 import { clearDolls } from './arms/doll'
 import { TRAP_APPROACH_SECONDS, TRAP_REACH, trapStage } from '../src/domain/item/doll'
 import { WALK_TOP_SPEED } from '../src/domain/player/locomotion'
+import { PLAYER_RADIUS } from '../src/domain/player/moving'
 import { clearDecoys } from './arms/decoy'
 import { clearLocators } from './arms/locator'
 import { relayState, sendHealth, sendStamina } from './relay'
@@ -150,8 +151,7 @@ export function updateTargets(room: RoomWorld, now: number): void {
     if (bot.knockLeft > 0) {
       const step = Math.min(bot.knockLeft, TICK_SECONDS)
       const speed = knockSpeed(bot.knockLeft, bot.knockTime || undefined)
-      bot.x += bot.knockX * speed * step
-      bot.z += bot.knockZ * speed * step
+      slideBot(room, bot, bot.knockX * speed * step, bot.knockZ * speed * step)
       bot.knockLeft = Math.max(0, bot.knockLeft - TICK_SECONDS)
     }
     if (bot.downLeft > 0) bot.downLeft = Math.max(0, bot.downLeft - TICK_SECONDS)
@@ -193,6 +193,40 @@ export function updateTargets(room: RoomWorld, now: number): void {
     relayState(room, bot, targetPayload(bot, now))
   }
 }
+
+/**
+ * 吹き飛ばされた的を 1 刻みぶん滑らせる。**壁で止める。**
+ *
+ * 人は自分の画面で滑り、押し戻し (resolveHorizontal) が壁の手前で止める。的には画面が無いので
+ * サーバーが動かすが、壁を見ていなかった — 壁際の的を飛ばすと壁の中に埋まった (本人 2026-11-03、
+ * foxtrot の TARGET 7 など)。人が止まる三角 (stage.body) に、膝と腰の高さで体の半径ぶん先まで線を
+ * 引き、当たったら手前で止まって滑るのをやめる
+ */
+function slideBot(room: RoomWorld, bot: MatchPlayer, dx: number, dz: number): void {
+  const length = Math.hypot(dx, dz)
+  const world = room.stage.body
+  if (length < 1e-6 || !world) {
+    bot.x += dx
+    bot.z += dz
+    return
+  }
+  const ux = dx / length
+  const uz = dz / length
+  const reach = length + PLAYER_RADIUS
+  let free = length
+  for (const height of SLIDE_PROBE_HEIGHTS) {
+    const y = bot.y + height
+    const hit = world.hit(bot.x, y, bot.z, bot.x + ux * reach, y, bot.z + uz * reach)
+    if (hit) free = Math.min(free, Math.max(0, hit.t * reach - PLAYER_RADIUS))
+  }
+  bot.x += ux * free
+  bot.z += uz * free
+  // 壁に当たった。残りは滑らない (押し当てたまま倒れる)
+  if (free < length) bot.knockLeft = 0
+}
+
+/** 滑る的の体を見る高さ (m、足元から)。膝 (低い塀) と腰 (壁) */
+const SLIDE_PROBE_HEIGHTS = [0.3, 0.9] as const
 
 /*
  * 的の姿。倒れた / 眠っている / 転んでいる / 起き上がっている / 立っている。
