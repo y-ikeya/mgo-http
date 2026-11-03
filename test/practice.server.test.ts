@@ -280,6 +280,9 @@ describe('練習部屋でローリング', () => {
     await Bun.sleep(3400)
     me.send({ type: 'spawn' })
     await Bun.sleep(600)
+    // 転がっている姿で申告する (サーバーは転がっていない人の体当たりを通さない)
+    me.pose = 'roll'
+    await Bun.sleep(100)
     me.send({ type: 'knock', id: me.id, hit: `target-${index}`, x: 0, z: -0.8 })
     await Bun.sleep(400)
     const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
