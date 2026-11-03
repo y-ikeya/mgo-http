@@ -475,6 +475,11 @@ const UI_SOUNDS = {
   /** 試合の残り 10 秒から 1 秒ごとに 10 回 (2026-10-25 本人の clockTick.mp3、どのルールでも) */
   clockTick: { file: "clock_tick1.mp3", volume: 0.6 },
   /**
+   * 試合が始まる暗転の前 (2026-11-03 本人の engine.mp3、tools/raw のまま)。2.9 秒。**鳴り終わりが試合の始まり**
+   * になるよう、締め切りの 2.9 秒前から鳴らす (Game の updateEngine)。素材のピークが -1dB と大きいので下げる
+   */
+  engine: { file: "engine1.mp3", volume: 0.45 },
+  /**
    * 結果の画面の曲 (2026-10-17 本人、tools/raw/result.mp3 のまま)。11.45 秒。**結果の画面は
    * 曲が鳴り終わるまで開いている** (server/match.ts の INTERMISSION_MS)。畳んだら止める
    */
