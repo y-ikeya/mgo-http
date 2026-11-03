@@ -23,6 +23,14 @@ export interface BriefingFacts {
   tickets: number
 }
 
+/** 説明の見出し。MGO2 の正式名 (2026-11-03 本人) */
+const TITLES: Partial<Record<Mode, string>> = {
+  DM: 'Death Match',
+  TDM: 'Team Death Match',
+  TSNE: 'Team Sneaking',
+  CAP: 'Capture',
+}
+
 export function briefingOf(mode: Mode, facts: BriefingFacts): BriefingPage[] {
   const minutes = Math.round(matchMsOf(facts.room) / 60_000)
   const label = MODES[mode].label
@@ -65,5 +73,5 @@ export function briefingOf(mode: Mode, facts: BriefingFacts): BriefingPage[] {
   if (!rule) return []
   // **1 枚だけ。** 2 枚目 (そのモードならではの手・部屋の持ち込み) は出さない
   // (2026-11-03 本人「全部の rule で 2 枚目はいらないわ」)
-  return [{ title: label, lines: rule }]
+  return [{ title: TITLES[mode] ?? label, lines: rule }]
 }
