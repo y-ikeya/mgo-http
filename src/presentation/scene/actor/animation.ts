@@ -270,9 +270,7 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
   claymore_windup: 'claymore_windup',
   claymore_place: 'claymore_place',
   jump_up: 'relaxed_run',
-  // 滞空は足を動かしていない落下 (柵を越えた先・手を離した) だけで出る。**腕は振らない** —
-  // 走りの型のままだと落ちながら手を振っていた (2026-11-03 本人「走ってるみたいに手を振ってる、キモい」)
-  jump_loop: 'relaxed_idle',
+  jump_loop: 'relaxed_run',
   // 着地は止まって膝を曲げる間 (soldier の landingTimer で動けない)。**腕は振らない** — 走りの型のままだと、
   // 走るボタンを押し続けた着地で足が止まっているのに手だけ振っていた (2026-10-22 本人)
   jump_down: 'relaxed_idle',
@@ -689,8 +687,7 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
   up_stair: 'run_unarmed',
   down_stair: 'run_unarmed',
   jump_up: 'run_unarmed',
-  // 滞空は腕を振らない (RELAXED_CLIPS の jump_loop と同じ)
-  jump_loop: 'pistol_relaxed',
+  jump_loop: 'run_unarmed',
   // 着地は止まっているので腕を振らない (RELAXED_CLIPS の jump_down と同じ)
   jump_down: 'pistol_relaxed',
   /*
