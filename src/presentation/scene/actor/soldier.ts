@@ -347,6 +347,14 @@ const VAULT_BODY_HEIGHT = 0.95
 const VAULT_FALL_DROP = 0.5
 /** 型のここまでは切らずに流す (尺に対する割合)。手を掛けて体を回すまで */
 const VAULT_FALL_PHASE = 0.6
+/**
+ * 跳び越えた先へ落ちる時に持ち越す前への速さの上限 (m/s)。**枠から離れるぶんだけ。**
+ *
+ * 跳んでいる型の速さ (1.2 倍速で 3m/s 前後) をそのまま空中へ持ち越していたので、柵の先が
+ * 落ちていると、落ちる間ずっとその速さで進んで遠くへ着いた (2026-11-03 本人「柵を越えた
+ * その推進力のまま下に落ちるから結構前に進みながら落ちる」)。枠を背にして真下へ落ちるくらいに留める
+ */
+const VAULT_FALL_CARRY = 0.8
 /** しゃがみから乗る時、乗る型をここで切ってしゃがみへ渡す (尺に対する割合)。腰の上がりが 9 割の所 */
 const VAULT_UP_CROUCH_CUT = 0.72
 /** 先の床が枠の上面とこれ以内の差なら「同じ高さ」= 一段上へ乗る (m) */
@@ -4073,9 +4081,10 @@ export class Soldier {
         this.animator?.endVault()
         this.mover.onGround = false
         this.velocityY = 0
-        // 跳んだ向きの勢いを空中へ持ち越す (真下ではなく外へ弧を描く)
-        this.mover.airX = -Math.sin(this.rollYaw) * moved.actualSpeed
-        this.mover.airZ = -Math.cos(this.rollYaw) * moved.actualSpeed
+        // 跳んだ向きの勢いは枠から離れるぶんだけ持ち越す (VAULT_FALL_CARRY)。遠くへ飛んでいかない
+        const carry = Math.min(moved.actualSpeed, VAULT_FALL_CARRY)
+        this.mover.airX = -Math.sin(this.rollYaw) * carry
+        this.mover.airZ = -Math.cos(this.rollYaw) * carry
       }
     }
 
