@@ -8,7 +8,7 @@ import { createSignal, onMount } from 'solid-js'
 import type { LookScale } from '../../src/infra/prefs/look'
 import { render } from 'solid-js/web'
 import Scoreboard from '../../src/presentation/ui/Scoreboard'
-import type { GameStats } from '../../src/presentation/scene/Game'
+import type { GameStats } from '../../src/presentation/scene/stats'
 import type { Skills } from '../../src/domain/player/skill'
 
 const players = [

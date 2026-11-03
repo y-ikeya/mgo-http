@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import type { LoadoutFocus } from '../scene/Game'
+import type { LoadoutFocus } from '../scene/stats'
 import { READY_HOLD } from '../../application/loadout/input'
 import { Portrait } from '../scene/portrait'
 import type { WeaponKind } from '../scene/arms/weapon'
