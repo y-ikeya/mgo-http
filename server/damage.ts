@@ -783,6 +783,8 @@ const PRONE_POSE = /^(prone|crawl)/
 export function applyRoll(room: RoomWorld, attacker: MatchPlayer, victim: MatchPlayer): boolean {
   if (!canAct(attacker.life) || !canBeHurt(victim.life)) return false
   if (PRONE_POSE.test(victim.locomotion)) return false
+  // **転がっている人だけ。** CQC の踏み込み・跳び越えで当たった申告は通さない (本人 2026-11-03)
+  if (attacker.locomotion !== 'roll') return false
   // 申告の検算。体当たりの間合い (+ 通信のずれの余裕)
   if (Math.hypot(victim.x - attacker.x, victim.z - attacker.z) > ROLL_HIT_RANGE + ROLL_HIT_SLACK) return false
   if (Math.abs(victim.y - attacker.y) > 1.2) return false

@@ -2691,6 +2691,14 @@ export class Soldier {
     return this.animator?.rollDuration ?? 0
   }
 
+  /**
+   * **転がりそのもの**の最中か (跳び越え・ぶら下がり・CQC を混ぜない)。体当たりで相手を倒すのはこれだけ —
+   * 混ぜた rolling で見ていたので、CQC の空振りのフックで踏み込んだ先のしゃがんだ相手が倒れた (本人 2026-11-03)
+   */
+  get rollingOnly(): boolean {
+    return this.animator?.rolling ?? false
+  }
+
   /** ローリング中か。この間は撃てず、方向も変えられない */
   get rolling(): boolean {
     // 跳び越えも転がりと同じ縛り (撃てず、向きも変えられず、重ねて始められない)

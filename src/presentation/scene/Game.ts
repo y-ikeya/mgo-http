@@ -3906,7 +3906,8 @@ export class Game {
    * 通り道にいる相手を順に弾いていく形になる。
    */
   private updateRollContact(): void {
-    const rolling = this.player.rolling;
+    // 転がりだけ。跳び越え・ぶら下がり・CQC の踏み込みで当たっても倒さない
+    const rolling = this.player.rollingOnly;
     // 転がり始めに履歴を空にする。同じ相手を何度も弾かないため。
     if (rolling && !this.wasRolling) this.rolledInto.clear();
     this.wasRolling = rolling;
