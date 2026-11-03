@@ -172,6 +172,16 @@ describe('散弾で的を突き飛ばす', () => {
     client.send({ type: 'loadout', primary: 'shotgun', support: 'grenade' })
     client.claimedWeapon = 'shotgun'
     await spawnAlive(client)
+    /*
+     * **的の姿が 1 通届くまで待つ。** 撃つ前と後で姿を比べる試験なので、
+     * 届いていない所から比べると「比べる物が無い」まま落ちる。前は湧きの
+     * 眠り (3.4 + 0.6 秒) がこれを兼ねていて、速くしたら表に出た
+     */
+    await waitFor(() => {
+      const roster = client.last.get('roster') as Extract<ServerMessage, { type: 'roster' }> | undefined
+      const found = roster?.players.find((p) => p.id === MINE_ID)
+      return found?.slot !== undefined && client.poses.has(found.slot)
+    }, '的の姿が届く')
     return client
   }
 
