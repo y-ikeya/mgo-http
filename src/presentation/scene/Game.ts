@@ -1,6 +1,5 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
 import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/weapon";
-import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
 import { followMovingShadow } from "./world/liveShadow";
@@ -28,7 +27,6 @@ import {
   canChooseSkills,
   masteryReloadScale,
   masteryRecoveryScale,
-  stunChargeSeconds,
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
@@ -73,10 +71,11 @@ import { Dolls } from "./arms/dolls";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { StunSparks } from "./fx/stunSparks";
+import { Melee } from "./self/melee";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME } from "../../domain/rule/damage";
 import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
@@ -497,18 +496,6 @@ const LAG_REPORT_WINDOW_MS = 10_000;
 const LAG_REPORT_EVERY_MS = 5_000;
 
 
-/**
- * 刺突の判定を出すタイミング (クリップ尺に対する割合)。
- *
- * **腕が伸び切る直前。** 頭で出すと刃が届く前に倒れ、遅いと刺さってから間が
- * 開いて倒れる。立ちの刺突 (stab、57 コマ) は 9〜12 コマ目で腕が伸び、12 コマ目で
- * 伸び切って 24 コマ目まで保つ (右肩から手まで 0.35 → 0.61m、soldier.glb で実測)。
- * 10.5 コマ目 = 19%。以前の 35% は伸び切ってから 0.4 秒後で、「刺さってから
- * ちょっと間が開いてやられる」だった (本人 2026-10-08)。しゃがみも同じ型
- */
-const STAB_HIT_PHASE = 0.19;
-/** 伏せた刺突 (prone_stab、41 コマ)。11〜17 コマ目で伸びるので、伸び切る直前の 15 コマ目 */
-const PRONE_STAB_HIT_PHASE = 0.36;
 /** 銃を構える高さは目の線からこれだけ下 (m) */
 const MUZZLE_BELOW_EYE = 0.15;
 /** 銃の胴の下側は銃口からこれだけ下 (m)。ここが遮蔽の上に出ていれば構えられる */
@@ -521,8 +508,6 @@ const AIM_SETTLE_SECONDS = 0.6;
 const MUZZLE_MIN_HEIGHT = 0.15;
 /** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
 const MUZZLE_HYSTERESIS = 1.08;
-/** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
-const FALLBACK_STAB_DURATION = 1.9;
 
 /**
  * 弾痕の色。**地形に当たった分だけ。**
@@ -862,6 +847,8 @@ export class Game {
   private readonly blast: BlastFx;
   /** スタンナイフの放電 (fx/stunSparks.ts)。自分と他人の刃先に出す */
   private readonly stunSparks: StunSparks;
+  /** 自機の近接 (ナイフと CQC、self/melee.ts) */
+  private readonly melee: Melee;
   /** 気配 (AWARENESS)。**何が在るかは届かない**ので、霧を置くだけ */
   private readonly sensed: Sensed;
   private readonly casings: Casings;
@@ -1090,11 +1077,6 @@ export class Game {
   /** リロードの音を鳴らし始める位置 (割合、調整用) */
   /** 連射中の何発目か。反動パターンを引く添字 */
   /** 姿勢由来の散布 (度)。移動と滞空で増え、落ち着くと戻る */
-  /** 刺突の残り時間。0 より大きい間は発砲できない */
-  private stabTimer = 0;
-  /** 判定を出したか。1 回の振りで 1 回だけ */
-  private stabResolved = true;
-  private readonly meleeForward = new THREE.Vector3();
   /** 今のローリングで既に弾いた相手。1 回の転がりで同じ相手を何度も弾かない */
   private readonly rolledInto = new Set<string>();
   private wasRolling = false;
@@ -1108,6 +1090,12 @@ export class Game {
    */
   private lastHitTranq = false;
   private hitFeedbackTimer = 0;
+
+  /** 当てた部位を HUD に出す (HIT_FEEDBACK_DURATION の間) */
+  private showHit(zone: string): void {
+    this.lastHitZone = zone;
+    this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
+  }
   /**
     * 状態を送るタイマーの握り。描画ループとは独立して回る。
     *
@@ -1627,6 +1615,23 @@ export class Game {
     this.follow.snapTo(this.player, this.cameraWorld);
     // 環境音はステージが決める。筏は波、屋内は街の音 (domain/stage の ambience)
     this.audio = new GameAudio(this.follow.camera, this.scene, STAGES[this.stageName].ambience);
+    // 自機の近接 (ナイフと CQC)。借りる物は問いと頼みの形で渡す (self/melee.ts)
+    this.melee = new Melee({
+      player: this.player,
+      remotes: this.remotes,
+      net: this.net,
+      audio: this.audio,
+      follow: this.follow,
+      input: this.input,
+      inv: this.inv,
+      stunSparks: this.stunSparks,
+      skills: () => this.skills,
+      hostileTo: (id, side) => this.hostileTo(id, side),
+      canUseHands: () => canAct(this.life) && !this.loadoutBlocking,
+      reloading: () => this.reloadTimer > 0,
+      releasing: () => this.grenadeRelease > 0 || this.setupRelease > 0,
+      showHit: (zone) => this.showHit(zone),
+    });
 
     this.calibration = createCalibration({
       knobs: this.knobs,
@@ -1935,7 +1940,7 @@ export class Game {
     this.syncHeld();
     this.releaseUnwornBox();
     this.inv.update(dt, this.input.firing);
-    this.updateTrigger();
+    this.melee.updateTrigger();
     this.updateZoom();
     this.applyWeaponView();
 
@@ -2011,7 +2016,7 @@ export class Game {
     this.player.setFade(1 - FADE_MAX * this.follow.crowding);
     this.updateRollContact();
     this.updateBoxContact();
-    this.updateStab(dt);
+    this.melee.updateStab(dt);
     this.askRosterIfWanted();
     const posture = {
       speed: this.player.speed,
@@ -2669,7 +2674,7 @@ export class Game {
         // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
         else if (message.hanging) this.player.resumeHang(message.yaw);
         // スタンナイフの充電も続きから (審判と同じ時計)。読み直しで満タンにはならない
-        this.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
+        this.melee.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
         // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
         // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
         this.loadout.support = message.support;
@@ -3905,9 +3910,9 @@ export class Game {
     this.reloadTimer = 0;
     this.reloadSoundIn = 0;
     this.boltIn = 0;
-    this.stabTimer = 0;
+    this.melee.stabTimer = 0;
     // スタンナイフは満ちた状態で湧く (審判の spawn と同じ)
-    this.stunReadyAt = Date.now();
+    this.melee.stunReadyAt = Date.now();
     this.spread.reset();
     this.follow.snapTo(this.player, this.cameraWorld);
   }
@@ -4153,216 +4158,6 @@ export class Game {
     return true;
   }
 
-  /** いま振っている刺突の判定を出す位置 (STAB_HIT_PHASE / PRONE_STAB_HIT_PHASE) */
-  private stabHitPhase = STAB_HIT_PHASE;
-  /** いま振っているのが眠らせる刺突 (スタンナイフ) か */
-  private stabStun = false;
-  /**
-   * スタンナイフの充電が満ちる時刻 (Date.now)。**湧いた時に今へ戻す** (満ちた状態)。
-   * 審判も同じ時計を持っていて、満ちる前の当たりは通さない (server/damage.ts)
-   */
-  private stunReadyAt = 0;
-
-  /** スタンナイフの充電 (0〜1)。HUD のメーター */
-  private get stunChargeNow(): number {
-    return stunCharge(this.stunReadyAt, Date.now(), stunChargeSeconds(this.skills));
-  }
-
-  /**
-   * ナイフを振り始める。リロード中と多重の振りは受け付けない。
-   *
-   * stun = 眠らせる刺突。**充電が満ちていなければ振らない** (空振りもしない)。
-   * 振ったら空振りでも充電は空になる
-   */
-  private startStab(stun = false): void {
-    if (this.stabTimer > 0 || this.reloadTimer > 0 || this.player.rolling)
-      return;
-    if (stun && this.stunChargeNow < 1) return;
-    this.stabStun = stun;
-    if (stun) {
-      this.stunReadyAt = stunReadyAfter(Date.now(), stunChargeSeconds(this.skills));
-      /*
-       * **バチバチと刃先が光る。** 振り始めから腕が伸び切る所まで。刃が無ければ
-       * (模型が届く前) 右手から。音も同じ所で鳴らし、他の人へも知らせる (zap)
-       */
-      this.stunSparks.discharge((out) => this.player.knifeTip(out) ?? this.player.handWorld(out));
-      this.audio.play("zap", this.player.position);
-      this.net.send({ type: "zap", id: this.net.id });
-    }
-    this.stabTimer = this.player.stabDuration || FALLBACK_STAB_DURATION;
-    this.stabResolved = false;
-    // 型が違うので腕が伸びる所も違う。振り始めの姿勢で決める
-    this.stabHitPhase = this.player.isProne ? PRONE_STAB_HIT_PHASE : STAB_HIT_PHASE;
-    this.player.stab();
-  }
-
-  /**
-   * 刺突の進行。モーションの途中で 1 回だけ判定を出す。
-   * 判定はキャラの向きを基準にする (カメラではなく体の正面)。
-   */
-  private updateStab(dt: number): void {
-    if (this.stabTimer <= 0) return;
-    const total = this.player.stabDuration || FALLBACK_STAB_DURATION;
-    const elapsed = total - this.stabTimer;
-    this.stabTimer -= dt;
-
-    if (this.stabResolved || elapsed < total * this.stabHitPhase) return;
-    this.stabResolved = true;
-
-    // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ)
-    const yaw = this.player.yaw;
-    this.meleeForward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
-    /*
-     * 振ったことだけ知らせる。**当たったかどうかは言わない。**
-     *
-     * decoy は風船なので刃でも割れるが、割るのはサーバー。位置も向きも
-     * あちらが持っているので、「刺した」と言わせない — 言えるようにすると、
-     * **刺していないのに割ったことにして相手を晒せる**。
-     *
-     * 空振りでも送る。手元では割れたかどうかが分からない (decoy かどうかを
-     * 手元で決めると、そこが嘘の入り口になる)。
-     */
-    this.net.send({ type: "stab" });
-
-    const result = this.remotes.hitMelee(
-      this.player.position,
-      this.meleeForward,
-      // 見下ろしていれば倒れている相手にも届く。構えていなければ水平とみなす
-      this.player.isAiming ? this.follow.aimPitch : 0,
-      // 倒れた相手には屈んで (しゃがみ / 伏せ) 見下ろしたときだけ届く
-      this.player.stance,
-    );
-    if (!result) return;
-
-    // 味方に当てた。申告は送らない (サーバーが捨てるが、送る意味も無い)。
-    // 表示だけは出す。当たったこと自体が分からないと、撃ち続けてしまう。
-    //
-    // **敵かどうかはルールに聞く。** 個人戦では同じ色でも敵で、陣営で見ていると
-    // 刺しても何も起きない
-    if (!this.hostileTo(result.id, result.side)) {
-      this.lastHitZone = "FF";
-      this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
-      return;
-    }
-
-    /*
-     * 手元の表示。**削る量を決めるのはサーバー。**
-     *
-     * 背後かどうかは申告に載せない — 位置と向きから分かるので、サーバーが
-     * 通ったコマから出す (sim/judge/hitcheck.ts の isBackstab)。ここに残って
-     * いるのは、刺した瞬間に何か出さないと手応えが無いから。**巻き戻しの
-     * 結果と食い違うことはあり得る**が、数字が動くわけではない。
-     */
-    this.lastHitZone = this.stabStun ? "STUN" : result.fromBehind ? "BACKSTAB" : "KNIFE";
-    this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
-    // 刺さった音。**空振りでは鳴らさない** — 当てたかどうかで結果が全部決まる
-    this.audio.play("stab", this.player.position);
-    this.net.send({
-      type: "damage",
-      id: this.net.id,
-      target: result.id,
-      kind: "melee",
-      // 眠らせる刺突。充電を確かめるのは審判
-      ...(this.stabStun ? { stun: true } : {}),
-    });
-  }
-
-  /** リロードの進行と、押しっぱなしの間 FIRE_INTERVAL ごとの発砲 */
-  /**
-   * 引き金は 1 本。手にある物が何をするかを決める。
-   *
-   * **撃つ・投げる・刺すが同じボタンになる。** 持ち替えて使う形にした以上、
-   * 物ごとに別のキーを割り当てると「持ち替えたのに別のキーを押す」ことになって、
-   * 持ち替えたこと自体が意味を失う。
-   */
-  private updateTrigger(): void {
-    // ナイフを持っている間、鍵盤の右クリックは眠らせる刺突 (構えは Shift)
-    this.input.rightClickStuns = this.inv.held === "knife";
-    if (!canAct(this.life) || this.loadoutBlocking) return;
-    if (this.inv.switching) return;
-    if (this.updateCqc()) return;
-    if (this.inv.held !== "knife") return;
-    // ナイフは押した瞬間に振る。押しっぱなしで連打しない。
-    // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
-    /*
-     * **構えていなければ刺さない。** ナイフを持っているだけで R2 で刺せた
-     * (本人 2026-10-08)。銃と同じく、構えてから使う。押したことは消すので、
-     * 押したまま構えても後から刺さない。
-     *
-     * 構えて 2 通り (MGO2 のスタンナイフ):
-     *   殺す刺突      パッド R1 / 鍵盤 左クリック
-     *   眠らせる刺突  パッド R2 / 鍵盤 右クリック (充電が満ちている時だけ。構えは Shift)
-     */
-    const aiming = this.player.isAiming;
-    const killTap = this.input.tapped("killStab");
-    const stunTap = this.input.tapped("stunStab");
-    if (this.input.firing && this.inv.pressedOnce) {
-      this.inv.consumePress();
-      if (aiming) this.startStab(this.input.firingByPad);
-      return;
-    }
-    if (!aiming) return;
-    if (killTap) this.startStab(false);
-    else if (stunTap) this.startStab(true);
-  }
-
-  /**
-   * CQC (domain/player/cqc.ts)。**構えずに引き金を引く。** 片手で持つ物 (拳銃・
-   * ナイフ・投げる物・置く物) の時だけで、長物では何も起きない。
-   *
-   * 構えているかは**ボタンで見る** (input.aiming)。投げ物を構えている間は体の構え
-   * (isAiming) が立たないので、そちらで見ると構えて引いた手榴弾が CQC に化ける
-   *
-   * **体の正面**の近くに立っている敵が居れば、そちらへ向き直って投げる。カメラの向きは
-   * 見ない (本人 2026-10-12) — 別の方の相手に掛けたいなら、移動で体をそちらへ向けてから押す。
-   * 居ない・しゃがんでいる・箱に入っている なら**空振り** — 型の後に棒立ちの隙が
-   * 残る (soldier の cqcRecoverLeft)。掛かったかを決めるのはサーバー
-   *
-   * @returns 引き金を CQC に使った (刺突へは回さない)
-   */
-  /** 投げ切る型の最中に押された CQC。手を離れたら出す (updateCqc) */
-  private cqcQueued = false;
-
-  private updateCqc(): boolean {
-    if (this.input.aiming || this.player.isAiming || !canThrowWith(this.inv.held)) {
-      this.cqcQueued = false;
-      return false;
-    }
-    const pressed = this.input.firing && this.inv.pressedOnce;
-    if (pressed) this.inv.consumePress();
-    if (!pressed && !this.cqcQueued) return false;
-    if (this.stabTimer > 0 || this.reloadTimer > 0) return true;
-    /*
-     * 投げ切る / 置き切る型の最中 (手を離れるまで最大 1 秒ほど)。**押したことは覚えておいて、
-     * 手を離れた瞬間に出す。** 捨てていたので、手榴弾を投げてすぐ目の前の敵に掛けようと
-     * すると何も起きなかった (本人 2026-10-12)
-     */
-    if (this.grenadeRelease > 0 || this.setupRelease > 0) {
-      this.cqcQueued = true;
-      return true;
-    }
-    this.cqcQueued = false;
-    const look = this.player.yaw;
-    this.meleeForward.set(-Math.sin(look), 0, -Math.cos(look));
-    const target = this.remotes.cqcTarget(this.player.position, this.meleeForward, (id, side) =>
-      this.hostileTo(id, side),
-    );
-    if (target?.throwable) {
-      const face = Math.atan2(
-        -(target.position.x - this.player.position.x),
-        -(target.position.z - this.player.position.z),
-      );
-      if (this.player.cqc("cqc_throw", face)) this.net.send({ type: "cqc", target: target.id });
-      return true;
-    }
-    // 相手が居れば、空振りでもそちらへ振る
-    const face = target
-      ? Math.atan2(-(target.position.x - this.player.position.x), -(target.position.z - this.player.position.z))
-      : look;
-    this.player.cqc("cqc_miss", face);
-    return true;
-  }
-
   private updateWeapon(dt: number): void {
     // 撃つ手を止めたらパターンを頭に戻す。バースト射撃が意味を持つのはこのため。
 
@@ -4471,7 +4266,7 @@ export class Game {
       body: can(this.player.body, "fire"),
       life: this.life,
       reloading: this.reloadTimer > 0,
-      stabbing: this.stabTimer > 0,
+      stabbing: this.melee.stabTimer > 0,
       ammo: this.ammo,
     });
     this.player.setFiring(firing);
@@ -4530,7 +4325,7 @@ export class Game {
   }
 
   private startReload(): void {
-    if (this.reloadTimer > 0 || this.stabTimer > 0) return;
+    if (this.reloadTimer > 0 || this.melee.stabTimer > 0) return;
     // 体の条件 (転がり・這い・伏せへの出入り・箱…) は動作の表 (moves.ts の reload)
     if (!can(this.player.body, "reload")) return;
     // どの姿勢で始めたかを控える。**途中で姿勢が変わったら中断する**
@@ -6228,7 +6023,7 @@ export class Game {
       held: this.inv.held,
       // **武器のカードに出す物。** 道具を手にしていても変わらない
       weaponHeld: shownWeapon,
-      stunCharge: this.stunChargeNow,
+      stunCharge: this.melee.stunChargeNow,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
       // STEALTH は手に持たないが、着ている間は道具のカードを点ける (武器のカードは暗くしない)
