@@ -2556,7 +2556,7 @@ export class Game {
     }
     // 支度に入った所でルールの説明を開く (openBriefing)
     if (message.type === "match" && message.phase === "ready" && this.phaseSeen !== "ready") {
-      this.briefFor(message.mode, message.blue);
+      this.briefFor(message.mode, message.blue, message.stage);
     }
     if (message.type === "match") this.phaseSeen = message.phase;
     if (message.type === "roster") this.rosterWanted = false;
@@ -3838,24 +3838,28 @@ export class Game {
    * **前の試合と同じモードなら出さない** — 同じ説明を毎試合読まされない。待合室のルールの
    * ボタンで開き直せる
    */
-  private briefFor(mode: Mode, tickets: number): void {
+  private briefFor(mode: Mode, tickets: number, stage: StageName): void {
     if (!this.roomName || mode === this.briefedMode) return;
     this.briefedMode = mode;
     this.briefTickets = tickets;
+    this.briefStage = stage;
     this.openBriefing();
   }
   /** 説明を出したモード。同じなら次の試合では出さない */
   private briefedMode: Mode | null = null;
   /** 説明に差し込む残機 (支度に入った時の match の blue) */
   private briefTickets = 0;
+  /** 説明に出すステージ (支度に入った時の match の stage) */
+  private briefStage: StageName | null = null;
   /** 出している説明。null なら閉じている */
   private briefing: Briefing | null = null;
 
   /** 説明を開く。待合室のルールのボタンからも */
   openBriefing(): void {
     const mode = this.replica.match?.mode ?? this.briefedMode;
-    if (!this.roomName || !mode) return;
-    this.briefing = briefingOf(mode, { room: this.roomName, tickets: this.briefTickets });
+    const stage = this.replica.match?.stage ?? this.briefStage;
+    if (!this.roomName || !mode || !stage) return;
+    this.briefing = briefingOf(mode, { room: this.roomName, tickets: this.briefTickets, stage });
   }
 
   closeBriefing(): void {

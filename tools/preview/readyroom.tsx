@@ -67,7 +67,7 @@ render(
 
 const brief = query.get('brief')
 if (brief) {
-  const briefing = briefingOf(brief as never, { room: (query.get('room') ?? 'bravo') as never, tickets: 20 })
+  const briefing = briefingOf(brief as never, { room: (query.get('room') ?? 'bravo') as never, tickets: 20, stage: (query.get('stage') ?? 'uu') as never })
   const host = document.body.appendChild(document.createElement('div'))
   Object.assign(host.style, { position: 'fixed', inset: '0' })
   if (briefing) render(() => <Briefing briefing={briefing} left={42} onClose={() => {}} />, host)

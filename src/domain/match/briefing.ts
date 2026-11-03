@@ -1,5 +1,6 @@
 import { CAP_COUNT_MS } from './capture'
 import { livesOf, matchMsOf, type Mode, type RoomName } from './room'
+import { STAGES, type StageName } from '../stage'
 
 /**
  * **試合の前に出すルールの説明** (2026-11-03 本人「ゲーム自体の説明 (1,2 枚) → OK で飛ばしたら → standby」)。
@@ -20,6 +21,8 @@ export interface Briefing {
   mode: BriefedMode
   /** 見出し。MGO2 の正式名で、どの言語でも英語 (2026-11-03 本人) */
   title: string
+  /** その試合のステージの名前 (本家の右上の MAP) */
+  map: string
   /** 始まる時の残機。個人戦は部屋で 1 つ */
   tickets: number
   /** 制限時間 (分)。TSNE は 1 ラウンドの長さ */
@@ -45,6 +48,8 @@ export interface BriefingFacts {
   room: RoomName
   /** 始まる時の残機 (支度の間の match の blue) */
   tickets: number
+  /** その試合のステージ (match の報せの stage) */
+  stage: StageName
 }
 
 /** その試合の説明。練習・休憩は出さない (null) */
@@ -53,6 +58,7 @@ export function briefingOf(mode: Mode, facts: BriefingFacts): Briefing | null {
   return {
     mode,
     title: TITLES[mode],
+    map: STAGES[facts.stage].label,
     tickets: facts.tickets,
     minutes: Math.round(matchMsOf(facts.room) / 60_000),
     lives: livesOf(facts.room),

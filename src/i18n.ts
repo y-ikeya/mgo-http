@@ -128,23 +128,26 @@ const JA = {
   'score.back': '戻る',
   // --- 試合の前のルールの説明 (ui/Briefing.tsx)。見出しはどちらも英語 (domain/match/briefing.ts) ---
   'briefing.startsIn': '開始まで 残り {n} 秒',
-  'rules.dm.hostile': '自分以外は全員敵。',
-  'rules.dm.tickets': '残機は部屋で {tickets} を共有。誰が倒されても 1 減り、0 で試合終了。',
-  'rules.dm.time': '制限時間 {minutes} 分。終わった時に一番多く倒した人の勝ち。',
-  'rules.dm.leader': '1 位の人は体が光り、居場所が全員に知られる。',
-  'rules.tdm.tickets': 'チケット制。各陣営 {tickets}。味方が倒されるたびに 1 減る (死因は問わない)。',
-  'rules.tdm.win': '相手のチケットを 0 にしたら勝ち。',
-  'rules.tdm.time': '制限時間 {minutes} 分。時間切れはチケットを多く残している方の勝ち。',
-  'rules.tsne.sides': '攻める側と守る側に分かれる。1 試合は先攻と後攻の 2 ラウンドで、ラウンドごとに入れ替わる。',
-  'rules.tsne.attack': '攻める側: 守る側の陣地にあるターゲットを自陣の基地まで運ぶか、守る側を全員倒す・眠らせたら勝ち。',
-  'rules.tsne.defence': '守る側: 時間切れ (1 ラウンド {minutes} 分) まで守るか、攻める側を全員倒す・眠らせたら勝ち。',
-  'rules.lives.any': '復活は何度でも。',
-  'rules.lives.none': '復活なし。',
-  'rules.lives.n': '復活は 1 人 {lives} 回まで。',
-  'rules.cap.target': 'ターゲット 1 つを両陣営で取り合う。',
-  'rules.cap.count': '持ったまま自陣の設置ポイント (相手の陣地の近く) に居る間だけ、自陣のカウント {count} 秒が減る。',
-  'rules.cap.win': '先に 0 にした方の勝ち。制限時間 {minutes} 分、時間切れは多く減らした方、並んだらサドンデス。',
-  'rules.cap.down': '復活は何度でも。ただし倒されるたびに倒れたままの時間が延びる。',
+  'rules.dm':
+    'プレイヤー全員が敵の個人戦を行います。\n' +
+    'チケット {tickets} 枚がなくなるか制限時間 {minutes} 分が過ぎた時、最も多く敵を倒したプレイヤーが勝利します。\n' +
+    '1 位のプレイヤーは体が光り、居場所が全員に知られます。',
+  'rules.tdm':
+    'レッドチーム 対 ブルーチームのチーム戦を行います。\n' +
+    '相手チームのプレイヤーを倒してチケット ({tickets} 枚) を減らし、先に 0 にしたチームが勝利します。\n' +
+    '制限時間 {minutes} 分が過ぎた時は、チケットを多く残したチームが勝利します。',
+  'rules.tsne':
+    '攻撃チーム 対 防衛チームの潜入戦を、攻守を入れ替えて 2 ラウンド行います。\n' +
+    '攻撃チームは姿を消して忍び込み、ターゲットを自陣の基地まで運べば勝利します。\n' +
+    '防衛チームは制限時間 {minutes} 分までターゲットを守り切れば勝利します。\n' +
+    '相手チーム全員を倒すか眠らせても勝利です。{lives}',
+  'rules.cap':
+    'レッドチーム 対 ブルーチームで 1 つのターゲットを奪い合います。\n' +
+    'ターゲットを持って自陣のゴールに留まるとカウント ({count} 秒) が減り、先に 0 にしたチームが勝利します。\n' +
+    '制限時間 {minutes} 分が過ぎた時は、カウントを多く減らしたチームが勝利します。',
+  'rules.lives.any': '',
+  'rules.lives.none': '復活はありません。',
+  'rules.lives.n': '復活は 1 人 {lives} 回までです。',
 } as const
 
 type Key = keyof typeof JA
@@ -236,23 +239,26 @@ const EN: Record<Key, string> = {
   'score.empty': 'Nobody yet',
   'score.back': 'Back',
   'briefing.startsIn': 'Starts in {n}s',
-  'rules.dm.hostile': 'Everyone else is hostile.',
-  'rules.dm.tickets': 'The room shares {tickets} tickets. Every death costs one; the match ends at 0.',
-  'rules.dm.time': 'Time limit {minutes} min. Whoever has the most kills at the end wins.',
-  'rules.dm.leader': 'The player in first place glows, revealing their position to everyone.',
-  'rules.tdm.tickets': 'Each team has {tickets} tickets. Every time a teammate goes down, your team loses one (whatever the cause).',
-  'rules.tdm.win': 'Bring the enemy team to 0 tickets to win.',
-  'rules.tdm.time': 'Time limit {minutes} min. If time runs out, the team with more tickets left wins.',
-  'rules.tsne.sides': 'Teams split into attackers and defenders. A match is two rounds; sides swap after each round.',
-  'rules.tsne.attack': 'Attackers win by carrying the target from the defenders\' base to their own, or by taking down or sleeping every defender.',
-  'rules.tsne.defence': 'Defenders win by holding out until time runs out ({minutes} min per round), or by taking down or sleeping every attacker.',
-  'rules.lives.any': 'Unlimited respawns.',
+  'rules.dm':
+    'Every player is your enemy.\n' +
+    'When the {tickets} shared tickets run out or {minutes} minutes pass, the player with the most kills wins.\n' +
+    'The player in first place glows, giving away their position.',
+  'rules.tdm':
+    'Red Team versus Blue Team.\n' +
+    'Take down enemy players to drain their {tickets} tickets. The first team to bring the other to 0 wins.\n' +
+    'If {minutes} minutes pass, the team with more tickets left wins.',
+  'rules.tsne':
+    'Attackers versus defenders, over two rounds with sides swapped.\n' +
+    'Attackers are invisible. They win by carrying the target back to their own base.\n' +
+    'Defenders win by guarding the target for {minutes} minutes.\n' +
+    'Taking down or sleeping the whole enemy team also wins. {lives}',
+  'rules.cap':
+    'Red Team versus Blue Team, fighting over a single target.\n' +
+    'Hold the target inside your goal to run down your {count}-second count. The first team to 0 wins.\n' +
+    'If {minutes} minutes pass, the team that ran down more of its count wins.',
+  'rules.lives.any': '',
   'rules.lives.none': 'No respawns.',
   'rules.lives.n': 'Each player can respawn {lives} times.',
-  'rules.cap.target': 'Both teams fight over a single target.',
-  'rules.cap.count': 'While you hold it inside your goal (near the enemy base), your team\'s {count}-second count ticks down.',
-  'rules.cap.win': 'First team to 0 wins. Time limit {minutes} min; on time-out the team that counted down more wins, ties go to sudden death.',
-  'rules.cap.down': 'Unlimited respawns, but each time you go down you stay down longer.',
 }
 
 const TABLE: Record<Lang, Record<Key, string>> = { ja: JA, en: EN }

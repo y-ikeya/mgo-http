@@ -32,15 +32,31 @@
   color: rgba(220, 235, 205, 0.95);
 }
 
-.briefing-lines {
-  margin: 0;
-  padding-left: 1.2em;
+.briefing-band {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 1.05rem;
-  line-height: 1.6;
-  color: rgba(205, 220, 190, 0.9);
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(160, 190, 140, 0.24);
+}
+
+.briefing-band-map {
+  text-align: right;
+}
+
+.briefing-band-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: rgba(180, 200, 165, 0.7);
+}
+
+.briefing-text {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: rgba(205, 220, 190, 0.92);
 }
 
 .briefing-foot {
@@ -55,6 +71,7 @@
   min-width: 180px;
 }
 
-.briefing-card .loadout-head {
-  padding: 0 0 12px;
+
+.briefing-foot .loadout-note {
+  white-space: nowrap;
 }
