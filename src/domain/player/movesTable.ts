@@ -39,7 +39,7 @@ export const MOVE_RULES: Record<Move, Rule> = {
   /** 撃つ。体の側の条件だけ。弾・引き金・装填中・ナイフを振っている間は持ち物の側。爆風で倒れている間は撃てる (伏せ撃ち) */
   fire: { needs: ['aiming'], not: ['dead', 'trapped', 'stabbing', 'rolling', 'vaulting', 'hanging', 'crawling', 'landing', 'cqc'] },
   /** 弾倉を替える。体の側の条件だけ。弾数・ボルト操作中・ナイフを振っている間は Game の側。始めた後にこれらになったらやめる */
-  reload: { needs: [], not: ['dead', 'trapped', 'boxed', 'stabbing', 'rolling', 'vaulting', 'hanging', 'proneShifting', 'crawling', 'cqc'] },
+  reload: { needs: [], not: ['dead', 'downed', 'standingUp', 'sleeping', 'trapped', 'flinching', 'boxed', 'bumping', 'saluting', 'stabbing', 'rolling', 'vaulting', 'hanging', 'onLadder', 'proneShifting', 'crawling', 'landing', 'inWater', 'cqc', 'stepping'] },
   /** 一歩下がる。構えて後ろを押しながら転がりの指。しゃがんでいればしゃがみの型。伏せ・箱からは出ない */
   step: { needs: ['onGround', 'aiming'], not: ['dead', 'downed', 'standingUp', 'sleeping', 'trapped', 'flinching', 'boxed', 'bumping', 'saluting', 'stabbing', 'rolling', 'vaulting', 'hanging', 'onLadder', 'prone', 'landing', 'inWater', 'cqc', 'stepping'] },
 }
