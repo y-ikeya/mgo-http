@@ -1,7 +1,5 @@
 import { CAP_COUNT_MS } from './capture'
 import { MODES, livesOf, matchMsOf, type Mode, type RoomName } from './room'
-import { STEALTH_BREAK_MS } from './sides'
-import { TARGET_RETURN_MS } from './target'
 
 /**
  * **試合の前に出すルールの説明** (2026-11-03 本人「ゲーム自体の説明 (1,2 枚) → OK で飛ばしたら → standby」)。
@@ -65,25 +63,7 @@ export function briefingOf(mode: Mode, facts: BriefingFacts): BriefingPage[] {
     }
   })()
   if (!rule) return []
-  const pages: BriefingPage[] = [{ title: label, lines: rule }]
-
-  // 2 枚目。**そのモードならではの手。** 部屋の持ち込みの縛りは書かない — 説明は試合のルールだけ
-  // (2026-11-03 本人「TDM の 2 枚目はいらないな, 試合のルールだけでいい」)
-  const extra: string[] = []
-  if (mode === 'TSNE') {
-    extra.push(
-      '攻める側はステルス (体が見えない)。持てるのは麻酔の銃とナイフ。',
-      `攻める側の誰かに攻撃が当たると、攻める側全員のステルスが ${STEALTH_BREAK_MS / 1000} 秒解ける (CAUTION)。`,
-      '守る側はターゲットの位置が常に見える。運んでいる人はターゲットが頭の上に浮く。',
-      `落ちたターゲットは ${TARGET_RETURN_MS / 1000} 秒動かされないと元の位置へ戻る。`,
-    )
-  }
-  if (mode === 'CAP') {
-    extra.push(
-      '運ぶ人が倒されたり眠らされたりすると、その場に落ちる。',
-      `落ちたターゲットは ${TARGET_RETURN_MS / 1000} 秒動かされないと元の位置へ戻る。`,
-    )
-  }
-  if (extra.length) pages.push({ title: `${label} — 知っておくこと`, lines: extra })
-  return pages
+  // **1 枚だけ。** 2 枚目 (そのモードならではの手・部屋の持ち込み) は出さない
+  // (2026-11-03 本人「全部の rule で 2 枚目はいらないわ」)
+  return [{ title: label, lines: rule }]
 }
