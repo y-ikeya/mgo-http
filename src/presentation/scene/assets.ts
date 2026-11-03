@@ -2,7 +2,7 @@ import type * as THREE from 'three'
 import { missingClips } from './actor/animation'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
-import { DEFAULT_SKIN } from './actor/skin'
+import { DEFAULT_SKIN, SKIN_FILES } from './actor/skin'
 import { shareGltfTextures } from './util/texshare'
 import type { StageName } from '../../domain/stage'
 
@@ -192,4 +192,36 @@ export function loadLocator(): Promise<GLTF> {
  */
 export function loadStage(name: StageName): Promise<GLTF> {
   return load(asset.model(`stage_${name}.glb`))
+}
+
+/**
+ * **試合の前に全部読む** (2026-11-03 本人「match 始まる前に asset を全部読む方針に」)。
+ *
+ * 体と武器は、その体を着た人・その武器を持った人が初めて見えた所で読んでいた。試合の頭で
+ * 相手が見えた瞬間に 20MB の体を落として解いて、5〜9 秒画面が止まった (本番のログ、
+ * 2026-11-03)。部屋に入った所 (支度・待合室) で全部を読み始めれば、試合が始まる頃には
+ * 手元にある。読んだ物は load の Promise に溜まるので、後で同じ物を頼めばすぐ返る
+ *
+ * 1 つ失敗しても他は読み続ける (読めなかった物は、今まで通り見えた時にもう一度頼む)
+ */
+export function preloadAll(): Promise<GLTF[]> {
+  const loads = [
+    ...SKIN_FILES.map((skin) => loadSoldier(skin)),
+    loadSmg(),
+    loadRifle(),
+    loadShotgun(),
+    loadSniper(),
+    loadMosin(),
+    loadM4(),
+    loadPistol(),
+    loadM1911(),
+    loadCasing(),
+    loadKnife(),
+    loadClaymore(),
+    loadGrenade(),
+    loadTarget(),
+    loadDoll(),
+    loadLocator(),
+  ]
+  return Promise.all(loads.map((p) => p.catch(() => null))).then((all) => all.filter((g): g is GLTF => g !== null))
 }

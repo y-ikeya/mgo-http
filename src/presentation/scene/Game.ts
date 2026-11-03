@@ -13,6 +13,8 @@ import * as THREE from "three";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
 import { pass } from "three/tsl";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { preloadAll } from "./assets";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
 import { Input } from "../../infra/input";
@@ -1549,6 +1551,8 @@ export class Game {
         });
       }
     });
+    // 試合の前に体と武器を全部読み、描く仕組み (シェーダー) も組んでおく (warmUp)
+    void this.warmUp();
     void Promise.all([this.stage.ready, loadStageSun(this.stageName)]).then(([, sunData]) => {
       if (sunData) applyStageSun(this.sun, sunData);
       fitShadowToStage(this.sun, this.stage);
@@ -4021,6 +4025,30 @@ export class Game {
   }
   /** エンジンを鳴らした締め切り (endsAt)。同じ締め切りで 2 度鳴らさない */
   private engineFor = 0;
+
+  /**
+   * **試合が始まる前に、読む物と組む物を済ませる** (2026-11-03 本人「match 始まる前に asset を全部読む方針に」)。
+   *
+   * 試合の頭で相手が見えた瞬間に、その体 (8〜20MB) を落として解き、描く仕組み (WebGPU の
+   * パイプライン) を組んでいたので、5〜9 秒画面が止まった (本番のログ)。部屋に入った所で
+   * 全部を読み (preloadAll)、地形と一緒に一度だけ組む (compileAsync)。組むために読んだ物の
+   * 複製を地面のずっと下に一瞬置き、組み終わったら外す — 画面には映らない
+   */
+  private async warmUp(): Promise<void> {
+    const [models] = await Promise.all([preloadAll(), this.stage.ready]);
+    if (this.disposed) return;
+    const holder = new THREE.Group();
+    holder.position.set(0, -500, 0);
+    for (const gltf of models) holder.add(cloneSkinned(gltf.scene));
+    this.scene.add(holder);
+    try {
+      await this.renderer.compileAsync(this.scene, this.follow.camera);
+    } catch (error) {
+      console.warn("[読み込み] 描く仕組みを先に組めなかった", error);
+    } finally {
+      this.scene.remove(holder);
+    }
+  }
 
   /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */
   private patTarget(): string | null {
