@@ -3,17 +3,24 @@
  *
  *   bun run server
  *
- * 体力・生死・復帰・キルを持つ。位置や見た目は持たず、そのまま中継する。
+ * 体力・生死・復帰・キル・残機・試合の段階を持ち、誰に何を配るかを決める。
  *
  * ダメージの計算は src/domain/rule/damage.ts を**そのまま読み込んでいる**。Bun は
  * TypeScript を直接動かせるので、クライアントと文字どおり同じコードが走る。
  * 移植しないので値がずれようがなく、片方だけ直して忘れる、が起きない。
  *
- * --- まだ守れていないこと ---
- * 「当たった」と言っているのはクライアント。壁抜けも自動照準もこれでは防げない。
- * 防ぐにはサーバーが位置・当たり判定・地形を持つ必要があり、それは Rust 版の仕事。
- * ここで先に押さえたのは、二重にキルが数えられない・体力が全員で一致する、
- * という「試合として成立させる」ための最低限。
+ * --- 守っている線 (2026-11-03 に実装へ合わせて書き直した) ---
+ * - **配る**: 敵の位置は、カメラから見えている相手にだけ配る (relay.ts、sim/space/eyepoint.ts)。
+ *   足音・銃声は届く距離だけ、方向と距離で。壁の向こうの相手の位置はブラウザに届かない
+ * - **当たりの検算**: 「当てた」申告を、連射の間隔・距離・視線・部位の露出で、履歴を巻き戻して
+ *   照合する (sim/judge/hitcheck.ts の verifyHit)。倒れていく・転がっている途中は型の体の位置で見る
+ * - **移動の検算**: 1 通ごとの移動を、人が止まる三角で壁抜けしていないか見る (checkMoveOnMesh)
+ * - **送り主を信じない**: 誰からの知らせかは接続で決め、名乗った id は使わない。認証は JWKS で署名を確かめる
+ *
+ * --- 守れていない線 ---
+ * - **骨の姿勢までの当たり**: 開けた場所で胴を撃って「頭」と申告されると通る (骨を持っていない)
+ * - **自動照準**: 見えている相手を機械が狙うのは、見えている以上は区別できない
+ * - **移動の速さ**: 1 通ごとの跳びは弾くが、少しずつ速く動くのは見ていない
  */
 
 import { dropWeapon, pickUp } from './arms/drops'
@@ -52,7 +59,7 @@ import {
 } from './match'
 import { receiveSnapshot, relayShot, relayState, seesPlayer, sendHealth, sendStamina} from './relay'
 import { newSession, sessionFor, sessionOf, sessions } from './session'
-import { type Client, ROOM_CAPACITY, broadcast, hostileToOwner, privateRoomKey, roomOf, rooms, setLife } from './world'
+import { type Client, type RoomWorld, ROOM_CAPACITY, broadcast, hostileToOwner, privateRoomKey, roomOf, rooms, setLife } from './world'
 import { RECOVER_CAP, RECOVER_DELAY, RECOVER_RATE } from '../src/domain/rule/damage'
 import { verifyToken, type Identity } from './auth'
 import { headHeightOf, lifeElapsed, newMatchPlayer, resupply, type MatchPlayer } from '../src/domain/player/player'
@@ -975,6 +982,35 @@ function handleMessage(
   }
 }
 
+/**
+ * 刻みの重さと持ち物。**追いついているかはここでしか見えない。**
+ *
+ * 1 回 15.6ms を超えたら次を押している。人数を増やしたときに、どこで
+ * 詰まり始めるかを読むために出す。heap は履歴の作り直しが効くところ。
+ * 名前も位置も入らないので、外にも返してよい (tools/measure/load.ts が 1 行目を読む)
+ */
+function tickLine(): string {
+  const heap = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+  return (
+    `刻み 平均 ${tickCost.average.toFixed(2)}ms / 最悪 ${tickCost.lastWorst.toFixed(2)}ms ` +
+    `(上限 ${TICK_MS.toFixed(1)}ms)  heap ${heap}MB\n`
+  )
+}
+
+/** 部屋に席を持っている人の数 (的は数えない) */
+function connectedCount(room: RoomWorld): number {
+  let count = 0
+  for (const player of room.players.values()) if (!player.bot) count++
+  return count
+}
+
+/** /health の詳しい行を返してよいか。Caddy を通っていない (X-Forwarded-For が無い) 手元からの問い合わせだけ */
+function healthDetailAllowed(request: Request, server: { requestIP(request: Request): { address: string } | null }): boolean {
+  if (request.headers.has('x-forwarded-for') || request.headers.has('forwarded')) return false
+  const address = server.requestIP(request)?.address ?? ''
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
+}
+
 /** ボイスを最後に言った時刻 (id → ms)。間隔で連打を弾く */
 const lastVoiceAt = new Map<string, number>()
 
@@ -988,6 +1024,20 @@ const server = Bun.serve<Client>({
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
 
     if (url.pathname === '/health') {
+      /*
+       * **外からは数だけ。** 詳しい行は名前・位置・誰が誰を見ているかまで出すので、外に開けると
+       * そのまま壁越しの透視になる (2026-11-03 のレビュー)。Caddy を通った知らせには必ず
+       * X-Forwarded-For が付くので、それが無く、かつ手元 (loopback) から来たものだけに詳しく返す —
+       * 箱の上で SSH から curl localhost:8787/health と、試験のサーバー
+       */
+      if (!healthDetailAllowed(request, server)) {
+        const summary = [...rooms]
+          .map(([name, room]) => `${name}: [${room.phase}] 青 ${room.blue} - 赤 ${room.red}  ${connectedCount(room)} 人`)
+          .join('\n')
+        return new Response(`ok\n${tickLine()}${summary}\n`, {
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+        })
+      }
       const lines = [...rooms].map(
         ([name, room]) =>
           `${name}: [${room.phase}] 青 ${room.blue} - 赤 ${room.red}  残り ${Math.max(0, Math.round((room.endsAt - Date.now()) / 1000))}s\n` +
@@ -1047,11 +1097,7 @@ const server = Bun.serve<Client>({
        * 1 回 15.6ms を超えたら次を押している。人数を増やしたときに、どこで
        * 詰まり始めるかを読むために出す。heap は履歴の作り直しが効くところ。
        */
-      const heap = Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
-      const cost =
-        `刻み 平均 ${tickCost.average.toFixed(2)}ms / 最悪 ${tickCost.lastWorst.toFixed(2)}ms ` +
-        `(上限 ${TICK_MS.toFixed(1)}ms)  heap ${heap}MB\n`
-      return new Response(`ok\n${cost}${lines.join('\n')}\n`, {
+      return new Response(`ok\n${tickLine()}${lines.join('\n')}\n`, {
         headers: { 'content-type': 'text/plain; charset=utf-8' },
       })
     }
