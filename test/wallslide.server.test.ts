@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { Client, startServer, type Server } from './server'
+import { Client, spawnAlive, startServer, waitFor, type Server } from './server'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { STAGES } from '../src/domain/stage'
 
@@ -22,10 +22,12 @@ test('**背中が窓の壁の的を正面から散弾で飛ばしても、壁の
   await me.ready()
   me.live()
   me.send({ type: 'loadout', primary: 'shotgun', support: 'grenade' })
-  await Bun.sleep(3400)
   me.claimedWeapon = 'shotgun'
-  me.send({ type: 'spawn' })
-  await Bun.sleep(600)
+  await spawnAlive(me)
+  await waitFor(() => {
+    const r = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }> | undefined
+    return !!r?.players.some((p) => p.id === 'target-6')
+  }, '的が名簿に居る')
 
   const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
   const target = roster.players.find((p) => p.id === 'target-6')!

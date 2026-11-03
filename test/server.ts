@@ -75,6 +75,13 @@ export async function startServer(env: Record<string, string> = {}): Promise<Ser
       MGO2_ASSEMBLE_MS: '0',
       // 全員の READY が揃ってからの待ちも飛ばす
       MGO2_READY_GRACE_MS: '0',
+      // 試合が始まるまでの数え (5 秒) も飛ばす。長さそのものを見る試験
+      // (test/matchstart) は env で戻す
+      MGO2_COUNTDOWN_MS: '0',
+      // 支度の床 (3 秒) と湧き無敵 (3 秒) も飛ばす。開始手順が 1 件ごとに
+      // 7 秒超えていた主因。長さが効くことは test/spawntiming が戻して見る
+      MGO2_CHOOSE_FLOOR_MS: '0',
+      MGO2_SPAWN_PROTECT_MS: '0',
       // **試験は本番の表に書かない。**
       //
       // bun は .env を勝手に読むので、何もしないと手元の秘密鍵をそのまま継いで
@@ -437,6 +444,84 @@ export function spot(dx: number, dz: number): [number, number, number] {
   return [dx, 0, dz]
 }
 
+/** そのクライアントが最後に見た試合の段階 (match の phase) */
+export function phaseOf(client: Client): string | undefined {
+  return (client.last.get('match') as { phase?: string } | undefined)?.phase
+}
+
+/**
+ * 条件が成り立つまで、届いた物を見ながら待つ。
+ *
+ * **固定の眠りの代わり。** 眠りは「その間に届くだろう」という見積もりで、
+ * 機械が遅ければ足りず、速ければ余る。見るべき物 (段階・状態) はもう
+ * クライアントが控えているので、それが揃うまで待てば見積もりが要らない。
+ * 上限を超えたら、どの条件で止まったかを持って落ちる
+ */
+export async function waitFor(check: () => boolean, what: string, ms = 15_000): Promise<void> {
+  const until = Date.now() + ms
+  for (;;) {
+    if (check()) return
+    if (Date.now() > until) throw new Error(`待っても成り立たない: ${what}`)
+    await Bun.sleep(20)
+  }
+}
+
+/**
+ * 全員が湧いて alive になるまで進める。
+ *
+ * spawn は**支度 (choosing) の間しか通らない**ので、通る状態の人にだけ
+ * 繰り返し送る。床 (CHOOSE_FLOOR) が残っているサーバーでは、明けるまで
+ * 送り続ける形になる — 待つ長さをここに書かずに済む
+ */
+export async function spawnAlive(...clients: Client[]): Promise<void> {
+  const until = Date.now() + 15_000
+  for (;;) {
+    for (const client of clients) {
+      if (client.life === 'choosing') client.send({ type: 'spawn' })
+    }
+    if (clients.every((client) => client.life === 'alive')) return
+    if (Date.now() > until) {
+      throw new Error(`湧いて alive にならない: ${clients.map((c) => `${c.id}=${c.life}`).join(', ')}`)
+    }
+    await Bun.sleep(25)
+  }
+}
+
+/**
+ * 支度から試合の開始まで進める。**twoPlayers の後半。**
+ *
+ * 手順を写している試験が各所にあるので、そこからも呼べるよう切り出した。
+ *
+ * - ready は**支度の段階に入ってから**押す。入る前に届いた分はサーバーが
+ *   黙って捨てる (server/index.ts の case 'ready')
+ * - 湧きは床が明け次第 (spawnAlive)。数え (countdown) の最中でも湧ける
+ * - 最後に段階が playing になるまで待つ。撃ち合いを見る試験は、段階が
+ *   playing でないと damage が捨てられるため
+ */
+export async function beginMatch(...clients: Client[]): Promise<void> {
+  /*
+   * 支度に入るまで待つ。**既に始まっている部屋へ入り直したとき**は支度が
+   * 無い (席が残っていて、そのまま alive で戻る) ので、playing も到達点に
+   * 入れておく — 支度を待って止まる形にしない
+   */
+  await waitFor(
+    () =>
+      clients.every((client) => {
+        const phase = phaseOf(client)
+        return phase === 'ready' || phase === 'playing'
+      }),
+    '支度の段階に入る',
+  )
+  if (clients.some((client) => phaseOf(client) === 'ready')) {
+    for (const client of clients) client.send({ type: 'ready', ready: true })
+  }
+  await spawnAlive(...clients)
+  await waitFor(
+    () => clients.every((client) => phaseOf(client) === 'playing'),
+    '試合が始まる',
+  )
+}
+
 /**
  * 2 人で試合を始めるところまで進める。位置は向かい合わせ。
  */
@@ -465,20 +550,13 @@ export async function twoPlayers(
    * 支度の段階を抜ける。**押さないと 60 秒待たされる。**
    *
    * 二人揃うと部屋は ready へ入り、全員が押すか 60 秒経つまで playing に
-   * ならない (server/match.ts の allReady)。試験の待ちは 20 秒なので、
-   * 押さないまま撃つと **damage が phase !== 'playing' で捨てられる**。
+   * ならない (server/match.ts の allReady)。押さないまま撃つと
+   * **damage が phase !== 'playing' で捨てられる**。
    *
-   * 少し置いてから押すのは、部屋が ready に入る前に届いた ready を
-   * サーバーが黙って捨てるため (server/index.ts の case 'ready')。
+   * 以前はここが固定の眠り (0.4 + 3.4 + 3.6 秒) で、開始手順だけで
+   * 1 件 7 秒超えていた。段階と状態を見て進める形 (beginMatch) に変えた
+   * ので、長さはサーバー側の数字 (試験では 0) にだけ依存する
    */
-  await Bun.sleep(400)
-  a.send({ type: 'ready', ready: true })
-  b.send({ type: 'ready', ready: true })
-  // 数え終わって湧けるようになるまで待って、二人とも出撃する (床は 3 秒)
-  await Bun.sleep(3400)
-  a.send({ type: 'spawn' })
-  b.send({ type: 'spawn' })
-  // 無敵 (3 秒) が切れて alive になるまで
-  await Bun.sleep(3600)
+  await beginMatch(a, b)
   return { a, b }
 }

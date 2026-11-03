@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { Client, spot, startServer, twoPlayers, type Server } from './server'
+import { beginMatch, Client, spot, startServer, twoPlayers, type Server } from './server'
 import { DEPLOY_SECONDS } from '../src/domain/item/decoy'
 import type { ServerMessage } from '../src/application/protocol/types'
 
@@ -241,13 +241,7 @@ describe('爆風と DECOY', () => {
     b.live()
     a.send({ type: 'loadout', primary: 'rifle', support: 'grenade' })
     b.send({ type: 'loadout', primary: 'rifle', support: 'decoy' })
-    await Bun.sleep(400)
-    a.send({ type: 'ready', ready: true })
-    b.send({ type: 'ready', ready: true })
-    await Bun.sleep(3400)
-    a.send({ type: 'spawn' })
-    b.send({ type: 'spawn' })
-    await Bun.sleep(3600)
+    await beginMatch(a, b)
 
     // b が a の 3m 手前に置く
     b.moveTo(0, 0, -3)

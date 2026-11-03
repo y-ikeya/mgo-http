@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { Client, spot, startServer, twoPlayers, type Server } from './server'
+import { Client, spawnAlive, spot, startServer, twoPlayers, type Server } from './server'
 import { DEPLOY_SECONDS } from '../src/domain/item/decoy'
 import { SUPPORT_SPECS } from '../src/domain/item/weapons'
 
@@ -293,11 +293,9 @@ describe('置けるかどうか', () => {
     const client = await new Client(server, 'dec-solo', spot(0, 0)).ready()
     client.live()
     client.send({ type: 'loadout', primary: 'rifle', support: 'decoy' })
-    await Bun.sleep(400)
-    client.send({ type: 'ready', ready: true })
-    await Bun.sleep(3400)
-    client.send({ type: 'spawn' })
-    await Bun.sleep(3600)
+    // 1 人では試合は始まらないが、湧くこと自体はできる (spawn は段階を見ない)。
+    // 床が明けて alive になるまで進める
+    await spawnAlive(client)
 
     client.holdDecoy(true)
     client.sendState()
