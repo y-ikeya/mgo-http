@@ -93,3 +93,47 @@ describe('肩越しと主観を切り替えても狙いはそのまま', () => {
     expect(miss(follow, aimed)).toBeGreaterThan(0.3)
   })
 })
+
+/**
+ * **後ろの壁より向こうへカメラを置かない** (2026-11-03 本人「UU にてカメラが壁の中に入る時が多々ある」)。
+ *
+ * 寄れる最短 (0.45m) で止めていた頃は、薄い壁が背中のすぐ後ろにあるとカメラが壁の中・向こうへ出た。
+ * 押し出しは触れている面の向きを足すので、薄い壁の表と裏に同時に触れると打ち消し合って戻せない
+ */
+describe('背中のすぐ後ろの薄い壁', () => {
+  const player = { position: new THREE.Vector3(0, 0, 0), onLadder: false } as unknown as Soldier
+  /** z = front から 0.1m の厚さの壁 (人は -Z を向くので、カメラは +Z の側に引かれる) */
+  const wallWorld = (front: number) => {
+    const back = front + 0.1
+    return {
+      distanceToObstruction(origin: THREE.Vector3, dir: THREE.Vector3, max: number) {
+        if (origin.z >= front || dir.z <= 1e-6) return max
+        const t = (front - origin.z) / dir.z
+        return t < max ? t : max
+      },
+      pushOut(position: THREE.Vector3, radius: number) {
+        // 実物と同じく、触れている面の向きを足して一番深い食い込みだけ押す (表と裏で打ち消す)
+        let nz = 0
+        let depth = 0
+        if (Math.abs(position.z - front) < radius) {
+          nz -= 1
+          depth = Math.max(depth, radius - Math.abs(position.z - front))
+        }
+        if (Math.abs(position.z - back) < radius) {
+          nz += 1
+          depth = Math.max(depth, radius - Math.abs(position.z - back))
+        }
+        position.z += nz * depth
+      },
+    }
+  }
+
+  for (const front of [0.3, 0.45, 0.6]) {
+    test(`壁が背中から ${front}m でも、カメラは壁の手前に居る`, () => {
+      const follow = new FollowCamera(1)
+      const world = wallWorld(front)
+      for (let i = 0; i < 300; i++) follow.update(1 / 60, player, world as never)
+      expect(follow.camera.position.z).toBeLessThan(front)
+    })
+  }
+})

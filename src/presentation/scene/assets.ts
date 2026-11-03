@@ -193,3 +193,35 @@ export function loadLocator(): Promise<GLTF> {
 export function loadStage(name: StageName): Promise<GLTF> {
   return load(asset.model(`stage_${name}.glb`))
 }
+
+/**
+ * **試合の前に武器と道具を全部読む** (2026-11-03 本人「match 始まる前に asset を全部読む方針に」)。
+ *
+ * 武器は、その武器を持った人が初めて見えた所で読んでいた。試合の頭で相手が見えた瞬間に
+ * 落として解いて、画面が止まった (本番のログ、2026-11-03)。武器は誰が何を持つか分からないので
+ * 全部読む (合わせても小さい)。**体は全部は読まない** — 部屋に居る人の分だけ (Game.warmSkin、
+ * 本人「そのマッチに参加している分だけ読めば良くない？」)。読んだ物は load の Promise に
+ * 溜まるので、後で同じ物を頼めばすぐ返る
+ *
+ * 1 つ失敗しても他は読み続ける (読めなかった物は、今まで通り見えた時にもう一度頼む)
+ */
+export function preloadArms(): Promise<GLTF[]> {
+  const loads = [
+    loadSmg(),
+    loadRifle(),
+    loadShotgun(),
+    loadSniper(),
+    loadMosin(),
+    loadM4(),
+    loadPistol(),
+    loadM1911(),
+    loadCasing(),
+    loadKnife(),
+    loadClaymore(),
+    loadGrenade(),
+    loadTarget(),
+    loadDoll(),
+    loadLocator(),
+  ]
+  return Promise.all(loads.map((p) => p.catch(() => null))).then((all) => all.filter((g): g is GLTF => g !== null))
+}

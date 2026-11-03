@@ -133,6 +133,11 @@ const OCCLUSION_PADDING = 0.28
  * 画面がキャラの背中で埋まるが、壁抜けよりは読める絵になる。
  */
 const MIN_OCCLUDED_DISTANCE = 0.45
+/**
+ * 後ろの壁がそれより近いときに詰められる最短 (m)。**壁を越えないことのほうが先** — 0.45 では
+ * 薄い壁の向こうへ出ることがあった。ほぼ頭の位置 (体は crowd で薄くなる)
+ */
+const CLOSEST_DISTANCE = 0.05
 
 /**
  * 倒した相手を映すときの構え。
@@ -779,10 +784,20 @@ export class FollowCamera {
       this.rayFrom.copy(this.pivot).addScaledVector(this.rayRight, sx).addScaledVector(this.rayUp, sy)
       blocked = Math.min(blocked, world.distanceToObstruction(this.rayFrom, this.back, this.distance))
     }
+    /*
+     * **壁より向こうへは置かない。** 寄れる最短 (MIN_OCCLUDED_DISTANCE) で止めていた頃は、後ろの壁が
+     * それより近いとカメラが壁の中・向こうへ出た。厚い壁は押し出し (pushOut) が戻すが、**薄い壁
+     * (面を押し出しただけの壁) は表と裏の両方に触れて押す向きが打ち消し合い、中に残った**
+     * (2026-11-03 本人「UU にてカメラが壁の中に入る時が多々ある」)。壁が近いときは壁の手前
+     * (球の半径ぶん) まで詰める — 頭の中に入る近さでも、体は寄りで薄くなる (crowd)
+     */
+    const safe = blocked - OCCLUSION_PADDING
     const target =
       blocked >= this.distance
         ? this.distance
-        : Math.max(MIN_OCCLUDED_DISTANCE, blocked - OCCLUSION_PADDING)
+        : safe >= MIN_OCCLUDED_DISTANCE
+          ? safe
+          : Math.max(CLOSEST_DISTANCE, Math.min(MIN_OCCLUDED_DISTANCE, blocked - CAMERA_RADIUS))
 
     if (dt <= 0) return target
 

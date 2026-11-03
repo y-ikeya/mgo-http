@@ -5,9 +5,12 @@
  *     ?skill=knifeMastery   詳しく出す技 (パッドで指している扱い)
  *     ?ready                自分が READY 済み
  *     ?hold=0.5             長押しの途中
+ *     ?brief=TDM&room=delta  ルールの説明を上に重ねる (&lang=en で英語) (ui/Briefing.tsx)
  */
 import { render } from 'solid-js/web'
 import ReadyRoom from '../../src/presentation/ui/ReadyRoom'
+import Briefing from '../../src/presentation/ui/Briefing'
+import { briefingOf } from '../../src/domain/match/briefing'
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
@@ -56,7 +59,16 @@ render(
       onReady={() => {}}
       hold={Number(query.get('hold') ?? '0')}
       focus={(query.get('skill') ?? 'runner') as never}
+      onRules={() => {}}
     />
   ),
   document.getElementById('root')!,
 )
+
+const brief = query.get('brief')
+if (brief) {
+  const briefing = briefingOf(brief as never, { room: (query.get('room') ?? 'bravo') as never, tickets: 20, stage: (query.get('stage') ?? 'uu') as never })
+  const host = document.body.appendChild(document.createElement('div'))
+  Object.assign(host.style, { position: 'fixed', inset: '0' })
+  if (briefing) render(() => <Briefing briefing={briefing} left={42} onClose={() => {}} />, host)
+}

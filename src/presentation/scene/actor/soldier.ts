@@ -1965,6 +1965,12 @@ export class Soldier {
       this.aiming = false
       return
     }
+    // 構えられない体なら下ろす (動作の表の aim。箱・梯子・ぶら下がり・転がり・怯み・眠り…)。
+    // 下の個別の縛り (倒れて背中が着くまで等) は表の外の時間の話
+    if (!can(this.body, 'aim')) {
+      this.aiming = false
+      return
+    }
     // 一歩下がっている間は銃を下ろす (本人 2026-10-30「構えを下ろしていい」)。下がりながら撃つ逃げ方にはしない
     if (this.stepLeft > 0) {
       this.aiming = false
@@ -2074,8 +2080,7 @@ export class Soldier {
 
   /** しゃがみの切り替え。空中では姿勢を変えない */
   toggleCrouch(): void {
-    // 倒れ・箱・伏せは下で別の動作 (起きる・脱ぐ・起き上がる) に振るので、表には入れていない
-    if (!can(this.body, 'crouch')) return
+    // 同じ指 (Space の短押し) でも、倒れ・箱・伏せの時は別の動作 (立ち直る・脱ぐ・起き上がる)。表の列も別
     /*
      * 吹き飛ばされて倒れている間。**Space が起き上がる合図。**
      *
@@ -2084,12 +2089,12 @@ export class Soldier {
      * 這うか起きるかの選び方が、自分で伏せたときと同じになる。
      */
     if (this.downed) {
-      this.standUp()
+      if (can(this.body, 'standUp')) this.standUp()
       return
     }
     // 箱を被ったまま立ち上がることはできない。脱いでから立つ。
     if (this.boxed) {
-      this.dropBox()
+      if (can(this.body, 'unbox')) this.dropBox()
       return
     }
     // 出入りの最中は受け付けない。**繋ぎを途中で切らない**
@@ -2100,11 +2105,13 @@ export class Soldier {
      * 天井を抜けた。「できるか」は表 (moves.ts) だが、「そこに余裕があるか」は地形に聞く
      */
     if (this.proneStage === 'prone') {
+      if (!can(this.body, 'rise')) return
       if (this.headroom() < COLLISION_HEIGHT.crouch) return
       // 伏せているなら、まず起き上がる。**戻る先はしゃがみ** (型がそこで終わる)
       this.riseFromProne()
       return
     }
+    if (!can(this.body, 'crouch')) return
     // しゃがみから立つのも同じ。低い天井の下では立てない
     if (this.crouching && this.headroom() < COLLISION_HEIGHT.stand) return
     this.crouching = !this.crouching
@@ -4134,7 +4141,8 @@ export class Soldier {
     if (
       groundedBefore &&
       !this.mover.onGround &&
-      can(this.body, 'hang') &&
+      // 足が縁を離れる直前の姿勢で聞く (表の縁に掴まるは 立ち / しゃがみ。離れた後の体はもう「空中」)
+      can({ ...this.body, onGround: true }, 'hang') &&
       // 窓から跳び降りたのは跳び降り。縁に掴まらない
       !fellFromVault &&
       moveDir.lengthSq() > 1e-6

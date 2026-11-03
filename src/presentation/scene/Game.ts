@@ -13,6 +13,9 @@ import * as THREE from "three";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
 import { pass } from "three/tsl";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { loadSoldier, preloadArms } from "./assets";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
 import { Input } from "../../infra/input";
@@ -99,9 +102,11 @@ import {
   secondariesOf,
   secondaryOf,
   supportsOf,
+  type Mode,
   type RoomName,
   type Side,
 } from "../../domain/match/room";
+import { briefingOf, type Briefing } from "../../domain/match/briefing";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunCaster, setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
@@ -147,7 +152,7 @@ import {
 import { PRONE_GRENADE_RELEASE_RATIO } from "./knobs";
 import type { NetTransport } from "../../application/protocol/types";
 import type { Identity } from "../../infra/auth/session";
-import { selfSkin } from "./actor/skin";
+import { selfSkin, skinFor } from "./actor/skin";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -269,6 +274,8 @@ export interface GameStats {
   loadoutOpen: boolean;
   /** READY の長押しの進み (0〜1)。鍵盤とパッドで押している分 */
   readyHold: number;
+  /** 試合の前のルールの説明。開いていなければ null (domain/match/briefing.ts) */
+  briefing: Briefing | null;
   /** 装備の画面が自動で閉じるまで (秒) */
   loadoutLeft: number;
   /** OK が効くようになるまで (秒)。0 なら押せる */
@@ -1549,6 +1556,10 @@ export class Game {
         });
       }
     });
+    // 試合の前に自分の体と武器を読み、描く仕組み (シェーダー) も組んでおく。
+    // 他の人の体は名簿に載った所で (performRoster → warmSkin)
+    this.warmSkin(selfSkin(identity.displayName));
+    this.warm(preloadArms());
     void Promise.all([this.stage.ready, loadStageSun(this.stageName)]).then(([, sunData]) => {
       if (sunData) applyStageSun(this.sun, sunData);
       fitShadowToStage(this.sun, this.stage);
@@ -2512,6 +2523,7 @@ export class Game {
       // 姿をレプリカに合わせる。倒れたかを決めるのはレプリカの側なので、
       // ここでは返り値を見ない
       case "sync":
+        this.warmSkin(skinFor(effect.entry.name, effect.id));
         this.remotes.sync(effect.id, effect.entry);
         break;
       case "died": {
@@ -2541,6 +2553,10 @@ export class Game {
      */
     if (message.type === "match" && message.phase === "countdown") {
       if (this.phaseSeen !== "countdown") this.rosterWanted = true;
+    }
+    // 支度に入った所でルールの説明を開く (openBriefing)
+    if (message.type === "match" && message.phase === "ready" && this.phaseSeen !== "ready") {
+      this.briefFor(message.mode, message.blue, message.stage);
     }
     if (message.type === "match") this.phaseSeen = message.phase;
     if (message.type === "roster") this.rosterWanted = false;
@@ -3480,6 +3496,21 @@ export class Game {
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
     /*
+     * ルールの説明が開いている間は、Enter / × で閉じる。スキルも READY も触らせない —
+     * 閉じた押下は、離すまで READY の長押しに数えない
+     */
+    if (this.briefing) {
+      if (this.input.tapped("spawn")) {
+        this.closeBriefing();
+        this.readyReleaseWait = true;
+      }
+      this.input.tapped("menuUp");
+      this.input.tapped("menuDown");
+      this.input.tapped("menuLeft");
+      this.input.tapped("menuRight");
+      return;
+    }
+    /*
      * 十字キーと矢印キー。**上下で枠、左右でその中。**
      *
      * パッドしか無い人はここを通らないと何も選べない。数字キーは残してある —
@@ -3800,6 +3831,41 @@ export class Game {
    * 配り直されて戻ってくるので、そこで全員ぶんまとめて反映される。
    * 先に付けると、弾かれた時 (試合が始まっていた等) にずれる。
    */
+  /**
+   * **試合の前のルールの説明** (2026-11-03 本人「ゲーム自体の説明 (1,2 枚) → OK で飛ばしたら → standby」)。
+   *
+   * 試合ごとに、その試合のモードで出す (部屋によってはルールを試合ごとに回すため)。
+   * **前の試合と同じモードなら出さない** — 同じ説明を毎試合読まされない。待合室のルールの
+   * ボタンで開き直せる
+   */
+  private briefFor(mode: Mode, tickets: number, stage: StageName): void {
+    if (!this.roomName || mode === this.briefedMode) return;
+    this.briefedMode = mode;
+    this.briefTickets = tickets;
+    this.briefStage = stage;
+    this.openBriefing();
+  }
+  /** 説明を出したモード。同じなら次の試合では出さない */
+  private briefedMode: Mode | null = null;
+  /** 説明に差し込む残機 (支度に入った時の match の blue) */
+  private briefTickets = 0;
+  /** 説明に出すステージ (支度に入った時の match の stage) */
+  private briefStage: StageName | null = null;
+  /** 出している説明。null なら閉じている */
+  private briefing: Briefing | null = null;
+
+  /** 説明を開く。待合室のルールのボタンからも */
+  openBriefing(): void {
+    const mode = this.replica.match?.mode ?? this.briefedMode;
+    const stage = this.replica.match?.stage ?? this.briefStage;
+    if (!this.roomName || !mode || !stage) return;
+    this.briefing = briefingOf(mode, { room: this.roomName, tickets: this.briefTickets, stage });
+  }
+
+  closeBriefing(): void {
+    this.briefing = null;
+  }
+
   setReady(ready: boolean): void {
     this.net.send({ type: "ready", ready });
     // 決めた手応え。武器を選んだ時と同じ「かちゃ」(2026-11-03 本人)。取り消しでは鳴らさない
@@ -4021,6 +4087,49 @@ export class Game {
   }
   /** エンジンを鳴らした締め切り (endsAt)。同じ締め切りで 2 度鳴らさない */
   private engineFor = 0;
+
+  /**
+   * **試合が始まる前に、読む物と組む物を済ませる** (2026-11-03 本人「match 始まる前に asset を全部読む方針に」)。
+   *
+   * 試合の頭で相手が見えた瞬間に、その体 (8〜20MB) を落として解き、描く仕組み (WebGPU の
+   * パイプライン) を組んでいたので、5〜9 秒画面が止まった (本番のログ)。
+   *
+   * **体は部屋に居る人の分だけ** (本人「そのマッチに参加している分だけ読めば良くない？
+   * 飛び入りしてきたら、その入ってきた時に追加で読む」)。名簿に載った所で読み始める —
+   * 支度・待合室で居る人は試合の前に、途中から入ってきた人はその時に。同じ体は 1 度だけ
+   */
+  private warmSkin(skin: string): void {
+    if (this.warmedSkins.has(skin)) return;
+    this.warmedSkins.add(skin);
+    this.warm(loadSoldier(skin).then((gltf) => [gltf]));
+  }
+  /** もう読み始めた体 */
+  private readonly warmedSkins = new Set<string>();
+  /** 組むのは 1 つずつ (compileAsync を重ねない) */
+  private warmChain: Promise<void> = Promise.resolve();
+
+  /**
+   * 読んだ物の複製を地面のずっと下に一瞬置き、地形と一緒に組み (compileAsync)、外す —
+   * 画面には映らない。読めなかった物は飛ばす (今まで通り見えた時にもう一度頼む)
+   */
+  private warm(loading: Promise<GLTF[]>): void {
+    const ready = Promise.all([loading.catch(() => [] as GLTF[]), this.stage.ready]);
+    this.warmChain = this.warmChain.then(async () => {
+      const [models] = await ready;
+      if (this.disposed || models.length === 0) return;
+      const holder = new THREE.Group();
+      holder.position.set(0, -500, 0);
+      for (const gltf of models) holder.add(cloneSkinned(gltf.scene));
+      this.scene.add(holder);
+      try {
+        await this.renderer.compileAsync(this.scene, this.follow.camera);
+      } catch (error) {
+        console.warn("[読み込み] 描く仕組みを先に組めなかった", error);
+      } finally {
+        this.scene.remove(holder);
+      }
+    });
+  }
 
   /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */
   private patTarget(): string | null {
@@ -6083,6 +6192,7 @@ export class Game {
       menuOpen: this.menuOpen,
       loadoutOpen: this.loadoutBlocking,
       readyHold: this.readyHoldRatio,
+      briefing: this.briefing,
       /*
        * 残り秒。**支度の段階では試合が始まるまでを出す。**
        *
