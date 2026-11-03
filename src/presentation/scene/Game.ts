@@ -102,9 +102,11 @@ import {
   secondariesOf,
   secondaryOf,
   supportsOf,
+  type Mode,
   type RoomName,
   type Side,
 } from "../../domain/match/room";
+import { briefingOf, type BriefingPage } from "../../domain/match/briefing";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunCaster, setSunProbe } from "./actor/blobShadow";
 import { STEALTH_BREAK_MS } from "../../domain/match/sides";
@@ -272,6 +274,8 @@ export interface GameStats {
   loadoutOpen: boolean;
   /** READY の長押しの進み (0〜1)。鍵盤とパッドで押している分 */
   readyHold: number;
+  /** 試合の前のルールの説明。開いていなければ null (domain/match/briefing.ts) */
+  briefing: { pages: BriefingPage[]; at: number } | null;
   /** 装備の画面が自動で閉じるまで (秒) */
   loadoutLeft: number;
   /** OK が効くようになるまで (秒)。0 なら押せる */
@@ -2550,6 +2554,10 @@ export class Game {
     if (message.type === "match" && message.phase === "countdown") {
       if (this.phaseSeen !== "countdown") this.rosterWanted = true;
     }
+    // 支度に入った所でルールの説明を開く (openBriefing)
+    if (message.type === "match" && message.phase === "ready" && this.phaseSeen !== "ready") {
+      this.briefFor(message.mode, message.blue);
+    }
     if (message.type === "match") this.phaseSeen = message.phase;
     if (message.type === "roster") this.rosterWanted = false;
 
@@ -3488,6 +3496,20 @@ export class Game {
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
     /*
+     * ルールの説明が開いている間は、Enter / × で次の枚へ。左右でもめくれる。
+     * スキルも READY も触らせない — 説明を閉じた押下は、離すまで READY の長押しに数えない
+     */
+    if (this.briefing.length) {
+      if (this.input.tapped("spawn") || this.input.tapped("menuRight")) {
+        this.nextBriefing();
+        if (!this.briefing.length) this.readyReleaseWait = true;
+      }
+      if (this.input.tapped("menuLeft")) this.previousBriefing();
+      this.input.tapped("menuUp");
+      this.input.tapped("menuDown");
+      return;
+    }
+    /*
      * 十字キーと矢印キー。**上下で枠、左右でその中。**
      *
      * パッドしか無い人はここを通らないと何も選べない。数字キーは残してある —
@@ -3808,6 +3830,51 @@ export class Game {
    * 配り直されて戻ってくるので、そこで全員ぶんまとめて反映される。
    * 先に付けると、弾かれた時 (試合が始まっていた等) にずれる。
    */
+  /**
+   * **試合の前のルールの説明** (2026-11-03 本人「ゲーム自体の説明 (1,2 枚) → OK で飛ばしたら → standby」)。
+   *
+   * 試合ごとに、その試合のモードで出す (部屋によってはルールを試合ごとに回すため)。
+   * **前の試合と同じモードなら出さない** — 同じ説明を毎試合読まされない。待合室のルールの
+   * ボタンで開き直せる
+   */
+  private briefFor(mode: Mode, tickets: number): void {
+    if (!this.roomName || mode === this.briefedMode) return;
+    this.briefedMode = mode;
+    this.briefTickets = tickets;
+    this.openBriefing();
+  }
+  /** 説明を出したモード。同じなら次の試合では出さない */
+  private briefedMode: Mode | null = null;
+  /** 説明に差し込む残機 (支度に入った時の match の blue) */
+  private briefTickets = 0;
+  /** 出している説明。空なら閉じている */
+  private briefing: BriefingPage[] = [];
+  /** いま何枚目か */
+  private briefingAt = 0;
+
+  /** 説明を頭から開く。待合室のルールのボタンからも */
+  openBriefing(): void {
+    const mode = this.replica.match?.mode ?? this.briefedMode;
+    if (!this.roomName || !mode) return;
+    this.briefing = briefingOf(mode, { room: this.roomName, tickets: this.briefTickets });
+    this.briefingAt = 0;
+  }
+
+  /** 次の枚へ。最後の枚なら閉じる */
+  nextBriefing(): void {
+    if (this.briefingAt + 1 < this.briefing.length) {
+      this.briefingAt += 1;
+    } else {
+      this.briefing = [];
+      this.briefingAt = 0;
+    }
+  }
+
+  /** 前の枚へ */
+  private previousBriefing(): void {
+    if (this.briefingAt > 0) this.briefingAt -= 1;
+  }
+
   setReady(ready: boolean): void {
     this.net.send({ type: "ready", ready });
     // 決めた手応え。武器を選んだ時と同じ「かちゃ」(2026-11-03 本人)。取り消しでは鳴らさない
@@ -6134,6 +6201,7 @@ export class Game {
       menuOpen: this.menuOpen,
       loadoutOpen: this.loadoutBlocking,
       readyHold: this.readyHoldRatio,
+      briefing: this.briefing.length ? { pages: this.briefing, at: this.briefingAt } : null,
       /*
        * 残り秒。**支度の段階では試合が始まるまでを出す。**
        *

@@ -12,6 +12,7 @@ import Hud from '../ui/Hud'
 import Scoreboard from '../ui/Scoreboard'
 import { CHOICES, SUPPORTS } from '../../domain/item/weapons'
 import ReadyRoom from '../ui/ReadyRoom'
+import Briefing from '../ui/Briefing'
 import { selfSkin } from '../scene/actor/skin'
 import type { WeaponKind } from '../scene/arms/weapon'
 import Loadout from '../ui/Loadout'
@@ -365,7 +366,19 @@ export default function Play(props: {
           onReady={(next) => game()?.setReady(next)}
           hold={stats()?.readyHold ?? 0}
           focus={stats()?.loadoutFocus ?? 'primary'}
+          onRules={() => game()?.openBriefing()}
         />
+      </Show>
+      {/* ルールの説明。支度に入った所で待合室の上に出る (ui/Briefing.tsx) */}
+      <Show when={stats()?.loadoutOpen && stats()?.match?.phase === 'ready' && stats()?.briefing}>
+        {(briefing) => (
+          <Briefing
+            pages={briefing().pages}
+            at={briefing().at}
+            left={stats()?.loadoutLeft ?? 0}
+            onNext={() => game()?.nextBriefing()}
+          />
+        )}
       </Show>
       <Show when={stats()?.loadoutOpen && stats()?.match?.phase !== 'ready'}>
         <Loadout

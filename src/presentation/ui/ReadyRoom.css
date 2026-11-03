@@ -177,3 +177,18 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ルールの説明を開き直す (ui/Briefing.tsx) */
+.readyroom-rules {
+  margin-left: auto;
+  padding: 4px 12px;
+  font: inherit;
+  color: rgba(205, 220, 190, 0.9);
+  background: transparent;
+  border: 1px solid rgba(160, 190, 140, 0.4);
+  cursor: pointer;
+}
+
+.readyroom-rules:hover {
+  background: rgba(160, 190, 140, 0.12);
+}

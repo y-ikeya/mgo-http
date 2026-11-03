@@ -40,6 +40,8 @@ export default function ReadyRoom(props: {
   /** 鍵盤・パッドで押している分 (0〜1)。Game が数える */
   hold: number
   focus: LoadoutFocus
+  /** ルールの説明を開き直す (ui/Briefing.tsx) */
+  onRules: () => void
 }) {
   let stage!: HTMLDivElement
   onMount(() => {
@@ -93,6 +95,9 @@ export default function ReadyRoom(props: {
         <header class="loadout-head">
           <span class="loadout-title">STAND BY</span>
           <span class="loadout-note">開始まで 残り {props.left} 秒</span>
+          <button class="readyroom-rules" onClick={() => props.onRules()}>
+            ルール
+          </button>
         </header>
 
         <div class="readyroom-skills">
