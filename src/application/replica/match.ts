@@ -22,6 +22,8 @@ import { MODES, type Mode } from '../../domain/match/room'
 import type { VoiceId } from '../../domain/player/voice'
 import { DEATH_POINTS, KILL_POINTS, STUN_POINTS, SUICIDE_POINTS } from '../../domain/match/scoring'
 import type { Team } from '../../domain/player/player'
+import { DOWN_DURATION, type Life } from '../../domain/player/lifecycle'
+import type { StageName } from '../../domain/stage'
 import type { KillEvent, MatchMessage, ServerMessage } from '../protocol/types'
 
 /** キルログに残す数。古いものから落ちる */
@@ -84,6 +86,22 @@ export interface MatchReplica {
   presenceFeed: PresenceEntry[]
   /** サーバーの時計とのずれ (clock.ts)。終わる時刻を手元の時計へ直すのに使う */
   clock: ServerClock
+  /**
+   * **自分の状態** (支度・湧いた・倒れた…)。決めるのはサーバーで、届いた life をそのまま持つ。
+   * 推し量る側の判断はどこにも残さない
+   */
+  life: Life
+  /** life が変わった時刻 (手元の時計) */
+  lifeAt: number
+  /** 倒れたままでいる秒数。倒れた知らせに載って届く (CAP は倒されるたびに延びる) */
+  downFor: number
+  /**
+   * **名簿を頼み続けるか。** 試合の頭で陣営が切り直されるので、秒読みに入ったら名簿が届くまで頼む。
+   * 落とすと前の試合の色のまま描き、敵味方が逆になる
+   */
+  rosterWanted: boolean
+  /** ルールの説明を出したモード。**同じモードが続く間は出さない** */
+  briefedMode: Mode | null
 }
 
 export function newMatchReplica(): MatchReplica {
@@ -98,6 +116,11 @@ export function newMatchReplica(): MatchReplica {
     pointFeed: [],
     presenceFeed: [],
     clock: newServerClock(),
+    life: 'joining',
+    lifeAt: 0,
+    downFor: DOWN_DURATION,
+    rosterWanted: false,
+    briefedMode: null,
   }
 }
 
@@ -121,6 +144,13 @@ export type MatchEffect =
   | { kind: 'headshot' }
   /** 誰かがボイスを言った。音を鳴らす (出す欄はレプリカが持っている) */
   | { kind: 'voice'; line: VoiceId }
+  /** 自分の状態が変わった。支度へ戻ったら湧き地点へ、湧いたら持ち物を配り直す */
+  | { kind: 'life'; to: Life }
+  /**
+   * 支度に入った。**ルールの説明を出す** (ui/Briefing.tsx)。前の試合と同じモードなら来ない。
+   * 中身はその試合のモード・始まる時の残機・ステージ (部屋によってはルールを試合ごとに回すため)
+   */
+  | { kind: 'brief'; mode: Mode; tickets: number; stage: StageName }
 
 /**
  * 報せを 1 つ受けて、レプリカを進める。
@@ -160,7 +190,27 @@ export function applyMatch(
             }
           : undefined,
       }
-      return changed ? [{ kind: 'phase', to: message.phase, teams: MODES[message.mode].teams }] : []
+      if (!changed) return []
+      const effects: MatchEffect[] = [{ kind: 'phase', to: message.phase, teams: MODES[message.mode].teams }]
+      // 秒読みに入った。名簿が届くまで頼み続ける (届いたら roster で下ろす)
+      if (message.phase === 'countdown') replica.rosterWanted = true
+      if (message.phase === 'ready' && message.mode !== replica.briefedMode) {
+        replica.briefedMode = message.mode
+        effects.push({ kind: 'brief', mode: message.mode, tickets: message.blue, stage: message.stage })
+      }
+      return effects
+    }
+
+    /*
+     * 自分の状態。**他人の分は名簿のレプリカ** (roster.ts)。同じ状態が重ねて届いても何もしない
+     */
+    case 'life': {
+      if (message.id !== selfId) return []
+      if (message.state === 'downed') replica.downFor = message.downFor ?? DOWN_DURATION
+      if (replica.life === message.state) return []
+      replica.life = message.state
+      replica.lifeAt = now
+      return [{ kind: 'life', to: message.state }]
     }
 
     // 往復を測る ping もサーバーの時刻を持っている。1 秒ごとに来るので時計のずれの測りに足す
@@ -169,6 +219,7 @@ export function applyMatch(
       return []
 
     case 'roster': {
+      replica.rosterWanted = false
       const me = message.players.find((player) => player.id === selfId)
       if (!me) return []
       replica.team = me.team

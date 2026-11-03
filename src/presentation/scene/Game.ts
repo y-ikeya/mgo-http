@@ -83,7 +83,6 @@ import {
   canChoose,
   CHOOSE_FLOOR,
   CHOOSE_TIMEOUT,
-  DOWN_DURATION,
   isDowned,
   isSpawning,
   onBattlefield,
@@ -102,7 +101,6 @@ import {
   secondariesOf,
   secondaryOf,
   supportsOf,
-  type Mode,
   type RoomName,
   type Side,
 } from "../../domain/match/room";
@@ -156,7 +154,6 @@ import { selfSkin, skinFor } from "./actor/skin";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
-  type MatchPhase,
   type SelfMessage,
   type KillEvent,
   type MatchMessage,
@@ -995,15 +992,10 @@ export class Game {
    */
   private readonly self = newSelfReplica();
   /**
-   * 名簿を待っているか。**試合が始まったら立ち、届いたら降りる。**
-   *
-   * 立っている間は 1 秒ごとに頼み直す (askRoster)。
+   * 名簿を頼み直した時刻 (Date.now)。**頼みすぎない**ための間隔。
+   * 頼み続けるかはレプリカ (replica.rosterWanted) が決める
    */
-  private rosterWanted = false;
-  /** 最後に頼んだ時刻 (Date.now)。**頼みすぎない**ための間隔 */
   private rosterAskedAt = 0;
-  /** 直前に見た段階。**変わった瞬間**を捕まえるのに要る */
-  private phaseSeen: MatchPhase | null = null;
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -2492,6 +2484,14 @@ export class Game {
         }
         break;
 
+      case "life":
+        this.enteredLife(effect.to);
+        break;
+
+      case "brief":
+        this.briefFor(effect);
+        break;
+
       case "team":
         // 誰が味方かは自分の所属が分かって初めて決まる
         this.remotes.setSelfTeam(effect.team);
@@ -2541,27 +2541,10 @@ export class Game {
 
   private receive(message: ServerMessage): void {
     /*
-     * 名簿の取りこぼしに気づく。**試合が始まったら、届くまで頼み続ける。**
-     *
-     * 試合の頭で陣営が切り直される。名簿を落とすと前の試合の色のまま描き、
-     * **敵味方が逆になる** — 撃てる相手かはクライアントが陣営で判断している
-     * ので、味方を撃ちに行って削れない、が起きる。
-     *
-     * サーバーからの自発的な送信は残っている (普段は 1 往復ぶん速い)。ここは
-     * それが落ちたときのための道で、**来なければもう一度頼む**。頼みのほうが
-     * 落ちることもあるので、「言えば来る」ではなく「来るまで言う」にする。
+     * **レプリカを先に進める。** 段階も所属もキルログも自分の状態も、持っているのはあちら。
+     * 名簿の頼み直し・ルールの説明を出すか・自分の状態が変わったかもあちらが決める
+     * (application/replica/match.ts)。ここは返ってきたことをするだけ
      */
-    if (message.type === "match" && message.phase === "countdown") {
-      if (this.phaseSeen !== "countdown") this.rosterWanted = true;
-    }
-    // 支度に入った所でルールの説明を開く (openBriefing)
-    if (message.type === "match" && message.phase === "ready" && this.phaseSeen !== "ready") {
-      this.briefFor(message.mode, message.blue, message.stage);
-    }
-    if (message.type === "match") this.phaseSeen = message.phase;
-    if (message.type === "roster") this.rosterWanted = false;
-
-    // **レプリカを先に進める。** 段階も所属もキルログも、持っているのはあちら
     for (const effect of applyMatch(this.replica, message, this.net.id, Date.now())) {
       this.perform(effect);
     }
@@ -3095,13 +3078,6 @@ export class Game {
       // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
       // ここから出る。推し量る側の判断はどこにも残さない
       // 他人のぶんはレプリカが受け取っている (sync / died)
-      case "life":
-        if (message.id === this.net.id) {
-          // 倒れたままでいる秒数 (CAP は倒されるたびに延びる)。残りを画面に出し、過ぎたら復活できない人と読む
-          if (message.state === "downed") this.downFor = message.downFor ?? DOWN_DURATION;
-          this.setLife(message.state);
-        }
-        break;
 
       // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
       // 待つと、遅れて届いているだけの相手と区別が付かない
@@ -3153,7 +3129,7 @@ export class Game {
    * 1 秒あれば往復は済んでいるので、それでも来ないなら落ちている。
    */
   private askRosterIfWanted(): void {
-    if (!this.rosterWanted) return;
+    if (!this.replica.rosterWanted) return;
     const now = Date.now();
     if (now - this.rosterAskedAt < ROSTER_RETRY) return;
     this.rosterAskedAt = now;
@@ -3584,9 +3560,13 @@ export class Game {
    * 都度組み立てていた。組み立て方が場所ごとにずれて不具合になっていたので、
    * 権威が言ってきた 1 つの値だけを見る (src/domain/player/lifecycle.ts)。
    */
-  private life: Life = "joining";
+  private get life(): Life {
+    return this.replica.life;
+  }
   /** その状態に入った時刻 (Date.now)。残り秒数の表示に使う */
-  private lifeAt = Date.now();
+  private get lifeAt(): number {
+    return this.replica.lifeAt;
+  }
 
   /**
    * サーバーが状態を移した。
@@ -3595,11 +3575,8 @@ export class Game {
    * 「開いているか」という別のフラグは持たない — 持つと、状態とフラグの 2 つが
    * 食い違い得る場所が生まれる (実際、フラグが閉じたまま開き直らない不具合があった)。
    */
-  private setLife(state: Life): void {
-    if (this.life === state) return;
-    this.life = state;
-    this.lifeAt = Date.now();
-
+  /** 自分の状態が変わった (レプリカが決めた)。支度へ戻ったら湧き地点へ、湧いたら持ち物を配り直す */
+  private enteredLife(state: Life): void {
     // 支度へ移った。倒した相手を映すのをやめて、自分の湧き地点へ戻る。
     // ここで初めて装備画面が出るので、その背景が自分の湧き地点になる
     if (state === "choosing") {
@@ -3633,7 +3610,9 @@ export class Game {
   }
 
   /** 倒れたままでいる秒数。倒れた知らせ (life) に載って届く (CAP は倒されるたびに延びる) */
-  private downFor = DOWN_DURATION;
+  private get downFor(): number {
+    return this.replica.downFor;
+  }
 
   /** CAP の設置ポイントの印 (光の柱と床の塗り)。読めるまで null */
   private capGoals: THREE.Object3D | null = null;
@@ -3838,28 +3817,20 @@ export class Game {
    * **前の試合と同じモードなら出さない** — 同じ説明を毎試合読まされない。待合室のルールの
    * ボタンで開き直せる
    */
-  private briefFor(mode: Mode, tickets: number, stage: StageName): void {
-    if (!this.roomName || mode === this.briefedMode) return;
-    this.briefedMode = mode;
-    this.briefTickets = tickets;
-    this.briefStage = stage;
+  private briefFor(brief: Extract<MatchEffect, { kind: "brief" }>): void {
+    this.lastBrief = brief;
     this.openBriefing();
   }
-  /** 説明を出したモード。同じなら次の試合では出さない */
-  private briefedMode: Mode | null = null;
-  /** 説明に差し込む残機 (支度に入った時の match の blue) */
-  private briefTickets = 0;
-  /** 説明に出すステージ (支度に入った時の match の stage) */
-  private briefStage: StageName | null = null;
+  /** 最後に出した説明の中身 (モード・残機・ステージ)。待合室のボタンで開き直す時に使う */
+  private lastBrief: Extract<MatchEffect, { kind: "brief" }> | null = null;
   /** 出している説明。null なら閉じている */
   private briefing: Briefing | null = null;
 
   /** 説明を開く。待合室のルールのボタンからも */
   openBriefing(): void {
-    const mode = this.replica.match?.mode ?? this.briefedMode;
-    const stage = this.replica.match?.stage ?? this.briefStage;
-    if (!this.roomName || !mode || !stage) return;
-    this.briefing = briefingOf(mode, { room: this.roomName, tickets: this.briefTickets, stage });
+    if (!this.roomName || !this.lastBrief) return;
+    const { mode, tickets, stage } = this.lastBrief;
+    this.briefing = briefingOf(mode, { room: this.roomName, tickets, stage });
   }
 
   closeBriefing(): void {
