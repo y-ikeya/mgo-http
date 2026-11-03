@@ -2234,553 +2234,593 @@ export class Game {
     for (const effect of applyRoster(this.roster, message, this.net.id)) {
       this.performRoster(effect);
     }
-    switch (message.type) {
-      case "state":
-        this.remotes.receive(message.snapshot);
-        break;
+    const receiver = this.receivers[message.type] as ((message: ServerMessage) => void) | undefined;
+    receiver?.(message);
+  }
 
-      case "shot":
-        // 弾道と発砲音は必ず出す。撃たれたことが見えないと遮蔽へ動く判断ができない。
-        // 当たったかどうかはここには載っていない (health で別に届く)。
-        this.remoteFrom.fromArray(message.from);
-        this.remoteTo.fromArray(message.to);
-        /*
-         * **他人の弾も痕を残す。**
-         *
-         * 長らく痕を出していなかった (法線を渡していなかった)。自分が外した
-         * 痕だけが残る形で、**索敵の材料になるのは他人の痕のほう**なので、
-         * 残す意味の半分が消えていた。
-         *
-         * 面の向きは弾の向きで代用する。`to` は撃った本人が出した着弾点なので
-         * 位置は分かるが、どの面に当たったかは届いていない。正面から当たれば
-         * 正しく、**浅い角度だと壁へ食い込む** — そこが気になったら地形の箱と
-         * 突き合わせて本当の法線を出す (この時点では割に合わない)。
-         */
-        this.impactFacing.subVectors(this.remoteFrom, this.remoteTo).normalize();
-        this.shots.fire(
-          this.remoteFrom,
-          this.remoteTo,
-          this.impactFacing,
-          IMPACT_WORLD,
-          /*
-           * 面は**着弾点から地形を引き直す。** 届くのは着弾点だけで、何に
-           * 当たったかは載っていない (載せると送る量が増える)。地形は全員が
-           * 同じ物を持っているので、撃った側と同じ答えが出る (playImpactAt)。
-           */
-          surfaceAt(
-            this.remoteTo,
-            IMPACT_PROBE,
-            this.stage.obstacles,
-            this.remoteTo.y,
-            IMPACT_PROBE,
-          ),
-        );
-        /*
-         * 他人の弾の着弾音。**当たった面はこちらで引き直す。**
-         *
-         * 届くのは着弾点だけで、何に当たったかは載っていない (載せると送る量が
-         * 増える)。位置から地形を引けば同じ答えが出る — 地形は全員が同じ物を
-         * 持っているので、撃った側と食い違わない。
-         */
-        this.playImpactAt(this.remoteTo);
-        {
-          // 撃った本人にボルト操作を流し、音もその銃のものにする。
-          // 全部ライフルの音だと、撃たれた側は相手の武器を読み違える
-          const kind = this.remotes.shot(message.id);
-          // 遠くの人の排莢も出す。通信はせず、撃ったことだけを合図に各自で出す
-          const yaw = this.remotes.ejectFrom(message.id, this.ejectPos);
-          if (yaw !== null) this.casings.eject(this.ejectPos, yaw);
-          const sound = weaponOf(kind).shotSound;
-          // 銃声も輪に出す。最も遠くまで届くので、撃ち合いが始まった方角が分かる。
-          this.addPing("shot", this.remoteFrom, this.audio.play(sound, this.remoteFrom));
-        }
-        break;
+  /**
+   * 報せの種類ごとの受け手。**1 つの報せに 1 つの小さな受け手** (2026-11-03、613 行の switch を割った)。
+   * 載っていない種類は、レプリカが受けるだけで体には何もしない
+   */
+  private readonly receivers: { [K in ServerMessage["type"]]?: (message: Extract<ServerMessage, { type: K }>) => void } = {
+    state: (message) => this.receiveState(message),
+    shot: (message) => this.receiveShot(message),
+    health: (message) => this.receiveHealth(message),
+    stamina: (message) => this.receiveStamina(message),
+    self: (message) => this.receiveSelf(message),
+    resume: (message) => this.receiveResume(message),
+    skills: (message) => this.receiveSkills(message),
+    respawn: (message) => this.receiveRespawn(message),
+    match: (message) => this.receiveMatch(message),
+    exposed: (message) => this.receiveExposed(message),
+    sensed: (message) => this.receiveSensed(message),
+    sensedGone: (message) => this.receiveSensedGone(message),
+    resupplied: () => this.receiveResupplied(),
+    zap: (message) => this.receiveZap(message),
+    throw: (message) => this.receiveThrow(message),
+    knock: (message) => this.receiveKnock(message),
+    grenade: (message) => this.receiveGrenade(message),
+    explosion: (message) => this.receiveExplosion(message),
+    dropped: (message) => this.receiveDropped(message),
+    droppedGone: (message) => this.receiveDroppedGone(message),
+    picked: (message) => this.receivePicked(message),
+    claymorePlaced: (message) => this.receiveClaymorePlaced(message),
+    decoyPlaced: (message) => this.receiveDecoyPlaced(message),
+    decoyGone: (message) => this.receiveDecoyGone(message),
+    dollPlaced: (message) => this.receiveDollPlaced(message),
+    dollSprung: (message) => this.receiveDollSprung(message),
+    dollGone: (message) => this.receiveDollGone(message),
+    trapReleased: (message) => this.receiveTrapReleased(message),
+    decoyBumped: (message) => this.receiveDecoyBumped(message),
+    cboxBumped: (message) => this.receiveCboxBumped(message),
+    locatorThrown: (message) => this.receiveLocatorThrown(message),
+    locatorPlaced: (message) => this.receiveLocatorPlaced(message),
+    locatorGone: (message) => this.receiveLocatorGone(message),
+    claymoreGone: (message) => this.receiveClaymoreGone(message),
+    thrown: (message) => this.receiveThrown(message),
+    targetTaken: (message) => this.receiveTargetTaken(message),
+    targetDropped: (message) => this.receiveTargetDropped(message),
+    targetDelivered: (message) => this.receiveTargetDelivered(message),
+    targetAt: (message) => this.receiveTargetAt(message),
+    stun: (message) => this.receiveStun(message),
+    released: () => this.receiveReleased(),
+    knockdown: (message) => this.receiveKnockdown(message),
+    join: () => this.receiveJoin(),
+    noise: (message) => this.receiveNoise(message),
+    ping: (message) => this.receivePing(message),
+    hidden: (message) => this.receiveHidden(message),
+  };
 
-      case "health":
-        this.applyHealth(message);
-        break;
+  private receiveState(message: Extract<ServerMessage, { type: "state" }>): void {
+    this.remotes.receive(message.snapshot);
+  }
 
+  private receiveShot(message: Extract<ServerMessage, { type: "shot" }>): void {
+    // 弾道と発砲音は必ず出す。撃たれたことが見えないと遮蔽へ動く判断ができない。
+    // 当たったかどうかはここには載っていない (health で別に届く)。
+    this.remoteFrom.fromArray(message.from);
+    this.remoteTo.fromArray(message.to);
+    /*
+     * **他人の弾も痕を残す。**
+     *
+     * 長らく痕を出していなかった (法線を渡していなかった)。自分が外した
+     * 痕だけが残る形で、**索敵の材料になるのは他人の痕のほう**なので、
+     * 残す意味の半分が消えていた。
+     *
+     * 面の向きは弾の向きで代用する。`to` は撃った本人が出した着弾点なので
+     * 位置は分かるが、どの面に当たったかは届いていない。正面から当たれば
+     * 正しく、**浅い角度だと壁へ食い込む** — そこが気になったら地形の箱と
+     * 突き合わせて本当の法線を出す (この時点では割に合わない)。
+     */
+    this.impactFacing.subVectors(this.remoteFrom, this.remoteTo).normalize();
+    this.shots.fire(
+      this.remoteFrom,
+      this.remoteTo,
+      this.impactFacing,
+      IMPACT_WORLD,
       /*
-       * スタミナ。**麻酔を受けた本人にだけ届く。**
-       *
-       * 眠るかどうかを決めるのはサーバー。こちらは知らせを受けて倒れるだけで、
-       * **自分で起きられない** — 起きられるなら麻酔は効かない。
+       * 面は**着弾点から地形を引き直す。** 届くのは着弾点だけで、何に
+       * 当たったかは載っていない (載せると送る量が増える)。地形は全員が
+       * 同じ物を持っているので、撃った側と同じ答えが出る (playImpactAt)。
        */
-      case "stamina": {
-        this.stamina = message.stamina;
-        // 起きる時刻はサーバーの時計。手元の時計へ直してから比べる (application/replica/clock.ts)
-        const left = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
-        // もう眠っているなら残りだけ縮める (もがいて早まった)。倒れる動きをやり直さない
-        if (left > 0 && this.player.sleeping) this.player.shortenSleep(left);
-        else if (left > 0) this.player.sleep(left);
-        else this.player.wake();
-        break;
-      }
-
-
-      /*
-       * 自分の本当の値。**3 秒ごとに届く。**
-       *
-       * 撃った瞬間に減らすのも、体力 0 で倒れるのもこちらがやっている
-       * (押した瞬間に返らないと手触りが壊れる)。ここで受けるのは
-       * 「本当はこう」という値だけで、**ずれていたら合わせる**ために使う。
-       * 普段は一致しているので何も起きない。
-       */
-      case "self":
-        this.applySelf(message);
-        break;
-
-
-      // 繋ぎ直したときに届く、離脱前の続き。
-      //
-      // 湧き地点へは戻さない。**その命の続き**なので、居た場所に居た体力で戻る。
-      // 弾数もサーバーがレプリカを持っているので、そちらを正とする
-      case "resume": {
-        this.player.resumeAt(message.x, message.y, message.z, message.health);
-        // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
-        const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
-        if (asleep > 0) this.player.sleep(asleep, true);
-        // 人形に釘付けの途中で読み直した。**寄る・しゃがみ込む動きは飛ばして**撫でている所から続ける
-        else if (message.trapped) this.player.trap(undefined, true);
-        // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
-        else if (message.hanging) this.player.resumeHang(message.yaw);
-        // スタンナイフの充電も続きから (審判と同じ時計)。読み直しで満タンにはならない
-        this.melee.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
-        // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
-        // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
-        resumeLoadout(this.choice, message);
-        /*
-         * **持ち物を組み直す。**
-         *
-         * 画面を読み直すと Inventory は既定 (AK47) で作られる。装備を戻すだけ
-         * では手の中は既定のままで、**P90 を選んでいたのに AK を持って戻る**。
-         * 戻した装備から組み直してから、残弾を当てる (順番が要る)。
-         */
-        this.inv.refill(this.loadout);
-        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
-        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
-        this.inv.restore(message.magazine, message.reserve, message.grenades);
-        this.onLoadout?.(this.pendingLoadout);
-        // 銃を持たない部屋では持ち替えない。手にあるのはナイフ
-        if (message.primary) void this.player.equip(message.primary);
-        this.follow.snapTo(this.player, this.cameraWorld);
-        break;
-      }
-
-      /*
-       * スキルが決まった。**送った物ではなく返ってきた物を持つ。**
-       *
-       * 弾かれたときも今の値が返るので、こちらの画面だけ選び直したつもりで
-       * 残らない。途中参加した人はそもそも送っていない (窓が閉じている) ので、
-       * これが唯一の入り口になる。
-       */
-      case "skills":
-        this.skills = message.skills as Skills;
-        // 速さは体が持っている。**同じ値を 2 か所に置かない** — 渡し忘れると
-        // 「散布だけ締まって走りは素のまま」という半端な効き方になる
-        this.player.setSkills(this.skills);
-        break;
-
-      // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
-      case "respawn":
-        if (message.id !== this.net.id) this.remotes.warp(message.id);
-        break;
-
-      // 光っている人 (個人戦の 1 位) を体に出す。レプリカは持っているが、
-      // 光らせるのは絵の仕事
-      case "match":
-        this.remotes.setLeaking(message.leader ?? null);
-        // ターゲット (TSNE)。運んでいるのが自分なら持ち物の一覧に並ぶ (選んで G / △ で落とす)
-        this.targetView = message.target ?? null;
-        this.inv.setTargetOwned(message.target?.carrier === this.net.id);
-        // 攻守の入れ替えとステルスの状態 (TSNE)。側が変われば持ち込める物も変わる
-        if (message.attack !== this.attackTeam) {
-          this.attackTeam = message.attack ?? null;
-          this.applyArmory();
-        }
-        // STEALTH が暴かれた瞬間 (効いていた → 解けた)。試合中だけ (CAUTION の始まり)
-        if (this.stealthOn && message.stealth === false && message.phase === "playing") {
-          this.audio.playUi("detectAlert");
-        }
-        // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)。**自分の STEALTH が戻った人にだけ** —
-        // 攻める側で、着ている (2026-10-17 本人「set 音は自分だけに聞こえるのでいい」)
-        if (
-          !this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen &&
-          message.attack === this.selfTeam && this.inv.wearingStealth
-        ) {
-          this.audio.playUi("stealthSet");
-        }
-        // 戻った音は「解けていた」を見た後だけ。入室直後の最初の通 (false → true に見える) では鳴らさない
-        this.cautionSeen = message.stealth === false && message.phase === "playing";
-        this.stealthOn = message.stealth === true;
-        break;
-
-      /*
-       * 抜いた相手が光り始めた (ENEMY EXPOSURE)。
-       *
-       * **届くのは抜いた側だけ。** サーバーが宛先を決めているので、
-       * ここで陣営を見る必要は無い。同じ通で遮蔽も外れるので、
-       * 壁の裏に居た相手の位置がこの後から流れてくる。
-       */
-      case "exposed":
-        this.remotes.expose(message.id, message.seconds);
-        break;
-
-      // 気配 (AWARENESS)。誰に届くかはサーバーが決めている。こちらは霧を置くだけ
-      case "sensed":
-        this.sensed.show(message.key, message.at);
-        break;
-
-      case "sensedGone":
-        this.sensed.hide(message.key);
-        break;
-
-      // 補給できた。数は直前の self で入っている。ここは印だけ
-      case "resupplied":
-        this.lastHitZone = "RESUPPLY";
-        this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
-        this.audio.play("resupply", this.player.position);
-        break;
-
-      // 他の人がスタンナイフを振った。**手元で放電して鳴る**
-      case "zap": {
-        const id = message.id;
-        if (id === this.net.id) break;
-        const at = this.remotes.positionOf(id);
-        if (at) this.audio.play("zap", at);
-        this.stunSparks.discharge((out) => this.remotes.handOf(id, out));
-        break;
-      }
-
-      case "throw":
-        // 初速だけが届く。同じ物理を同じ地形に対して解くので、
-        // 跳ねる場所も落ちる場所もこちらで求まる。
-        // 飛んでいる間は見えず、止まったところで現物が現れる。
-        this.remoteFrom.fromArray(message.from);
-        this.remoteTo.fromArray(message.dir);
-        this.thrown.throwFrom(this.remoteFrom, this.remoteTo, true);
-        break;
-
-      case "knock":
-        if (message.hit !== this.net.id) break;
-        this.player.knockBack(message.x, message.z);
-        break;
-
-      case "grenade":
-        // 番号 0 は捨てる。番号を振るのはサーバーなので、0 のまま届いたものは
-        // 中継されただけの申告であって、飛ばしてもらえていない。
-        // (手榴弾を知らない古いサーバーに繋ぐと、既定の中継でこれが起きる。
-        //  原点に極小の手榴弾が現れ、いつまでも爆発しない)
-        if (message.id <= 0) {
-          console.warn("[手榴弾] サーバーが飛ばしていない。サーバーが古い可能性");
-          break;
-        }
-        // 位置も速度もサーバーが決めたものをそのまま使う。自分が投げたものも
-        // 例外にしない — 手元で先に飛ばして後から合わせると、
-        // 見えている場所と爆ぜる場所がずれる
-        this.grenades.spawn(message.id, message.from, message.velocity);
-        break;
-
-      case "explosion": {
-        this.explode(message.id, message.at);
-        break;
-      }
-
-      // **置いたのが自分でも他人でも鳴らす。** 落ちた場所で鳴るので、
-      // 見えていなくても「そこで誰かが捨てた」ことが耳に入る
-      case "dropped": {
-        this.drops.place(message.id, message.weapon, message.at, message.yaw);
-        const at = this.drops.positionOf(message.id);
-        if (at) this.audio.play("drop", at);
-        break;
-      }
-
-      /*
-       * 拾われた / 消えた。**音と後片付けはここ 1 か所。**
-       *
-       * 拾った本人には picked も届くが、あちらでは消さない。消してしまうと
-       * この通が来たときに置き場所が分からず、**拾った本人にだけ音が鳴らない**。
-       * (実際そうなっていた。他の人には聞こえていたので気づきにくい)
-       */
-      case "droppedGone": {
-        const at = this.drops.positionOf(message.id);
-        if (at) this.audio.play("pick", at);
-        this.drops.remove(message.id);
-        break;
-      }
-
-      // 拾えた。**中身はここで初めて分かる** (見ただけでは残弾は読めない)
-      case "picked": {
-        const found =
-          message.count !== undefined && message.count > 0
-            ? { id: message.weapon as never, count: message.count }
-            : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
-        this.inv.pick(found);
-        // **消すのは droppedGone の側。** ここで消すと、あちらが鳴らす音の
-        // 置き場所が無くなる (自分にだけ聞こえない、になる)
-        break;
-      }
-
-      /*
-       * 置かれたクレイモア。**自分の物なら、ここで初めて残り数を減らす。**
-       *
-       * 置けるかを決めているのはサーバー (壁の中や縁の外へは置けない)。送った
-       * 時点で減らしていたので、断られると**置けていないのに減る**ことがあった。
-       *
-       * 同じ物が二度来る (見え隠れするたびに配られる) ので、初めて見た物だけ数える。
-       */
-      case "claymorePlaced": {
-        const mine = message.owner === this.net.id && !this.claymores.has(message.id);
-        // sensor に掛かる扇は置いた本人と味方に出す (猫の円と同じ)。敵には見えない
-        const friendly =
-          message.owner === this.net.id || (this.teamsMode && message.team === this.selfTeam);
-        this.claymores.place(message.id, message.at, message.yaw, friendly ? message.team : null);
-        if (mine) this.inv.spendOf("claymore");
-        break;
-      }
-
-      /*
-       * decoy が置かれた。**敵にも届く** — 見えないと撃たせられない。
-       *
-       * 膨らむ残り (readyIn) を受け取るのは、途中から見えるようになった人にも
-       * 同じ形を出すため。サーバーの時刻で終わりを渡すと、時計のずれが
-       * そのまま大きさのずれになる。
-       */
-      case "decoyPlaced": {
-        const mine = message.owner === this.net.id && !this.decoys.has(message.id);
-        this.decoys.place(message.id, message.at, message.yaw, message.skin, message.readyIn);
-        if (mine) this.inv.spendOf("decoy");
-        // 膨らむ音は**近くを通った人だけ**に届く (14m)。置いたこと自体は
-        // 漏らさない — 膨らむ 2 秒は罠が一番弱い所なので
-        if (message.readyIn > 0) {
-          this.popAt.fromArray(message.at);
-          this.audio.play("balloonInflate", this.popAt);
-        }
-        break;
-      }
-
-      /*
-       * 割れた / 消えた。
-       *
-       * **破裂音は普通の位置音。** 近ければ聞こえ、遠ければ聞こえない —
-       * 特別扱いしないだけで、両側に過不足のない情報が渡る。遠くから
-       * 安全に撃った人ほど、自分が晒されたことに気づけない。
-       */
-      case "decoyGone": {
-        this.decoys.remove(message.id);
-        if (!message.popped) break;
-        this.popAt.fromArray(message.at);
-        this.popAt.y += DECOY_POP_HEIGHT;
-        const gain = this.audio.play("balloon", this.popAt, 1);
-        this.addPing("shot", this.popAt, gain);
-        break;
-      }
-
-      /*
-       * 人形が押しのけられた。**見えている全員に届く。**
-       *
-       * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
-       * 撃たせる道具であると同時に、**見張る道具**でもある。
-       */
-      /*
-       * 猫 (DOLL)。置かれた (敵にも届く — 撃ち抜けるように)・誰かが掛かった・消えた・撃たれて解けた。
-       * **掛かるも解けるもサーバーが決める。** 自分が掛かったら体を止め、解けたら型を逆に流して戻る。
-       * 他の人の体は、その人から届く姿 (trapped / trapped_out) で動く
-       */
-      case "dollPlaced": {
-        const mine = message.owner === this.net.id;
-        if (mine && !this.dolls.has(message.id)) this.inv.spendOf("doll");
-        // 円は置いた本人と味方に出す (陣営で分かれない部屋では本人だけ)。敵には見えない
-        const friendly = mine || (this.teamsMode && message.team === this.selfTeam);
-        this.dolls.place(message.id, message.at, message.yaw, friendly, message.team);
-        break;
-      }
-      case "dollSprung": {
-        const doll = this.dolls.positionOf(message.id);
-        // 鳴き声は猫の所から。**近くの人にも届く** (誰かがそこで足止めされている)
-        if (doll) this.audio.play("catMeow", doll);
-        if (message.victims.includes(this.net.id)) {
-          const p = this.player.position;
-          // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
-          // 猫のほうへ歩いて寄ってからしゃがみ込む (猫の足元を渡す)
-          this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined, false, doll ?? undefined);
-        }
-        // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
-        for (const id of message.victims) {
-          setTimeout(() => {
-            const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
-            if (at) this.audio.play("ohh", at);
-          }, DOLL_OHH_MS);
-        }
-        break;
-      }
-      case "dollGone":
-        this.dolls.remove(message.id);
-        if (message.freed.includes(this.net.id)) this.player.untrap();
-        break;
-      case "trapReleased":
-        if (message.id === this.net.id) this.player.untrap();
-        break;
-
-      case "decoyBumped":
-        this.decoys.bump(message.id, message.dirX, message.dirZ);
-        break;
-
-      // 空のダンボールに誰かが触れた。一度だけガタッと揺れる
-      case "cboxBumped":
-        this.emptyBoxes.bump(message.index, message.dirX, message.dirZ);
-        break;
-
-      /*
-       * E LOCATOR が飛び始めた。**全員に届く。**
-       *
-       * 弧を描いて飛ぶ物なので、投げた場所が割れるのは避けられない。避けられる
-       * からこそ「どこから投げたか」を隠す動きに意味が出る (手榴弾と同じ)。
-       */
-      case "locatorThrown":
-        // **波を出すのは投げた本人の画面だけ。** 敵にも出すと、置いた場所を
-        // そのまま教えることになる
-        this.locators.spawn(
-          message.id,
-          message.from,
-          message.velocity,
-          message.owner === this.net.id,
-        );
-        break;
-
-      /*
-       * 既に置かれている E LOCATOR。**飛ぶところを見ていない人に届く。**
-       *
-       * 途中から入った人と、画面を読み直した人がここから受け取る。
-       * **見えないと壊せない**ので、見ていなかったことが「壊せない」に
-       * 化けてはいけない。
-       */
-      case "locatorPlaced":
-        this.locators.place(message.id, message.at, message.owner === this.net.id);
-        break;
-
-      // 壊れた / 寿命が尽きた。**寿命で消えた分は静かに消す** —
-      // 音を出すと「誰かが壊した」に読めて、嘘の情報になる
-      case "locatorGone": {
-        /*
-         * 寿命で消えるときは**小さく弾ける**。ダメージは無い (見せるだけ)。
-         *
-         * 壊された (broken) ときと片付け (cleared) では弾けない — 壊した側は
-         * 撃った手応えで分かるし、片付けは場の外の話。
-         */
-        const at = this.locators.remove(message.id) ?? this.remoteFrom.fromArray(message.at);
-        if (!message.broken && !message.cleared) {
-          this.blast.explode(at, LOCATOR_POP_SCALE);
-          this.audio.play("locatorPop", at);
-        }
-        break;
-      }
-
-      case "claymoreGone": {
-        // 位置を先に取る。消してから爆発を出すと出す場所が分からない
-        const mesh = this.claymores.at(message.id);
-        this.claymores.remove(message.id);
-        if (message.blast && mesh) {
-          const gain = this.audio.play("claymore", mesh, 1);
-          this.addPing("shot", mesh, gain);
-          this.blast.explode(mesh);
-        }
-        break;
-      }
-
-      // CQC で投げられた。投げた側の正面へ寄って倒れる (soldier の thrown)
-      case "thrown":
-        this.player.thrown(message.x, message.z, message.yaw);
-        this.throwing.loseHeldGrenade();
-        break;
-
-      // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
-      /*
-       * ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令と同じ帯で知らせる
-       * (本人 2026-10-19)。帯の色はその人の陣営
-       */
-      case "targetTaken":
-        this.targetNotice = { text: `${message.byName}がターゲットを取得した`, team: message.byTeam, at: Date.now() };
-        break;
-      case "targetDropped":
-        this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
-        break;
-      case "targetDelivered":
-        this.targetNotice = { text: `${message.byName}がターゲットを運び込んだ`, team: message.byTeam, at: Date.now() };
-        this.audio.playUi("goal");
-        break;
-
-      // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
-      case "targetAt":
-        this.targetView = { x: message.x, y: message.y, z: message.z, carrier: message.carrier };
-        break;
-
-      case "stun": {
-        const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
-        if (at) this.audio.play("stunOof", at);
-        break;
-      }
-
-      // 投げた側が倒れて、放された。倒れかけから立ち直る
-      case "released":
-        this.player.releaseThrown();
-        break;
-
-      case "knockdown":
-        // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
-        // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
-        if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
-        // 散弾は爆風より短く速く飛ぶ (domain/rule/damage.ts の SHOTGUN_KNOCK_*)
-        this.player.knockDown(message.distance !== undefined, message.shotgun === true);
-        // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
-        if (message.shotgun) {
-          this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME);
-        } else {
-          this.player.knockPush(message.dirX, message.dirZ, message.distance);
-        }
-        // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
-        this.throwing.loseHeldGrenade();
-        // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
-        if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
-        break;
-
-      // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —
-      // 参加を知ったら即座に返す。相手の画面に現れるまでを次の周期まで待たせない
-      case "join":
-        this.broadcast();
-        break;
-
-      case "noise":
-        this.hearNoise(message);
-        break;
-
-      // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
-      // ここから出る。推し量る側の判断はどこにも残さない
-      // 他人のぶんはレプリカが受け取っている (sync / died)
-
-      // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
-      // 待つと、遅れて届いているだけの相手と区別が付かない
-      /*
-       * 往復の時間を測られている。**そのまま打ち返す。**
-       *
-       * 測るのはサーバー。こちらで測って申告する形にすると、遅い人が
-       * 「速い」と名乗れる (protocol/types.ts の PingMessage)。
-       *
-       * 一緒に届く rtt は前回の答え。1 秒遅れの値だが、出すのは診断のため
-       * なので困らない。
-       */
-      case "ping":
-        this.latency = message.rtt;
-        this.net.send({ type: "pong", at: message.at });
-        this.noteLag(message.rtt);
-        break;
-
-      case "hidden":
-        this.remotes.hide(message.id, Date.now());
-        break;
-
-
+      surfaceAt(
+        this.remoteTo,
+        IMPACT_PROBE,
+        this.stage.obstacles,
+        this.remoteTo.y,
+        IMPACT_PROBE,
+      ),
+    );
+    /*
+     * 他人の弾の着弾音。**当たった面はこちらで引き直す。**
+     *
+     * 届くのは着弾点だけで、何に当たったかは載っていない (載せると送る量が
+     * 増える)。位置から地形を引けば同じ答えが出る — 地形は全員が同じ物を
+     * 持っているので、撃った側と食い違わない。
+     */
+    this.playImpactAt(this.remoteTo);
+    {
+      // 撃った本人にボルト操作を流し、音もその銃のものにする。
+      // 全部ライフルの音だと、撃たれた側は相手の武器を読み違える
+      const kind = this.remotes.shot(message.id);
+      // 遠くの人の排莢も出す。通信はせず、撃ったことだけを合図に各自で出す
+      const yaw = this.remotes.ejectFrom(message.id, this.ejectPos);
+      if (yaw !== null) this.casings.eject(this.ejectPos, yaw);
+      const sound = weaponOf(kind).shotSound;
+      // 銃声も輪に出す。最も遠くまで届くので、撃ち合いが始まった方角が分かる。
+      this.addPing("shot", this.remoteFrom, this.audio.play(sound, this.remoteFrom));
     }
+  }
+
+  private receiveHealth(message: Extract<ServerMessage, { type: "health" }>): void {
+    this.applyHealth(message);
+  }
+
+  /*
+   * スタミナ。**麻酔を受けた本人にだけ届く。**
+   *
+   * 眠るかどうかを決めるのはサーバー。こちらは知らせを受けて倒れるだけで、
+   * **自分で起きられない** — 起きられるなら麻酔は効かない。
+   */
+  private receiveStamina(message: Extract<ServerMessage, { type: "stamina" }>): void {
+    this.stamina = message.stamina;
+    // 起きる時刻はサーバーの時計。手元の時計へ直してから比べる (application/replica/clock.ts)
+    const left = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
+    // もう眠っているなら残りだけ縮める (もがいて早まった)。倒れる動きをやり直さない
+    if (left > 0 && this.player.sleeping) this.player.shortenSleep(left);
+    else if (left > 0) this.player.sleep(left);
+    else this.player.wake();
+  }
+
+  /*
+   * 自分の本当の値。**3 秒ごとに届く。**
+   *
+   * 撃った瞬間に減らすのも、体力 0 で倒れるのもこちらがやっている
+   * (押した瞬間に返らないと手触りが壊れる)。ここで受けるのは
+   * 「本当はこう」という値だけで、**ずれていたら合わせる**ために使う。
+   * 普段は一致しているので何も起きない。
+   */
+  private receiveSelf(message: Extract<ServerMessage, { type: "self" }>): void {
+    this.applySelf(message);
+  }
+
+  // 繋ぎ直したときに届く、離脱前の続き。
+  //
+  // 湧き地点へは戻さない。**その命の続き**なので、居た場所に居た体力で戻る。
+  // 弾数もサーバーがレプリカを持っているので、そちらを正とする
+  private receiveResume(message: Extract<ServerMessage, { type: "resume" }>): void {
+    this.player.resumeAt(message.x, message.y, message.z, message.health);
+    // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
+    const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
+    if (asleep > 0) this.player.sleep(asleep, true);
+    // 人形に釘付けの途中で読み直した。**寄る・しゃがみ込む動きは飛ばして**撫でている所から続ける
+    else if (message.trapped) this.player.trap(undefined, true);
+    // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
+    else if (message.hanging) this.player.resumeHang(message.yaw);
+    // スタンナイフの充電も続きから (審判と同じ時計)。読み直しで満タンにはならない
+    this.melee.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
+    // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
+    // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
+    resumeLoadout(this.choice, message);
+    /*
+     * **持ち物を組み直す。**
+     *
+     * 画面を読み直すと Inventory は既定 (AK47) で作られる。装備を戻すだけ
+     * では手の中は既定のままで、**P90 を選んでいたのに AK を持って戻る**。
+     * 戻した装備から組み直してから、残弾を当てる (順番が要る)。
+     */
+    this.inv.refill(this.loadout);
+    // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
+    // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
+    this.inv.restore(message.magazine, message.reserve, message.grenades);
+    this.onLoadout?.(this.pendingLoadout);
+    // 銃を持たない部屋では持ち替えない。手にあるのはナイフ
+    if (message.primary) void this.player.equip(message.primary);
+    this.follow.snapTo(this.player, this.cameraWorld);
+  }
+
+  /*
+   * スキルが決まった。**送った物ではなく返ってきた物を持つ。**
+   *
+   * 弾かれたときも今の値が返るので、こちらの画面だけ選び直したつもりで
+   * 残らない。途中参加した人はそもそも送っていない (窓が閉じている) ので、
+   * これが唯一の入り口になる。
+   */
+  private receiveSkills(message: Extract<ServerMessage, { type: "skills" }>): void {
+    this.skills = message.skills as Skills;
+    // 速さは体が持っている。**同じ値を 2 か所に置かない** — 渡し忘れると
+    // 「散布だけ締まって走りは素のまま」という半端な効き方になる
+    this.player.setSkills(this.skills);
+  }
+
+  // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
+  private receiveRespawn(message: Extract<ServerMessage, { type: "respawn" }>): void {
+    if (message.id !== this.net.id) this.remotes.warp(message.id);
+  }
+
+  // 光っている人 (個人戦の 1 位) を体に出す。レプリカは持っているが、
+  // 光らせるのは絵の仕事
+  private receiveMatch(message: Extract<ServerMessage, { type: "match" }>): void {
+    this.remotes.setLeaking(message.leader ?? null);
+    // ターゲット (TSNE)。運んでいるのが自分なら持ち物の一覧に並ぶ (選んで G / △ で落とす)
+    this.targetView = message.target ?? null;
+    this.inv.setTargetOwned(message.target?.carrier === this.net.id);
+    // 攻守の入れ替えとステルスの状態 (TSNE)。側が変われば持ち込める物も変わる
+    if (message.attack !== this.attackTeam) {
+      this.attackTeam = message.attack ?? null;
+      this.applyArmory();
+    }
+    // STEALTH が暴かれた瞬間 (効いていた → 解けた)。試合中だけ (CAUTION の始まり)
+    if (this.stealthOn && message.stealth === false && message.phase === "playing") {
+      this.audio.playUi("detectAlert");
+    }
+    // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)。**自分の STEALTH が戻った人にだけ** —
+    // 攻める側で、着ている (2026-10-17 本人「set 音は自分だけに聞こえるのでいい」)
+    if (
+      !this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen &&
+      message.attack === this.selfTeam && this.inv.wearingStealth
+    ) {
+      this.audio.playUi("stealthSet");
+    }
+    // 戻った音は「解けていた」を見た後だけ。入室直後の最初の通 (false → true に見える) では鳴らさない
+    this.cautionSeen = message.stealth === false && message.phase === "playing";
+    this.stealthOn = message.stealth === true;
+  }
+
+  /*
+   * 抜いた相手が光り始めた (ENEMY EXPOSURE)。
+   *
+   * **届くのは抜いた側だけ。** サーバーが宛先を決めているので、
+   * ここで陣営を見る必要は無い。同じ通で遮蔽も外れるので、
+   * 壁の裏に居た相手の位置がこの後から流れてくる。
+   */
+  private receiveExposed(message: Extract<ServerMessage, { type: "exposed" }>): void {
+    this.remotes.expose(message.id, message.seconds);
+  }
+
+  // 気配 (AWARENESS)。誰に届くかはサーバーが決めている。こちらは霧を置くだけ
+  private receiveSensed(message: Extract<ServerMessage, { type: "sensed" }>): void {
+    this.sensed.show(message.key, message.at);
+  }
+
+  private receiveSensedGone(message: Extract<ServerMessage, { type: "sensedGone" }>): void {
+    this.sensed.hide(message.key);
+  }
+
+  // 補給できた。数は直前の self で入っている。ここは印だけ
+  private receiveResupplied(): void {
+    this.lastHitZone = "RESUPPLY";
+    this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
+    this.audio.play("resupply", this.player.position);
+  }
+
+  // 他の人がスタンナイフを振った。**手元で放電して鳴る**
+  private receiveZap(message: Extract<ServerMessage, { type: "zap" }>): void {
+    const id = message.id;
+    if (id === this.net.id) return;
+    const at = this.remotes.positionOf(id);
+    if (at) this.audio.play("zap", at);
+    this.stunSparks.discharge((out) => this.remotes.handOf(id, out));
+  }
+
+  private receiveThrow(message: Extract<ServerMessage, { type: "throw" }>): void {
+    // 初速だけが届く。同じ物理を同じ地形に対して解くので、
+    // 跳ねる場所も落ちる場所もこちらで求まる。
+    // 飛んでいる間は見えず、止まったところで現物が現れる。
+    this.remoteFrom.fromArray(message.from);
+    this.remoteTo.fromArray(message.dir);
+    this.thrown.throwFrom(this.remoteFrom, this.remoteTo, true);
+  }
+
+  private receiveKnock(message: Extract<ServerMessage, { type: "knock" }>): void {
+    if (message.hit !== this.net.id) return;
+    this.player.knockBack(message.x, message.z);
+  }
+
+  private receiveGrenade(message: Extract<ServerMessage, { type: "grenade" }>): void {
+    // 番号 0 は捨てる。番号を振るのはサーバーなので、0 のまま届いたものは
+    // 中継されただけの申告であって、飛ばしてもらえていない。
+    // (手榴弾を知らない古いサーバーに繋ぐと、既定の中継でこれが起きる。
+    //  原点に極小の手榴弾が現れ、いつまでも爆発しない)
+    if (message.id <= 0) {
+      console.warn("[手榴弾] サーバーが飛ばしていない。サーバーが古い可能性");
+      return;
+    }
+    // 位置も速度もサーバーが決めたものをそのまま使う。自分が投げたものも
+    // 例外にしない — 手元で先に飛ばして後から合わせると、
+    // 見えている場所と爆ぜる場所がずれる
+    this.grenades.spawn(message.id, message.from, message.velocity);
+  }
+
+  private receiveExplosion(message: Extract<ServerMessage, { type: "explosion" }>): void {
+    this.explode(message.id, message.at);
+  }
+
+  // **置いたのが自分でも他人でも鳴らす。** 落ちた場所で鳴るので、
+  // 見えていなくても「そこで誰かが捨てた」ことが耳に入る
+  private receiveDropped(message: Extract<ServerMessage, { type: "dropped" }>): void {
+    this.drops.place(message.id, message.weapon, message.at, message.yaw);
+    const at = this.drops.positionOf(message.id);
+    if (at) this.audio.play("drop", at);
+  }
+
+  /*
+   * 拾われた / 消えた。**音と後片付けはここ 1 か所。**
+   *
+   * 拾った本人には picked も届くが、あちらでは消さない。消してしまうと
+   * この通が来たときに置き場所が分からず、**拾った本人にだけ音が鳴らない**。
+   * (実際そうなっていた。他の人には聞こえていたので気づきにくい)
+   */
+  private receiveDroppedGone(message: Extract<ServerMessage, { type: "droppedGone" }>): void {
+    const at = this.drops.positionOf(message.id);
+    if (at) this.audio.play("pick", at);
+    this.drops.remove(message.id);
+  }
+
+  // 拾えた。**中身はここで初めて分かる** (見ただけでは残弾は読めない)
+  private receivePicked(message: Extract<ServerMessage, { type: "picked" }>): void {
+    const found =
+      message.count !== undefined && message.count > 0
+        ? { id: message.weapon as never, count: message.count }
+        : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
+    this.inv.pick(found);
+    // **消すのは droppedGone の側。** ここで消すと、あちらが鳴らす音の
+    // 置き場所が無くなる (自分にだけ聞こえない、になる)
+  }
+
+  /*
+   * 置かれたクレイモア。**自分の物なら、ここで初めて残り数を減らす。**
+   *
+   * 置けるかを決めているのはサーバー (壁の中や縁の外へは置けない)。送った
+   * 時点で減らしていたので、断られると**置けていないのに減る**ことがあった。
+   *
+   * 同じ物が二度来る (見え隠れするたびに配られる) ので、初めて見た物だけ数える。
+   */
+  private receiveClaymorePlaced(message: Extract<ServerMessage, { type: "claymorePlaced" }>): void {
+    const mine = message.owner === this.net.id && !this.claymores.has(message.id);
+    // sensor に掛かる扇は置いた本人と味方に出す (猫の円と同じ)。敵には見えない
+    const friendly =
+      message.owner === this.net.id || (this.teamsMode && message.team === this.selfTeam);
+    this.claymores.place(message.id, message.at, message.yaw, friendly ? message.team : null);
+    if (mine) this.inv.spendOf("claymore");
+  }
+
+  /*
+   * decoy が置かれた。**敵にも届く** — 見えないと撃たせられない。
+   *
+   * 膨らむ残り (readyIn) を受け取るのは、途中から見えるようになった人にも
+   * 同じ形を出すため。サーバーの時刻で終わりを渡すと、時計のずれが
+   * そのまま大きさのずれになる。
+   */
+  private receiveDecoyPlaced(message: Extract<ServerMessage, { type: "decoyPlaced" }>): void {
+    const mine = message.owner === this.net.id && !this.decoys.has(message.id);
+    this.decoys.place(message.id, message.at, message.yaw, message.skin, message.readyIn);
+    if (mine) this.inv.spendOf("decoy");
+    // 膨らむ音は**近くを通った人だけ**に届く (14m)。置いたこと自体は
+    // 漏らさない — 膨らむ 2 秒は罠が一番弱い所なので
+    if (message.readyIn > 0) {
+      this.popAt.fromArray(message.at);
+      this.audio.play("balloonInflate", this.popAt);
+    }
+  }
+
+  /*
+   * 割れた / 消えた。
+   *
+   * **破裂音は普通の位置音。** 近ければ聞こえ、遠ければ聞こえない —
+   * 特別扱いしないだけで、両側に過不足のない情報が渡る。遠くから
+   * 安全に撃った人ほど、自分が晒されたことに気づけない。
+   */
+  private receiveDecoyGone(message: Extract<ServerMessage, { type: "decoyGone" }>): void {
+    this.decoys.remove(message.id);
+    if (!message.popped) return;
+    this.popAt.fromArray(message.at);
+    this.popAt.y += DECOY_POP_HEIGHT;
+    const gain = this.audio.play("balloon", this.popAt, 1);
+    this.addPing("shot", this.popAt, gain);
+  }
+
+  /*
+   * 人形が押しのけられた。**見えている全員に届く。**
+   *
+   * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
+   * 撃たせる道具であると同時に、**見張る道具**でもある。
+   */
+  /*
+   * 猫 (DOLL)。置かれた (敵にも届く — 撃ち抜けるように)・誰かが掛かった・消えた・撃たれて解けた。
+   * **掛かるも解けるもサーバーが決める。** 自分が掛かったら体を止め、解けたら型を逆に流して戻る。
+   * 他の人の体は、その人から届く姿 (trapped / trapped_out) で動く
+   */
+  private receiveDollPlaced(message: Extract<ServerMessage, { type: "dollPlaced" }>): void {
+    const mine = message.owner === this.net.id;
+    if (mine && !this.dolls.has(message.id)) this.inv.spendOf("doll");
+    // 円は置いた本人と味方に出す (陣営で分かれない部屋では本人だけ)。敵には見えない
+    const friendly = mine || (this.teamsMode && message.team === this.selfTeam);
+    this.dolls.place(message.id, message.at, message.yaw, friendly, message.team);
+  }
+
+  private receiveDollSprung(message: Extract<ServerMessage, { type: "dollSprung" }>): void {
+    const doll = this.dolls.positionOf(message.id);
+    // 鳴き声は猫の所から。**近くの人にも届く** (誰かがそこで足止めされている)
+    if (doll) this.audio.play("catMeow", doll);
+    if (message.victims.includes(this.net.id)) {
+      const p = this.player.position;
+      // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
+      // 猫のほうへ歩いて寄ってからしゃがみ込む (猫の足元を渡す)
+      this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined, false, doll ?? undefined);
+    }
+    // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
+    for (const id of message.victims) {
+      setTimeout(() => {
+        const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
+        if (at) this.audio.play("ohh", at);
+      }, DOLL_OHH_MS);
+    }
+  }
+
+  private receiveDollGone(message: Extract<ServerMessage, { type: "dollGone" }>): void {
+    this.dolls.remove(message.id);
+    if (message.freed.includes(this.net.id)) this.player.untrap();
+  }
+
+  private receiveTrapReleased(message: Extract<ServerMessage, { type: "trapReleased" }>): void {
+    if (message.id === this.net.id) this.player.untrap();
+  }
+
+  private receiveDecoyBumped(message: Extract<ServerMessage, { type: "decoyBumped" }>): void {
+    this.decoys.bump(message.id, message.dirX, message.dirZ);
+  }
+
+  // 空のダンボールに誰かが触れた。一度だけガタッと揺れる
+  private receiveCboxBumped(message: Extract<ServerMessage, { type: "cboxBumped" }>): void {
+    this.emptyBoxes.bump(message.index, message.dirX, message.dirZ);
+  }
+
+  /*
+   * E LOCATOR が飛び始めた。**全員に届く。**
+   *
+   * 弧を描いて飛ぶ物なので、投げた場所が割れるのは避けられない。避けられる
+   * からこそ「どこから投げたか」を隠す動きに意味が出る (手榴弾と同じ)。
+   */
+  private receiveLocatorThrown(message: Extract<ServerMessage, { type: "locatorThrown" }>): void {
+    // **波を出すのは投げた本人の画面だけ。** 敵にも出すと、置いた場所を
+    // そのまま教えることになる
+    this.locators.spawn(
+      message.id,
+      message.from,
+      message.velocity,
+      message.owner === this.net.id,
+    );
+  }
+
+  /*
+   * 既に置かれている E LOCATOR。**飛ぶところを見ていない人に届く。**
+   *
+   * 途中から入った人と、画面を読み直した人がここから受け取る。
+   * **見えないと壊せない**ので、見ていなかったことが「壊せない」に
+   * 化けてはいけない。
+   */
+  private receiveLocatorPlaced(message: Extract<ServerMessage, { type: "locatorPlaced" }>): void {
+    this.locators.place(message.id, message.at, message.owner === this.net.id);
+  }
+
+  // 壊れた / 寿命が尽きた。**寿命で消えた分は静かに消す** —
+  // 音を出すと「誰かが壊した」に読めて、嘘の情報になる
+  private receiveLocatorGone(message: Extract<ServerMessage, { type: "locatorGone" }>): void {
+    /*
+     * 寿命で消えるときは**小さく弾ける**。ダメージは無い (見せるだけ)。
+     *
+     * 壊された (broken) ときと片付け (cleared) では弾けない — 壊した側は
+     * 撃った手応えで分かるし、片付けは場の外の話。
+     */
+    const at = this.locators.remove(message.id) ?? this.remoteFrom.fromArray(message.at);
+    if (!message.broken && !message.cleared) {
+      this.blast.explode(at, LOCATOR_POP_SCALE);
+      this.audio.play("locatorPop", at);
+    }
+  }
+
+  private receiveClaymoreGone(message: Extract<ServerMessage, { type: "claymoreGone" }>): void {
+    // 位置を先に取る。消してから爆発を出すと出す場所が分からない
+    const mesh = this.claymores.at(message.id);
+    this.claymores.remove(message.id);
+    if (message.blast && mesh) {
+      const gain = this.audio.play("claymore", mesh, 1);
+      this.addPing("shot", mesh, gain);
+      this.blast.explode(mesh);
+    }
+  }
+
+  // CQC で投げられた。投げた側の正面へ寄って倒れる (soldier の thrown)
+  private receiveThrown(message: Extract<ServerMessage, { type: "thrown" }>): void {
+    this.player.thrown(message.x, message.z, message.yaw);
+    this.throwing.loseHeldGrenade();
+  }
+
+  // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
+  /*
+   * ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令と同じ帯で知らせる
+   * (本人 2026-10-19)。帯の色はその人の陣営
+   */
+  private receiveTargetTaken(message: Extract<ServerMessage, { type: "targetTaken" }>): void {
+    this.targetNotice = { text: `${message.byName}がターゲットを取得した`, team: message.byTeam, at: Date.now() };
+  }
+
+  private receiveTargetDropped(message: Extract<ServerMessage, { type: "targetDropped" }>): void {
+    this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
+  }
+
+  private receiveTargetDelivered(message: Extract<ServerMessage, { type: "targetDelivered" }>): void {
+    this.targetNotice = { text: `${message.byName}がターゲットを運び込んだ`, team: message.byTeam, at: Date.now() };
+    this.audio.playUi("goal");
+  }
+
+  // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
+  private receiveTargetAt(message: Extract<ServerMessage, { type: "targetAt" }>): void {
+    this.targetView = { x: message.x, y: message.y, z: message.z, carrier: message.carrier };
+  }
+
+  private receiveStun(message: Extract<ServerMessage, { type: "stun" }>): void {
+    const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
+    if (at) this.audio.play("stunOof", at);
+  }
+
+  // 投げた側が倒れて、放された。倒れかけから立ち直る
+  private receiveReleased(): void {
+    this.player.releaseThrown();
+  }
+
+  private receiveKnockdown(message: Extract<ServerMessage, { type: "knockdown" }>): void {
+    // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
+    // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
+    if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
+    // 散弾は爆風より短く速く飛ぶ (domain/rule/damage.ts の SHOTGUN_KNOCK_*)
+    this.player.knockDown(message.distance !== undefined, message.shotgun === true);
+    // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
+    if (message.shotgun) {
+      this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME);
+    } else {
+      this.player.knockPush(message.dirX, message.dirZ, message.distance);
+    }
+    // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
+    this.throwing.loseHeldGrenade();
+    // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
+    if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
+  }
+
+  // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —
+  // 参加を知ったら即座に返す。相手の画面に現れるまでを次の周期まで待たせない
+  private receiveJoin(): void {
+    this.broadcast();
+  }
+
+  private receiveNoise(message: Extract<ServerMessage, { type: "noise" }>): void {
+    this.hearNoise(message);
+  }
+
+  // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
+  // ここから出る。推し量る側の判断はどこにも残さない
+  // 他人のぶんはレプリカが受け取っている (sync / died)
+
+  // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
+  // 待つと、遅れて届いているだけの相手と区別が付かない
+  /*
+   * 往復の時間を測られている。**そのまま打ち返す。**
+   *
+   * 測るのはサーバー。こちらで測って申告する形にすると、遅い人が
+   * 「速い」と名乗れる (protocol/types.ts の PingMessage)。
+   *
+   * 一緒に届く rtt は前回の答え。1 秒遅れの値だが、出すのは診断のため
+   * なので困らない。
+   */
+  private receivePing(message: Extract<ServerMessage, { type: "ping" }>): void {
+    this.latency = message.rtt;
+    this.net.send({ type: "pong", at: message.at });
+    this.noteLag(message.rtt);
+  }
+
+  private receiveHidden(message: Extract<ServerMessage, { type: "hidden" }>): void {
+    this.remotes.hide(message.id, Date.now());
   }
 
   /**
