@@ -1,6 +1,5 @@
-import { CHOICES, WEAPONS } from '../item/weapons'
 import { CAP_COUNT_MS } from './capture'
-import { MODES, livesOf, matchMsOf, primariesOf, secondaryOf, type Mode, type RoomName } from './room'
+import { MODES, livesOf, matchMsOf, type Mode, type RoomName } from './room'
 import { STEALTH_BREAK_MS } from './sides'
 import { TARGET_RETURN_MS } from './target'
 
@@ -10,7 +9,7 @@ import { TARGET_RETURN_MS } from './target'
  * --- 部屋ではなく試合の持ち物 ---
  * 部屋によってはルールを試合ごとにランダムに回す (本人「room によってはランダム rule で match を
  * ローテする」)。なので**その試合のモード** (match の報せの mode) から引く。部屋から引くのは
- * 時間・復活・持ち込みのような、いまは部屋が決めている数字だけ。
+ * 時間・復活のような、いまは部屋が決めている数字だけ。
  *
  * --- 数字は書かない ---
  * 文に「20」「5 分」と書くと、値を変えた時に説明だけ古くなる。実際の値を差し込む
@@ -68,7 +67,8 @@ export function briefingOf(mode: Mode, facts: BriefingFacts): BriefingPage[] {
   if (!rule) return []
   const pages: BriefingPage[] = [{ title: label, lines: rule }]
 
-  // 2 枚目。**そのモードならではの手**と、部屋の持ち込みの縛り
+  // 2 枚目。**そのモードならではの手。** 部屋の持ち込みの縛りは書かない — 説明は試合のルールだけ
+  // (2026-11-03 本人「TDM の 2 枚目はいらないな, 試合のルールだけでいい」)
   const extra: string[] = []
   if (mode === 'TSNE') {
     extra.push(
@@ -83,15 +83,6 @@ export function briefingOf(mode: Mode, facts: BriefingFacts): BriefingPage[] {
       '運ぶ人が倒されたり眠らされたりすると、その場に落ちる。',
       `落ちたターゲットは ${TARGET_RETURN_MS / 1000} 秒動かされないと元の位置へ戻る。`,
     )
-  }
-  const primaries = primariesOf(facts.room)
-  if (mode !== 'TSNE' && primaries.length < CHOICES.primary.length) {
-    extra.push(
-      primaries.length === 0
-        ? 'この部屋は主武器なし。'
-        : `この部屋の主武器は ${primaries.map((id) => WEAPONS[id].label).join(' / ')} だけ。`,
-    )
-    if (secondaryOf(facts.room) === null) extra.push('副武器も無い。詰められたらナイフだけ。')
   }
   if (extra.length) pages.push({ title: `${label} — 知っておくこと`, lines: extra })
   return pages
