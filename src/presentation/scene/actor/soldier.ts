@@ -1165,8 +1165,7 @@ export class Soldier {
       bumping: this.bumping,
       saluting: this.saluting,
       stabbing: this.stabbing,
-      // 転がりの姿のまま落ちている間も、構える・撃つ・転がるは塞ぐ
-      rolling: (this.animator?.rolling ?? false) || (this.animator?.rollFallHeld ?? false),
+      rolling: this.animator?.rolling ?? false,
       // 跳び越えの姿のまま落ちている間も、構える・撃つ・転がるは跳び越えと同じく塞ぐ
       vaulting: this.vaulting || this.animator?.vaultFallHeld != null,
       hanging: this.hanging,
@@ -3837,9 +3836,8 @@ export class Soldier {
     if (this.steerlessFall) {
       if (this.mover.onGround || this.onLadder || this.inWater) {
         this.steerlessFall = false
-        // 跳び越え / 転がりの姿のまま落ちていたら、着いた所で普段へ
+        // 跳び越えの姿のまま落ちていたら、着いた所で普段へ
         this.animator?.releaseVaultFall()
-        this.animator?.releaseRollFall()
       } else moveDir = ZERO_MOVE
     }
     // 傾いている間は動けない。傾きながらの移動は作らない
@@ -4089,22 +4087,6 @@ export class Soldier {
         this.mover.onGround = false
         this.velocityY = 0
         // 跳んだ向きの勢いは枠から離れるぶんだけ持ち越す (VAULT_FALL_CARRY)。遠くへ飛んでいかない
-        const carry = Math.min(moved.actualSpeed, VAULT_FALL_CARRY)
-        this.mover.airX = -Math.sin(this.rollYaw) * carry
-        this.mover.airZ = -Math.cos(this.rollYaw) * carry
-      }
-    }
-
-    /*
-     * **転がっている途中で縁から落ちた。** 型が運ぶ移動 (秒速 3m 前後) をやめ、縁から離れるぶん
-     * (VAULT_FALL_CARRY) だけ持ち越して、ほぼ真下へ落ちる。姿は抜けた瞬間で止める (holdRollFall) —
-     * 型を流し切ると空中で起き上がる。跳び越えと同じ深さ (VAULT_FALL_DROP) から (2026-11-03 本人)
-     */
-    if ((this.animator?.rolling ?? false) && !this.mover.onGround) {
-      const below = world.groundHeight(this.position, PLAYER_RADIUS, this.position.y)
-      if (this.position.y - below > VAULT_FALL_DROP) {
-        this.steerlessFall = true
-        this.animator?.holdRollFall()
         const carry = Math.min(moved.actualSpeed, VAULT_FALL_CARRY)
         this.mover.airX = -Math.sin(this.rollYaw) * carry
         this.mover.airZ = -Math.cos(this.rollYaw) * carry
@@ -4837,8 +4819,7 @@ export class Soldier {
       patting: this.animator?.patting ?? false,
       // 寄っている間は普段の歩き (型も歩き)
       trapped: this.trappedStage === 'none' || this.trappedStage === 'approach' ? null : this.trappedStage,
-      // 転がり / 跳び越えの姿のまま落ちている間も、見せる姿はその型 (他の人の画面も同じ型のまま)
-      rolling: this.rolling || (this.animator?.rollFallHeld ?? false),
+      rolling: this.rolling,
       // 跳び越えの姿のまま落ちている間も、見せる姿は跳び越え (他の人の画面も同じ型のまま)
       vaulting: this.vaulting || this.animator?.vaultFallHeld != null,
       vaultingUp: this.vaultingUp || this.animator?.vaultFallHeld === 'vault_up',

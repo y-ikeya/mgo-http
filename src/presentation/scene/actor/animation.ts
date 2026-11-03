@@ -4477,7 +4477,6 @@ export class CharacterAnimator {
     lower.setEffectiveTimeScale(ROLL_TIME_SCALE)
     upper.reset().play()
     lower.reset().play()
-    this.rollFallHold = false
     this.upperState = 'roll'
     this.locomotion = 'roll'
     this.rootSampleValid = false
@@ -4595,34 +4594,8 @@ export class CharacterAnimator {
    * 返さないと、最終ポーズに固まった所からブレンドが始まって一拍止まって見える。
    */
   get rolling(): boolean {
-    return this.upperState === 'roll' && !this.rollFallHold
+    return this.upperState === 'roll'
   }
-
-  /**
-   * 転がっている途中で縁から落ちた。**抜けた瞬間の姿で止めて、そのまま落ちる** (2026-11-03 本人)。
-   * 型を流し切ると空中で起き上がる絵になるので止める。動きの縛り (rolling) は解き、着地 (releaseRollFall) で普段へ
-   */
-  holdRollFall(): void {
-    if (this.upperState !== 'roll') return
-    this.rollFallHold = true
-    this.upper.get(ROLL_KEY)?.setEffectiveTimeScale(0)
-    this.lower.get('roll')?.setEffectiveTimeScale(0)
-  }
-
-  /** 落ち切った。止めていた転がりの姿を畳む */
-  releaseRollFall(): void {
-    if (!this.rollFallHold) return
-    this.rollFallHold = false
-    this.upper.get(ROLL_KEY)?.setEffectiveTimeScale(ROLL_TIME_SCALE)
-    this.lower.get('roll')?.setEffectiveTimeScale(ROLL_TIME_SCALE)
-    if (this.upperState === 'roll') this.upperState = 'stance'
-  }
-
-  /** 転がりの姿のまま落ちている最中か */
-  get rollFallHeld(): boolean {
-    return this.rollFallHold && this.upperState === 'roll'
-  }
-  private rollFallHold = false
 
   /**
    * 転がりの**絵**がまだ流れているか。
