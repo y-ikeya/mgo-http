@@ -1,18 +1,21 @@
 /**
- * **その動作ができるか。** 体の状態を 1 つの構造体で受けて、表 (MOVES) で決める。
+ * **その動作ができるか。** 体の状態を **4 つの軸** (姿勢・動作中・倒れ・手) の値にして、表 (MOVES) で決める。
  *
  * --- なぜ表か ---
  * 動作ごとの入口 (roll / vault / setProne / stab / grabLadder …) に条件を手書き
  * していた頃は、動作を 1 つ足すたびに他の全部の入口へ if を足しに行くことになり、
- * 抜けた。ぶら下がりを足したときは「転がり中」の旗にぶら下がりを混ぜて全部の
- * 入口を塞ぐ、という雑な繋ぎ方をした。「何ができるか」を読む場所も、遊びを変える
- * ときに触る場所も、ここ 1 か所にする。
+ * 抜けた。「何ができるか」を読む場所も、遊びを変えるときに触る場所も、ここ 1 か所にする。
  *
- * --- 書き方 ---
- * needs は**全部立っている**必要がある旗、not は**1 つでも立っていたら**できない旗。
- * 旗の名前は体 (presentation の soldier) が持っている語をそのまま使う。
- * 位置に依る条件 (目の前に枠があるか、下が深いか) は表に書かない — それは
- * 「できるか」ではなく「そこにあるか」なので、呼ぶ側が地形に聞く。
+ * --- 正はスプレッドシート (2026-11-03 本人「星取表を実装に落とす」) ---
+ * 表の中身 (movesTable.ts) はシートの軸のタブから**書き出した物**。手で直さない —
+ * シートを直して `bun tools/moves_sheet.ts import`。写し (moves.csv) と表が一致しているかは
+ * moves.test.ts が見るので、取り込み忘れ・手で直したのは CI で落ちる。
+ *
+ * --- 読み方 ---
+ * 軸ごとに「その値ならできる」値の並び。**軸の中は どれか (OR)、軸どうしは 全部 (AND)。**
+ * 軸が書いていなければ関係ない。旗 (BodyState) は体が持っている語のまま受けて、ここで軸の値に直す
+ * (axesOf)。位置に依る条件 (目の前に枠があるか、下が深いか) や時間の縛り (倒れて背中が着くまで
+ * 構えない) は表に書かない — 表は「してはいけない」を決め、入口はその上で自分の条件を見る
  */
 
 import { MOVE_RULES } from './movesTable'
@@ -71,37 +74,109 @@ export interface BodyState {
 
 export type Flag = keyof BodyState
 
+/**
+ * 軸と、その値。**1 つの軸の中では必ずどれか 1 つだけが当てはまる** (MECE)。
+ * 名前の日本語 (シートの見出し) との対応は tools/moves_sheet.ts
+ */
+export const AXES = {
+  posture: ['stand', 'crouch', 'prone', 'box', 'ladder', 'hang', 'air', 'water'],
+  action: ['none', 'roll', 'vault', 'proneShift', 'crawl', 'stab', 'cqc', 'step', 'landing', 'salute', 'bump', 'flinch'],
+  down: ['none', 'downed', 'standingUp', 'sleep', 'trapped', 'dead'],
+  hand: ['aiming', 'relaxed'],
+} as const
+
+export type Axis = keyof typeof AXES
+export type AxisValue<A extends Axis> = (typeof AXES)[A][number]
+export type BodyAxes = { [A in Axis]: AxisValue<A> }
+
+/**
+ * 旗から軸の値へ。**旗は同時に立つことがあるので、強い方を取る順に並べてある。**
+ *
+ *   倒れ   死 > 眠り > 釘付け > 立ち直り中 > 倒れている
+ *   姿勢   梯子 > ぶら下がり > 箱 > 水中 > 伏せ > 空中 > しゃがみ > 立ち
+ *   動作中 CQC > 転がり > 跳び越え > 一歩下がる > 刺突 > 伏せへの出入り > 着地 > 怯み > 棒立ち > 敬礼 > 這い
+ */
+export function axesOf(body: BodyState): BodyAxes {
+  const down: BodyAxes['down'] = body.dead
+    ? 'dead'
+    : body.sleeping
+      ? 'sleep'
+      : body.trapped
+        ? 'trapped'
+        : body.standingUp
+          ? 'standingUp'
+          : body.downed
+            ? 'downed'
+            : 'none'
+  const posture: BodyAxes['posture'] = body.onLadder
+    ? 'ladder'
+    : body.hanging
+      ? 'hang'
+      : body.boxed
+        ? 'box'
+        : body.inWater
+          ? 'water'
+          : body.prone
+            ? 'prone'
+            : !body.onGround
+              ? 'air'
+              : body.crouching
+                ? 'crouch'
+                : 'stand'
+  const action: BodyAxes['action'] = body.cqc
+    ? 'cqc'
+    : body.rolling
+      ? 'roll'
+      : body.vaulting
+        ? 'vault'
+        : body.stepping
+          ? 'step'
+          : body.stabbing
+            ? 'stab'
+            : body.proneShifting
+              ? 'proneShift'
+              : body.landing
+                ? 'landing'
+                : body.flinching
+                  ? 'flinch'
+                  : body.bumping
+                    ? 'bump'
+                    : body.saluting
+                      ? 'salute'
+                      : body.crawling
+                        ? 'crawl'
+                        : 'none'
+  return { posture, action, down, hand: body.aiming ? 'aiming' : 'relaxed' }
+}
+
 export type Move =
   | 'roll'
   | 'vault'
   | 'hang'
   | 'prone'
+  | 'rise'
   | 'crouch'
-  | 'stab'
-  | 'salute'
-  | 'ladder'
+  | 'standUp'
   | 'box'
+  | 'unbox'
+  | 'ladder'
   | 'aim'
+  | 'fire'
+  | 'reload'
+  | 'stab'
   | 'throw'
   | 'place'
-  | 'sleep'
-  | 'struggle'
-  | 'pat'
   | 'cqc'
   | 'swap'
   | 'step'
-  | 'fire'
-  | 'reload'
+  | 'salute'
+  | 'pat'
+  | 'struggle'
 
-export interface Rule {
-  needs: readonly Flag[]
-  not: readonly Flag[]
-}
+/** 1 つの動作の決まり。軸ごとに「その値ならできる」並び。**書いていない軸は関係ない** */
+export type Rule = { readonly [A in Axis]?: readonly AxisValue<A>[] }
 
-/**
- * 表の中身。**正はスプレッドシート** (tools/moves_sheet.ts、2026-11-02 本人「その表を見ながらそれを正としながら実装をする」)。
- * 升目を変えたいときはシートを直して `bun tools/moves_sheet.ts import`。理由はシートの「メモ」の行と movesTable.ts の注
- */
+/** 表の中身。シートから書き出した物 (movesTable.ts) */
 export const MOVES: Record<Move, Rule> = MOVE_RULES
 
 /** その動作を始められるか */
@@ -110,12 +185,15 @@ export function can(body: BodyState, move: Move): boolean {
 }
 
 /**
- * 何に阻まれているか (無ければ null)。**表示と調べ物のため** — 「押したのに
- * 動かない」を追うとき、旗の名前で分かる。
+ * 何に阻まれているか (無ければ null)。**表示と調べ物のため** — 「押したのに動かない」を追うとき、
+ * どの軸のどの値で止まったかが分かる (例 'down:sleep')
  */
-export function blocker(body: BodyState, move: Move): Flag | null {
+export function blocker(body: BodyState, move: Move): string | null {
   const rule = MOVES[move]
-  for (const flag of rule.needs) if (!body[flag]) return flag
-  for (const flag of rule.not) if (body[flag]) return flag
+  const axes = axesOf(body)
+  for (const axis of Object.keys(AXES) as Axis[]) {
+    const allowed = rule[axis] as readonly string[] | undefined
+    if (allowed && !allowed.includes(axes[axis])) return `${axis}:${axes[axis]}`
+  }
   return null
 }
