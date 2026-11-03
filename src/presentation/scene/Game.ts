@@ -14,7 +14,8 @@ import { RenderPipeline, WebGPURenderer } from "three/webgpu";
 import { pass } from "three/tsl";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { preloadAll } from "./assets";
+import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { loadSoldier, preloadArms } from "./assets";
 import { FollowCamera, type CameraWorld } from "./sense/camera";
 import { isMesh } from "./util/guards";
 import { Input } from "../../infra/input";
@@ -149,7 +150,7 @@ import {
 import { PRONE_GRENADE_RELEASE_RATIO } from "./knobs";
 import type { NetTransport } from "../../application/protocol/types";
 import type { Identity } from "../../infra/auth/session";
-import { selfSkin } from "./actor/skin";
+import { selfSkin, skinFor } from "./actor/skin";
 import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
@@ -1551,8 +1552,10 @@ export class Game {
         });
       }
     });
-    // 試合の前に体と武器を全部読み、描く仕組み (シェーダー) も組んでおく (warmUp)
-    void this.warmUp();
+    // 試合の前に自分の体と武器を読み、描く仕組み (シェーダー) も組んでおく。
+    // 他の人の体は名簿に載った所で (performRoster → warmSkin)
+    this.warmSkin(selfSkin(identity.displayName));
+    this.warm(preloadArms());
     void Promise.all([this.stage.ready, loadStageSun(this.stageName)]).then(([, sunData]) => {
       if (sunData) applyStageSun(this.sun, sunData);
       fitShadowToStage(this.sun, this.stage);
@@ -2516,6 +2519,7 @@ export class Game {
       // 姿をレプリカに合わせる。倒れたかを決めるのはレプリカの側なので、
       // ここでは返り値を見ない
       case "sync":
+        this.warmSkin(skinFor(effect.entry.name, effect.id));
         this.remotes.sync(effect.id, effect.entry);
         break;
       case "died": {
@@ -4030,24 +4034,43 @@ export class Game {
    * **試合が始まる前に、読む物と組む物を済ませる** (2026-11-03 本人「match 始まる前に asset を全部読む方針に」)。
    *
    * 試合の頭で相手が見えた瞬間に、その体 (8〜20MB) を落として解き、描く仕組み (WebGPU の
-   * パイプライン) を組んでいたので、5〜9 秒画面が止まった (本番のログ)。部屋に入った所で
-   * 全部を読み (preloadAll)、地形と一緒に一度だけ組む (compileAsync)。組むために読んだ物の
-   * 複製を地面のずっと下に一瞬置き、組み終わったら外す — 画面には映らない
+   * パイプライン) を組んでいたので、5〜9 秒画面が止まった (本番のログ)。
+   *
+   * **体は部屋に居る人の分だけ** (本人「そのマッチに参加している分だけ読めば良くない？
+   * 飛び入りしてきたら、その入ってきた時に追加で読む」)。名簿に載った所で読み始める —
+   * 支度・待合室で居る人は試合の前に、途中から入ってきた人はその時に。同じ体は 1 度だけ
    */
-  private async warmUp(): Promise<void> {
-    const [models] = await Promise.all([preloadAll(), this.stage.ready]);
-    if (this.disposed) return;
-    const holder = new THREE.Group();
-    holder.position.set(0, -500, 0);
-    for (const gltf of models) holder.add(cloneSkinned(gltf.scene));
-    this.scene.add(holder);
-    try {
-      await this.renderer.compileAsync(this.scene, this.follow.camera);
-    } catch (error) {
-      console.warn("[読み込み] 描く仕組みを先に組めなかった", error);
-    } finally {
-      this.scene.remove(holder);
-    }
+  private warmSkin(skin: string): void {
+    if (this.warmedSkins.has(skin)) return;
+    this.warmedSkins.add(skin);
+    this.warm(loadSoldier(skin).then((gltf) => [gltf]));
+  }
+  /** もう読み始めた体 */
+  private readonly warmedSkins = new Set<string>();
+  /** 組むのは 1 つずつ (compileAsync を重ねない) */
+  private warmChain: Promise<void> = Promise.resolve();
+
+  /**
+   * 読んだ物の複製を地面のずっと下に一瞬置き、地形と一緒に組み (compileAsync)、外す —
+   * 画面には映らない。読めなかった物は飛ばす (今まで通り見えた時にもう一度頼む)
+   */
+  private warm(loading: Promise<GLTF[]>): void {
+    const ready = Promise.all([loading.catch(() => [] as GLTF[]), this.stage.ready]);
+    this.warmChain = this.warmChain.then(async () => {
+      const [models] = await ready;
+      if (this.disposed || models.length === 0) return;
+      const holder = new THREE.Group();
+      holder.position.set(0, -500, 0);
+      for (const gltf of models) holder.add(cloneSkinned(gltf.scene));
+      this.scene.add(holder);
+      try {
+        await this.renderer.compileAsync(this.scene, this.follow.camera);
+      } catch (error) {
+        console.warn("[読み込み] 描く仕組みを先に組めなかった", error);
+      } finally {
+        this.scene.remove(holder);
+      }
+    });
   }
 
   /** しゃがんで叩ける所で眠っている人 (一番近い人)。**敵でも起こせる。** 居なければ null */

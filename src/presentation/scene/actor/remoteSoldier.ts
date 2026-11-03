@@ -1279,28 +1279,6 @@ export class RemoteSoldiers {
   }
 
   /**
-   * その人のモデルを先に読んでおく。
-   *
-   * --- なぜ要るか ---
-   * 実体が作られるのは**位置が初めて届いたとき**で、モデルの読み込みはそこから
-   * 始まる。ところが位置が届くのは**遮蔽の裏から出てきた瞬間**なので、その試合で
-   * 初めて見る相手は、読み終わるまで画面に出ない。**サーバーは既に配っている =
-   * 撃たれる**ので、「居るのに映らない」になる。
-   *
-   * 名簿は入室した時点で届く。名前が分かれば着る物も決まる (skin.ts) ので、
-   * そこから読み始めれば、出てくる頃には解析が済んでいる。
-   *
-   * 読み込みは URL ごとに Promise を控えてある (assets.ts) ので、何度呼んでも
-   * 走るのは 1 回だけ。名簿は繰り返し届くが、2 回目以降は Map を引くだけ。
-   *
-   * **失敗しても黙って捨てる。** これは前倒しでしかなく、本当に要るときは実体の
-   * 側が同じ物を読んで、そこで例外を出す。ここで騒ぐと二重に出る。
-   */
-  private warmSkin(name: string | undefined, id?: string): void {
-    void loadSoldier(skinFor(name, id)).catch(() => {});
-  }
-
-  /**
    * 名簿のレプリカに姿を合わせる。**真実はレプリカの側** (src/application/replica/roster.ts)。
    *
    * 名前も所属も体力も状態も、決めているのはサーバー。ここは受け取った通りに
@@ -1309,7 +1287,6 @@ export class RemoteSoldiers {
    *
    */
   sync(id: string, entry: Player): void {
-    this.warmSkin(entry.name, id);
     const player = this.players.get(id);
     if (!player) {
       this.remember(id, { ...entry });
