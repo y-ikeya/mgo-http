@@ -10,6 +10,7 @@
 
 import { existsSync, renameSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { GLTFPACK_FLAGS } from './gltfpack_flags.js'
 
 const [input, outputArg] = process.argv.slice(2)
 if (!input) throw new Error('使い方: bun tools/pack_glb.js <入力.glb> [出力.glb]')
@@ -20,13 +21,10 @@ if (packed === output) throw new Error('出力は .glb でないと gltfpack が
 const gltfpack = path.join(import.meta.dir, '..', 'node_modules', '.bin', 'gltfpack')
 if (!existsSync(gltfpack)) throw new Error('gltfpack が無い (bun install)')
 
-// -af 0 はステージと違う所: 既定だとアニメーションが 30Hz にリサンプルされ、
-// 型のキーが間引かれる。兵士は動きそのものが中身なので、キーは元のまま残す。
-// それ以外 (-cc -kn -km -ke -vpf -vt 16) は export_stage.py と同じ。
-// -vpf で位置は量子化しないので、当たりの元になる形も丸まらない。
+// 加工のフラグは gltfpack_flags.js (unpack_glb.js と共通)。ここで足すのは
+// 圧縮の -cc だけ。土台のフラグは export_stage.py と揃えてある
 const proc = Bun.spawnSync([
-  gltfpack, '-i', input, '-o', packed,
-  '-cc', '-kn', '-km', '-ke', '-vpf', '-vt', '16', '-af', '0',
+  gltfpack, '-i', input, '-o', packed, '-cc', ...GLTFPACK_FLAGS,
 ])
 if (proc.exitCode !== 0) {
   throw new Error(`gltfpack 失敗: ${proc.stderr.toString().slice(0, 200)}`)

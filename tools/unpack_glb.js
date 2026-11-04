@@ -10,6 +10,7 @@
 
 import { existsSync, renameSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { GLTFPACK_FLAGS } from './gltfpack_flags.js'
 
 const [input, outputArg] = process.argv.slice(2)
 if (!input) throw new Error('使い方: bun tools/unpack_glb.js <入力.glb> [出力.glb]')
@@ -20,10 +21,13 @@ if (unpacked === output) throw new Error('出力は .glb でないと gltfpack �
 const gltfpack = path.join(import.meta.dir, '..', 'node_modules', '.bin', 'gltfpack')
 if (!existsSync(gltfpack)) throw new Error('gltfpack が無い (bun install)')
 
-// -c を付けなければ圧縮は掛からない。-kn/-km/-ke は詰めたときと同じく
-// 名前と素材と extras を落とさないため
+// -cc を付けなければ圧縮は掛からない。**ただし加工のフラグは pack と
+// 同じ物が要る** — gltfpack は圧縮しなくても既定の加工 (アニメーションの
+// 30Hz リサンプルと位置の量子化) を掛けるので、フラグを省くと戻した時点で
+// 型のキーと位置の精度が落ち、詰め直しても戻らない。共通のフラグは
+// gltfpack_flags.js に置いてある
 const proc = Bun.spawnSync([
-  gltfpack, '-i', input, '-o', unpacked, '-kn', '-km', '-ke',
+  gltfpack, '-i', input, '-o', unpacked, ...GLTFPACK_FLAGS,
 ])
 if (proc.exitCode !== 0) {
   throw new Error(`gltfpack 失敗: ${proc.stderr.toString().slice(0, 200)}`)

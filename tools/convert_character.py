@@ -151,7 +151,9 @@ print(f'[done] {config["out"]} ({os.path.getsize(config["out"]) / 1024 / 1024:.1
 # ステージと同じく meshopt 圧縮 (EXT_meshopt_compression) を掛ける。体は
 # 5 体で 60MB を超えていて、初回読込の大部分だった (2026-11-04 に実測)。
 # 読む側は GLTFLoader に MeshoptDecoder を渡している (assets.ts)。
-# フラグは tools/pack_glb.js と揃えてある。-af 0 だけステージと違う:
+# フラグの正は tools/gltfpack_flags.js (pack_glb.js / unpack_glb.js が読む)。
+# ここは Python なので写してある。変えるときは両方直すこと。
+# -af 0 だけステージと違う:
 # 既定だとアニメーションが 30Hz にリサンプルされ、型のキーが間引かれる。
 # 兵士は動きそのものが中身なので、キーは元のまま残す。
 # -vpf で位置は量子化しないので、当たりの元になる形も丸まらない。
