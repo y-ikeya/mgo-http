@@ -1340,6 +1340,34 @@ export function missingClips(animations: THREE.AnimationClip[]): string[] {
   return [...want].filter((name) => !have.has(name)).sort()
 }
 
+/** もう警告した体 (warnMissingClips)。体ごとに 1 度だけ言う */
+const warnedSkins = new Set<string>()
+
+/**
+ * **無い型をここで言う。** 読んだ時点で分かるのに、黙って代用に落ちていた。
+ *
+ * 欠けていると、その状態のときだけ別の型が流れる。握りはその型に合わせて
+ * 詰めてあるので銃がずれるが、**警告が無いので見た目で気づくしかない** —
+ * 雷電の knee_relaxed / knee_ready がそれで、試写が別のモデルを読んでいた
+ * ぶん、突き合わせるまで出なかった。
+ *
+ * 全部のモデルは CI でも見ている (skin.test.ts)。ここは**手元で差し替えた glb が
+ * 試験を通る前に**ずれているのを、実体を作る所 (Soldier / RemoteSoldier) で言う。
+ * assets.ts の読み込みの所に置いていたが、読み込み (assets) が型の表 (ここ) を読む
+ * 向きになり、層が両向きになっていたので移した (2026-11-04)
+ */
+export function warnMissingClips(skin: string, animations: THREE.AnimationClip[]): void {
+  if (warnedSkins.has(skin)) return
+  warnedSkins.add(skin)
+  const missing = missingClips(animations)
+  if (missing.length > 0) {
+    console.warn(
+      `[モデル] ${skin}.glb に無い型 (${missing.length}): ${missing.join(', ')}\n` +
+        '代わりの型で出るので、その姿勢だけ見た目と握りがずれる',
+    )
+  }
+}
+
 /** 走りの 8 方向 */
 const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as Locomotion))
 

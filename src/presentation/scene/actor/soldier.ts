@@ -23,7 +23,7 @@ import { SkyLight } from '../world/skylight'
 import { PRONE_SPEED_SCALE, leanOf, stanceOf, type Lean, type Stance, COLLISION_HEIGHT, BODY_BOX } from '../../../domain/player/stance'
 import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { CharacterAnimator, findBoneBySuffix } from './animation'
+import { CharacterAnimator, findBoneBySuffix, warnMissingClips } from './animation'
 import {
   CROUCH_WALK_TOP_SPEED,
   WALK_STICK,
@@ -4560,6 +4560,7 @@ export class Soldier {
       console.error('[Soldier] 兵士モデルの読み込みに失敗', error)
       return
     }
+    warnMissingClips(skin, gltf.animations)
     if (this.disposed) return
 
     // 読み込んだ実体は敵側とも共有しているので、直接いじらず複製して使う
