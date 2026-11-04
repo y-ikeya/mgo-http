@@ -312,7 +312,7 @@
 "min": [
 19.892,
 0.1,
-6.632
+6.74
 ],
 "max": [
 23.168,
@@ -341,7 +341,7 @@
 "min": [
 18.132,
 0.1,
-6.632
+6.74
 ],
 "max": [
 19.892,
@@ -367,7 +367,7 @@
 "min": [
 14.856,
 0.1,
-6.632
+6.74
 ],
 "max": [
 18.132,
@@ -564,7 +564,7 @@
 -39.088
 ],
 "max": [
-32.523,
+40.775,
 4.035,
 28.169
 ],
@@ -1584,11 +1584,11 @@
 ],
 "max": [
 28.231,
-7.938,
+6.47,
 22.782
 ],
 "top": {
-"h": 7.9375,
+"h": 6.47,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -6469,6 +6469,269 @@
 }
 },
 {
+"name": "brick_wall_2F_east",
+"min": [
+28.12,
+3.9,
+-33.98
+],
+"max": [
+32.987,
+7.9,
+24.27
+],
+"top": {
+"h": 7.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_window_red_east_notexture",
+"min": [
+-15.753,
+4.35,
+3.377
+],
+"max": [
+-15.547,
+15.51,
+14.523
+],
+"top": {
+"h": 15.51,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "vis_window_red_north_notexture",
+"min": [
+-25.482,
+4.35,
+0.207
+],
+"max": [
+-19.497,
+15.51,
+0.367
+],
+"top": {
+"h": 15.51,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "vis_window_b2_north_notexture",
+"min": [
+3.62,
+8.47,
+17.91
+],
+"max": [
+5.58,
+18.577,
+18.05
+],
+"top": {
+"h": 18.5767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "wood_box_box2_box_nouv.050",
+"min": [
+3.83,
+3.944,
+0.14
+],
+"max": [
+4.845,
+4.87,
+0.931
+],
+"top": {
+"h": 4.8701,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box2_box_nouv.051",
+"min": [
+3.83,
+3.944,
+-0.667
+],
+"max": [
+4.845,
+4.87,
+0.124
+],
+"top": {
+"h": 4.8701,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_box_box_box_nouv.004",
+"min": [
+3.835,
+3.865,
+0.931
+],
+"max": [
+4.833,
+5.855,
+2.009
+],
+"top": {
+"h": 5.8553,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "glass_window_red_east_noeye_nocamera",
+"min": [
+-15.733,
+4.53,
+3.557
+],
+"max": [
+-15.657,
+15.21,
+14.343
+],
+"top": {
+"h": 15.21,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "glass_window_red_north_noeye_nocamera",
+"min": [
+-25.302,
+4.53,
+0.317
+],
+"max": [
+-19.677,
+15.21,
+0.347
+],
+"top": {
+"h": 15.21,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "glass_window_b2_north_noeye_nocamera",
+"min": [
+3.8,
+8.65,
+18.02
+],
+"max": [
+5.4,
+18.277,
+18.03
+],
+"top": {
+"h": 18.2767,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -13.755,
@@ -6934,6 +7197,2242 @@
 "eye": true,
 "camera": true,
 "thrown": true
+}
+},
+{
+"name": "vis_concrete_far_shop_00",
+"min": [
+77.947,
+3.9,
+91.704
+],
+"max": [
+88.165,
+11.4,
+100.296
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_01",
+"min": [
+76.764,
+3.9,
+72.821
+],
+"max": [
+88.924,
+14.4,
+87.019
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_02",
+"min": [
+45.143,
+3.9,
+57.257
+],
+"max": [
+57.988,
+14.4,
+71.272
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_03",
+"min": [
+43.341,
+3.9,
+33.425
+],
+"max": [
+56.528,
+14.4,
+41.945
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_04",
+"min": [
+43.752,
+3.9,
+14.924
+],
+"max": [
+54.291,
+14.4,
+27.369
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_05",
+"min": [
+46.168,
+3.9,
+4.875
+],
+"max": [
+55.838,
+14.4,
+15.154
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_06",
+"min": [
+43.787,
+3.9,
+-24.652
+],
+"max": [
+54.679,
+11.4,
+-16.395
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_07",
+"min": [
+44.673,
+3.9,
+-41.829
+],
+"max": [
+57.845,
+11.4,
+-31.07
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_08",
+"min": [
+43.009,
+3.9,
+-73.5
+],
+"max": [
+53.064,
+14.4,
+-61.221
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_09",
+"min": [
+78.719,
+3.9,
+-90.459
+],
+"max": [
+89.191,
+11.4,
+-80.506
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_10",
+"min": [
+91.25,
+3.9,
+-88.778
+],
+"max": [
+100.75,
+11.4,
+-77.802
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_11",
+"min": [
+77.507,
+3.9,
+-89.955
+],
+"max": [
+88.432,
+14.4,
+-78.215
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_12",
+"min": [
+64.708,
+3.9,
+-87.901
+],
+"max": [
+76.472,
+14.4,
+-78.436
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_13",
+"min": [
+48.091,
+3.9,
+-88.868
+],
+"max": [
+63.568,
+14.4,
+-76.861
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_14",
+"min": [
+33.005,
+3.9,
+-89.56
+],
+"max": [
+48.821,
+11.4,
+-77.424
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_15",
+"min": [
+17.657,
+3.9,
+-86.154
+],
+"max": [
+29.928,
+14.4,
+-73.902
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_16",
+"min": [
+5.281,
+3.9,
+-87.13
+],
+"max": [
+15.475,
+14.4,
+-77.767
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_17",
+"min": [
+-9.056,
+3.9,
+-89.58
+],
+"max": [
+-0.173,
+11.4,
+-77.35
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_18",
+"min": [
+-21.907,
+3.9,
+-86.179
+],
+"max": [
+-12.495,
+11.4,
+-74.738
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_19",
+"min": [
+-39.076,
+3.9,
+-87.111
+],
+"max": [
+-26.347,
+11.4,
+-76.875
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_20",
+"min": [
+-50.536,
+3.9,
+-90.625
+],
+"max": [
+-39.056,
+14.4,
+-77.964
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_21",
+"min": [
+-66.3,
+3.9,
+-85.498
+],
+"max": [
+-55.645,
+14.4,
+-75.581
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_22",
+"min": [
+-80.708,
+3.9,
+-85.994
+],
+"max": [
+-70.673,
+11.4,
+-73.939
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_23",
+"min": [
+-97.716,
+3.9,
+-87.615
+],
+"max": [
+-85.204,
+14.4,
+-77.12
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_24",
+"min": [
+-89.493,
+3.9,
+-102.886
+],
+"max": [
+-76.407,
+11.4,
+-89.114
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_25",
+"min": [
+-90.207,
+3.9,
+-73.522
+],
+"max": [
+-78.012,
+14.4,
+-64.245
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_26",
+"min": [
+-88.04,
+3.9,
+-46.792
+],
+"max": [
+-77.375,
+11.4,
+-32.115
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_27",
+"min": [
+-87.648,
+3.9,
+-33.483
+],
+"max": [
+-74.485,
+11.4,
+-18.642
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_28",
+"min": [
+-89.132,
+3.9,
+-19.439
+],
+"max": [
+-77.197,
+14.4,
+-6.038
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_29",
+"min": [
+-88.44,
+3.9,
+-4.551
+],
+"max": [
+-79.061,
+14.4,
+5.178
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_30",
+"min": [
+-88.84,
+3.9,
+6.637
+],
+"max": [
+-79.247,
+14.4,
+20.582
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_31",
+"min": [
+-87.916,
+3.9,
+24.184
+],
+"max": [
+-74.866,
+11.4,
+35.729
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_32",
+"min": [
+-87.863,
+3.9,
+33.949
+],
+"max": [
+-76.596,
+11.4,
+48.125
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_33",
+"min": [
+-89.022,
+3.9,
+47.88
+],
+"max": [
+-77.595,
+11.4,
+58.45
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_34",
+"min": [
+-88.246,
+3.9,
+62.883
+],
+"max": [
+-76.646,
+11.4,
+70.913
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_35",
+"min": [
+-86.121,
+3.9,
+77.506
+],
+"max": [
+-74.273,
+11.4,
+87.0
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_36",
+"min": [
+-85.045,
+3.9,
+85.852
+],
+"max": [
+-75.695,
+11.4,
+101.687
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_37",
+"min": [
+-101.676,
+3.9,
+76.481
+],
+"max": [
+-90.324,
+14.4,
+86.753
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_38",
+"min": [
+-82.489,
+3.9,
+76.15
+],
+"max": [
+-73.017,
+11.4,
+85.812
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_39",
+"min": [
+-67.595,
+3.9,
+78.018
+],
+"max": [
+-57.927,
+14.4,
+89.232
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_40",
+"min": [
+-54.087,
+3.9,
+78.078
+],
+"max": [
+-38.447,
+11.4,
+89.29
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_41",
+"min": [
+-40.765,
+3.9,
+75.522
+],
+"max": [
+-25.449,
+11.4,
+85.357
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_42",
+"min": [
+-27.312,
+3.9,
+77.002
+],
+"max": [
+-16.873,
+11.4,
+89.286
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_43",
+"min": [
+-12.828,
+3.9,
+78.158
+],
+"max": [
+-1.791,
+11.4,
+89.889
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_44",
+"min": [
+3.403,
+3.9,
+74.82
+],
+"max": [
+16.065,
+14.4,
+85.286
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_45",
+"min": [
+29.015,
+3.9,
+75.751
+],
+"max": [
+44.21,
+14.4,
+88.381
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_46",
+"min": [
+44.815,
+3.9,
+77.971
+],
+"max": [
+54.494,
+14.4,
+90.2
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_47",
+"min": [
+59.482,
+3.9,
+76.565
+],
+"max": [
+69.865,
+11.4,
+89.151
+],
+"top": {
+"h": 11.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_shop_48",
+"min": [
+71.787,
+3.9,
+75.625
+],
+"max": [
+87.179,
+14.4,
+88.625
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_tower_00_nouv",
+"min": [
+-148.953,
+3.9,
+136.489
+],
+"max": [
+-129.96,
+76.9,
+155.482
+],
+"top": {
+"h": 76.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_00_nouv",
+"min": [
+-145.156,
+3.9,
+59.872
+],
+"max": [
+-135.037,
+36.451,
+108.928
+],
+"top": {
+"h": 36.4511,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_tower_01_nouv",
+"min": [
+-154.526,
+3.9,
+35.02
+],
+"max": [
+-130.277,
+78.24,
+59.27
+],
+"top": {
+"h": 78.24,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_tower_02_nouv",
+"min": [
+-151.599,
+3.9,
+-52.163
+],
+"max": [
+-131.624,
+66.919,
+-32.188
+],
+"top": {
+"h": 66.9192,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_01_nouv",
+"min": [
+-155.628,
+3.9,
+-94.822
+],
+"max": [
+-110.432,
+49.123,
+-84.221
+],
+"top": {
+"h": 49.1228,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_02_nouv",
+"min": [
+-104.977,
+3.9,
+71.981
+],
+"max": [
+-92.954,
+40.743,
+124.651
+],
+"top": {
+"h": 40.7428,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_03_nouv",
+"min": [
+-130.701,
+3.9,
+-57.421
+],
+"max": [
+-66.748,
+49.385,
+-45.606
+],
+"top": {
+"h": 49.3848,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_04_nouv",
+"min": [
+-90.55,
+3.9,
+-170.317
+],
+"max": [
+-80.065,
+42.727,
+-110.408
+],
+"top": {
+"h": 42.7271,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_05_nouv",
+"min": [
+-47.451,
+3.9,
+117.973
+],
+"max": [
+-36.662,
+37.754,
+171.707
+],
+"top": {
+"h": 37.7543,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_06_nouv",
+"min": [
+1.805,
+3.9,
+104.621
+],
+"max": [
+11.952,
+49.754,
+168.085
+],
+"top": {
+"h": 49.7535,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_07_nouv",
+"min": [
+-38.631,
+3.9,
+-103.115
+],
+"max": [
+27.241,
+46.15,
+-91.633
+],
+"top": {
+"h": 46.1503,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_08_nouv",
+"min": [
+27.787,
+3.9,
+126.166
+],
+"max": [
+76.664,
+36.626,
+137.286
+],
+"top": {
+"h": 36.6259,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_09_nouv",
+"min": [
+40.985,
+3.9,
+-176.462
+],
+"max": [
+51.422,
+49.575,
+-111.423
+],
+"top": {
+"h": 49.575,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_tower_03_nouv",
+"min": [
+87.917,
+3.9,
+129.795
+],
+"max": [
+107.766,
+69.9,
+149.645
+],
+"top": {
+"h": 69.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_10_nouv",
+"min": [
+81.691,
+3.9,
+66.442
+],
+"max": [
+93.154,
+42.791,
+132.998
+],
+"top": {
+"h": 42.7915,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_11_nouv",
+"min": [
+92.148,
+3.9,
+-167.41
+],
+"max": [
+103.232,
+46.438,
+-101.35
+],
+"top": {
+"h": 46.4381,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_tower_04_nouv",
+"min": [
+135.365,
+3.9,
+132.245
+],
+"max": [
+155.609,
+67.9,
+152.49
+],
+"top": {
+"h": 67.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_12_nouv",
+"min": [
+129.296,
+3.9,
+70.675
+],
+"max": [
+139.916,
+45.424,
+115.922
+],
+"top": {
+"h": 45.4238,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_13_nouv",
+"min": [
+71.781,
+3.9,
+34.136
+],
+"max": [
+136.588,
+49.645,
+46.374
+],
+"top": {
+"h": 49.6448,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_14_nouv",
+"min": [
+76.507,
+3.9,
+-8.689
+],
+"max": [
+143.638,
+43.537,
+3.407
+],
+"top": {
+"h": 43.5374,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_danchi_15_nouv",
+"min": [
+92.428,
+3.9,
+-70.488
+],
+"max": [
+103.93,
+48.639,
+-15.972
+],
+"top": {
+"h": 48.6394,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_tower_05_nouv",
+"min": [
+133.264,
+3.9,
+-96.73
+],
+"max": [
+157.266,
+84.9,
+-72.728
+],
+"top": {
+"h": 84.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_ground",
+"min": [
+-200.0,
+3.68,
+-200.0
+],
+"max": [
+200.0,
+3.88,
+200.0
+],
+"top": {
+"h": 3.88,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_00_nouv",
+"min": [
+30.6,
+3.9,
+16.776
+],
+"max": [
+39.5,
+14.4,
+23.7
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_01_nouv",
+"min": [
+30.6,
+3.9,
+8.564
+],
+"max": [
+39.5,
+17.4,
+16.176
+],
+"top": {
+"h": 17.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_02_nouv",
+"min": [
+30.6,
+3.9,
+-1.356
+],
+"max": [
+39.5,
+17.4,
+7.964
+],
+"top": {
+"h": 17.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_03_nouv",
+"min": [
+30.6,
+3.9,
+-7.594
+],
+"max": [
+39.5,
+20.4,
+-1.956
+],
+"top": {
+"h": 20.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_04_nouv",
+"min": [
+32.0,
+3.9,
+-15.391
+],
+"max": [
+39.5,
+17.4,
+-9.7
+],
+"top": {
+"h": 17.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_05_nouv",
+"min": [
+30.6,
+3.9,
+-23.014
+],
+"max": [
+39.5,
+17.4,
+-17.4
+],
+"top": {
+"h": 17.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_06_nouv",
+"min": [
+30.6,
+3.9,
+-30.754
+],
+"max": [
+39.5,
+14.4,
+-23.614
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_concrete_far_east_07_nouv",
+"min": [
+30.6,
+3.9,
+-33.5
+],
+"max": [
+39.5,
+14.4,
+-31.354
+],
+"top": {
+"h": 14.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_metal_scaffold_noeye",
+"min": [
+16.398,
+6.47,
+11.487
+],
+"max": [
+28.256,
+9.07,
+22.557
+],
+"top": {
+"h": 9.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_sheet_scaffold",
+"min": [
+16.263,
+6.475,
+11.352
+],
+"max": [
+28.391,
+9.01,
+22.692
+],
+"top": {
+"h": 9.01,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "concrete_wall2_corner",
+"min": [
+25.391,
+3.9,
+-37.952
+],
+"max": [
+28.473,
+6.47,
+-33.968
+],
+"top": {
+"h": 6.47,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "col_concrete_corner_fence_nobullet_blockthrow",
+"min": [
+25.391,
+6.47,
+-37.952
+],
+"max": [
+28.473,
+9.54,
+-33.968
+],
+"top": {
+"h": 9.54,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_scaffold_corner_noeye",
+"min": [
+25.477,
+6.47,
+-37.876
+],
+"max": [
+28.387,
+9.07,
+-34.054
+],
+"top": {
+"h": 9.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_sheet_scaffold_corner",
+"min": [
+25.326,
+6.475,
+-38.01
+],
+"max": [
+28.504,
+9.01,
+-33.921
+],
+"top": {
+"h": 9.01,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
 }
 }
 ],
