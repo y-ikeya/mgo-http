@@ -27,6 +27,7 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
     <div
       class="hud-browse-item"
       classList={{ 'hud-browse-item-tranq': isTranquilizer(props.item.id) }}
+      data-id={props.item.id}
     >
       <div class="hud-browse-n">{props.item.n ?? ''}</div>
       <div class="hud-browse-name">{HELD[props.item.id].label}</div>
@@ -34,8 +35,10 @@ function BrowseItem(props: { item: { id: HeldId; n: number | null } }) {
   )
 }
 
-/** 1 段送ったときに滑る距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
+/** 端で回った札が滑り込む距離 (px)。カード 1 枚より小さくして「動いた」だけを見せる */
 const BROWSE_SLIDE = 26
+/** 札が隣のマスへ移る長さ (ms) */
+const BROWSE_SHIFT_MS = 160
 
 /** 待合室を閉じる前に黒へ落とし始める (ms)。落ちきるのは CSS の transition (0.8 秒) */
 const STANDBY_BLACK_MS = 1000
@@ -235,50 +238,84 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   }
 
   /*
-   * 送った向きに滑らせる。
+   * **送ったら、札が隣のマスへ移っていく** (2026-11-04 本人「その場で消えて次のマスに現れてる…
+   * 次のマスまで shift するような animation が欲しい」)。
    *
-   * **どちらへ動いたかが分からない**という指摘。カードの中身だけが入れ替わるので、
-   * 上へ送ったのか下へ送ったのかが読めなかった。1 段ごとに、来た方向から
-   * 滑り込ませる。
+   * 送るたびに、前に居たマスから今のマスへ滑らせる (FLIP: 前の位置を覚えておき、新しい位置から
+   * 差のぶん戻した所で始めて 0 へ)。角の物 (武器・道具のカード) も同じで、角へ入った札の居た所から
+   * 滑り込む。**端で回った札 (列の一番上 ⇔ 角の隣) だけは**、画面を横切らせずに今まで通り来た方向から
+   * 少し滑り込ませる (本人「次のがなくて loop するコマに関しては今のでいい」)。
    *
-   * Solid は中身が変わっても要素を作り直さないので、CSS の入場アニメーションは
-   * 流れない。**送るたびに自分で 1 回流す** (Web Animations)。
+   * 位置は毎回の描き直しの後に測って覚える。Solid は中身が変わっても要素を作り直さないよう、
+   * 一覧は名前 (id) で並べている — 札の物は 0.1 秒ごとに新しく届くので、物で並べると毎回作り直されて
+   * 滑っている途中で消える
    */
   let columnEl: HTMLDivElement | undefined
   let rowEl: HTMLDivElement | undefined
+  let weaponCardEl: HTMLDivElement | undefined
+  let toolCardEl: HTMLDivElement | undefined
+  type Slot = 'top' | 'column' | 'row' | 'corner'
+  /** 前に描いた時の、札ごとの位置とマス */
+  let placed = new Map<string, { rect: DOMRect; slot: Slot }>()
   let browsedAt = -1
   createEffect(() => {
-    const at = props.stats?.browsing?.at
-    if (at === undefined || (!columnEl && !rowEl)) {
+    const browsing = props.stats?.browsing
+    const at = browsing?.at
+    if (!browsing || at === undefined) {
       browsedAt = -1
+      placed = new Map()
       return
     }
+    const tool = props.stats?.browsingFamily === 'tool'
+    const corner = tool ? toolCardEl : weaponCardEl
+    // いまの札とマス。列の一番上 (先頭の子) は「端で回る」の起点なので分けて持つ
+    const now = new Map<string, { el: HTMLElement; rect: DOMRect; slot: Slot }>()
+    const columnItems = [...(columnEl?.querySelectorAll<HTMLElement>('.hud-browse-item') ?? [])]
+    columnItems.forEach((el, i) => {
+      const id = el.dataset.id
+      if (id) now.set(id, { el, rect: el.getBoundingClientRect(), slot: i === 0 ? 'top' : 'column' })
+    })
+    for (const el of rowEl?.querySelectorAll<HTMLElement>('.hud-browse-item') ?? []) {
+      const id = el.dataset.id
+      if (id) now.set(id, { el, rect: el.getBoundingClientRect(), slot: 'row' })
+    }
+    const cornerId = browsing.items[at]?.id
+    if (corner && cornerId) now.set(cornerId, { el: corner, rect: corner.getBoundingClientRect(), slot: 'corner' })
+
     const from = browsedAt
     browsedAt = at
-    if (from < 0 || from === at) return
-    // 一覧は輪になっているので、端で回った分は近いほうの向きとして扱う
-    const count = props.stats?.browsing?.items.length ?? 1
-    const raw = at - from
-    const step = Math.abs(raw) > count / 2 ? -Math.sign(raw) : Math.sign(raw)
-    const shift = step * BROWSE_SLIDE
-    // 武器は上下 (列)、道具は左右 (行) に伸びるので、滑る向きも合わせる
-    const tool = props.stats?.browsingFamily === 'tool'
-    const offset = tool ? `translateX(${-shift}px)` : `translateY(${shift}px)`
-    /*
-     * **入れ物ではなく、中の 2 つを動かす。**
-     *
-     * L 字の列と行はそれぞれ画面に絶対配置してある。入れ物に transform を掛けると
-     * **そこが配置の基準になってしまい**、カードが画面の隅へ飛んで L 字が消えた。
-     */
-    for (const part of [columnEl, rowEl]) {
-      part?.animate(
-        [
-          { transform: offset, opacity: 0.35 },
-          { transform: 'translate(0, 0)', opacity: 1 },
-        ],
-        { duration: 130, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
-      )
+    if (from >= 0 && from !== at) {
+      // 一覧は輪になっているので、端で回った分は近いほうの向きとして扱う
+      const count = browsing.items.length
+      const raw = at - from
+      const step = Math.abs(raw) > count / 2 ? -Math.sign(raw) : Math.sign(raw)
+      for (const [id, here] of now) {
+        const before = placed.get(id)
+        if (!before) continue
+        const looped =
+          (before.slot === 'top' && here.slot === 'row') || (before.slot === 'row' && here.slot === 'top')
+        if (looped) {
+          // 武器は上下 (列)、道具は左右 (行) に伸びるので、滑る向きも合わせる
+          const shift = step * BROWSE_SLIDE
+          here.el.animate(
+            [
+              { transform: tool ? `translateX(${-shift}px)` : `translateY(${shift}px)`, opacity: 0.35 },
+              { transform: 'translate(0, 0)', opacity: 1 },
+            ],
+            { duration: 130, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
+          )
+          continue
+        }
+        const dx = before.rect.left - here.rect.left
+        const dy = before.rect.top - here.rect.top
+        if (dx === 0 && dy === 0) continue
+        here.el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }], {
+          duration: BROWSE_SHIFT_MS,
+          easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)',
+        })
+      }
     }
+    placed = new Map([...now].map(([id, here]) => [id, { rect: here.rect, slot: here.slot }]))
   })
 
   /** 角の上に積む物。選んでいる物と、左に出した物を除いた残り */
@@ -892,6 +929,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       */}
       <div
         class="hud-weapon"
+        ref={weaponCardEl}
         classList={{
           'hud-weapon-picking': !!props.stats?.browsing,
           'hud-weapon-switching': props.stats?.switching,
@@ -1048,11 +1086,16 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
               選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。
               別にカードを出すと同じ名前が 2 つ並ぶ。
             */}
+          {/* **名前で並べる** — 札の物は 0.1 秒ごとに新しく届くので、物で並べると毎回作り直されて滑りが切れる */}
           <div class="hud-browse-column" ref={columnEl}>
-            <For each={above()}>{(item) => <BrowseItem item={item} />}</For>
+            <For each={above().map((item) => item.id)}>
+              {(id) => <Show when={above().find((item) => item.id === id)}>{(item) => <BrowseItem item={item()} />}</Show>}
+            </For>
           </div>
           <div class="hud-browse-row" ref={rowEl}>
-            <Show when={beside()}>{(item) => <BrowseItem item={item()} />}</Show>
+            <For each={beside() ? [beside()!.id] : []}>
+              {() => <Show when={beside()}>{(item) => <BrowseItem item={item()} />}</Show>}
+            </For>
           </div>
         </div>
       </Show>
@@ -1065,7 +1108,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         なる (MGO2 も道具は左下で、武器のカードは別に出ていた)。
       */}
       <Show when={props.stats?.tool}>
-        <div class="hud-tool" classList={{ 'hud-tool-on': props.stats?.toolInHand || props.stats?.wearingStealth }}>
+        <div class="hud-tool" ref={toolCardEl} classList={{ 'hud-tool-on': props.stats?.toolInHand || props.stats?.wearingStealth }}>
           <div class="hud-tool-key">C</div>
           <div class="hud-tool-name">{HELD[shownTool()].label}</div>
         </div>
