@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import { HIT_LIMIT_MS } from '../../domain/rule/lag'
-import type { GameStats } from '../scene/Game'
+import type { GameStats } from '../scene/stats'
 import './Stats.css'
 
 /**

@@ -5,7 +5,7 @@ import { SKILL_BUDGET, costOf, type SkillId, type Skills } from '../../domain/pl
 import { dmOrder, dmVerdict, pointsOf } from '../../domain/match/scoring'
 import { useLevels } from '../../infra/api/levels'
 import type { Identity } from '../../infra/auth/session'
-import type { GameStats } from '../scene/Game'
+import type { GameStats } from '../scene/stats'
 import { SkillList } from './SkillPanel'
 import { DEFAULT_LOOK_SCALE, LOOK_SCALE_MAX, LOOK_SCALE_MIN, type LookScale } from '../../infra/prefs/look'
 import { RENDER_SCALE_MAX, RENDER_SCALE_MIN } from '../../infra/prefs/quality'

@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import type { LoadoutFocus } from '../scene/Game'
+import type { LoadoutFocus } from '../scene/stats'
 import { t } from '../../i18n'
 import {
   SUPPORT_SPECS,

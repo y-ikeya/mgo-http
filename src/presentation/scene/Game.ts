@@ -1,6 +1,5 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
 import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/weapon";
-import { canThrowWith } from "../../domain/player/cqc";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
 import { followMovingShadow } from "./world/liveShadow";
@@ -28,11 +27,10 @@ import {
   canChooseSkills,
   masteryReloadScale,
   masteryRecoveryScale,
-  stunChargeSeconds,
   type SkillId,
   type Skills,
 } from "../../domain/player/skill";
-import { BLAST_RADIUS, RELEASE_HEIGHT, throwSpeedOf } from "../../domain/item/grenade";
+import { BLAST_RADIUS } from "../../domain/item/grenade";
 import { pelletsOf } from "../../domain/item/weapons";
 import { VIEW_HEIGHT, leanMetres, type Lean, type Stance } from "../../domain/player/stance";
 import { offsetInCone } from "../../sim/space/aim";
@@ -50,7 +48,6 @@ import {
   STAGE_CODE,
   TEAM_COLOR,
   type Stage, addColliderOverlay, buildCapGoals, colliderOverlayOn, loadStageBases, loadStageBoxes, loadStageCapGoals } from "./world/stage";
-import { type PlaceSpot, placeSpot } from "../../sim/judge/claymore";
 import { type StageBox, solidBlockers } from "../../sim/space/vision";
 import { PlacePreview } from "./arms/placePreview";
 import {
@@ -73,43 +70,46 @@ import { Dolls } from "./arms/dolls";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { StunSparks } from "./fx/stunSparks";
+import { Melee } from "./self/melee";
+import { Throwing } from "./self/throwing";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
-import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME, stunCharge, stunReadyAfter } from "../../domain/rule/damage";
+import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME } from "../../domain/rule/damage";
 import { IDLE_EXIT_SPEED } from "./actor/motion";
 import {
   canAct,
   canChoose,
   CHOOSE_FLOOR,
-  CHOOSE_TIMEOUT,
-  DOWN_DURATION,
   isDowned,
   isSpawning,
   onBattlefield,
   type Life,
 } from "../../domain/player/lifecycle";
-import { CHOICES, SUPPORTS, roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
+import { roundsPerDecoy, type SupportId, type WeaponId } from "../../domain/item/weapons";
 import { Inventory } from "../../domain/item/inventory";
 import type { Intent } from "../../domain/player/intent";
-import { isGun, isPlaceable, isThrowable, isThrownByHand, type HeldId } from "../../domain/item/held";
+import { isGun, isThrowable } from "../../domain/item/held";
 import {
   MODES,
   ROOMS,
   isHostile,
   isRoomName,
-  primariesOf,
-  secondariesOf,
-  secondaryOf,
-  supportsOf,
-  type Mode,
   type RoomName,
   type Side,
 } from "../../domain/match/room";
 import { briefingOf, type Briefing } from "../../domain/match/briefing";
+import {
+  closeBriefing as closeBriefingInput,
+  focusAt,
+  holdRatio,
+  newLoadoutInput,
+  openBriefing as openBriefingInput,
+  stepLoadoutInput,
+  type LoadoutKeys,
+} from "../../application/loadout/input";
 import { RemoteSoldiers, type RemoteSoldier } from "./actor/remoteSoldier";
 import { setSunCaster, setSunProbe } from "./actor/blobShadow";
-import { STEALTH_BREAK_MS } from "../../domain/match/sides";
 import { LAG_LIMIT_MS } from "../../domain/match/lag";
 import type { HitZone } from "../../domain/rule/damage";
 import type { NoiseEvent } from "../../application/protocol/types";
@@ -149,309 +149,47 @@ import {
   type Calibration,
   type Knobs,
 } from "./calibration";
-import { PRONE_GRENADE_RELEASE_RATIO } from "./knobs";
 import type { NetTransport } from "../../application/protocol/types";
 import type { Identity } from "../../infra/auth/session";
 import { selfSkin, skinFor } from "./actor/skin";
 import {
+  downLeftOf,
+  loadoutClock,
+  secondsUntil,
+  targetNoticeOf,
+  voiceMenuOf,
+  weaponCard,
+  type GameStats,
+  type HudFeedItem,
+  type LoadoutFocus,
+} from "./stats";
+import {
   SNAPSHOT_INTERVAL,
   type HealthMessage,
-  type MatchPhase,
   type SelfMessage,
-  type KillEvent,
-  type MatchMessage,
   type ServerMessage,
   type Team,
 } from "../../application/protocol/types";
 import { MAX_STAMINA, PAT_RANGE, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
+import {
+  chooseLoadout,
+  fitArmory,
+  newLoadoutChoice,
+  resumeLoadout,
+  spawnLoadout,
+  stepChoice,
+  type Loadout,
+  type LoadoutChoice,
+  type LoadoutEffect,
+} from "../../application/loadout/choice";
 import { loadLookScale, type LookScale } from "../../infra/prefs/look";
 import { loadRenderScale } from "../../infra/prefs/quality";
-
-/** HUD へ渡す状態。Three.js 側からこれだけを Solid の signal に流す */
-/**
- * 支度の画面で指せる枠。
- *
- * 装備を選ぶ間は 3 つ、支度の段階ではスキルの並び (SkillId がそのまま入る)。
- * **窓によって並ぶ物が違う**ので、1 つの union にまとめてある。
- */
-export type LoadoutFocus = "primary" | "secondary" | "support" | SkillId;
-
-/** キルログの欄に出す 1 行。倒した / 眠らせた、または誰かのボイス */
-export type HudFeedItem =
-  | (KillEvent & { stun?: boolean; at: number })
-  | { type: "voice"; id: string; name: string; team: Team; text: string; at: number }
-  /** 抜けた / 戻りを待っている (application/replica/match.ts の PresenceEntry) */
-  | { type: "presence"; id: string; name: string; team: Team; state: "away" | "left"; at: number };
 
 /** パッドでボイスを選ぶ十字キーの並び。上から時計回り */
 const VOICE_PAD_ORDER = ["menuUp", "menuRight", "menuDown", "menuLeft"] as const;
 
-export interface GameStats {
-  /**
-   * 戦場を見せてよいか。**地形と自分の模型が揃うまで false。**
-   *
-   * 揃う前の画面は「まだ何も起きていない」ことを伝えられない。地形は
-   * ブロックアウトの箱だけ、模型は素の姿勢 (T ポーズ) で立っているので、
-   * **読み込み中ではなく壊れているように見える**。揃うまでは覆いを出す。
-   */
-  ready: boolean;
-  stage: string;
-  /**
-   * いま描いている裏側。'WebGPU' か 'WebGL2'。
-   *
-   * WebGPU が無い環境では three が黙って WebGL2 に落ちる。黙って落ちるのは
-   * 動かし続けるには正しいが、どちらで走っているのか分からないままだと、
-   * 速い / 遅いの原因を取り違える。
-   */
-  backend: string;
-  fps: number;
-  x: number;
-  z: number;
-  speed: number;
-  /** ポインタロック中か。false ならクロスヘアを隠して操作説明を出す */
-  locked: boolean;
-  shots: number;
-  ammo: number;
-  magazine: number;
-  /** 弾倉の外に残っている弾 */
-  reserve: number;
-  reloading: boolean;
-  /** 転んでいて、まだ起き上がれるか */
-  downed: boolean;
-  /** 構えているか。クロスヘアはこのときだけ出す */
-  aiming: boolean;
-  /** 構えようとしているが、銃口の先が塞がっていて構えられない */
-  aimBlocked: boolean;
-  /** 現在の散布界 (度)。クロスヘアの開き具合に使う */
-  spread: number;
-  /** その部屋で選べる主武器。**部屋が絞ることがある** */
-  primaries: readonly WeaponId[];
-  /** 選べる副武器。**持たせない部屋は空、TSNE は側の 1 挺** */
-  secondaries: readonly WeaponId[];
-  /** 選べる support。**TSNE は側ごとに違う** */
-  supports: readonly SupportId[];
-  /**
-   * 次に湧いたときの主武器。**選ばれている物。**
-   *
-   * 画面側で信号に持たせていた頃、初期値が 'rifle' で固定されていた。狙撃銃
-   * だけの部屋では**どれも選ばれていない**状態で開く (一覧に rifle が無いので
-   * どの札にも印が付かない)。選んでいる物を知っているのはこちら。
-   */
-  primary: WeaponId | null;
-  /** 副武器。**部屋が外していれば null** */
-  secondary: WeaponId | null;
-  /**
-   * 粒が散る角度 (度)。散弾でなければ 0。
-   *
-   * **0 でなければクロスヘアが輪になる。** 十字は「その一点へ 1 発飛ぶ」の形で、
-   * 8 粒に分かれる銃に出すと狙った点へ集まるように読めてしまう。
-   *
-   * 輪の大きさは**狙いの散布に粒の散りを足した幅**。粒がどこまで飛び散るかを
-   * そのまま出すので、間合いの外では輪が画面を覆うほど大きくなる。
-   */
-  pelletSpread: number;
-  /** しゃがんでいるか */
-  crouching: boolean;
-  /**
-   * いまの構え。**旗ではなく構えそのもの。**
-   *
-   * 伏せは屈みの旗も立てている (低い姿勢としての扱いが要る) ので、旗を
-   * 読むと CROUCH に見える。頭の高さも当たり判定も構えのほうで決まって
-   * いるので、見せる値もそちらから引く。
-   */
-  stance: Stance;
-  /** 直近に当てた部位。空文字なら表示しない */
-  hitZone: string;
-  /** その命中が麻酔だったか。**青で出す** */
-  hitTranq: boolean;
-  /** 敬礼で繋がったばかりの味方 */
-  links: string[];
-  /** 成績表を開いているか */
-  menuOpen: boolean;
-  /** 装備の画面を開いているか */
-  loadoutOpen: boolean;
-  /** READY の長押しの進み (0〜1)。鍵盤とパッドで押している分 */
-  readyHold: number;
-  /** 試合の前のルールの説明。開いていなければ null (domain/match/briefing.ts) */
-  briefing: Briefing | null;
-  /** 装備の画面が自動で閉じるまで (秒) */
-  loadoutLeft: number;
-  /** OK が効くようになるまで (秒)。0 なら押せる */
-  loadoutWait: number;
-  /**
-   * いま効いているスキル。**サーバーが決める。**
-   *
-   * 選んだ物をそのまま出さないのは、途中参加した人が自分で選んでいないため —
-   * 前回の選択を DB から持ってくるので、返ってきた物だけが正しい。
-   */
-  skills: Skills;
-  /** スキルを選び直せるか。**試合が始まったら閉じる** */
-  skillsOpen: boolean;
-  /**
-   * 支度の画面でいま指している枠。**パッドと矢印キー用。**
-   *
-   * 番号ではなく枠の名前を渡す。番号だと**並び順を画面と scene の 2 か所が
-   * 握る**ことになり、副武器の無い部屋で片方だけ詰め忘れると 1 つずれる。
-   * 名前なら画面は自分の枠と見比べるだけで済む。
-   */
-  loadoutFocus: LoadoutFocus;
-  /** スコープを覗いているか。覗いている間は専用の表示にする */
-  scoped: boolean;
-  /**
-   * 覗いているのが銃の照準器か (突撃銃の主観)。眼鏡ではないのでスコープの絵を重ねない。
-   * holo はホロサイトの輪と点を画面の真ん中に出す。null なら眼鏡か、覗いていない
-   */
-  sight: "iron" | "holo" | null;
-  /** いま持っている銃。調整パネルが追従する */
-  equipped: WeaponId;
-  /** 覗いている倍率。空なら覗いていない */
-  zoom: string;
-  /** ホイールで覗ける状態か。案内を出すのに使う */
-  canZoom: boolean;
-  /** 目の前に梯子があるか。**掴めることを知らせる**のに使う */
-  canClimb: boolean;
-  /**
-   * 検証用の読み出し (URL に ?debug を付けたときだけ)。今の型・立っている旗・
-   * 主な動作が何に阻まれているか・位置。「押したのに動かない」を追うため
-   */
-  debug: { locomotion: string; flags: string; blocked: string; where: string } | null;
-  /** 自分の基地の上に居る。G / △ で補給できる */
-  canResupply: boolean;
-  /** 眠っている人の傍でしゃがんでいる。G / △ で叩いて起こせる (味方でも敵でも) */
-  canPat: boolean;
-  /** 「{名前}がターゲットを取得した / 手放した」(TSNE、全員)。出している間だけ。leaving は退き始めた */
-  targetNotice: { text: string; team: Team; leaving: boolean } | null;
-  /** ターゲットを一覧で指している。G / △ で落とせる */
-  canDropTarget: boolean;
-  /** 部屋に居る全員の戦績。サーバーが 1 秒ごとに配る */
-  scores: MatchMessage["players"];
-  /**
-   * 直近の点の増減。**自分の分だけ。**
-   *
-   * 倒した / 倒された瞬間に右下へ出す。誰が誰を倒したかの一覧 (kills) とは別で、
-   * こちらは自分に何が起きたかだけを短く見せる。
-   */
-  points: { label: string; delta: number; at: number }[]
-  /** 近くに落ちている武器がある。**押せば拾える**という案内を出す */
-  canPickUp: boolean
-  /** 自分が光っている (個人戦の 1 位)。位置が全員に漏れている */
-  leaking: boolean
-  /**
-   * 直近のキル表示。新しいものが先頭。
-   *
-   * **眠らせたかどうかも運ぶ。** 倒したのと眠らせたのは同じ行で出すが、
-   * 残機が減っていないので**同じ色で出してはいけない** (出す側が三角の色を
-   * 分ける)。レプリカは KillEntry として別に持っているので、ここで畳んで渡す。
-   */
-  kills: HudFeedItem[]
-  /** ボイスの番号の一覧を出しているか (T を押した直後)。見出しと並べる文字列 */
-  voiceMenu: { title: string; items: readonly string[]; pad: boolean } | null
-  /** 残っている投げ物 */
-  throwables: number
-  /** 手榴弾の残り */
-  grenades: number
-  /** 投擲の枠に何を入れているか */
-  support: SupportId
-  /** 開いている持ち替えの一覧。閉じていれば null */
-  browsing: {
-    /** n = 持っている総数 (銃は装填 + 予備)。loaded/mag は銃だけ */
-    items: { id: HeldId; n: number | null; loaded: number | null; mag: number | null }[]
-    at: number
-  } | null
-  /** いま手にある物 */
-  held: HeldId
-  /** 武器系で選んでいる物。道具を手にしていても変わらない */
-  weaponHeld: HeldId
-  /** スタンナイフの充電 (0〜1)。ナイフのカードの弾の目盛りの所に出す */
-  stunCharge: number
-  /** 道具系で選んでいる物。使っていなければ 'none' */
-  tool: HeldId
-  /** その道具をいま手にしているか */
-  toolInHand: boolean
-  /** STEALTH を着ているか (TSNE の攻める側)。手には持たない */
-  wearingStealth: boolean
-  /** CAUTION の残り (秒)。0 なら出さない。部屋で 1 つ、全員が同じ秒数 */
-  caution: number
-  /** 落ちたターゲット (TSNE) が置き場所へ戻るまでの残り (秒)。落ちていなければ 0 */
-  targetReturn: number
-  /**
-   * 倒れたまま、復活の支度に移るまでの残り (秒)。**倒されるたびに延びる部屋 (CAP) でだけ** 0 より大きい。
-   * downFor はその満タン (今回の倒れたままの秒数)
-   */
-  downLeft: number
-  downFor: number
-  /** どちらの系統の一覧を開いているか。閉じていれば null */
-  browsingFamily: 'weapon' | 'tool' | null
-  /** 持ち替えの最中か。HUD を薄くするのに使う */
-  switching: boolean
-  /** 自分の所属 */
-  team: Team
-  /** 試合の状態。まだ届いていなければ null */
-  match: MatchMessage | null
-  /** 自分の体力 */
-  health: number;
-  /**
-   * 視界の曇り (0..1)。**スタミナが減るほど濃い。**
-   *
-   * 残りの数字ではなく効き目を渡す。画面は棒を出さずに曇るだけなので、
-   * 数字を持たせても使い道が無い (domain/player/stamina.ts の staminaBlur)。
-   */
-  stamina: number;
-  /**
-   * 直近の爆風。**近くで爆ぜるたび、別物に差し替わる。**
-   *
-   * 続いている効き目 (stamina) と違って、これは起きた一瞬を知らせる合図。
-   * 0.1 秒ごとの stats に乗せるので、いつ届くかは揃わない — **濃さと長さは
-   * 受けた側 (Hud.css) が時間で決める。** ここが持つのは近さだけ。
-   *
-   * seq は毎回増える番号。**同じ場所で続けて爆ぜても新しい 1 発と分かる。**
-   */
-  shock: { seq: number; power: number } | null;
-  /** 眠っているか。眠っている間は操作を受け付けない */
-  asleep: boolean;
-  /** 眠りの深さ。**1 が眠った瞬間、0 が起きた瞬間。** 画面の暗さがこれに従う */
-  sleepDepth: number;
-  /** パッドで遊んでいるか。眠っている間の「もがいて起きる」案内の出し分け */
-  padActive: boolean;
-  maxHealth: number;
-  /** 倒れているか */
-  dead: boolean;
-  /** 接続している他プレイヤーの数 */
-  players: number;
-  /**
-   * 自分が実際に位置を送れている回数 (通/秒)。
-   *
-   * 名目は 64。**下回っていたら、描画が重くて setInterval が発火できていない。**
-   * 相手の画面ではその分だけ自分がカクつく
-   */
-  /**
-   * 往復の時間 (ms)。**サーバーが測ってくれた値。**
-   *
-   * 0 ならまだ測れていない。回数 (FPS / TX / RX) とは別物で、あちらは
-   * 「何回」、こちらは「どれだけ待つか」。
-   */
-  /**
-   * いま流している型と銃の持ち方の段。**?stats=on にだけ出す。**
-   *
-   * 試写と本番で銃の位置が違ったときに、どちらの型を使っているかを目で
-   * 突き合わせるため。
-   */
-  pose: string;
-  latency: number;
-  /**
-   * 断られた理由。**入っていればもう戻らない。**
-   *
-   * 落ちただけなら勝手に繋ぎ直すので、ここには入らない。
-   */
-  rejected: string | null;
-  /** 認証が切れて断られた。画面は部屋の一覧へ戻す */
-  expired: boolean;
-  sendRate: number;
-  /** 相手ごとに、位置が届いている回数 (通/秒) */
-  peerRates: { name: string; rate: number }[];
-}
 
 const LINK_RANGE = 5;
 
@@ -474,10 +212,6 @@ function heapMB(): number {
   const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
   return memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0;
 }
-/** 「ターゲットを取得した / 手放した」を出しておく長さ (ms) */
-const TARGET_NOTICE_MS = 4000;
-/** 最後のこれだけで、始まりの指令と同じく割れて退く (Orders.css の animation と揃える) */
-const TARGET_NOTICE_LEAVE_MS = 600;
 /**
  * 叩く型の 2 回目の手が下りるまで (ms)。型の 26 コマ目 (24fps、tools/cqc/pat.py の KEYS)。
  * 型を作り直したらここも合わせる
@@ -491,18 +225,6 @@ const LAG_REPORT_WINDOW_MS = 10_000;
 const LAG_REPORT_EVERY_MS = 5_000;
 
 
-/**
- * 刺突の判定を出すタイミング (クリップ尺に対する割合)。
- *
- * **腕が伸び切る直前。** 頭で出すと刃が届く前に倒れ、遅いと刺さってから間が
- * 開いて倒れる。立ちの刺突 (stab、57 コマ) は 9〜12 コマ目で腕が伸び、12 コマ目で
- * 伸び切って 24 コマ目まで保つ (右肩から手まで 0.35 → 0.61m、soldier.glb で実測)。
- * 10.5 コマ目 = 19%。以前の 35% は伸び切ってから 0.4 秒後で、「刺さってから
- * ちょっと間が開いてやられる」だった (本人 2026-10-08)。しゃがみも同じ型
- */
-const STAB_HIT_PHASE = 0.19;
-/** 伏せた刺突 (prone_stab、41 コマ)。11〜17 コマ目で伸びるので、伸び切る直前の 15 コマ目 */
-const PRONE_STAB_HIT_PHASE = 0.36;
 /** 銃を構える高さは目の線からこれだけ下 (m) */
 const MUZZLE_BELOW_EYE = 0.15;
 /** 銃の胴の下側は銃口からこれだけ下 (m)。ここが遮蔽の上に出ていれば構えられる */
@@ -515,10 +237,6 @@ const AIM_SETTLE_SECONDS = 0.6;
 const MUZZLE_MIN_HEIGHT = 0.15;
 /** 壁で下ろした後、構え直すにはこの倍だけ空いている必要がある */
 const MUZZLE_HYSTERESIS = 1.08;
-/** READY に入るまで押し続ける時間 (秒)。画面のボタンも同じ長さ (ReadyRoom.tsx) */
-export const READY_HOLD = 0.6;
-/** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
-const FALLBACK_STAB_DURATION = 1.9;
 
 /**
  * 弾痕の色。**地形に当たった分だけ。**
@@ -543,13 +261,6 @@ const HIT_FEEDBACK_DURATION = 0.6;
  */
 /** 屋根の下 (頭の上が全く開いていない) で露出に掛ける倍率 */
 const ADAPT_MAX = 1.8;
-/** CAUTION の長さ (秒)。バーの満タン。STEALTH が解けている長さ (domain/match/sides.ts の STEALTH_BREAK_MS) */
-export const CAUTION_SECONDS = STEALTH_BREAK_MS / 1000;
-/**
- * 弾倉を投げてから次を構えられるまで (ms)。振りかぶりの型が無いので、手榴弾の
- * 「振り切ってからピンを抜く」(約 1.3 秒) に当たる間をここで置く
- */
-const MAGAZINE_REARM_MS = 1000;
 /** 時計の音を鳴らし始める残りの秒。10 秒から 1 秒まで 10 回 */
 const CLOCK_TICK_FROM = 10;
 /** エンジンの音を締め切りの何 ms 前から鳴らすか。素材 (engine1.mp3) の長さ 2.9 秒 */
@@ -659,14 +370,6 @@ const SURFACE_TOLERANCE = 0.03;
 
 
 
-/**
- * 手を離れる位置を、投げる向きへどれだけ前に出すか (m)。
- * server の RELEASE_FORWARD と揃える。
- *
- * 体の中心から出すと、真下へ投げたときに自分の足元をすり抜ける。
- * 腕を伸ばした先から出るようにする。
- */
-const GRENADE_RELEASE_FORWARD = 0.45;
 
 /**
  * 着弾の音。**材質ごとに鳴らし分ける。** 専用の音が無い材質 (壁・地面) は
@@ -696,18 +399,6 @@ function surfaceOfHit(object: THREE.Object3D): ReturnType<typeof surfaceOf> {
 /** 壁で体が画面を塞いだときの薄さの上限 (1 - 0.8 = 0.2 まで薄くなる) */
 const FADE_MAX = 0.8;
 
-/**
- * クレイモアが地面に着く位置。置く型に対する割合。
- *
- * **測った値を置く** (目分量だと手が上がりかけた後に現れる)。本人が作った
- * 0.90 秒の型 (2026-10-05) は右手が 2 度床へ下りる — 2〜3 コマ目と 23〜24 コマ目
- * (0.77〜0.80 秒、手の高さ 0.20m)。**後半の方で出す** (本人の指定)。前半で出すと
- * 残りの動きが「置いた物をいじっている」に見える。0.8 = 21.6 コマ目で、
- * 審判の返事 (claymorePlaced) が届いて絵に出るまでの往復ぶんだけ早めてある。
- *
- * Mixamo の 3.6 秒の型では 0.38 だった (右手が一番低い 0.37m の所)。
- */
-const CLAYMORE_PLACE_RATIO = 0.8;
 
 /**
  * 破裂音を鳴らす高さ (m)。人形の胸のあたり。
@@ -849,7 +540,6 @@ export class Game {
    * 判定 (placeSpot) に使う。届くまでは空 — その間は「置ける」と見る (弾くのは審判)
    */
   private placeSolid: StageBox[] = [];
-  private readonly placeAt: PlaceSpot = { x: 0, y: 0, z: 0, ok: false };
   private readonly decoys: Decoys;
   /** 置かれた猫 (DOLL)。置いた本人には効く範囲の円も出る */
   private readonly dolls: Dolls;
@@ -858,6 +548,10 @@ export class Game {
   private readonly blast: BlastFx;
   /** スタンナイフの放電 (fx/stunSparks.ts)。自分と他人の刃先に出す */
   private readonly stunSparks: StunSparks;
+  /** 自機の投げる・置く (self/throwing.ts) */
+  private readonly throwing: Throwing;
+  /** 自機の近接 (ナイフと CQC、self/melee.ts) */
+  private readonly melee: Melee;
   /** 気配 (AWARENESS)。**何が在るかは届かない**ので、霧を置くだけ */
   private readonly sensed: Sensed;
   private readonly casings: Casings;
@@ -878,13 +572,6 @@ export class Game {
    */
   private wheelLeft = 0;
 
-  private grenadeAiming = false;
-  /** 構え始めと同じフレームに引かれた引き金。次のフレームで放す */
-  private pendingThrow = false;
-  /** クレイモア側の同じもの */
-  private pendingSetup = false;
-  /** 弾倉側の同じもの */
-  private pendingDecoy = false;
   /**
    * 投げる引き金を**このフレームで引いたか**。押しっぱなしで連投しない。
    *
@@ -898,8 +585,6 @@ export class Game {
    */
   private triggerEdge = false;
   private wasFiring = false;
-  /** 手を離れるまでの残り (秒)。0 なら投げていない */
-  private grenadeRelease = 0;
   /** 直前のフレームの経過時間 (秒)。tick の外で時計を進めるのに使う */
   /** 空撃ちの音を次に鳴らせるまで (秒) */
   private emptyCooldown = 0;
@@ -910,12 +595,7 @@ export class Game {
    * (弾切れ・リロード中・構えていない) で押し始めたときに、条件が解けた瞬間へ
    * 1 発ぶん持ち越さないため。
    */
-  private readonly grenadeOrigin = new THREE.Vector3();
-  /** 振りかぶった右手。予測線の頭をここから出す */
-  private readonly throwHand = new THREE.Vector3();
   /** 手持ちの投げ物。復帰で戻る */
-  /** 投げる構えを取っているか。離した瞬間に投げる */
-  private throwAiming = false;
   /**
    * 通信路。既定はタブ間 (BroadcastChannel)、URL に ?server= を付けると WebSocket。
    * ゲーム側はどちらで繋がっているかを知らない。
@@ -995,15 +675,10 @@ export class Game {
    */
   private readonly self = newSelfReplica();
   /**
-   * 名簿を待っているか。**試合が始まったら立ち、届いたら降りる。**
-   *
-   * 立っている間は 1 秒ごとに頼み直す (askRoster)。
+   * 名簿を頼み直した時刻 (Date.now)。**頼みすぎない**ための間隔。
+   * 頼み続けるかはレプリカ (replica.rosterWanted) が決める
    */
-  private rosterWanted = false;
-  /** 最後に頼んだ時刻 (Date.now)。**頼みすぎない**ための間隔 */
   private rosterAskedAt = 0;
-  /** 直前に見た段階。**変わった瞬間**を捕まえるのに要る */
-  private phaseSeen: MatchPhase | null = null;
 
   /** 破棄済みか。非同期の初期化が終わったときに、まだ生きているかを確かめる */
   private disposed = false;
@@ -1021,40 +696,18 @@ export class Game {
    * 銃を置いてくるわけではないので、残りはそのまま残る。
    */
   /**
-   * 湧き地点で組んだ装備。
-   *
-   * 銃を並べて順に持ち替えるのではなく、**枠に何を入れるかを選ぶ**。
-   * 狙撃銃を主に選んだなら、詰められたときに突撃銃は無い — その代わり副武器がある。
-   * 選んだこと自体が手になる。
-   *
-   * 替えられるのは湧くときだけ。試合中に持ち物を組み替えられると、
-   * 状況ごとに最適な物へ乗り換えるだけになって、選ぶ意味が消える。
+   * 装備の選び (application/loadout/choice.ts)。次に湧く時の装備 (pending)、いま持っている装備
+   * (held)、持ち込める物 (armory)。**選ぶ・丸める・確定するはあちらが決める**
    */
-  /**
-   * 湧き地点で組んだ装備。
-   *
-   * 副武器は**部屋が外すことがある** (ROOMS の secondary)。null を持てないと、
-   * サーバーは外しているのに手元にだけ拳銃が残る。
-   */
-  private loadout: {
-    /** 主武器。**銃を外した部屋では null** (domain/match/room.ts の primaries) */
-    primary: WeaponId | null
-    secondary: WeaponId | null
-    support: SupportId
-    stealth?: boolean
-  } = {
-    primary: "rifle",
-    secondary: "m9",
-    support: "grenade",
-  };
+  private choice: LoadoutChoice = newLoadoutChoice(null, null);
+  /** 湧いた時に確定した装備 */
+  private get loadout(): Loadout {
+    return this.choice.held;
+  }
   /** 次に湧いたときの装備。試合中に変えても、いま持っている物は変わらない */
-  private pendingLoadout = {
-    primary: "rifle" as WeaponId | null,
-    secondary: "m9" as WeaponId | null,
-    support: "grenade" as SupportId,
-    /** STEALTH を持つか。**TSNE の攻める側だけ** (applyArmory) */
-    stealth: false,
-  };
+  private get pendingLoadout(): Loadout {
+    return this.choice.pending;
+  }
   /** いまどちらの枠を持っているか */
 
   /**
@@ -1091,11 +744,6 @@ export class Game {
   /** リロードの音を鳴らし始める位置 (割合、調整用) */
   /** 連射中の何発目か。反動パターンを引く添字 */
   /** 姿勢由来の散布 (度)。移動と滞空で増え、落ち着くと戻る */
-  /** 刺突の残り時間。0 より大きい間は発砲できない */
-  private stabTimer = 0;
-  /** 判定を出したか。1 回の振りで 1 回だけ */
-  private stabResolved = true;
-  private readonly meleeForward = new THREE.Vector3();
   /** 今のローリングで既に弾いた相手。1 回の転がりで同じ相手を何度も弾かない */
   private readonly rolledInto = new Set<string>();
   private wasRolling = false;
@@ -1109,6 +757,12 @@ export class Game {
    */
   private lastHitTranq = false;
   private hitFeedbackTimer = 0;
+
+  /** 当てた部位を HUD に出す (HIT_FEEDBACK_DURATION の間) */
+  private showHit(zone: string): void {
+    this.lastHitZone = zone;
+    this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
+  }
   /**
     * 状態を送るタイマーの握り。描画ループとは独立して回る。
     *
@@ -1365,13 +1019,21 @@ export class Game {
    * 一覧から消すだけでは足りない — 送ってくる側は止まらないので、
    * サーバーも同じ表で弾く (domain/player/equip.ts)。ここは見せ方の話。
    */
-  private primaries: readonly WeaponId[];
+  private get primaries(): readonly WeaponId[] {
+    return this.choice.armory.primaries;
+  }
   /** 副武器。**部屋が外していれば null** (ROOMS の secondary) */
-  private secondary: WeaponId | null;
+  private get secondary(): WeaponId | null {
+    return this.choice.armory.secondary;
+  }
   /** 選べる副武器の一覧 (domain/match/room.ts の secondariesOf) */
-  private secondaries: readonly WeaponId[] = CHOICES.secondary;
+  private get secondaries(): readonly WeaponId[] {
+    return this.choice.armory.secondaries;
+  }
   /** 選べる support (domain/match/room.ts の supportsOf) */
-  private supports: readonly SupportId[] = SUPPORTS;
+  private get supports(): readonly SupportId[] {
+    return this.choice.armory.supports;
+  }
   /** 入った部屋。持ち込める物を側が変わるたびに引き直す */
   private readonly roomName: RoomName | null;
 
@@ -1417,34 +1079,11 @@ export class Game {
       stage ?? (isRoomName(room) ? ROOMS[room].stages.stages[0] : 'mall')
     ].name;
     this.roomName = isRoomName(room) ? room : null;
-    this.primaries = isRoomName(room) ? primariesOf(room) : CHOICES.primary;
-    this.secondary = isRoomName(room) ? secondaryOf(room) : "m9";
-    this.secondaries = isRoomName(room) ? secondariesOf(room) : CHOICES.secondary;
-    // 手元の装備も部屋に合わせる。**サーバーは外しているのにこちらだけ持つ**を防ぐ
-    this.pendingLoadout.secondary = this.secondary;
-    this.loadout.secondary = this.secondary;
     /*
-     * 持ち込めない銃を選んだ状態で開かない。**サーバーも同じ表で丸める**
-     * (domain/player/equip.ts の fitLoadout)。
-     *
-     * **一覧が空なら銃を持たない部屋。** ナイフだけになる。
+     * **前回選んだ物から始める。初めてなら一覧の先頭** (本人 2026-10-14)。部屋で持ち込めない物は
+     * 先頭へ丸める (サーバーも同じ表で丸める、domain/player/equip.ts)。一覧が空なら銃を持たない部屋
      */
-    /*
-     * **前回選んだ物から始める。初めてなら一覧の先頭 (P90)** (本人 2026-10-14)。
-     * 部屋で持ち込めない物は先頭へ丸める。繋ぎ直した時はサーバーが覚えている物が
-     * 後から届いて上書きする (そちらのほうが新しい)
-     */
-    const last = loadLastLoadout();
-    const lastPrimary = last?.primary as WeaponId | null | undefined;
-    this.pendingLoadout.primary =
-      lastPrimary && this.primaries.includes(lastPrimary) ? lastPrimary : (this.primaries[0] ?? null);
-    const lastSecondary = last?.secondary as WeaponId | null | undefined;
-    if (this.secondary !== null && lastSecondary && this.secondaries.includes(lastSecondary)) {
-      this.pendingLoadout.secondary = lastSecondary;
-    }
-    const lastSupport = last?.support as SupportId | undefined;
-    if (lastSupport && this.supports.includes(lastSupport)) this.pendingLoadout.support = lastSupport;
-    this.loadout = { ...this.pendingLoadout };
+    this.choice = newLoadoutChoice(this.roomName, loadLastLoadout());
     this.inv.refill(this.loadout);
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room, privateRoom);
@@ -1628,6 +1267,42 @@ export class Game {
     this.follow.snapTo(this.player, this.cameraWorld);
     // 環境音はステージが決める。筏は波、屋内は街の音 (domain/stage の ambience)
     this.audio = new GameAudio(this.follow.camera, this.scene, STAGES[this.stageName].ambience);
+    // 自機の投げる・置く (self/throwing.ts)
+    this.throwing = new Throwing({
+      player: this.player,
+      input: this.input,
+      inv: this.inv,
+      follow: this.follow,
+      net: this.net,
+      thrown: this.thrown,
+      grenades: this.grenades,
+      placePreview: this.placePreview,
+      knobs: this.knobs,
+      stage: () => this.stage,
+      placeSolid: () => this.placeSolid,
+      selfTeam: () => this.selfTeam,
+      skills: () => this.skills,
+      canAct: () => canAct(this.life),
+      cocking: () => this.cocking,
+      triggerEdge: () => this.triggerEdge,
+    });
+    // 自機の近接 (ナイフと CQC)。借りる物は問いと頼みの形で渡す (self/melee.ts)
+    this.melee = new Melee({
+      player: this.player,
+      remotes: this.remotes,
+      net: this.net,
+      audio: this.audio,
+      follow: this.follow,
+      input: this.input,
+      inv: this.inv,
+      stunSparks: this.stunSparks,
+      skills: () => this.skills,
+      hostileTo: (id, side) => this.hostileTo(id, side),
+      canUseHands: () => canAct(this.life) && !this.loadoutBlocking,
+      reloading: () => this.reloadTimer > 0,
+      releasing: () => this.throwing.releasing,
+      showHit: (zone) => this.showHit(zone),
+    });
 
     this.calibration = createCalibration({
       knobs: this.knobs,
@@ -1884,7 +1559,7 @@ export class Game {
     //
     // **手を離したあとも塞ぐ。** 押している間だけ止めていたら、離した瞬間から
     // 動けるのに足はかがんだままで、置く型が流れきるまで滑って見えた。
-    if (this.setupAiming || this.player.placing) this.moveDir.set(0, 0, 0);
+    if (this.throwing.setupAiming || this.player.placing) this.moveDir.set(0, 0, 0);
 
     // ブラウザはユーザー操作があるまで音を出せない。ロック取得やボタン押下がそれにあたる。
     if (this.input.engaged) this.audio.resume();
@@ -1936,7 +1611,7 @@ export class Game {
     this.syncHeld();
     this.releaseUnwornBox();
     this.inv.update(dt, this.input.firing);
-    this.updateTrigger();
+    this.melee.updateTrigger();
     this.updateZoom();
     this.applyWeaponView();
 
@@ -1974,7 +1649,7 @@ export class Game {
     // 先に見た物が倒したフラグを後の物が読むことになる
     this.triggerEdge = this.input.firing && !this.wasFiring;
     this.wasFiring = this.input.firing;
-    this.updateThrowAim();
+    this.throwing.updateThrowAim();
     /*
      * **地形が届くまで人を進めない。**
      *
@@ -2012,7 +1687,7 @@ export class Game {
     this.player.setFade(1 - FADE_MAX * this.follow.crowding);
     this.updateRollContact();
     this.updateBoxContact();
-    this.updateStab(dt);
+    this.melee.updateStab(dt);
     this.askRosterIfWanted();
     const posture = {
       speed: this.player.speed,
@@ -2074,9 +1749,9 @@ export class Game {
       );
       this.addPing("shot", bounce.position, gain);
     });
-    this.updateGrenadeAim();
-    this.updateClaymoreRelease(dt);
-    this.updateGrenadeRelease(dt);
+    this.throwing.updateGrenadeAim();
+    this.throwing.updateClaymoreRelease(dt);
+    this.throwing.updateGrenadeRelease(dt);
     this.thrown.update(dt, this.stage.collidables, this.stage.water, (impact) => {
       // 水に落ちたら輪だけ。弾倉の音が水面から鳴ると、そこが床に聞こえる
       if (this.splashAt(impact.position, THROWN_SPLASH)) return;
@@ -2492,6 +2167,14 @@ export class Game {
         }
         break;
 
+      case "life":
+        this.enteredLife(effect.to);
+        break;
+
+      case "brief":
+        this.briefFor(effect);
+        break;
+
       case "team":
         // 誰が味方かは自分の所属が分かって初めて決まる
         this.remotes.setSelfTeam(effect.team);
@@ -2541,591 +2224,603 @@ export class Game {
 
   private receive(message: ServerMessage): void {
     /*
-     * 名簿の取りこぼしに気づく。**試合が始まったら、届くまで頼み続ける。**
-     *
-     * 試合の頭で陣営が切り直される。名簿を落とすと前の試合の色のまま描き、
-     * **敵味方が逆になる** — 撃てる相手かはクライアントが陣営で判断している
-     * ので、味方を撃ちに行って削れない、が起きる。
-     *
-     * サーバーからの自発的な送信は残っている (普段は 1 往復ぶん速い)。ここは
-     * それが落ちたときのための道で、**来なければもう一度頼む**。頼みのほうが
-     * 落ちることもあるので、「言えば来る」ではなく「来るまで言う」にする。
+     * **レプリカを先に進める。** 段階も所属もキルログも自分の状態も、持っているのはあちら。
+     * 名簿の頼み直し・ルールの説明を出すか・自分の状態が変わったかもあちらが決める
+     * (application/replica/match.ts)。ここは返ってきたことをするだけ
      */
-    if (message.type === "match" && message.phase === "countdown") {
-      if (this.phaseSeen !== "countdown") this.rosterWanted = true;
-    }
-    // 支度に入った所でルールの説明を開く (openBriefing)
-    if (message.type === "match" && message.phase === "ready" && this.phaseSeen !== "ready") {
-      this.briefFor(message.mode, message.blue, message.stage);
-    }
-    if (message.type === "match") this.phaseSeen = message.phase;
-    if (message.type === "roster") this.rosterWanted = false;
-
-    // **レプリカを先に進める。** 段階も所属もキルログも、持っているのはあちら
     for (const effect of applyMatch(this.replica, message, this.net.id, Date.now())) {
       this.perform(effect);
     }
     for (const effect of applyRoster(this.roster, message, this.net.id)) {
       this.performRoster(effect);
     }
-    switch (message.type) {
-      case "state":
-        this.remotes.receive(message.snapshot);
-        break;
+    const receiver = this.receivers[message.type] as ((message: ServerMessage) => void) | undefined;
+    receiver?.(message);
+  }
 
-      case "shot":
-        // 弾道と発砲音は必ず出す。撃たれたことが見えないと遮蔽へ動く判断ができない。
-        // 当たったかどうかはここには載っていない (health で別に届く)。
-        this.remoteFrom.fromArray(message.from);
-        this.remoteTo.fromArray(message.to);
-        /*
-         * **他人の弾も痕を残す。**
-         *
-         * 長らく痕を出していなかった (法線を渡していなかった)。自分が外した
-         * 痕だけが残る形で、**索敵の材料になるのは他人の痕のほう**なので、
-         * 残す意味の半分が消えていた。
-         *
-         * 面の向きは弾の向きで代用する。`to` は撃った本人が出した着弾点なので
-         * 位置は分かるが、どの面に当たったかは届いていない。正面から当たれば
-         * 正しく、**浅い角度だと壁へ食い込む** — そこが気になったら地形の箱と
-         * 突き合わせて本当の法線を出す (この時点では割に合わない)。
-         */
-        this.impactFacing.subVectors(this.remoteFrom, this.remoteTo).normalize();
-        this.shots.fire(
-          this.remoteFrom,
-          this.remoteTo,
-          this.impactFacing,
-          IMPACT_WORLD,
-          /*
-           * 面は**着弾点から地形を引き直す。** 届くのは着弾点だけで、何に
-           * 当たったかは載っていない (載せると送る量が増える)。地形は全員が
-           * 同じ物を持っているので、撃った側と同じ答えが出る (playImpactAt)。
-           */
-          surfaceAt(
-            this.remoteTo,
-            IMPACT_PROBE,
-            this.stage.obstacles,
-            this.remoteTo.y,
-            IMPACT_PROBE,
-          ),
-        );
-        /*
-         * 他人の弾の着弾音。**当たった面はこちらで引き直す。**
-         *
-         * 届くのは着弾点だけで、何に当たったかは載っていない (載せると送る量が
-         * 増える)。位置から地形を引けば同じ答えが出る — 地形は全員が同じ物を
-         * 持っているので、撃った側と食い違わない。
-         */
-        this.playImpactAt(this.remoteTo);
-        {
-          // 撃った本人にボルト操作を流し、音もその銃のものにする。
-          // 全部ライフルの音だと、撃たれた側は相手の武器を読み違える
-          const kind = this.remotes.shot(message.id);
-          // 遠くの人の排莢も出す。通信はせず、撃ったことだけを合図に各自で出す
-          const yaw = this.remotes.ejectFrom(message.id, this.ejectPos);
-          if (yaw !== null) this.casings.eject(this.ejectPos, yaw);
-          const sound = weaponOf(kind).shotSound;
-          // 銃声も輪に出す。最も遠くまで届くので、撃ち合いが始まった方角が分かる。
-          this.addPing("shot", this.remoteFrom, this.audio.play(sound, this.remoteFrom));
-        }
-        break;
+  /**
+   * 報せの種類ごとの受け手。**1 つの報せに 1 つの小さな受け手** (2026-11-03、613 行の switch を割った)。
+   * 載っていない種類は、レプリカが受けるだけで体には何もしない
+   */
+  private readonly receivers: { [K in ServerMessage["type"]]?: (message: Extract<ServerMessage, { type: K }>) => void } = {
+    state: (message) => this.receiveState(message),
+    shot: (message) => this.receiveShot(message),
+    health: (message) => this.receiveHealth(message),
+    stamina: (message) => this.receiveStamina(message),
+    self: (message) => this.receiveSelf(message),
+    resume: (message) => this.receiveResume(message),
+    skills: (message) => this.receiveSkills(message),
+    respawn: (message) => this.receiveRespawn(message),
+    match: (message) => this.receiveMatch(message),
+    exposed: (message) => this.receiveExposed(message),
+    sensed: (message) => this.receiveSensed(message),
+    sensedGone: (message) => this.receiveSensedGone(message),
+    resupplied: () => this.receiveResupplied(),
+    zap: (message) => this.receiveZap(message),
+    throw: (message) => this.receiveThrow(message),
+    knock: (message) => this.receiveKnock(message),
+    grenade: (message) => this.receiveGrenade(message),
+    explosion: (message) => this.receiveExplosion(message),
+    dropped: (message) => this.receiveDropped(message),
+    droppedGone: (message) => this.receiveDroppedGone(message),
+    picked: (message) => this.receivePicked(message),
+    claymorePlaced: (message) => this.receiveClaymorePlaced(message),
+    decoyPlaced: (message) => this.receiveDecoyPlaced(message),
+    decoyGone: (message) => this.receiveDecoyGone(message),
+    dollPlaced: (message) => this.receiveDollPlaced(message),
+    dollSprung: (message) => this.receiveDollSprung(message),
+    dollGone: (message) => this.receiveDollGone(message),
+    trapReleased: (message) => this.receiveTrapReleased(message),
+    decoyBumped: (message) => this.receiveDecoyBumped(message),
+    cboxBumped: (message) => this.receiveCboxBumped(message),
+    locatorThrown: (message) => this.receiveLocatorThrown(message),
+    locatorPlaced: (message) => this.receiveLocatorPlaced(message),
+    locatorGone: (message) => this.receiveLocatorGone(message),
+    claymoreGone: (message) => this.receiveClaymoreGone(message),
+    thrown: (message) => this.receiveThrown(message),
+    targetTaken: (message) => this.receiveTargetTaken(message),
+    targetDropped: (message) => this.receiveTargetDropped(message),
+    targetDelivered: (message) => this.receiveTargetDelivered(message),
+    targetAt: (message) => this.receiveTargetAt(message),
+    stun: (message) => this.receiveStun(message),
+    released: () => this.receiveReleased(),
+    knockdown: (message) => this.receiveKnockdown(message),
+    join: () => this.receiveJoin(),
+    noise: (message) => this.receiveNoise(message),
+    ping: (message) => this.receivePing(message),
+    hidden: (message) => this.receiveHidden(message),
+  };
 
-      case "health":
-        this.applyHealth(message);
-        break;
+  private receiveState(message: Extract<ServerMessage, { type: "state" }>): void {
+    this.remotes.receive(message.snapshot);
+  }
 
+  private receiveShot(message: Extract<ServerMessage, { type: "shot" }>): void {
+    // 弾道と発砲音は必ず出す。撃たれたことが見えないと遮蔽へ動く判断ができない。
+    // 当たったかどうかはここには載っていない (health で別に届く)。
+    this.remoteFrom.fromArray(message.from);
+    this.remoteTo.fromArray(message.to);
+    /*
+     * **他人の弾も痕を残す。**
+     *
+     * 長らく痕を出していなかった (法線を渡していなかった)。自分が外した
+     * 痕だけが残る形で、**索敵の材料になるのは他人の痕のほう**なので、
+     * 残す意味の半分が消えていた。
+     *
+     * 面の向きは弾の向きで代用する。`to` は撃った本人が出した着弾点なので
+     * 位置は分かるが、どの面に当たったかは届いていない。正面から当たれば
+     * 正しく、**浅い角度だと壁へ食い込む** — そこが気になったら地形の箱と
+     * 突き合わせて本当の法線を出す (この時点では割に合わない)。
+     */
+    this.impactFacing.subVectors(this.remoteFrom, this.remoteTo).normalize();
+    this.shots.fire(
+      this.remoteFrom,
+      this.remoteTo,
+      this.impactFacing,
+      IMPACT_WORLD,
       /*
-       * スタミナ。**麻酔を受けた本人にだけ届く。**
-       *
-       * 眠るかどうかを決めるのはサーバー。こちらは知らせを受けて倒れるだけで、
-       * **自分で起きられない** — 起きられるなら麻酔は効かない。
+       * 面は**着弾点から地形を引き直す。** 届くのは着弾点だけで、何に
+       * 当たったかは載っていない (載せると送る量が増える)。地形は全員が
+       * 同じ物を持っているので、撃った側と同じ答えが出る (playImpactAt)。
        */
-      case "stamina": {
-        this.stamina = message.stamina;
-        // 起きる時刻はサーバーの時計。手元の時計へ直してから比べる (application/replica/clock.ts)
-        const left = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
-        // もう眠っているなら残りだけ縮める (もがいて早まった)。倒れる動きをやり直さない
-        if (left > 0 && this.player.sleeping) this.player.shortenSleep(left);
-        else if (left > 0) this.player.sleep(left);
-        else this.player.wake();
-        break;
-      }
-
-
-      /*
-       * 自分の本当の値。**3 秒ごとに届く。**
-       *
-       * 撃った瞬間に減らすのも、体力 0 で倒れるのもこちらがやっている
-       * (押した瞬間に返らないと手触りが壊れる)。ここで受けるのは
-       * 「本当はこう」という値だけで、**ずれていたら合わせる**ために使う。
-       * 普段は一致しているので何も起きない。
-       */
-      case "self":
-        this.applySelf(message);
-        break;
-
-
-      // 繋ぎ直したときに届く、離脱前の続き。
-      //
-      // 湧き地点へは戻さない。**その命の続き**なので、居た場所に居た体力で戻る。
-      // 弾数もサーバーがレプリカを持っているので、そちらを正とする
-      case "resume": {
-        this.player.resumeAt(message.x, message.y, message.z, message.health);
-        // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
-        const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
-        if (asleep > 0) this.player.sleep(asleep, true);
-        // 人形に釘付けの途中で読み直した。**寄る・しゃがみ込む動きは飛ばして**撫でている所から続ける
-        else if (message.trapped) this.player.trap(undefined, true);
-        // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
-        else if (message.hanging) this.player.resumeHang(message.yaw);
-        // スタンナイフの充電も続きから (審判と同じ時計)。読み直しで満タンにはならない
-        this.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
-        // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
-        // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
-        this.loadout.support = message.support;
-        this.loadout.primary = message.primary;
-        /*
-         * **持ち物を組み直す。**
-         *
-         * 画面を読み直すと Inventory は既定 (AK47) で作られる。装備を戻すだけ
-         * では手の中は既定のままで、**P90 を選んでいたのに AK を持って戻る**。
-         * 戻した装備から組み直してから、残弾を当てる (順番が要る)。
-         */
-        this.inv.refill(this.loadout);
-        // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
-        // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
-        this.inv.restore(message.magazine, message.reserve, message.grenades);
-        this.pendingLoadout.support = message.support;
-        this.pendingLoadout.primary = message.primary;
-        this.pendingLoadout.secondary = message.secondary;
-        this.onLoadout?.(this.pendingLoadout);
-        // 銃を持たない部屋では持ち替えない。手にあるのはナイフ
-        if (message.primary) void this.player.equip(message.primary);
-        this.follow.snapTo(this.player, this.cameraWorld);
-        break;
-      }
-
-      /*
-       * スキルが決まった。**送った物ではなく返ってきた物を持つ。**
-       *
-       * 弾かれたときも今の値が返るので、こちらの画面だけ選び直したつもりで
-       * 残らない。途中参加した人はそもそも送っていない (窓が閉じている) ので、
-       * これが唯一の入り口になる。
-       */
-      case "skills":
-        this.skills = message.skills as Skills;
-        // 速さは体が持っている。**同じ値を 2 か所に置かない** — 渡し忘れると
-        // 「散布だけ締まって走りは素のまま」という半端な効き方になる
-        this.player.setSkills(this.skills);
-        break;
-
-      // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
-      case "respawn":
-        if (message.id !== this.net.id) this.remotes.warp(message.id);
-        break;
-
-      // 光っている人 (個人戦の 1 位) を体に出す。レプリカは持っているが、
-      // 光らせるのは絵の仕事
-      case "match":
-        this.remotes.setLeaking(message.leader ?? null);
-        // ターゲット (TSNE)。運んでいるのが自分なら持ち物の一覧に並ぶ (選んで G / △ で落とす)
-        this.targetView = message.target ?? null;
-        this.inv.setTargetOwned(message.target?.carrier === this.net.id);
-        // 攻守の入れ替えとステルスの状態 (TSNE)。側が変われば持ち込める物も変わる
-        if (message.attack !== this.attackTeam) {
-          this.attackTeam = message.attack ?? null;
-          this.applyArmory();
-        }
-        // STEALTH が暴かれた瞬間 (効いていた → 解けた)。試合中だけ (CAUTION の始まり)
-        if (this.stealthOn && message.stealth === false && message.phase === "playing") {
-          this.audio.playUi("detectAlert");
-        }
-        // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)。**自分の STEALTH が戻った人にだけ** —
-        // 攻める側で、着ている (2026-10-17 本人「set 音は自分だけに聞こえるのでいい」)
-        if (
-          !this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen &&
-          message.attack === this.selfTeam && this.inv.wearingStealth
-        ) {
-          this.audio.playUi("stealthSet");
-        }
-        // 戻った音は「解けていた」を見た後だけ。入室直後の最初の通 (false → true に見える) では鳴らさない
-        this.cautionSeen = message.stealth === false && message.phase === "playing";
-        this.stealthOn = message.stealth === true;
-        break;
-
-      /*
-       * 抜いた相手が光り始めた (ENEMY EXPOSURE)。
-       *
-       * **届くのは抜いた側だけ。** サーバーが宛先を決めているので、
-       * ここで陣営を見る必要は無い。同じ通で遮蔽も外れるので、
-       * 壁の裏に居た相手の位置がこの後から流れてくる。
-       */
-      case "exposed":
-        this.remotes.expose(message.id, message.seconds);
-        break;
-
-      // 気配 (AWARENESS)。誰に届くかはサーバーが決めている。こちらは霧を置くだけ
-      case "sensed":
-        this.sensed.show(message.key, message.at);
-        break;
-
-      case "sensedGone":
-        this.sensed.hide(message.key);
-        break;
-
-      // 補給できた。数は直前の self で入っている。ここは印だけ
-      case "resupplied":
-        this.lastHitZone = "RESUPPLY";
-        this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
-        this.audio.play("resupply", this.player.position);
-        break;
-
-      // 他の人がスタンナイフを振った。**手元で放電して鳴る**
-      case "zap": {
-        const id = message.id;
-        if (id === this.net.id) break;
-        const at = this.remotes.positionOf(id);
-        if (at) this.audio.play("zap", at);
-        this.stunSparks.discharge((out) => this.remotes.handOf(id, out));
-        break;
-      }
-
-      case "throw":
-        // 初速だけが届く。同じ物理を同じ地形に対して解くので、
-        // 跳ねる場所も落ちる場所もこちらで求まる。
-        // 飛んでいる間は見えず、止まったところで現物が現れる。
-        this.remoteFrom.fromArray(message.from);
-        this.remoteTo.fromArray(message.dir);
-        this.thrown.throwFrom(this.remoteFrom, this.remoteTo, true);
-        break;
-
-      case "knock":
-        if (message.hit !== this.net.id) break;
-        this.player.knockBack(message.x, message.z);
-        break;
-
-      case "grenade":
-        // 番号 0 は捨てる。番号を振るのはサーバーなので、0 のまま届いたものは
-        // 中継されただけの申告であって、飛ばしてもらえていない。
-        // (手榴弾を知らない古いサーバーに繋ぐと、既定の中継でこれが起きる。
-        //  原点に極小の手榴弾が現れ、いつまでも爆発しない)
-        if (message.id <= 0) {
-          console.warn("[手榴弾] サーバーが飛ばしていない。サーバーが古い可能性");
-          break;
-        }
-        // 位置も速度もサーバーが決めたものをそのまま使う。自分が投げたものも
-        // 例外にしない — 手元で先に飛ばして後から合わせると、
-        // 見えている場所と爆ぜる場所がずれる
-        this.grenades.spawn(message.id, message.from, message.velocity);
-        break;
-
-      case "explosion": {
-        this.explode(message.id, message.at);
-        break;
-      }
-
-      // **置いたのが自分でも他人でも鳴らす。** 落ちた場所で鳴るので、
-      // 見えていなくても「そこで誰かが捨てた」ことが耳に入る
-      case "dropped": {
-        this.drops.place(message.id, message.weapon, message.at, message.yaw);
-        const at = this.drops.positionOf(message.id);
-        if (at) this.audio.play("drop", at);
-        break;
-      }
-
-      /*
-       * 拾われた / 消えた。**音と後片付けはここ 1 か所。**
-       *
-       * 拾った本人には picked も届くが、あちらでは消さない。消してしまうと
-       * この通が来たときに置き場所が分からず、**拾った本人にだけ音が鳴らない**。
-       * (実際そうなっていた。他の人には聞こえていたので気づきにくい)
-       */
-      case "droppedGone": {
-        const at = this.drops.positionOf(message.id);
-        if (at) this.audio.play("pick", at);
-        this.drops.remove(message.id);
-        break;
-      }
-
-      // 拾えた。**中身はここで初めて分かる** (見ただけでは残弾は読めない)
-      case "picked": {
-        const found =
-          message.count !== undefined && message.count > 0
-            ? { id: message.weapon as never, count: message.count }
-            : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
-        this.inv.pick(found);
-        // **消すのは droppedGone の側。** ここで消すと、あちらが鳴らす音の
-        // 置き場所が無くなる (自分にだけ聞こえない、になる)
-        break;
-      }
-
-      /*
-       * 置かれたクレイモア。**自分の物なら、ここで初めて残り数を減らす。**
-       *
-       * 置けるかを決めているのはサーバー (壁の中や縁の外へは置けない)。送った
-       * 時点で減らしていたので、断られると**置けていないのに減る**ことがあった。
-       *
-       * 同じ物が二度来る (見え隠れするたびに配られる) ので、初めて見た物だけ数える。
-       */
-      case "claymorePlaced": {
-        const mine = message.owner === this.net.id && !this.claymores.has(message.id);
-        // sensor に掛かる扇は置いた本人と味方に出す (猫の円と同じ)。敵には見えない
-        const friendly =
-          message.owner === this.net.id || (this.teamsMode && message.team === this.selfTeam);
-        this.claymores.place(message.id, message.at, message.yaw, friendly ? message.team : null);
-        if (mine) this.inv.spendOf("claymore");
-        break;
-      }
-
-      /*
-       * decoy が置かれた。**敵にも届く** — 見えないと撃たせられない。
-       *
-       * 膨らむ残り (readyIn) を受け取るのは、途中から見えるようになった人にも
-       * 同じ形を出すため。サーバーの時刻で終わりを渡すと、時計のずれが
-       * そのまま大きさのずれになる。
-       */
-      case "decoyPlaced": {
-        const mine = message.owner === this.net.id && !this.decoys.has(message.id);
-        this.decoys.place(message.id, message.at, message.yaw, message.skin, message.readyIn);
-        if (mine) this.inv.spendOf("decoy");
-        // 膨らむ音は**近くを通った人だけ**に届く (14m)。置いたこと自体は
-        // 漏らさない — 膨らむ 2 秒は罠が一番弱い所なので
-        if (message.readyIn > 0) {
-          this.popAt.fromArray(message.at);
-          this.audio.play("balloonInflate", this.popAt);
-        }
-        break;
-      }
-
-      /*
-       * 割れた / 消えた。
-       *
-       * **破裂音は普通の位置音。** 近ければ聞こえ、遠ければ聞こえない —
-       * 特別扱いしないだけで、両側に過不足のない情報が渡る。遠くから
-       * 安全に撃った人ほど、自分が晒されたことに気づけない。
-       */
-      case "decoyGone": {
-        this.decoys.remove(message.id);
-        if (!message.popped) break;
-        this.popAt.fromArray(message.at);
-        this.popAt.y += DECOY_POP_HEIGHT;
-        const gain = this.audio.play("balloon", this.popAt, 1);
-        this.addPing("shot", this.popAt, gain);
-        break;
-      }
-
-      /*
-       * 人形が押しのけられた。**見えている全員に届く。**
-       *
-       * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
-       * 撃たせる道具であると同時に、**見張る道具**でもある。
-       */
-      /*
-       * 猫 (DOLL)。置かれた (敵にも届く — 撃ち抜けるように)・誰かが掛かった・消えた・撃たれて解けた。
-       * **掛かるも解けるもサーバーが決める。** 自分が掛かったら体を止め、解けたら型を逆に流して戻る。
-       * 他の人の体は、その人から届く姿 (trapped / trapped_out) で動く
-       */
-      case "dollPlaced": {
-        const mine = message.owner === this.net.id;
-        if (mine && !this.dolls.has(message.id)) this.inv.spendOf("doll");
-        // 円は置いた本人と味方に出す (陣営で分かれない部屋では本人だけ)。敵には見えない
-        const friendly = mine || (this.teamsMode && message.team === this.selfTeam);
-        this.dolls.place(message.id, message.at, message.yaw, friendly, message.team);
-        break;
-      }
-      case "dollSprung": {
-        const doll = this.dolls.positionOf(message.id);
-        // 鳴き声は猫の所から。**近くの人にも届く** (誰かがそこで足止めされている)
-        if (doll) this.audio.play("catMeow", doll);
-        if (message.victims.includes(this.net.id)) {
-          const p = this.player.position;
-          // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
-          // 猫のほうへ歩いて寄ってからしゃがみ込む (猫の足元を渡す)
-          this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined, false, doll ?? undefined);
-        }
-        // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
-        for (const id of message.victims) {
-          setTimeout(() => {
-            const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
-            if (at) this.audio.play("ohh", at);
-          }, DOLL_OHH_MS);
-        }
-        break;
-      }
-      case "dollGone":
-        this.dolls.remove(message.id);
-        if (message.freed.includes(this.net.id)) this.player.untrap();
-        break;
-      case "trapReleased":
-        if (message.id === this.net.id) this.player.untrap();
-        break;
-
-      case "decoyBumped":
-        this.decoys.bump(message.id, message.dirX, message.dirZ);
-        break;
-
-      // 空のダンボールに誰かが触れた。一度だけガタッと揺れる
-      case "cboxBumped":
-        this.emptyBoxes.bump(message.index, message.dirX, message.dirZ);
-        break;
-
-      /*
-       * E LOCATOR が飛び始めた。**全員に届く。**
-       *
-       * 弧を描いて飛ぶ物なので、投げた場所が割れるのは避けられない。避けられる
-       * からこそ「どこから投げたか」を隠す動きに意味が出る (手榴弾と同じ)。
-       */
-      case "locatorThrown":
-        // **波を出すのは投げた本人の画面だけ。** 敵にも出すと、置いた場所を
-        // そのまま教えることになる
-        this.locators.spawn(
-          message.id,
-          message.from,
-          message.velocity,
-          message.owner === this.net.id,
-        );
-        break;
-
-      /*
-       * 既に置かれている E LOCATOR。**飛ぶところを見ていない人に届く。**
-       *
-       * 途中から入った人と、画面を読み直した人がここから受け取る。
-       * **見えないと壊せない**ので、見ていなかったことが「壊せない」に
-       * 化けてはいけない。
-       */
-      case "locatorPlaced":
-        this.locators.place(message.id, message.at, message.owner === this.net.id);
-        break;
-
-      // 壊れた / 寿命が尽きた。**寿命で消えた分は静かに消す** —
-      // 音を出すと「誰かが壊した」に読めて、嘘の情報になる
-      case "locatorGone": {
-        /*
-         * 寿命で消えるときは**小さく弾ける**。ダメージは無い (見せるだけ)。
-         *
-         * 壊された (broken) ときと片付け (cleared) では弾けない — 壊した側は
-         * 撃った手応えで分かるし、片付けは場の外の話。
-         */
-        const at = this.locators.remove(message.id) ?? this.remoteFrom.fromArray(message.at);
-        if (!message.broken && !message.cleared) {
-          this.blast.explode(at, LOCATOR_POP_SCALE);
-          this.audio.play("locatorPop", at);
-        }
-        break;
-      }
-
-      case "claymoreGone": {
-        // 位置を先に取る。消してから爆発を出すと出す場所が分からない
-        const mesh = this.claymores.at(message.id);
-        this.claymores.remove(message.id);
-        if (message.blast && mesh) {
-          const gain = this.audio.play("claymore", mesh, 1);
-          this.addPing("shot", mesh, gain);
-          this.blast.explode(mesh);
-        }
-        break;
-      }
-
-      // CQC で投げられた。投げた側の正面へ寄って倒れる (soldier の thrown)
-      case "thrown":
-        this.player.thrown(message.x, message.z, message.yaw);
-        this.loseHeldGrenade();
-        break;
-
-      // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
-      /*
-       * ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令と同じ帯で知らせる
-       * (本人 2026-10-19)。帯の色はその人の陣営
-       */
-      case "targetTaken":
-        this.targetNotice = { text: `${message.byName}がターゲットを取得した`, team: message.byTeam, at: Date.now() };
-        break;
-      case "targetDropped":
-        this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
-        break;
-      case "targetDelivered":
-        this.targetNotice = { text: `${message.byName}がターゲットを運び込んだ`, team: message.byTeam, at: Date.now() };
-        this.audio.playUi("goal");
-        break;
-
-      // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
-      case "targetAt":
-        this.targetView = { x: message.x, y: message.y, z: message.z, carrier: message.carrier };
-        break;
-
-      case "stun": {
-        const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
-        if (at) this.audio.play("stunOof", at);
-        break;
-      }
-
-      // 投げた側が倒れて、放された。倒れかけから立ち直る
-      case "released":
-        this.player.releaseThrown();
-        break;
-
-      case "knockdown":
-        // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
-        // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
-        if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
-        // 散弾は爆風より短く速く飛ぶ (domain/rule/damage.ts の SHOTGUN_KNOCK_*)
-        this.player.knockDown(message.distance !== undefined, message.shotgun === true);
-        // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
-        if (message.shotgun) {
-          this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME);
-        } else {
-          this.player.knockPush(message.dirX, message.dirZ, message.distance);
-        }
-        // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
-        this.loseHeldGrenade();
-        // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
-        if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
-        break;
-
-      // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —
-      // 参加を知ったら即座に返す。相手の画面に現れるまでを次の周期まで待たせない
-      case "join":
-        this.broadcast();
-        break;
-
-      case "noise":
-        this.hearNoise(message);
-        break;
-
-      // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
-      // ここから出る。推し量る側の判断はどこにも残さない
-      // 他人のぶんはレプリカが受け取っている (sync / died)
-      case "life":
-        if (message.id === this.net.id) {
-          // 倒れたままでいる秒数 (CAP は倒されるたびに延びる)。残りを画面に出し、過ぎたら復活できない人と読む
-          if (message.state === "downed") this.downFor = message.downFor ?? DOWN_DURATION;
-          this.setLife(message.state);
-        }
-        break;
-
-      // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
-      // 待つと、遅れて届いているだけの相手と区別が付かない
-      /*
-       * 往復の時間を測られている。**そのまま打ち返す。**
-       *
-       * 測るのはサーバー。こちらで測って申告する形にすると、遅い人が
-       * 「速い」と名乗れる (protocol/types.ts の PingMessage)。
-       *
-       * 一緒に届く rtt は前回の答え。1 秒遅れの値だが、出すのは診断のため
-       * なので困らない。
-       */
-      case "ping":
-        this.latency = message.rtt;
-        this.net.send({ type: "pong", at: message.at });
-        this.noteLag(message.rtt);
-        break;
-
-      case "hidden":
-        this.remotes.hide(message.id, Date.now());
-        break;
-
-
+      surfaceAt(
+        this.remoteTo,
+        IMPACT_PROBE,
+        this.stage.obstacles,
+        this.remoteTo.y,
+        IMPACT_PROBE,
+      ),
+    );
+    /*
+     * 他人の弾の着弾音。**当たった面はこちらで引き直す。**
+     *
+     * 届くのは着弾点だけで、何に当たったかは載っていない (載せると送る量が
+     * 増える)。位置から地形を引けば同じ答えが出る — 地形は全員が同じ物を
+     * 持っているので、撃った側と食い違わない。
+     */
+    this.playImpactAt(this.remoteTo);
+    {
+      // 撃った本人にボルト操作を流し、音もその銃のものにする。
+      // 全部ライフルの音だと、撃たれた側は相手の武器を読み違える
+      const kind = this.remotes.shot(message.id);
+      // 遠くの人の排莢も出す。通信はせず、撃ったことだけを合図に各自で出す
+      const yaw = this.remotes.ejectFrom(message.id, this.ejectPos);
+      if (yaw !== null) this.casings.eject(this.ejectPos, yaw);
+      const sound = weaponOf(kind).shotSound;
+      // 銃声も輪に出す。最も遠くまで届くので、撃ち合いが始まった方角が分かる。
+      this.addPing("shot", this.remoteFrom, this.audio.play(sound, this.remoteFrom));
     }
+  }
+
+  private receiveHealth(message: Extract<ServerMessage, { type: "health" }>): void {
+    this.applyHealth(message);
+  }
+
+  /*
+   * スタミナ。**麻酔を受けた本人にだけ届く。**
+   *
+   * 眠るかどうかを決めるのはサーバー。こちらは知らせを受けて倒れるだけで、
+   * **自分で起きられない** — 起きられるなら麻酔は効かない。
+   */
+  private receiveStamina(message: Extract<ServerMessage, { type: "stamina" }>): void {
+    this.stamina = message.stamina;
+    // 起きる時刻はサーバーの時計。手元の時計へ直してから比べる (application/replica/clock.ts)
+    const left = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
+    // もう眠っているなら残りだけ縮める (もがいて早まった)。倒れる動きをやり直さない
+    if (left > 0 && this.player.sleeping) this.player.shortenSleep(left);
+    else if (left > 0) this.player.sleep(left);
+    else this.player.wake();
+  }
+
+  /*
+   * 自分の本当の値。**3 秒ごとに届く。**
+   *
+   * 撃った瞬間に減らすのも、体力 0 で倒れるのもこちらがやっている
+   * (押した瞬間に返らないと手触りが壊れる)。ここで受けるのは
+   * 「本当はこう」という値だけで、**ずれていたら合わせる**ために使う。
+   * 普段は一致しているので何も起きない。
+   */
+  private receiveSelf(message: Extract<ServerMessage, { type: "self" }>): void {
+    this.applySelf(message);
+  }
+
+  // 繋ぎ直したときに届く、離脱前の続き。
+  //
+  // 湧き地点へは戻さない。**その命の続き**なので、居た場所に居た体力で戻る。
+  // 弾数もサーバーがレプリカを持っているので、そちらを正とする
+  private receiveResume(message: Extract<ServerMessage, { type: "resume" }>): void {
+    this.player.resumeAt(message.x, message.y, message.z, message.health);
+    // 眠っている途中で読み直した。**倒れる動きは飛ばして**寝ている姿から続ける
+    const asleep = (toLocal(this.replica.clock, message.sleepUntil) - Date.now()) / 1000;
+    if (asleep > 0) this.player.sleep(asleep, true);
+    // 人形に釘付けの途中で読み直した。**寄る・しゃがみ込む動きは飛ばして**撫でている所から続ける
+    else if (message.trapped) this.player.trap(undefined, true);
+    // 縁にぶら下がっていた。縁を探して掴み直す (見つからなければ普段通り落ちる)
+    else if (message.hanging) this.player.resumeHang(message.yaw);
+    // スタンナイフの充電も続きから (審判と同じ時計)。読み直しで満タンにはならない
+    this.melee.stunReadyAt = toLocal(this.replica.clock, message.stunReadyAt);
+    // **選んである装備を戻す。** ここを抜かすと、こちらだけ既定値の手榴弾に
+    // 戻って、投げの型を出しているのにサーバーはクレイモアのまま、になる
+    resumeLoadout(this.choice, message);
+    /*
+     * **持ち物を組み直す。**
+     *
+     * 画面を読み直すと Inventory は既定 (AK47) で作られる。装備を戻すだけ
+     * では手の中は既定のままで、**P90 を選んでいたのに AK を持って戻る**。
+     * 戻した装備から組み直してから、残弾を当てる (順番が要る)。
+     */
+    this.inv.refill(this.loadout);
+    // **持っている銃にだけ当てる。** サーバーはまだ銃ごとの表で返してくるが、
+    // こちらは持っている物しか持たない。持っていない銃の弾は捨てる
+    this.inv.restore(message.magazine, message.reserve, message.grenades);
+    this.onLoadout?.(this.pendingLoadout);
+    // 銃を持たない部屋では持ち替えない。手にあるのはナイフ
+    if (message.primary) void this.player.equip(message.primary);
+    this.follow.snapTo(this.player, this.cameraWorld);
+  }
+
+  /*
+   * スキルが決まった。**送った物ではなく返ってきた物を持つ。**
+   *
+   * 弾かれたときも今の値が返るので、こちらの画面だけ選び直したつもりで
+   * 残らない。途中参加した人はそもそも送っていない (窓が閉じている) ので、
+   * これが唯一の入り口になる。
+   */
+  private receiveSkills(message: Extract<ServerMessage, { type: "skills" }>): void {
+    this.skills = message.skills as Skills;
+    // 速さは体が持っている。**同じ値を 2 か所に置かない** — 渡し忘れると
+    // 「散布だけ締まって走りは素のまま」という半端な効き方になる
+    this.player.setSkills(this.skills);
+  }
+
+  // 自分が湧いたことは life で分かる。ここで受けるのは他人の跳躍だけ
+  private receiveRespawn(message: Extract<ServerMessage, { type: "respawn" }>): void {
+    if (message.id !== this.net.id) this.remotes.warp(message.id);
+  }
+
+  // 光っている人 (個人戦の 1 位) を体に出す。レプリカは持っているが、
+  // 光らせるのは絵の仕事
+  private receiveMatch(message: Extract<ServerMessage, { type: "match" }>): void {
+    this.remotes.setLeaking(message.leader ?? null);
+    // ターゲット (TSNE)。運んでいるのが自分なら持ち物の一覧に並ぶ (選んで G / △ で落とす)
+    this.targetView = message.target ?? null;
+    this.inv.setTargetOwned(message.target?.carrier === this.net.id);
+    // 攻守の入れ替えとステルスの状態 (TSNE)。側が変われば持ち込める物も変わる
+    if (message.attack !== this.attackTeam) {
+      this.attackTeam = message.attack ?? null;
+      this.applyArmory();
+    }
+    // STEALTH が暴かれた瞬間 (効いていた → 解けた)。試合中だけ (CAUTION の始まり)
+    if (this.stealthOn && message.stealth === false && message.phase === "playing") {
+      this.audio.playUi("detectAlert");
+    }
+    // CAUTION が明けて STEALTH が戻った (解けていた → 効いた)。**自分の STEALTH が戻った人にだけ** —
+    // 攻める側で、着ている (2026-10-17 本人「set 音は自分だけに聞こえるのでいい」)
+    if (
+      !this.stealthOn && message.stealth === true && message.phase === "playing" && this.cautionSeen &&
+      message.attack === this.selfTeam && this.inv.wearingStealth
+    ) {
+      this.audio.playUi("stealthSet");
+    }
+    // 戻った音は「解けていた」を見た後だけ。入室直後の最初の通 (false → true に見える) では鳴らさない
+    this.cautionSeen = message.stealth === false && message.phase === "playing";
+    this.stealthOn = message.stealth === true;
+  }
+
+  /*
+   * 抜いた相手が光り始めた (ENEMY EXPOSURE)。
+   *
+   * **届くのは抜いた側だけ。** サーバーが宛先を決めているので、
+   * ここで陣営を見る必要は無い。同じ通で遮蔽も外れるので、
+   * 壁の裏に居た相手の位置がこの後から流れてくる。
+   */
+  private receiveExposed(message: Extract<ServerMessage, { type: "exposed" }>): void {
+    this.remotes.expose(message.id, message.seconds);
+  }
+
+  // 気配 (AWARENESS)。誰に届くかはサーバーが決めている。こちらは霧を置くだけ
+  private receiveSensed(message: Extract<ServerMessage, { type: "sensed" }>): void {
+    this.sensed.show(message.key, message.at);
+  }
+
+  private receiveSensedGone(message: Extract<ServerMessage, { type: "sensedGone" }>): void {
+    this.sensed.hide(message.key);
+  }
+
+  // 補給できた。数は直前の self で入っている。ここは印だけ
+  private receiveResupplied(): void {
+    this.lastHitZone = "RESUPPLY";
+    this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
+    this.audio.play("resupply", this.player.position);
+  }
+
+  // 他の人がスタンナイフを振った。**手元で放電して鳴る**
+  private receiveZap(message: Extract<ServerMessage, { type: "zap" }>): void {
+    const id = message.id;
+    if (id === this.net.id) return;
+    const at = this.remotes.positionOf(id);
+    if (at) this.audio.play("zap", at);
+    this.stunSparks.discharge((out) => this.remotes.handOf(id, out));
+  }
+
+  private receiveThrow(message: Extract<ServerMessage, { type: "throw" }>): void {
+    // 初速だけが届く。同じ物理を同じ地形に対して解くので、
+    // 跳ねる場所も落ちる場所もこちらで求まる。
+    // 飛んでいる間は見えず、止まったところで現物が現れる。
+    this.remoteFrom.fromArray(message.from);
+    this.remoteTo.fromArray(message.dir);
+    this.thrown.throwFrom(this.remoteFrom, this.remoteTo, true);
+  }
+
+  private receiveKnock(message: Extract<ServerMessage, { type: "knock" }>): void {
+    if (message.hit !== this.net.id) return;
+    this.player.knockBack(message.x, message.z);
+  }
+
+  private receiveGrenade(message: Extract<ServerMessage, { type: "grenade" }>): void {
+    // 番号 0 は捨てる。番号を振るのはサーバーなので、0 のまま届いたものは
+    // 中継されただけの申告であって、飛ばしてもらえていない。
+    // (手榴弾を知らない古いサーバーに繋ぐと、既定の中継でこれが起きる。
+    //  原点に極小の手榴弾が現れ、いつまでも爆発しない)
+    if (message.id <= 0) {
+      console.warn("[手榴弾] サーバーが飛ばしていない。サーバーが古い可能性");
+      return;
+    }
+    // 位置も速度もサーバーが決めたものをそのまま使う。自分が投げたものも
+    // 例外にしない — 手元で先に飛ばして後から合わせると、
+    // 見えている場所と爆ぜる場所がずれる
+    this.grenades.spawn(message.id, message.from, message.velocity);
+  }
+
+  private receiveExplosion(message: Extract<ServerMessage, { type: "explosion" }>): void {
+    this.explode(message.id, message.at);
+  }
+
+  // **置いたのが自分でも他人でも鳴らす。** 落ちた場所で鳴るので、
+  // 見えていなくても「そこで誰かが捨てた」ことが耳に入る
+  private receiveDropped(message: Extract<ServerMessage, { type: "dropped" }>): void {
+    this.drops.place(message.id, message.weapon, message.at, message.yaw);
+    const at = this.drops.positionOf(message.id);
+    if (at) this.audio.play("drop", at);
+  }
+
+  /*
+   * 拾われた / 消えた。**音と後片付けはここ 1 か所。**
+   *
+   * 拾った本人には picked も届くが、あちらでは消さない。消してしまうと
+   * この通が来たときに置き場所が分からず、**拾った本人にだけ音が鳴らない**。
+   * (実際そうなっていた。他の人には聞こえていたので気づきにくい)
+   */
+  private receiveDroppedGone(message: Extract<ServerMessage, { type: "droppedGone" }>): void {
+    const at = this.drops.positionOf(message.id);
+    if (at) this.audio.play("pick", at);
+    this.drops.remove(message.id);
+  }
+
+  // 拾えた。**中身はここで初めて分かる** (見ただけでは残弾は読めない)
+  private receivePicked(message: Extract<ServerMessage, { type: "picked" }>): void {
+    const found =
+      message.count !== undefined && message.count > 0
+        ? { id: message.weapon as never, count: message.count }
+        : { id: message.weapon as never, ammo: message.ammo ?? 0, reserve: message.reserve ?? 0 };
+    this.inv.pick(found);
+    // **消すのは droppedGone の側。** ここで消すと、あちらが鳴らす音の
+    // 置き場所が無くなる (自分にだけ聞こえない、になる)
+  }
+
+  /*
+   * 置かれたクレイモア。**自分の物なら、ここで初めて残り数を減らす。**
+   *
+   * 置けるかを決めているのはサーバー (壁の中や縁の外へは置けない)。送った
+   * 時点で減らしていたので、断られると**置けていないのに減る**ことがあった。
+   *
+   * 同じ物が二度来る (見え隠れするたびに配られる) ので、初めて見た物だけ数える。
+   */
+  private receiveClaymorePlaced(message: Extract<ServerMessage, { type: "claymorePlaced" }>): void {
+    const mine = message.owner === this.net.id && !this.claymores.has(message.id);
+    // sensor に掛かる扇は置いた本人と味方に出す (猫の円と同じ)。敵には見えない
+    const friendly =
+      message.owner === this.net.id || (this.teamsMode && message.team === this.selfTeam);
+    this.claymores.place(message.id, message.at, message.yaw, friendly ? message.team : null);
+    if (mine) this.inv.spendOf("claymore");
+  }
+
+  /*
+   * decoy が置かれた。**敵にも届く** — 見えないと撃たせられない。
+   *
+   * 膨らむ残り (readyIn) を受け取るのは、途中から見えるようになった人にも
+   * 同じ形を出すため。サーバーの時刻で終わりを渡すと、時計のずれが
+   * そのまま大きさのずれになる。
+   */
+  private receiveDecoyPlaced(message: Extract<ServerMessage, { type: "decoyPlaced" }>): void {
+    const mine = message.owner === this.net.id && !this.decoys.has(message.id);
+    this.decoys.place(message.id, message.at, message.yaw, message.skin, message.readyIn);
+    if (mine) this.inv.spendOf("decoy");
+    // 膨らむ音は**近くを通った人だけ**に届く (14m)。置いたこと自体は
+    // 漏らさない — 膨らむ 2 秒は罠が一番弱い所なので
+    if (message.readyIn > 0) {
+      this.popAt.fromArray(message.at);
+      this.audio.play("balloonInflate", this.popAt);
+    }
+  }
+
+  /*
+   * 割れた / 消えた。
+   *
+   * **破裂音は普通の位置音。** 近ければ聞こえ、遠ければ聞こえない —
+   * 特別扱いしないだけで、両側に過不足のない情報が渡る。遠くから
+   * 安全に撃った人ほど、自分が晒されたことに気づけない。
+   */
+  private receiveDecoyGone(message: Extract<ServerMessage, { type: "decoyGone" }>): void {
+    this.decoys.remove(message.id);
+    if (!message.popped) return;
+    this.popAt.fromArray(message.at);
+    this.popAt.y += DECOY_POP_HEIGHT;
+    const gain = this.audio.play("balloon", this.popAt, 1);
+    this.addPing("shot", this.popAt, gain);
+  }
+
+  /*
+   * 人形が押しのけられた。**見えている全員に届く。**
+   *
+   * 離れた所から自分の decoy が揺れるのが見えたら「誰かがそこを通った」。
+   * 撃たせる道具であると同時に、**見張る道具**でもある。
+   */
+  /*
+   * 猫 (DOLL)。置かれた (敵にも届く — 撃ち抜けるように)・誰かが掛かった・消えた・撃たれて解けた。
+   * **掛かるも解けるもサーバーが決める。** 自分が掛かったら体を止め、解けたら型を逆に流して戻る。
+   * 他の人の体は、その人から届く姿 (trapped / trapped_out) で動く
+   */
+  private receiveDollPlaced(message: Extract<ServerMessage, { type: "dollPlaced" }>): void {
+    const mine = message.owner === this.net.id;
+    if (mine && !this.dolls.has(message.id)) this.inv.spendOf("doll");
+    // 円は置いた本人と味方に出す (陣営で分かれない部屋では本人だけ)。敵には見えない
+    const friendly = mine || (this.teamsMode && message.team === this.selfTeam);
+    this.dolls.place(message.id, message.at, message.yaw, friendly, message.team);
+  }
+
+  private receiveDollSprung(message: Extract<ServerMessage, { type: "dollSprung" }>): void {
+    const doll = this.dolls.positionOf(message.id);
+    // 鳴き声は猫の所から。**近くの人にも届く** (誰かがそこで足止めされている)
+    if (doll) this.audio.play("catMeow", doll);
+    if (message.victims.includes(this.net.id)) {
+      const p = this.player.position;
+      // 猫のほうへ向き直る。yaw θ で -Z が (-sinθ, -cosθ) を向く
+      // 猫のほうへ歩いて寄ってからしゃがみ込む (猫の足元を渡す)
+      this.player.trap(doll ? Math.atan2(p.x - doll.x, p.z - doll.z) : undefined, false, doll ?? undefined);
+    }
+    // 掛かった人の声。しゃがみ終えて手を伸ばした所で、その人の所から
+    for (const id of message.victims) {
+      setTimeout(() => {
+        const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
+        if (at) this.audio.play("ohh", at);
+      }, DOLL_OHH_MS);
+    }
+  }
+
+  private receiveDollGone(message: Extract<ServerMessage, { type: "dollGone" }>): void {
+    this.dolls.remove(message.id);
+    if (message.freed.includes(this.net.id)) this.player.untrap();
+  }
+
+  private receiveTrapReleased(message: Extract<ServerMessage, { type: "trapReleased" }>): void {
+    if (message.id === this.net.id) this.player.untrap();
+  }
+
+  private receiveDecoyBumped(message: Extract<ServerMessage, { type: "decoyBumped" }>): void {
+    this.decoys.bump(message.id, message.dirX, message.dirZ);
+  }
+
+  // 空のダンボールに誰かが触れた。一度だけガタッと揺れる
+  private receiveCboxBumped(message: Extract<ServerMessage, { type: "cboxBumped" }>): void {
+    this.emptyBoxes.bump(message.index, message.dirX, message.dirZ);
+  }
+
+  /*
+   * E LOCATOR が飛び始めた。**全員に届く。**
+   *
+   * 弧を描いて飛ぶ物なので、投げた場所が割れるのは避けられない。避けられる
+   * からこそ「どこから投げたか」を隠す動きに意味が出る (手榴弾と同じ)。
+   */
+  private receiveLocatorThrown(message: Extract<ServerMessage, { type: "locatorThrown" }>): void {
+    // **波を出すのは投げた本人の画面だけ。** 敵にも出すと、置いた場所を
+    // そのまま教えることになる
+    this.locators.spawn(
+      message.id,
+      message.from,
+      message.velocity,
+      message.owner === this.net.id,
+    );
+  }
+
+  /*
+   * 既に置かれている E LOCATOR。**飛ぶところを見ていない人に届く。**
+   *
+   * 途中から入った人と、画面を読み直した人がここから受け取る。
+   * **見えないと壊せない**ので、見ていなかったことが「壊せない」に
+   * 化けてはいけない。
+   */
+  private receiveLocatorPlaced(message: Extract<ServerMessage, { type: "locatorPlaced" }>): void {
+    this.locators.place(message.id, message.at, message.owner === this.net.id);
+  }
+
+  // 壊れた / 寿命が尽きた。**寿命で消えた分は静かに消す** —
+  // 音を出すと「誰かが壊した」に読めて、嘘の情報になる
+  private receiveLocatorGone(message: Extract<ServerMessage, { type: "locatorGone" }>): void {
+    /*
+     * 寿命で消えるときは**小さく弾ける**。ダメージは無い (見せるだけ)。
+     *
+     * 壊された (broken) ときと片付け (cleared) では弾けない — 壊した側は
+     * 撃った手応えで分かるし、片付けは場の外の話。
+     */
+    const at = this.locators.remove(message.id) ?? this.remoteFrom.fromArray(message.at);
+    if (!message.broken && !message.cleared) {
+      this.blast.explode(at, LOCATOR_POP_SCALE);
+      this.audio.play("locatorPop", at);
+    }
+  }
+
+  private receiveClaymoreGone(message: Extract<ServerMessage, { type: "claymoreGone" }>): void {
+    // 位置を先に取る。消してから爆発を出すと出す場所が分からない
+    const mesh = this.claymores.at(message.id);
+    this.claymores.remove(message.id);
+    if (message.blast && mesh) {
+      const gain = this.audio.play("claymore", mesh, 1);
+      this.addPing("shot", mesh, gain);
+      this.blast.explode(mesh);
+    }
+  }
+
+  // CQC で投げられた。投げた側の正面へ寄って倒れる (soldier の thrown)
+  private receiveThrown(message: Extract<ServerMessage, { type: "thrown" }>): void {
+    this.player.thrown(message.x, message.z, message.yaw);
+    this.throwing.loseHeldGrenade();
+  }
+
+  // 誰かが眠らされた (スタン)。眠った人の位置でうめく。自分なら自分の所で
+  /*
+   * ターゲット (TSNE) を取った / 手放した。**全員に**、始まりの指令と同じ帯で知らせる
+   * (本人 2026-10-19)。帯の色はその人の陣営
+   */
+  private receiveTargetTaken(message: Extract<ServerMessage, { type: "targetTaken" }>): void {
+    this.targetNotice = { text: `${message.byName}がターゲットを取得した`, team: message.byTeam, at: Date.now() };
+  }
+
+  private receiveTargetDropped(message: Extract<ServerMessage, { type: "targetDropped" }>): void {
+    this.targetNotice = { text: `${message.byName}がターゲットを手放した`, team: message.byTeam, at: Date.now() };
+  }
+
+  private receiveTargetDelivered(message: Extract<ServerMessage, { type: "targetDelivered" }>): void {
+    this.targetNotice = { text: `${message.byName}がターゲットを運び込んだ`, team: message.byTeam, at: Date.now() };
+    this.audio.playUi("goal");
+  }
+
+  // 運ばれているターゲットの位置 (1 秒に 10 回)。運ぶ人が壁の裏でも届く
+  private receiveTargetAt(message: Extract<ServerMessage, { type: "targetAt" }>): void {
+    this.targetView = { x: message.x, y: message.y, z: message.z, carrier: message.carrier };
+  }
+
+  private receiveStun(message: Extract<ServerMessage, { type: "stun" }>): void {
+    const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
+    if (at) this.audio.play("stunOof", at);
+  }
+
+  // 投げた側が倒れて、放された。倒れかけから立ち直る
+  private receiveReleased(): void {
+    this.player.releaseThrown();
+  }
+
+  private receiveKnockdown(message: Extract<ServerMessage, { type: "knockdown" }>): void {
+    // 距離が付いているのはローリングの体当たり。倒れる型が違う (Hit2Back)。
+    // **転がってきた相手のほうを向いて**後ろへ倒れる (向きは押された先の逆)
+    if (message.distance !== undefined) this.player.yaw = Math.atan2(message.dirX, message.dirZ);
+    // 散弾は爆風より短く速く飛ぶ (domain/rule/damage.ts の SHOTGUN_KNOCK_*)
+    this.player.knockDown(message.distance !== undefined, message.shotgun === true);
+    // 爆心と逆へ飛ばす。**向きだけ届く** — 動かすのはこちら
+    if (message.shotgun) {
+      this.player.knockPush(message.dirX, message.dirZ, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME);
+    } else {
+      this.player.knockPush(message.dirX, message.dirZ, message.distance);
+    }
+    // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
+    this.throwing.loseHeldGrenade();
+    // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
+    if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
+  }
+
+  // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —
+  // 参加を知ったら即座に返す。相手の画面に現れるまでを次の周期まで待たせない
+  private receiveJoin(): void {
+    this.broadcast();
+  }
+
+  private receiveNoise(message: Extract<ServerMessage, { type: "noise" }>): void {
+    this.hearNoise(message);
+  }
+
+  // サーバーが状態を移した。装備画面も、倒れる姿勢も、無敵の見た目も
+  // ここから出る。推し量る側の判断はどこにも残さない
+  // 他人のぶんはレプリカが受け取っている (sync / died)
+
+  // 遮蔽の裏へ入った。位置が止まるのを待たずに消す。
+  // 待つと、遅れて届いているだけの相手と区別が付かない
+  /*
+   * 往復の時間を測られている。**そのまま打ち返す。**
+   *
+   * 測るのはサーバー。こちらで測って申告する形にすると、遅い人が
+   * 「速い」と名乗れる (protocol/types.ts の PingMessage)。
+   *
+   * 一緒に届く rtt は前回の答え。1 秒遅れの値だが、出すのは診断のため
+   * なので困らない。
+   */
+  private receivePing(message: Extract<ServerMessage, { type: "ping" }>): void {
+    this.latency = message.rtt;
+    this.net.send({ type: "pong", at: message.at });
+    this.noteLag(message.rtt);
+  }
+
+  private receiveHidden(message: Extract<ServerMessage, { type: "hidden" }>): void {
+    this.remotes.hide(message.id, Date.now());
   }
 
   /**
@@ -3153,7 +2848,7 @@ export class Game {
    * 1 秒あれば往復は済んでいるので、それでも来ないなら落ちている。
    */
   private askRosterIfWanted(): void {
-    if (!this.rosterWanted) return;
+    if (!this.replica.rosterWanted) return;
     const now = Date.now();
     if (now - this.rosterAskedAt < ROSTER_RETRY) return;
     this.rosterAskedAt = now;
@@ -3237,7 +2932,7 @@ export class Game {
     }
 
     // **仰け反れば手が緩む。** 振りかぶったまま頭を撃たれたら足元に落ちる
-    if (message.flinch) this.loseHeldGrenade();
+    if (message.flinch) this.throwing.loseHeldGrenade();
     // 倒れる向きはサーバーが決める (位置と向きの両方を持っているので)。
     // **他人の画面にはこちらの姿勢として届く** — 見た側が撃たれた向きを読める
     const died = this.player.setHealth(message.health, message.flinch, message.fromBehind);
@@ -3338,7 +3033,7 @@ export class Game {
    * 番号で持つのは、並ぶ物が窓によって変わるから (装備 3 つ / スキル 5 つ)。
    * 外へ出すときは名前に直す — GameStats の loadoutFocus を見よ。
    */
-  private loadoutAt = 0;
+  private readonly loadoutInput = newLoadoutInput();
 
   /**
    * いま並んでいる枠。**上から順に。**
@@ -3375,39 +3070,16 @@ export class Game {
   /** いま指している枠。窓が切り替わって番号が余ったら先頭へ戻す */
   private get loadoutFocus(): LoadoutFocus {
     const rows = this.loadoutRows;
-    return rows[Math.min(this.loadoutAt, rows.length - 1)] ?? "primary";
-  }
-
-  /**
-   * 一覧の中を隣へ送る。**端では回る。**
-   *
-   * 選び直すのは「送った先の物」で、決定の一手間は無い。数字キーで押したのと
-   * 同じ形にしてある — 一手間を挟むと、選んだのに効いていない状態が生まれて、
-   * READY を押すまで気づけない。
-   */
-  private stepChoice<T>(list: readonly T[], current: T | null, step: number): T | null {
-    if (list.length === 0) return null;
-    const at = current === null ? 0 : list.indexOf(current);
-    const from = at < 0 ? 0 : at;
-    return list[(from + step + list.length) % list.length] ?? null;
+    return rows[focusAt(this.loadoutInput, rows.length)] ?? "primary";
   }
 
   /** 支度の画面を左右に送る。指している枠によって送る物が変わる */
   private stepLoadout(step: number): void {
     const focus = this.loadoutFocus;
-    if (focus === "primary") {
-      const next = this.stepChoice(this.primaries, this.pendingLoadout.primary, step);
-      if (next) this.setLoadout(next);
-      return;
-    }
-    if (focus === "secondary") {
-      const next = this.stepChoice(this.secondaries, this.pendingLoadout.secondary, step);
-      if (next) this.setSecondary(next);
-      return;
-    }
-    if (focus === "support") {
-      const next = this.stepChoice(this.supports, this.pendingLoadout.support, step);
-      if (next) this.setSupport(next);
+    if (focus === "primary" || focus === "secondary" || focus === "support") {
+      // 送った先を選ぶ。**端では回る** (application/loadout/choice.ts の stepChoice)
+      const next = stepChoice(this.choice, focus, step);
+      if (next) this.performLoadout(chooseLoadout(this.choice, focus, next, this.canChooseLoadout));
       return;
     }
     /*
@@ -3481,100 +3153,59 @@ export class Game {
     return !solid.clear(me.x, y, me.z, tx, y, tz);
   }
 
-  /** 長押しで READY にした押下を、まだ離していない */
-  private readyReleaseWait = false;
-
-  /** READY を押し始めた時刻 (performance.now)。0 なら押していない */
-  private readyHoldSince = 0;
-
   /** READY の長押しの進み (0〜1)。画面の READY のボタンが満ちていく */
   private get readyHoldRatio(): number {
-    if (this.readyHoldSince === 0) return 0;
-    return Math.min(1, (performance.now() - this.readyHoldSince) / (READY_HOLD * 1000));
+    return holdRatio(this.loadoutInput, performance.now());
   }
 
+  /**
+   * 支度の画面の鍵盤とパッド。**何をするかは状態機械が決める** (application/loadoutInput.ts)。
+   * ここは押下を集めて渡し、返ってきたことをする
+   */
   private updateLoadoutKeys(): void {
     if (!this.canChooseLoadout) return;
-    /*
-     * ルールの説明が開いている間は、Enter / × で閉じる。スキルも READY も触らせない —
-     * 閉じた押下は、離すまで READY の長押しに数えない
-     */
-    if (this.briefing) {
-      if (this.input.tapped("spawn")) {
-        this.closeBriefing();
-        this.readyReleaseWait = true;
-      }
-      this.input.tapped("menuUp");
-      this.input.tapped("menuDown");
-      this.input.tapped("menuLeft");
-      this.input.tapped("menuRight");
-      return;
-    }
-    /*
-     * 十字キーと矢印キー。**上下で枠、左右でその中。**
-     *
-     * パッドしか無い人はここを通らないと何も選べない。数字キーは残してある —
-     * 一発で名指しできるほうが速いので、鍵盤ではそちらが本筋。
-     */
-    const rows = this.loadoutRows;
-    if (this.input.tapped("menuDown")) this.loadoutAt = (this.loadoutAt + 1) % rows.length;
-    if (this.input.tapped("menuUp")) {
-      this.loadoutAt = (this.loadoutAt + rows.length - 1) % rows.length;
-    }
-    if (this.input.tapped("menuRight")) this.stepLoadout(1);
-    if (this.input.tapped("menuLeft")) this.stepLoadout(-1);
-    /*
-     * Enter。**支度の段階では READY の切り替え、それ以外は湧く。**
-     *
-     * 同じキーに 2 つの意味を持たせているのは、押す場所が同じだから — 画面の
-     * 一番下のボタンが「READY」から「OK」に変わるだけで、位置も操作も同じ。
-     * 別のキーにすると、始まる前と後で押す指が変わる。
-     */
-    if (this.replica.match?.phase === "ready") {
-      /*
-       * **READY は長押し** (READY_HOLD)。1 押しで入っていた頃は、スキルを選んで
-       * いるつもりの × で READY になり、相手が先に押していると支度が終わった
-       * (2026-10-09 本人)。取り消しは 1 押しで — 外すのは急いでいい
-       */
-      /*
-       * 長押しで READY にした、その押下を離すまでは取り消しを読まない。
-       * 離した瞬間が 1 押しとして立ち、押し続けて離すと解除されていた
-       */
-      if (this.readyReleaseWait) {
-        if (!this.input.down("spawn")) this.readyReleaseWait = false;
-      } else if (this.selfReady) {
-        this.readyHoldSince = 0;
-        if (this.input.tapped("spawn")) this.setReady(false);
-      } else if (this.input.down("spawn")) {
-        const now = performance.now();
-        if (this.readyHoldSince === 0) this.readyHoldSince = now;
-        if (now - this.readyHoldSince >= READY_HOLD * 1000) {
-          this.readyHoldSince = 0;
-          this.readyReleaseWait = true;
-          this.setReady(true);
-        }
-      } else {
-        this.readyHoldSince = 0;
-      }
-      // 押した瞬間の立ち上がりは食っておく (長押しの途中で湧く側へ漏らさない)
-      this.input.tapped("spawn");
-    } else if (this.input.tapped("spawn")) {
-      this.requestSpawn();
-    }
-    // **番号は並び順から出す。** 主武器が 1 から、投擲はその続き。
+    // **番号は並び順から出す。** 主武器が 1 から、副武器・投擲はその続き。
     // 直に書くと、銃が 1 挺増えたときに番号が重なる (P90 を足して実際に重なった)
-    const choices = this.primaries;
-    choices.forEach((id, i) => {
-      if (this.input.slotPressed(i)) this.setLoadout(id);
+    const slots = [
+      ...this.primaries.map((id) => () => this.setLoadout(id)),
+      ...this.secondaries.map((id) => () => this.setSecondary(id)),
+      ...this.supports.map((id) => () => this.setSupport(id)),
+    ];
+    let slot: number | null = null;
+    slots.forEach((_, i) => {
+      if (this.input.slotPressed(i) && slot === null) slot = i;
     });
-    // 副武器。**主武器の続き番号。** 持たせない部屋では番号ごと詰める
-    const seconds = this.secondaries;
-    seconds.forEach((id, i) => {
-      if (this.input.slotPressed(choices.length + i)) this.setSecondary(id);
-    });
-    this.supports.forEach((id, i) => {
-      if (this.input.slotPressed(choices.length + seconds.length + i)) this.setSupport(id);
-    });
+    // 立ち上がりはどれも毎フレーム読んで食う (説明を閉じた押下などを次へ漏らさない)
+    const keys: LoadoutKeys = {
+      up: this.input.tapped("menuUp"),
+      down: this.input.tapped("menuDown"),
+      left: this.input.tapped("menuLeft"),
+      right: this.input.tapped("menuRight"),
+      confirm: this.input.tapped("spawn"),
+      confirmHeld: this.input.down("spawn"),
+      slot,
+    };
+    const scene = {
+      ready: this.replica.match?.phase === "ready",
+      rows: this.loadoutRows.length,
+      selfReady: this.selfReady,
+    };
+    for (const effect of stepLoadoutInput(this.loadoutInput, keys, scene, performance.now())) {
+      switch (effect.kind) {
+        case "step":
+          this.stepLoadout(effect.step);
+          break;
+        case "ready":
+          this.setReady(effect.ready);
+          break;
+        case "spawn":
+          this.requestSpawn();
+          break;
+        case "slot":
+          slots[effect.index]?.();
+          break;
+      }
+    }
   }
 
   /**
@@ -3584,9 +3215,13 @@ export class Game {
    * 都度組み立てていた。組み立て方が場所ごとにずれて不具合になっていたので、
    * 権威が言ってきた 1 つの値だけを見る (src/domain/player/lifecycle.ts)。
    */
-  private life: Life = "joining";
+  private get life(): Life {
+    return this.replica.life;
+  }
   /** その状態に入った時刻 (Date.now)。残り秒数の表示に使う */
-  private lifeAt = Date.now();
+  private get lifeAt(): number {
+    return this.replica.lifeAt;
+  }
 
   /**
    * サーバーが状態を移した。
@@ -3595,11 +3230,8 @@ export class Game {
    * 「開いているか」という別のフラグは持たない — 持つと、状態とフラグの 2 つが
    * 食い違い得る場所が生まれる (実際、フラグが閉じたまま開き直らない不具合があった)。
    */
-  private setLife(state: Life): void {
-    if (this.life === state) return;
-    this.life = state;
-    this.lifeAt = Date.now();
-
+  /** 自分の状態が変わった (レプリカが決めた)。支度へ戻ったら湧き地点へ、湧いたら持ち物を配り直す */
+  private enteredLife(state: Life): void {
     // 支度へ移った。倒した相手を映すのをやめて、自分の湧き地点へ戻る。
     // ここで初めて装備画面が出るので、その背景が自分の湧き地点になる
     if (state === "choosing") {
@@ -3633,7 +3265,9 @@ export class Game {
   }
 
   /** 倒れたままでいる秒数。倒れた知らせ (life) に載って届く (CAP は倒されるたびに延びる) */
-  private downFor = DOWN_DURATION;
+  private get downFor(): number {
+    return this.replica.downFor;
+  }
 
   /** CAP の設置ポイントの印 (光の柱と床の塗り)。読めるまで null */
   private capGoals: THREE.Object3D | null = null;
@@ -3764,20 +3398,6 @@ export class Game {
   }
 
   /**
-   * 選び直した装備を、待たずに反映してよい場面なら反映する。
-   *
-   * 組めるのは湧くときだけなので、その場面では**すぐ**効かせる。
-   * 次の湧きを待つと、支度の間に選び直した分が 1 試合ぶん遅れて効く。
-   * サーバーも同じドメインルールで手榴弾を配っているので、ここを揃えないと
-   * 画面には 3 個あるのに投げられない、が起きる。
-   */
-  private applyLoadoutNow(): void {
-    if (!this.canChooseLoadout) return;
-    this.loadout = { ...this.pendingLoadout };
-    this.refillFromLoadout();
-  }
-
-  /**
    * 次に湧いたときの装備を決める。
    *
    * 反映されるのは次に湧いたとき。いま持っている物は変わらない。
@@ -3789,33 +3409,33 @@ export class Game {
    * (server/match.ts の fitToRoom) ので、ここは見せ方を合わせるだけ
    */
   private applyArmory(): void {
-    if (!this.roomName) return;
     const side: Side | null =
       this.attackTeam === null ? null : this.selfTeam === this.attackTeam ? "attack" : "defence";
-    this.primaries = primariesOf(this.roomName, side);
-    this.secondary = secondaryOf(this.roomName, side);
-    this.secondaries = secondariesOf(this.roomName, side);
-    this.supports = supportsOf(this.roomName, side);
-    const pending = this.pendingLoadout;
-    if (pending.primary === null ? this.primaries.length > 0 : !this.primaries.includes(pending.primary)) {
-      pending.primary = this.primaries[0] ?? null;
+    this.performLoadout(fitArmory(this.choice, this.roomName, side));
+  }
+
+  /** 装備の選びが返してきたことをする (送る・配り直す・画面へ知らせる・STEALTH) */
+  private performLoadout(effects: LoadoutEffect[]): void {
+    for (const effect of effects) {
+      switch (effect.kind) {
+        case "send":
+          this.sendLoadout();
+          break;
+        case "refill":
+          this.refillFromLoadout();
+          break;
+        case "chosen":
+          this.onLoadout?.(this.pendingLoadout);
+          break;
+        case "stealth":
+          this.inv.setStealthOwned(effect.owned);
+          break;
+      }
     }
-    if (pending.secondary === null ? this.secondaries.length > 0 : !this.secondaries.includes(pending.secondary)) {
-      pending.secondary = this.secondaries[0] ?? null;
-    }
-    if (!this.supports.includes(pending.support)) pending.support = this.supports[0] ?? pending.support;
-    // STEALTH は攻める側だけが持つ
-    pending.stealth = side === "attack";
-    // **いま持っている物にも反映する。** 側が分かる前に湧いていると入らないまま (待機中は湧き直さない)
-    this.loadout.stealth = pending.stealth;
-    this.inv.setStealthOwned(pending.stealth);
   }
 
   setLoadout(primary: WeaponId | null): void {
-    this.pendingLoadout.primary = primary;
-    this.sendLoadout();
-    this.applyLoadoutNow();
-    this.onLoadout?.(this.pendingLoadout);
+    this.performLoadout(chooseLoadout(this.choice, "primary", primary, this.canChooseLoadout));
   }
 
   /**
@@ -3838,32 +3458,27 @@ export class Game {
    * **前の試合と同じモードなら出さない** — 同じ説明を毎試合読まされない。待合室のルールの
    * ボタンで開き直せる
    */
-  private briefFor(mode: Mode, tickets: number, stage: StageName): void {
-    if (!this.roomName || mode === this.briefedMode) return;
-    this.briefedMode = mode;
-    this.briefTickets = tickets;
-    this.briefStage = stage;
+  private briefFor(brief: Extract<MatchEffect, { kind: "brief" }>): void {
+    this.lastBrief = brief;
     this.openBriefing();
   }
-  /** 説明を出したモード。同じなら次の試合では出さない */
-  private briefedMode: Mode | null = null;
-  /** 説明に差し込む残機 (支度に入った時の match の blue) */
-  private briefTickets = 0;
-  /** 説明に出すステージ (支度に入った時の match の stage) */
-  private briefStage: StageName | null = null;
-  /** 出している説明。null なら閉じている */
-  private briefing: Briefing | null = null;
+  /** 最後に出した説明の中身 (モード・残機・ステージ)。待合室のボタンで開き直す時に使う */
+  private lastBrief: Extract<MatchEffect, { kind: "brief" }> | null = null;
+  /** 出している説明。閉じていれば null。開いているかは支度の入力が持つ (loadoutInput.briefing) */
+  private get briefing(): Briefing | null {
+    if (!this.loadoutInput.briefing || !this.roomName || !this.lastBrief) return null;
+    const { mode, tickets, stage } = this.lastBrief;
+    return briefingOf(mode, { room: this.roomName, tickets, stage });
+  }
 
   /** 説明を開く。待合室のルールのボタンからも */
   openBriefing(): void {
-    const mode = this.replica.match?.mode ?? this.briefedMode;
-    const stage = this.replica.match?.stage ?? this.briefStage;
-    if (!this.roomName || !mode || !stage) return;
-    this.briefing = briefingOf(mode, { room: this.roomName, tickets: this.briefTickets, stage });
+    if (this.lastBrief) openBriefingInput(this.loadoutInput);
   }
 
+  /** 説明を閉じる (画面の OK)。押したままの押下は READY の長押しに数えない */
   closeBriefing(): void {
-    this.briefing = null;
+    closeBriefingInput(this.loadoutInput);
   }
 
   setReady(ready: boolean): void {
@@ -3878,11 +3493,7 @@ export class Game {
   }
 
   setSecondary(secondary: WeaponId): void {
-    if (this.secondary === null) return;
-    this.pendingLoadout.secondary = secondary;
-    this.sendLoadout();
-    this.applyLoadoutNow();
-    this.onLoadout?.(this.pendingLoadout);
+    this.performLoadout(chooseLoadout(this.choice, "secondary", secondary, this.canChooseLoadout));
   }
 
   /**
@@ -3910,10 +3521,7 @@ export class Game {
    * 伝えないと弾倉を選んでも手榴弾が配られる。
    */
   setSupport(support: SupportId): void {
-    this.pendingLoadout.support = support;
-    this.sendLoadout();
-    this.applyLoadoutNow();
-    this.onLoadout?.(this.pendingLoadout);
+    this.performLoadout(chooseLoadout(this.choice, "support", support, this.canChooseLoadout));
   }
 
   /**
@@ -3957,7 +3565,7 @@ export class Game {
    */
   private respawnSelf(): void {
     // 湧くときに装備が確定する。試合中に組み替えても、ここまで反映されない
-    this.loadout = { ...this.pendingLoadout };
+    spawnLoadout(this.choice);
 
     if (this.loadout.primary) void this.player.equip(this.loadout.primary);
     this.player.respawn();
@@ -3965,9 +3573,9 @@ export class Game {
     this.reloadTimer = 0;
     this.reloadSoundIn = 0;
     this.boltIn = 0;
-    this.stabTimer = 0;
+    this.melee.stabTimer = 0;
     // スタンナイフは満ちた状態で湧く (審判の spawn と同じ)
-    this.stunReadyAt = Date.now();
+    this.melee.stunReadyAt = Date.now();
     this.spread.reset();
     this.follow.snapTo(this.player, this.cameraWorld);
   }
@@ -4213,216 +3821,6 @@ export class Game {
     return true;
   }
 
-  /** いま振っている刺突の判定を出す位置 (STAB_HIT_PHASE / PRONE_STAB_HIT_PHASE) */
-  private stabHitPhase = STAB_HIT_PHASE;
-  /** いま振っているのが眠らせる刺突 (スタンナイフ) か */
-  private stabStun = false;
-  /**
-   * スタンナイフの充電が満ちる時刻 (Date.now)。**湧いた時に今へ戻す** (満ちた状態)。
-   * 審判も同じ時計を持っていて、満ちる前の当たりは通さない (server/damage.ts)
-   */
-  private stunReadyAt = 0;
-
-  /** スタンナイフの充電 (0〜1)。HUD のメーター */
-  private get stunChargeNow(): number {
-    return stunCharge(this.stunReadyAt, Date.now(), stunChargeSeconds(this.skills));
-  }
-
-  /**
-   * ナイフを振り始める。リロード中と多重の振りは受け付けない。
-   *
-   * stun = 眠らせる刺突。**充電が満ちていなければ振らない** (空振りもしない)。
-   * 振ったら空振りでも充電は空になる
-   */
-  private startStab(stun = false): void {
-    if (this.stabTimer > 0 || this.reloadTimer > 0 || this.player.rolling)
-      return;
-    if (stun && this.stunChargeNow < 1) return;
-    this.stabStun = stun;
-    if (stun) {
-      this.stunReadyAt = stunReadyAfter(Date.now(), stunChargeSeconds(this.skills));
-      /*
-       * **バチバチと刃先が光る。** 振り始めから腕が伸び切る所まで。刃が無ければ
-       * (模型が届く前) 右手から。音も同じ所で鳴らし、他の人へも知らせる (zap)
-       */
-      this.stunSparks.discharge((out) => this.player.knifeTip(out) ?? this.player.handWorld(out));
-      this.audio.play("zap", this.player.position);
-      this.net.send({ type: "zap", id: this.net.id });
-    }
-    this.stabTimer = this.player.stabDuration || FALLBACK_STAB_DURATION;
-    this.stabResolved = false;
-    // 型が違うので腕が伸びる所も違う。振り始めの姿勢で決める
-    this.stabHitPhase = this.player.isProne ? PRONE_STAB_HIT_PHASE : STAB_HIT_PHASE;
-    this.player.stab();
-  }
-
-  /**
-   * 刺突の進行。モーションの途中で 1 回だけ判定を出す。
-   * 判定はキャラの向きを基準にする (カメラではなく体の正面)。
-   */
-  private updateStab(dt: number): void {
-    if (this.stabTimer <= 0) return;
-    const total = this.player.stabDuration || FALLBACK_STAB_DURATION;
-    const elapsed = total - this.stabTimer;
-    this.stabTimer -= dt;
-
-    if (this.stabResolved || elapsed < total * this.stabHitPhase) return;
-    this.stabResolved = true;
-
-    // yaw = θ のときローカル -Z が (-sinθ, 0, -cosθ)
-    const yaw = this.player.yaw;
-    this.meleeForward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
-    /*
-     * 振ったことだけ知らせる。**当たったかどうかは言わない。**
-     *
-     * decoy は風船なので刃でも割れるが、割るのはサーバー。位置も向きも
-     * あちらが持っているので、「刺した」と言わせない — 言えるようにすると、
-     * **刺していないのに割ったことにして相手を晒せる**。
-     *
-     * 空振りでも送る。手元では割れたかどうかが分からない (decoy かどうかを
-     * 手元で決めると、そこが嘘の入り口になる)。
-     */
-    this.net.send({ type: "stab" });
-
-    const result = this.remotes.hitMelee(
-      this.player.position,
-      this.meleeForward,
-      // 見下ろしていれば倒れている相手にも届く。構えていなければ水平とみなす
-      this.player.isAiming ? this.follow.aimPitch : 0,
-      // 倒れた相手には屈んで (しゃがみ / 伏せ) 見下ろしたときだけ届く
-      this.player.stance,
-    );
-    if (!result) return;
-
-    // 味方に当てた。申告は送らない (サーバーが捨てるが、送る意味も無い)。
-    // 表示だけは出す。当たったこと自体が分からないと、撃ち続けてしまう。
-    //
-    // **敵かどうかはルールに聞く。** 個人戦では同じ色でも敵で、陣営で見ていると
-    // 刺しても何も起きない
-    if (!this.hostileTo(result.id, result.side)) {
-      this.lastHitZone = "FF";
-      this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
-      return;
-    }
-
-    /*
-     * 手元の表示。**削る量を決めるのはサーバー。**
-     *
-     * 背後かどうかは申告に載せない — 位置と向きから分かるので、サーバーが
-     * 通ったコマから出す (sim/judge/hitcheck.ts の isBackstab)。ここに残って
-     * いるのは、刺した瞬間に何か出さないと手応えが無いから。**巻き戻しの
-     * 結果と食い違うことはあり得る**が、数字が動くわけではない。
-     */
-    this.lastHitZone = this.stabStun ? "STUN" : result.fromBehind ? "BACKSTAB" : "KNIFE";
-    this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
-    // 刺さった音。**空振りでは鳴らさない** — 当てたかどうかで結果が全部決まる
-    this.audio.play("stab", this.player.position);
-    this.net.send({
-      type: "damage",
-      id: this.net.id,
-      target: result.id,
-      kind: "melee",
-      // 眠らせる刺突。充電を確かめるのは審判
-      ...(this.stabStun ? { stun: true } : {}),
-    });
-  }
-
-  /** リロードの進行と、押しっぱなしの間 FIRE_INTERVAL ごとの発砲 */
-  /**
-   * 引き金は 1 本。手にある物が何をするかを決める。
-   *
-   * **撃つ・投げる・刺すが同じボタンになる。** 持ち替えて使う形にした以上、
-   * 物ごとに別のキーを割り当てると「持ち替えたのに別のキーを押す」ことになって、
-   * 持ち替えたこと自体が意味を失う。
-   */
-  private updateTrigger(): void {
-    // ナイフを持っている間、鍵盤の右クリックは眠らせる刺突 (構えは Shift)
-    this.input.rightClickStuns = this.inv.held === "knife";
-    if (!canAct(this.life) || this.loadoutBlocking) return;
-    if (this.inv.switching) return;
-    if (this.updateCqc()) return;
-    if (this.inv.held !== "knife") return;
-    // ナイフは押した瞬間に振る。押しっぱなしで連打しない。
-    // 引き金の面倒は持ち物が見る (domain/item/trigger.ts)
-    /*
-     * **構えていなければ刺さない。** ナイフを持っているだけで R2 で刺せた
-     * (本人 2026-10-08)。銃と同じく、構えてから使う。押したことは消すので、
-     * 押したまま構えても後から刺さない。
-     *
-     * 構えて 2 通り (MGO2 のスタンナイフ):
-     *   殺す刺突      パッド R1 / 鍵盤 左クリック
-     *   眠らせる刺突  パッド R2 / 鍵盤 右クリック (充電が満ちている時だけ。構えは Shift)
-     */
-    const aiming = this.player.isAiming;
-    const killTap = this.input.tapped("killStab");
-    const stunTap = this.input.tapped("stunStab");
-    if (this.input.firing && this.inv.pressedOnce) {
-      this.inv.consumePress();
-      if (aiming) this.startStab(this.input.firingByPad);
-      return;
-    }
-    if (!aiming) return;
-    if (killTap) this.startStab(false);
-    else if (stunTap) this.startStab(true);
-  }
-
-  /**
-   * CQC (domain/player/cqc.ts)。**構えずに引き金を引く。** 片手で持つ物 (拳銃・
-   * ナイフ・投げる物・置く物) の時だけで、長物では何も起きない。
-   *
-   * 構えているかは**ボタンで見る** (input.aiming)。投げ物を構えている間は体の構え
-   * (isAiming) が立たないので、そちらで見ると構えて引いた手榴弾が CQC に化ける
-   *
-   * **体の正面**の近くに立っている敵が居れば、そちらへ向き直って投げる。カメラの向きは
-   * 見ない (本人 2026-10-12) — 別の方の相手に掛けたいなら、移動で体をそちらへ向けてから押す。
-   * 居ない・しゃがんでいる・箱に入っている なら**空振り** — 型の後に棒立ちの隙が
-   * 残る (soldier の cqcRecoverLeft)。掛かったかを決めるのはサーバー
-   *
-   * @returns 引き金を CQC に使った (刺突へは回さない)
-   */
-  /** 投げ切る型の最中に押された CQC。手を離れたら出す (updateCqc) */
-  private cqcQueued = false;
-
-  private updateCqc(): boolean {
-    if (this.input.aiming || this.player.isAiming || !canThrowWith(this.inv.held)) {
-      this.cqcQueued = false;
-      return false;
-    }
-    const pressed = this.input.firing && this.inv.pressedOnce;
-    if (pressed) this.inv.consumePress();
-    if (!pressed && !this.cqcQueued) return false;
-    if (this.stabTimer > 0 || this.reloadTimer > 0) return true;
-    /*
-     * 投げ切る / 置き切る型の最中 (手を離れるまで最大 1 秒ほど)。**押したことは覚えておいて、
-     * 手を離れた瞬間に出す。** 捨てていたので、手榴弾を投げてすぐ目の前の敵に掛けようと
-     * すると何も起きなかった (本人 2026-10-12)
-     */
-    if (this.grenadeRelease > 0 || this.setupRelease > 0) {
-      this.cqcQueued = true;
-      return true;
-    }
-    this.cqcQueued = false;
-    const look = this.player.yaw;
-    this.meleeForward.set(-Math.sin(look), 0, -Math.cos(look));
-    const target = this.remotes.cqcTarget(this.player.position, this.meleeForward, (id, side) =>
-      this.hostileTo(id, side),
-    );
-    if (target?.throwable) {
-      const face = Math.atan2(
-        -(target.position.x - this.player.position.x),
-        -(target.position.z - this.player.position.z),
-      );
-      if (this.player.cqc("cqc_throw", face)) this.net.send({ type: "cqc", target: target.id });
-      return true;
-    }
-    // 相手が居れば、空振りでもそちらへ振る
-    const face = target
-      ? Math.atan2(-(target.position.x - this.player.position.x), -(target.position.z - this.player.position.z))
-      : look;
-    this.player.cqc("cqc_miss", face);
-    return true;
-  }
-
   private updateWeapon(dt: number): void {
     // 撃つ手を止めたらパターンを頭に戻す。バースト射撃が意味を持つのはこのため。
 
@@ -4531,7 +3929,7 @@ export class Game {
       body: can(this.player.body, "fire"),
       life: this.life,
       reloading: this.reloadTimer > 0,
-      stabbing: this.stabTimer > 0,
+      stabbing: this.melee.stabTimer > 0,
       ammo: this.ammo,
     });
     this.player.setFiring(firing);
@@ -4590,7 +3988,7 @@ export class Game {
   }
 
   private startReload(): void {
-    if (this.reloadTimer > 0 || this.stabTimer > 0) return;
+    if (this.reloadTimer > 0 || this.melee.stabTimer > 0) return;
     // 体の条件 (転がり・這い・伏せへの出入り・箱…) は動作の表 (moves.ts の reload)
     if (!can(this.player.body, "reload")) return;
     // どの姿勢で始めたかを控える。**途中で姿勢が変わったら中断する**
@@ -5001,456 +4399,6 @@ export class Game {
 
   /** この押下でもう転がったか。**1 回の押下につき 1 度だけ** */
   private rolledThisHold = false;
-  /** 次の弾倉を構えられる時刻 (performance.now)。投げてから MAGAZINE_REARM_MS */
-  private magazineReadyAt = 0;
-
-  /**
-   * 投げる構えと、離したときの投擲。
-   *
-   * 押している間は落下点を見せ、離した瞬間に投げる。音で釣る道具なので、
-   * どこへ落ちるかを見てから決められないと「そこへ落とす」判断にならない。
-   * 押した瞬間に飛ぶ形だと、狙った場所へ落とすのが運になる。
-   *
-   * 数を限ってあるのは、無制限だと「とりあえず投げ続ける」が最適になって
-   * 読み合いにならないため。1 回の命につき数発で、外せば手フラグが減る。
-   */
-  private updateThrowAim(): void {
-    // ボルトを送り終えるまでは投げられない。持ち替え・ダンボール・ローリング・
-    // リロードと同じドメインルール。ここが抜けていて、撃った直後に投げるとコッキングを
-    // 省略できた
-    const canThrow =
-      this.inv.held === "magazine" && canAct(this.life) && can(this.player.body, 'throw') && !this.cocking;
-    const held = canThrow && this.input.aiming;
-    // 手榴弾・クレイモアと同じドメインルール。構え始めと同じフレームの分も覚えておく
-    const pulled = this.triggerEdge || this.pendingDecoy;
-    const release = held && this.throwAiming && pulled;
-
-    if (held && !release) {
-      /*
-       * **投げてすぐは構え直さない。** 弾倉には振りかぶりの型が無いので、構えを押したままだと
-       * 投げた次のコマにはもう構えていて、引き金を連打するだけで投げ続けられた。手榴弾の
-       * 「振り切ってからピンを抜く」に当たる間を置く (2026-10-25 本人「mag とかの投擲も同じだよね？」)
-       */
-      if (!this.throwAiming && performance.now() < this.magazineReadyAt) return;
-      this.follow.aimOrigin(this.aimOrigin);
-      this.follow.aimDirection(this.aimDir);
-      this.thrown.showPreview(
-        this.aimOrigin,
-        this.aimDir,
-        this.stage.collidables,
-        this.stage.water,
-      );
-      if (!this.throwAiming) this.pendingDecoy = this.triggerEdge;
-      this.throwAiming = true;
-      return;
-    }
-
-    if (!this.throwAiming) return;
-    this.throwAiming = false;
-    this.pendingDecoy = false;
-    this.thrown.hidePreview();
-    // 構えをやめただけ / 解かされただけ (死んだ・箱に入った) なら投げない
-    if (!release || !canThrow) return;
-
-    this.inv.spend();
-    this.magazineReadyAt = performance.now() + MAGAZINE_REARM_MS;
-    this.follow.aimOrigin(this.aimOrigin);
-    this.follow.aimDirection(this.aimDir);
-    this.thrown.throwFrom(this.aimOrigin, this.aimDir);
-    this.net.send({
-      type: "throw",
-      id: this.net.id,
-      from: [this.aimOrigin.x, this.aimOrigin.y, this.aimOrigin.z],
-      dir: [this.aimDir.x, this.aimDir.y, this.aimDir.z],
-    });
-  }
-
-  /**
-   * 手榴弾の構えと投擲。
-   *
-   * 弾倉と同じで、押している間に落下点を見せ、離した瞬間に投げる。
-   * どこへ落ちるかを見てから決められないと「そこへ落とす」判断にならない。
-   *
-   * 信管は**手を離れてから**動き出す。握ったまま溜める手 (cooking) は入れていない。
-   * 溜められると、構えている間ずっと残り時間を見せる必要が出てきて、
-   * 「落下点を見る」ためのこの画面と役目がぶつかる。
-   */
-  /**
-   * 手にある物で分ける。
-   *
-   * **投げるのは引き金。** 持ち替えて手にした物を、引き金で使う。物ごとに別の
-   * キーを割り当てると「持ち替えたのに別のキーを押す」ことになって、持ち替えた
-   * こと自体が意味を失う。
-   *
-   * **銃と同じ二段。** 構える (Shift / 右クリック) と振りかぶり、引き金 (左
-   * クリック) で放す。銃は構えて撃つので、投げ物だけ別の操作にすると持ち替えた
-   * ときに指が迷う。落下点は構えている間ずっと見えるので、狙ってから放せる。
-   */
-  /**
-   * 握っていた手榴弾を手放す。
-   *
-   * **落としたのはサーバー** (転倒と仰け反りの所で足元に置いている)。こちらは
-   * その分を持ち物から引いて、構えを畳むだけ。引かないと、画面の残り数だけが
-   * 1 個多いまま残る。
-   *
-   * 振りかぶっていなければ何もしない — サーバーも同じ条件で見ている
-   * (holdingGrenade)。
-   */
-  /** いま投げようとしている物。**振り切ったときに知らせる先が変わる** */
-  private throwHeld: HeldId = "grenade";
-
-  private loseHeldGrenade(): void {
-    if (!this.grenadeAiming && this.grenadeRelease <= 0) return;
-    if (this.inv.held === "grenade") this.inv.spend();
-    this.grenadeAiming = false;
-    this.grenadeRelease = 0;
-    this.grenades.hidePreview();
-    this.player.cancelThrow();
-    this.player.setThrowing(false);
-  }
-
-  private updateGrenadeAim(): void {
-    // 手榴弾から離れたなら、構えも**落下点も**畳む。
-    //
-    // 消すのを忘れていて、構えたままダンボールを被ると放物線が出っぱなしに
-    // なっていた。持ち替え・箱・死亡のどれでもここを通る
-    //
-    // **振り切っている最中は畳まない** (grenadeRelease > 0)。最後の 1 個を投げると
-    // 持ち物から消えて次の武器へ移るので、投げの型がそこで中断されていた
-    if (!isThrownByHand(this.inv.held) && this.grenadeAiming && this.grenadeRelease <= 0) {
-      this.grenadeAiming = false;
-      this.grenades.hidePreview();
-      this.player.cancelThrow();
-      this.player.setThrowing(false);
-    }
-    // クレイモアから離れたときも同じ。**構えっぱなしで腕が上がったまま**になる
-    if (!isPlaceable(this.inv.held) && this.setupAiming && this.setupRelease <= 0) {
-      this.setupAiming = false;
-      this.placePreview.hide();
-      this.player.cancelThrow();
-      this.player.setThrowing(false);
-    }
-    /*
-     * 置く物は同じ型を通す。**クレイモアも decoy も「かがんで置く」。**
-     *
-     * 違うのは置いた後だけなので、構えと置き切りの手順は分けない。
-     * どちらを置いたかは setupHeld が覚えていて、知らせるときに分かれる。
-     */
-    if (isPlaceable(this.inv.held)) {
-      this.setupHeld = this.inv.held;
-      this.updateClaymoreSetup();
-      return;
-    }
-    /*
-     * **手榴弾と E LOCATOR は同じ型で投げる。**
-     *
-     * 違うのは手を離れた後だけ (爆ぜるか、置き続けるか) なので、構えと
-     * 振りかぶりの手順は分けない。どちらを投げたかは throwHeld が覚えていて、
-     * 知らせるときに分かれる (置く物で setupHeld がしているのと同じ形)。
-     */
-    if (!isThrownByHand(this.inv.held)) return;
-    this.throwHeld = this.inv.held;
-    // 倒れている間は投げられない。しゃがみと箱は許す (箱の中からは出せない)
-    const canThrow =
-      this.inv.countOf(this.inv.held) > 0 &&
-      canAct(this.life) &&
-      // 箱・倒れ・梯子・転がり・跳び越え・ぶら下がりは表 (domain/player/moves.ts) で弾く
-      can(this.player.body, 'throw') &&
-      // **転がりの絵が流れている間は振りかぶれない。** rolling より長い (尻尾の中で
-      // 始まって見えない) ので、表の rolling とは別にここで見る
-      !this.player.rollShowing &&
-      !this.cocking;
-    const held = canThrow && this.input.aiming;
-    /*
-     * 構えている間に引き金を引いたら放す。押しっぱなしで連投しない。
-     *
-     * **同じフレームで構えて引いた分も覚えておく** (pendingThrow)。Shift と
-     * クリックがほぼ同時だと、その回は「構え始め」で消えて、引いたことが
-     * 無かったことになっていた。押した意思は消さずに、振りかぶりが始まった
-     * 次のフレームで放す。
-     */
-    const pulled = this.triggerEdge || this.pendingThrow;
-    const release = held && this.grenadeAiming && pulled;
-
-    if (held && !release) {
-      /*
-       * **前の 1 個が手を離れるまで、次を構え始めない。**
-       *
-       * 構えたまま (Shift を押したまま) 引き金を引くと、その次のフレームには
-       * grenadeAiming が倒れていて「構え始め」に見える。そこで振りかぶりを
-       * 頭から流し直していたので、**振り上げている最中に前の 1 個が飛んだ**。
-       * 振り上げ切った時には 2 個目が構えられている、という形で出る。
-       *
-       * 手を離れるのは引き金を引いた 1.5 秒後まで遅れることがある
-       * (振りかぶりの残りを待つため)。その間は投げの型が流れているので、
-       * 新しい振りかぶりを重ねてはいけない。
-       */
-      if (this.grenadeRelease > 0) return;
-      /*
-       * **振り切りが流れ終わるまで、次のピンを抜かない。** 手を離れた瞬間に次の振りかぶりを
-       * 頭から流していたので、構えを押したままだと振り切りが打ち切られてピンを抜く動きが
-       * 見えないまま構え終わり、続けざまに投げられた (2026-10-25 本人「L2 押しっぱで次の球が
-       * すぐ投げられる、再度ピンを抜くモーションをしてくれないと連続で投げられる」)
-       */
-      if (!this.grenadeAiming && this.player.throwFollowingThrough) return;
-
-      // 構えた瞬間にピンを抜いて振りかぶり始める。腕を引き切った所で止まる。
-      // 落下点はその間ずっと見える — どこへ落とすかを見てから放せるように
-      if (!this.grenadeAiming) {
-        this.player.playThrow();
-        // 構え始めと同じフレームに引かれた分を覚えておく
-        this.pendingThrow = this.triggerEdge;
-      }
-      this.grenadeAiming = true;
-      this.follow.aimDirection(this.aimDir);
-      // 前へ出す量は水平方向だけで測る。見上げているときに近く、
-      // 見下ろしているときに遠く、では手の位置が動いて見える
-      const flat = Math.hypot(this.aimDir.x, this.aimDir.z) || 1;
-      // 手を離れる高さは構えで変わる。**伏せていれば腕も低い所を通る**
-      // (サーバーが手榴弾を出す位置と同じ式。ここを変えるなら domain/item/grenade も)
-      this.grenadeOrigin.set(
-        this.player.position.x + (this.aimDir.x / flat) * GRENADE_RELEASE_FORWARD,
-        this.player.position.y + RELEASE_HEIGHT[this.player.stance],
-        this.player.position.z + (this.aimDir.z / flat) * GRENADE_RELEASE_FORWARD,
-      );
-      // 線の頭は振りかぶった右手から。軌道 (落ちる所) はサーバーと同じ origin のまま
-      /*
-       * **振りかぶり切ってから線を出す。** 取り出して腕を引いている間は右手が
-       * 動くので、線の頭がそれに付いてうねる。引き切って手が止まり、実際に
-       * 放せる状態になった時に初めて出す (それまで放しても手を離れないので、
-       * 線が無くても嘘にならない)
-       */
-      if (this.player.throwWindupLeft > 0) {
-        this.grenades.hidePreview();
-      } else {
-        const fromHand = this.player.rightHandAt(this.throwHand);
-        this.grenades.showPreview(
-          this.grenadeOrigin,
-          this.aimDir,
-          this.stage.thrownWorld,
-          this.stage.water,
-          throwSpeedOf(this.skills),
-          fromHand ? this.throwHand : undefined,
-        );
-      }
-      // 体を照準の方へ向ける。投げる向きと見た目を一致させる
-      this.player.setThrowing(true);
-      return;
-    }
-
-    if (!this.grenadeAiming) {
-      /*
-       * 振り切っている最中に構えをやめた。**投げない。**
-       *
-       * 手榴弾が手を離れるのは引き金を引いた 1.5 秒後まで遅れることがある
-       * (振りかぶりが残っているぶん待つ)。その間に構えを解けば、腕は下りて
-       * 型も畳まれる。**画面では投げていないのに手榴弾だけ飛んでいく**のは
-       * 嘘になるので、離す前なら無かったことにする。
-       *
-       * ピンを戻したことになるが、そこを咎めるより「見た通りに起きる」ほうを
-       * 取る。代わりに、投げ切りたければ手を離れるまで構えていることになる。
-       */
-      if (this.grenadeRelease > 0 && !held) {
-        this.grenadeRelease = 0;
-        this.player.cancelThrow();
-        this.player.setThrowing(false);
-        return;
-      }
-      // 構えても投げてもいない間だけ解く。放すまでは向きを保つ
-      if (this.grenadeRelease <= 0) this.player.setThrowing(false);
-      return;
-    }
-    this.grenadeAiming = false;
-    this.pendingThrow = false;
-    this.grenades.hidePreview();
-
-    // **構えをやめただけなら投げない。** 引き金を引いていないのに投げると、
-    // 覗いて確かめる、が使えなくなる
-    if (!release) {
-      this.player.cancelThrow();
-      this.player.setThrowing(false);
-      return;
-    }
-
-    // 構えを解かされただけ (倒された・箱に入った・死んだ) なら投げない。
-    // 腕を下ろして構えに戻す。抜いたピンは無かったことになるが、
-    // ここで爆発させると理不尽な死に方が増えるだけで読み合いにならない
-    if (!canThrow) {
-      this.player.cancelThrow();
-      this.player.setThrowing(false);
-      return;
-    }
-
-    // **数を減らすのは手を離れたとき** (updateGrenadeRelease)。
-    //
-    // 引き金を引いた時点で減らしていたので、軽く叩いたとき (振りかぶりが
-    // 残っている) に「まだ投げていないのに残り数が減る」が 1.5 秒続いていた。
-    // 止めていた続きから振り切る。手を離れるのはその途中
-    this.player.releaseThrow();
-    // 残りは**いまどこまで再生されたか**から測る。
-    //
-    // 振りかぶりで止まっている前提で引くと、軽く叩いただけのときに
-    // まだ腕を引いている途中なのに手を離れる。長押しなら 1.50 秒まで
-    // 進んでいるので差は 0.16 秒、叩いただけならほぼ丸ごと残る。
-    // **振りかぶりの残りを待ってから**、投げの型の途中で手を離れる。
-    // 軽く叩いただけなら振りかぶりが残っているぶん遅れて出る
-    // 放す割合は型ごと。**伏せの投擲は弧の頂点** (knobs.ts の注)
-    const ratio = this.player.proneThrowing
-      ? PRONE_GRENADE_RELEASE_RATIO
-      : this.knobs.grenadeRelease;
-    this.grenadeRelease = Math.max(
-      0.01,
-      this.player.throwWindupLeft + ratio * this.player.throwReleaseDuration,
-    );
-  }
-
-  /** クレイモアを構えているか */
-  private setupAiming = false;
-  /** いま置こうとしている物。**置き切ったときに知らせる先が変わる** */
-  private setupHeld: HeldId = "claymore";
-  /** 置き切るまでの残り (秒)。0 になった瞬間にサーバーへ知らせる */
-  private setupRelease = 0;
-
-  /**
-   * クレイモアを置く。
-   *
-   * 手榴弾と同じで、押している間は構えたまま止まり、離すと置く型が流れる。
-   * **落下点は見せない** — 投げる物ではないので、置くのは自分の足元の前と決まっている。
-   *
-   * 置く型は 3.6 秒あって、その間ずっと無防備。置いて離れる道具の代償がここ。
-   *
-   * **置けない所では置く型に入らない。** 審判は壁際や縁の外を黙って弾く
-   * (placeSpot)。客が見ずに型だけ流すと、しゃがんで立ち上がって何も出ない、
-   * という形で出る。同じ式を手元で読んで、置けない間は引き金を無視して
-   * 構えのまま留める。印は赤くなるので、動けば置けると分かる。
-   */
-  private updateClaymoreSetup(): void {
-    const canPlace =
-      this.inv.countOf(this.inv.held) > 0 &&
-      canAct(this.life) &&
-      // 手榴弾と同じ。条件は表 (domain/player/moves.ts)
-      can(this.player.body, 'place') &&
-      // 手榴弾と同じ。絵が終わるまで待つ
-      !this.player.rollShowing &&
-      !this.cocking;
-    const held = canPlace && this.input.aiming;
-    // 手榴弾と同じドメインルール。**構え始めと同じフレームに引かれた分も覚えておく**
-    const pulled = this.triggerEdge || this.pendingSetup;
-    // 置く所。審判と同じ式 (向きは体の向き = 審判が受け取る yaw)
-    const spot = held
-      ? placeSpot(
-          { x: this.player.position.x, y: this.player.position.y, z: this.player.position.z, yaw: this.player.yaw },
-          this.placeSolid,
-          STEP_UP,
-          // 人が止まる面。審判と同じ (server/stage.ts の body)。無ければ箱で見る
-          this.stage.moveWorld?.surfaces ?? null,
-          this.placeAt,
-        )
-      : null;
-    if (spot && this.placeSolid.length === 0 && !this.stage.moveWorld) {
-      // 箱も面もまだ無い (届いていない / 読めなかった)。地面が 0 に見えて高い所では
-      // 全部「浮く」になるので、見ずに通す。弾くのは審判の仕事のまま
-      spot.ok = true;
-      spot.y = this.player.position.y;
-    }
-    // 構えている間だけ描く。置く型が流れ始めたら消す (置く所はもう決まった)
-    if (spot && this.setupRelease <= 0) {
-      this.placePreview.show(
-        spot,
-        this.player.yaw,
-        this.setupHeld === "claymore" ? "fan" : this.setupHeld === "doll" ? "disc" : null,
-        this.selfTeam,
-      );
-    } else {
-      this.placePreview.hide();
-    }
-    const placeable = !!spot?.ok;
-    if (pulled && !placeable) {
-      // 置けない所で引いた。**捨てる** — 動いて置ける所へ来た時に勝手に置かれると、
-      // 置く気の無い場所に置く。引き直してもらう
-      this.pendingSetup = false;
-    }
-    const release = held && this.setupAiming && pulled && placeable;
-
-    if (held && !release) {
-      /*
-       * **前の 1 個が手を離れるまで、次を構え始めない。**
-       *
-       * 手榴弾と同じ罠 (updateGrenadeThrow の grenadeRelease)。構えたまま
-       * 引き金を引くと、その次のフレームには setupAiming が倒れていて
-       * 「構え始め」に見える。そこで振りかぶりを頭から流し直すと、
-       * **置く型の途中で立ち姿 (腰 1.00m) から始まる**ので、立ち上がって
-       * しゃがみ直すように見えた。
-       *
-       * 置く型が流れている間 (setupRelease > 0) は何もしない。
-       *
-       * **置き切るまで次を構えない。** 手を離れた後も置く型は続いている
-       * (置くのは型の 8 割の所)。そこで次の振りかぶりを頭から流すと、しゃがんで
-       * 置いた人が立ち上がって見える (振りかぶりは立ち姿から始まる)
-       */
-      if (this.setupRelease > 0 || (!this.setupAiming && this.player.placing)) return;
-
-      if (!this.setupAiming) {
-        this.player.playSetup();
-        // 置けない所で引かれた分は覚えない (上と同じ理由)
-        this.pendingSetup = this.triggerEdge && placeable;
-      }
-      this.setupAiming = true;
-      // 体をカメラの方へ向ける。置く向き = 自分の向きなので、これが照準になる
-      this.player.setThrowing(true);
-      return;
-    }
-
-    if (!this.setupAiming) {
-      /*
-       * 置き切る前に構えをやめた。**置かない** (手榴弾と同じドメインルール)。
-       *
-       * 手を離れるのは引き金を引いたあと。その間に構えを解けば腕は下りるので、
-       * 画面では置いていない。**見た通りに起きる**ほうを取る。
-       */
-      if (this.setupRelease > 0 && !held) {
-        this.setupRelease = 0;
-        this.player.cancelThrow();
-        this.player.setThrowing(false);
-      }
-      return;
-    }
-    this.setupAiming = false;
-    this.pendingSetup = false;
-    this.placePreview.hide();
-    // 構えをやめただけなら置かない。覗いて場所を確かめる、が使える
-    if (!release || !canPlace) {
-      this.player.cancelThrow();
-      this.player.setThrowing(false);
-      return;
-    }
-
-    // **数を減らすのは置いた瞬間** (updateClaymoreRelease)
-    this.player.releaseSetup();
-    // 置き切るまでは向きを保つ。放した瞬間に向き直ると、置く先がずれる
-    this.player.setThrowing(true);
-    // 置く型の途中で手を離れる。振りかぶりが残っていればそのぶん待つ
-    this.setupRelease = Math.max(
-      0.01,
-      this.player.throwWindupLeft + CLAYMORE_PLACE_RATIO * this.player.setupReleaseDuration,
-    );
-  }
-
-  /** 置き切ったらサーバーへ知らせる。位置も向きもあちらが決める */
-  private updateClaymoreRelease(dt: number): void {
-    if (this.setupRelease <= 0) return;
-    this.setupRelease -= dt;
-    if (this.setupRelease > 0) return;
-    this.setupRelease = 0;
-    this.player.setThrowing(false);
-    // **数を減らすのはサーバーが置けたと言ってから** (claymorePlaced)。
-    // 壁の中や縁の外は断られるので、送った時点で減らすと置けずに減る
-    // **どちらを置いたかは構え始めに覚えてある。** 置き切るまでの間に
-    // 持ち替えられても、流れていた型と知らせる先が食い違わない
-    this.net.send(
-      this.setupHeld === "decoy" ? { type: "decoy" } : this.setupHeld === "doll" ? { type: "doll" } : { type: "claymore" },
-    );
-  }
 
   /**
    * 落ちたことをサーバーへ知らせる。
@@ -5660,29 +4608,6 @@ export class Game {
     if (isGun(held)) {
       void this.player.equip(held);
     }
-  }
-
-  /** 投げる型が振り切る所で手を離す */
-  private updateGrenadeRelease(dt: number): void {
-    if (this.grenadeRelease <= 0) return;
-    this.grenadeRelease -= dt;
-    if (this.grenadeRelease > 0) return;
-    this.grenadeRelease = 0;
-    this.player.setThrowing(false);
-    // ここで初めて手を離れる。残り数が減るのもここ
-    this.inv.spend();
-
-    // 向きはこの瞬間のもの。放す所まで狙いを追えるようにする
-    this.follow.aimDirection(this.aimDir);
-    // 向きだけ送る。位置も速さもサーバーが決める (捏造した初速で
-    // 地図の反対側まで飛ばせないように)
-    //
-    // **どちらを投げたかは構え始めに覚えてある** (throwHeld)。振り切るまでの
-    // 間に持ち替えられても、流れていた型と知らせる先が食い違わない
-    this.net.send({
-      type: this.throwHeld === "locator" ? "locator" : "grenade",
-      dir: [this.aimDir.x, this.aimDir.y, this.aimDir.z],
-    });
   }
 
   /**
@@ -6130,12 +5055,13 @@ export class Game {
      * 直前まで持っていた物に用は無い。
      */
     const choosing = this.canChooseLoadout;
-    const shownWeapon: HeldId =
-      choosing ? (this.pendingLoadout.primary ?? "knife") : this.inv.weapon;
-    const chosen = weaponOf(this.pendingLoadout.primary);
-    const shownAmmo = choosing
-      ? { magazine: chosen.magazine, reserve: chosen.reserve }
-      : { magazine: this.inv.ammoOf(shownWeapon), reserve: this.inv.reserveOf(shownWeapon) };
+    const card = weaponCard(choosing, this.pendingLoadout.primary, {
+      weapon: this.inv.weapon,
+      ammoOf: (id) => this.inv.ammoOf(id),
+      reserveOf: (id) => this.inv.reserveOf(id),
+      magazine: this.weapon.magazine,
+    });
+    const clock = loadoutClock(this.replica.match?.phase, this.replica.match?.endsAt ?? 0, this.chooseElapsed, now);
     this.onStats({
       // 地形と自分の模型が揃って初めて戦場を見せる。**どちらも後から届く**
       ready: this.stageReady && this.player.dressed,
@@ -6149,9 +5075,9 @@ export class Game {
       shots: this.shotCount,
       // **武器のカードに出す数。** 手にある物ではなく、カードが名指している武器の
       // 弾。ダンボールを被っている間も銃の残弾はそのまま出す
-      ammo: shownAmmo.magazine,
-      magazine: choosing ? chosen.magazine : this.weapon.magazine,
-      reserve: shownAmmo.reserve,
+      ammo: card.ammo,
+      magazine: card.magazine,
+      reserve: card.reserve,
       reloading: this.reloadTimer > 0,
       downed: this.player.canStandUp,
       aiming: this.player.isAiming,
@@ -6200,12 +5126,10 @@ export class Game {
        * になって、何を待っているのか分からなくなる。始まる時刻はサーバーが
        * 持っているので、そちらから引く。
        */
-      loadoutLeft:
-        this.replica.match?.phase === "ready" || this.replica.match?.phase === "countdown"
-          ? Math.max(0, Math.ceil(((this.replica.match?.endsAt ?? 0) - now) / 1000))
-          : Math.max(0, Math.ceil(CHOOSE_TIMEOUT - this.chooseElapsed)),
+      // 残り秒。**支度の段階では試合が始まるまで** (stats.ts の loadoutClock)
+      loadoutLeft: clock.left,
       // OK が効くようになるまで。押せないボタンを押させないための表示
-      loadoutWait: Math.max(0, Math.ceil(CHOOSE_FLOOR - this.chooseElapsed)),
+      loadoutWait: clock.wait,
       skills: this.skills,
       // 窓が開いているかは試合の段階で決まる。ドメインルールは domain が持つ
       loadoutFocus: this.loadoutFocus,
@@ -6219,14 +5143,7 @@ export class Game {
       debug: DEBUG_HUD ? this.debugReadout() : null,
       canResupply: this.canResupply,
       canPat: this.patTarget() !== null,
-      targetNotice:
-        this.targetNotice && now - this.targetNotice.at < TARGET_NOTICE_MS
-          ? {
-              text: this.targetNotice.text,
-              team: this.targetNotice.team,
-              leaving: now - this.targetNotice.at >= TARGET_NOTICE_MS - TARGET_NOTICE_LEAVE_MS,
-            }
-          : null,
+      targetNotice: targetNoticeOf(this.targetNotice, now),
       canDropTarget: this.inv.tool === "target",
       scores: this.replica.match?.players ?? [],
       // 視界の曇り (0..1)。**残りの数字ではなく、効き目を渡す**
@@ -6251,16 +5168,7 @@ export class Game {
         (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
       ),
       kills: this.feedItems(now),
-      voiceMenu:
-        this.voiceMenuUntil > now
-          ? this.voiceCategory === null
-            ? { title: "VOICE", items: VOICE_CATEGORIES.map((c) => c.label), pad: this.input.activeDevice === "gamepad" }
-            : {
-                title: VOICE_CATEGORIES[this.voiceCategory].label,
-                items: VOICE_CATEGORIES[this.voiceCategory].lines.map((id) => voiceLine(id)?.label ?? id),
-                pad: this.input.activeDevice === "gamepad",
-              }
-          : null,
+      voiceMenu: voiceMenuOf(this.voiceMenuUntil, this.voiceCategory, this.input.activeDevice === "gamepad", now),
       throwables: this.inv.countOf('magazine'),
       grenades: this.inv.supportCount,
       /**
@@ -6287,20 +5195,17 @@ export class Game {
         : null,
       held: this.inv.held,
       // **武器のカードに出す物。** 道具を手にしていても変わらない
-      weaponHeld: shownWeapon,
-      stunCharge: this.stunChargeNow,
+      weaponHeld: card.shown,
+      stunCharge: this.melee.stunChargeNow,
       tool: this.inv.tool,
       toolInHand: this.inv.usingTool,
       // STEALTH は手に持たないが、着ている間は道具のカードを点ける (武器のカードは暗くしない)
       wearingStealth: this.inv.wearingStealth,
       // CAUTION は部屋で 1 つ (サーバーが持つ)。手元の時計へ直した切れる時刻から
-      caution: Math.max(0, (this.replica.match?.cautionUntil ?? 0) - Date.now()) / 1000,
+      caution: secondsUntil(this.replica.match?.cautionUntil, now),
       // 落ちたターゲットが戻るまで。取り直すと消え、次に落とすと 30 秒から (サーバーが持つ)
-      targetReturn: Math.max(0, (this.replica.match?.target?.returnsAt ?? 0) - Date.now()) / 1000,
-      downLeft:
-        MODES[this.replica.mode].downGrows && isDowned(this.life)
-          ? Math.max(0, this.downFor - (Date.now() - this.lifeAt) / 1000)
-          : 0,
+      targetReturn: secondsUntil(this.replica.match?.target?.returnsAt, now),
+      downLeft: downLeftOf(MODES[this.replica.mode].downGrows, this.life, this.downFor, this.lifeAt, now),
       downFor: this.downFor,
       browsingFamily: this.inv.browsing?.family ?? null,
       switching: this.inv.switching,

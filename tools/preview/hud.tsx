@@ -11,7 +11,7 @@ import { createSignal } from 'solid-js'
 import { Spread } from '../../src/domain/item/spread'
 import { WEAPONS, type WeaponId } from '../../src/domain/item/weapons'
 import Hud from '../../src/presentation/ui/Hud'
-import type { GameStats } from '../../src/presentation/scene/Game'
+import type { GameStats } from '../../src/presentation/scene/stats'
 
 const base = {
   stage: 'GARAGE', backend: 'webgpu', fps: 120, x: 0, z: 0, speed: 0,

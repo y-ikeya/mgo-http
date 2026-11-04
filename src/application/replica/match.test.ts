@@ -263,3 +263,54 @@ describe('終わる時刻', () => {
     expect(replica.match?.endsAt).toBe(0)
   })
 })
+
+/**
+ * **自分の状態と、段階が変わった時にすること** (Game.ts の receive() から出した、2026-11-03)。
+ * 描画器が無いと動かないクラスの中にあった判断なので、ここで初めて試験できる
+ */
+describe('自分の状態', () => {
+  test('自分の life だけ受け、変わった時だけ知らせる', () => {
+    const replica = newMatchReplica()
+    expect(applyMatch(replica, { type: 'life', id: 'bob', state: 'downed' } as ServerMessage, SELF, 1)).toEqual([])
+    expect(replica.life).toBe('joining')
+    expect(applyMatch(replica, { type: 'life', id: SELF, state: 'choosing' } as ServerMessage, SELF, 2)).toEqual([
+      { kind: 'life', to: 'choosing' },
+    ])
+    expect(replica.lifeAt).toBe(2)
+    // 同じ状態が重ねて届いても何もしない (時刻も動かさない)
+    expect(applyMatch(replica, { type: 'life', id: SELF, state: 'choosing' } as ServerMessage, SELF, 3)).toEqual([])
+    expect(replica.lifeAt).toBe(2)
+  })
+
+  test('倒れた時は倒れたままでいる秒数も持つ (CAP は延びる)', () => {
+    const replica = newMatchReplica()
+    applyMatch(replica, { type: 'life', id: SELF, state: 'downed', downFor: 9 } as ServerMessage, SELF, 1)
+    expect(replica.downFor).toBe(9)
+  })
+})
+
+describe('段階が変わった時', () => {
+  test('**秒読みに入ったら名簿を頼み続け、届いたら下ろす**', () => {
+    const replica = newMatchReplica()
+    applyMatch(replica, matchMessage({ phase: 'countdown' }), SELF, 1)
+    expect(replica.rosterWanted).toBe(true)
+    // 秒読みが続いている間に届く報せでは立て直さない
+    applyMatch(replica, { type: 'roster', players: [] } as ServerMessage, SELF, 2)
+    applyMatch(replica, matchMessage({ phase: 'countdown' }), SELF, 3)
+    expect(replica.rosterWanted).toBe(false)
+  })
+
+  test('**支度に入ったらルールの説明。同じモードが続く間は出さない**', () => {
+    const replica = newMatchReplica()
+    const briefs = (message: ServerMessage) => applyMatch(replica, message, SELF, 0).filter((e) => e.kind === 'brief')
+    expect(briefs(matchMessage({ phase: 'ready', mode: 'TDM', blue: 20, stage: 'uu' }))).toEqual([
+      { kind: 'brief', mode: 'TDM', tickets: 20, stage: 'uu' },
+    ])
+    briefs(matchMessage({ phase: 'playing', mode: 'TDM' }))
+    // 次の試合も TDM なら出さない
+    expect(briefs(matchMessage({ phase: 'ready', mode: 'TDM' }))).toEqual([])
+    briefs(matchMessage({ phase: 'playing', mode: 'TDM' }))
+    // ルールが変わったら出す (試合ごとに回す部屋)
+    expect(briefs(matchMessage({ phase: 'ready', mode: 'CAP', blue: 20, stage: 'uu' }))).toHaveLength(1)
+  })
+})

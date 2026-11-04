@@ -98,11 +98,17 @@ const LAYERS: Record<string, readonly string[]> = {
   'application/protocol': ['domain'],
   /** サーバーの状態を追う。**決めない** — 報せを受けて進むだけ */
   'application/replica': ['domain', 'application/protocol'],
+  /**
+   * 支度 (装備を選ぶ・READY・湧く)。**押下と選んだ物を、やることに直す。** 決めるのはサーバーで、
+   * ここは手元の選びと入力の状態機械だけ (2026-11-03、Game.ts から出した)
+   */
+  'application/loadout': ['domain'],
   presentation: [
     'domain',
     'sim',
     'application/protocol',
     'application/replica',
+    'application/loadout',
     'infra/link',
     'infra/api',
     'infra/auth',
@@ -117,7 +123,7 @@ const LAYERS: Record<string, readonly string[]> = {
 }
 
 /** three も DOM も知らない層。**サーバーがそのまま読む**ので入れられない */
-const HEADLESS = ['domain', 'sim', 'application/protocol', 'application/replica', 'infra/codec']
+const HEADLESS = ['domain', 'sim', 'application/protocol', 'application/replica', 'application/loadout', 'infra/codec']
 
 const SRC = join(import.meta.dir)
 
