@@ -70,7 +70,7 @@ import { Dolls } from "./arms/dolls";
 import { Decoys } from "./arms/decoys";
 import { BlastFx } from "./fx/blastfx";
 import { StunSparks } from "./fx/stunSparks";
-import { Melee } from "./self/melee";
+import { Melee, PUNCH_DELAY } from "./self/melee";
 import { Throwing } from "./self/throwing";
 import { Sensed } from "./fx/sensed";
 import { Casings } from "./fx/casings";
@@ -4703,6 +4703,11 @@ export class Game {
       if (remote.rollStarted) {
         const gain = this.audio.play("roll", remote.object.position);
         this.addPing("roll", remote.object.position, gain);
+      }
+      // CQC の拳。掛かっても空振りでも、殴りかかった所で鳴る
+      if (remote.cqcStarted) {
+        const at = remote.object.position;
+        setTimeout(() => this.audio.play("punch", at), PUNCH_DELAY * 1000);
       }
       // リロードの音。姿が見えている相手にだけ届く (位置がそうなので)
       if (remote.reloadStarted) {
