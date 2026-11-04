@@ -73,8 +73,8 @@ export const rootMotionStore = new WeakMap<THREE.AnimationClip, RootMotionTrack>
 function load(url: string): Promise<GLTF> {
   let pending = cache.get(url)
   if (!pending) {
-    // ステージの glb は gltfpack で meshopt 圧縮している (tools/export_stage.py)。
-    // 兵士のモデルは圧縮していないが、decoder を渡しておいて困ることはない
+    // ステージと兵士の glb は gltfpack で meshopt 圧縮している
+    // (ステージは tools/export_stage.py、兵士は tools/convert_character.py)
     pending = new GLTFLoader()
       .setMeshoptDecoder(MeshoptDecoder)
       .loadAsync(url)

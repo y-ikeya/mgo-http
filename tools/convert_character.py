@@ -145,3 +145,33 @@ options = {
 valid = set(bpy.ops.export_scene.gltf.get_rna_type().properties.keys())
 bpy.ops.export_scene.gltf(**{k: v for k, v in options.items() if k in valid})
 print(f'[done] {config["out"]} ({os.path.getsize(config["out"]) / 1024 / 1024:.1f} MB)')
+
+# --- gltfpack で詰める ---
+#
+# ステージと同じく meshopt 圧縮 (EXT_meshopt_compression) を掛ける。体は
+# 5 体で 60MB を超えていて、初回読込の大部分だった (2026-11-04 に実測)。
+# 読む側は GLTFLoader に MeshoptDecoder を渡している (assets.ts)。
+# フラグの正は tools/gltfpack_flags.js (pack_glb.js / unpack_glb.js が読む)。
+# ここは Python なので写してある。変えるときは両方直すこと。
+# -af 0 だけステージと違う:
+# 既定だとアニメーションが 30Hz にリサンプルされ、型のキーが間引かれる。
+# 兵士は動きそのものが中身なので、キーは元のまま残す。
+# -vpf で位置は量子化しないので、当たりの元になる形も丸まらない。
+import subprocess
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+gltfpack = os.path.join(root, 'node_modules', '.bin', 'gltfpack')
+out_path = os.path.abspath(config['out'])
+if os.path.exists(gltfpack):
+    raw_size = os.path.getsize(out_path)
+    packed_path = out_path[:-len('.glb')] + '.packed.glb'
+    result = subprocess.run(
+        [gltfpack, '-i', out_path, '-o', packed_path, '-cc', '-kn', '-km', '-ke', '-vpf', '-vt', '16', '-af', '0'],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0 and os.path.exists(packed_path):
+        os.replace(packed_path, out_path)
+        print(f'  gltfpack で詰めた: {raw_size / 1e6:.1f}MB → {os.path.getsize(out_path) / 1e6:.1f}MB')
+    else:
+        print(f'  gltfpack に失敗したので素のまま出す: {result.stderr.strip()[:200]}')
+else:
+    print('  gltfpack が無い (bun install) ので素のまま出す')

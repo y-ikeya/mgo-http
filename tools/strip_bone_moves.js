@@ -23,6 +23,11 @@ const bytes = new Uint8Array(await Bun.file(path).arrayBuffer())
 const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 const jsonLength = view.getUint32(12, true)
 const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)))
+// meshopt 圧縮した glb はバイト列を float と誤読して静かに壊すので、先に断る
+if (json.extensionsUsed?.includes('EXT_meshopt_compression')) {
+  console.error(`${path} は meshopt 圧縮済み。この道具は圧縮前の glb 専用 (手順は tools/README.md)`)
+  process.exit(1)
+}
 const binChunk = bytes.subarray(20 + jsonLength)
 
 const hips = json.nodes.findIndex((n) => (n.name ?? '').endsWith('Hips'))

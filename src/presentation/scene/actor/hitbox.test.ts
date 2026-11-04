@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { CharacterAnimator } from './animation'
 import { Hitbox } from './hitbox'
 
@@ -17,7 +18,7 @@ import { Hitbox } from './hitbox'
  *
  * 描画は要らない。実際の soldier.glb を読んで、実際の Hitbox を撃つ。
  */
-const gltf = await new GLTFLoader().parseAsync(
+const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(
   await Bun.file('public/models/soldier.glb').arrayBuffer(),
   '',
 )

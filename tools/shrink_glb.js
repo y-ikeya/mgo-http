@@ -16,6 +16,12 @@ const view = new DataView(src.buffer, src.byteOffset, src.byteLength)
 // GLB: [magic, version, length] + チャンク列 (JSON, BIN)
 const jsonLength = view.getUint32(12, true)
 const gltf = JSON.parse(new TextDecoder().decode(src.subarray(20, 20 + jsonLength)))
+// meshopt 圧縮した glb は、圧縮ぶんの byteOffset が拡張の中にもあり、
+// BIN を組み直すとずれて静かに壊すので、先に断る
+if (gltf.extensionsUsed?.includes('EXT_meshopt_compression')) {
+  console.error(`${input} は meshopt 圧縮済み。この道具は圧縮前の glb 専用 (手順は tools/README.md)`)
+  process.exit(1)
+}
 const binStart = 20 + jsonLength + 8
 const bin = src.subarray(binStart, binStart + view.getUint32(20 + jsonLength, true))
 
