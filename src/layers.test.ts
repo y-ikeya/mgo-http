@@ -125,6 +125,9 @@ const LAYERS: Record<string, readonly string[]> = {
     'presentation/scene/sense',
     'presentation/scene/self',
     'presentation/scene/stats',
+    'presentation/scene/assets',
+    'presentation/scene/knobs',
+    'presentation/scene/calibration',
   ],
   /**
    * scene の中も棚ごとに縛る (2026-11-04)。
@@ -138,8 +141,9 @@ const LAYERS: Record<string, readonly string[]> = {
    * 向きの実態 (2026-11-04 に import を数えた):
    *   util が一番下。world がその上 (影と面)。actor と arms は world を
    *   読み、sense は actor を見る。self は自機の操作なので全部の利用者。
-   *   scene 直下 (Game / assets / calibration / portrait / knobs) は
-   *   組み立てる所なので、棚を全部読める。
+   *   scene 直下 (Game / portrait) は組み立てる所なので、棚を全部読める。
+   *   **棚は scene 直下を読まない** — 棚が読む assets / knobs は 1 枚ずつの層に
+   *   切り分けて棚より下に置いた (下の行)。直下と棚は一方通行
    */
   'presentation/scene': [
     'domain',
@@ -161,11 +165,35 @@ const LAYERS: Record<string, readonly string[]> = {
     'presentation/scene/sense',
     'presentation/scene/self',
     'presentation/scene/stats',
+    'presentation/scene/assets',
+    'presentation/scene/knobs',
+    'presentation/scene/calibration',
+  ],
+  /**
+   * scene 直下の 1 枚ずつ。**棚から読まれる物は、棚より下に置く** (2026-11-04)。
+   *
+   * 棚は assets (glb の読み) と knobs (調整の数) を読む。scene 直下を 1 つの層として
+   * 許していた頃は、棚と直下が互いに読み合う形だった (Game を読むのだけは別の試験で止める)。
+   * ファイルは動かさず、層の行を足して向きを決める (actor/skin と同じ流儀)。
+   *
+   *   assets       glb の読み。皮の名前 (actor/skin) と util だけ。**型の表は読まない** —
+   *                無い型の警告は体を組み立てる所 (actor/animation の warnMissingClips) へ移した
+   *   knobs        調整の数。何も読まない
+   *   calibration  調整盤。兵士・カメラ・箱・空を直に触る利用者なので棚より上
+   */
+  'presentation/scene/assets': ['domain', 'presentation/scene/actor/skin', 'presentation/scene/util'],
+  'presentation/scene/knobs': [],
+  'presentation/scene/calibration': [
+    'infra/input',
+    'presentation/scene/actor',
+    'presentation/scene/sense',
+    'presentation/scene/world',
+    'presentation/scene/knobs',
   ],
   /** 道具の置き場。three の小さな部品と、資産の読み書きだけ。棚は読まない */
   'presentation/scene/util': [],
   /** 面と影。util と、資産の読み (assets) だけ */
-  'presentation/scene/world': ['domain', 'sim', 'presentation/scene', 'presentation/scene/util'],
+  'presentation/scene/world': ['domain', 'sim', 'presentation/scene/util', 'presentation/scene/assets'],
   /**
    * 皮の対応表。**何も読まない**データだけの 1 枚。
    *
@@ -180,7 +208,7 @@ const LAYERS: Record<string, readonly string[]> = {
     'sim',
     'application/protocol',
     'application/replica',
-    'presentation/scene',
+    'presentation/scene/assets',
     'presentation/scene/util',
     'presentation/scene/world',
     'presentation/scene/arms',
@@ -191,20 +219,20 @@ const LAYERS: Record<string, readonly string[]> = {
   'presentation/scene/arms': [
     'domain',
     'sim',
-    'presentation/scene',
     'presentation/scene/util',
     'presentation/scene/world',
     'presentation/scene/actor/skin',
+    'presentation/scene/assets',
   ],
   /** 演出。面 (world/stage) と資産の読みだけ */
-  'presentation/scene/fx': ['domain', 'sim', 'presentation/scene', 'presentation/scene/world'],
+  'presentation/scene/fx': ['domain', 'sim', 'presentation/scene/world', 'presentation/scene/assets'],
   /** 目と耳。カメラが兵士を見るので actor は読む */
   'presentation/scene/sense': [
     'domain',
     'sim',
-    'presentation/scene',
     'presentation/scene/util',
     'presentation/scene/actor',
+    'presentation/scene/assets',
   ],
   /**
    * 自機の手つき (近接・投擲)。Game から借りる物は Host の形で渡されるので、
@@ -216,12 +244,13 @@ const LAYERS: Record<string, readonly string[]> = {
     'application/protocol',
     'application/replica',
     'infra/input',
-    'presentation/scene',
     'presentation/scene/actor',
     'presentation/scene/arms',
     'presentation/scene/fx',
     'presentation/scene/sense',
     'presentation/scene/world',
+    'presentation/scene/knobs',
+    'presentation/scene/calibration',
   ],
   /**
    * HUD へ渡す状態の型と判断 (PR #77 で Game から出した)。

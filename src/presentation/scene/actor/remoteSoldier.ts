@@ -17,7 +17,7 @@ import {
   transformedNormalView,
 } from "three/tsl";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { CharacterAnimator, findBoneBySuffix } from "./animation";
+import { CharacterAnimator, findBoneBySuffix, warnMissingClips } from "./animation";
 import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
@@ -1067,6 +1067,7 @@ export class RemoteSoldier {
       console.error("[RemoteSoldier] 兵士モデルの読み込みに失敗", error);
       return;
     }
+    warnMissingClips(this.skin, gltf.animations);
     if (this.disposed) return;
 
     const model = cloneSkinned(gltf.scene);
