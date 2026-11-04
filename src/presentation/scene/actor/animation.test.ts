@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { CharacterAnimator } from './animation'
 
 /**
@@ -12,7 +13,7 @@ import { CharacterAnimator } from './animation'
  * ここが無かったので「上半身だけ銃を構えたまま脚が転がる」「死体が構え直す」を
  * 2 回続けて出した。どちらも**目で見れば一目**だが、目で見るには実機が要る。
  */
-const gltf = await new GLTFLoader().parseAsync(
+const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(
   await Bun.file('public/models/soldier.glb').arrayBuffer(),
   '',
 )
@@ -1036,7 +1037,7 @@ describe('置く動作へ移る継ぎ目', () => {
   })
 })
 
-const nanashi = await new GLTFLoader().parseAsync(
+const nanashi = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(
   await Bun.file('public/models/soldier_nanashi.glb').arrayBuffer(),
   '',
 )

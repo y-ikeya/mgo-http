@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { missingClips } from './animation'
 import { SKIN_FILES } from './skin'
 
@@ -19,7 +20,9 @@ import { SKIN_FILES } from './skin'
 describe('モデルごとの型', () => {
   for (const file of SKIN_FILES) {
     test(`${file}.glb に足りない型が無い`, async () => {
-      const gltf = await new GLTFLoader().parseAsync(
+      // モデルは gltfpack で meshopt 圧縮してある (tools/pack_glb.js)。
+      // decoder を渡さないと圧縮した物は読めない
+      const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(
         await Bun.file(`public/models/${file}.glb`).arrayBuffer(),
         '',
       )
