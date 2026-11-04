@@ -9538,6 +9538,240 @@
 "camera": false,
 "thrown": false
 }
+},
+{
+"name": "wood_lumber_stack_1_nouv",
+"min": [
+17.777,
+6.47,
+20.925
+],
+"max": [
+21.016,
+7.185,
+22.18
+],
+"top": {
+"h": 7.185,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_lumber_stack_2_nouv",
+"min": [
+26.33,
+6.47,
+15.258
+],
+"max": [
+27.676,
+7.28,
+19.118
+],
+"top": {
+"h": 7.28,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_lumber_stack_3_nouv",
+"min": [
+22.351,
+6.47,
+21.122
+],
+"max": [
+24.867,
+6.9,
+22.261
+],
+"top": {
+"h": 6.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_pallet_1_nouv",
+"min": [
+19.776,
+6.47,
+14.954
+],
+"max": [
+22.388,
+6.595,
+16.129
+],
+"top": {
+"h": 6.595,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_cardboard_1_nouv",
+"min": [
+19.981,
+6.595,
+15.188
+],
+"max": [
+21.9,
+7.295,
+15.974
+],
+"top": {
+"h": 7.295,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_cardboard_2_nouv",
+"min": [
+18.034,
+6.47,
+13.337
+],
+"max": [
+23.475,
+7.2,
+21.849
+],
+"top": {
+"h": 7.2,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_scrap_box_nouv",
+"min": [
+23.927,
+6.47,
+12.462
+],
+"max": [
+25.273,
+7.37,
+13.338
+],
+"top": {
+"h": 7.37,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_wood_lean_planks_1_nouv",
+"min": [
+18.028,
+6.47,
+11.562
+],
+"max": [
+19.154,
+9.998,
+12.284
+],
+"top": {
+"h": 9.9981,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_wood_lean_planks_2_nouv",
+"min": [
+16.488,
+6.47,
+18.755
+],
+"max": [
+17.184,
+9.566,
+19.643
+],
+"top": {
+"h": 9.5658,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
 }
 ],
 "ladders": [
