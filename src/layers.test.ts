@@ -115,10 +115,125 @@ const LAYERS: Record<string, readonly string[]> = {
     'infra/input',
     'infra/prefs',
     'i18n',
+    'presentation/scene',
+    'presentation/scene/util',
+    'presentation/scene/world',
+    'presentation/scene/actor',
+    'presentation/scene/actor/skin',
+    'presentation/scene/arms',
+    'presentation/scene/fx',
+    'presentation/scene/sense',
+    'presentation/scene/self',
+    'presentation/scene/stats',
   ],
+  /**
+   * scene の中も棚ごとに縛る (2026-11-04)。
+   *
+   * presentation を 1 つの層として扱っていた頃は、中では誰が誰を読んでも
+   * 自由だった。Game.ts から装備・近接・投擲・HUD の数字を切り出しても
+   * (PR #77)、切り出した側が Game を読み直すことを止める物が無く、
+   * 分けた構造は作法でしか保てなかった。棚の向きをここに書いておくと、
+   * 逆向きの import を足した瞬間に落ちる。
+   *
+   * 向きの実態 (2026-11-04 に import を数えた):
+   *   util が一番下。world がその上 (影と面)。actor と arms は world を
+   *   読み、sense は actor を見る。self は自機の操作なので全部の利用者。
+   *   scene 直下 (Game / assets / calibration / portrait / knobs) は
+   *   組み立てる所なので、棚を全部読める。
+   */
+  'presentation/scene': [
+    'domain',
+    'sim',
+    'application/protocol',
+    'application/replica',
+    'application/loadout',
+    'infra/link',
+    'infra/api',
+    'infra/auth',
+    'infra/input',
+    'infra/prefs',
+    'presentation/scene/util',
+    'presentation/scene/world',
+    'presentation/scene/actor',
+    'presentation/scene/actor/skin',
+    'presentation/scene/arms',
+    'presentation/scene/fx',
+    'presentation/scene/sense',
+    'presentation/scene/self',
+    'presentation/scene/stats',
+  ],
+  /** 道具の置き場。three の小さな部品と、資産の読み書きだけ。棚は読まない */
+  'presentation/scene/util': [],
+  /** 面と影。util と、資産の読み (assets) だけ */
+  'presentation/scene/world': ['domain', 'sim', 'presentation/scene', 'presentation/scene/util'],
+  /**
+   * 皮の対応表。**何も読まない**データだけの 1 枚。
+   *
+   * arms の decoy が皮の名前を要するので、actor の棚ごとではなくこの 1 枚
+   * だけを切り分けた。actor → arms (兵士が武器を持つ) と arms → actor が
+   * 向かい合う形を作らないため。
+   */
+  'presentation/scene/actor/skin': [],
+  /** 人。武器 (arms/weapon) を持つので arms は読む。self と sense には読まれる側 */
+  'presentation/scene/actor': [
+    'domain',
+    'sim',
+    'application/protocol',
+    'application/replica',
+    'presentation/scene',
+    'presentation/scene/util',
+    'presentation/scene/world',
+    'presentation/scene/arms',
+    // 自分の棚のデータ (皮の対応表)。切り分けたので名前で足す
+    'presentation/scene/actor/skin',
+  ],
+  /** 武器と置き物。面と影 (world) と、皮の名前 (actor/skin) だけ。人そのものは読まない */
+  'presentation/scene/arms': [
+    'domain',
+    'sim',
+    'presentation/scene',
+    'presentation/scene/util',
+    'presentation/scene/world',
+    'presentation/scene/actor/skin',
+  ],
+  /** 演出。面 (world/stage) と資産の読みだけ */
+  'presentation/scene/fx': ['domain', 'sim', 'presentation/scene', 'presentation/scene/world'],
+  /** 目と耳。カメラが兵士を見るので actor は読む */
+  'presentation/scene/sense': [
+    'domain',
+    'sim',
+    'presentation/scene',
+    'presentation/scene/util',
+    'presentation/scene/actor',
+  ],
+  /**
+   * 自機の手つき (近接・投擲)。Game から借りる物は Host の形で渡されるので、
+   * Game は読まない。読むのは棚の全部 — 自機の操作は全部の利用者だから。
+   */
+  'presentation/scene/self': [
+    'domain',
+    'sim',
+    'application/protocol',
+    'application/replica',
+    'infra/input',
+    'presentation/scene',
+    'presentation/scene/actor',
+    'presentation/scene/arms',
+    'presentation/scene/fx',
+    'presentation/scene/sense',
+    'presentation/scene/world',
+  ],
+  /**
+   * HUD へ渡す状態の型と判断 (PR #77 で Game から出した)。
+   *
+   * ui と screens が読む**契約**なので、scene の棚は読まない。ここが scene を
+   * 読み始めると、HUD の数字を見るために画面全体が要る形に戻る。
+   */
+  'presentation/scene/stats': ['domain', 'application/protocol'],
   i18n: [],
-  // 組み立てる所。画面を並べて、認証が済むまで待たせる
-  App: ['infra/auth', 'presentation'],
+  // 組み立てる所。画面を並べて、認証が済むまで待たせる。
+  // 起動前に GPU を確かめるので util/gpu だけは名指しする
+  App: ['infra/auth', 'presentation', 'presentation/scene/util'],
   index: ['App'],
 }
 
@@ -175,6 +290,12 @@ function importsOf(source: string): { from: string; typeOnly: boolean }[] {
   const statement = /(?:^|\n)\s*(?:import|export)\s+([^;=]*?)\bfrom\s*['"]([^'"]+)['"]/g
   for (const match of source.matchAll(statement)) {
     found.push({ from: match[2], typeOnly: match[1].trimStart().startsWith('type ') })
+  }
+  // `import '../Game'` のような、名前を持たない import も依存。
+  // from 付きだけを見ていた頃は、この 1 行で見張りをすり抜けられた
+  const bare = /(?:^|\n)\s*import\s*['"]([^'"]+)['"]/g
+  for (const match of source.matchAll(bare)) {
+    found.push({ from: match[1], typeOnly: false })
   }
   return found
 }
@@ -370,6 +491,29 @@ describe('層の順序', () => {
       for (const { from, typeOnly } of importsOf(readFileSync(file, 'utf8'))) {
         if (typeOnly) continue
         if (layerOf(file, from) === 'domain') guilty.push(`${relative(SRC, file)} → ${from}`)
+      }
+    }
+    expect(guilty).toEqual([])
+  })
+
+  /**
+   * **Game.ts を読んでよいのは画面 (screens) だけ。**
+   *
+   * 上の表では scene 直下は 1 つの層なので、棚が assets や knobs を読むのと、
+   * Game を読むのが区別できない。Game は組み立てる所 — 棚が読み直すと、
+   * PR #77 で Host の形に切り分けた境界が作法だけに戻る。ここだけは
+   * ファイル名で見る。
+   */
+  test('Game.ts を読むのは screens だけ', () => {
+    const game = join(SRC, 'presentation', 'scene', 'Game')
+    const guilty: string[] = []
+    for (const file of sourcesOf(SRC)) {
+      if (file.startsWith(join(SRC, 'presentation', 'screens'))) continue
+      for (const { from } of importsOf(readFileSync(file, 'utf8'))) {
+        if (!from.startsWith('.')) continue
+        if (resolve(dirname(file), from) === game) {
+          guilty.push(`${relative(SRC, file)} → ${from}`)
+        }
       }
     }
     expect(guilty).toEqual([])
