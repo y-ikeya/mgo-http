@@ -253,6 +253,32 @@ if (which === 'aiming') {
     ),
     document.getElementById('root')!,
   )
+} else if (new URLSearchParams(location.search).has('step')) {
+  /*
+   * 一覧を 1 段送った所。**札が隣のマスへ移っていく途中**を止めて見る。
+   *
+   *     ?case=browsingFour&step=1&mid=80    1 段下へ送って 80ms の所で止める (step=-1 で上へ)
+   *
+   * 0.1 秒ごとに新しい物で届く本番に合わせて、同じ中身を新しい物で何度か送り直してから送る
+   */
+  const query = new URLSearchParams(location.search)
+  const step = Number(query.get('step'))
+  const mid = query.get('mid')
+  const start = { ...base, ...cases[which] } as GameStats
+  const [stats, setStats] = createSignal<GameStats>(start)
+  render(() => <Hud stats={stats()} selfId="me" />, document.getElementById('root')!)
+  const browsing = start.browsing!
+  setTimeout(() => setStats({ ...start, browsing: { ...browsing, items: browsing.items.map((i) => ({ ...i })) } }), 100)
+  setTimeout(() => {
+    const at = (browsing.at + step + browsing.items.length) % browsing.items.length
+    setStats({ ...start, browsing: { items: browsing.items.map((i) => ({ ...i })), at } })
+    if (mid !== null) {
+      for (const animation of document.getAnimations()) {
+        animation.pause()
+        animation.currentTime = Number(mid)
+      }
+    }
+  }, 300)
 } else {
   const stats = { ...base, ...cases[which] } as GameStats
   render(() => <Hud stats={stats} selfId="me" />, document.getElementById('root')!)

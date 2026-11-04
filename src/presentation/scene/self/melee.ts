@@ -35,6 +35,12 @@ const PRONE_STAB_HIT_PHASE = 0.36
 /** 刺突モーションの尺のフォールバック (秒)。クリップが無いとき用 */
 const FALLBACK_STAB_DURATION = 1.9
 
+/**
+ * CQC の拳の音を、型が始まってから鳴らすまで (秒)。**手が伸び始める所に合わせる** — 型の頭で鳴らすと
+ * まだ手を伸ばしていないのに声が出た (2026-11-04 本人「もう 0.1 秒くらい遅く」)。他人の CQC も同じ
+ */
+export const PUNCH_DELAY = 0.1
+
 /** 近接が借りる物。Game が渡す */
 export interface MeleeHost {
   readonly player: Soldier
@@ -266,7 +272,10 @@ export class Melee {
         -(target.position.x - this.host.player.position.x),
         -(target.position.z - this.host.player.position.z),
       )
-      if (this.host.player.cqc('cqc_throw', face)) this.host.net.send({ type: 'cqc', target: target.id })
+      if (this.host.player.cqc('cqc_throw', face)) {
+        this.host.net.send({ type: 'cqc', target: target.id })
+        this.punchSoon()
+      }
       return true
     }
     // 相手が居れば、空振りでもそちらへ振る
@@ -276,7 +285,12 @@ export class Melee {
           -(target.position.z - this.host.player.position.z),
         )
       : look
-    this.host.player.cqc('cqc_miss', face)
+    if (this.host.player.cqc('cqc_miss', face)) this.punchSoon()
     return true
+  }
+
+  /** 拳の音を PUNCH_DELAY 後に、その時の自分の位置で鳴らす */
+  private punchSoon(): void {
+    setTimeout(() => this.host.audio.play('punch', this.host.player.position), PUNCH_DELAY * 1000)
   }
 }

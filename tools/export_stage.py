@@ -560,6 +560,12 @@ for obj in list(bpy.context.scene.objects):
     # three だと出ない」)。delimit UV は UV の島の境目しか守らない
     if 'decal' in obj.name:
         continue
+    # **シート (vis_sheet_*) も間引かない。** 皺は数度の起伏の積み重ねで、平らと見なす
+    # 角度 (PROP_PLANAR_ANGLE) の内側に入る。溶かすと大きな三角に潰れて、皺の代わりに
+    # 斑な影が出た (2026-11-04 足場のブルーシート)。網目は作る側 (tools/scaffold_sheet.py)
+    # で粗さを決めてある
+    if 'vis_sheet' in obj.name:
+        continue
     mesh = obj.data
     if mesh.name in thinned:
         obj.data = thinned[mesh.name]

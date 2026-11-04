@@ -305,7 +305,9 @@ def bake(samples=SAMPLES):
     total = 0
     for obj in meshes():
         mesh = obj.data
-        if shared(obj):
+        # **シート (vis_sheet_*) は一様にする。** 皺の細かい面ごとに空の見え方を測ると、面の向きの
+        # わずかな違いがそのまま明暗になり、皺ではなくモザイクに見えた (2026-11-04 足場のブルーシート)
+        if shared(obj) or 'vis_sheet' in obj.name:
             flat(mesh)
             continue
         if LAYER in mesh.color_attributes:

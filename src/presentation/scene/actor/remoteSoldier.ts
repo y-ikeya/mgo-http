@@ -411,6 +411,8 @@ export class RemoteSoldier {
   step: Step | null = null;
   /** このフレームで転がり始めたか。同じく Game が拾う */
   rollStarted = false;
+  /** CQC で殴りかかった (掛かったか空振りかは問わない)。この刻みだけ立つ */
+  cqcStarted = false;
   private yaw = 0;
   private yawInitialized = false;
   private disposed = false;
@@ -516,6 +518,7 @@ export class RemoteSoldier {
     this.stateAt = performance.now();
     // 全身モーションは重みの補間では出せない。状態が切り替わった瞬間に頭から流す。
     this.rollStarted = false;
+    this.cqcStarted = false;
     this.sweptThisFrame = false;
     this.reloadStarted = false;
     // ぶら下がりの上半身は型が終わっても戻さない (掴んだまま)。抜けたときにここで戻す
@@ -539,6 +542,7 @@ export class RemoteSoldier {
       animator.skipAhead(state.locomotionAge);
       // 叫んだこと・回り始めたことを呼ぶ側へ伝える。音を鳴らすのは Game の仕事
       this.rollStarted = locomotion === "roll";
+      this.cqcStarted = locomotion === "cqc_throw" || locomotion === "cqc_miss";
       this.sweptThisFrame = locomotion === "sweep" || locomotion === "shotgun_sweep";
     }
     /*

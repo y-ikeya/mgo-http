@@ -80,6 +80,11 @@ const SOUNDS = {
   stab: { file: "knife_stab1.mp3", reference: 3, max: 18 },
   /** スタンナイフの放電 (本人の素材 elec.mp3 を -9dB、2026-10-08「うるさすぎ」)。眠らせる刺突を振った人の手元で鳴る */
   zap: { file: "stun_elec1.mp3", reference: 3, max: 20 },
+  /**
+   * CQC の拳 (本人の素材 punch.mp3、2026-11-04)。**掛かっても空振りでも、殴りかかった所で鳴る** —
+   * 掛ける側の手が出たことが周りにも分かる。刺突と同じく届くのは近くだけ
+   */
+  punch: { file: "punch1.mp3", reference: 3, max: 18 },
   /** 弾倉の入れ替え。自分にしか要らないが、近くの相手には隙が伝わる */
   reload: { file: "ak47_reload1.mp3", reference: 2, max: 24 },
   // M4 の装填 (本人、2026-10-10)。2.1 秒でリロード (2.5 秒) に収まる
