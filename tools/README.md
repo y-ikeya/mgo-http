@@ -110,6 +110,7 @@ UV も箱の大きさに合わせてゲーム側で作り直している (Blende
 | `convert_character.py` | FBX 群 → 1 つの glb。設定ファイルを引数に取る。最後に gltfpack で詰める (ステージと同じ meshopt 圧縮) |
 | `pack_glb.js` | 変換済みの glb を後から詰める。`convert_character.py` の最後とフラグを揃えてある |
 | `unpack_glb.js` | 詰めた glb をバイト列を読める形に戻す。`pack_glb.js` の逆 |
+| `make_knife_swing.ts` | ナイフの横振り (knife_swing) を手続きで作って glb に足す。素材が無い動きの試作用 |
 | `soldier.json` | **どの FBX がどのクリップになったか**の対応表。32 本ぶん |
 | `bake_stage.py` | ステージに**空の見え方**を焼く (頂点色)。単体で回すと .blend に保存する。書き出しに `-- --bake [試行回数]` を付ければ読み込んだ複製に焼いて .blend は触らない (city は 20 秒ほど)。形を共有している物 (Alt+D) は焼かれず一様の明るさ |
 | `merge_clip.js` | 既存の glb にクリップだけ追加する。全体を作り直さずに済む |
