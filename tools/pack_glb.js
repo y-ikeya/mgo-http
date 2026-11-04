@@ -2,9 +2,8 @@
 //
 // ステージは書き出しの最後に export_stage.py が同じことをしている。こちらは
 // 変換済みの glb を後から詰めるための受け口で、convert_character.py の最後と
-// フラグを揃えてある。clip を足す系の道具 (merge_clip / retime_clip /
-// split_clip) は圧縮前の素の glb に対して使うこと。詰めた物に使うと、
-// 圧縮されたバイト列を float の並びだと思って静かに壊す。
+// フラグを揃えてある。glb のバイト列を直接読む道具は圧縮前の素の glb 専用で、
+// 詰めた物は道具の側で先に弾く (戻し方は unpack_glb.js と README)。
 //
 // 使い方: bun tools/pack_glb.js <入力.glb> [出力.glb]
 //         出力を省くと入力を置き換える。

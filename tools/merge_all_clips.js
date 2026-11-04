@@ -19,17 +19,22 @@ if (!outPath) {
   process.exit(1)
 }
 
-function parseGlb(bytes) {
+function parseGlb(bytes, path) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const jsonLength = view.getUint32(12, true)
   const json = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)))
+  // meshopt 圧縮した glb はバイト列を float と誤読して静かに壊すので、先に断る
+  if (json.extensionsUsed?.includes('EXT_meshopt_compression')) {
+    console.error(`${path} は meshopt 圧縮済み。この道具は圧縮前の glb 専用 (手順は tools/README.md)`)
+    process.exit(1)
+  }
   const binStart = 20 + jsonLength + 8
   const binLength = view.getUint32(20 + jsonLength, true)
   return { json, bin: bytes.subarray(binStart, binStart + binLength) }
 }
 
-const src = parseGlb(new Uint8Array(await Bun.file(srcPath).arrayBuffer()))
-const dest = parseGlb(new Uint8Array(await Bun.file(destPath).arrayBuffer()))
+const src = parseGlb(new Uint8Array(await Bun.file(srcPath).arrayBuffer()), srcPath)
+const dest = parseGlb(new Uint8Array(await Bun.file(destPath).arrayBuffer()), destPath)
 
 const destNodeByName = new Map(dest.json.nodes.map((n, i) => [n.name, i]))
 const added = []

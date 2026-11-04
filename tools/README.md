@@ -109,6 +109,7 @@ UV も箱の大きさに合わせてゲーム側で作り直している (Blende
 |---|---|
 | `convert_character.py` | FBX 群 → 1 つの glb。設定ファイルを引数に取る。最後に gltfpack で詰める (ステージと同じ meshopt 圧縮) |
 | `pack_glb.js` | 変換済みの glb を後から詰める。`convert_character.py` の最後とフラグを揃えてある |
+| `unpack_glb.js` | 詰めた glb をバイト列を読める形に戻す。`pack_glb.js` の逆 |
 | `soldier.json` | **どの FBX がどのクリップになったか**の対応表。32 本ぶん |
 | `bake_stage.py` | ステージに**空の見え方**を焼く (頂点色)。単体で回すと .blend に保存する。書き出しに `-- --bake [試行回数]` を付ければ読み込んだ複製に焼いて .blend は触らない (city は 20 秒ほど)。形を共有している物 (Alt+D) は焼かれず一様の明るさ |
 | `merge_clip.js` | 既存の glb にクリップだけ追加する。全体を作り直さずに済む |
@@ -124,11 +125,13 @@ $BLENDER -b --factory-startup --python tools/convert_character.py -- one.json
 bun tools/merge_clip.js public/models/soldier.glb new.glb sneak out.glb
 ```
 
-**clip を足す系の道具 (merge_clip / retime_clip / split_clip) は圧縮前の glb に使うこと。**
-リポジトリの兵士 glb は meshopt 圧縮済みで、圧縮した物に使うと圧縮されたバイト列を
-float の並びだと思って静かに壊す。手順は: gltfpack で素に戻す
-(`gltfpack -i public/models/soldier.glb -o /tmp/soldier.glb`、量子化は残るが
-バイト列は読める形になる) → 道具で足す → `bun tools/pack_glb.js` で詰め直す。
+**glb のバイト列を直接読む道具は、圧縮前の glb に使うこと。**
+対象は merge_clip / merge_all_clips / retime_clip / split_clip / turn_clip /
+fit_height / strip_bone_moves / shrink_glb。リポジトリの兵士 glb は meshopt
+圧縮済みで、圧縮した物に使うと圧縮されたバイト列を float の並びだと思って
+静かに壊すので、**道具の側で先に弾く**ようにしてある。手順は:
+`bun tools/unpack_glb.js` で素に戻す (量子化は残るがバイト列は読める形になる)
+→ 道具で足す → `bun tools/pack_glb.js` で詰め直す。
 
 ### 作り直したら投擲を割り直すこと
 
