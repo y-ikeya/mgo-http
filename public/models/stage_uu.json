@@ -9280,32 +9280,6 @@
 }
 },
 {
-"name": "vis_concrete_far_east_04_nouv",
-"min": [
-32.0,
-3.9,
--15.391
-],
-"max": [
-39.5,
-17.4,
--9.7
-],
-"top": {
-"h": 17.4,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": false,
-"bullet": false,
-"eye": true,
-"camera": false,
-"thrown": false
-}
-},
-{
 "name": "vis_concrete_far_east_05_nouv",
 "min": [
 30.6,
