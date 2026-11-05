@@ -17,9 +17,9 @@ export const SKY_FLOOR = 0.06
 /**
  * ステージごとの一番暗い所の明るさ。無ければ SKY_FLOOR。**焼き込みは .blend のシーンの sky_floor と揃える。**
  *
- * BB は地下が空の見えない所ばかりで、0.06 では日陰を 5 倍にしても真っ暗だった (2026-11-05 本人)
+ * BB は地下が空の見えない所ばかりで、0.06 では日陰を 5 倍にしても真っ暗だった。0.3 は少し明るすぎた (2026-11-05 本人)
  */
-export const STAGE_SKY_FLOOR: Partial<Record<StageName, number>> = { bb: 0.3 }
+export const STAGE_SKY_FLOOR: Partial<Record<StageName, number>> = { bb: 0.25 }
 /** いまのステージの一番暗い所。buildStage が決める */
 let floor = SKY_FLOOR
 export function setSkyFloor(name: StageName): void {

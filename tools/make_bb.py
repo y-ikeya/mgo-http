@@ -59,7 +59,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
 # 屋内 (空の見えない所) の一番暗い明るさ。焼き込み (bake_stage.py) が読む。ゲーム側の skylight.ts の
 # STAGE_SKY_FLOOR と揃える。地下が真っ暗だった (2026-11-05 本人「もっと明るくていい」)
-scene['sky_floor'] = 0.3
+scene['sky_floor'] = 0.25
 
 
 def P(px, py):
@@ -226,6 +226,24 @@ for i, r in enumerate(HOLES):
 for name, (x0, y0, x1, y1), axis, toward, bottom in B2_STAIRS:
     carve(ground, box('tmp_' + name, x0, y0, x1, y1, bottom, F1 + 0.5))
     stairs(name, x0, y0, x1, y1, F1, bottom, axis, toward)
+# 1F から地下へ下りる階段は、下り口の他の 3 方を高さ 1.8m の壁で囲う (2026-11-05 本人)。
+# 下り口は 1F の高さの端 (向き toward の逆の端)
+RAIL_H = 1.8
+RW = 0.3 / M_PER_PX * 3
+for name, (x0, y0, x1, y1), axis, toward, bottom in B2_STAIRS:
+    if axis == 'y':
+        entry = 'n' if toward > 0 else 's'
+    else:
+        entry = 'w' if toward > 0 else 'e'
+    sides = {
+        'n': (x0 - RW, y0 - RW, x1 + RW, y0),
+        's': (x0 - RW, y1, x1 + RW, y1 + RW),
+        'w': (x0 - RW, y0, x0, y1),
+        'e': (x1, y0, x1 + RW, y1),
+    }
+    for side, r in sides.items():
+        if side != entry:
+            box(f'{name.replace("concrete_stair", "concrete_stair_wall")}_{side}', *r, F1 - 0.05, F1 + RAIL_H)
 for i, r in enumerate(B1_COLUMNS):
     box(f'concrete_b1_column_{i}', *r, B1, B1_CEIL)
 # 北の階段は東 (1F) から西へ下り、下りた先は階段の周りを回る通路 (本人)。階段の北・南・東は壁で囲み、
