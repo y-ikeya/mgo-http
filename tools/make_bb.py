@@ -280,7 +280,8 @@ box('concrete_wall_outer_w', x0 - T, y0, x0, y1, B1_CEIL, WALL_TOP)
 box('concrete_wall_outer_e', x1, y0, x1 + T, y1, B1_CEIL, WALL_TOP)
 
 # --- 塔とベランダ ------------------------------------------------------------------------
-box('concrete_tower', 445, 425, 550, 528, F1 - 0.5, TOWER_TOP)
+# 2F より上は筒 (tools/bb_tower.py)。ここでは四角の場所だけ決め、下で筒に置き換える
+TOWER_SQ = (445, 425, 550, 528)
 TOWER_RING = (410, 385, 585, 560)
 rx0, ry0, rx1, ry1 = TOWER_RING
 # 1F はベランダの外の縁まで塊。せり出し (鼠返し) の下には入れない (本人 2026-11-05)
@@ -290,13 +291,8 @@ box('concrete_tower_balcony_s', rx0, 528, rx1, ry1, F2 - SLAB, F2)
 box('concrete_tower_balcony_w', rx0, 425, 445, 528, F2 - SLAB, F2)
 box('concrete_tower_balcony_e', 550, 425, rx1, 528, F2 - SLAB, F2)
 # ベランダの手すり (腰の高さ、外の縁)。弾は通す
-# 北と南の通路の先端の正面は手すりを付けない (跳び移る所、本人)。通路の幅より左右 0.5m 広く空ける
-RAIL_GAP = (463, 510)
-RAIL_GAP_S = (485, 530)
-for side, r in (('n_w', (rx0, ry0, RAIL_GAP[0], ry0 + 4)), ('n_e', (RAIL_GAP[1], ry0, rx1, ry0 + 4)),
-                ('s_w', (rx0, ry1 - 4, RAIL_GAP_S[0], ry1)), ('s_e', (RAIL_GAP_S[1], ry1 - 4, rx1, ry1)),
-                ('w', (rx0, ry0, rx0 + 4, ry1)), ('e', (rx1 - 4, ry0, rx1, ry1))):
-    box(f'metal_tower_rail_{side}_nobullet_noeye', *r, F2, F2 + 1.0)
+# ベランダの内側 (筒の足元) も床で埋める。筒にしたら四角の 4 隅が抜けた
+box('concrete_tower_balcony_core', 445, 425, 550, 528, F2 - SLAB, F2)
 
 # --- 2F の通路 (板、下は通れる) -----------------------------------------------------------
 WALKS = {
@@ -510,6 +506,18 @@ for k, b in BUNKERS.items():
 empty('meta_baseBlue', 150, 790, F1)   # 南西のトーチカ
 empty('meta_baseRed', 805, 130, F1)    # 北東のトーチカ
 
+
+# --- 塔: 2F より上は筒、ベランダの縁は崩れたコンクリートの壁 (tools/bb_tower.py) -------------
+import bb_tower
+(tx0, ty0), (tx1, ty1) = P(TOWER_SQ[0], TOWER_SQ[1]), P(TOWER_SQ[2], TOWER_SQ[3])
+bb_tower.tube(bpy, scene, (tx0 + tx1) / 2, (ty0 + ty1) / 2, min(abs(tx1 - tx0), abs(ty1 - ty0)) / 2, F1 - 0.5, TOWER_TOP)
+(bx0, by0), (bx1, by1) = P(rx0, ry1), P(rx1, ry0)
+gap = {}
+for side, name in (('n', 'concrete_walk_2F_n_tab'), ('s', 'concrete_walk_2F_s_tab')):
+    o = bpy.data.objects[name]
+    xs = [(o.matrix_world @ v.co).x for v in o.data.vertices]
+    gap[side] = (min(xs) - 0.5, max(xs) + 0.5)
+bb_tower.parapet(bpy, scene, bx0, by0, bx1, by1, F2, gap)
 
 # --- 柵 (2F の通路・踊り場・1F ⇔ 2F の階段の縁、tools/bb_rail.py) ---------------------------
 # 縁の外に何が続いているかを光線で調べるので、形が全部できてから最後に
