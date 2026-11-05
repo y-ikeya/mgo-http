@@ -352,6 +352,14 @@ for f in [f for f in bm.faces if f.material_index == 1]:
 bm.to_mesh(gme)
 bm.free()
 
+# A2 の地下 2F への階段の南の壁に V 字の切れ込み。1F から切れ込み越しに、階段を登ってくる相手を撃ち抜ける
+# (本人「UU で作ったみたいな V 字の亀裂、stair を登ってきたところをそのスリットから打ち抜けるように」)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bb_vnotch
+# 真ん中は本人がカーソルで示した所 (壁の真ん中より 0.5m 東)
+bb_vnotch.vnotch(bpy.data.objects['concrete_stair_wall_b2_a2_s'], -25.43, 0.8, F1 + 0.5)
+
 for i, r in enumerate(B1_COLUMNS):
     box(f'concrete_b1_column_{i}', *r, B1, B1_CEIL)
 # 北の階段は東 (1F) から西へ下り、下りた先は階段の周りを回る通路 (本人)。階段の北・南・東は壁で囲み、
@@ -440,13 +448,22 @@ MID = (F1 + F2) / 2
 stairs('metal_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
 box('metal_landing_nw', 295, 228, 325, 288, MID - DECK, MID)
 stairs('metal_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
-# 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
-stairs('metal_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
-box('metal_landing_se', 605, 670, 655, 700, MID - DECK, MID)
-# 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
-box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - DECK)
-# 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
-stairs('metal_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
+# 南東: 柱の下から 2F が南へ延び、その南の端から西 → 東へ長い階段で踊り場へ、踊り場から南 → 北へ下りて 1F
+# (本人の画面 2026-11-05「ここの形ちゃんと見てみな」。A1 の北と読んで印だけにしていた階段が下の階段)。
+# 下の階段は東の通路より東にあるので、2F の下には潜らない
+# 階段は他と同じ傾き (2.2m で 1.8m、本人「階段の傾斜は他と同じに」)。下絵の長い階段のぶんは踊り場を東へ延ばす
+SE_RUN = 2.24 / M_PER_PX * 3
+# 幅はどれも他の通路と同じ 2.24m (SE_RUN と同じ。本人「横幅おかしくない？」— 延ばした 2F が 3.95m あった)
+box('metal_walk_2F_se_down', 605, 640, 605 + SE_RUN, 700, F2 - DECK, F2)
+# 2F を東へ延ばし、上の階段を下の階段のすぐ西へ寄せる。踊り場は下の階段の頭だけ (本人「階段をもっと東に寄せて、
+# 2F も東に延長した方が下の空間が使える」— 長い踊り場の下は 1.8m で通れなかった)
+box('metal_walk_2F_se_south', 605 + SE_RUN, 700 - SE_RUN, 786 - 2 * SE_RUN, 700, F2 - DECK, F2)
+box('concrete_walk_2F_se_south_pillar', (605 + 786 - SE_RUN) / 2 - 3, 695, (605 + 786 - SE_RUN) / 2 + 3, 700, F1 - 0.05, F2 - DECK)
+stairs('metal_stair_se_upper', 786 - 2 * SE_RUN, 700 - SE_RUN, 786 - SE_RUN, 700, F2, MID, 'x', +1, open_under=True)
+box('metal_landing_se', 786 - SE_RUN, 700 - SE_RUN, 786, 700, MID - DECK, MID)
+box('concrete_landing_se_pillar', 781, 695, 786, 700, F1 - 0.05, MID - DECK)
+box('concrete_landing_se_pillar_w', 786 - SE_RUN, 695, 791 - SE_RUN, 700, F1 - 0.05, MID - DECK)
+stairs('metal_stair_se', 786 - SE_RUN, 700 - 2 * SE_RUN, 786, 700 - SE_RUN, MID, F1, 'y', -1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('metal_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
 box('metal_landing_sw', 325, 730, 388, 800, MID - DECK, MID)
@@ -458,8 +475,6 @@ box('metal_landing_ne', 605, 220, 665, 250, MID - DECK, MID)
 stairs('metal_stair_ne', 665, 220, 695, 250, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
-for name, r in (('a1_north', (755, 600, 790, 670)),):
-    box(f'ref_stair_{name}', *r, F1, F1 + 0.05)
 
 # --- 遮蔽 (下絵の三角の印) ----------------------------------------------------------------
 # 三角の印 = 先細りの四角いコンクリートの塊が横に倒れた物 (本人の画面 2026-11-05「横にたおれてる、短辺側から上に
@@ -709,6 +724,14 @@ bb_rail.build(bpy, scene)
 # 2F の通路と踊り場の屋根 (tools/bb_roof.py、本人「2F には屋根がついてる」)
 import bb_roof
 bb_roof.build(bpy, scene)
+# 屋根は UU の赤いトタン (red_metal_plate、blue_metal_plate の絵を色相で赤くした物) を UU の blend から持ってくる
+# (2026-11-05 本人「2F の屋根は UU みたいに赤いトタンの屋根で」)
+with bpy.data.libraries.load(os.path.join(root, 'tools', 'raw', 'stage_uu.blend'), link=False) as (src, dst):
+    dst.materials = ['red_metal_plate']
+for o in scene.objects:
+    if o.name.startswith('metal_roof_walk'):
+        o.data.materials.clear()
+        o.data.materials.append(dst.materials[0])
 
 bpy.ops.wm.save_as_mainfile(filepath=out)
 print('書き出し', out, len(scene.objects), '個')

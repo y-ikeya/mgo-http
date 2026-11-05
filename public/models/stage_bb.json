@@ -105,32 +105,6 @@
 }
 },
 {
-"name": "concrete_landing_se_pillar",
-"min": [
-9.137,
-11.25,
-16.282
-],
-"max": [
-9.537,
-13.05,
-16.682
-],
-"top": {
-"h": 13.05,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "metal_walk_2F_w",
 "min": [
 -15.687,
@@ -666,12 +640,12 @@
 {
 "name": "concrete_rock_20",
 "min": [
-1.33,
+4.964,
 11.3,
 21.603
 ],
 "max": [
-4.33,
+7.964,
 12.98,
 23.287
 ],
@@ -774,19 +748,19 @@
 {
 "name": "concrete_rock_16",
 "min": [
--2.119,
+0.356,
 11.3,
-10.715
+7.231
 ],
 "max": [
--0.435,
+3.356,
 12.98,
-13.715
+8.915
 ],
 "top": {
 "h": 12.2,
-"dx": -0.0,
-"dz": 0.26667,
+"dx": 0.26667,
+"dz": 0.0,
 "thick": 1.6787
 },
 "flags": {
@@ -801,14 +775,14 @@
 {
 "name": "concrete_rock_15",
 "min": [
--9.123,
+-10.823,
 11.3,
-8.513
+5.372
 ],
 "max": [
--6.123,
+-7.823,
 12.98,
-10.198
+7.056
 ],
 "top": {
 "h": 13.0,
@@ -828,19 +802,19 @@
 {
 "name": "concrete_rock_14",
 "min": [
-12.903,
+11.315,
 11.3,
--2.687
+3.555
 ],
 "max": [
-15.903,
+12.999,
 12.98,
--1.002
+6.555
 ],
 "top": {
-"h": 12.2,
-"dx": 0.26667,
-"dz": 0.0,
+"h": 13.0,
+"dx": 0.0,
+"dz": -0.26667,
 "thick": 1.6787
 },
 "flags": {
@@ -855,19 +829,19 @@
 {
 "name": "concrete_rock_13",
 "min": [
-7.733,
+10.497,
 11.3,
--4.68
+-4.365
 ],
 "max": [
-10.733,
+13.497,
 12.98,
--2.996
+-2.68
 ],
 "top": {
-"h": 13.0,
-"dx": -0.26667,
-"dz": -0.0,
+"h": 12.2,
+"dx": 0.26667,
+"dz": 0.0,
 "thick": 1.6787
 },
 "flags": {
@@ -936,14 +910,14 @@
 {
 "name": "concrete_rock_10",
 "min": [
--10.93,
+-10.061,
 11.3,
-2.129
+-3.531
 ],
 "max": [
--9.245,
+-8.377,
 12.98,
-5.129
+-0.531
 ],
 "top": {
 "h": 12.2,
@@ -1017,14 +991,14 @@
 {
 "name": "concrete_rock_07",
 "min": [
-20.878,
+22.536,
 11.3,
--4.591
+4.925
 ],
 "max": [
-22.563,
+24.22,
 12.98,
--1.591
+7.925
 ],
 "top": {
 "h": 13.0,
@@ -1046,12 +1020,12 @@
 "min": [
 24.943,
 11.3,
--8.787
+-5.551
 ],
 "max": [
 27.943,
 12.98,
--7.102
+-3.867
 ],
 "top": {
 "h": 12.2,
@@ -1071,14 +1045,14 @@
 {
 "name": "concrete_rock_05",
 "min": [
-19.012,
+18.269,
 11.3,
--12.207
+-6.811
 ],
 "max": [
-20.696,
+19.953,
 12.98,
--9.207
+-3.811
 ],
 "top": {
 "h": 13.0,
@@ -1685,9 +1659,12 @@
 24.162
 ],
 "top": {
-"h": 13.1,
+"h": 13.6485,
 "dx": 0.0,
-"dz": 0.0
+"dz": -0.70914,
+"riser": 0.13,
+"foot": 11.44,
+"head": 13.23
 },
 "flags": {
 "draw": true,
@@ -1907,64 +1884,6 @@
 }
 },
 {
-"name": "metal_stair_se_upper",
-"min": [
-9.177,
-13.05,
-13.335
-],
-"max": [
-11.79,
-14.9,
-15.575
-],
-"top": {
-"h": 15.0445,
-"dx": 0.0,
-"dz": -0.80894,
-"riser": 0.15,
-"foot": 13.1,
-"head": 15.05
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_stair_se",
-"min": [
-12.91,
-11.1,
-15.58
-],
-"max": [
-15.15,
-12.95,
-17.82
-],
-"top": {
-"h": 13.0951,
-"dx": -0.80126,
-"dz": 0.0,
-"riser": 0.15,
-"foot": 11.15,
-"head": 13.1
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "metal_stair_nw_lower",
 "min": [
 -16.21,
@@ -2012,32 +1931,6 @@
 "riser": 0.15,
 "foot": 13.1,
 "head": 15.05
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_landing_se",
-"min": [
-9.177,
-13.05,
-15.575
-],
-"max": [
-12.91,
-13.1,
-17.815
-],
-"top": {
-"h": 13.1,
-"dx": 0.0,
-"dz": 0.0
 },
 "flags": {
 "draw": true,
@@ -2129,12 +2022,12 @@
 {
 "name": "metal_crate_e",
 "min": [
-25.873,
+26.238,
 11.25,
 4.384
 ],
 "max": [
-27.573,
+27.938,
 13.0,
 6.084
 ],
@@ -2155,14 +2048,14 @@
 {
 "name": "concrete_support_00_base",
 "min": [
-9.344,
+9.084,
 11.25,
-11.302
+11.011
 ],
 "max": [
-11.244,
+10.984,
 13.0,
-13.202
+12.911
 ],
 "top": {
 "h": 13.0,
@@ -2181,14 +2074,14 @@
 {
 "name": "metal_support_00_frame",
 "min": [
-9.614,
+9.354,
 13.0,
-11.572
+11.281
 ],
 "max": [
-10.974,
+10.714,
 14.85,
-12.932
+12.641
 ],
 "top": {
 "h": 14.85,
@@ -2207,14 +2100,14 @@
 {
 "name": "vis_metal_support_00_brace_noeye",
 "min": [
-9.669,
+9.409,
 12.97,
-11.627
+11.336
 ],
 "max": [
-10.919,
+10.659,
 14.85,
-12.877
+12.586
 ],
 "top": {
 "h": 14.85,
@@ -2779,12 +2672,12 @@
 {
 "name": "concrete_support_08_base",
 "min": [
-1.246,
+3.931,
 11.25,
 -13.381
 ],
 "max": [
-3.146,
+5.831,
 13.0,
 -11.481
 ],
@@ -2805,12 +2698,12 @@
 {
 "name": "metal_support_08_frame",
 "min": [
-1.516,
+4.201,
 13.0,
 -13.111
 ],
 "max": [
-2.876,
+5.561,
 14.85,
 -11.751
 ],
@@ -2831,12 +2724,12 @@
 {
 "name": "vis_metal_support_08_brace_noeye",
 "min": [
-1.571,
+4.256,
 12.97,
 -13.056
 ],
 "max": [
-2.821,
+5.506,
 14.85,
 -11.806
 ],
@@ -2857,14 +2750,14 @@
 {
 "name": "concrete_support_09_base",
 "min": [
--0.586,
+-0.625,
 11.25,
--9.228
+-10.772
 ],
 "max": [
-1.314,
+1.275,
 13.0,
--7.328
+-8.872
 ],
 "top": {
 "h": 13.0,
@@ -2883,14 +2776,14 @@
 {
 "name": "metal_support_09_frame",
 "min": [
--0.316,
+-0.355,
 13.0,
--8.958
+-10.502
 ],
 "max": [
-1.044,
+1.005,
 14.85,
--7.598
+-9.142
 ],
 "top": {
 "h": 14.85,
@@ -2909,14 +2802,14 @@
 {
 "name": "vis_metal_support_09_brace_noeye",
 "min": [
--0.261,
+-0.3,
 12.97,
--8.903
+-10.447
 ],
 "max": [
-0.989,
+0.95,
 14.85,
--7.653
+-9.197
 ],
 "top": {
 "h": 14.85,
@@ -3725,6 +3618,325 @@
 }
 },
 {
+"name": "concrete_rock_13.001",
+"min": [
+-10.433,
+-0.65,
+-3.457
+],
+"max": [
+-7.433,
+1.03,
+-1.773
+],
+"top": {
+"h": 1.0504,
+"dx": -0.26667,
+"dz": -0.0,
+"thick": 1.6787
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_walk_2F_se_down",
+"min": [
+9.18,
+13.9,
+13.34
+],
+"max": [
+11.42,
+14.9,
+17.82
+],
+"top": {
+"h": 14.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_support_00_base.001",
+"min": [
+9.169,
+11.25,
+15.925
+],
+"max": [
+11.069,
+13.0,
+17.825
+],
+"top": {
+"h": 13.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_support_00_frame.001",
+"min": [
+9.439,
+13.0,
+16.195
+],
+"max": [
+10.799,
+14.85,
+17.555
+],
+"top": {
+"h": 14.85,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_support_00_brace_noeye.001",
+"min": [
+9.494,
+12.97,
+16.25
+],
+"max": [
+10.744,
+14.85,
+17.5
+],
+"top": {
+"h": 14.85,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_stair_se_upper",
+"min": [
+18.21,
+13.05,
+15.58
+],
+"max": [
+20.45,
+14.75,
+17.82
+],
+"top": {
+"h": 14.8945,
+"dx": -0.80894,
+"dz": 0.0,
+"riser": 0.15,
+"foot": 12.95,
+"head": 14.9
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_landing_se",
+"min": [
+20.45,
+13.05,
+15.58
+],
+"max": [
+22.69,
+13.1,
+17.82
+],
+"top": {
+"h": 13.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_stair_se",
+"min": [
+20.45,
+11.25,
+13.34
+],
+"max": [
+22.69,
+12.95,
+15.58
+],
+"top": {
+"h": 11.2825,
+"dx": 0.0,
+"dz": 0.80894,
+"riser": 0.15,
+"foot": 11.15,
+"head": 13.1
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar",
+"min": [
+22.29,
+11.25,
+17.42
+],
+"max": [
+22.69,
+13.05,
+17.82
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar.002",
+"min": [
+20.45,
+11.25,
+17.42
+],
+"max": [
+20.85,
+13.05,
+17.82
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_walk_2F_se_south",
+"min": [
+11.42,
+13.9,
+15.58
+],
+"max": [
+18.21,
+14.9,
+17.82
+],
+"top": {
+"h": 14.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_walk_2F_se_south_pillar",
+"min": [
+14.615,
+11.25,
+17.42
+],
+"max": [
+15.015,
+14.85,
+17.82
+],
+"top": {
+"h": 14.85,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "metal_rail_walk_2F_w_nobox_noeye_nocamera",
 "min": [
 -15.717,
@@ -4011,32 +4223,6 @@
 }
 },
 {
-"name": "metal_rail_landing_se_nobox_noeye_nocamera",
-"min": [
-9.147,
-13.1,
-15.545
-],
-"max": [
-12.94,
-14.225,
-17.845
-],
-"top": {
-"h": 14.225,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": false,
-"camera": false,
-"thrown": true
-}
-},
-{
 "name": "metal_rail_landing_nw_nobox_noeye_nocamera",
 "min": [
 -14.0,
@@ -4115,19 +4301,19 @@
 }
 },
 {
-"name": "metal_rail_flight_se_upper_nobox_noeye_nocamera",
+"name": "metal_rail_walk_2F_se_down_nobox_noeye_nocamera",
 "min": [
-9.177,
-13.25,
-13.305
+9.15,
+14.9,
+13.31
 ],
 "max": [
-11.79,
-16.02,
-15.605
+11.45,
+16.025,
+17.85
 ],
 "top": {
-"h": 16.0201,
+"h": 16.025,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4141,19 +4327,45 @@
 }
 },
 {
-"name": "metal_rail_flight_se_nobox_noeye_nocamera",
+"name": "metal_rail_landing_se_nobox_noeye_nocamera",
 "min": [
-12.88,
-11.3,
+20.42,
+13.1,
+15.55
+],
+"max": [
+22.72,
+14.225,
+17.85
+],
+"top": {
+"h": 14.225,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "metal_rail_walk_2F_se_south_nobox_noeye_nocamera",
+"min": [
+11.39,
+14.9,
 15.58
 ],
 "max": [
-15.18,
-14.07,
+18.24,
+16.025,
 17.82
 ],
 "top": {
-"h": 14.0701,
+"h": 16.025,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4323,19 +4535,149 @@
 }
 },
 {
+"name": "metal_rail_flight_se_upper_nobox_noeye_nocamera",
+"min": [
+18.18,
+13.1,
+15.58
+],
+"max": [
+20.48,
+15.87,
+17.82
+],
+"top": {
+"h": 15.8701,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "metal_rail_flight_se_nobox_noeye_nocamera",
+"min": [
+20.45,
+11.3,
+13.31
+],
+"max": [
+22.69,
+14.07,
+15.61
+],
+"top": {
+"h": 14.0701,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": false,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar.003",
+"min": [
+9.257,
+11.25,
+-17.92
+],
+"max": [
+9.657,
+13.05,
+-17.52
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar.004",
+"min": [
+-13.926,
+11.25,
+-17.397
+],
+"max": [
+-13.526,
+13.05,
+-16.997
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar.005",
+"min": [
+-12.161,
+11.25,
+-13.401
+],
+"max": [
+-11.761,
+13.05,
+-13.001
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "metal_roof_walk_2F_w",
 "min": [
 -15.687,
-17.9,
+16.95,
 -9.438
 ],
 "max": [
 -13.223,
-18.1,
+17.95,
 13.335
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4357,11 +4699,11 @@
 ],
 "max": [
 -13.123,
-18.1,
+17.95,
 13.335
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4378,16 +4720,16 @@
 "name": "metal_roof_walk_2F_sw",
 "min": [
 -13.223,
-17.9,
+16.95,
 11.095
 ],
 "max": [
 -7.026,
-18.1,
+17.95,
 13.335
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4409,11 +4751,11 @@
 ],
 "max": [
 -7.026,
-18.1,
+17.95,
 13.435
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4430,16 +4772,16 @@
 "name": "metal_roof_walk_2F_se",
 "min": [
 9.177,
-17.9,
+16.95,
 11.095
 ],
 "max": [
 17.913,
-18.1,
+17.95,
 13.335
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4461,11 +4803,11 @@
 ],
 "max": [
 17.913,
-18.1,
+17.95,
 13.435
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4482,16 +4824,16 @@
 "name": "metal_roof_walk_2F_s_tab",
 "min": [
 0.59,
-17.9,
+16.95,
 8.262
 ],
 "max": [
 3.203,
-18.1,
+17.95,
 15.575
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4513,11 +4855,11 @@
 ],
 "max": [
 3.303,
-18.1,
+17.95,
 15.575
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4534,16 +4876,16 @@
 "name": "metal_roof_walk_2F_s_down",
 "min": [
 -9.117,
-17.9,
+16.95,
 15.582
 ],
 "max": [
 -7.026,
-18.1,
+17.95,
 19.175
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4565,11 +4907,11 @@
 ],
 "max": [
 -6.926,
-18.1,
+17.95,
 19.175
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4586,16 +4928,16 @@
 "name": "metal_roof_walk_2F_s",
 "min": [
 -9.117,
-17.9,
+16.95,
 13.335
 ],
 "max": [
 0.59,
-18.1,
+17.95,
 15.575
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4617,11 +4959,11 @@
 ],
 "max": [
 0.59,
-18.1,
+17.95,
 15.675
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4638,16 +4980,16 @@
 "name": "metal_roof_walk_2F_nw_up",
 "min": [
 -9.49,
-17.9,
+16.95,
 -17.427
 ],
 "max": [
 -7.026,
-18.1,
+17.95,
 -7.198
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4669,11 +5011,11 @@
 ],
 "max": [
 -6.926,
-18.1,
+17.95,
 -7.198
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4690,16 +5032,16 @@
 "name": "metal_roof_walk_2F_nw_join",
 "min": [
 -13.223,
-17.9,
+16.95,
 -9.438
 ],
 "max": [
 -9.49,
-18.1,
+17.95,
 -7.198
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4721,11 +5063,11 @@
 ],
 "max": [
 -9.49,
-18.1,
+17.95,
 -7.098
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4742,16 +5084,16 @@
 "name": "metal_roof_walk_2F_n_tab",
 "min": [
 -1.053,
-17.9,
+16.95,
 -13.545
 ],
 "max": [
 1.71,
-18.1,
+17.95,
 -6.605
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4773,11 +5115,11 @@
 ],
 "max": [
 1.81,
-18.1,
+17.95,
 -6.605
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4794,16 +5136,16 @@
 "name": "metal_roof_walk_2F_n",
 "min": [
 1.71,
-17.9,
+16.95,
 -13.545
 ],
 "max": [
 17.913,
-18.1,
+17.95,
 -11.305
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4825,11 +5167,11 @@
 ],
 "max": [
 17.913,
-18.1,
+17.95,
 -11.205
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4846,16 +5188,16 @@
 "name": "metal_roof_walk_2F_e",
 "min": [
 15.523,
-17.9,
+16.95,
 -11.305
 ],
 "max": [
 17.913,
-18.1,
+17.95,
 11.095
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4877,11 +5219,115 @@
 ],
 "max": [
 18.013,
-18.1,
+17.95,
 11.095
 ],
 "top": {
-"h": 18.1,
+"h": 17.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_se_down",
+"min": [
+9.18,
+16.95,
+13.34
+],
+"max": [
+11.42,
+17.95,
+17.82
+],
+"top": {
+"h": 17.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_se_down_nobox",
+"min": [
+9.08,
+14.85,
+13.34
+],
+"max": [
+11.52,
+17.95,
+17.82
+],
+"top": {
+"h": 17.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_se_south",
+"min": [
+11.42,
+16.95,
+15.58
+],
+"max": [
+18.21,
+17.95,
+17.82
+],
+"top": {
+"h": 17.95,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_se_south_nobox",
+"min": [
+11.42,
+14.85,
+15.48
+],
+"max": [
+18.21,
+17.95,
+17.92
+],
+"top": {
+"h": 17.95,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4968,13 +5414,6 @@
 }
 ],
 "capGoals": {
-"blue": {
-"x": 21.95,
-"y": 11.3,
-"z": 16.05,
-"halfX": 2.0,
-"halfZ": 2.0
-},
 "red": {
 "x": -19.6,
 "y": 11.3,
