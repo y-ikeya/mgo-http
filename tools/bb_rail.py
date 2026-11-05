@@ -125,24 +125,39 @@ def build(bpy, scene):
         scene.collection.objects.link(bpy.data.objects.new(name, me))
         made += 1
 
-    # 床と踊り場: 4 辺
-    # 踊り場の下の柱 (concrete_landing_se_pillar) は床ではない
+    # 床と踊り場: **上の面の本当の縁** に沿って。外接する四角の 4 辺で立てていたら、本人が L 字に直した
+    # 踊り場 (南西) で、欠けた角の床の無い所を柵が通った (2026-11-05 本人「手すりが床に沿ってない」)
     for o in [o for o in scene.objects if o.type == 'MESH' and o.name.startswith(SLABS) and 'pillar' not in o.name]:
         lo, hi = _bounds(o)
         z = hi.z
-        edges = {
-            's': (Vector((lo.x, lo.y, z)), Vector((hi.x, lo.y, z)), Vector((0, -1, 0))),
-            'n': (Vector((lo.x, hi.y, z)), Vector((hi.x, hi.y, z)), Vector((0, 1, 0))),
-            'w': (Vector((lo.x, lo.y, z)), Vector((lo.x, hi.y, z)), Vector((-1, 0, 0))),
-            'e': (Vector((hi.x, lo.y, z)), Vector((hi.x, hi.y, z)), Vector((1, 0, 0))),
-        }
+        M = o.matrix_world
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        bm.transform(M)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+        tops = {f for f in bm.faces if f.normal.z > 0.9 and abs(f.calc_center_median().z - z) < 0.02 and f.calc_area() > 1e-6}
+        # 上の面のうち、上の面を 1 枚しか持たない辺が縁
+        border = [e for e in bm.edges if sum(1 for f in e.link_faces if f in tops) == 1 and e.calc_length() > 1e-3]
+        lo_sx, hi_sx = lo.x + 0.02, hi.x - 0.02
         segs = []
-        for side, (a, b, n) in edges.items():
+        for e in border:
+            a, b = e.verts[0].co.copy(), e.verts[1].co.copy()
+            a.z = b.z = z
+            face = next(f for f in e.link_faces if f in tops)
+            d = (b - a).normalized()
+            n = Vector((d.y, -d.x, 0))
+            c = face.calc_center_median()
+            if n.dot(c - (a + b) / 2) > 0:
+                n = -n
+            # 縁の向きから名前を引く (SKIP_EDGES は四角の辺の向きで書いてある)
+            if abs(n.y) > abs(n.x):
+                side = 'n' if n.y > 0 else 's'
+            else:
+                side = 'e' if n.x > 0 else 'w'
             if (o.name, side) in SKIP_EDGES:
                 continue
             length = (b - a).length
             cnt = max(1, int(length / SAMPLE))
-            d = (b - a).normalized()
             flags = []
             for i in range(cnt):
                 on = a + (b - a) * ((i + 0.5) / cnt)
@@ -152,9 +167,8 @@ def build(bpy, scene):
                 flags.append(not cut and not _covered(scene, dg, p.x, p.y, z, o))
             for s0, s1 in _runs(flags, length / cnt):
                 if s1 - s0 >= MIN_LEN:
-                    d = (b - a).normalized()
-                    # 縁から柵の半分だけ内へ
                     segs.append((a + d * s0 - n * (POST / 2), a + d * s1 - n * (POST / 2), n))
+        bm.free()
         emit(f'metal_rail_{o.name.split("_", 1)[1]}_nobullet_noeye_nocamera', segs)
 
     # 1F ⇔ 2F の階段: 長い 2 辺に、傾きに沿って
