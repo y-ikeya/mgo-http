@@ -646,5 +646,9 @@ import bb_rail
 bpy.context.view_layer.update()
 bb_rail.build(bpy, scene)
 
+# 2F の通路と踊り場の屋根 (tools/bb_roof.py、本人「2F には屋根がついてる」)
+import bb_roof
+bb_roof.build(bpy, scene)
+
 bpy.ops.wm.save_as_mainfile(filepath=out)
 print('書き出し', out, len(scene.objects), '個')

@@ -639,20 +639,20 @@
 {
 "name": "concrete_rock_21",
 "min": [
--2.119,
+-2.127,
 11.3,
 24.902
 ],
 "max": [
--0.435,
-12.98,
+-0.427,
+13.0,
 27.902
 ],
 "top": {
 "h": 12.2,
 "dx": 0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -668,18 +668,18 @@
 "min": [
 1.33,
 11.3,
-21.603
+21.595
 ],
 "max": [
 4.33,
-12.98,
-23.287
+13.0,
+23.295
 ],
 "top": {
 "h": 13.0,
 "dx": -0.26667,
-"dz": 0.0,
-"thick": 1.6787
+"dz": -0.0,
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -695,18 +695,18 @@
 "min": [
 -0.91,
 11.3,
-18.093
+18.085
 ],
 "max": [
 2.09,
-12.98,
-19.778
+13.0,
+19.785
 ],
 "top": {
 "h": 13.0,
 "dx": -0.26667,
-"dz": -0.0,
-"thick": 1.6787
+"dz": 0.0,
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -722,18 +722,18 @@
 "min": [
 -16.441,
 11.3,
-19.811
+19.803
 ],
 "max": [
 -13.441,
-12.98,
-21.495
+13.0,
+21.503
 ],
 "top": {
 "h": 13.0,
 "dx": -0.26667,
 "dz": -0.0,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -749,18 +749,18 @@
 "min": [
 -15.099,
 11.3,
-14.883
+14.875
 ],
 "max": [
 -12.099,
-12.98,
-16.567
+13.0,
+16.575
 ],
 "top": {
 "h": 13.0,
 "dx": -0.26667,
-"dz": -0.0,
-"thick": 1.6787
+"dz": 0.0,
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -774,20 +774,20 @@
 {
 "name": "concrete_rock_16",
 "min": [
--2.119,
+-2.127,
 11.3,
 10.715
 ],
 "max": [
--0.435,
-12.98,
+-0.427,
+13.0,
 13.715
 ],
 "top": {
 "h": 12.2,
-"dx": -0.0,
+"dx": 0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -803,18 +803,18 @@
 "min": [
 -9.123,
 11.3,
-8.513
+8.505
 ],
 "max": [
 -6.123,
-12.98,
-10.198
+13.0,
+10.205
 ],
 "top": {
 "h": 13.0,
 "dx": -0.26667,
-"dz": 0.0,
-"thick": 1.6787
+"dz": -0.0,
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -830,18 +830,18 @@
 "min": [
 12.903,
 11.3,
--2.687
+-2.695
 ],
 "max": [
 15.903,
-12.98,
--1.002
+13.0,
+-0.995
 ],
 "top": {
 "h": 12.2,
 "dx": 0.26667,
 "dz": 0.0,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -857,18 +857,18 @@
 "min": [
 7.733,
 11.3,
--4.68
+-4.688
 ],
 "max": [
 10.733,
-12.98,
--2.996
+13.0,
+-2.988
 ],
 "top": {
 "h": 13.0,
 "dx": -0.26667,
-"dz": -0.0,
-"thick": 1.6787
+"dz": 0.0,
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -882,20 +882,20 @@
 {
 "name": "concrete_rock_12",
 "min": [
--25.49,
+-25.497,
 11.3,
 7.355
 ],
 "max": [
--23.805,
-12.98,
+-23.797,
+13.0,
 10.355
 ],
 "top": {
 "h": 12.2,
-"dx": 0.0,
+"dx": -0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -909,20 +909,20 @@
 {
 "name": "concrete_rock_11",
 "min": [
--19.292,
+-19.3,
 11.3,
 5.339
 ],
 "max": [
--17.608,
-12.98,
+-17.6,
+13.0,
 8.339
 ],
 "top": {
 "h": 12.2,
 "dx": 0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -936,20 +936,20 @@
 {
 "name": "concrete_rock_10",
 "min": [
--10.93,
+-10.937,
 11.3,
 2.129
 ],
 "max": [
--9.245,
-12.98,
+-9.237,
+13.0,
 5.129
 ],
 "top": {
 "h": 12.2,
-"dx": -0.0,
+"dx": 0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -963,20 +963,20 @@
 {
 "name": "concrete_rock_09",
 "min": [
--27.132,
+-27.14,
 11.3,
 -0.111
 ],
 "max": [
--25.448,
-12.98,
+-25.44,
+13.0,
 2.889
 ],
 "top": {
 "h": 12.2,
-"dx": -0.0,
+"dx": 0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -990,20 +990,20 @@
 {
 "name": "concrete_rock_08",
 "min": [
--21.308,
+-21.316,
 11.3,
 -3.845
 ],
 "max": [
--19.624,
-12.98,
+-19.616,
+13.0,
 -0.845
 ],
 "top": {
 "h": 12.2,
 "dx": -0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1017,20 +1017,20 @@
 {
 "name": "concrete_rock_07",
 "min": [
-20.878,
+20.871,
 11.3,
 -4.591
 ],
 "max": [
-22.563,
-12.98,
+22.571,
+13.0,
 -1.591
 ],
 "top": {
 "h": 13.0,
-"dx": 0.0,
+"dx": -0.0,
 "dz": -0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1046,18 +1046,18 @@
 "min": [
 24.943,
 11.3,
--8.787
+-8.795
 ],
 "max": [
 27.943,
-12.98,
--7.102
+13.0,
+-7.095
 ],
 "top": {
 "h": 12.2,
 "dx": 0.26667,
 "dz": -0.0,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1071,20 +1071,20 @@
 {
 "name": "concrete_rock_05",
 "min": [
-19.012,
+19.004,
 11.3,
 -12.207
 ],
 "max": [
-20.696,
-12.98,
+20.704,
+13.0,
 -9.207
 ],
 "top": {
 "h": 13.0,
 "dx": 0.0,
 "dz": -0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1098,20 +1098,20 @@
 {
 "name": "concrete_rock_04",
 "min": [
-24.014,
+24.007,
 11.3,
 -15.045
 ],
 "max": [
-25.699,
-12.98,
+25.707,
+13.0,
 -12.045
 ],
 "top": {
 "h": 13.0,
-"dx": 0.0,
+"dx": -0.0,
 "dz": -0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1127,18 +1127,18 @@
 "min": [
 -7.481,
 11.3,
--14.171
+-14.179
 ],
 "max": [
 -4.481,
-12.98,
--12.487
+13.0,
+-12.479
 ],
 "top": {
 "h": 13.0,
 "dx": -0.26667,
 "dz": 0.0,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1154,18 +1154,18 @@
 "min": [
 0.21,
 11.3,
--18.493
+-18.501
 ],
 "max": [
 3.21,
-12.98,
--16.809
+13.0,
+-16.801
 ],
 "top": {
 "h": 12.2,
 "dx": 0.26667,
 "dz": 0.0,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1179,20 +1179,20 @@
 {
 "name": "concrete_rock_01",
 "min": [
--5.106,
+-5.113,
 11.3,
 -22.138
 ],
 "max": [
--3.421,
-12.98,
+-3.413,
+13.0,
 -19.138
 ],
 "top": {
 "h": 12.2,
 "dx": 0.0,
 "dz": 0.26667,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -1208,18 +1208,18 @@
 "min": [
 0.21,
 11.3,
--24.093
+-24.101
 ],
 "max": [
 3.21,
-12.98,
--22.409
+13.0,
+-22.401
 ],
 "top": {
 "h": 12.2,
 "dx": 0.26667,
 "dz": 0.0,
-"thick": 1.6787
+"thick": 1.7
 },
 "flags": {
 "draw": true,
@@ -3589,90 +3589,6 @@
 }
 },
 {
-"name": "concrete_stair_ne_upper",
-"min": [
-9.177,
-13.05,
--15.785
-],
-"max": [
-11.417,
-14.9,
--13.545
-],
-"top": {
-"h": 13.2312,
-"dx": 0.0,
-"dz": 0.80183,
-"riser": 0.15,
-"foot": 13.1,
-"head": 15.05
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_landing_ne",
-"min": [
-9.177,
-12.9,
--18.025
-],
-"max": [
-13.657,
-13.1,
--15.785
-],
-"top": {
-"h": 13.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_stair_ne",
-"min": [
-13.657,
-11.25,
--18.025
-],
-"max": [
-15.897,
-13.1,
--15.785
-],
-"top": {
-"h": 13.2451,
-"dx": -0.80126,
-"dz": 0.0,
-"riser": 0.15,
-"foot": 11.3,
-"head": 13.25
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "metal_rail_walk_2F_w_nobullet_noeye_nocamera",
 "min": [
 -15.717,
@@ -4037,32 +3953,6 @@
 }
 },
 {
-"name": "metal_rail_landing_ne_nobullet_noeye_nocamera",
-"min": [
-9.147,
-13.1,
--18.055
-],
-"max": [
-13.687,
-14.225,
--15.755
-],
-"top": {
-"h": 14.225,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": false,
-"thrown": false
-}
-},
-{
 "name": "metal_rail_stair_se_upper_nobullet_noeye_nocamera",
 "min": [
 9.177,
@@ -4237,61 +4127,783 @@
 }
 },
 {
-"name": "metal_rail_stair_ne_upper_nobullet_noeye_nocamera",
+"name": "concrete_slit_wall_n.002",
 "min": [
-9.177,
-13.25,
--15.815
+-17.475,
+11.3,
+-5.059
 ],
 "max": [
-11.417,
-16.02,
--13.515
+-15.332,
+13.2,
+-4.709
 ],
 "top": {
-"h": 14.2266,
+"h": 13.2,
 "dx": 0.0,
-"dz": 0.7568,
-"riser": 0.21,
-"foot": 14.16,
-"head": 16.23
+"dz": 0.0
 },
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
-"eye": false,
-"camera": false,
-"thrown": false
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
 }
 },
 {
-"name": "metal_rail_stair_ne_nobullet_noeye_nocamera",
+"name": "concrete_slit_wall_n.001",
 "min": [
-13.627,
-11.45,
--18.025
+-15.38,
+11.3,
+-7.248
 ],
 "max": [
-15.927,
-14.22,
--15.785
+-15.03,
+13.2,
+-5.105
 ],
 "top": {
-"h": 14.1673,
-"dx": -0.7568,
-"dz": 0.0,
-"riser": 0.21,
-"foot": 12.36,
-"head": 14.43
+"h": 13.2,
+"dx": 0.0,
+"dz": 0.0
 },
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
-"eye": false,
-"camera": false,
-"thrown": false
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_w",
+"min": [
+-15.687,
+17.9,
+-9.438
+],
+"max": [
+-13.223,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_w",
+"min": [
+-15.537,
+14.9,
+-9.288
+],
+"max": [
+-13.373,
+17.9,
+13.185
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_sw",
+"min": [
+-15.687,
+17.9,
+11.095
+],
+"max": [
+-7.026,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_sw",
+"min": [
+-15.537,
+14.9,
+11.245
+],
+"max": [
+-7.176,
+17.9,
+13.185
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_se",
+"min": [
+9.177,
+17.9,
+11.095
+],
+"max": [
+17.913,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_se",
+"min": [
+9.327,
+14.9,
+11.245
+],
+"max": [
+17.763,
+17.9,
+13.185
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_s_tab",
+"min": [
+0.59,
+17.9,
+8.862
+],
+"max": [
+3.203,
+18.1,
+15.575
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_s_tab",
+"min": [
+0.74,
+14.9,
+9.012
+],
+"max": [
+3.053,
+17.9,
+15.425
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_s_down",
+"min": [
+-9.117,
+17.9,
+15.582
+],
+"max": [
+-7.026,
+18.1,
+19.175
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_s_down",
+"min": [
+-8.967,
+14.9,
+15.732
+],
+"max": [
+-7.176,
+17.9,
+19.025
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_s",
+"min": [
+-9.117,
+17.9,
+13.335
+],
+"max": [
+3.203,
+18.1,
+15.575
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_s",
+"min": [
+-8.967,
+14.9,
+13.485
+],
+"max": [
+3.053,
+17.9,
+15.425
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_nw_up",
+"min": [
+-9.49,
+17.9,
+-17.427
+],
+"max": [
+-7.026,
+18.1,
+-7.198
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_nw_up",
+"min": [
+-9.34,
+14.9,
+-17.277
+],
+"max": [
+-7.176,
+17.9,
+-7.348
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_nw_join",
+"min": [
+-15.687,
+17.9,
+-9.438
+],
+"max": [
+-7.026,
+18.1,
+-7.198
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_nw_join",
+"min": [
+-15.537,
+14.9,
+-9.288
+],
+"max": [
+-7.176,
+17.9,
+-7.348
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_n_tab",
+"min": [
+-1.053,
+17.9,
+-13.545
+],
+"max": [
+1.71,
+18.1,
+-7.205
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_n_tab",
+"min": [
+-0.903,
+14.9,
+-13.395
+],
+"max": [
+1.56,
+17.9,
+-7.355
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_n",
+"min": [
+-1.053,
+17.9,
+-13.545
+],
+"max": [
+17.913,
+18.1,
+-11.305
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_n",
+"min": [
+-0.903,
+14.9,
+-13.395
+],
+"max": [
+17.763,
+17.9,
+-11.455
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_e",
+"min": [
+15.523,
+17.9,
+-13.545
+],
+"max": [
+17.913,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_e",
+"min": [
+15.673,
+14.9,
+-13.395
+],
+"max": [
+17.763,
+17.9,
+13.185
+],
+"top": {
+"h": 17.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_landing_se",
+"min": [
+9.177,
+16.1,
+15.575
+],
+"max": [
+12.91,
+16.3,
+17.815
+],
+"top": {
+"h": 16.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_landing_se",
+"min": [
+9.327,
+13.1,
+15.725
+],
+"max": [
+12.76,
+16.1,
+17.665
+],
+"top": {
+"h": 16.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_landing_nw",
+"min": [
+-13.97,
+16.1,
+-17.43
+],
+"max": [
+-11.73,
+16.3,
+-12.95
+],
+"top": {
+"h": 16.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_landing_nw",
+"min": [
+-13.82,
+13.1,
+-17.28
+],
+"max": [
+-11.88,
+16.1,
+-13.1
+],
+"top": {
+"h": 16.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_landing_sw",
+"min": [
+-10.156,
+16.1,
+21.397
+],
+"max": [
+-7.083,
+16.3,
+25.442
+],
+"top": {
+"h": 16.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_landing_sw",
+"min": [
+-10.006,
+13.1,
+21.547
+],
+"max": [
+-7.233,
+16.1,
+25.292
+],
+"top": {
+"h": 16.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
 }
 },
 {
