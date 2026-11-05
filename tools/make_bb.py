@@ -355,11 +355,14 @@ box('concrete_landing_se', 605, 670, 655, 700, MID - 0.3, MID)
 box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - 0.3)
 # 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
 stairs('concrete_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
+# 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
+stairs('concrete_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
+box('concrete_landing_sw', 325, 730, 388, 800, MID - 0.3, MID)
+stairs('concrete_stair_sw', 295, 765, 325, 800, MID, F1, 'x', -1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
 for name, r in (
                 ('north_b1_e', (655, 180, 735, 215)), ('north_b1_s', (605, 215, 640, 275)),
-                ('sw_from_2F', (355, 700, 390, 745)), ('sw_inner', (290, 765, 360, 800)),
                 ('a1_north', (755, 600, 790, 670))):
     box(f'ref_stair_{name}', *r, F1, F1 + 0.05)
 
