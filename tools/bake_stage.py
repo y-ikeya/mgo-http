@@ -44,7 +44,11 @@ PROP_CELL = 0.8
 # 0.3 では建物の中が明るく、足元の影だけが黒く浮いた (影に入って隠れる意味が薄れる。2026-10-17 本人
 # 「建物の中を濃くして」)。0.12 でもまだ明るく、0.06 にして足元の影 (blobShadow.ts の 0.6) と揃えた。
 # 人の明るさ (src/presentation/scene/world/skylight.ts の SKY_FLOOR) と揃える
-FLOOR = 0.06
+#
+# **ステージごとに上げられる:** .blend のシーンに sky_floor があればそれを使う (ゲーム側は
+# world/skylight.ts の STAGE_SKY_FLOOR と揃える)。BB は地下が空の見えない所ばかりで、0.06 では
+# 真っ暗だった (2026-11-05 本人「影の中はもっと明るくていい」)
+FLOOR = float(bpy.context.scene.get('sky_floor', 0.06))
 # 光線を飛ばす距離 (m)。ステージの対角より長ければ十分
 REACH = 120.0
 # 面から浮かせて撃つ量 (m)。自分自身に当たるのを避ける

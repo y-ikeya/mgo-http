@@ -57,6 +57,9 @@ SLAB = 0.4                     # 2F の板の厚み
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
+# 屋内 (空の見えない所) の一番暗い明るさ。焼き込み (bake_stage.py) が読む。ゲーム側の skylight.ts の
+# STAGE_SKY_FLOOR と揃える。地下が真っ暗だった (2026-11-05 本人「もっと明るくていい」)
+scene['sky_floor'] = 0.3
 
 
 def P(px, py):

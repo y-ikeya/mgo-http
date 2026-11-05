@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { TriangleBvh } from '../../../sim/space/bvh'
+import type { StageName } from '../../../domain/stage'
 
 /**
  * **その場所からどれだけ空が見えるか。** 人の明るさに掛ける。
@@ -13,6 +14,20 @@ import type { TriangleBvh } from '../../../sim/space/bvh'
 
 /** 一番暗い所の明るさ。地形の焼き込み (bake_stage.py の FLOOR) と揃える */
 export const SKY_FLOOR = 0.06
+/**
+ * ステージごとの一番暗い所の明るさ。無ければ SKY_FLOOR。**焼き込みは .blend のシーンの sky_floor と揃える。**
+ *
+ * BB は地下が空の見えない所ばかりで、0.06 では日陰を 5 倍にしても真っ暗だった (2026-11-05 本人)
+ */
+export const STAGE_SKY_FLOOR: Partial<Record<StageName, number>> = { bb: 0.3 }
+/** いまのステージの一番暗い所。buildStage が決める */
+let floor = SKY_FLOOR
+export function setSkyFloor(name: StageName): void {
+  floor = STAGE_SKY_FLOOR[name] ?? SKY_FLOOR
+}
+export function skyFloor(): number {
+  return floor
+}
 /** 足元から測る点までの高さ (m) */
 export const SKY_PROBE_HEIGHT = 1.0
 /** 光線の長さ (m)。建物の屋根を抜けて空まで届けば十分 */
@@ -36,7 +51,7 @@ export function skyAt(sight: TriangleBvh, x: number, y: number, z: number): numb
   for (const [dx, dy, dz] of RAYS) {
     if (sight.clear(x, y, z, x + dx * REACH, y + dy * REACH, z + dz * REACH)) open += dy
   }
-  return SKY_FLOOR + (1 - SKY_FLOOR) * (open / WEIGHT)
+  return floor + (1 - floor) * (open / WEIGHT)
 }
 
 /**

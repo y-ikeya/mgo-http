@@ -1,4 +1,4 @@
-import { SKY_FLOOR } from './skylight'
+import { setSkyFloor, skyFloor } from './skylight'
 import { addMovingShadow, castStaticShadow, STATIC_SHADOW_LAYER } from './liveShadow'
 import { instanceRepeats } from './instancing'
 import { swayingGrassMaterial } from './grass'
@@ -70,7 +70,7 @@ const GROUND_SKY_EPS = 0.05
 /** 光線を飛ばす距離 (m) */
 const GROUND_SKY_REACH = 60
 /** 一番暗い所の明るさ。0 にすると建物の奥が真っ黒になる (tools/bake_stage.py と同じ) */
-const GROUND_SKY_FLOOR = SKY_FLOOR
+// 地面の一番暗い所。ステージごと (skylight.ts の STAGE_SKY_FLOOR)、buildStage が決める
 
 /**
  * 天空光の強さ。日陰の明るさはこれで決まる。
@@ -181,8 +181,8 @@ const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dust
  * 日陰の面が黒く沈んで形が読めなかった。影の濃さ (SHADOW_INTENSITY) を下げても、
  * 日の当たらない向きの壁は明るくならない — 日陰の明るさはここで決まる
  */
-// BB も 3 倍 (2026-11-05 本人「このステージの影の中はもっと明るくていい」、UU と同じ頼まれ方)
-const STAGE_AMBIENT: Partial<Record<StageName, number>> = { uu: 3, bb: 3 }
+// BB は 5 倍 (2026-11-05 本人「このステージの影の中はもっと明るくていい」、3 倍でも「もっと明るくていい」)。地下が空の見えない所ばかりで、焼き込みの下限 (SKY_FLOOR) まで落ちる
+const STAGE_AMBIENT: Partial<Record<StageName, number>> = { uu: 3, bb: 5 }
 /** いまのステージの天空光の倍率。buildStage が決めて、buildLights が読む */
 let ambientScale = 1
 /** いまの場の見え方。buildStage が決めて、空・霧・光・映り込みがこれを読む */
@@ -607,7 +607,7 @@ async function bakeGroundSky(stage: StageName, geometry: THREE.BufferGeometry): 
       if (clear) open += dy
     }
     const weight = rays.reduce((sum, r) => sum + r[1], 0)
-    const sky = GROUND_SKY_FLOOR + (1 - GROUND_SKY_FLOOR) * (open / weight)
+    const sky = skyFloor() + (1 - skyFloor()) * (open / weight)
     colors[i * 3] = sky
     colors[i * 3 + 1] = sky
     colors[i * 3 + 2] = sky
@@ -1516,6 +1516,7 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
   // 場の見え方を先に決める。空・霧・光 (buildLights は後から呼ばれる) がこれを読む
   look = lookFor(name)
   ambientScale = STAGE_AMBIENT[name] ?? 1
+  setSkyFloor(name)
   scene.add(buildSky())
   // フォグは空の地平線側と同じ色にする。違うと遠景が地平線で不自然に切れる。
   // 開始距離を遠くしてあるのは、近すぎると中距離の遮蔽物まで白んで索敵の判断材料が減るため。
