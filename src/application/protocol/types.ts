@@ -1,6 +1,6 @@
 import type { Locomotion } from '../../domain/player/locomotion'
 import type { HitZone } from '../../domain/rule/damage'
-import type { StageName, Surface } from '../../domain/stage'
+import type { RotationOrder, StageName, Surface } from '../../domain/stage'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import type { HeldId } from '../../domain/item/held'
 import type { Life } from '../../domain/player/lifecycle'
@@ -1135,6 +1135,15 @@ export interface RoomSummary {
   red: number
   /** 今の段階が終わるまで (秒)。待機中は 0 */
   remaining: number
+  /**
+   * いま (次に) 遊ぶステージ。**入る前にどこで遊ぶかを見せる** (2026-11-05 本人「ステージは何で、
+   * ルールはローテなのか固定なのか分かるように」)。部屋がまだ無ければ回し順の先頭
+   */
+  stage: StageName
+  /** 回し順。固定なら 1 つ */
+  stages: StageName[]
+  /** 回し方 (固定 / 順に / ランダム) */
+  order: RotationOrder
 }
 
 export interface MatchMessage {

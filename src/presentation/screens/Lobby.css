@@ -14,7 +14,7 @@
 }
 
 .lobby-head {
-  max-width: 620px;
+  max-width: 980px;
   margin: 0 auto;
   padding: 40px 0 22px;
   display: flex;
@@ -54,7 +54,7 @@
 
 .lobby-error,
 .lobby-empty {
-  max-width: 620px;
+  max-width: 980px;
   margin: 0 auto 14px;
   padding: 9px 12px;
   font-size: 12px;
@@ -71,35 +71,35 @@
 }
 
 .lobby-rooms {
-  max-width: 620px;
+  max-width: 980px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 /*
- * 1 部屋 1 行。左から 名前 / 人数 / 空き具合 / 段階 / 得点 / 残り時間。
- * 縦に並べたとき、同じ情報が同じ列に来るよう幅を決め打ちする。
- */
-/*
- * 部屋の行。**行そのものはボタンではない** — 中に名前の札 (ボタン) を
- * 置くので、button の入れ子にできない。押して入るのは .room-enter のほう。
+ * 1 部屋 1 枚。左に部屋の中身 (ルール・ステージ・状態・人数)、右に誰が居るか
+ * (2026-11-05 本人「どのステータスで誰が入っててステージは何で、ルールは何で」)。
+ * **カードそのものはボタンではない** — 右の名前の札がボタンなので入れ子にできない。押して入るのは左
  */
 .room {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
   background: rgba(12, 18, 10, 0.72);
   border: 1px solid rgba(160, 190, 140, 0.2);
+  border-radius: 6px;
 }
 
 .room-enter {
-  display: grid;
-  grid-template-columns: 5.5em 6.8em 3.6em 1fr 6em 4.5em 3.4em 5.5em;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 18px 22px;
   background: none;
   border: none;
+  border-right: 1px solid rgba(160, 190, 140, 0.14);
   color: inherit;
   font-family: inherit;
   font-size: 13px;
@@ -115,101 +115,106 @@
 
 .room-enter:disabled {
   cursor: default;
+}
+
+/* 対戦中の部屋は左の縁で分かる */
+.room-live {
+  box-shadow: inset 3px 0 0 rgba(180, 214, 150, 0.7);
+}
+
+/* まだ開けていない部屋。**一覧には出す** — 何を作れば開くかが見える */
+.room-shut {
   opacity: 0.45;
 }
 
-/* 誰が居るか。名前を押すとその人の戦績が開く */
-.room-players {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 18px 13px;
-}
-
-.room-player {
-  background: rgba(160, 190, 140, 0.08);
-  border: 1px solid rgba(160, 190, 140, 0.22);
-  border-radius: 999px;
-  padding: 3px 11px;
-  font-family: inherit;
-  font-size: 12px;
-  color: rgba(200, 216, 186, 0.9);
-  cursor: pointer;
-  /* 長い名前で行が崩れないように */
-  max-width: 12em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 札の中の Lv。名前より先に目に入らないよう小さく */
-.room-player-lv {
-  margin-right: 5px;
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  color: rgba(150, 166, 140, 0.75);
-}
-
-.room-player:hover:not(:disabled),
-.room-player:focus-visible {
-  border-color: rgba(180, 214, 150, 0.6);
-  color: rgba(224, 236, 212, 1);
-}
-
-/* 戦績の設定が無い環境。押せないことが見て分かるようにする */
-.room-player:disabled {
-  cursor: default;
+.room-full .room-enter {
   opacity: 0.6;
-}
-
-/*
- * 所属は札の縁だけで示す。**体には色を掛けない**と決めたので
- * (remotePlayer.ts)、ここも塗り潰しではなく縁に留める
- */
-.room-player-blue { border-color: rgba(126, 166, 255, 0.5); }
-.room-player-red { border-color: rgba(255, 138, 114, 0.5); }
-
-.room-live {
-  border-left: 3px solid rgba(180, 214, 150, 0.7);
 }
 
 .room-name {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  letter-spacing: 0.1em;
+  font-size: 20px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: rgba(232, 240, 222, 0.98);
 }
 
-.room-count {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.room-rule {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
-.room-count-now {
+.room-rule-title {
   font-size: 15px;
+  color: rgba(214, 226, 200, 0.95);
 }
 
-.room-count-max {
+/* ルールの略号。名前の隣に小さく */
+.room-mode {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 1px 6px;
+  color: #cfe0ff;
+  border: 1px solid rgba(126, 166, 255, 0.35);
+}
+
+/* ステージ。札 (固定 / ローテ / ランダム) と、回し順 */
+.room-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.room-order {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(160, 190, 140, 0.35);
+  color: rgba(190, 206, 176, 0.85);
+}
+
+.room-order-cycle,
+.room-order-random {
+  border-color: rgba(230, 196, 110, 0.5);
+  color: rgba(236, 210, 140, 0.95);
+}
+
+.room-stages {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.room-stage-name {
   color: rgba(150, 166, 140, 0.6);
+}
+
+/* 今 (次に) 遊ぶステージ */
+.room-stage-now {
+  color: rgba(232, 240, 222, 0.98);
+  border-bottom: 1px solid rgba(180, 214, 150, 0.8);
+}
+
+.room-stage-arrow {
+  color: rgba(150, 166, 140, 0.45);
   font-size: 11px;
 }
 
-.room-bar {
-  height: 3px;
-  background: rgba(160, 190, 140, 0.14);
-  display: block;
-}
-
-.room-bar-fill {
-  display: block;
-  height: 100%;
-  background: rgba(180, 214, 150, 0.7);
+.room-status {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .room-phase {
-  font-size: 11px;
-  color: rgba(170, 186, 156, 0.75);
+  font-size: 12px;
+  color: rgba(170, 186, 156, 0.8);
 }
 
 .room-live .room-phase {
@@ -232,47 +237,153 @@
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   color: rgba(150, 166, 140, 0.7);
-  text-align: right;
 }
 
-@media (max-width: 560px) {
-  .room-enter {
-    grid-template-columns: 4.5em 6.8em 3.4em 1fr 5.5em;
-    row-gap: 6px;
-  }
-  .room-phase, .room-score, .room-time {
-    grid-column: span 1;
-  }
-}
-
-/* ルールの略称。名前の隣に小さく */
-.room-mode {
-  justify-self: start;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  padding: 1px 6px;
-  color: #cfe0ff;
-  border: 1px solid rgba(126, 166, 255, 0.35);
-}
-
-/* まだ開けていない部屋。**一覧には出す** — 何を作れば開くかが見える */
-.room-shut {
-  opacity: 0.45;
-}
-
-/*
- * 部屋の覚え書き。**ルールの隣に小さく。**
- *
- * 名前とルールが主で、これは添え物。目立たせると、書いてある部屋と
- * 書いていない部屋で行の重さが変わってしまう。
- */
+/* 部屋の覚え書き。ルールの名前だけでは伝わらないこと */
 .room-note {
-  justify-self: end;
-  text-align: right;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: rgba(190, 206, 176, 0.55);
+  font-size: 12px;
+  color: rgba(190, 206, 176, 0.7);
+}
+
+/* 人数と埋まり具合。1 人 1 目盛り */
+.room-fill {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 6px;
+  margin-top: 4px;
+}
+
+.room-fill-label {
+  font-size: 12px;
+  color: rgba(150, 166, 140, 0.7);
+}
+
+.room-count {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.room-ticks {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 3px;
+}
+
+.room-tick {
+  flex: 1;
+  height: 4px;
+  border-radius: 1px;
+  background: rgba(160, 190, 140, 0.16);
+}
+
+.room-tick-on {
+  background: rgba(200, 220, 180, 0.85);
+}
+
+/* 誰が居るか。チーム戦はレッドとブルーの 2 列 */
+.room-roster {
+  display: flex;
+  gap: 28px;
+  padding: 16px 22px;
+  align-items: flex-start;
+}
+
+.room-nobody {
+  align-self: center;
+  font-size: 12px;
+  color: rgba(150, 166, 140, 0.5);
+}
+
+.room-team {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.room-team-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: rgba(200, 216, 186, 0.85);
+}
+
+.room-team-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.room-team-red .room-team-dot { background: #ff6a52; }
+.room-team-blue .room-team-dot { background: #6a96ff; }
+
+.room-team-count {
+  color: rgba(150, 166, 140, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 名前の札。押すとその人の戦績が開く */
+.room-player {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  color: rgba(214, 226, 200, 0.95);
+  text-align: left;
+  cursor: pointer;
+}
+
+.room-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 名前の前の Lv。名前より先に目に入らないよう小さく */
+.room-player-lv {
+  flex: none;
+  min-width: 2.6em;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: rgba(150, 166, 140, 0.75);
+}
+
+.room-player:hover:not(:disabled) .room-player-name,
+.room-player:focus-visible .room-player-name {
+  color: rgba(240, 248, 230, 1);
+  text-decoration: underline;
+}
+
+/* 戦績の設定が無い環境。押せないことが見て分かるようにする */
+.room-player:disabled {
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .lobby {
+    padding: 0 12px 60px;
+  }
+  .room {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .room-roster {
+    gap: 16px;
+  }
+  .room-enter {
+    border-right: none;
+    border-bottom: 1px solid rgba(160, 190, 140, 0.14);
+  }
 }
 
 /* 題字を押すと最初の画面へ。見た目は題字のまま */

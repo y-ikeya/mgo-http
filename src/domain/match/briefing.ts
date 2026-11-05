@@ -40,6 +40,11 @@ const TITLES: Record<BriefedMode, string> = {
   CAP: 'Capture',
 }
 
+/** ルールの英語の正式名 (説明の見出しと同じ)。説明の無いルール (練習など) は null */
+export function ruleTitle(mode: Mode): string | null {
+  return isBriefed(mode) ? TITLES[mode] : null
+}
+
 function isBriefed(mode: Mode): mode is BriefedMode {
   return mode in TITLES
 }

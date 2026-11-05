@@ -1150,6 +1150,10 @@ const server = Bun.serve<Client>({
           red: room?.capture ? Math.ceil(room.capture.count.red / 1000) : (room?.red ?? 0),
           // 残り時間はこちらで秒に直す。時計を合わせる話を持ち込まない
           remaining: room?.endsAt ? Math.max(0, Math.round((room.endsAt - Date.now()) / 1000)) : 0,
+          // どこで遊ぶか、回すのか固定か。部屋がまだ無ければ回し順の先頭 (最初の試合)
+          stage: room?.stage.name ?? ROOMS[name].stages.stages[0]!,
+          stages: ROOMS[name].stages.stages,
+          order: ROOMS[name].stages.order,
         } satisfies RoomSummary
       })
       return Response.json(summaries, { headers: CORS })
