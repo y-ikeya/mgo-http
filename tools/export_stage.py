@@ -991,7 +991,9 @@ SURFACE_IDS = {'concrete': 0, 'metal': 1, 'wood': 2, 'glass': 3}
 # sand_ は網の番号としてはコンクリート (2 ビットに 5 つ目は入らない)。足音と絵は箱の名前から砂として引く
 # 煉瓦 (brick_) は音も当たりもコンクリートと同じ。絵は自前 (材質に絵が繋がっている前提)
 SURFACE_TAGS = (('metal_', 'metal'), ('concrete_', 'concrete'), ('brick_', 'concrete'),
-                ('wood_', 'wood'), ('glass_', 'glass'), ('sand_', 'concrete'))
+                ('wood_', 'wood'), ('glass_', 'glass'), ('sand_', 'concrete'),
+                # 布 (ブルーシートの裏の板)。網ではコンクリート、着弾の音は名前から布として引く (domain/stage/surface.ts)
+                ('cloth_', 'concrete'))
 
 
 def surface_of(name):

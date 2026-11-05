@@ -1443,6 +1443,8 @@ const SURFACE_TEXTURES: Record<Surface, string> = {
   // ガラスは絵を貼らない。**透けることそのものが見た目**なので、模様を乗せると
   // 向こうが読めなくなる。materialFor が手前で分岐して、ここには来ない
   glass: '',
+  // 布はシートの裏の見えない板にだけ付ける (描かない)。シートの絵は Blender の物
+  cloth: '',
 }
 
 /**
@@ -1458,6 +1460,7 @@ const SURFACE_TILE: Record<Surface, number> = {
   sand: 2.5,
   // 貼らないので効かないが、Record を埋めるために置く
   glass: 2.5,
+  cloth: 2.5,
 }
 
 /**

@@ -375,8 +375,9 @@ const SURFACE_TOLERANCE = 0.03;
  * 着弾の音。**材質ごとに鳴らし分ける。** 専用の音が無い材質 (壁・地面) は
  * hit.mp3 (本人 2026-10-08「指定がなかったらこれ」)
  */
-function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | "hitWood" | "hitDefault" {
+function impactSoundOf(surface: ReturnType<typeof surfaceOf>): "hitMetal" | "hitGlass" | "hitWood" | "hitCloth" | "hitDefault" {
   if (surface === "metal") return "hitMetal";
+  if (surface === "cloth") return "hitCloth";
   if (surface === "glass") return "hitGlass";
   if (surface === "wood") return "hitWood";
   return "hitDefault";

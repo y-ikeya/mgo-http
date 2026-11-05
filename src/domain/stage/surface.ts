@@ -15,7 +15,7 @@
  * (stage/flags.ts の noeye / nobullet)。**材質と、何を止めるかは別の軸。**
  * 見通せるガラスにしたいなら glass_wall_noeye と書く。
  */
-export type Surface = 'concrete' | 'metal' | 'wood' | 'glass' | 'sand'
+export type Surface = 'concrete' | 'metal' | 'wood' | 'glass' | 'sand' | 'cloth'
 
 /** 名前のタグから材質を引く。組み合わせられる (col_metal_wall) */
 const SURFACE_TAGS: Record<string, Surface> = {
@@ -34,6 +34,12 @@ const SURFACE_TAGS: Record<string, Surface> = {
    * 足音と絵は箱の名前から引くので、こちらは砂として分かれる。
    */
   sand_: 'sand',
+  /*
+   * 布 (工事現場のブルーシート)。**着弾の音だけが違う** (cloth_hit1.mp3、2026-11-05 本人)。
+   * シートそのもの (vis_sheet_*) は素通りなので、裏の見えない板 (col_cloth_…) に付ける。
+   * 網の番号は砂と同じくコンクリートで出す (着弾の見た目は石の粉)
+   */
+  cloth_: 'cloth',
 }
 
 /**

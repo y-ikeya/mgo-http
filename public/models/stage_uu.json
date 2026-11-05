@@ -9436,7 +9436,7 @@
 }
 },
 {
-"name": "col_concrete_corner_fence_nobullet_blockthrow",
+"name": "col_cloth_corner_fence_blockthrow",
 "min": [
 25.391,
 6.47,
@@ -9455,7 +9455,7 @@
 "flags": {
 "draw": false,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": true,
 "thrown": true
@@ -9511,6 +9511,32 @@
 "eye": true,
 "camera": false,
 "thrown": false
+}
+},
+{
+"name": "col_cloth_scaffold_fence_blockthrow",
+"min": [
+16.273,
+6.47,
+11.362
+],
+"max": [
+28.381,
+9.07,
+22.682
+],
+"top": {
+"h": 9.07,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": false,
+"player": true,
+"bullet": true,
+"eye": false,
+"camera": true,
+"thrown": true
 }
 },
 {
