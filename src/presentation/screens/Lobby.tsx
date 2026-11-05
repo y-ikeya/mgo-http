@@ -5,7 +5,6 @@ import { useLevels } from "../../infra/api/levels";
 import { t } from "../../i18n";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { MODES } from "../../domain/match/room";
-import { ruleTitle } from "../../domain/match/briefing";
 import { STAGES } from "../../domain/stage";
 import { fetchRooms } from "../../infra/api/rooms";
 import type { MatchPhase, RoomSummary } from "../../application/protocol/types";
@@ -167,18 +166,17 @@ export default function Lobby(props: { identity: Identity }) {
                 onClick={() => enter(room.name)}
               >
                 <span class="room-name">{room.name}</span>
-                {/* ルール。英語の正式名 (説明の見出しと同じ) と、略号 */}
+                {/*
+                  ルール。**固定かローテか**の札と、略号
+                  (2026-11-05 本人「rule 名の左に正式名称を書かなくていい、その代わり fix かローテかを書いて」)
+                */}
                 <span class="room-rule">
-                  <span class="room-rule-title">{ruleTitle(room.mode) ?? MODES[room.mode].label}</span>
+                  <span class={`room-order room-order-${room.order}`}>{ORDER_LABEL[room.order]()}</span>
                   <span class="room-mode">{room.mode}</span>
                 </span>
 
-                {/*
-                  ステージ。**固定かローテか**を札で、ローテなら回し順を並べて今のを光らせる
-                  (2026-11-05 本人「ステージは何で、ルールはローテなのか固定なのか」)
-                */}
+                {/* ステージ。ローテなら回し順を並べて今のを光らせる */}
                 <span class="room-stage">
-                  <span class={`room-order room-order-${room.order}`}>{ORDER_LABEL[room.order]()}</span>
                   <span class="room-stages">
                     <For each={room.stages}>
                       {(stage, i) => (

@@ -141,16 +141,11 @@
 
 .room-rule {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
-.room-rule-title {
-  font-size: 15px;
-  color: rgba(214, 226, 200, 0.95);
-}
-
-/* ルールの略号。名前の隣に小さく */
+/* ルールの略号。札の隣に */
 .room-mode {
   font-size: 10px;
   letter-spacing: 0.1em;
@@ -159,7 +154,7 @@
   border: 1px solid rgba(126, 166, 255, 0.35);
 }
 
-/* ステージ。札 (固定 / ローテ / ランダム) と、回し順 */
+/* ステージ。回し順 */
 .room-stage {
   display: flex;
   align-items: center;
@@ -167,6 +162,7 @@
   flex-wrap: wrap;
 }
 
+/* 札 (固定 / ローテ / ランダム) */
 .room-order {
   font-size: 10px;
   letter-spacing: 0.08em;
