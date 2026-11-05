@@ -440,13 +440,16 @@ MID = (F1 + F2) / 2
 stairs('metal_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
 box('metal_landing_nw', 295, 228, 325, 288, MID - DECK, MID)
 stairs('metal_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
-# 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
-stairs('metal_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
-box('metal_landing_se', 605, 670, 655, 700, MID - DECK, MID)
+# 南東: 2F の通路を南へ 1.4m 延ばし (本人「もう少し 2F が長く続いてる」、南西と同じ作り) → 南へ下りて踊り場 →
+# 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
+SE_EXT = 1.4 / M_PER_PX * 3
+box('metal_walk_2F_se_down', 605, 640, 640, 640 + SE_EXT, F2 - DECK, F2)
+stairs('metal_stair_se_upper', 605, 640 + SE_EXT, 640, 670 + SE_EXT, F2, MID, 'y', +1, open_under=True)
+box('metal_landing_se', 605, 670 + SE_EXT, 655, 700 + SE_EXT, MID - DECK, MID)
 # 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
-box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - DECK)
+box('concrete_landing_se_pillar', 605, 680 + SE_EXT, 605 + 0.4 / M_PER_PX * 3, 680 + SE_EXT + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - DECK)
 # 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
-stairs('metal_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
+stairs('metal_stair_se', 655, 670 + SE_EXT, 685, 700 + SE_EXT, MID, F1, 'x', +1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('metal_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
 box('metal_landing_sw', 325, 730, 388, 800, MID - DECK, MID)
