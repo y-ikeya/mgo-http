@@ -142,13 +142,17 @@ def build(bpy, scene):
     for o in [o for o in scene.objects if o.type == 'MESH' and o.name.startswith(FLIGHTS)]:
         lo, hi = _bounds(o)
         ws = [o.matrix_world @ v.co for v in o.data.vertices]
-        along_x = (hi.x - lo.x) >= (hi.y - lo.y)
-        # 高い端: 一番高い頂点のある側
-        top = max(ws, key=lambda w: w.z)
-        if along_x:
-            high_at_hi = top.x > (lo.x + hi.x) / 2
-        else:
-            high_at_hi = top.y > (lo.y + hi.y) / 2
+        # **上る向きは段の高さから決める。** 辺の長さで決めていたら、平面が正方形の階段 (北西の 2 本、2.24m 角) で
+        # 向きを取り違え、柵が上り口と下り口を塞いだ (2026-11-05 本人「cursor らへんどういうこと？」)。
+        # 一番高い段と一番低い段の真ん中を結んだ向きが上る向き
+        zmax, zmin = max(w.z for w in ws), min(w.z for w in ws)
+        high = [w for w in ws if w.z > zmax - 0.01]
+        low = [w for w in ws if w.z < zmin + 0.01]
+        hc = sum(high, Vector()) / len(high)
+        lc = sum(low, Vector()) / len(low)
+        run = hc - lc
+        along_x = abs(run.x) >= abs(run.y)
+        high_at_hi = (run.x if along_x else run.y) > 0
         z_lo = min(w.z for w in ws) + 0.2      # 一番低い段の上面 (板の厚み 0.2)
         z_hi = hi.z
 
