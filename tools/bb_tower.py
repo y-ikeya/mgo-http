@@ -1,7 +1,7 @@
 # BB の真ん中の塔 (本人の画面 2026-11-05「真ん中の塔の柵はボロボロ、上に行けても狙われやすい」
 # 「塔の 2F 部分は四角じゃなくて筒」)。
 #
-#   筒      concrete_tower         2F より上は円柱 (16 角)、ベランダから 2.8m の低いトーチカ。1 面おきに覗き穴
+#   筒      concrete_tower         2F より上は円柱 (32 角、外側は 1 枚につながった網で丸く見せる)、ベランダから 2.8m の低いトーチカ。1 面おきに覗き穴
 #                                  (中には入れない)。1F の土台 (concrete_tower_base) は四角のまま
 #   崩れた壁 concrete_tower_parapet_<辺>   ベランダの外の縁に、高さ 0.4〜1.2m のまばらな塊。切れ目がある
 #                                          (人も弾も止めるが、隠れきれない)。跳び移る所は空ける
@@ -11,7 +11,7 @@ import bmesh
 import math
 import random
 
-SIDES = 16
+SIDES = 32
 PARAPET_T = 0.3
 CHUNK = (0.6, 1.8)        # 塊の長さ
 GAP = (0.2, 1.0)          # 切れ目の長さ
@@ -41,48 +41,64 @@ WALL = 0.5                # 筒の壁の厚み。覗き穴はこの深さだけ�
 SLIT_W, SLIT_Z, SLIT_H = 0.9, 1.2, 0.25   # 覗き穴の幅・下端 (ベランダの床から)・高さ。1 面おき
 
 
+SLITS = 8                 # 覗き穴の数 (周りに等間隔)
+
+
 def tube(bpy, scene, cx, cy, r, z0, z1, name='concrete_tower', floor=None):
-    """筒。floor (ベランダの床の高さ) を渡すと、そこから SLIT_Z の高さに 1 面おきに覗き穴 (本人「周囲を
-    見渡せるトーチカ、覗き穴がある、中には入れない」)"""
-    def ring(rad, a):
-        return cx + rad * math.cos(a), cy + rad * math.sin(a)
-
-    def prism(bm, a0, a1, r0, r1, h0, h1):
-        """角度 a0..a1、半径 r0..r1、高さ h0..h1 の塊 (辺は直線)"""
-        pts = [ring(r0, a0), ring(r0, a1), ring(r1, a1), ring(r1, a0)]
-        lo = [bm.verts.new((x, y, h0)) for x, y in pts]
-        hi = [bm.verts.new((x, y, h1)) for x, y in pts]
-        bm.faces.new(list(reversed(lo)))
-        bm.faces.new(hi)
-        for i in range(4):
-            j = (i + 1) % 4
-            bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
-
+    """筒。**外側の面は 1 枚につながった網** — 面ごとに別の箱で組んでいたら頂点が共有されず、Shade Auto Smooth
+    しても角が立った (2026-11-05 本人「全然滑らかにならない」)。floor (ベランダの床) を渡すと、そこから SLIT_Z の
+    高さに覗き穴 (本人「周囲を見渡せるトーチカ、覗き穴がある、中には入れない」)。穴は壁の厚み WALL だけ凹む"""
     def build(bm):
-        rin = r - WALL
-        # 芯 (中には入れない)
-        core = [bm.verts.new((*ring(rin, 2 * math.pi * i / SIDES), z0)) for i in range(SIDES)]
-        top = [bm.verts.new((v.co.x, v.co.y, z1)) for v in core]
-        bm.faces.new(list(reversed(core)))
-        bm.faces.new(top)
-        for i in range(SIDES):
-            j = (i + 1) % SIDES
-            bm.faces.new((core[i], core[j], top[j], top[i]))
-        # 壁 (面ごと)。覗き穴のある面は、穴の上下左右に分ける
-        for i in range(SIDES):
-            a0, a1 = 2 * math.pi * i / SIDES, 2 * math.pi * (i + 1) / SIDES
-            if floor is None or i % 2:
-                prism(bm, a0, a1, rin, r, z0, z1)
-                continue
-            s0, s1 = floor + SLIT_Z, floor + SLIT_Z + SLIT_H
-            side = 2 * r * math.sin(math.pi / SIDES)
-            f = min(0.45, SLIT_W / side / 2)
-            am0, am1 = (a0 + a1) / 2 - (a1 - a0) * f, (a0 + a1) / 2 + (a1 - a0) * f
-            prism(bm, a0, a1, rin, r, z0, s0)
-            prism(bm, a0, a1, rin, r, s1, z1)
-            prism(bm, a0, am0, rin, r, s0, s1)
-            prism(bm, am1, a1, rin, r, s0, s1)
-    return _new(bpy, scene, name, build)
+        half = (SLIT_W / 2) / r                     # 覗き穴の半分の角度
+        slits = [2 * math.pi * (k + 0.5) / SLITS for k in range(SLITS)] if floor is not None else []
+        angles = sorted({2 * math.pi * i / SIDES for i in range(SIDES)} |
+                        {a % (2 * math.pi) for c in slits for a in (c - half, c + half)})
+        zs = [z0, z1] if floor is None else [z0, floor + SLIT_Z, floor + SLIT_Z + SLIT_H, z1]
+        n = len(angles)
+        grid = [[bm.verts.new((cx + r * math.cos(a), cy + r * math.sin(a), z)) for z in zs] for a in angles]
+
+        def in_slit(a):
+            return any(abs((a - c + math.pi) % (2 * math.pi) - math.pi) < half - 1e-6 for c in slits)
+
+        for i in range(n):
+            j = (i + 1) % n
+            a0, a1 = angles[i], angles[j] if j else angles[j] + 2 * math.pi
+            mid = (a0 + a1) / 2
+            for k in range(len(zs) - 1):
+                if floor is not None and k == 1 and in_slit(mid):
+                    # 穴: 奥 (半径 r - WALL) と上下・左右の面
+                    rin = r - WALL
+                    bl = bm.verts.new((cx + rin * math.cos(a0), cy + rin * math.sin(a0), zs[1]))
+                    br = bm.verts.new((cx + rin * math.cos(a1), cy + rin * math.sin(a1), zs[1]))
+                    tl = bm.verts.new((cx + rin * math.cos(a0), cy + rin * math.sin(a0), zs[2]))
+                    tr = bm.verts.new((cx + rin * math.cos(a1), cy + rin * math.sin(a1), zs[2]))
+                    bm.faces.new((bl, br, tr, tl))                                   # 奥
+                    bm.faces.new((grid[i][1], grid[j][1], br, bl))                   # 下
+                    bm.faces.new((tl, tr, grid[j][2], grid[i][2]))                   # 上
+                    if not in_slit(a0 - 1e-4):
+                        bm.faces.new((grid[i][1], bl, tl, grid[i][2]))               # 左の縁
+                    if not in_slit(a1 + 1e-4):
+                        bm.faces.new((br, grid[j][1], grid[j][2], tr))               # 右の縁
+                    continue
+                bm.faces.new((grid[i][k], grid[j][k], grid[j][k + 1], grid[i][k + 1]))
+        bm.faces.new([grid[i][-1] for i in range(n)])                                 # 屋根
+        bm.faces.new([grid[i][0] for i in reversed(range(n))])                       # 底
+        # 穴が 2 つの区間にまたがる時、奥どうしの境目に頂点が重なる。つなげる
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+    o = _new(bpy, scene, name, build)
+    # 丸く見せる。角度の大きい所 (穴の縁・屋根の縁) は角のまま
+    for p in o.data.polygons:
+        p.use_smooth = True
+    try:
+        mod = o.modifiers.new('smooth', 'NODES')
+        bpy.ops.object.select_all(action='DESELECT')
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        o.modifiers.remove(mod)
+        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(30))
+    except Exception as error:   # 画面の無い Blender などで演算子が使えない時は、滑らかの印だけ
+        print('shade_smooth_by_angle が使えない:', error)
+    return o
 
 
 def parapet(bpy, scene, x0, y0, x1, y1, z, gaps, seed=5):

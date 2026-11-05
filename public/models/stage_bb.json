@@ -3563,32 +3563,6 @@
 }
 },
 {
-"name": "concrete_tower",
-"min": [
--2.7,
-10.8,
--2.72
-],
-"max": [
-5.0,
-17.7,
-4.98
-],
-"top": {
-"h": 17.7,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "metal_rail_walk_2F_w_nobullet_noeye_nocamera",
 "min": [
 -15.717,
@@ -4124,6 +4098,32 @@
 "eye": false,
 "camera": false,
 "thrown": false
+}
+},
+{
+"name": "concrete_tower",
+"min": [
+-2.7,
+10.8,
+-2.72
+],
+"max": [
+5.0,
+17.7,
+4.98
+],
+"top": {
+"h": 17.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
 }
 },
 {
