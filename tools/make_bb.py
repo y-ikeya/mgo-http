@@ -346,18 +346,18 @@ for k, r in (('w', (135, 335, 170, 368)), ('e', (825, 515, 855, 548))):
 MID = (F1 + F2) / 2
 # 北西: 1F (西) → 東へ上がって踊り場 → 北寄りの階段で東へ上がって 2F の通路
 stairs('concrete_stair_nw_lower', 195, 255, 255, 285, F1, MID, 'x', +1, open_under=True)
-box('concrete_landing_nw', 255, 258, 351, 285, MID - 0.3, MID)
+box('concrete_landing_nw', 255, 258, 351, 285, MID - SLAB, MID)
 stairs('concrete_stair_nw', 290, 228, 360, 258, MID, F2, 'x', +1, open_under=True)
 # 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
 stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
-box('concrete_landing_se', 605, 670, 655, 700, MID - 0.3, MID)
+box('concrete_landing_se', 605, 670, 655, 700, MID - SLAB, MID)
 # 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
-box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - 0.3)
+box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - SLAB)
 # 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
 stairs('concrete_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('concrete_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
-box('concrete_landing_sw', 325, 730, 388, 800, MID - 0.3, MID)
+box('concrete_landing_sw', 325, 730, 388, 800, MID - SLAB, MID)
 stairs('concrete_stair_sw', 295, 765, 325, 800, MID, F1, 'x', -1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
