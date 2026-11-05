@@ -241,7 +241,8 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
    */
   // 試合ごとに city → UU → BB を回す (2026-11-05 本人「bravo は 3 種類のローテ」)。BB を足す前は city と UU の交互
   bravo: { mode: 'TDM', stages: cycle('city', 'uu', 'bb') },
-  charlie: { mode: 'TSNE', stages: cycle('city', 'uu'), armory: TSNE_ARMORY, lives: 0 },
+  // BB も回す (2026-11-05 本人「Charlie に BB も入れられる」、ターゲットは地下 1F の 2 か所)
+  charlie: { mode: 'TSNE', stages: cycle('city', 'uu', 'bb'), armory: TSNE_ARMORY, lives: 0 },
   delta: {
     mode: 'TDM',
     // 砂部屋は UU (2026-10-22 本人)。筏 (raft) は練習で作ったもので、いまはどの部屋でも使わない

@@ -3,7 +3,7 @@ import { updateMatch } from '../server/match'
 import { rooms, roomOf } from '../server/world'
 
 /**
- * **試合の切れ目でステージを回す** (charlie は city と UU を交互に、2026-10-22 本人。bravo は city → UU → BB、2026-11-05)。
+ * **試合の切れ目でステージを回す** (bravo と charlie は city → UU → BB、2026-11-05。それまでは city と UU の交互)。
  * 替わるのは結果を見せ終えた所 (over の終わり)。画面は配られた stage を見て組み直す (screens/Play.tsx)
  */
 test('bravo は最初の試合が city、結果を見せ終えるたびに UU → BB → city と回る', () => {
