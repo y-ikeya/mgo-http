@@ -297,9 +297,13 @@ const SMG: WeaponConfig = {
  * (Bayonet) が入っている。その骨内の行列を測り、本番の取り付け (肘→手首の線を
  * 基準にする attachTo) を逆算してこの 2 つにした。目で合わせた値ではない。
  * 測り直すときは Blender で骨からの相対行列を出して、同じ逆算を通す。
+ *
+ * ただし握りの z だけは、測った値 (0.025) から刃の側へ 5cm 寄せた。測った値では柄の尻
+ * (柄は z −0.05〜+0.055、鍔は −0.07〜−0.05) を握って見えた (2026-11-05 本人「あと5cmくらい
+ * 深く、いま柄の部分をもっちゃってる」)。−0.025 で鍔のすぐ手前を握る
  */
 const KNIFE: WeaponConfig = {
-  grip: new THREE.Vector3(0.015, 0.08, 0.025),
+  grip: new THREE.Vector3(0.015, 0.08, -0.025),
   rotation: new THREE.Euler(degrees(59.1), degrees(5.8), degrees(-26.8)),
   tip: new THREE.Vector3(0, 0, -0.24),
 }
