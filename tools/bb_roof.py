@@ -80,6 +80,7 @@ def build(bpy, scene):
             for x, y in spots:
                 _box(bm, (x - POST / 2, y - POST / 2, bottom), (x + POST / 2, y + POST / 2, top + ROOF_H))
         if spots:
-            new(f'metal_roof_post_{key}', posts)
+            # nobox: 両側に柱が並ぶので、外接の箱にされると通路が塞がる (柵で起きた)
+            new(f'metal_roof_post_{key}_nobox', posts)
         made += 1
     return made

@@ -1,7 +1,8 @@
 # BB の 2F の通路・踊り場・1F ⇔ 2F の階段の柵 (本人の画面 2026-11-05「2F 部分と階段と踊り場はこういうふうに柵がある」)。
 #
 #   柱 (約 1.5m おき)・上の手すり (1.1m)・中の手すり・下半分の穴あきの金網の板。階段は傾きに沿って斜め。
-#   名前 metal_rail_<k>_noeye_nocamera — 人・弾・投げた物は止め、視線とカメラは通す。弾は柵の形 (柱・手すり・板) に
+#   名前 metal_rail_<k>_nobox_noeye_nocamera — 人・弾・投げた物は止め、視線とカメラは通す。**nobox** が無いと
+#   書き出しが人の層を外接の箱に置き換え、両側に柵のある通路が丸ごと箱で塞がって進めなかった (2026-11-05)。弾は柵の形 (柱・手すり・板) に
 #   当たるので、隙間は抜ける (2026-11-05 本人「全部止めていい、隙間は通していい」)
 #
 # **縁ごとに、外に何が続いているかを調べて決める。** 縁のすぐ外に、同じ高さの床・踊り場・階段・ベランダがあれば
@@ -170,7 +171,7 @@ def build(bpy, scene):
                 if s1 - s0 >= MIN_LEN:
                     segs.append((a + d * s0 - n * (POST / 2), a + d * s1 - n * (POST / 2), n))
         bm.free()
-        emit(f'metal_rail_{o.name.split("_", 1)[1]}_noeye_nocamera', segs)
+        emit(f'metal_rail_{o.name.split("_", 1)[1]}_nobox_noeye_nocamera', segs)
 
     # 1F ⇔ 2F の階段: 長い 2 辺に、傾きに沿って
     for o in [o for o in scene.objects if o.type == 'MESH' and o.name.startswith(FLIGHTS)]:
@@ -226,5 +227,5 @@ def build(bpy, scene):
                 segs.append((a - n * (POST / 2), b - n * (POST / 2), n))
         # 名前に stair を入れない — 書き出し (is_stair) が柵を階段と見なして柵の高さに坂の板を張り、
         # 階段の上で頭がつかえて登れなかった (2026-11-05 本人「stair が登れなかった」)
-        emit(f'metal_rail_{o.name.split("_", 1)[1].replace("stair_", "flight_")}_noeye_nocamera', segs)
+        emit(f'metal_rail_{o.name.split("_", 1)[1].replace("stair_", "flight_")}_nobox_noeye_nocamera', segs)
     return made

@@ -3725,7 +3725,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_w_noeye_nocamera",
+"name": "metal_rail_walk_2F_w_nobox_noeye_nocamera",
 "min": [
 -15.717,
 14.9,
@@ -3751,7 +3751,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_sw_noeye_nocamera",
+"name": "metal_rail_walk_2F_sw_nobox_noeye_nocamera",
 "min": [
 -15.717,
 14.9,
@@ -3777,7 +3777,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_se_noeye_nocamera",
+"name": "metal_rail_walk_2F_se_nobox_noeye_nocamera",
 "min": [
 9.147,
 14.9,
@@ -3803,7 +3803,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_s_tab_noeye_nocamera",
+"name": "metal_rail_walk_2F_s_tab_nobox_noeye_nocamera",
 "min": [
 0.56,
 14.9,
@@ -3829,7 +3829,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_s_down_noeye_nocamera",
+"name": "metal_rail_walk_2F_s_down_nobox_noeye_nocamera",
 "min": [
 -9.117,
 14.9,
@@ -3855,7 +3855,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_s_noeye_nocamera",
+"name": "metal_rail_walk_2F_s_nobox_noeye_nocamera",
 "min": [
 -9.117,
 14.9,
@@ -3881,7 +3881,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_nw_up_noeye_nocamera",
+"name": "metal_rail_walk_2F_nw_up_nobox_noeye_nocamera",
 "min": [
 -9.52,
 14.9,
@@ -3907,7 +3907,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_nw_join_noeye_nocamera",
+"name": "metal_rail_walk_2F_nw_join_nobox_noeye_nocamera",
 "min": [
 -15.717,
 14.9,
@@ -3933,7 +3933,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_n_tab_noeye_nocamera",
+"name": "metal_rail_walk_2F_n_tab_nobox_noeye_nocamera",
 "min": [
 -1.083,
 14.9,
@@ -3959,7 +3959,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_n_noeye_nocamera",
+"name": "metal_rail_walk_2F_n_nobox_noeye_nocamera",
 "min": [
 -1.083,
 14.9,
@@ -3985,7 +3985,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_e_noeye_nocamera",
+"name": "metal_rail_walk_2F_e_nobox_noeye_nocamera",
 "min": [
 15.493,
 14.9,
@@ -4011,7 +4011,7 @@
 }
 },
 {
-"name": "metal_rail_landing_se_noeye_nocamera",
+"name": "metal_rail_landing_se_nobox_noeye_nocamera",
 "min": [
 9.147,
 13.1,
@@ -4037,7 +4037,7 @@
 }
 },
 {
-"name": "metal_rail_landing_nw_noeye_nocamera",
+"name": "metal_rail_landing_nw_nobox_noeye_nocamera",
 "min": [
 -14.0,
 13.1,
@@ -4063,7 +4063,7 @@
 }
 },
 {
-"name": "metal_rail_landing_sw_noeye_nocamera",
+"name": "metal_rail_landing_sw_nobox_noeye_nocamera",
 "min": [
 -10.186,
 13.1,
@@ -4089,7 +4089,7 @@
 }
 },
 {
-"name": "metal_rail_landing_ne_noeye_nocamera",
+"name": "metal_rail_landing_ne_nobox_noeye_nocamera",
 "min": [
 9.147,
 13.1,
@@ -4115,7 +4115,7 @@
 }
 },
 {
-"name": "metal_rail_flight_se_upper_noeye_nocamera",
+"name": "metal_rail_flight_se_upper_nobox_noeye_nocamera",
 "min": [
 9.177,
 13.25,
@@ -4141,7 +4141,7 @@
 }
 },
 {
-"name": "metal_rail_flight_se_noeye_nocamera",
+"name": "metal_rail_flight_se_nobox_noeye_nocamera",
 "min": [
 12.88,
 11.3,
@@ -4167,7 +4167,7 @@
 }
 },
 {
-"name": "metal_rail_flight_nw_lower_noeye_nocamera",
+"name": "metal_rail_flight_nw_lower_nobox_noeye_nocamera",
 "min": [
 -16.24,
 11.45,
@@ -4193,7 +4193,7 @@
 }
 },
 {
-"name": "metal_rail_flight_nw_noeye_nocamera",
+"name": "metal_rail_flight_nw_nobox_noeye_nocamera",
 "min": [
 -11.76,
 13.25,
@@ -4219,7 +4219,7 @@
 }
 },
 {
-"name": "metal_rail_flight_sw_upper_noeye_nocamera",
+"name": "metal_rail_flight_sw_upper_nobox_noeye_nocamera",
 "min": [
 -9.117,
 13.25,
@@ -4245,7 +4245,7 @@
 }
 },
 {
-"name": "metal_rail_flight_sw_noeye_nocamera",
+"name": "metal_rail_flight_sw_nobox_noeye_nocamera",
 "min": [
 -12.43,
 11.45,
@@ -4271,7 +4271,7 @@
 }
 },
 {
-"name": "metal_rail_flight_ne_upper_noeye_nocamera",
+"name": "metal_rail_flight_ne_upper_nobox_noeye_nocamera",
 "min": [
 9.177,
 13.25,
@@ -4297,7 +4297,7 @@
 }
 },
 {
-"name": "metal_rail_flight_ne_noeye_nocamera",
+"name": "metal_rail_flight_ne_nobox_noeye_nocamera",
 "min": [
 13.627,
 11.45,
@@ -4349,7 +4349,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_w",
+"name": "metal_roof_post_walk_2F_w_nobox",
 "min": [
 -15.787,
 14.85,
@@ -4401,7 +4401,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_sw",
+"name": "metal_roof_post_walk_2F_sw_nobox",
 "min": [
 -15.687,
 14.85,
@@ -4453,7 +4453,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_se",
+"name": "metal_roof_post_walk_2F_se_nobox",
 "min": [
 9.177,
 14.85,
@@ -4505,7 +4505,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_s_tab",
+"name": "metal_roof_post_walk_2F_s_tab_nobox",
 "min": [
 0.49,
 14.85,
@@ -4557,7 +4557,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_s_down",
+"name": "metal_roof_post_walk_2F_s_down_nobox",
 "min": [
 -9.217,
 14.85,
@@ -4609,7 +4609,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_s",
+"name": "metal_roof_post_walk_2F_s_nobox",
 "min": [
 -5.06,
 14.85,
@@ -4661,7 +4661,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_nw_up",
+"name": "metal_roof_post_walk_2F_nw_up_nobox",
 "min": [
 -9.59,
 14.85,
@@ -4713,7 +4713,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_nw_join",
+"name": "metal_roof_post_walk_2F_nw_join_nobox",
 "min": [
 -15.687,
 14.85,
@@ -4765,7 +4765,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_n_tab",
+"name": "metal_roof_post_walk_2F_n_tab_nobox",
 "min": [
 -1.153,
 14.85,
@@ -4817,7 +4817,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_n",
+"name": "metal_roof_post_walk_2F_n_nobox",
 "min": [
 -1.053,
 14.85,
@@ -4869,7 +4869,7 @@
 }
 },
 {
-"name": "metal_roof_post_walk_2F_e",
+"name": "metal_roof_post_walk_2F_e_nobox",
 "min": [
 15.423,
 14.85,
