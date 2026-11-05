@@ -167,16 +167,18 @@ export default function Lobby(props: { identity: Identity }) {
               >
                 <span class="room-name">{room.name}</span>
                 {/*
-                  ルール。**固定かローテか**の札と、略号
-                  (2026-11-05 本人「rule 名の左に正式名称を書かなくていい、その代わり fix かローテかを書いて」)
+                  ルールとステージ、それぞれが**固定かローテか**の札と中身
+                  (2026-11-05 本人「rule が fix なのかを書いて欲しかった。rule についてと stage についての両方がある」)
+                  ルールは今は部屋ごとに 1 つなので常に固定
                 */}
-                <span class="room-rule">
-                  <span class={`room-order room-order-${room.order}`}>{ORDER_LABEL[room.order]()}</span>
+                <span class="room-line">
+                  <span class="room-line-label">{t("lobby.rule")}</span>
+                  <span class="room-order room-order-fixed">{ORDER_LABEL.fixed()}</span>
                   <span class="room-mode">{room.mode}</span>
                 </span>
-
-                {/* ステージ。ローテなら回し順を並べて今のを光らせる */}
-                <span class="room-stage">
+                <span class="room-line">
+                  <span class="room-line-label">{t("lobby.stage")}</span>
+                  <span class={`room-order room-order-${room.order}`}>{ORDER_LABEL[room.order]()}</span>
                   <span class="room-stages">
                     <For each={room.stages}>
                       {(stage, i) => (
