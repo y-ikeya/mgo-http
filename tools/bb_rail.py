@@ -22,7 +22,7 @@ OUT = 0.12                # 縁の外を調べる距離
 NEAR_Z = 0.4              # 外の床が「同じ高さ」と見なす差
 MIN_LEN = 0.4             # これより短い柵は付けない
 SLABS = ('metal_walk_2F_', 'metal_landing_')
-FLIGHTS = ('concrete_stair_nw', 'concrete_stair_se', 'concrete_stair_sw')   # 1F ⇔ 2F (地下の b1_ / b2_ は壁がある)
+FLIGHTS = ('concrete_stair_nw', 'concrete_stair_se', 'concrete_stair_sw', 'concrete_stair_ne')   # 1F ⇔ 2F (地下の b1_ / b2_ は壁がある)
 WALKABLE = ('metal_walk_2F_', 'metal_landing_', 'concrete_stair_', 'concrete_tower_balcony_', 'concrete_tower')
 # 柵を付けない縁: (物の名前, 縁の向き)。北と南の通路の先端の、塔に向いた縁 (転がりで跳び移る、本人)
 SKIP_EDGES = {('metal_walk_2F_n_tab', 's'), ('metal_walk_2F_s_tab', 'n')}

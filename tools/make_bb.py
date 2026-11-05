@@ -430,11 +430,14 @@ stairs('concrete_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=Tru
 stairs('concrete_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
 box('metal_landing_sw', 325, 730, 388, 800, MID - SLAB, MID)
 stairs('concrete_stair_sw', 295, 765, 325, 800, MID, F1, 'x', -1, open_under=True)
+# 北東: 北の 2F の通路の北の縁 → 北へ下りて踊り場 → 東へ下りて 1F (本人「cursor の部分に stair がない」。
+# 地下 1F へ下りる階段だと読み違えて印だけにしていた)
+stairs('concrete_stair_ne_upper', 605, 250, 635, 280, MID, F2, 'y', +1, open_under=True)
+box('metal_landing_ne', 605, 220, 665, 250, MID - SLAB, MID)
+stairs('concrete_stair_ne', 665, 220, 695, 250, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
-for name, r in (
-                ('north_b1_e', (655, 180, 735, 215)), ('north_b1_s', (605, 215, 640, 275)),
-                ('a1_north', (755, 600, 790, 670))):
+for name, r in (('a1_north', (755, 600, 790, 670)),):
     box(f'ref_stair_{name}', *r, F1, F1 + 0.05)
 
 # --- 遮蔽 (下絵の三角の印) ----------------------------------------------------------------

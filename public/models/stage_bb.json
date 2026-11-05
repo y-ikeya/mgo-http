@@ -3589,6 +3589,90 @@
 }
 },
 {
+"name": "concrete_stair_ne_upper",
+"min": [
+9.177,
+13.05,
+-15.785
+],
+"max": [
+11.417,
+14.9,
+-13.545
+],
+"top": {
+"h": 13.2312,
+"dx": 0.0,
+"dz": 0.80183,
+"riser": 0.15,
+"foot": 13.1,
+"head": 15.05
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_landing_ne",
+"min": [
+9.177,
+12.9,
+-18.025
+],
+"max": [
+13.657,
+13.1,
+-15.785
+],
+"top": {
+"h": 13.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_stair_ne",
+"min": [
+13.657,
+11.25,
+-18.025
+],
+"max": [
+15.897,
+13.1,
+-15.785
+],
+"top": {
+"h": 13.2451,
+"dx": -0.80126,
+"dz": 0.0,
+"riser": 0.15,
+"foot": 11.3,
+"head": 13.25
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "metal_rail_walk_2F_w_nobullet_noeye_nocamera",
 "min": [
 -15.717,
@@ -3953,6 +4037,32 @@
 }
 },
 {
+"name": "metal_rail_landing_ne_nobullet_noeye_nocamera",
+"min": [
+9.147,
+13.1,
+-18.055
+],
+"max": [
+13.687,
+14.225,
+-15.755
+],
+"top": {
+"h": 14.225,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
 "name": "metal_rail_stair_se_upper_nobullet_noeye_nocamera",
 "min": [
 9.177,
@@ -4112,6 +4222,64 @@
 "top": {
 "h": 12.4266,
 "dx": 0.7568,
+"dz": 0.0,
+"riser": 0.21,
+"foot": 12.36,
+"head": 14.43
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_rail_stair_ne_upper_nobullet_noeye_nocamera",
+"min": [
+9.177,
+13.25,
+-15.815
+],
+"max": [
+11.417,
+16.02,
+-13.515
+],
+"top": {
+"h": 14.2266,
+"dx": 0.0,
+"dz": 0.7568,
+"riser": 0.21,
+"foot": 14.16,
+"head": 16.23
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_rail_stair_ne_nobullet_noeye_nocamera",
+"min": [
+13.627,
+11.45,
+-18.025
+],
+"max": [
+15.927,
+14.22,
+-15.785
+],
+"top": {
+"h": 14.1673,
+"dx": -0.7568,
 "dz": 0.0,
 "riser": 0.21,
 "foot": 12.36,
