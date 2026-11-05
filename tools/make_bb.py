@@ -604,6 +604,11 @@ for k, b in BUNKERS.items():
         wall(f'concrete_bunker_{k}_wall_{i}', a, c, F1 - 0.05, BUNKER_TOP)
     prism(f'concrete_bunker_{k}_roof', b['roof'], BUNKER_TOP, BUNKER_TOP + 0.4)
 
+# --- CAP の target: 地下 2F の真ん中の通り (塔の真下) の真ん中 (2026-11-05 本人) ----------------------
+cap = bpy.data.objects.new('meta_cap_target', None)
+cap.location = (1.34, -1.0, B2 + 0.5)
+scene.collection.objects.link(cap)
+
 # --- 基地・湧く所 ------------------------------------------------------------------------
 # トーチカの中。どちらの軍がどちらかは仮 (本人に確かめる)
 empty('meta_baseBlue', 150, 790, F1)   # 南西のトーチカ
