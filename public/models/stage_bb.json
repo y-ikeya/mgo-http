@@ -1659,9 +1659,12 @@
 24.162
 ],
 "top": {
-"h": 13.1,
+"h": 13.6485,
 "dx": 0.0,
-"dz": 0.0
+"dz": -0.70914,
+"riser": 0.13,
+"foot": 11.44,
+"head": 13.23
 },
 "flags": {
 "draw": true,
@@ -5256,6 +5259,84 @@
 "bullet": true,
 "eye": false,
 "camera": false,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar.003",
+"min": [
+9.257,
+11.25,
+-17.92
+],
+"max": [
+9.657,
+13.05,
+-17.52
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar.004",
+"min": [
+-13.926,
+11.25,
+-17.397
+],
+"max": [
+-13.526,
+13.05,
+-16.997
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_landing_se_pillar.005",
+"min": [
+-12.161,
+11.25,
+-13.401
+],
+"max": [
+-11.761,
+13.05,
+-13.001
+],
+"top": {
+"h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
 "thrown": true
 }
 },
