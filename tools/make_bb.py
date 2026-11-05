@@ -56,7 +56,7 @@ B1_CEIL = -0.3 + LIFT                 # 地下 1F の天井 (1F の床の下)
 GROUND_TOP = F1
 TOWER_TOP = 12.1 + LIFT
 WALL_TOP = 7.1 + LIFT                 # 外壁の上
-SLAB = 0.4                     # 2F の板の厚み
+SLAB = 0.2                     # 2F の床の厚み。階段の段の板と同じ (0.4 は厚かった、2026-11-05 本人)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
