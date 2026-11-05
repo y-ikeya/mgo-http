@@ -447,10 +447,14 @@ stairs('metal_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
 SE_RUN = 2.24 / M_PER_PX * 3
 # 幅はどれも他の通路と同じ 2.24m (SE_RUN と同じ。本人「横幅おかしくない？」— 延ばした 2F が 3.95m あった)
 box('metal_walk_2F_se_down', 605, 640, 605 + SE_RUN, 700, F2 - DECK, F2)
-stairs('metal_stair_se_upper', 605 + SE_RUN, 700 - SE_RUN, 605 + 2 * SE_RUN, 700, F2, MID, 'x', +1, open_under=True)
-box('metal_landing_se', 605 + 2 * SE_RUN, 700 - SE_RUN, 786, 700, MID - DECK, MID)
+# 2F を東へ延ばし、上の階段を下の階段のすぐ西へ寄せる。踊り場は下の階段の頭だけ (本人「階段をもっと東に寄せて、
+# 2F も東に延長した方が下の空間が使える」— 長い踊り場の下は 1.8m で通れなかった)
+box('metal_walk_2F_se_south', 605 + SE_RUN, 700 - SE_RUN, 786 - 2 * SE_RUN, 700, F2 - DECK, F2)
+box('concrete_walk_2F_se_south_pillar', (605 + 786 - SE_RUN) / 2 - 3, 695, (605 + 786 - SE_RUN) / 2 + 3, 700, F1 - 0.05, F2 - DECK)
+stairs('metal_stair_se_upper', 786 - 2 * SE_RUN, 700 - SE_RUN, 786 - SE_RUN, 700, F2, MID, 'x', +1, open_under=True)
+box('metal_landing_se', 786 - SE_RUN, 700 - SE_RUN, 786, 700, MID - DECK, MID)
 box('concrete_landing_se_pillar', 781, 695, 786, 700, F1 - 0.05, MID - DECK)
-box('concrete_landing_se_pillar_w', 605 + 2 * SE_RUN, 695, 610 + 2 * SE_RUN, 700, F1 - 0.05, MID - DECK)
+box('concrete_landing_se_pillar_w', 786 - SE_RUN, 695, 791 - SE_RUN, 700, F1 - 0.05, MID - DECK)
 stairs('metal_stair_se', 786 - SE_RUN, 700 - 2 * SE_RUN, 786, 700 - SE_RUN, MID, F1, 'y', -1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('metal_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
