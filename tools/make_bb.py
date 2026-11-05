@@ -261,6 +261,47 @@ for name, (x0, y0, x1, y1), axis, toward, bottom in B2_STAIRS:
     for side, r in sides.items():
         if side != entry:
             box(f'{name.replace("concrete_stair", "concrete_stair_wall")}_{side}', *r, F1 - 0.05, F1 + RAIL_H)
+# 1F の床だけ coral_ground_02 (Poly Haven、CC0。tools/raw/coral_ground_02_4k.gltf、2026-11-05 本人「床はこれ」)。
+# 地下 1F・2F の床と、穴や吹き抜けの壁はコンクリートのまま (材質の枠 0 は空 = ゲームのコンクリート)
+def floor_material():
+    tex = os.path.join(root, 'tools', 'raw', 'coral_ground_02_4k.gltf', 'textures')
+    mat = bpy.data.materials.new('coral_ground_02')
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out_n = nt.nodes.new('ShaderNodeOutputMaterial')
+    bsdf = nt.nodes.new('ShaderNodeBsdfPrincipled')
+
+    def img(name, space):
+        node = nt.nodes.new('ShaderNodeTexImage')
+        node.image = bpy.data.images.load(os.path.join(tex, name))
+        node.image.colorspace_settings.name = space
+        return node
+    d = img('coral_ground_02_diff_4k.jpg', 'sRGB')
+    r = img('coral_ground_02_rough_4k.jpg', 'Non-Color')
+    n = img('coral_ground_02_nor_gl_4k.jpg', 'Non-Color')
+    nm = nt.nodes.new('ShaderNodeNormalMap')
+    nt.links.new(d.outputs['Color'], bsdf.inputs['Base Color'])
+    nt.links.new(r.outputs['Color'], bsdf.inputs['Roughness'])
+    nt.links.new(n.outputs['Color'], nm.inputs['Color'])
+    nt.links.new(nm.outputs['Normal'], bsdf.inputs['Normal'])
+    nt.links.new(bsdf.outputs['BSDF'], out_n.inputs['Surface'])
+    return mat
+
+
+FLOOR_TILE = 3.0   # 絵 1 枚が覆う大きさ (m)
+gme = ground.data
+gme.materials.append(None)
+gme.materials.append(floor_material())
+guv = gme.uv_layers.active or gme.uv_layers.new(name='UVMap')
+for poly in gme.polygons:
+    top = poly.normal.z > 0.9 and abs(poly.center.z - F1) < 0.05
+    poly.material_index = 1 if top else 0
+    if top:
+        for li in poly.loop_indices:
+            w = gme.vertices[gme.loops[li].vertex_index].co
+            guv.data[li].uv = (w.x / FLOOR_TILE, w.y / FLOOR_TILE)
+
 for i, r in enumerate(B1_COLUMNS):
     box(f'concrete_b1_column_{i}', *r, B1, B1_CEIL)
 # 北の階段は東 (1F) から西へ下り、下りた先は階段の周りを回る通路 (本人)。階段の北・南・東は壁で囲み、
