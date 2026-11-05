@@ -63,7 +63,7 @@ def build(bpy, scene):
                 else:
                     x, y = (lo[0] - POST / 2) if side < 0 else (hi[0] + POST / 2), u
                 if free(x, y):
-                    spots.append((x, y))
+                    spots.append((x, y, ('y' if along_x else 'x') + ('-' if side < 0 else '+')))
 
         def new(name, fill):
             me = bpy.data.meshes.new(name)
@@ -73,12 +73,13 @@ def build(bpy, scene):
             bm.free()
             scene.collection.objects.link(bpy.data.objects.new(name, me))
 
-        # 屋根は柱に届くよう、柱の幅だけ外へ広げる
-        new(f'metal_roof_{key}', lambda bm: _box(bm, (lo[0] - POST, lo[1] - POST, top + ROOF_H), (hi[0] + POST, hi[1] + POST, top + ROOF_H + ROOF_T)))
+        # 屋根は通路と同じ形。広げると隣の通路の屋根と縁が重なった (2026-11-05 本人「屋根の 2 重になってる
+        # ところ直して」)。柱は屋根の縁の外に沿わせ、屋根の上面まで伸ばして縁に付ける
+        new(f'metal_roof_{key}', lambda bm: _box(bm, (lo[0], lo[1], top + ROOF_H), (hi[0], hi[1], top + ROOF_H + ROOF_T)))
 
         def posts(bm):
-            for x, y in spots:
-                _box(bm, (x - POST / 2, y - POST / 2, bottom), (x + POST / 2, y + POST / 2, top + ROOF_H))
+            for x, y, _s in spots:
+                _box(bm, (x - POST / 2, y - POST / 2, bottom), (x + POST / 2, y + POST / 2, top + ROOF_H + ROOF_T))
         if spots:
             # nobox: 両側に柱が並ぶので、外接の箱にされると通路が塞がる (柵で起きた)
             new(f'metal_roof_post_{key}_nobox', posts)

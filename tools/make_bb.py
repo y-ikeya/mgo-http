@@ -643,6 +643,11 @@ def grate_material():
     return mat
 
 
+# 通路の板どうしの重なりを切る (角で重ねて置いていた。上面が同じ高さで重なると表示がちらつく、tools/bb_trim.py)
+import bb_trim
+bpy.context.view_layer.update()
+bb_trim.trim(scene)
+
 grate = grate_material()
 GRATE_TILE = 1.0
 
