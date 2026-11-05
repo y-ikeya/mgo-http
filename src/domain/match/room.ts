@@ -236,10 +236,11 @@ const TSNE_ARMORY: Record<Side, Armory> = {
 export const ROOMS: Record<RoomName, RoomSpec> = {
   alpha: { mode: 'DM', stages: only('city') },
   /*
-   * **試合ごとに city と UU を交互に** (2026-10-22 本人)。部屋ができて最初の試合は city。
+   * charlie は**試合ごとに city と UU を交互に** (2026-10-22 本人)。部屋ができて最初の試合は city。
    * TSNE は 2 ラウンドで 1 試合なので、後攻が終わってから替わる。替わる時は画面が暗転して組み直す
    */
-  bravo: { mode: 'TDM', stages: cycle('city', 'uu') },
+  // 試合ごとに city → UU → BB を回す (2026-11-05 本人「bravo は 3 種類のローテ」)。BB を足す前は city と UU の交互
+  bravo: { mode: 'TDM', stages: cycle('city', 'uu', 'bb') },
   charlie: { mode: 'TSNE', stages: cycle('city', 'uu'), armory: TSNE_ARMORY, lives: 0 },
   delta: {
     mode: 'TDM',
@@ -258,8 +259,9 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
     // 10 分 (2026-11-03 本人「制限時間を10minとかに変えてくれない？」)
     minutes: 10,
   },
-  // CAP は UU で (2026-10-26 本人「一旦ステージは UU だけでいい」)。練習部屋だった所を譲った (練習は golf へ)
-  echo: { mode: 'CAP', stages: only('uu') },
+  // CAP は BB で (2026-11-05 本人「echo の CAP で使われるのはこの BB に」。target は地下 2F の真ん中の通り)。
+  // それまでは UU (2026-10-26)。練習部屋だった所を譲った (練習は golf へ)
+  echo: { mode: 'CAP', stages: only('bb') },
   // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある。
   // 作る側の道具なので公開しない (2026-10-07 本人)
   foxtrot: { mode: 'PRACTICE', stages: only('lab'), local: true, unlisted: true },

@@ -43,6 +43,12 @@ const ITERATIONS = 4
 const WALKABLE_Y = 0.5
 /** これより緩い面 (32° まで) は触れた高さを問わず登れる面。それより急なら、触れた点の高さで見る */
 const GENTLE_Y = 0.85
+/**
+ * 階段の坂の板 (MESH_STAIR) は 45° まで、触れた高さを問わず登れる面。詰めた階段 (2.2m で 1.8m) は 39° あって、
+ * 32° (GENTLE_Y) を超えるので壁扱いになり登れなかった (2026-11-05 本人「stair だったら 45 度まで」)。
+ * 印の無い面 (箱・壁の角) はこれまで通り GENTLE_Y で見る
+ */
+const STAIR_Y = Math.SQRT1_2 - 0.01
 /** 段差に足す許し (m)。段差ちょうどの角に触れても壁にしない */
 const STEP_TOUCH = 0.1
 /** 低い体で、段差の縁とみなす高さの余裕 (m)。rise は輪の縁で測るので、触れた点は少し上に出る */
@@ -156,7 +162,7 @@ export class MeshMoveWorld implements MoveWorld {
       for (let slice = 0; slice < BODY_SLICES; slice++) {
         const ratio = BODY_SLICES === 1 ? 0 : slice / (BODY_SLICES - 1)
         const y = bottom + Math.max(0, top - bottom) * ratio
-        this.solid.touching(position.x, y, position.z, radius, (contact) => {
+        this.solid.touching(position.x, y, position.z, radius, (contact, tri) => {
           if (lowBody && y - contact.ny * (radius - contact.depth) <= feetY + rise + LOW_STEP_SLACK) return
           /*
            * 登れる面は押し返さない。坂の上で水平に押されると進めなくなる。
@@ -167,6 +173,7 @@ export class MeshMoveWorld implements MoveWorld {
            * 触れた高さを問わない — 一番下の球は 54° までの坂に触れないので、
            * ここに来る「登れる面」は箱や壁の角しか無い
            */
+          if (contact.ny >= STAIR_Y && this.solid.isStair(tri)) return
           if (Math.abs(contact.ny) >= WALKABLE_Y) {
             const pointY = y - contact.ny * (radius - contact.depth)
             if (contact.ny >= GENTLE_Y || pointY <= feetY + this.stepUp + STEP_TOUCH) return
@@ -217,8 +224,11 @@ export class MeshMoveWorld implements MoveWorld {
     const limit = feetY + this.stepUp + STEP_TOUCH
     const from = feetY + height - 0.05
     const blockedAt = (x: number, z: number) => {
-      const y = this.probe(x, z, from, from, from)
-      return y !== null && y > limit
+      const hit = this.probeHit(x, z, from, from)
+      if (hit === null || hit.y <= limit) return false
+      // 階段の坂の板は、体の縁で高くても離さない (登る面)。39° の坂だと縁が 0.35m 上にあり、
+      // 段差より高い床と見なして登り口で止めていた (2026-11-05 BB)
+      return !(hit.ny >= STAIR_Y && this.solid.isStair(hit.tri))
     }
     /*
      * 中心まで入ってしまっていたら (1 コマで輪ごと跳び込んだ)、一番近い空いた
@@ -347,6 +357,17 @@ export class MeshMoveWorld implements MoveWorld {
    * しゃがみに戻った (2026-10-26)。足元の少し上 (low) から上へ線を引き、当たれば
    * そのすぐ下から下ろす
    */
+  /** probe と同じ線を下ろし、当たった三角も返す (階段の坂か見るため) */
+  private probeHit(x: number, z: number, from: number, low: number): { y: number; ny: number; tri: number } | null {
+    if (from > low) {
+      const ceiling = this.solid.hit(x, low, z, x, from, z)
+      if (ceiling) from = low + ceiling.t * (from - low) - 0.001
+    }
+    const found = this.solid.hit(x, from, z, x, from - PROBE_DOWN, z)
+    if (!found) return null
+    return { y: from - found.t * PROBE_DOWN, ny: Math.abs(found.ny), tri: found.tri }
+  }
+
   private probe(x: number, z: number, from: number, limit: number, low: number): number | null {
     if (from > low) {
       const ceiling = this.solid.hit(x, low, z, x, from, z)

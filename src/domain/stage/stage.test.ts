@@ -63,8 +63,18 @@ describe('部屋の割り当て', () => {
     expect(nextStage(ROOMS.golf.stages, null, 0)).toBe('training')
   })
 
-  test('**bravo と charlie は試合ごとに city と UU を交互に。** 最初の試合は city', () => {
-    for (const room of ['bravo', 'charlie'] as const) {
+  test('**bravo は試合ごとに city → UU → BB を回す。** 最初の試合は city', () => {
+    const order: string[] = []
+    let previous = null as ReturnType<typeof nextStage> | null
+    for (let i = 0; i < 4; i++) {
+      previous = nextStage(ROOMS.bravo.stages, previous, 0.5)
+      order.push(previous)
+    }
+    expect(order).toEqual(['city', 'uu', 'bb', 'city'])
+  })
+
+  test('**charlie は試合ごとに city と UU を交互に。** 最初の試合は city', () => {
+    for (const room of ['charlie'] as const) {
       const first = nextStage(ROOMS[room].stages, null, 0.5)
       const second = nextStage(ROOMS[room].stages, first, 0.5)
       const third = nextStage(ROOMS[room].stages, second, 0.5)

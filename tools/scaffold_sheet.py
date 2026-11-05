@@ -228,7 +228,22 @@ def build():
         ((x0 + INSET, b1), (a1, b1), Vector((0, 1, 0))),
     ]
     frame_and_sheet(coll, '', segments, top, rnd)
+    fence_colliders(coll, segments, top)
     build_corner(coll, rnd)
+
+
+def fence_colliders(coll, segments, top):
+    """シートの裏 (柱とシートの間) に見えない板。**人も弾も投げた物も止める** (2026-11-05 本人「たまもとめて
+    人も手榴弾もとめて」)。シートは素通りなので、これが無いと塊の上から外へ歩いて出られた。
+    視線はシートが止める。角は隣の板と重なるよう、両端を少し伸ばす"""
+    bm = bmesh.new()
+    for (sa, sb, out) in segments:
+        a3, b3 = Vector((*sa, 0)), Vector((*sb, 0))
+        run = b3 - a3
+        mid = (a3 + b3) / 2 + out * 0.07
+        add_box(bm, mid, run.length + 0.3, 0.1, top, top + HEIGHT, math.atan2(run.y, run.x))
+    # cloth_: 撃つと布の音 (domain/stage/surface.ts)
+    finish(bm, 'col_cloth_scaffold_fence_blockthrow', coll, None, uv=False)
 
 
 
@@ -237,7 +252,7 @@ def build():
 # 外壁 (concrete_wall1_2F) の 2 面 (高さ 9.54) を外して、塀 (上端 6.47) + 足場とシートにする
 # (2026-11-04 本人「いま cursor がある角のところも block + ブルーシートで構成してくれる？」)。
 # シートは遊ぶ側に向ける (青が見える)。シートは素通りなので、**人と投げた物が外へ出ないよう**
-# 見えない板 (col_ … _nobullet_blockthrow) を元の外壁の高さまで立てる。弾は通す (シートと同じ)
+# 見えない板 (col_ … _blockthrow) を元の外壁の高さまで立てる。弾も止める (2026-11-05 本人、初めは通していた)
 CORNER = [((25.49, 34.32), (25.46, 37.85)), ((25.49, 34.32), (28.35, 33.98))]
 CORNER_INSIDE = Vector((-1, -1, 0)).normalized()  # 遊ぶ側
 WALL_TOP = 6.47
@@ -288,7 +303,7 @@ def build_corner(coll, rnd):
         top_mid = (a3 + b3) / 2 + normal * (THICK / 2)
         segs.append(((a3 + normal * (THICK / 2)).xy[:], (b3 + normal * (THICK / 2)).xy[:], normal))
     finish(bm, 'concrete_wall2_corner', coll, bpy.data.materials.get('concrete_slab_wall_02'), uv=True)
-    finish(col, 'col_concrete_corner_fence_nobullet_blockthrow', coll, None, uv=False)
+    finish(col, 'col_cloth_corner_fence_blockthrow', coll, None, uv=False)
     frame_and_sheet(coll, '_corner', [(tuple(a), tuple(b), n) for a, b, n in segs], WALL_TOP, rnd, sheet_side=-1.0)
 
 
@@ -326,4 +341,6 @@ def finish(bm, name, coll, mat, uv):
     coll.objects.link(obj)
 
 
-build()
+# 定義だけ読みたい時 (一部だけ作り直す) は先に SCAFFOLD_NO_BUILD = True
+if not globals().get('SCAFFOLD_NO_BUILD'):
+    build()

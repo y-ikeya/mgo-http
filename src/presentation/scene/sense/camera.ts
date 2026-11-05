@@ -46,8 +46,12 @@ import { AIM_CAMERA, HIP_CAMERA } from '../../../sim/space/eyepoint'
  * 変えない — 向きだけで、線は構えのまま。
  *
  *     ?camp=3    度で試す
+ *
+ * **0 にした** (2026-11-05 本人「本家の構えてない時と構えた時の reticle の位置…ちょっと上向きすぎ」)。
+ * 本家の腰だめの画面と並べると、3 度では地平線が画面の上から 39% (本家 約 45%)、照準が出る所が 42% で
+ * 頭よりかなり上だった。0 度で地平線 44%・頭 53%・照準 47% (頭のすぐ右上) と本家に揃う (tools/preview/reticle.html)
  */
-const HIP_PITCH_DOWN = (tunedSigned('camp', 3) * Math.PI) / 180
+const HIP_PITCH_DOWN = (tunedSigned('camp', 0) * Math.PI) / 180
 
 /**
  * 構えた瞬間に視線を上げる量 (rad)。解くと同じだけ戻す。**腰だめの画面は変えない。**
@@ -56,8 +60,11 @@ const HIP_PITCH_DOWN = (tunedSigned('camp', 3) * Math.PI) / 180
  * 目線を合わせ直すのが手間だった (2026-10-08 本人)。向きごと回すので照準 = 弾の向き。
  *
  *     ?aimp=3    度で試す (本人が試して 3 に決めた)
+ *
+ * **0 にした** (2026-11-05)。上の腰だめの見下ろし (HIP_PITCH_DOWN) を 0 にしたので、それを打ち消して
+ * いた分も要らない。残すと構えた時だけ上を向く (本人「上向きすぎ」)
  */
-const AIM_PITCH_UP = (tunedSigned('aimp', 3) * Math.PI) / 180
+const AIM_PITCH_UP = (tunedSigned('aimp', 0) * Math.PI) / 180
 
 /** ?cams= で腰だめの肩を直に決めたいとき。無ければ構えの肩に追従する (update) */
 const HIP_SHOULDER_TUNED = ((): number | null => {
@@ -263,9 +270,13 @@ export function zoomLookScale(fov: number): number {
   const half = (deg: number) => Math.tan((deg * Math.PI) / 360)
   return Math.min(1, half(fov) / half(LOOK_REFERENCE_FOV))
 }
-/** 見下ろし / 見上げの限界 (rad)。見上げ側はカメラが地面に潜るので浅め */
+/**
+ * 見下ろし / 見上げの限界 (rad)。見上げ側はカメラが地面に潜るので浅め。
+ * 見上げは 0.55 (31.5°) → 0.81 (46.5°)。BB の 2F や塔の上の相手を下から狙えなかった
+ * (2026-11-05 本人「もう少し銃口を上向けられるように、+15 度くらい」)
+ */
 const MIN_PITCH = -1.1
-const MAX_PITCH = 0.55
+const MAX_PITCH = 0.81
 
 /**
  * 反動が戻り始めるまでの猶予 (秒)。
