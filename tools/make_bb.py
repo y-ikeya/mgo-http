@@ -288,7 +288,10 @@ box('concrete_tower_balcony_s', rx0, 528, rx1, ry1, F2 - SLAB, F2)
 box('concrete_tower_balcony_w', rx0, 425, 445, 528, F2 - SLAB, F2)
 box('concrete_tower_balcony_e', 550, 425, rx1, 528, F2 - SLAB, F2)
 # ベランダの手すり (腰の高さ、外の縁)。弾は通す
-for side, r in (('n', (rx0, ry0, rx1, ry0 + 4)), ('s', (rx0, ry1 - 4, rx1, ry1)),
+# 北の通路の先端の正面は手すりを付けない (跳び移る所、本人)。通路の幅より左右 0.5m 広く空ける
+RAIL_GAP = (463, 510)
+for side, r in (('n_w', (rx0, ry0, RAIL_GAP[0], ry0 + 4)), ('n_e', (RAIL_GAP[1], ry0, rx1, ry0 + 4)),
+                ('s', (rx0, ry1 - 4, rx1, ry1)),
                 ('w', (rx0, ry0, rx0 + 4, ry1)), ('e', (rx1 - 4, ry0, rx1, ry1))):
     box(f'metal_tower_rail_{side}_nobullet_noeye', *r, F2, F2 + 1.0)
 
@@ -298,7 +301,8 @@ WALKS = {
     'nw_join': (272, 335, 388, 365),
     'nw_up': (355, 228, 388, 365),
     'n': (468, 280, 722, 310),
-    'n_tab': (468, 280, 505, 355),
+    # 先端は塔のベランダまで 1.5m。転がりで跳び移れる (本人「ローリングで飛び乗れる」。初めは 2.8m 空いていた)
+    'n_tab': (468, 280, 505, 369),
     'e': (690, 280, 722, 640),
     'se': (605, 610, 722, 640),
     'sw': (272, 610, 388, 640),

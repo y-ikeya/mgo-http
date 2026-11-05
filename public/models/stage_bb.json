@@ -53,32 +53,6 @@
 }
 },
 {
-"name": "metal_tower_rail_n_nobullet_noeye",
-"min": [
--6.729,
-14.9,
--7.131
-],
-"max": [
-9.604,
-15.9,
--6.757
-],
-"top": {
-"h": 15.9,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true,
-"thrown": false
-}
-},
-{
 "name": "metal_tower_rail_e_nobullet_noeye",
 "min": [
 9.231,
@@ -738,7 +712,7 @@
 "max": [
 2.137,
 14.9,
--9.931
+-8.63
 ],
 "top": {
 "h": 14.9,
@@ -2618,6 +2592,58 @@
 "eye": true,
 "camera": true,
 "thrown": true
+}
+},
+{
+"name": "metal_tower_rail_n_w_nobullet_noeye",
+"min": [
+-6.729,
+14.9,
+-7.131
+],
+"max": [
+-1.82,
+15.9,
+-6.757
+],
+"top": {
+"h": 15.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true,
+"thrown": false
+}
+},
+{
+"name": "metal_tower_rail_n_e_nobullet_noeye",
+"min": [
+2.64,
+14.9,
+-7.131
+],
+"max": [
+9.604,
+15.9,
+-6.757
+],
+"top": {
+"h": 15.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true,
+"thrown": false
 }
 },
 {
