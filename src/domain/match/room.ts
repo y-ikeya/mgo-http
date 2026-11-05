@@ -259,8 +259,9 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
     // 10 分 (2026-11-03 本人「制限時間を10minとかに変えてくれない？」)
     minutes: 10,
   },
-  // CAP は UU で (2026-10-26 本人「一旦ステージは UU だけでいい」)。練習部屋だった所を譲った (練習は golf へ)
-  echo: { mode: 'CAP', stages: only('uu') },
+  // CAP は BB で (2026-11-05 本人「echo の CAP で使われるのはこの BB に」。target は地下 2F の真ん中の通り)。
+  // それまでは UU (2026-10-26)。練習部屋だった所を譲った (練習は golf へ)
+  echo: { mode: 'CAP', stages: only('bb') },
   // 検証場。段・窓・通路・階段・堀で動作を試す部屋。的も 2 つ置いてある。
   // 作る側の道具なので公開しない (2026-10-07 本人)
   foxtrot: { mode: 'PRACTICE', stages: only('lab'), local: true, unlisted: true },
