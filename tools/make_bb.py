@@ -440,16 +440,14 @@ MID = (F1 + F2) / 2
 stairs('metal_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
 box('metal_landing_nw', 295, 228, 325, 288, MID - DECK, MID)
 stairs('metal_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
-# 南東: 2F の通路を南へ 1.4m 延ばし (本人「もう少し 2F が長く続いてる」、南西と同じ作り) → 南へ下りて踊り場 →
-# 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
-SE_EXT = 1.4 / M_PER_PX * 3
-box('metal_walk_2F_se_down', 605, 640, 640, 640 + SE_EXT, F2 - DECK, F2)
-stairs('metal_stair_se_upper', 605, 640 + SE_EXT, 640, 670 + SE_EXT, F2, MID, 'y', +1, open_under=True)
-box('metal_landing_se', 605, 670 + SE_EXT, 655, 700 + SE_EXT, MID - DECK, MID)
-# 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
-box('concrete_landing_se_pillar', 605, 680 + SE_EXT, 605 + 0.4 / M_PER_PX * 3, 680 + SE_EXT + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - DECK)
-# 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
-stairs('metal_stair_se', 655, 670 + SE_EXT, 685, 700 + SE_EXT, MID, F1, 'x', +1, open_under=True)
+# 南東: 柱の下から 2F が南へ延び、その南の端から西 → 東へ長い階段で踊り場へ、踊り場から南 → 北へ下りて 1F
+# (本人の画面 2026-11-05「ここの形ちゃんと見てみな」。A1 の北と読んで印だけにしていた階段が下の階段)。
+# 下の階段は東の通路より東にあるので、2F の下には潜らない
+box('metal_walk_2F_se_down', 605, 640, 658, 700, F2 - DECK, F2)
+stairs('metal_stair_se_upper', 658, 673, 748, 700, F2, MID, 'x', +1, open_under=True)
+box('metal_landing_se', 748, 670, 786, 700, MID - DECK, MID)
+box('concrete_landing_se_pillar', 781, 695, 786, 700, F1 - 0.05, MID - DECK)
+stairs('metal_stair_se', 748, 602, 786, 670, MID, F1, 'y', -1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('metal_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
 box('metal_landing_sw', 325, 730, 388, 800, MID - DECK, MID)
@@ -461,8 +459,6 @@ box('metal_landing_ne', 605, 220, 665, 250, MID - DECK, MID)
 stairs('metal_stair_ne', 665, 220, 695, 250, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
-for name, r in (('a1_north', (755, 600, 790, 670)),):
-    box(f'ref_stair_{name}', *r, F1, F1 + 0.05)
 
 # --- 遮蔽 (下絵の三角の印) ----------------------------------------------------------------
 # 三角の印 = 先細りの四角いコンクリートの塊が横に倒れた物 (本人の画面 2026-11-05「横にたおれてる、短辺側から上に
