@@ -56,7 +56,8 @@ B1_CEIL = -0.3 + LIFT                 # 地下 1F の天井 (1F の床の下)
 GROUND_TOP = F1
 TOWER_TOP = 12.1 + LIFT
 WALL_TOP = 7.1 + LIFT                 # 外壁の上
-SLAB = 0.2                     # 2F の床の厚み。階段の段の板と同じ (0.4 は厚かった、2026-11-05 本人)
+SLAB = 0.2                     # 塔のベランダ (コンクリート) の厚み。階段の段の板と同じ
+DECK = 0.05                    # 2F の通路と踊り場の鉄板の厚み (0.2 も厚かった、2026-11-05 本人「金属一枚、5cm くらい」)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -263,6 +264,19 @@ for name, (x0, y0, x1, y1), axis, toward, bottom in B2_STAIRS:
             box(f'{name.replace("concrete_stair", "concrete_stair_wall")}_{side}', *r, F1 - 0.05, F1 + RAIL_H)
 # 1F の床だけ coral_ground_02 (Poly Haven、CC0。tools/raw/coral_ground_02_4k.gltf、2026-11-05 本人「床はこれ」)。
 # 地下 1F・2F の床と、穴や吹き抜けの壁はコンクリートのまま (材質の枠 0 は空 = ゲームのコンクリート)
+# 持ち込んだ絵は明るく鮮やかすぎてステージから浮く。明度と彩度を落とす (書き出しが絵に焼き込む)
+# (2026-11-05 本人「texture 貼ったらちゃんと光度を落として」)
+TEX_VALUE, TEX_SAT = 0.6, 0.75
+
+
+def dim_into(nt, tex, bsdf):
+    hs = nt.nodes.new('ShaderNodeHueSaturation')
+    hs.inputs['Value'].default_value = TEX_VALUE
+    hs.inputs['Saturation'].default_value = TEX_SAT
+    nt.links.new(tex.outputs['Color'], hs.inputs['Color'])
+    nt.links.new(hs.outputs['Color'], bsdf.inputs['Base Color'])
+
+
 def floor_material():
     tex = os.path.join(root, 'tools', 'raw', 'coral_ground_02_4k.gltf', 'textures')
     mat = bpy.data.materials.new('coral_ground_02')
@@ -281,7 +295,7 @@ def floor_material():
     r = img('coral_ground_02_rough_4k.jpg', 'Non-Color')
     n = img('coral_ground_02_nor_gl_4k.jpg', 'Non-Color')
     nm = nt.nodes.new('ShaderNodeNormalMap')
-    nt.links.new(d.outputs['Color'], bsdf.inputs['Base Color'])
+    dim_into(nt, d, bsdf)
     nt.links.new(r.outputs['Color'], bsdf.inputs['Roughness'])
     nt.links.new(n.outputs['Color'], nm.inputs['Color'])
     nt.links.new(nm.outputs['Normal'], bsdf.inputs['Normal'])
@@ -385,7 +399,7 @@ WALKS = {
     's_down': (360, 640, 388, 700),
 }
 for k, r in WALKS.items():
-    box(f'metal_walk_2F_{k}', *r, F2 - SLAB, F2)
+    box(f'metal_walk_2F_{k}', *r, F2 - DECK, F2)
 
 # 通路を支える柱 (通路の角と、長い辺の途中)
 PILLARS = [(272, 335), (272, 488), (272, 610), (384, 610), (690, 280), (690, 460), (690, 610),
@@ -396,11 +410,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bb_support
 for i, (px, py) in enumerate(PILLARS):
-    bb_support.support(bpy, scene, f'{i:02d}', *P(px, py), F1, F2 - SLAB)
+    bb_support.support(bpy, scene, f'{i:02d}', *P(px, py), F1, F2 - DECK)
 
 # 小さな暗い四角 (下絵) のうち真ん中寄りの 1 つは 2F を支える柱 (本人「2F を支える柱かも」)。2F の高さまで。
 # 塔の北西と南の 2 つは地下 2F への穴 (HOLES)、西と東の 2 つは金属の箱 (下)
-bb_support.support(bpy, scene, 'col', *P(622, 596), F1, F2 - SLAB)
+bb_support.support(bpy, scene, 'col', *P(622, 596), F1, F2 - DECK)
 
 # 西と東の四角は金属の箱 (本人の画面 2026-11-05「西側と東側にある四角い物体」)。縁に枠の付いた
 # コンテナのような箱。下絵の四角の真ん中に 1.7m 角
@@ -417,23 +431,23 @@ MID = (F1 + F2) / 2
 # 北西: 1F (西) → 東へ上がって踊り場 → 北の列へ寄って東へ上がり 2F の通路。どれも 2.2m で隙間なく繋ぐ
 # (2026-11-05 本人「ひどいから直して」。南西を本人が直した形が理想: 踊り場は 2 本を繋ぐのに要る大きさだけ)
 stairs('concrete_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
-box('metal_landing_nw', 295, 228, 325, 288, MID - SLAB, MID)
+box('metal_landing_nw', 295, 228, 325, 288, MID - DECK, MID)
 stairs('concrete_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
 # 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
 stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
-box('metal_landing_se', 605, 670, 655, 700, MID - SLAB, MID)
+box('metal_landing_se', 605, 670, 655, 700, MID - DECK, MID)
 # 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
-box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - SLAB)
+box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - DECK)
 # 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
 stairs('concrete_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('concrete_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
-box('metal_landing_sw', 325, 730, 388, 800, MID - SLAB, MID)
+box('metal_landing_sw', 325, 730, 388, 800, MID - DECK, MID)
 stairs('concrete_stair_sw', 295, 765, 325, 800, MID, F1, 'x', -1, open_under=True)
 # 北東: 北の 2F の通路の北の縁 → 北へ下りて踊り場 → 東へ下りて 1F (本人「cursor の部分に stair がない」。
 # 地下 1F へ下りる階段だと読み違えて印だけにしていた)
 stairs('concrete_stair_ne_upper', 605, 250, 635, 280, MID, F2, 'y', +1, open_under=True)
-box('metal_landing_ne', 605, 220, 665, 250, MID - SLAB, MID)
+box('metal_landing_ne', 605, 220, 665, 250, MID - DECK, MID)
 stairs('concrete_stair_ne', 665, 220, 695, 250, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
@@ -612,7 +626,7 @@ def grate_material():
     n = img('metal_grate_rusty_nor_gl_4k.jpg', 'Non-Color')
     sep = nt.nodes.new('ShaderNodeSeparateColor')
     nm = nt.nodes.new('ShaderNodeNormalMap')
-    nt.links.new(d.outputs['Color'], bsdf.inputs['Base Color'])
+    dim_into(nt, d, bsdf)
     nt.links.new(arm.outputs['Color'], sep.inputs['Color'])
     nt.links.new(sep.outputs['Green'], bsdf.inputs['Roughness'])
     nt.links.new(sep.outputs['Blue'], bsdf.inputs['Metallic'])
