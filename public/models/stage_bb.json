@@ -3433,6 +3433,162 @@
 }
 },
 {
+"name": "concrete_tower_parapet_n",
+"min": [
+-5.383,
+14.9,
+-5.705
+],
+"max": [
+7.683,
+16.224,
+-5.405
+],
+"top": {
+"h": 16.2244,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_tower_parapet_s",
+"min": [
+-5.383,
+14.9,
+7.062
+],
+"max": [
+7.683,
+16.184,
+7.362
+],
+"top": {
+"h": 16.1835,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_tower_parapet_w",
+"min": [
+-5.383,
+14.9,
+-5.705
+],
+"max": [
+-5.083,
+16.146,
+7.362
+],
+"top": {
+"h": 16.1462,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_tower_parapet_e",
+"min": [
+7.383,
+14.9,
+-5.705
+],
+"max": [
+7.683,
+16.101,
+7.362
+],
+"top": {
+"h": 16.1013,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_tower_balcony_core",
+"min": [
+-2.77,
+14.7,
+-2.718
+],
+"max": [
+5.07,
+14.9,
+4.973
+],
+"top": {
+"h": 14.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_tower",
+"min": [
+-2.7,
+10.8,
+-2.72
+],
+"max": [
+5.0,
+17.7,
+4.98
+],
+"top": {
+"h": 17.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "metal_rail_walk_2F_w_nobullet_noeye_nocamera",
 "min": [
 -15.717,
@@ -3968,162 +4124,6 @@
 "eye": false,
 "camera": false,
 "thrown": false
-}
-},
-{
-"name": "concrete_tower_parapet_n",
-"min": [
--5.383,
-14.9,
--5.705
-],
-"max": [
-7.683,
-16.224,
--5.405
-],
-"top": {
-"h": 16.2244,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_tower_parapet_s",
-"min": [
--5.383,
-14.9,
-7.062
-],
-"max": [
-7.683,
-16.184,
-7.362
-],
-"top": {
-"h": 16.1835,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_tower_parapet_w",
-"min": [
--5.383,
-14.9,
--5.705
-],
-"max": [
--5.083,
-16.146,
-7.362
-],
-"top": {
-"h": 16.1462,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_tower_parapet_e",
-"min": [
-7.383,
-14.9,
--5.705
-],
-"max": [
-7.683,
-16.101,
-7.362
-],
-"top": {
-"h": 16.1013,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_tower_balcony_core",
-"min": [
--2.77,
-14.7,
--2.718
-],
-"max": [
-5.07,
-14.9,
-4.973
-],
-"top": {
-"h": 14.9,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_tower",
-"min": [
--2.7,
-10.8,
--2.72
-],
-"max": [
-5.0,
-17.7,
-4.98
-],
-"top": {
-"h": 17.7,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
 }
 },
 {

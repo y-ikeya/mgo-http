@@ -105,6 +105,8 @@ def build(bpy, scene):
         bm = bmesh.new()
         for a, b, n in segs:
             _rail(bm, a, b, n)
+        # 面の向きを外へ揃える (金網の板の組み方で裏返っていた)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         bm.to_mesh(me)
         bm.free()
         scene.collection.objects.link(bpy.data.objects.new(name, me))
