@@ -131,7 +131,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_w",
+"name": "metal_walk_2F_w",
 "min": [
 -15.687,
 14.7,
@@ -157,7 +157,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_sw",
+"name": "metal_walk_2F_sw",
 "min": [
 -15.687,
 14.7,
@@ -183,7 +183,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_se",
+"name": "metal_walk_2F_se",
 "min": [
 9.177,
 14.7,
@@ -209,7 +209,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_s_tab",
+"name": "metal_walk_2F_s_tab",
 "min": [
 0.59,
 14.7,
@@ -235,7 +235,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_s_down",
+"name": "metal_walk_2F_s_down",
 "min": [
 -9.117,
 14.704,
@@ -261,7 +261,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_s",
+"name": "metal_walk_2F_s",
 "min": [
 -9.117,
 14.7,
@@ -287,7 +287,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_nw_up",
+"name": "metal_walk_2F_nw_up",
 "min": [
 -9.49,
 14.7,
@@ -313,7 +313,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_nw_join",
+"name": "metal_walk_2F_nw_join",
 "min": [
 -15.687,
 14.7,
@@ -339,7 +339,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_n_tab",
+"name": "metal_walk_2F_n_tab",
 "min": [
 -1.053,
 14.7,
@@ -365,7 +365,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_n",
+"name": "metal_walk_2F_n",
 "min": [
 -1.053,
 14.7,
@@ -391,7 +391,7 @@
 }
 },
 {
-"name": "concrete_walk_2F_e",
+"name": "metal_walk_2F_e",
 "min": [
 15.523,
 14.7,
@@ -2023,7 +2023,7 @@
 }
 },
 {
-"name": "concrete_landing_se",
+"name": "metal_landing_se",
 "min": [
 9.177,
 12.9,
@@ -2049,7 +2049,7 @@
 }
 },
 {
-"name": "concrete_landing_nw",
+"name": "metal_landing_nw",
 "min": [
 -13.97,
 12.9,
@@ -3196,7 +3196,7 @@
 }
 },
 {
-"name": "concrete_landing_sw",
+"name": "metal_landing_sw",
 "min": [
 -10.156,
 12.9,
@@ -3550,6 +3550,32 @@
 ],
 "top": {
 "h": 14.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_tower",
+"min": [
+-3.585,
+10.8,
+-3.661
+],
+"max": [
+5.911,
+17.7,
+5.836
+],
+"top": {
+"h": 17.7,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -4098,32 +4124,6 @@
 "eye": false,
 "camera": false,
 "thrown": false
-}
-},
-{
-"name": "concrete_tower",
-"min": [
--3.585,
-10.8,
--3.661
-],
-"max": [
-5.911,
-17.7,
-5.836
-],
-"top": {
-"h": 17.7,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
 }
 },
 {

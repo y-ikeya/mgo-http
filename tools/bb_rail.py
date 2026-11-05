@@ -21,11 +21,24 @@ SAMPLE = 0.1              # 縁を調べる刻み (m)
 OUT = 0.12                # 縁の外を調べる距離
 NEAR_Z = 0.4              # 外の床が「同じ高さ」と見なす差
 MIN_LEN = 0.4             # これより短い柵は付けない
-SLABS = ('concrete_walk_2F_', 'concrete_landing_')
+SLABS = ('metal_walk_2F_', 'metal_landing_')
 FLIGHTS = ('concrete_stair_nw', 'concrete_stair_se', 'concrete_stair_sw')   # 1F ⇔ 2F (地下の b1_ / b2_ は壁がある)
-WALKABLE = ('concrete_walk_2F_', 'concrete_landing_', 'concrete_stair_', 'concrete_tower_balcony_', 'concrete_tower')
+WALKABLE = ('metal_walk_2F_', 'metal_landing_', 'concrete_stair_', 'concrete_tower_balcony_', 'concrete_tower')
 # 柵を付けない縁: (物の名前, 縁の向き)。北と南の通路の先端の、塔に向いた縁 (転がりで跳び移る、本人)
-SKIP_EDGES = {('concrete_walk_2F_n_tab', 's'), ('concrete_walk_2F_s_tab', 'n')}
+SKIP_EDGES = {('metal_walk_2F_n_tab', 's'), ('metal_walk_2F_s_tab', 'n')}
+# 手すりの切れ目 (Blender の x, y、長さ m)。**狙いやすく、また狙われやすく** する (2026-11-05 本人「中央のトーチカ
+# 2F にいる人を狙いやすくする」「ところどころ切っていい」)。縁に 0.6m 以内の点を、その縁の上で長さぶん空ける。
+# **手で切った所はここに書く** — 作り直すと手の直しは消える (本人が切った所を一度消した)
+CUTS = [
+    (-13.22, -3.95, 2.4),   # 西の通路の内側 (塔に向く) — 本人が切った所
+    (15.52, 1.5, 2.4),      # 東の通路の内側
+    (8.0, 11.3, 2.4),       # 北の通路の内側
+    (-4.0, -13.34, 2.0),    # 南の通路の内側
+    (-15.69, 3.0, 2.0),     # 西の通路の外側
+    (17.91, -6.0, 2.0),     # 東の通路の外側
+    (14.0, -13.34, 2.0),    # 南東の通路の南
+    (-12.0, 9.44, 2.0),     # 北西の通路の北
+]
 
 
 def _bounds(o):
@@ -129,16 +142,20 @@ def build(bpy, scene):
                 continue
             length = (b - a).length
             cnt = max(1, int(length / SAMPLE))
+            d = (b - a).normalized()
             flags = []
             for i in range(cnt):
-                p = a + (b - a) * ((i + 0.5) / cnt) + n * OUT
-                flags.append(not _covered(scene, dg, p.x, p.y, z, o))
+                on = a + (b - a) * ((i + 0.5) / cnt)
+                p = on + n * OUT
+                cut = any(abs((Vector((cx, cy, z)) - a).dot(n)) < 0.6 and abs((on - Vector((cx, cy, z))).dot(d)) < ln / 2
+                          for cx, cy, ln in CUTS)
+                flags.append(not cut and not _covered(scene, dg, p.x, p.y, z, o))
             for s0, s1 in _runs(flags, length / cnt):
                 if s1 - s0 >= MIN_LEN:
                     d = (b - a).normalized()
                     # 縁から柵の半分だけ内へ
                     segs.append((a + d * s0 - n * (POST / 2), a + d * s1 - n * (POST / 2), n))
-        emit(f'metal_rail_{o.name.split("concrete_")[1]}_nobullet_noeye_nocamera', segs)
+        emit(f'metal_rail_{o.name.split("_", 1)[1]}_nobullet_noeye_nocamera', segs)
 
     # 1F ⇔ 2F の階段: 長い 2 辺に、傾きに沿って
     for o in [o for o in scene.objects if o.type == 'MESH' and o.name.startswith(FLIGHTS)]:

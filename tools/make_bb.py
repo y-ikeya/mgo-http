@@ -297,10 +297,43 @@ guv = gme.uv_layers.active or gme.uv_layers.new(name='UVMap')
 for poly in gme.polygons:
     top = poly.normal.z > 0.9 and abs(poly.center.z - F1) < 0.05
     poly.material_index = 1 if top else 0
-    if top:
-        for li in poly.loop_indices:
-            w = gme.vertices[gme.loops[li].vertex_index].co
-            guv.data[li].uv = (w.x / FLOOR_TILE, w.y / FLOOR_TILE)
+
+# **絵の繰り返しを崩す** (本人「規則正しく揃っていてなんかきもい」)。でたらめな角度の線で床を不揃いな区画に
+# 切り、区画ごとに絵を回す・裏返す・ずらす。四角いマスで切ったら境目が碁盤の目に見えた
+import random
+import math
+from mathutils import Vector
+FLOOR_LINES = 18
+bm = bmesh.new()
+bm.from_mesh(gme)
+rng = random.Random(11)
+xs = [v.co.x for v in bm.verts]
+ys = [v.co.y for v in bm.verts]
+lines = []
+for _ in range(FLOOR_LINES):
+    a = rng.uniform(0, math.pi)
+    nrm = Vector((math.cos(a), math.sin(a), 0))
+    pt = Vector((rng.uniform(min(xs), max(xs)), rng.uniform(min(ys), max(ys)), F1))
+    lines.append((pt, nrm))
+    tops = [f for f in bm.faces if f.material_index == 1]
+    geom = tops + list({e for f in tops for e in f.edges}) + list({v for f in tops for v in f.verts})
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=pt, plane_no=nrm)
+uvl = bm.loops.layers.uv.active or bm.loops.layers.uv.new('UVMap')
+regions = {}
+for f in [f for f in bm.faces if f.material_index == 1]:
+    c = f.calc_center_median()
+    key = tuple((c - pt).dot(nrm) > 0 for pt, nrm in lines)
+    if key not in regions:
+        regions[key] = (rng.uniform(0, 2 * math.pi), rng.random() < 0.5, rng.random() * 4, rng.random() * 4)
+    a, flip, ox, oy = regions[key]
+    ca, sa = math.cos(a), math.sin(a)
+    for loop in f.loops:
+        u, v = loop.vert.co.x / FLOOR_TILE, loop.vert.co.y / FLOOR_TILE
+        if flip:
+            u = -u
+        loop[uvl].uv = (u * ca - v * sa + ox, u * sa + v * ca + oy)
+bm.to_mesh(gme)
+bm.free()
 
 for i, r in enumerate(B1_COLUMNS):
     box(f'concrete_b1_column_{i}', *r, B1, B1_CEIL)
@@ -352,7 +385,7 @@ WALKS = {
     's_down': (360, 640, 388, 700),
 }
 for k, r in WALKS.items():
-    box(f'concrete_walk_2F_{k}', *r, F2 - SLAB, F2)
+    box(f'metal_walk_2F_{k}', *r, F2 - SLAB, F2)
 
 # 通路を支える柱 (通路の角と、長い辺の途中)
 PILLARS = [(272, 335), (272, 488), (272, 610), (384, 610), (690, 280), (690, 460), (690, 610),
@@ -384,18 +417,18 @@ MID = (F1 + F2) / 2
 # 北西: 1F (西) → 東へ上がって踊り場 → 北の列へ寄って東へ上がり 2F の通路。どれも 2.2m で隙間なく繋ぐ
 # (2026-11-05 本人「ひどいから直して」。南西を本人が直した形が理想: 踊り場は 2 本を繋ぐのに要る大きさだけ)
 stairs('concrete_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
-box('concrete_landing_nw', 295, 228, 325, 288, MID - SLAB, MID)
+box('metal_landing_nw', 295, 228, 325, 288, MID - SLAB, MID)
 stairs('concrete_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
 # 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
 stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
-box('concrete_landing_se', 605, 670, 655, 700, MID - SLAB, MID)
+box('metal_landing_se', 605, 670, 655, 700, MID - SLAB, MID)
 # 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
 box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - SLAB)
 # 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
 stairs('concrete_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('concrete_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
-box('concrete_landing_sw', 325, 730, 388, 800, MID - SLAB, MID)
+box('metal_landing_sw', 325, 730, 388, 800, MID - SLAB, MID)
 stairs('concrete_stair_sw', 295, 765, 325, 800, MID, F1, 'x', -1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
@@ -548,6 +581,44 @@ empty('meta_baseBlue', 150, 790, F1)   # 南西のトーチカ
 empty('meta_baseRed', 805, 130, F1)    # 北東のトーチカ
 
 
+# --- 2F の通路と踊り場は錆びた縞鋼板 (metal_grate_rusty、Poly Haven、CC0。tools/raw/metal_grate_rusty_4k.gltf、
+# 2026-11-05 本人「踊り場や 2F は metal_grate_rusty」)。名前も metal_ (足音と着弾が金属)。絵は書き出しが
+# 箱に立方投影で貼る (texel = 絵 1 枚の大きさ)
+def grate_material():
+    tex = os.path.join(root, 'tools', 'raw', 'metal_grate_rusty_4k.gltf', 'textures')
+    mat = bpy.data.materials.new('metal_grate_rusty')
+    mat['texel'] = 1.0
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out_n = nt.nodes.new('ShaderNodeOutputMaterial')
+    bsdf = nt.nodes.new('ShaderNodeBsdfPrincipled')
+
+    def img(name, space):
+        node = nt.nodes.new('ShaderNodeTexImage')
+        node.image = bpy.data.images.load(os.path.join(tex, name))
+        node.image.colorspace_settings.name = space
+        return node
+    d = img('metal_grate_rusty_diff_4k.jpg', 'sRGB')
+    arm = img('metal_grate_rusty_arm_4k.jpg', 'Non-Color')
+    n = img('metal_grate_rusty_nor_gl_4k.jpg', 'Non-Color')
+    sep = nt.nodes.new('ShaderNodeSeparateColor')
+    nm = nt.nodes.new('ShaderNodeNormalMap')
+    nt.links.new(d.outputs['Color'], bsdf.inputs['Base Color'])
+    nt.links.new(arm.outputs['Color'], sep.inputs['Color'])
+    nt.links.new(sep.outputs['Green'], bsdf.inputs['Roughness'])
+    nt.links.new(sep.outputs['Blue'], bsdf.inputs['Metallic'])
+    nt.links.new(n.outputs['Color'], nm.inputs['Color'])
+    nt.links.new(nm.outputs['Normal'], bsdf.inputs['Normal'])
+    nt.links.new(bsdf.outputs['BSDF'], out_n.inputs['Surface'])
+    return mat
+
+
+grate = grate_material()
+for o in scene.objects:
+    if o.type == 'MESH' and o.name.startswith(('metal_walk_2F_', 'metal_landing_')) and 'pillar' not in o.name:
+        o.data.materials.append(grate)
+
 # --- 塔: 2F より上は筒、ベランダの縁は崩れたコンクリートの壁 (tools/bb_tower.py) -------------
 import bb_tower
 (tx0, ty0), (tx1, ty1) = P(TOWER_SQ[0], TOWER_SQ[1]), P(TOWER_SQ[2], TOWER_SQ[3])
@@ -555,7 +626,7 @@ import bb_tower
 bb_tower.tube(bpy, scene, (tx0 + tx1) / 2, (ty0 + ty1) / 2, min(abs(tx1 - tx0), abs(ty1 - ty0)) / 2, F1 - 0.5, F2 + 2.8, floor=F2)
 (bx0, by0), (bx1, by1) = P(rx0, ry1), P(rx1, ry0)
 gap = {}
-for side, name in (('n', 'concrete_walk_2F_n_tab'), ('s', 'concrete_walk_2F_s_tab')):
+for side, name in (('n', 'metal_walk_2F_n_tab'), ('s', 'metal_walk_2F_s_tab')):
     o = bpy.data.objects[name]
     xs = [(o.matrix_world @ v.co).x for v in o.data.vertices]
     gap[side] = (min(xs) - 0.5, max(xs) + 0.5)
