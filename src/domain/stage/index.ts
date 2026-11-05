@@ -52,7 +52,7 @@ export {
   ladderGrip,
 } from './ladder'
 
-export type StageName = 'mall' | 'training' | 'raft' | 'city' | 'lab' | 'uu'
+export type StageName = 'mall' | 'training' | 'raft' | 'city' | 'lab' | 'uu' | 'bb'
 
 /**
  * 地面の上の 1 点。
@@ -412,6 +412,34 @@ const UU: StageSpec = {
 }
 
 /**
+ * BB (MGO2 の Blood Bath、叩き台)。**真ん中の塔を囲む 2F の通路と、塔の真下を抜ける地下。**
+ *
+ * 形は tools/raw/stage_bb.blend (tools/make_bb.py で起こし、本人が Blender で育てる)、下絵は
+ * tools/raw/bb_map.jpg (1F)・bb_map_B2F.png・bb_map_B1B2.png (地下、本人が描いた)。1 画素 0.28m で外壁の内側 70m 四方
+ * (本家の MAP SIZE 70 × 70)。床の上面は地下 2F −6.2 / 地下 1F −2.9 / 1F 0.1 / 2F 3.7。
+ * 地下 1F から地下 2F へは崖を落ちる (上がれない)。1F の 2 つの穴は地下 2F まで縦に抜ける。
+ *
+ * 拠点は南西と北東の角のトーチカ。どちらが青かは仮 (2026-11-05)。基地の値は json (meta_base*) と同じ
+ */
+const BB: StageSpec = {
+  name: 'bb',
+  label: 'BB',
+  ambience: 'city_loop1.mp3',
+  bases: {
+    blue: { x: -31.0, z: 30.67, y: 0.1 },
+    red: { x: 30.14, z: -30.93, y: 0.1 },
+  },
+  // 個人戦は両方のトーチカと、北西 (A2)・南東 (A1) の角
+  solo: [
+    { x: -31.0, z: 30.67, y: 0.1 },
+    { x: 30.14, z: -30.93, y: 0.1 },
+    { x: -23.5, z: -27.7, y: 0.1 },
+    { x: 26.9, z: 26.9, y: 0.1 },
+  ],
+  targets: [],
+}
+
+/**
  * 検証場。**動作を試すための地形** (tools/make_lab.py が白紙から起こす)。
  *
  * 段の列 (0.25 / 0.45 / 0.9 / 1.2 / 1.5)、窓の壁、しゃがみでくぐる通路、
@@ -481,6 +509,7 @@ export const STAGES: Record<StageName, StageSpec> = {
   raft: RAFT,
   city: CITY,
   uu: UU,
+  bb: BB,
 }
 
 /**

@@ -1,0 +1,372 @@
+# BB (MGO2 の Blood Bath) の叩き台を、下絵 tools/raw/bb_map.jpg から白紙で起こす。
+#
+#   $BLENDER -b --factory-startup --python tools/make_bb.py
+#   $BLENDER -b tools/raw/stage_bb.blend --python tools/export_stage.py -- --bake
+#
+# 書き出すのは tools/raw/stage_bb.blend。**叩き台なので、本人が Blender で育て始めたら流し直さない**
+# (流すと上書きする)。
+#
+# 縮尺: 本家の MAP SIZE は 70 × 70、高さ 15 (wiki。UU は 85 × 75 で、こちらの UU の外壁 約 77 × 81 と
+# ほぼ 1 対 1)。下絵の外壁の内側 250 画素 → 70m で 1 画素 0.28m。
+#
+# 階 (本人 2026-11-05「地下1F, 1F, 2F部分の回路」「真ん中に四角の塔、中には入れないが 2F のベランダには行ける」):
+#   いちばん明るい帯 = 2F の通路と塔のベランダ、それ以外 = 1F、真ん中の暗い四角 = 塔。
+#   **地下はまだ入れていない。** 下絵で少し薄い所が地下だが読み分けられないので、本人が地下だけの
+#   絵を別に作る (同日)。地下へ降りる階段も、場所の印 (ref_) だけ
+#   床の上面  地下 2F −6.2 / 地下 1F −2.9 / 1F 0.1 (GROUND_TOP、他のステージと同じ) / 2F 3.7。塔の上 12.1
+#
+#   地下 2F (本人の絵 tools/raw/bb_map_B2F.png、下絵と同じ枠): A2 の階段 (北西) から塔の真下を南北に抜けて
+#   A1 の階段 (南東) へ出る 1 本の通路。1F の地面をこの深さまで厚くして、通路の形にくり抜く。
+#   2 つの階段の所は 1F まで吹き抜け (1F の下絵にも階段が描いてある)
+#
+#   地下 1F (本人の絵 tools/raw/bb_map_B1B2.png、白の線。赤は地下 2F): 北 (北の張り出しから北の通路の下まで) と
+#   南西 (南の張り出しまで) の 2 区画。どちらも 1F から階段で下りる。**地下 2F へは崖を落ちる** —
+#   白と赤の線がぶつかる所 (本人「2F から 1F には上がれない、崖を落ちる」。地下の 2F → 1F の意味)。
+#   崖の所は地下 2F の通路の天井を地下 1F の天井まで上げて、地下 1F の床の縁から落ちられるようにする
+#   外の張り出し (北と南) は外壁の外。地面の箱をそこまで広げる
+#
+#   小さな暗い四角 5 つ = 2F を支える太い柱 (本人。初めは City の錆びた鉄塔と言っていた)
+#   三角の印 = 高さ 2m くらいの石の障害物 (本人)
+#
+# 決めきれていない物 (本人に確かめる):
+#   - 2F の通路の下は通れる (板を柱で支える) と置いた。下が塞がった塀なら箱を伸ばす
+#   - 北と南の通路の先 (塔のベランダの手前 2.8m) は切れたままにした
+#   - 階段のうち、どちらへ上るか下絵で決めきれない物は形を作らず、ref_ の板 (書き出されない) で場所だけ残す
+#
+# 座標は下絵を 3 倍に引き伸ばした 960 画素の上で読んだ (x 右、y 下)。Blender は X 右 / Y 奥 / Z 上
+import bpy
+import bmesh
+import os
+
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+out = os.path.join(root, 'tools', 'raw', 'stage_bb.blend')
+
+M_PER_PX = 0.28
+CX, CY = 160.7, 153.8          # 外壁の内側の真ん中 (下絵の画素)
+B2, B1, F1, F2 = -6.2, -2.9, 0.1, 3.7    # 床の上面
+B2_CEIL = -3.4                 # 地下 2F の天井 (地下 1F の床の下)
+B1_CEIL = -0.3                 # 地下 1F の天井 (1F の床の下)
+GROUND_TOP = F1
+TOWER_TOP = 12.1
+WALL_TOP = 7.1                 # 外壁の上
+SLAB = 0.4                     # 2F の板の厚み
+
+bpy.ops.wm.read_factory_settings(use_empty=True)
+scene = bpy.context.scene
+
+
+def P(px, py):
+    """960 画素の下絵の点 → Blender の (x, y)"""
+    return ((px / 3 - CX) * M_PER_PX, -(py / 3 - CY) * M_PER_PX)
+
+
+def box(name, x0, y0, x1, y1, z0, z1):
+    """軸に沿った箱。x0..y1 は 960 画素の下絵の矩形、z は m"""
+    (ax, ay), (bx, by) = P(x0, y0), P(x1, y1)
+    lo = (min(ax, bx), min(ay, by), z0)
+    hi = (max(ax, bx), max(ay, by), z1)
+    return box_m(name, lo, hi)
+
+
+def box_m(name, lo, hi):
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    for v in bm.verts:
+        v.co.x = lo[0] if v.co.x < 0 else hi[0]
+        v.co.y = lo[1] if v.co.y < 0 else hi[1]
+        v.co.z = lo[2] if v.co.z < 0 else hi[2]
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(o)
+    return o
+
+
+def empty(name, px, py, z):
+    x, y = P(px, py)
+    o = bpy.data.objects.new(name, None)
+    o.location = (x, y, z)
+    scene.collection.objects.link(o)
+    return o
+
+
+def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward):
+    """段の箱を並べた階段。axis = 'x' か 'y' (下絵の向き)、toward = +1 で座標の増える向きへ上る"""
+    (ax, ay), (bx, by) = P(x0, y0), P(x1, y1)
+    lo_x, hi_x, lo_y, hi_y = min(ax, bx), max(ax, bx), min(ay, by), max(ay, by)
+    # 下る階段は、上る階段を逆から組む (段の箱は低い方から順に重ねる)
+    if z_to < z_from:
+        z_from, z_to, toward = z_to, z_from, -toward
+    rise = z_to - z_from
+    n = max(2, round(abs(rise) / 0.25))
+    step = rise / n
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    # 下絵の y は Blender の -y。axis='y' で下絵の下へ上る (toward=+1) = Blender の -y へ上る
+    for i in range(n):
+        t0, t1 = i / n, (i + 1) / n
+        top = z_from + step * (i + 1)
+        if axis == 'x':
+            s0, s1 = (t0, 1.0) if toward > 0 else (0.0, 1 - t0)
+            xa, xb = lo_x + (hi_x - lo_x) * s0, lo_x + (hi_x - lo_x) * s1
+            ya, yb = lo_y, hi_y
+        else:
+            s0, s1 = (0.0, 1 - t0) if toward > 0 else (t0, 1.0)
+            xa, xb = lo_x, hi_x
+            ya, yb = lo_y + (hi_y - lo_y) * s0, lo_y + (hi_y - lo_y) * s1
+        bot = min(z_from, z_to) - 0.05
+        geom = bmesh.ops.create_cube(bm, size=1.0)['verts']
+        for v in geom:
+            v.co.x = xa if v.co.x < 0 else xb
+            v.co.y = ya if v.co.y < 0 else yb
+            v.co.z = bot if v.co.z < 0 else top
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(o)
+    return o
+
+
+# --- 地面 (1F) と地下 2F ----------------------------------------------------------------
+# 地面は地下 2F の床の下まで 1 つの厚い箱。地下 2F の通路と階段の吹き抜けをくり抜く。
+# 地下 1F は本人の絵を待つ (入れる時はこの厚みからくり抜く)
+OUTER = (107, 88, 857, 835)
+ground = box('concrete_ground_1F', OUTER[0], 30, OUTER[2], 925, B2 - 0.5, F1)
+
+# 地下 2F の通路の輪郭 (960 画素、本人の絵をなぞった)
+B2_OUTLINE = [
+    (110, 143), (110, 312), (237, 312), (290, 284), (352, 284), (408, 312), (460, 312), (460, 325),
+    (428, 352), (428, 378), (457, 403), (457, 550), (428, 568), (428, 595), (457, 612), (457, 640),
+    (377, 640), (377, 695), (457, 695), (457, 750), (540, 750), (540, 695), (612, 695), (612, 785),
+    (770, 785), (770, 737), (662, 737), (662, 640), (543, 640), (543, 567), (578, 540), (578, 522),
+    (543, 497), (543, 458), (578, 430), (578, 412), (543, 388), (543, 316), (650, 316), (650, 257),
+    (522, 257), (522, 200), (460, 200), (460, 255), (408, 255), (352, 227), (290, 227), (237, 255),
+    (160, 255), (160, 143),
+]
+# 地下 1F の輪郭 (白の線をなぞった)
+B1_OUTLINES = {
+    'n': [(405, 238), (405, 110), (432, 110), (432, 90), (530, 92), (530, 38), (750, 38), (750, 202),
+          (648, 202), (648, 257), (600, 257), (600, 202), (530, 202), (530, 145), (457, 145), (457, 238)],
+    'sw': [(162, 640), (333, 640), (333, 750), (377, 750), (377, 695), (415, 695), (415, 750), (457, 750),
+           (540, 750), (540, 793), (418, 793), (418, 915), (210, 915), (210, 750), (277, 750), (277, 690),
+           (162, 690)],
+}
+# 地下 1F の中の柱 (南西の部屋の真ん中の四角)
+B1_COLUMNS = [(265, 803, 357, 860)]
+# 1F の床から地下 2F まで縦に抜ける穴 (本人の絵の赤く塗った四角)。落ちれば地下 2F へ直に行け、手榴弾も投げ込める
+HOLES = [(438, 252, 495, 309), (495, 639, 555, 696)]
+# 崖: 地下 2F の側で、天井を地下 1F の天井まで上げる帯 (白と赤がぶつかる辺から、地下 2F の通路の幅ぶん)
+CLIFFS = [
+    (600, 257, 648, 316),   # 北の部屋の東寄り → 地下 2F の東の腕
+    (377, 640, 415, 695),   # 南西 → 地下 2F の西の出っ張り
+    (457, 695, 540, 750),   # 南西 → 地下 2F の南の端
+]
+# 階段の吹き抜け (1F まで開ける) と、階段の向き
+B2_STAIRS = [
+    # A2: 北の端 (y 143) が 1F、南へ下りる
+    ('concrete_stair_b2_a2', (110, 143, 160, 255), 'y', +1, B2),
+    # A1: 東の端 (x 770) が 1F、西へ下りる
+    ('concrete_stair_b2_a1', (662, 737, 770, 785), 'x', -1, B2),
+    # 南西の地下 1F: 西の端 (x 162) が 1F、東へ下りる
+    ('concrete_stair_b1_sw', (162, 640, 277, 690), 'x', +1, B1),
+    # 北の地下 1F: 東の端 (x 685) が 1F、西へ下りる。下りた先は階段の周りを回る通路
+    ('concrete_stair_b1_n', (583, 85, 685, 145), 'x', -1, B1),
+]
+
+
+def prism(name, outline, z0, z1):
+    """輪郭 (960 画素) を z0〜z1 に押し出した、閉じた柱 (底・上・側)。底が開いていると引き算が効かない"""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    lo = [bm.verts.new((*P(px, py), z0)) for px, py in outline]
+    hi = [bm.verts.new((*P(px, py), z1)) for px, py in outline]
+    bm.faces.new(lo)
+    bm.faces.new(hi)
+    n = len(outline)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(o)
+    return o
+
+
+def carve(target, cutter):
+    mod = target.modifiers.new('carve', 'BOOLEAN')
+    mod.operation = 'DIFFERENCE'
+    mod.object = cutter
+    mod.solver = 'EXACT'
+    bpy.context.view_layer.objects.active = target
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+
+
+carve(ground, prism('tmp_b2', B2_OUTLINE, B2, B2_CEIL))
+for k, outline in B1_OUTLINES.items():
+    carve(ground, prism('tmp_b1_' + k, outline, B1, B1_CEIL))
+for i, r in enumerate(CLIFFS):
+    carve(ground, box(f'tmp_cliff_{i}', *r, B2, B1_CEIL))
+for i, r in enumerate(HOLES):
+    carve(ground, box(f'tmp_hole_{i}', *r, B2, F1 + 0.5))
+for name, (x0, y0, x1, y1), axis, toward, bottom in B2_STAIRS:
+    carve(ground, box('tmp_' + name, x0, y0, x1, y1, bottom, F1 + 0.5))
+    stairs(name, x0, y0, x1, y1, F1, bottom, axis, toward)
+for i, r in enumerate(B1_COLUMNS):
+    box(f'concrete_b1_column_{i}', *r, B1, B1_CEIL)
+# 北の階段は東 (1F) から西へ下り、下りた先は階段の周りを回る通路 (本人)。階段の北・南・東は壁で囲み、
+# 西の下の端だけで通路に出る (囲わないと、周りの通路へ横から 3m 落ちた)
+SW = 0.3 / M_PER_PX * 3
+box('concrete_b1_n_stair_wall_n', 583, 85 - SW, 685 + SW, 85, B1, B1_CEIL)
+box('concrete_b1_n_stair_wall_s', 583, 145, 685 + SW, 145 + SW, B1, B1_CEIL)
+box('concrete_b1_n_stair_wall_e', 685, 85, 685 + SW, 145, B1, B1_CEIL)
+
+
+# --- 外壁 ------------------------------------------------------------------------------
+T = 0.5 / M_PER_PX * 3   # 0.5m を 960 画素で
+x0, y0, x1, y1 = OUTER
+box('concrete_wall_outer_n', x0 - T, y0 - T, x1 + T, y0, B1_CEIL, WALL_TOP)
+box('concrete_wall_outer_s', x0 - T, y1, x1 + T, y1 + T, B1_CEIL, WALL_TOP)
+box('concrete_wall_outer_w', x0 - T, y0, x0, y1, B1_CEIL, WALL_TOP)
+box('concrete_wall_outer_e', x1, y0, x1 + T, y1, B1_CEIL, WALL_TOP)
+
+# --- 塔とベランダ ------------------------------------------------------------------------
+box('concrete_tower', 445, 425, 550, 528, F1 - 0.5, TOWER_TOP)
+TOWER_RING = (410, 385, 585, 560)
+rx0, ry0, rx1, ry1 = TOWER_RING
+# 1F はベランダの外の縁まで塊。せり出し (鼠返し) の下には入れない (本人 2026-11-05)
+box('concrete_tower_base', rx0, ry0, rx1, ry1, F1 - 0.05, F2 - SLAB)
+box('concrete_tower_balcony_n', rx0, ry0, rx1, 425, F2 - SLAB, F2)
+box('concrete_tower_balcony_s', rx0, 528, rx1, ry1, F2 - SLAB, F2)
+box('concrete_tower_balcony_w', rx0, 425, 445, 528, F2 - SLAB, F2)
+box('concrete_tower_balcony_e', 550, 425, rx1, 528, F2 - SLAB, F2)
+# ベランダの手すり (腰の高さ、外の縁)。弾は通す
+for side, r in (('n', (rx0, ry0, rx1, ry0 + 4)), ('s', (rx0, ry1 - 4, rx1, ry1)),
+                ('w', (rx0, ry0, rx0 + 4, ry1)), ('e', (rx1 - 4, ry0, rx1, ry1))):
+    box(f'metal_tower_rail_{side}_nobullet_noeye', *r, F2, F2 + 1.0)
+
+# --- 2F の通路 (板、下は通れる) -----------------------------------------------------------
+WALKS = {
+    'w': (272, 335, 305, 640),
+    'nw_join': (272, 335, 388, 365),
+    'nw_up': (355, 228, 388, 365),
+    'n': (468, 280, 722, 310),
+    'n_tab': (468, 280, 505, 355),
+    'e': (690, 280, 722, 640),
+    'se': (605, 610, 722, 640),
+    'se_down': (605, 610, 640, 695),
+    'sw': (272, 610, 388, 640),
+    's': (360, 640, 525, 670),
+    's_tab': (490, 590, 525, 670),
+    's_down': (360, 640, 388, 700),
+}
+for k, r in WALKS.items():
+    box(f'concrete_walk_2F_{k}', *r, F2 - SLAB, F2)
+
+# 通路を支える柱 (通路の角と、長い辺の途中)
+PILLARS = [(272, 335), (272, 488), (272, 610), (388, 610), (690, 280), (690, 460), (690, 610),
+           (468, 280), (595, 280), (605, 680), (360, 670), (490, 640)]
+PIL = 0.4 / M_PER_PX * 3
+for i, (px, py) in enumerate(PILLARS):
+    box(f'concrete_walk_pillar_{i:02d}', px, py, px + PIL, py + PIL, F1 - 0.05, F2 - SLAB)
+
+# 小さな暗い四角 (下絵) = 2F を支える柱 (本人 2026-11-05「2F を支える柱かも」)。四角の大きさのまま、2F の高さまで。
+# 塔の北西と南の 2 つは柱ではなく地下 2F への穴 (HOLES)
+for i, r in enumerate([(135, 335, 170, 368), (605, 580, 640, 612), (825, 515, 855, 548)]):
+    box(f'concrete_column_{i}', *r, F1 - 0.05, F2)
+
+
+# --- 階段 (向きが読める物) --------------------------------------------------------------
+stairs('concrete_stair_nw', 290, 228, 360, 258, F1, F2, 'x', +1)       # 1F (西) → 2F (東の通路)
+stairs('concrete_stair_se', 655, 670, 735, 700, F2, F1, 'x', +1)       # 2F (西の通路の端) → 1F (東)
+
+# 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
+for name, r in (('a2_south', (195, 255, 255, 285)),
+                ('north_b1_e', (655, 180, 735, 215)), ('north_b1_s', (605, 215, 640, 275)),
+                ('sw_from_2F', (355, 700, 390, 745)), ('sw_inner', (290, 765, 360, 800)),
+                ('a1_north', (755, 600, 790, 670))):
+    box(f'ref_stair_{name}', *r, F1, F1 + 0.05)
+
+# --- 遮蔽 (下絵の三角の印) ----------------------------------------------------------------
+COVERS = [(505, 150), (425, 185), (505, 225), (402, 265), (815, 280), (748, 318), (840, 355), (773, 420),
+          (208, 430), (130, 480), (347, 510), (235, 553), (152, 580), (600, 410), (675, 440),
+          (380, 595), (465, 625), (290, 672), (282, 738), (490, 715), (520, 762), (465, 815)]
+# 石の障害物: 高さ 2m、下 1.8 × 1.4、上へ細る (本人「2m くらいの石の障害物」)
+ROCK_H, ROCK_W, ROCK_D, ROCK_TOP = 2.0, 1.8, 1.4, 0.6
+
+
+def rock(name, px, py, z):
+    x, y = P(px, py)
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    for v in bm.verts:
+        k = ROCK_TOP if v.co.z > 0 else 1.0
+        v.co.x = x + v.co.x * ROCK_W * k
+        v.co.y = y + v.co.y * ROCK_D * k
+        v.co.z = z if v.co.z < 0 else z + ROCK_H
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(o)
+
+
+for i, (px, py) in enumerate(COVERS):
+    rock(f'concrete_rock_{i:02d}', px, py, F1)
+
+# --- トーチカ (両軍の拠点) ----------------------------------------------------------------
+# 北東と南西の角を斜めの壁で切り取った区画。壁と屋根のある小屋で、ここに両軍の拠点がある
+# (本人 2026-11-05「トーチカみたいになっていてここに blue と red の拠点がある」)。
+# 下絵の白い線をなぞった。線の切れ目が出入り口
+BUNKER_TOP = F1 + 3.0
+BUNKER_WALL = 0.5
+import math
+
+
+def wall(name, a, b, z0, z1, thick=BUNKER_WALL):
+    """960 画素の下絵の点 a → b に沿った壁 (厚み thick、線の真ん中に立てる)"""
+    (ax, ay), (bx, by) = P(*a), P(*b)
+    dx, dy = bx - ax, by - ay
+    length = math.hypot(dx, dy)
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    c, s_ = dx / length, dy / length
+    for v in bm.verts:
+        lx = v.co.x * (length + thick)
+        ly = v.co.y * thick
+        v.co.x = (ax + bx) / 2 + lx * c - ly * s_
+        v.co.y = (ay + by) / 2 + lx * s_ + ly * c
+        v.co.z = z0 if v.co.z < 0 else z1
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(o)
+    return o
+
+
+BUNKERS = {
+    # 北東: 外壁からの短い壁 → 出入り口 → 斜めの壁 → 出入り口 → 外壁までの短い壁。南西と同じく出入り口は 2 つ
+    # (本人「片方の base に入り口が 2 個ないのがある」。初めは外壁から斜めの壁まで塞いでいた)
+    'ne': {'walls': [((750, 88), (750, 105)), ((750, 147), (810, 195)), ((840, 195), (857, 195))],
+           'roof': [(750, 88), (857, 88), (857, 195), (810, 195), (750, 147)]},
+    # 南西: 外壁からの短い壁 → 出入り口 → 斜めの壁 → 出入り口 → 外壁までの短い壁
+    'sw': {'walls': [((107, 726), (123, 726)), ((156, 726), (213, 783)), ((213, 819), (213, 835))],
+           'roof': [(107, 726), (156, 726), (213, 783), (213, 835), (107, 835)]},
+}
+for k, b in BUNKERS.items():
+    for i, (a, c) in enumerate(b['walls']):
+        wall(f'concrete_bunker_{k}_wall_{i}', a, c, F1 - 0.05, BUNKER_TOP)
+    prism(f'concrete_bunker_{k}_roof', b['roof'], BUNKER_TOP, BUNKER_TOP + 0.4)
+
+# --- 基地・湧く所 ------------------------------------------------------------------------
+# トーチカの中。どちらの軍がどちらかは仮 (本人に確かめる)
+empty('meta_baseBlue', 150, 790, F1)   # 南西のトーチカ
+empty('meta_baseRed', 805, 130, F1)    # 北東のトーチカ
+
+
+bpy.ops.wm.save_as_mainfile(filepath=out)
+print('書き出し', out, len(scene.objects), '個')

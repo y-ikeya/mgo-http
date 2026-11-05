@@ -236,10 +236,11 @@ const TSNE_ARMORY: Record<Side, Armory> = {
 export const ROOMS: Record<RoomName, RoomSpec> = {
   alpha: { mode: 'DM', stages: only('city') },
   /*
-   * **試合ごとに city と UU を交互に** (2026-10-22 本人)。部屋ができて最初の試合は city。
+   * charlie は**試合ごとに city と UU を交互に** (2026-10-22 本人)。部屋ができて最初の試合は city。
    * TSNE は 2 ラウンドで 1 試合なので、後攻が終わってから替わる。替わる時は画面が暗転して組み直す
    */
-  bravo: { mode: 'TDM', stages: cycle('city', 'uu') },
+  // BB を試す (2026-11-05 本人「Bravo として書き出してみて」)。それまでは city と UU を交互に
+  bravo: { mode: 'TDM', stages: only('bb') },
   charlie: { mode: 'TSNE', stages: cycle('city', 'uu'), armory: TSNE_ARMORY, lives: 0 },
   delta: {
     mode: 'TDM',
