@@ -478,8 +478,13 @@ def rock(name, px, py, wide, z):
     for q in quads:
         bm.faces.new([vs[k] for k in q])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    # 角は少し丸い (本人「角がシャープじゃなくてちょっと丸まってる」)。8cm を 3 段
+    bmesh.ops.bevel(bm, geom=list(bm.edges) + list(bm.verts), offset=0.08, offset_type='OFFSET', segments=3,
+                    profile=0.5, affect='EDGES', clamp_overlap=True)
     bm.to_mesh(me)
     bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
     o = bpy.data.objects.new(name, me)
     scene.collection.objects.link(o)
 
