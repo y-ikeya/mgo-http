@@ -99,10 +99,12 @@ def empty(name, px, py, z):
 
 
 STEP = 0.15
+TREAD = 0.2      # 下に入れる階段の段の板の厚み
 
 
-def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward):
-    """段の箱を並べた階段。axis = 'x' か 'y' (下絵の向き)、toward = +1 で座標の増える向きへ上る"""
+def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward, open_under=False):
+    """段の箱を並べた階段。axis = 'x' か 'y' (下絵の向き)、toward = +1 で座標の増える向きへ上る。
+    open_under: 段の板 (厚み TREAD) だけを並べ、下に入れるようにする (1F ⇔ 2F の階段、本人「階段下は入れる」)"""
     (ax, ay), (bx, by) = P(x0, y0), P(x1, y1)
     lo_x, hi_x, lo_y, hi_y = min(ax, bx), max(ax, bx), min(ay, by), max(ay, by)
     # 下る階段は、上る階段を逆から組む (段の箱は低い方から順に重ねる)
@@ -118,7 +120,19 @@ def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward):
     for i in range(n):
         t0, t1 = i / n, (i + 1) / n
         top = z_from + step * (i + 1)
-        if axis == 'x':
+        if open_under:
+            # その段の踏み面だけ
+            if axis == 'x':
+                s0, s1 = (t0, t1) if toward > 0 else (1 - t1, 1 - t0)
+            else:
+                s0, s1 = (1 - t1, 1 - t0) if toward > 0 else (t0, t1)
+            if axis == 'x':
+                xa, xb = lo_x + (hi_x - lo_x) * s0, lo_x + (hi_x - lo_x) * s1
+                ya, yb = lo_y, hi_y
+            else:
+                xa, xb = lo_x, hi_x
+                ya, yb = lo_y + (hi_y - lo_y) * s0, lo_y + (hi_y - lo_y) * s1
+        elif axis == 'x':
             s0, s1 = (t0, 1.0) if toward > 0 else (0.0, 1 - t0)
             xa, xb = lo_x + (hi_x - lo_x) * s0, lo_x + (hi_x - lo_x) * s1
             ya, yb = lo_y, hi_y
@@ -126,7 +140,7 @@ def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward):
             s0, s1 = (0.0, 1 - t0) if toward > 0 else (t0, 1.0)
             xa, xb = lo_x, hi_x
             ya, yb = lo_y + (hi_y - lo_y) * s0, lo_y + (hi_y - lo_y) * s1
-        bot = min(z_from, z_to) - 0.05
+        bot = top - TREAD if open_under else min(z_from, z_to) - 0.05
         geom = bmesh.ops.create_cube(bm, size=1.0)['verts']
         for v in geom:
             v.co.x = xa if v.co.x < 0 else xb
@@ -286,7 +300,6 @@ WALKS = {
     'n_tab': (468, 280, 505, 355),
     'e': (690, 280, 722, 640),
     'se': (605, 610, 722, 640),
-    'se_down': (605, 610, 640, 695),
     'sw': (272, 610, 388, 640),
     's': (360, 640, 525, 670),
     's_tab': (490, 590, 525, 670),
@@ -309,11 +322,20 @@ for i, r in enumerate([(135, 335, 170, 368), (605, 580, 640, 612), (825, 515, 85
 
 
 # --- 階段 (向きが読める物) --------------------------------------------------------------
-stairs('concrete_stair_nw', 290, 228, 360, 258, F1, F2, 'x', +1)       # 1F (西) → 2F (東の通路)
-stairs('concrete_stair_se', 655, 670, 735, 700, F2, F1, 'x', +1)       # 2F (西の通路の端) → 1F (東)
+# 1F ⇔ 2F は踊り場 (半分の高さ) をはさんだ 2 本。どれも段の板だけで、下に入れる (2026-11-05 本人
+# 「1F から 2F まで続くんじゃなくてどの stair も踊り場がある」「階段下は入れる」)
+MID = (F1 + F2) / 2
+# 北西: 1F (西) → 東へ上がって踊り場 → 北寄りの階段で東へ上がって 2F の通路
+stairs('concrete_stair_nw_lower', 195, 255, 255, 285, F1, MID, 'x', +1, open_under=True)
+box('concrete_landing_nw', 255, 258, 351, 285, MID - 0.3, MID)
+stairs('concrete_stair_nw', 290, 228, 360, 258, MID, F2, 'x', +1, open_under=True)
+# 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
+stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
+box('concrete_landing_se', 605, 670, 655, 700, MID - 0.3, MID)
+stairs('concrete_stair_se', 655, 670, 735, 700, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
-for name, r in (('a2_south', (195, 255, 255, 285)),
+for name, r in (
                 ('north_b1_e', (655, 180, 735, 215)), ('north_b1_s', (605, 215, 640, 275)),
                 ('sw_from_2F', (355, 700, 390, 745)), ('sw_inner', (290, 765, 360, 800)),
                 ('a1_north', (755, 600, 790, 670))):
