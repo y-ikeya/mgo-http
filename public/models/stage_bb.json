@@ -2573,6 +2573,32 @@
 }
 },
 {
+"name": "concrete_slit_wall_n",
+"min": [
+-14.184,
+11.3,
+-33.892
+],
+"max": [
+-13.834,
+13.2,
+-29.556
+],
+"top": {
+"h": 13.2,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_red_boxcol",
 "min": [
 29.708,

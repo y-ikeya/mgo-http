@@ -36,6 +36,7 @@
 # 座標は下絵を 3 倍に引き伸ばした 960 画素の上で読んだ (x 右、y 下)。Blender は X 右 / Y 奥 / Z 上
 import bpy
 import bmesh
+import math
 import os
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -370,13 +371,59 @@ def rock(name, px, py, z):
 for i, (px, py) in enumerate(COVERS):
     rock(f'concrete_rock_{i:02d}', px, py, F1)
 
+# --- 銃眼のある壁 ---------------------------------------------------------------------------
+# コンクリートの板を並べた壁。板ごとに胸の高さに横長の銃眼 (本人の画面 2026-11-05「地図の北の方にある南北に
+# 伸びる壁の障害物」)。下絵の短い白線をなぞる
+PANEL_H, PANEL_T = 1.9, 0.35
+SLIT_W, SLIT_H, SLIT_Z = 0.7, 0.3, 1.1   # 銃眼の幅・高さ・真ん中の高さ (床から)
+PANEL_GAP = 0.05
+
+
+def slit_wall(name, a, b, z):
+    """a → b (960 画素) に、板を幅 2m 前後で並べる。板ごとに真ん中に銃眼"""
+    (ax, ay), (bx, by) = P(*a), P(*b)
+    dx, dy = bx - ax, by - ay
+    length = math.hypot(dx, dy)
+    ux, uy = dx / length, dy / length
+    n = max(1, round(length / 2.0))
+    w = length / n
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+
+    def piece(u0, u1, z0, z1):
+        # 線に沿った u0..u1、厚み PANEL_T、高さ z0..z1 の箱
+        geom = bmesh.ops.create_cube(bm, size=1.0)['verts']
+        for v in geom:
+            u = u0 if v.co.x < 0 else u1
+            t = (-0.5 if v.co.y < 0 else 0.5) * PANEL_T
+            v.co.x = ax + ux * u - uy * t
+            v.co.y = ay + uy * u + ux * t
+            v.co.z = z0 if v.co.z < 0 else z1
+
+    for i in range(n):
+        u0, u1 = i * w + PANEL_GAP / 2, (i + 1) * w - PANEL_GAP / 2
+        mid = (u0 + u1) / 2
+        s0, s1 = z + SLIT_Z - SLIT_H / 2, z + SLIT_Z + SLIT_H / 2
+        piece(u0, u1, z, s0)                                  # 銃眼の下
+        piece(u0, u1, s1, z + PANEL_H)                        # 銃眼の上
+        piece(u0, mid - SLIT_W / 2, s0, s1)                   # 銃眼の左
+        piece(mid + SLIT_W / 2, u1, s0, s1)                   # 銃眼の右
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(o)
+    return o
+
+
+slit_wall('concrete_slit_wall_n', (332, 98), (332, 145), F1)
+
+
 # --- トーチカ (両軍の拠点) ----------------------------------------------------------------
 # 北東と南西の角を斜めの壁で切り取った区画。壁と屋根のある小屋で、ここに両軍の拠点がある
 # (本人 2026-11-05「トーチカみたいになっていてここに blue と red の拠点がある」)。
 # 下絵の白い線をなぞった。線の切れ目が出入り口
 BUNKER_TOP = F1 + 3.0
 BUNKER_WALL = 0.5
-import math
 
 
 def wall(name, a, b, z0, z1, thick=BUNKER_WALL):
