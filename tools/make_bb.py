@@ -352,6 +352,14 @@ for f in [f for f in bm.faces if f.material_index == 1]:
 bm.to_mesh(gme)
 bm.free()
 
+# A2 の地下 2F への階段の南の壁に V 字の切れ込み。1F から切れ込み越しに、階段を登ってくる相手を撃ち抜ける
+# (本人「UU で作ったみたいな V 字の亀裂、stair を登ってきたところをそのスリットから打ち抜けるように」)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bb_vnotch
+# 真ん中は本人がカーソルで示した所 (壁の真ん中より 0.5m 東)
+bb_vnotch.vnotch(bpy.data.objects['concrete_stair_wall_b2_a2_s'], -25.43, 0.8, F1 + 0.5)
+
 for i, r in enumerate(B1_COLUMNS):
     box(f'concrete_b1_column_{i}', *r, B1, B1_CEIL)
 # 北の階段は東 (1F) から西へ下り、下りた先は階段の周りを回る通路 (本人)。階段の北・南・東は壁で囲み、
