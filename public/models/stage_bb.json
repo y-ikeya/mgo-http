@@ -1651,32 +1651,6 @@
 }
 },
 {
-"name": "concrete_column_4",
-"min": [
-32.004,
-11.25,
-5.003
-],
-"max": [
-34.804,
-14.9,
-8.083
-],
-"top": {
-"h": 14.9,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "concrete_column_3",
 "min": [
 11.471,
@@ -1687,32 +1661,6 @@
 14.737,
 14.9,
 14.056
-],
-"top": {
-"h": 14.9,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_column_0",
-"min": [
--32.396,
-11.25,
--11.797
-],
-"max": [
--29.129,
-14.9,
--8.717
 ],
 "top": {
 "h": 14.9,
@@ -2577,15 +2525,67 @@
 "min": [
 -14.184,
 11.3,
--33.892
+-34.803
 ],
 "max": [
 -13.834,
 13.2,
--29.556
+-30.467
 ],
 "top": {
 "h": 13.2,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_crate_w",
+"min": [
+-31.613,
+11.25,
+-11.107
+],
+"max": [
+-29.913,
+13.0,
+-9.407
+],
+"top": {
+"h": 13.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_crate_e",
+"min": [
+32.554,
+11.25,
+5.693
+],
+"max": [
+34.254,
+13.0,
+7.393
+],
+"top": {
+"h": 13.0,
 "dx": 0.0,
 "dz": 0.0
 },
