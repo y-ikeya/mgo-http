@@ -2,8 +2,10 @@
 # ビルの窓枠ね」、本家の画面: 2F の外の通路 (concrete_cube.005) に沿って窓が 4 つ、窓の前に横の格子が 6 本、
 # 石の窓台、ガラスの真ん中に縦の桟と上寄りの横の桟、通路の端に梯子)。
 #
-#   窓 1 つ = 枠の石 (左右・上) + 窓台 + 暗いガラス + 桟 + 横の格子。vis_ … _noeye (素通り、視線も通す。
-#   壁から 0.25m しか出ないので、当たりにすると通路で引っ掛かるだけ。見えている壁が視線を止める)
+#   窓 1 つ = 枠の石 (左右・上) + 窓台 + 暗い奥 + 桟 + 横の格子。vis_ … _noeye (素通り、視線も通す。
+#   壁から 0.13m しか出ないので、当たりにすると通路で引っ掛かるだけ。見えている壁が視線を止める)
+#   ガラスは面ごとに 1 つの glass_ … (ゲームのガラスの材質、何も止めない)。暗い奥から GLASS_OUT 離す —
+#   入口のガラスを壁の 4cm 手前に置いたら表示が揺らいだ (2026-11-05 本人)
 #
 # 面は柱 (concrete_cube.003 / .004) で 3 つに分かれる。通路の階 (と上の階) は梯子 8 (y 16.7〜17.4) を避けて
 # 窓を 3 つにする。材質は赤い建物の窓 (window_*) と同じ物を使う (色は足さない)。
@@ -21,9 +23,14 @@ COLLECTION = 'white_windows'
 SILLS = (5.4, 8.95, 12.5, 16.05)
 WIN_W, WIN_H = 1.2, 1.9
 JAMB = 0.14          # 枠の石の幅
-OUT = 0.16           # 枠の石が壁から出る量
-BAR_OUT = 0.12       # 格子が壁から出る量
+OUT = 0.08           # 枠の石が壁から出る量 (0.16 は出すぎた、2026-11-05 本人)
+BAR_OUT = 0.085      # 格子が壁から出る量 (枠の石の外)
 BARS = 6
+GLASS_OUT = 0.06     # ガラスが壁から出る量 (暗い奥は 0〜0.005)
+SILL_OUT = 0.13      # 窓台が壁から出る量
+# 窓は壁に引っ込める。壁 (concrete_building_white) の方を tools/white_recess.py で窓枠の外寸だけ同じ深さに
+# 凹ませてある (2026-11-05 本人「窓とその窓枠くらい引っ込められる？」「全部やってよ」)。枠の石の前が壁と揃う
+RECESS = 0.08
 LADDER8 = (16.6, 11.7)   # 梯子 8 の y の始まりと、梯子が始まる高さ (東の面)
 
 # 入口 (西の面の 1 階)。南の入口 (扉 2 組) を写し、組を PAIRS まで横に足して広げる
@@ -78,19 +85,20 @@ def add_box(bm, lo, hi, mat):
 FRAME, GLASS, SILL, BAR = 0, 1, 2, 3
 
 
-def window(bm, wall_x, d, yc, z0):
+def window(bm, gbm, wall_x, d, yc, z0, back=0.0):
     """窓 1 つ。wall_x = 面の x、d = 外の向き (±1)、yc = 窓の真ん中の y、z0 = 窓の下端"""
     x = wall_x(yc)
 
     def box(out0, y0, za, out1, y1, zb, mat):
         # 壁からの出 (out0〜out1) を x に直す
-        xa, xb = x + d * out0, x + d * out1
-        add_box(bm, (min(xa, xb), y0, za), (max(xa, xb), y1, zb), mat)
+        xa, xb = x + d * (out0 - back), x + d * (out1 - back)
+        add_box(gbm if mat is None else bm, (min(xa, xb), y0, za), (max(xa, xb), y1, zb), mat or 0)
 
     y0, y1 = yc - WIN_W / 2, yc + WIN_W / 2
     z1 = z0 + WIN_H
-    # 暗いガラス (壁のすぐ外)
-    box(0, y0, z0, 0.02, y1, z1, GLASS)
+    # 暗い奥 (壁のすぐ外) と、その前のガラス
+    box(0, y0, z0, 0.005, y1, z1, GLASS)
+    box(GLASS_OUT, y0, z0, GLASS_OUT + 0.01, y1, z1, None)
     # 桟: 縦の真ん中と、上から 1/3 の横
     box(0, yc - 0.03, z0, 0.05, yc + 0.03, z1, FRAME)
     zt = z1 - WIN_H / 3
@@ -100,7 +108,7 @@ def window(bm, wall_x, d, yc, z0):
     box(0, y1, z0, OUT, y1 + JAMB, z1 + JAMB, SILL)
     box(0, y0, z1, OUT, y1, z1 + JAMB, SILL)
     # 窓台。枠より少し広く、前へ出る
-    box(0, y0 - JAMB - 0.06, z0 - 0.16, 0.26, y1 + JAMB + 0.06, z0, SILL)
+    box(0, y0 - JAMB - 0.06, z0 - 0.16, SILL_OUT, y1 + JAMB + 0.06, z0, SILL)
     # 横の格子 (枠の石の外で、左右の石に掛かる)
     for i in range(BARS):
         z = z0 + 0.22 + i * (WIN_H - 0.4) / (BARS - 1)
@@ -150,9 +158,12 @@ def entrance(col):
                 place(src, f'{base}.{k}', shift=k * PAIR_PITCH)
         elif 'header' in src.name or 'step' in src.name:
             place(src, base, stretch=True)
+        elif 'pillar' in src.name:
+            # 柱は付けない (本人が外した、2026-11-05)
+            continue
         elif lo > mid:
-            # 右の枠・柱、2 組目の扉。2 組目は 1 組目を並べて作るので捨てる
-            if 'jamb' in src.name or 'pillar' in src.name:
+            # 右の枠、2 組目の扉。2 組目は 1 組目を並べて作るので捨てる
+            if 'jamb' in src.name:
                 place(src, base, shift=WIDEN)
         elif lo >= PAIR_A[0] and hi <= PAIR_A[1]:
             for k in range(PAIRS):
@@ -165,7 +176,9 @@ def entrance(col):
 col = fresh_collection()
 mats = [bpy.data.materials[n] for n in ('window_frame_offwhite', 'window_glass_dark', 'window_sill_stone', 'metal_fence_frame')]
 count = 0
+glass = {}
 for side, wall_x, d, sections, skip in FACES:
+    gbm = glass.setdefault(side, bmesh.new())
     for fi, z0 in enumerate(SILLS):
         for si, (a, b, n) in enumerate(sections):
             if side == 'east' and si == 1 and z0 + WIN_H > LADDER8[1]:
@@ -179,7 +192,7 @@ for side, wall_x, d, sections, skip in FACES:
                 name = f'vis_window_white_{side}_{fi + 1}_{yc:.1f}_noeye_notexture'
                 me = bpy.data.meshes.new(name)
                 bm = bmesh.new()
-                window(bm, wall_x, d, yc, z0)
+                window(bm, gbm, wall_x, d, yc, z0, RECESS)
                 bm.to_mesh(me)
                 bm.free()
                 for m in mats:
@@ -187,4 +200,12 @@ for side, wall_x, d, sections, skip in FACES:
                 o = bpy.data.objects.new(name, me)
                 col.objects.link(o)
                 count += 1
+for side, gbm in glass.items():
+    name = f'glass_window_white_{side}_noplayer_nobullet_noeye_nocamera'
+    me = bpy.data.meshes.new(name)
+    gbm.to_mesh(me)
+    gbm.free()
+    me.materials.append(bpy.data.materials['window_glass_pane'])
+    col.objects.link(bpy.data.objects.new(name, me))
+    print(name, len(me.polygons) * 2, '三角')
 print('窓', count, '個 / 入口の部品', entrance(col), '個')
