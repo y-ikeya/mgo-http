@@ -222,5 +222,7 @@ def build(bpy, scene):
                     a = Vector((c, lo.y + (hi.y - lo.y) * t0, floor_at(t0)))
                     b = Vector((c, lo.y + (hi.y - lo.y) * t1, floor_at(t1)))
                 segs.append((a - n * (POST / 2), b - n * (POST / 2), n))
-        emit(f'metal_rail_{o.name.split("concrete_")[1]}_nobullet_noeye_nocamera', segs)
+        # 名前に stair を入れない — 書き出し (is_stair) が柵を階段と見なして柵の高さに坂の板を張り、
+        # 階段の上で頭がつかえて登れなかった (2026-11-05 本人「stair が登れなかった」)
+        emit(f'metal_rail_{o.name.split("concrete_")[1].replace("stair_", "flight_")}_nobullet_noeye_nocamera', segs)
     return made

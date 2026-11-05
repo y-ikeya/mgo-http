@@ -270,9 +270,13 @@ export function zoomLookScale(fov: number): number {
   const half = (deg: number) => Math.tan((deg * Math.PI) / 360)
   return Math.min(1, half(fov) / half(LOOK_REFERENCE_FOV))
 }
-/** 見下ろし / 見上げの限界 (rad)。見上げ側はカメラが地面に潜るので浅め */
+/**
+ * 見下ろし / 見上げの限界 (rad)。見上げ側はカメラが地面に潜るので浅め。
+ * 見上げは 0.55 (31.5°) → 0.81 (46.5°)。BB の 2F や塔の上の相手を下から狙えなかった
+ * (2026-11-05 本人「もう少し銃口を上向けられるように、+15 度くらい」)
+ */
 const MIN_PITCH = -1.1
-const MAX_PITCH = 0.55
+const MAX_PITCH = 0.81
 
 /**
  * 反動が戻り始めるまでの猶予 (秒)。

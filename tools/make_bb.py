@@ -623,9 +623,31 @@ def grate_material():
 
 
 grate = grate_material()
+GRATE_TILE = 1.0
+
+
+def planar_uv(o, tile):
+    """面の向きで平らに UV を貼る (tile m で絵 1 枚)。UV が無いと書き出しの焼き込みで細かく割られた時に
+    全部 1 点に潰れて、床が一色になった (2026-11-05 本人「2F の床がオレンジ一色」)"""
+    me = o.data
+    uv = me.uv_layers.active or me.uv_layers.new(name='UVMap')
+    M = o.matrix_world
+    for poly in me.polygons:
+        n = poly.normal
+        for li in poly.loop_indices:
+            w = M @ me.vertices[me.loops[li].vertex_index].co
+            if abs(n.z) >= max(abs(n.x), abs(n.y)):
+                uv.data[li].uv = (w.x / tile, w.y / tile)
+            elif abs(n.x) >= abs(n.y):
+                uv.data[li].uv = (w.y / tile, w.z / tile)
+            else:
+                uv.data[li].uv = (w.x / tile, w.z / tile)
+
+
 for o in scene.objects:
     if o.type == 'MESH' and o.name.startswith(('metal_walk_2F_', 'metal_landing_')) and 'pillar' not in o.name:
         o.data.materials.append(grate)
+        planar_uv(o, GRATE_TILE)
 
 # --- 塔: 2F より上は筒、ベランダの縁は崩れたコンクリートの壁 (tools/bb_tower.py) -------------
 import bb_tower
