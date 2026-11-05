@@ -1,7 +1,8 @@
 # BB の真ん中の塔 (本人の画面 2026-11-05「真ん中の塔の柵はボロボロ、上に行けても狙われやすい」
 # 「塔の 2F 部分は四角じゃなくて筒」)。
 #
-#   筒      concrete_tower         2F より上は円柱 (16 角)。1F の土台 (concrete_tower_base) は四角のまま
+#   筒      concrete_tower         2F より上は円柱 (16 角)、ベランダから 2.8m の低いトーチカ。1 面おきに覗き穴
+#                                  (中には入れない)。1F の土台 (concrete_tower_base) は四角のまま
 #   崩れた壁 concrete_tower_parapet_<辺>   ベランダの外の縁に、高さ 0.4〜1.2m のまばらな塊。切れ目がある
 #                                          (人も弾も止めるが、隠れきれない)。跳び移る所は空ける
 #
@@ -27,6 +28,8 @@ def _new(bpy, scene, name, build):
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
     build(bm)
+    # 面の向きを外へ揃える (組む時の頂点の順がばらばらで、書き出しが 300 枚あまり裏返していた)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me)
     bm.free()
     o = bpy.data.objects.new(name, me)
@@ -34,15 +37,51 @@ def _new(bpy, scene, name, build):
     return o
 
 
-def tube(bpy, scene, cx, cy, r, z0, z1, name='concrete_tower'):
-    def build(bm):
-        lo = [bm.verts.new((cx + r * math.cos(a), cy + r * math.sin(a), z0)) for a in (2 * math.pi * i / SIDES for i in range(SIDES))]
-        hi = [bm.verts.new((v.co.x, v.co.y, z1)) for v in lo]
+WALL = 0.5                # 筒の壁の厚み。覗き穴はこの深さだけ凹む (奥は芯で塞がっている、中には入れない)
+SLIT_W, SLIT_Z, SLIT_H = 0.9, 1.2, 0.25   # 覗き穴の幅・下端 (ベランダの床から)・高さ。1 面おき
+
+
+def tube(bpy, scene, cx, cy, r, z0, z1, name='concrete_tower', floor=None):
+    """筒。floor (ベランダの床の高さ) を渡すと、そこから SLIT_Z の高さに 1 面おきに覗き穴 (本人「周囲を
+    見渡せるトーチカ、覗き穴がある、中には入れない」)"""
+    def ring(rad, a):
+        return cx + rad * math.cos(a), cy + rad * math.sin(a)
+
+    def prism(bm, a0, a1, r0, r1, h0, h1):
+        """角度 a0..a1、半径 r0..r1、高さ h0..h1 の塊 (辺は直線)"""
+        pts = [ring(r0, a0), ring(r0, a1), ring(r1, a1), ring(r1, a0)]
+        lo = [bm.verts.new((x, y, h0)) for x, y in pts]
+        hi = [bm.verts.new((x, y, h1)) for x, y in pts]
         bm.faces.new(list(reversed(lo)))
         bm.faces.new(hi)
+        for i in range(4):
+            j = (i + 1) % 4
+            bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+
+    def build(bm):
+        rin = r - WALL
+        # 芯 (中には入れない)
+        core = [bm.verts.new((*ring(rin, 2 * math.pi * i / SIDES), z0)) for i in range(SIDES)]
+        top = [bm.verts.new((v.co.x, v.co.y, z1)) for v in core]
+        bm.faces.new(list(reversed(core)))
+        bm.faces.new(top)
         for i in range(SIDES):
             j = (i + 1) % SIDES
-            bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+            bm.faces.new((core[i], core[j], top[j], top[i]))
+        # 壁 (面ごと)。覗き穴のある面は、穴の上下左右に分ける
+        for i in range(SIDES):
+            a0, a1 = 2 * math.pi * i / SIDES, 2 * math.pi * (i + 1) / SIDES
+            if floor is None or i % 2:
+                prism(bm, a0, a1, rin, r, z0, z1)
+                continue
+            s0, s1 = floor + SLIT_Z, floor + SLIT_Z + SLIT_H
+            side = 2 * r * math.sin(math.pi / SIDES)
+            f = min(0.45, SLIT_W / side / 2)
+            am0, am1 = (a0 + a1) / 2 - (a1 - a0) * f, (a0 + a1) / 2 + (a1 - a0) * f
+            prism(bm, a0, a1, rin, r, z0, s0)
+            prism(bm, a0, a1, rin, r, s1, z1)
+            prism(bm, a0, am0, rin, r, s0, s1)
+            prism(bm, am1, a1, rin, r, s0, s1)
     return _new(bpy, scene, name, build)
 
 

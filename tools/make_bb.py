@@ -510,7 +510,8 @@ empty('meta_baseRed', 805, 130, F1)    # 北東のトーチカ
 # --- 塔: 2F より上は筒、ベランダの縁は崩れたコンクリートの壁 (tools/bb_tower.py) -------------
 import bb_tower
 (tx0, ty0), (tx1, ty1) = P(TOWER_SQ[0], TOWER_SQ[1]), P(TOWER_SQ[2], TOWER_SQ[3])
-bb_tower.tube(bpy, scene, (tx0 + tx1) / 2, (ty0 + ty1) / 2, min(abs(tx1 - tx0), abs(ty1 - ty0)) / 2, F1 - 0.5, TOWER_TOP)
+# 筒はベランダから 2.8m のトーチカ (本人「こんな高くない」)
+bb_tower.tube(bpy, scene, (tx0 + tx1) / 2, (ty0 + ty1) / 2, min(abs(tx1 - tx0), abs(ty1 - ty0)) / 2, F1 - 0.5, F2 + 2.8, floor=F2)
 (bx0, by0), (bx1, by1) = P(rx0, ry1), P(rx1, ry0)
 gap = {}
 for side, name in (('n', 'concrete_walk_2F_n_tab'), ('s', 'concrete_walk_2F_s_tab')):

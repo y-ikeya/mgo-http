@@ -3971,32 +3971,6 @@
 }
 },
 {
-"name": "concrete_tower",
-"min": [
--2.695,
-10.8,
--2.718
-],
-"max": [
-4.995,
-23.3,
-4.973
-],
-"top": {
-"h": 23.3,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "concrete_tower_parapet_n",
 "min": [
 -5.383,
@@ -4114,6 +4088,32 @@
 ],
 "top": {
 "h": 14.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_tower",
+"min": [
+-2.7,
+10.8,
+-2.72
+],
+"max": [
+5.0,
+17.7,
+4.98
+],
+"top": {
+"h": 17.7,
 "dx": 0.0,
 "dz": 0.0
 },
