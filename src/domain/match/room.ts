@@ -239,8 +239,8 @@ export const ROOMS: Record<RoomName, RoomSpec> = {
    * charlie は**試合ごとに city と UU を交互に** (2026-10-22 本人)。部屋ができて最初の試合は city。
    * TSNE は 2 ラウンドで 1 試合なので、後攻が終わってから替わる。替わる時は画面が暗転して組み直す
    */
-  // BB を試す (2026-11-05 本人「Bravo として書き出してみて」)。それまでは city と UU を交互に
-  bravo: { mode: 'TDM', stages: only('bb') },
+  // 試合ごとに city → UU → BB を回す (2026-11-05 本人「bravo は 3 種類のローテ」)。BB を足す前は city と UU の交互
+  bravo: { mode: 'TDM', stages: cycle('city', 'uu', 'bb') },
   charlie: { mode: 'TSNE', stages: cycle('city', 'uu'), armory: TSNE_ARMORY, lives: 0 },
   delta: {
     mode: 'TDM',
