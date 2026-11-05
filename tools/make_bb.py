@@ -309,8 +309,8 @@ for k, r in WALKS.items():
     box(f'concrete_walk_2F_{k}', *r, F2 - SLAB, F2)
 
 # 通路を支える柱 (通路の角と、長い辺の途中)
-PILLARS = [(272, 335), (272, 488), (272, 610), (388, 610), (690, 280), (690, 460), (690, 610),
-           (468, 280), (595, 280), (605, 680), (360, 670), (490, 640)]
+PILLARS = [(272, 335), (272, 488), (272, 610), (384, 610), (690, 280), (690, 460), (690, 610),
+           (468, 280), (595, 280), (360, 670), (490, 640)]
 PIL = 0.4 / M_PER_PX * 3
 for i, (px, py) in enumerate(PILLARS):
     box(f'concrete_walk_pillar_{i:02d}', px, py, px + PIL, py + PIL, F1 - 0.05, F2 - SLAB)
@@ -332,6 +332,8 @@ stairs('concrete_stair_nw', 290, 228, 360, 258, MID, F2, 'x', +1, open_under=Tru
 # 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
 stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
 box('concrete_landing_se', 605, 670, 655, 700, MID - 0.3, MID)
+# 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
+box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - 0.3)
 stairs('concrete_stair_se', 655, 670, 735, 700, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
