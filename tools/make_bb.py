@@ -321,12 +321,16 @@ for k, r in WALKS.items():
 PILLARS = [(272, 335), (272, 488), (272, 610), (384, 610), (690, 280), (690, 460), (690, 610),
            (468, 280), (595, 280), (360, 670), (490, 640)]
 PIL = 0.4 / M_PER_PX * 3
+# 2F を支える柱は、コンクリートの台座に鉄骨の櫓 (tools/bb_support.py、本人の画面 2026-11-05)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bb_support
 for i, (px, py) in enumerate(PILLARS):
-    box(f'concrete_walk_pillar_{i:02d}', px, py, px + PIL, py + PIL, F1 - 0.05, F2 - SLAB)
+    bb_support.support(bpy, scene, f'{i:02d}', *P(px, py), F1, F2 - SLAB)
 
 # 小さな暗い四角 (下絵) のうち真ん中寄りの 1 つは 2F を支える柱 (本人「2F を支える柱かも」)。2F の高さまで。
 # 塔の北西と南の 2 つは地下 2F への穴 (HOLES)、西と東の 2 つは金属の箱 (下)
-box('concrete_column_0', 605, 580, 640, 612, F1 - 0.05, F2)
+bb_support.support(bpy, scene, 'col', *P(622, 596), F1, F2 - SLAB)
 
 # 西と東の四角は金属の箱 (本人の画面 2026-11-05「西側と東側にある四角い物体」)。縁に枠の付いた
 # コンテナのような箱。下絵の四角の真ん中に 1.7m 角
