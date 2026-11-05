@@ -1205,12 +1205,12 @@
 "min": [
 -7.481,
 11.3,
--15.515
+-14.179
 ],
 "max": [
 -4.481,
 13.0,
--13.815
+-12.479
 ],
 "top": {
 "h": 13.0,
@@ -2045,18 +2045,18 @@
 {
 "name": "concrete_stair_nw_lower",
 "min": [
--21.437,
+-16.21,
 11.25,
--15.411
+-15.19
 ],
 "max": [
--16.957,
+-13.97,
 13.1,
--13.171
+-12.95
 ],
 "top": {
-"h": 11.4594,
-"dx": 0.39343,
+"h": 11.4492,
+"dx": 0.79397,
 "dz": 0.0,
 "riser": 0.15,
 "foot": 11.3,
@@ -2074,18 +2074,18 @@
 {
 "name": "concrete_stair_nw",
 "min": [
--14.343,
+-11.73,
 13.05,
--17.427
+-17.43
 ],
 "max": [
--9.117,
+-9.49,
 14.9,
--15.187
+-15.19
 ],
 "top": {
-"h": 13.2729,
-"dx": 0.33119,
+"h": 13.2503,
+"dx": 0.80126,
 "dz": 0.0,
 "riser": 0.15,
 "foot": 13.1,
@@ -2129,14 +2129,14 @@
 {
 "name": "concrete_landing_nw",
 "min": [
--16.957,
+-13.97,
 12.9,
--15.187
+-17.43
 ],
 "max": [
--9.789,
+-11.73,
 13.1,
--13.171
+-12.95
 ],
 "top": {
 "h": 13.1,
@@ -3422,6 +3422,188 @@
 "riser": 0.15,
 "foot": 11.3,
 "head": 13.25
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_support_01_base.001",
+"min": [
+-9.231,
+11.25,
+-9.207
+],
+"max": [
+-7.331,
+13.0,
+-7.307
+],
+"top": {
+"h": 13.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_support_01_frame.001",
+"min": [
+-8.961,
+13.0,
+-8.937
+],
+"max": [
+-7.601,
+14.7,
+-7.577
+],
+"top": {
+"h": 14.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_support_01_brace_noeye.001",
+"min": [
+-8.906,
+12.97,
+-8.882
+],
+"max": [
+-7.656,
+14.73,
+-7.632
+],
+"top": {
+"h": 14.7295,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "concrete_support_01_base.002",
+"min": [
+-9.231,
+11.25,
+-17.3
+],
+"max": [
+-7.331,
+13.0,
+-15.4
+],
+"top": {
+"h": 13.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_support_01_frame.002",
+"min": [
+-8.961,
+13.0,
+-17.03
+],
+"max": [
+-7.601,
+14.7,
+-15.67
+],
+"top": {
+"h": 14.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_metal_support_01_brace_noeye.002",
+"min": [
+-8.906,
+12.97,
+-16.975
+],
+"max": [
+-7.656,
+14.73,
+-15.725
+],
+"top": {
+"h": 14.7295,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": false,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "concrete_landing_se_pillar.001",
+"min": [
+-7.481,
+11.25,
+25.025
+],
+"max": [
+-7.081,
+12.9,
+25.425
+],
+"top": {
+"h": 12.9,
+"dx": 0.0,
+"dz": 0.0
 },
 "flags": {
 "draw": true,

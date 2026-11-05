@@ -344,10 +344,11 @@ for k, r in (('w', (135, 335, 170, 368)), ('e', (825, 515, 855, 548))):
 # 1F ⇔ 2F は踊り場 (半分の高さ) をはさんだ 2 本。どれも段の板だけで、下に入れる (2026-11-05 本人
 # 「1F から 2F まで続くんじゃなくてどの stair も踊り場がある」「階段下は入れる」)
 MID = (F1 + F2) / 2
-# 北西: 1F (西) → 東へ上がって踊り場 → 北寄りの階段で東へ上がって 2F の通路
-stairs('concrete_stair_nw_lower', 195, 255, 255, 285, F1, MID, 'x', +1, open_under=True)
-box('concrete_landing_nw', 255, 258, 351, 285, MID - SLAB, MID)
-stairs('concrete_stair_nw', 290, 228, 360, 258, MID, F2, 'x', +1, open_under=True)
+# 北西: 1F (西) → 東へ上がって踊り場 → 北の列へ寄って東へ上がり 2F の通路。どれも 2.2m で隙間なく繋ぐ
+# (2026-11-05 本人「ひどいから直して」。南西を本人が直した形が理想: 踊り場は 2 本を繋ぐのに要る大きさだけ)
+stairs('concrete_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
+box('concrete_landing_nw', 295, 228, 325, 288, MID - SLAB, MID)
+stairs('concrete_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
 # 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
 stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
 box('concrete_landing_se', 605, 670, 655, 700, MID - SLAB, MID)
