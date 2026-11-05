@@ -724,6 +724,14 @@ bb_rail.build(bpy, scene)
 # 2F の通路と踊り場の屋根 (tools/bb_roof.py、本人「2F には屋根がついてる」)
 import bb_roof
 bb_roof.build(bpy, scene)
+# 屋根は UU の赤いトタン (red_metal_plate、blue_metal_plate の絵を色相で赤くした物) を UU の blend から持ってくる
+# (2026-11-05 本人「2F の屋根は UU みたいに赤いトタンの屋根で」)
+with bpy.data.libraries.load(os.path.join(root, 'tools', 'raw', 'stage_uu.blend'), link=False) as (src, dst):
+    dst.materials = ['red_metal_plate']
+for o in scene.objects:
+    if o.name.startswith('metal_roof_walk'):
+        o.data.materials.clear()
+        o.data.materials.append(dst.materials[0])
 
 bpy.ops.wm.save_as_mainfile(filepath=out)
 print('書き出し', out, len(scene.objects), '個')

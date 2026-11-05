@@ -991,12 +991,12 @@
 {
 "name": "concrete_rock_07",
 "min": [
-20.878,
+22.536,
 11.3,
 4.925
 ],
 "max": [
-22.563,
+24.22,
 12.98,
 7.925
 ],
@@ -1020,12 +1020,12 @@
 "min": [
 24.943,
 11.3,
--8.787
+-5.551
 ],
 "max": [
 27.943,
 12.98,
--7.102
+-3.867
 ],
 "top": {
 "h": 12.2,
@@ -1045,12 +1045,12 @@
 {
 "name": "concrete_rock_05",
 "min": [
-19.012,
+18.269,
 11.3,
 -6.811
 ],
 "max": [
-20.696,
+19.953,
 12.98,
 -3.811
 ],
@@ -2022,12 +2022,12 @@
 {
 "name": "metal_crate_e",
 "min": [
-25.873,
+26.238,
 11.25,
 4.384
 ],
 "max": [
-27.573,
+27.938,
 13.0,
 6.084
 ],
@@ -3937,682 +3937,6 @@
 }
 },
 {
-"name": "metal_roof_walk_2F_w",
-"min": [
--15.687,
-17.9,
--9.438
-],
-"max": [
--13.223,
-18.1,
-13.335
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_w_nobox",
-"min": [
--15.787,
-14.85,
--9.438
-],
-"max": [
--13.123,
-18.1,
-13.335
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_sw",
-"min": [
--13.223,
-17.9,
-11.095
-],
-"max": [
--7.026,
-18.1,
-13.335
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_sw_nobox",
-"min": [
--13.223,
-14.85,
-10.995
-],
-"max": [
--7.026,
-18.1,
-13.435
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_se",
-"min": [
-9.177,
-17.9,
-11.095
-],
-"max": [
-17.913,
-18.1,
-13.335
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_se_nobox",
-"min": [
-9.177,
-14.85,
-10.995
-],
-"max": [
-17.913,
-18.1,
-13.435
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_s_tab",
-"min": [
-0.59,
-17.9,
-8.262
-],
-"max": [
-3.203,
-18.1,
-15.575
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_s_tab_nobox",
-"min": [
-0.49,
-14.85,
-8.262
-],
-"max": [
-3.303,
-18.1,
-15.575
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_s_down",
-"min": [
--9.117,
-17.9,
-15.582
-],
-"max": [
--7.026,
-18.1,
-19.175
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_s_down_nobox",
-"min": [
--9.217,
-14.85,
-15.582
-],
-"max": [
--6.926,
-18.1,
-19.175
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_s",
-"min": [
--9.117,
-17.9,
-13.335
-],
-"max": [
-0.59,
-18.1,
-15.575
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_s_nobox",
-"min": [
--4.313,
-14.85,
-13.235
-],
-"max": [
-0.59,
-18.1,
-15.675
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_nw_up",
-"min": [
--9.49,
-17.9,
--17.427
-],
-"max": [
--7.026,
-18.1,
--7.198
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_nw_up_nobox",
-"min": [
--9.59,
-14.85,
--17.427
-],
-"max": [
--6.926,
-18.1,
--7.198
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_nw_join",
-"min": [
--13.223,
-17.9,
--9.438
-],
-"max": [
--9.49,
-18.1,
--7.198
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_nw_join_nobox",
-"min": [
--13.223,
-14.85,
--9.538
-],
-"max": [
--9.49,
-18.1,
--7.098
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_n_tab",
-"min": [
--1.053,
-17.9,
--13.545
-],
-"max": [
-1.71,
-18.1,
--6.605
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_n_tab_nobox",
-"min": [
--1.153,
-14.85,
--13.545
-],
-"max": [
-1.81,
-18.1,
--6.605
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_n",
-"min": [
-1.71,
-17.9,
--13.545
-],
-"max": [
-17.913,
-18.1,
--11.305
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_n_nobox",
-"min": [
-1.71,
-14.85,
--13.645
-],
-"max": [
-17.913,
-18.1,
--11.205
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_e",
-"min": [
-15.523,
-17.9,
--11.305
-],
-"max": [
-17.913,
-18.1,
-11.095
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_e_nobox",
-"min": [
-15.423,
-14.85,
--11.305
-],
-"max": [
-18.013,
-18.1,
-11.095
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_se_down",
-"min": [
-9.18,
-17.9,
-13.34
-],
-"max": [
-11.42,
-18.1,
-17.82
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_se_down_nobox",
-"min": [
-9.08,
-14.85,
-13.34
-],
-"max": [
-11.52,
-18.1,
-17.82
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_walk_2F_se_south",
-"min": [
-11.42,
-17.9,
-15.58
-],
-"max": [
-18.21,
-18.1,
-17.82
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_roof_post_walk_2F_se_south_nobox",
-"min": [
-11.42,
-14.85,
-15.48
-],
-"max": [
-18.21,
-18.1,
-17.92
-],
-"top": {
-"h": 18.1,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "metal_rail_walk_2F_w_nobox_noeye_nocamera",
 "min": [
 -15.717,
@@ -5328,6 +4652,682 @@
 ],
 "top": {
 "h": 13.05,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_w",
+"min": [
+-15.687,
+17.9,
+-9.438
+],
+"max": [
+-13.223,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_w_nobox",
+"min": [
+-15.787,
+14.85,
+-9.438
+],
+"max": [
+-13.123,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_sw",
+"min": [
+-13.223,
+17.9,
+11.095
+],
+"max": [
+-7.026,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_sw_nobox",
+"min": [
+-13.223,
+14.85,
+10.995
+],
+"max": [
+-7.026,
+18.1,
+13.435
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_se",
+"min": [
+9.177,
+17.9,
+11.095
+],
+"max": [
+17.913,
+18.1,
+13.335
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_se_nobox",
+"min": [
+9.177,
+14.85,
+10.995
+],
+"max": [
+17.913,
+18.1,
+13.435
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_s_tab",
+"min": [
+0.59,
+17.9,
+8.262
+],
+"max": [
+3.203,
+18.1,
+15.575
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_s_tab_nobox",
+"min": [
+0.49,
+14.85,
+8.262
+],
+"max": [
+3.303,
+18.1,
+15.575
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_s_down",
+"min": [
+-9.117,
+17.9,
+15.582
+],
+"max": [
+-7.026,
+18.1,
+19.175
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_s_down_nobox",
+"min": [
+-9.217,
+14.85,
+15.582
+],
+"max": [
+-6.926,
+18.1,
+19.175
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_s",
+"min": [
+-9.117,
+17.9,
+13.335
+],
+"max": [
+0.59,
+18.1,
+15.575
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_s_nobox",
+"min": [
+-4.313,
+14.85,
+13.235
+],
+"max": [
+0.59,
+18.1,
+15.675
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_nw_up",
+"min": [
+-9.49,
+17.9,
+-17.427
+],
+"max": [
+-7.026,
+18.1,
+-7.198
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_nw_up_nobox",
+"min": [
+-9.59,
+14.85,
+-17.427
+],
+"max": [
+-6.926,
+18.1,
+-7.198
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_nw_join",
+"min": [
+-13.223,
+17.9,
+-9.438
+],
+"max": [
+-9.49,
+18.1,
+-7.198
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_nw_join_nobox",
+"min": [
+-13.223,
+14.85,
+-9.538
+],
+"max": [
+-9.49,
+18.1,
+-7.098
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_n_tab",
+"min": [
+-1.053,
+17.9,
+-13.545
+],
+"max": [
+1.71,
+18.1,
+-6.605
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_n_tab_nobox",
+"min": [
+-1.153,
+14.85,
+-13.545
+],
+"max": [
+1.81,
+18.1,
+-6.605
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_n",
+"min": [
+1.71,
+17.9,
+-13.545
+],
+"max": [
+17.913,
+18.1,
+-11.305
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_n_nobox",
+"min": [
+1.71,
+14.85,
+-13.645
+],
+"max": [
+17.913,
+18.1,
+-11.205
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_e",
+"min": [
+15.523,
+17.9,
+-11.305
+],
+"max": [
+17.913,
+18.1,
+11.095
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_e_nobox",
+"min": [
+15.423,
+14.85,
+-11.305
+],
+"max": [
+18.013,
+18.1,
+11.095
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_se_down",
+"min": [
+9.18,
+17.9,
+13.34
+],
+"max": [
+11.42,
+18.1,
+17.82
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_se_down_nobox",
+"min": [
+9.08,
+14.85,
+13.34
+],
+"max": [
+11.52,
+18.1,
+17.82
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_walk_2F_se_south",
+"min": [
+11.42,
+17.9,
+15.58
+],
+"max": [
+18.21,
+18.1,
+17.82
+],
+"top": {
+"h": 18.1,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_roof_post_walk_2F_se_south_nobox",
+"min": [
+11.42,
+14.85,
+15.48
+],
+"max": [
+18.21,
+18.1,
+17.92
+],
+"top": {
+"h": 18.1,
 "dx": 0.0,
 "dz": 0.0
 },
