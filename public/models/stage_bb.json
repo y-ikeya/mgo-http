@@ -213,7 +213,7 @@
 "min": [
 0.59,
 14.85,
-8.862
+8.262
 ],
 "max": [
 3.203,
@@ -348,7 +348,7 @@
 "max": [
 1.71,
 14.9,
--7.205
+-6.605
 ],
 "top": {
 "h": 14.9,
@@ -3725,7 +3725,7 @@
 }
 },
 {
-"name": "metal_rail_walk_2F_w_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_w_noeye_nocamera",
 "min": [
 -15.717,
 14.9,
@@ -3744,14 +3744,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_sw_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_sw_noeye_nocamera",
 "min": [
 -15.717,
 14.9,
@@ -3770,14 +3770,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_se_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_se_noeye_nocamera",
 "min": [
 9.147,
 14.9,
@@ -3796,18 +3796,18 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_s_tab_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_s_tab_noeye_nocamera",
 "min": [
 0.56,
 14.9,
-8.832
+8.232
 ],
 "max": [
 3.233,
@@ -3822,14 +3822,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_s_down_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_s_down_noeye_nocamera",
 "min": [
 -9.117,
 14.9,
@@ -3848,14 +3848,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_s_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_s_noeye_nocamera",
 "min": [
 -9.117,
 14.9,
@@ -3874,14 +3874,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_nw_up_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_nw_up_noeye_nocamera",
 "min": [
 -9.52,
 14.9,
@@ -3900,14 +3900,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_nw_join_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_nw_join_noeye_nocamera",
 "min": [
 -15.717,
 14.9,
@@ -3926,14 +3926,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_n_tab_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_n_tab_noeye_nocamera",
 "min": [
 -1.083,
 14.9,
@@ -3942,7 +3942,7 @@
 "max": [
 1.74,
 16.025,
--7.175
+-6.575
 ],
 "top": {
 "h": 16.025,
@@ -3952,14 +3952,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_n_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_n_noeye_nocamera",
 "min": [
 -1.083,
 14.9,
@@ -3978,14 +3978,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_walk_2F_e_nobullet_noeye_nocamera",
+"name": "metal_rail_walk_2F_e_noeye_nocamera",
 "min": [
 15.493,
 14.9,
@@ -4004,14 +4004,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_landing_se_nobullet_noeye_nocamera",
+"name": "metal_rail_landing_se_noeye_nocamera",
 "min": [
 9.147,
 13.1,
@@ -4030,14 +4030,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_landing_nw_nobullet_noeye_nocamera",
+"name": "metal_rail_landing_nw_noeye_nocamera",
 "min": [
 -14.0,
 13.1,
@@ -4056,14 +4056,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_landing_sw_nobullet_noeye_nocamera",
+"name": "metal_rail_landing_sw_noeye_nocamera",
 "min": [
 -10.186,
 13.1,
@@ -4082,14 +4082,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_landing_ne_nobullet_noeye_nocamera",
+"name": "metal_rail_landing_ne_noeye_nocamera",
 "min": [
 9.147,
 13.1,
@@ -4108,14 +4108,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_se_upper_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_se_upper_noeye_nocamera",
 "min": [
 9.177,
 13.25,
@@ -4134,14 +4134,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_se_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_se_noeye_nocamera",
 "min": [
 12.88,
 11.3,
@@ -4160,14 +4160,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_nw_lower_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_nw_lower_noeye_nocamera",
 "min": [
 -16.24,
 11.45,
@@ -4186,14 +4186,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_nw_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_nw_noeye_nocamera",
 "min": [
 -11.76,
 13.25,
@@ -4212,14 +4212,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_sw_upper_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_sw_upper_noeye_nocamera",
 "min": [
 -9.117,
 13.25,
@@ -4238,14 +4238,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_sw_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_sw_noeye_nocamera",
 "min": [
 -12.43,
 11.45,
@@ -4264,14 +4264,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_ne_upper_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_ne_upper_noeye_nocamera",
 "min": [
 9.177,
 13.25,
@@ -4290,14 +4290,14 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
-"name": "metal_rail_flight_ne_nobullet_noeye_nocamera",
+"name": "metal_rail_flight_ne_noeye_nocamera",
 "min": [
 13.627,
 11.45,
@@ -4316,10 +4316,10 @@
 "flags": {
 "draw": true,
 "player": true,
-"bullet": false,
+"bullet": true,
 "eye": false,
 "camera": false,
-"thrown": false
+"thrown": true
 }
 },
 {
@@ -4483,7 +4483,7 @@
 "min": [
 0.49,
 17.9,
-8.762
+8.162
 ],
 "max": [
 3.303,
@@ -4509,7 +4509,7 @@
 "min": [
 0.49,
 14.85,
-8.862
+8.262
 ],
 "max": [
 3.303,
@@ -4748,7 +4748,7 @@
 "max": [
 1.81,
 18.1,
--7.105
+-6.505
 ],
 "top": {
 "h": 18.1,
@@ -4774,7 +4774,7 @@
 "max": [
 1.81,
 17.9,
--7.205
+-6.605
 ],
 "top": {
 "h": 17.9,
