@@ -624,12 +624,18 @@ cap = bpy.data.objects.new('meta_cap_target1', None)
 cap.location = (1.34, -1.0, B2 + 0.5)
 scene.collection.objects.link(cap)
 # 運び込む所 (本人が置いた場所)。名前と広さは UU と同じ (meta_cap_base_<陣営>、立方体の表示で 4m 四方)
-for team, (gx, gy) in (('blue', (21.95, -16.05)), ('red', (-19.6, 21.87))):
+for team, (gx, gy) in (('blue', (24.8, -22.26)), ('red', (-19.6, 21.87))):
     goal = bpy.data.objects.new(f'meta_cap_base_{team}', None)
     goal.empty_display_type = 'CUBE'
     goal.location = (gx, gy, F1 + 0.03)
     goal.scale = (2.0, 2.0, 0.27)
     scene.collection.objects.link(goal)
+
+# TSNE のターゲット (本人が置いた所、地下 1F の 2 か所)。名前は UU と同じ meta_target<n>
+for i, (tx, ty) in enumerate(((5.49, 30.22), (-18.39, -23.9)), 1):
+    t = bpy.data.objects.new(f'meta_target{i}', None)
+    t.location = (tx, ty, B1)
+    scene.collection.objects.link(t)
 
 # --- 基地・湧く所 ------------------------------------------------------------------------
 # トーチカの中。どちらの軍がどちらかは仮 (本人に確かめる)
