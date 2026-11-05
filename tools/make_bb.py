@@ -445,12 +445,13 @@ stairs('metal_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
 # 下の階段は東の通路より東にあるので、2F の下には潜らない
 # 階段は他と同じ傾き (2.2m で 1.8m、本人「階段の傾斜は他と同じに」)。下絵の長い階段のぶんは踊り場を東へ延ばす
 SE_RUN = 2.24 / M_PER_PX * 3
-box('metal_walk_2F_se_down', 605, 640, 658, 700, F2 - DECK, F2)
-stairs('metal_stair_se_upper', 658, 673, 658 + SE_RUN, 700, F2, MID, 'x', +1, open_under=True)
-box('metal_landing_se', 658 + SE_RUN, 670, 786, 700, MID - DECK, MID)
+# 幅はどれも他の通路と同じ 2.24m (SE_RUN と同じ。本人「横幅おかしくない？」— 延ばした 2F が 3.95m あった)
+box('metal_walk_2F_se_down', 605, 640, 605 + SE_RUN, 700, F2 - DECK, F2)
+stairs('metal_stair_se_upper', 605 + SE_RUN, 700 - SE_RUN, 605 + 2 * SE_RUN, 700, F2, MID, 'x', +1, open_under=True)
+box('metal_landing_se', 605 + 2 * SE_RUN, 700 - SE_RUN, 786, 700, MID - DECK, MID)
 box('concrete_landing_se_pillar', 781, 695, 786, 700, F1 - 0.05, MID - DECK)
-box('concrete_landing_se_pillar_w', 688, 695, 693, 700, F1 - 0.05, MID - DECK)
-stairs('metal_stair_se', 748, 670 - SE_RUN, 786, 670, MID, F1, 'y', -1, open_under=True)
+box('concrete_landing_se_pillar_w', 605 + 2 * SE_RUN, 695, 610 + 2 * SE_RUN, 700, F1 - 0.05, MID - DECK)
+stairs('metal_stair_se', 786 - SE_RUN, 700 - 2 * SE_RUN, 786, 700 - SE_RUN, MID, F1, 'y', -1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
 stairs('metal_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
 box('metal_landing_sw', 325, 730, 388, 800, MID - DECK, MID)
