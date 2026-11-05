@@ -103,7 +103,7 @@ def empty(name, px, py, z):
 
 
 STEP = 0.15
-TREAD = 0.2      # 下に入れる階段の段の板の厚み
+TREAD = 0.05     # 下に入れる階段 (1F ⇔ 2F) の段の板の厚み。鉄板 1 枚 (2026-11-05 本人「階段も 5cm」)
 
 
 def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward, open_under=False):
@@ -430,25 +430,25 @@ for k, r in (('w', (135, 335, 170, 368)), ('e', (825, 515, 855, 548))):
 MID = (F1 + F2) / 2
 # 北西: 1F (西) → 東へ上がって踊り場 → 北の列へ寄って東へ上がり 2F の通路。どれも 2.2m で隙間なく繋ぐ
 # (2026-11-05 本人「ひどいから直して」。南西を本人が直した形が理想: 踊り場は 2 本を繋ぐのに要る大きさだけ)
-stairs('concrete_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
+stairs('metal_stair_nw_lower', 265, 258, 295, 288, F1, MID, 'x', +1, open_under=True)
 box('metal_landing_nw', 295, 228, 325, 288, MID - DECK, MID)
-stairs('concrete_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
+stairs('metal_stair_nw', 325, 228, 355, 258, MID, F2, 'x', +1, open_under=True)
 # 南東: 2F の通路 → 南へ下りて踊り場 → 東へ下りて 1F (細い帯を階段と踊り場に分けた、読みは要確認)
-stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
+stairs('metal_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_under=True)
 box('metal_landing_se', 605, 670, 655, 700, MID - DECK, MID)
 # 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
 box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - DECK)
 # 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
-stairs('concrete_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
+stairs('metal_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
 # 南西: 2F の通路 (s_down) の先 → 南へ下りて踊り場 → 西へ下りて 1F (本人「踊り場付きの階段は？」)。どちらも 2.2m
-stairs('concrete_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
+stairs('metal_stair_sw_upper', 360, 700, 388, 730, F2, MID, 'y', +1, open_under=True)
 box('metal_landing_sw', 325, 730, 388, 800, MID - DECK, MID)
-stairs('concrete_stair_sw', 295, 765, 325, 800, MID, F1, 'x', -1, open_under=True)
+stairs('metal_stair_sw', 295, 765, 325, 800, MID, F1, 'x', -1, open_under=True)
 # 北東: 北の 2F の通路の北の縁 → 北へ下りて踊り場 → 東へ下りて 1F (本人「cursor の部分に stair がない」。
 # 地下 1F へ下りる階段だと読み違えて印だけにしていた)
-stairs('concrete_stair_ne_upper', 605, 250, 635, 280, MID, F2, 'y', +1, open_under=True)
+stairs('metal_stair_ne_upper', 605, 250, 635, 280, MID, F2, 'y', +1, open_under=True)
 box('metal_landing_ne', 605, 220, 665, 250, MID - DECK, MID)
-stairs('concrete_stair_ne', 665, 220, 695, 250, MID, F1, 'x', +1, open_under=True)
+stairs('metal_stair_ne', 665, 220, 695, 250, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
 for name, r in (('a1_north', (755, 600, 790, 670)),):
@@ -659,7 +659,7 @@ def planar_uv(o, tile):
 
 
 for o in scene.objects:
-    if o.type == 'MESH' and o.name.startswith(('metal_walk_2F_', 'metal_landing_')) and 'pillar' not in o.name:
+    if o.type == 'MESH' and o.name.startswith(('metal_walk_2F_', 'metal_landing_', 'metal_stair_')) and 'pillar' not in o.name:
         o.data.materials.append(grate)
         planar_uv(o, GRATE_TILE)
 

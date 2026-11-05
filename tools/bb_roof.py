@@ -28,7 +28,7 @@ def _box(bm, lo, hi):
         v.co.z = lo[2] if v.co.z < 0 else hi[2]
 
 
-WALKABLE = ('metal_walk_2F_', 'metal_landing_', 'concrete_stair_', 'concrete_tower')
+WALKABLE = ('metal_walk_2F_', 'metal_landing_', 'concrete_stair_', 'metal_stair_', 'concrete_tower')
 
 
 def build(bpy, scene):

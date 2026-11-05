@@ -22,8 +22,8 @@ OUT = 0.12                # 縁の外を調べる距離
 NEAR_Z = 0.4              # 外の床が「同じ高さ」と見なす差
 MIN_LEN = 0.4             # これより短い柵は付けない
 SLABS = ('metal_walk_2F_', 'metal_landing_')
-FLIGHTS = ('concrete_stair_nw', 'concrete_stair_se', 'concrete_stair_sw', 'concrete_stair_ne')   # 1F ⇔ 2F (地下の b1_ / b2_ は壁がある)
-WALKABLE = ('metal_walk_2F_', 'metal_landing_', 'concrete_stair_', 'concrete_tower_balcony_', 'concrete_tower')
+FLIGHTS = ('metal_stair_nw', 'metal_stair_se', 'metal_stair_sw', 'metal_stair_ne')   # 1F ⇔ 2F (地下の b1_ / b2_ は壁がある)
+WALKABLE = ('metal_walk_2F_', 'metal_landing_', 'concrete_stair_', 'metal_stair_', 'concrete_tower_balcony_', 'concrete_tower')
 # 柵を付けない縁: (物の名前, 縁の向き)。北と南の通路の先端の、塔に向いた縁 (転がりで跳び移る、本人)
 SKIP_EDGES = {('metal_walk_2F_n_tab', 's'), ('metal_walk_2F_s_tab', 'n')}
 # 手すりの切れ目 (Blender の x, y、長さ m)。**狙いやすく、また狙われやすく** する (2026-11-05 本人「中央のトーチカ
@@ -186,7 +186,8 @@ def build(bpy, scene):
         run = hc - lc
         along_x = abs(run.x) >= abs(run.y)
         high_at_hi = (run.x if along_x else run.y) > 0
-        z_lo = min(w.z for w in ws) + 0.2      # 一番低い段の上面 (板の厚み 0.2)
+        # 一番低い段の上面 = 高さの値の 2 番目に小さい物 (板の厚みによらない)
+        z_lo = sorted({round(w.z, 4) for w in ws})[1]
         z_hi = hi.z
 
         def floor_at(t):
@@ -224,5 +225,5 @@ def build(bpy, scene):
                 segs.append((a - n * (POST / 2), b - n * (POST / 2), n))
         # 名前に stair を入れない — 書き出し (is_stair) が柵を階段と見なして柵の高さに坂の板を張り、
         # 階段の上で頭がつかえて登れなかった (2026-11-05 本人「stair が登れなかった」)
-        emit(f'metal_rail_{o.name.split("concrete_")[1].replace("stair_", "flight_")}_nobullet_noeye_nocamera', segs)
+        emit(f'metal_rail_{o.name.split("_", 1)[1].replace("stair_", "flight_")}_nobullet_noeye_nocamera', segs)
     return made

@@ -1907,10 +1907,10 @@
 }
 },
 {
-"name": "concrete_stair_se_upper",
+"name": "metal_stair_se_upper",
 "min": [
 9.177,
-13.05,
+13.2,
 13.335
 ],
 "max": [
@@ -1936,10 +1936,10 @@
 }
 },
 {
-"name": "concrete_stair_se",
+"name": "metal_stair_se",
 "min": [
 12.91,
-11.1,
+11.25,
 15.58
 ],
 "max": [
@@ -1965,10 +1965,10 @@
 }
 },
 {
-"name": "concrete_stair_nw_lower",
+"name": "metal_stair_nw_lower",
 "min": [
 -16.21,
-11.25,
+11.4,
 -15.19
 ],
 "max": [
@@ -1994,10 +1994,10 @@
 }
 },
 {
-"name": "concrete_stair_nw",
+"name": "metal_stair_nw",
 "min": [
 -11.73,
-13.05,
+13.2,
 -17.43
 ],
 "max": [
@@ -3167,10 +3167,10 @@
 }
 },
 {
-"name": "concrete_stair_sw_upper",
+"name": "metal_stair_sw_upper",
 "min": [
 -9.117,
-13.05,
+13.2,
 19.175
 ],
 "max": [
@@ -3222,10 +3222,10 @@
 }
 },
 {
-"name": "concrete_stair_sw",
+"name": "metal_stair_sw",
 "min": [
 -12.4,
-11.25,
+11.4,
 22.839
 ],
 "max": [
@@ -3641,10 +3641,10 @@
 }
 },
 {
-"name": "concrete_stair_ne_upper",
+"name": "metal_stair_ne_upper",
 "min": [
 9.177,
-13.05,
+13.2,
 -15.785
 ],
 "max": [
@@ -3696,10 +3696,10 @@
 }
 },
 {
-"name": "concrete_stair_ne",
+"name": "metal_stair_ne",
 "min": [
 13.657,
-11.25,
+11.4,
 -18.025
 ],
 "max": [
