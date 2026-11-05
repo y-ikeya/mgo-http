@@ -1,0 +1,189 @@
+# BB の 2F の通路・踊り場・1F ⇔ 2F の階段の柵 (本人の画面 2026-11-05「2F 部分と階段と踊り場はこういうふうに柵がある」)。
+#
+#   柱 (約 1.5m おき)・上の手すり (1.1m)・中の手すり・下半分の穴あきの金網の板。階段は傾きに沿って斜め。
+#   名前 metal_rail_<k>_nobullet_noeye_nocamera — 人と投げた物は止め、弾・視線・カメラは通す (塔のベランダの手すりと同じ)
+#
+# **縁ごとに、外に何が続いているかを調べて決める。** 縁のすぐ外に、同じ高さの床・踊り場・階段・ベランダがあれば
+# 付けない (繋ぎ目)。転がりで跳び移る塔の手前 (北と南の通路の先端) は SKIP_EDGES で空ける。
+# 開いている blend でも make_bb.py からでも、build(bpy, scene) を呼ぶ。前の柵 (metal_rail_*) は消して作り直す
+import bmesh
+import math
+from mathutils import Vector
+
+RAIL_H = 1.1
+MID_H = 0.55
+PANEL = (0.1, 0.85)       # 金網の板の下と上 (床から)
+POST = 0.06
+BAR = 0.05
+PANEL_T = 0.02
+POST_STEP = 1.5
+SAMPLE = 0.1              # 縁を調べる刻み (m)
+OUT = 0.12                # 縁の外を調べる距離
+NEAR_Z = 0.4              # 外の床が「同じ高さ」と見なす差
+MIN_LEN = 0.4             # これより短い柵は付けない
+SLABS = ('concrete_walk_2F_', 'concrete_landing_')
+FLIGHTS = ('concrete_stair_nw', 'concrete_stair_se', 'concrete_stair_sw')   # 1F ⇔ 2F (地下の b1_ / b2_ は壁がある)
+WALKABLE = ('concrete_walk_2F_', 'concrete_landing_', 'concrete_stair_', 'concrete_tower_balcony_', 'concrete_tower')
+# 柵を付けない縁: (物の名前, 縁の向き)。北と南の通路の先端の、塔に向いた縁 (転がりで跳び移る、本人)
+SKIP_EDGES = {('concrete_walk_2F_n_tab', 's'), ('concrete_walk_2F_s_tab', 'n')}
+
+
+def _bounds(o):
+    ps = [o.matrix_world @ v.co for v in o.data.vertices]
+    return Vector([min(p[i] for p in ps) for i in range(3)]), Vector([max(p[i] for p in ps) for i in range(3)])
+
+
+def _covered(scene, dg, x, y, z, self_obj):
+    """(x, y) の真下、高さ z ± NEAR_Z に歩ける面があるか"""
+    hit, loc, _n, _i, obj, _m = scene.ray_cast(dg, Vector((x, y, z + NEAR_Z)), Vector((0, 0, -1)), distance=2 * NEAR_Z)
+    return hit and obj is not self_obj and obj.name.startswith(WALKABLE)
+
+
+def _runs(flags, step):
+    """[(開始の距離, 終わりの距離)] — flags が True の続き"""
+    out, start = [], None
+    for i, f in enumerate(flags + [False]):
+        if f and start is None:
+            start = i
+        elif not f and start is not None:
+            out.append((start * step, i * step))
+            start = None
+    return out
+
+
+def _bar(bm, a, b, t):
+    d = b - a
+    if d.length < 1e-4:
+        return
+    rot = d.to_track_quat('Z', 'Y').to_matrix()
+    mid = (a + b) / 2
+    for v in bmesh.ops.create_cube(bm, size=1.0)['verts']:
+        v.co = mid + rot @ Vector((v.co.x * t, v.co.y * t, v.co.z * d.length))
+
+
+def _panel(bm, a, b, lo, hi, n):
+    """a → b の線 (床の高さ) に沿った、床から lo〜hi の薄い板。n は外向き (厚みの向き)"""
+    off = n * (PANEL_T / 2)
+    vs = []
+    for p in (a, b):
+        for h in (lo, hi):
+            for s in (-1, 1):
+                vs.append(bm.verts.new(p + Vector((0, 0, h)) + off * s))
+    # vs: [a lo -, a lo +, a hi -, a hi +, b lo -, b lo +, b hi -, b hi +]
+    for q in ((0, 4, 6, 2), (1, 3, 7, 5), (0, 1, 5, 4), (2, 6, 7, 3), (0, 2, 3, 1), (4, 5, 7, 6)):
+        bm.faces.new([vs[i] for i in q])
+
+
+def _rail(bm, a, b, n):
+    """a → b (床の線、傾いてよい) に柵。n は外向き"""
+    length = (b - a).length
+    k = max(1, math.ceil(length / POST_STEP))
+    for i in range(k + 1):
+        p = a + (b - a) * (i / k)
+        _bar(bm, p, p + Vector((0, 0, RAIL_H)), POST)
+    up = Vector((0, 0, RAIL_H))
+    mid = Vector((0, 0, MID_H))
+    _bar(bm, a + up, b + up, BAR)
+    _bar(bm, a + mid, b + mid, BAR * 0.8)
+    _panel(bm, a, b, PANEL[0], PANEL[1], n)
+
+
+def build(bpy, scene):
+    for o in [o for o in scene.objects if o.name.startswith('metal_rail_')]:
+        me = o.data
+        bpy.data.objects.remove(o)
+        if me.users == 0:
+            bpy.data.meshes.remove(me)
+    dg = bpy.context.evaluated_depsgraph_get()
+    made = 0
+
+    def emit(name, segs):
+        nonlocal made
+        if not segs:
+            return
+        me = bpy.data.meshes.new(name)
+        bm = bmesh.new()
+        for a, b, n in segs:
+            _rail(bm, a, b, n)
+        bm.to_mesh(me)
+        bm.free()
+        scene.collection.objects.link(bpy.data.objects.new(name, me))
+        made += 1
+
+    # 床と踊り場: 4 辺
+    # 踊り場の下の柱 (concrete_landing_se_pillar) は床ではない
+    for o in [o for o in scene.objects if o.type == 'MESH' and o.name.startswith(SLABS) and 'pillar' not in o.name]:
+        lo, hi = _bounds(o)
+        z = hi.z
+        edges = {
+            's': (Vector((lo.x, lo.y, z)), Vector((hi.x, lo.y, z)), Vector((0, -1, 0))),
+            'n': (Vector((lo.x, hi.y, z)), Vector((hi.x, hi.y, z)), Vector((0, 1, 0))),
+            'w': (Vector((lo.x, lo.y, z)), Vector((lo.x, hi.y, z)), Vector((-1, 0, 0))),
+            'e': (Vector((hi.x, lo.y, z)), Vector((hi.x, hi.y, z)), Vector((1, 0, 0))),
+        }
+        segs = []
+        for side, (a, b, n) in edges.items():
+            if (o.name, side) in SKIP_EDGES:
+                continue
+            length = (b - a).length
+            cnt = max(1, int(length / SAMPLE))
+            flags = []
+            for i in range(cnt):
+                p = a + (b - a) * ((i + 0.5) / cnt) + n * OUT
+                flags.append(not _covered(scene, dg, p.x, p.y, z, o))
+            for s0, s1 in _runs(flags, length / cnt):
+                if s1 - s0 >= MIN_LEN:
+                    d = (b - a).normalized()
+                    # 縁から柵の半分だけ内へ
+                    segs.append((a + d * s0 - n * (POST / 2), a + d * s1 - n * (POST / 2), n))
+        emit(f'metal_rail_{o.name.split("concrete_")[1]}_nobullet_noeye_nocamera', segs)
+
+    # 1F ⇔ 2F の階段: 長い 2 辺に、傾きに沿って
+    for o in [o for o in scene.objects if o.type == 'MESH' and o.name.startswith(FLIGHTS)]:
+        lo, hi = _bounds(o)
+        ws = [o.matrix_world @ v.co for v in o.data.vertices]
+        along_x = (hi.x - lo.x) >= (hi.y - lo.y)
+        # 高い端: 一番高い頂点のある側
+        top = max(ws, key=lambda w: w.z)
+        if along_x:
+            high_at_hi = top.x > (lo.x + hi.x) / 2
+        else:
+            high_at_hi = top.y > (lo.y + hi.y) / 2
+        z_lo = min(w.z for w in ws) + 0.2      # 一番低い段の上面 (板の厚み 0.2)
+        z_hi = hi.z
+
+        def floor_at(t):
+            # t: 0 = 座標の小さい端、1 = 大きい端
+            u = t if high_at_hi else 1 - t
+            return z_lo + (z_hi - z_lo) * u
+
+        segs = []
+        if along_x:
+            sides = ((lo.y, Vector((0, -1, 0))), (hi.y, Vector((0, 1, 0))))
+        else:
+            sides = ((lo.x, Vector((-1, 0, 0))), (hi.x, Vector((1, 0, 0))))
+        for c, n in sides:
+            length = (hi.x - lo.x) if along_x else (hi.y - lo.y)
+            cnt = max(1, int(length / SAMPLE))
+            flags = []
+            for i in range(cnt):
+                t = (i + 0.5) / cnt
+                if along_x:
+                    x, y = lo.x + (hi.x - lo.x) * t, c
+                else:
+                    x, y = c, lo.y + (hi.y - lo.y) * t
+                p = Vector((x, y, 0)) + n * OUT
+                flags.append(not _covered(scene, dg, p.x, p.y, floor_at(t), o))
+            for s0, s1 in _runs(flags, length / cnt):
+                if s1 - s0 < MIN_LEN:
+                    continue
+                t0, t1 = s0 / length, s1 / length
+                if along_x:
+                    a = Vector((lo.x + (hi.x - lo.x) * t0, c, floor_at(t0)))
+                    b = Vector((lo.x + (hi.x - lo.x) * t1, c, floor_at(t1)))
+                else:
+                    a = Vector((c, lo.y + (hi.y - lo.y) * t0, floor_at(t0)))
+                    b = Vector((c, lo.y + (hi.y - lo.y) * t1, floor_at(t1)))
+                segs.append((a - n * (POST / 2), b - n * (POST / 2), n))
+        emit(f'metal_rail_{o.name.split("concrete_")[1]}_nobullet_noeye_nocamera', segs)
+    return made

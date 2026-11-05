@@ -511,5 +511,11 @@ empty('meta_baseBlue', 150, 790, F1)   # 南西のトーチカ
 empty('meta_baseRed', 805, 130, F1)    # 北東のトーチカ
 
 
+# --- 柵 (2F の通路・踊り場・1F ⇔ 2F の階段の縁、tools/bb_rail.py) ---------------------------
+# 縁の外に何が続いているかを光線で調べるので、形が全部できてから最後に
+import bb_rail
+bpy.context.view_layer.update()
+bb_rail.build(bpy, scene)
+
 bpy.ops.wm.save_as_mainfile(filepath=out)
 print('書き出し', out, len(scene.objects), '個')
