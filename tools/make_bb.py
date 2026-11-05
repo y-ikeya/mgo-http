@@ -349,7 +349,8 @@ stairs('concrete_stair_se_upper', 605, 640, 640, 670, F2, MID, 'y', +1, open_und
 box('concrete_landing_se', 605, 670, 655, 700, MID - 0.3, MID)
 # 踊り場を支える柱 (2F の通路の柱だった物を、踊り場の下面まで縮めた。そのままだと踊り場を突き抜けた)
 box('concrete_landing_se_pillar', 605, 680, 605 + 0.4 / M_PER_PX * 3, 680 + 0.4 / M_PER_PX * 3, F1 - 0.05, MID - 0.3)
-stairs('concrete_stair_se', 655, 670, 735, 700, MID, F1, 'x', +1, open_under=True)
+# 下の階段も踊り場の上の階段と同じ長さに詰める (横を 0.8 倍にした時に伸びて見えた、2026-11-05 本人「コンパクトに」)
+stairs('concrete_stair_se', 655, 670, 685, 700, MID, F1, 'x', +1, open_under=True)
 
 # 向きを決めきれない階段・地下へ降りる階段は印だけ (ref_ は書き出されない)
 for name, r in (
