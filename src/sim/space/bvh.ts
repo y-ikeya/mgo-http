@@ -39,6 +39,8 @@ export interface TriangleMesh {
    * 一緒に連れて来ないと、**木の床から石の音**が鳴る。
    */
   surfaces?: Uint8Array
+  /** 三角 1 枚ごとに、階段の坂の板なら 1 (stagemesh.ts の MESH_STAIR)。急でも登れる面 */
+  stairs?: Uint8Array
 }
 
 /** 押し出す向きと深さ。**球が食い込んだときに返る** */
@@ -135,6 +137,7 @@ const PARALLEL = 1e-9
 export class TriangleBvh {
   private readonly positions: Float32Array
   private readonly surfaces: Uint8Array | null
+  private readonly stairs: Uint8Array | null
   /** 三角の索引。木を組むときに並べ替える (positions は動かさない) */
   private readonly tris: Uint32Array
   private readonly nodes: Node[] = []
@@ -142,6 +145,7 @@ export class TriangleBvh {
   constructor(mesh: TriangleMesh) {
     this.positions = mesh.positions
     this.surfaces = mesh.surfaces ?? null
+    this.stairs = mesh.stairs ?? null
     const count = Math.floor(mesh.positions.length / 9)
     this.tris = new Uint32Array(count)
     for (let i = 0; i < count; i++) this.tris[i] = i
@@ -236,6 +240,11 @@ export class TriangleBvh {
       nz = -nz
     }
     return { nx, ny, nz }
+  }
+
+  /** その三角が階段の坂の板か */
+  isStair(tri: number): boolean {
+    return this.stairs ? this.stairs[tri] === 1 : false
   }
 
   /** その三角の材質の番号。持っていなければ null */

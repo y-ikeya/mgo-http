@@ -32,6 +32,12 @@ export const MESH_CAMERA = 8
  */
 export const MESH_THROWN = 64
 /**
+ * 階段の坂の板 (人の層)。**急でも登れる面** — 段の角を結んだ坂は、詰めた階段だと 32° を超える。
+ * 箱や壁の角を登れる面にしないよう、印の付いた面だけ急さを緩めて見る (meshworld.ts の STAIR_Y)。
+ * 一番上の空きのビット (2026-11-05 本人「stair だったら 45 度まで登れるようにすれば？」)
+ */
+export const MESH_STAIR = 128
+/**
  * 材質は上位 2 ビット。**番号の意味はここでは決めない。**
  *
  * どの番号が木でどれが石かは遊びの話 (domain/stage/surface.ts の
@@ -68,18 +74,20 @@ export function decodeStageMesh(buffer: ArrayBuffer): StageMesh {
 export function meshSubset(
   mesh: StageMesh,
   bit: number,
-): { positions: Float32Array; surfaces: Uint8Array } {
+): { positions: Float32Array; surfaces: Uint8Array; stairs: Uint8Array } {
   let count = 0
   for (const mark of mesh.marks) if (mark & bit) count++
   const positions = new Float32Array(count * 9)
   const surfaces = new Uint8Array(count)
+  const stairs = new Uint8Array(count)
   let at = 0
   for (let i = 0; i < mesh.marks.length; i++) {
     const mark = mesh.marks[i]!
     if (!(mark & bit)) continue
     positions.set(mesh.positions.subarray(i * 9, i * 9 + 9), at * 9)
     surfaces[at] = (mark >> MESH_SURFACE_SHIFT) & MESH_SURFACE_MASK
+    stairs[at] = mark & MESH_STAIR ? 1 : 0
     at++
   }
-  return { positions, surfaces }
+  return { positions, surfaces, stairs }
 }

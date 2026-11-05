@@ -145,6 +145,9 @@ def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward, open_under=False):
             xa, xb = lo_x, hi_x
             ya, yb = lo_y + (hi_y - lo_y) * s0, lo_y + (hi_y - lo_y) * s1
         bot = top - TREAD if open_under else min(z_from, z_to) - 0.05
+        # 一番下の段は下の床まで伸ばす。浮いていると坂の板の足元が床より 10cm 上になり、その縁で止まった
+        if open_under and i == 0:
+            bot = z_from - 0.05
         geom = bmesh.ops.create_cube(bm, size=1.0)['verts']
         for v in geom:
             v.co.x = xa if v.co.x < 0 else xb

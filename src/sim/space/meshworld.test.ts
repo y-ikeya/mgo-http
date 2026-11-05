@@ -225,3 +225,35 @@ describe('伏せて低い縁を越える', () => {
     expect(at.x).toBeLessThan(-0.3)
   })
 })
+
+describe('階段の坂の板 (MESH_STAIR)', () => {
+  /**
+   * x 0..2 で 0 → 1.9m 上がる坂 (43.5°) と、その先の上の床。詰めた階段 (2.2m で 1.8m) の坂の板は、両端の
+   * 半段の持ち上げを戻す所で 45° 近くになる (export_stage.py の ramp_triangles_of)
+   */
+  function steep(stair: boolean) {
+    const ramp = [0, 0, -1, 2, 1.9, -1, 2, 1.9, 1, 0, 0, -1, 2, 1.9, 1, 0, 0, 1]
+    const tris = [...slab(-5, -5, 0, 5, 0), ...ramp, ...slab(2, -5, 6, 5, 1.9)]
+    const count = tris.length / 9
+    const stairs = new Uint8Array(count)
+    if (stair) stairs[2] = stairs[3] = 1
+    return new MeshMoveWorld(new TriangleBvh({ positions: Float32Array.from(tris), stairs }), { height: 1.7, stepUp: 0.25 })
+  }
+  function climb(w: MeshMoveWorld) {
+    const p = { x: -1, y: 0, z: 0 }
+    for (let i = 0; i < 80; i++) {
+      p.x += 0.05
+      w.resolveHorizontal(p, 0.35, p.y)
+      p.y = w.groundHeight(p, 0.35, p.y)
+    }
+    return p
+  }
+
+  test('**印の付いた坂は 45° 近くでも登れる** (BB の詰めた階段、2026-11-05)', () => {
+    expect(climb(steep(true)).y).toBeCloseTo(1.9, 1)
+  })
+
+  test('印の無い同じ傾きの面は今まで通り上まで登れない (箱の角を登らせない)', () => {
+    expect(climb(steep(false)).y).toBeLessThan(1.5)
+  })
+})

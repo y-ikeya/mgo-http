@@ -940,6 +940,8 @@ PLAYER_BIT = 4
 CAMERA_BIT = 8
 SURFACE_SHIFT = 4
 THROWN_BIT = 64
+# 階段の坂の板。急でも登れる面 (src/sim/space/stagemesh.ts の MESH_STAIR、meshworld.ts の STAIR_Y)
+STAIR_BIT = 128
 #
 # --- 人が当たる形は、細かい物では代用する ---
 #
@@ -1165,8 +1167,12 @@ def ramp_triangles_of(box):
         quad(r0[0], r0[2], r1[2], r1[0])   # 下面
         quad(r0[0], r1[0], r1[1], r0[1])   # 片側
         quad(r0[2], r0[3], r1[3], r1[2])   # 反対側
-    quad(*rows[0])                          # 端
-    quad(*rows[-1])
+    # 端は**高い側だけ**塞ぐ。低い側の端は下の床の高さまで立つ縦の縁で、足元が当たって登り口で止まった
+    # (2026-11-05 BB、段の板を 5cm にして坂の足元が床と揃った時。人が下の床から乗るので要らない)
+    if rows[0][1][1] > rows[-1][1][1]:
+        quad(*rows[0])
+    else:
+        quad(*rows[-1])
     return out
 
 
@@ -1380,7 +1386,7 @@ for obj in bpy.context.scene.objects:
         | (THROWN_BIT if flags['thrown'] and not flags['bullet'] else 0)
         | (SURFACE_IDS[surface_of(obj.name)] << SURFACE_SHIFT)
     )
-    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT | THROWN_BIT)
+    surface_mark = mark & ~(EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT | THROWN_BIT | STAIR_BIT)
 
     # --- 階段は人の層だけ坂で受ける ---
     #
@@ -1422,7 +1428,7 @@ for obj in bpy.context.scene.objects:
         ramp = ramp_triangles_of(box) if box else None
         if ramp:
             positions.extend(ramp)
-            marks.extend([PLAYER_BIT | surface_mark] * (len(ramp) // 9))
+            marks.extend([PLAYER_BIT | STAIR_BIT | surface_mark] * (len(ramp) // 9))
             mark &= ~PLAYER_BIT
             # 箱の側 (サーバー・三角が届く前の客) も歩ける物にしておく
             box['flags']['player'] = True
