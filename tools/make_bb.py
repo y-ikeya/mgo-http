@@ -95,6 +95,9 @@ def empty(name, px, py, z):
     return o
 
 
+STEP = 0.15
+
+
 def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward):
     """段の箱を並べた階段。axis = 'x' か 'y' (下絵の向き)、toward = +1 で座標の増える向きへ上る"""
     (ax, ay), (bx, by) = P(x0, y0), P(x1, y1)
@@ -103,7 +106,8 @@ def stairs(name, x0, y0, x1, y1, z_from, z_to, axis, toward):
     if z_to < z_from:
         z_from, z_to, toward = z_to, z_from, -toward
     rise = z_to - z_from
-    n = max(2, round(abs(rise) / 0.25))
+    # 段の高さ 0.15m (0.25 では粗かった、2026-11-05 本人「階段の段をもっと細かく」)
+    n = max(2, round(abs(rise) / STEP))
     step = rise / n
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
