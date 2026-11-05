@@ -288,10 +288,11 @@ box('concrete_tower_balcony_s', rx0, 528, rx1, ry1, F2 - SLAB, F2)
 box('concrete_tower_balcony_w', rx0, 425, 445, 528, F2 - SLAB, F2)
 box('concrete_tower_balcony_e', 550, 425, rx1, 528, F2 - SLAB, F2)
 # ベランダの手すり (腰の高さ、外の縁)。弾は通す
-# 北の通路の先端の正面は手すりを付けない (跳び移る所、本人)。通路の幅より左右 0.5m 広く空ける
+# 北と南の通路の先端の正面は手すりを付けない (跳び移る所、本人)。通路の幅より左右 0.5m 広く空ける
 RAIL_GAP = (463, 510)
+RAIL_GAP_S = (485, 530)
 for side, r in (('n_w', (rx0, ry0, RAIL_GAP[0], ry0 + 4)), ('n_e', (RAIL_GAP[1], ry0, rx1, ry0 + 4)),
-                ('s', (rx0, ry1 - 4, rx1, ry1)),
+                ('s_w', (rx0, ry1 - 4, RAIL_GAP_S[0], ry1)), ('s_e', (RAIL_GAP_S[1], ry1 - 4, rx1, ry1)),
                 ('w', (rx0, ry0, rx0 + 4, ry1)), ('e', (rx1 - 4, ry0, rx1, ry1))):
     box(f'metal_tower_rail_{side}_nobullet_noeye', *r, F2, F2 + 1.0)
 
@@ -307,7 +308,8 @@ WALKS = {
     'se': (605, 610, 722, 640),
     'sw': (272, 610, 388, 640),
     's': (360, 640, 525, 670),
-    's_tab': (490, 590, 525, 670),
+    # 南も北と同じく、先端を塔のベランダまで 1.5m (本人「南も同じように」)
+    's_tab': (490, 576, 525, 670),
     's_down': (360, 640, 388, 700),
 }
 for k, r in WALKS.items():

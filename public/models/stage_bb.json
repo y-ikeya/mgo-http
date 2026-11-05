@@ -27,32 +27,6 @@
 }
 },
 {
-"name": "metal_tower_rail_s_nobullet_noeye",
-"min": [
--6.729,
-14.9,
-8.829
-],
-"max": [
-9.604,
-15.9,
-9.203
-],
-"top": {
-"h": 15.9,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": false,
-"eye": false,
-"camera": true,
-"thrown": false
-}
-},
-{
 "name": "metal_tower_rail_e_nobullet_noeye",
 "min": [
 9.231,
@@ -577,7 +551,7 @@
 "min": [
 0.737,
 14.5,
-12.003
+10.7
 ],
 "max": [
 4.004,
@@ -2631,6 +2605,58 @@
 9.604,
 15.9,
 -6.757
+],
+"top": {
+"h": 15.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true,
+"thrown": false
+}
+},
+{
+"name": "metal_tower_rail_s_w_nobullet_noeye",
+"min": [
+-6.729,
+14.9,
+8.829
+],
+"max": [
+0.237,
+15.9,
+9.203
+],
+"top": {
+"h": 15.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": false,
+"eye": false,
+"camera": true,
+"thrown": false
+}
+},
+{
+"name": "metal_tower_rail_s_e_nobullet_noeye",
+"min": [
+4.504,
+14.9,
+8.829
+],
+"max": [
+9.604,
+15.9,
+9.203
 ],
 "top": {
 "h": 15.9,
