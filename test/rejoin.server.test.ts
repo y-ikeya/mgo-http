@@ -68,3 +68,25 @@ test('戻るで出てから入り直しても同じ側', async () => {
   c.close()
   d.close()
 }, 30000)
+
+test('**入り直したら、古い接続から届く位置は受けない**', async () => {
+  // 別のタブを開いたままにしていると、古いタブが止まった位置を送り続ける。
+  // 受けていた頃は古いタブの位置が席を握り、敵に映らなかった (2026-11-05)
+  server = await startServer()
+  const a = await new Client(server, 'rj-g', spot(0, -6)).ready()
+  const b = await new Client(server, 'rj-h', spot(0, 6)).ready()
+  a.live()
+  b.live()
+  await Bun.sleep(300)
+  const again = await new Client(server, 'rj-g', spot(8, -6)).ready()
+  again.live()
+  await Bun.sleep(300)
+  // 古い a は (0, -6) を送り続けている。何度見ても新しい方の (8, -6) に居る
+  for (let i = 0; i < 5; i++) {
+    expect(await server.health()).toMatch(/rj-g .*@\(8\.0, /)
+    await Bun.sleep(50)
+  }
+  a.close()
+  again.close()
+  b.close()
+}, 30000)

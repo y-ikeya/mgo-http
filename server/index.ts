@@ -539,7 +539,14 @@ function handleMessage(
   const room = rooms.get(socket.data.roomKey)
   const player = room?.players.get(socket.data.id)
   if (!room || !player) return
-
+  /*
+   * **今の接続から来たものだけ受ける。** 同じ id で繋ぎ直しても、古い接続は
+   * 閉じられるまで送ってくる (別のタブを開いたまま、など)。受けていた頃は、
+   * 古いタブの止まった位置が席を握り、今の画面の位置は全部「跳んだ」で
+   * 弾かれて、敵の画面にはずっと映らなかった (2026-11-05 本人「同じ試合に
+   * 居るはずなのに敵が見当たらない」。/health で却下 2 万回・通が 2 倍)
+   */
+  if (sessions.get(player.id)?.socket !== socket) return
 
   // 位置だけ 2 進。数が桁違いに多いので、ここだけ詰めてある
   if (raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)) {
