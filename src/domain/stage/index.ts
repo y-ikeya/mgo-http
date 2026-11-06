@@ -342,7 +342,7 @@ const RAFT: StageSpec = {
  */
 const CITY: StageSpec = {
   name: 'city',
-  label: 'CITY',
+  label: 'CC',
   ambience: 'city_loop1.mp3',
   bases: {
     blue: { x: -18.41, z: 49.09, y: 10.01 },
