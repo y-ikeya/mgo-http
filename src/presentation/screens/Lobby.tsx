@@ -5,8 +5,10 @@ import { useLevels } from "../../infra/api/levels";
 import { t } from "../../i18n";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { MODES } from "../../domain/match/room";
+import { STAGES } from "../../domain/stage";
 import { fetchRooms } from "../../infra/api/rooms";
 import type { MatchPhase, RoomSummary } from "../../application/protocol/types";
+import type { Team } from "../../domain/player/player";
 import type { Identity } from "../../infra/auth/session";
 import { signOut } from "../../infra/auth/session";
 import "./Lobby.css";
@@ -34,6 +36,13 @@ const PHASE_LABEL: Record<MatchPhase, () => string> = {
   // ラウンドの合間も試合中 (部屋の一覧ではそう見せる)
   break: () => t("lobby.playing"),
   over: () => t("lobby.over"),
+};
+
+/** 回し方の札 */
+const ORDER_LABEL: Record<RoomSummary["order"], () => string> = {
+  fixed: () => t("lobby.fixed"),
+  cycle: () => t("lobby.rotation"),
+  random: () => t("lobby.random"),
 };
 
 export default function Lobby(props: { identity: Identity }) {
@@ -82,6 +91,17 @@ export default function Lobby(props: { identity: Identity }) {
     const timer = setInterval(() => void poll(), POLL_MS);
     onCleanup(() => clearInterval(timer));
   });
+
+  /**
+   * 居る人をチームに分ける。チーム戦はレッドとブルー (居なくても見出しは出す)、個人戦は 1 つ
+   */
+  const teamsOf = (room: RoomSummary): { team: Team | null; members: RoomSummary["roster"] }[] =>
+    MODES[room.mode].teams && !MODES[room.mode].solo
+      ? (["red", "blue"] as const).map((team) => ({
+          team,
+          members: room.roster.filter((who) => who.team === team),
+        }))
+      : [{ team: null, members: room.roster }];
 
   const full = (room: RoomSummary) => room.players >= room.capacity;
   /** 入れない部屋。まだ開けていないルール (TSNE は非殺傷武器が要る) */
@@ -132,13 +152,13 @@ export default function Lobby(props: { identity: Identity }) {
               class="room"
               classList={{
                 "room-full": full(room),
-                "room-live": room.phase === "playing",
+                "room-live": room.phase === "playing" || room.phase === "break",
                 "room-shut": shut(room),
               }}
             >
               {/*
-                入るのはこのボタン。**名前のカードは別のボタン**なので、行ごと
-                1 つのボタンにはできない (button の中に button は置けない)。
+                左: 部屋の中身 (ルール・ステージ・状態・人数)。押すと入る。
+                右: 誰が居るか。**名前の札は別のボタン**なので、カードごと 1 つのボタンにはできない
               */}
               <button
                 class="room-enter"
@@ -146,79 +166,112 @@ export default function Lobby(props: { identity: Identity }) {
                 onClick={() => enter(room.name)}
               >
                 <span class="room-name">{room.name}</span>
-                {/* **どのルールの部屋かを一覧で見せる。** 入ってから分かるのでは遅い */}
-                <span class="room-mode">{room.mode}</span>
-
-                <span class="room-count">
-                  <span class="room-count-now">{room.players}</span>
-                  <span class="room-count-max">/ {room.capacity}</span>
-                </span>
-
-                {/* 空き具合をバー表示で。数字を読む前に埋まり具合が分かる */}
-                <span class="room-bar">
-                  <span
-                    class="room-bar-fill"
-                    style={{
-                      width: `${(room.players / room.capacity) * 100}%`,
-                    }}
-                  />
-                </span>
-
-                <span class="room-phase">
-                  {shut(room) ? "準備中" : PHASE_LABEL[room.phase]()}
-                </span>
-
-                {/* 残機は削り合う部屋だけ。休憩と練習に 0–0 が出ても意味が無い */}
-                <Show
-                  when={
-                    MODES[room.mode].tickets &&
-                    (room.phase === "playing" || room.phase === "over")
-                  }
-                >
-                  <span class="room-score">
-                    <span class="room-blue">{room.blue}</span>
-                    <span class="room-dash">–</span>
-                    <span class="room-red">{room.red}</span>
-                  </span>
-                </Show>
-
-                <Show when={room.remaining > 0}>
-                  <span class="room-time">
-                    {Math.floor(room.remaining / 60)}:
-                    {String(room.remaining % 60).padStart(2, "0")}
-                  </span>
-                </Show>
-
                 {/*
-                部屋の覚え書き。**ルールの名前だけでは伝わらないこと** —
-                同じ TDM でも、持ち込める銃を絞ってあれば別の遊びになる。
-                行の右端に置く。名前とルールが主で、これは添え物。
-              */}
-                <span class="room-note">{room.note ?? ""}</span>
+                  ルールとステージ、それぞれが**固定かローテか**の札と中身
+                  (2026-11-05 本人「rule が fix なのかを書いて欲しかった。rule についてと stage についての両方がある」)
+                  ルールは今は部屋ごとに 1 つなので常に固定
+                */}
+                <span class="room-line">
+                  <span class="room-line-label">{t("lobby.rule")}</span>
+                  <span class="room-order room-order-fixed">{ORDER_LABEL.fixed()}</span>
+                  <span class="room-mode">{room.mode}</span>
+                </span>
+                <span class="room-line">
+                  <span class="room-line-label">{t("lobby.stage")}</span>
+                  <span class={`room-order room-order-${room.order}`}>{ORDER_LABEL[room.order]()}</span>
+                  <span class="room-stages">
+                    <For each={room.stages}>
+                      {(stage, i) => (
+                        <>
+                          <Show when={i() > 0}>
+                            <span class="room-stage-arrow">{room.order === "random" ? "/" : "→"}</span>
+                          </Show>
+                          <span class="room-stage-name" classList={{ "room-stage-now": stage === room.stage }}>
+                            {STAGES[stage].label}
+                          </span>
+                        </>
+                      )}
+                    </For>
+                  </span>
+                </span>
+
+                {/* 状態。段階 / 得点 / 残り時間 */}
+                <span class="room-status">
+                  <span class="room-phase">{shut(room) ? t("lobby.shut") : PHASE_LABEL[room.phase]()}</span>
+                  <Show
+                    when={
+                      MODES[room.mode].tickets &&
+                      (room.phase === "playing" || room.phase === "break" || room.phase === "over")
+                    }
+                  >
+                    <span class="room-score">
+                      <span class="room-blue">{room.blue}</span>
+                      <span class="room-dash">–</span>
+                      <span class="room-red">{room.red}</span>
+                    </span>
+                  </Show>
+                  <Show when={room.remaining > 0}>
+                    <span class="room-time">
+                      {Math.floor(room.remaining / 60)}:{String(room.remaining % 60).padStart(2, "0")}
+                    </span>
+                  </Show>
+                </span>
+
+                {/* 部屋の覚え書き。**ルールの名前だけでは伝わらないこと** (同じ TDM でも狙撃銃だけ、など) */}
+                <Show when={room.note}>
+                  <span class="room-note">{room.note}</span>
+                </Show>
+
+                {/* 人数と埋まり具合。1 人 1 目盛り — 数字を読む前に埋まり具合が分かる */}
+                <span class="room-fill">
+                  <span class="room-fill-label">{t("lobby.players")}</span>
+                  <span class="room-count">
+                    {room.players} / {room.capacity}
+                  </span>
+                  <span class="room-ticks">
+                    <For each={Array.from({ length: room.capacity }, (_, i) => i)}>
+                      {(i) => <span class="room-tick" classList={{ "room-tick-on": i < room.players }} />}
+                    </For>
+                  </span>
+                </span>
               </button>
 
               {/*
-                誰が居るか。**部屋は人数ではなく人で選ぶ。**
+                誰が居るか。**部屋は人数ではなく人で選ぶ。** チーム戦はチームごとに分けて並べる。
                 押すとその人の通算が開く (戦績の設定が無い環境では押せない)
               */}
-              <Show when={room.roster.length > 0}>
-                <div class="room-players">
-                  <For each={room.roster}>
-                    {(who) => (
-                      <button
-                        class={`room-player room-player-${who.team}`}
-                        disabled={!profilesAvailable}
-                        onClick={() =>
-                          setOpened({ id: who.id, name: who.name })
-                        }
-                      >
-                        <span class="room-player-lv">{levelFor(who.id)}</span>
-                        {who.name}
-                      </button>
+              <div class="room-roster">
+                <Show
+                  when={room.roster.length > 0}
+                  fallback={<span class="room-nobody">{t("lobby.nobody")}</span>}
+                >
+                  <For each={teamsOf(room)}>
+                    {(group) => (
+                      <div class={`room-team room-team-${group.team ?? "all"}`}>
+                        <Show when={group.team}>
+                          <div class="room-team-head">
+                            <span class="room-team-dot" />
+                            {group.team === "red" ? t("lobby.red") : t("lobby.blue")}
+                            <span class="room-team-count">{group.members.length}</span>
+                          </div>
+                        </Show>
+                        <For each={group.members}>
+                          {(who) => (
+                            <button
+                              class="room-player"
+                              disabled={!profilesAvailable}
+                              onClick={() => setOpened({ id: who.id, name: who.name })}
+                            >
+                              <span class="room-player-lv">{levelFor(who.id)}</span>
+                              <span class="room-player-name">{who.name}</span>
+                            </button>
+                          )}
+                        </For>
+                      </div>
                     )}
                   </For>
-                </div>
-              </Show>
+                </Show>
+              </div>
             </div>
           )}
         </For>

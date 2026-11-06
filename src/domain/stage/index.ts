@@ -557,7 +557,7 @@ export function isStageName(name: string): name is StageName {
  *     random  毎回引き直す。**同じ物が続くのは許す** — 避けると
  *             「次はこれではない」が読めて、それ自体が情報になる
  */
-type RotationOrder = 'fixed' | 'cycle' | 'random'
+export type RotationOrder = 'fixed' | 'cycle' | 'random'
 
 export interface Rotation {
   stages: StageName[]
