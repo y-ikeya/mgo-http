@@ -58,7 +58,7 @@ def is_bench(name):
     return 'bench' in lower or 'table' in lower
 
 
-# 土嚢。**人の層は積みごとの箱 1 つ**、弾と視線は袋の形のまま。名前に sand_bag
+# 土嚢。**人・弾・視線は積みの箱** (袋の三角は網に出さない)。見た目は積みごとに 1 つの形にまとめる。名前に sand_bag
 def is_sandbag(name):
     return 'sand_bag' in name.lower()
 
@@ -1306,7 +1306,7 @@ def box_is_fair(obj, tris):
 # VAULT_MIN / VAULT_MAX)。袋の形をそのまま人の層にすると、上面は袋の丸みで
 # でこぼこ、積みの高さは置き方しだいで、**同じ列で跳べる所と跳べない所が混ざる**。
 # ベンチ・階段と同じく、人の層だけ書き出しが箱に置き換える — XY が重なる袋を
-# 1 つの積みにまとめ、その外接の箱 (天面は平ら) を人に当てる。弾と視線は袋のまま。
+# 1 つの積みにまとめ、その外接の箱 (天面は平ら) を人に当てる。弾と視線も同じ箱 (2026-11-07 から)。
 # 見た目は自由に積み直してよく、跳べるかは箱の天面 1 つで決まる。
 #
 # 箱の天面は実寸のまま (1.2m に丸めない)。丸めると絵より低い所を跳んで体が袋に
@@ -1398,10 +1398,15 @@ for obj in bpy.context.scene.objects:
     # Blender で col_ を別に作らなくてよい — 名前に stair が入っていれば書き出しが
     # 敷く。**vis_ を付けた階段にも敷く** (見た目だけにしておいて、歩く面はこちら)。
     # 自分で col_ を置いた物には敷かない (二重になる)。
-    # --- 土嚢は積みの箱だけが人に当たる ---
+    # --- 土嚢は積みの箱が人にも弾にも視線にも当たる ---
+    #
+    # **袋の三角は網に出さない。** 弾と視線を袋の形で受けていた頃は、街の 267 袋だけで
+    # 網の三角の 3 分の 1 (10 万枚) を占め、mesh.bin が 11MB あった (2026-11-07 本人
+    # 「軽量化できるところ」)。袋の隙間を弾が抜けなくなるだけで、遮蔽としては同じ
     stack = sandbag_stack_of.get(obj.name)
     if stack is not None and (mark & PLAYER_BIT):
-        mark &= ~PLAYER_BIT
+        stack['bits'] = stack.get('bits', 0) | (mark & (EYE_BIT | BULLET_BIT | CAMERA_BIT | THROWN_BIT))
+        mark &= ~(PLAYER_BIT | EYE_BIT | BULLET_BIT | CAMERA_BIT | THROWN_BIT)
         lo, hi = sandbag_bounds[obj.name]
         # 天面: この袋の真上 (XZ が重なる) に積まれた袋の一番高い所
         top = hi[1]
@@ -1437,7 +1442,10 @@ for obj in bpy.context.scene.objects:
     # 何も止めないなら出さない。飾りはここで落ちる
     if mark & (EYE_BIT | BULLET_BIT | PLAYER_BIT | CAMERA_BIT | THROWN_BIT) == 0:
         continue
-    tris = triangles_of(obj)
+    # **boxhit の札は、どの層も向き付きの外接の箱で受ける。** 持ち込みの細かい置き物
+    # (給水塔・車) は 1 台で 1 万〜5 万枚あり、遮蔽としては箱で足りる (2026-11-07 本人
+    # 「軽量化できるところ」)。親に付ければ子に写る (親の札を子に配る)
+    tris = box_triangles_of(obj) if 'boxhit' in obj.name.lower() else triangles_of(obj)
     if not tris:
         continue
     hit_mark = mark & (EYE_BIT | BULLET_BIT | THROWN_BIT)
@@ -1766,7 +1774,7 @@ for stack in sandbag_stacks:
     for lo, hi, surface_mark in merge_sandbag_boxes(stack.get('boxes', [])):
         parts = box_triangles(lo, hi)
         positions.extend(parts)
-        marks.extend([PLAYER_BIT | surface_mark] * (len(parts) // 9))
+        marks.extend([PLAYER_BIT | stack.get('bits', 0) | surface_mark] * (len(parts) // 9))
         sandbag_box_count += 1
 
 bin_path = os.path.join(root, 'public', 'models', stage_name + '.mesh.bin')
@@ -1961,9 +1969,10 @@ else:
 #
 # 2026-10-08 に 1024 へ (本人)。2048 の 25 枚で 8MB あり、glb 19.4MB の 4 割を占めていた
 MAX_TEXTURE = 1024
-# 置き物 (壁や床でない、三角の多い形) の絵はさらに小さく。木箱は 1m 角で、2K を
-# 貼っても遊ぶ距離では見分けられない
-PROP_MAX_TEXTURE = 1024
+# 置き物 (壁や床でない、三角の多い形) **だけ**が使う絵はさらに小さく。木箱は 1m 角で、2K を
+# 貼っても遊ぶ距離では見分けられない。2026-11-07 に 1024 → 512 (街の絵 100 枚 9.9MB、本人「軽量化」)。
+# 壁や床と同じ絵を使う置き物があれば、大きい方 (MAX_TEXTURE) に合わせる
+PROP_MAX_TEXTURE = 512
 # 法線の絵はさらに小さく。glb の 21MB のうち絵が 18MB で、一番大きいのは地面・壁・煉瓦の法線
 # (2K で 1 枚 0.9〜2.1MB)。法線の細かさは近づかないと見分けられないので 1K で足りる
 NORMAL_MAX_TEXTURE = 1024
@@ -1980,6 +1989,16 @@ def is_normal_map(node):
 def shrink_textures():
     seen = set()
     shrunk = []
+    # 絵ごとに、置き物でない物にも使われているか。**使われていれば置き物の上限は掛けない**
+    # (先に見た物で上限が決まると、物の並び順で絵の大きさが変わる)
+    used_by_non_prop = set()
+    for obj in bpy.context.scene.objects:
+        if obj.type != 'MESH' or not obj.select_get() or obj.data.name.endswith('_slim'):
+            continue
+        for slot in obj.material_slots:
+            mat = slot.material
+            if mat and mat.use_nodes:
+                used_by_non_prop.update(n.image.name for n in mat.node_tree.nodes if n.type == 'TEX_IMAGE' and n.image)
     for obj in bpy.context.scene.objects:
         if obj.type != 'MESH' or not obj.select_get():
             continue
@@ -1997,7 +2016,7 @@ def shrink_textures():
                     continue
                 seen.add(image.name)
                 w, h = image.size
-                cap = PROP_MAX_TEXTURE if is_prop else MAX_TEXTURE
+                cap = PROP_MAX_TEXTURE if is_prop and image.name not in used_by_non_prop else MAX_TEXTURE
                 if is_normal_map(node):
                     cap = min(cap, NORMAL_MAX_TEXTURE)
                 if max(w, h) <= cap:
@@ -2147,6 +2166,28 @@ def patch_gltf_vertex_color():
 
 patch_gltf_vertex_color()
 
+# --- 土嚢の見た目を積みごとに 1 つにまとめる -------------------------------------
+#
+# **描く回数は物の数で決まる。** 街の土嚢 267 袋はそれぞれ別の物で、描画の呼び出しの
+# 4 割 (影を入れると 2 倍) を占めていた (2026-11-07 本人「軽量化」)。判定はもう書いた
+# (上の積みの箱) ので、glb に出す前に積みごとに結合する。名前に sand_bag を残すので、
+# 後の地面の高さを測る所 (袋を飛ばして光線を落とす) もそのまま動く
+_joined = 0
+for _i, _stack in enumerate(sandbag_stacks):
+    _objs = [bpy.data.objects.get(n) for n in _stack['names']]
+    _objs = [o for o in _objs if o is not None and o.type == 'MESH']
+    if len(_objs) < 2:
+        continue
+    for o in _objs:
+        o.data = o.data.copy()   # 共有を解いてから結合する (他の積みの袋の形を巻き込まない)
+    with bpy.context.temp_override(active_object=_objs[0], selected_editable_objects=_objs, object=_objs[0]):
+        bpy.ops.object.join()
+    _objs[0].name = f'sand_bag_stack_{_i}'
+    _objs[0].select_set(True)
+    _joined += len(_objs)
+if _joined:
+    print(f'  土嚢の見た目を積みごとにまとめた: {_joined} 袋 → {len(sandbag_stacks)} 個')
+
 # 材質は載せる。
 #
 # 以前は 'NONE' にして「見た目はゲーム側で付ける」ことにしていた。箱しか無かった
@@ -2249,7 +2290,7 @@ if sandbag_stacks:
         st['height'] = st['hi'][1] - ground_under_stack(st)
     heights = [st['height'] for st in sandbag_stacks]
     print(f'          土嚢 {len(sandbag_stack_of)} 袋 → まっすぐな列ごとにまとめた箱 {sandbag_box_count} 個 (天面は列に沿って平ら) が人に当たる。積み {len(sandbag_stacks)} 個'
-          f' (地面から天面まで {min(heights):.2f}〜{max(heights):.2f}m。弾と視線は袋のまま)')
+          f' (地面から天面まで {min(heights):.2f}〜{max(heights):.2f}m。弾と視線も箱)')
     for st in sandbag_stacks:
         h = st['height']
         at = f'({(st["lo"][0] + st["hi"][0]) / 2:.1f}, {-(st["lo"][2] + st["hi"][2]) / 2:.1f})'

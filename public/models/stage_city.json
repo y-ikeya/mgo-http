@@ -5238,7 +5238,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Details_0",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Details_0",
 "min": [
 -6.936,
 9.852,
@@ -5264,7 +5264,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Body_0.001",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Body_0.001",
 "min": [
 -6.68,
 10.224,
@@ -5290,7 +5290,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Details_0.001",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Details_0.001",
 "min": [
 -42.089,
 9.821,
@@ -5316,7 +5316,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Body_0.003",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Body_0.003",
 "min": [
 -41.951,
 10.172,
@@ -5342,7 +5342,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Details_0.002",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Details_0.002",
 "min": [
 -8.465,
 9.899,
@@ -5368,7 +5368,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Body_0.005",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Body_0.005",
 "min": [
 -8.305,
 10.25,
@@ -6252,7 +6252,7 @@
 }
 },
 {
-"name": "metal_rustCar1_2_Material #29_0",
+"name": "metal_rustCar1_boxhit_2_Material #29_0",
 "min": [
 -17.265,
 9.918,
@@ -10597,7 +10597,7 @@
 }
 },
 {
-"name": "metal_rustCar1_2_Material #29_0.001",
+"name": "metal_rustCar1_boxhit_2_Material #29_0.001",
 "min": [
 1.878,
 9.41,
@@ -12604,7 +12604,7 @@
 }
 },
 {
-"name": "metal_rustCar1_2_Material #29_0.002",
+"name": "metal_rustCar1_boxhit_2_Material #29_0.002",
 "min": [
 -8.628,
 9.918,
@@ -16267,7 +16267,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_3",
+"name": "metal_tank_2s3m_boxhit_Object_3",
 "min": [
 25.62,
 12.644,
@@ -16293,7 +16293,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_7",
+"name": "metal_tank_2s3m_boxhit_Object_7",
 "min": [
 25.643,
 9.911,
@@ -16319,7 +16319,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_15",
+"name": "metal_tank_2s3m_boxhit_Object_15",
 "min": [
 26.424,
 9.977,
@@ -16345,7 +16345,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_16",
+"name": "metal_tank_2s3m_boxhit_Object_16",
 "min": [
 25.68,
 9.928,
@@ -16371,7 +16371,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_17",
+"name": "metal_tank_2s3m_boxhit_Object_17",
 "min": [
 25.669,
 12.705,
@@ -16397,7 +16397,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_18",
+"name": "metal_tank_2s3m_boxhit_Object_18",
 "min": [
 27.134,
 12.686,
@@ -16423,7 +16423,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_20",
+"name": "metal_tank_2s3m_boxhit_Object_20",
 "min": [
 25.716,
 9.899,
@@ -16449,7 +16449,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_24",
+"name": "metal_tank_2s3m_boxhit_Object_24",
 "min": [
 25.854,
 9.955,
@@ -16954,6 +16954,29 @@
 "z": -50.89
 }
 ],
+"capTargets": [
+{
+"x": -13.27,
+"y": 9.97,
+"z": -8.22
+}
+],
+"capGoals": {
+"blue": {
+"x": 7.55,
+"y": 9.98,
+"z": -48.56,
+"halfX": 2.0,
+"halfZ": 2.0
+},
+"red": {
+"x": -39.68,
+"y": 9.97,
+"z": 10.62,
+"halfX": 2.0,
+"halfZ": 2.0
+}
+},
 "fx": [
 {
 "kind": "smoke",
