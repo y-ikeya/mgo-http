@@ -1,4 +1,4 @@
-import { setSkyFloor, skyFloor } from './skylight'
+import { setSkyFloor, skyAt, skyFloor } from './skylight'
 import { addMovingShadow, castStaticShadow, STATIC_SHADOW_LAYER } from './liveShadow'
 import { instanceRepeats } from './instancing'
 import { swayingGrassMaterial } from './grass'
@@ -1933,12 +1933,35 @@ async function replaceWithModel(
     return false
   }
 
-  // 土嚢・木箱は同じ形をまとめて 1 回で描く。元の物は判定のために見えないまま残す
-  instanceRepeats(model, (mesh) => {
-    let name = mesh.name
-    for (let up = mesh.parent; up && up !== model; up = up.parent) name = `${up.name}/${name}`
-    return name
-  })
+  /*
+   * 土嚢・木箱は同じ形をまとめて 1 回で描く。元の物は判定のために見えないまま残す。
+   *
+   * 形を共有するので頂点の「空の見え方」は持てない (instancing.ts の注)。代わりに
+   * 置き場所ごとに、箱のてっぺんの少し上から空の見え方を測って色として掛ける。
+   * てっぺんから測るのは、自分の形に光線が当たって全部遮られるのを避けるため。
+   * 視線の網が届いていないステージでは測れないので、色は掛けず今まで通り。
+   */
+  const sight = await loadStageSightWorld(stageName)
+  const shadeBounds = new THREE.Box3()
+  instanceRepeats(
+    model,
+    (mesh) => {
+      let name = mesh.name
+      for (let up = mesh.parent; up && up !== model; up = up.parent) name = `${up.name}/${name}`
+      return name
+    },
+    sight
+      ? (mesh) => {
+          shadeBounds.setFromObject(mesh)
+          return skyAt(
+            sight,
+            (shadeBounds.min.x + shadeBounds.max.x) / 2,
+            shadeBounds.max.y + 0.05,
+            (shadeBounds.min.z + shadeBounds.max.z) / 2,
+          )
+        }
+      : undefined,
+  )
 
   // 描画だけのモデル (vis_ ばかりの環境など) でも表示はする。
   // 判定が 0 個でも「読めていない」わけではない。
