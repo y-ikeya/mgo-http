@@ -454,13 +454,55 @@ for obj in bpy.context.scene.objects:
 if thin_bevels:
     print(f'  {BEVEL_MIN_WIDTH * 100:.0f}cm 未満のベベルを外した: {thin_bevels} 個')
 
+# **「同じモディファイアか」は設定の値まで見る。** 種類と Decimate の比だけで見ていた頃は、
+# 同じ形 (Cylinder) に付けた Array (ジオメトリノード) が数も向きも違うのに 1 つの結果を
+# 使い回し、斜めに置いた鉄筋が縦に並んだ (2026-11-07 本人「blender だと横に array して
+# いるのに描画は z の方向」)。ジオメトリノードと、別の物を参照するモディファイア
+# (Array の物でずらす・Mirror の物など) は置き場所で結果が変わりうるので、使い回さない
+_SKIP_PROPS = {'rna_type', 'name', 'persistent_uid', 'is_active', 'is_override_data', 'show_expanded',
+               'show_in_editmode', 'show_on_cage', 'show_viewport', 'show_render', 'execution_time',
+               'use_pin_to_last'}
+
+
+def _hashable(value):
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if hasattr(value, 'name') and hasattr(value, 'bl_rna'):
+        return ('ID', value.name)
+    if isinstance(value, (set, frozenset)):
+        return tuple(sorted(str(v) for v in value))
+    try:
+        return tuple(_hashable(v) for v in value)
+    except TypeError:
+        return repr(value)
+
+
+def modifier_key(obj, mod):
+    values = []
+    refers_object = False
+    for prop in mod.bl_rna.properties:
+        if prop.identifier in _SKIP_PROPS:
+            continue
+        try:
+            value = getattr(mod, prop.identifier)
+        except AttributeError:
+            continue
+        if isinstance(value, bpy.types.Object):
+            refers_object = True
+        values.append((prop.identifier, _hashable(value)))
+    if mod.type == 'NODES':
+        # 入力の値は Blender の版で読み方が違う (5.2 は keys() が無い)。置き場所ごとに確定させるので要らない
+        refers_object = True
+    return (mod.type, tuple(values), obj.name if refers_object else None)
+
+
 baked = []
 baked_by_key = {}
 depsgraph = bpy.context.evaluated_depsgraph_get()
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or not obj.select_get() or not obj.modifiers:
         continue
-    key = (obj.data.name, tuple((m.type, getattr(m, 'ratio', None), getattr(m, 'decimate_type', None)) for m in obj.modifiers))
+    key = (obj.data.name, tuple(modifier_key(obj, m) for m in obj.modifiers))
     mesh = baked_by_key.get(key)
     if mesh is None:
         mesh = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
