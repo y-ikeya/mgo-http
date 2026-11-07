@@ -207,6 +207,8 @@ const MAX_RANGE = 200;
 const SLOW_FRAME_MS = 500;
 /** 詰まりを知らせる間隔の下限 (ms) */
 const SLOW_FRAME_EVERY_MS = 5_000;
+/** 詰まりの記録に載せる、詰まる前に届いた通信を遡る長さ (ms) */
+const SLOW_FRAME_LOOKBACK_MS = 1_000;
 /** JS の使用メモリ (MB)。Chrome だけ取れる。取れなければ 0 */
 function heapMB(): number {
   const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
@@ -1932,6 +1934,11 @@ export class Game {
    */
   /** 最後に詰まりを知らせた時刻 (ms)。続けて詰まった時に毎コマ送らない */
   private slowReportedAt = 0;
+  /**
+   * 届いた通信の種類と時刻 (performance.now)。**詰まりの直前に何が届いたか**を記録に載せる
+   * (2026-11-08 decoy を置くと止まる、を本番で絞るため)。詰まりを調べる時に古い分を捨てる
+   */
+  private arrivals: { type: string; at: number }[] = [];
 
   /**
    * 画面が詰まったら記録する。**コンソールとサーバーのログの両方へ。**
@@ -1943,8 +1950,12 @@ export class Game {
    * 裏のタブ (描画が止まる) と、極端に長い間 (タブを戻した時) は数えない。
    */
   private noteSlowFrame(gap: number): void {
-    if (this.lastTime === 0 || gap < SLOW_FRAME_MS || gap > 10_000 || document.hidden) return;
     const now = performance.now();
+    // 詰まったコマの頭より前の 1 秒と、詰まっている間に届いた物。毎コマ畳んで溜めない
+    const since = now - gap - SLOW_FRAME_LOOKBACK_MS;
+    const recent = this.arrivals.filter((a) => a.at >= since);
+    this.arrivals = recent;
+    if (this.lastTime === 0 || gap < SLOW_FRAME_MS || gap > 10_000 || document.hidden) return;
     if (now - this.slowReportedAt < SLOW_FRAME_EVERY_MS) return;
     this.slowReportedAt = now;
     const p = this.player.position;
@@ -1957,6 +1968,8 @@ export class Game {
       draws: this.drawsLast,
       triangles: this.trianglesLast,
       heap: heapMB(),
+      // 種類だけ、重ねずに。位置は毎秒何十通も届くので数は載せない
+      recent: [...new Set(recent.map((a) => a.type))],
     };
     console.warn("[重い]", report);
     this.net.send(report);
@@ -2224,6 +2237,7 @@ export class Game {
   }
 
   private receive(message: ServerMessage): void {
+    this.arrivals.push({ type: message.type, at: performance.now() });
     /*
      * **レプリカを先に進める。** 段階も所属もキルログも自分の状態も、持っているのはあちら。
      * 名簿の頼み直し・ルールの説明を出すか・自分の状態が変わったかもあちらが決める

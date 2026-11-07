@@ -910,9 +910,14 @@ function handleMessage(
     // 画面が詰まった。**ログに書くだけ** (遅延で切る前に何が起きていたかを後で読む)
     case 'slowFrame': {
       const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : -1)
+      // 画面から来た文字なので、種類の名前の形 (英字) だけを数を絞って書く
+      const recent = Array.isArray(message.recent)
+        ? message.recent.filter((t): t is string => typeof t === 'string' && /^[A-Za-z]{1,32}$/.test(t)).slice(0, 16)
+        : []
       console.warn(
         `[重い] ${player.name} ${n(message.ms)}ms 位置 (${n(message.x)}, ${n(message.z)}) 向き ${n(((message.yaw as number) * 180) / Math.PI)}° ` +
-          `描画 ${n(message.draws)} 回 / ${n(message.triangles)} 三角 heap ${n(message.heap)}MB ステージ ${room.stage.name}`,
+          `描画 ${n(message.draws)} 回 / ${n(message.triangles)} 三角 heap ${n(message.heap)}MB ステージ ${room.stage.name}` +
+          (recent.length > 0 ? ` 直前 ${recent.join(',')}` : ''),
       )
       break
     }
