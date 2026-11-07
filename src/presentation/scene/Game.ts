@@ -207,6 +207,8 @@ const MAX_RANGE = 200;
 const SLOW_FRAME_MS = 500;
 /** 詰まりを知らせる間隔の下限 (ms) */
 const SLOW_FRAME_EVERY_MS = 5_000;
+/** 装備の画面が使う操作。画面が出ている間もこれだけは飲み込まない (Game.tick の holdBack) */
+const LOADOUT_ACTIONS = ["menuUp", "menuDown", "menuLeft", "menuRight", "spawn", "menu"] as const;
 /** 詰まりの記録に載せる、詰まる前に届いた通信を遡る長さ (ms) */
 const SLOW_FRAME_LOOKBACK_MS = 1_000;
 /** JS の使用メモリ (MB)。Chrome だけ取れる。取れなければ 0 */
@@ -1502,6 +1504,13 @@ export class Game {
     this.flushPat();
     // 押している時間を進める。**単押しと長押しの別はここで決まる** (infra/input)
     this.input.advance(dt);
+    /*
+     * 装備の画面が出ている間は、**画面の操作のほかの押下を離すまで飲み込む。**
+     * 画面の裏で体が動く (× でしゃがむ・L1 で持ち替える) のを止め、× で決めた押下が
+     * 閉じた後に転がりになるのも止める (2026-11-08 本人「決定の罰ボタン押すと
+     * ローリングしちゃう」「loadout 画面で pad を動かしてもキャラに影響しないように」)
+     */
+    if (this.loadoutBlocking) this.input.holdBack(LOADOUT_ACTIONS);
 
     // 視点はマウスが唯一の駆動源。カメラを回してから移動方向を解決する。
     // 感度は構えているかで使い分ける (設定画面の 4 本、infra/prefs/look.ts)
