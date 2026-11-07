@@ -634,7 +634,7 @@
 "max": [
 -30.369,
 12.834,
--18.793
+-28.754
 ],
 "top": {
 "h": 12.8342,
@@ -685,11 +685,11 @@
 ],
 "max": [
 -30.369,
-12.37,
+12.307,
 -31.067
 ],
 "top": {
-"h": 12.3697,
+"h": 12.3069,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -757,9 +757,9 @@
 {
 "name": "concrete_building6.023",
 "min": [
--22.223,
-9.986,
--30.002
+-22.094,
+9.98,
+-30.007
 ],
 "max": [
 -17.567,
@@ -837,10 +837,10 @@
 "min": [
 -24.542,
 9.063,
--30.001
+-30.007
 ],
 "max": [
--21.952,
+-22.337,
 12.981,
 -29.758
 ],
@@ -1161,12 +1161,12 @@
 "min": [
 -27.412,
 13.121,
--40.727
+-47.322
 ],
 "max": [
--14.791,
+-9.834,
 14.807,
--35.983
+-35.971
 ],
 "top": {
 "h": 14.8066,
@@ -1420,16 +1420,16 @@
 "name": "wood_box_nouv.004",
 "min": [
 10.335,
-11.056,
+11.101,
 -22.236
 ],
 "max": [
 11.44,
-12.212,
+12.257,
 -20.82
 ],
 "top": {
-"h": 12.2118,
+"h": 12.2568,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -1523,14 +1523,14 @@
 {
 "name": "concrete_building6.045",
 "min": [
--30.602,
+-30.612,
 13.076,
 -32.54
 ],
 "max": [
--30.359,
+-30.369,
 15.786,
--28.707
+-28.754
 ],
 "top": {
 "h": 15.7858,
@@ -1575,12 +1575,12 @@
 {
 "name": "wood_box_nouv.008",
 "min": [
--15.122,
+-15.074,
 9.973,
 -36.031
 ],
 "max": [
--13.798,
+-13.75,
 12.132,
 -34.922
 ],
@@ -3433,58 +3433,6 @@
 }
 },
 {
-"name": "concrete_building6.051",
-"min": [
--18.414,
-13.121,
--44.816
-],
-"max": [
--9.834,
-14.807,
--35.971
-],
-"top": {
-"h": 14.8066,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "concrete_building6.052",
-"min": [
--13.451,
-13.121,
--47.322
-],
-"max": [
--9.872,
-14.807,
--41.628
-],
-"top": {
-"h": 14.8066,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "concrete_building6.053",
 "min": [
 -12.44,
@@ -3514,16 +3462,16 @@
 "name": "concrete_building6.054",
 "min": [
 -10.129,
-14.309,
+14.314,
 -45.221
 ],
 "max": [
 -9.891,
-16.112,
--41.97
+16.117,
+-41.98
 ],
 "top": {
-"h": 16.1116,
+"h": 16.1166,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -5238,7 +5186,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Details_0",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Details_0",
 "min": [
 -6.936,
 9.852,
@@ -5264,7 +5212,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Body_0.001",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Body_0.001",
 "min": [
 -6.68,
 10.224,
@@ -5290,7 +5238,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Details_0.001",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Details_0.001",
 "min": [
 -42.089,
 9.821,
@@ -5316,7 +5264,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Body_0.003",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Body_0.003",
 "min": [
 -41.951,
 10.172,
@@ -5342,7 +5290,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Details_0.002",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Details_0.002",
 "min": [
 -8.465,
 9.899,
@@ -5368,7 +5316,7 @@
 }
 },
 {
-"name": "metal_brokenCar_vw1_Plane_Body_0.005",
+"name": "metal_brokenCar_vw1_boxhit_Plane_Body_0.005",
 "min": [
 -8.305,
 10.25,
@@ -6252,7 +6200,7 @@
 }
 },
 {
-"name": "metal_rustCar1_2_Material #29_0",
+"name": "metal_rustCar1_boxhit_2_Material #29_0",
 "min": [
 -17.265,
 9.918,
@@ -10597,7 +10545,7 @@
 }
 },
 {
-"name": "metal_rustCar1_2_Material #29_0.001",
+"name": "metal_rustCar1_boxhit_2_Material #29_0.001",
 "min": [
 1.878,
 9.41,
@@ -10625,17 +10573,17 @@
 {
 "name": "wood_box_nouv.040",
 "min": [
-10.881,
-9.881,
--26.95
+10.883,
+10.002,
+-26.948
 ],
 "max": [
-12.66,
-11.036,
--25.163
+12.661,
+11.158,
+-25.162
 ],
 "top": {
-"h": 11.0364,
+"h": 11.1578,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -10652,16 +10600,16 @@
 "name": "wood_box_nouv.041",
 "min": [
 11.839,
-9.881,
+10.002,
 -25.902
 ],
 "max": [
 13.617,
-11.036,
+11.158,
 -24.116
 ],
 "top": {
-"h": 11.0364,
+"h": 11.1578,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -12604,7 +12552,7 @@
 }
 },
 {
-"name": "metal_rustCar1_2_Material #29_0.002",
+"name": "metal_rustCar1_boxhit_2_Material #29_0.002",
 "min": [
 -8.628,
 9.918,
@@ -15695,6 +15643,271 @@
 }
 },
 {
+"name": "metal_pipe",
+"min": [
+-33.021,
+18.034,
+-23.699
+],
+"max": [
+-33.001,
+19.034,
+-22.874
+],
+"top": {
+"h": 19.0348,
+"dx": -0.09883,
+"dz": 0.0,
+"thick": 0.02
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.001",
+"min": [
+-33.395,
+18.034,
+-23.312
+],
+"max": [
+-33.375,
+19.034,
+-22.487
+],
+"top": {
+"h": 19.0348,
+"dx": -0.09883,
+"dz": -0.0,
+"thick": 0.02
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.002",
+"min": [
+-34.715,
+18.034,
+-23.184
+],
+"max": [
+-34.695,
+19.034,
+-22.359
+],
+"top": {
+"h": 19.0348,
+"dx": -0.09883,
+"dz": -0.0,
+"thick": 0.02
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.003",
+"min": [
+-33.175,
+18.034,
+-24.518
+],
+"max": [
+-32.35,
+19.034,
+-24.498
+],
+"top": {
+"h": 19.0348,
+"dx": 0.0,
+"dz": -0.09873,
+"thick": 0.02
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.004",
+"min": [
+-35.195,
+18.034,
+-23.643
+],
+"max": [
+-34.37,
+19.034,
+-23.623
+],
+"top": {
+"h": 19.0348,
+"dx": -0.0,
+"dz": -0.09873,
+"thick": 0.02
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.009",
+"min": [
+-24.833,
+10.193,
+5.349
+],
+"max": [
+-24.008,
+12.613,
+5.369
+],
+"top": {
+"h": 12.6131,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.011",
+"min": [
+-25.845,
+12.423,
+5.349
+],
+"max": [
+-25.825,
+13.247,
+5.369
+],
+"top": {
+"h": 13.2474,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.012",
+"min": [
+-28.824,
+12.62,
+5.349
+],
+"max": [
+-27.004,
+13.171,
+5.369
+],
+"top": {
+"h": 13.1708,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.005",
+"min": [
+-34.613,
+10.124,
+5.349
+],
+"max": [
+-33.788,
+12.144,
+5.369
+],
+"top": {
+"h": 12.1445,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_pipe.006",
+"min": [
+-34.266,
+9.741,
+12.566
+],
+"max": [
+-33.341,
+10.741,
+13.289
+],
+"top": {
+"h": 10.7411,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
 "name": "wood_toolbox_blue_boxcol",
 "min": [
 -18.84,
@@ -16267,7 +16480,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_3",
+"name": "metal_tank_2s3m_boxhit_Object_3",
 "min": [
 25.62,
 12.644,
@@ -16293,7 +16506,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_7",
+"name": "metal_tank_2s3m_boxhit_Object_7",
 "min": [
 25.643,
 9.911,
@@ -16319,7 +16532,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_15",
+"name": "metal_tank_2s3m_boxhit_Object_15",
 "min": [
 26.424,
 9.977,
@@ -16345,7 +16558,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_16",
+"name": "metal_tank_2s3m_boxhit_Object_16",
 "min": [
 25.68,
 9.928,
@@ -16371,7 +16584,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_17",
+"name": "metal_tank_2s3m_boxhit_Object_17",
 "min": [
 25.669,
 12.705,
@@ -16397,7 +16610,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_18",
+"name": "metal_tank_2s3m_boxhit_Object_18",
 "min": [
 27.134,
 12.686,
@@ -16423,7 +16636,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_20",
+"name": "metal_tank_2s3m_boxhit_Object_20",
 "min": [
 25.716,
 9.899,
@@ -16449,7 +16662,7 @@
 }
 },
 {
-"name": "metal_tank_2s3m_Object_24",
+"name": "metal_tank_2s3m_boxhit_Object_24",
 "min": [
 25.854,
 9.955,
@@ -16954,6 +17167,29 @@
 "z": -50.89
 }
 ],
+"capTargets": [
+{
+"x": -13.27,
+"y": 9.97,
+"z": -8.22
+}
+],
+"capGoals": {
+"blue": {
+"x": 7.55,
+"y": 9.98,
+"z": -48.56,
+"halfX": 2.0,
+"halfZ": 2.0
+},
+"red": {
+"x": -39.68,
+"y": 9.97,
+"z": 10.62,
+"halfX": 2.0,
+"halfZ": 2.0
+}
+},
 "fx": [
 {
 "kind": "smoke",

@@ -265,6 +265,11 @@ for name, (x0, y0, x1, y1), axis, toward, bottom in B2_STAIRS:
 # (Blender x -1.87〜0.96) は本人が 7.8m から上を埋めた塊、東半分 (x 0.96〜4.32) は 7.8〜8.3m の床と 2.4m 四方の落とし穴
 # (x 1.44〜3.84・y -21.14〜-18.74)、床の北の端 (y -17.52) に 1F→B2F の穴の列との間の壁 (厚み 0.2m、本人「壁なくない？」)。
 # **この道具は作らない** — 開いている stage_bb.blend で手で張った
+# 地下 2F の床は 5.5m (2026-11-07 本人「B2F の床を 50cm 上げて」)。この道具の B2 (5.0m) で作った後、開いている
+# stage_bb.blend で床の頂点を 0.5m 上げた。1F の穴の下の東西の通路と、そこから 1F へ上る階段 (A2 / A1) までは 5.3m、
+# 金網へ向かう行き止まりと、その先 (金網の向こう) も 5.3m (本人「cursor があるところも 20cm 下げていい」)。金網は 5.3〜7.5m。
+# 真ん中の南北の通路の両端を 35° の坂 (長さ 0.29m) にした (本人「B2F の中央通りが slope になってるイメージ」
+# 「35 度くらいの急なやつでいい、全然坂があるってわからない」。最初は 2m の坂だった)。金網は下端を床に合わせる (上端 7.5m のまま)。**流し直すと 5.0m に戻る**
 B2_FENCES = [('metal_fence_b2_n', 460, 522, 200, 2.5), ('metal_fence_b2_s', 457, 540, 750, 2.5)]
 # 1F から地下へ下りる階段は、下り口の他の 3 方を高さ 1.8m の壁で囲う (2026-11-05 本人)。
 # 下り口は 1F の高さの端 (向き toward の逆の端)
@@ -289,6 +294,7 @@ for name, (x0, y0, x1, y1), axis, toward, bottom in B2_STAIRS:
 # 持ち込んだ絵は明るく鮮やかすぎてステージから浮く。明度と彩度を落とす (書き出しが絵に焼き込む)
 # (2026-11-05 本人「texture 貼ったらちゃんと光度を落として」)
 TEX_VALUE, TEX_SAT = 0.6, 0.75
+# 1F の床 (coral_ground_02) だけは開いている blend で明度 0.42・彩度 0.6 に落としてある (2026-11-07 本人「新品みたいな床の色」)
 
 
 def dim_into(nt, tex, bsdf):
@@ -360,7 +366,10 @@ for f in [f for f in bm.faces if f.material_index == 1]:
     c = f.calc_center_median()
     key = tuple((c - pt).dot(nrm) > 0 for pt, nrm in lines)
     if key not in regions:
-        regions[key] = (rng.uniform(0, 2 * math.pi), rng.random() < 0.5, rng.random() * 4, rng.random() * 4)
+        # 区画ごとの回し方は区画から決める (面の並び順で変わらないように。2026-11-07 開いている blend で床を
+        # 貼り直した時にこの形にした。並び順で引いていた頃の値とは違う)
+        r = random.Random(''.join('1' if k else '0' for k in key))
+        regions[key] = (r.uniform(0, 2 * math.pi), r.random() < 0.5, r.random() * 4, r.random() * 4)
     a, flip, ox, oy = regions[key]
     ca, sa = math.cos(a), math.sin(a)
     for loop in f.loops:
