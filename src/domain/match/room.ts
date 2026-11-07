@@ -234,7 +234,8 @@ const TSNE_ARMORY: Record<Side, Armory> = {
 }
 
 export const ROOMS: Record<RoomName, RoomSpec> = {
-  alpha: { mode: 'DM', stages: only('city') },
+  // 試合ごとに city と BB を交互に (2026-11-07 本人「BB も DM に対応できる？」)。UU は個人戦の湧きが 2 か所しかないので入れない
+  alpha: { mode: 'DM', stages: cycle('city', 'bb') },
   /*
    * charlie は**試合ごとに city と UU を交互に** (2026-10-22 本人)。部屋ができて最初の試合は city。
    * TSNE は 2 ラウンドで 1 試合なので、後攻が終わってから替わる。替わる時は画面が暗転して組み直す
