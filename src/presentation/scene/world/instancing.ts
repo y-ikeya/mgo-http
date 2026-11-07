@@ -19,9 +19,21 @@ const MIN_COPIES = 3
 
 /**
  * @param path 物の名前 (親からの道筋、stage.ts の札の読み方と同じ)
+ * @param brightness 置き場所ごとの明るさ (0〜1)。渡されればコピーごとに色として掛ける。
+ *
+ * **形を共有する物は頂点の「空の見え方」を持てない。** 焼き込み (tools/bake_stage.py) は
+ * 置き場所ごとに違う値を頂点へ入れるので、共有した形には書けない (shared() が外している)。
+ * その代わり、まとめた物はコピーごとに色を掛けられる (instanceColor)。物の内側の
+ * 濃淡は付けられないが、置き物は小さいので、置き場所の明るさを 1 つ掛けるだけで
+ * 「同じ場所の物は同じように沈む」になる。値の測り方は呼び出し側 (stage.ts) が持ち、
+ * ここは掛けるだけ。
  * @returns まとめた物の数
  */
-export function instanceRepeats(model: THREE.Object3D, path: (mesh: THREE.Mesh) => string): number {
+export function instanceRepeats(
+  model: THREE.Object3D,
+  path: (mesh: THREE.Mesh) => string,
+  brightness?: (mesh: THREE.Mesh) => number,
+): number {
   model.updateMatrixWorld(true)
   const groups = new Map<string, THREE.Mesh[]>()
   model.traverse((obj) => {
@@ -40,11 +52,17 @@ export function instanceRepeats(model: THREE.Object3D, path: (mesh: THREE.Mesh) 
     const first = meshes[0]
     const instanced = new THREE.InstancedMesh(first.geometry, first.material, meshes.length)
     instanced.name = `${first.name}_instanced`
+    const shade = new THREE.Color()
     meshes.forEach((mesh, i) => {
       instanced.setMatrixAt(i, matrix.multiplyMatrices(toModel, mesh.matrixWorld))
+      if (brightness) {
+        const value = Math.min(1, Math.max(0, brightness(mesh)))
+        instanced.setColorAt(i, shade.setScalar(value))
+      }
       mesh.visible = false
     })
     instanced.instanceMatrix.needsUpdate = true
+    if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true
     instanced.castShadow = first.castShadow
     instanced.receiveShadow = first.receiveShadow
     // 街の影の地図に焼く層も写す (world/liveShadow.ts)
