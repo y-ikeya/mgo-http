@@ -11,8 +11,8 @@ export const MOVE_RULES: Record<Move, Rule> = {
   hang: { posture: ['stand', 'crouch'], action: ['none'], down: ['none'] },
   /** 伏せる (伏せ始める)。押すと「伏せへの出入り」を通って伏せになる */
   prone: { posture: ['stand', 'crouch'], action: ['none'], down: ['none'], hand: ['relaxed'] },
-  /** 起き上がる (伏せから)。Space 短押し。頭上の余裕は地形に聞く (表の外) */
-  rise: { posture: ['prone'], action: ['none'], down: ['none'] },
+  /** 起き上がる (伏せから)。Space 短押し。頭上の余裕は地形に聞く (表の外) 這いながらでも起き上がれる (2026-11-08 本人「移動ボタンと立ち上がりを両方押すと立ち上がりがキャンセルされる」) */
+  rise: { posture: ['prone'], action: ['none', 'crawl'], down: ['none'] },
   /** しゃがむ (立ち⇄しゃがみ)。Space 短押し。刺しながらしゃがめる */
   crouch: { posture: ['stand', 'crouch'], action: ['none', 'stab'], down: ['none'] },
   /** 立ち直る (倒れから)。Space 短押し */

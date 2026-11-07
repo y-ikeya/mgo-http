@@ -111,4 +111,8 @@ describe('外したくない決まり', () => {
     expect(can(standing, 'rise')).toBe(false)
     expect(can(standing, 'crouch')).toBe(true)
   })
+
+  test('這いながらでも起き上がれる (移動を押したまま Space で、止まらずにしゃがみへ)', () => {
+    expect(can({ ...standing, prone: true, crawling: true }, 'rise')).toBe(true)
+  })
 })
