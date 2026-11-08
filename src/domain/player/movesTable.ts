@@ -23,8 +23,8 @@ export const MOVE_RULES: Record<Move, Rule> = {
   unbox: { posture: ['box'], action: ['none'], down: ['none'] },
   /** 梯子を掴む */
   ladder: { posture: ['stand', 'crouch', 'air', 'water'], action: ['none'], down: ['none'] },
-  /** 構える。倒れている間も構えられる (伏せ撃ち) */
-  aim: { posture: ['stand', 'crouch', 'prone', 'air', 'water'], action: ['none', 'proneShift', 'crawl', 'landing'], down: ['none', 'downed'] },
+  /** 構える。倒れている間も構えられる (伏せ撃ち) 刺している間も構えたまま (下を刺すのに見下ろした向きを保つ。2026-11-08) */
+  aim: { posture: ['stand', 'crouch', 'prone', 'air', 'water'], action: ['none', 'proneShift', 'crawl', 'stab', 'landing'], down: ['none', 'downed'] },
   /** 撃つ。弾・引き金・装填中・ボルトは持ち物の側 (表の外) */
   fire: { posture: ['stand', 'crouch', 'prone', 'air', 'water'], action: ['none', 'proneShift'], down: ['none', 'downed'], hand: ['aiming'] },
   /** リロードする。始めた後にできない状態になったらやめる。弾数・ボルトは表の外 */
