@@ -116,6 +116,10 @@ describe('外したくない決まり', () => {
     expect(can({ ...standing, stabbing: true, aiming: true }, 'aim')).toBe(true)
   })
 
+  test('**刺している途中でも箱を被れる** — 被って刺突を取り消す技 (当たりの前なら刺さらない)', () => {
+    expect(can({ ...standing, stabbing: true }, 'box')).toBe(true)
+  })
+
   test('這いながらでも起き上がれる (移動を押したまま Space で、止まらずにしゃがみへ)', () => {
     expect(can({ ...standing, prone: true, crawling: true }, 'rise')).toBe(true)
   })

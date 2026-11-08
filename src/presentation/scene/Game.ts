@@ -4629,6 +4629,8 @@ export class Game {
     this.player.setHeld(held);
     // ダンボールは被る状態が別にある。持ち替えに合わせる
     this.player.setBoxed(this.inv.usingTool && held === "box");
+    // 刺している途中に被ったら刺突を取り消す。当たりを出す前なら刺さらない (melee.ts の cancelStab)
+    if (this.player.isBoxed) this.melee.cancelStab();
     if (isGun(held)) {
       void this.player.equip(held);
     }

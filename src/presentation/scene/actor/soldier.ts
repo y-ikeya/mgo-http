@@ -1124,6 +1124,8 @@ export class Soldier {
     if (this.boxed) {
       this.crouching = true
       this.aiming = false
+      // 刺している途中なら取り消す。当たりを出す前なら刺さらない (Game が Melee も止める)
+      this.animator?.cancelStab()
     }
   }
 

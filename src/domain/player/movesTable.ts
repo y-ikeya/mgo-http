@@ -18,7 +18,7 @@ export const MOVE_RULES: Record<Move, Rule> = {
   /** 立ち直る (倒れから)。Space 短押し */
   standUp: { action: ['none'], down: ['downed'] },
   /** 箱を被る */
-  box: { posture: ['stand', 'crouch'], action: ['none'], down: ['none'] },
+  box: { posture: ['stand', 'crouch'], action: ['none', 'stab'], down: ['none'] },
   /** 箱を脱ぐ。Space 短押し / 持ち替え */
   unbox: { posture: ['box'], action: ['none'], down: ['none'] },
   /** 梯子を掴む */
