@@ -704,8 +704,38 @@ export class Input {
     return 'yieldsWhenAiming' in bind && bind.yieldsWhenAiming === true && this.aiming
   }
 
-  /** その操作のキーかボタンが押されているか */
+  /**
+   * 飲み込んでいる操作。**離すまで、押されていないものとして扱う** (holdBack)。
+   * 離した所で外す (advance)
+   */
+  private readonly muted = new Set<Action>()
+
+  /**
+   * いま押されている操作を、**離すまで効かせない。** allowed に挙げた物は除く。
+   *
+   * 装備の画面は × で決めるが、同じ × がしゃがみ (短押し) と転がり (長押し) でもある。
+   * 決めた押下が画面の閉じた後も押されたままだと、そこから長押しが成立して転がった
+   * (2026-11-08 本人「決定の罰ボタン押すと決定だけでなくローリングしちゃう」)。
+   * 画面が出ている間は毎コマ呼び、画面の操作以外の押下をまとめて飲み込む。
+   * 押し直せば効く — 飲み込むのはその押下だけ
+   */
+  holdBack(allowed: readonly Action[]): void {
+    for (const action of Object.keys(BINDINGS) as Action[]) {
+      if (this.muted.has(action) || allowed.includes(action)) continue
+      if (!this.physicallyDown(action)) continue
+      this.muted.add(action)
+      // 数えかけの押下を捨てる。残すと、離した所で単押しが立つ
+      Object.assign(this.holds.get(action) ?? {}, newHold())
+    }
+  }
+
+  /** その操作のキーかボタンが押されているか (飲み込んでいる物は押されていない) */
   private rawDown(action: Action): boolean {
+    return !this.muted.has(action) && this.physicallyDown(action)
+  }
+
+  /** その操作のキーかボタンが、指の上で押されているか */
+  private physicallyDown(action: Action): boolean {
     const bind = BINDINGS[action]
     if (bind.keys.some((code) => this.pressed.has(code))) return true
     if (this.padYields(action)) return false
@@ -714,6 +744,7 @@ export class Input {
 
   /** その操作の立ち上がりを 1 回だけ取る */
   private rawPressed(action: Action): boolean {
+    if (this.muted.has(action)) return false
     const bind = BINDINGS[action]
     let hit = false
     // **両方を評価する。** 片方で早く返すと、もう片方の立ち上がりが持ち越される
@@ -734,6 +765,7 @@ export class Input {
    * 単押しは離した時に立てる (押している間はまだどちらか決まらない)。
    */
   advance(dt: number): void {
+    for (const action of this.muted) if (!this.physicallyDown(action)) this.muted.delete(action)
     for (const [action, hold] of this.holds) {
       const bind = BINDINGS[action]
       advanceHold(hold, this.rawDown(action), dt, 'hold' in bind ? bind.hold : undefined)
@@ -870,12 +902,21 @@ export class Input {
     return this.listInvert ? -step : step
   }
 
-  /** 視点を掴む。ユーザーの操作の最中から呼ぶこと */
+  /**
+   * 視点を掴む。ユーザーの操作の最中から呼ぶこと。
+   *
+   * **パッドで遊んでいる間は掴まない。** パッドは掴まなくても操作できる (engaged) のに、
+   * 掴むたびにブラウザが「Esc でカーソルを表示」の案内を出す。Start で成績表を閉じる・
+   * × で装備の画面を閉じるたびに出ていた (2026-11-08 本人)。鍵盤やマウスに触れば、
+   * そちらの入口 (onKeyDown / onMouseDown) が掴む
+   */
   grab(): void {
+    if (this.activeDevice === 'gamepad') return
     if (!this.locked) this.requestLock()
   }
 
   private clearHeld(): void {
+    this.muted.clear()
     this.pressed.clear()
     this.justPressed.clear()
     this.fireHeld = false

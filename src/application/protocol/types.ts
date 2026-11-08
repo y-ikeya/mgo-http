@@ -919,6 +919,8 @@ export interface SlowFrameEvent {
   triangles: number
   /** JS の使用メモリ (MB)。Chrome だけ取れる。取れなければ 0 */
   heap: number
+  /** 詰まる前の 1 秒と詰まっている間に届いた通信の種類 (decoyPlaced など)。古い画面は送らない */
+  recent?: string[]
 }
 
 /**

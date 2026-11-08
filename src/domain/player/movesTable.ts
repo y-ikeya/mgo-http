@@ -11,20 +11,20 @@ export const MOVE_RULES: Record<Move, Rule> = {
   hang: { posture: ['stand', 'crouch'], action: ['none'], down: ['none'] },
   /** 伏せる (伏せ始める)。押すと「伏せへの出入り」を通って伏せになる */
   prone: { posture: ['stand', 'crouch'], action: ['none'], down: ['none'], hand: ['relaxed'] },
-  /** 起き上がる (伏せから)。Space 短押し。頭上の余裕は地形に聞く (表の外) */
-  rise: { posture: ['prone'], action: ['none'], down: ['none'] },
+  /** 起き上がる (伏せから)。Space 短押し。頭上の余裕は地形に聞く (表の外) 這いながらでも起き上がれる (2026-11-08 本人「移動ボタンと立ち上がりを両方押すと立ち上がりがキャンセルされる」) */
+  rise: { posture: ['prone'], action: ['none', 'crawl'], down: ['none'] },
   /** しゃがむ (立ち⇄しゃがみ)。Space 短押し。刺しながらしゃがめる */
   crouch: { posture: ['stand', 'crouch'], action: ['none', 'stab'], down: ['none'] },
   /** 立ち直る (倒れから)。Space 短押し */
   standUp: { action: ['none'], down: ['downed'] },
   /** 箱を被る */
-  box: { posture: ['stand', 'crouch'], action: ['none'], down: ['none'] },
+  box: { posture: ['stand', 'crouch'], action: ['none', 'stab'], down: ['none'] },
   /** 箱を脱ぐ。Space 短押し / 持ち替え */
   unbox: { posture: ['box'], action: ['none'], down: ['none'] },
   /** 梯子を掴む */
   ladder: { posture: ['stand', 'crouch', 'air', 'water'], action: ['none'], down: ['none'] },
-  /** 構える。倒れている間も構えられる (伏せ撃ち) */
-  aim: { posture: ['stand', 'crouch', 'prone', 'air', 'water'], action: ['none', 'proneShift', 'crawl', 'landing'], down: ['none', 'downed'] },
+  /** 構える。倒れている間も構えられる (伏せ撃ち) 刺している間も構えたまま (下を刺すのに見下ろした向きを保つ。2026-11-08) */
+  aim: { posture: ['stand', 'crouch', 'prone', 'air', 'water'], action: ['none', 'proneShift', 'crawl', 'stab', 'landing'], down: ['none', 'downed'] },
   /** 撃つ。弾・引き金・装填中・ボルトは持ち物の側 (表の外) */
   fire: { posture: ['stand', 'crouch', 'prone', 'air', 'water'], action: ['none', 'proneShift'], down: ['none', 'downed'], hand: ['aiming'] },
   /** リロードする。始めた後にできない状態になったらやめる。弾数・ボルトは表の外 */

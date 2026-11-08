@@ -91,6 +91,8 @@ export class Decoys {
     number,
     {
       group: THREE.Group
+      /** 台。**この物のためだけに作った**ので、消すときに捨てる */
+      base: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>
       body: THREE.Object3D
       at: number[]
       yaw: number
@@ -154,6 +156,7 @@ export class Decoys {
     // 位相は id から。並べても揃わず、同じ物は何度描いても同じ形になる
     const entry = {
       group,
+      base,
       body,
       at: [...at],
       yaw,
@@ -292,19 +295,22 @@ export class Decoys {
     entry.body.rotation.x = entry.swayZ * swing
   }
 
+  /**
+   * 場から外す。**捨てるのは台だけ。人形の形と材質は捨てない。**
+   *
+   * 人形は cloneSkinned の複製で、形と材質は読み込みの控え (loadSoldier) と共有している。
+   * 同じ控えから**その人の体** (remoteSoldier・自分の体) も作られているので、ここで
+   * dispose すると、その姿の人全員の形が GPU から消えて次のコマで作り直しになる
+   * (2026-11-08 本人「decoy を設置すると俺も相手も画面がフリーズする」。5 秒ほど止まって、
+   * 動いてはまた止まる)。台はこの物のために作ったので捨てる
+   */
   remove(id: number): void {
     const entry = this.live.get(id)
     if (!entry) return
     this.scene.remove(entry.group)
     refreshStaticShadows()
-    entry.group.traverse((obj) => {
-      const mesh = obj as THREE.Mesh
-      if (!mesh.isMesh) return
-      mesh.geometry?.dispose()
-      const material = mesh.material
-      if (Array.isArray(material)) for (const m of material) m.dispose()
-      else material?.dispose()
-    })
+    entry.base.geometry.dispose()
+    entry.base.material.dispose()
     this.live.delete(id)
   }
 

@@ -4175,6 +4175,16 @@ export class CharacterAnimator {
   }
 
   /**
+   * 刺突を途中でやめる。**箱を被って取り消す** (2026-11-08 本人「ダンボールをかぶることで
+   * キャンセルするっていう技」)。止めずに重みを構えへ移すだけ (cancelReload と同じ)。
+   * 下半身は箱の型が刺突より先に選ばれる (motion.ts の resolveLocomotion)
+   */
+  cancelStab(): void {
+    if (this.upperState !== 'stab') return
+    this.upperState = 'stance'
+  }
+
+  /**
    * 装填を途中でやめる。**止めずに重みを構えへ移すだけ** (cancelThrow と同じ)。
    *
    * stop() すると、再生されていない型が重みの行き先として残り、足りない分に
