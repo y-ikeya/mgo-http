@@ -393,3 +393,34 @@
 .lobby-home:hover {
   opacity: 0.8;
 }
+
+/*
+ * パッドで選んでいる物 (screens/padNav.ts)。スクリプトから focus() した時は :focus-visible が
+ * 付かないことがあるので、パッドを使っている間 (html[data-input="pad"]) は :focus にも同じ見た目を当てる
+ */
+:root[data-input='pad'] .home-mode:focus {
+  border-color: rgba(190, 220, 160, 0.6);
+  background: rgba(32, 40, 28, 0.85);
+  outline: none;
+}
+
+:root[data-input='pad'] .room:has(.room-enter:focus) {
+  border-color: rgba(180, 214, 150, 0.55);
+  background: rgba(20, 30, 16, 0.85);
+}
+
+:root[data-input='pad'] .room-enter:focus,
+:root[data-input='pad'] .home-mode:focus {
+  outline: none;
+}
+
+:root[data-input='pad'] .room-player:focus .room-player-name {
+  color: rgba(240, 248, 230, 1);
+  text-decoration: underline;
+}
+
+:root[data-input='pad'] .lobby-home:focus,
+:root[data-input='pad'] .profile-close:focus {
+  outline: 1px solid rgba(190, 220, 160, 0.7);
+  outline-offset: 2px;
+}

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from '@solidjs/router'
 import { t } from '../../i18n'
 import type { Identity } from '../../infra/auth/session'
 import { signOut } from '../../infra/auth/session'
+import { usePadNav } from './padNav'
 import './Lobby.css'
 import './Home.css'
 
@@ -28,6 +29,8 @@ export default function Home(props: { identity: Identity }) {
   })
   // クエリは持って行く (?server= などは先で読まれる。Lobby の enter と同じ)
   const go = (path: string) => navigate(`${path}${location.search}`)
+  // パッドで選ぶ。最初の画面なので ○ で戻る先は無い
+  usePadNav()
 
   return (
     <div class="lobby">
@@ -37,6 +40,7 @@ export default function Home(props: { identity: Identity }) {
           {props.identity.displayName}
           <button
             class="lobby-signout"
+            data-pad-skip
             onClick={() => {
               signOut()
               location.reload()

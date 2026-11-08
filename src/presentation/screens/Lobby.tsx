@@ -11,6 +11,7 @@ import type { MatchPhase, RoomSummary } from "../../application/protocol/types";
 import type { Team } from "../../domain/player/player";
 import type { Identity } from "../../infra/auth/session";
 import { signOut } from "../../infra/auth/session";
+import { usePadNav } from "./padNav";
 import "./Lobby.css";
 
 /**
@@ -114,6 +115,8 @@ export default function Lobby(props: { identity: Identity }) {
    * ここで落とすと効かない (手元の画面から本番のサーバーへ繋ぐ、ができなくなる)。
    */
   const enter = (name: string) => navigate(`/rooms/${name}${location.search}`);
+  // パッドで選ぶ。○ で最初の画面へ (左上の MGOHTTP と同じ行き先)
+  usePadNav({ back: () => navigate(`/${location.search}`) });
 
   return (
     <div class="lobby">
@@ -126,6 +129,7 @@ export default function Lobby(props: { identity: Identity }) {
           {props.identity.displayName}
           <button
             class="lobby-signout"
+            data-pad-skip
             onClick={() => {
               signOut();
               location.reload();
