@@ -902,8 +902,16 @@ export class Input {
     return this.listInvert ? -step : step
   }
 
-  /** 視点を掴む。ユーザーの操作の最中から呼ぶこと */
+  /**
+   * 視点を掴む。ユーザーの操作の最中から呼ぶこと。
+   *
+   * **パッドで遊んでいる間は掴まない。** パッドは掴まなくても操作できる (engaged) のに、
+   * 掴むたびにブラウザが「Esc でカーソルを表示」の案内を出す。Start で成績表を閉じる・
+   * × で装備の画面を閉じるたびに出ていた (2026-11-08 本人)。鍵盤やマウスに触れば、
+   * そちらの入口 (onKeyDown / onMouseDown) が掴む
+   */
   grab(): void {
+    if (this.activeDevice === 'gamepad') return
     if (!this.locked) this.requestLock()
   }
 
