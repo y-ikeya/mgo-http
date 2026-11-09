@@ -1539,6 +1539,14 @@ export class Soldier {
   private applyOpacity(): void {
     if (!this.model) return
     const opacity = this.ghost ? GHOST_OPACITY : this.fade
+    /*
+     * **消え切ったら画面には描かない** (他の人の画面の体と同じ、remoteSoldier.ts の applyBodyOpacity)。
+     * 体の材質は奥行きを書く (drawLast) ので、濃さ 0 でも描くと、後ろの窓ガラス (透明の物は後から描く)
+     * が体の形に抜けて、ガラスに影のように映った (2026-11-09 本人「カメラと UU の窓のガラスの間に
+     * ステルスのキャラがいるとガラスにそのキャラの影が映る」)。画面のカメラが見る層 0 からだけ外し、
+     * 影の地図の層には残す (影は落とし続ける)
+     */
+    const shown = this.stealthFade < 0.999
     this.model.traverse((obj) => {
       if (!isMesh(obj)) return
       // 体 (骨で動く形) だけがステルスで薄くなる。手の武器は別の形
@@ -1546,6 +1554,9 @@ export class Soldier {
       const value = body ? opacity * (1 - this.stealthFade) : opacity
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const material of materials) material.opacity = value
+      if (!body) return
+      if (shown) obj.layers.enable(0)
+      else obj.layers.disable(0)
     })
   }
 
