@@ -1,4 +1,5 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { skyTableAt } from "./world/skyTable";
 import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/weapon";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
@@ -4300,12 +4301,20 @@ export class Game {
   private updateSkyLight(dt: number): void {
     const sight = this.stage.sightWorld;
     this.updateExposure(sight, dt);
-    if (!sight) return;
+    /*
+     * **空の見え方の表があるステージは表から引く** (world/skyTable.ts)。地形と同じ表なので、
+     * 人と地形の暗さの決まり方がそろう。無ければ視線の網に光線を飛ばして測る
+     */
+    const table = this.stage.skyTable;
+    const at = (x: number, y: number, z: number): number | null =>
+      table ? skyTableAt(table, x, y, z) : sight ? skyAt(sight, x, y, z) : null;
     const me = this.player.position;
-    this.player.setSkyLight(skyAt(sight, me.x, me.y + SKY_PROBE_HEIGHT, me.z), dt);
+    const mine = at(me.x, me.y + SKY_PROBE_HEIGHT, me.z);
+    if (mine === null) return;
+    this.player.setSkyLight(mine, dt);
     for (const remote of this.remotes.all) {
-      const at = remote.object.position;
-      remote.setSkyLight(skyAt(sight, at.x, at.y + SKY_PROBE_HEIGHT, at.z), dt);
+      const p = remote.object.position;
+      remote.setSkyLight(at(p.x, p.y + SKY_PROBE_HEIGHT, p.z) ?? mine, dt);
     }
   }
 

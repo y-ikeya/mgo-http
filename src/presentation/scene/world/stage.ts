@@ -2,6 +2,8 @@ import { setSkyFloor, skyFloor } from './skylight'
 import { addMovingShadow, castStaticShadow, STATIC_SHADOW_LAYER } from './liveShadow'
 import { instanceRepeats } from './instancing'
 import { swayingGrassMaterial } from './grass'
+import { applySkyGrid, loadSkyTable } from './skyGrid'
+import type { SkyTable } from './skyTable'
 import * as THREE from 'three'
 import type { Team } from '../../../domain/player/player'
 import { DEFAULT_SURFACE, surfaceOf, type Surface, type Spot, type Zone } from '../../../domain/stage'
@@ -525,6 +527,11 @@ export interface Stage {
    * 当たるのに審判は通さない — その弾は手元でも遮蔽で止める。
    */
   readonly sightWorld: TriangleBvh | null
+  /**
+   * 空の見え方の升の表 (world/skyTable.ts)。表のあるステージだけ。届いていなければ null。
+   * 人の明るさもここから引く (無ければ視線の網に光線を飛ばして測る)
+   */
+  readonly skyTable: SkyTable | null
   /** カメラを止める面の三角 (CAMERA_BIT)。カメラを壁から押し出すのに使う。届いていなければ null */
   readonly cameraWorld: TriangleBvh | null
   /**
@@ -1652,10 +1659,11 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
    * glb と同じで後から差し替わる。届かないステージ (三角をまだ出していない)
    * はずっと null で、箱のまま遊べる。
    */
-  const moving: { world: MeshMoveWorld | null; sight: TriangleBvh | null; camera: TriangleBvh | null } = {
+  const moving: { world: MeshMoveWorld | null; sight: TriangleBvh | null; camera: TriangleBvh | null; sky: SkyTable | null } = {
     world: null,
     sight: null,
     camera: null,
+    sky: null,
   }
   const meshReady = Promise.all([
     loadStageMoveWorld(name).then((world) => {
@@ -1666,6 +1674,9 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
     }),
     loadStageCameraWorld(name).then((camera) => {
       moving.camera = camera
+    }),
+    loadSkyTable(name).then((table) => {
+      moving.sky = table
     }),
   ])
 
@@ -1680,6 +1691,9 @@ export function buildStage(scene: THREE.Scene, name: StageName): Stage {
     },
     get sightWorld() {
       return moving.sight
+    },
+    get skyTable() {
+      return moving.sky
     },
     get cameraWorld() {
       return moving.camera
@@ -1793,12 +1807,14 @@ async function replaceWithModel(
   // 材質ごとに 1 つずつ共有する。同じ材質の箱がいくつあっても増えない
   // (UV を頂点側で作り直すので、大きさが違っても 1 つで足りる)
   const materials = new Map<Surface, THREE.MeshStandardMaterial>()
+  // 絵を貼り終わるのを待つため (空の見え方の表で描く時は、材質を写す前に絵が要る)
+  const textured: Promise<void>[] = []
   const materialFor = (surface: Surface) => {
     let material = materials.get(surface)
     if (!material) {
       // ガラスだけは絵を読まない。透けることが見た目なので貼る物が無い
       material = surface === 'glass' ? createGlassMaterial() : createBlockoutMaterial()
-      if (surface !== 'glass') void applyStructureTexture(material, surface)
+      if (surface !== 'glass') textured.push(applyStructureTexture(material, surface).catch(() => {}))
       materials.set(surface, material)
     }
     return material
@@ -1950,6 +1966,14 @@ async function replaceWithModel(
   if (meshCount === 0) {
     console.warn('[Stage] stage.glb にメッシュが無い。ブロックアウトのまま続行する')
     return false
+  }
+
+  // 空の見え方の表があるステージは、面ごとに表を引く材質に替える (world/skyGrid.ts)。まとめて描く前に
+  // 写した材質には後から貼る絵が届かないので、貼り終わってから写す
+  const sky = await loadSkyTable(stageName)
+  if (sky) {
+    await Promise.all(textured)
+    applySkyGrid(model, sky)
   }
 
   // 土嚢・木箱は同じ形をまとめて 1 回で描く。元の物は判定のために見えないまま残す

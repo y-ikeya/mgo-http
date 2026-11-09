@@ -2388,3 +2388,15 @@ print(f'属性: 全部止める {len(boxes) - len(special)} 個' +
 for b in special:
     off = [k for k, v in b['flags'].items() if not v]
     print(f"  {b['name']}: {' '.join(off)} を通す")
+
+# **空の見え方の升の表 (--sky)。焼き込み (--bake) の代わり** (tools/sky_grid.py、2026-11-09)。
+# 頂点に暗さを焼くと、暗さを細かくしたい所は平らな面でも頂点を割るしかなく、CC で glb を 1.6MB
+# 食っていた。表は面の近くだけ持って 1MB 弱。画面は表のあるステージだけ表で描く (world/skyGrid.ts)
+#
+#   $BLENDER -b tools/raw/stage_city.blend --python tools/export_stage.py -- --sky
+if '--sky' in _argv:
+    if '--bake' in _argv:
+        print('  --sky と --bake を両方付けた。頂点の暗さは表で上書きされる (表のあるステージは表で描く)')
+    _sky = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sky_grid.py')
+    sys.argv = [sys.argv[0], '--', stage_name[len('stage_'):] if stage_name.startswith('stage_') else stage_name]
+    exec(compile(open(_sky).read(), _sky, 'exec'), {'__name__': 'sky_grid', '__file__': _sky})
