@@ -105,7 +105,7 @@
 }
 },
 {
-"name": "concrete_building13",
+"name": "concrete_building36",
 "min": [
 -49.495,
 9.966,
@@ -313,7 +313,7 @@
 }
 },
 {
-"name": "concrete_building32.003",
+"name": "concrete_building36.001",
 "min": [
 -45.399,
 9.676,
@@ -339,7 +339,7 @@
 }
 },
 {
-"name": "concrete_building32.004",
+"name": "concrete_building36.002",
 "min": [
 -40.225,
 9.705,
@@ -16346,6 +16346,163 @@
 ],
 "top": {
 "h": 18.24,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_building36_frames",
+"min": [
+-49.543,
+11.01,
+-74.505
+],
+"max": [
+-37.551,
+15.97,
+-34.669
+],
+"top": {
+"h": 15.97,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_building36_sashes",
+"min": [
+-49.351,
+11.14,
+-74.373
+],
+"max": [
+-37.744,
+15.9,
+-34.861
+],
+"top": {
+"h": 15.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "glass_building36_panes_notexture",
+"min": [
+-49.25,
+11.13,
+-74.381
+],
+"max": [
+-37.845,
+15.91,
+-34.962
+],
+"top": {
+"h": 15.91,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false,
+"thrown": true
+}
+},
+{
+"name": "metal_building36_bars",
+"min": [
+-49.478,
+11.09,
+-74.404
+],
+"max": [
+-37.617,
+12.35,
+-34.734
+],
+"top": {
+"h": 12.35,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_building36_shutters",
+"min": [
+-49.253,
+9.97,
+-45.688
+],
+"max": [
+-43.496,
+12.57,
+-43.288
+],
+"top": {
+"h": 12.57,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "concrete_building36_trim",
+"min": [
+-49.613,
+13.17,
+-78.546
+],
+"max": [
+-37.428,
+17.737,
+-34.599
+],
+"top": {
+"h": 17.7365,
 "dx": 0.0,
 "dz": 0.0
 },
