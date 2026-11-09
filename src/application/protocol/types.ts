@@ -1212,8 +1212,21 @@ export interface MatchMessage {
    * 受け取る側は endsAt と同じく手元の時計へ直す
    */
   cautionUntil?: number
-  /** いま何ラウンド目か (TSNE。1 = 先攻、2 = 後攻)。1 試合は 2 ラウンド */
+  /**
+   * いま何ラウンド目か。1 試合は 2 ラウンド。TSNE は 1 = 先攻・2 = 後攻、
+   * 前後半の部屋 (TDM / CAP) は 1 = 前半・2 = 後半。2 ラウンドでない部屋は無い
+   */
   round?: number
+  /**
+   * **陣地を入れ替えているか** (前後半の部屋の後半)。湧く基地・地面の枠・CAP の設置ポイントを
+   * 相手の色の物にする (domain/match/sides.ts の homeOf)。前後半でない部屋は無い
+   */
+  basesSwapped?: boolean
+  /**
+   * 前の半までの残り (前後半の部屋の後半だけ)。TDM は残機、CAP はカウントの秒。
+   * 決着は前後半の残りの合計で決まる
+   */
+  carried?: Record<Team, number>
   /** 色ごとに勝ったラウンドの数 (TSNE) */
   roundWins?: Record<Team, number>
   /**

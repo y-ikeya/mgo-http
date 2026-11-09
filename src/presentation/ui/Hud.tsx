@@ -362,8 +362,12 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
     const endsAt = props.stats?.match?.endsAt ?? 0
     return Math.max(0, Math.ceil((endsAt - now()) / 1000))
   }
+  /**
+   * 試合の時計。**ラウンドの合間 (break) は 0:00 のまま** — 合間の締め切りへ減っていく数は試合の
+   * 時間ではない (2026-11-09 本人「あれは試合用の時計だから break 中は 0:00 でいい」)
+   */
   const clock = () => {
-    const t = remaining()
+    const t = phase() === 'break' ? 0 : remaining()
     return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
   }
 

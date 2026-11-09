@@ -389,9 +389,26 @@ export function buildBases(stage: StageName): THREE.Object3D {
     // 高台の上に基地があるなら、枠もその床に敷く
     frame.position.set(base.x, (base.y ?? 0) + BASE_Y, base.z)
     frame.frustumCulled = false
+    // どの色の基地か。後半に塗り替える (recolorHomes)
+    frame.userData.home = team
     group.add(frame)
   }
   return group
+}
+
+/**
+ * 陣地の印 (基地の枠・CAP の設置ポイント) を、**いまその陣地を使っている色**で塗り直す。
+ * 前後半の部屋の後半は陣地が入れ替わるので、赤の基地の所に青の枠が出る
+ * (domain/match/sides.ts の homeOf、2026-11-09 本人「陣地を変えた前後半戦」)
+ */
+export function recolorHomes(root: THREE.Object3D, swapped: boolean): void {
+  root.traverse((obj) => {
+    const home = obj.userData.home as Team | undefined
+    const material = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined
+    if (!home || !material?.color) return
+    const user: Team = swapped ? (home === 'blue' ? 'red' : 'blue') : home
+    material.color.set(TEAM_COLOR[user])
+  })
 }
 
 /**
@@ -1180,6 +1197,8 @@ export function buildCapGoals(goals: Partial<Record<Team, Zone>>): THREE.Object3
     pillar.scale.set(goal.halfX, 1, goal.halfZ)
     pillar.position.set(goal.x, goal.y + CAP_PILLAR_HEIGHT / 2, goal.z)
     for (const mesh of [frame, fill]) mesh.frustumCulled = false
+    // どの色の設置ポイントか。後半に塗り替える (recolorHomes)
+    for (const mesh of [frame, fill, tube]) mesh.userData.home = team
     group.add(frame, fill, pillar)
   }
   return group

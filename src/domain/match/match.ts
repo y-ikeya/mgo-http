@@ -150,8 +150,21 @@ export interface Match {
   stealthSent: boolean
   /** 最後に配った revealedUntil (CAUTION の切れる時刻)。延びた時だけ配り直すため */
   cautionSent: number
-  /** いま何ラウンド目か (攻める側と守る側に分かれる部屋。1 = 先攻、2 = 後攻) */
+  /**
+   * いま何ラウンド目か。**2 ラウンドで 1 試合の部屋** (sides.ts の twoRounds) で使う。
+   * 攻守に分かれる部屋 (TSNE) は 1 = 先攻、2 = 後攻。前後半の部屋 (TDM / CAP) は 1 = 前半、2 = 後半
+   */
   round: number
+  /**
+   * **陣地を入れ替えているか** (前後半の部屋の後半)。湧く基地と CAP の設置ポイントを
+   * 相手の色の物にする。陣営から陣地を引く所は全部 sides.ts の homeOf を通す
+   */
+  basesSwapped: boolean
+  /**
+   * 前の半までの残り (前後半の部屋)。TDM は残機、CAP はカウント (ms)。
+   * 半ごとに残機とカウントを戻すので、決着はこれと最後の半の残りを足して見る
+   */
+  carried: Record<Team, number>
   /** 色ごとに勝ったラウンドの数 */
   roundWins: Record<Team, number>
   /** TSNE のターゲット (domain/match/target.ts)。ラウンドが始まった時に置く。無い部屋・無いステージは null */
@@ -183,6 +196,8 @@ export function newMatch(mode: Mode): Match {
     cautionSent: 0,
     round: 1,
     roundWins: { blue: 0, red: 0 },
+    basesSwapped: false,
+    carried: { blue: 0, red: 0 },
     target: null,
     targetDelivered: false,
     capture: null,

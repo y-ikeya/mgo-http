@@ -19,7 +19,7 @@ import { canAct, canBeHurt, onBattlefield } from '../player/lifecycle'
 import type { MatchPlayer, Team } from '../player/player'
 import { isAsleep } from '../player/stamina'
 import type { Match } from './match'
-import type { Side } from './room'
+import type { ModeSpec, Side } from './room'
 
 /** 当たってからステルスが戻るまで (ms) */
 export const STEALTH_BREAK_MS = 5000
@@ -36,6 +36,24 @@ export function cautionUntil(room: Match, now: number): number | null {
 export function sideOf(room: Match, team: Team): Side | null {
   if (!room.mode.sides) return null
   return team === room.attack ? 'attack' : 'defence'
+}
+
+/**
+ * **2 ラウンドで 1 試合か。** 攻守に分かれる部屋 (TSNE、先攻と後攻) と、前後半の部屋
+ * (TDM / CAP、陣地を入れ替える) の 2 つ。ラウンドの合間 (break) を挟んで 2 ラウンド目へ進む
+ */
+export function twoRounds(mode: ModeSpec): boolean {
+  return mode.sides || mode.halves
+}
+
+/**
+ * **その色がいま使う陣地** (湧く基地と CAP の設置ポイント)。前後半の部屋の後半は相手の色の物
+ * (2026-11-09 本人「陣地を変えた前後半戦」)。陣営から陣地を引く所は全部ここを通す —
+ * 1 か所でも素で引くと、後半にその所だけ前半の陣地を指す
+ */
+export function homeOf(room: Pick<Match, 'basesSwapped'>, team: Team): Team {
+  if (!room.basesSwapped) return team
+  return team === 'blue' ? 'red' : 'blue'
 }
 
 /** 攻守を入れ替える。**試合の頭で必ず 1 回** */

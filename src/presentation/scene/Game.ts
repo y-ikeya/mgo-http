@@ -9,6 +9,7 @@ import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
 import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
 import * as THREE from "three";
+import { homeOf } from "../../domain/match/sides";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
 import { pass } from "three/tsl";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
@@ -37,6 +38,7 @@ import { offsetInCone } from "../../sim/space/aim";
 import {
   buildLights,
   buildBases,
+  recolorHomes,
   buildStage,
   fitShadowToStage,
   loadStageSun,
@@ -267,8 +269,6 @@ const HIT_FEEDBACK_DURATION = 0.6;
 const ADAPT_MAX = 1.8;
 /** 時計の音を鳴らし始める残りの秒。10 秒から 1 秒まで 10 回 */
 const CLOCK_TICK_FROM = 10;
-/** エンジンの音を締め切りの何 ms 前から鳴らすか。素材 (engine1.mp3) の長さ 2.9 秒 */
-const ENGINE_LEAD_MS = 2900;
 /** 散弾の粒の痕の大きさ (普通の弾痕に対して)。小さな点が散らばって見える (2026-11-03 本人) */
 const PELLET_HOLE_SCALE = 0.45;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
@@ -865,7 +865,7 @@ export class Game {
    */
   private get canResupply(): boolean {
     if (!this.teamsMode || !canAct(this.life) || this.player.sleeping || this.player.downed) return false;
-    const base = STAGES[this.stageName].bases[this.selfTeam];
+    const base = STAGES[this.stageName].bases[this.homeOf(this.selfTeam)];
     const p = this.player.position;
     return atBase(p.x, p.y, p.z, base);
   }
@@ -1140,6 +1140,7 @@ export class Game {
     void loadStageCapGoals(this.stageName).then((goals) => {
       if (this.disposed) return;
       this.capGoals = buildCapGoals(goals);
+      recolorHomes(this.capGoals, this.homesSwapped);
       this.capGoals.visible = false;
       this.scene.add(this.capGoals);
     });
@@ -1801,6 +1802,7 @@ export class Game {
     this.updateTsneTarget(dt);
     this.updateClockTick();
     this.updateEngine();
+    this.syncHomes();
     // 草むらを押す人。自分が先頭
     this.grassPushers.clear();
     this.grassPushers.set(this.net.id, this.player.position);
@@ -3014,7 +3016,7 @@ export class Game {
     const solo = spawns.solo;
     // 基地は書き出した json (blend の meta_*base*) を優先。無ければ表の値
     const base = MODES[this.replica.mode].teams
-      ? (this.stageBases[this.replica.team] ?? spawns.bases[this.replica.team])
+      ? (this.stageBases[this.homeOf(this.replica.team)] ?? spawns.bases[this.homeOf(this.replica.team)])
       : solo[Math.floor(Math.random() * solo.length)];
     // 同じ点に重なると互いが見えないので、ID から決まる向きへ散らす
     const spread = spawnAngle(this.net.id + this.shotCount);
@@ -3726,27 +3728,34 @@ export class Game {
    * ENGINE_LEAD_MS 前に鳴らしていたが、全員が押すと締め切りが 3 秒後へ縮む (READY_GRACE_MS) ので
    * 押した瞬間に鳴り、取り消して押し直すたびに鳴り直した。
    *
-   * ラウンドの合間 (break) の締め切りは取り消しで延びないので、今まで通り ENGINE_LEAD_MS 前に鳴らす
-   * (鳴り終わりが暗転の明けに重なる)
+   * **ラウンドの合間 (break、前後半・先攻後攻の切り替え) では鳴らさない** (2026-11-09 本人「前後半の切り替えの
+   * 時は試合開始の音いらない、トラック発信音の音ね」)。試合が始まるのは 1 度だけ
    */
   private updateEngine(): void {
-    const match = this.replica.match;
-    const phase = match?.phase;
+    const phase = this.replica.match?.phase;
     const previous = this.enginePhase;
     this.enginePhase = phase;
-    if (!match) return;
-    if (previous === "ready" && phase === "countdown") {
-      this.audio.playUi("engine");
-      return;
-    }
-    if (phase !== "break" || !(match.endsAt > 0)) return;
-    const left = match.endsAt - Date.now();
-    if (left <= 0 || left > ENGINE_LEAD_MS || this.engineFor === match.endsAt) return;
-    this.engineFor = match.endsAt;
-    this.audio.playUi("engine");
+    if (previous === "ready" && phase === "countdown") this.audio.playUi("engine");
   }
-  /** エンジンを鳴らした締め切り (endsAt)。同じ締め切りで 2 度鳴らさない */
-  private engineFor = 0;
+
+  /**
+   * その色がいま使う陣地。**前後半の部屋の後半は相手の色の物** (domain/match/sides.ts)。
+   * 湧く場所・補給の基地はここを通す
+   */
+  private homeOf(team: Team): Team {
+    return homeOf({ basesSwapped: this.replica.match?.basesSwapped === true }, team);
+  }
+
+  /** 陣地の印 (基地の枠・CAP の設置ポイント) を、陣地が入れ替わったら塗り直す */
+  private syncHomes(): void {
+    const swapped = this.replica.match?.basesSwapped === true;
+    if (swapped === this.homesSwapped) return;
+    this.homesSwapped = swapped;
+    if (this.bases) recolorHomes(this.bases, swapped);
+    if (this.capGoals) recolorHomes(this.capGoals, swapped);
+  }
+  /** 印を塗った時の入れ替え。読み込みが後から来た印は、作った所で今の値に合わせる */
+  private homesSwapped = false;
   /** 前のコマで見た試合の段階。待合室から秒読みへ移った瞬間を拾う */
   private enginePhase: string | undefined = undefined;
 

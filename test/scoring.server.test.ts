@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { startServer, twoPlayers, type Client, type Server } from './server'
+import { spawnAlive, startServer, twoPlayers, type Client, type Server } from './server'
 import { pointsOf } from '../src/domain/match/scoring'
 
 /**
@@ -77,28 +77,46 @@ describe('残機', () => {
     b.close()
   }, 40_000)
 
-  test('削り切ったらその場で終わる。時間切れを待たない', async () => {
+  test('削り切ったらその場で半が終わる。後半は陣地を入れ替えて残機を戻し、削り切ったら試合が終わる', async () => {
+    // TDM は前後半で 1 試合 (2026-11-09 本人「陣地を変えた前後半戦で 1 match」)。決着は残りの合計
     server = await startServer({ MGO2_TICKETS: '2' })
     const { a, b } = await twoPlayers(server)
     const winner = teamOf(a)
-
-    for (let i = 0; i < 2; i++) {
-      await waitAlive(server, b)
-      a.send({ type: 'damage', id: a.id, target: b.id, kind: 'bullet', zone: 'HEAD', distance: 12 })
-      await Bun.sleep(900)
+    const wipe = async () => {
+      for (let i = 0; i < 2; i++) {
+        await waitAlive(server!, b)
+        a.send({ type: 'damage', id: a.id, target: b.id, kind: 'bullet', zone: 'HEAD', distance: 12 })
+        await Bun.sleep(900)
+      }
     }
 
-    const after = await teams(server)
-    expect(after[teamOf(b)]).toBe(0)
-    const match = a.last.get('match')
-    if (match?.type !== 'match') throw new Error('match が来ていない')
-    // 試合は 5 分だが、削り切った時点で終わっている
-    expect(match.phase).toBe('over')
-    expect(match.winner).toBe(winner)
+    await wipe()
+    expect((await teams(server))[teamOf(b)]).toBe(0)
+    const half = a.last.get('match')
+    if (half?.type !== 'match') throw new Error('match が来ていない')
+    // 試合は 5 分だが、削り切った時点で前半が終わっている
+    expect(half.phase).toBe('break')
+    expect(half.round).toBe(1)
+    expect(half.winner).toBe(winner)
+
+    // 後半。陣地が入れ替わり、残機が戻る
+    await spawnAlive(a, b)
+    const second = a.last.get('match')
+    if (second?.type !== 'match') throw new Error('match が来ていない')
+    expect(second.round).toBe(2)
+    expect(second.basesSwapped).toBe(true)
+    expect(await teams(server)).toEqual({ blue: 2, red: 2 })
+
+    await wipe()
+    const over = a.last.get('match')
+    if (over?.type !== 'match') throw new Error('match が来ていない')
+    expect(over.phase).toBe('over')
+    // 合計は 4 対 0
+    expect(over.winner).toBe(winner)
 
     a.close()
     b.close()
-  }, 60_000)
+  }, 90_000)
 
   test('自死でも自陣の残機が減る。敵は増えない', async () => {
     // 残機は死因を問わない。だから「殺されるくらいなら自死」が成り立たない

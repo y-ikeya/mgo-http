@@ -22,7 +22,7 @@ import { livesOf, matchMsOf, primariesOf, secondaryOf, supportsOf } from '../src
 import { clearTsneTarget, placeTsneTarget, updateTsneTarget } from './target'
 import { captureView, placeCapture, updateCapture } from './capture'
 import { captureWinner } from '../src/domain/match/capture'
-import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
+import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides, twoRounds } from '../src/domain/match/sides'
 import { targetReturnsAt } from '../src/domain/match/target'
 import { fitLoadout } from '../src/domain/player/equip'
 import { canChoose, isAwaitingReturn, isDowned, isSeated } from '../src/domain/player/lifecycle'
@@ -435,8 +435,12 @@ export function matchState(room: RoomWorld): ServerMessage {
     attack: room.mode.sides ? room.attack : undefined,
     stealth: room.mode.sides ? stealthActive(room, Date.now()) : undefined,
     cautionUntil: cautionUntil(room, Date.now()) ?? undefined,
-    round: room.mode.sides ? room.round : undefined,
+    round: twoRounds(room.mode) ? room.round : undefined,
     roundWins: room.mode.sides ? room.roundWins : undefined,
+    // 前後半の部屋の後半は陣地が入れ替わっている。湧く基地と印を相手の色の物にする (sides.ts の homeOf)
+    basesSwapped: room.mode.halves ? room.basesSwapped : undefined,
+    // 前の半までの残り (TDM は残機、CAP はカウントの秒)。決着は合計で決まる
+    carried: room.mode.halves && room.round > 1 ? carriedView(room) : undefined,
     target: room.target
       ? {
           x: room.target.x,
@@ -488,16 +492,48 @@ export function fitToRoom(room: RoomWorld, player: MatchPlayer): void {
   fitLoadout(player, primariesOf(room.name, side), secondaryOf(room.name, side), supportsOf(room.name, side))
 }
 
+/** 前の半までの残りを配る形。CAP のカウントは秒 (captureView と同じ小数 1 桁) */
+function carriedView(room: RoomWorld): Record<Team, number> {
+  if (!room.mode.capture) return { ...room.carried }
+  return { blue: Math.round(room.carried.blue / 100) / 10, red: Math.round(room.carried.red / 100) / 10 }
+}
+
+/** この半の残り。TDM は残機、CAP はカウント (ms) */
+function halfLeft(room: RoomWorld): Record<Team, number> {
+  if (room.mode.capture) return room.capture ? { ...room.capture.count } : { blue: 0, red: 0 }
+  return { blue: room.blue, red: room.red }
+}
+
 /**
- * 後攻のラウンドへ。**支度 (スキル選び) を挟まず、攻守を入れ替えて秒読みから** (TSNE)。
+ * 前後半の部屋の決着。**前後半の残りの合計で決める** (2026-11-09 本人「最終的な勝ち負けは合計の
+ * 残りチケットが少ない方」)。TDM は残機の合計が少ない方の負け、CAP はカウントを減らすほど良いので
+ * 合計が少ない方の勝ち。並んだら引き分け (CAP は後半の時間切れでサドンデスに入れてある)
+ */
+function halvesWinner(room: RoomWorld): Team | 'draw' {
+  const { blue, red } = room.carried
+  if (blue === red) return 'draw'
+  if (room.mode.capture) return blue < red ? 'blue' : 'red'
+  return blue > red ? 'blue' : 'red'
+}
+
+/**
+ * 2 ラウンド目へ。**支度 (スキル選び) を挟まず、秒読みから。**
+ *
+ *     攻守に分かれる部屋 (TSNE)  攻守を入れ替える (後攻)
+ *     前後半の部屋 (TDM / CAP)   陣地を入れ替え、残機を戻す (後半。カウントは始まる時に placeCapture が戻す)
  *
  * 試合の札・戦績はそのまま (1 試合の続き)。置いた物は片付ける — 前のラウンドの守る側の
- * クレイモアが、次のラウンドでは攻める側の物として残ることになる。装備は側が変わったので
- * 選び直す (支度の画面は出す。スキルの窓は出さない)
+ * クレイモアが、次のラウンドでは攻める側の物として残ることになる。装備は選び直す
+ * (支度の画面は出す。スキルの窓は出さない)
  */
 function startNextRound(room: RoomWorld, now: number): void {
   room.round += 1
-  swapSides(room)
+  if (room.mode.sides) swapSides(room)
+  if (room.mode.halves) {
+    room.basesSwapped = true
+    room.blue = TICKETS
+    room.red = TICKETS
+  }
   clearTsneTarget(room)
   room.revealedUntil = 0
   room.grenades.length = 0
@@ -506,7 +542,7 @@ function startNextRound(room: RoomWorld, now: number): void {
   clearDolls(room)
   clearLocators(room)
   for (const player of connected(room)) {
-    fitToRoom(room, player)
+    if (room.mode.sides) fitToRoom(room, player)
     player.roundDeaths = 0
     player.sleepUntil = 0
     setLife(room, player, 'choosing', now)
@@ -526,17 +562,26 @@ function startNextRound(room: RoomWorld, now: number): void {
  */
 function endRound(room: RoomWorld, now: number): void {
   const winner = decideWinner(room)
-  if (room.mode.sides) {
+  if (twoRounds(room.mode)) {
     if (winner !== 'draw') room.roundWins[winner] += 1
+    if (room.mode.halves) {
+      const left = halfLeft(room)
+      room.carried.blue += left.blue
+      room.carried.red += left.red
+    }
     if (room.round < 2) {
-      // 合間を挟んでから後攻へ (updateMatch の break)。winner はこのラウンドの勝ち
+      // 合間を挟んでから 2 ラウンド目へ (updateMatch の break)。winner はこのラウンドの勝ち
       room.phase = 'break'
       room.winner = winner
       room.endsAt = now + ROUND_BREAK_MS
       return
     }
-    const { blue, red } = room.roundWins
-    room.winner = blue === red ? 'draw' : blue > red ? 'blue' : 'red'
+    if (room.mode.halves) {
+      room.winner = halvesWinner(room)
+    } else {
+      const { blue, red } = room.roundWins
+      room.winner = blue === red ? 'draw' : blue > red ? 'blue' : 'red'
+    }
   } else {
     room.winner = winner
   }
@@ -718,6 +763,9 @@ function enterReady(room: RoomWorld, now: number, afterMatch = false): void {
   room.revealedUntil = 0
   room.round = 1
   room.roundWins = { blue: 0, red: 0 }
+  // 前後半の部屋は前半から。陣地を戻し、前の試合の残りを捨てる
+  room.basesSwapped = false
+  room.carried = { blue: 0, red: 0 }
   clearTsneTarget(room)
   room.capture = null
   for (const player of room.players.values()) player.ready = false
@@ -869,7 +917,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
       }
     }
   } else if (room.phase === 'break' && now >= room.endsAt) {
-    // ラウンドの合間が明けた。攻守を入れ替えて後攻の秒読みへ
+    // ラウンドの合間が明けた。攻守 (TSNE) か陣地 (TDM / CAP) を入れ替えて 2 ラウンド目の秒読みへ
     startNextRound(room, now)
   } else if (room.phase === 'countdown' && now >= room.endsAt) {
     room.phase = 'playing'
@@ -878,8 +926,8 @@ export function updateMatch(room: RoomWorld, now: number): void {
     placeTsneTarget(room)
     placeCapture(room, now)
     // ここで身元が決まる。以後この試合の記録は全部これに紐づく。
-    // **後攻のラウンドは同じ試合の続き** なので発番し直さない
-    if (!(room.mode.sides && room.round > 1 && room.matchId)) {
+    // **2 ラウンド目 (後攻・後半) は同じ試合の続き** なので発番し直さない
+    if (!(twoRounds(room.mode) && room.round > 1 && room.matchId)) {
       room.matchId = crypto.randomUUID()
       room.startedAt = now
     }
@@ -894,8 +942,9 @@ export function updateMatch(room: RoomWorld, now: number): void {
   if (room.phase !== 'playing' || previous !== 'playing') {
     // 段階が変わった刻みでは決着を見ない (上の分岐で済んでいる)
   } else if (room.mode.capture) {
-    // **CAP はカウントで決まる。** 先に 0 にしたか、時間切れで差が付いていれば終わり (並んだらサドンデスで続ける)
-    if (capture.winner) endRound(room, now)
+    // **CAP はカウントで決まる。** 先に 0 にしたか、時間切れで差が付いていれば終わり (並んだらサドンデスで続ける)。
+    // 前後半なら前半は時間切れで終わり、後半は前半の残りを足して見る (server/capture.ts)
+    if (capture.over) endRound(room, now)
   } else if (room.targetDelivered) {
     // **運び込んだ。** 攻める側の勝ち (decideWinner)。時間を待たずにその場で終わる
     endRound(room, now)
