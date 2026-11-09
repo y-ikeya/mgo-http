@@ -3720,12 +3720,26 @@ export class Game {
 
   /**
    * 試合が始まる暗転の前にエンジンの音 (2026-11-03 本人「試合が開始する暗転まえは engine」)。
-   * 待合室 (ready) とラウンドの合間 (break) の締め切りの ENGINE_LEAD_MS 前に 1 回 — 鳴り終わりが暗転の明け
-   * (試合の始まり) に重なる。締め切りごとに 1 回だけ (誰かが READY を取り消して締め切りが延びても、次の締め切りでまた鳴る)
+   *
+   * **待合室 (ready) は、始まるのが決まった時に 1 回だけ** — 秒読み (countdown) へ移った所で鳴らす
+   * (2026-11-09 本人「match が始まることが確定した 1 回だけ流れて欲しい」)。前は締め切りの
+   * ENGINE_LEAD_MS 前に鳴らしていたが、全員が押すと締め切りが 3 秒後へ縮む (READY_GRACE_MS) ので
+   * 押した瞬間に鳴り、取り消して押し直すたびに鳴り直した。
+   *
+   * ラウンドの合間 (break) の締め切りは取り消しで延びないので、今まで通り ENGINE_LEAD_MS 前に鳴らす
+   * (鳴り終わりが暗転の明けに重なる)
    */
   private updateEngine(): void {
     const match = this.replica.match;
-    if (!match || (match.phase !== "ready" && match.phase !== "break") || !(match.endsAt > 0)) return;
+    const phase = match?.phase;
+    const previous = this.enginePhase;
+    this.enginePhase = phase;
+    if (!match) return;
+    if (previous === "ready" && phase === "countdown") {
+      this.audio.playUi("engine");
+      return;
+    }
+    if (phase !== "break" || !(match.endsAt > 0)) return;
     const left = match.endsAt - Date.now();
     if (left <= 0 || left > ENGINE_LEAD_MS || this.engineFor === match.endsAt) return;
     this.engineFor = match.endsAt;
@@ -3733,6 +3747,8 @@ export class Game {
   }
   /** エンジンを鳴らした締め切り (endsAt)。同じ締め切りで 2 度鳴らさない */
   private engineFor = 0;
+  /** 前のコマで見た試合の段階。待合室から秒読みへ移った瞬間を拾う */
+  private enginePhase: string | undefined = undefined;
 
   /**
    * **試合が始まる前に、読む物と組む物を済ませる** (2026-11-03 本人「match 始まる前に asset を全部読む方針に」)。

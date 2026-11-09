@@ -25,7 +25,7 @@ import { captureWinner } from '../src/domain/match/capture'
 import { canRespawn, cautionUntil, sideOf, stealthActive, standing, swapSides } from '../src/domain/match/sides'
 import { targetReturnsAt } from '../src/domain/match/target'
 import { fitLoadout } from '../src/domain/player/equip'
-import { canChoose, isDowned, isSeated } from '../src/domain/player/lifecycle'
+import { canChoose, isAwaitingReturn, isDowned, isSeated } from '../src/domain/player/lifecycle'
 import { type MatchPlayer, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
@@ -738,14 +738,15 @@ function standingCounts(room: RoomWorld, now: number): void {
 }
 
 /**
- * 全員の支度が済んだか。**席を持っている人を全員数える** (戻りを待っている人も)。
+ * 全員の支度が済んだか。**繋がっている人だけを数える。**
  *
- * 繋がっている人だけを数えていた頃は、相手がリロードで一瞬切れた間に残った 1 人が
- * 押すと揃ったことになり、相手を置いて始まった (2026-10-09)。戻ってこない人で部屋が
- * 止まることは無い — 支度の締め切り (READY_SECONDS) で始まり、席も 30 秒で畳まれる
+ * 2026-10-09 に「戻りを待っている人も数える」にした (相手がリロードで一瞬切れた間に、残った
+ * 1 人が押すと置いて始まった)。それだと押さずにタブを閉じた人の席が 30 秒残り、残った全員が
+ * 押しても始まらなかった。本人「支度の際はその 30 秒とかの buffer いらないんじゃないかな」
+ * (2026-11-09)。リロードで一瞬切れた人を置いて始まるのは受け入れる
  */
 function allReady(room: RoomWorld): boolean {
-  const here = [...room.players.values()].filter((p) => !p.bot)
+  const here = [...room.players.values()].filter((p) => !p.bot && !isAwaitingReturn(p.life))
   return here.length > 0 && here.every((p) => p.ready)
 }
 
