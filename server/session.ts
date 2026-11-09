@@ -148,6 +148,11 @@ export interface Session {
    */
   badPacketAt: number
   /** 成立しない移動を最後に警告した時刻 (Date.now)。同じく間引くため */
+  /**
+   * 最後に「ここへ戻れ」(moveRejected) を送った時刻 (ms)。位置は毎秒 64 通届くので、
+   * 断るたびに送ると戻す知らせが山になる。SNAP_BACK_MS ごとに 1 通
+   */
+  snapBackAt: number
   badMoveAt: number
   /**
    * 往復の時間の控え (domain/match/lag.ts)。
@@ -202,6 +207,7 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     resuppliedAt: 0,
     badPacketAt: 0,
     badMoveAt: 0,
+    snapBackAt: 0,
     lastShotAt: 0,
     pelletsLeft: 0,
     flinchedThisShot: false,

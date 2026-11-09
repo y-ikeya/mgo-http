@@ -2263,6 +2263,19 @@ export class Game {
   }
 
   /**
+   * 送った位置が断られた。**サーバーが持っている位置へ跳んで戻る** (2026-11-09 本人「一人姿が見えてない」)。
+   *
+   * 戻らないと差が開く一方で、他の人の画面ではずっと古い位置に居る (server/relay.ts)。
+   * 跳んだ距離を足音に積ませない (warpTo)。届くまでの間に送った位置も断られるので、
+   * 少しの間は何通か続けて届く
+   */
+  private receiveMoveRejected(message: Extract<ServerMessage, { type: "moveRejected" }>): void {
+    const [x, y, z] = message.at;
+    this.player.position.set(x, y, z);
+    this.player.warpTo(x, y, z);
+  }
+
+  /**
    * 報せの種類ごとの受け手。**1 つの報せに 1 つの小さな受け手** (2026-11-03、613 行の switch を割った)。
    * 載っていない種類は、レプリカが受けるだけで体には何もしない
    */
@@ -2296,6 +2309,7 @@ export class Game {
     dollGone: (message) => this.receiveDollGone(message),
     trapReleased: (message) => this.receiveTrapReleased(message),
     decoyBumped: (message) => this.receiveDecoyBumped(message),
+    moveRejected: (message) => this.receiveMoveRejected(message),
     cboxBumped: (message) => this.receiveCboxBumped(message),
     locatorThrown: (message) => this.receiveLocatorThrown(message),
     locatorPlaced: (message) => this.receiveLocatorPlaced(message),

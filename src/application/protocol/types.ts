@@ -556,6 +556,19 @@ export interface DecoyPlaced {
 }
 
 /**
+ * 送った位置を断った。**サーバーが持っている位置へ戻る** (server/relay.ts)。
+ *
+ * 位置は「跳んだ / 抜けた」を見て断る。断ったまま知らせないと、画面は動き続けるのに
+ * サーバーは古い位置のままで、差が開いて二度と通らない (他の人の画面では動かなくなる)。
+ * 断られている間は SNAP_BACK_MS ごとに届く
+ */
+export interface MoveRejected {
+  type: 'moveRejected'
+  /** サーバーが持っている足元の位置 (three の座標) */
+  at: [number, number, number]
+}
+
+/**
  * 人形が押しのけられた。**誰かが触った。**
  *
  * 見えている全員へ配る。離れた所から自分の decoy が揺れるのが見えたら
@@ -1594,6 +1607,7 @@ export type ServerMessage =
   | ClaymoreGone
   | DecoyPlaced
   | DecoyBumped
+  | MoveRejected
   | CboxBumped
   | DecoyGone
   | DollPlaced
