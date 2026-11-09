@@ -1713,6 +1713,14 @@ export class RemoteSoldiers {
     return formed;
   }
 
+  /**
+   * その人との繋がりを断つ。**相手が倒れたら結び直し** (2026-11-09 本人「仲間が死んだ後も光り続けてる
+   * (次の命でも発光を引き継いでる) のは bad」)。自分が倒れた時の clearLinks と同じ決まりを、相手の側にも
+   */
+  unlink(id: string): void {
+    this.players.get(id)?.setLinked(false);
+  }
+
   /** 繋がりを断つ。倒れたら結び直し */
   clearLinks(): void {
     for (const player of this.players.values()) player.setLinked(false);

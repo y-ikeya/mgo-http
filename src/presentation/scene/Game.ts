@@ -2239,6 +2239,8 @@ export class Game {
         // 離れた場所の誰かには「そこで撃ち合いが終わった」と伝わる
         const at = this.remotes.positionOf(effect.id);
         if (at) this.addPing("shot", at, this.audio.play("scream", at));
+        // 敬礼で繋がっていた味方なら切る。次の命はもう一度敬礼を交わしてから
+        this.remotes.unlink(effect.id);
         break;
       }
       case "left":
