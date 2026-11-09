@@ -45,6 +45,7 @@ import {
 import { MAX_FALL_SPEED, applyBlastDamage, applyCqc, applyDamage, applyRoll, reject } from './damage'
 import { alertAims, alertShot } from './alert'
 import { relayAwareness, revealTo } from './aware'
+import { updateLinks } from './link'
 import {
   fitToRoom,
   leaveRoom,
@@ -233,6 +234,8 @@ setInterval(() => {
       }
 
       updateMatch(room, now)
+      // 手を挙げている味方どうしを結ぶ (server/link.ts)
+      updateLinks(room, now)
       if (room.mode.id === 'PRACTICE') {
         updateTargets(room, now)
         // 練習の猫。自分で掛かって確かめる。消えたら置き直す

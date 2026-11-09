@@ -192,9 +192,6 @@ import { loadRenderScale } from "../../infra/prefs/quality";
 /** パッドでボイスを選ぶ十字キーの並び。上から時計回り */
 const VOICE_PAD_ORDER = ["menuUp", "menuRight", "menuDown", "menuLeft"] as const;
 
-
-const LINK_RANGE = 5;
-
 /** 繋がったことを何秒出すか */
 const LINK_FEED_LIFE = 4;
 const LINK_FEED_MAX = 3;
@@ -1655,7 +1652,6 @@ export class Game {
         }
       }
     }
-    this.updateLinks();
     // 押している間は手を挙げたまま。離すと下ろす
     this.player.setSaluteHeld(!this.loadoutBlocking && !voiceOpen && this.input.down("salute"));
     // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
@@ -2314,6 +2310,7 @@ export class Game {
     trapReleased: (message) => this.receiveTrapReleased(message),
     decoyBumped: (message) => this.receiveDecoyBumped(message),
     moveRejected: (message) => this.receiveMoveRejected(message),
+    links: (message) => this.receiveLinks(message),
     cboxBumped: (message) => this.receiveCboxBumped(message),
     locatorThrown: (message) => this.receiveLocatorThrown(message),
     locatorPlaced: (message) => this.receiveLocatorPlaced(message),
@@ -4879,22 +4876,14 @@ export class Game {
   }
 
   /**
-   * 敬礼を交わした味方と繋がる。
+   * 敬礼で繋がっている味方が届いた (server/link.ts)。**結ぶのも切るのもサーバー。**
    *
-   * 味方の位置はサーバーが配っているが、既定では映さない。互いに手を挙げて
-   * 初めて壁越しに見えるようになる。誰と組むかを自分で選ぶための手続き。
+   * 新しく繋がった相手は名前を出して、音でも返す。手を挙げている間は画面を見ていない
    */
-  private updateLinks(): void {
-    const formed = this.remotes.linkSaluting(
-      this.player.isSaluting,
-      this.player.position,
-      LINK_RANGE,
-      this.replica.team,
-    );
-    for (const name of formed) {
+  private receiveLinks(message: Extract<ServerMessage, { type: "links" }>): void {
+    for (const name of this.remotes.setLinks(message.ids)) {
       this.links.unshift({ name, at: Date.now() });
       this.links.length = Math.min(this.links.length, LINK_FEED_MAX);
-      // 繋がったことは音でも返す。手を挙げている間は画面を見ていない
       this.audio.play("clink", this.player.position);
     }
   }

@@ -251,6 +251,16 @@ export interface MatchPlayer extends Player {
    */
   leaks: Map<string, number>
   /**
+   * **敬礼を交わして繋がっている味方** (id)。両側に持つ (server/link.ts が結び、どちらかが倒れたら切る)。
+   *
+   * 暴いた情報 (EE の輪郭・TA / E LOCATOR の気配・AWARENESS) は本人と、ここに居る人にだけ届く
+   * (leakReaches、2026-11-09 本人「暴く系は基本は自分の画面だけ。link した時は仲間にも共有。
+   * 全員に問答無用で配るのは NG」)
+   */
+  links: Set<string>
+  /** 手を挙げたままか (敬礼を保っている)。位置と一緒に届く。繋がるのは互いに保っている間 */
+  saluteHeld: boolean
+  /**
    * いま手にある物。位置と一緒に届く。
    *
    * 撃てない物 (手榴弾・ナイフ・箱) を持っている間の射撃を弾くのに使う。
@@ -462,6 +472,8 @@ export function newMatchPlayer(seed: {
     inventory: new Inventory({ primary: 'rifle', secondary: 'm9', support: 'grenade' }),
     skills: {},
     leaks: new Map(),
+    links: new Set(),
+    saluteHeld: false,
     knockX: 0,
     knockZ: 0,
     knockLeft: 0,
@@ -622,21 +634,25 @@ export function isProtected(who: Player): boolean {
 }
 
 /**
- * 抜いた側を宛先の形にする。
+ * 抜いた側を宛先の形にする。**宛先はいつも抜いた本人。**
  *
- * **陣営のある部屋は陣営ぜんぶ、無い部屋は本人だけ。** 抜いた情報を味方に
- * 渡せるからチーム戦で 1 枠割く価値が出る。個人戦には渡す相手が居ないので、
- * 同じドメインルールが自動的に「本人だけ」に落ちる — 部屋ごとに分岐を書かなくて済む。
- *
- * @param teams その部屋に陣営があるか (domain/match/room.ts の mode.teams)
+ * 前は陣営のある部屋なら陣営ぜんぶだった。誰が抜いても味方全員の画面に出るので、
+ * 合流しなくても情報が揃った (2026-11-09 本人「全員に問答無用で姿を配るのは NG」)。
+ * 味方へ渡るのは、敬礼を交わして繋がっている間だけ (leakReaches)
  */
-export function leakTag(attacker: MatchPlayer, teams: boolean): string {
-  return teams ? `team:${attacker.team}` : `id:${attacker.id}`
+export function leakTag(attacker: MatchPlayer): string {
+  return `id:${attacker.id}`
 }
 
-/** その宛先は、その人に届くか */
-export function leakReaches(tag: string, viewer: MatchPlayer): boolean {
-  return tag === `team:${viewer.team}` || tag === `id:${viewer.id}`
+/**
+ * その宛先は、その人に届くか。**本人か、本人と繋がっている味方** (links)。
+ *
+ * 毎回ここで問うので、繋がる前に抜いた光も繋がった時点から届き、切れたら止まる
+ */
+export function leakReaches(tag: string, viewer: Pick<MatchPlayer, 'id' | 'links'>): boolean {
+  if (!tag.startsWith('id:')) return false
+  const owner = tag.slice(3)
+  return owner === viewer.id || viewer.links.has(owner)
 }
 
 /**

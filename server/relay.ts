@@ -154,6 +154,8 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   player.aiming = snapshot.aiming || snapshot.holdingGrenade
   player.locomotion = snapshot.locomotion
   player.locomotionAge = snapshot.locomotionAge
+  // 手を挙げたままか。敬礼で繋がるのはお互いに保っている間 (server/link.ts)
+  player.saluteHeld = snapshot.saluteHeld
   // 持っている銃。威力と連射の上限をこれで引く
   /*
    * **手にある物は申告だが、持てない物は受け取らない。**

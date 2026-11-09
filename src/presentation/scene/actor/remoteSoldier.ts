@@ -1685,30 +1685,19 @@ export class RemoteSoldiers {
   }
 
   /**
-   * 敬礼を交わした味方を探す。
+   * 敬礼で繋がっている味方を、**サーバーが送ってきた一覧に合わせる** (server/link.ts)。
    *
-   * 味方の位置はサーバーが配っているが、既定では映さない。**互いに敬礼して
-   * 初めて繋がる。** 味方が全員最初から見えていると、探すことも合流することも
-   * 手続きでなくなる。手を挙げて返してもらう、という一手間が入るだけで、
-   * 「誰と組んでいるか」が自分で選んだものになる。
+   * 結ぶのも切るのもサーバー。画面が自分で結んでいた頃は、暴いた情報を誰に配るかを
+   * サーバーが決められなかった (2026-11-09)。
    *
-   * @param saluting 自分が手を挙げているか
    * @returns 新しく繋がった相手の名前
    */
-  linkSaluting(
-    saluting: boolean,
-    origin: THREE.Vector3,
-    range: number,
-    team: Team | null,
-  ): string[] {
-    if (!saluting || team === null) return [];
-
+  setLinks(ids: readonly string[]): string[] {
     const formed: string[] = [];
-    for (const player of this.players.values()) {
-      if (player.isLinked || !player.isAlly(team) || !player.saluting) continue;
-      if (player.object.position.distanceTo(origin) > range) continue;
-      player.setLinked(true);
-      formed.push(player.name);
+    for (const [id, player] of this.players) {
+      const linked = ids.includes(id);
+      if (linked && !player.isLinked) formed.push(player.name);
+      if (linked !== player.isLinked) player.setLinked(linked);
     }
     return formed;
   }

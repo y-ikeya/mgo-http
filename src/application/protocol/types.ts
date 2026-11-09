@@ -556,6 +556,15 @@ export interface DecoyPlaced {
 }
 
 /**
+ * 敬礼で繋がっている味方 (id)。**変わるたびに全部を送る** (結んだ・切れた。server/link.ts)。
+ * 画面はこの一覧の味方を壁越しに光らせる。暴いた情報もこの相手とだけ分け合う
+ */
+export interface LinksMessage {
+  type: 'links'
+  ids: string[]
+}
+
+/**
  * 送った位置を断った。**サーバーが持っている位置へ戻る** (server/relay.ts)。
  *
  * 位置は「跳んだ / 抜けた」を見て断る。断ったまま知らせないと、画面は動き続けるのに
@@ -1621,6 +1630,7 @@ export type ServerMessage =
   | DecoyPlaced
   | DecoyBumped
   | MoveRejected
+  | LinksMessage
   | CboxBumped
   | DecoyGone
   | DollPlaced
