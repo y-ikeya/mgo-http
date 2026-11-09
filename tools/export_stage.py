@@ -68,6 +68,31 @@ STAIR_BINS = 12
 STAIR_BIN_MAX = 0.15
 
 
+def tread_points(obj, faces, main, steps=8):
+    """踏み面の上に点を敷き詰める。**頂点の数に左右されずに段の高さを拾うため。**
+
+    stair_plane は帯ごとの一番高い点を拾う。踏み面の頂点は段の縁にしか無いので、
+    頂点だけで拾うと空の帯が出て、縁の頂点が入った帯だけで直線を引くことになり、
+    傾きが頂点の付き方で変わった。焼き込みの割りすぎを直して頂点が減ったら、CC の
+    階段の坂が 0.356 → 0.331 にずれ、真ん中で 7cm 沈んだ (2026-11-09)。
+    踏み面の三角ごとに格子状に点を打てば、どの帯にも踏み面の高さが入る
+    """
+    mw = obj.matrix_world
+    pts = []
+    for _, n, poly in faces:
+        if n.dot(main) < 0.996:
+            continue
+        vs = [mw @ obj.data.vertices[i].co for i in poly.vertices]
+        for k in range(1, len(vs) - 1):
+            a, b, c = vs[0], vs[k], vs[k + 1]
+            for i in range(steps + 1):
+                for j in range(steps + 1 - i):
+                    u = i / steps
+                    v = j / steps
+                    pts.append(to_gltf(a * (1 - u - v) + b * u + c * v))
+    return pts
+
+
 def stair_plane(pts, lo, hi):
     """段を追う坂を作る。**平らさは見ない。**
 
@@ -815,7 +840,7 @@ def top_plane(obj, lo, hi):
     # 仕掛け (moving.ts の STEP_UP) と同じで、絵と足取りは元から一致していない。
     # 階段は平らさを見ない。**段を追う坂**を別に作る
     if is_stair(obj.name):
-        return stair_plane(pts, lo, hi) or flat
+        return stair_plane(tread_points(obj, faces, main) or pts, lo, hi) or flat
 
     worst = max(abs(p[1] - (a + b * p[0] + c * p[2])) for p in pts)
     if worst > 0.05:
