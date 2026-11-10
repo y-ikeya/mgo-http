@@ -9,7 +9,7 @@ import type { Input } from '../../../infra/input'
 import type { RemoteSoldiers } from '../actor/remoteSoldier'
 import type { Soldier } from '../actor/soldier'
 import type { StunSparks } from '../fx/stunSparks'
-import type { GameAudio } from '../sense/audio'
+import type { CryRole, GameAudio } from '../sense/audio'
 import type { FollowCamera } from '../sense/camera'
 
 /**
@@ -47,6 +47,8 @@ export interface MeleeHost {
   readonly remotes: RemoteSoldiers
   readonly net: NetTransport
   readonly audio: GameAudio
+  /** 自分の声で鳴らす (声は着ている体で決まる。Game.ts の cry) */
+  cry(role: CryRole, at: THREE.Vector3): void
   readonly follow: FollowCamera
   readonly input: Input
   readonly inv: Inventory
@@ -304,6 +306,6 @@ export class Melee {
 
   /** 拳の音を PUNCH_DELAY 後に、その時の自分の位置で鳴らす */
   private punchSoon(): void {
-    setTimeout(() => this.host.audio.play('punch', this.host.player.position), PUNCH_DELAY * 1000)
+    setTimeout(() => this.host.cry('punch', this.host.player.position), PUNCH_DELAY * 1000)
   }
 }

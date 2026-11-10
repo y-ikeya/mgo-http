@@ -1326,6 +1326,7 @@ export class Game {
       remotes: this.remotes,
       net: this.net,
       audio: this.audio,
+      cry: (role, at) => void this.cry(role, this.net.id, at),
       follow: this.follow,
       input: this.input,
       inv: this.inv,
@@ -4814,7 +4815,7 @@ export class Game {
       // CQC の拳。掛かっても空振りでも、殴りかかった所で鳴る
       if (remote.cqcStarted) {
         const at = remote.object.position;
-        setTimeout(() => this.audio.play("punch", at), PUNCH_DELAY * 1000);
+        setTimeout(() => this.cry("punch", remote.id, at), PUNCH_DELAY * 1000);
       }
       // リロードの音。姿が見えている相手にだけ届く (位置がそうなので)
       if (remote.reloadStarted) {
