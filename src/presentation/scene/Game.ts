@@ -744,6 +744,10 @@ export class Game {
   private boltRate = 1;
   /** 0 より大きい間はリロード中で、発砲できない */
   private reloadTimer = 0;
+  /** その装填の全体の尺 (秒) */
+  private reloadTotal = 0;
+  /** その装填でもう弾を移したか (拳銃は差し込んだ所で移す。weapons.ts の reloadLoadsAt) */
+  private reloadLoaded = false;
   /** その装填を始めたときに伏せていたか。**姿勢をまたいだら中断する** */
   private reloadProne = false;
   /** どの銃を替えていたか。**持ち替えたら中断する** */
@@ -3948,12 +3952,17 @@ export class Game {
 
     if (this.reloadTimer > 0) {
       this.reloadTimer -= dt;
-      if (this.reloadTimer <= 0) {
-        this.reloadTimer = 0;
+      if (this.reloadTimer <= 0) this.reloadTimer = 0;
+      /*
+       * 弾を移す。**弾倉が入った瞬間に**知らせる (長物は動作の終わり、拳銃は差し込んだ所)。
+       * 始まりではなく入った所を送ることで、サーバーは銃ごとの装填の尺を持たなくてよくなる。
+       * 撃てるのは動作が終わってから (reloadTimer)。入った後に中断しても弾は入ったまま
+       */
+      const done = this.reloadTotal > 0 ? 1 - this.reloadTimer / this.reloadTotal : 1;
+      if (!this.reloadLoaded && done >= (this.weapon.reloadLoadsAt ?? 1) - 1e-6) {
+        this.reloadLoaded = true;
         // 予備から足りるぶんだけ移す。弾倉に残っていた分は捨てない
         const kind = this.player.equipped;
-        // **終わった瞬間**に知らせる。始まりではなく終わりを送ることで、
-        // サーバーは銃ごとの装填の尺を持たなくてよくなる
         if (this.inv.reload()) this.net.send({ type: "reload", weapon: kind });
       }
       // 弾倉に手が掛かる頃に鳴らす。近くの相手には「いま撃てない」が伝わる
@@ -4110,6 +4119,8 @@ export class Game {
      */
     // **極めた銃だけ速い。** 拾った銃は素の尺のまま (masteryReloadScale)
     this.reloadTimer = this.weapon.reload * masteryReloadScale(this.skills, this.weapon.id);
+    this.reloadTotal = this.reloadTimer;
+    this.reloadLoaded = false;
     this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
     this.reloadSoundIn = this.reloadTimer * (this.weapon.reloadSoundAt ?? this.knobs.reloadSoundAt);
