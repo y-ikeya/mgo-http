@@ -262,6 +262,8 @@ const FLAG2_WINDUP = 4
  * (stampStealthed)。守る側が名乗っても消えない
  */
 const FLAG2_STEALTH = 8
+/** 左肩越しで見ている。サーバーはカメラの位置をこちらの側へ出す (sim/space/eyepoint.ts) */
+const FLAG2_LEFT_SHOULDER = 16
 
 /** 位置を詰める。slot は送る側では 0 (サーバーが書き込む) */
 export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer {
@@ -292,7 +294,8 @@ export function encodeSnapshot(snapshot: PlayerSnapshot, slot = 0): ArrayBuffer 
     OFF_FLAGS2,
     (snapshot.reloading ? FLAG2_RELOADING : 0) |
       (snapshot.holdingGrenade ? FLAG2_WINDUP : 0) |
-      (snapshot.stealthed ? FLAG2_STEALTH : 0),
+      (snapshot.stealthed ? FLAG2_STEALTH : 0) |
+      (snapshot.leftShoulder ? FLAG2_LEFT_SHOULDER : 0),
   )
   view.setUint8(OFF_HELD, HELD_INDEX.get(snapshot.held) ?? 0)
   view.setUint8(OFF_WEAPON, WEAPON_INDEX.get(snapshot.weapon) ?? 0)
@@ -329,6 +332,7 @@ export function decodeSnapshot(view: DataView, id: string): PlayerSnapshot {
     reloading: (view.getUint8(OFF_FLAGS2) & FLAG2_RELOADING) !== 0,
     protectedNow: (view.getUint8(OFF_FLAGS2) & FLAG2_PROTECTED) !== 0,
     stealthed: (view.getUint8(OFF_FLAGS2) & FLAG2_STEALTH) !== 0,
+    leftShoulder: (view.getUint8(OFF_FLAGS2) & FLAG2_LEFT_SHOULDER) !== 0,
   }
 }
 

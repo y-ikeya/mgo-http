@@ -84,6 +84,27 @@ describe('bodyVisible (箱の 12 辺)', () => {
   })
 })
 
+describe('左肩越し', () => {
+  test('カメラは右肩と左右対称の位置に出る (高さと引きは同じ)', () => {
+    const right = cameraPoint(0, 0, 0, 0, 0, true, 1.5)
+    const left = cameraPoint(0, 0, 0, 0, 0, true, 1.5, [], { x: 0, y: 0, z: 0 }, -1)
+    expect(left.x).toBeCloseTo(-right.x, 5)
+    expect(left.x).toBeLessThan(0)
+    expect(left.y).toBeCloseTo(right.y, 5)
+    expect(left.z).toBeCloseTo(right.z, 5)
+  })
+
+  test('左の物陰の向こうは、左肩越しのときだけ見える (審判の目も左へ出る)', () => {
+    // 体の中心より左 (x < 0) からしか通らない線。右肩のカメラと注視点 (x = 0) からは通らない
+    const fromLeftOnly = (ex: number) => ex < -0.1
+    const viewer = { x: 0, y: 0, z: 0, cameraYaw: 0, pitch: 0, aiming: true }
+    expect(seesFromCamera({ ...viewer, leftShoulder: false }, [1.5, 1.5], [], fromLeftOnly)).toBe(false)
+    expect(seesFromCamera({ ...viewer, leftShoulder: true }, [1.5, 1.5], [], fromLeftOnly)).toBe(true)
+    // 省けば右 (古い版・ボット)
+    expect(seesFromCamera(viewer, [1.5, 1.5], [], fromLeftOnly)).toBe(false)
+  })
+})
+
 describe('網で寄せる (CameraBlocker)', () => {
   test('何にも当たらなければ引き切る。外接の箱の中 (建物の窪み) でも頭へ戻さない', () => {
     const open = { hit: () => null }

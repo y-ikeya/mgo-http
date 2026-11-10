@@ -342,7 +342,7 @@ export function zoneExposed(
   const cam = cameraPoint(
     attacker.x, attacker.y, attacker.z,
     attacker.cameraYaw ?? attacker.yaw, attacker.pitch, attacker.aiming ?? true,
-    rules.viewHeight(attacker.stance),
+    rules.viewHeight(attacker.stance), [], undefined, attacker.leftShoulder ? -1 : 1,
   )
   if (!reaches(cam.x, cam.y, cam.z)) return false
   const eye = zoneShape(target, 'HEAD', rules)

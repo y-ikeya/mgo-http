@@ -134,15 +134,17 @@ export function cameraPoint(
   viewHeight: number,
   boxes: CameraBlocker = [],
   out: ViewPoint = { x: 0, y: 0, z: 0 },
+  side: 1 | -1 = 1,
 ): ViewPoint {
   const view = aiming ? AIM_CAMERA : HIP_CAMERA
 
   const [dirX, dirY, dirZ] = viewDirection(yaw, pitch)
 
   // 肩へのずれは水平だけ (pitch で肩越しの左右がブレないように)
-  let pivotX = x + Math.cos(yaw) * view.shoulder
+  // 左肩越し (side -1) なら反対へ。画面の camera.ts の shoulderSide と同じ
+  let pivotX = x + Math.cos(yaw) * view.shoulder * side
   let pivotY = feetY + viewHeight + view.lift
-  let pivotZ = z + -Math.sin(yaw) * view.shoulder
+  let pivotZ = z + -Math.sin(yaw) * view.shoulder * side
 
   if (!Array.isArray(boxes)) {
     // 網。肩へずらす間に壁があれば肩のずれを捨てる (壁に体の側面を付けた時)
@@ -204,6 +206,8 @@ export interface Viewer {
   cameraYaw: number
   pitch: number
   aiming: boolean
+  /** 左肩越しか。省けば右 */
+  leftShoulder?: boolean
 }
 
 /**
@@ -228,7 +232,7 @@ export function seesFromCamera(
     const eye = cameraPoint(
       viewer.x, viewer.y, viewer.z,
       viewer.cameraYaw, viewer.pitch, viewer.aiming,
-      height, cameraBoxes, scratch,
+      height, cameraBoxes, scratch, viewer.leftShoulder ? -1 : 1,
     )
     if (visibleFrom(eye.x, eye.y, eye.z)) return true
 

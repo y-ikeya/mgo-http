@@ -60,4 +60,13 @@ describe('位置の符号', () => {
     expect(round(1.234)).toBeCloseTo(1.25, 5)
     expect(round(40)).toBeCloseTo(12.75, 5)
   })
+
+  test('肩越しの左右が往復する。他の 2 枚目の旗と混ざらない (省けば右)', () => {
+    const round = (extra: object) => decodeSnapshot(new DataView(encodeSnapshot({ ...SNAPSHOT, ...extra })), 'a')
+    expect(round({}).leftShoulder).toBe(false)
+    const left = round({ leftShoulder: true, reloading: true })
+    expect(left.leftShoulder).toBe(true)
+    expect(left.reloading).toBe(true)
+    expect(left.stealthed).toBe(false)
+  })
 })

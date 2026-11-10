@@ -71,6 +71,8 @@ export interface Pose {
    */
   cameraYaw?: number
   aiming?: boolean
+  /** 左肩越しだったか。カメラの横のずれの向き (無ければ右) */
+  leftShoulder?: boolean
   /** 傾き (lean_left / lean_right)。目と体を横へずらして判定する */
   lean?: Lean
   /**
@@ -179,6 +181,8 @@ export interface MatchPlayer extends Player {
   cameraYaw: number
   pitch: number
   aiming: boolean
+  /** 左肩越しか (位置の報せの申告)。カメラの位置をこちらの側へ出す */
+  leftShoulder: boolean
   /**
    * 集中し始めた時刻 (Date.now)。0 なら集中していない。
    *
@@ -463,6 +467,7 @@ export function newMatchPlayer(seed: {
     cameraYaw: 0,
     pitch: 0,
     aiming: false,
+    leftShoulder: false,
     crouching: false,
     boxed: false,
     loweredAt: 0,

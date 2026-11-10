@@ -872,6 +872,24 @@ export class Game {
   private zoomStep = 0;
 
   /**
+   * 左肩越しか (2026-11-10 本人「左肩にカメラが寄るのもある、持ち手は変わらない」)。
+   *
+   * **構えている間だけ持ち替えられる** (パッドは構え中の R3、鍵盤は X)。構えを解いても
+   * 戻さない — 角の左側を覗き続ける人が、構え直すたびに右へ戻されると困る。
+   * サーバーへも送る (snapshot.leftShoulder)。可視の判定はカメラの位置から引くので、
+   * 片側だけ左にすると「画面では見えるのに配られない」が出る
+   */
+  private leftShoulder = false;
+
+  /** 構えている間の肩の持ち替え。狙っている所は動かさない (holdAimAt) */
+  private updateShoulder(): void {
+    if (!this.input.tapped("shoulder") || !this.player.isAiming || this.voiceMenuOpen()) return;
+    this.follow.holdAimAt(this.aimedDistance());
+    this.leftShoulder = !this.leftShoulder;
+    this.follow.setShoulderSide(this.leftShoulder ? -1 : 1);
+  }
+
+  /**
    * 倍率を上げ下げする。
    *
    * 構えていないときは受け付けない。構えを解いたら 0 へ戻す —
@@ -1624,6 +1642,7 @@ export class Game {
     this.inv.update(dt, this.input.firing);
     this.melee.updateTrigger();
     this.updateZoom();
+    this.updateShoulder();
     this.applyWeaponView();
 
     // 成績表。開いている間はポインタを離して、押せる状態にする
@@ -2098,6 +2117,8 @@ export class Game {
     // 視点の向きはカメラが持っている。体の向きとは別 (構えていないと体は進行方向を向く)。
     // サーバーはこれで「どこから見ているか」を出し、可視の判定に使う
     snapshot.cameraYaw = this.follow.aimYaw;
+    // 肩越しの左右。サーバーのカメラの位置 (可視の判定の目) を同じ側へ出す
+    snapshot.leftShoulder = this.leftShoulder;
     // 撃ち返せない時間は相手にも見せる。反撃の機会になる
     snapshot.reloading = this.reloadTimer > 0;
     // STEALTH を着ているか。効いているかはサーバーが確かめて、効いていなければ消して配る
@@ -4269,7 +4290,7 @@ export class Game {
    */
   private readonly eyePose = {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance,
-    lean: 0 as Lean, cameraYaw: 0, aiming: false,
+    lean: 0 as Lean, cameraYaw: 0, aiming: false, leftShoulder: false,
   };
   private readonly targetPose = {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
@@ -4333,6 +4354,7 @@ export class Game {
     this.eyePose.pitch = this.follow.aimPitch;
     // カメラが寄っているか (投げ物の振りかぶりも寄る)。審判と同じ判断
     this.eyePose.aiming = this.follow.isAiming;
+    this.eyePose.leftShoulder = this.leftShoulder;
     const at = target.object.position;
     this.targetPose.x = at.x;
     this.targetPose.y = at.y;

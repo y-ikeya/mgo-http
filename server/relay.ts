@@ -149,6 +149,8 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   player.boxed = snapshot.boxed
   player.yaw = snapshot.yaw
   player.cameraYaw = snapshot.cameraYaw
+  // 肩越しの左右。可視の判定の目 (カメラ) をこちらの側へ出す
+  player.leftShoulder = snapshot.leftShoulder === true
   player.pitch = snapshot.pitch
   // 振りかぶり (投げ物を構えている) も構え。客のカメラは銃と同じに寄っているので、見える判定の目もそちら
   player.aiming = snapshot.aiming || snapshot.holdingGrenade
@@ -290,7 +292,7 @@ export function seesPlayer(room: RoomWorld, viewer: MatchPlayer, target: MatchPl
 /** 作業場。seesPlayer / eyeOf は同期で、返した物はその場で使い切る */
 const targetShift = { x: 0, z: 0 }
 const viewerShift = { x: 0, z: 0 }
-const leanedViewer: Viewer = { x: 0, y: 0, z: 0, cameraYaw: 0, pitch: 0, aiming: false }
+const leanedViewer: Viewer = { x: 0, y: 0, z: 0, cameraYaw: 0, pitch: 0, aiming: false, leftShoulder: false }
 
 /**
  * 見ている側の目の置き場。**傾いていれば横へずらす。**
@@ -306,6 +308,7 @@ function eyeOf(viewer: MatchPlayer): Viewer {
   leanedViewer.cameraYaw = viewer.cameraYaw
   leanedViewer.pitch = viewer.pitch
   leanedViewer.aiming = viewer.aiming
+  leanedViewer.leftShoulder = viewer.leftShoulder
   return leanedViewer
 }
 
@@ -426,6 +429,7 @@ export function viewOf(room: RoomWorld, player: MatchPlayer, now: number): { x: 
     (low + high) / 2,
     room.stage.camera,
     viewEye,
+    player.leftShoulder ? -1 : 1,
   )
 }
 
