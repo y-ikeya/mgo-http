@@ -4112,7 +4112,7 @@ export class Game {
     this.reloadTimer = this.weapon.reload * masteryReloadScale(this.skills, this.weapon.id);
     this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
-    this.reloadSoundIn = this.reloadTimer * this.knobs.reloadSoundAt;
+    this.reloadSoundIn = this.reloadTimer * (this.weapon.reloadSoundAt ?? this.knobs.reloadSoundAt);
     // 覗いたままだと入れ替えの間ずっと視界が狭い。肩越しへ戻す
     this.zoomStep = 0;
   }
@@ -4818,9 +4818,11 @@ export class Game {
         setTimeout(() => this.cry("punch", remote.id, at), PUNCH_DELAY * 1000);
       }
       // リロードの音。姿が見えている相手にだけ届く (位置がそうなので)
+      // 自分と同じだけ遅らせる (型の頭で鳴らすと弾倉に手が掛かる前に鳴る)。尺は素の値 (極めたかは知らない)
       if (remote.reloadStarted) {
         const spec = weaponOf(remote.equipped);
-        this.audio.play(spec.reloadSound, remote.object.position);
+        const at = remote.object.position;
+        setTimeout(() => this.audio.play(spec.reloadSound, at), spec.reload * (spec.reloadSoundAt ?? this.knobs.reloadSoundAt) * 1000);
       }
       // 吹き飛ばされた叫び。倒れたのではなく、まだ生きて転がっている
       if (remote.sweptThisFrame) {

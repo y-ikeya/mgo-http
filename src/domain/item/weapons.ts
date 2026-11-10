@@ -147,6 +147,12 @@ export interface WeaponSpec {
   kill: string
   /** リロードの音 (audio.ts の名前)。銃ごとに違う */
   reloadSound: 'reload' | 'pistolReload' | 'm1911Reload' | 'smgReload' | 'm4Reload'
+  /**
+   * リロードの音を鳴らし始める位置 (動作全体に対する割合)。無ければ共通の値
+   * (presentation の RELOAD_SOUND_AT = 0.28、長物の型に合わせた値)。
+   * 拳銃は型が違う (左手が弾倉を差すのが 60〜65% の所) ので、音の「差す」の山をそこへ合わせる
+   */
+  reloadSoundAt?: number
   /** 撃ったときの音 (audio.ts の名前) */
   shotSound: 'rifle' | 'm4' | 'snipe' | 'mosin' | 'm9' | 'm1911' | 'smg' | 'shotgun'
   /** モデルのファイル名 (拡張子なし) */
@@ -725,6 +731,8 @@ const PISTOL: WeaponSpec = {
   kill: 'M9',
   shotSound: 'm9',
   reloadSound: 'pistolReload',
+  // 音の「差す」の山 (0.45 秒目) を、型の差す所 (2.1 秒の 62%) へ。共通の 0.28 では 0.26 秒早かった
+  reloadSoundAt: 0.41,
   model: 'm9',
   aimReach: 0.4,
   // 胴 4 発。突撃銃 (5 発) よりわずかに速いだけで、離れると減衰で届かなくなる
@@ -852,6 +860,8 @@ const M1911: WeaponSpec = {
   kill: 'M1911',
   shotSound: 'm1911',
   reloadSound: 'm1911Reload',
+  // 音の大きい 2 つ目の山 (0.34 秒目、差す) を、型の差す所 (2.3 秒の 62%) へ
+  reloadSoundAt: 0.48,
   model: 'm1911',
   aimReach: 0.4,
   // 胴 3 発。M9 (4 発) より 1 発早い
