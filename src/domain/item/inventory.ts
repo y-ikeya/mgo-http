@@ -869,6 +869,28 @@ export class Inventory {
     return { magazine, reserve }
   }
 
+  /**
+   * 基地での補給。**弾の総数は満たすが、弾倉はそのまま。**
+   *
+   * 持ち物は湧いた時と同じ形に組み直す (refill)。ただし前から持っていた銃の弾倉は
+   * 補給の前の数に戻し、差を予備へ回す — 弾倉を替えるのは本人のリロード
+   * (2026-11-10 本人「baseで補給した時にリロードも一緒に済まされるのは良くない」)
+   */
+  restock(loadout: Loadout): void {
+    const before = new Map<WeaponId, number>()
+    for (const item of this.items) {
+      if ('ammo' in item) before.set(item.id, item.ammo)
+    }
+    this.refill(loadout)
+    for (const item of this.items) {
+      if (!('ammo' in item)) continue
+      const kept = before.get(item.id)
+      if (kept === undefined || kept >= item.ammo) continue
+      item.reserve += item.ammo - kept
+      item.ammo = kept
+    }
+  }
+
   reload(): boolean {
     const item = this.item
     if (!item || !('ammo' in item)) return false

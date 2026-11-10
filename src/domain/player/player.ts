@@ -713,7 +713,8 @@ export function isLeakedTo(target: MatchPlayer, viewer: MatchPlayer, now: number
  * 消える。それでよい: 補給できるのは自分の装備の弾)。
  */
 export function resupply(player: MatchPlayer): void {
-  player.inventory.refill({
+  // 弾倉はそのまま、予備を満たす (inventory.ts の restock)
+  player.inventory.restock({
     primary: player.primary,
     secondary: player.secondary,
     support: player.support,
