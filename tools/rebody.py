@@ -501,7 +501,10 @@ def add_bust():
     side = (side - up * side.dot(up)).normalized()
     forward = side.cross(up).normalized()
 
-    mesh = max(meshes, key=lambda m: len(m.data.vertices))
+    # **脊椎の重みを持つメッシュから選ぶ。** 頂点の数だけで選ぶと、付け替えた頭
+    # (名無しは頭 6037 > 体 5469) を選んで「脊椎の頂点群が無い」で諦めた
+    torsos = [m for m in meshes if any(g.name in ('mixamorig:Spine1', 'mixamorig:Spine2') for g in m.vertex_groups)]
+    mesh = max(torsos or meshes, key=lambda m: len(m.data.vertices))
     groups = {g.name: g.index for g in mesh.vertex_groups}
     spine_ids = {groups[n] for n in ('mixamorig:Spine1', 'mixamorig:Spine2') if n in groups}
     if not spine_ids:
