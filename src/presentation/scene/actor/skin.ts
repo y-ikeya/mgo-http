@@ -45,11 +45,12 @@ const SKINS: Record<string, string> = {
   /*
    * nanashi。Mixamo の Kachujin の体に、Tripo の頭を付け替えたもの (2026-11-10、
    * 元は tools/raw/bald_woman.blend、書き出しに使った写しは nanashi_kachujin.blend)。
-   * Raiden と同じ道 (rebody --nohead → merge_all_clips → fit_height → dedup → pack)。
+   * Raiden と同じ道 (rebody --nohead → merge_all_clips → fit_height --hips → dedup → pack)。
    *
    * **型は前の名無しの glb から移した** (宿主から merge_clip で足した 100 本が揃っている)。
    * 頭と首の重みは Blender で塗ってあるので rebody は --nohead で通す。
-   * 体が宿主より大きく (頭 1.572m)、fit_height で 0.85 倍に縮めて 12cm 持ち上げた
+   * 体が宿主より大きく (頭 1.572m)、fit_height で 0.85 倍に縮めた。**持ち上げずに型の腰の上下を
+   * 1.15 倍にする (--hips)** — 持ち上げは型によらず一定なので、伏せると 12cm 浮いた
    */
   nanashi: 'soldier_nanashi',
   /*
