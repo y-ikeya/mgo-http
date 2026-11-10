@@ -18,7 +18,7 @@ afterEach(() => {
 })
 
 describe('補給', () => {
-  test('基地の上で頼めば通り、弾倉が満タンに戻る', async () => {
+  test('基地の上で頼めば通り、予備で弾の総数が満タンに戻る (弾倉はそのまま)', async () => {
     server = await startServer()
     const { a, b } = await twoPlayers(server, 'grenade', ['rs-a1', 'rs-b1'])
     const roster = a.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
@@ -39,8 +39,10 @@ describe('補給', () => {
     expect(a.got('resupplied')).toBe(1)
     const self = a.messages.find((m) => m.type === 'self') as Extract<ServerMessage, { type: 'self' }> | undefined
     expect(self).toBeDefined()
-    // 主武器 (rifle) の弾倉が満タン (30)
-    expect(self!.magazine.rifle).toBe(30)
+    // 主武器 (rifle) の弾倉は撃った後のまま (29)、予備が 1 発ぶん増えて総数は満タン (30 + 90)。
+    // 弾倉を替えるのは本人のリロード
+    expect(self!.magazine.rifle).toBe(29)
+    expect(self!.reserve.rifle).toBe(91)
     expect(self!.grenades).toBe(3)
     void b
   }, 30000)

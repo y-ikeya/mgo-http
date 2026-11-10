@@ -16,8 +16,6 @@
  * ここで引いた結果を**構築の引数として渡す**ことで、その順序の問題を作らない。
  */
 
-import type { Voice } from '../sense/audio'
-
 /** 既定のモデル。public/models/<名前>.glb */
 export const DEFAULT_SKIN = 'soldier'
 
@@ -77,11 +75,14 @@ export const SKIN_FILES: readonly string[] = [
  * 体ごとの声 (倒れた叫び・うめきなど。sense/audio.ts の CRIES)。**載っていない体は男の声。**
  * 見た目と同じく名前から決まるので、誰の画面でも同じ声になる
  */
-const VOICES: Readonly<Record<string, Voice>> = {
+const VOICES: Readonly<Record<string, BodyVoice>> = {
   soldier_nanashi: 'woman1',
 }
 
-export function voiceFor(skin: string): Voice {
+/** 声の主。sense/audio.ts の CRIES の鍵と同じ (この棚は他を読めないので文字で持つ) */
+export type BodyVoice = 'man1' | 'woman1'
+
+export function voiceFor(skin: string): BodyVoice {
   return VOICES[skin] ?? 'man1'
 }
 

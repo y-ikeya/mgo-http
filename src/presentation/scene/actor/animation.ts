@@ -504,10 +504,10 @@ const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
 const BUST_STIFF = 110
 /** 減衰。大きいほど早く収まる */
 const BUST_DAMP = 11
-/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** */
-const BUST_GAIN = 0.0055
-/** 振れ幅の上限 (rad)。これを超えると体を突き抜ける */
-const BUST_MAX = 0.30
+/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** (2026-11-11 本人「揺れ幅1.7倍でいいよ」で 0.0055 から 1.7 倍) */
+const BUST_GAIN = 0.00935
+/** 振れ幅の上限 (rad)。これを超えると体を突き抜ける (1.7 倍にした時に 0.30 から広げた) */
+const BUST_MAX = 0.38
 
 /**
  * 髪の揺れ。**手で足した骨 (mixamorig で始まらない骨) を鎖として拾う。**
