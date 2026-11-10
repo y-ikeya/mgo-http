@@ -43,12 +43,13 @@ const SKINS: Record<string, string> = {
    */
   pepa1404: 'soldier_raiden',
   /*
-   * nanashi。Raiden と同じ道で入れた体 (rebody → merge_all_clips → fit_height)。
+   * nanashi。Mixamo の Kachujin の体に、Tripo の頭を付け替えたもの (2026-11-10、
+   * 元は tools/raw/bald_woman.blend、書き出しに使った写しは nanashi_kachujin.blend)。
+   * Raiden と同じ道 (rebody --nohead → merge_all_clips → fit_height → dedup → pack)。
    *
-   * **出どころが違う。** Raiden は Mixamo の既製キャラだが、こちらは外で作った
-   * 体を Mixamo の auto-rig に通したもの。骨の名前は揃うが、**単位系と向きが
-   * 揃わない** — 上が -Y を向いていて、腰を z で測ると負の値が出た。
-   * rebody.py が向きを測ってから合わせるようにしてある。
+   * **型は前の名無しの glb から移した** (宿主から merge_clip で足した 100 本が揃っている)。
+   * 頭と首の重みは Blender で塗ってあるので rebody は --nohead で通す。
+   * 体が宿主より大きく (頭 1.572m)、fit_height で 0.85 倍に縮めて 12cm 持ち上げた
    */
   nanashi: 'soldier_nanashi',
   /*

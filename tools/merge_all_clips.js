@@ -47,7 +47,22 @@ function copyAccessor(index) {
   if (cached !== undefined) return cached
 
   const accessor = src.json.accessors[index]
-  const bufferView = src.json.bufferViews[accessor.bufferView]
+  const accessorIndex = dest.json.accessors.length
+  dest.json.accessors.push({ ...accessor, bufferView: copyView(accessor.bufferView) })
+  copied.set(index, accessorIndex)
+  return accessorIndex
+}
+
+/**
+ * bufferView は 1 度だけ写す。**dedup を通した glb は accessor どうしが 1 つの
+ * bufferView を分け合う** (accessor の byteOffset で中を指す)。accessor ごとに
+ * 丸ごと写すと同じ列が何千回も重なり、名無しの型で Out of memory になった
+ */
+const copiedViews = new Map()
+function copyView(index) {
+  const cached = copiedViews.get(index)
+  if (cached !== undefined) return cached
+  const bufferView = src.json.bufferViews[index]
   const start = bufferView.byteOffset ?? 0
   const data = src.bin.subarray(start, start + bufferView.byteLength)
 
@@ -67,10 +82,8 @@ function copyAccessor(index) {
     addedLength += pad
   }
 
-  const accessorIndex = dest.json.accessors.length
-  dest.json.accessors.push({ ...accessor, bufferView: viewIndex })
-  copied.set(index, accessorIndex)
-  return accessorIndex
+  copiedViews.set(index, viewIndex)
+  return viewIndex
 }
 
 dest.json.animations = dest.json.animations ?? []
