@@ -718,6 +718,7 @@ Tripo から来た材質が**半透明扱い**になっていた (glTF の alpha
 """
 DROP_NORMAL = os.environ.get('REBODY_NONORMAL') == '1'
 opaque = 0
+masked = 0
 for mat in bpy.data.materials:
     if getattr(mat, 'blend_method', None) is not None:
         mat.blend_method = 'OPAQUE'
@@ -735,12 +736,30 @@ for mat in bpy.data.materials:
         if not alpha:
             continue
         for link in list(alpha.links):
+            src = link.from_node
+            if src.type == 'TEX_IMAGE' and link.from_socket.name == 'Alpha' and src.image and src.image.channels == 4:
+                """
+                **絵の透明で形を抜いている所は、くり抜き (MASK) で残す。**
+
+                Kachujin の胸元のロープの蝶結びは、背景の透けた絵を板 1 枚に貼った物。
+                繋ぎを切って不透明にすると、透けていた所が灰色の板になって
+                **社員証を下げているように**見えた (2026-11-11 本人)。
+                くり抜きは深度を書くので、半透明の砕け (上の注) は起きない。
+                書き出しは Alpha の手前の Math (ROUND) を見て MASK にする
+                """
+                cut = tree.nodes.new('ShaderNodeMath')
+                cut.operation = 'ROUND'
+                tree.links.remove(link)
+                tree.links.new(src.outputs['Alpha'], cut.inputs[0])
+                tree.links.new(cut.outputs[0], alpha)
+                masked += 1
+                continue
             tree.links.remove(link)
             opaque += 1
         if alpha.default_value < 1.0:
             opaque += 1
         alpha.default_value = 1.0
-print(f'  材質を不透明にした ({opaque} 箇所を直した / 材質 {len(bpy.data.materials)})')
+print(f'  材質を不透明にした ({opaque} 箇所を直した / くり抜きで残した {masked} / 材質 {len(bpy.data.materials)})')
 
 for im in bpy.data.images:
     if max(im.size) > SIDE:
