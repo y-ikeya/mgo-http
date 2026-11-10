@@ -352,6 +352,11 @@ export class SpineAim {
   private readonly twist = new THREE.Quaternion()
   private readonly world = new THREE.Quaternion()
   private static readonly UP = new THREE.Vector3(0, 1, 0)
+  /** 最後に測って曲げた量 (骨ごと、親の空間)。構えを解いた後はこれを薄めるだけ (fade) */
+  private bent: THREE.Quaternion[] | null = null
+  /** bent を測った時の掛かり具合 */
+  private bentWeight = 0
+  private readonly part = new THREE.Quaternion()
 
   restore(): void {
     if (!this.saved || !this.bones) return
@@ -407,5 +412,22 @@ export class SpineAim {
         setWorldQuaternion(bone, this.world.premultiply(this.turn))
       }
     }
+    this.bent = this.bones.map((b, i) => this.saved![i].clone().invert().multiply(b.quaternion))
+    this.bentWeight = weight
+  }
+
+  /**
+   * **構えを解いた後は測り直さない。** 解いた時の曲げを、掛かり具合に合わせて薄めるだけ。
+   *
+   * 解いた後も掛かり具合が 0 になるまで (約 0.3 秒) apply で測り直していた。その間に
+   * 上半身の型は脱力へ移っていて、銃口は下を向いていく (拳銃は特に)。それを照準へ
+   * 起こそうとして背骨を後ろへ反らせ、**一瞬のけぞった** (頭が落ち着く先より 2.5〜10cm
+   * 後ろへ行き過ぎた。体によらず、soldier・雷電・名無しで出た)
+   */
+  fade(weight: number): void {
+    if (weight <= 1e-3 || !this.bones || !this.bent || this.bentWeight <= 1e-3) return
+    this.saved = this.bones.map((b) => b.quaternion.clone())
+    const k = Math.min(1, weight / this.bentWeight)
+    this.bones.forEach((bone, i) => bone.quaternion.multiply(this.part.identity().slerp(this.bent![i], k)))
   }
 }

@@ -2413,7 +2413,7 @@ export class CharacterAnimator {
     // mixer がボーンの回転を書き換えた「後」に上乗せする。順序を逆にすると毎フレーム消える。
     this.squareHips()
     this.captureUpperBases()
-    this.alignSpineToUpperClip()
+    this.alignSpineToUpperClip(dt)
     this.applyAimPitch()
     this.turnTorso(dt)
     this.updateSways(dt)
@@ -2662,7 +2662,7 @@ export class CharacterAnimator {
    * 別のクリップだと、その差の分だけ上体が反ったり折れたりする。
    * 親 (腰) の空間で前から掛けることで、背骨のワールド姿勢を本来の向きに戻す。
    */
-  private alignSpineToUpperClip(): void {
+  private alignSpineToUpperClip(dt: number): void {
     const spine = this.spineBone
     const hips = this.hipsBone
     if (!spine || !hips) return
@@ -2671,7 +2671,7 @@ export class CharacterAnimator {
 
     // 上下が同じクリップなら食い違いようがない。補正は掛けない。
     // **実際に流している下半身**と見比べる。脱力中は別のクリップを流している
-    if (this.upperClipNames.get(key) === this.lowerClipNames.get(this.resolveLowerKey())) return
+    if (this.upperClipNames.get(key) === this.lowerClipNames.get(this.resolveLowerKey())) return this.easeSpineFix(spine, null, dt)
     /*
      * 伏せている間も掛けない。
      *
@@ -2679,11 +2679,11 @@ export class CharacterAnimator {
      * その基準そのものが当てはまらないので、寄せるほど体が起きる。伏せの型は
      * 上下ともほぼ同じ腰の向きで作られているので、補正しなくても食い違わない。
      */
-    if (PRONE_LOCOMOTIONS.has(this.locomotion)) return
+    if (PRONE_LOCOMOTIONS.has(this.locomotion)) return this.easeSpineFix(spine, null, dt)
 
     const track = this.upperHipsTracks.get(key)
     const action = this.upper.get(key)
-    if (!track || !action) return
+    if (!track || !action) return this.easeSpineFix(spine, null, dt)
 
     // 「今このフレームで本来あるべき腰の向き」を、再生位置に合わせて取り出す
     sampleQuaternionTrack(track, action.time, this.referenceHips, this.sampleScratch)
@@ -2725,8 +2725,34 @@ export class CharacterAnimator {
 
     // 現在の腰の逆 × 本来の腰 = 打ち消すべき差分
     this.scratchRotation.copy(hips.quaternion).invert().multiply(this.referenceHips)
-    spine.quaternion.premultiply(this.scratchRotation)
+    this.easeSpineFix(spine, this.scratchRotation, dt)
   }
+
+  /**
+   * 背骨を揃える差分を**時間で寄せてから**掛ける。
+   *
+   * 揃えるかどうかは上半身の型で決まり、型は一瞬で切り替わる (重みは混ぜて
+   * 寄せている)。差分をそのまま掛けると、構えを解いた 1 コマで補正が丸ごと
+   * 消えて、**頭が 10cm 後ろへ跳んでから戻った** (拳銃・ライフルとも、どの体でも)。
+   * 型の重みと同じ速さ (UPPER_BLEND_LAMBDA) で**効き具合を**寄せる。
+   *
+   * 寄せるのは差分そのものではなく効き具合。差分は腰の揺れに合わせて毎コマ
+   * 変わる (走りながら構える) ので、差分を遅らせると上体が揺れに遅れる。
+   * 揃えない側へ移ったら、最後に測った差分を薄めていく。
+   *
+   * @param target 掛けたい差分 (腰の空間)。揃えない時は null
+   */
+  private easeSpineFix(spine: THREE.Object3D, target: THREE.Quaternion | null, dt: number): void {
+    if (target) this.spineFixLast.copy(target)
+    this.spineFixWeight = damp(this.spineFixWeight, target ? 1 : 0, UPPER_BLEND_LAMBDA, dt)
+    if (this.spineFixWeight < 1e-3) return
+    spine.quaternion.premultiply(this.spineFixNow.identity().slerp(this.spineFixLast, this.spineFixWeight))
+  }
+  /** 背骨を揃える効き具合 (easeSpineFix)。0..1 */
+  private spineFixWeight = 0
+  /** 最後に測った差分 */
+  private readonly spineFixLast = new THREE.Quaternion()
+  private readonly spineFixNow = new THREE.Quaternion()
 
   /**
    * 腰のクォータニオンが乗っている空間での「上」。

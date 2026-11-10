@@ -666,7 +666,12 @@ export class RemoteSoldier {
     this.weapon?.setAimWeight(this.aimTrimWeight)
     if (this.model && this.weapon) {
       // 銃身の上下を照準へ。背骨で曲げる。自機と同じ
-      if (!prone) this.spineAim.apply(this.model, this.weapon.object, this.yaw, state.pitch, this.aimTrimWeight);
+      // 解いた後は測り直さずに薄める (armIk.ts の fade)。自機と同じ
+      if (!prone && state.aiming && !this.serverDead) {
+        this.spineAim.apply(this.model, this.weapon.object, this.yaw, state.pitch, this.aimTrimWeight);
+      } else if (!prone) {
+        this.spineAim.fade(this.aimTrimWeight);
+      }
       // 右手を先にずらす (rightShift)。自機と同じ
       const shift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.rightShift;
       this.rightArm.moved.set(0, 0, 0);

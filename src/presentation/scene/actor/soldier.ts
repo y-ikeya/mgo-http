@@ -4470,8 +4470,10 @@ export class Soldier {
       this.weapon?.setAimWeight(this.aimTrimWeight)
       if (this.model && this.weapon) {
         // 銃身の上下を照準へ。**背骨で曲げる** (腕や銃を動かす補正より先)
+        // 解いた後は測り直さずに薄める (armIk.ts の fade)
         if (this.proneStage === 'none' && isGun(this.held)) {
-          this.spineAim.apply(this.model, this.weapon.object, this.yaw, this.aimPitch, this.aimTrimWeight)
+          if (this.aiming) this.spineAim.apply(this.model, this.weapon.object, this.yaw, this.aimPitch, this.aimTrimWeight)
+          else this.spineAim.fade(this.aimTrimWeight)
         }
         // 右手を先にずらす (rightShift)。銃が一緒に動くので、左手はその後で運ぶ
         const shift = isGun(this.held) ? WEAPON_CONFIGS[this.held].rightShift : undefined
