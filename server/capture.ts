@@ -1,4 +1,5 @@
-import { captureWinner, countDown, inGoal, newCapture } from '../src/domain/match/capture'
+import { countDown, inGoal, newCapture } from '../src/domain/match/capture'
+import { homeOf } from '../src/domain/match/sides'
 import type { Team } from '../src/domain/player/player'
 import type { RoomWorld } from './world'
 
@@ -22,17 +23,24 @@ export function placeCapture(room: RoomWorld, now: number): void {
 function holdingTeam(room: RoomWorld): Team | null {
   const carrier = room.target?.carrier ? room.players.get(room.target.carrier) : undefined
   if (!carrier) return null
-  const goal = room.stage.capGoals[carrier.team]
+  // 後半は陣地が入れ替わる (前後半の部屋)。自陣の設置ポイントも相手の色の物
+  const goal = room.stage.capGoals[homeOf(room, carrier.team)]
   return goal && inGoal(goal, carrier.x, carrier.y, carrier.z) ? carrier.team : null
 }
 
 /**
- * 1 刻みぶん進める。**決着したら勝った陣営** (呼ぶ側が試合を終える)、まだなら null。
- * 時間切れで並んだらサドンデスに入れて続ける。持つ陣営が替わった時は changed を立てる (すぐ配る)
+ * 1 刻みぶん進める。**このラウンドが終わったら over** (呼ぶ側が endRound で決着を付ける)。
+ *
+ *     どちらかのカウントが 0           終わり
+ *     前後半の前半で時間切れ           終わり (並んでいても。決着は後半と合わせて見る)
+ *     それ以外で時間切れ・サドンデス中  合計 (前の半の残り + この半の残り) に差が付いたら終わり。
+ *                                      並んだらサドンデスに入れて続ける
+ *
+ * 持つ陣営が替わった時は changed を立てる (すぐ配る)
  */
-export function updateCapture(room: RoomWorld, now: number): { winner: Team | null; changed: boolean } {
+export function updateCapture(room: RoomWorld, now: number): { over: boolean; changed: boolean } {
   const capture = room.capture
-  if (!capture || room.phase !== 'playing') return { winner: null, changed: false }
+  if (!capture || room.phase !== 'playing') return { over: false, changed: false }
   const dt = Math.max(0, now - (countedAt.get(room) ?? now))
   countedAt.set(room, now)
   const holding = holdingTeam(room)
@@ -40,12 +48,17 @@ export function updateCapture(room: RoomWorld, now: number): { winner: Team | nu
   let changed = next.holding !== capture.holding
   room.capture = next
   const timeUp = now >= room.endsAt
-  const winner = captureWinner(next, timeUp)
-  if (!winner && timeUp && !next.suddenDeath) {
+  if (next.count.blue <= 0 || next.count.red <= 0) return { over: true, changed }
+  if (!timeUp && !next.suddenDeath) return { over: false, changed }
+  // 前後半の前半は時間で区切る。サドンデスは試合の最後だけ
+  if (room.mode.halves && room.round < 2) return { over: timeUp, changed }
+  const carried = room.mode.halves ? room.carried : { blue: 0, red: 0 }
+  if (next.count.blue + carried.blue !== next.count.red + carried.red) return { over: true, changed }
+  if (!next.suddenDeath) {
     room.capture = { ...next, suddenDeath: true }
     changed = true
   }
-  return { winner, changed }
+  return { over: false, changed }
 }
 
 /** 配る形。**秒**で (小数 1 桁) */

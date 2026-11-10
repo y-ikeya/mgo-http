@@ -1,4 +1,5 @@
 import { STAGES, type Spot } from '../src/domain/stage'
+import { homeOf } from '../src/domain/match/sides'
 import type { MatchPlayer, Team } from '../src/domain/player/player'
 import { canAct } from '../src/domain/player/lifecycle'
 import { isAsleep } from '../src/domain/player/stamina'
@@ -18,8 +19,10 @@ const CARRIED_SEND_MS = 100
 /** 部屋ごとの、最後に運ばれている位置を配った時刻 */
 const carriedSentAt = new WeakMap<RoomWorld, number>()
 
+/** その色がいま使う基地 (後半は入れ替わる、sides.ts の homeOf) */
 function baseOf(room: RoomWorld, team: Team): Spot {
-  return room.stage.bases[team] ?? STAGES[room.stage.name].bases[team]
+  const home = homeOf(room, team)
+  return room.stage.bases[home] ?? STAGES[room.stage.name].bases[home]
 }
 
 function defenceOf(room: RoomWorld): Team {

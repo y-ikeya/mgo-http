@@ -152,6 +152,29 @@ describe('使う', () => {
   })
 })
 
+describe('基地での補給', () => {
+  test('**弾倉はそのまま**、予備で総数を満たす。替えるのは本人のリロード', () => {
+    const inv = make()
+    for (let i = 0; i < 25; i++) inv.spend()
+    inv.reload()
+    for (let i = 0; i < 10; i++) inv.spend()
+    const full = make()
+    inv.restock(loadout)
+    expect(inv.ammo).toBe(20)
+    expect(inv.ammo + inv.reserve).toBe(full.ammo + full.reserve)
+    expect(inv.reload()).toBe(true)
+    expect(inv.ammo).toBe(30)
+  })
+
+  test('満タンの弾倉はそのまま満タン', () => {
+    const inv = make()
+    inv.restock(loadout)
+    const full = make()
+    expect(inv.ammo).toBe(full.ammo)
+    expect(inv.reserve).toBe(full.reserve)
+  })
+})
+
 describe('拾う', () => {
   test('持っていない銃は持ち物に加わる。主武器 2 丁になる', () => {
     const inv = make()

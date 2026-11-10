@@ -84,6 +84,8 @@ export interface Session {
    * 物の気配 (sensed) と違って**時間で消える**。走査のたびに伸びるので、
    * 半径の中に居る間は続く。
    */
+  /** 霧を置いた位置 (revealed と同じ鍵)。繋がった味方へ写すのに要る (server/link.ts) */
+  revealedAt: Map<string, [number, number, number]>
   revealed: Map<string, number>
   /**
    * 最後に届いた位置のパケット。**そのまま配り直す**ために取っておく。
@@ -148,6 +150,11 @@ export interface Session {
    */
   badPacketAt: number
   /** 成立しない移動を最後に警告した時刻 (Date.now)。同じく間引くため */
+  /**
+   * 最後に「ここへ戻れ」(moveRejected) を送った時刻 (ms)。位置は毎秒 64 通届くので、
+   * 断るたびに送ると戻す知らせが山になる。SNAP_BACK_MS ごとに 1 通
+   */
+  snapBackAt: number
   badMoveAt: number
   /**
    * 往復の時間の控え (domain/match/lag.ts)。
@@ -187,6 +194,7 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     seenLocators: new Set(),
     sensed: new Map(),
     revealed: new Map(),
+    revealedAt: new Map(),
     lastPayload: null,
     packetGap: 0,
     lastPacketAt: 0,
@@ -202,6 +210,7 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     resuppliedAt: 0,
     badPacketAt: 0,
     badMoveAt: 0,
+    snapBackAt: 0,
     lastShotAt: 0,
     pelletsLeft: 0,
     flinchedThisShot: false,

@@ -428,7 +428,8 @@ function snapshotOf(
     locomotion,
     locomotionAge: 0,
     concentrating: false,
-    saluteHeld: false,
+    // 敬礼の姿勢なら手を挙げたまま (敬礼で繋がる試験。server/link.ts)
+    saluteHeld: locomotion === 'salute' || locomotion === 'crouch_salute',
     reloading: false,
     weapon: claimed,
     // 振りかぶっている間だけ立つ (FLAG2_WINDUP)

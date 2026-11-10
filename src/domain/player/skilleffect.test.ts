@@ -241,15 +241,24 @@ describe('ENEMY EXPOSURE の宛先', () => {
 
   const now = 1_000_000
 
-  /** 陣営のある部屋。**味方に渡せるからチーム戦で 1 枠割く価値が出る** */
-  test('陣営のある部屋では、当てた側の陣営ぜんぶに見える', () => {
+  /**
+   * **見えるのは本人と、敬礼で繋がっている味方だけ** (2026-11-09 本人「暴く系は基本は自分の画面だけ。
+   * link した時は仲間にも共有。全員に問答無用で配るのは NG」)。繋がる前に当てた分も、繋がった時点から届く
+   */
+  test('当てた本人に見える。繋がっていない味方には見えず、繋がると見える。切れたら見えない', () => {
     const alice = player('alice', 'blue')
     const mate = player('mate', 'blue')
     const bob = player('bob', 'red')
-    leakTo(bob, leakTag(alice, true), now + 5000)
+    leakTo(bob, leakTag(alice), now + 5000)
 
     expect(isLeakedTo(bob, alice, now)).toBe(true)
+    expect(isLeakedTo(bob, mate, now)).toBe(false)
+    alice.links.add(mate.id)
+    mate.links.add(alice.id)
     expect(isLeakedTo(bob, mate, now)).toBe(true)
+    alice.links.delete(mate.id)
+    mate.links.delete(alice.id)
+    expect(isLeakedTo(bob, mate, now)).toBe(false)
   })
 
   /**
@@ -260,27 +269,26 @@ describe('ENEMY EXPOSURE の宛先', () => {
     const alice = player('alice', 'blue')
     const bob = player('bob', 'red')
     const bobMate = player('bobMate', 'red')
-    leakTo(bob, leakTag(alice, true), now + 5000)
+    leakTo(bob, leakTag(alice), now + 5000)
 
     expect(isLeakedTo(bob, bobMate, now)).toBe(false)
   })
 
-  /** 陣営が無い部屋 (個人戦)。渡す相手が居ないので、同じドメインルールが本人だけに落ちる */
-  test('陣営の無い部屋では、当てた本人だけ', () => {
+  /** 個人戦。同じ色でも味方ではない (繋がらない) ので、本人だけ */
+  test('同じ色でも繋がっていなければ見えない', () => {
     const alice = player('alice', 'blue')
     const carol = player('carol', 'blue')
     const bob = player('bob', 'blue')
-    leakTo(bob, leakTag(alice, false), now + 5000)
+    leakTo(bob, leakTag(alice), now + 5000)
 
     expect(isLeakedTo(bob, alice, now)).toBe(true)
-    // **同じ色でも見えない。** 個人戦では陣営が味方を意味しない
     expect(isLeakedTo(bob, carol, now)).toBe(false)
   })
 
   test('時間で切れる', () => {
     const alice = player('alice', 'blue')
     const bob = player('bob', 'red')
-    leakTo(bob, leakTag(alice, true), now + 5000)
+    leakTo(bob, leakTag(alice), now + 5000)
 
     expect(isLeakedTo(bob, alice, now + 4999)).toBe(true)
     expect(isLeakedTo(bob, alice, now + 5000)).toBe(false)
@@ -296,7 +304,7 @@ describe('ENEMY EXPOSURE の宛先', () => {
   test('湧き直すと宛先ごと消える', () => {
     const alice = player('alice', 'blue')
     const bob = player('bob', 'red')
-    leakTo(bob, leakTag(alice, true), now + 5000)
+    leakTo(bob, leakTag(alice), now + 5000)
 
     refill(bob)
     expect(bob.leaks.size).toBe(0)
@@ -312,8 +320,8 @@ describe('ENEMY EXPOSURE の宛先', () => {
     const carol = player('carol', 'blue')
     const bob = player('bob', 'red')
     // 個人戦 (宛先は本人)。alice が当てたあと carol も当てた
-    leakTo(bob, leakTag(alice, false), now + 5000)
-    leakTo(bob, leakTag(carol, false), now + 3000)
+    leakTo(bob, leakTag(alice), now + 5000)
+    leakTo(bob, leakTag(carol), now + 3000)
 
     expect(isLeakedTo(bob, alice, now)).toBe(true)
     expect(isLeakedTo(bob, carol, now)).toBe(true)
@@ -326,7 +334,7 @@ describe('ENEMY EXPOSURE の宛先', () => {
   test('同じ宛先に短い光を重ねても縮まない', () => {
     const alice = player('alice', 'blue')
     const bob = player('bob', 'red')
-    const tag = leakTag(alice, true)
+    const tag = leakTag(alice)
     expect(leakTo(bob, tag, now + 5000)).toBe(true)
     expect(leakTo(bob, tag, now + 2000)).toBe(false)
     expect(isLeakedTo(bob, alice, now + 4999)).toBe(true)

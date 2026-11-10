@@ -86,6 +86,14 @@ export interface ModeSpec {
    * 倒されてもすぐ戻って特攻すればいい、を抑える (2026-10-26 本人「倒れてる時間を長くして欲しい」)
    */
   downGrows: boolean
+  /**
+   * **前半と後半で 1 試合か** (TDM / CAP、2026-11-09 本人「陣地を変えた前後半戦で 1 match にしたい」)。
+   *
+   * 後半は陣地 (湧く基地と CAP の設置ポイント) を入れ替える (match.ts の basesSwapped)。
+   * 残機 (CAP はカウント) は半ごとに戻し、勝ち負けは前後半の残りの合計で決める
+   * (server/match.ts の endRound)。TSNE も 2 ラウンドだが、あちらは攻守の入れ替え (sides)
+   */
+  halves: boolean
 }
 
 /** 攻める側か守る側か。**色 (Team) とは別の問い** — 試合ごとに入れ替わる */
@@ -109,8 +117,8 @@ export interface Armory {
 export const TSNE_SLEEP_SECONDS = 450
 
 export const MODES: Record<Mode, ModeSpec> = {
-  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
-  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
+  DM: { id: 'DM', label: '個人戦', hostility: 'all', tickets: true, records: true, active: true, solo: false, teams: false, leaderGlows: true, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false, halves: false },
+  TDM: { id: 'TDM', label: 'チーム戦', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false, halves: true },
   /**
    * 潜入 / 防御 (2026-10-17 本人)。
    *
@@ -121,20 +129,20 @@ export const MODES: Record<Mode, ModeSpec> = {
    * 相手の側が全員倒れるか眠ったら勝ち。時間切れは守る側の勝ち。
    * 試合ごとに攻守が入れ替わる。
    */
-  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: true, sleepSeconds: TSNE_SLEEP_SECONDS, capture: false, downGrows: false },
+  TSNE: { id: 'TSNE', label: '潜入 / 防御', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: true, sleepSeconds: TSNE_SLEEP_SECONDS, capture: false, downGrows: false, halves: false },
   /**
    * キャプチャー (2026-10-26 本人、MGO2 の CAP)。target 1 つを両陣営で取り合い、**自陣の設置ポイント**
    * (相手の陣地の近く) へ運んで持ったまま留まる。何度でも復活できるが、倒されるたびに倒れたままの時間が延びる
    */
-  CAP: { id: 'CAP', label: 'キャプチャー', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: true, downGrows: true },
-  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
+  CAP: { id: 'CAP', label: 'キャプチャー', hostility: 'team', tickets: true, records: true, active: true, solo: false, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: true, downGrows: true, halves: true },
+  INT: { id: 'INT', label: '休憩', hostility: 'none', tickets: false, records: false, active: true, solo: true, teams: false, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false, halves: false },
   /**
    * 練習。**入る人は全員青**で、赤には棒立ちの的が並ぶ。
    *
    * 戦績に残さないのは、動かない相手を撃った数が記録に混ざると記録の意味が
    * 消えるため。ここで武器の距離感と当て方を確かめる。
    */
-  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false },
+  PRACTICE: { id: 'PRACTICE', label: '練習', hostility: 'team', tickets: false, records: false, active: true, solo: true, teams: true, leaderGlows: false, sides: false, sleepSeconds: SLEEP_SECONDS, capture: false, downGrows: false, halves: false },
 }
 
 /**

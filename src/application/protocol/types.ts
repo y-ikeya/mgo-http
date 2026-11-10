@@ -49,6 +49,13 @@ export interface PlayerSnapshot {
    * 画面に映るものを決めているのはカメラの位置で、目の位置ではない。
    */
   cameraYaw: number
+  /**
+   * 左肩越しか (構え中の R3 / X で持ち替える)。**カメラの横のずれの向き。**
+   *
+   * サーバーはカメラの位置から可視を引くので、左肩で覗いている人を右肩の位置で
+   * 見ると「画面に映るのに配られない」になる。省けば右 (古い版・ボット)
+   */
+  leftShoulder?: boolean
   /** 再生すべき移動アニメ。速度から推定するより確実で、帯域も食わない */
   locomotion: Locomotion
   /**
@@ -553,6 +560,28 @@ export interface DecoyPlaced {
    * サーバーの時刻で終わりを渡すと、時計のずれがそのまま大きさのずれになる。
    */
   readyIn: number
+}
+
+/**
+ * 敬礼で繋がっている味方 (id)。**変わるたびに全部を送る** (結んだ・切れた。server/link.ts)。
+ * 画面はこの一覧の味方を壁越しに光らせる。暴いた情報もこの相手とだけ分け合う
+ */
+export interface LinksMessage {
+  type: 'links'
+  ids: string[]
+}
+
+/**
+ * 送った位置を断った。**サーバーが持っている位置へ戻る** (server/relay.ts)。
+ *
+ * 位置は「跳んだ / 抜けた」を見て断る。断ったまま知らせないと、画面は動き続けるのに
+ * サーバーは古い位置のままで、差が開いて二度と通らない (他の人の画面では動かなくなる)。
+ * 断られている間は SNAP_BACK_MS ごとに届く
+ */
+export interface MoveRejected {
+  type: 'moveRejected'
+  /** サーバーが持っている足元の位置 (three の座標) */
+  at: [number, number, number]
 }
 
 /**
@@ -1199,8 +1228,21 @@ export interface MatchMessage {
    * 受け取る側は endsAt と同じく手元の時計へ直す
    */
   cautionUntil?: number
-  /** いま何ラウンド目か (TSNE。1 = 先攻、2 = 後攻)。1 試合は 2 ラウンド */
+  /**
+   * いま何ラウンド目か。1 試合は 2 ラウンド。TSNE は 1 = 先攻・2 = 後攻、
+   * 前後半の部屋 (TDM / CAP) は 1 = 前半・2 = 後半。2 ラウンドでない部屋は無い
+   */
   round?: number
+  /**
+   * **陣地を入れ替えているか** (前後半の部屋の後半)。湧く基地・地面の枠・CAP の設置ポイントを
+   * 相手の色の物にする (domain/match/sides.ts の homeOf)。前後半でない部屋は無い
+   */
+  basesSwapped?: boolean
+  /**
+   * 前の半までの残り (前後半の部屋の後半だけ)。TDM は残機、CAP はカウントの秒。
+   * 決着は前後半の残りの合計で決まる
+   */
+  carried?: Record<Team, number>
   /** 色ごとに勝ったラウンドの数 (TSNE) */
   roundWins?: Record<Team, number>
   /**
@@ -1594,6 +1636,8 @@ export type ServerMessage =
   | ClaymoreGone
   | DecoyPlaced
   | DecoyBumped
+  | MoveRejected
+  | LinksMessage
   | CboxBumped
   | DecoyGone
   | DollPlaced

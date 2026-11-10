@@ -148,7 +148,7 @@ export function exposeTo(
   const now = Date.now()
   const attacker = toward
   const until = now + seconds * 1000
-  const tag = leakTag(attacker, room.mode.teams)
+  const tag = leakTag(attacker)
   // 同じ宛先で、いまより短くなるなら何もしない (伸ばすだけ。domain の leakTo)
   if (!leakTo(victim, tag, until)) return
 

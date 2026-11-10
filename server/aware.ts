@@ -88,13 +88,13 @@ const PERSON_LIFT = 0.3
  * **物の気配と同じ霧。** 輪郭 (exposeTo) だと向きも姿勢も読めて、壁越しに
  * 撃つ準備まで済む。覗く道具は「どの辺に居るか」までにする。
  *
- * 宛先は exposeTo と同じ規則 (leakTag)。陣営のある部屋は陣営ぜんぶ、
- * 無い部屋は本人だけ。暴かれた本人には送らない。
+ * 宛先は exposeTo と同じ規則 (leakTag)。本人と、本人と敬礼で繋がっている味方だけ
+ * (2026-11-09。前は陣営ぜんぶ)。暴かれた本人には送らない。
  *
  * 位置は**この瞬間の物**。次の走査まで動かない。
  */
 export function revealTo(room: RoomWorld, subject: MatchPlayer, toward: MatchPlayer, seconds: number): void {
-  const tag = leakTag(toward, room.mode.teams)
+  const tag = leakTag(toward)
   const key = `player:${subject.id}`
   const at: [number, number, number] = [subject.x, subject.y + PERSON_LIFT, subject.z]
   const until = Date.now() + seconds * 1000
@@ -103,6 +103,7 @@ export function revealTo(room: RoomWorld, subject: MatchPlayer, toward: MatchPla
     if (!leakReaches(tag, viewer)) continue
     const revealed = sessionOf(viewer).revealed
     revealed.set(key, Math.max(until, revealed.get(key) ?? 0))
+    sessionOf(viewer).revealedAt.set(key, at)
     sessionOf(viewer).socket.send(JSON.stringify({ type: 'sensed', key, at } satisfies ServerMessage))
   }
 }
@@ -115,13 +116,21 @@ export function relayAwareness(room: RoomWorld, now: number): void {
     for (const [key, until] of revealed) {
       if (now < until) continue
       revealed.delete(key)
+      sessionOf(viewer).revealedAt.delete(key)
       sessionOf(viewer).socket.send(JSON.stringify({ type: 'sensedGone', key } satisfies ServerMessage))
     }
 
     const sensed = sessionOf(viewer).sensed
-    // 取っていない人・戦場に居ない人には何も無い。知らせていた分は畳む
-    const able = hasAwareness(viewer.skills) && onBattlefield(viewer.life)
-    if (!able) {
+    /*
+     * 感じ取る人。**本人と、敬礼で繋がっている味方のうち取っている人** (2026-11-09 本人「暴く系は
+     * link している仲間にも共有」)。誰も取っていない・本人が戦場に居ないなら何も無い。知らせていた分は畳む
+     */
+    const sources = onBattlefield(viewer.life)
+      ? [viewer, ...[...viewer.links].map((id) => room.players.get(id))].filter(
+          (p): p is MatchPlayer => !!p && hasAwareness(p.skills) && onBattlefield(p.life),
+        )
+      : []
+    if (sources.length === 0) {
       for (const key of sensed.keys()) gone(viewer, key)
       continue
     }
@@ -129,10 +138,13 @@ export function relayAwareness(room: RoomWorld, now: number): void {
     const near = new Set<string>()
     for (const item of items) {
       if (!hostileItem(room, viewer, item)) continue
-      const dx = item.x - viewer.x
-      const dy = item.y - viewer.y
-      const dz = item.z - viewer.z
-      if (dx * dx + dy * dy + dz * dz > AWARENESS_RADIUS * AWARENESS_RADIUS) continue
+      const close = sources.some((p) => {
+        const dx = item.x - p.x
+        const dy = item.y - p.y
+        const dz = item.z - p.z
+        return dx * dx + dy * dy + dz * dz <= AWARENESS_RADIUS * AWARENESS_RADIUS
+      })
+      if (!close) continue
       near.add(item.key)
       const told = sensed.get(item.key)
       if (told && Math.hypot(told[0] - item.x, told[1] - item.y, told[2] - item.z) < RESEND_DISTANCE) continue

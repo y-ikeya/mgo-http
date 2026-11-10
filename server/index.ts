@@ -45,6 +45,7 @@ import {
 import { MAX_FALL_SPEED, applyBlastDamage, applyCqc, applyDamage, applyRoll, reject } from './damage'
 import { alertAims, alertShot } from './alert'
 import { relayAwareness, revealTo } from './aware'
+import { updateLinks } from './link'
 import {
   fitToRoom,
   leaveRoom,
@@ -77,7 +78,7 @@ import {
   secondaryOf,
   supportsOf,
 } from '../src/domain/match/room'
-import { canRespawn, isStealthed, sideOf } from '../src/domain/match/sides'
+import { canRespawn, homeOf, isStealthed, sideOf } from '../src/domain/match/sides'
 import { RECONNECT_GRACE_MS, assignTeam, connected, holdsChoosing, present, nextSlot } from '../src/domain/match/match'
 import { stampLocomotion, stampProtected, stampStealthed } from '../src/infra/codec/snapshot'
 import { fallDamage } from '../src/domain/rule/damage'
@@ -233,6 +234,8 @@ setInterval(() => {
       }
 
       updateMatch(room, now)
+      // 手を挙げている味方どうしを結ぶ (server/link.ts)
+      updateLinks(room, now)
       if (room.mode.id === 'PRACTICE') {
         updateTargets(room, now)
         // 練習の猫。自分で掛かって確かめる。消えたら置き直す
@@ -854,7 +857,9 @@ function handleMessage(
       const now = Date.now()
       if (now - sessionOf(player).resuppliedAt < RESUPPLY_COOLDOWN_MS) break
       // 基地は書き出した json を優先。無ければ表の値
-      const base = room.stage.bases[player.team] ?? STAGES[room.stage.name].bases[player.team]
+      // 後半は陣地が入れ替わる (前後半の部屋)。補給できるのはいま使っている基地
+      const home = homeOf(room, player.team)
+      const base = room.stage.bases[home] ?? STAGES[room.stage.name].bases[home]
       if (!atBase(player.x, player.y, player.z, base)) break
       sessionOf(player).resuppliedAt = now
       resupply(player)

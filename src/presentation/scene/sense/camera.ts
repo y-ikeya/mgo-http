@@ -353,7 +353,15 @@ export class FollowCamera {
 
   private aiming = false
   private distance = HIP_VIEW.distance
+  /** 肩越しのずれ (m)。**左肩なら負** (shoulderSide)。均しながら左右を行き来する */
   private shoulder = HIP_VIEW.shoulder
+  /**
+   * どちらの肩越しか。1 = 右、-1 = 左。
+   *
+   * MGO2 は構え中の R3 で左肩へ寄った (2026-11-10 本人)。**持ち手は変わらない** — 体も
+   * 銃もそのままで、カメラの横のずれだけ反対へ出す。構えを解いても戻さない (本家どおり)
+   */
+  private shoulderSide: 1 | -1 = 1
   /** 注視点の上下のずらし (m)。腰だめと構えで違うので均しながら動く */
   private lift = HIP_VIEW.lift
   /** 見下ろしの足し分 (rad)。腰だめだけ。構えると 0 へ均す */
@@ -535,6 +543,11 @@ export class FollowCamera {
     })
   }
 
+  /** 肩越しの左右を持ち替える。1 = 右、-1 = 左。横のずれは均しながら移る */
+  setShoulderSide(side: 1 | -1): void {
+    this.shoulderSide = side
+  }
+
   /** カメラ基準の前方向 (XZ 平面、正規化済み) */
   forward(out: THREE.Vector3): THREE.Vector3 {
     return out.set(-Math.sin(this.aimYaw), 0, -Math.cos(this.aimYaw))
@@ -647,7 +660,7 @@ export class FollowCamera {
      * に追従させる。覗く銃 (shoulder 0) なら真後ろ。URL で ?cams= が来ていればそれ
      */
     // 低い天井の下では肩越しをやめて頭の真後ろ (主観寄り)
-    const shoulder = (this.aiming || HIP_SHOULDER_TUNED !== null ? target.shoulder : this.aimView.shoulder) * (1 - this.tight)
+    const shoulder = (this.aiming || HIP_SHOULDER_TUNED !== null ? target.shoulder : this.aimView.shoulder) * (1 - this.tight) * this.shoulderSide
     this.shoulder = damp(this.shoulder, shoulder, AIM_LAMBDA, dt)
     this.lift = damp(this.lift, target.lift * (1 - this.tight), AIM_LAMBDA, dt)
     this.pitchDown = damp(this.pitchDown, target.pitchDown, AIM_LAMBDA, dt)
@@ -713,15 +726,19 @@ export class FollowCamera {
      * カメラも壁の中 — 壁の裏が映る。中心から肩の向きへ線を引いて、壁までの
      * 距離 (カメラの球ぶんを引く) までしか肩を出さない
      */
+    // 左肩 (負) でも同じく測る。向き (sign) と量 (reach) に分けて、出す向きの壁で縮める
     const wantedSide = this.shoulder + this.leanOffset
-    let side = wantedSide
-    if (world && side > 0) {
-      this.sideDir.set(rightX, 0, rightZ)
-      const free = world.distanceToObstruction(this.centerPivot, this.sideDir, side + CAMERA_RADIUS)
-      side = Math.max(0, Math.min(side, free - CAMERA_RADIUS))
+    const sign = wantedSide < 0 ? -1 : 1
+    const wantedReach = Math.abs(wantedSide)
+    let reach = wantedReach
+    if (world && reach > 0) {
+      this.sideDir.set(rightX * sign, 0, rightZ * sign)
+      const free = world.distanceToObstruction(this.centerPivot, this.sideDir, reach + CAMERA_RADIUS)
+      reach = Math.max(0, Math.min(reach, free - CAMERA_RADIUS))
     }
     // 肩越しがどれだけ潰されたか (0 = そのまま / 1 = 体の真後ろ)。体を薄くする量に使う
-    this.sideCollapse = wantedSide > 0.05 ? 1 - side / wantedSide : 0
+    this.sideCollapse = wantedReach > 0.05 ? 1 - reach / wantedReach : 0
+    const side = reach * sign
     this.pivot.set(base.x + rightX * side, pivotY, base.z + rightZ * side)
 
     // 視線の逆方向へ distance だけ引いた位置がカメラの定位置。

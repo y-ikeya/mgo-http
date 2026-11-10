@@ -81,7 +81,7 @@ const SOUNDS = {
   /** スタンナイフの放電 (本人の素材 elec.mp3 を -9dB、2026-10-08「うるさすぎ」)。眠らせる刺突を振った人の手元で鳴る */
   zap: { file: "stun_elec1.mp3", reference: 3, max: 20 },
   /**
-   * CQC の拳 (本人の素材 punch.mp3、2026-11-04)。**掛かっても空振りでも、殴りかかった所で鳴る** —
+   * CQC の拳の掛け声 (本人の素材 punch.mp3、2026-11-04。男の声)。**掛かっても空振りでも、殴りかかった所で鳴る** —
    * 掛ける側の手が出たことが周りにも分かる。刺突と同じく届くのは近くだけ
    */
   punch: { file: "punch1.mp3", reference: 3, max: 18 },
@@ -220,6 +220,17 @@ const SOUNDS = {
    * 詰めるか退くかの判断に直に効く。
    */
   blastScream: { file: "man1_scream2.mp3", reference: 8, max: 110 },
+  /*
+   * 女の声 (名無しの体。skin.ts の voiceFor)。役も届く距離も男の声と同じで、音源だけ違う。
+   * 本人が用意した 5 本 (2026-11-10)
+   */
+  screamWoman: { file: "woman1_scream1.mp3", reference: 8, max: 110 },
+  painWoman: { file: "woman1_pain1.mp3", reference: 3, max: 26 },
+  blastScreamWoman: { file: "woman1_scream2.mp3", reference: 8, max: 110 },
+  stunOofWoman: { file: "woman1_stun1.mp3", reference: 4, max: 40 },
+  ohhWoman: { file: "woman1_ohh1.mp3", reference: 2, max: 14 },
+  /** CQC の掛け声 (本人の cqc_hun.mp3、2026-11-10) */
+  punchWoman: { file: "woman1_punch1.mp3", reference: 3, max: 18 },
   /**
    * 爆発。
    *
@@ -372,6 +383,28 @@ const SOUNDS = {
 } as const;
 
 export type SoundName = keyof typeof SOUNDS;
+
+/** 体から出る声の役。**誰の声で鳴らすかは体が決める** (skin.ts の voiceFor) */
+export type CryRole = "scream" | "pain" | "blastScream" | "stunOof" | "ohh" | "punch";
+
+/** 声の主ごとの、役 → 音源。man1 は前からの声 */
+const CRIES = {
+  man1: { scream: "scream", pain: "pain", blastScream: "blastScream", stunOof: "stunOof", ohh: "ohh", punch: "punch" },
+  woman1: {
+    scream: "screamWoman",
+    pain: "painWoman",
+    blastScream: "blastScreamWoman",
+    stunOof: "stunOofWoman",
+    ohh: "ohhWoman",
+    punch: "punchWoman",
+  },
+} as const satisfies Record<string, Record<CryRole, SoundName>>;
+
+export type Voice = keyof typeof CRIES;
+
+export function crySound(voice: Voice, role: CryRole): SoundName {
+  return CRIES[voice][role];
+}
 
 /** 1 つの音の 1 つの録り。高さは録りごとに変えられる (代用の音を落とすため) */
 interface Take {

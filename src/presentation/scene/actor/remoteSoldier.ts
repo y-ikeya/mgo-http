@@ -417,8 +417,8 @@ export class RemoteSoldier {
   private yawInitialized = false;
   private disposed = false;
 
-  /** どのモデルを着るか (見た目の試作。skin.ts) */
-  private readonly skin: string;
+  /** どのモデルを着るか (見た目の試作。skin.ts)。声もこれで決まる */
+  readonly skin: string;
 
   constructor(id: string, scene: THREE.Scene, skin: string = DEFAULT_SKIN) {
     this.id = id;
@@ -666,7 +666,12 @@ export class RemoteSoldier {
     this.weapon?.setAimWeight(this.aimTrimWeight)
     if (this.model && this.weapon) {
       // 銃身の上下を照準へ。背骨で曲げる。自機と同じ
-      if (!prone) this.spineAim.apply(this.model, this.weapon.object, this.yaw, state.pitch, this.aimTrimWeight);
+      // 解いた後は測り直さずに薄める (armIk.ts の fade)。自機と同じ
+      if (!prone && state.aiming && !this.serverDead) {
+        this.spineAim.apply(this.model, this.weapon.object, this.yaw, state.pitch, this.aimTrimWeight);
+      } else if (!prone) {
+        this.spineAim.fade(this.aimTrimWeight);
+      }
       // 右手を先にずらす (rightShift)。自機と同じ
       const shift = WEAPON_CONFIGS[state.weapon as keyof typeof WEAPON_CONFIGS]?.rightShift;
       this.rightArm.moved.set(0, 0, 0);
@@ -1603,6 +1608,11 @@ export class RemoteSoldiers {
     return this.players.get(id)?.object.position ?? null;
   }
 
+  /** その人の体 (skin.ts)。まだ姿が届いていなければ null */
+  skinOf(id: string): string | null {
+    return this.players.get(id)?.skin ?? null;
+  }
+
   /**
    * **位置が届いている間だけ**今いる場所。隠している (位置が途切れた) 人は null。
    *
@@ -1685,32 +1695,29 @@ export class RemoteSoldiers {
   }
 
   /**
-   * 敬礼を交わした味方を探す。
+   * 敬礼で繋がっている味方を、**サーバーが送ってきた一覧に合わせる** (server/link.ts)。
    *
-   * 味方の位置はサーバーが配っているが、既定では映さない。**互いに敬礼して
-   * 初めて繋がる。** 味方が全員最初から見えていると、探すことも合流することも
-   * 手続きでなくなる。手を挙げて返してもらう、という一手間が入るだけで、
-   * 「誰と組んでいるか」が自分で選んだものになる。
+   * 結ぶのも切るのもサーバー。画面が自分で結んでいた頃は、暴いた情報を誰に配るかを
+   * サーバーが決められなかった (2026-11-09)。
    *
-   * @param saluting 自分が手を挙げているか
    * @returns 新しく繋がった相手の名前
    */
-  linkSaluting(
-    saluting: boolean,
-    origin: THREE.Vector3,
-    range: number,
-    team: Team | null,
-  ): string[] {
-    if (!saluting || team === null) return [];
-
+  setLinks(ids: readonly string[]): string[] {
     const formed: string[] = [];
-    for (const player of this.players.values()) {
-      if (player.isLinked || !player.isAlly(team) || !player.saluting) continue;
-      if (player.object.position.distanceTo(origin) > range) continue;
-      player.setLinked(true);
-      formed.push(player.name);
+    for (const [id, player] of this.players) {
+      const linked = ids.includes(id);
+      if (linked && !player.isLinked) formed.push(player.name);
+      if (linked !== player.isLinked) player.setLinked(linked);
     }
     return formed;
+  }
+
+  /**
+   * その人との繋がりを断つ。**相手が倒れたら結び直し** (2026-11-09 本人「仲間が死んだ後も光り続けてる
+   * (次の命でも発光を引き継いでる) のは bad」)。自分が倒れた時の clearLinks と同じ決まりを、相手の側にも
+   */
+  unlink(id: string): void {
+    this.players.get(id)?.setLinked(false);
   }
 
   /** 繋がりを断つ。倒れたら結び直し */

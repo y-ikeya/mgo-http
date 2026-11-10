@@ -60,7 +60,7 @@ const PAD_BUTTONS = {
    * L1。**単押しでダンボール、長押しで道具の一覧。**
    *
    * 鍵盤の C と同じ役。武器 (R1) と左右で対になっていて、どちらの系統を
-   * 送っているかが指で分かる。構えている間も同じ (眼鏡は R3)。
+   * 送っているかが指で分かる。構えている間も同じ (倍率は △)。
    */
   box: [4],
   /**
@@ -77,8 +77,12 @@ const PAD_BUTTONS = {
   support: [12],
   /** 十字キー下。**支度の画面では行を送るほうに使う** */
   salute: [13],
-  /** OPTIONS / START */
-  menu: [9],
+  /**
+   * OPTIONS / START と、**タッチパッドの押し込み** (DualShock 4 / DualSense の真ん中、標準マッピングの 17)。
+   * 全画面で OPTIONS を 2 回目以降押すとブラウザの「Esc で全画面表示を終了」が出てメニューが開かない
+   * 環境があった (2026-11-09 本人、DualShock 4。偽のパッドでは再現しない)。押しやすい真ん中でも開けるように
+   */
+  menu: [9, 17],
   /**
    * R1。**単押しで持ち替え、長押しで一覧。**
    *
@@ -86,16 +90,22 @@ const PAD_BUTTONS = {
    */
   swap: [5],
   /**
-   * R3 (右スティック押し込み)。倍率を 1 段上げる (一番上まで行ったら戻る)。
+   * △ / Y を**構えている間だけ**。倍率を 1 段上げる (一番上まで行ったら戻る)。
    *
-   * 眼鏡の倍率は R3 が通例 (照準のスティックを押し込む)。前は L1 を構えている間だけ
-   * 眼鏡にしていたが、道具 (box) と同じ指で読み違えやすかった。
+   * MGO2 は構え中の △ で主観 / 倍率だった (2026-11-10 本人)。前は R3 だったが、R3 は肩の
+   * 持ち替えに譲った。構えていない △ は置く / 拾う (drop が構えている間だけ手を引く)。
    *
    * **十字キー右は持たない。** 覗いている間は右へ傾く指 (lean の menuRight) で、両方に
    * 割り当てていた頃は傾こうとすると倍率が送られ、一番上を越えて主観から外れた (2026-10-17 本人)
    */
-  zoom: [11],
-  /** △ / Y。置く / 拾う */
+  zoom: [3],
+  /**
+   * R3 (右スティック押し込み) を**構えている間だけ**。肩越しの左右を持ち替える。
+   *
+   * MGO2 は構え中の R3 で左肩へ寄った (2026-11-10 本人)。持ち手は変わらず、カメラだけ
+   */
+  shoulder: [11],
+  /** △ / Y。置く / 拾う。**構えている間は倍率 (zoom) に譲る** */
   drop: [3],
 } as const
 
@@ -139,7 +149,9 @@ const BINDINGS = {
   salute: { keys: ['KeyV'], pad: 'salute' },
   /** 定型文のボイス。T で番号の一覧を出し、1〜5 で言う (domain/player/voice.ts) */
   voice: { keys: ['KeyT'], pad: 'voice' },
-  zoom: { keys: ['KeyZ'], pad: 'zoom' },
+  zoom: { keys: ['KeyZ'], pad: 'zoom', padOnlyWhenAiming: true },
+  /** 肩越しの左右。パッドは構え中の R3 だけ (構えていない R3 は空き) */
+  shoulder: { keys: ['KeyX'], pad: 'shoulder', padOnlyWhenAiming: true },
   /**
    * 武器の一覧。単押しで往復、押している間は一覧を送る。
    *
@@ -161,7 +173,8 @@ const BINDINGS = {
   stunStab: { keys: [MOUSE_RIGHT] },
   /** 道具の一覧。単押しでダンボール、押している間は一覧 */
   swapTool: { keys: ['KeyC'], pad: 'box' },
-  drop: { keys: ['KeyG'], pad: 'drop' },
+  /** パッドの △ は構えている間は倍率 (zoom) が使う */
+  drop: { keys: ['KeyG'], pad: 'drop', yieldsWhenAiming: true },
   toSupport: { keys: ['KeyE'], pad: 'support' },
   /**
    * 戦場へ出る / READY。**3 つ受ける** — 右手が置き場所によって違う。
@@ -184,7 +197,7 @@ const BINDINGS = {
   menuRight: { keys: ['ArrowRight'], pad: 'menuRight' },
 } as const satisfies Record<
   string,
-  { keys: readonly string[]; pad?: PadAction; hold?: number; yieldsWhenAiming?: boolean }
+  { keys: readonly string[]; pad?: PadAction; hold?: number; yieldsWhenAiming?: boolean; padOnlyWhenAiming?: boolean }
 >
 
 export type Action = keyof typeof BINDINGS
@@ -693,15 +706,17 @@ export class Input {
   /**
    * そのボタンを今この操作が握っているか。
    *
-   * **同じボタンが構えの有無で別の役になる。** L1 は素でダンボール、構えて
-   * いれば眼鏡。譲る側 (印の付いた操作) が構えている間だけ手を引くので、
-   * 両方が同時に立つことがない。
+   * **同じボタンが構えの有無で別の役になる。** △ は素で置く / 拾う、構えて
+   * いれば倍率。譲る側 (yieldsWhenAiming) が構えている間だけ手を引き、構えている間
+   * だけの側 (padOnlyWhenAiming) が構えていない間は手を引くので、両方が同時に立つことがない。
    *
    * 譲るのはパッドだけ。鍵盤は指が別なのでぶつからない。
    */
   private padYields(action: Action): boolean {
     const bind = BINDINGS[action]
-    return 'yieldsWhenAiming' in bind && bind.yieldsWhenAiming === true && this.aiming
+    if ('yieldsWhenAiming' in bind && bind.yieldsWhenAiming === true && this.aiming) return true
+    // 構えている間だけ受け持つ側 (△ の倍率、R3 の肩)。構えていなければ手を引く
+    return 'padOnlyWhenAiming' in bind && bind.padOnlyWhenAiming === true && !this.aiming
   }
 
   /**

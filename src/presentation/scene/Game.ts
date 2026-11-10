@@ -1,4 +1,5 @@
 import { openSkyAt, skyAt, SKY_PROBE_HEIGHT } from "./world/skylight";
+import { skyTableAt } from "./world/skyTable";
 import { Weapon, WEAPON_CONFIGS as SIGHT_CONFIGS, cutSightGlass } from "./arms/weapon";
 import type { TriangleBvh } from "../../sim/space/bvh";
 import { onStaticShadowRefresh } from "./world/staticShadow";
@@ -9,6 +10,7 @@ import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
 import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
 import * as THREE from "three";
+import { homeOf } from "../../domain/match/sides";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
 import { pass } from "three/tsl";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
@@ -37,6 +39,7 @@ import { offsetInCone } from "../../sim/space/aim";
 import {
   buildLights,
   buildBases,
+  recolorHomes,
   buildStage,
   fitShadowToStage,
   loadStageSun,
@@ -57,7 +60,7 @@ import {
   resolveCircle,
   surfaceAt,
 } from "../../sim/space/collision";
-import { GameAudio, type SoundToken } from "./sense/audio";
+import { GameAudio, crySound, type CryRole, type SoundToken } from "./sense/audio";
 import type { Step } from "../../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./sense/soundRing";
 import { Locators } from "./arms/locators";
@@ -151,7 +154,7 @@ import {
 } from "./calibration";
 import type { NetTransport } from "../../application/protocol/types";
 import type { Identity } from "../../infra/auth/session";
-import { selfSkin, skinFor } from "./actor/skin";
+import { selfSkin, skinFor, voiceFor } from "./actor/skin";
 import {
   downLeftOf,
   loadoutClock,
@@ -189,9 +192,6 @@ import { loadRenderScale } from "../../infra/prefs/quality";
 
 /** パッドでボイスを選ぶ十字キーの並び。上から時計回り */
 const VOICE_PAD_ORDER = ["menuUp", "menuRight", "menuDown", "menuLeft"] as const;
-
-
-const LINK_RANGE = 5;
 
 /** 繋がったことを何秒出すか */
 const LINK_FEED_LIFE = 4;
@@ -267,8 +267,6 @@ const HIT_FEEDBACK_DURATION = 0.6;
 const ADAPT_MAX = 1.8;
 /** 時計の音を鳴らし始める残りの秒。10 秒から 1 秒まで 10 回 */
 const CLOCK_TICK_FROM = 10;
-/** エンジンの音を締め切りの何 ms 前から鳴らすか。素材 (engine1.mp3) の長さ 2.9 秒 */
-const ENGINE_LEAD_MS = 2900;
 /** 散弾の粒の痕の大きさ (普通の弾痕に対して)。小さな点が散らばって見える (2026-11-03 本人) */
 const PELLET_HOLE_SCALE = 0.45;
 /** 頭の上がこれだけ開いていれば外とみなす (0〜1)。壁際の軒先で明るくならないように */
@@ -520,6 +518,17 @@ export class Game {
   private readonly scene = new THREE.Scene();
   private readonly follow: FollowCamera;
   private readonly player = new Soldier();
+  /** 自分が着ている体 (skin.ts)。声もこれで決まる */
+  private ownSkin = selfSkin(undefined);
+
+  /**
+   * その人の声で叫ぶ・うめく。**声は体が決める** (名無しは女の声)。
+   * 姿がまだ届いていない相手は男の声
+   */
+  private cry(role: CryRole, id: string, at: THREE.Vector3): number {
+    const skin = id === this.net.id ? this.ownSkin : this.remotes.skinOf(id);
+    return this.audio.play(crySound(voiceFor(skin ?? ""), role), at);
+  }
   private readonly input = new Input();
   private readonly stage: Stage;
   private readonly sun: THREE.DirectionalLight;
@@ -735,6 +744,10 @@ export class Game {
   private boltRate = 1;
   /** 0 より大きい間はリロード中で、発砲できない */
   private reloadTimer = 0;
+  /** その装填の全体の尺 (秒) */
+  private reloadTotal = 0;
+  /** その装填でもう弾を移したか (拳銃は差し込んだ所で移す。weapons.ts の reloadLoadsAt) */
+  private reloadLoaded = false;
   /** その装填を始めたときに伏せていたか。**姿勢をまたいだら中断する** */
   private reloadProne = false;
   /** どの銃を替えていたか。**持ち替えたら中断する** */
@@ -865,13 +878,31 @@ export class Game {
    */
   private get canResupply(): boolean {
     if (!this.teamsMode || !canAct(this.life) || this.player.sleeping || this.player.downed) return false;
-    const base = STAGES[this.stageName].bases[this.selfTeam];
+    const base = STAGES[this.stageName].bases[this.homeOf(this.selfTeam)];
     const p = this.player.position;
     return atBase(p.x, p.y, p.z, base);
   }
 
   /** いま覗いている段。0 なら肩越し */
   private zoomStep = 0;
+
+  /**
+   * 左肩越しか (2026-11-10 本人「左肩にカメラが寄るのもある、持ち手は変わらない」)。
+   *
+   * **構えている間だけ持ち替えられる** (パッドは構え中の R3、鍵盤は X)。構えを解いても
+   * 戻さない — 角の左側を覗き続ける人が、構え直すたびに右へ戻されると困る。
+   * サーバーへも送る (snapshot.leftShoulder)。可視の判定はカメラの位置から引くので、
+   * 片側だけ左にすると「画面では見えるのに配られない」が出る
+   */
+  private leftShoulder = false;
+
+  /** 構えている間の肩の持ち替え。狙っている所は動かさない (holdAimAt) */
+  private updateShoulder(): void {
+    if (!this.input.tapped("shoulder") || !this.player.isAiming || this.voiceMenuOpen()) return;
+    this.follow.holdAimAt(this.aimedDistance());
+    this.leftShoulder = !this.leftShoulder;
+    this.follow.setShoulderSide(this.leftShoulder ? -1 : 1);
+  }
 
   /**
    * 倍率を上げ下げする。
@@ -1094,7 +1125,8 @@ export class Game {
     this.net = createTransport(identity, room, privateRoom);
     // 自機のモデルはここで読み始める。**構築時ではない** —
     // どのモデルを着るかは名前で決まり、名前を知っているのはこちら (skin.ts)
-    this.player.start(selfSkin(identity.displayName));
+    this.ownSkin = selfSkin(identity.displayName);
+    this.player.start(this.ownSkin);
 
     // WebGPU が無い環境では three が自動で WebGL2 に落ちる。
     // 「対応ブラウザだけ」にはならないので、片道の選択ではない。
@@ -1140,6 +1172,7 @@ export class Game {
     void loadStageCapGoals(this.stageName).then((goals) => {
       if (this.disposed) return;
       this.capGoals = buildCapGoals(goals);
+      recolorHomes(this.capGoals, this.homesSwapped);
       this.capGoals.visible = false;
       this.scene.add(this.capGoals);
     });
@@ -1297,6 +1330,7 @@ export class Game {
       remotes: this.remotes,
       net: this.net,
       audio: this.audio,
+      cry: (role, at) => void this.cry(role, this.net.id, at),
       follow: this.follow,
       input: this.input,
       inv: this.inv,
@@ -1625,6 +1659,7 @@ export class Game {
     this.inv.update(dt, this.input.firing);
     this.melee.updateTrigger();
     this.updateZoom();
+    this.updateShoulder();
     this.applyWeaponView();
 
     // 成績表。開いている間はポインタを離して、押せる状態にする
@@ -1654,7 +1689,6 @@ export class Game {
         }
       }
     }
-    this.updateLinks();
     // 押している間は手を挙げたまま。離すと下ろす
     this.player.setSaluteHeld(!this.loadoutBlocking && !voiceOpen && this.input.down("salute"));
     // **引き金の立ち上がりはフレームの頭で 1 回だけ。** 投げ物ごとに数えると、
@@ -1801,6 +1835,7 @@ export class Game {
     this.updateTsneTarget(dt);
     this.updateClockTick();
     this.updateEngine();
+    this.syncHomes();
     // 草むらを押す人。自分が先頭
     this.grassPushers.clear();
     this.grassPushers.set(this.net.id, this.player.position);
@@ -2099,6 +2134,8 @@ export class Game {
     // 視点の向きはカメラが持っている。体の向きとは別 (構えていないと体は進行方向を向く)。
     // サーバーはこれで「どこから見ているか」を出し、可視の判定に使う
     snapshot.cameraYaw = this.follow.aimYaw;
+    // 肩越しの左右。サーバーのカメラの位置 (可視の判定の目) を同じ側へ出す
+    snapshot.leftShoulder = this.leftShoulder;
     // 撃ち返せない時間は相手にも見せる。反撃の機会になる
     snapshot.reloading = this.reloadTimer > 0;
     // STEALTH を着ているか。効いているかはサーバーが確かめて、効いていなければ消して配る
@@ -2236,7 +2273,9 @@ export class Game {
         // 倒れた相手の位置で叫ぶ。撃った側には当てた手応えになり、
         // 離れた場所の誰かには「そこで撃ち合いが終わった」と伝わる
         const at = this.remotes.positionOf(effect.id);
-        if (at) this.addPing("shot", at, this.audio.play("scream", at));
+        if (at) this.addPing("shot", at, this.cry("scream", effect.id, at));
+        // 敬礼で繋がっていた味方なら切る。次の命はもう一度敬礼を交わしてから
+        this.remotes.unlink(effect.id);
         break;
       }
       case "left":
@@ -2260,6 +2299,19 @@ export class Game {
     }
     const receiver = this.receivers[message.type] as ((message: ServerMessage) => void) | undefined;
     receiver?.(message);
+  }
+
+  /**
+   * 送った位置が断られた。**サーバーが持っている位置へ跳んで戻る** (2026-11-09 本人「一人姿が見えてない」)。
+   *
+   * 戻らないと差が開く一方で、他の人の画面ではずっと古い位置に居る (server/relay.ts)。
+   * 跳んだ距離を足音に積ませない (warpTo)。届くまでの間に送った位置も断られるので、
+   * 少しの間は何通か続けて届く
+   */
+  private receiveMoveRejected(message: Extract<ServerMessage, { type: "moveRejected" }>): void {
+    const [x, y, z] = message.at;
+    this.player.position.set(x, y, z);
+    this.player.warpTo(x, y, z);
   }
 
   /**
@@ -2296,6 +2348,8 @@ export class Game {
     dollGone: (message) => this.receiveDollGone(message),
     trapReleased: (message) => this.receiveTrapReleased(message),
     decoyBumped: (message) => this.receiveDecoyBumped(message),
+    moveRejected: (message) => this.receiveMoveRejected(message),
+    links: (message) => this.receiveLinks(message),
     cboxBumped: (message) => this.receiveCboxBumped(message),
     locatorThrown: (message) => this.receiveLocatorThrown(message),
     locatorPlaced: (message) => this.receiveLocatorPlaced(message),
@@ -2677,7 +2731,7 @@ export class Game {
     for (const id of message.victims) {
       setTimeout(() => {
         const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
-        if (at) this.audio.play("ohh", at);
+        if (at) this.cry("ohh", id, at);
       }, DOLL_OHH_MS);
     }
   }
@@ -2786,7 +2840,7 @@ export class Game {
 
   private receiveStun(message: Extract<ServerMessage, { type: "stun" }>): void {
     const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
-    if (at) this.audio.play("stunOof", at);
+    if (at) this.cry("stunOof", message.target, at);
   }
 
   // 投げた側が倒れて、放された。倒れかけから立ち直る
@@ -2809,7 +2863,7 @@ export class Game {
     // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
     this.throwing.loseHeldGrenade();
     // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
-    if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
+    if (message.distance === undefined) this.cry("blastScream", this.net.id, this.player.position);
   }
 
   // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —
@@ -2950,7 +3004,7 @@ export class Game {
       // 倒れなかった頭への一発はうめきになる。近くの相手にだけ届く。
       if (message.zone === "HEAD" && message.damage > 0) {
         const at = this.remotes.positionOf(message.id);
-        if (at) this.addPing("shot", at, this.audio.play("pain", at));
+        if (at) this.addPing("shot", at, this.cry("pain", message.id, at));
       }
       return;
     }
@@ -2973,10 +3027,10 @@ export class Game {
       this.player.setFiring(false);
       // 倒れたら繋がりは切れる。生き返ったら結び直し
       this.remotes.clearLinks();
-      this.audio.play("scream", this.player.position);
+      this.cry("scream", this.net.id, this.player.position);
     } else if (message.zone === "HEAD" && message.damage > 0) {
       // 頭に当たったのに立っている。仕留められなかったことが音で分かる
-      this.audio.play("pain", this.player.position);
+      this.cry("pain", this.net.id, this.player.position);
     }
   }
 
@@ -3000,7 +3054,7 @@ export class Game {
     const solo = spawns.solo;
     // 基地は書き出した json (blend の meta_*base*) を優先。無ければ表の値
     const base = MODES[this.replica.mode].teams
-      ? (this.stageBases[this.replica.team] ?? spawns.bases[this.replica.team])
+      ? (this.stageBases[this.homeOf(this.replica.team)] ?? spawns.bases[this.homeOf(this.replica.team)])
       : solo[Math.floor(Math.random() * solo.length)];
     // 同じ点に重なると互いが見えないので、ID から決まる向きへ散らす
     const spread = spawnAngle(this.net.id + this.shotCount);
@@ -3706,19 +3760,42 @@ export class Game {
 
   /**
    * 試合が始まる暗転の前にエンジンの音 (2026-11-03 本人「試合が開始する暗転まえは engine」)。
-   * 待合室 (ready) とラウンドの合間 (break) の締め切りの ENGINE_LEAD_MS 前に 1 回 — 鳴り終わりが暗転の明け
-   * (試合の始まり) に重なる。締め切りごとに 1 回だけ (誰かが READY を取り消して締め切りが延びても、次の締め切りでまた鳴る)
+   *
+   * **待合室 (ready) は、始まるのが決まった時に 1 回だけ** — 秒読み (countdown) へ移った所で鳴らす
+   * (2026-11-09 本人「match が始まることが確定した 1 回だけ流れて欲しい」)。前は締め切りの
+   * ENGINE_LEAD_MS 前に鳴らしていたが、全員が押すと締め切りが 3 秒後へ縮む (READY_GRACE_MS) ので
+   * 押した瞬間に鳴り、取り消して押し直すたびに鳴り直した。
+   *
+   * **ラウンドの合間 (break、前後半・先攻後攻の切り替え) では鳴らさない** (2026-11-09 本人「前後半の切り替えの
+   * 時は試合開始の音いらない、トラック発信音の音ね」)。試合が始まるのは 1 度だけ
    */
   private updateEngine(): void {
-    const match = this.replica.match;
-    if (!match || (match.phase !== "ready" && match.phase !== "break") || !(match.endsAt > 0)) return;
-    const left = match.endsAt - Date.now();
-    if (left <= 0 || left > ENGINE_LEAD_MS || this.engineFor === match.endsAt) return;
-    this.engineFor = match.endsAt;
-    this.audio.playUi("engine");
+    const phase = this.replica.match?.phase;
+    const previous = this.enginePhase;
+    this.enginePhase = phase;
+    if (previous === "ready" && phase === "countdown") this.audio.playUi("engine");
   }
-  /** エンジンを鳴らした締め切り (endsAt)。同じ締め切りで 2 度鳴らさない */
-  private engineFor = 0;
+
+  /**
+   * その色がいま使う陣地。**前後半の部屋の後半は相手の色の物** (domain/match/sides.ts)。
+   * 湧く場所・補給の基地はここを通す
+   */
+  private homeOf(team: Team): Team {
+    return homeOf({ basesSwapped: this.replica.match?.basesSwapped === true }, team);
+  }
+
+  /** 陣地の印 (基地の枠・CAP の設置ポイント) を、陣地が入れ替わったら塗り直す */
+  private syncHomes(): void {
+    const swapped = this.replica.match?.basesSwapped === true;
+    if (swapped === this.homesSwapped) return;
+    this.homesSwapped = swapped;
+    if (this.bases) recolorHomes(this.bases, swapped);
+    if (this.capGoals) recolorHomes(this.capGoals, swapped);
+  }
+  /** 印を塗った時の入れ替え。読み込みが後から来た印は、作った所で今の値に合わせる */
+  private homesSwapped = false;
+  /** 前のコマで見た試合の段階。待合室から秒読みへ移った瞬間を拾う */
+  private enginePhase: string | undefined = undefined;
 
   /**
    * **試合が始まる前に、読む物と組む物を済ませる** (2026-11-03 本人「match 始まる前に asset を全部読む方針に」)。
@@ -3875,12 +3952,17 @@ export class Game {
 
     if (this.reloadTimer > 0) {
       this.reloadTimer -= dt;
-      if (this.reloadTimer <= 0) {
-        this.reloadTimer = 0;
+      if (this.reloadTimer <= 0) this.reloadTimer = 0;
+      /*
+       * 弾を移す。**弾倉が入った瞬間に**知らせる (長物は動作の終わり、拳銃は差し込んだ所)。
+       * 始まりではなく入った所を送ることで、サーバーは銃ごとの装填の尺を持たなくてよくなる。
+       * 撃てるのは動作が終わってから (reloadTimer)。入った後に中断しても弾は入ったまま
+       */
+      const done = this.reloadTotal > 0 ? 1 - this.reloadTimer / this.reloadTotal : 1;
+      if (!this.reloadLoaded && done >= (this.weapon.reloadLoadsAt ?? 1) - 1e-6) {
+        this.reloadLoaded = true;
         // 予備から足りるぶんだけ移す。弾倉に残っていた分は捨てない
         const kind = this.player.equipped;
-        // **終わった瞬間**に知らせる。始まりではなく終わりを送ることで、
-        // サーバーは銃ごとの装填の尺を持たなくてよくなる
         if (this.inv.reload()) this.net.send({ type: "reload", weapon: kind });
       }
       // 弾倉に手が掛かる頃に鳴らす。近くの相手には「いま撃てない」が伝わる
@@ -4037,9 +4119,11 @@ export class Game {
      */
     // **極めた銃だけ速い。** 拾った銃は素の尺のまま (masteryReloadScale)
     this.reloadTimer = this.weapon.reload * masteryReloadScale(this.skills, this.weapon.id);
+    this.reloadTotal = this.reloadTimer;
+    this.reloadLoaded = false;
     this.player.playReload(this.reloadTimer);
     // 音は動作に合わせて遅らせる (下の updateWeapon で鳴らす)
-    this.reloadSoundIn = this.reloadTimer * this.knobs.reloadSoundAt;
+    this.reloadSoundIn = this.reloadTimer * (this.weapon.reloadSoundAt ?? this.knobs.reloadSoundAt);
     // 覗いたままだと入れ替えの間ずっと視界が狭い。肩越しへ戻す
     this.zoomStep = 0;
   }
@@ -4230,7 +4314,7 @@ export class Game {
    */
   private readonly eyePose = {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance,
-    lean: 0 as Lean, cameraYaw: 0, aiming: false,
+    lean: 0 as Lean, cameraYaw: 0, aiming: false, leftShoulder: false,
   };
   private readonly targetPose = {
     time: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, stance: "stand" as Stance, lean: 0 as Lean,
@@ -4262,12 +4346,20 @@ export class Game {
   private updateSkyLight(dt: number): void {
     const sight = this.stage.sightWorld;
     this.updateExposure(sight, dt);
-    if (!sight) return;
+    /*
+     * **空の見え方の表があるステージは表から引く** (world/skyTable.ts)。地形と同じ表なので、
+     * 人と地形の暗さの決まり方がそろう。無ければ視線の網に光線を飛ばして測る
+     */
+    const table = this.stage.skyTable;
+    const at = (x: number, y: number, z: number): number | null =>
+      table ? skyTableAt(table, x, y, z) : sight ? skyAt(sight, x, y, z) : null;
     const me = this.player.position;
-    this.player.setSkyLight(skyAt(sight, me.x, me.y + SKY_PROBE_HEIGHT, me.z), dt);
+    const mine = at(me.x, me.y + SKY_PROBE_HEIGHT, me.z);
+    if (mine === null) return;
+    this.player.setSkyLight(mine, dt);
     for (const remote of this.remotes.all) {
-      const at = remote.object.position;
-      remote.setSkyLight(skyAt(sight, at.x, at.y + SKY_PROBE_HEIGHT, at.z), dt);
+      const p = remote.object.position;
+      remote.setSkyLight(at(p.x, p.y + SKY_PROBE_HEIGHT, p.z) ?? mine, dt);
     }
   }
 
@@ -4286,6 +4378,7 @@ export class Game {
     this.eyePose.pitch = this.follow.aimPitch;
     // カメラが寄っているか (投げ物の振りかぶりも寄る)。審判と同じ判断
     this.eyePose.aiming = this.follow.isAiming;
+    this.eyePose.leftShoulder = this.leftShoulder;
     const at = target.object.position;
     this.targetPose.x = at.x;
     this.targetPose.y = at.y;
@@ -4452,7 +4545,7 @@ export class Game {
     if (fallDamage(this.player.fallingSpeed) < this.player.health) return;
     this.fallScreamed = true;
     // 長いほう (3.3 秒)。落ちている間ずっと聞こえていてほしい
-    this.audio.play("blastScream", this.player.position);
+    this.cry("blastScream", this.net.id, this.player.position);
   }
 
   /** この落下でもう叫んだか。着地するか、落ちるのをやめたら戻す */
@@ -4733,16 +4826,18 @@ export class Game {
       // CQC の拳。掛かっても空振りでも、殴りかかった所で鳴る
       if (remote.cqcStarted) {
         const at = remote.object.position;
-        setTimeout(() => this.audio.play("punch", at), PUNCH_DELAY * 1000);
+        setTimeout(() => this.cry("punch", remote.id, at), PUNCH_DELAY * 1000);
       }
       // リロードの音。姿が見えている相手にだけ届く (位置がそうなので)
+      // 自分と同じだけ遅らせる (型の頭で鳴らすと弾倉に手が掛かる前に鳴る)。尺は素の値 (極めたかは知らない)
       if (remote.reloadStarted) {
         const spec = weaponOf(remote.equipped);
-        this.audio.play(spec.reloadSound, remote.object.position);
+        const at = remote.object.position;
+        setTimeout(() => this.audio.play(spec.reloadSound, at), spec.reload * (spec.reloadSoundAt ?? this.knobs.reloadSoundAt) * 1000);
       }
       // 吹き飛ばされた叫び。倒れたのではなく、まだ生きて転がっている
       if (remote.sweptThisFrame) {
-        const gain = this.audio.play("blastScream", remote.object.position);
+        const gain = this.cry("blastScream", remote.id, remote.object.position);
         this.addPing("shot", remote.object.position, gain);
       }
       // 相手が水に落ちた。**しぶきで気づける** — 姿は水面の下へ消える
@@ -4838,22 +4933,14 @@ export class Game {
   }
 
   /**
-   * 敬礼を交わした味方と繋がる。
+   * 敬礼で繋がっている味方が届いた (server/link.ts)。**結ぶのも切るのもサーバー。**
    *
-   * 味方の位置はサーバーが配っているが、既定では映さない。互いに手を挙げて
-   * 初めて壁越しに見えるようになる。誰と組むかを自分で選ぶための手続き。
+   * 新しく繋がった相手は名前を出して、音でも返す。手を挙げている間は画面を見ていない
    */
-  private updateLinks(): void {
-    const formed = this.remotes.linkSaluting(
-      this.player.isSaluting,
-      this.player.position,
-      LINK_RANGE,
-      this.replica.team,
-    );
-    for (const name of formed) {
+  private receiveLinks(message: Extract<ServerMessage, { type: "links" }>): void {
+    for (const name of this.remotes.setLinks(message.ids)) {
       this.links.unshift({ name, at: Date.now() });
       this.links.length = Math.min(this.links.length, LINK_FEED_MAX);
-      // 繋がったことは音でも返す。手を挙げている間は画面を見ていない
       this.audio.play("clink", this.player.position);
     }
   }

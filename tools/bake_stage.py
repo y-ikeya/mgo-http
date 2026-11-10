@@ -97,19 +97,26 @@ def subdivide(obj):
     # **絶対値で取る。** 鏡像に置いた箱 (拡縮が負) は to_scale が負を返す。負のままだと辺が
     # 「長くない」ことになって割られず (72 棟の箱がそうだった)、格子刻みでは刻み幅が負に
     # なって while が終わらなかった (書き出しが 10 分たっても終わらない)
-    scale = max(abs(v) for v in obj.matrix_world.to_scale())
+    #
+    # **縦横で倍率が違う物も、辺ごとに世界での長さで測る。** 前は一番大きい倍率を全部の辺に
+    # 掛けていた。CC の地面は x 53.7 倍・y 95.8 倍・高さ 1.26 倍で、高さ 2.6m の側面が 200m と
+    # 見積もられて 64 に割られ、190 三角が 83,304 三角になっていた (2026-11-09)。縦横で 2 倍以上
+    # 違う物は CC に 280 個 (建物の箱の多く)。形を世界の座標へ移してから割って刻み、元へ戻す
+    mw = obj.matrix_world
     # 小さな物 (置き物・ブロック) は細かく割る。2m の箱を 4m 刻みだと面の 4 隅だけに値が入り、
     # 四角を 2 つの三角に割った境で明るさの変わり方が折れて、斜めの線に見えた (基地の近くのブロック)
     cell = CELL if max(obj.dimensions) >= PROP_SIZE else PROP_CELL
     bm = bmesh.new()
     bm.from_mesh(mesh)
+    bm.transform(mw)
     for _ in range(6):
         long_edges = [e for e in bm.edges
-                      if (e.verts[0].co - e.verts[1].co).length * scale > cell]
+                      if (e.verts[0].co - e.verts[1].co).length > cell]
         if not long_edges:
             break
         bmesh.ops.subdivide_edges(bm, edges=long_edges, cuts=1, use_grid_fill=True)
-    grid_cut(bm, scale, cell)
+    grid_cut(bm, 1.0, cell)
+    bm.transform(mw.inverted())
     bm.to_mesh(mesh)
     bm.free()
 

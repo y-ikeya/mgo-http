@@ -43,12 +43,14 @@ const SKINS: Record<string, string> = {
    */
   pepa1404: 'soldier_raiden',
   /*
-   * nanashi。Raiden と同じ道で入れた体 (rebody → merge_all_clips → fit_height)。
+   * nanashi。Mixamo の Kachujin の体に、Tripo の頭を付け替えたもの (2026-11-10、
+   * 元は tools/raw/bald_woman.blend、書き出しに使った写しは nanashi_kachujin.blend)。
+   * Raiden と同じ道 (rebody --nohead --bust → merge_all_clips → fit_height --hips → dedup → pack)。
    *
-   * **出どころが違う。** Raiden は Mixamo の既製キャラだが、こちらは外で作った
-   * 体を Mixamo の auto-rig に通したもの。骨の名前は揃うが、**単位系と向きが
-   * 揃わない** — 上が -Y を向いていて、腰を z で測ると負の値が出た。
-   * rebody.py が向きを測ってから合わせるようにしてある。
+   * **型は前の名無しの glb から移した** (宿主から merge_clip で足した 100 本が揃っている)。
+   * 頭と首の重みは Blender で塗ってあるので rebody は --nohead で通す。
+   * 体が宿主より大きく (頭 1.572m)、fit_height で 0.85 倍に縮めた。**持ち上げずに型の腰の上下を
+   * 1.15 倍にする (--hips)** — 持ち上げは型によらず一定なので、伏せると 12cm 浮いた
    */
   nanashi: 'soldier_nanashi',
   /*
@@ -68,6 +70,21 @@ const SKINS: Record<string, string> = {
 export const SKIN_FILES: readonly string[] = [
   ...new Set([DEFAULT_SKIN, TARGET_SKIN, ...Object.values(SKINS)]),
 ]
+
+/**
+ * 体ごとの声 (倒れた叫び・うめきなど。sense/audio.ts の CRIES)。**載っていない体は男の声。**
+ * 見た目と同じく名前から決まるので、誰の画面でも同じ声になる
+ */
+const VOICES: Readonly<Record<string, BodyVoice>> = {
+  soldier_nanashi: 'woman1',
+}
+
+/** 声の主。sense/audio.ts の CRIES の鍵と同じ (この棚は他を読めないので文字で持つ) */
+export type BodyVoice = 'man1' | 'woman1'
+
+export function voiceFor(skin: string): BodyVoice {
+  return VOICES[skin] ?? 'man1'
+}
 
 /** 的の id の頭 (server/world.ts の placeTargets が付ける) */
 const TARGET_ID_PREFIX = 'target-'

@@ -76,6 +76,7 @@ export function recordPose(player: MatchPlayer): void {
     // 撃った線をカメラから引き直すのに要る (hitcheck.ts の zoneExposed)
     slot.cameraYaw = player.cameraYaw
     slot.aiming = player.aiming
+    slot.leftShoulder = player.leftShoulder
     slot.lean = leanOf(player.locomotion)
     // 倒れていく・転がっている体の部位の位置を、型の時間で引く (poseCurve.ts)
     slot.locomotion = player.locomotion

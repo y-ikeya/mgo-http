@@ -13,6 +13,8 @@
  * 溢れないように、種類ごとに 1 秒に 1 回まで。間に起きた回数は次の 1 行に数えて出す。
  */
 
+import { readFileSync } from 'node:fs'
+
 /** これを超えた刻みを出す (ms)。64Hz の 1 刻みは 15.6ms */
 export const SLOW_TICK_MS = 50
 /** 刻みがこれ以上遅れて始まったら出す (ms) */
@@ -38,11 +40,49 @@ export function reportSlow(kind: string, line: () => string, now = Date.now()): 
   console.warn(`${line()}${more > 0 ? ` (この 1 秒で他に ${more} 回)` : ''}`)
 }
 
+/**
+ * 前の刻みからの CPU の使われ方。**止まっていた間に何をしていたか**を分ける (2026-11-09)。
+ *
+ * 13:33 にサーバーが 22.7 秒止まり、全員の往復が数秒に延びて 1 人切られた。1 通ごとの
+ * 処理は軽く (通信重い は 20〜50ms)、heap も 120MB のまま。止まっていた間に
+ *
+ *     JS が CPU を使い続けていた (cpu ≒ 止まっていた長さ) → 測っていない所で回っている
+ *     ほとんど使っていない (cpu ≒ 0)                      → OS / 仮想機械に待たされた
+ *
+ * のどちらかを、遅れの行に一緒に出す。steal は仮想機械の CPU を他に取られた時間
+ * (Lightsail の CPU の使用枠を使い切ると増える)。Linux の /proc/stat から読み、無ければ出さない
+ */
+let previousCpu = process.cpuUsage()
+let previousSteal = readSteal()
+
+/** 全 CPU の steal の累計 (ms)。読めなければ null */
+function readSteal(): number | null {
+  try {
+    const line = readFileSync('/proc/stat', 'utf8').split('\n')[0] as string
+    // cpu  user nice system idle iowait irq softirq steal ...  (単位は 1/100 秒)
+    const steal = Number(line.trim().split(/\s+/)[8])
+    return Number.isFinite(steal) ? steal * 10 : null
+  } catch {
+    return null
+  }
+}
+
 /** 刻みが始まった時刻を受けて、予定より遅れていれば出す */
 export function noteTickStart(startedAt: number, previousStartedAt: number, tickMs: number, heapMb: () => number): void {
+  const cpu = process.cpuUsage(previousCpu)
+  previousCpu = process.cpuUsage()
+  const steal = readSteal()
+  const stolen = steal !== null && previousSteal !== null ? steal - previousSteal : null
+  previousSteal = steal
   if (previousStartedAt === 0) return
   const late = startedAt - previousStartedAt - tickMs
   if (late >= LATE_TICK_MS) {
-    reportSlow('late', () => `[刻み遅れ] ${Math.round(late)}ms 遅れて始まった (刻みの外で止まっていた) heap ${heapMb()}MB`)
+    const used = Math.round((cpu.user + cpu.system) / 1000)
+    reportSlow(
+      'late',
+      () =>
+        `[刻み遅れ] ${Math.round(late)}ms 遅れて始まった (刻みの外で止まっていた) heap ${heapMb()}MB` +
+        ` その間の CPU ${used}ms${stolen !== null ? ` steal ${stolen}ms` : ''}`,
+    )
   }
 }

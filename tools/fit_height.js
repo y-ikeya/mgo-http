@@ -27,9 +27,12 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
-const [hostPath, targetPath] = process.argv.slice(2)
+const args = process.argv.slice(2)
+// 持ち上げずに、型の腰の高さを伸ばして足を着ける (下の「--hips」)
+const HIPS = args.includes('--hips')
+const [hostPath, targetPath] = args.filter((a) => a !== '--hips')
 if (!targetPath) {
-  console.error('引数: <宿主.glb> <合わせる.glb>')
+  console.error('引数: <宿主.glb> <合わせる.glb> [--hips]')
   process.exit(1)
 }
 
@@ -105,7 +108,7 @@ async function measure(path) {
     return found
   }
   const toe = Math.min(at('LeftToeBase'), at('RightToeBase'))
-  return { head: at('mixamorigHead'), toe }
+  return { head: at('mixamorigHead'), toe, hips: at('mixamorigHips') }
 }
 
 /*
@@ -122,6 +125,60 @@ async function measure(path) {
  * 宿主に上書きされていたので、何を入れても頭は揃った — 代わりにメッシュが
  * 裂けていた (merge_all_clips.js の注)。
  */
+/** 骨格の根に乗っている持ち上げ (m) */
+function armatureLift(json) {
+  return armature(json).translation?.[1] ?? 0
+}
+
+/**
+ * 全部の型の腰の位置の、**上の成分だけ**を f 倍にする。返すのは書き換えた列の数。
+ *
+ * 上がどの軸かは腰の親 (骨格の根) の回転で決まる (この骨格は Z が上)。
+ * 同じ列を型どうしで分け合っている (dedup) ので、列ごとに 1 度だけ掛ける
+ */
+function scaleHipsHeight(glb, f) {
+  const { json, bin } = glb
+  const hipsIndex = json.nodes.findIndex((n) => n.name?.endsWith('Hips'))
+  // 親の空間での「上」。世界の上 (0,1,0) を、根から親までの回転の逆で戻す
+  const chain = []
+  for (let p = json.nodes.findIndex((n) => n.children?.includes(hipsIndex)); p >= 0; ) {
+    chain.push(p)
+    p = json.nodes.findIndex((n) => n.children?.includes(p))
+  }
+  const world = new THREE.Quaternion()
+  for (const i of chain.reverse()) world.multiply(new THREE.Quaternion(...(json.nodes[i].rotation ?? [0, 0, 0, 1])))
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(world.invert())
+  const done = new Set()
+  for (const clip of json.animations ?? []) {
+    for (const ch of clip.channels) {
+      if (ch.target.node !== hipsIndex || ch.target.path !== 'translation') continue
+      const index = clip.samplers[ch.sampler].output
+      if (done.has(index)) continue
+      done.add(index)
+      const acc = json.accessors[index]
+      if (acc.componentType !== 5126 || acc.type !== 'VEC3') throw new Error(`腰の列 ${index} が float の VEC3 でない`)
+      const view = json.bufferViews[acc.bufferView]
+      const stride = view.byteStride ?? 12
+      const base = (view.byteOffset ?? 0) + (acc.byteOffset ?? 0)
+      const dv = new DataView(bin.buffer, bin.byteOffset, bin.byteLength)
+      const v = new THREE.Vector3()
+      for (let k = 0; k < acc.count; k++) {
+        const o = base + k * stride
+        v.set(dv.getFloat32(o, true), dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true))
+        v.addScaledVector(up, (f - 1) * v.dot(up))
+        dv.setFloat32(o, v.x, true)
+        dv.setFloat32(o + 4, v.y, true)
+        dv.setFloat32(o + 8, v.z, true)
+      }
+      if (acc.min && acc.max) {
+        delete acc.min
+        delete acc.max
+      }
+    }
+  }
+  return done.size
+}
+
 const host_ = await measure(hostPath)
 const mine = await measure(targetPath)
 const node = armature(target.json)
@@ -139,17 +196,42 @@ const have = (node.scale ?? [1, 1, 1])[0]
  */
 const want = have * ((host_.head - host_.toe) / (mine.head - mine.toe))
 node.scale = [want, want, want]
-// 縮めたぶん爪先も動くので、そのあとで持ち上げる量を出す
-const lift = host_.toe - mine.toe * (want / have)
-node.translation = [
-  (node.translation?.[0] ?? 0),
-  (node.translation?.[1] ?? 0) + lift,
-  (node.translation?.[2] ?? 0),
-]
 
 console.log(`宿主 頭 ${host_.head.toFixed(4)} 爪先 ${host_.toe.toFixed(4)}`)
 console.log(`こちら 頭 ${mine.head.toFixed(4)} 爪先 ${mine.toe.toFixed(4)}`)
-console.log(`scale ${have.toFixed(6)} -> ${want.toFixed(6)} / 持ち上げ ${lift.toFixed(4)}m`)
+
+if (!HIPS) {
+  // 縮めたぶん爪先も動くので、そのあとで持ち上げる量を出す
+  const lift = host_.toe - mine.toe * (want / have)
+  node.translation = [
+    (node.translation?.[0] ?? 0),
+    (node.translation?.[1] ?? 0) + lift,
+    (node.translation?.[2] ?? 0),
+  ]
+  console.log(`scale ${have.toFixed(6)} -> ${want.toFixed(6)} / 持ち上げ ${lift.toFixed(4)}m`)
+} else {
+  /*
+   * --- --hips: 持ち上げずに、型の腰の高さを伸ばす ---
+   *
+   * **持ち上げは型によらず一定**なので、伏せると体が浮く。型の腰の高さは
+   * 宿主の脚の長さで入っているから、脚の長い体は立つと爪先が沈み、それを
+   * 持ち上げで埋めると、腰が低い型 (伏せ・匍匐) ではその分だけ宙に浮く
+   * (名無しで匍匐の一番低い所が 14.7cm、soldier は 2.5cm)。
+   *
+   * 腰の**上下だけ**を f 倍にする。立っても伏せても腰の高さが脚の長さに比例する。
+   * 前後左右の動きは触らない (跳び越えの距離などは宿主のまま)。
+   * f は idle で爪先が宿主と同じ高さに来る値。爪先の高さは f に対して一次なので、
+   * 1 回測って解き、もう 1 回測って確かめる
+   */
+  await Bun.write(targetPath, writeGlb(target.json, target.bin))
+  const before = await measure(targetPath)
+  const f = 1 + (host_.toe - before.toe) / (before.hips - armatureLift(target.json))
+  const touched = scaleHipsHeight(target, f)
+  await Bun.write(targetPath, writeGlb(target.json, target.bin))
+  const after = await measure(targetPath)
+  console.log(`scale ${have.toFixed(6)} -> ${want.toFixed(6)} / 腰の上下 ×${f.toFixed(4)} (列 ${touched})`)
+  console.log(`合わせた後 頭 ${after.head.toFixed(4)} 爪先 ${after.toe.toFixed(4)}`)
+}
 
 await Bun.write(targetPath, writeGlb(target.json, target.bin))
 console.log(`書いた ${targetPath}`)

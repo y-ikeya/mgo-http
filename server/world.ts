@@ -4,6 +4,7 @@
  * 配る相手を引くのもここ (broadcast)。
  */
 
+import { breakLinks } from './link'
 import { type Match, connected, newMatch, nextSlot } from '../src/domain/match/match'
 import { ROOMS, type RoomName } from '../src/domain/match/room'
 import { STAGES, nextStage } from '../src/domain/stage'
@@ -191,6 +192,8 @@ export function setLife(room: RoomWorld, player: MatchPlayer, next: Life, now = 
   broadcast(room, { type: 'life', id: player.id, state: next, downFor: next === 'downed' ? downSeconds(player.deaths, room.mode.downGrows) : undefined })
   // 戦場を離れた (倒れた・切れた・支度へ戻った)。投げている相手は放す
   if (next !== 'alive' && next !== 'spawning') releaseCqc(room, player)
+  // 敬礼の繋がりも切る (倒れた・切れた・支度へ戻った)。眠らされただけでは状態が変わらないので切れない
+  if (next !== 'alive' && next !== 'spawning') breakLinks(room, player, now)
   /*
    * 人形に釘付けなら解く。**切れた (dropped) だけでは解かない** — 解くと、画面を読み直す
    * だけで抜け出せた (本人 2026-10-20)。戻ってこなくても、人形が消える時にまとめて解ける

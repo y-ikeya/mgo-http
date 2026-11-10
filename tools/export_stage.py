@@ -68,6 +68,31 @@ STAIR_BINS = 12
 STAIR_BIN_MAX = 0.15
 
 
+def tread_points(obj, faces, main, steps=8):
+    """踏み面の上に点を敷き詰める。**頂点の数に左右されずに段の高さを拾うため。**
+
+    stair_plane は帯ごとの一番高い点を拾う。踏み面の頂点は段の縁にしか無いので、
+    頂点だけで拾うと空の帯が出て、縁の頂点が入った帯だけで直線を引くことになり、
+    傾きが頂点の付き方で変わった。焼き込みの割りすぎを直して頂点が減ったら、CC の
+    階段の坂が 0.356 → 0.331 にずれ、真ん中で 7cm 沈んだ (2026-11-09)。
+    踏み面の三角ごとに格子状に点を打てば、どの帯にも踏み面の高さが入る
+    """
+    mw = obj.matrix_world
+    pts = []
+    for _, n, poly in faces:
+        if n.dot(main) < 0.996:
+            continue
+        vs = [mw @ obj.data.vertices[i].co for i in poly.vertices]
+        for k in range(1, len(vs) - 1):
+            a, b, c = vs[0], vs[k], vs[k + 1]
+            for i in range(steps + 1):
+                for j in range(steps + 1 - i):
+                    u = i / steps
+                    v = j / steps
+                    pts.append(to_gltf(a * (1 - u - v) + b * u + c * v))
+    return pts
+
+
 def stair_plane(pts, lo, hi):
     """段を追う坂を作る。**平らさは見ない。**
 
@@ -815,7 +840,7 @@ def top_plane(obj, lo, hi):
     # 仕掛け (moving.ts の STEP_UP) と同じで、絵と足取りは元から一致していない。
     # 階段は平らさを見ない。**段を追う坂**を別に作る
     if is_stair(obj.name):
-        return stair_plane(pts, lo, hi) or flat
+        return stair_plane(tread_points(obj, faces, main) or pts, lo, hi) or flat
 
     worst = max(abs(p[1] - (a + b * p[0] + c * p[2])) for p in pts)
     if worst > 0.05:
@@ -2363,3 +2388,15 @@ print(f'属性: 全部止める {len(boxes) - len(special)} 個' +
 for b in special:
     off = [k for k, v in b['flags'].items() if not v]
     print(f"  {b['name']}: {' '.join(off)} を通す")
+
+# **空の見え方の升の表 (--sky)。焼き込み (--bake) の代わり** (tools/sky_grid.py、2026-11-09)。
+# 頂点に暗さを焼くと、暗さを細かくしたい所は平らな面でも頂点を割るしかなく、CC で glb を 1.6MB
+# 食っていた。表は面の近くだけ持って 1MB 弱。画面は表のあるステージだけ表で描く (world/skyGrid.ts)
+#
+#   $BLENDER -b tools/raw/stage_city.blend --python tools/export_stage.py -- --sky
+if '--sky' in _argv:
+    if '--bake' in _argv:
+        print('  --sky と --bake を両方付けた。頂点の暗さは表で上書きされる (表のあるステージは表で描く)')
+    _sky = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sky_grid.py')
+    sys.argv = [sys.argv[0], '--', stage_name[len('stage_'):] if stage_name.startswith('stage_') else stage_name]
+    exec(compile(open(_sky).read(), _sky, 'exec'), {'__name__': 'sky_grid', '__file__': _sky})

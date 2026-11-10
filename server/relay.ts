@@ -41,6 +41,8 @@ import { isSeated } from '../src/domain/player/lifecycle'
  * 繋ぎ直した直後も前の位置とは繋がっていない。その分をここで見逃す。
  */
 export const WARP_GRACE = 1000
+/** 断った人へ「ここへ戻れ」を送る間隔 (ms)。届くまでの間に送られてきた位置も断られるので、毎通は送らない */
+export const SNAP_BACK_MS = 500
 
 export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: ArrayBuffer | ArrayBufferView): void {
   const bytes =
@@ -115,6 +117,21 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
         sessionOf(player).badMoveAt = arrived
         console.warn(`[位置] ${player.name}: ${verdict.reason}`)
       }
+      /*
+       * **本人を据え置いた位置へ戻す** (2026-11-09 本人「一人姿が見えてない」)。
+       *
+       * 戻さないと、本人の画面は動き続けるのにこちらは古い位置のままなので、差が開く
+       * 一方で二度と通らない。kome27 が 139m 離れたまま試合をまたいで断られ続け、
+       * 他の人には古い位置しか配られなかった。遅延で切られて 30 秒以内に入り直した
+       * 時 (生きたまま席に戻るので WARP_GRACE が効かない) にも起きる。
+       * 通すのではなく戻すので、位置を偽って壁越しに見る、には緩めない
+       */
+      if (arrived - sessionOf(player).snapBackAt > SNAP_BACK_MS) {
+        sessionOf(player).snapBackAt = arrived
+        sessionOf(player).socket.send(
+          JSON.stringify({ type: 'moveRejected', at: [player.x, player.y, player.z] } satisfies ServerMessage),
+        )
+      }
       // 動かさない。姿勢や向きは受けてよいので、位置だけ据え置く
       return
     }
@@ -132,11 +149,15 @@ export function receiveSnapshot(room: RoomWorld, player: MatchPlayer, raw: Array
   player.boxed = snapshot.boxed
   player.yaw = snapshot.yaw
   player.cameraYaw = snapshot.cameraYaw
+  // 肩越しの左右。可視の判定の目 (カメラ) をこちらの側へ出す
+  player.leftShoulder = snapshot.leftShoulder === true
   player.pitch = snapshot.pitch
   // 振りかぶり (投げ物を構えている) も構え。客のカメラは銃と同じに寄っているので、見える判定の目もそちら
   player.aiming = snapshot.aiming || snapshot.holdingGrenade
   player.locomotion = snapshot.locomotion
   player.locomotionAge = snapshot.locomotionAge
+  // 手を挙げたままか。敬礼で繋がるのはお互いに保っている間 (server/link.ts)
+  player.saluteHeld = snapshot.saluteHeld
   // 持っている銃。威力と連射の上限をこれで引く
   /*
    * **手にある物は申告だが、持てない物は受け取らない。**
@@ -271,7 +292,7 @@ export function seesPlayer(room: RoomWorld, viewer: MatchPlayer, target: MatchPl
 /** 作業場。seesPlayer / eyeOf は同期で、返した物はその場で使い切る */
 const targetShift = { x: 0, z: 0 }
 const viewerShift = { x: 0, z: 0 }
-const leanedViewer: Viewer = { x: 0, y: 0, z: 0, cameraYaw: 0, pitch: 0, aiming: false }
+const leanedViewer: Viewer = { x: 0, y: 0, z: 0, cameraYaw: 0, pitch: 0, aiming: false, leftShoulder: false }
 
 /**
  * 見ている側の目の置き場。**傾いていれば横へずらす。**
@@ -287,6 +308,7 @@ function eyeOf(viewer: MatchPlayer): Viewer {
   leanedViewer.cameraYaw = viewer.cameraYaw
   leanedViewer.pitch = viewer.pitch
   leanedViewer.aiming = viewer.aiming
+  leanedViewer.leftShoulder = viewer.leftShoulder
   return leanedViewer
 }
 
@@ -407,6 +429,7 @@ export function viewOf(room: RoomWorld, player: MatchPlayer, now: number): { x: 
     (low + high) / 2,
     room.stage.camera,
     viewEye,
+    player.leftShoulder ? -1 : 1,
   )
 }
 
