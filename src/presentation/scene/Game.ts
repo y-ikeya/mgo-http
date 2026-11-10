@@ -60,7 +60,7 @@ import {
   resolveCircle,
   surfaceAt,
 } from "../../sim/space/collision";
-import { GameAudio, type SoundToken } from "./sense/audio";
+import { GameAudio, crySound, type CryRole, type SoundToken } from "./sense/audio";
 import type { Step } from "../../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./sense/soundRing";
 import { Locators } from "./arms/locators";
@@ -154,7 +154,7 @@ import {
 } from "./calibration";
 import type { NetTransport } from "../../application/protocol/types";
 import type { Identity } from "../../infra/auth/session";
-import { selfSkin, skinFor } from "./actor/skin";
+import { selfSkin, skinFor, voiceFor } from "./actor/skin";
 import {
   downLeftOf,
   loadoutClock,
@@ -518,6 +518,17 @@ export class Game {
   private readonly scene = new THREE.Scene();
   private readonly follow: FollowCamera;
   private readonly player = new Soldier();
+  /** 自分が着ている体 (skin.ts)。声もこれで決まる */
+  private ownSkin = selfSkin(undefined);
+
+  /**
+   * その人の声で叫ぶ・うめく。**声は体が決める** (名無しは女の声)。
+   * 姿がまだ届いていない相手は男の声
+   */
+  private cry(role: CryRole, id: string, at: THREE.Vector3): number {
+    const skin = id === this.net.id ? this.ownSkin : this.remotes.skinOf(id);
+    return this.audio.play(crySound(voiceFor(skin ?? ""), role), at);
+  }
   private readonly input = new Input();
   private readonly stage: Stage;
   private readonly sun: THREE.DirectionalLight;
@@ -1110,7 +1121,8 @@ export class Game {
     this.net = createTransport(identity, room, privateRoom);
     // 自機のモデルはここで読み始める。**構築時ではない** —
     // どのモデルを着るかは名前で決まり、名前を知っているのはこちら (skin.ts)
-    this.player.start(selfSkin(identity.displayName));
+    this.ownSkin = selfSkin(identity.displayName);
+    this.player.start(this.ownSkin);
 
     // WebGPU が無い環境では three が自動で WebGL2 に落ちる。
     // 「対応ブラウザだけ」にはならないので、片道の選択ではない。
@@ -2256,7 +2268,7 @@ export class Game {
         // 倒れた相手の位置で叫ぶ。撃った側には当てた手応えになり、
         // 離れた場所の誰かには「そこで撃ち合いが終わった」と伝わる
         const at = this.remotes.positionOf(effect.id);
-        if (at) this.addPing("shot", at, this.audio.play("scream", at));
+        if (at) this.addPing("shot", at, this.cry("scream", effect.id, at));
         // 敬礼で繋がっていた味方なら切る。次の命はもう一度敬礼を交わしてから
         this.remotes.unlink(effect.id);
         break;
@@ -2714,7 +2726,7 @@ export class Game {
     for (const id of message.victims) {
       setTimeout(() => {
         const at = id === this.net.id ? this.player.position : this.remotes.positionOf(id);
-        if (at) this.audio.play("ohh", at);
+        if (at) this.cry("ohh", id, at);
       }, DOLL_OHH_MS);
     }
   }
@@ -2823,7 +2835,7 @@ export class Game {
 
   private receiveStun(message: Extract<ServerMessage, { type: "stun" }>): void {
     const at = message.target === this.net.id ? this.player.position : this.remotes.positionOf(message.target);
-    if (at) this.audio.play("stunOof", at);
+    if (at) this.cry("stunOof", message.target, at);
   }
 
   // 投げた側が倒れて、放された。倒れかけから立ち直る
@@ -2846,7 +2858,7 @@ export class Game {
     // 転べば手が緩む。**握っていた手榴弾は足元へ** (落としたのはサーバー)
     this.throwing.loseHeldGrenade();
     // 悲鳴は爆風の時だけ (ローリングで倒れた時は距離が付いてくる)
-    if (message.distance === undefined) this.audio.play("blastScream", this.player.position);
+    if (message.distance === undefined) this.cry("blastScream", this.net.id, this.player.position);
   }
 
   // 名前と所属はレプリカが受け取っている。ここでやるのは折り返しだけ —
@@ -2987,7 +2999,7 @@ export class Game {
       // 倒れなかった頭への一発はうめきになる。近くの相手にだけ届く。
       if (message.zone === "HEAD" && message.damage > 0) {
         const at = this.remotes.positionOf(message.id);
-        if (at) this.addPing("shot", at, this.audio.play("pain", at));
+        if (at) this.addPing("shot", at, this.cry("pain", message.id, at));
       }
       return;
     }
@@ -3010,10 +3022,10 @@ export class Game {
       this.player.setFiring(false);
       // 倒れたら繋がりは切れる。生き返ったら結び直し
       this.remotes.clearLinks();
-      this.audio.play("scream", this.player.position);
+      this.cry("scream", this.net.id, this.player.position);
     } else if (message.zone === "HEAD" && message.damage > 0) {
       // 頭に当たったのに立っている。仕留められなかったことが音で分かる
-      this.audio.play("pain", this.player.position);
+      this.cry("pain", this.net.id, this.player.position);
     }
   }
 
@@ -4521,7 +4533,7 @@ export class Game {
     if (fallDamage(this.player.fallingSpeed) < this.player.health) return;
     this.fallScreamed = true;
     // 長いほう (3.3 秒)。落ちている間ずっと聞こえていてほしい
-    this.audio.play("blastScream", this.player.position);
+    this.cry("blastScream", this.net.id, this.player.position);
   }
 
   /** この落下でもう叫んだか。着地するか、落ちるのをやめたら戻す */
@@ -4811,7 +4823,7 @@ export class Game {
       }
       // 吹き飛ばされた叫び。倒れたのではなく、まだ生きて転がっている
       if (remote.sweptThisFrame) {
-        const gain = this.audio.play("blastScream", remote.object.position);
+        const gain = this.cry("blastScream", remote.id, remote.object.position);
         this.addPing("shot", remote.object.position, gain);
       }
       // 相手が水に落ちた。**しぶきで気づける** — 姿は水面の下へ消える

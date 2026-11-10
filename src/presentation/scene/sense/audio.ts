@@ -220,6 +220,15 @@ const SOUNDS = {
    * 詰めるか退くかの判断に直に効く。
    */
   blastScream: { file: "man1_scream2.mp3", reference: 8, max: 110 },
+  /*
+   * 女の声 (名無しの体。skin.ts の voiceFor)。役も届く距離も男の声と同じで、音源だけ違う。
+   * 本人が用意した 5 本 (2026-11-10)
+   */
+  screamWoman: { file: "woman1_scream1.mp3", reference: 8, max: 110 },
+  painWoman: { file: "woman1_pain1.mp3", reference: 3, max: 26 },
+  blastScreamWoman: { file: "woman1_scream2.mp3", reference: 8, max: 110 },
+  stunOofWoman: { file: "woman1_stun1.mp3", reference: 4, max: 40 },
+  ohhWoman: { file: "woman1_ohh1.mp3", reference: 2, max: 14 },
   /**
    * 爆発。
    *
@@ -372,6 +381,27 @@ const SOUNDS = {
 } as const;
 
 export type SoundName = keyof typeof SOUNDS;
+
+/** 体から出る声の役。**誰の声で鳴らすかは体が決める** (skin.ts の voiceFor) */
+export type CryRole = "scream" | "pain" | "blastScream" | "stunOof" | "ohh";
+
+/** 声の主ごとの、役 → 音源。man1 は前からの声 */
+const CRIES = {
+  man1: { scream: "scream", pain: "pain", blastScream: "blastScream", stunOof: "stunOof", ohh: "ohh" },
+  woman1: {
+    scream: "screamWoman",
+    pain: "painWoman",
+    blastScream: "blastScreamWoman",
+    stunOof: "stunOofWoman",
+    ohh: "ohhWoman",
+  },
+} as const satisfies Record<string, Record<CryRole, SoundName>>;
+
+export type Voice = keyof typeof CRIES;
+
+export function crySound(voice: Voice, role: CryRole): SoundName {
+  return CRIES[voice][role];
+}
 
 /** 1 つの音の 1 つの録り。高さは録りごとに変えられる (代用の音を落とすため) */
 interface Take {

@@ -417,8 +417,8 @@ export class RemoteSoldier {
   private yawInitialized = false;
   private disposed = false;
 
-  /** どのモデルを着るか (見た目の試作。skin.ts) */
-  private readonly skin: string;
+  /** どのモデルを着るか (見た目の試作。skin.ts)。声もこれで決まる */
+  readonly skin: string;
 
   constructor(id: string, scene: THREE.Scene, skin: string = DEFAULT_SKIN) {
     this.id = id;
@@ -1601,6 +1601,11 @@ export class RemoteSoldiers {
   /** 今いる場所。倒れていなくても音を鳴らす先が要るとき用 */
   positionOf(id: string): THREE.Vector3 | null {
     return this.players.get(id)?.object.position ?? null;
+  }
+
+  /** その人の体 (skin.ts)。まだ姿が届いていなければ null */
+  skinOf(id: string): string | null {
+    return this.players.get(id)?.skin ?? null;
   }
 
   /**
