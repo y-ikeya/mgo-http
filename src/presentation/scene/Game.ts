@@ -3323,6 +3323,17 @@ export class Game {
       this.placeAtSpawn();
       this.player.respawn();
       this.follow.snapTo(this.player, this.cameraWorld);
+      /*
+       * **選びを持ち物にしてサーバーへ伝える。** 支度の間はサーバーも選びで持ち物を組み直す。
+       *
+       * 送っていたのは選び直した時と出撃 (OK) の時だけだった。画面を読み直すと手元は
+       * ブラウザが覚えている前回の選び (M1911) で組むのに、サーバーは既定 (M9) のままで、
+       * 3 秒ごとの残弾の表 (持っていない銃は 0) で M1911 が 0 発に上書きされた
+       * (待合室で読み直すと M1911 などが 0、2026-11-11 本人)
+       */
+      this.choice.held = { ...this.choice.pending };
+      this.refillFromLoadout();
+      this.sendLoadout();
     }
 
     // 戦場へ出た。装備が確定して、持ち物が配り直される

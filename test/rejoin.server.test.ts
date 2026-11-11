@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { Client, spot, startServer, type Server } from './server'
+import { Client, spawnAlive, spot, startServer, type Server } from './server'
 
 /**
  * **入り直しても陣営は変わらない。** 古い接続が閉じる前に入り直しても
@@ -88,5 +88,24 @@ test('**入り直したら、古い接続から届く位置は受けない**', a
   }
   a.close()
   again.close()
+  b.close()
+}, 30000)
+
+test('**読み直すと、いま持っている銃とその弾が返る** (選びとずれていても、持っている銃は 0 発にならない)', async () => {
+  server = await startServer()
+  const a = await new Client(server, 'rj-g', spot(0, -6)).ready()
+  const b = await new Client(server, 'rj-h', spot(0, 6)).ready()
+  a.live()
+  b.live()
+  // 続き (resume) を返すのは戦場で生きていた人だけ
+  await spawnAlive(a, b)
+  // 同じ人で入り直す (画面の読み直し)
+  const again = await new Client(server, 'rj-g', spot(0, -6)).ready()
+  await Bun.sleep(300)
+  const resume = again.last.get('resume') as { carried?: string[]; magazine: Record<string, number> } | undefined
+  expect(resume?.carried?.length).toBeGreaterThan(0)
+  for (const gun of resume!.carried!) expect(resume!.magazine[gun]).toBeGreaterThan(0)
+  again.close()
+  a.close()
   b.close()
 }, 30000)

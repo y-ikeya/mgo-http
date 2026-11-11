@@ -1356,6 +1356,7 @@ const server = Bun.serve<Client>({
             support: resumed.support,
             primary: resumed.primary,
             secondary: resumed.secondary,
+            carried: resumed.inventory.guns(),
             sleepUntil: resumed.sleepUntil,
             trapped: resumed.trappedBy !== 0,
             hanging: resumed.locomotion.startsWith('hang'),

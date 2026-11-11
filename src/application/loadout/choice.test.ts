@@ -81,4 +81,13 @@ describe('繋ぎ直した時', () => {
     expect(choice.pending).toMatchObject({ primary: 'smg', secondary: 'm1911', support: 'decoy' })
     expect(choice.held).toMatchObject({ primary: 'smg', support: 'decoy', secondary: 'm9' })
   })
+
+  test('**持っている銃はサーバーの持ち物に合わせる。** 選びと持ち物がずれていても、持っていない銃を組まない', () => {
+    // 手元の前回の選びは M1911。サーバーの持ち物は AK と M9 (選びは M1911 へ変えたが、まだ湧き直していない)
+    const choice = newLoadoutChoice('bravo', { primary: 'smg', secondary: 'm1911', support: 'grenade' })
+    resumeLoadout(choice, { primary: 'smg', secondary: 'm1911', support: 'grenade', carried: ['rifle', 'm9'] })
+    expect(choice.held).toMatchObject({ primary: 'rifle', secondary: 'm9' })
+    // 次に湧く時の選びはサーバーの選びのまま
+    expect(choice.pending).toMatchObject({ primary: 'smg', secondary: 'm1911' })
+  })
 })
