@@ -489,6 +489,8 @@ const UI_SOUNDS = {
    * パンとフィルタが掛かって曇った。声は効果音より小さめに
    */
   voiceGoodLuck: { file: "voice_goodluck1.mp3", volume: 0.45 },
+  /** 「幸運を」の女の声 (名無しの体。domain/player/voice.ts の woman1) */
+  voiceGoodLuckWoman: { file: "voice_goodluck_woman1.mp3", volume: 0.45 },
   voiceMatane: { file: "voice_matane1.mp3", volume: 0.45 },
   voiceSesshou: { file: "voice_sesshou1.mp3", volume: 0.45 },
   voiceShinukato: { file: "voice_shinukato1.mp3", volume: 0.45 },

@@ -9,7 +9,8 @@
  * 音の実体は public/audio/voice_◯◯1.mp3 (presentation/scene/sense/audio.ts の表)。
  */
 export const VOICE_LINES = [
-  { id: 'goodluck', label: '幸運を祈る', sound: 'voiceGoodLuck' },
+  // 女の声 (名無しの体) は「幸運を」。本人の goodluck.mp3 (2026-11-11)
+  { id: 'goodluck', label: '幸運を祈る', sound: 'voiceGoodLuck', woman1: { label: '幸運を', sound: 'voiceGoodLuckWoman' } },
   { id: 'matane', label: 'じゃ！またね！', sound: 'voiceMatane' },
   { id: 'sesshou', label: 'また無駄な殺生をしてしまった...', sound: 'voiceSesshou' },
   { id: 'shinukato', label: '痛ぁ...死ぬかと思った', sound: 'voiceShinukato' },
@@ -41,4 +42,15 @@ export const VOICE_MENU_SECONDS = 3
 
 export function voiceLine(id: string): (typeof VOICE_LINES)[number] | null {
   return VOICE_LINES.find((line) => line.id === id) ?? null
+}
+
+/**
+ * その声の主が言う台詞 (文言と音)。**声の主ごとの版が無ければ男の版** (いまは goodluck だけ女の版がある)。
+ * 声の主は体で決まる (presentation の skin.ts の voiceFor。'man1' / 'woman1')
+ */
+export function spokenLine(id: string, voice: string): { label: string; sound: string } | null {
+  const line = voiceLine(id)
+  if (!line) return null
+  const own = voice === 'woman1' && 'woman1' in line ? line.woman1 : null
+  return own ?? { label: line.label, sound: line.sound }
 }

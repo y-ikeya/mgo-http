@@ -6,7 +6,7 @@ import { STEALTH_BREAK_MS } from '../../domain/match/sides'
 import { CHOOSE_FLOOR, CHOOSE_TIMEOUT, isDowned, type Life } from '../../domain/player/lifecycle'
 import type { SkillId, Skills } from '../../domain/player/skill'
 import type { Stance } from '../../domain/player/stance'
-import { VOICE_CATEGORIES, voiceLine } from '../../domain/player/voice'
+import { VOICE_CATEGORIES, spokenLine } from '../../domain/player/voice'
 
 /**
  * **HUD へ渡す状態** (GameStats) と、それを組む判断。
@@ -382,9 +382,10 @@ export function targetNoticeOf(
  * @param until 開いておく締め切り (ms)
  * @param category 選んだ分類 (VOICE_CATEGORIES の番号)。まだなら null
  */
-export function voiceMenuOf(until: number, category: number | null, pad: boolean, now: number): GameStats['voiceMenu'] {
+export function voiceMenuOf(until: number, category: number | null, pad: boolean, now: number, voice = 'man1'): GameStats['voiceMenu'] {
   if (until <= now) return null
   if (category === null) return { title: 'VOICE', items: VOICE_CATEGORIES.map((c) => c.label), pad }
   const chosen = VOICE_CATEGORIES[category]
-  return { title: chosen.label, items: chosen.lines.map((id) => voiceLine(id)?.label ?? id), pad }
+  // 自分の声の版の文言で出す (名無しなら「幸運を」)
+  return { title: chosen.label, items: chosen.lines.map((id) => spokenLine(id, voice)?.label ?? id), pad }
 }
