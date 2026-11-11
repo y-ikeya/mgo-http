@@ -84,7 +84,9 @@ describe('ボイスの一覧', () => {
     const at = (VOICE_CATEGORIES[greet]!.lines as readonly string[]).indexOf('goodluck')
     expect(voiceMenuOf(2000, greet, false, 1000)?.items[at]).toBe('幸運を祈る')
     expect(voiceMenuOf(2000, greet, false, 1000, 'woman1')?.items[at]).toBe('幸運を')
-    const other = (VOICE_CATEGORIES[greet]!.lines as readonly string[]).findIndex((id) => id !== 'goodluck')
-    expect(voiceMenuOf(2000, greet, false, 1000, 'woman1')?.items[other]).toBe(voiceMenuOf(2000, greet, false, 1000)?.items[other])
+    // 女の版の無い台詞 (ん？) は男と同じ文言
+    const surprise = VOICE_CATEGORIES.findIndex((c) => (c.lines as readonly string[]).includes('nn'))
+    const nn = (VOICE_CATEGORIES[surprise]!.lines as readonly string[]).indexOf('nn')
+    expect(voiceMenuOf(2000, surprise, false, 1000, 'woman1')?.items[nn]).toBe('ん？')
   })
 })

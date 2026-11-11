@@ -9,15 +9,15 @@
  * 音の実体は public/audio/voice_◯◯1.mp3 (presentation/scene/sense/audio.ts の表)。
  */
 export const VOICE_LINES = [
-  // 女の声 (名無しの体) は「幸運を」。本人の goodluck.mp3 (2026-11-11)
+  // woman1 = 女の声 (名無しの体) の版。本人が録った goodluck / matane / yoro / gome.mp3 (2026-11-11)
   { id: 'goodluck', label: '幸運を祈る', sound: 'voiceGoodLuck', woman1: { label: '幸運を', sound: 'voiceGoodLuckWoman' } },
-  { id: 'matane', label: 'じゃ！またね！', sound: 'voiceMatane' },
+  { id: 'matane', label: 'じゃ！またね！', sound: 'voiceMatane', woman1: { label: 'またね', sound: 'voiceMataneWoman' } },
   { id: 'sesshou', label: 'また無駄な殺生をしてしまった...', sound: 'voiceSesshou' },
   { id: 'shinukato', label: '痛ぁ...死ぬかと思った', sound: 'voiceShinukato' },
-  { id: 'yolo', label: 'よろしくお願いします！', sound: 'voiceYolo' },
+  { id: 'yolo', label: 'よろしくお願いします！', sound: 'voiceYolo', woman1: { label: 'よろしくお願いします', sound: 'voiceYoloWoman' } },
   { id: 'grenade', label: 'グッグレネード！', sound: 'voiceGrenade' },
   { id: 'stomach', label: 'うぅ...お腹痛い...', sound: 'voiceStomach' },
-  { id: 'sumimasen', label: 'すみません', sound: 'voiceSumimasen' },
+  { id: 'sumimasen', label: 'すみません', sound: 'voiceSumimasen', woman1: { label: 'ごめんなさい', sound: 'voiceSumimasenWoman' } },
   { id: 'nn', label: 'ん？', sound: 'voiceNn' },
 ] as const
 

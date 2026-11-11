@@ -489,15 +489,19 @@ const UI_SOUNDS = {
    * パンとフィルタが掛かって曇った。声は効果音より小さめに
    */
   voiceGoodLuck: { file: "voice_goodluck1.mp3", volume: 0.45 },
-  /** 「幸運を」の女の声 (名無しの体。domain/player/voice.ts の woman1) */
+  /** 女の声の版 (名無しの体。domain/player/voice.ts の woman1)。大きさは男の版の LUFS にそろえてある */
   voiceGoodLuckWoman: { file: "voice_goodluck_woman1.mp3", volume: 0.45 },
   voiceMatane: { file: "voice_matane1.mp3", volume: 0.45 },
+  voiceMataneWoman: { file: "voice_matane_woman1.mp3", volume: 0.45 },
   voiceSesshou: { file: "voice_sesshou1.mp3", volume: 0.45 },
   voiceShinukato: { file: "voice_shinukato1.mp3", volume: 0.45 },
   voiceYolo: { file: "voice_yolo1.mp3", volume: 0.45 },
+  voiceYoloWoman: { file: "voice_yolo_woman1.mp3", volume: 0.45 },
   voiceGrenade: { file: "voice_grenade1.mp3", volume: 0.45 },
   voiceStomach: { file: "voice_stomach1.mp3", volume: 0.45 },
   voiceSumimasen: { file: "voice_sumimasen1.mp3", volume: 0.45 },
+  /** 女の版は「ごめんなさい」 */
+  voiceSumimasenWoman: { file: "voice_sumimasen_woman1.mp3", volume: 0.45 },
   // 素材のピークが他の声より 5dB 低い (-5.5dB / 他は -0.3dB)。ファイルは本人のまま、ここで揃える
   voiceNn: { file: "voice_nn1.mp3", volume: 0.8 },
   /** 持ち物の一覧が出た。**押さえ続けて出るので、出た瞬間が要る** */
