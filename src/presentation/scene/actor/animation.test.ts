@@ -1048,8 +1048,8 @@ const nanashi = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAs
  * 向きと手応えは目で見るしかないので、ここで押さえるのは
  * **暴れないこと**と**無い体で何も起きないこと**の 2 つ。
  */
-/** animation.ts の BUST_MAX (0.30) を 2 軸ぶん見込んだ上限 */
-const BUST_MAX_TEST = 0.45
+/** animation.ts の BUST_MAX (0.5) を 2 軸ぶん見込んだ上限 */
+const BUST_MAX_TEST = 0.75
 
 describe('胸の揺れ', () => {
   function shake(
