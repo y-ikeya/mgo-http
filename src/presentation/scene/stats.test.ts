@@ -78,4 +78,15 @@ describe('ボイスの一覧', () => {
     expect(inside?.items).toHaveLength(VOICE_CATEGORIES[0]!.lines.length)
     expect(voiceMenuOf(1000, null, false, 1000)).toBeNull()
   })
+
+  test('**自分の声の版の文言で出す。** 女の声 (名無し) は「幸運を」、版の無い台詞は男と同じ', () => {
+    const greet = VOICE_CATEGORIES.findIndex((c) => (c.lines as readonly string[]).includes('goodluck'))
+    const at = (VOICE_CATEGORIES[greet]!.lines as readonly string[]).indexOf('goodluck')
+    expect(voiceMenuOf(2000, greet, false, 1000)?.items[at]).toBe('幸運を祈る')
+    expect(voiceMenuOf(2000, greet, false, 1000, 'woman1')?.items[at]).toBe('幸運を')
+    // 女の版の無い台詞 (ん？) は男と同じ文言
+    const surprise = VOICE_CATEGORIES.findIndex((c) => (c.lines as readonly string[]).includes('nn'))
+    const nn = (VOICE_CATEGORIES[surprise]!.lines as readonly string[]).indexOf('nn')
+    expect(voiceMenuOf(2000, surprise, false, 1000, 'woman1')?.items[nn]).toBe('ん？')
+  })
 })

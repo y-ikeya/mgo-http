@@ -143,7 +143,7 @@ export type MatchEffect =
    */
   | { kind: 'headshot' }
   /** 誰かがボイスを言った。音を鳴らす (出す欄はレプリカが持っている) */
-  | { kind: 'voice'; line: VoiceId }
+  | { kind: 'voice'; line: VoiceId; id: string; name: string }
   /** 自分の状態が変わった。支度へ戻ったら湧き地点へ、湧いたら持ち物を配り直す */
   | { kind: 'life'; to: Life }
   /**
@@ -261,7 +261,7 @@ export function applyMatch(
     case 'voice': {
       replica.voiceFeed.unshift({ id: message.id, name: message.name ?? '', team: message.team ?? 'blue', line: message.line, at: now })
       replica.voiceFeed.length = Math.min(replica.voiceFeed.length, KILL_FEED_MAX)
-      return [{ kind: 'voice', line: message.line }]
+      return [{ kind: 'voice', line: message.line, id: message.id, name: message.name ?? '' }]
     }
 
     case 'kill': {

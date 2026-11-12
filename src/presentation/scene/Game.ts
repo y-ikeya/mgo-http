@@ -8,7 +8,7 @@ import { addMaskedShadows } from "./world/fenceShadow";
 import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
-import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, voiceLine } from "../../domain/player/voice";
+import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, spokenLine, type VoiceStyle } from "../../domain/player/voice";
 import * as THREE from "three";
 import { homeOf } from "../../domain/match/sides";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
@@ -60,7 +60,7 @@ import {
   resolveCircle,
   surfaceAt,
 } from "../../sim/space/collision";
-import { GameAudio, crySound, type CryRole, type SoundToken } from "./sense/audio";
+import { GameAudio, crySound, type CryRole, type SoundToken, type UiSoundName } from "./sense/audio";
 import type { Step } from "../../domain/rule/footsteps";
 import { SoundRing, type PingKind } from "./sense/soundRing";
 import { Locators } from "./arms/locators";
@@ -525,6 +525,11 @@ export class Game {
    * その人の声で叫ぶ・うめく。**声は体が決める** (名無しは女の声)。
    * 姿がまだ届いていない相手は男の声
    */
+  /** その人の声の主。自分は着ている体、他人は名前から (skin.ts) */
+  private voiceOf(id: string, name: string): VoiceStyle {
+    return voiceFor(id === this.net.id ? this.ownSkin : skinFor(name, id));
+  }
+
   private cry(role: CryRole, id: string, at: THREE.Vector3): number {
     const skin = id === this.net.id ? this.ownSkin : this.remotes.skinOf(id);
     return this.audio.play(crySound(voiceFor(skin ?? ""), role), at);
@@ -2180,8 +2185,9 @@ export class Game {
         break;
       // 誰かのボイス。無線なので距離を見ず、耳元で鳴らす
       case "voice": {
-        const line = voiceLine(effect.line);
-        if (line) this.audio.playVoice(line.sound);   // 位置を持たない。前の声は途中で止める
+        // 声の主は体で決まる (名無しは女の声の版があれば)
+        const line = spokenLine(effect.line, this.voiceOf(effect.id, effect.name));
+        if (line) this.audio.playVoice(line.sound as UiSoundName);   // 位置を持たない。前の声は途中で止める
         break;
       }
       case "phase":
@@ -3317,6 +3323,17 @@ export class Game {
       this.placeAtSpawn();
       this.player.respawn();
       this.follow.snapTo(this.player, this.cameraWorld);
+      /*
+       * **選びを持ち物にしてサーバーへ伝える。** 支度の間はサーバーも選びで持ち物を組み直す。
+       *
+       * 送っていたのは選び直した時と出撃 (OK) の時だけだった。画面を読み直すと手元は
+       * ブラウザが覚えている前回の選び (M1911) で組むのに、サーバーは既定 (M9) のままで、
+       * 3 秒ごとの残弾の表 (持っていない銃は 0) で M1911 が 0 発に上書きされた
+       * (待合室で読み直すと M1911 などが 0、2026-11-11 本人)
+       */
+      this.choice.held = { ...this.choice.pending };
+      this.refillFromLoadout();
+      this.sendLoadout();
     }
 
     // 戦場へ出た。装備が確定して、持ち物が配り直される
@@ -4992,7 +5009,7 @@ export class Game {
         id: entry.id,
         name: entry.name,
         team: entry.team,
-        text: voiceLine(entry.line)?.label ?? entry.line,
+        text: spokenLine(entry.line, this.voiceOf(entry.id, entry.name))?.label ?? entry.line,
         at: entry.at,
       }));
     /*
@@ -5286,7 +5303,7 @@ export class Game {
         (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
       ),
       kills: this.feedItems(now),
-      voiceMenu: voiceMenuOf(this.voiceMenuUntil, this.voiceCategory, this.input.activeDevice === "gamepad", now),
+      voiceMenu: voiceMenuOf(this.voiceMenuUntil, this.voiceCategory, this.input.activeDevice === "gamepad", now, voiceFor(this.ownSkin)),
       throwables: this.inv.countOf('magazine'),
       grenades: this.inv.supportCount,
       /**

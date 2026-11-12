@@ -187,14 +187,21 @@ export function spawnLoadout(choice: LoadoutChoice): Loadout {
  * 繋ぎ直した。**サーバーが覚えている物に戻す。** 戻さないと、こちらだけ既定値の手榴弾に戻って、
  * 投げの型を出しているのにサーバーはクレイモアのまま、になる。
  *
- * 持っている物は主武器と support だけ戻す (副武器は湧き直すまで今のまま)。選びは 3 つとも
+ * 選びは 3 つとも戻す。**持っている銃はサーバーの持ち物 (carried) に合わせる** — 選びは湧き直すまで
+ * 持ち物とずれることがあり、選びで組み直すとサーバーが持っていない銃に 0 発が当たった
+ * (待合室で読み直すと M1911 が 0)。carried の無い古いサーバーでは、前と同じく主武器だけ選びから
  */
 export function resumeLoadout(
   choice: LoadoutChoice,
-  server: { primary: WeaponId | null; secondary: WeaponId | null; support: SupportId },
+  server: { primary: WeaponId | null; secondary: WeaponId | null; support: SupportId; carried?: readonly WeaponId[] },
 ): void {
   choice.held.support = server.support
-  choice.held.primary = server.primary
+  if (server.carried) {
+    choice.held.primary = server.carried.find((id) => CHOICES.primary.includes(id)) ?? null
+    choice.held.secondary = server.carried.find((id) => CHOICES.secondary.includes(id)) ?? null
+  } else {
+    choice.held.primary = server.primary
+  }
   choice.pending.support = server.support
   choice.pending.primary = server.primary
   choice.pending.secondary = server.secondary

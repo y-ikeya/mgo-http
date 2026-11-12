@@ -9,14 +9,15 @@
  * 音の実体は public/audio/voice_◯◯1.mp3 (presentation/scene/sense/audio.ts の表)。
  */
 export const VOICE_LINES = [
-  { id: 'goodluck', label: '幸運を祈る', sound: 'voiceGoodLuck' },
-  { id: 'matane', label: 'じゃ！またね！', sound: 'voiceMatane' },
+  // woman1 = 女の声 (名無しの体) の版。本人が録った goodluck / matane / yoro / gome.mp3 (2026-11-11)
+  { id: 'goodluck', label: '幸運を祈る', sound: 'voiceGoodLuck', woman1: { label: '幸運を', sound: 'voiceGoodLuckWoman' } },
+  { id: 'matane', label: 'じゃ！またね！', sound: 'voiceMatane', woman1: { label: 'またね', sound: 'voiceMataneWoman' } },
   { id: 'sesshou', label: 'また無駄な殺生をしてしまった...', sound: 'voiceSesshou' },
   { id: 'shinukato', label: '痛ぁ...死ぬかと思った', sound: 'voiceShinukato' },
-  { id: 'yolo', label: 'よろしくお願いします！', sound: 'voiceYolo' },
+  { id: 'yolo', label: 'よろしくお願いします！', sound: 'voiceYolo', woman1: { label: 'よろしくお願いします', sound: 'voiceYoloWoman' } },
   { id: 'grenade', label: 'グッグレネード！', sound: 'voiceGrenade' },
   { id: 'stomach', label: 'うぅ...お腹痛い...', sound: 'voiceStomach' },
-  { id: 'sumimasen', label: 'すみません', sound: 'voiceSumimasen' },
+  { id: 'sumimasen', label: 'すみません', sound: 'voiceSumimasen', woman1: { label: 'ごめんなさい', sound: 'voiceSumimasenWoman' } },
   { id: 'nn', label: 'ん？', sound: 'voiceNn' },
 ] as const
 
@@ -98,4 +99,15 @@ export function fitVoice(input: { style?: unknown; pitch?: unknown } | null | un
       ? Math.min(VOICE_PITCH_MAX, Math.max(VOICE_PITCH_MIN, raw))
       : DEFAULT_VOICE_PITCH
   return { style, pitch }
+}
+
+/**
+ * その声の主が言う台詞 (文言と音)。**声の主ごとの版が無ければ男の版** (いまは挨拶の 4 つに女の版がある)。
+ * 声の主 (VoiceStyle) はいまは体で決まる (presentation の skin.ts の voiceFor)。本人が選ぶ声 (VoiceChoice) の配線はまだ
+ */
+export function spokenLine(id: string, voice: VoiceStyle): { label: string; sound: string } | null {
+  const line = voiceLine(id)
+  if (!line) return null
+  const own = voice === 'woman1' && 'woman1' in line ? line.woman1 : null
+  return own ?? { label: line.label, sound: line.sound }
 }

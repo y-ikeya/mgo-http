@@ -4,7 +4,7 @@
 "name": "concrete_building2",
 "min": [
 -44.565,
-9.516,
+9.962,
 29.891
 ],
 "max": [
@@ -30,7 +30,7 @@
 "name": "concrete_building5",
 "min": [
 -35.515,
-9.901,
+9.971,
 -13.275
 ],
 "max": [
@@ -81,17 +81,17 @@
 {
 "name": "concrete_building8",
 "min": [
--15.487,
-8.887,
-57.528
+-35.13,
+9.96,
+48.365
 ],
 "max": [
 -5.935,
-19.185,
+19.76,
 75.385
 ],
 "top": {
-"h": 19.1846,
+"h": 19.76,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -135,12 +135,12 @@
 "min": [
 -22.612,
 10.126,
-70.25
+75.506
 ],
 "max": [
 -2.603,
 20.423,
-87.777
+85.326
 ],
 "top": {
 "h": 20.4233,
@@ -160,7 +160,7 @@
 "name": "concrete_building17",
 "min": [
 5.816,
-9.432,
+9.877,
 -15.363
 ],
 "max": [
@@ -186,7 +186,7 @@
 "name": "concrete_building24",
 "min": [
 8.976,
-9.876,
+9.962,
 58.342
 ],
 "max": [
@@ -212,7 +212,7 @@
 "name": "concrete_building23",
 "min": [
 16.938,
-3.579,
+9.962,
 55.693
 ],
 "max": [
@@ -238,7 +238,7 @@
 "name": "concrete_building28",
 "min": [
 -53.814,
-9.8,
+9.965,
 -28.078
 ],
 "max": [
@@ -261,10 +261,10 @@
 }
 },
 {
-"name": "concrete_building29",
+"name": "concrete_building28_wing",
 "min": [
 -49.41,
-9.744,
+9.966,
 -26.555
 ],
 "max": [
@@ -290,7 +290,7 @@
 "name": "concrete_building33",
 "min": [
 8.986,
-9.822,
+9.858,
 -68.393
 ],
 "max": [
@@ -316,7 +316,7 @@
 "name": "concrete_building36.001",
 "min": [
 -45.399,
-9.676,
+9.968,
 -61.55
 ],
 "max": [
@@ -342,7 +342,7 @@
 "name": "concrete_building36.002",
 "min": [
 -40.225,
-9.705,
+9.969,
 -78.485
 ],
 "max": [
@@ -368,7 +368,7 @@
 "name": "concrete_building35",
 "min": [
 -45.596,
-8.99,
+9.962,
 43.138
 ],
 "max": [
@@ -391,36 +391,10 @@
 }
 },
 {
-"name": "concrete_building8.001",
-"min": [
--35.13,
-9.387,
-48.365
-],
-"max": [
--9.126,
-19.685,
-68.417
-],
-"top": {
-"h": 19.6848,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "concrete_building24.001",
 "min": [
 -5.24,
-8.981,
+9.962,
 85.43
 ],
 "max": [
@@ -446,7 +420,7 @@
 "name": "concrete_building25.001",
 "min": [
 11.434,
-9.849,
+9.867,
 -22.778
 ],
 "max": [
@@ -472,7 +446,7 @@
 "name": "concrete_building32.011",
 "min": [
 17.254,
-9.057,
+9.949,
 -98.136
 ],
 "max": [
@@ -498,7 +472,7 @@
 "name": "concrete_building11.001",
 "min": [
 -25.11,
-9.636,
+9.975,
 -51.868
 ],
 "max": [
@@ -550,7 +524,7 @@
 "name": "concrete_building6.003",
 "min": [
 -38.868,
-9.719,
+8.98,
 -32.702
 ],
 "max": [
@@ -576,7 +550,7 @@
 "name": "concrete_building6.007",
 "min": [
 -17.648,
-9.429,
+9.977,
 -32.698
 ],
 "max": [
@@ -628,7 +602,7 @@
 "name": "concrete_building6.019",
 "min": [
 -30.612,
-8.958,
+9.973,
 -28.754
 ],
 "max": [
@@ -654,7 +628,7 @@
 "name": "concrete_building6.020",
 "min": [
 -30.612,
-9.429,
+9.973,
 -32.57
 ],
 "max": [
@@ -680,7 +654,7 @@
 "name": "concrete_building6.021",
 "min": [
 -27.012,
-9.709,
+9.974,
 -29.985
 ],
 "max": [
@@ -706,7 +680,7 @@
 "name": "concrete_building6.022",
 "min": [
 -22.337,
-9.709,
+9.976,
 -30.007
 ],
 "max": [
@@ -758,7 +732,7 @@
 "name": "concrete_building6.024",
 "min": [
 -26.837,
-9.709,
+9.974,
 -24.237
 ],
 "max": [
@@ -784,7 +758,7 @@
 "name": "concrete_building6.027",
 "min": [
 -24.64,
-9.709,
+9.975,
 -29.972
 ],
 "max": [
@@ -810,7 +784,7 @@
 "name": "concrete_building6.028",
 "min": [
 -24.542,
-9.063,
+9.975,
 -30.007
 ],
 "max": [
@@ -1004,7 +978,7 @@
 "name": "concrete_building11.002",
 "min": [
 -27.413,
-5.216,
+9.974,
 -36.599
 ],
 "max": [
@@ -1056,7 +1030,7 @@
 "name": "concrete_building11.004",
 "min": [
 -21.749,
-5.216,
+9.976,
 -36.599
 ],
 "max": [
@@ -1082,7 +1056,7 @@
 "name": "concrete_building11.005",
 "min": [
 -18.311,
-5.216,
+9.977,
 -36.599
 ],
 "max": [
@@ -1108,7 +1082,7 @@
 "name": "concrete_building11.006",
 "min": [
 -15.384,
-5.216,
+9.978,
 -36.599
 ],
 "max": [
@@ -1209,7 +1183,7 @@
 }
 },
 {
-"name": "concrete_building29.001",
+"name": "concrete_building28_wing_top",
 "min": [
 -49.396,
 12.599,
@@ -1235,7 +1209,7 @@
 }
 },
 {
-"name": "concrete_building29.002",
+"name": "concrete_building28_wing_north",
 "min": [
 -49.446,
 9.966,
@@ -1316,7 +1290,7 @@
 "name": "concrete_building5.001",
 "min": [
 -27.46,
-9.924,
+9.974,
 -14.069
 ],
 "max": [
@@ -1628,7 +1602,7 @@
 "name": "concrete_building34.001",
 "min": [
 10.393,
-9.302,
+9.857,
 -33.075
 ],
 "max": [
@@ -2225,7 +2199,7 @@
 }
 },
 {
-"name": "concrete_building29.003",
+"name": "concrete_building28_wing_parapet",
 "min": [
 -45.701,
 12.897,
@@ -2303,19 +2277,19 @@
 }
 },
 {
-"name": "Cube",
+"name": "brick_wall",
 "min": [
--54.98,
-7.24,
+-45.98,
+9.967,
 8.051
 ],
 "max": [
 -45.854,
-14.24,
+13.696,
 17.178
 ],
 "top": {
-"h": 14.2403,
+"h": 13.6962,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -3216,7 +3190,7 @@
 "name": "concrete_building23.001",
 "min": [
 18.375,
-3.579,
+9.954,
 38.82
 ],
 "max": [
@@ -3554,7 +3528,7 @@
 "name": "concrete_wall6_west",
 "min": [
 -39.0,
-9.6,
+9.97,
 -32.71
 ],
 "max": [
@@ -3658,7 +3632,7 @@
 "name": "concrete_wall6_north",
 "min": [
 -38.78,
-9.6,
+9.97,
 -32.81
 ],
 "max": [
@@ -3736,7 +3710,7 @@
 "name": "concrete_wall6_south",
 "min": [
 -38.81,
-9.6,
+9.97,
 -19.04
 ],
 "max": [
@@ -4127,7 +4101,7 @@
 "name": "concrete_building31",
 "min": [
 -24.03,
-9.4,
+9.962,
 28.81
 ],
 "max": [
@@ -5092,7 +5066,7 @@
 "name": "concrete_wall6_east",
 "min": [
 -17.65,
-9.6,
+9.977,
 -32.7
 ],
 "max": [
@@ -5562,7 +5536,7 @@
 "name": "concrete_building15",
 "min": [
 32.66,
-9.83,
+9.884,
 -98.59
 ],
 "max": [
@@ -5745,7 +5719,7 @@
 "name": "concrete_building32",
 "min": [
 -4.25,
-9.84,
+9.943,
 -37.898
 ],
 "max": [
@@ -5955,7 +5929,7 @@
 "name": "concrete_building22",
 "min": [
 -4.79,
-9.78,
+9.975,
 -19.78
 ],
 "max": [
@@ -6060,7 +6034,7 @@
 "name": "concrete_building10",
 "min": [
 -27.895,
-9.9,
+9.962,
 -73.325
 ],
 "max": [
@@ -6321,7 +6295,7 @@
 "name": "concrete_building3",
 "min": [
 -35.83,
-9.744,
+9.967,
 4.77
 ],
 "max": [
@@ -6478,7 +6452,7 @@
 "name": "concrete_building18",
 "min": [
 -7.15,
-9.85,
+9.918,
 -4.89
 ],
 "max": [
@@ -6819,7 +6793,7 @@
 "name": "concrete_building11.007",
 "min": [
 -24.643,
-9.882,
+9.975,
 -36.599
 ],
 "max": [
@@ -7418,17 +7392,17 @@
 {
 "name": "metal_building28_pipe",
 "min": [
--53.934,
-10.0,
+-53.405,
+9.882,
 -28.198
 ],
 "max": [
--53.405,
-17.956,
--13.705
+-49.239,
+15.661,
+-13.054
 ],
 "top": {
-"h": 17.956,
+"h": 15.6606,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -7789,7 +7763,7 @@
 "name": "concrete_building12",
 "min": [
 -40.95,
-9.9,
+9.933,
 -90.73
 ],
 "max": [
@@ -16597,7 +16571,7 @@
 "name": "concrete_building10.001",
 "min": [
 -13.85,
-9.6,
+9.979,
 -62.06
 ],
 "max": [
@@ -16643,6 +16617,686 @@
 "eye": true,
 "camera": true,
 "thrown": true
+}
+},
+{
+"name": "metal_building5_balcony_rail",
+"min": [
+-18.75,
+13.6,
+-8.25
+],
+"max": [
+-17.352,
+14.65,
+-2.25
+],
+"top": {
+"h": 14.6504,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_building28_wing_frames",
+"min": [
+-48.06,
+11.24,
+-37.07
+],
+"max": [
+-45.472,
+17.3,
+-19.537
+],
+"top": {
+"h": 17.3,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_building28_wing_sashes",
+"min": [
+-47.93,
+11.37,
+-36.878
+],
+"max": [
+-45.664,
+17.23,
+-19.667
+],
+"top": {
+"h": 17.23,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "glass_building28_wing_panes_notexture",
+"min": [
+-47.94,
+11.36,
+-36.777
+],
+"max": [
+-45.765,
+17.24,
+-19.657
+],
+"top": {
+"h": 17.24,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false,
+"thrown": true
+}
+},
+{
+"name": "concrete_building28_wing_trim",
+"min": [
+-49.486,
+11.23,
+-37.08
+],
+"max": [
+-45.462,
+19.542,
+-16.599
+],
+"top": {
+"h": 19.5424,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_building8_frames",
+"min": [
+-34.474,
+13.9,
+48.693
+],
+"max": [
+-5.885,
+17.46,
+75.434
+],
+"top": {
+"h": 17.46,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_building8_sashes",
+"min": [
+-34.243,
+14.03,
+48.924
+],
+"max": [
+-6.077,
+17.39,
+75.242
+],
+"top": {
+"h": 17.39,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "glass_building8_panes_notexture",
+"min": [
+-34.159,
+14.02,
+49.008
+],
+"max": [
+-6.178,
+17.4,
+75.141
+],
+"top": {
+"h": 17.4,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"texture": false,
+"thrown": true
+}
+},
+{
+"name": "concrete_building8_trim",
+"min": [
+-34.478,
+13.89,
+48.689
+],
+"max": [
+-5.875,
+16.56,
+75.444
+],
+"top": {
+"h": 16.56,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_Door_b8_entry_0",
+"min": [
+-5.955,
+9.958,
+65.974
+],
+"max": [
+-5.884,
+12.238,
+66.937
+],
+"top": {
+"h": 12.2383,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_Door_b8_entry_frame_0",
+"min": [
+-6.02,
+9.953,
+65.885
+],
+"max": [
+-5.906,
+12.336,
+67.037
+],
+"top": {
+"h": 12.3362,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_Door_b8_entry_1",
+"min": [
+-22.576,
+9.958,
+52.671
+],
+"max": [
+-21.696,
+12.238,
+53.194
+],
+"top": {
+"h": 12.2383,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_Door_b8_entry_frame_1",
+"min": [
+-22.686,
+9.953,
+52.648
+],
+"max": [
+-21.619,
+12.336,
+53.299
+],
+"top": {
+"h": 12.3362,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_Door_b8_entry_2",
+"min": [
+-25.756,
+9.958,
+61.85
+],
+"max": [
+-24.875,
+12.238,
+62.373
+],
+"top": {
+"h": 12.2383,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "wood_Door_b8_entry_frame_2",
+"min": [
+-25.832,
+9.953,
+61.746
+],
+"max": [
+-24.766,
+12.336,
+62.397
+],
+"top": {
+"h": 12.3362,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_street_north_concrete_wall_new",
+"min": [
+15.832,
+9.9,
+-131.415
+],
+"max": [
+42.915,
+23.7,
+-103.469
+],
+"top": {
+"h": 23.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_frames",
+"min": [
+14.91,
+10.02,
+-161.0
+],
+"max": [
+46.67,
+21.98,
+-103.667
+],
+"top": {
+"h": 21.98,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_ground",
+"min": [
+9.72,
+9.6,
+-161.2
+],
+"max": [
+49.09,
+9.98,
+-100.6
+],
+"top": {
+"h": 9.98,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_panes_notexture",
+"min": [
+14.99,
+10.9,
+-161.0
+],
+"max": [
+46.59,
+21.9,
+-104.515
+],
+"top": {
+"h": 21.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_peeling_painted_wall",
+"min": [
+10.72,
+9.9,
+-173.0
+],
+"max": [
+48.09,
+23.9,
+-131.762
+],
+"top": {
+"h": 23.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_plaster_alley",
+"min": [
+34.09,
+9.9,
+-146.269
+],
+"max": [
+44.819,
+23.7,
+-112.866
+],
+"top": {
+"h": 23.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_pole_arms",
+"min": [
+31.99,
+17.34,
+-154.05
+],
+"max": [
+33.79,
+18.26,
+-111.95
+],
+"top": {
+"h": 18.26,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_poles",
+"min": [
+32.72,
+10.0,
+-154.17
+],
+"max": [
+33.06,
+19.0,
+-111.83
+],
+"top": {
+"h": 19.0,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_shutters",
+"min": [
+24.74,
+10.1,
+-156.72
+],
+"max": [
+34.07,
+12.6,
+-103.747
+],
+"top": {
+"h": 12.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_whitewashed_brick",
+"min": [
+11.993,
+9.9,
+-156.972
+],
+"max": [
+43.781,
+23.7,
+-103.547
+],
+"top": {
+"h": 23.7,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_street_north_wires_notexture",
+"min": [
+32.178,
+16.767,
+-154.02
+],
+"max": [
+33.602,
+18.436,
+-111.98
+],
+"top": {
+"h": 18.4356,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"texture": false,
+"thrown": false
 }
 },
 {
@@ -17667,16 +18321,16 @@
 "name": "metal_drum_b3",
 "min": [
 -35.08,
-11.709,
-17.273
+10.861,
+19.269
 ],
 "max": [
 -34.492,
-12.609,
-17.861
+11.761,
+19.857
 ],
 "top": {
-"h": 12.6093,
+"h": 11.7608,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -17719,16 +18373,16 @@
 "name": "metal_drum_b3.002",
 "min": [
 -35.123,
-10.843,
-16.792
+9.994,
+18.789
 ],
 "max": [
 -34.399,
-11.743,
-17.516
+10.894,
+19.512
 ],
 "top": {
-"h": 11.7428,
+"h": 10.8943,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -17745,16 +18399,16 @@
 "name": "metal_drum_b3.003",
 "min": [
 -35.123,
-10.843,
-17.393
+9.994,
+19.389
 ],
 "max": [
 -34.399,
-11.743,
-18.117
+10.894,
+20.113
 ],
 "top": {
-"h": 11.7428,
+"h": 10.8943,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -17877,15 +18531,6 @@
 }
 },
 "fx": [
-{
-"kind": "smoke",
-"name": "fx_smoke_tank",
-"x": 29.0,
-"y": 12.7,
-"z": -96.8,
-"size": 1.2,
-"yaw": 0.0
-},
 {
 "kind": "spark",
 "name": "fx_spark_wall6",
