@@ -37,7 +37,7 @@ export type RosterEffect =
   /** 倒れた。**倒れた場所で叫ぶ** — 撃った側には手応え、遠くの人には合図 */
   | { kind: 'died'; id: string }
 
-const UNKNOWN: Omit<Player, 'name'> = { team: 'blue', health: 100, life: 'joining' }
+const UNKNOWN: Omit<Player, 'name'> = { team: 'blue', health: 100, life: 'joining', voice: null }
 
 /** 居なければ作る。名簿より先に位置が届くことがある */
 function entryOf(roster: Roster, id: string, name = ''): Player {
@@ -71,6 +71,8 @@ export function applyRoster(
         // **状態を先に入れる。** 無いと既定の joining のまま = 戦場に居ない扱いで、
         // 位置が届いていても一度も描かれない
         if (player.life) entry.life = player.life
+        // 選んだ声。**省かれていたら前のまま** (古いサーバー・声を持たない便)
+        if (player.voice !== undefined) entry.voice = player.voice
         effects.push({ kind: 'sync', id: player.id, entry })
       }
       return effects

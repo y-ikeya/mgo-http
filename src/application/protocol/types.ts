@@ -4,7 +4,7 @@ import type { RotationOrder, StageName, Surface } from '../../domain/stage'
 import type { SupportId, WeaponId } from '../../domain/item/weapons'
 import type { HeldId } from '../../domain/item/held'
 import type { Life } from '../../domain/player/lifecycle'
-import type { VoiceId } from '../../domain/player/voice'
+import type { VoiceId, VoiceChoice } from '../../domain/player/voice'
 
 /**
  * ネットワークで流す型。
@@ -453,6 +453,13 @@ export interface LoadoutEvent {
    * 古い版は送ってこないので、**省かれたら今のまま**。
    */
   secondary?: WeaponId
+  /**
+   * 本人が選んだ声。**省ける。** 装備と一緒に知らせる。
+   *
+   * 申告は生のまま (style は文字列、高さは数とは限らない)。サーバーが
+   * domain の fitVoice で丸めてから名簿に載せる。省かれたら今のまま
+   */
+  voice?: { style?: unknown; pitch?: unknown }
 }
 
 /**
@@ -1113,6 +1120,8 @@ export interface RosterMessage {
     slot?: number
     /** いまどういう状態に居るか。これが無いと描かれない (上記) */
     life?: Life
+    /** 本人が選んだ声。**null は未選択** (体が決める)。省かれたら前のまま */
+    voice?: VoiceChoice | null
   }[]
 }
 

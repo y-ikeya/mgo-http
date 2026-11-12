@@ -412,6 +412,9 @@ export default function Play(props: {
           onSkill={(id, level) => game()?.setSkill(id, level)}
           // パッド / 矢印キーで指している枠。マウスと数字キーでは動かない
           focus={stats()?.loadoutFocus ?? 'primary'}
+          voice={stats()?.voice ?? { style: 'man1', pitch: 1 }}
+          onVoiceStyle={(style) => game()?.setVoiceStyle(style)}
+          onVoicePitch={(pitch) => game()?.setVoicePitch(pitch)}
         />
       </Show>
 

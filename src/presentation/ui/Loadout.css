@@ -422,3 +422,17 @@
   background: rgba(120, 160, 100, 0.12);
   border-bottom: 1px solid rgba(160, 190, 140, 0.16);
 }
+
+/* 声の段。喋り方は文字の札、高さはつまみ (アイコンが無いので武器の段と形を変える) */
+.loadout-tile-text {
+  width: 72px;
+  font-size: 22px;
+}
+
+.loadout-pitch {
+  align-self: center;
+  width: 180px;
+  margin-left: 12px;
+  accent-color: rgba(150, 214, 132, 0.8);
+  cursor: pointer;
+}

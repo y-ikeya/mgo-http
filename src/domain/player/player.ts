@@ -27,6 +27,7 @@
  * 知らない — 知ると「弾がどう飛ぶか」を変えるたびに「何発で死ぬか」が動く。
  */
 import { canTransition, isSpawning, type Life } from './lifecycle'
+import type { VoiceChoice } from './voice'
 import type { Locomotion } from './locomotion'
 import { HEAD_HEIGHT, stanceOf, type Stance, type Lean } from './stance'
 import { creditOf, takeDamage, type Credit, type Wound } from '../rule/damage'
@@ -131,6 +132,12 @@ export interface Player {
    * 同じ問いへの答えが場所ごとにずれて、そのまま不具合になっていた。
    */
   life: Life
+  /**
+   * 本人が選んだ声 (voice.ts の VoiceChoice)。**null は「選んでいない」** —
+   * その場合は体が決める (名無しは女の声)。選んだ声で埋めてしまうと
+   * 未選択の人の体の声まで消えるので、既定で埋めずに null のまま配る
+   */
+  voice: VoiceChoice | null
 }
 
 export interface MatchPlayer extends Player {
@@ -458,6 +465,7 @@ export function newMatchPlayer(seed: {
     slot: seed.slot,
     health: MAX_HEALTH,
     life: 'joining',
+    voice: null,
     lifeAt: seed.now,
     killedBy: '',
     x: 0,

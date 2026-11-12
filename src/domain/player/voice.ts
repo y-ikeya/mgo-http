@@ -56,8 +56,9 @@ export function voiceLine(id: string): (typeof VOICE_LINES)[number] | null {
  * style の文字列だけが両者を繋ぐ。性別は別に持たない — style が声の主
  * (録り手) を兼ねるので、「女声で低め」のような組み合わせも矛盾なく表せる。
  *
- * **まだ配線していない。** この PR は構造だけ — 名簿への載せ方、設定の
- * 画面、再生側で pitch を重ねる所は次に分ける。
+ * 配線: 申告は装備の便 (loadout) に相乗りし、サーバーが fitVoice で丸めて
+ * Player.voice に載せ、名簿で全員に配る。再生側は「選んだ声 ?? 体の声」で
+ * 解決し、pitch を録り音の rate に重ねる。
  */
 
 /** 喋り方。いまは男の声と女の声の 2 種 (録り音は presentation の CRIES が持つ) */
@@ -103,7 +104,7 @@ export function fitVoice(input: { style?: unknown; pitch?: unknown } | null | un
 
 /**
  * その声の主が言う台詞 (文言と音)。**声の主ごとの版が無ければ男の版** (いまは挨拶の 4 つに女の版がある)。
- * 声の主 (VoiceStyle) はいまは体で決まる (presentation の skin.ts の voiceFor)。本人が選ぶ声 (VoiceChoice) の配線はまだ
+ * 声の主 (VoiceStyle) は、本人が選んだ声があればそれ、無ければ体で決まる (presentation の skin.ts の voiceFor)
  */
 export function spokenLine(id: string, voice: VoiceStyle): { label: string; sound: string } | null {
   const line = voiceLine(id)

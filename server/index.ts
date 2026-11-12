@@ -26,7 +26,7 @@
 import { dropWeapon, pickUp } from './arms/drops'
 import { recordLag } from '../src/domain/match/lag'
 import { AUTH_CLOSE_CODE, LAG_CLOSE_CODE } from '../src/application/protocol/types'
-import { VOICE_COOLDOWN, voiceLine } from '../src/domain/player/voice'
+import { VOICE_COOLDOWN, fitVoice, voiceLine } from '../src/domain/player/voice'
 
 import { type Claymore, blastPlaced, detonateClaymore, placeClaymore, relayClaymores, shotHitsClaymore } from './arms/claymore'
 import { bumpDecoys, placeDecoy, relayDecoys, shotHitsDecoy, stabHitsDecoy } from './arms/decoy'
@@ -627,6 +627,12 @@ function handleMessage(
           player,
           `選べない装備 (${message.primary} / ${message.secondary ?? '-'} / ${message.support})`,
         )
+      }
+      // 声の申告が付いていたら、**丸めてから**人に持たせて名簿を配り直す。
+      // 装備と違い弾く物ではない (知らない style でも既定の声で通る)
+      if (message.voice !== undefined) {
+        player.voice = fitVoice(message.voice)
+        broadcast(room, rosterMessage(room))
       }
       break
 

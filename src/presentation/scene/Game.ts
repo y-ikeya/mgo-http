@@ -8,7 +8,7 @@ import { addMaskedShadows } from "./world/fenceShadow";
 import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
-import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, spokenLine, type VoiceStyle } from "../../domain/player/voice";
+import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, fitVoice, spokenLine, type VoiceChoice, type VoiceStyle } from "../../domain/player/voice";
 import * as THREE from "three";
 import { homeOf } from "../../domain/match/sides";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
@@ -176,6 +176,7 @@ import {
 import { MAX_STAMINA, PAT_RANGE, staminaBlur, staminaSwayScale } from "../../domain/player/stamina";
 import { setSlideBlocker } from "./actor/deathSlide";
 import { loadLastLoadout, saveLastLoadout } from "../../infra/prefs/loadout";
+import { loadLastVoice, saveLastVoice } from "../../infra/prefs/voice";
 import {
   chooseLoadout,
   fitArmory,
@@ -520,19 +521,31 @@ export class Game {
   private readonly player = new Soldier();
   /** 自分が着ている体 (skin.ts)。声もこれで決まる */
   private ownSkin = selfSkin(undefined);
+  /**
+   * 自分が選んだ声。**null は未選択** — その間は体の声 (名無しは女の声)。
+   * 前回の選びはこの端末に覚えている (infra/prefs/voice)
+   */
+  private ownVoice: VoiceChoice | null = null;
 
   /**
-   * その人の声で叫ぶ・うめく。**声は体が決める** (名無しは女の声)。
-   * 姿がまだ届いていない相手は男の声
+   * その人の声で叫ぶ・うめく。**選んだ声があればそれ、無ければ体が決める**
+   * (名無しは女の声)。姿がまだ届いていない相手は男の声
    */
-  /** その人の声の主。自分は着ている体、他人は名前から (skin.ts) */
+  /** その人が選んだ声。自分は手元の選び、他人は名簿。未選択なら null */
+  private chosenVoiceOf(id: string): VoiceChoice | null {
+    return id === this.net.id ? this.ownVoice : (this.roster.get(id)?.voice ?? null);
+  }
+
+  /** その人の声の主。**選んだ声があればそれ、無ければ体が決める** (skin.ts) */
   private voiceOf(id: string, name: string): VoiceStyle {
-    return voiceFor(id === this.net.id ? this.ownSkin : skinFor(name, id));
+    return this.chosenVoiceOf(id)?.style ?? voiceFor(id === this.net.id ? this.ownSkin : skinFor(name, id));
   }
 
   private cry(role: CryRole, id: string, at: THREE.Vector3): number {
     const skin = id === this.net.id ? this.ownSkin : this.remotes.skinOf(id);
-    return this.audio.play(crySound(voiceFor(skin ?? ""), role), at);
+    const chosen = this.chosenVoiceOf(id);
+    const style = chosen?.style ?? voiceFor(skin ?? "");
+    return this.audio.play(crySound(style, role), at, 1, 1, chosen?.pitch ?? 1);
   }
   private readonly input = new Input();
   private readonly stage: Stage;
@@ -1126,6 +1139,9 @@ export class Game {
      */
     this.choice = newLoadoutChoice(this.roomName, loadLastLoadout());
     this.inv.refill(this.loadout);
+    // 前回選んだ声。無ければ未選択 (体の声) のまま
+    const lastVoice = loadLastVoice();
+    if (lastVoice) this.ownVoice = fitVoice(lastVoice);
     // 誰として繋ぐか。token を渡し、サーバーが署名から ID を導く
     this.net = createTransport(identity, room, privateRoom);
     // 自機のモデルはここで読み始める。**構築時ではない** —
@@ -2185,9 +2201,9 @@ export class Game {
         break;
       // 誰かのボイス。無線なので距離を見ず、耳元で鳴らす
       case "voice": {
-        // 声の主は体で決まる (名無しは女の声の版があれば)
+        // 声の主は、選んだ声があればそれ、無ければ体で決まる (名無しは女の声の版があれば)
         const line = spokenLine(effect.line, this.voiceOf(effect.id, effect.name));
-        if (line) this.audio.playVoice(line.sound as UiSoundName);   // 位置を持たない。前の声は途中で止める
+        if (line) this.audio.playVoice(line.sound as UiSoundName, this.chosenVoiceOf(effect.id)?.pitch ?? 1);   // 位置を持たない。前の声は途中で止める
         break;
       }
       case "phase":
@@ -3606,7 +3622,23 @@ export class Game {
       primary: this.pendingLoadout.primary,
       // 持たせない部屋 (null) では送らない。**送ると弾かれる**
       secondary: this.pendingLoadout.secondary ?? undefined,
+      // 選んだ声も一緒に知らせる。未選択なら送らない (サーバーは今のままにする)
+      voice: this.ownVoice ?? undefined,
     });
+  }
+
+  /** 喋り方を選び直す。装備と同じ便でサーバーへ知らせ、この端末にも覚える */
+  setVoiceStyle(style: VoiceStyle): void {
+    this.ownVoice = fitVoice({ style, pitch: this.ownVoice?.pitch ?? 1 });
+    saveLastVoice(this.ownVoice);
+    this.sendLoadout();
+  }
+
+  /** 声の高さを選び直す。喋り方は今効いているものを保つ (高さだけ変えて声の主が替わらないように) */
+  setVoicePitch(pitch: number): void {
+    this.ownVoice = fitVoice({ style: this.ownVoice?.style ?? voiceFor(this.ownSkin), pitch });
+    saveLastVoice(this.ownVoice);
+    this.sendLoadout();
   }
 
   /**
@@ -5243,6 +5275,8 @@ export class Game {
        * null のまま。どちらの意味でも読める。
        */
       secondary: this.pendingLoadout.secondary,
+      // 自分の声の効いている値 (選んだ声 ?? 体の声)。画面はこれを出す
+      voice: this.ownVoice ?? { style: voiceFor(this.ownSkin), pitch: 1 },
       // 粒が散る角度 (度)。**0 でなければクロスヘアが輪になる**
       pelletSpread: pelletsOf(this.weapon) > 1 ? (this.weapon.pelletSpread ?? 0) : 0,
       crouching: this.player.isCrouching,
@@ -5303,7 +5337,7 @@ export class Game {
         (entry) => now - entry.at < POINT_FEED_DURATION * 1000,
       ),
       kills: this.feedItems(now),
-      voiceMenu: voiceMenuOf(this.voiceMenuUntil, this.voiceCategory, this.input.activeDevice === "gamepad", now, voiceFor(this.ownSkin)),
+      voiceMenu: voiceMenuOf(this.voiceMenuUntil, this.voiceCategory, this.input.activeDevice === "gamepad", now, this.voiceOf(this.net.id, "")),
       throwables: this.inv.countOf('magazine'),
       grenades: this.inv.supportCount,
       /**

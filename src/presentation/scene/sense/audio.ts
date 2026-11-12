@@ -673,7 +673,7 @@ export class GameAudio {
    * 定型文のボイスを鳴らす。画面の音と同じく位置を持たないが、**枠は 1 つだけ**。
    * 続けて来たら前の声を途中で止めて新しい声に替える。重ねると聞き取れない
    */
-  playVoice(name: UiSoundName): void {
+  playVoice(name: UiSoundName, pitch = 1): void {
     const buffer = this.uiBuffers.get(name);
     if (!buffer) return;
     if (!this.voiceSound) this.voiceSound = new THREE.Audio(this.listener);
@@ -681,6 +681,8 @@ export class GameAudio {
     if (sound.isPlaying) sound.stop();
     sound.setBuffer(buffer);
     sound.setVolume(UI_SOUNDS[name].volume);
+    // 本人が選んだ声の高さ (VoiceChoice.pitch)。枠は使い回すので毎回掛ける
+    sound.setPlaybackRate(pitch);
     sound.play();
   }
 
@@ -726,7 +728,7 @@ export class GameAudio {
    *   レーダーはこれをそのまま使う。「聞こえたものだけ映る」を別々の計算で
    *   判断すると、耳とレーダーが食い違う。
    */
-  play(name: SoundName, position: THREE.Vector3, volume = 1, range = 1): number {
+  play(name: SoundName, position: THREE.Vector3, volume = 1, range = 1, pitch = 1): number {
     const takes = this.buffers.get(name);
     if (!takes || takes.length === 0) return 0;
     /*
@@ -755,8 +757,8 @@ export class GameAudio {
     sound.setMaxDistance(profile.max * range);
     sound.setBuffer(take.buffer);
     sound.setVolume(volume);
-    // 録りごとの基準の高さに、毎回のゆらぎを掛ける
-    sound.setPlaybackRate(take.rate * jitter());
+    // 録りごとの基準の高さに、毎回のゆらぎと、本人が選んだ声の高さを掛ける
+    sound.setPlaybackRate(take.rate * jitter() * pitch);
     /*
      * こもらせる音だけ低い所を残す。
      *

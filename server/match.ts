@@ -993,6 +993,8 @@ export function rosterMessage(room: RoomWorld): ServerMessage {
       // 繋いだ人はここで受け取らないと既定値 (joining) のままになり、
       // **その人たちが一度も描かれない**
       life: p.life,
+      // 選んだ声 (未選択は null)。声は全員の画面で一致させる物なので名簿で配る
+      voice: p.voice,
     })),
   } satisfies ServerMessage
 }

@@ -13,6 +13,13 @@ import {
   type SkillId,
   type Skills,
 } from '../../domain/player/skill'
+import {
+  VOICE_PITCH_MAX,
+  VOICE_PITCH_MIN,
+  VOICE_STYLES,
+  type VoiceChoice,
+  type VoiceStyle,
+} from '../../domain/player/voice'
 import { SkillList } from './SkillPanel'
 import type { MatchPhase, MatchMessage } from '../../application/protocol/types'
 import './Loadout.css'
@@ -130,6 +137,10 @@ export default function Loadout(props: {
    * 部屋で片方だけ詰め忘れて 1 つずれる。**
    */
   focus: LoadoutFocus
+  /** 自分の声の効いている値 (選んだ声 ?? 体の声) */
+  voice: VoiceChoice
+  onVoiceStyle: (style: VoiceStyle) => void
+  onVoicePitch: (pitch: number) => void
 }) {
   /** 支度の段階か。**押し合う場所になるのはここだけ** */
   const preparing = () => props.phase === 'ready'
@@ -334,6 +345,46 @@ export default function Loadout(props: {
                     </button>
                   )}
                 </For>
+              </div>
+            </div>
+          </div>
+
+          {/*
+            声。**自分の声を変える。** 喋り方 (男の声 / 女の声) と高さ。
+            武器と同じ便でサーバーへ知らせ、名簿で全員に配られる —
+            自分の耳だけでなく、相手の画面でも同じ声で聞こえる
+          */}
+          <div class="loadout-row">
+            <div class="loadout-slot">VOICE</div>
+            <div class="loadout-rail">
+              <Readout
+                category="声"
+                name={props.voice.style === 'woman1' ? '女の声' : '男の声'}
+                detail={`高さ × ${props.voice.pitch.toFixed(2)}`}
+              />
+              <div class="loadout-items">
+                <For each={VOICE_STYLES}>
+                  {(style) => (
+                    <button
+                      class="loadout-tile loadout-tile-text"
+                      classList={{ 'loadout-tile-on': style === props.voice.style }}
+                      title={style === 'woman1' ? '女の声' : '男の声'}
+                      onClick={() => props.onVoiceStyle(style)}
+                    >
+                      {style === 'woman1' ? '女' : '男'}
+                    </button>
+                  )}
+                </For>
+                <input
+                  class="loadout-pitch"
+                  type="range"
+                  min={VOICE_PITCH_MIN}
+                  max={VOICE_PITCH_MAX}
+                  step={0.01}
+                  value={props.voice.pitch}
+                  title="声の高さ"
+                  onInput={(e) => props.onVoicePitch(Number(e.currentTarget.value))}
+                />
               </div>
             </div>
           </div>

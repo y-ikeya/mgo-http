@@ -27,7 +27,7 @@ describe('名簿のレプリカ', () => {
       roster([{ id: 'bob', name: 'B', health: 70, team: 'red', slot: 1, life: 'alive' }]),
       SELF,
     )
-    expect(r.get('bob')).toEqual({ name: 'B', team: 'red', health: 70, life: 'alive' })
+    expect(r.get('bob')).toEqual({ name: 'B', team: 'red', health: 70, life: 'alive', voice: null })
     expect(effects).toEqual([{ kind: 'sync', id: 'bob', entry: r.get('bob')! }])
   })
 
@@ -40,6 +40,28 @@ describe('名簿のレプリカ', () => {
     applyRoster(r, { type: 'life', id: 'bob', state: 'alive' } as ServerMessage, SELF)
     applyRoster(r, roster([{ id: 'bob', name: 'B', health: 100, team: 'red', slot: 1 }]), SELF)
     expect(r.get('bob')?.life).toBe('alive')
+  })
+
+  test('選んだ声は名簿で入る。**省かれた便では前のまま**', () => {
+    const r = newRoster()
+    applyRoster(
+      r,
+      roster([
+        { id: 'bob', name: 'B', health: 100, team: 'red', slot: 1, voice: { style: 'woman1', pitch: 1.1 } },
+      ]),
+      SELF,
+    )
+    expect(r.get('bob')?.voice).toEqual({ style: 'woman1', pitch: 1.1 })
+    // 声を持たない名簿が来ても、選んだ声を落とさない
+    applyRoster(r, roster([{ id: 'bob', name: 'B', health: 90, team: 'red', slot: 1 }]), SELF)
+    expect(r.get('bob')?.voice).toEqual({ style: 'woman1', pitch: 1.1 })
+    // 未選択に戻す便 (null) はそのまま受ける
+    applyRoster(
+      r,
+      roster([{ id: 'bob', name: 'B', health: 90, team: 'red', slot: 1, voice: null }]),
+      SELF,
+    )
+    expect(r.get('bob')?.voice).toBeNull()
   })
 
   test('体力は health で動く。**倒れたかは状態が決める**', () => {

@@ -6,7 +6,7 @@ import { STEALTH_BREAK_MS } from '../../domain/match/sides'
 import { CHOOSE_FLOOR, CHOOSE_TIMEOUT, isDowned, type Life } from '../../domain/player/lifecycle'
 import type { SkillId, Skills } from '../../domain/player/skill'
 import type { Stance } from '../../domain/player/stance'
-import { VOICE_CATEGORIES, spokenLine, type VoiceStyle } from '../../domain/player/voice'
+import { VOICE_CATEGORIES, spokenLine, type VoiceChoice, type VoiceStyle } from '../../domain/player/voice'
 
 /**
  * **HUD へ渡す状態** (GameStats) と、それを組む判断。
@@ -87,6 +87,8 @@ export interface GameStats {
   primary: WeaponId | null
   /** 副武器。**部屋が外していれば null** */
   secondary: WeaponId | null
+  /** 自分の声の効いている値 (選んだ声 ?? 体の声)。装備の画面で選び直す */
+  voice: VoiceChoice
   /**
    * 粒が散る角度 (度)。散弾でなければ 0。
    *
