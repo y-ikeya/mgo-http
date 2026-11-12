@@ -8,7 +8,7 @@ import { addMaskedShadows } from "./world/fenceShadow";
 import { GAME_SET_SECONDS, RECONNECT_GRACE_MS } from "../../domain/match/match";
 import { StageSmoke } from "./fx/stageSmoke";
 import { StageSparks } from "./fx/stageSparks";
-import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, spokenLine } from "../../domain/player/voice";
+import { VOICE_CATEGORIES, VOICE_MENU_SECONDS, spokenLine, type VoiceStyle } from "../../domain/player/voice";
 import * as THREE from "three";
 import { homeOf } from "../../domain/match/sides";
 import { RenderPipeline, WebGPURenderer } from "three/webgpu";
@@ -526,7 +526,7 @@ export class Game {
    * 姿がまだ届いていない相手は男の声
    */
   /** その人の声の主。自分は着ている体、他人は名前から (skin.ts) */
-  private voiceOf(id: string, name: string): string {
+  private voiceOf(id: string, name: string): VoiceStyle {
     return voiceFor(id === this.net.id ? this.ownSkin : skinFor(name, id));
   }
 
