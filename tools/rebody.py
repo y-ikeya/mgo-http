@@ -54,6 +54,12 @@ if '--widen' in argv:
     _w = argv.index('--widen')
     WIDEN = float(argv[_w + 1])
     del argv[_w:_w + 2]
+# 脚の付け根の幅を何倍にするか (--legs 0.92)。省けば WIDEN と同じ。肩だけ広げて腰は細く、ができる
+LEGS = None
+if '--legs' in argv:
+    _w = argv.index('--legs')
+    LEGS = float(argv[_w + 1])
+    del argv[_w:_w + 2]
 argv = [a for a in argv if a not in ('--bust', '--hair', '--nohead', '--hairbones')]
 SRC, OUT = argv[0], argv[1]
 # 宿主 (soldier.glb) の腰の高さ。合わせる先
@@ -196,8 +202,13 @@ foot = (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2
 """
 
 
+# 胴の骨ごとの、脚 (0) から胸 (1) への混ぜ具合
+TORSO_BLEND = {'Hips': 0.0, 'Spine': 0.33, 'Spine1': 0.67, 'Spine2': 1.0}
+
+
 def widen_body():
-    if abs(WIDEN - 1.0) < 1e-6:
+    legs = WIDEN if LEGS is None else LEGS
+    if abs(WIDEN - 1.0) < 1e-6 and abs(legs - 1.0) < 1e-6:
         return
     la, ra = at('mixamorig:LeftArm'), at('mixamorig:RightArm')
     side = la - ra
@@ -205,7 +216,7 @@ def widen_body():
     centre = (la + ra) / 2
     arm_shift = (la - ra).dot(side) * (WIDEN - 1.0) / 2
     lu, ru = at('mixamorig:LeftUpLeg'), at('mixamorig:RightUpLeg')
-    leg_shift = (lu - ru).dot(side) * (WIDEN - 1.0) / 2
+    leg_shift = (lu - ru).dot(side) * (legs - 1.0) / 2
 
     def chain(root_name):
         root = arm.data.bones.get(root_name)
@@ -226,8 +237,11 @@ def widen_body():
             return -side * leg_shift
         if bone_name in still:
             return mathutils.Vector()
-        # 胴: 中心から横へ
-        return side * ((world - centre).dot(side) * (WIDEN - 1.0))
+        # 胴: 中心から横へ。**骨盤は脚と同じ、胸は WIDEN、その間はなだらかに** —
+        # 胴を一律に広げると、脚の付け根を寄せても骨盤の肌が張って見える
+        k = TORSO_BLEND.get(bone_name.split(':')[-1], 1.0)
+        factor = legs + (WIDEN - legs) * k
+        return side * ((world - centre).dot(side) * (factor - 1.0))
 
     # 肌。各頂点に、重みで混ぜたずらしを足す (素の姿勢の世界座標で)
     moved = 0
@@ -267,7 +281,8 @@ def widen_body():
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.context.view_layer.update()
     w2 = (at('mixamorig:LeftArm') - at('mixamorig:RightArm')).dot(side)
-    print(f'  胴を横に {WIDEN} 倍: 肩幅 {(la - ra).dot(side):.3f} -> {w2:.3f}m、腕と脚は外へ {arm_shift:.3f} / {leg_shift:.3f}m (頂点 {moved})')
+    h2 = (at('mixamorig:LeftUpLeg') - at('mixamorig:RightUpLeg')).dot(side)
+    print(f'  胴を横に {WIDEN} 倍: 肩幅 {(la - ra).dot(side):.3f} -> {w2:.3f}m、腰 (脚の付け根) {(lu - ru).dot(side):.3f} -> {h2:.3f}m、腕と脚は外へ {arm_shift:.3f} / {leg_shift:.3f}m (頂点 {moved})')
 
 
 widen_body()
