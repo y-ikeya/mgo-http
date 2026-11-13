@@ -24,11 +24,9 @@
  */
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { CLIMB_TOP_TUNING, Soldier } from '../../src/presentation/scene/actor/soldier'
 import { buildLights } from '../../src/presentation/scene/world/stage'
-import { loadSoldier } from '../../src/presentation/scene/assets'
+import { loadSoldier, loadStage } from '../../src/presentation/scene/assets'
 import { loadStageLadders, loadStageMoveWorld } from '../../src/presentation/scene/world/stage'
 
 const query = new URLSearchParams(location.search)
@@ -69,7 +67,8 @@ const world = await loadStageMoveWorld(map)
 if (!ladder) throw new Error('梯子が無い')
 
 if (showStage) {
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`/models/stage_${map}.glb`)
+  // 本番と同じ読み方 (meshopt と KTX2 の絵を読める)
+  const gltf = await loadStage(map)
   scene.add(gltf.scene)
 }
 

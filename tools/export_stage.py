@@ -2264,17 +2264,29 @@ if _joined:
 # それを落とすと灰色の塊になる。クライアントは「テクスチャを持たないメッシュだけ
 # 差し替える」形になっている (stage.ts) ので、載せておけば箱は今までどおり
 # 名前から塗られ、車は自分の絵のまま出る。
+# **絵は KTX2 (GPU が圧縮のまま持てる形) にする。** WebP / JPEG は GPU に載る時に
+# 1 画素 4 バイトへ展開され、city で 422MB になった。KTX2 なら 4〜8 分の 1。
+# 変換はネイティブ版の gltfpack (-tc) がやる。npm 版は BasisU を持たず断る ("built
+# without BasisU support") ので、PATH にある node_modules の外の gltfpack を探す
+# (本人の機械は ~/.local/bin/gltfpack、zeux/meshoptimizer の Releases の macOS 版)。
+# gltfpack の -tc は PNG / JPEG しか読めない (WebP は素通しになる) ので、KTX2 にする
+# 時は Blender から元の形式 (AUTO) で出す。無ければ今までどおり WebP。
+import shutil
+# Blender を Dock から開くと PATH に ~/.local/bin が入らないので、そこも直に見る
+gltfpack_native = shutil.which('gltfpack') or shutil.which('gltfpack', path=os.path.expanduser('~/.local/bin'))
+if gltfpack_native and 'node_modules' in os.path.realpath(gltfpack_native):
+    gltfpack_native = None
 bpy.ops.export_scene.gltf(
     filepath=glb_path,
     export_format='GLB',
     use_selection=True,
     export_apply=True,      # モディファイアを確定させてから出す
     export_materials='EXPORT',
-    # **絵は WebP で出す。** AUTO だと持ち込みの PNG がそのまま乗り、木箱 1 種類
+    # **KTX2 にしない時は WebP で出す。** AUTO だと持ち込みの PNG がそのまま乗り、木箱 1 種類
     # (2048 の PNG 3 枚) で 16MB になった。JPEG は小さいが透明を捨てる — 木箱の
     # 板の隙間 (透明) が黒く塗り潰された。WebP は透明を持ったまま JPEG 並みに小さい。
     # three の GLTFLoader は EXT_texture_webp を読む (Chrome / Safari 16+)
-    export_image_format='WEBP',
+    export_image_format='AUTO' if gltfpack_native else 'WEBP',
     export_image_quality=85,
     # **頂点色も出す。** bake_stage.py が焼いた「空の見え方」がここに乗る。
     # 既定 (MATERIAL) だと材質が使っていない色は落とされるので、明示する
@@ -2297,15 +2309,22 @@ bpy.ops.export_scene.gltf(
 # 壁から 3〜4mm 浮かせた汚れのデカールが壁と同じ深さに丸まって、カメラの揺れで
 # チカチカした (建物 6 の雨だれ)。位置ぶんの容量は増えるが meshopt の圧縮は掛かる。
 # -vt 16: UV は 16 ビット (壁の絵は 60 回繰り返す UV を持つので、既定の 12 ビットだと粗い)。
+# -tc: 絵を KTX2 (ETC1S) に。法線の絵も ETC1S — UASTC (-tu normal) は崩れが少ないが
+# city で落とす量が 12MB → 22MB になった。試写で煉瓦の目地は見分けが付かなかった。
 import subprocess
-gltfpack = os.path.join(root, 'node_modules', '.bin', 'gltfpack')
+gltfpack = gltfpack_native or os.path.join(root, 'node_modules', '.bin', 'gltfpack')
 if os.path.exists(gltfpack):
     raw_size = os.path.getsize(glb_path)
     packed_path = glb_path[:-len('.glb')] + '.packed.glb'   # gltfpack は出力も .glb でないと断る
+    texture_flags = ['-tc', '-tj', '8'] if gltfpack_native else []
     result = subprocess.run(
-        [gltfpack, '-i', glb_path, '-o', packed_path, '-cc', '-kn', '-km', '-ke', '-vpf', '-vt', '16'],
+        [gltfpack, '-i', glb_path, '-o', packed_path, '-cc', '-kn', '-km', '-ke', '-vpf', '-vt', '16', *texture_flags],
         capture_output=True, text=True,
     )
+    if gltfpack_native:
+        print(f'  絵は KTX2 ({gltfpack_native})')
+    else:
+        print('  ネイティブ版の gltfpack が PATH に無いので、絵は WebP のまま (GPU では展開される)')
     if result.returncode == 0 and os.path.exists(packed_path):
         os.replace(packed_path, glb_path)
         print(f'  gltfpack で詰めた: {raw_size / 1e6:.1f}MB → {os.path.getsize(glb_path) / 1e6:.1f}MB')
