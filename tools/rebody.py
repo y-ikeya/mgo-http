@@ -72,6 +72,10 @@ bpy.context.scene.render.fps_base = 1
 """
 if SRC.endswith('.blend'):
     bpy.ops.wm.open_mainfile(filepath=SRC)
+    # **編集モードのまま保存された blend は、開くと編集モード。** 物を選ぶ操作が通らずに落ちる
+    # (2026-11-13、名無しを手で直した直後に)。先にオブジェクトモードへ戻す
+    if bpy.context.object and bpy.context.object.mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
 else:
     bpy.ops.import_scene.fbx(filepath=SRC)
 """
