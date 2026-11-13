@@ -55,8 +55,9 @@ const SKINS: Record<string, string> = {
    */
   nanashi: 'soldier_nanashi',
   /*
-   * kome27。Mixamo の MocapGuy (本人が落とした T-Pose.fbx → tools/raw/MocapGuy.fbx)。Raiden と同じ道
-   * (rebody → merge_all_clips → fit_height、頭 1.4609m・爪先は宿主と同じ)。
+   * kome27。Mixamo の MocapGuy。素の姿勢 (T ポーズ) の元は tools/raw/mocapMan.blend (本人が MocapGuy.fbx から
+   * 作って手を入れる)。作り直しはここから。Raiden と同じ道 (rebody --nohead → merge_all_clips (soldier.glb から)
+   * → fit_height --hips → dedup → pack、頭 1.4609m)。
    * **rebody は --nohead で通す** — T ポーズの腕が「顎から上」に入って頭の骨へ寄せられ、腕が翼のように伸びた
    */
   kome27: 'soldier_kome',
