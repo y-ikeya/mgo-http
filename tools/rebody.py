@@ -48,6 +48,12 @@ HAIR = '--hair' in argv
 HAIR_BONES = '--hairbones' in argv
 # 顎から上を頭の骨だけに握らせるか
 HARD_HEAD = '--nohead' not in argv
+# 胴を横に何倍に広げるか (--widen 1.22)。**頭と腕の長さは変えない** (下の widen_body)
+WIDEN = 1.0
+if '--widen' in argv:
+    _w = argv.index('--widen')
+    WIDEN = float(argv[_w + 1])
+    del argv[_w:_w + 2]
 argv = [a for a in argv if a not in ('--bust', '--hair', '--nohead', '--hairbones')]
 SRC, OUT = argv[0], argv[1]
 # 宿主 (soldier.glb) の腰の高さ。合わせる先
@@ -173,6 +179,98 @@ print(f'  腰の高さ {before:.3f} -> {after:.3f} m (宿主 {HOST_HIPS})')
 足元は縮尺で動くので測り直す。上の向きは変わらない。
 """
 foot = (at('mixamorig:LeftFoot') + at('mixamorig:RightFoot')) / 2
+
+"""
+--- 胴を横に広げる (--widen) ---
+
+**背の高さを揃えると、細身の体は小さく見える。** 名無し (Kachujin) は頭の高さを合わせて
+0.85 倍にした結果、肩幅が soldier の 7 割 (0.30m) になった。当たり判定は全員同じなので、
+細いほど見つけにくいだけ得をする (2026-11-13 本人「他の model よりも小さい？」→ kome と同じくらいに)。
+
+体を横にそのまま伸ばすと、T ポーズで横へ伸びた腕まで長くなる。骨ごとに動かし方を分ける:
+    頭・首        動かさない (顔と髪の幅はそのまま)
+    背骨・腰      体の中心から横へ WIDEN 倍
+    腕 (肩から先) 外へ平行にずらす。腕の長さは変えない
+    脚 (腿から先) 外へ平行にずらす
+頂点は重みで混ぜた同じずらしを受けるので、骨と肌がずれない (束ね方は崩れない)。
+"""
+
+
+def widen_body():
+    if abs(WIDEN - 1.0) < 1e-6:
+        return
+    la, ra = at('mixamorig:LeftArm'), at('mixamorig:RightArm')
+    side = la - ra
+    side = (side - up * side.dot(up)).normalized()
+    centre = (la + ra) / 2
+    arm_shift = (la - ra).dot(side) * (WIDEN - 1.0) / 2
+    lu, ru = at('mixamorig:LeftUpLeg'), at('mixamorig:RightUpLeg')
+    leg_shift = (lu - ru).dot(side) * (WIDEN - 1.0) / 2
+
+    def chain(root_name):
+        root = arm.data.bones.get(root_name)
+        return {root.name} | {b.name for b in root.children_recursive} if root else set()
+
+    left_arm, right_arm = chain('mixamorig:LeftShoulder'), chain('mixamorig:RightShoulder')
+    left_leg, right_leg = chain('mixamorig:LeftUpLeg'), chain('mixamorig:RightUpLeg')
+    still = chain('mixamorig:Neck')  # 首・頭とその下 (髪の骨も)
+
+    def offset(bone_name, world):
+        if bone_name in left_arm:
+            return side * arm_shift
+        if bone_name in right_arm:
+            return -side * arm_shift
+        if bone_name in left_leg:
+            return side * leg_shift
+        if bone_name in right_leg:
+            return -side * leg_shift
+        if bone_name in still:
+            return mathutils.Vector()
+        # 胴: 中心から横へ
+        return side * ((world - centre).dot(side) * (WIDEN - 1.0))
+
+    # 肌。各頂点に、重みで混ぜたずらしを足す (素の姿勢の世界座標で)
+    moved = 0
+    for mesh in meshes:
+        names = {g.index: g.name for g in mesh.vertex_groups}
+        to_local = mesh.matrix_world.inverted()
+        for v in mesh.data.vertices:
+            world = mesh.matrix_world @ v.co
+            total = 0.0
+            delta = mathutils.Vector()
+            for e in v.groups:
+                name = names.get(e.group)
+                if not name or not arm.data.bones.get(name) or e.weight <= 0:
+                    continue
+                delta += offset(name, world) * e.weight
+                total += e.weight
+            if total <= 0:
+                continue
+            v.co = to_local @ (world + delta / total)
+            moved += 1
+    # 骨。根元と先を同じ規則でずらす
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    to_arm = arm.matrix_world.inverted()
+    # **元の位置を先に全部控えてから動かす。** つながった骨は親の先を動かすと子の根元も動くので、
+    # 1 本ずつ読みながら書くと腕を 2 回ずらす (肩幅が 1.22 倍のつもりで 1.44 倍になった)
+    limbs = left_arm | right_arm | left_leg | right_leg
+    plan = []
+    for eb in arm.data.edit_bones:
+        head_w = arm.matrix_world @ eb.head
+        tail_w = arm.matrix_world @ eb.tail
+        plan.append((eb, to_arm @ (head_w + offset(eb.name, head_w)),
+                     to_arm @ (tail_w + offset(eb.name, head_w if eb.name in limbs else tail_w))))
+    for eb, head, tail in plan:
+        eb.head = head
+        eb.tail = tail
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.update()
+    w2 = (at('mixamorig:LeftArm') - at('mixamorig:RightArm')).dot(side)
+    print(f'  胴を横に {WIDEN} 倍: 肩幅 {(la - ra).dot(side):.3f} -> {w2:.3f}m、腕と脚は外へ {arm_shift:.3f} / {leg_shift:.3f}m (頂点 {moved})')
+
+
+widen_body()
 
 HEAD_BAND = float(os.environ.get('REBODY_BAND', '0.04'))
 """
