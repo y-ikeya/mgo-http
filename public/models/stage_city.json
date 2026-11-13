@@ -18447,6 +18447,1562 @@
 "camera": true,
 "thrown": true
 }
+},
+{
+"name": "metal_watertank_bc011_1",
+"min": [
+-10.797,
+15.137,
+-66.879
+],
+"max": [
+-9.597,
+16.737,
+-65.679
+],
+"top": {
+"h": 16.7369,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_bc011_1",
+"min": [
+-11.637,
+15.086,
+-65.021
+],
+"max": [
+-11.456,
+16.085,
+-64.836
+],
+"top": {
+"h": 16.0848,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_bc011_2",
+"min": [
+-6.534,
+15.086,
+-65.021
+],
+"max": [
+-6.353,
+15.952,
+-64.836
+],
+"top": {
+"h": 15.9371,
+"dx": 0.05592,
+"dz": 0.05599,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_bc011_3",
+"min": [
+-6.534,
+15.086,
+-73.497
+],
+"max": [
+-6.353,
+15.952,
+-73.312
+],
+"top": {
+"h": 15.9371,
+"dx": 0.05592,
+"dz": 0.05599,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_bc011_4",
+"min": [
+-11.637,
+15.086,
+-73.497
+],
+"max": [
+-11.456,
+16.085,
+-73.312
+],
+"top": {
+"h": 16.0848,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b10_1",
+"min": [
+-15.395,
+17.3,
+-58.025
+],
+"max": [
+-14.195,
+18.9,
+-56.825
+],
+"top": {
+"h": 18.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b10_2",
+"min": [
+-26.995,
+17.3,
+-72.425
+],
+"max": [
+-25.795,
+18.9,
+-71.225
+],
+"top": {
+"h": 18.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b10_001_1",
+"min": [
+-7.88,
+17.3,
+-61.16
+],
+"max": [
+-6.68,
+18.9,
+-59.96
+],
+"top": {
+"h": 18.9,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b10_001_1",
+"min": [
+-13.791,
+17.699,
+-58.002
+],
+"max": [
+-13.609,
+18.698,
+-57.818
+],
+"top": {
+"h": 18.6943,
+"dx": 0.0559,
+"dz": -0.05598,
+"thick": 1.0031
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b10_001_2",
+"min": [
+-6.021,
+17.699,
+-58.002
+],
+"max": [
+-5.839,
+18.299,
+-57.818
+],
+"top": {
+"h": 18.2928,
+"dx": -0.0559,
+"dz": 0.05599,
+"thick": 0.6019
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b10_001_3",
+"min": [
+-6.021,
+17.699,
+-62.002
+],
+"max": [
+-5.839,
+18.432,
+-61.818
+],
+"top": {
+"h": 18.4266,
+"dx": -0.05594,
+"dz": 0.05601,
+"thick": 0.7356
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b10_001_4",
+"min": [
+-13.791,
+17.699,
+-62.002
+],
+"max": [
+-13.609,
+18.565,
+-61.818
+],
+"top": {
+"h": 18.5603,
+"dx": -0.05594,
+"dz": 0.05601,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b11_001_1",
+"min": [
+-24.21,
+18.938,
+-50.968
+],
+"max": [
+-23.01,
+20.538,
+-49.768
+],
+"top": {
+"h": 20.538,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b12_1",
+"min": [
+-40.05,
+21.58,
+-80.7
+],
+"max": [
+-38.85,
+23.18,
+-79.5
+],
+"top": {
+"h": 23.18,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b12_2",
+"min": [
+21.32,
+21.58,
+-89.83
+],
+"max": [
+22.52,
+23.18,
+-88.63
+],
+"top": {
+"h": 23.18,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b12_1",
+"min": [
+-40.891,
+21.529,
+-78.842
+],
+"max": [
+-40.709,
+22.395,
+-78.658
+],
+"top": {
+"h": 22.3949,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b12_2",
+"min": [
+23.179,
+21.529,
+-78.842
+],
+"max": [
+23.361,
+22.395,
+-78.658
+],
+"top": {
+"h": 22.3903,
+"dx": -0.05594,
+"dz": 0.056,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b12_3",
+"min": [
+23.179,
+21.529,
+-90.672
+],
+"max": [
+23.361,
+22.528,
+-90.488
+],
+"top": {
+"h": 22.5278,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b12_4",
+"min": [
+-40.891,
+21.529,
+-90.672
+],
+"max": [
+-40.709,
+22.395,
+-90.488
+],
+"top": {
+"h": 22.3802,
+"dx": 0.05594,
+"dz": 0.056,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b2_1",
+"min": [
+-28.397,
+23.641,
+42.605
+],
+"max": [
+-27.197,
+25.241,
+43.805
+],
+"top": {
+"h": 25.2413,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b2_2",
+"min": [
+-43.665,
+23.641,
+30.791
+],
+"max": [
+-42.465,
+25.241,
+31.991
+],
+"top": {
+"h": 25.2413,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b21_1",
+"min": [
+-4.703,
+20.423,
+76.406
+],
+"max": [
+-3.503,
+22.023,
+77.606
+],
+"top": {
+"h": 22.0233,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b21_2",
+"min": [
+-21.712,
+20.423,
+83.226
+],
+"max": [
+-20.512,
+22.023,
+84.426
+],
+"top": {
+"h": 22.0233,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b21_1",
+"min": [
+-22.553,
+20.372,
+85.083
+],
+"max": [
+-22.372,
+21.238,
+85.268
+],
+"top": {
+"h": 21.2383,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b21_2",
+"min": [
+-2.844,
+20.372,
+85.083
+],
+"max": [
+-2.663,
+21.238,
+85.268
+],
+"top": {
+"h": 21.2337,
+"dx": -0.05594,
+"dz": 0.056,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b21_3",
+"min": [
+-2.844,
+20.372,
+75.563
+],
+"max": [
+-2.663,
+21.371,
+75.748
+],
+"top": {
+"h": 21.3712,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b21_4",
+"min": [
+-22.553,
+20.372,
+75.563
+],
+"max": [
+-22.372,
+21.238,
+75.748
+],
+"top": {
+"h": 21.2235,
+"dx": 0.05594,
+"dz": 0.056,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b22_1",
+"min": [
+-3.89,
+20.65,
+-18.88
+],
+"max": [
+-2.69,
+22.25,
+-17.68
+],
+"top": {
+"h": 22.25,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b23_1",
+"min": [
+17.838,
+13.286,
+61.077
+],
+"max": [
+19.038,
+14.886,
+62.277
+],
+"top": {
+"h": 14.8861,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b23_1",
+"min": [
+16.998,
+13.235,
+62.935
+],
+"max": [
+17.179,
+14.234,
+63.12
+],
+"top": {
+"h": 14.234,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b23_4",
+"min": [
+16.998,
+13.235,
+55.75
+],
+"max": [
+17.179,
+14.234,
+55.935
+],
+"top": {
+"h": 14.234,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b23_001_1",
+"min": [
+21.492,
+13.286,
+44.205
+],
+"max": [
+22.692,
+14.886,
+45.405
+],
+"top": {
+"h": 14.8861,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b24_1",
+"min": [
+23.884,
+20.173,
+59.242
+],
+"max": [
+25.084,
+21.773,
+60.442
+],
+"top": {
+"h": 21.7729,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b24_2",
+"min": [
+9.876,
+20.173,
+84.272
+],
+"max": [
+11.076,
+21.773,
+85.472
+],
+"top": {
+"h": 21.7729,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b24_1",
+"min": [
+9.035,
+20.122,
+86.129
+],
+"max": [
+9.217,
+20.988,
+86.314
+],
+"top": {
+"h": 20.9731,
+"dx": 0.05594,
+"dz": 0.056,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b24_2",
+"min": [
+25.743,
+20.122,
+86.129
+],
+"max": [
+25.925,
+20.988,
+86.314
+],
+"top": {
+"h": 20.9731,
+"dx": 0.05594,
+"dz": 0.056,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b24_3",
+"min": [
+25.743,
+20.122,
+58.4
+],
+"max": [
+25.925,
+21.121,
+58.585
+],
+"top": {
+"h": 21.1208,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b24_4",
+"min": [
+9.035,
+20.122,
+58.4
+],
+"max": [
+9.217,
+21.121,
+58.585
+],
+"top": {
+"h": 21.1068,
+"dx": 0.0559,
+"dz": 0.05598,
+"thick": 1.0031
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b24_001_1",
+"min": [
+-4.34,
+19.278,
+86.33
+],
+"max": [
+-3.14,
+20.878,
+87.53
+],
+"top": {
+"h": 20.8781,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b25_001_1",
+"min": [
+12.334,
+17.679,
+-20.82
+],
+"max": [
+13.534,
+19.279,
+-19.62
+],
+"top": {
+"h": 19.2792,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b25_001_1",
+"min": [
+11.493,
+17.628,
+-18.962
+],
+"max": [
+11.674,
+18.494,
+-18.777
+],
+"top": {
+"h": 18.4793,
+"dx": 0.05594,
+"dz": 0.05601,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b25_001_2",
+"min": [
+20.501,
+17.628,
+-18.962
+],
+"max": [
+20.683,
+18.627,
+-18.777
+],
+"top": {
+"h": 18.627,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b25_001_3",
+"min": [
+20.501,
+17.628,
+-22.721
+],
+"max": [
+20.683,
+18.627,
+-22.536
+],
+"top": {
+"h": 18.6131,
+"dx": 0.0559,
+"dz": 0.05598,
+"thick": 1.0031
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b25_001_4",
+"min": [
+11.493,
+17.628,
+-22.721
+],
+"max": [
+11.674,
+18.494,
+-22.536
+],
+"top": {
+"h": 18.4897,
+"dx": 0.05594,
+"dz": -0.05601,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b32_011_1",
+"min": [
+23.522,
+19.354,
+-93.102
+],
+"max": [
+24.722,
+20.954,
+-91.902
+],
+"top": {
+"h": 20.9544,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b36_1",
+"min": [
+-45.352,
+21.0,
+-53.358
+],
+"max": [
+-44.152,
+22.6,
+-52.158
+],
+"top": {
+"h": 22.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b36_1",
+"min": [
+-49.437,
+20.949,
+-34.961
+],
+"max": [
+-49.255,
+21.948,
+-34.776
+],
+"top": {
+"h": 21.9339,
+"dx": 0.0559,
+"dz": 0.05598,
+"thick": 1.0031
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b36_2",
+"min": [
+-43.493,
+20.949,
+-34.961
+],
+"max": [
+-43.311,
+21.948,
+-34.776
+],
+"top": {
+"h": 21.9544,
+"dx": -0.0559,
+"dz": -0.05598,
+"thick": 1.0031
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b36_3",
+"min": [
+-43.493,
+20.949,
+-54.2
+],
+"max": [
+-43.311,
+21.948,
+-54.015
+],
+"top": {
+"h": 21.9544,
+"dx": -0.0559,
+"dz": -0.05598,
+"thick": 1.0031
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b36_4",
+"min": [
+-49.437,
+20.949,
+-54.2
+],
+"max": [
+-49.255,
+21.948,
+-54.015
+],
+"top": {
+"h": 21.9544,
+"dx": -0.0559,
+"dz": -0.05598,
+"thick": 1.0031
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b36_002_1",
+"min": [
+-39.325,
+21.0,
+-77.585
+],
+"max": [
+-38.125,
+22.6,
+-76.385
+],
+"top": {
+"h": 22.6,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b5_1",
+"min": [
+-34.615,
+21.584,
+0.646
+],
+"max": [
+-33.415,
+23.184,
+1.846
+],
+"top": {
+"h": 23.1845,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b5_2",
+"min": [
+-20.846,
+21.584,
+-12.375
+],
+"max": [
+-19.646,
+23.184,
+-11.175
+],
+"top": {
+"h": 23.1845,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "vis_rebar_b5_1",
+"min": [
+-35.455,
+21.534,
+2.503
+],
+"max": [
+-35.274,
+22.532,
+2.688
+],
+"top": {
+"h": 22.5323,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b5_2",
+"min": [
+-18.987,
+21.534,
+2.503
+],
+"max": [
+-18.806,
+22.399,
+2.688
+],
+"top": {
+"h": 22.3847,
+"dx": 0.05594,
+"dz": 0.05601,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b5_3",
+"min": [
+-18.987,
+21.534,
+-13.218
+],
+"max": [
+-18.806,
+22.399,
+-13.033
+],
+"top": {
+"h": 22.3846,
+"dx": 0.05594,
+"dz": 0.05601,
+"thick": 0.8694
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "vis_rebar_b5_4",
+"min": [
+-35.455,
+21.534,
+-13.218
+],
+"max": [
+-35.274,
+22.532,
+-13.033
+],
+"top": {
+"h": 22.5323,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": false,
+"bullet": false,
+"eye": true,
+"camera": false,
+"thrown": false
+}
+},
+{
+"name": "metal_watertank_b6_001_1",
+"min": [
+-19.665,
+19.131,
+-20.893
+],
+"max": [
+-18.465,
+20.731,
+-19.693
+],
+"top": {
+"h": 20.7308,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
+},
+{
+"name": "metal_watertank_b6_001_2",
+"min": [
+-37.968,
+19.131,
+-31.802
+],
+"max": [
+-36.768,
+20.731,
+-30.602
+],
+"top": {
+"h": 20.7308,
+"dx": 0.0,
+"dz": 0.0
+},
+"flags": {
+"draw": true,
+"player": true,
+"bullet": true,
+"eye": true,
+"camera": true,
+"thrown": true
+}
 }
 ],
 "ladders": [
