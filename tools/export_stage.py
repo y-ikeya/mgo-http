@@ -2161,6 +2161,22 @@ def bake_hsv_nodes():
                     continue
                 src = node.inputs['Color'].links
                 dst = [l for l in node.outputs['Color'].links if l.to_socket.name == 'Base Color']
+                # 間に「一定の色を掛ける」(Mix の乗算) が 1 つあってもよい。白っぽい絵に色を乗せる時に
+                # 使う — 色相を回しても灰色には色が乗らないので、彩度を抜いてから土色を掛ける
+                # (CC の煉瓦、2026-11-13 本人「レンガの色を土色に近づけて」)
+                tint = None
+                if not dst:
+                    for l in node.outputs['Color'].links:
+                        mix = l.to_node
+                        if (mix.type == 'MIX' and mix.data_type == 'RGBA' and mix.blend_type == 'MULTIPLY'
+                                and l.to_socket == mix.inputs[6] and not mix.inputs[7].is_linked
+                                and not mix.inputs['Factor'].is_linked):
+                            out_links = [m for m in mix.outputs[2].links if m.to_socket.name == 'Base Color']
+                            if out_links:
+                                dst = out_links
+                                tint = (np.array(mix.inputs[7].default_value[:3], dtype=np.float32),
+                                        mix.inputs['Factor'].default_value)
+                                break
                 if not src or not dst or src[0].from_node.type != 'TEX_IMAGE' or node.inputs['Factor'].is_linked:
                     continue
                 tex = src[0].from_node
@@ -2178,6 +2194,9 @@ def bake_hsv_nodes():
                 lin = _srgb_to_linear(px[:, :3])
                 out = _apply_hsv(lin, hue, sat, val)
                 out = lin + (out - lin) * fac
+                if tint is not None:
+                    color, tfac = tint
+                    out = out + (out * color - out) * tfac
                 px[:, :3] = np.clip(_linear_to_srgb(out), 0, 1)
                 # 写しは新しく作る (image.copy() は縮める前の大きさで読み直してしまう)
                 copy = bpy.data.images.new(image.name + '_hsv', w, h, alpha=True)
@@ -2187,9 +2206,11 @@ def bake_hsv_nodes():
                 copy.pack()
                 tex.image = copy
                 tree.links.new(tex.outputs['Color'], dst[0].to_socket)
-                baked.append((mat.name, image.name, round(hue, 3), round(sat, 3), round(val, 3)))
+                baked.append((mat.name, image.name, round(hue, 3), round(sat, 3), round(val, 3),
+                              None if tint is None else [round(float(c), 3) for c in tint[0]]))
     for row in baked:
-        print(f'  色相・彩度・明度を絵に焼き込んだ: {row[0]} ({row[1]}) H {row[2]} S {row[3]} V {row[4]}')
+        extra = f' × {row[5]} (線形)' if row[5] else ''
+        print(f'  色相・彩度・明度を絵に焼き込んだ: {row[0]} ({row[1]}) H {row[2]} S {row[3]} V {row[4]}{extra}')
 
 
 bake_hsv_nodes()
