@@ -82,7 +82,7 @@ w('| | 数 | 説明 |')
 w('|---|---|---|')
 for (const id of SUPPORTS) {
   const s = SUPPORT_SPECS[id]
-  w(`| ${s.label} | ${s.count} | ${s.hint} |`)
+  w(`| ${s.label} | ${s.count} | ${s.hint.ja} |`)
 }
 w()
 w('### 手榴弾の爆風')
