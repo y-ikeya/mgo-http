@@ -81,7 +81,8 @@ interface SupportSpec {
   label: string
   /** 1 つの命で持てる数 */
   count: number
-  hint: string
+  /** 一言の説明。画面の言語で引く (src/i18n.ts の lang) */
+  hint: { ja: string; en: string }
 }
 
 export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
@@ -94,13 +95,13 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
     id: 'locator',
     label: 'E.LOCATOR',
     count: 3,
-    hint: '投げた所の周りに居る敵が光る。**壁を抜ける**',
+    hint: { ja: '投げた所の周りに居る敵が光る。**壁を抜ける**', en: 'Enemies near where it lands glow. **Works through walls**' },
   },
   grenade: {
     id: 'grenade',
     label: 'GRENADE',
     count: 3,
-    hint: '爆風で削って転ばせる',
+    hint: { ja: '爆風で削って転ばせる', en: 'The blast damages and knocks enemies down' },
   },
   claymore: {
     id: 'claymore',
@@ -108,7 +109,7 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
     // 置きっぱなしで効き続けるが、**場に出せる数は別に上限がある**
     // (domain/item/held.ts の PLACED_LIMIT)。持てる数はそこで抑えなくてよい
     count: 3,
-    hint: '置いて離れる。前を通った敵で起爆',
+    hint: { ja: '置いて離れる。前を通った敵で起爆', en: 'Place it and walk away. Detonates when an enemy passes in front' },
   },
   /*
    * **撃たせる道具。** 三者で効く相手が割れる:
@@ -125,7 +126,7 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
     // クレイモアと同じ数。場に出せる数の上限も同じ (PLACED_LIMIT)
     count: 3,
     // 装備画面はそのまま出す。**強調の記法は効かない** (他の 2 つも素の文)
-    hint: '自分そっくりの人形。撃った相手の位置が漏れる',
+    hint: { ja: '自分そっくりの人形。撃った相手の位置が漏れる', en: 'A dummy that looks like you. Whoever shoots it gives away their position' },
   },
   /*
    * 猫の置物。**近づいた敵を釘付けにする** (domain/item/doll.ts)。半径 1.5m に入った敵は
@@ -135,7 +136,7 @@ export const SUPPORT_SPECS: Record<SupportId, SupportSpec> = {
     id: 'doll',
     label: 'DOLL',
     count: 3,
-    hint: '置いた猫の傍に来た敵が釘付けになる。撃てば壊れる',
+    hint: { ja: '置いた猫の傍に来た敵が釘付けになる。撃てば壊れる', en: 'Enemies that come near the cat are stuck petting it. Shoot it to break it' },
   },
 }
 

@@ -53,7 +53,8 @@ export const SKILL_BUDGET = 4
 interface SkillSpec {
   id: SkillId
   label: string
-  hint: string
+  /** 一言の説明 (スキルの一覧で指した時に出る)。画面の言語で引く (src/i18n.ts の lang) */
+  hint: { ja: string; en: string }
   /**
    * 取れる段の数。**段がそのまま値段なので、これがそのまま上限の値段**。
    *
@@ -72,49 +73,49 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   runner: {
     id: 'runner',
     label: 'FAST MOVE',
-    hint: '走るのが速くなる。**持っている物の重さと掛け合わさる**',
+    hint: { ja: '走るのが速くなる。**持っている物の重さと掛け合わさる**', en: 'Run faster. **Multiplies with the weight of what you carry**' },
     levels: 3,
   },
   boxMove: {
     id: 'boxMove',
     label: 'CBOX MOVE',
-    hint: 'ダンボールを被ったまま動ける。**頭の高さは下がったまま**',
+    hint: { ja: 'ダンボールを被ったまま動ける。**頭の高さは下がったまま**', en: 'Move while wearing the cardboard box. **Your head stays low**' },
     levels: 3,
   },
   smgMastery: {
     id: 'smgMastery',
     label: 'SMG MASTERY',
-    hint: 'P90 の散布が締まり、装填が速い',
+    hint: { ja: 'P90 の散布が締まり、装填が速い', en: 'Tighter P90 spread and faster reloads' },
     levels: 3,
   },
   rifleMastery: {
     id: 'rifleMastery',
     label: 'AR MASTERY',
-    hint: 'AK47 の散布が締まり、装填が速い',
+    hint: { ja: 'AK47 の散布が締まり、装填が速い', en: 'Tighter AK47 spread and faster reloads' },
     levels: 3,
   },
   sniperMastery: {
     id: 'sniperMastery',
     label: 'SNIPER MASTERY',
-    hint: 'XM2010 の散布が締まり、装填が速い',
+    hint: { ja: 'XM2010 の散布が締まり、装填が速い', en: 'Tighter XM2010 spread and faster reloads' },
     levels: 3,
   },
   shotgunMastery: {
     id: 'shotgunMastery',
     label: 'SG MASTERY',
-    hint: 'M870 の**ポンプと装填が速い**。粒の散りは変わらない',
+    hint: { ja: 'M870 の**ポンプと装填が速い**。粒の散りは変わらない', en: '**Faster M870 pumping and reloads**. Pellet spread is unchanged' },
     levels: 3,
   },
   pistolMastery: {
     id: 'pistolMastery',
     label: 'HANDGUN MASTERY',
-    hint: 'M9 の散布が締まり、装填が速い。**拳銃は全員が持っている**',
+    hint: { ja: 'M9 の散布が締まり、装填が速い。**拳銃は全員が持っている**', en: 'Tighter M9 spread and faster reloads. **Everyone carries a pistol**' },
     levels: 3,
   },
   throwing: {
     id: 'throwing',
     label: 'THROWING MASTERY',
-    hint: '遠くへ投げられる。**投げた手榴弾が相手の AWARENESS に映らない**',
+    hint: { ja: '遠くへ投げられる。**投げた手榴弾が相手の AWARENESS に映らない**', en: 'Throw farther. **Your grenades don\'t show on enemy AWARENESS**' },
     /*
      * **段が無い。取るか取らないかだけ** (ENEMY EXPOSURE と同じ扱い)。
      *
@@ -126,7 +127,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   exposure: {
     id: 'exposure',
     label: 'ENEMY EXPOSURE',
-    hint: '当てた相手が 5 秒光る。**倒さなくても情報になる**',
+    hint: { ja: '当てた相手が 5 秒光る。**倒さなくても情報になる**', en: 'Enemies you hit glow for 5 seconds. **Intel even without the kill**' },
     /*
      * **段が無い。取るか取らないかだけ。**
      *
@@ -138,7 +139,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   targetAlert: {
     id: 'targetAlert',
     label: 'TARGET ALERT',
-    hint: '自分を攻撃してきた相手の気配が分かる。**段が上がるほど、早い段階で分かる**',
+    hint: { ja: '自分を攻撃してきた相手の気配が分かる。**段が上がるほど、早い段階で分かる**', en: 'Sense enemies attacking you. **Higher levels warn you earlier**' },
     /*
      * **段に意味がある。** 値段が変わるだけでなく、気配が出る**条件**が段で緩む
      * (alertTriggeredBy)。Lv1 は当てられてから、Lv3 は狙われた時点で分かる。
@@ -148,7 +149,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   awareness: {
     id: 'awareness',
     label: 'AWARENESS',
-    hint: '近くに置かれた敵の物 (クレイモア / DECOY / E LOCATOR / 手榴弾) の気配が壁越しに分かる',
+    hint: { ja: '近くに置かれた敵の物 (クレイモア / DECOY / E LOCATOR / 手榴弾) の気配が壁越しに分かる', en: 'Sense nearby enemy devices (claymore / DECOY / E LOCATOR / grenade) through walls' },
     /*
      * **段が無い。** 本家は段で届く距離が伸びた (8 / 15 / 20.5m) が、
      * 値段が 1 のままなら上の段しか選ばれない (EE と同じ理由)。距離を 1 つに決める。
@@ -158,7 +159,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   trapMastery: {
     id: 'trapMastery',
     label: 'TRAP MASTERY',
-    hint: '置くのが速い。**置いた物 (クレイモア / DECOY / E LOCATOR) が相手の AWARENESS に映らない**',
+    hint: { ja: '置くのが速い。**置いた物 (クレイモア / DECOY / E LOCATOR) が相手の AWARENESS に映らない**', en: 'Place devices faster. **Your devices (claymore / DECOY / E LOCATOR) don\'t show on enemy AWARENESS**' },
     /*
      * **段が無い。** 速さに段を付けても、映らなくなる方は on/off なので、上の段しか
      * 選ばれない (EE・AWARENESS と同じ理由)。
@@ -171,7 +172,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   knifeMastery: {
     id: 'knifeMastery',
     label: 'KNIFE MASTERY',
-    hint: '刺すのが速い。**スタンナイフの充電が早く満ちる** (素 20 秒 → Lv3 10 秒)',
+    hint: { ja: '刺すのが速い。**スタンナイフの充電が早く満ちる** (素 20 秒 → Lv3 10 秒)', en: 'Stab faster. **The stun knife charges faster** (20 s base → 10 s at Lv3)' },
     /*
      * **段に意味がある。** 速さも充電も段で伸びる (銃の mastery と同じ 3 段)。
      * ナイフは全員が持っているので、主武器を選ばなくても 1 枠で寄せられる
@@ -181,7 +182,7 @@ export const SKILLS: Record<SkillId, SkillSpec> = {
   quickRecovery: {
     id: 'quickRecovery',
     label: 'QUICK RECOVERY',
-    hint: '眠らされても早く起きる。**眠っている人を叩いて起こすのが強い** (Lv3 なら 1 回で起こせる)',
+    hint: { ja: '眠らされても早く起きる。**眠っている人を叩いて起こすのが強い** (Lv3 なら 1 回で起こせる)', en: 'Wake up sooner when put to sleep. **Better at waking sleepers by patting them** (one pat at Lv3)' },
     /*
      * **段に意味がある。** 本人 2026-10-19「QuickRecovery っていうスキル、1〜3 まであって、3 だと
      * 一回で他の人を起こせるし、自分の stun の回復も早い」。自分の眠りが短くなり、叩いて縮める

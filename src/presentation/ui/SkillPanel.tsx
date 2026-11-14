@@ -1,4 +1,5 @@
 import { For } from 'solid-js'
+import { lang } from '../../i18n'
 import { SKILLS, SKILL_BUDGET, costOf, type SkillId, type Skills } from '../../domain/player/skill'
 import './SkillPanel.css'
 
@@ -60,7 +61,7 @@ export function SkillList(props: {
                       返してから**考えるので、Lv2 から Lv3 は差額 1 で足りる。
                     */
                     disabled={!props.open || spent() - level() + n > SKILL_BUDGET}
-                    title={spec.hint}
+                    title={spec.hint[lang]}
                     onClick={() => props.onSkill(spec.id, level() === n ? 0 : n)}
                   >
                     {spec.levels === 1 ? '' : n}

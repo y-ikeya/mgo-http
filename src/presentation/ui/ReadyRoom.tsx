@@ -6,7 +6,7 @@ import type { WeaponKind } from '../scene/arms/weapon'
 import { SKILLS, SKILL_BUDGET, costOf, type SkillId, type Skills } from '../../domain/player/skill'
 import { skillDetail } from '../../domain/player/skillDetail'
 import type { MatchMessage } from '../../application/protocol/types'
-import { t } from '../../i18n'
+import { t, lang } from '../../i18n'
 import { SkillList } from './SkillPanel'
 import './Loadout.css'
 import './ReadyRoom.css'
@@ -62,7 +62,7 @@ export default function ReadyRoom(props: {
     if (focus in SKILLS) return focus as SkillId
     return hovered() ?? (Object.keys(SKILLS)[0] as SkillId)
   })
-  const detail = createMemo(() => skillDetail(shown()))
+  const detail = createMemo(() => skillDetail(shown(), lang))
   const level = () => props.skills[shown()] ?? 0
 
   /*
@@ -94,7 +94,7 @@ export default function ReadyRoom(props: {
       <div class="readyroom-side">
         <header class="loadout-head">
           <span class="loadout-title">STAND BY</span>
-          <span class="loadout-note">開始まで 残り {props.left} 秒</span>
+          <span class="loadout-note">{t('readyroom.left', { left: props.left })}</span>
           <button class="readyroom-rules" onClick={() => props.onRules()}>
             RULES
           </button>
@@ -105,7 +105,7 @@ export default function ReadyRoom(props: {
             <div class="readyroom-budget" classList={{ 'loadout-budget-full': costOf(props.skills) >= SKILL_BUDGET }}>
               SKILL {costOf(props.skills)} / {SKILL_BUDGET}
               <Show when={!props.skillsOpen}>
-                <span class="readyroom-locked">READY 中は変えられない (取り消すと直せる)</span>
+                <span class="readyroom-locked">{t('readyroom.locked')}</span>
               </Show>
             </div>
             <SkillList
@@ -148,7 +148,7 @@ export default function ReadyRoom(props: {
               </tbody>
             </table>
             <For each={detail().notes}>{(note) => <div class="readyroom-note">・{note}</div>}</For>
-            <div class="readyroom-cost">1 段ごとに {SKILL_BUDGET} のうち 1 を使う</div>
+            <div class="readyroom-cost">{t('readyroom.cost', { budget: SKILL_BUDGET })}</div>
           </div>
         </div>
 
@@ -187,7 +187,7 @@ export default function ReadyRoom(props: {
               if (readyAtDown && ready()) props.onReady(false)
             }}
           >
-            {ready() ? 'READY を取り消す' : 'READY (長押し)'}
+            {ready() ? t('readyroom.cancel') : t('readyroom.hold')}
             <span class="loadout-key loadout-key-wide">Enter / ×</span>
           </button>
         </footer>
