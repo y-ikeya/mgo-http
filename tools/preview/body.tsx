@@ -16,6 +16,7 @@
  *     ?sky=0.4                屋内の暗さ (空の見え方 SKY_FLOOR〜1) を体に掛ける
  *     ?trace                  0.1 秒ごとに銃身と両手の向きを書き出す (コンソールの [trace])
  *     ?death=front|back|none  clip の姿勢で 1 秒置いてから倒す (front = 正面から撃たれた)。t は倒してから
+ *     ?sleep                  clip の姿勢で 1 秒置いてから眠らせる (麻酔)。clip=sweep なら仰向けに倒してから。t は眠らせてから
  *     ?throw                  手榴弾の振りかぶりを頭から流す (t 秒目で止める)
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
@@ -262,6 +263,17 @@ if (death) {
   }
   anim.playDeath(death === 'front' ? false : death === 'back' ? true : undefined)
 }
+// ?sleep … 姿勢を 1 秒落ち着かせてから眠らせる。本番と同じく playSleep を通し、その後は姿勢 sleep を渡し続ける。
+// clip=sweep なら爆風で仰向けに倒してから (仰向けのまま眠る)
+const sleep = query.has('sleep')
+if (sleep) {
+  if (clipName === 'sweep') anim.playSweep()
+  for (let i = 0; i < 60; i++) {
+    if (clipName !== 'sweep') anim.setLocomotion(clipName as never)
+    anim.update(1 / 60)
+  }
+  anim.playSleep()
+}
 const zapHand = findBoneBySuffix(model, 'RightHand')
 if (zap && zapHand) zap.discharge((out) => out.setFromMatrixPosition(zapHand.matrixWorld))
 /*
@@ -292,7 +304,7 @@ for (let t = 0; t < stopAt; t += 1 / 60) {
     )
   }
   // 流した型を姿勢で上書きしない (roll / stab は型が姿勢を持っている)
-  if (!oneShot && !query.has('stab')) anim.setLocomotion(clipName as never)
+  if (!oneShot && !query.has('stab')) anim.setLocomotion((sleep ? 'sleep' : clipName) as never)
   // 置く型は本番と同じく、姿勢を setupLocomotion から引く (soldier.ts の setting)
   if (query.has('setup') || query.has('place')) anim.setLocomotion((anim.setupLocomotion ?? clipName) as never)
   anim.setFiring(firing)

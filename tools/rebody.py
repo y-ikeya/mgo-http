@@ -163,6 +163,10 @@ Armature の scale。宿主と違う値が入っていると、その比のぶ�
 宿主と同じ値にする。**回転は焼かない** — scale だけ。
 """
 arm.scale = [HOST_HIPS / before] * 3
+# 形を共有している物 (左右の目玉は同じ球を使い回す) は、適用できない ("multi user") ので先に切り離す
+for o in meshes:
+    if o.data.users > 1:
+        o.data = o.data.copy()
 bpy.ops.object.select_all(action='DESELECT')
 for o in [arm] + meshes:
     o.select_set(True)

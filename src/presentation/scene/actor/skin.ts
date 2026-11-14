@@ -52,6 +52,11 @@ const SKINS: Record<string, string> = {
    * 頭と首の重みは Blender で塗ってあるので rebody は --nohead で通す。
    * 体が宿主より大きく (頭 1.572m)、fit_height で 0.85 倍に縮めた。**持ち上げずに型の腰の上下を
    * 1.15 倍にする (--hips)** — 持ち上げは型によらず一定なので、伏せると 12cm 浮いた
+   *
+   * 目は 2026-11-14 に作り直した: Tripo の頭の目をくり抜き、球の目玉 (tools/raw/eyeball.blend、
+   * eye_L / eye_R、Head の骨に重み 1) を入れ、右の目頭の肉を左から写して頭に結合した。頭の色の絵は
+   * 下まつ毛のギザギザを塗り直した写し (tools/raw/bald_woman_tex/)。瞬きは頭のシェイプキー Blink
+   * (本人が作った。動かすのは animation.ts の updateBlink)
    */
   nanashi: 'soldier_nanashi',
   /*
@@ -59,6 +64,8 @@ const SKINS: Record<string, string> = {
    * 作って手を入れる)。作り直しはここから。Raiden と同じ道 (rebody --nohead → merge_all_clips (soldier.glb から)
    * → fit_height --hips → dedup → pack、頭 1.4609m)。
    * **rebody は --nohead で通す** — T ポーズの腕が「顎から上」に入って頭の骨へ寄せられ、腕が翼のように伸びた
+   * 瞬きは体とまつ毛 (MocapGuy_BrowsLashes) のシェイプキー Blink (2026-11-14)。まつ毛にも同じ名前で無いと、
+   * まぶただけ閉じてまつ毛が浮いて残る
    */
   kome27: 'soldier_kome',
 }
