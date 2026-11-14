@@ -1048,8 +1048,8 @@ const nanashi = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAs
  * 向きと手応えは目で見るしかないので、ここで押さえるのは
  * **暴れないこと**と**無い体で何も起きないこと**の 2 つ。
  */
-/** animation.ts の BUST_MAX (0.30) を 2 軸ぶん見込んだ上限 */
-const BUST_MAX_TEST = 0.45
+/** animation.ts の BUST_MAX (0.5) を 2 軸ぶん見込んだ上限 */
+const BUST_MAX_TEST = 0.75
 
 describe('胸の揺れ', () => {
   function shake(
@@ -1154,6 +1154,140 @@ describe('胸の揺れ', () => {
     // 止めれば落ち着く。**同じ所へ戻る**
     shake(anim, root, 2.5, 0, 'idle')
     expect(calm.angleTo(bone.quaternion)).toBeLessThan(0.05)
+  })
+
+  /** **名無しは瞬きする。** 形 (シェイプキー Blink) は体の側、効き具合は CharacterAnimator が動かす */
+  test('名無しは瞬きする', () => {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    let head: THREE.Mesh | null = null
+    root.traverse((o) => {
+      if (!head && (o as THREE.Mesh).morphTargetDictionary?.Blink !== undefined) head = o as THREE.Mesh
+    })
+    expect(head).not.toBeNull()
+    const mesh = head as unknown as THREE.Mesh
+    const index = mesh.morphTargetDictionary!.Blink
+    // 間隔は 2〜6 秒。7 秒回せば少なくとも 1 度は閉じ切る
+    let peak = 0
+    for (let i = 0; i < 7 * 60; i++) {
+      anim.update(1 / 60)
+      peak = Math.max(peak, mesh.morphTargetInfluences![index])
+    }
+    expect(peak).toBeGreaterThan(0.9)
+  })
+
+  /** **眠らされている間は目を閉じたまま。** 起きれば開く */
+  test('眠っている間は目を閉じたまま', () => {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    let head: THREE.Mesh | null = null
+    root.traverse((o) => {
+      if (!head && (o as THREE.Mesh).morphTargetDictionary?.Blink !== undefined) head = o as THREE.Mesh
+    })
+    const mesh = head as unknown as THREE.Mesh
+    const index = mesh.morphTargetDictionary!.Blink
+    anim.playSleep()
+    let low = 1
+    for (let i = 0; i < 60; i++) anim.update(1 / 60)
+    for (let i = 0; i < 5 * 60; i++) {
+      anim.update(1 / 60)
+      low = Math.min(low, mesh.morphTargetInfluences![index])
+    }
+    expect(low).toBeGreaterThan(0.99)
+  })
+
+  /** 仰向けに倒れた体の腰の高さ。眠らせても殺しても、立ち上がらずにここに留まる */
+  function supineAfter(act: (anim: CharacterAnimator) => void): { before: number; after: number; blink: number; dead: boolean } {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    let hips: THREE.Object3D | null = null
+    let head: THREE.Mesh | null = null
+    root.traverse((o) => {
+      if (!hips && o.name.endsWith('Hips')) hips = o
+      if (!head && (o as THREE.Mesh).morphTargetDictionary?.Blink !== undefined) head = o as THREE.Mesh
+    })
+    const y = () => (hips as unknown as THREE.Object3D).getWorldPosition(new THREE.Vector3()).y
+    anim.playSweep()
+    for (let i = 0; i < 3 * 60; i++) anim.update(1 / 60)
+    root.updateMatrixWorld(true)
+    const before = y()
+    act(anim)
+    for (let i = 0; i < 3 * 60; i++) anim.update(1 / 60)
+    root.updateMatrixWorld(true)
+    const mesh = head as unknown as THREE.Mesh
+    return { before, after: y(), blink: mesh.morphTargetInfluences![mesh.morphTargetDictionary!.Blink], dead: anim.dead }
+  }
+
+  /** **仰向けに倒れた所で眠らされたら、仰向けのまま眠る** (立ち上がってから崩れない) */
+  test('仰向けのまま眠る', () => {
+    const r = supineAfter((anim) => {
+      anim.playSleep()
+      anim.setLocomotion('sleep')
+    })
+    expect(Math.abs(r.after - r.before)).toBeLessThan(0.05)
+    expect(r.blink).toBeGreaterThan(0.99)
+  })
+
+  /**
+   * **CQC で投げられて仰向けのまま眠っている間、カメラを上下に振っても上半身は起きない。**
+   * 照準の曲げが「眠っている」を姿勢の名前だけで見ていて、cqc_thrown のまま眠る体に乗っていた
+   */
+  test('投げられて眠っている間は上半身が起きない', () => {
+    const headY = (pitch: number) => {
+      const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+      const root = (anim as unknown as { root: THREE.Object3D }).root
+      let head: THREE.Object3D | null = null
+      root.traverse((o) => {
+        if (!head && o.name.endsWith('Head')) head = o
+      })
+      anim.playThrown()
+      for (let i = 0; i < 90; i++) {
+        anim.setLocomotion('cqc_thrown')
+        anim.update(1 / 60)
+      }
+      anim.playSleep()
+      for (let i = 0; i < 120; i++) {
+        anim.setLocomotion('sleep')
+        anim.setAimPitch(pitch)
+        anim.update(1 / 60)
+      }
+      root.updateMatrixWorld(true)
+      return (head as unknown as THREE.Object3D).getWorldPosition(new THREE.Vector3()).y
+    }
+    expect(Math.abs(headY(1.2) - headY(0))).toBeLessThan(0.02)
+  })
+
+  /** **眠っている・死んでいる体は、カメラを回しても首を振らない** */
+  test('眠り・死の間は首を振らない', () => {
+    const headTurn = (enter: (anim: CharacterAnimator) => void, yaw: number) => {
+      const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+      const root = (anim as unknown as { root: THREE.Object3D }).root
+      let head: THREE.Object3D | null = null
+      root.traverse((o) => {
+        if (!head && o.name.endsWith('Head')) head = o
+      })
+      for (let i = 0; i < 30; i++) anim.update(1 / 60)
+      enter(anim)
+      for (let i = 0; i < 120; i++) {
+        anim.setLookYaw(yaw)
+        anim.update(1 / 60)
+      }
+      root.updateMatrixWorld(true)
+      return (head as unknown as THREE.Object3D).getWorldQuaternion(new THREE.Quaternion())
+    }
+    for (const enter of [(a: CharacterAnimator) => a.playSleep(), (a: CharacterAnimator) => a.playDeath()]) {
+      expect(headTurn(enter, 1.2).angleTo(headTurn(enter, 0))).toBeLessThan(0.02)
+    }
+  })
+
+  /** **仰向けに倒れた所で殺されたら、仰向けのまま死ぬ** (2 通目の向き付きも同じ) */
+  test('仰向けのまま死ぬ', () => {
+    const r = supineAfter((anim) => {
+      anim.playDeath()
+      anim.playDeath(true)
+    })
+    expect(r.dead).toBe(true)
+    expect(Math.abs(r.after - r.before)).toBeLessThan(0.05)
   })
 
   /** **上限を超えない。** 超えると体を突き抜ける */

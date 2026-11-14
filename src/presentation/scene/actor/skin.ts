@@ -45,18 +45,27 @@ const SKINS: Record<string, string> = {
   /*
    * nanashi。Mixamo の Kachujin の体に、Tripo の頭を付け替えたもの (2026-11-10、
    * 元は tools/raw/bald_woman.blend、書き出しに使った写しは nanashi_kachujin.blend)。
-   * Raiden と同じ道 (rebody --nohead --bust → merge_all_clips → fit_height --hips → dedup → pack)。
+   * Raiden と同じ道 (rebody --nohead --bust --legs 0.916 → merge_all_clips (soldier.glb から) → fit_height --hips → dedup → pack)。
+   * --legs で脚の付け根を寄せて、腰の幅を kome と同じ 0.19m に (肩幅は細身のまま 0.30m)。
+   * 素の姿勢 (T ポーズ) の元は tools/raw/bald_woman.blend。作り直しはここから
    *
-   * **型は前の名無しの glb から移した** (宿主から merge_clip で足した 100 本が揃っている)。
    * 頭と首の重みは Blender で塗ってあるので rebody は --nohead で通す。
    * 体が宿主より大きく (頭 1.572m)、fit_height で 0.85 倍に縮めた。**持ち上げずに型の腰の上下を
    * 1.15 倍にする (--hips)** — 持ち上げは型によらず一定なので、伏せると 12cm 浮いた
+   *
+   * 目は 2026-11-14 に作り直した: Tripo の頭の目をくり抜き、球の目玉 (tools/raw/eyeball.blend、
+   * eye_L / eye_R、Head の骨に重み 1) を入れ、右の目頭の肉を左から写して頭に結合した。頭の色の絵は
+   * 下まつ毛のギザギザを塗り直した写し (tools/raw/bald_woman_tex/)。瞬きは頭のシェイプキー Blink
+   * (本人が作った。動かすのは animation.ts の updateBlink)
    */
   nanashi: 'soldier_nanashi',
   /*
-   * kome27。Mixamo の MocapGuy (本人が落とした T-Pose.fbx → tools/raw/MocapGuy.fbx)。Raiden と同じ道
-   * (rebody → merge_all_clips → fit_height、頭 1.4609m・爪先は宿主と同じ)。
+   * kome27。Mixamo の MocapGuy。素の姿勢 (T ポーズ) の元は tools/raw/mocapMan.blend (本人が MocapGuy.fbx から
+   * 作って手を入れる)。作り直しはここから。Raiden と同じ道 (rebody --nohead → merge_all_clips (soldier.glb から)
+   * → fit_height --hips → dedup → pack、頭 1.4609m)。
    * **rebody は --nohead で通す** — T ポーズの腕が「顎から上」に入って頭の骨へ寄せられ、腕が翼のように伸びた
+   * 瞬きは体とまつ毛 (MocapGuy_BrowsLashes) のシェイプキー Blink (2026-11-14)。まつ毛にも同じ名前で無いと、
+   * まぶただけ閉じてまつ毛が浮いて残る
    */
   kome27: 'soldier_kome',
 }

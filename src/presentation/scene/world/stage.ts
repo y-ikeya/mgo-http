@@ -155,9 +155,15 @@ interface Look {
 }
 /** 夜の雲の明るさ (昼の何倍)。昼の白い雲のままだと夜空に浮いて見えた */
 const NIGHT_CLOUD = 0.12
-const LOOKS: Record<'clear' | 'dusty' | 'night', Look> = {
+const LOOKS: Record<'clear' | 'dusty' | 'dustyWhite' | 'night', Look> = {
   clear: { zenith: 0x3f78c8, horizon: 0xbcd2e4, sun: 0xfff2d8, sunLight: 0xfff4e6, ground: 0x6b6055, fogNear: 55, fogFar: 135 },
   dusty: { zenith: 0x8f9a86, horizon: 0xd3c9a2, sun: 0xf0e0b4, sunLight: 0xf3e3c4, ground: 0x5c4c38, fogNear: 40, fogFar: 115 },
+  /*
+   * CC の空。dusty の天頂と地平を白へ 25% 寄せた (2026-11-13 本人「今までの空を少しだけしろく」
+   * 「青い空はちょっと合わない」)。地平の色は霧と日陰の空の色も兼ねるので、遠くが少し白く霞み、
+   * 日陰もわずかに明るくなる
+   */
+  dustyWhite: { zenith: 0xabb3a4, horizon: 0xded6b9, sun: 0xf0e0b4, sunLight: 0xf3e3c4, ground: 0x5c4c38, fogNear: 40, fogFar: 115 },
   /*
    * 夜 (2026-10-08 本人「雰囲気を変えるくらい、夜っぽく暗く」)。濃紺の空と青白い月明かり。
    * **埃が舞っていないので見通しは昼より良い** (霧が遠い)。暗さは画面の上だけで、
@@ -174,7 +180,7 @@ const LOOKS: Record<'clear' | 'dusty' | 'night', Look> = {
     night: { sunScale: 0.22, ambientScale: 1.7, ambientSky: 0x56688f },
   },
 }
-const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dusty', lab: 'dusty' }
+const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dustyWhite', lab: 'dusty' }
 /**
  * 日陰の明るさ (天空光 AMBIENT_INTENSITY) をステージごとに何倍にするか。無ければ 1。
  *
@@ -189,7 +195,7 @@ const STAGE_AMBIENT: Partial<Record<StageName, number>> = { uu: 3, bb: 3.5 }
 let ambientScale = 1
 /** いまの場の見え方。buildStage が決めて、空・霧・光・映り込みがこれを読む */
 let look: Look = LOOKS.clear
-/** ?look=clear / dusty / night で試せる。試写 (stagecam) は look が視点なので ?mood= で */
+/** ?look=clear / dusty / dustyWhite / night で試せる。試写 (stagecam) は look が視点なので ?mood= で */
 function lookFor(name: StageName): Look {
   const query = new URLSearchParams(location.search)
   const forced = (query.get('mood') ?? query.get('look')) as keyof typeof LOOKS | null

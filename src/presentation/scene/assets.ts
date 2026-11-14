@@ -1,5 +1,6 @@
 import type * as THREE from 'three'
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { DEFAULT_SKIN } from './actor/skin'
 import { shareGltfTextures } from './util/texshare'
@@ -69,14 +70,40 @@ export type RootMotionTrack = { times: Float32Array; values: Float32Array }
  */
 export const rootMotionStore = new WeakMap<THREE.AnimationClip, RootMotionTrack>()
 
+/**
+ * KTX2 の絵 (KHR_texture_basisu) を読む。**GPU が圧縮のまま持てる形に、読む時に変える。**
+ *
+ * WebP / JPEG は GPU に載せる時に 1 画素 4 バイトへ展開される (city で 422MB)。KTX2 は
+ * BC7 / ASTC / ETC2 など、その GPU が読める圧縮の形へ変えて載せるので 4〜8 分の 1 で済む。
+ * 変換器 (public/basis/) は three の examples/jsm/libs/basis/ の写し。three を上げたら写し直す。
+ *
+ * どの形が読めるかは描画器に訊くのが本来だが、描画器は試合・待合・試写でばらばらに
+ * 作られ、glb は描画器より先に読み始める。WebGPU の描画器は**アダプタが持つ機能を全部
+ * 要求して**デバイスを作る (three の WebGPUBackend) ので、アダプタに直接訊いて同じ答えになる。
+ * WebGPU が無い時は何も読めない扱いにして、展開した RGBA に落とす (重いが必ず映る)。
+ */
+let ktx2: Promise<KTX2Loader> | null = null
+function ktx2Loader(): Promise<KTX2Loader> {
+  ktx2 ??= (async () => {
+    const gpu = (navigator as Navigator & { gpu?: GPU }).gpu
+    const adapter = gpu ? await gpu.requestAdapter().catch(() => null) : null
+    const loader = new KTX2Loader().setTranscoderPath(`${import.meta.env.BASE_URL}basis/`)
+    loader.detectSupport({
+      isWebGPURenderer: true,
+      hasFeature: (name: string) => adapter?.features.has(name) ?? false,
+    } as never)
+    return loader
+  })()
+  return ktx2
+}
+
 function load(url: string): Promise<GLTF> {
   let pending = cache.get(url)
   if (!pending) {
     // ステージと兵士の glb は gltfpack で meshopt 圧縮している
     // (ステージは tools/export_stage.py、兵士は tools/convert_character.py)
-    pending = new GLTFLoader()
-      .setMeshoptDecoder(MeshoptDecoder)
-      .loadAsync(url)
+    pending = ktx2Loader()
+      .then((ktx) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setKTX2Loader(ktx).loadAsync(url))
       .then((gltf) => {
         // 絵のずらしごとに複製されたテクスチャを 1 枚にまとめる (util/texshare.ts)。
         // WebGPU は複製ごとに GPU へ載せるので、city では同じ絵が 540MB ぶん重なっていた

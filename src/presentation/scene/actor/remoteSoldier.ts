@@ -17,7 +17,7 @@ import {
   transformedNormalView,
 } from "three/tsl";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { CharacterAnimator, findBoneBySuffix, warnMissingClips } from "./animation";
+import { CharacterAnimator, findBoneBySuffix, SUPINE_LOCOMOTIONS, warnMissingClips } from "./animation";
 import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
@@ -195,6 +195,12 @@ const PLAY_WHOLE_BODY: Record<
  * 位置は「少し過去の状態」を 2 点間で補間して描く。届いた位置をそのまま入れると、
  * 受信した瞬間だけ飛んで、次が来るまで止まる。
  */
+/**
+ * 体の外側に出ない顔の部品 (名無しの eye_L / eye_R、kome の MocapGuy_Eyes / Caruncula / Teeth / BrowsLashes)。
+ * 光の写しを作らない (buildGlow)。体を足した時に部品の名前が違えばここに足す
+ */
+const INNER_PART = /eye|carunc|teeth|lash|brow/i;
+
 export class RemoteSoldier {
   readonly id: string;
   readonly object = new THREE.Group();
@@ -532,11 +538,16 @@ export class RemoteSoldier {
       // 'hang' (待つ姿) もここを通る。落ちる型の上半身を止め絵へ渡すため
       animator.endHang();
     }
-    // CQC で投げられている途中で放された (倒れる型から普段の姿へ)。上半身を戻す
-    if (this.locomotion === "cqc_thrown" && locomotion !== "cqc_thrown" && !isWholeBody(locomotion)) {
+    // CQC で投げられている途中で放された (倒れる型から普段の姿へ)。上半身を戻す。
+    // **眠った (sleep) のは放されたのではない** — 仰向けのまま眠る (animation.ts の SUPINE_LOCOMOTIONS)。
+    // 戻すと上半身の倒れる型が流していない爆風の型へ替わり、上半身だけ T ポーズで起き上がった (2026-11-14 本人)
+    if (this.locomotion === "cqc_thrown" && locomotion !== "cqc_thrown" && locomotion !== "sleep" && !isWholeBody(locomotion)) {
       animator.releaseThrown();
     }
-    if (locomotion !== this.locomotion && isWholeBody(locomotion)) {
+    // 仰向けのまま眠っていた体が起きて、倒れた姿 (cqc_thrown / sweep …) へ戻った。**倒れる型を流し直さない** —
+    // 流すと起きた瞬間にもう一度投げ飛ばされる。体はずっと倒れた型で留まっている
+    const wokeLying = this.locomotion === "sleep" && animator.lyingOnBack && SUPINE_LOCOMOTIONS.has(locomotion);
+    if (locomotion !== this.locomotion && isWholeBody(locomotion) && !wokeLying) {
       PLAY_WHOLE_BODY[locomotion](animator);
       // 型の途中から見えた相手は、その分だけ進めてから流す (届くまでの遅れの分も含む)
       animator.skipAhead(state.locomotionAge);
@@ -907,6 +918,10 @@ export class RemoteSoldier {
     this.bodies.push(...sources);
     this.applyBodyOpacity(true);
     for (const source of sources) {
+      // **顔の中の小さな部品は光らせない。** 光は面の向きで輪郭を描くので、目玉 (球) のような別の形が
+      // 顔の上に丸く浮き出た (2026-11-14 本人「輪郭だけ光って欲しいのに目とかそれぞれの parts が光る」)。
+      // ステルスで消す方 (bodies) には入れたまま — 消える時は目玉も一緒に消えないと浮いて残る
+      if (INNER_PART.test(source.name)) continue
       const material = new MeshBasicNodeMaterial({
         color: ALLY_GLOW_TINT[this.team],
         transparent: true,

@@ -4491,15 +4491,24 @@ export class Game {
          * 出る。下がっている間は銃を下ろす。後ろを押していなければ何も起きない
          */
         this.aimedThisHold = this.player.isAiming;
-        if (this.aimedThisHold) {
+        /*
+         * **しゃがんで止まっている時の長押しは、転がらずにその場で伏せる**
+         * (本人 2026-11-13「chrouchしてる時に左スティックを入力しないで罰長押しした時にproneするようにして」)。
+         * 転がりの出口でしか伏せられなかったので、物陰でしゃがんだまま伏せたい時に前へ飛び出していた。
+         * 移動を入れていれば今まで通り転がる (避ける動作は残す)。伏せられるかは表 (moves.ts) が決める
+         */
+        this.proneThisHold = !this.aimedThisHold && this.player.stance === "crouch" && !this.movingInput();
+        if (this.proneThisHold) {
+          this.player.setProne(true);
+        } else if (this.aimedThisHold) {
           if (this.pushingBack()) this.player.stepBack();
         } else if (!this.cocking) {
           // ボルトを送り終えるまでは転がれない。撃って即座に回避、を塞ぐ
           this.player.roll();
         }
       }
-      // 構えていた押下では伏せない (押したまま転がり切ると伏せる、の対象は転がり)
-      if (this.aimedThisHold) return;
+      // 構えていた押下では伏せない (押したまま転がり切ると伏せる、の対象は転がり)。その場で伏せた押下も、もう伏せている
+      if (this.aimedThisHold || this.proneThisHold) return;
       /*
        * **押したまま転がり切ると、立たずに伏せる。**
        *
@@ -4517,10 +4526,19 @@ export class Game {
     // 離した。次の押下でまた転がれる
     this.rolledThisHold = false;
     this.aimedThisHold = false;
+    this.proneThisHold = false;
   }
 
   /** この押下を構えたまま始めたか。転がらない (下がるか何もしない) ので、押したままでも伏せない */
   private aimedThisHold = false;
+
+  /** この押下でしゃがみからその場で伏せたか。転がっていないので、転がりの出口の伏せ (飛び込み) は通さない */
+  private proneThisHold = false;
+
+  /** 移動を入れているか (左スティック / WASD)。倒し始めの遊びは pushingBack と同じ 0.3 */
+  private movingInput(): boolean {
+    return Math.hypot(this.moveDir.x, this.moveDir.z) >= 0.3;
+  }
 
   /** 体の後ろ側へ移動を入れているか (体の向きから 45° 以内の後ろ) */
   private pushingBack(): boolean {

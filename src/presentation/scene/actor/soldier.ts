@@ -1227,7 +1227,19 @@ export class Soldier {
    * おかしい。倒れるのと違って**起きる**ので、持ち物は失わない。
    */
   sleep(seconds: number, settled = false): void {
-    if (this.down || this.downed) return
+    if (this.down) return
+    /*
+     * **倒れている (仰向け) 所で眠らされたら、そのまま眠る。** 以前はここで黙って戻っていて、
+     * サーバーは眠らせたのに本人は起き上がって歩き回れた (撃っても当たらない) — 2026-11-14 本人。
+     * 起き上がり・這い出し・構えは表 (moves.ts の眠り) が止める。型は animator が倒れた姿のまま留める
+     */
+    if (this.downed) {
+      this.sleepLeft = seconds
+      this.sleepSpan = seconds
+      this.aiming = false
+      this.animator?.playSleep(settled)
+      return
+    }
     /*
      * **梯子からは手が離れる。** 眠った人が梯子に貼り付いたままなのはおかしい。
      *
@@ -3622,6 +3634,8 @@ export class Soldier {
 
   private crawlFromDown(): void {
     if (!this.downed_ || this.standing || this.downLocked) return
+    // 倒れた所から抜ける動き。起き上がりと同じ列で引く (眠っている間は這い出せない)
+    if (!can(this.body, 'standUp')) return
     this.downed_ = false
     const span = this.animator?.proneRollDownDuration ?? 0
     if (span <= 0) {

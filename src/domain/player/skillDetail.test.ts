@@ -26,3 +26,21 @@ describe('スキルの説明', () => {
     expect(charge.values).toEqual(['16 秒', '13 秒', '10 秒'])
   })
 })
+
+/**
+ * **英語の画面でも日本語が出ない** (2026-11-14 本人「skill の desc が JA しかなくない？」)。
+ * 数字は同じ関数から出すので、日本語と英語で行の数と値の並びは揃う
+ */
+describe('英語の説明', () => {
+  const japanese = /[぀-ヿ一-鿿]/
+  for (const id of Object.keys(SKILLS) as SkillId[]) {
+    test(id, () => {
+      const en = skillDetail(id, 'en')
+      const ja = skillDetail(id, 'ja')
+      const texts = [en.summary, ...en.notes, ...en.effects.flatMap((e) => [e.label, ...e.values]), SKILLS[id].hint.en]
+      for (const text of texts) expect(text).not.toMatch(japanese)
+      expect(en.effects.map((e) => e.values.length)).toEqual(ja.effects.map((e) => e.values.length))
+      expect(en.notes.length).toBe(ja.notes.length)
+    })
+  }
+})

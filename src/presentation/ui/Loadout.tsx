@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import type { LoadoutFocus } from '../scene/stats'
-import { t } from '../../i18n'
+import { t, lang } from '../../i18n'
 import {
   SUPPORT_SPECS,
   WEAPONS,
@@ -202,7 +202,7 @@ export default function Loadout(props: {
         <header class="loadout-head">
           <span class="loadout-title">{preparing() ? 'READY UP' : 'LOADOUT'}</span>
           <span class="loadout-note">
-            {preparing() ? `開始まで 残り ${props.left} 秒` : `${props.note} · 残り ${props.left} 秒`}
+            {preparing() ? t('readyroom.left', { left: props.left }) : t('loadout.left', { note: props.note, left: props.left })}
           </span>
         </header>
 
@@ -312,7 +312,7 @@ export default function Loadout(props: {
               <Readout
                 category={CATEGORY[props.support]}
                 name={SUPPORT_SPECS[props.support].label}
-                detail={`× ${SUPPORT_SPECS[props.support].count} · ${SUPPORT_SPECS[props.support].hint}`}
+                detail={`× ${SUPPORT_SPECS[props.support].count} · ${SUPPORT_SPECS[props.support].hint[lang]}`}
               />
               <div class="loadout-items">
                 <For each={props.supports}>

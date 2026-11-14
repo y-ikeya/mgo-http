@@ -502,12 +502,43 @@ const ROOT_DISTANCE_SCALE: Record<string, number> = { roll: 0.8 }
  * 分だけ遅れて付いてくる、というばねにする。
  */
 const BUST_STIFF = 110
+/**
+ * 瞬き。**形は体の側 (シェイプキー `Blink`) にあり、ここは効き具合を動かすだけ。**
+ *
+ * 名無しの頭 (tools/raw/bald_woman.blend の head) に本人が閉じた目の形を作った
+ * (2026-11-14 本人「瞬きさせたい」)。形を持たない体では何もしない。
+ * 人の瞬きは 2〜6 秒に 1 回、閉じて開くまで 0.2 秒ほど。間隔は毎回ばらつかせる —
+ * 揃えると、並んだ兵士が一斉に瞬いて作り物に見える
+ */
+/**
+ * 仰向けに倒れている姿勢 (爆風・散弾・CQC で投げられた・体当たり)。型は仰向けで終わって留まる。
+ *
+ * **ここで眠らされたら・殺されたら、その姿のまま。** 眠り・死ぬ型は立ち姿から崩れるので、
+ * 流すと倒れていた体が一度立ってから崩れる (2026-11-14 本人「仰向けのまま眠る… そのまま death」)
+ */
+export const SUPINE_LOCOMOTIONS: ReadonlySet<Locomotion> = new Set<Locomotion>(['sweep', 'shotgun_sweep', 'cqc_thrown', 'hit2back'])
+
+const BLINK_MORPH = 'Blink'
+const BLINK_GAP_MIN = 2
+const BLINK_GAP_MAX = 6
+/** 閉じる・閉じたまま・開く (秒)。閉じる方が速い */
+const BLINK_CLOSE = 0.07
+const BLINK_HOLD = 0.04
+const BLINK_OPEN = 0.12
+/**
+ * 眠らされている間は目を閉じたまま (2026-11-14 本人「stunされた時は…」)。
+ * 閉じるのはゆっくり — 眠りの型は立ったままふらついてから崩れるので、眠気で落ちていく速さ。
+ * 起きたら瞬きと同じ速さで開ける
+ */
+const SLEEP_SHUT = 0.6
+const SLEEP_WAKE = 0.15
+
 /** 減衰。大きいほど早く収まる */
 const BUST_DAMP = 11
-/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** (2026-11-11 本人「揺れ幅1.7倍でいいよ」で 0.0055 から 1.7 倍) */
-const BUST_GAIN = 0.00935
-/** 振れ幅の上限 (rad)。これを超えると体を突き抜ける (1.7 倍にした時に 0.30 から広げた) */
-const BUST_MAX = 0.38
+/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** (2026-11-11 本人「揺れ幅1.7倍でいいよ」で 0.0055 から 1.7 倍、11-12 に左右の加速度の取り違えを直したら振れが 6 割に減ったので「揺れを大きくして」で 0.035) */
+const BUST_GAIN = 0.035
+/** 振れ幅の上限 (rad)。これを超えると体を突き抜ける (1.7 倍にした時に 0.30 → 0.38、11-12 に「揺れを大きくして」で 0.5) */
+const BUST_MAX = 0.5
 
 /**
  * 髪の揺れ。**手で足した骨 (mixamorig で始まらない骨) を鎖として拾う。**
@@ -2365,7 +2396,9 @@ export class CharacterAnimator {
      * 上体の傾き**が乗り続けていた。倒れた型を流しているのに体が起き上がる、
      * という形で出る (伏せを入れたときと同じ罠)。
      */
-    const asleep = this.locomotion === 'sleep' || this.upperState === 'sleep'
+    // 仰向けのまま眠っている (sleepingDown) も。姿勢の名前は倒れたまま (cqc_thrown など) なので、
+    // 名前だけ見ていると照準の曲げが乗って上半身が起き上がった (2026-11-14 本人「上半身が起きちゃってる」)
+    const asleep = this.locomotion === 'sleep' || this.upperState === 'sleep' || this.sleepingDown
     const committed =
       (this.upperState === 'stab' && this.locomotion !== 'crouch_stab') ||
       this.upperState === 'salute' ||
@@ -2376,7 +2409,9 @@ export class CharacterAnimator {
       asleep ||
       prone
     this.aimPitch = damp(this.aimPitch, committed ? 0 : this.aimPitchTarget, AIM_PITCH_LAMBDA, dt)
-    this.lookYaw = damp(this.lookYaw, this.lookYawTarget, LOOK_YAW_LAMBDA, dt)
+    // 眠っている・死んでいる体は首を振らない。カメラを回すと首だけ付いてきた (2026-11-14 本人「stunや多分deathしてる時も…首が動いちゃう」)
+    const headStill = asleep || this.upperState === 'death'
+    this.lookYaw = damp(this.lookYaw, headStill ? 0 : this.lookYawTarget, LOOK_YAW_LAMBDA, dt)
     // ナイフの構えも同じ (立ち止まっても上半身だけ knife_idle、脚は立ちの型。下の resolveLowerKey の注)
     this.hipSquare = damp(
       this.hipSquare,
@@ -2417,6 +2452,59 @@ export class CharacterAnimator {
     this.applyAimPitch()
     this.turnTorso(dt)
     this.updateSways(dt)
+    this.updateBlink(dt)
+  }
+
+  /** 瞬きの形を持つメッシュ。**1 度だけ探す** (null = まだ探していない) */
+  private blinkTargets: { influences: number[]; index: number }[] | null = null
+  /** 次の瞬きまでの残り (秒) */
+  private blinkWait = BLINK_GAP_MIN + Math.random() * (BLINK_GAP_MAX - BLINK_GAP_MIN)
+  /** 瞬きを始めてからの秒数。負なら瞬いていない */
+  private blinkT = -1
+  /** 眠りで閉じている度合い (0〜1) */
+  private sleepShut = 0
+  /** 仰向けに倒れたまま眠っている (playSleep / setLocomotion('sleep') が倒れた姿のまま留めた) */
+  private sleepingDown = false
+
+  private updateBlink(dt: number): void {
+    if (!this.blinkTargets) {
+      const found: { influences: number[]; index: number }[] = []
+      this.root.traverse((o) => {
+        const mesh = o as THREE.Mesh
+        const index = mesh.morphTargetDictionary?.[BLINK_MORPH]
+        if (index !== undefined && mesh.morphTargetInfluences) found.push({ influences: mesh.morphTargetInfluences, index })
+      })
+      this.blinkTargets = found
+    }
+    if (!this.blinkTargets.length || dt <= 0) return
+    const asleep = this.locomotion === 'sleep' || this.upperState === 'sleep' || this.sleepingDown
+    this.sleepShut = asleep
+      ? Math.min(1, this.sleepShut + dt / SLEEP_SHUT)
+      : Math.max(0, this.sleepShut - dt / SLEEP_WAKE)
+    if (this.sleepShut > 0) {
+      // 眠っている間 (と開ききるまで) は瞬きを数えない。起きた直後に重ねて瞬かない
+      this.blinkT = -1
+      for (const target of this.blinkTargets) target.influences[target.index] = this.sleepShut
+      return
+    }
+    if (this.blinkT < 0) {
+      this.blinkWait -= dt
+      if (this.blinkWait <= 0) this.blinkT = 0
+    }
+    let closed = 0
+    if (this.blinkT >= 0) {
+      this.blinkT += dt
+      const t = this.blinkT
+      closed =
+        t < BLINK_CLOSE ? t / BLINK_CLOSE
+        : t < BLINK_CLOSE + BLINK_HOLD ? 1
+        : Math.max(0, 1 - (t - BLINK_CLOSE - BLINK_HOLD) / BLINK_OPEN)
+      if (t >= BLINK_CLOSE + BLINK_HOLD + BLINK_OPEN) {
+        this.blinkT = -1
+        this.blinkWait = BLINK_GAP_MIN + Math.random() * (BLINK_GAP_MAX - BLINK_GAP_MIN)
+      }
+    }
+    for (const target of this.blinkTargets) target.influences[target.index] = closed
   }
 
   /**
@@ -2442,6 +2530,8 @@ export class CharacterAnimator {
         rest: bone.quaternion.clone(),
         angle: new THREE.Vector2(),
         speed: new THREE.Vector2(),
+        // 骨の向き (親の空間)。素の姿勢で骨の先が向く方
+        fwd: new THREE.Vector3(0, 1, 0).applyQuaternion(bone.quaternion).normalize(),
         stiff,
         damp,
         gain: gain * Math.pow(HAIR_WHIP, depth),
@@ -2485,34 +2575,64 @@ export class CharacterAnimator {
     }
     if (!this.sways.length || dt <= 0) return
 
+    /*
+     * **付け根の加速度は 1 フレームに 1 回だけ測る。** 左右の胸は同じ付け根 (Spine2) を見ている。
+     * 骨ごとに前の位置と速度を書き換えていた頃は、左を計算した所で控えが進み、右には
+     * 「速度 0 から止まった」逆向きの加速度が入って、左右が正反対に揺れた (2026-11-12)
+     */
+    this.swayFrame.clear()
     for (const entry of this.sways) {
       const anchor = entry.anchor
-      anchor.getWorldPosition(this.swayAt)
-      const was = this.swayWas.get(anchor)
-      if (!was) {
-        this.swayWas.set(anchor, { at: this.swayAt.clone(), vel: new THREE.Vector3() })
-        continue
+      let acc = this.swayFrame.get(anchor)
+      if (acc === undefined) {
+        anchor.getWorldPosition(this.swayAt)
+        const was = this.swayWas.get(anchor)
+        if (!was) {
+          this.swayWas.set(anchor, { at: this.swayAt.clone(), vel: new THREE.Vector3() })
+          acc = null
+        } else {
+          // 速度 → 加速度。**前の速度との差**で見る
+          this.swayNow.subVectors(this.swayAt, was.at).divideScalar(dt)
+          was.at.copy(this.swayAt)
+          acc = this.swayNow.clone().sub(was.vel).divideScalar(dt)
+          was.vel.copy(this.swayNow)
+        }
+        this.swayFrame.set(anchor, acc)
       }
-      // 速度 → 加速度。**前の速度との差**で見る
-      this.swayNow.subVectors(this.swayAt, was.at).divideScalar(dt)
-      was.at.copy(this.swayAt)
-      this.swayAcc.subVectors(this.swayNow, was.vel).divideScalar(dt)
-      was.vel.copy(this.swayNow)
-      // 親の空間へ。Y が上、X が横
+      if (acc === null) continue
+      this.swayAcc.copy(acc)
+      // 親の空間へ
       anchor.getWorldQuaternion(this.swaySpin)
-      this.swayAcc.applyQuaternion(this.swaySpin.invert())
+      this.swaySpin.invert()
+      this.swayAcc.applyQuaternion(this.swaySpin)
 
       const hold = (v: number) => Math.max(-entry.max, Math.min(entry.max, v))
-      // **加速度の逆へ遅れる。** 上へ持ち上げられたら下がる
-      const wantX = hold(-this.swayAcc.y * entry.gain)
-      const wantZ = hold(-this.swayAcc.x * entry.gain)
+      /*
+       * **軸は測って決める。** 付け根の骨の軸が上・横を向いているとは限らない (名無しの Spine2 は
+       * 横の軸が前後を向いていた)。上は世界の上を付け根の空間へ戻した物、横は骨の向き (素の姿勢の
+       * 先) と上の外積。左右の胸で骨の向きはほぼ同じなので、横の軸も同じになる
+       */
+      this.swayUp.set(0, 1, 0).applyQuaternion(this.swaySpin)
+      this.swaySide.copy(entry.fwd).cross(this.swayUp).normalize()
+      const accUp = this.swayAcc.dot(this.swayUp)
+      const accSide = this.swayAcc.dot(this.swaySide)
+      // **加速度の逆へ遅れる。** 上へ持ち上げられたら下がる (横の軸で + に回すと先が上がる)
+      const wantX = hold(-accUp * entry.gain)
+      const wantZ = hold(-accSide * entry.gain)
 
       entry.speed.x += ((wantX - entry.angle.x) * entry.stiff - entry.speed.x * entry.damp) * dt
       entry.speed.y += ((wantZ - entry.angle.y) * entry.stiff - entry.speed.y * entry.damp) * dt
       entry.angle.x = hold(entry.angle.x + entry.speed.x * dt)
       entry.angle.y = hold(entry.angle.y + entry.speed.y * dt)
-      this.swayEuler.set(entry.angle.x, 0, entry.angle.y)
-      entry.bone.quaternion.copy(entry.rest).multiply(this.swaySpin.setFromEuler(this.swayEuler))
+      /*
+       * **付け根 (親) の向きで回す。** 骨の向きで回すと、左右の胸は鏡写しの向きで付いているので、
+       * 同じ「前へ傾ける」が左右で逆に効いて片方が上がり片方が下がった (上下の相関 -1、
+       * 2026-11-12 本人「左右の胸がべつべつにうごいてる」)。親の横の軸 (X) で上下、
+       * 縦の軸 (Y) で左右に振る — 左右とも同じ向きへ揺れる
+       */
+      this.swayPitch.setFromAxisAngle(this.swaySide, entry.angle.x)
+      this.swayYaw.setFromAxisAngle(this.swayUp, entry.angle.y)
+      entry.bone.quaternion.copy(this.swayYaw).multiply(this.swayPitch).multiply(entry.rest)
       /*
        * **鎖は親から順に確かめる。** 子の付け根の位置は親の回転で動くので、
        * ここで世界行列を更新しておかないと、次の骨が 1 フレーム古い位置を見る。
@@ -3009,6 +3129,12 @@ export class CharacterAnimator {
   setLocomotion(next: Locomotion): void {
     // 倒れたら他の状態を一切受け付けない。死体が走り出さないため。
     if (this.dead) return
+    // 仰向けのまま眠る。眠りの型へは移らず、倒れた姿で留める (SUPINE_LOCOMOTIONS)
+    if (next === 'sleep' && SUPINE_LOCOMOTIONS.has(this.locomotion)) {
+      this.sleepingDown = true
+      return
+    }
+    if (next !== 'sleep') this.sleepingDown = false
     /*
      * 実際の切り替えは重みの補間に任せる。ここは目標を記録するだけ。
      *
@@ -3048,7 +3174,9 @@ export class CharacterAnimator {
     /** 付け根。加速度をここで測る */
     anchor: THREE.Object3D
     rest: THREE.Quaternion
-    /** x: 前後 (骨の X まわり) / y: 左右 (骨の Z まわり) */
+    /** 骨の向き (親の空間)。横の軸を出すのに使う */
+    fwd: THREE.Vector3
+    /** x: 上下 (付け根の横の軸まわり) / y: 左右 (付け根の上の軸まわり) */
     angle: THREE.Vector2
     speed: THREE.Vector2
     stiff: number
@@ -3063,7 +3191,12 @@ export class CharacterAnimator {
   private readonly swayNow = new THREE.Vector3()
   private readonly swayAcc = new THREE.Vector3()
   private readonly swaySpin = new THREE.Quaternion()
-  private readonly swayEuler = new THREE.Euler()
+  /** このフレームで測った付け根ごとの加速度 (世界)。null はまだ前のフレームが無い */
+  private readonly swayFrame = new Map<THREE.Object3D, THREE.Vector3 | null>()
+  private readonly swayUp = new THREE.Vector3()
+  private readonly swaySide = new THREE.Vector3()
+  private readonly swayPitch = new THREE.Quaternion()
+  private readonly swayYaw = new THREE.Quaternion()
 
   /**
    * 片手で持っているか。**走り方と構えの型が変わる。**
@@ -3261,6 +3394,17 @@ export class CharacterAnimator {
 
   playDeath(fromBehind?: boolean): void {
     /*
+     * **仰向けに倒れたまま殺されたら、その姿のまま。** 倒れる型は仰向けの最終姿勢で
+     * 留まっているので、上半身も同じ型 (fallKey) のまま死んだことにする。
+     * 2 通目 (向きを持った death_front / death_back) もここで返る — 姿勢は倒れたままなので
+     */
+    if (SUPINE_LOCOMOTIONS.has(this.locomotion)) {
+      this.sleepingDown = false
+      this.aiming = false
+      this.upperState = 'death'
+      return
+    }
+    /*
      * **伏せたまま倒されたら、伏せたまま崩れる。**
      *
      * 立ちの型で倒れると、伏せていた体が一度立ち上がってから崩れる。撃たれた
@@ -3354,6 +3498,11 @@ export class CharacterAnimator {
    *   時刻を末尾へ置けばそのまま寝た姿になる
    */
   playSleep(settled = false): void {
+    // 仰向けに倒れている所で眠らされた。**倒れた姿のまま眠る** (型は流さない)
+    if (SUPINE_LOCOMOTIONS.has(this.locomotion)) {
+      this.sleepingDown = true
+      return
+    }
     const upper = this.upper.get(SLEEP_KEY)
     const lower = this.lower.get('sleep')
     if (!upper || !lower) return
@@ -3367,8 +3516,17 @@ export class CharacterAnimator {
     this.locomotion = 'sleep'
   }
 
+  /**
+   * 仰向けに倒れた型で留まっているか (SUPINE_LOCOMOTIONS)。仰向けのまま眠っていた体が起きて、
+   * 同じ倒れた姿へ戻る時に、倒れる型を頭から流し直さないために見る (remoteSoldier)
+   */
+  get lyingOnBack(): boolean {
+    return SUPINE_LOCOMOTIONS.has(this.locomotion)
+  }
+
   /** 眠りが明けた。**構えへ戻す** — 倒れる型と違って、ここから先がある */
   wakeFromSleep(): void {
+    this.sleepingDown = false
     if (this.upperState !== 'sleep') return
     this.upperState = 'stance'
   }
@@ -3464,6 +3622,8 @@ export class CharacterAnimator {
     if (this.locomotion === 'sleep' && this.upper.has(SLEEP_KEY)) return SLEEP_KEY
     // 倒れている間は他の何よりも優先する
     if (this.upperState === 'death') {
+      // 仰向けに倒れたまま死んだ (playDeath)。倒れる型の最終姿勢で留める
+      if (SUPINE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(this.fallKey)) return this.fallKey
       // 伏せたまま崩れている。**ここで返さないと上半身の重みが流れていない立ちの型へ
       // 寄って、上半身だけ T ポーズ**になった (2026-10-14)
       if (this.locomotion === 'prone_death' && this.upper.has(PRONE_DEATH_KEY)) return PRONE_DEATH_KEY
