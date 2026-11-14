@@ -212,6 +212,8 @@ if (gunName) {
   }
 }
 
+// 構えていない時の持ち方は銃ごと (animation.ts の WEAPON_RELAXED)
+if (gunName && gunName !== 'knife') anim.setHeldWeapon(gunName)
 anim.setAiming(query.has('aim'))
 
 /*
@@ -325,6 +327,30 @@ if (query.has('bones')) {
       console.log('[bones]', suffix, v.y.toFixed(3), 'x', v.x.toFixed(3), 'z', v.z.toFixed(3))
     }
   }
+  /*
+   * ?gunref … 右手の骨 3 本の位置と、銃の空間の 3 点の位置 (世界)。**Blender で同じ持ち方を再現する**ための数字
+   * (骨の頭の位置は軸の取り方によらないので、骨の向きの違う Blender でも同じ枠が組める。2026-11-14)
+   */
+  if (weapon && query.has('gunref')) {
+    // 姿勢と構えの持ち方は下で当てるが、測るのはそれを当てた後の置き場所
+    weapon.applyStance(Number(query.get('stance') ?? '0'))
+    weapon.setAimWeight(query.has('aim') ? 1 : 0)
+    weapon.object.updateMatrixWorld(true)
+    const at = (s: string) => findBoneBySuffix(model, s)?.getWorldPosition(new THREE.Vector3()).toArray()
+    const gun = [[0, 0, 0], [0, 0, -1], [0, 1, 0]].map((p) => weapon!.object.localToWorld(new THREE.Vector3(...(p as [number, number, number]))).toArray())
+    const hand = findBoneBySuffix(model, 'RightHand')!.getWorldPosition(new THREE.Vector3())
+    console.log('[gunref] muzzle-hand', weapon.muzzleWorld(new THREE.Vector3()).sub(hand).toArray().map((x) => x.toFixed(3)).join(' '))
+    console.log('[gunref] keys', anim.playingKeys)
+    {
+      // 銃身 (銃の -Z) の向き。体の前 (根の -Z) からの左右と上下 (度)
+      const b = new THREE.Vector3(0, 0, -1).transformDirection(weapon.object.matrixWorld)
+      const f = new THREE.Vector3(0, 0, -1).applyQuaternion(root.quaternion)
+      const yaw = Math.atan2(b.x * f.z - b.z * f.x, b.x * f.x + b.z * f.z)
+      console.log('[gunref] barrel yaw', ((yaw * 180) / Math.PI).toFixed(1), 'pitch', ((Math.asin(b.y) * 180) / Math.PI).toFixed(1))
+    }
+    console.log('[gunref] chain', JSON.stringify(['Hips', 'Spine', 'Spine1', 'Spine2', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand'].map((b) => at(b)?.map((x) => +x.toFixed(3)))))
+    console.log('[gunref]', JSON.stringify({ hand: at('RightHand'), fore: at('RightForeArm'), mid: at('RightHandMiddle1'), gun, local: { position: weapon.object.position.toArray(), quaternion: weapon.object.quaternion.toArray(), scale: weapon.object.scale.x } }))
+  }
   // 銃口の高さ (構えの壁判定の高さを決めるのに使う)
   if (weapon) {
     const muzzle = weapon.muzzleWorld(new THREE.Vector3())
@@ -378,6 +404,8 @@ if (box) {
 }
 // 姿勢ごとに握りが違う。しゃがみの型を見るときは stance=1 を付ける
 weapon?.applyStance(Number(query.get('stance') ?? '0'))
+// 構えの持ち方 (aimHold) は試合と同じく掛かり具合で寄せる
+weapon?.setAimWeight(query.has('aim') ? 1 : 0)
 
 const bone = (name: string) => {
   let found: THREE.Object3D | null = null

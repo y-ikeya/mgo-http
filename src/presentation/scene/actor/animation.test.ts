@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import type { Locomotion } from '../../../domain/player/locomotion'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
@@ -1156,6 +1157,29 @@ describe('胸の揺れ', () => {
     expect(calm.angleTo(bone.quaternion)).toBeLessThan(0.05)
   })
 
+  /**
+   * **構えていない時の持ち方は銃ごと。** P90 は専用の型 (smg_relaxed_idle)、型の無い銃は共通の型、
+   * 構えれば銃に関わらず構えの型
+   */
+  test('構えていない時の上半身は銃ごとの型', () => {
+    const upperOf = (weapon: string | null, aiming: boolean, locomotion: Locomotion = 'idle') => {
+      const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+      anim.setHeldWeapon(weapon)
+      anim.setAiming(aiming)
+      anim.setLocomotion(locomotion)
+      for (let i = 0; i < 90; i++) anim.update(1 / 60)
+      return anim.playingKeys.split(' / ')[1]
+    }
+    expect(upperOf('smg', false)).toContain('smg_relaxed_idle')
+    expect(upperOf('rifle', false)).not.toContain('smg_relaxed_idle')
+    expect(upperOf('smg', true)).toBe('smg_aim')
+    expect(upperOf('rifle', true)).toBe('idle')
+    expect(upperOf('smg', true, 'crouch_idle')).toBe('smg_crouch_aim')
+    expect(upperOf('rifle', true, 'crouch_idle')).toBe('knee_ready')
+    expect(upperOf('smg', false, 'crouch_idle')).toBe('smg_crouch_relaxed')
+    expect(upperOf('rifle', false, 'crouch_idle')).toBe('knee_relaxed')
+  })
+
   /** **名無しは瞬きする。** 形 (シェイプキー Blink) は体の側、効き具合は CharacterAnimator が動かす */
   test('名無しは瞬きする', () => {
     const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
@@ -1278,6 +1302,37 @@ describe('胸の揺れ', () => {
     for (const enter of [(a: CharacterAnimator) => a.playSleep(), (a: CharacterAnimator) => a.playDeath()]) {
       expect(headTurn(enter, 1.2).angleTo(headTurn(enter, 0))).toBeLessThan(0.02)
     }
+  })
+
+  /**
+   * **頭のねじれの半分を首が受け持つ。積み重ならない。**
+   * 構えていない立ち止まり (relaxed_idle) は頭が首に対して 43° までねじれ、名無しの顎が歪んだ。
+   * 首へ移す回しを控えの前に掛けていた時は、three が書き戻さない回に積み重なって首が回り続けた
+   */
+  test('頭のねじれを首と分け、首は回り続けない', () => {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    let neck: THREE.Object3D | null = null
+    let head: THREE.Object3D | null = null
+    root.traverse((o) => {
+      if (!neck && o.name.endsWith('Neck')) neck = o
+      if (!head && o.name.endsWith('Head')) head = o
+    })
+    const n = neck as unknown as THREE.Object3D
+    const h = head as unknown as THREE.Object3D
+    const neckRest = n.quaternion.clone()
+    const headRest = h.quaternion.clone()
+    let headTwist = 0
+    let neckTurn = 0
+    for (let i = 0; i < 60 * 30; i++) {
+      anim.setLocomotion('idle')
+      anim.update(1 / 60)
+      const e = new THREE.Euler().setFromQuaternion(headRest.clone().invert().multiply(h.quaternion), 'XYZ')
+      headTwist = Math.max(headTwist, Math.abs(THREE.MathUtils.radToDeg(e.y)))
+      neckTurn = Math.max(neckTurn, THREE.MathUtils.radToDeg(neckRest.angleTo(n.quaternion)))
+    }
+    expect(headTwist).toBeLessThan(25)
+    expect(neckTurn).toBeLessThan(45)
   })
 
   /** **仰向けに倒れた所で殺されたら、仰向けのまま死ぬ** (2 通目の向き付きも同じ) */

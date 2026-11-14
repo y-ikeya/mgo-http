@@ -1,4 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
+import { INNER_PART, innerOpacity } from './skin'
 import { BlobShadow } from './blobShadow'
 import { castMovingShadow, MOVING_SHADOW_LAYER } from '../world/liveShadow'
 import { boxMoveScale, runnerScale, setupSpeedScale, stabSpeedScale, type Skills } from '../../../domain/player/skill'
@@ -1563,7 +1564,17 @@ export class Soldier {
       if (!isMesh(obj)) return
       // 体 (骨で動く形) だけがステルスで薄くなる。手の武器は別の形
       const body = (obj as THREE.SkinnedMesh).isSkinnedMesh === true
-      const value = body ? opacity * (1 - this.stealthFade) : opacity
+      /*
+       * 顔の中の部品 (目玉・まつ毛…) は**体より早く透ける** (skin.ts の innerOpacity)。透けた頭越しに
+       * 目玉が浮いて見えた (2026-11-14 本人)。kome の歯・目頭は体と同じ材質なので、先に自分の写しへ分ける
+       */
+      const inner = body && INNER_PART.test(obj.name)
+      if (inner && !obj.userData.ownInnerMaterial) {
+        obj.material = Array.isArray(obj.material) ? obj.material.map((m) => m.clone()) : obj.material.clone()
+        obj.userData.ownInnerMaterial = true
+      }
+      const base = body ? opacity * (1 - this.stealthFade) : opacity
+      const value = inner ? innerOpacity(base) : base
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const material of materials) material.opacity = value
       if (!body) return
@@ -1762,6 +1773,8 @@ export class Soldier {
      */
     this.animator?.setPistol(!isTwoHanded(id))
     this.animator?.setKnife(id === 'knife')
+    // 構えていない時の持ち方を銃ごとに (animation.ts の WEAPON_RELAXED)
+    this.animator?.setHeldWeapon(id)
     // 投げ物と設置物は手に何も出ない。転がりの尻尾 (銃を構える形) を出さない
     this.animator?.setHandsEmpty(isThrowable(id) || isPlaceable(id))
   }
@@ -4616,6 +4629,7 @@ export class Soldier {
     // 読み込み前に持ち替えている場合があるので、いま手にある物から決める
     this.animator.setPistol(!isTwoHanded(this.held))
     this.animator.setKnife(this.held === 'knife')
+    this.animator.setHeldWeapon(this.held)
     this.animator.setSetupSpeed(setupSpeedScale(this.skills))
     this.animator.setStabSpeed(stabSpeedScale(this.skills))
     this.animator.setHandsEmpty(isThrowable(this.held) || isPlaceable(this.held))
