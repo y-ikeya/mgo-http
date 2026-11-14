@@ -1869,6 +1869,7 @@ with open(bin_path, 'wb') as f:
 # 持ち込んだ物は自前の UV が正しいので触らない。名前で宣言する、という他の
 # 決めごとと同じ形にしてある。
 import bmesh
+import zlib
 
 # 1 タイルが何メートルか。小さいほど模様が細かく繰り返す
 TEXEL = 2.0
@@ -1908,6 +1909,8 @@ def has_image(obj):
 
 def texel_of(obj):
     """1 タイルの実寸 (m)。**絵の実寸に合わせたい材質は custom property `texel` に書く**
+    (面ごとにも見る: 材質の違う面が混ざる物は、面の材質の texel が勝つ)。
+    custom property `jitter` を真にした材質は、壁の平面ごとに模様を横縦にずらす
 
     無ければ TEXEL。Poly Haven の絵は 1 枚の実寸が絵ごとに違う (しっくい 3.2m、
     レンガ 2m)。2m に揃えると模様の大きさが絵ごとにずれる
@@ -1918,7 +1921,7 @@ def texel_of(obj):
     return TEXEL
 
 
-def reproject(obj, uv=True):
+def reproject(obj, uv=True, tiling_only=False):
     """ワールド座標の立方投影で UV を張り直す。**scale がいくつでも伸びない**
 
     ついでに法線を外向きに揃える。Plane を E で押し出した箱は面が全部内を向き、
@@ -1939,13 +1942,79 @@ def reproject(obj, uv=True):
     layer = bm.loops.layers.uv.verify()
     mw = obj.matrix_world
     texel = texel_of(obj)
-    for face in bm.faces if uv else ():
-        n = (mw.to_3x3() @ face.normal)
+    slots = obj.material_slots
+
+    def face_mat(face):
+        return slots[face.material_index].material if face.material_index < len(slots) else None
+
+    def plane_of(face):
+        """面の向き (一番強い軸と表裏) と、その軸での位置。同じ平面の面は同じ値になる"""
+        n = mw.to_3x3() @ face.normal
         axis = max(range(3), key=lambda i: abs(n[i]))
+        center = mw @ face.calc_center_median()
+        return axis, n[axis] > 0, round(center[axis], 1), center
+
+    def plane_jitter(mat, plane):
+        # **壁の平面ごとに模様をずらす。** ワールド座標で貼るので、何もしないと隣の建物まで
+        # 模様の位置がそろい、同じ剥がれが並んで単調になる (2026-11-13 本人「パターンを
+        # 単調にしないで、よこやたてにずらして」)。同じ平面 (向きと位置が同じ) の面は同じだけ
+        # ずらすので、1 枚の壁の中に継ぎ目は出ない。量は名前と平面から決まり、毎回同じ
+        if not (mat and mat.get('jitter')):
+            return 0.0, 0.0
+        h = zlib.crc32(f'{obj.name}|{plane[0]}|{plane[1]}|{plane[2]}'.encode())
+        return (h & 0xFFFF) / 0x10000, (h >> 16) / 0x10000
+
+    def texel_for(mat):
+        return float(mat['texel']) if mat and 'texel' in mat else texel
+
+    if uv:
+        # **段ごとに横へずらす** (custom property `row_shift` を持つ材質の壁だけ)。1 段上がるごとに
+        # row_shift 枚ぶん右へ (2026-11-13 本人「一段上の漆喰は 0.5 枚分だけ右にずらす…」→ 0.37)。
+        # 0.5 だと 2 段で元に戻って交互になるだけなので、半端な量にして何段上がっても揃わないように。
+        # 1 枚の面が何段にもまたがると段ごとに UV を変えられないので、先に段の境目で面を横に切る
+        world_up = mw.to_3x3().transposed() @ mathutils.Vector((0, 0, 1))
+        world_up.normalize()
+        groups = {}
+        for face in bm.faces:
+            mat = face_mat(face)
+            if not (mat and mat.get('row_shift')):
+                continue
+            plane = plane_of(face)
+            if plane[0] == 2:
+                continue
+            groups.setdefault(plane[:3], (mat, plane))
+        inv = mw.inverted()
+        for key, (mat, plane) in groups.items():
+            t = texel_for(mat)
+            dv = plane_jitter(mat, plane)[1]
+            members = lambda: [f for f in bm.faces if face_mat(f) is mat and plane_of(f)[:3] == key]
+            faces = members()
+            zs = [(mw @ v.co).z for f in faces for v in f.verts]
+            if not zs:
+                continue
+            for k in range(math.floor(min(zs) / t + dv) + 1, math.ceil(max(zs) / t + dv)):
+                z = (k - dv) * t
+                faces = members()
+                edges = list({e for f in faces for e in f.edges})
+                verts = list({v for f in faces for v in f.verts})
+                bmesh.ops.bisect_plane(bm, geom=faces + edges + verts, dist=1e-4,
+                                       plane_co=inv @ mathutils.Vector((0, 0, z)), plane_no=world_up)
+
+    for face in bm.faces if uv else ():
+        mat = face_mat(face)
+        # 自前の UV を持つ物は、繰り返しの絵 (texel を書いた材質) の面だけ貼り直す
+        if tiling_only and not (mat and 'texel' in mat):
+            continue
+        plane = plane_of(face)
+        axis = plane[0]
         u_axis, v_axis = PROJECT_AXES[axis]
+        t = texel_for(mat)
+        du, dv = plane_jitter(mat, plane)
+        if mat and mat.get('row_shift') and axis != 2:
+            du += math.floor(plane[3].z / t + dv) * float(mat['row_shift'])
         for loop in face.loops:
             world = mw @ loop.vert.co
-            loop[layer].uv = (world[u_axis] / texel, world[v_axis] / texel)
+            loop[layer].uv = (world[u_axis] / t + du, world[v_axis] / t + dv)
     bm.to_mesh(mesh)
     bm.free()
     return flipped
@@ -1956,7 +2025,15 @@ flipped_faces = 0
 for obj in bpy.context.scene.objects:
     if obj.type != 'MESH' or not obj.select_get():
         continue
+    # **繰り返しの絵 (texel を書いた材質) の面は、札・面の数に関係なく貼り直す。** 漆喰や石積みの
+    # 建物は窓の穴で面が SIMPLE_MAX_FACES を越え、自前の UV のまま出ていた — texel / jitter /
+    # row_shift が効かなかった (2026-11-13、building12・18・9・31 など)。その物のほかの材質の面は触らない
+    tiling = KEEP_UV not in obj.name and any(
+        slot.material and 'texel' in slot.material for slot in obj.material_slots)
     if not any(tag in obj.name for tag in NORMAL_TAGS):
+        if tiling:
+            reproject(obj, True, tiling_only=True)
+            reprojected += 1
         continue
     # **絵を持ち込んだ細かい物の UV は触らない。** 焼き込んだ絵 (1 枚の地図) は立方投影で
     # 貼り直すと崩れ、絵の外 (黒) を拾う (木箱の面に黒い抜け)。一方、箱に繰り返しの絵
@@ -1967,8 +2044,8 @@ for obj in bpy.context.scene.objects:
         and KEEP_UV not in obj.name
         and not (has_image(obj) and len(obj.data.polygons) > SIMPLE_MAX_FACES)
     )
-    flipped = reproject(obj, uv)
-    reprojected += uv
+    flipped = reproject(obj, uv or tiling, tiling_only=tiling and not uv)
+    reprojected += uv or tiling
     if flipped:
         flipped_faces += flipped
         print(f'  {obj.name}: 内向きの面 {flipped} 枚を外向きに直した (Blender では Shift+N)')

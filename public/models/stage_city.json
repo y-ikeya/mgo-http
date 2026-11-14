@@ -18449,32 +18449,6 @@
 }
 },
 {
-"name": "metal_watertank_bc011_1",
-"min": [
--10.797,
-15.137,
--66.879
-],
-"max": [
--9.597,
-16.737,
--65.679
-],
-"top": {
-"h": 16.7369,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "vis_rebar_bc011_1",
 "min": [
 -11.637,
@@ -18793,58 +18767,6 @@
 }
 },
 {
-"name": "metal_watertank_b12_1",
-"min": [
--40.05,
-21.58,
--80.7
-],
-"max": [
--38.85,
-23.18,
--79.5
-],
-"top": {
-"h": 23.18,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_watertank_b12_2",
-"min": [
-21.32,
-21.58,
--89.83
-],
-"max": [
-22.52,
-23.18,
--88.63
-],
-"top": {
-"h": 23.18,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "vis_rebar_b12_1",
 "min": [
 -40.891,
@@ -19029,32 +18951,6 @@
 }
 },
 {
-"name": "metal_watertank_b21_2",
-"min": [
--21.712,
-20.423,
-83.226
-],
-"max": [
--20.512,
-22.023,
-84.426
-],
-"top": {
-"h": 22.0233,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
 "name": "vis_rebar_b21_1",
 "min": [
 -22.553,
@@ -19174,32 +19070,6 @@
 ],
 "top": {
 "h": 22.25,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_watertank_b23_1",
-"min": [
-17.838,
-13.286,
-61.077
-],
-"max": [
-19.038,
-14.886,
-62.277
-],
-"top": {
-"h": 14.8861,
 "dx": 0.0,
 "dz": 0.0
 },
@@ -19447,58 +19317,6 @@
 "eye": true,
 "camera": false,
 "thrown": false
-}
-},
-{
-"name": "metal_watertank_b24_001_1",
-"min": [
--4.34,
-19.278,
-86.33
-],
-"max": [
--3.14,
-20.878,
-87.53
-],
-"top": {
-"h": 20.8781,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_watertank_b25_001_1",
-"min": [
-12.334,
-17.679,
--20.82
-],
-"max": [
-13.534,
-19.279,
--19.62
-],
-"top": {
-"h": 19.2792,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
 }
 },
 {
@@ -19782,32 +19600,6 @@
 ],
 "top": {
 "h": 22.6,
-"dx": 0.0,
-"dz": 0.0
-},
-"flags": {
-"draw": true,
-"player": true,
-"bullet": true,
-"eye": true,
-"camera": true,
-"thrown": true
-}
-},
-{
-"name": "metal_watertank_b5_1",
-"min": [
--34.615,
-21.584,
-0.646
-],
-"max": [
--33.415,
-23.184,
-1.846
-],
-"top": {
-"h": 23.1845,
 "dx": 0.0,
 "dz": 0.0
 },
