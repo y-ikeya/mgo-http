@@ -16,6 +16,23 @@
  * ここで引いた結果を**構築の引数として渡す**ことで、その順序の問題を作らない。
  */
 
+/**
+ * 体の外側に出ない顔の部品 (名無しの eye_L / eye_R・lash_lower_L / R、kome の MocapGuy_Eyes /
+ * Caruncula / Teeth / BrowsLashes)。**体が透けている間と、光る写しには出さない** — 頭が透けると
+ * 中の目玉が浮いて見え、光は輪郭で描くので部品が丸く浮き出た (2026-11-14 本人)。
+ * 体を足した時に部品の名前が違えばここに足す
+ */
+export const INNER_PART = /eye|carunc|teeth|lash|brow/i
+
+/**
+ * 体が透けている時の、顔の中の部品の濃さ。**体より早く透ける** (濃さの 3 乗。体 0.5 で 0.125)。
+ * 同じ濃さだと透けた頭越しに目玉が浮いて見え、消すと目の無い顔になった (2026-11-14 本人
+ * 「体の opacity より目の方が透明になるように」)
+ */
+export function innerOpacity(body: number): number {
+  return body * body * body
+}
+
 /** 既定のモデル。public/models/<名前>.glb */
 export const DEFAULT_SKIN = 'soldier'
 

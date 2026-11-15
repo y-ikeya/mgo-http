@@ -22,7 +22,7 @@ import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
 import { loadSoldier } from "../assets";
-import { DEFAULT_SKIN, skinFor } from "./skin";
+import { DEFAULT_SKIN, INNER_PART, innerOpacity, skinFor } from "./skin";
 import { leanOf, stanceAt, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING, LANDING_RATE, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
@@ -195,12 +195,6 @@ const PLAY_WHOLE_BODY: Record<
  * 位置は「少し過去の状態」を 2 点間で補間して描く。届いた位置をそのまま入れると、
  * 受信した瞬間だけ飛んで、次が来るまで止まる。
  */
-/**
- * 体の外側に出ない顔の部品 (名無しの eye_L / eye_R、kome の MocapGuy_Eyes / Caruncula / Teeth / BrowsLashes)。
- * 光の写しを作らない (buildGlow)。体を足した時に部品の名前が違えばここに足す
- */
-const INNER_PART = /eye|carunc|teeth|lash|brow/i;
-
 export class RemoteSoldier {
   readonly id: string;
   readonly object = new THREE.Group();
@@ -224,6 +218,8 @@ export class RemoteSoldier {
   private team: Team = "red";
   /** 色を掛ける対象。所属が変わっても掛け直せるよう控えておく */
   private readonly tinted: THREE.MeshStandardMaterial[] = [];
+  /** 顔の中の部品の材質。体より早く透ける (skin.ts の innerOpacity) */
+  private readonly innerMaterials = new Set<THREE.Material>();
   /** 居る場所の空の見え方を材質に掛ける (屋内で暗くなる) */
   private readonly skyLight = new SkyLight();
 
@@ -373,7 +369,7 @@ export class RemoteSoldier {
         material.transparent = transparent
         material.needsUpdate = true
       }
-      material.opacity = opacity
+      material.opacity = this.innerMaterials.has(material) ? innerOpacity(opacity) : opacity
     }
     /*
      * 消え切ったら画面には描かない (透明でも描くと重なりの順で縁が残る)。**影は落とし続ける** —
@@ -1100,6 +1096,7 @@ export class RemoteSoldier {
     // 元のマテリアルは自機と共有しているので複製する。
     // 複製が要るのは色のためではなく、無敵の半透明を人ごとに掛けるため
     const cloned = new Map<THREE.Material, THREE.Material>();
+    const innerCloned = new Map<THREE.Material, THREE.Material>();
     model.traverse((obj) => {
       if (!isMesh(obj)) return;
       // 人も影を落とす (人の影の地図に毎フレーム描く、world/liveShadow.ts)
@@ -1109,7 +1106,10 @@ export class RemoteSoldier {
       obj.receiveShadow = true;
       // スキニング後の姿勢はバウンディングボックスに出ないので視錐台カリングを切る
       obj.frustumCulled = false;
-      obj.material = cloneMaterial(obj.material, cloned, this.tinted);
+      // 顔の中の部品は体と材質を分ける (kome の歯・目頭は体と同じ材質)。体より早く透かすため (applyBodyOpacity)
+      const inner = INNER_PART.test(obj.name);
+      obj.material = cloneMaterial(obj.material, inner ? innerCloned : cloned, this.tinted);
+      if (inner) for (const m of Array.isArray(obj.material) ? obj.material : [obj.material]) this.innerMaterials.add(m);
     });
     for (const material of this.tinted) this.skyLight.add(material);
     this.buildGlow(model);
@@ -1124,6 +1124,11 @@ export class RemoteSoldier {
     );
     // モデルが届く前に状態が変わっていた場合を拾う
     this.animator.setBoxed(this.boxed);
+    // 持ち替えが先に届いていた (equip は animator が無いと素通りする)
+    if (this.weaponKind) {
+      this.animator.setPistol(this.weaponKind === 'm9');
+      this.animator.setHeldWeapon(this.weaponKind);
+    }
     if (this.serverDead) this.animator.playDeath();
 
     this.model = model;
@@ -1143,6 +1148,7 @@ export class RemoteSoldier {
     if (kind === this.weaponKind) return;
     this.weaponKind = kind
     this.animator?.setPistol(kind === 'm9');
+    this.animator?.setHeldWeapon(kind);
     const model = this.model;
     if (!model) return;
     /*

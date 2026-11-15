@@ -98,6 +98,17 @@ export interface WeaponConfig {
    * 無ければ crouchGrip / crouchRotation を使う。
    */
   crouchHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  /**
+   * 構えている間の持ち方 (立ち・しゃがみ)。**骨 (RightHand) の空間そのまま。**
+   * 構えていない持ち方から aimWeight で寄せる。あれば aimTrim は掛けない —
+   * 構えの型と一緒に Blender で銃を持たせて詰めた物なので、回し直すとずれる
+   */
+  aimHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  /** 立って構えていない時の持ち方 (骨 RightHand の空間)。crouchHold と同じく、あれば握りの値を上書きする */
+  standHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  crouchAimHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  /** しゃがんで構えた時の左手首 (銃の空間)。無ければ leftHand。立ちとの間は姿勢で混ぜる */
+  crouchLeftHand?: { position: THREE.Vector3; quaternion: THREE.Quaternion }
   proneGrip?: THREE.Vector3
   proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
@@ -262,17 +273,41 @@ const M4: WeaponConfig = {
  * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
  */
 const SMG: WeaponConfig = {
-  // しゃがみ構えの右手を目の前へ (体の中心側へ 6cm)。本人 2026-10-10
-  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.06, 0, 0) },
-  // 立って構えた時の左手首 (銃の空間)。しゃがんでもここを握る
-  leftHand: {
-    position: new THREE.Vector3(-0.075, 0.04, -0.68),
-    quaternion: new THREE.Quaternion(-0.4283, -0.2438, -0.3835, 0.7811),
+  /*
+   * 構えていない時 (立ち / しゃがみ)・構え (立ち / しゃがみ) の持ち方と左手は、**本人が Blender で P90 用の型
+   * (smg_relaxed_idle / smg_crouch_relaxed / smg_aim / smg_crouch_aim) に銃を持たせて詰めた所** (2026-11-15)。
+   * 型の手の骨からの相対を、試合の骨の空間へ写した値。型が持ち方ごと作ってあるので、
+   * 旧来の型を補っていた上体の起こし (aimLift)・右手の寄せ (rightShift)・回し (aimTrim) は外した
+   */
+  standHold: {
+    position: new THREE.Vector3(-5.7088, -67.4329, 8.9373),
+    quaternion: new THREE.Quaternion(0.47457, 0.47727, -0.47369, 0.568),
+    scale: 117.41,
   },
-  // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: -7.7, yaw: -10.5, crouchPitch: 33.7, crouchYaw: -12.2 },
-  // しゃがみの構えは型が 30° 以上下を向く。大半を上体の起こしで返す (残りを aimTrim で回す)
-  aimLift: { stand: 0, crouch: 10 },
+  crouchHold: {
+    position: new THREE.Vector3(-2.8529, -67.6357, 0.1779),
+    quaternion: new THREE.Quaternion(0.53052, 0.44858, -0.39269, 0.6026),
+    scale: 117.41,
+  },
+  aimHold: {
+    position: new THREE.Vector3(-13.2731, -66.573, 4.1481),
+    quaternion: new THREE.Quaternion(0.5, 0.5, -0.5, 0.5),
+    scale: 117.41,
+  },
+  crouchAimHold: {
+    position: new THREE.Vector3(-13.4023, -65.6388, 3.6242),
+    quaternion: new THREE.Quaternion(0.5, 0.5, -0.5, 0.5),
+    scale: 117.41,
+  },
+  leftHand: {
+    position: new THREE.Vector3(-0.0701, 0.0986, -0.6877),
+    quaternion: new THREE.Quaternion(-0.23685, 0.38215, -0.67245, 0.58794),
+  },
+  crouchLeftHand: {
+    position: new THREE.Vector3(-0.0558, 0.0601, -0.6724),
+    quaternion: new THREE.Quaternion(-0.46183, 0.02763, -0.43997, 0.76966),
+  },
+  aimTrim: { pitch: 3.3, yaw: 1.8, crouchPitch: -6.2, crouchYaw: 4.9 },
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
   grip: new THREE.Vector3(0.01, 0.11, -0.465),
   rotation: new THREE.Euler(degrees(-8), degrees(-8), degrees(0)),
@@ -462,6 +497,7 @@ export class Weapon {
    * 回しても動かない滑りがあると、壊れているのか効いていないのか分からない
    */
   private crouchHold: WeaponConfig['crouchHold'] | null
+  private standHold: WeaponConfig['standHold'] | null
   private readonly crouchGrip: THREE.Vector3
   private readonly crouchRotation: THREE.Euler
   private readonly proneGrip: THREE.Vector3
@@ -519,6 +555,9 @@ export class Weapon {
           quaternion: config.crouchHold.quaternion.clone(),
           scale: config.crouchHold.scale,
         }
+      : null
+    this.standHold = config.standHold
+      ? { position: config.standHold.position.clone(), quaternion: config.standHold.quaternion.clone(), scale: config.standHold.scale }
       : null
     this.crouchRotation = (config.crouchRotation ?? config.rotation).clone()
     // 伏せは書いていなければしゃがみと同じ。**書くまでは今までの見え方のまま**
@@ -687,6 +726,7 @@ export class Weapon {
     } else {
       this.grip.copy(grip)
       this.rotation.copy(rotation)
+      this.standHold = null
     }
     this.rebuild(Math.max(this.stance, 0))
   }
@@ -785,8 +825,16 @@ export class Weapon {
   leftHandTarget(outPosition: THREE.Vector3, outQuaternion: THREE.Quaternion): boolean {
     const hold = this.config.leftHand
     if (!hold || this.aimWeight <= 0) return false
-    outPosition.copy(hold.position).applyMatrix4(this.object.matrixWorld)
-    outQuaternion.copy(this.object.getWorldQuaternion(new THREE.Quaternion())).multiply(hold.quaternion)
+    const crouch = this.config.crouchLeftHand
+    const t = crouch ? Math.min(1, Math.max(0, this.stance)) : 0
+    outPosition.copy(hold.position)
+    outQuaternion.copy(hold.quaternion)
+    if (crouch && t > 0) {
+      outPosition.lerp(crouch.position, t)
+      outQuaternion.slerp(crouch.quaternion, t)
+    }
+    outPosition.applyMatrix4(this.object.matrixWorld)
+    outQuaternion.premultiply(this.object.getWorldQuaternion(new THREE.Quaternion()))
     return true
   }
 
@@ -852,14 +900,44 @@ export class Weapon {
      * 隣の姿勢との間は**置き場所どうしを混ぜる**。握りを混ぜてから組むのとは
      * 途中が変わるが、両端は変わらないので切り替わりで跳ねない。
      */
+    // 立ちの置き場所 (standHold) も同じく測った物で上書きし、しゃがみへ向けて抜く
+    const stand = this.standHold
+    if (stand && blend < 1) {
+      const toStand = 1 - blend
+      this.object.position.lerp(stand.position, toStand)
+      this.object.quaternion.slerp(stand.quaternion, toStand)
+      this.object.scale.lerp(this.holdScale.setScalar(stand.scale), toStand)
+    }
     const hold = this.crouchHold
-    if (!hold) return
     const toHold = blend <= 1 ? t : 1 - t
-    if (toHold <= 0) return
-    this.object.position.lerp(hold.position, toHold)
-    this.object.quaternion.slerp(hold.quaternion, toHold)
-    this.object.scale.lerp(this.holdScale.setScalar(hold.scale), toHold)
+    if (hold && toHold > 0) {
+      this.object.position.lerp(hold.position, toHold)
+      this.object.quaternion.slerp(hold.quaternion, toHold)
+      this.object.scale.lerp(this.holdScale.setScalar(hold.scale), toHold)
+    }
+    this.placeAim(blend)
   }
+
+  /**
+   * 構えの持ち方 (aimHold / crouchAimHold) へ aimWeight で寄せる。立ち→しゃがみで混ぜ、
+   * 伏せへ向けて抜く (伏せの構えは握りの値のまま)
+   */
+  private placeAim(blend: number): void {
+    const stand = this.config.aimHold
+    if (!stand || this.aimWeight <= 0) return
+    const fade = blend <= 1 ? 1 : Math.max(0, 2 - blend)
+    const weight = this.aimWeight * fade
+    if (weight <= 0) return
+    const crouch = this.config.crouchAimHold ?? stand
+    const c = Math.min(1, blend)
+    const position = this.aimPosition.lerpVectors(stand.position, crouch.position, c)
+    const quaternion = this.aimQuaternion.slerpQuaternions(stand.quaternion, crouch.quaternion, c)
+    this.object.position.lerp(position, weight)
+    this.object.quaternion.slerp(quaternion, weight)
+    this.object.scale.lerp(this.holdScale.setScalar(THREE.MathUtils.lerp(stand.scale, crouch.scale, c)), weight)
+  }
+  private readonly aimPosition = new THREE.Vector3()
+  private readonly aimQuaternion = new THREE.Quaternion()
 
   /**
    * 握り位置と追加回転を指定して取り付け姿勢を作り直す。

@@ -49,6 +49,16 @@ const CROUCH_TORSO_YAW = (12 * Math.PI) / 180
 
 /** 立ちとしゃがみの間で旋回を移す速さ。姿勢の変化より遅れないように */
 const CROUCH_TORSO_LAMBDA = 10
+
+/**
+ * 頭の**首に対するねじれ (骨の縦軸) と上下**のうち、首へ移す割合。
+ *
+ * 型の多くは頭を振る動きを頭の骨だけで作っていて、首に対して 40〜55° ねじれる
+ * (cqc_hook 54.6°・stab 52.9°・run_r 44.1°・throw_windup 41.2°)。名無しは首と顎の付け根の
+ * 皮膚が付いて来られず、顎がキャラから見て右へ歪んで見えた (本人 2026-11-15)。
+ * 半分を首に持たせ、頭は同じだけ戻す — 顔の向きは型のまま
+ */
+const NECK_SHARE = 0.5
 /** 構えの入り抜けで腰の補正が寄る速さ */
 const AIM_HIP_LAMBDA = 10
 
@@ -319,7 +329,8 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
  * (首が 1 コマ 2°)、0.067 秒で回すと 15Hz の震えになる。実測で手が 1 コマ
  * 6.8mm 動いていた (立ちは 0.12mm)。
  */
-const POSE_ONLY_CLIPS = new Set(['knee_relaxed', 'knee_ready'])
+// P90 のしゃがみも Blender の 1 姿勢から書き出した 2〜4 コマ。下半身にも流すので体ごと震えた (本人 2026-11-15)
+const POSE_ONLY_CLIPS = new Set(['knee_relaxed', 'knee_ready', 'smg_crouch_relaxed', 'smg_crouch_aim'])
 
 const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
   'crouch_idle',
@@ -747,6 +758,41 @@ const PISTOL_RELAXED: Partial<Record<Locomotion, string>> = {
 }
 
 const pistolKey = (state: Locomotion) => `pistol_relaxed:${state}`
+/**
+ * **銃ごとの、構えていない時の上半身の型。** 無い銃・無い姿勢は共通の型 (RELAXED_CLIPS) を流す。
+ *
+ * 長物を全部同じ型で提げていた。銃の形も重さも違うので持ち方が 1 つなのは無理がある
+ * (2026-11-14 本人「本来は武器ごとにないといけない」)。P90 は胸の前に斜めに抱える
+ * (本人が Blender で組んだ持ち方。腕と手の骨だけ固定し、背骨・頭は relaxed_idle の呼吸のまま)。
+ * 銃は右手に付けたまま型で腕を動かす — 銃の位置は付け方 (weapon.ts) ではなく型が決める
+ */
+const WEAPON_RELAXED: Readonly<Record<string, Partial<Record<Locomotion, string>>>> = {
+  smg: { idle: 'smg_relaxed_idle', crouch_idle: 'smg_crouch_relaxed' },
+}
+const weaponRelaxedKey = (weapon: string, state: Locomotion) => `relaxed:${weapon}:${state}`
+/**
+ * **銃ごとの、立って構えた時の上半身の型。** 無い銃は共通の構え (AIM_KEY = idle の上半身)。
+ * P90 は AK と同じ持ち方だったのを本人が持ち直した (2026-11-15「前は P90 を AK みたいに持っていた」)。
+ * 撃つ間もこの型のまま — 撃つ型 (FIRE_KEY) は AK の持ち方なので、替えると持ち方が戻る
+ */
+const WEAPON_AIM: Readonly<Record<string, string>> = {
+  smg: 'smg_aim',
+}
+const weaponAimKey = (weapon: string) => `aim:${weapon}`
+/** **銃ごとの、しゃがんで構えた時の上半身の型。** 無い銃は共通のしゃがみ構え (CROUCH_AIM_KEY = knee_ready) */
+const WEAPON_CROUCH_AIM: Readonly<Record<string, string>> = {
+  smg: 'smg_crouch_aim',
+}
+const weaponCrouchAimKey = (weapon: string) => `crouch_aim:${weapon}`
+/**
+ * 銃ごとの型の名前。**本人が Blender で銃を持たせて全身を詰めた物**なので、旧来の型を
+ * 補う上体の旋回 (CROUCH_TORSO_YAW) を重ねない — 重ねると持ち方が崩れた (P90、2026-11-15)
+ */
+const WEAPON_OWN_CLIPS = new Set<string>([
+  ...Object.values(WEAPON_RELAXED).flatMap((table) => Object.values(table) as string[]),
+  ...Object.values(WEAPON_AIM),
+  ...Object.values(WEAPON_CROUCH_AIM),
+])
 /**
  * ナイフを構えた型。**構えたときだけ。**
  *
@@ -1670,6 +1716,12 @@ export class CharacterAnimator {
   private spineBone: THREE.Bone | null = null
   /** 頭ボーン。カメラの注視点をアニメーションの姿勢から決めるのに使う */
   private headBone: THREE.Bone | null = null
+  /** 首へねじれを分ける骨と、頭の元の向き (NECK_SHARE) */
+  private neckShare: { neck: THREE.Bone; head: THREE.Bone; headRest: THREE.Quaternion } | null = null
+  private readonly neckDelta = new THREE.Quaternion()
+  private readonly neckHalf = new THREE.Quaternion()
+  private readonly neckMove = new THREE.Quaternion()
+  private readonly neckEuler = new THREE.Euler()
   private headResolved = false
   /** 構えているか (目標) と、実際に効いている補正量 (0..1) */
   private aiming = false
@@ -1780,6 +1832,10 @@ export class CharacterAnimator {
     this.root = root
     this.moveSpeed = moveSpeed
     this.mixer = new THREE.AnimationMixer(root)
+    // 頭の元の向きは型を流す前に控える (NECK_SHARE)
+    const neck = findBoneBySuffix(root, 'Neck')
+    const head = findBoneBySuffix(root, 'Head')
+    if (neck && head && head.parent === neck) this.neckShare = { neck, head, headRest: head.quaternion.clone() }
 
     const rootBone = findRootBone(root)
     if (!rootBone) {
@@ -1902,13 +1958,19 @@ export class CharacterAnimator {
     for (const [state, name] of [
       ...Object.entries(RELAXED_CLIPS).map(([k, v]) => [k, v] as const),
       ...Object.entries(PISTOL_RELAXED).map(([k, v]) => [k, v] as const),
+      // 銃ごとの脱力の型も上下そろえる。上だけ差し替えると背骨の打ち消しが上体を回し、
+      // Blender で詰めた持ち方から右手が 10cm 外れた (P90、2026-11-15)
+      ...Object.values(WEAPON_RELAXED).flatMap((table) => Object.entries(table).map(([k, v]) => [k, v as string] as const)),
     ]) {
-      if (!RELAXED_LOWER_STATES.has(state as Locomotion)) continue
+      // 銃ごとの型はしゃがみ (crouch_idle) もそろえる。持ち方ごと全身で詰めた 1 枚なので
+      const own = Object.values(WEAPON_RELAXED).some((table) => (table as Record<string, string>)[state] === name)
+      if (!own && !RELAXED_LOWER_STATES.has(state as Locomotion)) continue
       const clip = byName.get(name)
       const key = relaxedLowerKey(state as Locomotion, name)
       if (!clip || this.lower.has(key)) continue
       const action = this.mixer.clipAction(splitClip(clip, 'lower', key))
       action.play()
+      if (POSE_ONLY_CLIPS.has(clip.name)) action.setEffectiveTimeScale(0)
       this.lower.set(key, action)
       this.lowerClipNames.set(key, clip.name)
     }
@@ -1970,6 +2032,23 @@ export class CharacterAnimator {
     for (const [state, clipName] of Object.entries(PISTOL_RELAXED) as [Locomotion, string][]) {
       const clip = byName.get(clipName)
       if (clip) registerUpper(pistolKey(state), clip)
+    }
+
+    for (const [weapon, clipName] of Object.entries(WEAPON_CROUCH_AIM)) {
+      const clip = byName.get(clipName)
+      if (clip) registerUpper(weaponCrouchAimKey(weapon), clip)
+    }
+    // 銃ごとの構えの型 (WEAPON_AIM)。体に無ければ共通の構え
+    for (const [weapon, clipName] of Object.entries(WEAPON_AIM)) {
+      const clip = byName.get(clipName)
+      if (clip) registerUpper(weaponAimKey(weapon), clip)
+    }
+    // 銃ごとの構えていない型 (WEAPON_RELAXED)。体に無ければ共通の型へ落ちる
+    for (const [weapon, table] of Object.entries(WEAPON_RELAXED)) {
+      for (const [state, clipName] of Object.entries(table) as [Locomotion, string][]) {
+        const clip = byName.get(clipName)
+        if (clip) registerUpper(weaponRelaxedKey(weapon, state), clip)
+      }
     }
 
     // 構えていないときは銃を下ろした姿勢。移動状態ごとに別のクリップを使う。
@@ -2448,11 +2527,30 @@ export class CharacterAnimator {
     // mixer がボーンの回転を書き換えた「後」に上乗せする。順序を逆にすると毎フレーム消える。
     this.squareHips()
     this.captureUpperBases()
+    // 控え (captureUpperBases) の後。先に掛けると控えに入り、three が書き戻さない回に積み重なって首が回り続けた
+    this.shareNeckTwist()
     this.alignSpineToUpperClip(dt)
     this.applyAimPitch()
     this.turnTorso(dt)
     this.updateSways(dt)
     this.updateBlink(dt)
+  }
+
+  /**
+   * 型の頭のねじれと上下を、半分 (NECK_SHARE) だけ首へ移す。**頭は世界で同じ向きのまま。**
+   * 首を頭の元の向きの空間で回し (元 × 半分 × 元の逆)、頭はその逆を掛けて戻す
+   */
+  private shareNeckTwist(): void {
+    const share = this.neckShare
+    if (!share) return
+    const { neck, head, headRest } = share
+    const delta = this.neckDelta.copy(headRest).invert().multiply(head.quaternion)
+    const e = this.neckEuler.setFromQuaternion(delta, 'XYZ')
+    // Blender で P90 の型を直した時と同じ順 (縦軸の回り × 横軸の回り)
+    const half = this.neckHalf.setFromEuler(e.set(e.x * NECK_SHARE, e.y * NECK_SHARE, 0, 'YXZ'))
+    const move = this.neckMove.copy(headRest).multiply(half).multiply(this.neckDelta.copy(headRest).invert())
+    neck.quaternion.multiply(move)
+    head.quaternion.premultiply(move.invert())
   }
 
   /** 瞬きの形を持つメッシュ。**1 度だけ探す** (null = まだ探していない) */
@@ -2654,12 +2752,14 @@ export class CharacterAnimator {
     const axes = this.aimAxes ?? this.resolveAimAxes()
     if (!axes.length) return
 
-    const target = CROUCH_LOCOMOTIONS.has(this.locomotion) ? 1 : 0
+    // 銃ごとの型 (P90 など) は本人が持ち方ごと半身を詰めてあるので回さない
+    const upperName = this.upperClipNames.get(this.resolveUpperKey())
+    const own = !!upperName && WEAPON_OWN_CLIPS.has(upperName)
+    const target = CROUCH_LOCOMOTIONS.has(this.locomotion) && !own ? 1 : 0
     this.crouchBlend = damp(this.crouchBlend, target, CROUCH_TORSO_LAMBDA, dt)
 
     // 上向きの軸に対して正が左回りなので、右へ回すには符号を反転する
     // 上半身の型ごとの向きの補正 (UPPER_FACING)
-    const upperName = this.upperClipNames.get(this.resolveUpperKey())
     this.upperFacing = damp(this.upperFacing, (upperName && UPPER_FACING[upperName]) || 0, CROUCH_TORSO_LAMBDA, dt)
     const total = -this.crouchTorsoYaw * this.crouchBlend + this.upperFacing
     if (Math.abs(total) < 0.001) return
@@ -3086,7 +3186,10 @@ export class CharacterAnimator {
       const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
       if (this.lower.has(key)) return key
     }
-    if (this.aiming || !RELAXED_LOWER_STATES.has(this.locomotion)) return this.locomotion
+    if (this.aiming) return this.locomotion
+    const own = this.heldWeapon ? WEAPON_RELAXED[this.heldWeapon]?.[this.locomotion] : undefined
+    if (own && this.lower.has(relaxedLowerKey(this.locomotion, own))) return relaxedLowerKey(this.locomotion, own)
+    if (!RELAXED_LOWER_STATES.has(this.locomotion)) return this.locomotion
     const name = this.pistol ? PISTOL_RELAXED[this.locomotion] : RELAXED_CLIPS[this.locomotion]
     if (!name) return this.locomotion
     const key = relaxedLowerKey(this.locomotion, name)
@@ -3244,6 +3347,13 @@ export class CharacterAnimator {
   setHandsEmpty(empty: boolean): void {
     this.handsEmpty = empty
   }
+
+  /** 持っている銃 (WeaponId)。構えていない時の型を銃ごとに引く (WEAPON_RELAXED)。手ぶら・ナイフは null */
+  setHeldWeapon(weapon: string | null): void {
+    this.heldWeapon = weapon
+  }
+
+  private heldWeapon: string | null = null
 
   setPistol(oneHanded: boolean): void {
     this.pistol = oneHanded
@@ -3605,6 +3715,9 @@ export class CharacterAnimator {
        * 合わせて詰めてある。下の構えの枝がしゃがみの構えを返す
        */
       const crouching = CROUCH_LOCOMOTIONS.has(this.locomotion)
+      // 銃ごとの構えがあれば撃つ間もそれ (WEAPON_AIM の注)
+      const own = this.heldWeapon ? weaponAimKey(this.heldWeapon) : ''
+      if (!crouching && this.upper.has(own)) return own
       if (!crouching && this.upper.has(FIRE_KEY)) return FIRE_KEY
     }
     if (this.upperState === 'reload') {
@@ -3796,8 +3909,23 @@ export class CharacterAnimator {
         const key = crouching ? PISTOL_CROUCH_AIM_KEY : PISTOL_AIM_KEY
         if (this.upper.has(key)) return key
       }
+      // しゃがんで構えた。銃ごとの型があればそれ (WEAPON_CROUCH_AIM)
+      if (crouching && this.heldWeapon) {
+        const key = weaponCrouchAimKey(this.heldWeapon)
+        if (this.upper.has(key)) return key
+      }
       if (crouching && this.upper.has(CROUCH_AIM_KEY)) return CROUCH_AIM_KEY
+      // 立って構えた。銃ごとの構えがあればそれ (WEAPON_AIM)
+      if (this.heldWeapon) {
+        const key = weaponAimKey(this.heldWeapon)
+        if (this.upper.has(key)) return key
+      }
       return AIM_KEY
+    }
+    // 持っている銃に専用の型があればそれ (WEAPON_RELAXED)
+    if (this.heldWeapon) {
+      const key = weaponRelaxedKey(this.heldWeapon, this.locomotion)
+      if (this.upper.has(key)) return key
     }
     // 拳銃は納めているので手ぶら。移動状態ごとに専用の型がある
     if (this.pistol) {
