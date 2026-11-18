@@ -9,6 +9,7 @@
 // 使い方: bun merge_clip.js <取り込み先.glb> <取り込み元.glb> <クリップ名> <出力.glb>
 //         [--hips-from <既存の型>] … 腰の高さをその型の先頭に揃える (揺れは残す)
 //         [--rotation-only]  … 体つきが違う相手へ移すとき (腰の移動だけ残す)
+//         [--hips-lift <n>]  … --hips-from で揃えた後、腰をさらに n だけ上げる (型の単位、負で下げる)
 
 const args = process.argv.slice(2)
 /*
@@ -46,8 +47,17 @@ const noRoot = args.includes('--no-root')
 const inPlace = args.includes('--in-place')
 const hipsFromAt = args.indexOf('--hips-from')
 const hipsFrom = hipsFromAt >= 0 ? args[hipsFromAt + 1] : null
+/*
+ * --hips-lift <n> … 腰を揃えた後に、上へ n だけ上げる。**骨の向きが違う体で足が潜る・浮く時に。**
+ *
+ * --rotation-only は骨の回転をそのまま載せるので、骨の元の向きが違う体 (raiden) では、同じ角度でも
+ * 脚の伸び方が変わって足が床に潜った (P90 の立ち止まりで 9.6cm、2026-11-15)。腰の高さを揃えても
+ * 足の高さは揃わないので、測った差だけ持ち上げる。上の向きは --in-place と同じく idle の腰で見分ける
+ */
+const hipsLiftAt = args.indexOf('--hips-lift')
+const hipsLift = hipsLiftAt >= 0 ? Number(args[hipsLiftAt + 1]) : 0
 const [destPath, srcPath, clipName, outPath] = args.filter(
-  (a, i) => !a.startsWith('--') && !(hipsFromAt >= 0 && i === hipsFromAt + 1),
+  (a, i) => !a.startsWith('--') && !(hipsFromAt >= 0 && i === hipsFromAt + 1) && !(hipsLiftAt >= 0 && i === hipsLiftAt + 1),
 )
 
 function parseGlb(bytes, path) {
@@ -164,6 +174,11 @@ for (const channel of animation.channels) {
     let shift = null
     const output = copyAccessor(source.output, (floats) => {
       shift = [ref[0] - floats[0], ref[1] - floats[1], ref[2] - floats[2]]
+      if (hipsLift) {
+        const rest = hipsFirstFrame(dest, 'idle')
+        const up = rest.map(Math.abs).indexOf(Math.max(...rest.map(Math.abs)))
+        shift[up] += hipsLift * Math.sign(rest[up])
+      }
       for (let i = 0; i < floats.length; i += 3) {
         floats[i] += shift[0]
         floats[i + 1] += shift[1]

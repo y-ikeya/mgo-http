@@ -2,8 +2,9 @@
  * 突撃銃の主観 (照準器を覗く段) を、**本番と同じ置き方で**カメラの前に出して見る。
  *
  *     bunx vite → http://localhost:5174/tools/preview/sight.html?weapon=rifle
- *     ?weapon=rifle|m4   どの銃か
+ *     ?weapon=rifle|m4|smg   どの銃か
  *     ?fov=30            画角 (度)。weapons.ts の scope と同じ値
+ *     ?eye=x,y,z         目の位置を設定 (weapon.ts の sight.eye) の代わりに使う。詰める間だけ
  *
  * 画面の真ん中に細い十字を引く。**照準器 (照門と照星の頂 / ホロサイトの窓) が十字に
  * 重なっていれば、照準線と弾の行き先が一致している** (弾は画面の真ん中へ飛ぶ)
@@ -14,7 +15,7 @@ import { buildLights } from '../../src/presentation/scene/world/stage'
 import { Weapon, WEAPON_CONFIGS, cutSightGlass } from '../../src/presentation/scene/arms/weapon'
 
 const query = new URLSearchParams(location.search)
-const kind = (query.get('weapon') ?? 'rifle') as 'rifle' | 'm4'
+const kind = (query.get('weapon') ?? 'rifle') as 'rifle' | 'm4' | 'smg'
 const fov = Number(query.get('fov') ?? '30')
 const WIDTH = 1280
 const HEIGHT = 800
@@ -36,7 +37,9 @@ scene.add(target)
 const camera = new THREE.PerspectiveCamera(fov, WIDTH / HEIGHT, 0.1, 500)
 scene.add(camera)
 const weapon = await Weapon.load(kind)
-const sight = WEAPON_CONFIGS[kind].sight!
+const eyeOverride = query.get('eye')?.split(',').map(Number)
+const sight = { ...WEAPON_CONFIGS[kind].sight! }
+if (eyeOverride?.length === 3) sight.eye = new THREE.Vector3(...(eyeOverride as [number, number, number]))
 const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), sight.pitch).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), sight.roll))
 weapon.object.quaternion.copy(turn)
 weapon.object.position.copy(sight.eye).applyQuaternion(turn).negate()

@@ -22,6 +22,9 @@ from mathutils import Vector
 
 # 物差しの接頭辞。ゲームには持ち込まない
 REF_PREFIX = 'ref_'
+# 部品の棚と、部品で組んだ見本の建物を置くコレクション。.blend の中の型紙なので出さない
+# (2026-11-18 本人「同じ blend に作ろう…これを基準にしていく」)。ステージ側の物は形を共有して使う
+PARTS_COLLECTION = 'parts'
 
 # 名前に付けられる札。これ以外の接頭辞は打ち間違いの可能性が高い
 # shield_ は**印だけ**。書き出しの上では普通の壁で、名前で役目が読めるようにしてある
@@ -73,7 +76,7 @@ def tread_points(obj, faces, main, steps=8):
 
     stair_plane は帯ごとの一番高い点を拾う。踏み面の頂点は段の縁にしか無いので、
     頂点だけで拾うと空の帯が出て、縁の頂点が入った帯だけで直線を引くことになり、
-    傾きが頂点の付き方で変わった。焼き込みの割りすぎを直して頂点が減ったら、CC の
+    傾きが頂点の付き方で変わった。焼き込みの割りすぎを直して頂点が減ったら、MM の
     階段の坂が 0.356 → 0.331 にずれ、真ん中で 7cm 沈んだ (2026-11-09)。
     踏み面の三角ごとに格子状に点を打てば、どの帯にも踏み面の高さが入る
     """
@@ -302,6 +305,21 @@ if bpy.context.object is not None and bpy.context.object.mode != 'OBJECT':
     bpy.ops.object.mode_set(mode='OBJECT')
 
 bpy.ops.object.select_all(action='DESELECT')
+
+# --- 部品の棚と見本の建物は出さない -------------------------------------------
+#
+# `parts` コレクションは .blend の中の型紙。見た目 (glb) から外すだけでは足りず、
+# 当たりの箱 (json) と当たりの三角 (mesh.bin) には入っていた (2026-11-18)。
+# 書き出し用に読んだ写しなので、**最初に物ごと消す**。形はステージの物と共有して
+# いるので、物を消しても形は残る。
+_parts = bpy.data.collections.get(PARTS_COLLECTION)
+if _parts:
+    _gone = list(_parts.all_objects)
+    for _obj in _gone:
+        bpy.data.objects.remove(_obj)
+    print(f'  部品の棚と見本: {len(_gone)} 個を出さない')
+    if bpy.context.view_layer.objects.active is None:
+        bpy.context.view_layer.objects.active = next((o for o in bpy.context.scene.objects if o.type == 'MESH'), None)
 
 # --- 基地の工具箱 -------------------------------------------------------------
 #
@@ -1907,6 +1925,10 @@ def has_image(obj):
     return False
 
 
+# 段ごとの縦のずらし (絵の枚数)。材質の custom property `row_vshift` で変えられる。row_shift (横 0.37) と違う半端な量
+ROW_VSHIFT = 0.43
+
+
 def texel_of(obj):
     """1 タイルの実寸 (m)。**絵の実寸に合わせたい材質は custom property `texel` に書く**
     (面ごとにも見る: 材質の違う面が混ざる物は、面の材質の texel が勝つ)。
@@ -1954,6 +1976,22 @@ def reproject(obj, uv=True, tiling_only=False):
         center = mw @ face.calc_center_median()
         return axis, n[axis] > 0, round(center[axis], 1), center
 
+    # **窓を縮めた周りの埋めは、建物の壁と同じだけずらす。** 量は名前から決まるので、
+    # 埋め (vis_concrete_bN_window_infill) と建物が別の物だと、窓の周りだけ模様の目が
+    # 合わない継ぎ当てに見えた (2026-11-17)。物の custom property `uv_group` に建物の名前を
+    # 書くと、その建物の同じ向き・ほぼ同じ位置 (0.15m 以内) の平面と同じ量を使う
+    group = obj.get('uv_group')
+    owner = bpy.data.objects.get(group) if group else None
+    owner_planes = []
+    if owner is not None and owner.type == 'MESH':
+        omw = owner.matrix_world
+        found = set()
+        for p in owner.data.polygons:
+            n = omw.to_3x3() @ p.normal
+            ax = max(range(3), key=lambda i: abs(n[i]))
+            found.add((ax, n[ax] > 0, round((omw @ p.center)[ax], 1)))
+        owner_planes = list(found)
+
     def plane_jitter(mat, plane):
         # **壁の平面ごとに模様をずらす。** ワールド座標で貼るので、何もしないと隣の建物まで
         # 模様の位置がそろい、同じ剥がれが並んで単調になる (2026-11-13 本人「パターンを
@@ -1961,7 +1999,14 @@ def reproject(obj, uv=True, tiling_only=False):
         # ずらすので、1 枚の壁の中に継ぎ目は出ない。量は名前と平面から決まり、毎回同じ
         if not (mat and mat.get('jitter')):
             return 0.0, 0.0
-        h = zlib.crc32(f'{obj.name}|{plane[0]}|{plane[1]}|{plane[2]}'.encode())
+        name, key = obj.name, plane[:3]
+        if owner_planes:
+            at = plane[3][plane[0]]
+            near = [p for p in owner_planes
+                    if p[0] == plane[0] and p[1] == plane[1] and abs(p[2] - at) <= 0.15]
+            if near:
+                name, key = owner.name, min(near, key=lambda p: abs(p[2] - at))
+        h = zlib.crc32(f'{name}|{key[0]}|{key[1]}|{key[2]}'.encode())
         return (h & 0xFFFF) / 0x10000, (h >> 16) / 0x10000
 
     def texel_for(mat):
@@ -2011,7 +2056,13 @@ def reproject(obj, uv=True, tiling_only=False):
         t = texel_for(mat)
         du, dv = plane_jitter(mat, plane)
         if mat and mat.get('row_shift') and axis != 2:
-            du += math.floor(plane[3].z / t + dv) * float(mat['row_shift'])
+            row = math.floor(plane[3].z / t + dv)
+            du += row * float(mat['row_shift'])
+            # **縦にも段ごとにずらす** (2026-11-16 本人「1回と二回で同じような模様になってない？」)。
+            # 横だけだと、絵 1 枚の高さ (texel 4m) と階の高さがほぼ同じ建物で、どの階にも絵の同じ
+            # 高さの帯が来て同じ剥がれが上下に並んだ。横 (row_shift) と違う半端な量にして、何段
+            # 上がっても縦横とも揃わないように。段の境目で面は切ってあるので、1 段の中に継ぎ目は出ない
+            dv += row * float(mat.get('row_vshift', ROW_VSHIFT))
         for loop in face.loops:
             world = mw @ loop.vert.co
             loop[layer].uv = (world[u_axis] / t + du, world[v_axis] / t + dv)
@@ -2240,7 +2291,7 @@ def bake_hsv_nodes():
                 dst = [l for l in node.outputs['Color'].links if l.to_socket.name == 'Base Color']
                 # 間に「一定の色を掛ける」(Mix の乗算) が 1 つあってもよい。白っぽい絵に色を乗せる時に
                 # 使う — 色相を回しても灰色には色が乗らないので、彩度を抜いてから土色を掛ける
-                # (CC の煉瓦、2026-11-13 本人「レンガの色を土色に近づけて」)
+                # (MM の煉瓦、2026-11-13 本人「レンガの色を土色に近づけて」)
                 tint = None
                 if not dst:
                     for l in node.outputs['Color'].links:
@@ -2507,7 +2558,7 @@ for b in special:
     print(f"  {b['name']}: {' '.join(off)} を通す")
 
 # **空の見え方の升の表 (--sky)。焼き込み (--bake) の代わり** (tools/sky_grid.py、2026-11-09)。
-# 頂点に暗さを焼くと、暗さを細かくしたい所は平らな面でも頂点を割るしかなく、CC で glb を 1.6MB
+# 頂点に暗さを焼くと、暗さを細かくしたい所は平らな面でも頂点を割るしかなく、MM で glb を 1.6MB
 # 食っていた。表は面の近くだけ持って 1MB 弱。画面は表のあるステージだけ表で描く (world/skyGrid.ts)
 #
 #   $BLENDER -b tools/raw/stage_city.blend --python tools/export_stage.py -- --sky

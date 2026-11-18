@@ -297,6 +297,12 @@ export const TARGET_DOWN = 2.0 + TARGET_STAND
  * ここにレプリカを置いていて、モールの的を東棟へ移したときに取り残された
  * (試験だけが 45m 先を撃っていた)。地形の点は地形の側に 1 つ。
  */
+/** 青の基地のほうを向く向き (rad)。撃ち返す的が湧いた時に向く */
+function towardBlue(room: RoomWorld, at: { x: number; z: number }): number {
+  const base = STAGES[room.stage.name].bases.blue
+  return Math.atan2(-(base.x - at.x), -(base.z - at.z))
+}
+
 export function placeTargets(room: RoomWorld): void {
   const now = Date.now()
   STAGES[room.stage.name].targets.forEach((at, i) => {
@@ -313,6 +319,8 @@ export function placeTargets(room: RoomWorld): void {
       y: at.y,
       stance: at.stance,
       patrol: at.patrol,
+      // 撃ち返す的は青の基地のほうを向いて湧く (向き 0 で -Z を向く)
+      fires: at.fires ? { yaw: towardBlue(room, at), weapon: at.weapon } : undefined,
       now,
     })
     room.players.set(bot.id, bot)

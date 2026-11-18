@@ -10,7 +10,7 @@ import { parseSkyTable, type SkyTable } from './skyTable'
  * 影の中を暗くする方法」)。表を読む・CPU で引くのは skyTable.ts、焼くのは tools/sky_grid.py。
  *
  * 前は「空の見え方」を頂点に焼いていた (tools/bake_stage.py)。暗さを細かくしたい所は平らな面でも
- * 頂点を割るしかなく、CC で glb を 1.6MB 食っていた。表は面の近くだけ持って 1MB 弱。
+ * 頂点を割るしかなく、MM で glb を 1.6MB 食っていた。表は面の近くだけ持って 1MB 弱。
  * **表 (stage_<名>.sky.bin) のあるステージだけ表で描く。** 無いステージは今まで通り頂点の暗さ。
  *
  * --- 引き方 ---

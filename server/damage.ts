@@ -382,7 +382,11 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
    * 当てると 1 粒目以外が全部弾かれて、当たっているのに削れない。1 発ぶんの
    * 窓の中では粒の数まで通して、それを超えたら弾く。
    */
-  if (event.kind === 'bullet') {
+  /*
+   * **撃ち返す的 (bot) の弾は確かめない。** サーバーが自分で作った弾で、申告ではない
+   * (server/botGun.ts)。接続も無いので、連射の数えや却下の数え (sessionOf) を引くと落ちる
+   */
+  if (event.kind === 'bullet' && !attacker.bot) {
     const now = Date.now()
     const spec = weaponOf(attacker.weapon)
     const limit = spec.fireInterval * 1000 * FIRE_INTERVAL_SLACK
@@ -403,7 +407,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
   }
 
   const spec = weaponOf(attacker.weapon)
-  const verdict = verifyHit(
+  const verdict = attacker.bot ? null : verifyHit(
     posesOf(attacker),
     posesOf(victim),
     {
@@ -423,7 +427,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
     LAG_WINDOW_MS,
     HIT_RULES,
   )
-  if (!verdict.ok) {
+  if (verdict && !verdict.ok) {
     reject(attacker, verdict.reason)
     return NOT_HURT
   }
@@ -440,7 +444,7 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
    * **どちら側から飛んできたか**なので別の式。
    */
   const stabbedBehind =
-    event.kind === 'melee' && isBackstab(verdict.attacker, verdict.target, HIT_RULES.backstabDot)
+    event.kind === 'melee' && verdict !== null && isBackstab(verdict.attacker, verdict.target, HIT_RULES.backstabDot)
 
   /*
    * 削る量。**散弾だけ別の道。**
@@ -506,11 +510,12 @@ export function applyDamage(room: RoomWorld, attacker: MatchPlayer, event: Clien
      * **1 発につき 1 回。** 散弾は 1 発が 8 粒に分かれるので、粒ごとに送ると
      * 近距離で 8 回重なって体が跳ね回る。当たった数は削れる量で出ている。
      */
-    const session = sessionOf(attacker)
+    // 撃ち返す的 (bot) は接続が無い。1 発 1 回の数えは要らない (散弾を持たない)
+    const session = attacker.bot ? null : sessionOf(attacker)
     // 散弾は距離の帯が決める。他の銃は今まで通り「頭に当たったのに倒れなかった」
     const wants = band ? band.flinch : event.kind === 'bullet' && event.zone === 'HEAD'
-    const flinch = wants && !session.flinchedThisShot
-    if (flinch) session.flinchedThisShot = true
+    const flinch = wants && !session?.flinchedThisShot
+    if (flinch && session) session.flinchedThisShot = true
     // 的は足を止める (人は本人の画面が止める、soldier の flinchLeft)。走り続ける的が仰け反ったまま走っていた
     if (flinch && victim.bot) victim.staggerUntil = Math.max(victim.staggerUntil, Date.now() + FLINCH_SECONDS * 1000)
     // **仰け反れば手が緩む。** 振りかぶったまま撃たれたら足元に落ちる。

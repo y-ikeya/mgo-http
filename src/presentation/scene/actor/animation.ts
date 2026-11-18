@@ -330,7 +330,12 @@ const RELAXED_CLIPS: Partial<Record<Locomotion, string>> = {
  * 6.8mm 動いていた (立ちは 0.12mm)。
  */
 // P90 のしゃがみも Blender の 1 姿勢から書き出した 2〜4 コマ。下半身にも流すので体ごと震えた (本人 2026-11-15)
-const POSE_ONLY_CLIPS = new Set(['knee_relaxed', 'knee_ready', 'smg_crouch_relaxed', 'smg_crouch_aim'])
+const POSE_ONLY_CLIPS = new Set([
+  'knee_relaxed', 'knee_ready',
+  'smg_crouch_relaxed', 'smg_crouch_aim', 'smg_prone_relaxed', 'smg_prone_aim',
+  'sniper_relaxed_idle', 'sniper_aim', 'sniper_crouch_relaxed', 'sniper_crouch_aim', 'sniper_prone_relaxed', 'sniper_prone_aim',
+  'pistol_crouch_relaxed', 'handgun_crouch_aim', 'handgun_relaxed_idle', 'handgun_aim', 'handgun_prone_relaxed', 'handgun_prone_aim',
+])
 
 const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
   'crouch_idle',
@@ -544,45 +549,65 @@ const BLINK_OPEN = 0.12
 const SLEEP_SHUT = 0.6
 const SLEEP_WAKE = 0.15
 
-/** 減衰。大きいほど早く収まる */
-const BUST_DAMP = 11
-/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** (2026-11-11 本人「揺れ幅1.7倍でいいよ」で 0.0055 から 1.7 倍、11-12 に左右の加速度の取り違えを直したら振れが 6 割に減ったので「揺れを大きくして」で 0.035) */
-const BUST_GAIN = 0.035
+/**
+ * 減衰。大きいほど早く収まる。11 → 5.5 (2026-11-16 本人「揺れがおさまるのを長く」、大きくはしない)。
+ * 名無しを走って止めて、0.01 rad を超えて揺れている間が 0.67 → 1.17 秒。下げた分だけ振れも大きく
+ * なるので、BUST_GAIN を下げて走っている間の振れを前と同じ (0.09 rad) にそろえた
+ */
+const BUST_DAMP = 5.5
+/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここで決まる** (2026-11-11 本人「揺れ幅1.7倍でいいよ」で 0.0055 から 1.7 倍、11-12 に左右の加速度の取り違えを直したら振れが 6 割に減ったので「揺れを大きくして」で 0.035、11-16 に減衰を半分にした分を戻して 0.024) */
+const BUST_GAIN = 0.024
 /** 振れ幅の上限 (rad)。これを超えると体を突き抜ける (1.7 倍にした時に 0.30 → 0.38、11-12 に「揺れを大きくして」で 0.5) */
 const BUST_MAX = 0.5
 
 /**
- * 髪の揺れ。**手で足した骨 (mixamorig で始まらない骨) を鎖として拾う。**
+ * 腰の紐 (名無しの Bow1〜8、背骨 Spine から垂れた 2 本の鎖)。**垂れた布なので胸とは振り方が違う。**
+ * (2026-11-16 本人「bow については揺れるようにして」「キャラが回ると bow が後からついてくる」)
  *
- * --- なぜ走らせる側で計算するか ---
- * Blender の制約や物理は**書き出しに出ない**。焼けば出るが、こちらは 71 本の
- * クリップで動かしているので、**走り・伏せ・転がり…全部に焼く**ことになる。
- * 付け根の動きから毎フレーム出すほうが、型が増えても勝手に付いてくる。
- *
- * 胸と同じばね。違うのは 2 つ — **柔らかい** (髪は肉より自由に振れる) のと、
- * **先へ行くほど大きく振れる** (鞭のようにしなる)。
+ * 付け根の**速さ**の逆へなびく (風を受けて後ろへ流れる)。速さを測るのは骨ごとの付け根 —
+ * 紐は体の中心から 11〜22cm 外に付いているので、**その場で回っても付け根は横へ動き**、
+ * 回った後から紐がついてくる。加速度も少し足す (踏み出し・止まりで跳ねる)。
+ * 子の骨は親の振れを受け継ぐので、先ほど大きく振れる
  */
-const HAIR_STIFF = 55
-const HAIR_DAMP = 6
-/** 加速度 (m/s^2) を角度 (rad) へ。**振れ幅はここ** */
-const HAIR_GAIN = 0.013
-const HAIR_MAX = 0.45
-/** 鎖の 1 つ先へ行くごとに掛ける。先端ほど大きく振れる */
-const HAIR_WHIP = 1.25
-
-/*
- * --- 背中へ刺さるのを止める手は、まだ入っていない ---
- *
- * 2 つ試して 2 つとも外した:
- *
- *   世界の下へ引き寄せる  **走っている間まで垂れた。** ポニーテールは頭に
- *                         付いて靡く物で、紐で吊った重りではない
- *   前へ回り込むのを禁じる **暴れた。** 押し戻した結果をばねの状態へ返して
- *                         いないので、次のコマでばねが押し返して発振する
- *
- * 次にやるなら、押し戻した分を entry.angle へ書き戻すこと。さもなければ
- * 背中に円柱を置いて骨を外へ逃がす (当たり判定を持つ) 形になる。
+const BOW_STIFF = 30
+/** 減衰。胸 (5.5) より小さめ — 布は収まるまで長く揺れる */
+const BOW_DAMP = 4
+/** 付け根の速さ (m/s) を角度 (rad) へ。走って (4.5m/s) 0.4 rad */
+const BOW_DRAG = 0.09
+/**
+ * 体が回った分の付け根の速さ (体の中心からの横の速さ、m/s) へ**さらに**掛ける。回った後から
+ * ついてくるのを見せる (速さだけでは 6 rad/s で回って先が 5〜9cm しか遅れなかった)。0.25 では
+ * 太ももへ強く振り込んで弾けたので 0.15
  */
+const BOW_SPIN = 0.15
+/**
+ * これより速い付け根の動き (m/s)・体の回り (rad/s) は**瞬間移動**として捨てる。生き返り・位置の
+ * 補正で体が飛んだ 1 コマに、紐が真横まで跳ねないように
+ */
+const BOW_TELEPORT_SPEED = 15
+const BOW_TELEPORT_SPIN = 40
+/**
+ * 太もも。**紐が刺さらないように外へ押し出す** (2026-11-16 本人「太ももとかを貫通する」)。
+ * 腿の付け根 (UpLeg) から膝 (Leg) への細っていく円柱。名無しの体で骨の線から表面までを測った
+ * (付け根側の 6 割で 11〜13.5cm、膝の近くで 6cm)。服の前垂れ (16cm) までは避けない —
+ * 紐が大きく外へ逃げて不自然になる
+ */
+const BOW_THIGH_RADIUS_HIP = 0.125
+const BOW_THIGH_RADIUS_KNEE = 0.07
+/** 紐の太さぶんの余白 (m) */
+const BOW_THIGH_MARGIN = 0.01
+/**
+ * 太ももに触れている間の、ばねへの伝え方。押し出しは描く骨だけで、ばねの位置は書き換えない
+ * (書き換えると震えた)。代わりに**前のコマで食い込んだ分だけ、ばねの狙いを外へずらし**、減衰を
+ * 足す (布が擦れて勢いが落ちる)。ばねが太ももの奥まで入り込むと、押し出しが毎コマ大きく、
+ * 向きも変わって**ピンボールのように弾けた** (2026-11-16 本人「そんな荒ぶらないで欲しい」)
+ */
+const BOW_CONTACT_PUSH = 1
+const BOW_CONTACT_DAMP = 25
+/** 付け根の加速度 (m/s^2) を角度 (rad) へ */
+const BOW_GAIN = 0.01
+/** 振れ幅の上限 (rad) */
+const BOW_MAX = 0.6
 
 const ROLL_EXIT_PHASE = 0.78
 
@@ -767,8 +792,60 @@ const pistolKey = (state: Locomotion) => `pistol_relaxed:${state}`
  * 銃は右手に付けたまま型で腕を動かす — 銃の位置は付け方 (weapon.ts) ではなく型が決める
  */
 const WEAPON_RELAXED: Readonly<Record<string, Partial<Record<Locomotion, string>>>> = {
-  smg: { idle: 'smg_relaxed_idle', crouch_idle: 'smg_crouch_relaxed' },
+  // しゃがんで動く (深く倒した crouch_f) は P90 専用のしゃがみ走り。立って走る型から作った (本人 2026-11-16)
+  smg: { ...ownRelaxed('smg_relaxed_idle', 'smg_crouch_relaxed', 'smg_prone_relaxed'), ...crouchRun('smg_crouch_run') },
+  // 狙撃銃 (本人 2026-11-16)
+  sniper: ownRelaxed('sniper_relaxed_idle', 'sniper_crouch_relaxed', 'sniper_prone_relaxed'),
+  /*
+   * 拳銃のしゃがみ走り。**体は P90 のしゃがみ走りと同じ** (頭の高さを揃える。銃の持ち替えで頭の位置が
+   * 変わると、持ち替えが頭の高さを変える手になる、本人 2026-11-16)。両手を前に、拳銃を右手・左手を添える
+   */
+  // しゃがみ止まりは P90 のしゃがみと同じ体で拳銃を持つ (本人 2026-11-16)
+  // 立ち止まりも P90 の胴体に拳銃の腕 (本人 2026-11-16)
+  /*
+   * 拳銃の立ち走り (pistol_run)。**体は長物の走り (relaxed_run) そのもの**、腕は手ぶらの走り (run_unarmed) の
+   * 振りを脚の拍に合わせて流し、指だけ立ち止まり (handgun_relaxed_idle) の握り (tools/compose_clip.js --swing、
+   * 本人 2026-11-18「腕振って欲しかった」)。手ぶらの走り (run_unarmed) は
+   * 上体が起きていて、頭が P90 より 9cm 高く 17cm 後ろだった (本人 2026-11-18「running の pistol と p90 で
+   * head の位置が違う」、しゃがみ走りと同じ考え方)
+   */
+  m9: { idle: 'handgun_relaxed_idle', crouch_idle: 'pistol_crouch_relaxed', prone_idle: 'handgun_prone_relaxed', ...crouchRun('pistol_crouch_run'), ...standRun('pistol_run') },
+  m1911: { idle: 'handgun_relaxed_idle', crouch_idle: 'pistol_crouch_relaxed', prone_idle: 'handgun_prone_relaxed', ...crouchRun('pistol_crouch_run'), ...standRun('pistol_run') },
 }
+/**
+ * 銃ごとの構えていない型。**止まっている時だけ。**
+ *
+ * 歩く・走る間は共通の型 (腕を振る walk / relaxed_run) のまま。銃は右手に詰めた持ち方で付き、
+ * 左手は詰めた姿の左手の所へ運ぶ (weapon.ts の relaxedLeftHand、carrying)。動いている間も腕を
+ * 振らずに抱えさせたら不自然だった (本人 2026-11-16「前みたいに銃を振って移動しないと不自然」)
+ */
+function ownRelaxed(stand: string, crouch: string, prone: string): Partial<Record<Locomotion, string>> {
+  /*
+   * しゃがみ歩きは上半身も銃ごとの型。共通の型 (knee_relaxed) は腕を振らない止め絵なので、銃ごとのしゃがみの
+   * 型を流しても振りは失われない。止まった所と歩き出した所で上半身の形が変わらない (本人 2026-11-16
+   * 「chrouch の時の歩くのも同様に調整してくれた？」)。脚は歩きの型 (OWN_LOWER_STATES)
+   */
+  return { idle: stand, crouch_idle: crouch, crouch_walk: crouch, crouch_step_back: crouch, prone_idle: prone }
+}
+/**
+ * しゃがみ走りの型を**8 方向全部**に。構えていない間は体が進む向きへ遅れて回るので、曲がった直後は
+ * 横・斜めのしゃがみ移動 (crouch_r など) になる。前 (crouch_f) だけにしていた頃は、その一瞬だけ
+ * 共通のしゃがみ移動 (頭が 22cm 高い) に戻って上体が起きた (本人 2026-11-16「方向転換する時に一瞬、上半身が上に起きちゃう」)
+ */
+function crouchRun(name: string): Partial<Record<Locomotion, string>> {
+  return Object.fromEntries(MOVE_DIRECTIONS.map((d) => [`crouch_${d}`, name])) as Partial<Record<Locomotion, string>>
+}
+/** 立ちの走りの型を 8 方向全部に (crouchRun と同じ理由) */
+function standRun(name: string): Partial<Record<Locomotion, string>> {
+  return Object.fromEntries(MOVE_DIRECTIONS.map((d) => [`run_${d}`, name])) as Partial<Record<Locomotion, string>>
+}
+/** 構えずに銃を提げている姿勢。銃ごとの持ち方の左手をここで運ぶ (carrying) */
+const CARRY_STATES = new Set<Locomotion>([
+  'idle', 'walk', 'step_back', 'up_stair', 'down_stair', 'crouch_idle', 'crouch_walk', 'crouch_step_back',
+  ...MOVE_DIRECTIONS.map((d) => `run_${d}` as Locomotion),
+])
+/** 銃ごとの構えていない型を**下半身にも**流す姿勢。止まっている時だけ (動いている間は脚を動きの型に任せる) */
+const OWN_LOWER_STATES = new Set<Locomotion>(['idle', 'crouch_idle', ...MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion)])
 const weaponRelaxedKey = (weapon: string, state: Locomotion) => `relaxed:${weapon}:${state}`
 /**
  * **銃ごとの、立って構えた時の上半身の型。** 無い銃は共通の構え (AIM_KEY = idle の上半身)。
@@ -777,21 +854,59 @@ const weaponRelaxedKey = (weapon: string, state: Locomotion) => `relaxed:${weapo
  */
 const WEAPON_AIM: Readonly<Record<string, string>> = {
   smg: 'smg_aim',
+  sniper: 'sniper_aim',
+  // 拳銃も P90 の構えの胴体に拳銃の腕 (本人 2026-11-16)。共通の拳銃の構え (pistol_aim) より先に引く
+  m9: 'handgun_aim',
+  m1911: 'handgun_aim',
 }
 const weaponAimKey = (weapon: string) => `aim:${weapon}`
 /** **銃ごとの、しゃがんで構えた時の上半身の型。** 無い銃は共通のしゃがみ構え (CROUCH_AIM_KEY = knee_ready) */
 const WEAPON_CROUCH_AIM: Readonly<Record<string, string>> = {
   smg: 'smg_crouch_aim',
+  sniper: 'sniper_crouch_aim',
+  // 拳銃のしゃがみ構え。胸を真横近くまで回した共通の型 (pistol_crouch_aim) をやめ、P90 の構えくらいの半身に (本人 2026-11-16)
+  m9: 'handgun_crouch_aim',
+  m1911: 'handgun_crouch_aim',
 }
 const weaponCrouchAimKey = (weapon: string) => `crouch_aim:${weapon}`
+/**
+ * **止まって構えている間は、銃ごとの構えの型を下半身にも流す。** 本人が Blender で全身を詰めた 1 枚なので。
+ * 上半身だけだった頃は、脚が共通のしゃがみ (crouch_idle) のままで、腰の違いを打ち消す分だけ上体が
+ * 付け直され、詰めた持ち方から手が 4〜5cm (背骨の向け直しの後は 6〜7cm) 外れ、右膝は 22cm 違った
+ * (2026-11-16 本人「weapon_poses で作った crouch aim P90 と…手が違う」)。動いている間は脚を動きの型に任せる
+ */
+const OWN_AIM_LOWER: Partial<Record<Locomotion, Readonly<Record<string, string>>>> = {
+  idle: WEAPON_AIM,
+  crouch_idle: WEAPON_CROUCH_AIM,
+}
+const ownAimLowerName = (state: Locomotion, name: string) =>
+  Object.values(OWN_AIM_LOWER[state] ?? {}).includes(name)
+/**
+ * **銃ごとの、伏せて構えた時の上半身の型。** 無い銃は伏せ撃ちの頭の 1 枚 (PRONE_AIM_KEY)。
+ * 伏せは脱力・構えとも**上半身だけ** — 脚と腰は這う型 (crawl_f) の頭の 1 枚のまま (Blender でもそれに載せて詰めた)
+ */
+const WEAPON_PRONE_AIM: Readonly<Record<string, string>> = {
+  smg: 'smg_prone_aim',
+  sniper: 'sniper_prone_aim',
+  // 拳銃は伏せの脱力 (handgun_prone_relaxed) を元に本人が詰めた (2026-11-16)
+  m9: 'handgun_prone_aim',
+  m1911: 'handgun_prone_aim',
+}
+const weaponProneAimKey = (weapon: string) => `prone_aim:${weapon}`
 /**
  * 銃ごとの型の名前。**本人が Blender で銃を持たせて全身を詰めた物**なので、旧来の型を
  * 補う上体の旋回 (CROUCH_TORSO_YAW) を重ねない — 重ねると持ち方が崩れた (P90、2026-11-15)
  */
+/**
+ * 銃ごとの表に入っているが、**体は共通の型そのもの**の物。前傾 (lean)・腰の向け (hipSquare) は共通の型と
+ * 同じに掛ける — 外すと頭が 2cm 低く 3cm 前へずれた (pistol_run、体は relaxed_run)
+ */
+const COMMON_BODY_CLIPS = new Set<string>(['pistol_run'])
 const WEAPON_OWN_CLIPS = new Set<string>([
-  ...Object.values(WEAPON_RELAXED).flatMap((table) => Object.values(table) as string[]),
+  ...Object.values(WEAPON_RELAXED).flatMap((table) => (Object.values(table) as string[]).filter((name) => !COMMON_BODY_CLIPS.has(name))),
   ...Object.values(WEAPON_AIM),
   ...Object.values(WEAPON_CROUCH_AIM),
+  ...Object.values(WEAPON_PRONE_AIM),
 ])
 /**
  * ナイフを構えた型。**構えたときだけ。**
@@ -801,6 +916,12 @@ const WEAPON_OWN_CLIPS = new Set<string>([
  */
 const KNIFE_KEY = 'knife_idle'
 const RELOAD_KEY = 'reload'
+/**
+ * 長物の装填の型 (30fps) を切るコマ。**Blender の 74 コマ目まで残す。** 型のキーは Blender のコマ N が
+ * 時刻 N/30 に付いていて、subclip は終わりのコマを含まないので 75 (残る長さは 73/30 = 2.43 秒)
+ */
+const RELOAD_END_FRAME = 75
+const RELOAD_FPS = 30
 const STAB_KEY = 'stab'
 /** 伏せたまま刺す。全身の型 (tools/prone_knife.json) */
 const PRONE_STAB_KEY = 'prone_stab'
@@ -1255,6 +1376,14 @@ const WALK_CLIP_SPEED = 1.27
 /** 状態ではなく**クリップ**で速さが違う物。手ぶらの表 (PISTOL_RELAXED) が引く */
 const CLIP_NATIVE_SPEED: Record<string, number> = {
   walk_unarmed: 0.78,
+  /*
+   * P90 のしゃがみ走り。立って走る型 (relaxed_run) の腰を下ろし、歩幅を 1.7m に詰めて焼いた (立ちの
+   * 2.78m のままだと大股でゆっくり運んで滑って見えた、本人 2026-11-16)。名無しで床に着いた足が流れる
+   * 速さを測った値。試合のしゃがみ移動 (2.74 × 0.7 = 1.92 m/s) で 1 歩 0.97 秒
+   */
+  smg_crouch_run: 2.06,
+  // 体は P90 のしゃがみ走りと同じ
+  pistol_crouch_run: 2.06,
 }
 /**
  * 歩きの再生の上限 (m/s)。**他人の型には速さが届かない** (moveSpeed は走りの値の
@@ -1961,9 +2090,15 @@ export class CharacterAnimator {
       // 銃ごとの脱力の型も上下そろえる。上だけ差し替えると背骨の打ち消しが上体を回し、
       // Blender で詰めた持ち方から右手が 10cm 外れた (P90、2026-11-15)
       ...Object.values(WEAPON_RELAXED).flatMap((table) => Object.entries(table).map(([k, v]) => [k, v as string] as const)),
+      // 銃ごとの構えの型も、止まっている間は下半身まで (OWN_AIM_LOWER の注)
+      ...Object.values(WEAPON_AIM).map((v) => ['idle', v] as const),
+      ...Object.values(WEAPON_CROUCH_AIM).map((v) => ['crouch_idle', v] as const),
     ]) {
       // 銃ごとの型はしゃがみ (crouch_idle) もそろえる。持ち方ごと全身で詰めた 1 枚なので
-      const own = Object.values(WEAPON_RELAXED).some((table) => (table as Record<string, string>)[state] === name)
+      // 下半身にも流すのは止まっている時だけ (OWN_LOWER_STATES)。伏せは上半身だけ (WEAPON_PRONE_AIM の注)
+      const own = (OWN_LOWER_STATES.has(state as Locomotion)
+        && Object.values(WEAPON_RELAXED).some((table) => (table as Record<string, string>)[state] === name))
+        || ownAimLowerName(state as Locomotion, name)
       if (!own && !RELAXED_LOWER_STATES.has(state as Locomotion)) continue
       const clip = byName.get(name)
       const key = relaxedLowerKey(state as Locomotion, name)
@@ -2038,6 +2173,10 @@ export class CharacterAnimator {
       const clip = byName.get(clipName)
       if (clip) registerUpper(weaponCrouchAimKey(weapon), clip)
     }
+    for (const [weapon, clipName] of Object.entries(WEAPON_PRONE_AIM)) {
+      const clip = byName.get(clipName)
+      if (clip) registerUpper(weaponProneAimKey(weapon), clip)
+    }
     // 銃ごとの構えの型 (WEAPON_AIM)。体に無ければ共通の構え
     for (const [weapon, clipName] of Object.entries(WEAPON_AIM)) {
       const clip = byName.get(clipName)
@@ -2097,7 +2236,13 @@ export class CharacterAnimator {
     const fire = byName.get('fire')
     if (fire) registerUpper(FIRE_KEY, fire)
 
-    const reload = byName.get('reload')
+    /*
+     * 長物の装填は **Blender の 74 コマ目で切る。** その先は手を AK のような長物の
+     * 構えへ揃え直す動きで、今の P90 などの持ち方と合わない (本人 2026-11-18「74 コマ目くらいで切って
+     * いい…それ以降は AK のような長もの武器の構えに手を揃えるから」)。切った後は構えの型へ混ぜて戻る
+     */
+    const reloadFull = byName.get('reload')
+    const reload = reloadFull ? THREE.AnimationUtils.subclip(reloadFull, 'reload', 0, RELOAD_END_FRAME, RELOAD_FPS) : undefined
     if (reload) {
       const action = registerUpper(RELOAD_KEY, reload)
       action.setLoop(THREE.LoopOnce, 1)
@@ -2491,10 +2636,16 @@ export class CharacterAnimator {
     // 眠っている・死んでいる体は首を振らない。カメラを回すと首だけ付いてきた (2026-11-14 本人「stunや多分deathしてる時も…首が動いちゃう」)
     const headStill = asleep || this.upperState === 'death'
     this.lookYaw = damp(this.lookYaw, headStill ? 0 : this.lookYawTarget, LOOK_YAW_LAMBDA, dt)
+    /*
+     * **銃ごとの型 (本人が Blender で詰めた姿) には、上体の前傾・起こし (lean) と構えの腰の向け (hipSquare) を
+     * 重ねない。** 型にもう入っている — 重ねると二重になり、狙撃銃のしゃがみで銃口が 9cm・6° ずれた
+     * (2026-11-16)。照準へ向ける上下 (aimPitch)・首の向き・背骨の向け直し (armIk の SpineAim) は掛ける
+     */
+    const ownPose = WEAPON_OWN_CLIPS.has(this.upperClipNames.get(this.resolveUpperKey()) ?? '')
     // ナイフの構えも同じ (立ち止まっても上半身だけ knife_idle、脚は立ちの型。下の resolveLowerKey の注)
     this.hipSquare = damp(
       this.hipSquare,
-      this.aiming && !committed ? AIM_HIP_SQUARE : 0,
+      this.aiming && !committed && !ownPose ? AIM_HIP_SQUARE : 0,
       AIM_HIP_LAMBDA,
       dt,
     )
@@ -2502,7 +2653,7 @@ export class CharacterAnimator {
     // 座りとの行き来でも跳ねない。
     const leanTarget = this.boxed
       ? this.relaxedLean - (this.locomotion === 'sneak' ? BOX_LEAN : 0)
-      : committed
+      : committed || ownPose
         ? 0
         : this.aiming
           ? // 構えている間は逆に起こす。型が下を向いているぶんを返す (+ 銃ごとの起こし)
@@ -2606,20 +2757,17 @@ export class CharacterAnimator {
   }
 
   /**
-   * 遅れて揺れる骨を探す。**1 度だけ。**
-   *
-   * 胸は名前で (Bust_L/R)、髪は**mixamorig で始まらない骨**で拾う。後者に
-   * したのは、手で足した骨の名前を決め打ちしないため — 体を作った人が
-   * Bone でも Hair でも好きに付けられる。
+   * 遅れて揺れる骨を探す。**1 度だけ。** 胸 (Bust_L/R) と腰の紐 (Bow1, Bow2…) を名前で拾う。
+   * 髪の鎖も拾っていたが、鎖を持つ体が無いので外した (2026-11-16 本人「なかったことにしていい」)
    */
   private findSways(): void {
     const add = (
       bone: THREE.Bone | null,
-      depth: number,
       stiff: number,
       damp: number,
       gain: number,
       max: number,
+      drag = 0,
     ) => {
       if (!bone || !bone.parent) return
       this.sways.push({
@@ -2632,32 +2780,36 @@ export class CharacterAnimator {
         fwd: new THREE.Vector3(0, 1, 0).applyQuaternion(bone.quaternion).normalize(),
         stiff,
         damp,
-        gain: gain * Math.pow(HAIR_WHIP, depth),
+        gain,
         max,
+        drag,
+        length: (bone.children.find(isBone) ?? bone).position.length(),
+        contact: new THREE.Vector2(),
       })
     }
 
     for (const suffix of ['Bust_L', 'Bust_R']) {
-      add(findBoneBySuffix(this.root, suffix), 0, BUST_STIFF, BUST_DAMP, BUST_GAIN, BUST_MAX)
+      add(findBoneBySuffix(this.root, suffix), BUST_STIFF, BUST_DAMP, BUST_GAIN, BUST_MAX)
     }
-
-    /*
-     * 髪の鎖。**頭の下にぶら下がった、mixamorig でない骨**を辿る。
-     *
-     * 先端 (_end) は重みを持たないので飛ばす — 回しても何も動かないのに
-     * ばねだけ回ることになる。
-     */
-    const head = findBoneBySuffix(this.root, 'Head')
-    const walk = (bone: THREE.Object3D, depth: number) => {
-      for (const kid of bone.children) {
-        if (!isBone(kid) || kid.name.startsWith('mixamorig')) continue
-        if (!kid.name.endsWith('_end')) {
-          add(kid, depth, HAIR_STIFF, HAIR_DAMP, HAIR_GAIN, HAIR_MAX)
-        }
-        walk(kid, depth + 1)
+    // 腰の紐。**鎖の根から順に** (子は親を回した後の位置で測る)
+    const bows: THREE.Bone[] = []
+    this.root.traverse((o) => {
+      if (isBone(o) && /Bow\d+$/.test(o.name)) bows.push(o)
+    })
+    const depth = (b: THREE.Object3D) => {
+      let n = 0
+      for (let p = b.parent; p && isBone(p) && /Bow\d+$/.test(p.name); p = p.parent) n++
+      return n
+    }
+    bows.sort((a, b) => depth(a) - depth(b))
+    for (const bone of bows) add(bone, BOW_STIFF, BOW_DAMP, BOW_GAIN, BOW_MAX, BOW_DRAG)
+    if (bows.length) {
+      for (const side of ['Left', 'Right']) {
+        const up = findBoneBySuffix(this.root, `${side}UpLeg`)
+        const knee = findBoneBySuffix(this.root, `${side}Leg`)
+        if (up && knee) this.hangLegs.push([up, knee])
       }
     }
-    if (head) walk(head, 0)
   }
 
   /**
@@ -2679,7 +2831,20 @@ export class CharacterAnimator {
      * 「速度 0 から止まった」逆向きの加速度が入って、左右が正反対に揺れた (2026-11-12)
      */
     this.swayFrame.clear()
+    if (this.sways.some((entry) => entry.drag > 0)) {
+      // 体の回る速さ。紐の付け根の横への速さを足すのに使う (BOW_SPIN)
+      this.root.getWorldQuaternion(this.hangQuat)
+      const yaw = this.hangEuler.setFromQuaternion(this.hangQuat, 'YXZ').y
+      this.hangSpin = this.hangWasYaw === null ? 0 : Math.atan2(Math.sin(yaw - this.hangWasYaw), Math.cos(yaw - this.hangWasYaw)) / dt
+      if (Math.abs(this.hangSpin) > BOW_TELEPORT_SPIN) this.hangSpin = 0
+      this.hangWasYaw = yaw
+      this.root.getWorldPosition(this.hangCentre)
+    }
     for (const entry of this.sways) {
+      if (entry.drag > 0) {
+        this.updateHang(entry, dt)
+        continue
+      }
       const anchor = entry.anchor
       let acc = this.swayFrame.get(anchor)
       if (acc === undefined) {
@@ -2737,6 +2902,125 @@ export class CharacterAnimator {
        */
       entry.bone.updateMatrixWorld(true)
     }
+  }
+
+  /**
+   * 垂れた紐を 1 本回す。**付け根の速さと加速度の逆へ、骨の先を倒す。**
+   *
+   * 胸のばね (上下・左右の 2 軸) は骨が前を向いている前提で、垂れた骨では横の軸が潰れる。
+   * こちらは世界の水平面で「先をどちらへどれだけ倒すか」を持ち、倒す軸は骨の向きとその向きの外積
+   */
+  private updateHang(entry: (typeof this.sways)[number], dt: number): void {
+    const bone = entry.bone
+    bone.getWorldPosition(this.swayAt)
+    const was = this.hangWas.get(bone)
+    if (!was) {
+      this.hangWas.set(bone, { at: this.swayAt.clone(), vel: new THREE.Vector3() })
+      return
+    }
+    this.swayNow.subVectors(this.swayAt, was.at).divideScalar(dt)
+    was.at.copy(this.swayAt)
+    if (this.swayNow.length() > BOW_TELEPORT_SPEED) {
+      // 飛んだ。速さは前のまま、加速度は無し
+      this.swayNow.copy(was.vel)
+    }
+    this.swayAcc.subVectors(this.swayNow, was.vel).divideScalar(dt)
+    was.vel.copy(this.swayNow)
+
+    const hold = (v: number) => Math.max(-entry.max, Math.min(entry.max, v))
+    // 体が回って付け根が横へ動く速さ (ω × 中心からの位置)。上の軸まわりなので x = ω z、z = -ω x
+    const spinX = this.hangSpin * (this.swayAt.z - this.hangCentre.z)
+    const spinZ = -this.hangSpin * (this.swayAt.x - this.hangCentre.x)
+    // 倒したい向き (世界の水平)。速さと加速度の逆。**親がもう倒れている分は引く**
+    const parent = this.hangTotal.get(entry.anchor)
+    const pushX = this.swayNow.x * entry.drag + spinX * BOW_SPIN + this.swayAcc.x * entry.gain
+    const pushZ = this.swayNow.z * entry.drag + spinZ * BOW_SPIN + this.swayAcc.z * entry.gain
+    // 太ももに触れていれば、食い込んだ分だけ狙いを外へ・減衰を足す (BOW_CONTACT_PUSH)
+    const wantX = hold(-pushX) - (parent?.x ?? 0) + entry.contact.x * BOW_CONTACT_PUSH
+    const wantZ = hold(-pushZ) - (parent?.y ?? 0) + entry.contact.y * BOW_CONTACT_PUSH
+    const damping = entry.damp + (entry.contact.lengthSq() > 0 ? BOW_CONTACT_DAMP : 0)
+    entry.speed.x += ((wantX - entry.angle.x) * entry.stiff - entry.speed.x * damping) * dt
+    entry.speed.y += ((wantZ - entry.angle.y) * entry.stiff - entry.speed.y * damping) * dt
+    entry.angle.x = hold(entry.angle.x + entry.speed.x * dt)
+    entry.angle.y = hold(entry.angle.y + entry.speed.y * dt)
+    const total = this.hangTotal.get(bone) ?? this.hangTotal.set(bone, new THREE.Vector2()).get(bone)!
+    total.set((parent?.x ?? 0) + entry.angle.x, (parent?.y ?? 0) + entry.angle.y)
+
+    const angle = Math.hypot(entry.angle.x, entry.angle.y)
+    if (angle < 1e-5) {
+      bone.quaternion.copy(entry.rest)
+    } else {
+      // 倒す向きを親の空間へ。軸は「骨の向き × 倒す向き」— 回すと骨の先がその向きへ動く
+      entry.anchor.getWorldQuaternion(this.swaySpin).invert()
+      this.hangWant.set(entry.angle.x / angle, 0, entry.angle.y / angle).applyQuaternion(this.swaySpin)
+      this.hangAxis.crossVectors(entry.fwd, this.hangWant)
+      if (this.hangAxis.lengthSq() < 1e-8) {
+        bone.quaternion.copy(entry.rest)
+      } else {
+        this.swayPitch.setFromAxisAngle(this.hangAxis.normalize(), angle)
+        bone.quaternion.copy(this.swayPitch).multiply(entry.rest)
+      }
+    }
+    bone.updateMatrixWorld(true)
+    /*
+     * 太ももから押し出す。**見た目だけで、ばねへは返さない。** 押し出した倒れ具合をばねへ書き戻すと
+     * (速さも消して)、ばねがまた太ももへ倒し、押し出し…を繰り返して震えた (回り続けて紐が太ももに
+     * 押し付けられた間、先の向きが 3 秒で 67 回反転)。ばねは太ももの中に居てよく、描く骨だけ外に出す
+     */
+    this.pushOutOfThighs(entry)
+  }
+
+  /**
+   * 紐の骨の途中と先が太ももに入っていたら、**付け根を支点に外へ回す。** 回したら true。
+   * 子の骨はこの回した後の位置から測る (押し出された親に付いて外へ出る)
+   * 見るのは骨の線の上だけ (布の幅の端は見ない)
+   */
+  private pushOutOfThighs(entry: (typeof this.sways)[number]): boolean {
+    if (!this.hangLegs.length) return false
+    const bone = entry.bone
+    let pushed = false
+    entry.contact.set(0, 0)
+    for (const along of [0.5, 1]) {
+      bone.getWorldPosition(this.hangHead)
+      this.hangPoint.set(0, entry.length * along, 0)
+      bone.localToWorld(this.hangPoint)
+      for (const [up, knee] of this.hangLegs) {
+        up.getWorldPosition(this.hangSeg.start)
+        knee.getWorldPosition(this.hangSeg.end)
+        const t = this.hangSeg.closestPointToPointParameter(this.hangPoint, true)
+        this.hangSeg.at(t, this.hangClosest)
+        const radius = BOW_THIGH_RADIUS_HIP + (BOW_THIGH_RADIUS_KNEE - BOW_THIGH_RADIUS_HIP) * t + BOW_THIGH_MARGIN
+        const gap = this.hangPoint.distanceTo(this.hangClosest)
+        if (gap >= radius) continue
+        /*
+         * 表面の外の点へ。太ももの中心の線から離れる向き (真上・真下に重なったら横へ)。
+         * 紐の付け根の側へ出す形も試したが、反対側へ入り込んだ紐を太ももの周りで大きく回すことに
+         * なって、1 コマで 50cm 飛んだ (2026-11-16)。入り込ませないのはばねの側 (BOW_CONTACT_PUSH)
+         */
+        this.hangOut.subVectors(this.hangPoint, this.hangClosest)
+        if (this.hangOut.lengthSq() < 1e-10) this.hangOut.set(1, 0, 0)
+        this.hangOut.normalize().multiplyScalar(radius).add(this.hangClosest)
+        // 先の点の食い込みを、ばねへ伝える量として残す (骨の長さで割って角度へ)
+        if (along === 1) {
+          const reach = Math.max(1e-3, this.hangPoint.distanceTo(this.hangHead))
+          entry.contact.x += (this.hangOut.x - this.hangPoint.x) / reach
+          entry.contact.y += (this.hangOut.z - this.hangPoint.z) / reach
+        }
+        // 付け根から見た向きを回す (世界) → 親の空間へ
+        this.hangFrom.subVectors(this.hangPoint, this.hangHead).normalize()
+        this.hangTo.subVectors(this.hangOut, this.hangHead).normalize()
+        this.hangTurn.setFromUnitVectors(this.hangFrom, this.hangTo)
+        entry.anchor.getWorldQuaternion(this.swaySpin)
+        this.hangQuat.copy(this.swaySpin).invert().multiply(this.hangTurn).multiply(this.swaySpin)
+        bone.quaternion.premultiply(this.hangQuat)
+        bone.updateMatrixWorld(true)
+        bone.getWorldPosition(this.hangHead)
+        this.hangPoint.set(0, entry.length * along, 0)
+        bone.localToWorld(this.hangPoint)
+        pushed = true
+      }
+    }
+    return pushed
   }
 
   /**
@@ -3134,6 +3418,13 @@ export class CharacterAnimator {
         const name = table[locomotion]
         if (name) this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scaleOf(name))
       }
+      // 銃ごとの型を動きの中で流す物 (P90 のしゃがみ走り)。上下とも同じ速さで
+      for (const [weapon, table] of Object.entries(WEAPON_RELAXED)) {
+        const name = table[locomotion]
+        if (!name || POSE_ONLY_CLIPS.has(name)) continue
+        this.lower.get(relaxedLowerKey(locomotion, name))?.setEffectiveTimeScale(scaleOf(name))
+        this.upper.get(weaponRelaxedKey(weapon, locomotion))?.setEffectiveTimeScale(scaleOf(name))
+      }
       /*
        * **上下が同じクリップなら、速さも同じにする。**
        *
@@ -3186,8 +3477,14 @@ export class CharacterAnimator {
       const key = relaxedLowerKey('prone_idle', PRONE_KNIFE_KEY)
       if (this.lower.has(key)) return key
     }
-    if (this.aiming) return this.locomotion
-    const own = this.heldWeapon ? WEAPON_RELAXED[this.heldWeapon]?.[this.locomotion] : undefined
+    if (this.aiming) {
+      // 止まって構えていて、銃ごとの構えの型があれば脚もその型 (OWN_AIM_LOWER)
+      const aim = this.heldWeapon ? OWN_AIM_LOWER[this.locomotion]?.[this.heldWeapon] : undefined
+      if (aim && this.lower.has(relaxedLowerKey(this.locomotion, aim))) return relaxedLowerKey(this.locomotion, aim)
+      return this.locomotion
+    }
+    // 立ちの走りも銃ごとの型があれば脚まで (拳銃の pistol_run。体ごと長物の走りと同じにするため)
+    const own = this.heldWeapon && (OWN_LOWER_STATES.has(this.locomotion) || RUN_STATES.has(this.locomotion)) ? WEAPON_RELAXED[this.heldWeapon]?.[this.locomotion] : undefined
     if (own && this.lower.has(relaxedLowerKey(this.locomotion, own))) return relaxedLowerKey(this.locomotion, own)
     if (!RELAXED_LOWER_STATES.has(this.locomotion)) return this.locomotion
     const name = this.pistol ? PISTOL_RELAXED[this.locomotion] : RELAXED_CLIPS[this.locomotion]
@@ -3267,10 +3564,8 @@ export class CharacterAnimator {
   private handsEmpty = false
 
   /**
-   * 遅れて揺れる骨。**無い体では空のまま** (soldier / raiden には無い)。
-   *
-   * 胸 (Bust_L/R) と髪の鎖を同じ形で持つ。どちらも「付け根の加速度の逆へ
-   * 振れて、ばねで戻る」だけなので、分ける理由がない。
+   * 遅れて揺れる骨 (胸 Bust_L/R・腰の紐 Bow)。**無い体では空のまま** (soldier / raiden には無い)。
+   * 「付け根の加速度の逆へ振れて、ばねで戻る」
    */
   private readonly sways: {
     bone: THREE.Bone
@@ -3279,14 +3574,48 @@ export class CharacterAnimator {
     rest: THREE.Quaternion
     /** 骨の向き (親の空間)。横の軸を出すのに使う */
     fwd: THREE.Vector3
-    /** x: 上下 (付け根の横の軸まわり) / y: 左右 (付け根の上の軸まわり) */
+    /**
+     * 胸: x 上下 (付け根の横の軸まわり) / y 左右 (付け根の上の軸まわり)。
+     * 垂れた紐 (drag > 0): 骨の先を倒す向きと量 (世界の x / z、rad)
+     */
     angle: THREE.Vector2
     speed: THREE.Vector2
     stiff: number
     damp: number
     gain: number
     max: number
+    /** 0 より大きければ垂れた紐。付け根の速さの逆へなびく (BOW_DRAG) */
+    drag: number
+    /** 骨の長さ (骨の空間)。紐の当たりを見る点を置く。先の骨は子が無いので親と同じ長さ */
+    length: number
+    /** 前のコマで太ももに食い込んだ分 (先を外へ倒すべき量、世界の x / z、rad)。触れていなければ 0 */
+    contact: THREE.Vector2
   }[] = []
+  /** 紐を押し出す太もも (付け根の骨・膝の骨)。紐が無い体では空 */
+  private readonly hangLegs: [THREE.Object3D, THREE.Object3D][] = []
+  /** 垂れた紐の骨ごとの、前フレームの付け根の位置と速度 (世界) */
+  private readonly hangWas = new Map<THREE.Bone, { at: THREE.Vector3; vel: THREE.Vector3 }>()
+  /**
+   * 紐の骨ごとの、世界で見た倒れ具合 (親の分を足した物、x / z)。子は**親が倒れた残りだけ**倒す —
+   * 骨ごとに同じだけ倒すと鎖で積み重なり、走ると先が真横まで跳ね上がった (4 本で 4 倍)
+   */
+  private readonly hangTotal = new Map<THREE.Object3D, THREE.Vector2>()
+  private readonly hangWant = new THREE.Vector3()
+  /** 体 (root) の前フレームの向き。回る速さ (世界の上の軸まわり、rad/s) を出す */
+  private hangWasYaw: number | null = null
+  private hangSpin = 0
+  private readonly hangCentre = new THREE.Vector3()
+  private readonly hangQuat = new THREE.Quaternion()
+  private readonly hangEuler = new THREE.Euler()
+  private readonly hangHead = new THREE.Vector3()
+  private readonly hangPoint = new THREE.Vector3()
+  private readonly hangClosest = new THREE.Vector3()
+  private readonly hangOut = new THREE.Vector3()
+  private readonly hangFrom = new THREE.Vector3()
+  private readonly hangTo = new THREE.Vector3()
+  private readonly hangTurn = new THREE.Quaternion()
+  private readonly hangSeg = new THREE.Line3()
+  private readonly hangAxis = new THREE.Vector3()
   private swayResolved = false
   /** 付け根ごとの前フレームの位置と速度 */
   private readonly swayWas = new Map<THREE.Object3D, { at: THREE.Vector3; vel: THREE.Vector3 }>()
@@ -3349,6 +3678,20 @@ export class CharacterAnimator {
   }
 
   /** 持っている銃 (WeaponId)。構えていない時の型を銃ごとに引く (WEAPON_RELAXED)。手ぶら・ナイフは null */
+  /**
+   * **構えずに、銃ごとの持ち方がある銃を提げて立つ・歩く・走る・しゃがんでいる。** 左手を銃の決まった所へ
+   * 運ぶ間 (weapon.ts の relaxedLeftHand)。リロード・投げ・敬礼など、型が左手を使う間は false
+   */
+  get carrying(): boolean {
+    return (
+      !this.aiming &&
+      this.upperState === 'stance' &&
+      CARRY_STATES.has(this.locomotion) &&
+      !!this.heldWeapon &&
+      !!WEAPON_RELAXED[this.heldWeapon]
+    )
+  }
+
   setHeldWeapon(weapon: string | null): void {
     this.heldWeapon = weapon
   }
@@ -3477,6 +3820,17 @@ export class CharacterAnimator {
   /** 遊底を操作している最中か。**その間は銃を納めない** (見えない銃を操作して見える) */
   get bolting(): boolean {
     return this.upperState === 'bolt'
+  }
+  /**
+   * 弾を込めている・遊底を引いている最中か。**その間は銃口を照準へ向ける補正を止める。**
+   *
+   * 構えたまま装填やコッキングをすると、型が銃を傾けている (弾倉を差す・遊底を引く) のに
+   * 背骨の向け直し (armIk の SpineAim) がその傾きを照準へ戻そうとして、上半身が大きく
+   * 前へ倒れた (2026-11-18 本人「aim しながら Reload すると上半身がめちゃ前傾」「pistol の
+   * コッキングもそう」)。手で銃を扱う間は型の姿のまま
+   */
+  get handlingGun(): boolean {
+    return this.upperState === 'reload' || this.upperState === 'bolt'
   }
 
 
@@ -3704,7 +4058,10 @@ export class CharacterAnimator {
     // 撃ったことは銃口炎・音・カメラの反動・照準の散らばりで既に伝わっている。
     // 型が無くても分からなくはならない。
     if (this.upperState === 'fire' && !this.pistol) {
-      // 伏せ撃ちは専用の型。立ちの発砲を腹這いに載せると上体だけ起き上がる
+      // 伏せ撃ちは専用の型。立ちの発砲を腹這いに載せると上体だけ起き上がる。
+      // 銃ごとの伏せの構えがあれば撃つ間もそれ (WEAPON_AIM の注と同じ)
+      const ownProne = this.heldWeapon ? weaponProneAimKey(this.heldWeapon) : ''
+      if (this.locomotion === 'prone_idle' && this.upper.has(ownProne)) return ownProne
       if (PRONE_LOCOMOTIONS.has(this.locomotion) && this.upper.has(PRONE_FIRE_KEY)) {
         return PRONE_FIRE_KEY
       }
@@ -3858,8 +4215,17 @@ export class CharacterAnimator {
       if (this.aiming && this.locomotion === 'prone_idle' && this.knife && this.upper.has(PRONE_KNIFE_KEY)) {
         return PRONE_KNIFE_KEY
       }
+      if (this.aiming && this.locomotion === 'prone_idle' && this.heldWeapon) {
+        const own = weaponProneAimKey(this.heldWeapon)
+        if (this.upper.has(own)) return own
+      }
       if (this.aiming && this.locomotion === 'prone_idle' && this.upper.has(PRONE_AIM_KEY)) {
         return PRONE_AIM_KEY
+      }
+      // 銃ごとの伏せの脱力 (WEAPON_RELAXED の prone_idle)
+      if (!this.aiming && this.heldWeapon) {
+        const own = weaponRelaxedKey(this.heldWeapon, this.locomotion)
+        if (this.upper.has(own)) return own
       }
       const key = relaxedKey(this.locomotion)
       if (this.upper.has(key)) return key
@@ -3905,6 +4271,11 @@ export class CharacterAnimator {
        */
       // 伏せは上の PRONE_LOCOMOTIONS の枝が先に受ける (prone_knife)
       if (this.knife && this.upper.has(KNIFE_KEY)) return KNIFE_KEY
+      // 拳銃も構えた型が銃ごとにあればそれ (handgun_aim / handgun_crouch_aim、本人 2026-11-16)
+      if (this.pistol && this.heldWeapon) {
+        const own = crouching ? weaponCrouchAimKey(this.heldWeapon) : weaponAimKey(this.heldWeapon)
+        if (this.upper.has(own)) return own
+      }
       if (this.pistol) {
         const key = crouching ? PISTOL_CROUCH_AIM_KEY : PISTOL_AIM_KEY
         if (this.upper.has(key)) return key
