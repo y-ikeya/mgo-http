@@ -603,8 +603,8 @@ export function sendHealth(
     )
   }
 
-  // 他の人に要るのは、誰がどれだけ削られたかまで。倒れた表現に使う。
-  // **残りの体力は渡さない** — 倒れたかどうかは life が伝える。本人の値は
-  // 上の本人宛てだけで届く
-  broadcast(room, { type: 'health', id: player.id, damage, flinch }, player.id)
+  // 他の人に要るのは、**当たったかどうか**まで (血と怯みの表現に使う)。
+  // 削られた量も渡さない — 足し合わせれば残りの体力が逆算できてしまう。
+  // 倒れたかどうかは life が伝える。本人の値は上の本人宛てだけで届く
+  broadcast(room, { type: 'health', id: player.id, damage: damage > 0 ? 1 : 0, flinch }, player.id)
 }
