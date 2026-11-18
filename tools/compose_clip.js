@@ -8,10 +8,22 @@
 // 腕の骨 (Shoulder / Arm / ForeArm / Hand と指) は、腕の型の**先頭のキー**を体の型の長さいっぱいに
 // 置く。腕の型の長さのまま流すと、型の長さが体の型と違って走りの 1 周がずれる。
 //
-// 使い方: bun tools/compose_clip.js <入出力.glb> <新しい型の名前> <体の型> <腕の型>
+// --swing <振りの型> … 腕 (肩・上腕・前腕・手首) は振りの型を**体の型の 1 周に合わせて**流す。指だけ
+// 腕の型の先頭で止める (拳銃を握ったまま腕を振る、本人 2026-11-18「腕振って欲しかった」)。
+// 振りの型は長さを体の型へ伸び縮みさせ、脚 (UpLeg) の回りが一番そろう所から始める — 腕は自分の脚と
+// 逆に振る形で作られているので、脚の拍をそろえれば体の型の脚とも逆に振る
+//
+// 使い方: bun tools/compose_clip.js <入出力.glb> <新しい型の名前> <体の型> <腕の型> [--swing <振りの型>]
 //         圧縮前の glb 専用 (tools/unpack_glb.js で戻してから)。同じ名前があれば差し替える
 
-const [path, newName, bodyName, armName] = process.argv.slice(2)
+// --bones <正規表現> … 腕の型から取る骨をさらに絞る (骨の名前の後ろ、例 '^LeftHand')。
+//   拳銃のしゃがみ走りの左手首だけを止まりの形へ戻すのに使った (肘ごと戻すと肘が張った、2026-11-18)
+const argv = process.argv.slice(2)
+const option = (flag) => { const at = argv.indexOf(flag); return at >= 0 ? argv[at + 1] : undefined }
+const swingName = option('--swing')
+const bonesPattern = option('--bones')
+const optionAt = ['--swing', '--bones'].flatMap((flag) => { const at = argv.indexOf(flag); return at >= 0 ? [at, at + 1] : [] })
+const [path, newName, bodyName, armName] = argv.filter((_, i) => !optionAt.includes(i))
 if (!armName) throw new Error('使い方: bun tools/compose_clip.js <入出力.glb> <新しい型> <体の型> <腕の型>')
 
 const bytes = new Uint8Array(await Bun.file(path).arrayBuffer())
@@ -25,6 +37,8 @@ const bin = bytes.subarray(binStart, binStart + view.getUint32(20 + jsonLength, 
 const body = json.animations.find((a) => a.name === bodyName)
 const arm = json.animations.find((a) => a.name === armName)
 if (!body || !arm) throw new Error(`${bodyName} か ${armName} が無い`)
+const swing = swingName ? json.animations.find((a) => a.name === swingName) : undefined
+if (swingName && !swing) throw new Error(`${swingName} が無い`)
 
 const SIZE = { SCALAR: 1, VEC3: 3, VEC4: 4 }
 const floatsOf = (index) => {
@@ -44,7 +58,36 @@ const floatsOf = (index) => {
 }
 
 // 腕の骨。名前の後ろで見分ける (mixamorig:LeftForeArm / mixamorig:RightHandIndex1 など)
-const isArm = (name) => /(Shoulder|Arm|ForeArm|Hand)/.test(name.replace(/^.*:/, '')) && !/^Armature/.test(name)
+const isArm = (name) =>
+  /(Shoulder|Arm|ForeArm|Hand)/.test(name.replace(/^.*:/, '')) &&
+  !/^Armature/.test(name) &&
+  (!bonesPattern || new RegExp(bonesPattern).test(name.replace(/^.*:/, '')))
+// 指 (RightHandIndex1 など)。--swing でも握りの形のまま
+const isFinger = (name) => /Hand(Thumb|Index|Middle|Ring|Pinky)/.test(name)
+
+// 型の 1 本 (sampler) を時刻 t で引く。回りは球面で、ほかは直線で補う
+const sampleAt = (sampler, t) => {
+  const times = floatsOf(sampler.input)
+  const out = floatsOf(sampler.output)
+  const width = out.length / times.length
+  if (t <= times[0]) return out.slice(0, width)
+  if (t >= times[times.length - 1]) return out.slice(out.length - width)
+  let i = 0
+  while (times[i + 1] < t) i++
+  const a = out.slice(i * width, i * width + width)
+  const b = out.slice((i + 1) * width, (i + 1) * width + width)
+  if (sampler.interpolation === 'STEP') return a
+  const k = (t - times[i]) / (times[i + 1] - times[i])
+  if (width !== 4) return a.map((v, j) => v + (b[j] - v) * k)
+  let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+  const sign = dot < 0 ? -1 : 1
+  dot *= sign
+  const q = a.map((v, j) => v * (1 - k) + b[j] * sign * k)
+  const len = Math.hypot(...q)
+  return q.map((v) => v / len)
+}
+const lengthOf = (clip) => Math.max(...clip.samplers.map((s) => { const t = floatsOf(s.input); return t[t.length - 1] }))
+const firstOf = (clip) => Math.min(...clip.samplers.map((s) => floatsOf(s.input)[0]))
 
 // 体の型の長さ
 let duration = 0
@@ -68,6 +111,51 @@ const push = (floats, type) => {
 }
 const times = push(new Float32Array([0, duration]), 'SCALAR')
 
+// 振りの型を体の型の 1 周へ写す: 体の時刻 t → 振りの時刻 start + (t / 体の長さ) × 振りの長さ (回る)
+const STEPS = 48
+let swingTimes, mapSwing
+if (swing) {
+  const bodyStart = firstOf(body)
+  const swingStart = firstOf(swing)
+  const swingLength = lengthOf(swing) - swingStart
+  const bodyLength = duration - bodyStart
+  const legOf = (clip, side) => clip.channels.find((c) => json.nodes[c.target.node].name.endsWith(`${side}UpLeg`) && c.target.path === 'rotation')
+  const legs = ['Left', 'Right'].map((side) => [legOf(body, side), legOf(swing, side)])
+  if (legs.some(([a, b]) => !a || !b)) throw new Error('UpLeg の回りが無い')
+  // 脚の回りが一番そろう始まり (0〜1 の割合) を探す
+  let best = 0
+  let bestScore = -Infinity
+  for (let k = 0; k < 120; k++) {
+    const shift = k / 120
+    let score = 0
+    for (let i = 0; i < 24; i++) {
+      const p = i / 24
+      for (const [b, w] of legs) {
+        const qb = sampleAt(body.samplers[b.sampler], bodyStart + p * bodyLength)
+        const qw = sampleAt(swing.samplers[w.sampler], swingStart + ((p + shift) % 1) * swingLength)
+        score += Math.abs(qb[0] * qw[0] + qb[1] * qw[1] + qb[2] * qw[2] + qb[3] * qw[3])
+      }
+    }
+    if (score > bestScore) { bestScore = score; best = shift }
+  }
+  console.log(`振り ${swingName} (${swingLength.toFixed(3)} 秒) を ${bodyLength.toFixed(3)} 秒へ、${(best * 100).toFixed(0)}% の所から (脚のそろい ${(bestScore / 48).toFixed(3)})`)
+  const t = new Float32Array(STEPS + 1)
+  for (let i = 0; i <= STEPS; i++) t[i] = bodyStart + (i / STEPS) * bodyLength
+  swingTimes = push(t, 'SCALAR')
+  mapSwing = (sampler, type) => {
+    const width = SIZE[type]
+    const values = new Float32Array(width * (STEPS + 1))
+    for (let i = 0; i <= STEPS; i++) {
+      // 最後のコマは最初と同じ (継ぎ目で跳ねない)
+      const p = i === STEPS ? best : (i / STEPS + best) % 1
+      values.set(sampleAt(sampler, swingStart + p * swingLength), i * width)
+    }
+    return values
+  }
+}
+const swingKey = swing ? new Map(swing.channels.map((c) => [`${c.target.node}:${c.target.path}`, c])) : new Map()
+let fromSwing = 0
+
 const samplers = []
 const channels = []
 const armKey = new Map(arm.channels.map((c) => [`${c.target.node}:${c.target.path}`, c]))
@@ -76,7 +164,13 @@ let fromArm = 0
 for (const c of body.channels) {
   const name = json.nodes[c.target.node].name
   const key = `${c.target.node}:${c.target.path}`
-  if (isArm(name) && armKey.has(key)) {
+  if (swing && isArm(name) && !isFinger(name) && swingKey.has(key)) {
+    const w = swingKey.get(key)
+    const src = swing.samplers[w.sampler]
+    const type = json.accessors[src.output].type
+    samplers.push({ input: swingTimes, output: push(mapSwing(src, type), type), interpolation: 'LINEAR' })
+    fromSwing++
+  } else if (isArm(name) && armKey.has(key)) {
     const a = armKey.get(key)
     const src = arm.samplers[a.sampler]
     const out = floatsOf(src.output)
@@ -116,4 +210,4 @@ dv.setUint32(0, 0x46546c67, true); dv.setUint32(4, 2, true); dv.setUint32(8, out
 dv.setUint32(12, js.length, true); dv.setUint32(16, 0x4e4f534a, true); out.set(js, 20)
 dv.setUint32(20 + js.length, binOut.length, true); dv.setUint32(24 + js.length, 0x004e4942, true); out.set(binOut, 28 + js.length)
 await Bun.write(path, out)
-console.log(`${newName}: 体 ${bodyName} から ${fromBody} 本、腕 ${armName} の先頭から ${fromArm} 本 (${duration.toFixed(3)} 秒)`)
+console.log(`${newName}: 体 ${bodyName} から ${fromBody} 本、${swing ? `振り ${swingName} から ${fromSwing} 本、` : ''}腕 ${armName} の先頭から ${fromArm} 本 (${duration.toFixed(3)} 秒)`)

@@ -74,6 +74,12 @@ const SKINS: Record<string, string> = {
    * eye_L / eye_R、Head の骨に重み 1) を入れ、右の目頭の肉を左から写して頭に結合した。頭の色の絵は
    * 下まつ毛のギザギザを塗り直した写し (tools/raw/bald_woman_tex/)。瞬きは頭のシェイプキー Blink
    * (本人が作った。動かすのは animation.ts の updateBlink)
+   *
+   * **目玉の絵は縮めた絵 (mipmap) を使わず、端を繰り返さない** (glb の sampler: minFilter LINEAR・wrap CLAMP)。
+   * 絵は上から瞳・黒目・白目の帯で、黒目は高さの 17% しかない。離れると縮めた絵で白目と混ざって黒目が
+   * 灰白色に飛び、繰り返しでは瞳の真ん中に下の端の桃色がにじんだ (2026-11-18 本人「白内障っぽく見える」)。
+   * Blender の書き出しは minFilter を mipmap に戻すので、**書き出し直したら glb の sampler を直す**
+   * (wrap は Blender の材質で EXTEND にしてある)。粗さは 0.05 — 0.35 では照り返しが黒目に広がった
    */
   nanashi: 'soldier_nanashi',
   /*

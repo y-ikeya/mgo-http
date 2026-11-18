@@ -803,8 +803,9 @@ const WEAPON_RELAXED: Readonly<Record<string, Partial<Record<Locomotion, string>
   // しゃがみ止まりは P90 のしゃがみと同じ体で拳銃を持つ (本人 2026-11-16)
   // 立ち止まりも P90 の胴体に拳銃の腕 (本人 2026-11-16)
   /*
-   * 拳銃の立ち走り (pistol_run)。**体は長物の走り (relaxed_run) そのもの**、腕は立ち止まり
-   * (handgun_relaxed_idle) の先頭の形で止めた物 (tools/compose_clip.js)。手ぶらの走り (run_unarmed) は
+   * 拳銃の立ち走り (pistol_run)。**体は長物の走り (relaxed_run) そのもの**、腕は手ぶらの走り (run_unarmed) の
+   * 振りを脚の拍に合わせて流し、指だけ立ち止まり (handgun_relaxed_idle) の握り (tools/compose_clip.js --swing、
+   * 本人 2026-11-18「腕振って欲しかった」)。手ぶらの走り (run_unarmed) は
    * 上体が起きていて、頭が P90 より 9cm 高く 17cm 後ろだった (本人 2026-11-18「running の pistol と p90 で
    * head の位置が違う」、しゃがみ走りと同じ考え方)
    */
