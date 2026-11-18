@@ -179,7 +179,6 @@ export function updateTargets(room: RoomWorld, now: number): void {
       reviveBot(bot, now)
       broadcast(room, { type: 'life', id: bot.id, state: 'alive' })
       broadcast(room, { type: 'respawn', id: bot.id })
-      broadcast(room, { type: 'health', id: bot.id, health: bot.health, damage: 0, flinch: false })
     }
     // **見せている姿を、審判が見る姿にもする。** 送る姿だけ組み立てていた頃は、
     // 転んでいても眠っていても審判の中では立っていて、足元の的に真っ直ぐ前を
@@ -986,7 +985,6 @@ export function rosterMessage(room: RoomWorld): ServerMessage {
     players: present(room).map((p) => ({
       id: p.id,
       name: p.name,
-      health: p.health,
       team: p.team,
       slot: p.slot,
       // 状態も載せる。life は変わった時にしか配らないので、後から

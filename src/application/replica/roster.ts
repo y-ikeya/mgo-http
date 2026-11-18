@@ -67,7 +67,6 @@ export function applyRoster(
         const entry = entryOf(roster, player.id, player.name)
         entry.name = player.name
         entry.team = player.team
-        entry.health = player.health
         // **状態を先に入れる。** 無いと既定の joining のまま = 戦場に居ない扱いで、
         // 位置が届いていても一度も描かれない
         if (player.life) entry.life = player.life
@@ -84,12 +83,8 @@ export function applyRoster(
       return [{ kind: 'sync', id: message.id, entry }]
     }
 
-    case 'health': {
-      if (message.id === selfId) return []
-      const entry = entryOf(roster, message.id)
-      entry.health = message.health
-      return [{ kind: 'sync', id: message.id, entry }]
-    }
+    // 'health' は名簿では扱わない。**他人の体力は届かない** (本人宛てだけ) し、
+    // 倒れたかどうかは life が伝える。被弾の表現は Game が直接受ける
 
     case 'life': {
       if (message.id === selfId) return []

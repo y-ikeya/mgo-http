@@ -88,10 +88,7 @@ describe('練習部屋', () => {
       (m) => m.type === 'life' && m.id === 'target-0' && m.state === 'alive',
     )
     expect(revived).toBe(true)
-    const healed = shooter.messages.some(
-      (m) => m.type === 'health' && m.id === 'target-0' && m.health === 100,
-    )
-    expect(healed).toBe(true)
+    // 体力の値は他人に配らない (本人宛てだけ)。戻ったことは life / respawn で届く
     shooter.close()
   }, 20000)
 })

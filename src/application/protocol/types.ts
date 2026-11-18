@@ -1108,7 +1108,7 @@ export interface RosterMessage {
   players: {
     id: string
     name: string
-    health: number
+    /** 体力は載せない。**自分の体力は self / health (本人宛て) で届く** */
     team: Team
     slot?: number
     /** いまどういう状態に居るか。これが無いと描かれない (上記) */
@@ -1353,7 +1353,15 @@ export interface MatchMessage {
 export interface HealthMessage {
   type: 'health'
   id: string
-  health: number
+  /**
+   * 残りの体力。**入っているのは本人宛ての便だけ。**
+   *
+   * 他人宛てにも同じ値を流していた頃は、名簿と合わせて全員の体力が
+   * 全クライアントに届いていた。改造した画面なら敵の体力の棒が出せる —
+   * 位置をあれだけ絞っているのに、体力だけ素通りだった。他人に要るのは
+   * 削られた量と怯みまでで、倒れたかどうかは life が伝える。
+   */
+  health?: number
   /**
    * 当たった部位。頭に当たって耐えたときの反応を出すのに使う。
    *

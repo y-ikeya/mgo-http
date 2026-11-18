@@ -40,7 +40,6 @@ import {
 import { isMesh } from "../util/guards";
 import {
   BACKSTAB_DOT,
-  MAX_HEALTH,
   MELEE_CONE_COS,
   MELEE_RANGE,
   ROLL_HIT_RANGE,
@@ -54,7 +53,7 @@ import { Hitbox } from "./hitbox";
 import { damp, dampAngle } from "../util/math";
 import { LADDER_SPEED } from "../../../domain/stage";
 import { Weapon, WEAPON_CONFIGS, WEAPON_STANCE_LAMBDA, weaponStanceOf } from "../arms/weapon";
-import { onBattlefield } from "../../../domain/player/lifecycle";
+import { isDowned, onBattlefield } from "../../../domain/player/lifecycle";
 import type { Player } from "../../../domain/player/player";
 import {
   INTERPOLATION_DELAY,
@@ -204,7 +203,6 @@ export class RemoteSoldier {
   /** ボーンに追従する当たり判定。メッシュではなくこれを撃つ */
   readonly hitbox = new Hitbox();
 
-  health = MAX_HEALTH;
   /** 画面に出す名前。スナップショットで届く */
   name = "";
   /**
@@ -310,6 +308,15 @@ export class RemoteSoldier {
   /** 眠っているか (送られてきた姿が sleep)。味方なら叩いて起こせる */
   get asleep(): boolean {
     return this.locomotion === "sleep";
+  }
+
+  /**
+   * 倒れているか。**体力の値は他人には届かない** (本人にだけ届く) ので、
+   * 撃てる/刺せる相手から外す判断は状態でやる。体力が 0 と倒れているは
+   * サーバーの中では同じ瞬間に起きる (domain/rule/damage.ts)。
+   */
+  get downed(): boolean {
+    return isDowned(this.life);
   }
 
   get throwable(): boolean {
@@ -975,17 +982,6 @@ export class RemoteSoldier {
   }
 
   /**
-   * サーバーが確定させた体力を反映する。
-   *
-   * 倒れる / 起き上がるは体力ではなく**状態**が決める (setLife)。ここは
-   * 数字を控えるだけ。体力から生死を導いていた頃は、状態と導出結果が
-   * 食い違い得る場所が 2 つあった。
-   */
-  applyHealth(health: number): void {
-    this.health = health;
-  }
-
-  /**
    * サーバーが状態を移した。
    *
    * 倒れる姿勢も、戦場に居るかどうかも全部ここから出す。
@@ -1227,7 +1223,6 @@ const REMOTE_MOVE_SPEED = 3.8;
 interface Pending {
   name?: string;
   team?: Team;
-  health?: number;
   life?: Life;
 }
 
@@ -1295,7 +1290,6 @@ export class RemoteSoldiers {
       if (known) {
         if (known.name !== undefined) player.name = known.name;
         if (known.team !== undefined) player.setTeam(known.team);
-        if (known.health !== undefined) player.applyHealth(known.health);
         if (known.life !== undefined) player.setLife(known.life);
         this.pending.delete(snapshot.id);
       }
@@ -1312,7 +1306,7 @@ export class RemoteSoldiers {
   /**
    * 名簿のレプリカに姿を合わせる。**真実はレプリカの側** (src/application/replica/roster.ts)。
    *
-   * 名前も所属も体力も状態も、決めているのはサーバー。ここは受け取った通りに
+   * 名前も所属も状態も、決めているのはサーバー。ここは受け取った通りに
    * 体を直すだけで、覚えておく必要は無い — 体がまだ無ければ、位置が届いて
    * 作られるときに同じものを当てる。
    *
@@ -1326,7 +1320,6 @@ export class RemoteSoldiers {
     player.name = entry.name;
     player.setTeam(entry.team);
     this.refreshAlly(player);
-    player.applyHealth(entry.health);
     player.setLife(entry.life);
   }
 
@@ -1414,7 +1407,7 @@ export class RemoteSoldiers {
     let best: { player: RemoteSoldier; zone: HitZone; distance: number } | null =
       null;
     for (const player of this.players.values()) {
-      if (player.health <= 0) continue;
+      if (player.downed) continue;
       // 見えていない相手は撃てない。位置が古いので、当てても居ない場所を撃っている
       if (!player.object.visible) continue;
       const hit = player.hitbox.raycast(
@@ -1454,7 +1447,7 @@ export class RemoteSoldiers {
     let closest: { player: RemoteSoldier; distance: number } | null = null;
 
     for (const player of this.players.values()) {
-      if (player.health <= 0) continue;
+      if (player.downed) continue;
       // 倒れている相手には刺さらない。**サーバーと同じ式を読む** —
       // 手元で外しておかないと、サーバーが弾いた空振りに対して
       // 「当たった」表示だけが出る
@@ -1506,7 +1499,7 @@ export class RemoteSoldiers {
   ): { id: string; throwable: boolean; position: THREE.Vector3 } | null {
     let closest: { player: RemoteSoldier; distance: number } | null = null;
     for (const player of this.players.values()) {
-      if (player.health <= 0 || !player.object.visible) continue;
+      if (player.downed || !player.object.visible) continue;
       if (!hostile(player.id, player.side)) continue;
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;
@@ -1541,7 +1534,7 @@ export class RemoteSoldiers {
     const knocks: { id: string; x: number; z: number }[] = [];
 
     for (const player of this.players.values()) {
-      if (player.health <= 0 || exclude.has(player.id)) continue;
+      if (player.downed || exclude.has(player.id)) continue;
       // 伏せている相手には当たらない (下を転がり抜ける。本人 2026-10-20)
       if (player.prone) continue;
 
@@ -1574,7 +1567,7 @@ export class RemoteSoldiers {
   touching(origin: THREE.Vector3, range: number): { id: string; side: Team }[] {
     const found: { id: string; side: Team }[] = [];
     for (const player of this.players.values()) {
-      if (player.health <= 0) continue;
+      if (player.downed) continue;
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;
       if (this.scratch.length() > range) continue;
@@ -1590,7 +1583,7 @@ export class RemoteSoldiers {
   sleepingNear(origin: THREE.Vector3, range: number): { id: string; side: Team }[] {
     const found: { id: string; side: Team; distance: number }[] = [];
     for (const player of this.players.values()) {
-      if (player.health <= 0 || !player.asleep) continue;
+      if (player.downed || !player.asleep) continue;
       this.scratch.subVectors(player.object.position, origin);
       this.scratch.y = 0;
       const distance = this.scratch.length();
