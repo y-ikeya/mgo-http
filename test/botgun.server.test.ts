@@ -48,7 +48,7 @@ const shotsAt = (client: Client, at: [number, number, number]) =>
     (m) => m.type === 'shot' && m.id === ID && Math.hypot(m.to[0] - at[0], m.to[2] - at[2]) < 3,
   ).length
 const hurt = (client: Client) =>
-  client.messages.some((m): m is Extract<ServerMessage, { type: 'health' }> => m.type === 'health' && m.id === client.id && m.health < 100)
+  client.messages.some((m): m is Extract<ServerMessage, { type: 'health' }> => m.type === 'health' && m.id === client.id && (m.health ?? 100) < 100)
 
 describe('撃ち返す的', () => {
   test('ステージの表に撃ち返す的がある', () => {
