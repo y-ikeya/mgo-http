@@ -83,6 +83,8 @@ interface Corrected {
   aimCorrection(outDelta: THREE.Quaternion, outPivot: THREE.Vector3): boolean
   leftHandTarget(outPosition: THREE.Vector3, outQuaternion: THREE.Quaternion): boolean
   readonly aimAmount: number
+  /** 左手を運ぶ掛かり具合 (構え・提げの大きいほう)。無ければ aimAmount */
+  readonly leftHandWeight?: number
 }
 
 /**
@@ -145,7 +147,7 @@ export class LeftArmFollow {
      * 銃に左手の置き場所 (leftHand) があればそこへ。構えの掛かり具合で寄せる
      */
     if (weapon.leftHandTarget(this.hold, this.holdTurn)) {
-      const weight = weapon.aimAmount
+      const weight = weapon.leftHandWeight ?? weapon.aimAmount
       this.saved = [upper.quaternion.clone(), lower.quaternion.clone(), end.quaternion.clone()]
       end.updateWorldMatrix(true, false)
       this.wrist.setFromMatrixPosition(end.matrixWorld)

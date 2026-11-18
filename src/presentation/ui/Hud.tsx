@@ -372,7 +372,14 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   }
 
   return (
-    <div class="hud">
+    <div
+      class="hud"
+      classList={{
+        // 一覧を開いている側。その角のカードだけ暗くする幕の上に出す (Hud.css の .hud-browse-mask)
+        'hud-browsing-weapon': !!props.stats?.browsing && props.stats?.browsingFamily === 'weapon',
+        'hud-browsing-tool': !!props.stats?.browsing && props.stats?.browsingFamily === 'tool',
+      }}
+    >
       {/*
         残機と残り時間。画面上部の中央。
         自分の陣営を左に置かない。どちらが青でどちらが赤かが固定されているほうが、
@@ -1085,6 +1092,8 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
           class="hud-browse"
           classList={{ 'hud-browse-tool': props.stats?.browsingFamily === 'tool' }}
         >
+          {/* 一覧と角のカード以外を少し暗くする幕 (本人 2026-11-15)。重なりは Hud.css の .hud-browse-mask */}
+          <div class="hud-browse-mask" />
             {/*
               角は出さない。**角にあるのは武器のカードそのもの** (下の hud-weapon)。
               選んでいる物の弾数まで出ているカードが、そのまま選択の印になる。

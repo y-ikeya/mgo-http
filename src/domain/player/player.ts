@@ -331,6 +331,8 @@ export interface MatchPlayer extends Player {
   homeY: number
   /** 的の構え。立っている / しゃがんでいる / 伏せている / 箱を被っている / 左右へ lean し続ける。人は使わない */
   homeStance: 'stand' | 'crouch' | 'prone' | 'box' | 'lean' | 'salute'
+  /** 撃ち返す的が倒れて戻るときに向く方 (rad)。湧いた時の向き */
+  homeYaw: number
   /** 走り続ける的の、もう一方の端。null なら動かない。人は使わない */
   patrolTo: { x: number; z: number } | null
   /** いま向こうの端 (patrolTo) へ走っているか。false なら置き場 (home) へ戻っている */
@@ -367,6 +369,8 @@ export interface MatchPlayer extends Player {
    * 同じ場所へ戻る。戦績には残さない。
    */
   bot: boolean
+  /** **撃ち返す的。** 見えた敵を撃ってくる (server/botGun.ts、domain/rule/botGun.ts)。人と普通の的は false */
+  fires: boolean
   /** 倒した数 / 倒された数。試合ごとに 0 に戻る */
   kills: number
   deaths: number
@@ -487,6 +491,7 @@ export function newMatchPlayer(seed: {
     homeZ: 0,
     homeY: 0,
     homeStance: 'stand',
+    homeYaw: 0,
     patrolTo: null,
     patrolOut: true,
     downLeft: 0,
@@ -504,6 +509,7 @@ export function newMatchPlayer(seed: {
     wearingStealth: false,
     wasAlive: false,
     bot: false,
+    fires: false,
     kills: 0,
     deaths: 0,
     roundDeaths: 0,
@@ -548,6 +554,8 @@ export function newBot(seed: {
   stance?: 'stand' | 'crouch' | 'prone' | 'box' | 'lean' | 'salute'
   /** 走り続ける的のもう一方の端。省けば動かない */
   patrol?: { x: number; z: number }
+  /** 撃ち返す的。向き (rad) は湧いた時に向く方 — 撃ってくる側 (青) の基地へ向ける */
+  fires?: { yaw: number; weapon?: WeaponId }
   now: number
 }): MatchPlayer {
   const bot = newMatchPlayer({ id: seed.id, name: seed.name, team: seed.team, slot: seed.slot, now: seed.now })
@@ -564,6 +572,13 @@ export function newBot(seed: {
   bot.life = 'alive'
   // 撃ってくる側 (青) を向いて立つ。背後判定が常に成立すると練習にならない
   bot.yaw = Math.PI
+  if (seed.fires) {
+    bot.fires = true
+    bot.yaw = seed.fires.yaw
+    bot.homeYaw = seed.fires.yaw
+    if (seed.fires.weapon) bot.weapon = seed.fires.weapon
+  }
+  bot.cameraYaw = bot.yaw
   return bot
 }
 
@@ -589,6 +604,8 @@ export function reviveBot(bot: MatchPlayer, now: number): void {
   bot.y = bot.homeY
   bot.z = bot.homeZ
   bot.patrolOut = true
+  // 撃ち返す的は元の向きへ。最後に撃っていた方を向いたまま戻ると、湧いた所から撃たれない
+  if (bot.fires) bot.yaw = bot.cameraYaw = bot.homeYaw
 }
 
 /**

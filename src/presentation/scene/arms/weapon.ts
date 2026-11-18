@@ -99,6 +99,12 @@ export interface WeaponConfig {
    */
   crouchHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
   /**
+   * standHold / crouchHold / proneHold を**構えていない間だけ**使う (構えれば aimHold / crouchAimHold / proneAimHold へ寄せる)。拳銃の構えていない型 (handgun_relaxed_idle /
+   * pistol_crouch_relaxed / pistol_crouch_run / handgun_prone_relaxed) に合わせた持ち方で、構えている間は今まで通り握りの値から
+   * 組んで照準へ向け直す (alignBarrel)
+   */
+  relaxedHoldsOnly?: true
+  /**
    * 構えている間の持ち方 (立ち・しゃがみ)。**骨 (RightHand) の空間そのまま。**
    * 構えていない持ち方から aimWeight で寄せる。あれば aimTrim は掛けない —
    * 構えの型と一緒に Blender で銃を持たせて詰めた物なので、回し直すとずれる
@@ -109,6 +115,21 @@ export interface WeaponConfig {
   crouchAimHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
   /** しゃがんで構えた時の左手首 (銃の空間)。無ければ leftHand。立ちとの間は姿勢で混ぜる */
   crouchLeftHand?: { position: THREE.Vector3; quaternion: THREE.Quaternion }
+  /** 伏せの持ち方 (構えていない / 構え、骨 RightHand の空間)。crouchHold / aimHold と同じ扱い */
+  proneHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  proneAimHold?: { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }
+  /** 伏せて構えた時の左手首 (銃の空間)。しゃがみとの間は姿勢で混ぜる */
+  proneLeftHand?: { position: THREE.Vector3; quaternion: THREE.Quaternion }
+  /**
+   * **構えずに提げている間の左手首** (銃の空間、立ち / しゃがみ)。銃ごとの型で詰めた姿の左手の所。
+   * 歩く・走る間は腕を振る共通の型なので、右手の銃に左手を運んで両手の関係を詰めた形に保つ
+   * (本人 2026-11-16「いまの両手の関係とかを既存の走る型に反映できないの？」)。掛かり具合は Soldier が
+   * 型 (CharacterAnimator.carrying) を見て寄せる (setCarryWeight)
+   */
+  relaxedLeftHand?: {
+    stand: { position: THREE.Vector3; quaternion: THREE.Quaternion }
+    crouch: { position: THREE.Vector3; quaternion: THREE.Quaternion }
+  }
   proneGrip?: THREE.Vector3
   proneRotation?: THREE.Euler
   /** 先端 (銃口 / 刃先)。トレーサーや判定の基準 */
@@ -273,6 +294,13 @@ const M4: WeaponConfig = {
  * 画面の調整パネル (Calibrator) で動かして、確定したらここへ書き戻す。
  */
 const SMG: WeaponConfig = {
+  // 主観の目。機関部の上の照準器 (リングサイト) の窓を覗く。tools/preview/sight.html?weapon=smg で詰める
+  sight: {
+    eye: new THREE.Vector3(0, 0.2335, -0.49),
+    roll: 0,
+    pitch: 0,
+    glass: { min: new THREE.Vector3(-0.013, 0.22, -0.8), max: new THREE.Vector3(0.013, 0.243, -0.64) },
+  },
   /*
    * 構えていない時 (立ち / しゃがみ)・構え (立ち / しゃがみ) の持ち方と左手は、**本人が Blender で P90 用の型
    * (smg_relaxed_idle / smg_crouch_relaxed / smg_aim / smg_crouch_aim) に銃を持たせて詰めた所** (2026-11-15)。
@@ -307,7 +335,30 @@ const SMG: WeaponConfig = {
     position: new THREE.Vector3(-0.0558, 0.0601, -0.6724),
     quaternion: new THREE.Quaternion(-0.46183, 0.02763, -0.43997, 0.76966),
   },
-  aimTrim: { pitch: 3.3, yaw: 1.8, crouchPitch: -6.2, crouchYaw: 4.9 },
+  // 伏せ (smg_prone_relaxed / smg_prone_aim)。脱力は前からの握り (proneGrip) と同じ所
+  proneHold: {
+    position: new THREE.Vector3(-6.7376, -60.8176, 6.329),
+    quaternion: new THREE.Quaternion(0.41535, 0.54506, -0.52336, 0.50645),
+    scale: 117.41,
+  },
+  proneAimHold: {
+    position: new THREE.Vector3(-13.2452, -64.8968, 2.3022),
+    quaternion: new THREE.Quaternion(0.5, 0.5, -0.5, 0.5),
+    scale: 117.41,
+  },
+  proneLeftHand: {
+    position: new THREE.Vector3(-0.0934, 0.1227, -0.6734),
+    quaternion: new THREE.Quaternion(-0.28004, 0.38296, -0.70834, 0.52266),
+  },
+  relaxedLeftHand: {
+    stand: { position: new THREE.Vector3(-0.073, 0.1232, -0.7692), quaternion: new THREE.Quaternion(0.01637, -0.00361, -0.86522, 0.50111) },
+    crouch: { position: new THREE.Vector3(-0.0702, 0.1542, -0.7454), quaternion: new THREE.Quaternion(-0.08941, 0.0423, -0.93794, 0.3324) },
+  },
+  /*
+   * しゃがみは 0.6 / -2.2。止まって構える間は脚も P90 の型 (smg_crouch_aim) になったので、共通のしゃがみの
+   * 脚に合わせていた -6.2 / 4.9 では銃身が左 7°・下 7° を向き、背骨の向け直しで右手が 6.8cm 動いた (2026-11-16)
+   */
+  aimTrim: { pitch: 3.3, yaw: 1.8, crouchPitch: 0.6, crouchYaw: -2.2 },
   // 実機で詰めた値。引き金の輪 (後ろ側の大きいほう) の中に来る
   grip: new THREE.Vector3(0.01, 0.11, -0.465),
   rotation: new THREE.Euler(degrees(-8), degrees(-8), degrees(0)),
@@ -350,10 +401,42 @@ const KNIFE: WeaponConfig = {
  * 実際の見え方は調整パネルで詰める。ここは出発点。
  */
 const SNIPER: WeaponConfig = {
-  // しゃがみ構えの右手を体の中心側へ 6.5cm (M4 と同じ。本人 2026-10-10)
-  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
-  // 構えた時に銃口を照準へ (tools/preview/weapon.html?views=3&fixeddt で、本番と同じ Soldier を測って詰めた)
-  aimTrim: { pitch: 3.9, yaw: -9.3, crouchPitch: 1.6, crouchYaw: 9.1 },
+  /*
+   * 立ち・しゃがみ・伏せ (構えていない / 構え) は、**本人が Blender で狙撃銃用の型 (sniper_relaxed_idle /
+   * sniper_aim / sniper_crouch_relaxed / sniper_crouch_aim / sniper_prone_relaxed / sniper_prone_aim) に
+   * 銃を持たせて詰めた所** (2026-11-16)。型が持ち方ごと作ってあるので、旧来の型を補っていた
+   * しゃがみ構えの右手の寄せ (rightShift) と回し (aimTrim) は外した
+   */
+  standHold: {
+    position: new THREE.Vector3(27.4906, 21.4818, 5.7449),
+    quaternion: new THREE.Quaternion(0.49397, -0.4194, 0.65931, 0.38132),
+    scale: 117.41,
+  },
+  aimHold: {
+    position: new THREE.Vector3(27.3436, 25.0356, 5.5574),
+    quaternion: new THREE.Quaternion(0.51331, -0.40243, 0.65721, 0.37768),
+    scale: 117.41,
+  },
+  relaxedLeftHand: {
+    stand: { position: new THREE.Vector3(0.0822, 0.2133, -0.1832), quaternion: new THREE.Quaternion(-0.03743, -0.53726, 0.6489, 0.53747) },
+    crouch: { position: new THREE.Vector3(0.1067, 0.2129, -0.2325), quaternion: new THREE.Quaternion(-0.19299, -0.52023, 0.61086, 0.56477) },
+  },
+  crouchAimHold: {
+    position: new THREE.Vector3(6.3559, 29.8541, 5.5517),
+    quaternion: new THREE.Quaternion(0.57365, -0.51862, 0.49908, 0.39098),
+    scale: 100.0,
+  },
+  // 伏せの構えていない時は前からの握り (proneGrip) と同じ所
+  proneHold: {
+    position: new THREE.Vector3(24.2021, 19.3082, -9.2365),
+    quaternion: new THREE.Quaternion(0.59904, -0.33093, 0.43507, 0.58511),
+    scale: 117.41,
+  },
+  proneAimHold: {
+    position: new THREE.Vector3(8.9302, 29.4636, 4.1095),
+    quaternion: new THREE.Quaternion(0.4789, -0.53443, 0.51602, 0.46772),
+    scale: 117.41,
+  },
   grip: new THREE.Vector3(0.01, 0.28, 0.135),
   rotation: new THREE.Euler(degrees(-20), degrees(-9), degrees(-180)),
   /*
@@ -402,6 +485,46 @@ const SNIPER: WeaponConfig = {
  * 無い。ずれていたら調整パネルで詰める。
  */
 const M1911: WeaponConfig = {
+  /*
+   * しゃがんで構えていない間 (pistol_crouch_relaxed / pistol_crouch_run)。P90 のしゃがみと同じ体に拳銃を
+   * 持たせ、本人が Blender で詰めた持ち方 (2026-11-16)
+   */
+  crouchHold: {
+    position: new THREE.Vector3(-0.8626, 8.8088, 2.4369),
+    quaternion: new THREE.Quaternion(0.61105, 0.36836, -0.4306, 0.55273),
+    scale: 117.41,
+  },
+  relaxedHoldsOnly: true,
+  // 立って構えていない時 (handgun_relaxed_idle)。本人が Blender で詰めた持ち方
+  standHold: {
+    position: new THREE.Vector3(4.963, 15.6344, 3.0639),
+    quaternion: new THREE.Quaternion(0.46406, 0.50941, -0.58396, 0.42912),
+    scale: 117.41,
+  },
+  // 伏せて構えていない時 (handgun_prone_relaxed)。本人が Blender で詰めた持ち方
+  proneHold: {
+    position: new THREE.Vector3(4.5781, 12.6771, 3.3652),
+    quaternion: new THREE.Quaternion(0.60972, 0.48948, -0.42082, 0.45996),
+    scale: 117.41,
+  },
+  // 伏せて構えた時 (handgun_prone_aim)。本人が Blender で詰めた持ち方
+  proneAimHold: {
+    position: new THREE.Vector3(-0.0636, 8.9579, 3.0379),
+    quaternion: new THREE.Quaternion(0.4706, 0.44583, -0.43199, 0.62702),
+    scale: 117.41,
+  },
+  // 立って構えた時 (handgun_aim)。本人が Blender で詰めた持ち方
+  aimHold: {
+    position: new THREE.Vector3(3.5978, 12.1443, 2.9111),
+    quaternion: new THREE.Quaternion(0.55516, 0.49497, -0.4468, 0.49716),
+    scale: 117.41,
+  },
+  // しゃがんで構えた時 (handgun_crouch_aim)。本人が Blender で詰めた持ち方。銃身は今まで通り照準へ向け直す (alignBarrel)
+  crouchAimHold: {
+    position: new THREE.Vector3(3.3528, 10.9273, 2.6058),
+    quaternion: new THREE.Quaternion(0.57439, 0.53501, -0.46349, 0.41111),
+    scale: 117.41,
+  },
   // 構えている間、銃身を照準へ毎コマ向ける (alignBarrel の注)
   alignBarrel: true,
   // 立ちは本人が三面図で詰めた値 (2026-10-10)
@@ -412,11 +535,51 @@ const M1911: WeaponConfig = {
   crouchRotation: new THREE.Euler(degrees(-16), degrees(33), degrees(-1)),
   proneGrip: new THREE.Vector3(0.035, 0, 0.11),
   proneRotation: new THREE.Euler(degrees(-5), 0, 0),
-  rightShift: { stand: new THREE.Vector3(0.06, -0.005, 0.02), crouch: new THREE.Vector3(-0.03, -0.045, 0.04) },
+  // 右手の寄せ (rightShift) は無し: 立ち・しゃがみとも構えの型 (handgun_aim / handgun_crouch_aim) に入っている (本人 2026-11-16)
   tip: new THREE.Vector3(0, 0.067, -0.172),
 }
 
 const PISTOL: WeaponConfig = {
+  /*
+   * しゃがんで構えていない間 (pistol_crouch_relaxed / pistol_crouch_run)。P90 のしゃがみと同じ体に拳銃を
+   * 持たせ、本人が Blender で詰めた持ち方 (2026-11-16)
+   */
+  crouchHold: {
+    position: new THREE.Vector3(-0.8626, 8.8088, 2.4369),
+    quaternion: new THREE.Quaternion(0.61105, 0.36836, -0.4306, 0.55273),
+    scale: 117.41,
+  },
+  relaxedHoldsOnly: true,
+  // 立って構えていない時 (handgun_relaxed_idle)。本人が Blender で詰めた持ち方
+  standHold: {
+    position: new THREE.Vector3(4.963, 15.6344, 3.0639),
+    quaternion: new THREE.Quaternion(0.46406, 0.50941, -0.58396, 0.42912),
+    scale: 117.41,
+  },
+  // 伏せて構えていない時 (handgun_prone_relaxed)。本人が Blender で詰めた持ち方
+  proneHold: {
+    position: new THREE.Vector3(4.5781, 12.6771, 3.3652),
+    quaternion: new THREE.Quaternion(0.60972, 0.48948, -0.42082, 0.45996),
+    scale: 117.41,
+  },
+  // 伏せて構えた時 (handgun_prone_aim)。本人が Blender で詰めた持ち方
+  proneAimHold: {
+    position: new THREE.Vector3(-0.0636, 8.9579, 3.0379),
+    quaternion: new THREE.Quaternion(0.4706, 0.44583, -0.43199, 0.62702),
+    scale: 117.41,
+  },
+  // 立って構えた時 (handgun_aim)。本人が Blender で詰めた持ち方
+  aimHold: {
+    position: new THREE.Vector3(3.5978, 12.1443, 2.9111),
+    quaternion: new THREE.Quaternion(0.55516, 0.49497, -0.4468, 0.49716),
+    scale: 117.41,
+  },
+  // しゃがんで構えた時 (handgun_crouch_aim)。本人が Blender で詰めた持ち方。銃身は今まで通り照準へ向け直す (alignBarrel)
+  crouchAimHold: {
+    position: new THREE.Vector3(3.3528, 10.9273, 2.6058),
+    quaternion: new THREE.Quaternion(0.57439, 0.53501, -0.46349, 0.41111),
+    scale: 117.41,
+  },
   // 構えている間、銃身を照準へ毎コマ向ける (alignBarrel の注)
   alignBarrel: true,
   // 立ちは本人が三面図で詰めた値 (2026-10-10)
@@ -427,7 +590,7 @@ const PISTOL: WeaponConfig = {
   crouchRotation: new THREE.Euler(degrees(-16), degrees(33), degrees(-1)),
   proneGrip: new THREE.Vector3(0.035, 0, 0.11),
   proneRotation: new THREE.Euler(degrees(-5), 0, 0),
-  rightShift: { stand: new THREE.Vector3(0.06, -0.005, 0.02), crouch: new THREE.Vector3(-0.03, -0.045, 0.04) },
+  // 右手の寄せ (rightShift) は無し: 立ち・しゃがみとも構えの型 (handgun_aim / handgun_crouch_aim) に入っている (本人 2026-11-16)
   // 銃口。モデルの先端 5mm を測ると y 0.051〜0.083 で、その中央。
   // 置き値のままだと 4.7cm 低く 6.6cm 手前から弾が出ていた
   tip: new THREE.Vector3(0, 0.067, -0.172),
@@ -439,7 +602,21 @@ const PISTOL: WeaponConfig = {
  * convert_gltf_gun.py が銃口を同じ座標へ揃えて書き出すので、握りの値も
  * ボルトの置き場所もそのまま通る。合わなければここで分ける。
  */
-const MOSIN: WeaponConfig = SNIPER
+/*
+ * モシン (麻酔の狙撃銃)。**狙撃銃の前の持ち方のまま。** 狙撃銃用の型 (sniper_*) はモシンには流さない
+ * (animation.ts の表は sniper だけ) ので、型に合わせた置き場所は持たせない
+ */
+const MOSIN: WeaponConfig = {
+  ...SNIPER,
+  rightShift: { stand: new THREE.Vector3(0, 0, 0), crouch: new THREE.Vector3(-0.065, 0, 0) },
+  aimTrim: { pitch: 3.9, yaw: -9.3, crouchPitch: 1.6, crouchYaw: 9.1 },
+  crouchAimHold: undefined,
+  proneHold: undefined,
+  proneAimHold: undefined,
+  standHold: undefined,
+  aimHold: undefined,
+  relaxedLeftHand: undefined,
+}
 
 export const WEAPON_CONFIGS = { smg: SMG, rifle: RIFLE, m4: M4, shotgun: SHOTGUN, sniper: SNIPER, mosin: MOSIN, m9: PISTOL, m1911: M1911, knife: KNIFE } as const
 export type WeaponKind = keyof typeof WEAPON_CONFIGS
@@ -498,6 +675,7 @@ export class Weapon {
    */
   private crouchHold: WeaponConfig['crouchHold'] | null
   private standHold: WeaponConfig['standHold'] | null
+  private proneHold: WeaponConfig['proneHold'] | null
   private readonly crouchGrip: THREE.Vector3
   private readonly crouchRotation: THREE.Euler
   private readonly proneGrip: THREE.Vector3
@@ -558,6 +736,9 @@ export class Weapon {
       : null
     this.standHold = config.standHold
       ? { position: config.standHold.position.clone(), quaternion: config.standHold.quaternion.clone(), scale: config.standHold.scale }
+      : null
+    this.proneHold = config.proneHold
+      ? { position: config.proneHold.position.clone(), quaternion: config.proneHold.quaternion.clone(), scale: config.proneHold.scale }
       : null
     this.crouchRotation = (config.crouchRotation ?? config.rotation).clone()
     // 伏せは書いていなければしゃがみと同じ。**書くまでは今までの見え方のまま**
@@ -718,6 +899,7 @@ export class Weapon {
     if (stance === 'prone') {
       this.proneGrip.copy(grip)
       this.proneRotation.copy(rotation)
+      this.proneHold = null
     } else if (stance === 'crouch') {
       this.crouchGrip.copy(grip)
       this.crouchRotation.copy(rotation)
@@ -823,8 +1005,23 @@ export class Weapon {
    * 構えている間に**左手首を置く所** (世界)。銃に leftHand が無ければ false
    */
   leftHandTarget(outPosition: THREE.Vector3, outQuaternion: THREE.Quaternion): boolean {
-    const hold = this.config.leftHand
-    if (!hold || this.aimWeight <= 0) return false
+    const aiming = !!this.config.leftHand && this.aimWeight > 0
+    const carry = this.config.relaxedLeftHand
+    const carrying = !!carry && this.carryWeight > 0
+    this.leftWeight = Math.max(aiming ? this.aimWeight : 0, carrying ? this.carryWeight : 0)
+    if (!aiming && !carrying) return false
+    // 提げている間の左手 (立ち→しゃがみで混ぜる)
+    if (carrying) {
+      const c = Math.min(1, Math.max(0, this.stance))
+      this.carryPosition.lerpVectors(carry!.stand.position, carry!.crouch.position, c)
+      this.carryQuaternion.slerpQuaternions(carry!.stand.quaternion, carry!.crouch.quaternion, c)
+      if (!aiming) {
+        outPosition.copy(this.carryPosition).applyMatrix4(this.object.matrixWorld)
+        outQuaternion.copy(this.carryQuaternion).premultiply(this.object.getWorldQuaternion(new THREE.Quaternion()))
+        return true
+      }
+    }
+    const hold = this.config.leftHand!
     const crouch = this.config.crouchLeftHand
     const t = crouch ? Math.min(1, Math.max(0, this.stance)) : 0
     outPosition.copy(hold.position)
@@ -832,6 +1029,17 @@ export class Weapon {
     if (crouch && t > 0) {
       outPosition.lerp(crouch.position, t)
       outQuaternion.slerp(crouch.quaternion, t)
+    }
+    const prone = this.config.proneLeftHand
+    if (prone && this.stance > 1) {
+      const p = Math.min(1, this.stance - 1)
+      outPosition.lerp(prone.position, p)
+      outQuaternion.slerp(prone.quaternion, p)
+    }
+    // 構えと提げの間 (構えの掛かり具合で寄せる)
+    if (carrying) {
+      outPosition.lerpVectors(this.carryPosition, outPosition, this.aimWeight)
+      outQuaternion.slerpQuaternions(this.carryQuaternion, outQuaternion, this.aimWeight)
     }
     outPosition.applyMatrix4(this.object.matrixWorld)
     outQuaternion.premultiply(this.object.getWorldQuaternion(new THREE.Quaternion()))
@@ -842,6 +1050,36 @@ export class Weapon {
   get aimAmount(): number {
     return this.aimWeight
   }
+
+  /** 左手を運ぶ掛かり具合 (0..1)。構え・提げの大きいほう。leftHandTarget が出す */
+  get leftHandWeight(): number {
+    return this.leftWeight
+  }
+
+  /**
+   * 提げている間の左手の掛かり具合 (0..1、relaxedLeftHand)。Soldier が型 (CharacterAnimator.carrying) を見て寄せる
+   */
+  setCarryWeight(weight: number): void {
+    this.carryWeight = weight
+  }
+
+  /**
+   * **構えの置き場所 (aimHold / crouchAimHold / proneAimHold) の掛かり具合。** 伏せも含む。
+   *
+   * 構えの補正 (setAimWeight) は伏せで 0 にしている (伏せは回さない・左手を付け直さない) ので、それで
+   * 置き場所まで寄せていた頃は**伏せの構えの置き場所が試合で効いていなかった** (試写は 1 を渡していて
+   * 気づかなかった、2026-11-16)。渡されなければ構えの補正と同じ値
+   */
+  setAimHoldWeight(weight: number): void {
+    if (Math.abs(weight - this.aimHoldWeight) < 0.002) return
+    this.aimHoldWeight = weight
+    if (!this.lent) this.rebuild(this.stance < 0 ? 0 : this.stance)
+  }
+  private carryWeight = 0
+  private leftWeight = 0
+  private aimHoldWeight = -1
+  private readonly carryPosition = new THREE.Vector3()
+  private readonly carryQuaternion = new THREE.Quaternion()
 
   /**
    * 構えの補正で銃が回った分を、**世界の向きで**返す (回した後 × 回す前の逆)。
@@ -903,17 +1141,26 @@ export class Weapon {
     // 立ちの置き場所 (standHold) も同じく測った物で上書きし、しゃがみへ向けて抜く
     const stand = this.standHold
     if (stand && blend < 1) {
-      const toStand = 1 - blend
+      const relaxedOnly = this.config.relaxedHoldsOnly ? 1 - (this.aimHoldWeight < 0 ? this.aimWeight : this.aimHoldWeight) : 1
+      const toStand = (1 - blend) * relaxedOnly
       this.object.position.lerp(stand.position, toStand)
       this.object.quaternion.slerp(stand.quaternion, toStand)
       this.object.scale.lerp(this.holdScale.setScalar(stand.scale), toStand)
     }
     const hold = this.crouchHold
-    const toHold = blend <= 1 ? t : 1 - t
+    const aimHold = this.aimHoldWeight < 0 ? this.aimWeight : this.aimHoldWeight
+    const toHold = (blend <= 1 ? t : 1 - t) * (this.config.relaxedHoldsOnly ? 1 - aimHold : 1)
     if (hold && toHold > 0) {
       this.object.position.lerp(hold.position, toHold)
       this.object.quaternion.slerp(hold.quaternion, toHold)
       this.object.scale.lerp(this.holdScale.setScalar(hold.scale), toHold)
+    }
+    const prone = this.proneHold
+    if (prone && blend > 1) {
+      const toProne = t * (this.config.relaxedHoldsOnly ? 1 - aimHold : 1)
+      this.object.position.lerp(prone.position, toProne)
+      this.object.quaternion.slerp(prone.quaternion, toProne)
+      this.object.scale.lerp(this.holdScale.setScalar(prone.scale), toProne)
     }
     this.placeAim(blend)
   }
@@ -923,19 +1170,37 @@ export class Weapon {
    * 伏せへ向けて抜く (伏せの構えは握りの値のまま)
    */
   private placeAim(blend: number): void {
-    const stand = this.config.aimHold
-    if (!stand || this.aimWeight <= 0) return
-    const fade = blend <= 1 ? 1 : Math.max(0, 2 - blend)
-    const weight = this.aimWeight * fade
+    const aimHold = this.aimHoldWeight < 0 ? this.aimWeight : this.aimHoldWeight
+    if (aimHold <= 0) return
+    /*
+     * 姿勢ごとの構えの置き場所 (立ち / しゃがみ / 伏せ)。**ある姿勢だけ寄せる** — 無い姿勢は握りの値のまま。
+     * 狙撃銃は立ちの構えを持たない (しゃがみと伏せだけ型で詰めた、2026-11-16)。しゃがみは無ければ立ちと同じ
+     */
+    const holds = [this.config.aimHold, this.config.crouchAimHold ?? this.config.aimHold, this.config.proneAimHold]
+    const low = blend < 1 ? 0 : 1
+    const t = Math.min(1, Math.max(0, blend - low))
+    const a = holds[low]
+    const b = holds[low + 1]
+    if (!a && !b) return
+    let weight = aimHold
+    if (a && b) {
+      this.aimPosition.lerpVectors(a.position, b.position, t)
+      this.aimQuaternion.slerpQuaternions(a.quaternion, b.quaternion, t)
+      this.aimScale = THREE.MathUtils.lerp(a.scale, b.scale, t)
+    } else {
+      // 片方だけ。無い側へ向けて抜く
+      const only = (a ?? b)!
+      this.aimPosition.copy(only.position)
+      this.aimQuaternion.copy(only.quaternion)
+      this.aimScale = only.scale
+      weight *= a ? 1 - t : t
+    }
     if (weight <= 0) return
-    const crouch = this.config.crouchAimHold ?? stand
-    const c = Math.min(1, blend)
-    const position = this.aimPosition.lerpVectors(stand.position, crouch.position, c)
-    const quaternion = this.aimQuaternion.slerpQuaternions(stand.quaternion, crouch.quaternion, c)
-    this.object.position.lerp(position, weight)
-    this.object.quaternion.slerp(quaternion, weight)
-    this.object.scale.lerp(this.holdScale.setScalar(THREE.MathUtils.lerp(stand.scale, crouch.scale, c)), weight)
+    this.object.position.lerp(this.aimPosition, weight)
+    this.object.quaternion.slerp(this.aimQuaternion, weight)
+    this.object.scale.lerp(this.holdScale.setScalar(this.aimScale), weight)
   }
+  private aimScale = 1
   private readonly aimPosition = new THREE.Vector3()
   private readonly aimQuaternion = new THREE.Quaternion()
 

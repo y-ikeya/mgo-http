@@ -32,6 +32,8 @@ import { loadSoldier } from '../../src/presentation/scene/assets'
 import { CharacterAnimator, findBoneBySuffix } from '../../src/presentation/scene/actor/animation'
 import { Weapon, type WeaponKind } from '../../src/presentation/scene/arms/weapon'
 import { StunSparks } from '../../src/presentation/scene/fx/stunSparks'
+import { LeftArmFollow, RightArmShift, SpineAim } from '../../src/presentation/scene/actor/armIk'
+import { WEAPON_CONFIGS } from '../../src/presentation/scene/arms/weapon'
 
 const WIDTH = 1280
 const HEIGHT = 900
@@ -75,6 +77,17 @@ root.rotation.y = turn + Math.PI
 scene.add(root)
 model.rotation.y = MODEL_YAW_OFFSET
 root.add(model)
+
+/** 骨ごとの世界の行列 (?dump)。素の姿は型を流す前にここで控える */
+const bonesWorld = () => {
+  const out: Record<string, number[]> = {}
+  root.updateMatrixWorld(true)
+  model.traverse((o) => {
+    if ((o as THREE.Bone).isBone) out[o.name] = o.matrixWorld.toArray().map((v) => +v.toFixed(7))
+  })
+  return out
+}
+const restWorld = query.has('dump') ? bonesWorld() : null
 
 /*
  * ?shadow … 影を受ける体 (soldier.ts の receiveShadow)。屋内で日向の明るさに
@@ -404,8 +417,49 @@ if (box) {
 }
 // 姿勢ごとに握りが違う。しゃがみの型を見るときは stance=1 を付ける
 weapon?.applyStance(Number(query.get('stance') ?? '0'))
-// 構えの持ち方 (aimHold) は試合と同じく掛かり具合で寄せる
+// 構えの持ち方 (aimHold) は試合と同じく掛かり具合で寄せる。提げている間の左手も試合と同じく型に聞く
 weapon?.setAimWeight(query.has('aim') ? 1 : 0)
+weapon?.setAimHoldWeight(query.has('aim') ? 1 : 0)
+weapon?.setCarryWeight(anim.carrying ? 1 : 0)
+/*
+ * ?dump … 試合と同じ順で**構えの補正を掛けて**、骨と銃の置き場所をページに書き出す (Blender で同じ姿を
+ * 組むため)。構えている間は背骨を照準へ向け直し (SpineAim)、右手をずらし (rightShift)、銃身を照準へ
+ * (alignBarrel の銃だけ)、最後に左手を運ぶ (soldier.ts の順)。?dump を付けない時は今まで通り左手だけ
+ */
+const rightShift = new RightArmShift()
+if (weapon && gunName && query.has('dump') && query.has('aim')) {
+  model.updateMatrixWorld(true)
+  // 試合の向き (yaw) は根の回りそのもの (soldier.ts の object.rotation.y = yaw)。ここの根は turn + 180°
+  const yaw = turn + Math.PI
+  new SpineAim().apply(model, weapon.object, yaw, pitch, 1)
+  const shift = WEAPON_CONFIGS[gunName as keyof typeof WEAPON_CONFIGS]?.rightShift
+  if (shift) {
+    const crouch = Math.min(1, Number(query.get('stance') ?? '0'))
+    rightShift.apply(model, root, new THREE.Vector3().lerpVectors(shift.stand, shift.crouch, crouch))
+  }
+  weapon.object.updateWorldMatrix(true, false)
+  const aimDir = new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch))
+  weapon.alignTo(aimDir, 1)
+}
+// 左手を銃へ運ぶ (試合の Soldier と同じ。構えの左手・提げている間の左手)
+if (weapon) {
+  model.updateMatrixWorld(true)
+  new LeftArmFollow().apply(model, weapon, rightShift.moved)
+}
+if (restWorld) {
+  const dump = document.createElement('pre')
+  dump.id = 'dump'
+  dump.textContent = JSON.stringify({
+    rest: restWorld,
+    pose: bonesWorld(),
+    keys: anim.playingKeys,
+    // 右手の骨の空間の銃の置き場所 (weapon.object は右手の子)
+    hold: weapon
+      ? { position: weapon.object.position.toArray(), quaternion: weapon.object.quaternion.toArray(), scale: weapon.object.scale.x }
+      : null,
+  })
+  document.body.appendChild(dump)
+}
 
 const bone = (name: string) => {
   let found: THREE.Object3D | null = null

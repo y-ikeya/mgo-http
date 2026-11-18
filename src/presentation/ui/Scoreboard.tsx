@@ -7,7 +7,14 @@ import { useLevels } from '../../infra/api/levels'
 import type { Identity } from '../../infra/auth/session'
 import type { GameStats } from '../scene/stats'
 import { SkillList } from './SkillPanel'
-import { DEFAULT_LOOK_SCALE, LOOK_SCALE_MAX, LOOK_SCALE_MIN, type LookScale } from '../../infra/prefs/look'
+import {
+  DEFAULT_LOOK_SCALE,
+  LONG_PRESS_MAX,
+  LONG_PRESS_MIN,
+  LOOK_SCALE_MAX,
+  LOOK_SCALE_MIN,
+  type LookScale,
+} from '../../infra/prefs/look'
 import { RENDER_SCALE_MAX, RENDER_SCALE_MIN } from '../../infra/prefs/quality'
 import './Scoreboard.css'
 
@@ -423,6 +430,21 @@ export default function Scoreboard(props: {
                 checked={props.lookScale.listInvert}
                 onChange={(e) => props.onLookScale({ ...props.lookScale, listInvert: e.currentTarget.checked })}
               />
+            </label>
+            {/* しゃがみの長押し (本人 2026-11-16)。この時間を越えて押すと転がる・伏せる。右ほど長く押す */}
+            <div class="score-settings-head">長押し</div>
+            <label class="score-setting">
+              <span class="score-setting-label">しゃがみ → 転がる</span>
+              <input
+                class="score-setting-range"
+                type="range"
+                min={LONG_PRESS_MIN}
+                max={LONG_PRESS_MAX}
+                step={0.01}
+                value={props.lookScale.longPress}
+                onInput={(e) => props.onLookScale({ ...props.lookScale, longPress: Number(e.currentTarget.value) })}
+              />
+              <span class="score-setting-value">{props.lookScale.longPress.toFixed(2)} 秒</span>
             </label>
             <button class="score-leave score-settings-reset" onClick={() => props.onLookScale({ ...DEFAULT_LOOK_SCALE })}>
               既定に戻す
