@@ -159,7 +159,7 @@ const LOOKS: Record<'clear' | 'dusty' | 'dustyWhite' | 'night', Look> = {
   clear: { zenith: 0x3f78c8, horizon: 0xbcd2e4, sun: 0xfff2d8, sunLight: 0xfff4e6, ground: 0x6b6055, fogNear: 55, fogFar: 135 },
   dusty: { zenith: 0x8f9a86, horizon: 0xd3c9a2, sun: 0xf0e0b4, sunLight: 0xf3e3c4, ground: 0x5c4c38, fogNear: 40, fogFar: 115 },
   /*
-   * CC の空。dusty の天頂と地平を白へ 25% 寄せた (2026-11-13 本人「今までの空を少しだけしろく」
+   * MM の空。dusty の天頂と地平を白へ 25% 寄せた (2026-11-13 本人「今までの空を少しだけしろく」
    * 「青い空はちょっと合わない」)。地平の色は霧と日陰の空の色も兼ねるので、遠くが少し白く霞み、
    * 日陰もわずかに明るくなる
    */

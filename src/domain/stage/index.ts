@@ -39,6 +39,7 @@
  */
 
 import type { Team } from '../player/player'
+import type { WeaponId } from '../item/weapons'
 
 // --- 面の宣言。棚の中から取り次ぐ ---
 export { DEFAULT_SURFACE, SURFACE_ORDER, surfaceOf, taggedSurface, type Surface } from './surface'
@@ -104,6 +105,13 @@ export interface TargetSpot extends Spot {
    * 間に物が無い所に置く (的は壁を見ずに真っ直ぐ走る)。立っている的だけ
    */
   patrol?: { x: number; z: number }
+  /**
+   * **撃ち返す的。** 見えた敵 (練習の人) を振り向いて撃ってくる (domain/rule/botGun.ts)。
+   * 湧いた時は青の基地のほうを向く。走る的には付けない (本人 2026-11-15)
+   */
+  fires?: true
+  /** 撃ち返す的が持つ銃。省けばライフル */
+  weapon?: WeaponId
 }
 
 /**
@@ -268,6 +276,8 @@ const TRAINING: StageSpec = {
     { x: -13, z: -2, stance: 'prone' },
     // 走り続ける的 (CQC の練習)。立っている列の手前を東西に往復する
     { x: -30, z: -30, patrol: { x: -16, z: -30 } },
+    // 撃ち返す的 (本人 2026-11-15)。立っている列の東、基地から 30m ほど。更地なので出たら撃たれる
+    { x: -12, z: -18, fires: true },
   ],
   // 高台を降りた南側。2 匹並べて円を重ねる (解けた後に隣で掛からないかも見られる)
   practiceDolls: [
@@ -342,7 +352,7 @@ const RAFT: StageSpec = {
  */
 const CITY: StageSpec = {
   name: 'city',
-  label: 'CC',
+  label: 'MM',
   ambience: 'city_loop1.mp3',
   bases: {
     blue: { x: -18.41, z: 49.09, y: 10.01 },
@@ -482,8 +492,10 @@ const LAB: StageSpec = {
   // 足元は地面の上面 (0.1)。省くと 0 に立って 10cm 埋まった
   targets: [
     { x: -18, z: 0, y: 0.1 },
-    // 立ったまま左右へ lean を繰り返す的 (2026-10-21 本人)。立った的だった所
-    { x: 4, z: -30, y: 0.1, stance: 'lean' },
+    // 立ったまま左右へ lean を繰り返す的 (2026-10-21 本人)。立った的だった所。
+    // 撃ち返しもする (2026-11-15 本人「target2 も撃つようにしていいよ」) — 角から出入りしながら撃ってくる
+    // 持つのは狙撃銃 (本人 2026-11-15「sniper を持たせてね」)
+    { x: 4, z: -30, y: 0.1, stance: 'lean', fires: true, weapon: 'sniper' },
     // 低い的。手元の /training はこの検証場なので、ここにも置く (2026-10-14)。それぞれの立った的の両脇
     // CBOX を被った的 (2026-10-20 本人「一つの enemy の代わりに CBox に入った enemy」)。しゃがんだ的だった所
     { x: -18, z: -3, y: 0.1, stance: 'box' },
@@ -510,6 +522,9 @@ const LAB: StageSpec = {
     { x: -13, z: -7, y: 0.1, team: 'blue', stance: 'salute' },
     { x: -10.5, z: -7, y: 0.1, team: 'blue' },
     { x: -8, z: -7, y: 0.1, team: 'blue', stance: 'crouch' },
+    // 撃ち返す的 (本人 2026-11-15)。**青の基地から見えない所** — 這って通る通路の壁の陰、基地から 16m
+    // (2026-11-16 本人「スタートした時に打たれると嫌」。赤の基地に立たせていた頃は湧いた途端に撃たれた)
+    { x: 1, z: -16, y: 0.1, fires: true },
   ],
   // 1 匹は基地の南東の空いた床 ((-6, -4) は空のダンボールの中で、猫が箱に埋もれて見えなかった)。
   // もう 1 匹は**塔の上、梯子を登り切った所** (本人 2026-10-20)。登りながらは箱を被れないので、

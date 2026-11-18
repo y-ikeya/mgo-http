@@ -144,6 +144,7 @@ const BINDINGS = {
    * 長押しの意味は Game が姿勢で読み替える — しゃがんで移動を入れていなければ、
    * 転がらずにその場で伏せる (Game.ts の updateStanceInput)。
    */
+  // 時間は設定画面で変えられる (lookScale.longPress)。ここは既定
   stance: { keys: ['Space'], pad: 'roll', hold: 0.17 },
   /** 跳び越え。目の前に枠や塀があるときだけ効く (無ければ何もしない) */
   vault: { keys: ['KeyF'], pad: 'vault' },
@@ -505,9 +506,15 @@ export class Input {
    */
   /**
    * 視点の感度の倍率 (設定画面で選ぶ)。**マウスとパッドで別。** 構えているかで
-   * 使い分けるので、それぞれ 2 本。既定は 1
+   * 使い分けるので、それぞれ 2 本。既定は 1。
+   * 長押しと見なす時間 (longPress、秒) も同じ設定画面から来る。無ければ BINDINGS の hold
    */
-  lookScale = { mouseHip: 1, mouseAim: 1, padHip: 1, padAim: 1 }
+  lookScale: { mouseHip: number; mouseAim: number; padHip: number; padAim: number; longPress?: number } = {
+    mouseHip: 1,
+    mouseAim: 1,
+    padHip: 1,
+    padAim: 1,
+  }
 
   consumeLook(out: { x: number; y: number }, aiming = false): { x: number; y: number } {
     const mouse = aiming ? this.lookScale.mouseAim : this.lookScale.mouseHip
@@ -786,7 +793,7 @@ export class Input {
     for (const action of this.muted) if (!this.physicallyDown(action)) this.muted.delete(action)
     for (const [action, hold] of this.holds) {
       const bind = BINDINGS[action]
-      advanceHold(hold, this.rawDown(action), dt, 'hold' in bind ? bind.hold : undefined)
+      advanceHold(hold, this.rawDown(action), dt, 'hold' in bind ? (this.lookScale.longPress ?? bind.hold) : undefined)
     }
   }
 

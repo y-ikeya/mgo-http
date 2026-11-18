@@ -76,6 +76,7 @@ import { StunSparks } from "./fx/stunSparks";
 import { Melee, PUNCH_DELAY } from "./self/melee";
 import { Throwing } from "./self/throwing";
 import { Sensed } from "./fx/sensed";
+import { AllyNames } from "./actor/allyNames";
 import { Casings } from "./fx/casings";
 import { Drops } from "./arms/drops";
 import { BOX_BUMP_RANGE, fallDamage, MAX_HEALTH, SHOTGUN_KNOCK_DISTANCE, SHOTGUN_KNOCK_TIME } from "../../domain/rule/damage";
@@ -573,6 +574,8 @@ export class Game {
   private readonly melee: Melee;
   /** 気配 (AWARENESS)。**何が在るかは届かない**ので、霧を置くだけ */
   private readonly sensed: Sensed;
+  /** 見えている味方の頭の上の名前 (陣営で分かれる部屋だけ) */
+  private readonly allyNames: AllyNames;
   private readonly casings: Casings;
   /** 地面に落ちている武器。浮かせて回している */
   private readonly drops: Drops;
@@ -1283,6 +1286,7 @@ export class Game {
     this.tsneTarget = new TsneTarget(this.scene);
     this.stunSparks = new StunSparks(this.scene);
     this.sensed = new Sensed(this.scene);
+    this.allyNames = new AllyNames(container);
     this.casings = new Casings(this.scene);
     this.drops = new Drops(this.scene);
     this.shots = new Shots(this.scene);
@@ -1515,6 +1519,7 @@ export class Game {
     this.grenades.dispose();
     this.blast.dispose();
     this.sensed.dispose();
+    this.allyNames.dispose();
     this.casings.dispose();
     this.drops.clear();
     this.player.dispose();
@@ -1775,6 +1780,7 @@ export class Game {
     this.follow.setRecoilRecovery(masteryRecoveryScale(this.skills, this.weapon.id));
     this.updateWeapon(dt);
     this.remotes.update(dt, Date.now());
+    this.updateAllyNames();
     this.updateSkyLight(dt);
     this.drops.update(dt);
     this.updateFootsteps();
@@ -4379,6 +4385,33 @@ export class Game {
       remote.setSkyLight(at(p.x, p.y + SKY_PROBE_HEIGHT, p.z) ?? mine, dt);
     }
   }
+
+  /**
+   * 見えている味方に名札を出す (actor/allyNames.ts)。
+   *
+   * **見えているかはカメラから頭への線で決める** (目の三角 = 視線を止める面)。壁の裏の
+   * 味方を知らせるのは敬礼の光の仕事で、名札まで壁を抜けると敬礼が要らなくなる。
+   * 陣営で分かれない部屋には味方が居ないので出さない。
+   */
+  private updateAllyNames(): void {
+    if (!this.teamsMode) {
+      this.allyNames.sync([], this.follow.camera, 0, 0);
+      return;
+    }
+    const sight = this.stage.sightWorld;
+    const eye = this.follow.camera.getWorldPosition(this.nameEye);
+    const visible = [];
+    for (const ally of this.remotes.allyNames()) {
+      const head = ally.head;
+      if (sight && !sight.clear(eye.x, eye.y, eye.z, head.x, head.y, head.z)) continue;
+      visible.push({ ...ally, head: head.clone() });
+    }
+    const width = this.container.clientWidth || window.innerWidth;
+    const height = this.container.clientHeight || window.innerHeight;
+    this.allyNames.sync(visible, this.follow.camera, width, height);
+  }
+
+  private readonly nameEye = new THREE.Vector3();
 
   private eyeReaches(target: RemoteSoldier, zone: HitZone, distance: number): boolean {
     const sight = this.stage.sightWorld;

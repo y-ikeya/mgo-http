@@ -624,6 +624,10 @@ export class Soldier {
   private weaponStance = 0
   /** 構えの補正の掛かり具合 (weapon.ts の aimTrim) */
   private aimTrimWeight = 0
+  /** 構えの置き場所の掛かり具合 (伏せも含む、weapon.ts の setAimHoldWeight) */
+  private aimHoldWeight = 0
+  /** 提げている間の左手の掛かり具合 (weapon.ts の relaxedLeftHand) */
+  private carryWeight = 0
   /** 補正で回った銃に左手を付いていかせる */
   private readonly leftArm = new LeftArmFollow()
   /** 梯子を登り切る間、手を掴んだ所に留める (armIk.ts の CLIMB_TOP_GRIPS) */
@@ -4493,13 +4497,20 @@ export class Soldier {
        * 構えている間だけ、銃を握りを支点に回して銃口を照準へ揃える (weapon.ts の
        * aimTrim)。回した分、左手を付いていかせる (armIk.ts)
        */
-      this.aimTrimWeight = damp(this.aimTrimWeight, this.aiming && this.proneStage === 'none' ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+      // 弾を込める・遊底を引く間は止める (CharacterAnimator.handlingGun)
+      const handling = this.animator?.handlingGun ?? false
+      this.aimTrimWeight = damp(this.aimTrimWeight, this.aiming && !handling && this.proneStage === 'none' ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
       this.weapon?.setAimWeight(this.aimTrimWeight)
+      // 構えの置き場所は伏せでも寄せる。提げている間は左手を銃ごとの持ち方の所へ (CharacterAnimator.carrying)
+      this.aimHoldWeight = damp(this.aimHoldWeight, this.aiming ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+      this.weapon?.setAimHoldWeight(this.aimHoldWeight)
+      this.carryWeight = damp(this.carryWeight, this.animator?.carrying && this.proneStage === 'none' ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+      this.weapon?.setCarryWeight(this.carryWeight)
       if (this.model && this.weapon) {
         // 銃身の上下を照準へ。**背骨で曲げる** (腕や銃を動かす補正より先)
         // 解いた後は測り直さずに薄める (armIk.ts の fade)
         if (this.proneStage === 'none' && isGun(this.held)) {
-          if (this.aiming) this.spineAim.apply(this.model, this.weapon.object, this.yaw, this.aimPitch, this.aimTrimWeight)
+          if (this.aiming && !handling) this.spineAim.apply(this.model, this.weapon.object, this.yaw, this.aimPitch, this.aimTrimWeight)
           else this.spineAim.fade(this.aimTrimWeight)
         }
         // 右手を先にずらす (rightShift)。銃が一緒に動くので、左手はその後で運ぶ

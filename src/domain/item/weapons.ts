@@ -433,10 +433,13 @@ const SMG: WeaponSpec = {
   // 突撃銃より寄らない。近距離で振り回す銃なので、視野を狭めない
   aimFov: 42,
   aimDistance: 1.3,
-  aimShoulder: 0.38,
+  // 肩越しのずれは全部の銃で 0.4 (本人 2026-11-16「0.4固定」)。持ち替えでカメラが左右に動くと、
+  // 角からの覗き方が持ち物で変わる (頭の高さを揃えたのと同じ理由)
+  aimShoulder: 0.4,
   // 軽いぶん構えたままでも動ける
   aimSpeedScale: 0.62,
-  scope: [],
+  // 主観。機関部の上の照準器 (リングサイト) の窓を覗く (2026-11-15 本人「P90 も主観モードできるんじゃない？」)
+  scope: [{ fov: 30, label: '1x', sight: 'holo' }],
 }
 
 /**
@@ -818,7 +821,9 @@ const PISTOL: WeaponSpec = {
   // 覗く倍率は持たない。肩越しのまま撃つ銃
   aimFov: 44,
   aimDistance: 1.5,
-  aimShoulder: 0.44,
+  // 肩越しのずれは全部の銃で 0.4 (本人 2026-11-16「0.4固定」)。持ち替えでカメラが左右に動くと、
+  // 角からの覗き方が持ち物で変わる (頭の高さを揃えたのと同じ理由)
+  aimShoulder: 0.4,
   aimSpeedScale: 0.72,
   scope: [],
 }
@@ -900,7 +905,9 @@ const M1911: WeaponSpec = {
   spreadPerStance: 0.12,
   aimFov: 44,
   aimDistance: 1.5,
-  aimShoulder: 0.44,
+  // 肩越しのずれは全部の銃で 0.4 (本人 2026-11-16「0.4固定」)。持ち替えでカメラが左右に動くと、
+  // 角からの覗き方が持ち物で変わる (頭の高さを揃えたのと同じ理由)
+  aimShoulder: 0.4,
   aimSpeedScale: 0.7,
   scope: [],
 }

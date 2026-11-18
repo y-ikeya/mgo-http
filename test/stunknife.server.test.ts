@@ -17,13 +17,24 @@ beforeAll(async () => {
 })
 afterAll(() => server.stop())
 
-const [FIRST, SECOND] = STAGES[ROOMS.golf.stages.stages[0]].targets
+/*
+ * 使う的は**撃ち返す的の背中側に立つ 2 体** (表の 3 番と 4 番、撃ち返す的の向きから 140°・153°)。
+ * 前の 0 番・1 番は撃ち返す的 (2026-11-15) の視野に入り、2 体目の前で充電を待つ間に撃ち殺されて
+ * 刺突が効かなかった
+ */
+const TABLE = STAGES[ROOMS.golf.stages.stages[0]].targets
+const FIRST_AT = 3
+const SECOND_AT = 4
+const FIRST = TABLE[FIRST_AT]
+const SECOND = TABLE[SECOND_AT]
 
 function targets(me: Client): { id: string; slot: number }[] {
   const roster = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }>
-  return roster.players
-    .filter((p) => p.id.startsWith('target') && p.slot !== undefined)
-    .map((p) => ({ id: p.id, slot: p.slot! }))
+  const at = (index: number) => roster.players.find((p) => p.id === `target-${index}` && p.slot !== undefined)
+  return [FIRST_AT, SECOND_AT].flatMap((index) => {
+    const p = at(index)
+    return p ? [{ id: p.id, slot: p.slot! }] : []
+  })
 }
 
 function stab(me: Client, target: { id: string }, stun: boolean) {

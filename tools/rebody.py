@@ -100,14 +100,33 @@ else:
 移す先は `mixamorig:Head` の下。**世界での位置を保つ** — 骨格ごとに scale が
 違う (体 0.01 / 手で足したほう 0.2) ので、そのまま数値を写すと桁がずれる。
 """
-arms = [o for o in bpy.data.objects if o.type == 'ARMATURE']
+def _preview(o):
+    """試写のコピー (コレクション名が preview_ で始まる)。**骨格として数えない。**
+
+    P90・狙撃銃の持ち方を詰めた名無しのコピー (preview_p90… / preview_sniper…) を bald_woman.blend に
+    置いていた頃、2 つ目以降の骨格 (spare) として頭に合体させかけた (2026-11-15)。今は
+    tools/raw/weapon_poses.blend に移したが、消し忘れても壊れないように除く
+    """
+    return any(c.name.startswith('preview_') for c in o.users_collection)
+
+
+# 試写のコピーは先に取り除く。最後に全部選んで書き出す (select_all) ので、残すと一緒に書き出される。
+# 読み込んだ中で消すだけで、.blend には書き戻さない
+_dropped = [o for o in bpy.data.objects if _preview(o)]
+for _o in _dropped:
+    bpy.data.objects.remove(_o, do_unlink=True)
+if _dropped:
+    print(f'  試写のコピーを除いた ({len(_dropped)} 個、preview_ のコレクション)')
+
+
+arms = [o for o in bpy.data.objects if o.type == 'ARMATURE' and not _preview(o)]
 arm = next(a for a in arms if any(b.name.startswith('mixamorig') for b in a.data.bones))
 spare = [a for a in arms if a is not arm]
 
 # 体のメッシュ。**曲線や下書きは混ぜない**
 meshes = [o for o in bpy.data.objects if o.type == 'MESH' and o.find_armature() is arm]
 if not meshes:
-    meshes = [o for o in bpy.data.objects if o.type == 'MESH']
+    meshes = [o for o in bpy.data.objects if o.type == 'MESH' and not _preview(o)]
 hips = arm.data.bones.get('mixamorig:Hips')
 if not hips:
     raise SystemExit('mixamorig:Hips が無い。Mixamo の auto-rig を通してから使う')
@@ -612,6 +631,11 @@ BUST_NAMES = ('mixamorig:Bust_L', 'mixamorig:Bust_R')
 
 
 def add_bust():
+    # **.blend に胸の骨があれば、それを使う。** 本人が重みを手で直せるように、bald_woman.blend の
+    # T ポーズへ同じ手で骨と重みを入れた (2026-11-16)。ここで作り直すと手直しが消える
+    if any(arm.data.bones.get(n) for n in BUST_NAMES):
+        print('  胸: 元の体に骨がある。作らずにそれを使う')
+        return
     spine2 = at('mixamorig:Spine2')
     neck = at('mixamorig:Neck')
     """

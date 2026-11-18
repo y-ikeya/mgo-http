@@ -1071,16 +1071,6 @@ describe('胸の揺れ', () => {
     }
   }
 
-  function hairBone(root: THREE.Object3D): THREE.Bone | null {
-    let bone: THREE.Object3D | null = null
-    root.traverse((o) => {
-      if (!bone && (o as THREE.Bone).isBone && !o.name.startsWith('mixamorig') && !o.name.endsWith('_end')) {
-        bone = o
-      }
-    })
-    return bone as THREE.Bone | null
-  }
-
   function bustBone(root: THREE.Object3D): THREE.Bone | null {
     let bone: THREE.Object3D | null = null
     root.traverse((o) => {
@@ -1135,26 +1125,164 @@ describe('胸の揺れ', () => {
   })
 
   /**
-   * **髪の鎖も揺れて、止まれば落ち着く。**
-   *
-   * Blender の制約や物理は書き出しに出ないので、揺れは走らせる側で出す。
-   * 手で足した骨 (mixamorig で始まらない骨) を鎖として拾っている。
+   * **腰の紐 (名無しの Bow) は、回ると後からついてきて、止まれば落ち着く。**
+   * 走っても回っても、瞬間移動しても真横まで跳ねない (2026-11-16 本人「キャラが回ると bow が後からついてくる」)
    */
-  test('**髪の鎖も揺れて、止まれば落ち着く**', () => {
-    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
-    const root = (anim as unknown as { root: THREE.Object3D }).root
-    const bone = hairBone(root)
-    if (!bone) return
+  test('腰の紐は回ると遅れてついてきて、止まれば落ち着く', () => {
+    /*
+     * 立ち止まりの型も紐の付け根を動かす (先が数 cm 動く)。**同じだけ型を流した、回さない体と比べる**
+     */
+    const body = () => {
+      const outer = new THREE.Group()
+      const model = nanashi.scene.clone(true)
+      outer.add(model)
+      const anim = new CharacterAnimator(model, nanashi.animations, 4.5)
+      let found: THREE.Object3D | null = null
+      model.traverse((o) => {
+        if (!found && (o as THREE.Bone).isBone && o.name.endsWith('Bow4')) found = o
+      })
+      const tip = new THREE.Object3D()
+      tip.position.set(0, 13, 0)
+      ;(found as unknown as THREE.Bone).add(tip)
+      // 体の空間で見た先端 (回った分・動いた分は除く)
+      const where = () => {
+        outer.updateMatrixWorld(true)
+        return outer.worldToLocal(tip.getWorldPosition(new THREE.Vector3()))
+      }
+      return { outer, anim, where }
+    }
+    const moved = body()
+    const still = body()
+    const step = 1 / 60
+    const tick = (seconds: number, move: () => void) => {
+      for (let i = 0; i < Math.round(seconds / step); i++) {
+        move()
+        for (const b of [moved, still]) {
+          b.outer.updateMatrixWorld(true)
+          b.anim.setLocomotion('idle')
+          b.anim.update(step)
+        }
+      }
+    }
+    const gap = () => moved.where().distanceTo(still.where())
+    tick(1, () => {})
+    expect(gap()).toBeLessThan(0.005)
 
-    shake(anim, root, 1.5, 0, 'idle')
-    const calm = bone.quaternion.clone()
+    // その場で左回り (6 rad/s)。先が遅れる (太ももに止められるので 5cm 前後)
+    tick(0.5, () => (moved.outer.rotation.y += 6 * step))
+    expect(gap()).toBeGreaterThan(0.04)
 
-    shake(anim, root, 1.0, 0.06)
-    expect(calm.angleTo(bone.quaternion)).toBeGreaterThan(0.01)
+    // 止まれば戻る
+    tick(3, () => {})
+    expect(gap()).toBeLessThan(0.02)
 
-    // 止めれば落ち着く。**同じ所へ戻る**
-    shake(anim, root, 2.5, 0, 'idle')
-    expect(calm.angleTo(bone.quaternion)).toBeLessThan(0.05)
+    // 50m 飛んでも跳ねない
+    tick(step, () => (moved.outer.position.x += 50))
+    tick(0.3, () => {})
+    expect(gap()).toBeLessThan(0.02)
+  })
+
+  /**
+   * **紐は太ももに刺さらず、押し付けられても震えない。** 回り続けると紐が太ももへ押し付けられる。
+   * 押し出しをばねへ書き戻していた頃は、先の向きが 3 秒で 67 回反転した (2026-11-16)
+   */
+  test('腰の紐は太ももに刺さらず、押し付けられても震えない', () => {
+    const outer = new THREE.Group()
+    const model = nanashi.scene.clone(true)
+    outer.add(model)
+    const anim = new CharacterAnimator(model, nanashi.animations, 4.5)
+    const find = (suffix: string) => {
+      let hit: THREE.Object3D | null = null
+      model.traverse((o) => {
+        if (!hit && (o as THREE.Bone).isBone && o.name.endsWith(suffix)) hit = o
+      })
+      return hit as unknown as THREE.Object3D
+    }
+    // 紐の骨ごとに途中と先 (骨の空間で 13 = 13cm、縮尺 0.01)
+    const points = [1, 2, 3, 4, 5, 6, 7, 8].flatMap((i) =>
+      [6.5, 13].map((y) => {
+        const o = new THREE.Object3D()
+        o.position.set(0, y, 0)
+        find(`Bow${i}`).add(o)
+        return o
+      }),
+    )
+    const legs = ['Left', 'Right'].map((side) => [find(`${side}UpLeg`), find(`${side}Leg`)])
+    const tip = points[7]
+    const step = 1 / 60
+    let deepest = 0
+    let flips = 0
+    const trail: THREE.Vector3[] = []
+    for (let i = 0; i < 180; i++) {
+      outer.rotation.y += 6 * step
+      outer.updateMatrixWorld(true)
+      anim.setLocomotion('idle')
+      anim.update(step)
+      outer.updateMatrixWorld(true)
+      for (const point of points) {
+        const at = point.getWorldPosition(new THREE.Vector3())
+        for (const [up, knee] of legs) {
+          const line = new THREE.Line3(up.getWorldPosition(new THREE.Vector3()), knee.getWorldPosition(new THREE.Vector3()))
+          const t = line.closestPointToPointParameter(at, true)
+          // 太ももの太さ (付け根 12.5cm → 膝 7cm)
+          const radius = 0.125 + (0.07 - 0.125) * t
+          deepest = Math.max(deepest, radius - at.distanceTo(line.at(t, new THREE.Vector3())))
+        }
+      }
+      trail.push(outer.worldToLocal(tip.getWorldPosition(new THREE.Vector3())))
+      const n = trail.length
+      if (i >= 60 && n >= 3) {
+        const a = trail[n - 1].clone().sub(trail[n - 2])
+        const b = trail[n - 2].clone().sub(trail[n - 3])
+        if (a.dot(b) < 0 && a.length() > 0.003) flips++
+      }
+    }
+    // 骨の途中と先を順に押し出すので、後の点を回した時に先の点がわずかに戻る (2mm ほど)
+    expect(deepest).toBeLessThan(0.005)
+    expect(flips).toBeLessThan(10)
+  })
+
+  /**
+   * **太ももに当たっても弾けない。** 左右に振り向きを繰り返すと紐が太ももへ振り込まれる。
+   * ばねを太ももの奥まで入らせたまま描く骨だけ押し出していた頃は、押し出す向きが入れ替わって
+   * 紐の先が 1 コマで 16cm 跳ねた (2026-11-16 本人「ピンボールみたいに弾けてる」)
+   */
+  test('腰の紐は太ももに当たっても弾けない', () => {
+    const outer = new THREE.Group()
+    const model = nanashi.scene.clone(true)
+    outer.add(model)
+    const anim = new CharacterAnimator(model, nanashi.animations, 4.5)
+    const tips = [4, 8].map((i) => {
+      let bone: THREE.Object3D | null = null
+      model.traverse((o) => {
+        if (!bone && (o as THREE.Bone).isBone && o.name.endsWith(`Bow${i}`)) bone = o
+      })
+      const tip = new THREE.Object3D()
+      tip.position.set(0, 13, 0)
+      ;(bone as unknown as THREE.Object3D).add(tip)
+      return tip
+    })
+    const step = 1 / 60
+    const trails = tips.map(() => [] as THREE.Vector3[])
+    for (let i = 0; i < 240; i++) {
+      // 0.8 秒ごとに向きを返して、その場で 6 rad/s で振り向く
+      outer.rotation.y += Math.sign(Math.sin(i * step * 4)) * 6 * step
+      outer.updateMatrixWorld(true)
+      anim.setLocomotion('idle')
+      anim.update(step)
+      outer.updateMatrixWorld(true)
+      tips.forEach((tip, k) => trails[k].push(outer.worldToLocal(tip.getWorldPosition(new THREE.Vector3()))))
+    }
+    // コマごとの速さの変わり (体の空間)。体ごと向きを返したコマの分 (3cm ほど) はある
+    let worst = 0
+    for (const trail of trails) {
+      for (let i = 32; i < trail.length; i++) {
+        const a = trail[i].clone().sub(trail[i - 1])
+        const b = trail[i - 1].clone().sub(trail[i - 2])
+        worst = Math.max(worst, a.sub(b).length())
+      }
+    }
+    expect(worst).toBeLessThan(0.06)
   })
 
   /**
@@ -1178,6 +1306,73 @@ describe('胸の揺れ', () => {
     expect(upperOf('rifle', true, 'crouch_idle')).toBe('knee_ready')
     expect(upperOf('smg', false, 'crouch_idle')).toBe('smg_crouch_relaxed')
     expect(upperOf('rifle', false, 'crouch_idle')).toBe('knee_relaxed')
+    expect(upperOf('smg', true, 'prone_idle')).toBe('smg_prone_aim')
+    expect(upperOf('rifle', true, 'prone_idle')).toBe('prone_fire')
+    expect(upperOf('smg', false, 'prone_idle')).toBe('smg_prone_relaxed')
+    // 狙撃銃も全部の姿勢で専用 (本人 2026-11-16)
+    expect(upperOf('sniper', false, 'crouch_idle')).toBe('sniper_crouch_relaxed')
+    expect(upperOf('sniper', true, 'crouch_idle')).toBe('sniper_crouch_aim')
+    expect(upperOf('sniper', false, 'prone_idle')).toBe('sniper_prone_relaxed')
+    expect(upperOf('sniper', true, 'prone_idle')).toBe('sniper_prone_aim')
+    expect(upperOf('sniper', true)).toBe('sniper_aim')
+    expect(upperOf('sniper', false)).toBe('sniper_relaxed_idle')
+    // 動いている間は腕を振る共通の型 (左手は weapon.ts の relaxedLeftHand で銃へ運ぶ)
+    expect(upperOf('smg', false, 'walk')).not.toContain('smg_')
+    // P90 を持ってしゃがんで動く (深く倒す) 間は、P90 専用のしゃがみ走り
+    expect(upperOf('smg', false, 'crouch_f')).toBe('smg_crouch_run')
+    expect(upperOf('rifle', false, 'crouch_f')).not.toContain('smg_')
+    // 拳銃も P90 と同じ体のしゃがみ走り (頭の高さを揃える)
+    expect(upperOf('m9', false, 'crouch_f')).toBe('pistol_crouch_run')
+    expect(upperOf('m1911', false, 'crouch_f')).toBe('pistol_crouch_run')
+    // 立ちの走りも長物と同じ体 (pistol_run は体が relaxed_run)
+    expect(upperOf('m9', false, 'run_f')).toBe('pistol_run')
+    expect(upperOf('m1911', false, 'run_f')).toBe('pistol_run')
+    // 曲がった直後の横・斜め・後ろも同じしゃがみ走り (一瞬だけ共通の型に戻って上体が起きた)
+    for (const d of ['crouch_r', 'crouch_fl', 'crouch_b'] as Locomotion[]) {
+      expect(upperOf('smg', false, d)).toBe('smg_crouch_run')
+      expect(upperOf('m9', false, d)).toBe('pistol_crouch_run')
+    }
+    // 拳銃のしゃがみ止まり・しゃがみ構えも専用 (P90 のしゃがみと同じ体)
+    expect(upperOf('m9', false, 'crouch_idle')).toBe('pistol_crouch_relaxed')
+    expect(upperOf('m9', false, 'idle')).toBe('handgun_relaxed_idle')
+    expect(upperOf('m9', true, 'crouch_idle')).toBe('handgun_crouch_aim')
+    expect(upperOf('m9', true)).toBe('handgun_aim')
+    expect(upperOf('m9', false, 'prone_idle')).toBe('handgun_prone_relaxed')
+    expect(upperOf('m1911', true, 'prone_idle')).toBe('handgun_prone_aim')
+    expect(upperOf('m1911', true, 'walk')).toBe('handgun_aim')
+    // しゃがみ歩きは上半身も銃ごとのしゃがみの型 (共通の型も腕を振らない止め絵)
+    expect(upperOf('sniper', false, 'crouch_walk')).toBe('sniper_crouch_relaxed')
+    // モシンは狙撃銃の型を使わない
+    expect(upperOf('mosin', true, 'crouch_idle')).toBe('knee_ready')
+  })
+
+  /**
+   * **提げている間 (carrying) は、銃ごとの持ち方の左手を運ぶ。** 構えている間・銃ごとの持ち方が無い銃では運ばない
+   * (本人 2026-11-16「いまの両手の関係とかを既存の走る型に反映できないの？」)
+   */
+  test('銃ごとの持ち方がある銃を提げて動く間は carrying', () => {
+    const carrying = (weapon: string, locomotion: Locomotion, aiming = false) => {
+      const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+      anim.setHeldWeapon(weapon)
+      anim.setAiming(aiming)
+      anim.setLocomotion(locomotion)
+      for (let i = 0; i < 30; i++) anim.update(1 / 60)
+      return anim.carrying
+    }
+    expect(carrying('smg', 'run_f')).toBe(true)
+    expect(carrying('sniper', 'crouch_walk')).toBe(true)
+    expect(carrying('smg', 'run_f', true)).toBe(false)
+    expect(carrying('rifle', 'run_f')).toBe(false)
+    expect(carrying('smg', 'crawl_f')).toBe(false)
+  })
+
+  /** **伏せは上半身だけ銃ごとの型。** 脚と腰は這う型のまま (P90 の伏せも crawl_f に載せて詰めた) */
+  test('伏せの下半身は這う型のまま', () => {
+    const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)
+    anim.setHeldWeapon('smg')
+    anim.setLocomotion('prone_idle')
+    for (let i = 0; i < 90; i++) anim.update(1 / 60)
+    expect(anim.playingKeys.split(' / ')[0]).toBe('crawl_f')
   })
 
   /** **名無しは瞬きする。** 形 (シェイプキー Blink) は体の側、効き具合は CharacterAnimator が動かす */

@@ -71,9 +71,10 @@ import {
  * やめたのは、**着せ替えを入れる以上、着せた物がその色に染まってしまう**から。
  * 何を着ても青か赤に転ぶなら、見た目を選ぶ意味が薄い。
  *
- * 所属は link の光 (ALLY_GLOW_TINT) が受け持つ。こちらは敬礼で繋いだ相手にしか
- * 出ないので、**繋いでいない味方は敵と同じに見える** — その代わりに
- * 「誰と繋ぐか」が意味を持つ。
+ * 所属は 2 つで受け持つ。**見えている味方には頭上に陣営色の名前** (allyNames.ts、
+ * 繋いでいなくても出す)、**壁の裏の味方は link の光** (ALLY_GLOW_TINT、敬礼で
+ * 繋いだ相手だけ)。以前は名札が無く「繋いでいない味方は敵と同じに見える」だったが、
+ * 誤射が起きるので畳んだ (2026-11-17 本人)。敬礼の役目は壁越しに位置が見えること。
  */
 
 /**
@@ -238,6 +239,9 @@ export class RemoteSoldier {
   private model: THREE.Object3D | null = null;
   /** 構えの補正の掛かり具合 (weapon.ts の aimTrim) */
   private aimTrimWeight = 0;
+  /** 構えの置き場所の掛かり具合 (伏せも含む) と、提げている間の左手の掛かり具合。自機と同じ */
+  private aimHoldWeight = 0;
+  private carryWeight = 0;
   /** 補正で回った銃に左手を付いていかせる (armIk.ts) */
   private readonly leftArm = new LeftArmFollow();
   /** 梯子を登り切る間、手を掴んだ所に留める。自機と同じ (soldier.ts) */
@@ -669,12 +673,18 @@ export class RemoteSoldier {
     )
     this.weapon?.applyStance(this.weaponStance)
     // 構えている間は銃口を照準へ揃え、左手を付いていかせる (自機と同じ。soldier.ts)
-    this.aimTrimWeight = damp(this.aimTrimWeight, state.aiming && !this.serverDead && !prone ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+    // 弾を込める・遊底を引く間は止める (自機と同じ。CharacterAnimator.handlingGun)
+    const handling = this.animator?.handlingGun ?? false
+    this.aimTrimWeight = damp(this.aimTrimWeight, state.aiming && !handling && !this.serverDead && !prone ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
     this.weapon?.setAimWeight(this.aimTrimWeight)
+    this.aimHoldWeight = damp(this.aimHoldWeight, state.aiming && !this.serverDead ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+    this.weapon?.setAimHoldWeight(this.aimHoldWeight)
+    this.carryWeight = damp(this.carryWeight, this.animator?.carrying && !prone && !this.serverDead ? 1 : 0, WEAPON_STANCE_LAMBDA, dt)
+    this.weapon?.setCarryWeight(this.carryWeight)
     if (this.model && this.weapon) {
       // 銃身の上下を照準へ。背骨で曲げる。自機と同じ
       // 解いた後は測り直さずに薄める (armIk.ts の fade)。自機と同じ
-      if (!prone && state.aiming && !this.serverDead) {
+      if (!prone && state.aiming && !handling && !this.serverDead) {
         this.spineAim.apply(this.model, this.weapon.object, this.yaw, state.pitch, this.aimTrimWeight);
       } else if (!prone) {
         this.spineAim.fade(this.aimTrimWeight);
@@ -839,6 +849,20 @@ export class RemoteSoldier {
 
   get isLinked(): boolean {
     return this.linked;
+  }
+
+  /**
+   * 名札を出す頭の位置。**味方で、戦場に立っていて、体が見えている時だけ** (allyNames.ts)。
+   * 出さない時は false。壁越しに見えているかは呼ぶ側が線で決める。
+   */
+  nameAnchor(out: THREE.Vector3): boolean {
+    if (!this.ally || !this.name) return false;
+    if (this.life !== "alive" && this.life !== "downed") return false;
+    if (this.stealthed || !this.object.visible) return false;
+    const head = this.animator?.headHeight() ?? null;
+    out.copy(this.object.position);
+    out.y += head ?? 1.6;
+    return true;
   }
 
   /** ステルスで体が見えなくなっているか (TSNE の攻める側) */
@@ -1366,6 +1390,16 @@ export class RemoteSoldiers {
    * ここが 64 を大きく下回っている相手は、**その人の機械が送れていない**。
    * こちらの画面ではその人がカクつくが、直せるのは相手側だけ。
    */
+  /** 名札を出す味方 (allyNames.ts)。頭の位置は out の器を使い回す */
+  *allyNames(): Generator<{ id: string; name: string; team: Team; head: THREE.Vector3 }> {
+    for (const [id, player] of this.players) {
+      if (!player.nameAnchor(this.nameHead)) continue;
+      yield { id, name: player.name, team: player.side, head: this.nameHead };
+    }
+  }
+
+  private readonly nameHead = new THREE.Vector3();
+
   rates(): { name: string; rate: number }[] {
     const out: { name: string; rate: number }[] = [];
     for (const player of this.players.values()) {

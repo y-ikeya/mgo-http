@@ -721,6 +721,29 @@
   font-family: var(--hud-font, ui-monospace, monospace);
 }
 
+/*
+ * 一覧を開いている間、**一覧と角のカード以外を少し暗くする** (本人 2026-11-15「menu item 以外の背景を
+ * 少し暗めにマスクして欲しい」)。選んでいる物に目が行くように。
+ *
+ * 重なりは z-index で決める。DOM の順に頼ると、一覧と角のカード (hud-weapon / hud-tool) の間に
+ * 並んだ HUD が幕の上に出て暗くならない。幕は 2、一覧の札と**開いている側の**角のカードは 3、
+ * ほかの HUD は指定なし (幕の下)。武器の一覧を開いている間は道具のカードも暗くなる。
+ * スコープ (15) や支度の画面などの大きな画面は今まで通り上
+ */
+.hud-browse-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.hud-browse-column,
+.hud-browse-row,
+.hud-browsing-weapon .hud-weapon,
+.hud-browsing-tool .hud-tool {
+  z-index: 3;
+}
+
 /* 角より前。武器カードの真上へ積む (角に近いほど下) */
 .hud-browse-column {
   position: absolute;

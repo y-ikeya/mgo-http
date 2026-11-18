@@ -44,6 +44,7 @@ import { closeMatch, recordPlayer } from './stats'
 import { type RoomWorld, TARGET_RESPAWN, TARGET_STAND, broadcast, releaseCqc, rotateStage, setLife } from './world'
 import { forgetPoses, recordPose } from './history'
 import { breakLinks } from './link'
+import { botAiming, botGunTick, botPitch } from './botGun'
 
 /**
  * 陣営ごとの残機。TDM の勝敗はこれの削り合いで決まる。
@@ -172,6 +173,8 @@ export function updateTargets(room: RoomWorld, now: number): void {
       bot.stamina = MAX_STAMINA
     }
 
+    // 撃ち返す的。見えた敵へ振り向いて撃つ (server/botGun.ts)
+    if (bot.fires) botGunTick(room, bot, now, TICK_SECONDS)
     patrol(bot, now)
     approachDoll(room, bot, now)
 
@@ -362,12 +365,14 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         y: bot.y,
         z: bot.z,
         yaw: bot.yaw,
-        pitch: 0,
+        pitch: botPitch(bot),
         cameraYaw: bot.yaw,
         locomotionAge: (now - (botPoseSince.get(bot) ?? now)) / 1000,
         locomotion: bot.locomotion,
-        aiming: false,
-        weapon: 'rifle',
+        // 撃ち返す的は狙っている間だけ構える
+        aiming: botAiming(bot),
+        // 持っている銃 (撃ち返す的は表で選べる。ほかの的はライフル)
+        weapon: bot.weapon,
         crouching: bot.homeStance === 'crouch' && bot.locomotion === 'crouch_idle',
         boxed: bot.boxed,
         reloading: false,
@@ -375,7 +380,7 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         stealthed: false,
         holdingGrenade: false,
         // 箱を被っているかは手にある物で届く (snapshot.ts の held === 'box')
-        held: bot.boxed ? 'box' : 'rifle',
+        held: bot.boxed ? 'box' : bot.weapon,
         concentrating: false,
         // 敬礼の的は手を挙げたまま。下ろすと型の終わりで手が下りる
         saluteHeld: bot.locomotion === 'salute',
