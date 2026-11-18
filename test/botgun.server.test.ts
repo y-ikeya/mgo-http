@@ -19,7 +19,8 @@ beforeAll(async () => {
 afterAll(() => server.stop())
 
 const STAGE = STAGES[ROOMS.golf.stages.stages[0]]
-const INDEX = STAGE.targets.findIndex((t) => t.fires)
+// 立ったままの撃ち返す的 (lean の的は狙撃銃で、角から出入りしながら撃つので弾の数が揃わない)
+const INDEX = STAGE.targets.findIndex((t) => t.fires && !t.stance)
 const SHOOTER = STAGE.targets[INDEX]
 const ID = `target-${INDEX}`
 
