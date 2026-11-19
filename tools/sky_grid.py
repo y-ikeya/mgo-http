@@ -35,7 +35,7 @@ import zlib
 from mathutils import Vector
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-STAGE = argv[0] if argv else 'city'
+STAGE = argv[0] if argv else 'mm'
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bake_stage.py')
 ns = {'__name__': 'sky_grid'}

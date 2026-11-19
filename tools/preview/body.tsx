@@ -18,6 +18,8 @@
  *     ?death=front|back|none  clip の姿勢で 1 秒置いてから倒す (front = 正面から撃たれた)。t は倒してから
  *     ?sleep                  clip の姿勢で 1 秒置いてから眠らせる (麻酔)。clip=sweep なら仰向けに倒してから。t は眠らせてから
  *     ?throw                  手榴弾の振りかぶりを頭から流す (t 秒目で止める)
+ *     ?reload=2.4             装填の型を頭から流す (秒)。clip=run_f と組むと走りながら
+ *     ?blink=1                瞬きのシェイプキー Blink をその効き (0〜1) に止める
  *
  * 決め絵の試写 (decoy) は**止まった姿勢しか映らない**ので、動かして初めて出る
  * 崩れ — 髪が引きずられる、顎がずれる — が見えない。ここは型を流して、
@@ -171,6 +173,8 @@ anim.setKnife(query.has('knife'))
 // ?look=60 … 首をカメラの向きへ (度、左が正)。構えていないときだけ効く
 anim.setLookYaw((Number(query.get('look') ?? '0') * Math.PI) / 180)
 anim.setAimPitch(pitch)
+// ?hairstay=0.5 … 髪の根を胸に残す割合 (animation.ts の HAIR_STAY) を試す
+if (query.has('hairstay')) anim.hairStay = Number(query.get('hairstay'))
 // ?boxed … 箱の中の姿勢。箱は本番と同じ物を半透明で重ねて、頭と腕の収まりを見る
 const boxed = query.has('boxed')
 anim.setBoxed(boxed)
@@ -248,6 +252,8 @@ const oneShot =
   query.has('setup') || query.has('place')
 if (!oneShot) anim.setLocomotion(clipName as never)
 if (query.has('roll')) anim.playRoll()
+// ?reload … 装填の型を頭から流す (clip の姿勢のまま。&reload=2.4 で秒を決める)。走りながらの上体の折れを見る
+if (query.has('reload')) anim.playReload(Number(query.get('reload')) || 0)
 // ?vault … 窓枠を跳び越える。転がりと同じ全身の型で、playVault が入口
 if (query.has('vault')) anim.playVault()
 // ?vaultup … 一段上へ乗る (上下は型から抜いてあるので、その場で足だけ動く)
@@ -324,6 +330,14 @@ for (let t = 0; t < stopAt; t += 1 / 60) {
   if (query.has('setup') || query.has('place')) anim.setLocomotion((anim.setupLocomotion ?? clipName) as never)
   anim.setFiring(firing)
   anim.update(1 / 60)
+  if (query.has('blink')) {
+    const shut = Number(query.get('blink') || '1')
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      const index = mesh.morphTargetDictionary?.Blink
+      if (index !== undefined) mesh.morphTargetInfluences![index] = shut
+    })
+  }
   if (zap) {
     model.updateMatrixWorld(true)
     zap.update(1 / 60)
@@ -472,7 +486,12 @@ const bone = (name: string) => {
 const camera = new THREE.PerspectiveCamera(40, WIDTH / HEIGHT, 0.05, 100)
 const head = bone('Head') ?? new THREE.Vector3(0, 1.5, 0)
 const chest = bone('Spine2') ?? new THREE.Vector3(0, 1.3, 0)
-if (at === 'head') {
+// ?cam=x,y,z … 頭から見たカメラの位置 (m)。顎の下から見上げるなど (例 cam=0.1,-0.25,0.45)
+const camAt = query.get('cam')?.split(',').map(Number)
+if (at === 'head' && camAt?.length === 3) {
+  camera.position.set(head.x + camAt[0]!, head.y + camAt[1]!, head.z + camAt[2]!)
+  camera.lookAt(head.x, head.y - 0.05, head.z)
+} else if (at === 'head') {
   camera.position.set(head.x + 0.1, head.y + 0.05, head.z + 0.55)
   camera.lookAt(head.x, head.y + 0.05, head.z)
 } else if (at === 'chest') {
@@ -491,3 +510,31 @@ if (at === 'prone') {
 await renderer.init()
 await renderer.renderAsync(scene, camera)
 ;(globalThis as unknown as { ready: boolean }).ready = true
+
+/*
+ * ?orbit … 止めずに型を流し続け、マウスでカメラを回せる (左ドラッグで回す・右で平行移動・ホイールで寄る)。
+ * 本人が体を見回して、崩れている所を指すため (2026-11-19)。&clip=run_f で走らせながら回せる
+ */
+if (query.has('orbit')) {
+  const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js')
+  const canvas = renderer.domElement as HTMLCanvasElement
+  const fit = () => {
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    camera.aspect = window.innerWidth / window.innerHeight
+    camera.updateProjectionMatrix()
+  }
+  fit()
+  window.addEventListener('resize', fit)
+  const controls = new OrbitControls(camera, canvas)
+  controls.target.set(head.x, at === 'head' ? head.y : 1.0, head.z)
+  controls.enableDamping = true
+  controls.update()
+  const clock = new THREE.Clock()
+  renderer.setAnimationLoop(() => {
+    const dt = Math.min(clock.getDelta(), 0.05)
+    if (!oneShot && !query.has('stab')) anim.setLocomotion(clipName as never)
+    anim.update(dt)
+    controls.update()
+    renderer.render(scene, camera)
+  })
+}

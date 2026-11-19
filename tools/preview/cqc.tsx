@@ -6,7 +6,7 @@
  *     ?miss         投げる側を空振りの型にする (相手は立ったまま)
  *     ?release=1.2  その秒で投げられる側を放す (投げた側が倒れた時、soldier の releaseThrown)
  *     ?cam=side|front|top|back   カメラ (既定 side)。?dist= で距離
- *     ?skin=soldier_raiden
+ *     ?skin=soldier_freya
  *
  * 投げる側は原点で -Z を向き、投げられる側は CQC_PAIR_DISTANCE 前でこちらを向く
  * (ゲームで thrown を受けた時と同じ置き方)。型に焼かれた移動は soldier.ts と同じ式で

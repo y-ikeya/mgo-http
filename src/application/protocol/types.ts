@@ -1347,6 +1347,10 @@ export interface MatchMessage {
   required: number
   /** phase が over のときだけ */
   winner?: Team | 'draw'
+  /** 個人戦の勝った人 (id)。phase が over のときだけ。個人戦の winner はいつも draw */
+  soloWinner?: string
+  /** 個人戦で、時間切れ・残機切れの時に倒した数の一番が並んだ。次に差が付いた所で終わる */
+  suddenDeath?: boolean
 }
 
 /** サーバーが確定させた体力。0 なら倒れている */

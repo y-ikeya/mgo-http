@@ -65,9 +65,12 @@ export class SkyLight {
 
   /** 掛ける相手。色を持つ材質だけ */
   add(material: THREE.Material): void {
-    if (!(material instanceof THREE.MeshStandardMaterial)) return
-    if (!material.userData.baseColor) material.userData.baseColor = material.color.clone()
-    this.materials.push(material)
+    // 肌の材質 (actor/skinShading.ts) は MeshStandardNodeMaterial で、MeshStandardMaterial を継いでいない
+    const standard = material instanceof THREE.MeshStandardMaterial || (material as { isMeshStandardNodeMaterial?: boolean }).isMeshStandardNodeMaterial === true
+    if (!standard) return
+    const colored = material as THREE.MeshStandardMaterial
+    if (!colored.userData.baseColor) colored.userData.baseColor = colored.color.clone()
+    this.materials.push(colored)
   }
 
   /** 目標へ寄せて掛ける。dt は秒 */

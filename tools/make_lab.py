@@ -77,7 +77,7 @@ box('concrete_crawl_roof', -2, 12.92, GROUND_TOP + 0.9 + 0.12, 4, 2.08, 0.24)
 
 # city の階段 (concrete_stair1、Array で組んだ段) を持ち込む。**本番の階段で坂の板を試す**。
 # 低い端が +y 側、高い端が -y 側。高い端に上の床 (1 段ぶん上) を付ける
-CITY_BLEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'raw', 'stage_city.blend')
+CITY_BLEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'raw', 'stage_mm.blend')
 if os.path.exists(CITY_BLEND):
     with bpy.data.libraries.load(CITY_BLEND, link=False) as (src, dst):
         dst.objects = ['concrete_stair1'] if 'concrete_stair1' in src.objects else []

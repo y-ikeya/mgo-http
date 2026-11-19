@@ -38,31 +38,40 @@ export const DEFAULT_SKIN = 'soldier'
 
 /**
  * 練習の的の見た目。**人と見分けが付くように、Mixamo の X Bot** (本人 2026-10-16)。
- * 体は Raiden と同じ道で入れた (rebody → merge_all_clips → fit_height、頭の高さは宿主と同じ)
+ * 体は Freya と同じ道で入れた (rebody → merge_all_clips → fit_height、頭の高さは宿主と同じ)
  */
 export const TARGET_SKIN = 'soldier_xbot'
 
 const SKINS: Record<string, string> = {
   /*
-   * Raiden。体ごと差し替えてある。
+   * pepa1404。Freya (Rigify の女性の体、2026-11-19) を Mixamo で骨を入れ直し、服を着せ替えたもの。
+   * 前は Raiden だったが、権利の都合で外した (本人 2026-11-19)。
    *
-   * 骨は貼り替えず、**クリップだけを移した** (tools/rebody.py +
-   * tools/merge_all_clips.js)。メッシュを別の骨に貼り直すとレストポーズの差が
-   * そのまま歪みになるが、回転は体つきに依存しないので同じ角度で曲がる。
+   * 骨は貼り替えず、**クリップだけを移した** (tools/rebody.py + tools/merge_all_clips.js)。
+   * メッシュを別の骨に貼り直すとレストポーズの差がそのまま歪みになるが、回転は体つきに
+   * 依存しないので同じ角度で曲がる。
+   *
+   * 素の姿勢 (T ポーズ) の元は tools/raw/freya.blend (元の体は ~/Downloads/Blend/FreyaOri.blend)。
+   * 作り直し: rebody --nohead → merge_all_clips (soldier.glb から) → fit_height --hips --sink 0.016 (裸足で足裏が浮くぶん) →
+   * strip_bone_moves → prune --keep-solid-textures → dedup → pack。**骨格は宿主と同じ単位 (Armature の scale 0.01・骨は cm)
+   * にしてから rebody へ渡す** — scale 1・骨が m のままだと体が 100 分の 1 に縮み、型の腰の移動が
+   * 100 倍になって体が画面いっぱいに飛んだ。
+   * 目の表面のガラス (Glass) は、読み込んだ所で照り返しだけを足す膜に差し替える (actor/skinShading.ts)。
+   * rebody が材質を不透明にするので、そのままでは黒目を白く覆った (前は書き出しで外していた)。
+   * 肌 (Body) も同じ所で、影の境目へ赤く回り込む材質に替える (Blender の肌の下で散る光の代わり)。
+   * **眉はくり抜きの境を 0.2 にしてある** (glb の Eyebrows の alphaCutoff。書き出しは 0.5)。眉は薄く透けた
+   * 毛の絵で、0.5 では毛のほとんどが抜けて眉が薄く見えた (2026-11-19 本人)。作り直したら glb を直す。
    *
    * 背丈は Armature の scale を宿主と揃えて合わせてある (tools/fit_height.js)。
    * **見た目の理由だけではない** — HEAD_HEIGHT = 1.47 は 1 体を実測した値なので、
    * 頭がずれた体を入れると、その人だけ見た目と判定が食い違う (見えている頭を
    * 撃つと胴に当たり、頭の上の空を撃つと頭に当たる)。
-   *
-   * 移したクリップは**宿主の単位で腰の高さを持っている**。scale がずれていると
-   * その比のぶん腰が沈む — 素の姿勢では合っているのに動かすと低い、という形で出る。
    */
-  pepa1404: 'soldier_raiden',
+  pepa1404: 'soldier_freya',
   /*
    * nanashi。Mixamo の Kachujin の体に、Tripo の頭を付け替えたもの (2026-11-10、
    * 元は tools/raw/bald_woman.blend、書き出しに使った写しは nanashi_kachujin.blend)。
-   * Raiden と同じ道 (rebody --nohead --bust --legs 0.916 → merge_all_clips (soldier.glb から) → fit_height --hips → dedup → pack)。
+   * Freya と同じ道 (rebody --nohead --bust --legs 0.916 → merge_all_clips (soldier.glb から) → fit_height --hips → dedup → pack)。
    * --legs で脚の付け根を寄せて、腰の幅を kome と同じ 0.19m に (肩幅は細身のまま 0.30m)。
    * 素の姿勢 (T ポーズ) の元は tools/raw/bald_woman.blend。作り直しはここから
    *
@@ -84,7 +93,7 @@ const SKINS: Record<string, string> = {
   nanashi: 'soldier_nanashi',
   /*
    * kome27。Mixamo の MocapGuy。素の姿勢 (T ポーズ) の元は tools/raw/mocapMan.blend (本人が MocapGuy.fbx から
-   * 作って手を入れる)。作り直しはここから。Raiden と同じ道 (rebody --nohead → merge_all_clips (soldier.glb から)
+   * 作って手を入れる)。作り直しはここから。Freya と同じ道 (rebody --nohead → merge_all_clips (soldier.glb から)
    * → fit_height --hips → dedup → pack、頭 1.4609m)。
    * **rebody は --nohead で通す** — T ポーズの腕が「顎から上」に入って頭の骨へ寄せられ、腕が翼のように伸びた
    * 瞬きは体とまつ毛 (MocapGuy_BrowsLashes) のシェイプキー Blink (2026-11-14)。まつ毛にも同じ名前で無いと、
@@ -109,6 +118,7 @@ export const SKIN_FILES: readonly string[] = [
  */
 const VOICES: Readonly<Record<string, BodyVoice>> = {
   soldier_nanashi: 'woman1',
+  soldier_freya: 'woman1',
 }
 
 /** 声の主。sense/audio.ts の CRIES の鍵と同じ (この棚は他を読めないので文字で持つ) */
@@ -131,7 +141,7 @@ export function skinFor(name: string | undefined, id?: string): string {
 }
 
 /**
- * `?skin=soldier_raiden` で自分の見た目を上書きする。試作を見るためだけの物。
+ * `?skin=soldier_freya` で自分の見た目を上書きする。試作を見るためだけの物。
  *
  * **自分にしか効かない。** 他人の見た目はその人の名前から決まるので、
  * ここで何を指定しても相手の画面には出ない。見せかけて有利になる類の物でもない

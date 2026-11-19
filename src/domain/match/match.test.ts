@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  assignTeam, isLeaking, leaderOf, leakingOf, loseTicket, newMatch, shuffleTeams, type Match,
+  assignTeam, isLeaking, leaderOf, leakingOf, loseTicket, newMatch, shuffleTeams, type Match, topKiller,
 } from './match'
 import { newMatchPlayer } from '../player/player'
 
@@ -217,5 +217,17 @@ describe('陣営を切り直す', () => {
       seen.add(teamsOf(match).join(''))
     }
     expect(seen.size).toBeGreaterThan(1)
+  })
+})
+
+describe('個人戦の勝ち (topKiller)', () => {
+  test('倒した数が一番多い 1 人', () => {
+    expect(topKiller([{ id: 'a', kills: 3 }, { id: 'b', kills: 5 }, { id: 'c', kills: 1 }])).toBe('b')
+  })
+  test('一番が並んだら null (サドンデス)', () => {
+    expect(topKiller([{ id: 'a', kills: 5 }, { id: 'b', kills: 5 }, { id: 'c', kills: 1 }])).toBeNull()
+  })
+  test('的 (bot) は数えない', () => {
+    expect(topKiller([{ id: 'a', kills: 2 }, { id: 'bot', kills: 9, bot: true }])).toBe('a')
   })
 })

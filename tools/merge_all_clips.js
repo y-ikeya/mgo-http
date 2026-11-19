@@ -1,7 +1,7 @@
 // ある glb の**全クリップ**を、別の glb へ移す。
 //
 //   bun tools/merge_all_clips.js <取り込み元.glb> <取り込み先.glb> <出力.glb>
-//   bun tools/merge_all_clips.js public/models/soldier.glb raiden_base.glb soldier_raiden.glb
+//   bun tools/merge_all_clips.js public/models/soldier.glb freya_base.glb soldier_freya.glb
 //
 // merge_clip.js は 1 本ずつで、51 本やると 10MB の glb を 51 回書き直すことになる。
 // こちらは 1 回で済ませる。

@@ -9,7 +9,7 @@ import { rooms, roomOf } from '../server/world'
 test('bravo は最初の試合が city、結果を見せ終えるたびに UU → BB → city と回る', () => {
   const room = roomOf('bravo', 'rotate-test')
   try {
-    expect(room.stage.name).toBe('city')
+    expect(room.stage.name).toBe('mm')
     const seen: string[] = []
     for (let i = 0; i < 4; i++) {
       // 結果を見せ終えた (人が揃っていないので待ちへ戻る道。揃っていれば支度へ入る道で、どちらも同じ所で回す)
@@ -18,7 +18,7 @@ test('bravo は最初の試合が city、結果を見せ終えるたびに UU �
       updateMatch(room, Date.now())
       seen.push(room.stage.name)
     }
-    expect(seen).toEqual(['uu', 'bb', 'city', 'uu'])
+    expect(seen).toEqual(['uu', 'bb', 'mm', 'uu'])
   } finally {
     rooms.delete(room.key)
   }
@@ -30,7 +30,7 @@ test('結果を見せている間は替えない', () => {
     room.phase = 'over'
     room.endsAt = Date.now() + 10_000
     updateMatch(room, Date.now())
-    expect(room.stage.name).toBe('city')
+    expect(room.stage.name).toBe('mm')
   } finally {
     rooms.delete(room.key)
   }

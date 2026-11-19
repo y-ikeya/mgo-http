@@ -70,7 +70,7 @@ describe('部屋の割り当て', () => {
       previous = nextStage(ROOMS.bravo.stages, previous, 0.5)
       order.push(previous)
     }
-    expect(order).toEqual(['city', 'uu', 'bb', 'city'])
+    expect(order).toEqual(['mm', 'uu', 'bb', 'mm'])
   })
 
   test('**charlie も試合ごとに city → UU → BB を回す。** 最初の試合は city', () => {
@@ -80,7 +80,7 @@ describe('部屋の割り当て', () => {
       previous = nextStage(ROOMS.charlie.stages, previous, 0.5)
       order.push(previous)
     }
-    expect(order).toEqual(['city', 'uu', 'bb', 'city'])
+    expect(order).toEqual(['mm', 'uu', 'bb', 'mm'])
   })
 
   test('全部の部屋に表がある', () => {

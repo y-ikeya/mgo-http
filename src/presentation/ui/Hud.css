@@ -1562,6 +1562,10 @@
   pointer-events: none;
   animation: hud-dawn 0.9s ease-out both;
 }
+/* 試合の始まりはエンジンの音が鳴り終わるまで黒のまま (Hud.tsx の ENGINE_BLACK_MS) */
+.hud-dawn-engine {
+  animation-delay: var(--hud-dawn-hold);
+}
 
 @keyframes hud-assembled-black {
   0%, 78% { opacity: 0; }

@@ -176,12 +176,12 @@ const LAYERS: Record<string, readonly string[]> = {
    * 許していた頃は、棚と直下が互いに読み合う形だった (Game を読むのだけは別の試験で止める)。
    * ファイルは動かさず、層の行を足して向きを決める (actor/skin と同じ流儀)。
    *
-   *   assets       glb の読み。皮の名前 (actor/skin) と util だけ。**型の表は読まない** —
+   *   assets       glb の読み。皮の名前 (actor/skin)・肌の材質 (actor/skinShading) と util だけ。**型の表は読まない** —
    *                無い型の警告は体を組み立てる所 (actor/animation の warnMissingClips) へ移した
    *   knobs        調整の数。何も読まない
    *   calibration  調整盤。兵士・カメラ・箱・空を直に触る利用者なので棚より上
    */
-  'presentation/scene/assets': ['domain', 'presentation/scene/actor/skin', 'presentation/scene/util'],
+  'presentation/scene/assets': ['domain', 'presentation/scene/actor/skin', 'presentation/scene/actor/skinShading', 'presentation/scene/util'],
   'presentation/scene/knobs': [],
   'presentation/scene/calibration': [
     'infra/input',
@@ -202,6 +202,11 @@ const LAYERS: Record<string, readonly string[]> = {
    * 向かい合う形を作らないため。
    */
   'presentation/scene/actor/skin': [],
+  /**
+   * 肌と目の膜の材質 (2026-11-19)。**three だけを読む** 1 枚。読み込んだ体の材質を assets が差し替えるので、
+   * actor の棚ごとではなくこの 1 枚だけを切り分けた (actor は assets を読むので、向かい合わせない)
+   */
+  'presentation/scene/actor/skinShading': [],
   /** 人。武器 (arms/weapon) を持つので arms は読む。self と sense には読まれる側 */
   'presentation/scene/actor': [
     'domain',

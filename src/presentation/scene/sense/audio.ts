@@ -227,6 +227,7 @@ const SOUNDS = {
   screamWoman: { file: "woman1_scream1.mp3", reference: 8, max: 110 },
   painWoman: { file: "woman1_pain1.mp3", reference: 3, max: 26 },
   blastScreamWoman: { file: "woman1_scream2.mp3", reference: 8, max: 110 },
+  // 眠らされた声は 2026-11-19 に本人の altu.mp3 へ差し替え (元の頭が切れて 0.5dB 越えていたので -1.5dB)
   stunOofWoman: { file: "woman1_stun1.mp3", reference: 4, max: 40 },
   ohhWoman: { file: "woman1_ohh1.mp3", reference: 2, max: 14 },
   /** CQC の掛け声 (本人の cqc_hun.mp3、2026-11-10) */

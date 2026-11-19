@@ -112,6 +112,10 @@ export interface Match {
   endsAt: number
   phase: Phase
   winner?: Team | 'draw'
+  /** 個人戦の勝った人 (id)。倒した数が一番多い 1 人 (topKiller) */
+  soloWinner?: string
+  /** 個人戦で、時間切れ・残機切れの時に倒した数の一番が並んでいた。次に差が付いた所で終わる */
+  suddenDeath?: boolean
   /** 最後に状態を配った時刻。1 秒ごとに配る */
   lastBroadcast: number
   /** 自分の本当の値を最後に配った時刻。**全員へ配る便とは別の時計** */
@@ -402,4 +406,23 @@ export function soleTeam(seats: MatchPlayer[]): Team | null {
   const red = seats.some((p) => p.team === 'red')
   if (blue === red) return null
   return blue ? 'blue' : 'red'
+}
+
+/**
+ * 個人戦の勝ち。**倒した数が一番多い 1 人。** 一番が並んでいれば null (サドンデスで続ける。
+ * 2026-11-19 本人「勝った人で、draw だったらサドンデスにしよう」)。的 (bot) は数えない
+ */
+export function topKiller(players: Iterable<Pick<MatchPlayer, 'id' | 'kills'> & { bot?: boolean }>): string | null {
+  let top: string | null = null
+  let best = -1
+  let tied = false
+  for (const p of players) {
+    if (p.bot) continue
+    if (p.kills > best) {
+      top = p.id
+      best = p.kills
+      tied = false
+    } else if (p.kills === best) tied = true
+  }
+  return tied ? null : top
 }
