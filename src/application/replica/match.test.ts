@@ -92,7 +92,7 @@ describe('試合のレプリカ', () => {
     const replica = newMatchReplica()
     const effects = applyMatch(
       replica,
-      { type: 'roster', players: [{ id: SELF, name: 'A', health: 100, team: 'red', slot: 0 }] } as ServerMessage,
+      { type: 'roster', players: [{ id: SELF, name: 'A', team: 'red', slot: 0 }] } as ServerMessage,
       SELF,
       0,
     )
@@ -104,7 +104,7 @@ describe('試合のレプリカ', () => {
     const replica = newMatchReplica()
     const effects = applyMatch(
       replica,
-      { type: 'roster', players: [{ id: 'bob', name: 'B', health: 100, team: 'red', slot: 1 }] } as ServerMessage,
+      { type: 'roster', players: [{ id: 'bob', name: 'B', team: 'red', slot: 1 }] } as ServerMessage,
       SELF,
       0,
     )
