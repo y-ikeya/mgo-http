@@ -3025,7 +3025,7 @@ export class Game {
     if (message.flinch) this.throwing.loseHeldGrenade();
     // 倒れる向きはサーバーが決める (位置と向きの両方を持っているので)。
     // **他人の画面にはこちらの姿勢として届く** — 見た側が撃たれた向きを読める
-    const died = this.player.setHealth(message.health, message.flinch, message.fromBehind);
+    const died = this.player.setHealth(message.health ?? this.player.health, message.flinch, message.fromBehind);
     if (message.damage > 0) {
       this.lastHitZone = "HIT";
       this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
