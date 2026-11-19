@@ -42,6 +42,11 @@ const BROWSE_SHIFT_MS = 160
 
 /** 待合室を閉じる前に黒へ落とし始める (ms)。落ちきるのは CSS の transition (0.8 秒) */
 const STANDBY_BLACK_MS = 1000
+/**
+ * 試合が始まる時 (待合室 → 秒読み) は、エンジンの音 (sense/audio.ts の engine、2.9 秒) が鳴っている間は
+ * 黒のままにしてから明ける (2026-11-19 本人「試合開始の track エンジン音中は暗転していて」)
+ */
+const ENGINE_BLACK_MS = 2900
 
 /** 影絵のある持ち物 (public/icons/<id>.png、tools/preview/icons.html で撮る) */
 const HUD_ART: ReadonlySet<HeldId> = new Set<HeldId>([
@@ -65,7 +70,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
    * hud-assembled-black)、支度に入ったら黒から明ける。告知を経ずに支度へ入った
    * (結果画面の後など) 時は明けない
    */
-  const [dawn, setDawn] = createSignal(false)
+  const [dawn, setDawn] = createSignal<false | 'plain' | 'engine'>(false)
   /*
    * **決着は 2 段で出す。** まず「試合終了」だけを帯で告げ、間を置いてから勝敗を
    * 開ける。終わった瞬間に VICTORY / DEFEAT を出すと、どちらだったかを待つ間が
@@ -93,8 +98,9 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       (lastPhase === 'ready' && now === 'countdown') ||
       (lastPhase === 'break' && now === 'countdown')
     ) {
-      setDawn(true)
-      const timer = setTimeout(() => setDawn(false), 900)
+      const engine = lastPhase === 'ready' && now === 'countdown'
+      setDawn(engine ? 'engine' : 'plain')
+      const timer = setTimeout(() => setDawn(false), 900 + (engine ? ENGINE_BLACK_MS : 0))
       onCleanup(() => clearTimeout(timer))
     }
     lastPhase = now
@@ -126,11 +132,18 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
   }
   /** いまカウントを進めている陣営の数字を脈打たせる (target を持った人が設置ポイントに居る) */
   const holding = (team: 'blue' | 'red') => capture()?.holding === team
+  /** 個人戦の勝った人の行。**個人戦の勝ち負けは陣営でなく人で決まる** (server/match.ts の topKiller) */
+  const soloWinner = () => {
+    const id = props.stats?.match?.soloWinner
+    return id ? props.stats?.match?.players.find((p) => p.id === id) : undefined
+  }
   const won = () => {
+    if (!teams()) return soloWinner() !== undefined && soloWinner()!.id === props.selfId
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner === props.stats?.team
   }
   const lost = () => {
+    if (!teams()) return soloWinner() !== undefined && soloWinner()!.id !== props.selfId
     const winner = props.stats?.match?.winner
     return winner !== undefined && winner !== 'draw' && winner !== props.stats?.team
   }
@@ -462,9 +475,10 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
       </Show>
 
       {/*
-        CAP の時間切れで並んだ。**先にカウントを進めた側の勝ち** (domain/match/capture.ts)
+        CAP の時間切れで並んだ。**先にカウントを進めた側の勝ち** (domain/match/capture.ts)。
+        個人戦は倒した数の一番が並んだ時。**次に倒した人の勝ち** (server/match.ts の topKiller)
       */}
-      <Show when={capture()?.suddenDeath && phase() === 'playing'}>
+      <Show when={(capture()?.suddenDeath || props.stats?.match?.suddenDeath) && phase() === 'playing'}>
         <div class="hud-caution hud-sudden-death">
           <span class="hud-caution-label">SUDDEN DEATH</span>
         </div>
@@ -540,7 +554,7 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
         <div class="hud-assembled-black" />
       </Show>
       <Show when={dawn()}>
-        <div class="hud-dawn" />
+        <div class="hud-dawn" classList={{ 'hud-dawn-engine': dawn() === 'engine' }} style={{ '--hud-dawn-hold': `${ENGINE_BLACK_MS}ms` }} />
       </Show>
       {/* 待合室から試合へ。締め切りの最後で黒へ落ち、秒読みに入ると上の hud-dawn で明ける */}
       <div class="hud-standby-black" classList={{ 'hud-standby-black-on': standbyClosing() }} />
@@ -621,10 +635,15 @@ export default function Hud(props: { stats: GameStats | null; selfId: string }) 
             class="hud-result-title"
             classList={{ 'hud-result-win': won(), 'hud-result-lose': lost() }}
           >
-            {props.stats?.match?.winner === 'draw' ? 'DRAW' : won() ? 'VICTORY' : 'DEFEAT'}
+            {won() ? 'VICTORY' : lost() ? 'DEFEAT' : 'DRAW'}
           </div>
+          {/* 個人戦は勝った人と倒した数。残機は部屋で 1 つの池なので点差にならない */}
           <div class="hud-result-score">
-            {props.stats?.match?.blue ?? 0} — {props.stats?.match?.red ?? 0}
+            {teams()
+              ? `${props.stats?.match?.blue ?? 0} — ${props.stats?.match?.red ?? 0}`
+              : soloWinner()
+                ? `${soloWinner()!.name}  ${soloWinner()!.kills} KILLS`
+                : ''}
           </div>
           <div class="hud-result-next">NEXT MATCH IN {remaining()}</div>
         </div>

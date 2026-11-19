@@ -8,7 +8,7 @@
  *     ?out=0.17     体の中心 (足元の原点) を壁面から外へ何 m 出すか
  *     ?below=1.78   足元を縁からどれだけ下げるか (m)
  *     ?cam=side|front|top|back   カメラ (既定 side)。?dist= で距離
- *     ?skin=soldier_raiden
+ *     ?skin=soldier_freya
  *
  * 壁面は z = 0 (壁は z < 0 側、縁の上面は y = 3)。体は z > 0 側に居る。
  * 画面左上に、手・胸・腰の**壁面からの距離** (正 = 壁の外、負 = 壁の中) と、

@@ -180,7 +180,7 @@ const LOOKS: Record<'clear' | 'dusty' | 'dustyWhite' | 'night', Look> = {
     night: { sunScale: 0.22, ambientScale: 1.7, ambientSky: 0x56688f },
   },
 }
-const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { city: 'dustyWhite', lab: 'dusty' }
+const STAGE_LOOK: Partial<Record<StageName, keyof typeof LOOKS>> = { mm: 'dustyWhite', lab: 'dusty' }
 /**
  * 日陰の明るさ (天空光 AMBIENT_INTENSITY) をステージごとに何倍にするか。無ければ 1。
  *
@@ -416,6 +416,17 @@ export function recolorHomes(root: THREE.Object3D, swapped: boolean): void {
     if (!home || !material?.color) return
     const user: Team = swapped ? (home === 'blue' ? 'red' : 'blue') : home
     material.color.set(TEAM_COLOR[user])
+  })
+}
+
+/** 個人戦の基地の色。誰の陣地でもない補給の場所 (2026-11-19 本人「base の color は gray にして」) */
+const NEUTRAL_BASE_COLOR = 0xb0b0b0
+
+/** 基地の枠を灰色にする (個人戦)。陣営のある部屋に戻ったら recolorHomes で塗り直す */
+export function grayHomes(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    const material = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined
+    if (obj.userData.home && material?.color) material.color.set(NEUTRAL_BASE_COLOR)
   })
 }
 

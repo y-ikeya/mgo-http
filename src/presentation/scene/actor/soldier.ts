@@ -4696,7 +4696,13 @@ export class Soldier {
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
       // 元から半透明だった物 (髪のような重なる板) は実体を全部描いたあとに回す
       const wasTransparent = materials.some((material) => material.transparent)
-      obj.renderOrder = SELF_RENDER_ORDER + (wasTransparent ? 1 : 0)
+      /*
+       * **くり抜きの板 (glTF の MASK、alphaTest) も後に回す。** 半透明ではないので前は実体と同じ順で、
+       * Freya の髪が頭より先に描かれた回は、髪の濃い所が深度を書いて裏の後頭部と背中が落ち、
+       * 薄く混ぜた髪越しに背景が見えた (2026-11-19 本人「髪が透けてその向こう側の背景が見えちゃってる」)
+       */
+      const cutout = materials.some((material) => material.alphaTest > 0)
+      obj.renderOrder = SELF_RENDER_ORDER + (wasTransparent || cutout ? 1 : 0)
       const replaced = materials.map((material) => {
         let copy = cloned.get(material)
         if (!copy) {

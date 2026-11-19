@@ -1395,6 +1395,30 @@ describe('胸の揺れ', () => {
     expect(peak).toBeGreaterThan(0.9)
   })
 
+  /**
+   * **pepa (Freya の体) も瞬きする。** Blink は本人の Freya.blend のシェイプキー (2026-11-19)。体が 1 つの形を
+   * 材質ごとに 6 つに分けて読まれるので、まつ毛・まぶたの**全部**が閉じること
+   */
+  test('pepa は瞬きする', async () => {
+    const freya = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(
+      await Bun.file('public/models/soldier_freya.glb').arrayBuffer(),
+      '',
+    )
+    const anim = new CharacterAnimator(freya.scene.clone(true), freya.animations, 4.5)
+    const root = (anim as unknown as { root: THREE.Object3D }).root
+    const meshes: THREE.Mesh[] = []
+    root.traverse((o) => {
+      if ((o as THREE.Mesh).morphTargetDictionary?.Blink !== undefined) meshes.push(o as THREE.Mesh)
+    })
+    expect(meshes.length).toBeGreaterThan(1)
+    const peaks = meshes.map(() => 0)
+    for (let i = 0; i < 7 * 60; i++) {
+      anim.update(1 / 60)
+      meshes.forEach((m, k) => (peaks[k] = Math.max(peaks[k], m.morphTargetInfluences![m.morphTargetDictionary!.Blink])))
+    }
+    for (const peak of peaks) expect(peak).toBeGreaterThan(0.9)
+  })
+
   /** **眠らされている間は目を閉じたまま。** 起きれば開く */
   test('眠っている間は目を閉じたまま', () => {
     const anim = new CharacterAnimator(nanashi.scene.clone(true), nanashi.animations, 4.5)

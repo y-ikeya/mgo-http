@@ -6,7 +6,7 @@
  * 返さない関数の 2 本に分けてある。
  */
 
-import type { MatchPlayer } from '../src/domain/player/player'
+import type { MatchPlayer, Team } from '../src/domain/player/player'
 import { newLagRecord, type LagRecord } from '../src/domain/match/lag'
 import type { Client } from './world'
 
@@ -116,6 +116,8 @@ export interface Session {
   lastReject: string
   /** 最後に補給した時刻 (ms)。連打を間引く */
   resuppliedAt: number
+  /** 個人戦で最後に補給した基地。同じ基地では続けて補給できない (domain/rule/resupply.ts の soloSupplyBase) */
+  lastSupplyBase: Team | null
   /** 最後に撃った時刻 (Date.now)。連射の速さの上限を見るのに使う */
   lastShotAt: number
   /**
@@ -208,6 +210,7 @@ export function newSession(player: MatchPlayer, socket: Bun.ServerWebSocket<Clie
     rejected: 0,
     lastReject: '',
     resuppliedAt: 0,
+    lastSupplyBase: null,
     badPacketAt: 0,
     badMoveAt: 0,
     snapBackAt: 0,

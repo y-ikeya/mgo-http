@@ -1,7 +1,7 @@
 // 移した体の背丈を宿主に合わせる。
 //
 //   bun tools/fit_height.js <宿主.glb> <合わせる.glb>
-//   bun tools/fit_height.js public/models/soldier.glb public/models/soldier_raiden.glb
+//   bun tools/fit_height.js public/models/soldier.glb public/models/soldier_freya.glb
 //
 // merge_all_clips.js のあとに必ず通す。
 //
@@ -30,7 +30,14 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 const args = process.argv.slice(2)
 // 持ち上げずに、型の腰の高さを伸ばして足を着ける (下の「--hips」)
 const HIPS = args.includes('--hips')
-const [hostPath, targetPath] = args.filter((a) => a !== '--hips')
+/*
+ * --sink <m> … 爪先の骨を宿主より m だけ低く合わせる (--hips と組む)。**裸足の体に。**
+ * 合わせているのは爪先の骨の高さで、宿主は靴の底が骨のすぐ下にある。裸足の Freya は骨から
+ * 足裏までが薄く、骨を揃えると足裏が 1.7cm 浮いた (2026-11-19 本人「ちょっと地面から浮いてる？」)
+ */
+const sinkAt = args.indexOf('--sink')
+const SINK = sinkAt >= 0 ? Number(args[sinkAt + 1]) : 0
+const [hostPath, targetPath] = args.filter((a, i) => a !== '--hips' && !(sinkAt >= 0 && (i === sinkAt || i === sinkAt + 1)))
 if (!targetPath) {
   console.error('引数: <宿主.glb> <合わせる.glb> [--hips]')
   process.exit(1)
@@ -225,7 +232,7 @@ if (!HIPS) {
    */
   await Bun.write(targetPath, writeGlb(target.json, target.bin))
   const before = await measure(targetPath)
-  const f = 1 + (host_.toe - before.toe) / (before.hips - armatureLift(target.json))
+  const f = 1 + (host_.toe - SINK - before.toe) / (before.hips - armatureLift(target.json))
   const touched = scaleHipsHeight(target, f)
   await Bun.write(targetPath, writeGlb(target.json, target.bin))
   const after = await measure(targetPath)

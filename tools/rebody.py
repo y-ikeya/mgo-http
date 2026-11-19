@@ -704,25 +704,27 @@ def add_bust():
         made.append((name, centre))
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    # 重みを移す。中心ほど胸、遠いほど元のまま
-    keep = hand_rigged(mesh)
-    for name, centre in made:
-        group = mesh.vertex_groups.get(name) or mesh.vertex_groups.new(name=name)
-        moved = 0
-        for v in mesh.data.vertices:
-            if v.index in keep:
-                continue
-            world = mesh.matrix_world @ v.co
-            gap = (world - centre).length
-            if gap >= BUST_REACH:
-                continue
-            t = 1.0 - gap / BUST_REACH
-            t *= t          # 縁をなだらかに。線形だと境目が見える
-            for e in v.groups:
-                e.weight *= 1 - t
-            group.add([v.index], t, 'ADD')
-            moved += 1
-        print(f'  胸: {name} を作った ({moved} 頂点)')
+    # 重みを移す。中心ほど胸、遠いほど元のまま。
+    # **胸を覆う服にも同じ重みを。** 体だけに入れると、胸が揺れた分だけ上着を突き抜けた (Freya のシャツ、2026-11-19)
+    for target in [mesh] + [m for m in torsos if m is not mesh]:
+        keep = hand_rigged(target)
+        for name, centre in made:
+            group = target.vertex_groups.get(name) or target.vertex_groups.new(name=name)
+            moved = 0
+            for v in target.data.vertices:
+                if v.index in keep:
+                    continue
+                world = target.matrix_world @ v.co
+                gap = (world - centre).length
+                if gap >= BUST_REACH:
+                    continue
+                t = 1.0 - gap / BUST_REACH
+                t *= t          # 縁をなだらかに。線形だと境目が見える
+                for e in v.groups:
+                    e.weight *= 1 - t
+                group.add([v.index], t, 'ADD')
+                moved += 1
+            print(f'  胸: {name} ({target.name} の {moved} 頂点)')
 
 
 
@@ -899,6 +901,49 @@ for mat in bpy.data.materials:
                 tree.links.new(cut.outputs[0], alpha)
                 masked += 1
                 continue
+            if src.type == 'TEX_IMAGE' and link.from_socket.name == 'Color' and src.image and 'alpha' in src.image.name.lower():
+                """
+                **透けを別の白黒の絵で持っている材質** (Freya の髪・頭皮の Hair-Alpha.png / Cap-Alpha.png)。
+
+                glTF の透けは基本色の絵の A にしか置けない。繋ぎを切ると髪の房の板が透けない板のまま
+                描かれ、毛先が平たい帯に見えた (2026-11-19 本人「texture 見えない」)。白黒の絵を基本色の
+                絵の A へ焼き込み、上と同じくくり抜き (MASK) で残す
+                """
+                base = node.inputs['Base Color'].links
+                base_node = base[0].from_node if base and base[0].from_node.type == 'TEX_IMAGE' else None
+                if base_node and base_node.image:
+                    colour = base_node.image
+                    mask = src.image.copy()
+                    if tuple(mask.size) != tuple(colour.size):
+                        mask.scale(colour.size[0], colour.size[1])
+                    merged = colour.copy()
+                    merged.name = colour.name.rsplit('.', 1)[0] + '_cut'
+                    px = list(merged.pixels)
+                    mp = list(mask.pixels)
+                    px[3::4] = mp[0::4]
+                    merged.pixels = px
+                    # **書き換えた画素は一度ファイルへ出してから詰める。** 詰めてあった元の PNG のまま
+                    # 書き出され、透けが入らなかった
+                    import tempfile
+                    merged.filepath_raw = os.path.join(tempfile.gettempdir(), merged.name + '.png')
+                    merged.file_format = 'PNG'
+                    # image.save() は A を落として RGB の PNG を書いた。描き出しの設定で RGBA を指定する
+                    _settings = bpy.context.scene.render.image_settings
+                    _settings.file_format = 'PNG'
+                    _settings.color_mode = 'RGBA'
+                    merged.save_render(merged.filepath_raw)
+                    merged.unpack(method='REMOVE') if merged.packed_file else None
+                    merged.reload()
+                    merged.pack()
+                    bpy.data.images.remove(mask)
+                    base_node.image = merged
+                    cut = tree.nodes.new('ShaderNodeMath')
+                    cut.operation = 'ROUND'
+                    tree.links.remove(link)
+                    tree.links.new(base_node.outputs['Alpha'], cut.inputs[0])
+                    tree.links.new(cut.outputs[0], alpha)
+                    masked += 1
+                    continue
             tree.links.remove(link)
             opaque += 1
         if alpha.default_value < 1.0:

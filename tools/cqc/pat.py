@@ -3,7 +3,7 @@
 #   Blender -b tools/raw/cqc.blend --python tools/cqc/pat.py
 #   → tools/raw/pat.glb (型は pat 1 本)。cqc.blend にも action 'pat' として残す
 #   → bun tools/merge_clip.js public/models/soldier.glb tools/raw/pat.glb pat public/models/soldier.glb --rotation-only
-#     (4 つの皮 soldier / soldier_nanashi / soldier_raiden / soldier_xbot に同じく)
+#     (4 つの皮 soldier / soldier_nanashi / soldier_freya / soldier_xbot に同じく)
 #
 # 本人 2026-10-19「crouch しながら近くの stun された人をぽんぽん叩いておく motion 作れる?」。
 # しゃがみ (crouch_idle の 1 コマ目) から、左手だけ銃を離して左膝の外へ伸ばし、前の床の少し上

@@ -17,6 +17,7 @@ import {
   present,
   shuffleTeams,
   soleTeam,
+  topKiller,
 } from '../src/domain/match/match'
 import { livesOf, matchMsOf, primariesOf, secondaryOf, supportsOf } from '../src/domain/match/room'
 import { clearTsneTarget, placeTsneTarget, updateTsneTarget } from './target'
@@ -463,6 +464,8 @@ export function matchState(room: RoomWorld): ServerMessage {
     present: connected(room).length,
     required: MIN_PLAYERS,
     winner: room.winner,
+    soloWinner: room.soloWinner,
+    suddenDeath: room.suddenDeath || undefined,
     // 戦績。1 秒ごとに配られるので、成績表はこれを見れば足りる。
     //
     // 離脱中の人も**消さずに残す**。リロードしている 2 秒のあいだ行が消えて
@@ -765,6 +768,8 @@ function enterReady(room: RoomWorld, now: number, afterMatch = false): void {
   room.blue = TICKETS
   room.red = TICKETS
   room.winner = undefined
+  room.soloWinner = undefined
+  room.suddenDeath = undefined
   // **攻守交代。** 試合を 1 つ終えるたびに必ず入れ替える (2026-10-17 本人)。
   // 1 試合は先攻と後攻の 2 ラウンドなので、終わった時点で 1 度入れ替わっている。戻して同じ色から始める
   if (room.mode.sides && afterMatch) swapSides(room)
@@ -947,12 +952,26 @@ export function updateMatch(room: RoomWorld, now: number): void {
   const targetChanged = (room.mode.sides || room.mode.capture) && updateTsneTarget(room, now)
   // CAP のカウント (server/capture.ts)。持った人が自陣の設置ポイントに居る間だけ減る
   const capture = updateCapture(room, now)
+  let suddenDeathStarted = false
   if (room.phase !== 'playing' || previous !== 'playing') {
     // 段階が変わった刻みでは決着を見ない (上の分岐で済んでいる)
   } else if (room.mode.capture) {
     // **CAP はカウントで決まる。** 先に 0 にしたか、時間切れで差が付いていれば終わり (並んだらサドンデスで続ける)。
     // 前後半なら前半は時間切れで終わり、後半は前半の残りを足して見る (server/capture.ts)
     if (capture.over) endRound(room, now)
+  } else if (!room.mode.teams && (room.suddenDeath || ticketsGone(room) || now >= room.endsAt)) {
+    /*
+     * **個人戦は倒した数が一番多い人の勝ち。** 時間切れ・残機切れで一番が並んでいたら
+     * サドンデスに入れて続け、誰かが倒して差が付いた所で終わる (topKiller)
+     */
+    const top = topKiller(room.players.values())
+    if (top) {
+      room.soloWinner = top
+      endRound(room, now)
+    } else if (!room.suddenDeath) {
+      room.suddenDeath = true
+      suddenDeathStarted = true
+    }
   } else if (room.targetDelivered) {
     // **運び込んだ。** 攻める側の勝ち (decideWinner)。時間を待たずにその場で終わる
     endRound(room, now)
@@ -972,7 +991,7 @@ export function updateMatch(room: RoomWorld, now: number): void {
   const cautionChanged = room.mode.sides && room.revealedUntil !== room.cautionSent
   if (cautionChanged) room.cautionSent = room.revealedUntil
   // 段階が変わったら即座に配る。残り時間の表示のために定期的にも配る
-  if (previous !== room.phase || stealthChanged || cautionChanged || targetChanged || capture.changed || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
+  if (previous !== room.phase || suddenDeathStarted || stealthChanged || cautionChanged || targetChanged || capture.changed || now - room.lastBroadcast >= MATCH_BROADCAST_MS) {
     room.lastBroadcast = now
     broadcast(room, matchState(room))
   }

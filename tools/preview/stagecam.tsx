@@ -2,7 +2,7 @@
  * ステージを**本番と同じ光と影で**、決めた場所から描く。
  *
  *     bunx vite → http://localhost:5174/tools/preview/stagecam.html
- *     ?stage=city            どのステージか
+ *     ?stage=mm            どのステージか
  *     ?eye=-12,11,48         カメラの位置 (three の x,y,z)
  *     ?look=-8,13,44         カメラの向く先
  *     ?fov=60
@@ -31,7 +31,7 @@ import { STEP_UP } from '../../src/domain/player/moving'
 import { BlobShadow, setSunProbe } from '../../src/presentation/scene/actor/blobShadow'
 
 const query = new URLSearchParams(location.search)
-const stageName = (query.get('stage') ?? 'city') as StageName
+const stageName = (query.get('stage') ?? 'mm') as StageName
 const vec = (key: string, fallback: [number, number, number]): THREE.Vector3 => {
   const raw = query.get(key)?.split(',').map(Number)
   return raw && raw.length === 3 && raw.every(Number.isFinite) ? new THREE.Vector3(raw[0], raw[1], raw[2]) : new THREE.Vector3(...fallback)

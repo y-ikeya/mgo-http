@@ -53,7 +53,7 @@ export {
   ladderGrip,
 } from './ladder'
 
-export type StageName = 'mall' | 'training' | 'raft' | 'city' | 'lab' | 'uu' | 'bb'
+export type StageName = 'mall' | 'training' | 'raft' | 'mm' | 'lab' | 'uu' | 'bb'
 
 /**
  * 地面の上の 1 点。
@@ -344,19 +344,19 @@ const RAFT: StageSpec = {
 }
 
 /**
- * 街。**仮の置き場** (tools/raw/stage_city.blend、2026-09-21、全体を 0.4 倍に縮めた物)。
+ * 街。**仮の置き場** (tools/raw/stage_mm.blend、2026-09-21、全体を 0.4 倍に縮めた物)。
  *
  * 100m × 180m の砂地にコンクリートの建物が 136 棟。地面は y=10.01。基地は blend の空 (meta_baseBlue / meta_baseRed) で、書き出しが
  * json に写す (`bases`)。**ここの値はその控え** — json が読めないときだけ使う。
  * 個人戦の湧き (solo) は街の空いている地面に散らしてある。
  */
-const CITY: StageSpec = {
-  name: 'city',
+const MM: StageSpec = {
+  name: 'mm',
   label: 'MM',
   ambience: 'city_loop1.mp3',
   bases: {
     blue: { x: -18.41, z: 49.09, y: 10.01 },
-    red: { x: 1.33, z: -76.6, y: 10.01 },
+    red: { x: 3.65, z: -76.62, y: 10.01 },
   },
   // blend の空 target1 (青の陣地の近く、建物 18 の路地) / target2 (赤の陣地の近く)
   tsneTargets: [
@@ -369,7 +369,7 @@ const CITY: StageSpec = {
    * 選び方: 2m 刻みで地面 (屋根ではない) に当たる点のうち、半径 3m に何も無い所
    * (足元 + 0.6m と + 1.5m の高さで 8 方向) で、**街に囲まれている所** (目の高さで 16 方向
    * とも 60m 以内に建物がある) を拾い、街の真ん中に近い点から順に互いに一番遠い点を
-   * 足して 8 つ (Blender で測った。tools/raw/stage_city.blend)。
+   * 足して 8 つ (Blender で測った。tools/raw/stage_mm.blend)。
    * 囲まれているかを見ていなかった版は、外周の建物の外の砂地を 4 点拾って場外で湧いた (2026-10-19 本人)
    */
   solo: [
@@ -540,7 +540,7 @@ export const STAGES: Record<StageName, StageSpec> = {
   mall: MALL,
   training: TRAINING,
   raft: RAFT,
-  city: CITY,
+  mm: MM,
   uu: UU,
   bb: BB,
 }

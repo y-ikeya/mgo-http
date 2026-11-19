@@ -39,6 +39,7 @@ import { offsetInCone } from "../../sim/space/aim";
 import {
   buildLights,
   buildBases,
+  grayHomes,
   recolorHomes,
   buildStage,
   fitShadowToStage,
@@ -134,7 +135,7 @@ const DEBUG_HUD = new URLSearchParams(globalThis.location?.search ?? "").has("de
 import { toLocal } from "../../application/replica/clock";
 import { TsneTarget, type TargetView } from "./world/tsneTarget";
 import { pushGrass } from "./world/grass";
-import { atBase } from "../../domain/rule/resupply";
+import { atBase, soloSupplyBase } from "../../domain/rule/resupply";
 import { createTransport } from "../../infra/link";
 import {
   applyMatch,
@@ -879,17 +880,21 @@ export class Game {
   private teamsMode = false;
 
   /**
-   * 補給できる場所に居るか。**自分の基地の上、生きている間。**
+   * 補給できる場所に居るか。**自分の基地の上、生きている間。** 個人戦はどの基地でもよいが、
+   * 前に補給した基地は続けて使えない。
    *
-   * 判定はサーバーも同じ問い (domain/rule/resupply.ts の atBase) で見るので、
+   * 判定はサーバーも同じ問い (domain/rule/resupply.ts の atBase / soloSupplyBase) で見るので、
    * ここで出せば通る。案内 (HUD) と押した時の両方がこれを読む。
    */
   private get canResupply(): boolean {
-    if (!this.teamsMode || !canAct(this.life) || this.player.sleeping || this.player.downed) return false;
-    const base = STAGES[this.stageName].bases[this.homeOf(this.selfTeam)];
+    if (!canAct(this.life) || this.player.sleeping || this.player.downed) return false;
+    const bases = STAGES[this.stageName].bases;
     const p = this.player.position;
-    return atBase(p.x, p.y, p.z, base);
+    if (!this.teamsMode) return soloSupplyBase(p.x, p.y, p.z, bases, this.lastSupplyBase) !== null;
+    return atBase(p.x, p.y, p.z, bases[this.homeOf(this.selfTeam)]);
   }
+  /** 個人戦で最後に補給した基地。補給が通った (resupplied) 時に、立っている基地を控える */
+  private lastSupplyBase: Team | null = null;
 
   /** いま覗いている段。0 なら肩越し */
   private zoomStep = 0;
@@ -1256,13 +1261,13 @@ export class Game {
     });
     // 陣営の基地。地面を見れば自分の湧く場所が分かる
     /*
-     * 陣営の基地。**個人戦では出さない。**
+     * 陣営の基地。**個人戦では灰色にして補給の場所として出す。**
      *
-     * ルールは 1 秒ごとに届く match で分かるので、置いてから隠す。地面に色の
-     * 付いた枠があると「そこが自分の陣地」に読めるが、個人戦にはそんな場所は
-     * 無い (湧く所も毎回変わる)。
+     * ルールは 1 秒ごとに届く match で分かるので、置いてから塗り替える。陣営の色の
+     * 枠があると「そこが自分の陣地」に読めるが、個人戦にはそんな場所は無い。
      */
     this.bases = buildBases(this.stageName);
+    if (!this.teamsMode) grayHomes(this.bases);
     this.scene.add(this.bases);
     this.sun = buildLights(this.scene);
     // 動かない物が増減したら影マップを 1 度描き直す (world/staticShadow.ts)
@@ -2197,8 +2202,11 @@ export class Game {
         break;
       }
       case "phase":
-        // 陣営が無い部屋には基地も無い
-        if (this.bases) this.bases.visible = effect.teams;
+        // 陣営が無い部屋 (個人戦) の基地は、誰の物でもない補給の場所として灰色で出す
+        if (this.bases && effect.teams !== this.teamsMode) {
+          if (effect.teams) recolorHomes(this.bases, this.homesSwapped);
+          else grayHomes(this.bases);
+        }
         this.teamsMode = effect.teams;
         // 試合が切り替わったら飛んでいる物を捨てる。サーバー側も同じ所で
         // 捨てるので、爆発が届かないまま残り続ける
@@ -2579,6 +2587,10 @@ export class Game {
 
   // 補給できた。数は直前の self で入っている。ここは印だけ
   private receiveResupplied(): void {
+    if (!this.teamsMode) {
+      const p = this.player.position;
+      this.lastSupplyBase = soloSupplyBase(p.x, p.y, p.z, STAGES[this.stageName].bases, this.lastSupplyBase) ?? this.lastSupplyBase;
+    }
     this.lastHitZone = "RESUPPLY";
     this.hitFeedbackTimer = HIT_FEEDBACK_DURATION;
     this.audio.play("resupply", this.player.position);

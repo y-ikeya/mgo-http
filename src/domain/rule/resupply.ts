@@ -1,3 +1,4 @@
+import type { Team } from '../player/player'
 import type { Spot } from '../stage'
 
 /**
@@ -22,4 +23,24 @@ export function atBase(x: number, y: number, z: number, base: Spot): boolean {
   const flat = Math.hypot(x - base.x, z - base.z)
   if (flat > RESUPPLY_RADIUS) return false
   return Math.abs(y - (base.y ?? 0)) <= RESUPPLY_HEIGHT
+}
+
+/**
+ * 陣営の無い部屋 (個人戦) で補給できる基地。**どの基地でもよいが、前に補給した基地は続けて使えない。**
+ *
+ * 個人戦は誰の陣地でもないので、チーム戦の基地 (青・赤) をそのまま補給の場所に使う。同じ基地に
+ * 居座って補給し続けると強すぎるので、次は別の基地まで動かせる (2026-11-19 本人「連続で同じ base は
+ * 使えないでいいんじゃないかな」)。立っている基地を返す。使えなければ null
+ */
+export function soloSupplyBase(
+  x: number,
+  y: number,
+  z: number,
+  bases: Partial<Record<Team, Spot>>,
+  last: Team | null,
+): Team | null {
+  for (const [team, base] of Object.entries(bases) as [Team, Spot][]) {
+    if (team !== last && atBase(x, y, z, base)) return team
+  }
+  return null
 }

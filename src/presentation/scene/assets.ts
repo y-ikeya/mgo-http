@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { DEFAULT_SKIN } from './actor/skin'
+import { applySkinShading } from './actor/skinShading'
 import { shareGltfTextures } from './util/texshare'
 import type { StageName } from '../../domain/stage'
 
@@ -122,7 +123,11 @@ function load(url: string): Promise<GLTF> {
  */
 export function loadSoldier(skin: string = DEFAULT_SKIN): Promise<GLTF> {
   // 無い型の警告は体を組み立てる所で出す (actor/animation.ts の warnMissingClips)
-  return load(asset.model(`${skin}.glb`))
+  const url = asset.model(`${skin}.glb`)
+  const first = !cache.has(url)
+  const pending = load(url)
+  // 肌と目の膜の材質を、読んだ 1 度目にだけ差し替える (actor/skinShading.ts)
+  return first ? pending.then((gltf) => (applySkinShading(skin, gltf.scene), gltf)) : pending
 }
 
 export function loadSmg(): Promise<GLTF> {

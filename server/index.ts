@@ -92,7 +92,7 @@ import { dropTsneTarget } from './target'
 import { costOf, patSeconds } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
 import { STAGES, inWater, waterOf } from '../src/domain/stage'
-import { RESUPPLY_COOLDOWN_MS, atBase } from '../src/domain/rule/resupply'
+import { RESUPPLY_COOLDOWN_MS, atBase, soloSupplyBase } from '../src/domain/rule/resupply'
 import { MAX_HEALTH } from '../src/domain/rule/damage'
 import { MAX_STAMINA, PAT_RANGE, isAsleep, pat, recoverStamina, struggle } from '../src/domain/player/stamina'
 import { advanceLife, canAct, canBeHurt, canChoose, CHOOSE_FLOOR, SPAWN_PROTECT, downSeconds, isAwaitingReturn, onBattlefield } from '../src/domain/player/lifecycle'
@@ -847,20 +847,26 @@ function handleMessage(
      * 名簿を配り直すのは、**誰を待っているかが全員に見える**必要があるから。
      */
     /*
-     * 補給。**自分の陣営の基地の上で、生きている間だけ。**
+     * 補給。**自分の陣営の基地の上で、生きている間だけ。** 個人戦はどの基地でもよいが、
+     * 同じ基地では続けて補給できない (soloSupplyBase)。
      *
-     * 位置は届いている物 (検算済み) を見る。陣営の無い部屋には基地が無いので
-     * 補給も無い。通ったら self をすぐ返す (次の定期便を待たせない)。
+     * 位置は届いている物 (検算済み) を見る。通ったら self をすぐ返す (次の定期便を待たせない)。
      */
     case 'resupply': {
-      if (!room.mode.teams || !canAct(player.life)) break
+      if (!canAct(player.life)) break
       const now = Date.now()
       if (now - sessionOf(player).resuppliedAt < RESUPPLY_COOLDOWN_MS) break
       // 基地は書き出した json を優先。無ければ表の値
-      // 後半は陣地が入れ替わる (前後半の部屋)。補給できるのはいま使っている基地
-      const home = homeOf(room, player.team)
-      const base = room.stage.bases[home] ?? STAGES[room.stage.name].bases[home]
-      if (!atBase(player.x, player.y, player.z, base)) break
+      const bases = { ...STAGES[room.stage.name].bases, ...room.stage.bases }
+      if (room.mode.teams) {
+        // 後半は陣地が入れ替わる (前後半の部屋)。補給できるのはいま使っている基地
+        if (!atBase(player.x, player.y, player.z, bases[homeOf(room, player.team)])) break
+      } else {
+        // 個人戦はどの基地でも。ただし前に補給した基地は続けて使えない
+        const at = soloSupplyBase(player.x, player.y, player.z, bases, sessionOf(player).lastSupplyBase)
+        if (!at) break
+        sessionOf(player).lastSupplyBase = at
+      }
       sessionOf(player).resuppliedAt = now
       resupply(player)
       const ammo = player.inventory.ammoTable()

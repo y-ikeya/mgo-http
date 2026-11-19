@@ -559,6 +559,14 @@ const BUST_DAMP = 5.5
 const BUST_GAIN = 0.024
 /** 振れ幅の上限 (rad)。これを超えると体を突き抜ける (1.7 倍にした時に 0.30 → 0.38、11-12 に「揺れを大きくして」で 0.5) */
 const BUST_MAX = 0.5
+/**
+ * お尻の揺れ (Butt_L/R、親は Hips)。胸と同じばねで、付け根 (Hips) の加速度で揺らす (2026-11-19 本人
+ * 「butt をたしてみて」)。振れは胸の 2/3 (本人「むねの 2/3 でいい」)
+ */
+const BUTT_STIFF = BUST_STIFF
+const BUTT_DAMP = BUST_DAMP
+const BUTT_GAIN = (BUST_GAIN * 2) / 3
+const BUTT_MAX = (BUST_MAX * 2) / 3
 
 /**
  * 腰の紐 (名無しの Bow1〜8、背骨 Spine から垂れた 2 本の鎖)。**垂れた布なので胸とは振り方が違う。**
@@ -608,6 +616,19 @@ const BOW_CONTACT_DAMP = 25
 const BOW_GAIN = 0.01
 /** 振れ幅の上限 (rad) */
 const BOW_MAX = 0.6
+
+/**
+ * 髪の鎖 (Freya の Hair_FL1〜4 など、頭から垂れた 5 本の鎖、2026-11-19 本人「髪については rig いれて別で動かした方がいい」)。
+ * 腰の紐と同じ振り方 (付け根の速さの逆へなびく) で、**紐より硬く小さく**振る — 髪は布より軽く戻りが早く、
+ * 大きく振ると肩と胸を突き抜ける
+ */
+const HAIR_STIFF = 45
+const HAIR_DAMP = 6
+const HAIR_DRAG = 0.05
+const HAIR_GAIN = 0.006
+const HAIR_MAX = 0.3
+/** 頭が回った分のうち、髪の根を胸に残す割合 (0 = 頭について回る、1 = 胸のまま) */
+const HAIR_STAY = 0.75
 
 const ROLL_EXIT_PHASE = 0.78
 
@@ -1465,10 +1486,13 @@ const AIM_PITCH_LAMBDA = 12
  *
  * 相手のカメラがどこを見ているかは、これまで体の向きからしか読めなかった (体は
  * 進行方向を向く)。首が回れば「あいつは右の路地を見ている」が絵で分かる —
- * 情報が核の遊びなので、これは相手に**渡す**情報。範囲は体の正面から左右 75°。
+ * 情報が核の遊びなので、これは相手に**渡す**情報。範囲は体の正面から左右 60°。
  * それ以上は体ごと回るので、首だけが後ろを向く絵にはならない。首と頭で分ける。
+ *
+ * **75° から 60° に絞った** (2026-11-19 本人「max60 くらいにするか」)。首を大きく回すと、頭について回る顎と
+ * 体に残る首の間の皮がねじれて細り、見上げると顎だけ浮いて首が分かれて見えた (Freya)
  */
-const LOOK_YAW_MAX = (75 * Math.PI) / 180
+const LOOK_YAW_MAX = (60 * Math.PI) / 180
 const LOOK_YAW_LAMBDA = 10
 const LOOK_CHAIN: Record<string, number> = { Neck: 0.4, Head: 0.6 }
 
@@ -1591,6 +1615,29 @@ const RUN_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `run_${d}` as 
  * 本来の姿勢として残す。なので X の差 8.6° が上体の傾きとして残り、**立って
  * いるだけで右へ 15° ほど傾いて**見えた。上下を同じクリップにすれば差が無くなる。
  */
+/**
+ * 走りながらの装填・コッキングで、上体を装填の型の腰へ起こし戻す割合 (0 = 捻れだけ揃える、1 = 丸ごと)。
+ * 0 では胸が 57° 前へ倒れすぎ (型の胸がもとから立った腰の上で前へ曲がっている)、1 では 22° に起きて
+ * 腰と胸の間で折れた。普通に走る時の胸 (41°) に合う所 (alignSpineToUpperClip)
+ */
+const RUN_HANDLING_UPRIGHT = 0.45
+/**
+ * しゃがみ移動しながらの装填・コッキング。**負 = 腰の差分をさらに逆へ足して、上体を前へ倒し足す。**
+ * しゃがみ走りの型は胸が 76° 前へ倒れているが、装填の型は立って作った物なので、上半身をそちらへ
+ * 替えると頭が 5〜10cm 起き上がった (2026-11-19 本人「chrouch run してる時に reload やコッキングすると
+ * 上半身が起き上がってる」)。頭の高さで合わせた: しゃがみ走り 0.93m に対して -0.3 で装填 0.92〜0.94m・
+ * コッキング 0.99m (前は 0.98〜0.99m / 1.04m)。しゃがみ止まり (crouch_idle) は前へ倒れすぎるので
+ * 掛けない (CROUCH_MOVE_STATES)
+ */
+const CROUCH_HANDLING_UPRIGHT = -0.3
+/**
+ * しゃがみ止まりで装填・コッキングしている間、上体を前へ倒し足す角度 (lean に足す)。立って作った装填の型へ
+ * 上半身を替えると、しゃがみの前傾が抜けて頭が 9〜15cm 後ろへ反った (2026-11-19 本人「chrouch で run
+ * してない時も reload とかするとちょっと上半身そってる」)。30° で頭の前への出方が 14〜21cm (しゃがみ止まりは
+ * 21〜22cm)。背骨の合わせ直し (CROUCH_HANDLING_UPRIGHT) は長物で効かなかったので、こちらで倒す
+ */
+const CROUCH_IDLE_HANDLING_LEAN = THREE.MathUtils.degToRad(30)
+const CROUCH_MOVE_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion))
 const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle', 'walk'])
 
 /** 脱力中の下半身を引く鍵。**元の状態と、流すクリップの組** */
@@ -2661,7 +2708,9 @@ export class CharacterAnimator {
             ? this.aimLevel.crouch
             : this.aimLevel.stand
           : this.relaxedLean
-    this.lean = damp(this.lean, leanTarget, AIM_PITCH_LAMBDA, dt)
+    // しゃがみ止まりで装填・コッキング中は前へ倒し足す (CROUCH_IDLE_HANDLING_LEAN)
+    const handlingLean = this.handlingGun && this.locomotion === 'crouch_idle' && !this.boxed ? CROUCH_IDLE_HANDLING_LEAN : 0
+    this.lean = damp(this.lean, leanTarget + handlingLean, AIM_PITCH_LAMBDA, dt)
     // 型ごとの向きの補正。**いま下半身に流している型**で引く
     const lowerName = this.lowerClipNames.get(this.resolveLowerKey())
     this.facingFix = damp(this.facingFix, (lowerName && CLIP_FACING[lowerName]) || 0, AIM_HIP_LAMBDA, dt)
@@ -2757,8 +2806,7 @@ export class CharacterAnimator {
   }
 
   /**
-   * 遅れて揺れる骨を探す。**1 度だけ。** 胸 (Bust_L/R) と腰の紐 (Bow1, Bow2…) を名前で拾う。
-   * 髪の鎖も拾っていたが、鎖を持つ体が無いので外した (2026-11-16 本人「なかったことにしていい」)
+   * 遅れて揺れる骨を探す。**1 度だけ。** 胸 (Bust_L/R)・お尻 (Butt_L/R)・腰の紐 (Bow1, Bow2…)・髪の鎖 (Hair_FL1…) を名前で拾う
    */
   private findSways(): void {
     const add = (
@@ -2791,6 +2839,9 @@ export class CharacterAnimator {
     for (const suffix of ['Bust_L', 'Bust_R']) {
       add(findBoneBySuffix(this.root, suffix), BUST_STIFF, BUST_DAMP, BUST_GAIN, BUST_MAX)
     }
+    for (const suffix of ['Butt_L', 'Butt_R']) {
+      add(findBoneBySuffix(this.root, suffix), BUTT_STIFF, BUTT_DAMP, BUTT_GAIN, BUTT_MAX)
+    }
     // 腰の紐。**鎖の根から順に** (子は親を回した後の位置で測る)
     const bows: THREE.Bone[] = []
     this.root.traverse((o) => {
@@ -2803,6 +2854,42 @@ export class CharacterAnimator {
     }
     bows.sort((a, b) => depth(a) - depth(b))
     for (const bone of bows) add(bone, BOW_STIFF, BOW_DAMP, BOW_GAIN, BOW_MAX, BOW_DRAG)
+    // 髪の鎖。腰の紐と同じく根から順に (Hair_FL1 → FL2 …)
+    const hairs: THREE.Bone[] = []
+    this.root.traverse((o) => {
+      if (isBone(o) && /Hair_[A-Z]+\d+$/.test(o.name)) hairs.push(o)
+    })
+    const hairDepth = (b: THREE.Object3D) => Number(/(\d+)$/.exec(b.name)?.[1] ?? 0)
+    hairs.sort((a, b) => hairDepth(a) - hairDepth(b))
+    for (const bone of hairs) add(bone, HAIR_STIFF, HAIR_DAMP, HAIR_GAIN, HAIR_MAX, HAIR_DRAG)
+    /*
+     * **髪の根は頭に付いているが、頭について丸ごと回すと肩に垂れた髪が胸・首を突き抜ける**
+     * (2026-11-19 本人「これやばくない？」、首を 60° 回すと右肩の髪が胸を横切った)。素の姿勢 (束ね方の
+     * 逆行列) から胸に対する根の向きを控え、毎コマ頭について回る向きと胸に残る向きの間へ寄せる
+     */
+    const spine2 = findBoneBySuffix(this.root, 'Spine2')
+    let skeleton: THREE.Skeleton | null = null
+    this.root.traverse((o) => {
+      if (!skeleton && (o as THREE.SkinnedMesh).isSkinnedMesh) skeleton = (o as THREE.SkinnedMesh).skeleton
+    })
+    const sk = skeleton as THREE.Skeleton | null
+    if (spine2 && sk && hairs.length) {
+      const bindQ = (b: THREE.Bone) => {
+        const i = sk.bones.indexOf(b)
+        if (i < 0) return null
+        const m = sk.boneInverses[i]!.clone().invert()
+        const q = new THREE.Quaternion()
+        m.decompose(new THREE.Vector3(), q, new THREE.Vector3())
+        return q
+      }
+      const qs = bindQ(spine2)
+      for (const entry of this.sways) {
+        if (!/Hair_[A-Z]+1$/.test(entry.bone.name)) continue
+        const qh = bindQ(entry.bone)
+        if (qs && qh) entry.follow = qs.clone().invert().multiply(qh)
+      }
+      this.hairBody = spine2
+    }
     if (bows.length) {
       for (const side of ['Left', 'Right']) {
         const up = findBoneBySuffix(this.root, `${side}UpLeg`)
@@ -2946,19 +3033,28 @@ export class CharacterAnimator {
     const total = this.hangTotal.get(bone) ?? this.hangTotal.set(bone, new THREE.Vector2()).get(bone)!
     total.set((parent?.x ?? 0) + entry.angle.x, (parent?.y ?? 0) + entry.angle.y)
 
+    // 髪の根: 頭について回る向きと胸に残る向きの間へ (HAIR_STAY)
+    let rest = entry.rest
+    if (entry.follow && this.hairBody) {
+      entry.anchor.getWorldQuaternion(this.hairQa)
+      this.hairQb.copy(this.hairQa).multiply(entry.rest)
+      this.hairBody.getWorldQuaternion(this.hairRest).multiply(entry.follow)
+      this.hairQb.slerp(this.hairRest, this.hairStay)
+      rest = this.hairRest.copy(this.hairQa.invert()).multiply(this.hairQb)
+    }
     const angle = Math.hypot(entry.angle.x, entry.angle.y)
     if (angle < 1e-5) {
-      bone.quaternion.copy(entry.rest)
+      bone.quaternion.copy(rest)
     } else {
       // 倒す向きを親の空間へ。軸は「骨の向き × 倒す向き」— 回すと骨の先がその向きへ動く
       entry.anchor.getWorldQuaternion(this.swaySpin).invert()
       this.hangWant.set(entry.angle.x / angle, 0, entry.angle.y / angle).applyQuaternion(this.swaySpin)
       this.hangAxis.crossVectors(entry.fwd, this.hangWant)
       if (this.hangAxis.lengthSq() < 1e-8) {
-        bone.quaternion.copy(entry.rest)
+        bone.quaternion.copy(rest)
       } else {
         this.swayPitch.setFromAxisAngle(this.hangAxis.normalize(), angle)
-        bone.quaternion.copy(this.swayPitch).multiply(entry.rest)
+        bone.quaternion.copy(this.swayPitch).multiply(rest)
       }
     }
     bone.updateMatrixWorld(true)
@@ -3229,6 +3325,18 @@ export class CharacterAnimator {
 
     // 現在の腰の逆 × 本来の腰 = 打ち消すべき差分
     this.scratchRotation.copy(hips.quaternion).invert().multiply(this.referenceHips)
+    /*
+     * **走りながらの装填・コッキングは捻れだけ揃える。** 前への倒れは脚の型 (走り) のまま上体へ渡す。
+     * 装填の型は立って作った物で腰が起きているので、差分を丸ごと掛けると走りで前へ倒れた腰を打ち消して
+     * 上体だけ真っ直ぐに戻り、腰と胸の間で折れた (2026-11-19 本人「reload をしながら run してると…
+     * お腹らへんが変なふうに曲がってる」。胸の前傾 41° → 22°、腰は 16.6° のまま)
+     */
+    if (this.handlingGun && (RUN_STATES.has(this.locomotion) || CROUCH_MOVE_STATES.has(this.locomotion))) {
+      const up = this.twistAxisScratch.copy(this.hipsUp ?? this.resolveHipsUp()).applyQuaternion(this.neutralScratch.copy(hips.quaternion).invert())
+      this.neutralScratch.copy(this.scratchRotation)
+      keepTwist(this.scratchRotation, up)
+      this.scratchRotation.slerp(this.neutralScratch, RUN_STATES.has(this.locomotion) ? RUN_HANDLING_UPRIGHT : CROUCH_HANDLING_UPRIGHT)
+    }
     this.easeSpineFix(spine, this.scratchRotation, dt)
   }
 
@@ -3252,6 +3360,7 @@ export class CharacterAnimator {
     if (this.spineFixWeight < 1e-3) return
     spine.quaternion.premultiply(this.spineFixNow.identity().slerp(this.spineFixLast, this.spineFixWeight))
   }
+  private readonly twistAxisScratch = new THREE.Vector3()
   /** 背骨を揃える効き具合 (easeSpineFix)。0..1 */
   private spineFixWeight = 0
   /** 最後に測った差分 */
@@ -3590,7 +3699,19 @@ export class CharacterAnimator {
     length: number
     /** 前のコマで太ももに食い込んだ分 (先を外へ倒すべき量、世界の x / z、rad)。触れていなければ 0 */
     contact: THREE.Vector2
+    /**
+     * 髪の鎖の根の骨だけ: 胸 (Spine2) から見た素の姿勢の向き。頭が回っても**髪は肩に残す**ため、
+     * 頭について回る向きとこれの間へ寄せる (HAIR_STAY)
+     */
+    follow?: THREE.Quaternion
   }[] = []
+  /** 髪の根を胸に残す割合 (HAIR_STAY)。試写の ?hairstay= で触れる */
+  hairStay = HAIR_STAY
+  /** 髪の根を寄せる先 (胸の骨)。髪の鎖が無い体では null */
+  private hairBody: THREE.Object3D | null = null
+  private readonly hairQa = new THREE.Quaternion()
+  private readonly hairQb = new THREE.Quaternion()
+  private readonly hairRest = new THREE.Quaternion()
   /** 紐を押し出す太もも (付け根の骨・膝の骨)。紐が無い体では空 */
   private readonly hangLegs: [THREE.Object3D, THREE.Object3D][] = []
   /** 垂れた紐の骨ごとの、前フレームの付け根の位置と速度 (世界) */

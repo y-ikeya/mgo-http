@@ -706,7 +706,7 @@ for obj in list(bpy.context.scene.objects):
 
 # --- 空の見え方を焼く (任意) ---------------------------------------------------
 #
-#   $BLENDER -b tools/raw/stage_city.blend --python tools/export_stage.py -- --bake [試行回数]
+#   $BLENDER -b tools/raw/stage_mm.blend --python tools/export_stage.py -- --bake [試行回数]
 #
 # bake_stage.py を**読み込んだ複製に対して**掛ける。あちらは .blend に保存する作りだが、
 # 開いている .blend を書き換えない (本人が編集中) し、面を割った形を元に残さない。
@@ -2561,7 +2561,7 @@ for b in special:
 # 頂点に暗さを焼くと、暗さを細かくしたい所は平らな面でも頂点を割るしかなく、MM で glb を 1.6MB
 # 食っていた。表は面の近くだけ持って 1MB 弱。画面は表のあるステージだけ表で描く (world/skyGrid.ts)
 #
-#   $BLENDER -b tools/raw/stage_city.blend --python tools/export_stage.py -- --sky
+#   $BLENDER -b tools/raw/stage_mm.blend --python tools/export_stage.py -- --sky
 if '--sky' in _argv:
     if '--bake' in _argv:
         print('  --sky と --bake を両方付けた。頂点の暗さは表で上書きされる (表のあるステージは表で描く)')

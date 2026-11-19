@@ -243,15 +243,15 @@ const TSNE_ARMORY: Record<Side, Armory> = {
 
 export const ROOMS: Record<RoomName, RoomSpec> = {
   // 試合ごとに city と BB を交互に (2026-11-07 本人「BB も DM に対応できる？」)。UU は個人戦の湧きが 2 か所しかないので入れない
-  alpha: { mode: 'DM', stages: cycle('city', 'bb') },
+  alpha: { mode: 'DM', stages: cycle('mm', 'bb') },
   /*
    * charlie は**試合ごとに city と UU を交互に** (2026-10-22 本人)。部屋ができて最初の試合は city。
    * TSNE は 2 ラウンドで 1 試合なので、後攻が終わってから替わる。替わる時は画面が暗転して組み直す
    */
   // 試合ごとに city → UU → BB を回す (2026-11-05 本人「bravo は 3 種類のローテ」)。BB を足す前は city と UU の交互
-  bravo: { mode: 'TDM', stages: cycle('city', 'uu', 'bb') },
+  bravo: { mode: 'TDM', stages: cycle('mm', 'uu', 'bb') },
   // BB も回す (2026-11-05 本人「Charlie に BB も入れられる」、ターゲットは地下 1F の 2 か所)
-  charlie: { mode: 'TSNE', stages: cycle('city', 'uu', 'bb'), armory: TSNE_ARMORY, lives: 0 },
+  charlie: { mode: 'TSNE', stages: cycle('mm', 'uu', 'bb'), armory: TSNE_ARMORY, lives: 0 },
   delta: {
     mode: 'TDM',
     // 砂部屋は UU (2026-10-22 本人)。筏 (raft) は練習で作ったもので、いまはどの部屋でも使わない
