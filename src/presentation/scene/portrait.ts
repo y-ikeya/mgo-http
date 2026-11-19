@@ -139,6 +139,40 @@ export class Portrait {
       const canvas = this.renderer.domElement
       const backend = (this.renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
       this.mark(`60 コマ描いた (${canvas.width}x${canvas.height}, ${backend?.isWebGPUBackend ? 'WebGPU' : 'WebGL'})`)
+      void this.probe()
+    }
+  }
+
+  /**
+   * 描いた物を読み戻して数える (診断用の一時物)。
+   *
+   * 「60 コマ描いた」と言っても、GPU が本当に兵士を描いたのか、描いたのに
+   * 画面 (canvas) へ出ていないだけかは区別できない。小さい描き先へ同じ場面を
+   * 描いて画素を読み戻せば、色の付いた画素が有るかで切り分けられる:
+   * 読み戻しに居れば「描画はできていて、画面への出方」の問題、
+   * 居なければ「場面の描画そのもの」の問題。
+   */
+  private async probe(): Promise<void> {
+    const w = 96
+    const h = Math.max(1, Math.round((w * this.host.clientHeight) / Math.max(1, this.host.clientWidth)))
+    const target = new THREE.WebGLRenderTarget(w, h)
+    try {
+      this.renderer.setRenderTarget(target)
+      this.renderer.render(this.scene, this.camera)
+      this.renderer.setRenderTarget(null)
+      const pixels = await this.renderer.readRenderTargetPixelsAsync(target, 0, 0, w, h)
+      let coloured = 0
+      let max = 0
+      for (let i = 0; i < pixels.length; i += 4) {
+        const v = Math.max(pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3])
+        if (v > max) max = v
+        if (v > 8) coloured++
+      }
+      this.mark(`読み戻し ${w}x${h}: 色のある画素 ${coloured} / ${w * h} (最大 ${max})`)
+    } catch (error) {
+      this.mark(`読み戻し失敗: ${error}`)
+    } finally {
+      target.dispose()
     }
   }
 
