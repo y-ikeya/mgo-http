@@ -44,9 +44,11 @@ import {
 import { LAG_WINDOW_MS } from '../src/domain/rule/lag'
 import { exposeSeconds, sleepScale, stunChargeSeconds } from '../src/domain/player/skill'
 import { alertHit } from './alert'
+import { noteWork } from './slow'
 import { drainStamina, isAsleep, wakeFloor } from '../src/domain/player/stamina'
 import {
   CQC_FACING_COS,
+  CQC_DOWN_SECONDS,
   CQC_LAND_SECONDS,
   CQC_PAIR_DISTANCE,
   CQC_REACH,
@@ -688,8 +690,11 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
   session.cqcThrow = {
     victim,
     timer: setTimeout(() => {
+      const workAt = performance.now()
       session.cqcThrow = null
       cqcLanded(room, attacker, victim)
+      // 刻みの外で走る。遅れた時の内訳に入れる (slow.ts)
+      noteWork('CQC の着地', performance.now() - workAt)
     }, CQC_LAND_SECONDS * 1000),
   }
 
@@ -703,8 +708,9 @@ export function applyCqc(room: RoomWorld, attacker: MatchPlayer, target: string)
     victim.z = attacker.z - Math.cos(yaw) * CQC_PAIR_DISTANCE
     victim.yaw = yaw + Math.PI
     victim.knockLeft = 0
-    // 倒れる型 (2.9 秒) を流し切ってから少し寝て、起き上がる
-    victim.downLeft = TARGET_STAND + 3.5
+    // 人が動けるようになる時刻 (CQC_DOWN_SECONDS) ですぐ起き上がり始める。行動不能の長さを的で見られる
+    // (2026-11-20 本人「倒されたらなるべく早く…立ち上がるようにして、そこで試す」)
+    victim.downLeft = TARGET_STAND + CQC_DOWN_SECONDS
     victim.downThrown = true
     victim.downRolled = false
     victim.downShotgun = false

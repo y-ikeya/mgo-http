@@ -5,6 +5,7 @@ import { FIXED_STEP, stepProjectile, throwVelocity, type Projectile } from '../.
 import type { Water } from '../../../domain/stage'
 import type { SolidWorld } from '../../../sim/space/vision'
 import { THROW_LOFT } from '../../../domain/item/grenade'
+import { TOWARD_CAMERA } from '../util/depth'
 
 /**
  * 手榴弾。
@@ -42,6 +43,42 @@ const PREVIEW_STEPS = 90
 /** 線の頭を手から本当の軌道へ寄せる点の数。短いと折れて見え、長いと落ちる所まで嘘になる */
 const PREVIEW_HAND_BLEND = 12
 
+const UP = new THREE.Vector3(0, 1, 0)
+
+/** 落下点の地面の光の半径 (m) */
+const GLOW_RADIUS = 0.7
+/** 光の脈打ちの速さ (回/秒) と、明るさの振れ幅 */
+const GLOW_PULSE_HZ = 1.6
+const GLOW_PULSE = 0.3
+
+/**
+ * 地面の光の絵。中心が明るく、縁へ向けて消える丸。**一度だけ作って使い回す**
+ */
+function glowTexture(): THREE.Texture {
+  const size = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const g = canvas.getContext('2d')!
+  const r = size / 2
+  const fill = g.createRadialGradient(r, r, 0, r, r, r)
+  fill.addColorStop(0, 'rgba(255,255,255,1)')
+  fill.addColorStop(0.18, 'rgba(255,255,255,0.85)')
+  fill.addColorStop(0.55, 'rgba(255,255,255,0.3)')
+  fill.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = fill
+  g.fillRect(0, 0, size, size)
+  // 縁に細い輪。広がりの境が読める
+  g.strokeStyle = 'rgba(255,255,255,0.55)'
+  g.lineWidth = 3
+  g.beginPath()
+  g.arc(r, r, r * 0.86, 0, Math.PI * 2)
+  g.stroke()
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
 export interface Bounce {
   position: THREE.Vector3
   /** 当たりの強さ (0..1)。垂直に叩きつけるほど大きい */
@@ -66,6 +103,9 @@ export class Grenades {
 
   private readonly preview: THREE.Line
   private readonly marker: THREE.Mesh
+  /** 落下点に置く光。当たった面 (床・壁) に貼る (2026-11-20 本人「爆発地点の地面が光って表示することできる？」「壁に当たるんだったら circle は壁に垂直に」) */
+  private readonly glow: THREE.Mesh
+  private readonly glowNormal = new THREE.Vector3()
   private readonly previewPoints: Float32Array
   private readonly bounce: Bounce = { position: new THREE.Vector3(), strength: 0 }
   private readonly launch = { x: 0, y: 0, z: 0 }
@@ -104,6 +144,30 @@ export class Grenades {
     )
     this.marker.visible = false
     scene.add(this.marker)
+
+    /*
+     * 落下点の地面の光。**足し合わせ (加算) で描く** — 暗い屋内でも明るい屋外でも、地面の上に
+     * 光が乗って見える。深さには書かず、地面へ少し手前寄せして沈まないようにする (util/depth.ts)。
+     * 露出 (トーンマップ) に左右させない。狙いの印なので明るさで読めなくなっては困る
+     */
+    this.glow = new THREE.Mesh(
+      new THREE.CircleGeometry(GLOW_RADIUS, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        map: glowTexture(),
+        color: 0xffa040,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+        polygonOffset: true,
+        polygonOffsetFactor: TOWARD_CAMERA * 2,
+        polygonOffsetUnits: TOWARD_CAMERA * 2,
+      }),
+    )
+    this.glow.visible = false
+    this.glow.frustumCulled = false
+    scene.add(this.glow)
 
     void loadGrenade().then((gltf) => {
       this.model = gltf.scene
@@ -249,6 +313,7 @@ export class Grenades {
     p.bounces = 0
     p.resting = false
     p.sunk = false
+    p.normal = undefined
 
     let count = 0
     for (let i = 0; i < PREVIEW_STEPS; i++) {
@@ -283,11 +348,20 @@ export class Grenades {
     this.preview.visible = true
     this.marker.position.set(p.x, p.y, p.z)
     this.marker.visible = true
+    // 光は当たった面に貼る。床なら水平、壁なら壁に沿って立てる (円の表は面の外向き)
+    const n = p.normal ?? { x: 0, y: 1, z: 0 }
+    this.glowNormal.set(n.x, n.y, n.z)
+    this.glow.quaternion.setFromUnitVectors(UP, this.glowNormal)
+    this.glow.position.set(p.x + n.x * 0.02, p.y + n.y * 0.02, p.z + n.z * 0.02)
+    const pulse = 1 - GLOW_PULSE * 0.5 * (1 + Math.sin((performance.now() / 1000) * Math.PI * 2 * GLOW_PULSE_HZ))
+    ;(this.glow.material as THREE.MeshBasicMaterial).opacity = 0.9 * pulse
+    this.glow.visible = true
   }
 
   hidePreview(): void {
     this.preview.visible = false
     this.marker.visible = false
+    this.glow.visible = false
   }
 
   /** 試合が切り替わったら全部消す。前の試合の手榴弾が残っていると混乱する */
@@ -304,6 +378,10 @@ export class Grenades {
     this.marker.removeFromParent()
     this.marker.geometry.dispose()
     ;(this.marker.material as THREE.Material).dispose()
+    this.glow.removeFromParent()
+    this.glow.geometry.dispose()
+    ;(this.glow.material as THREE.MeshBasicMaterial).map?.dispose()
+    ;(this.glow.material as THREE.Material).dispose()
   }
 }
 

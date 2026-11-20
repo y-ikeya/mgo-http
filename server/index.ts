@@ -87,7 +87,7 @@ import { sensedBy } from '../src/sim/judge/claymore'
 import { SENSE_HEIGHT, SENSOR_HEIGHT, TRIGGER_COS, TRIGGER_RANGE } from '../src/domain/item/claymore'
 import { flush } from './stats'
 import { loadSkills, saveSkills } from './skills'
-import { noteTickStart, reportSlow, SLOW_MESSAGE_MS, SLOW_TICK_MS } from './slow'
+import { noteTickStart, noteWork, reportSlow, SLOW_MESSAGE_MS, SLOW_TICK_MS } from './slow'
 import { dropTsneTarget } from './target'
 import { costOf, patSeconds } from '../src/domain/player/skill'
 import { FIXED_STEP, stepProjectile } from '../src/sim/judge/ballistic'
@@ -429,6 +429,8 @@ setInterval(() => {
    * 詰まっているのに平均が下がる。
    */
   const cost = performance.now() - startedAt
+  // 刻みそのものも内訳に入れる。CPU の使用量との差が「測っていない所」になる (slow.ts)
+  noteWork('刻み', cost)
   if (cost >= SLOW_TICK_MS) {
     reportSlow('tick', () => `[刻み重い] ${cost.toFixed(1)}ms 内訳 ${roomCosts.join(' / ') || '-'} heap ${heapMb()}MB`)
   }
@@ -1056,7 +1058,10 @@ const lastVoiceAt = new Map<string, number>()
 const server = Bun.serve<Client>({
   port: PORT,
 
-  async fetch(request, server) {
+  fetch(request, server) {
+    // 同期で走った分だけ測る (待っている間は CPU を使わない)。刻みが遅れた時の内訳 (slow.ts の noteWork)
+    const workAt = performance.now()
+    const out = (async () => {
     const url = new URL(request.url)
 
     // ブラウザは別のポート (Vite) から一覧を取りに来る
@@ -1238,10 +1243,15 @@ const server = Bun.serve<Client>({
       },
     })
     return upgraded ? undefined : new Response('WebSocket でつないでほしい', { status: 426 })
+    })()
+    noteWork(`HTTP ${new URL(request.url).pathname}`, performance.now() - workAt)
+    return out
   },
 
   websocket: {
     open(socket) {
+      const workAt = performance.now()
+      ;(() => {
       // 認証の切れた接続。席は作らず、符号を付けて閉じる (fetch の註釈)
       if (socket.data.reject === 'auth') {
         socket.close(AUTH_CLOSE_CODE, '認証の期限切れ')
@@ -1371,6 +1381,8 @@ const server = Bun.serve<Client>({
           } satisfies ServerMessage),
         )
       }
+      })()
+      noteWork('接続 open', performance.now() - workAt)
     },
 
     message(socket, raw) {
@@ -1378,6 +1390,9 @@ const server = Bun.serve<Client>({
       try {
         handleMessage(socket, raw)
         const cost = performance.now() - startedAt
+        // 種類ごとに足しておく (刻みが遅れた時の内訳、slow.ts の noteWork)。JSON は頭の type だけ拾う
+        // 誰から来たかも付ける (1 人が大量に送ってきたのかを見分ける)
+        noteWork(`${typeof raw === 'string' ? `通信 ${/"type":"(\w+)"/.exec(raw.slice(0, 40))?.[1] ?? '?'}` : '通信 位置'} ${socket.data.name}`, cost)
         if (cost >= SLOW_MESSAGE_MS) {
           reportSlow('message', () => {
             const room = rooms.get(socket.data.roomKey)
@@ -1392,6 +1407,8 @@ const server = Bun.serve<Client>({
     },
 
     close(socket) {
+      const workAt = performance.now()
+      ;(() => {
       const room = rooms.get(socket.data.roomKey)
       const player = room?.players.get(socket.data.id)
       if (!room || !player) return
@@ -1413,6 +1430,8 @@ const server = Bun.serve<Client>({
       // 戻る**。戦場に居ない扱いになって、一度も描かれない。
       //
       // 配るのは席を畳むとき (猶予切れ / 自分から出たとき) だけ。
+      })()
+      noteWork('接続 close', performance.now() - workAt)
     },
   },
 })

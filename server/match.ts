@@ -30,6 +30,7 @@ import { canChoose, isAwaitingReturn, isDowned, isSeated } from '../src/domain/p
 import { type MatchPlayer, type Team, lifeElapsed, refill, reviveBot } from '../src/domain/player/player'
 import { MAX_HEALTH, knockSpeed } from '../src/domain/rule/damage'
 import { MAX_STAMINA, isAsleep } from '../src/domain/player/stamina'
+import { PRONE_SPEED_SCALE } from '../src/domain/player/stance'
 import { encodeSnapshot } from '../src/infra/codec/snapshot'
 import type { ServerMessage } from '../src/application/protocol/types'
 import { clearClaymores } from './arms/claymore'
@@ -160,6 +161,12 @@ export function updateTargets(room: RoomWorld, now: number): void {
       bot.knockLeft = Math.max(0, bot.knockLeft - TICK_SECONDS)
     }
     if (bot.downLeft > 0) bot.downLeft = Math.max(0, bot.downLeft - TICK_SECONDS)
+    // 走り続ける的は、投げられて動けるようになったら起き上がらずに這い出す (crawlStage)
+    if (bot.downThrown && bot.patrolTo && bot.downLeft > 0 && bot.downLeft <= TARGET_STAND && !isDowned(bot.life)) {
+      bot.downLeft = 0
+      bot.downThrown = false
+      botCrawlSince.set(bot, now)
+    }
 
     /*
      * 眠りから醒める。**的も自分では起きられない。**
@@ -195,6 +202,8 @@ export function updateTargets(room: RoomWorld, now: number): void {
     bot.locomotionAge = (now - (botPoseSince.get(bot) ?? now)) / 1000
     // 箱を被った的は、座っている間だけ箱の中 (倒されたら箱が落ち、起き上がったらまた被る)
     bot.boxed = bot.homeStance === 'box' && next === 'sit'
+    // 敬礼の的は手を挙げたまま。審判 (link.ts の holdingSalute) も同じ値を見る — 配る姿にだけ載せていて、的と繋がらなかった
+    bot.saluteHeld = next === 'salute'
     recordPose(bot)
     relayState(room, bot, targetPayload(bot, now))
   }
@@ -255,6 +264,8 @@ export function targetLocomotion(bot: MatchPlayer, now: number): Locomotion {
   if (trap) return trap
   if (bot.downLeft > TARGET_STAND) return bot.downThrown ? 'cqc_thrown' : bot.downRolled ? 'hit2back' : bot.downShotgun ? 'shotgun_sweep' : 'sweep'
   if (bot.downLeft > 0) return 'stand'
+  const crawl = crawlStage(bot, now)
+  if (crawl) return crawl
   if (patrolling(bot, now)) return 'run_f'
   // 左右へ lean し続ける的。LEAN_SWAP_MS ごとに入れ替える (体の出し入れは型が受け持つ)
   if (bot.homeStance === 'lean') return Math.floor(now / LEAN_SWAP_MS) % 2 === 0 ? 'lean_left' : 'lean_right'
@@ -300,8 +311,11 @@ const PATROL_SPEED = 2.74
 
 /** 的が走っている最中か。倒れている・眠っている・転んでいる・投げられている間は走らない */
 function patrolling(bot: MatchPlayer, now: number): boolean {
+  const crawl = crawlStage(bot, now)
   return (
     bot.patrolTo !== null &&
+    // 寝返り・起き上がりの間は止まる。這っている間は進む
+    (crawl === null || crawl === 'crawl_f') &&
     !isDowned(bot.life) &&
     !isAsleep(bot.sleepUntil, now) &&
     bot.downLeft <= 0 &&
@@ -325,7 +339,7 @@ function patrol(bot: MatchPlayer, now: number): void {
   const dx = goal.x - bot.x
   const dz = goal.z - bot.z
   const left = Math.hypot(dx, dz)
-  const step = PATROL_SPEED * TICK_SECONDS
+  const step = PATROL_SPEED * (crawlStage(bot, now) === 'crawl_f' ? PRONE_SPEED_SCALE : 1) * TICK_SECONDS
   if (left <= step) {
     bot.x = goal.x
     bot.z = goal.z
@@ -337,6 +351,47 @@ function patrol(bot: MatchPlayer, now: number): void {
   // 向き 0 で -Z を向く (domain/player/stance.ts の leanShift と同じ取り方)
   bot.yaw = Math.atan2(-dx, -dz)
 }
+
+/**
+ * 走り続ける的が CQC で投げられた後、**起き上がらずに這い出す** (2026-11-20 本人「起き上がるんじゃなくて
+ * prone で這うようにして、training でずっと動いている bot は」)。人が投げられた後に取る動きの練習台。
+ *
+ * 動けるようになった時刻 (CQC_DOWN_SECONDS) から、寝返り (仰向け → うつ伏せ) → 這う → 起き上がる (しゃがみまで)
+ * → また走る。尺は型に合わせてある (soldier.glb の prone_roll_down 0.5 秒・prone_rise 1.83 秒)
+ */
+const CRAWL_ROLL_SECONDS = 0.5
+/** 這う長さ (秒)。人の伏せの速さ (PRONE_SPEED_SCALE) で進むので、0.77m/s × これ */
+const CRAWL_SECONDS = 5
+const CRAWL_RISE_SECONDS = 1.83
+
+/** 這い出し始めた時刻 (ms)。無ければ這っていない */
+const botCrawlSince = new WeakMap<MatchPlayer, number>()
+
+/** 這い出しのどの段か。終わった・倒された・眠った・また転んだ なら null (控えも消す) */
+function crawlStage(bot: MatchPlayer, now: number): 'prone_roll_down' | 'crawl_f' | 'prone_rise' | null {
+  const since = botCrawlSince.get(bot)
+  if (since === undefined) return null
+  const t = (now - since) / 1000
+  const interrupted = isDowned(bot.life) || isAsleep(bot.sleepUntil, now) || bot.downLeft > 0 || bot.knockLeft > 0
+  if (interrupted || t >= CRAWL_ROLL_SECONDS + CRAWL_SECONDS + CRAWL_RISE_SECONDS) {
+    botCrawlSince.delete(bot)
+    botCrawlTurned.delete(bot)
+    return null
+  }
+  if (t < CRAWL_ROLL_SECONDS) {
+    // 寝返りの型は頭と足を入れ替える。人と同じく、前半 (PRONE_TURN_BLEND 0.25 秒) で向きを半周回して打ち消す
+    // (soldier.ts の crawlFromDown)。回り切った向きは投げた人と同じ向き
+    if (!botCrawlTurned.has(bot)) botCrawlTurned.set(bot, bot.yaw)
+    const from = botCrawlTurned.get(bot)!
+    bot.yaw = from + Math.PI * Math.min(1, t / 0.25)
+    return 'prone_roll_down'
+  }
+  botCrawlTurned.delete(bot)
+  return t < CRAWL_ROLL_SECONDS + CRAWL_SECONDS ? 'crawl_f' : 'prone_rise'
+}
+
+/** 寝返りを始めた時の向き */
+const botCrawlTurned = new WeakMap<MatchPlayer, number>()
 
 /** 的の姿が変わった時刻 (ms)。型の経過 (locomotionAge) を出すのに使う */
 const botPoseSince = new WeakMap<MatchPlayer, number>()
@@ -383,7 +438,7 @@ export function targetPayload(bot: MatchPlayer, now: number): Uint8Array {
         held: bot.boxed ? 'box' : bot.weapon,
         concentrating: false,
         // 敬礼の的は手を挙げたまま。下ろすと型の終わりで手が下りる
-        saluteHeld: bot.locomotion === 'salute',
+        saluteHeld: bot.saluteHeld,
       },
       bot.slot,
     ),

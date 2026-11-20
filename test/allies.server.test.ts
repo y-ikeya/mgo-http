@@ -50,3 +50,26 @@ test('**青の味方が 3 人立ち、1 人は敬礼したまま。** 撃って�
   expect(me.messages.some((m) => m.type === 'health' && m.id === enemy.id && m.damage > 0)).toBe(true)
   me.close()
 }, 30000)
+
+test('**敬礼している味方の的と、寄って敬礼すれば繋がる** (2026-11-20 本人「ally13 と link できなくなってる」)', async () => {
+  const me = new Client(server, 'ally-link', [-10, 0.1, 0], 'foxtrot')
+  await me.ready()
+  me.live()
+  await spawnAlive(me)
+  let salutingId = ''
+  await waitFor(() => {
+    const r = me.last.get('roster') as Extract<ServerMessage, { type: 'roster' }> | undefined
+    const found = r?.players.find((p) => p.name.startsWith('ALLY') && me.poses.get(p.slot!)?.locomotion === 'salute')
+    salutingId = found?.id ?? ''
+    return !!found
+  }, '敬礼している味方の的')
+  // 敬礼している的 (-13, -7) の 2m 脇で敬礼する
+  me.moveTo(-11, 0.1, -7)
+  await Bun.sleep(200)
+  me.pose = 'salute'
+  await waitFor(() => {
+    const links = me.last.get('links') as Extract<ServerMessage, { type: 'links' }> | undefined
+    return links?.ids.includes(salutingId) ?? false
+  }, '的と繋がる', 5000)
+  me.close()
+}, 30000)

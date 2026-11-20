@@ -22,7 +22,7 @@ import type { Locomotion } from "../../../domain/player/locomotion";
 import { canBeStabbed } from "../../../domain/rule/damage";
 import { CQC_FACING_COS, CQC_REACH, canBeThrown } from "../../../domain/player/cqc";
 import { loadSoldier } from "../assets";
-import { DEFAULT_SKIN, INNER_PART, innerOpacity, skinFor } from "./skin";
+import { DEFAULT_SKIN, INNER_PART, innerOpacity, setBodyOpacity, skinFor } from "./skin";
 import { leanOf, stanceAt, stanceOf, type Lean, type Stance } from "../../../domain/player/stance";
 import { isDeath, isWholeBody, type WholeBodyLocomotion } from "./motion";
 import { CLIMB_TOP_TUNING, LANDING_RATE, STEALTH_FADE_IN, STEALTH_FADE_OUT } from "./soldier";
@@ -380,7 +380,7 @@ export class RemoteSoldier {
         material.transparent = transparent
         material.needsUpdate = true
       }
-      material.opacity = this.innerMaterials.has(material) ? innerOpacity(opacity) : opacity
+      setBodyOpacity(material, this.innerMaterials.has(material) ? innerOpacity(opacity) : opacity)
     }
     /*
      * 消え切ったら画面には描かない (透明でも描くと重なりの順で縁が残る)。**影は落とし続ける** —
@@ -1013,7 +1013,22 @@ export class RemoteSoldier {
    */
   setLife(state: Life): boolean {
     if (this.life === state) return false;
+    const wasOnField = onBattlefield(this.life);
+    const wasDead = this.serverDead;
     this.life = state;
+    /*
+     * **戦場を出入りした・倒れた所から戻った時は、溜めた位置を捨てて、次の位置が届くまで出さない。**
+     *
+     * 他人の体は少し過去を補間して描くので、倒れた場所の古い位置が残っていると、湧いた直後に
+     * 倒れた場所から湧き地点 (基地) まで線を引くように描かれた (2026-11-20 本人「death して数秒後に
+     * respawn する間に base に瞬間移動する絵がある」)。的は戦場を出ずに倒れた所から並び直すので、
+     * 生き返った時も同じにする
+     */
+    const revived = wasDead && state !== "downed";
+    if (wasOnField !== onBattlefield(state) || revived) {
+      this.buffer.length = 0;
+      this.presence.waitForNext();
+    }
 
     const dead = state === "downed";
     if (dead !== this.serverDead) {

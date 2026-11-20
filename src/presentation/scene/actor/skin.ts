@@ -33,6 +33,31 @@ export function innerOpacity(body: number): number {
   return body * body * body
 }
 
+/** 濃さを変える材質の、ここで触る所だけ (three を読まずに済ませる) */
+interface FadingMaterial {
+  opacity: number
+  alphaTest: number
+  userData: Record<string, unknown>
+}
+
+/**
+ * 体の材質の濃さを替える。**くり抜きの材質 (髪・眉。glTF の MASK) は、くり抜きの境も同じ割合で下げる。**
+ *
+ * くり抜きは「絵の透け × 濃さ」を境と比べるので、濃さだけ下げると境を割った所から毛が丸ごと抜けた。
+ * カメラが寄って体が少し薄くなっただけで坊主に見えた (2026-11-20 本人「freya が坊主に表示されるのが早い」)。
+ * 境も下げれば、抜ける形は変わらずに全体が薄くなる
+ */
+export function setBodyOpacity(material: FadingMaterial, opacity: number): void {
+  material.opacity = opacity
+  if (typeof material.userData.baseAlphaTest !== 'number') {
+    if (material.alphaTest <= 0) return
+    material.userData.baseAlphaTest = material.alphaTest
+  }
+  const cutoff = material.userData.baseAlphaTest as number
+  // 0 にすると、くり抜きの無い材質として組み直されるので、小さく残す
+  material.alphaTest = Math.max(0.001, cutoff * opacity)
+}
+
 /** 既定のモデル。public/models/<名前>.glb */
 export const DEFAULT_SKIN = 'soldier'
 
@@ -61,6 +86,9 @@ const SKINS: Record<string, string> = {
    * 肌 (Body) も同じ所で、影の境目へ赤く回り込む材質に替える (Blender の肌の下で散る光の代わり)。
    * **眉はくり抜きの境を 0.2 にしてある** (glb の Eyebrows の alphaCutoff。書き出しは 0.5)。眉は薄く透けた
    * 毛の絵で、0.5 では毛のほとんどが抜けて眉が薄く見えた (2026-11-19 本人)。作り直したら glb を直す。
+   * 銃ごとのしゃがみ止まり (smg / sniper / pistol_crouch_relaxed) は、weapon_poses.blend で脚を伸ばして名無しの
+   * 足が床に届くようにした構え (2026-11-20 本人「idle の時に足が接地してない」)。体つきの差で、Freya は 2.2cm 浮く
+   * (頭 0.93m)。書き出しは tools/skins/freya/build.sh。
    *
    * 背丈は Armature の scale を宿主と揃えて合わせてある (tools/fit_height.js)。
    * **見た目の理由だけではない** — HEAD_HEIGHT = 1.47 は 1 体を実測した値なので、

@@ -121,8 +121,10 @@ const STEP_LAMBDA = 6
  * 段差 (最大 0.25m) より大きく、跳躍 (0.6m) より小さい所に置く。
  */
 const STEP_SNAP = 0.45
-/** カメラが地面に潜らないための下限 (m) */
+/** カメラが地面に潜らないための下限 (足元の床から、m) */
 const MIN_CAMERA_Y = 0.4
+/** 引く線がこの高さ (足元から、m) より下で当たったら、足元の床に当たったとみなす (resolveDistance) */
+const FLOOR_HIT = 0.15
 
 /**
  * 壁からどれだけ手前に置くか (m)。
@@ -240,8 +242,11 @@ const TIGHT_DISTANCE = 0.15
 /** 主観へ寄る・戻る速さ (1/秒)。構えの出入りと同じ */
 const TIGHT_LAMBDA = AIM_LAMBDA
 
-/** カメラがこれより体に寄ったら、体を薄くし始める距離 (m) */
-const CROWD_NEAR = 1.4
+/**
+ * カメラがこれより体に寄ったら、体を薄くし始める距離 (m)。1.4 では早すぎた
+ * (2026-11-20 本人「もう少し全表示する距離を長くして」)
+ */
+const CROWD_NEAR = 1.1
 /** 薄さの追従の速さ (1/s)。壁際で明滅させない */
 const CROWD_LAMBDA = 10
 
@@ -745,12 +750,15 @@ export class FollowCamera {
     // 途中に壁があればそこまでしか引かない。
     this.back.copy(this.viewDir).negate()
     // 梯子の上では寄りも均す。輪の桟で寄り引きを繰り返さないため
-    this.occludedDistance = this.resolveDistance(world, dt, player.onLadder)
+    this.occludedDistance = this.resolveDistance(world, dt, player.onLadder, footY)
     const pulled = Math.max(0, Math.min(1, (CROWD_NEAR - this.occludedDistance) / (CROWD_NEAR - MIN_OCCLUDED_DISTANCE)))
     const crowdTarget = Math.max(this.sideCollapse, pulled)
     this.crowd = dt > 0 ? damp(this.crowd, crowdTarget, CROWD_LAMBDA, dt) : crowdTarget
     this.desired.copy(this.pivot).addScaledVector(this.back, this.occludedDistance)
-    if (this.desired.y < this.minY) this.desired.y = this.minY
+    // 床の上に置く。足元の床 (上の階でも) から MIN_CAMERA_Y。足元の床に当たった線は寄せない (resolveDistance) ので、
+    // 見上げた時はここで持ち上がる
+    const floorY = Math.max(this.minY, footY + MIN_CAMERA_Y)
+    if (this.desired.y < floorY) this.desired.y = floorY
     /*
      * 線の脇の壁から離す。near 平面の四隅が壁に入ると画面の端から裏が見える。
      *
@@ -792,6 +800,8 @@ export class FollowCamera {
     dt: number,
     /** 梯子を登っている最中か。**囲まれているので寄りも均す** */
     onLadder: boolean,
+    /** 足元の高さ (均した値)。足元の床に当たった線を寄りに数えないため */
+    footY: number,
   ): number {
     if (!world) return this.distance
 
@@ -819,6 +829,17 @@ export class FollowCamera {
      * (2026-11-03 本人「UU にてカメラが壁の中に入る時が多々ある」)。壁が近いときは壁の手前
      * (球の半径ぶん) まで詰める — 頭の中に入る近さでも、体は寄りで薄くなる (crowd)
      */
+    /*
+     * **足元の床に当たった線は寄せない。** しゃがんで見上げると、後ろへ引く線が足元の床へ刺さって
+     * カメラが体へ寄り、体が薄くなった (crowd) — 構えているだけで後頭部が透けた (2026-11-20 本人
+     * 「chrouch してるときの aim でも体透けるの？それは雑魚すぎる」)。床より下へは置かず、
+     * computeDesired が床の上 (footY + MIN_CAMERA_Y) へ持ち上げる。床の高さ (足元 + FLOOR_HIT) を
+     * 越えて当たった物 (壁・箱) だけを寄りに数える
+     */
+    if (this.back.y < -0.05 && blocked < this.distance) {
+      const hitY = this.pivot.y + this.back.y * blocked
+      if (hitY <= footY + FLOOR_HIT) blocked = this.distance
+    }
     const safe = blocked - OCCLUSION_PADDING
     const target =
       blocked >= this.distance

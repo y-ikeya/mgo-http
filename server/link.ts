@@ -6,18 +6,19 @@
  * 知らせた時の 1 通**で画面に出る。繋がった・切れた瞬間に、その差分をここで送り直す
  * (繋がる前に抜いていた光も、繋がった時点から仲間の画面に出る。切れたら消える)
  */
-import { connected } from '../src/domain/match/match'
+import { present } from '../src/domain/match/match'
 import { isHostile } from '../src/domain/match/room'
 import { canLink } from '../src/domain/player/link'
 import { leakReaches, type MatchPlayer } from '../src/domain/player/player'
 import type { ServerMessage } from '../src/application/protocol/types'
-import { sessionFor, sessionOf } from './session'
+import { sessionFor } from './session'
 import type { RoomWorld } from './world'
 
 /** 手を挙げている味方どうしを結ぶ。毎刻み。陣営の無い部屋には味方が居ない */
 export function updateLinks(room: RoomWorld, now: number): void {
   if (!room.mode.teams) return
-  const here = connected(room).filter((p) => !p.bot)
+  // 的も入れる (練習の敬礼している味方の的と繋がる)。的へは何も送らない (sendLinks は席の無い者を飛ばす)
+  const here = present(room)
   for (let i = 0; i < here.length; i++) {
     for (let j = i + 1; j < here.length; j++) {
       const a = here[i]!
@@ -89,9 +90,10 @@ function refreshExposure(room: RoomWorld, viewer: MatchPlayer, before: Map<strin
  * 位置ごと写す (aware.ts の revealTo が控えている)。消えるのは元と同じ時刻
  */
 function shareFog(from: MatchPlayer, to: MatchPlayer, now: number): void {
-  const source = sessionOf(from)
+  // 的は霧を持たない (接続が無い)
+  const source = sessionFor(from)
   const target = sessionFor(to)
-  if (!target) return
+  if (!source || !target) return
   for (const [key, until] of source.revealed) {
     const at = source.revealedAt.get(key)
     if (until <= now || !at || key === `player:${to.id}`) continue
