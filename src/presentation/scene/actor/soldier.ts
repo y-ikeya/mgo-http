@@ -4696,15 +4696,19 @@ export class Soldier {
     root.traverse((obj) => {
       if (!isMesh(obj)) return
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-      // 元から半透明だった物 (髪のような重なる板) は実体を全部描いたあとに回す
-      const wasTransparent = materials.some((material) => material.transparent)
       /*
-       * **くり抜きの板 (glTF の MASK、alphaTest) も後に回す。** 半透明ではないので前は実体と同じ順で、
-       * Freya の髪が頭より先に描かれた回は、髪の濃い所が深度を書いて裏の後頭部と背中が落ち、
-       * 薄く混ぜた髪越しに背景が見えた (2026-11-19 本人「髪が透けてその向こう側の背景が見えちゃってる」)
+       * **実体の上に重なるだけの物を、実体を全部描いたあとに回す。** 髪のような重なった板が
+       * 実体より先に出ると、髪の濃い所が深度を書いて裏の後頭部と背中が落ち、薄く混ぜた髪越しに
+       * 背景が見える (2026-11-19 本人「髪が透けてその向こう側の背景が見えちゃってる」)。
+       *
+       * 判定は「材質の**全部**が半透明かくり抜き (glTF の MASK、alphaTest)」。「1 つでもあれば後」
+       * だと Freya では効かなかった — 体が 1 つのメッシュに実体と一緒にまつ毛・眉・帽子のロゴ
+       * (どれもくり抜き) を同居させていて、体まで髪と同格になり、順番が距離の並べ替え任せに
+       * 戻っていた (2026-11-21 本人、自分のキャラを後ろから見て透ける)。まつ毛や眉は顔に
+       * 貼り付いた物なので、体と一緒の順で問題ない。
        */
-      const cutout = materials.some((material) => material.alphaTest > 0)
-      obj.renderOrder = SELF_RENDER_ORDER + (wasTransparent || cutout ? 1 : 0)
+      const overlay = materials.every((material) => material.transparent || material.alphaTest > 0)
+      obj.renderOrder = SELF_RENDER_ORDER + (overlay ? 1 : 0)
       const replaced = materials.map((material) => {
         let copy = cloned.get(material)
         if (!copy) {
