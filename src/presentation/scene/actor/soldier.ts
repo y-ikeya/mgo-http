@@ -1,5 +1,5 @@
 import { carrySpeedScale, weaponOf, type WeaponId } from '../../../domain/item/weapons'
-import { INNER_PART, innerOpacity } from './skin'
+import { INNER_PART, innerOpacity, setBodyOpacity } from './skin'
 import { BlobShadow } from './blobShadow'
 import { castMovingShadow, MOVING_SHADOW_LAYER } from '../world/liveShadow'
 import { boxMoveScale, runnerScale, setupSpeedScale, stabSpeedScale, type Skills } from '../../../domain/player/skill'
@@ -37,7 +37,7 @@ import { damp, dampAngle } from '../util/math'
 import { stepMovement, type MoveResult, type Mover } from '../../../sim/space/movement'
 import { PLAYER_HEIGHT as BODY_HEIGHT, PLAYER_RADIUS as DOMAIN_RADIUS, STEP_UP } from '../../../domain/player/moving'
 import { can, type BodyState } from '../../../domain/player/moves'
-import { CQC_LAND_SECONDS, CQC_MISS_RECOVERY, CQC_PAIR_DISTANCE } from '../../../domain/player/cqc'
+import { CQC_DOWN_SECONDS, CQC_LAND_SECONDS, CQC_MISS_RECOVERY, CQC_PAIR_DISTANCE } from '../../../domain/player/cqc'
 import { WATER_DRAG } from '../../../sim/judge/ballistic'
 import type { Surface, Water } from '../../../domain/stage'
 import {
@@ -45,7 +45,7 @@ import {
   crawlSurge,
   resolveLocomotion,
 } from './motion'
-import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, placeBox } from './box'
+import { BoxMotion, advanceBoxLift, boxLift, createCardboardBox, disposeBox, keepBoxOutOfWalls, placeBox } from './box'
 import { Footsteps, type Step } from '../../../domain/rule/footsteps'
 import { MAX_HEALTH } from '../../../domain/rule/damage'
 import { HandPin, LeftArmFollow, RightArmShift, SpineAim, climbGripWeight } from './armIk'
@@ -1580,7 +1580,7 @@ export class Soldier {
       const base = body ? opacity * (1 - this.stealthFade) : opacity
       const value = inner ? innerOpacity(base) : base
       const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
-      for (const material of materials) material.opacity = value
+      for (const material of materials) setBodyOpacity(material, value)
       if (!body) return
       if (shown) obj.layers.enable(0)
       else obj.layers.disable(0)
@@ -2038,8 +2038,8 @@ export class Soldier {
     // 押し直させることで、伏せて撃つのが**選んだ結果**になる。
     if (!aiming) this.aimLatched = false
     if (this.downed) {
-      // 投げられている間は背中が着くまで (CQC_LAND_SECONDS)。転ぶ型の尺とは別
-      const landed = this.downElapsed >= (this.thrownFall ? CQC_LAND_SECONDS : (this.animator?.sweepDuration ?? 1.5))
+      // 投げられた時は動けるようになるまで (CQC_DOWN_SECONDS)。転ぶ型の尺とは別
+      const landed = this.downElapsed >= (this.thrownFall ? CQC_DOWN_SECONDS : (this.animator?.sweepDuration ?? 1.5))
       this.aiming = landed && aiming && !this.aimLatched
       return
     }
@@ -3641,12 +3641,12 @@ export class Soldier {
   /**
    * 倒れた直後で、まだ何もできない間か。
    *
-   * 爆風で転んだ時は DOWN_LOCK (0.35 秒) だが、**CQC で投げられている間は背中が着くまで**
-   * (CQC_LAND_SECONDS)。0.35 秒で解けていたので、投げられている最中にスティックを倒すと
+   * 爆風で転んだ時は DOWN_LOCK (0.35 秒) だが、**CQC で投げられた時は背中が着いた後も少し**
+   * (CQC_DOWN_SECONDS)。0.35 秒で解けていたので、投げられている最中にスティックを倒すと
    * 宙で寝返り (prone_roll_down) が始まり、投げの型を捨ててその場でうねっていた (本人 2026-10-15)
    */
   private get downLocked(): boolean {
-    return this.downElapsed < (this.thrownFall ? CQC_LAND_SECONDS : DOWN_LOCK)
+    return this.downElapsed < (this.thrownFall ? CQC_DOWN_SECONDS : DOWN_LOCK)
   }
 
   private crawlFromDown(): void {
@@ -4094,6 +4094,8 @@ export class Soldier {
           },
           dt,
         )
+    // 被った箱を壁にめり込ませない (体の円より箱が大きい。box.ts の keepBoxOutOfWalls)
+    if (this.boxed && !this.onLadder && !this.hanging) keepBoxOutOfWalls(this.position, this.yaw, world)
 
     /*
      * 一段上へ乗る跳び越え。**位置を型の上がり方に沿って持ち上げる。**

@@ -114,8 +114,13 @@ const SOUNDS = {
    * 姿勢ごとに max を変えなくても、音量の違いが届く距離の違いになる。
    */
   step: { file: "step_concrete1.mp3", reference: 2, max: STEP_RANGE },
-  /** 金属の上を歩いたとき。届く距離はコンクリートと同じにして、材質の差だけ出す */
-  metalStep: { file: "step_metal1.mp3", reference: 2, max: STEP_RANGE },
+  /**
+   * 金属の上を歩いたとき。届く距離はコンクリートと同じにして、材質の差だけ出す。
+   * **音源がコンクリートより 10dB ほど大きく録れている** (平均 -18.5dB と -28.9dB) ので 0.45 倍 (-7dB) で鳴らす。
+   * 金属らしく少しだけ大きく残す (2026-11-20 本人「金属の上歩く音の volume がでかい」)。
+   * 同じ音源の clink・metalBounce は別の音なので触らない
+   */
+  metalStep: { file: "step_metal1.mp3", reference: 2, max: STEP_RANGE, gain: 0.45 },
   /** 砂の上を歩いたとき。届く距離は他と同じ */
   sandStep: { file: "step_sand1.mp3", reference: 2, max: STEP_RANGE },
   /** 梯子を 1 段登った。届く距離は足音と同じ (domain/rule/footsteps.ts の CLIMB) */
@@ -755,7 +760,8 @@ export class GameAudio {
     sound.setRefDistance(profile.reference * range);
     sound.setMaxDistance(profile.max * range);
     sound.setBuffer(take.buffer);
-    sound.setVolume(volume);
+    // 音源ごとの録りの大きさの差を均す (gain)。聞こえる距離の計算 (返り値) には入れない — 材質で届き方は変えない
+    sound.setVolume(volume * ("gain" in profile ? profile.gain : 1));
     // 録りごとの基準の高さに、毎回のゆらぎを掛ける
     sound.setPlaybackRate(take.rate * jitter());
     /*

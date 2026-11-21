@@ -186,3 +186,10 @@ restart:
 	$(SSH) 'sudo systemctl restart mgohttp'
 	@sleep 2
 	@$(MAKE) --no-print-directory status
+
+# 銃の持ち方を weapon_poses.blend から書き出す (Blender が要るので check には入れない)。
+# holds-check は書かずに、書き出した値が .blend と食い違っていれば止める
+holds:
+	bash tools/holds/export_holds.sh
+holds-check:
+	bash tools/holds/export_holds.sh --check

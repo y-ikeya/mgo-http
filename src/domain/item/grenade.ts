@@ -82,8 +82,11 @@ export const KNOCK_NEAR = 0.28
  * 投げ出す速さ (m/s)。
  *
  * サーバーが上限として使い、予測線もこれで引く。申告された速さは信じない。
+ *
+ * 12 → 14 (2026-11-20 本人「グレネードの飛距離もう少し遠くまで飛ばせてもいい」)。水平に狙って
+ * 平らな地面へ落ちるまで、約 14m → 約 19m (THROW_LOFT 28°・手の高さ 1.4m から)
  */
-export const THROW_SPEED = 12
+export const THROW_SPEED = 14
 
 /**
  * その人が投げ出す速さ (m/s)。**THROWING MASTERY を掛けた後の値。**

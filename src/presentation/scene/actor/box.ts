@@ -83,6 +83,55 @@ const tuning: BoxTuning = {
   opacity: 1,
 }
 
+/**
+ * **被った箱を壁にめり込ませない。** 体の位置を、箱の形が壁の外に収まるところまで押し戻す。
+ *
+ * 体の当たりは半径 0.35m の円 (domain/player/moving.ts の PLAYER_RADIUS) だが、箱は前へ 0.92m・
+ * 横へ 0.45m 出ている。体の円だけで当てていると、正面から壁へ寄った時に箱が 57cm めり込んだ
+ * (2026-11-20 本人「ダンボールで壁にぶつかるとさめり込んじゃうのをなんとかしたい」)。
+ *
+ * 箱の床の長方形を円で覆って、円ごとに地形へ押し戻させ、その動きを体へ足す。
+ * 大きい円 2 つで箱の前後と横を、小さい円 4 つで角を覆う (角が斜めの壁へ刺さるのを 8cm 以内に)。
+ * 箱の向きは体の向き (箱は体の子)。手前の円から順に 2 周して、押し戻しどうしの食い違いを均す
+ */
+export function keepBoxOutOfWalls(
+  position: THREE.Vector3,
+  yaw: number,
+  world: { resolveHorizontal(position: THREE.Vector3, radius: number, feetY: number, height?: number): void },
+): void {
+  const halfW = tuning.width / 2
+  const halfD = tuning.depth / 2
+  const big = halfW
+  const small = Math.min(0.2, halfW / 2)
+  // 箱の中心 (体の局所: 右 offsetRight・前 offsetForward) から見た円の中心と半径
+  const circles: [number, number, number][] = [
+    [0, -(halfD - big), big],
+    [0, halfD - big, big],
+    [-(halfW - small), -(halfD - small), small],
+    [halfW - small, -(halfD - small), small],
+    [-(halfW - small), halfD - small, small],
+    [halfW - small, halfD - small, small],
+  ]
+  // 体の右と前 (世界)。箱は体の子で、局所の前は -Z
+  const rightX = Math.cos(yaw)
+  const rightZ = -Math.sin(yaw)
+  const forwardX = -Math.sin(yaw)
+  const forwardZ = -Math.cos(yaw)
+  for (let pass = 0; pass < 2; pass++) {
+    for (const [right, forward, radius] of circles) {
+      const r = tuning.offsetRight + right
+      const f = tuning.offsetForward + forward
+      probe.set(position.x + rightX * r + forwardX * f, position.y, position.z + rightZ * r + forwardZ * f)
+      const beforeX = probe.x
+      const beforeZ = probe.z
+      world.resolveHorizontal(probe, radius, position.y, tuning.height)
+      position.x += probe.x - beforeX
+      position.z += probe.z - beforeZ
+    }
+  }
+}
+const probe = new THREE.Vector3()
+
 /** 寸法と位置の調整用。確定したら tuning の初期値へ焼き込む */
 export function setBoxTuning(next: Partial<BoxTuning>): void {
   Object.assign(tuning, next)

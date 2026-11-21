@@ -30,7 +30,11 @@ export function holdingSalute(player: Pick<MatchPlayer, 'locomotion' | 'saluteHe
  * 2 人がいま繋がれるか。**味方かどうかは呼ぶ側** (部屋のルールで決まる、room.ts の isHostile)
  */
 export function canLink(a: MatchPlayer, b: MatchPlayer): boolean {
-  if (a.id === b.id || a.bot || b.bot) return false
+  /*
+   * 的どうしは繋げない。**人と的は繋がる** — 練習の部屋の敬礼している味方の的 (ALLY) は繋がりを試す相手
+   * (2026-11-20 本人「ally13 と link できなくなってる」。サーバーで結ぶ形にした時に的を外していた)
+   */
+  if (a.id === b.id || (a.bot && b.bot)) return false
   if (!canAct(a.life) || !canAct(b.life)) return false
   if (!holdingSalute(a) || !holdingSalute(b)) return false
   if (Math.abs(a.y - b.y) > LINK_RISE) return false

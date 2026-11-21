@@ -233,3 +233,16 @@ describe('通/秒', () => {
     expect(p.rate).toBeLessThan(hz * 1.25)
   })
 })
+
+describe('湧き直し (waitForNext)', () => {
+  test('次の位置が届くまで出さず、届いたら出す', () => {
+    const p = new Presence(50)
+    p.setOnField(true)
+    p.push(1000, 1000)
+    expect(p.visibleAt(1010)).toBe(true)
+    p.waitForNext()
+    expect(p.visibleAt(1020)).toBe(false)
+    p.push(1030, 1030)
+    expect(p.visibleAt(1040)).toBe(true)
+  })
+})

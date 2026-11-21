@@ -67,6 +67,55 @@ function readSteal(): number | null {
   }
 }
 
+/**
+ * 刻みの外でした仕事 (届いた通信・HTTP) の、種類ごとの数と時間。**刻みが遅れた時の内訳に出す** (2026-11-20)。
+ *
+ * 11/19 23:55 に刻みが 10 秒ほど 1 秒ずつ遅れ (CPU は使い切り、steal 0)、kome27 が遅延で切られた。
+ * 1 通ごとの処理は 20ms を超えず「通信重い」に出なかったので、何が CPU を使っていたか読めなかった。
+ * 軽い 1 通が大量に来たのか、測っていない所で回っているのかを、ここで分ける
+ */
+const work = new Map<string, { count: number; ms: number }>()
+
+export function noteWork(kind: string, ms: number): void {
+  const entry = work.get(kind)
+  if (entry) {
+    entry.count++
+    entry.ms += ms
+  } else work.set(kind, { count: 1, ms })
+}
+
+/**
+ * 溜めた仕事の内訳 (重い順に 6 つ)。**CPU の使用量から測った分を引いた残り**も出す — 残りが大きければ
+ * コードの外 (Bun 自身の送受信・GC・await の後の続き) で使っている
+ */
+function workLine(usedMs: number): string {
+  const entries = [...work].sort((a, b) => b[1].ms - a[1].ms)
+  const total = entries.reduce((sum, [, e]) => sum + e.ms, 0)
+  const top = entries.slice(0, 6).map(([kind, e]) => `${kind} ${e.count}回 ${Math.round(e.ms)}ms`)
+  return ` 内訳 測った分 ${Math.round(total)}ms (${top.join(' / ') || 'なし'}) 測っていない ${Math.max(0, Math.round(usedMs - total))}ms`
+}
+
+/**
+ * メモリの取り合い。**このプロセスがディスクから読み直した回数 (majflt) と、機械がメモリを空けるために
+ * 探した頁 (pgscan)** の累計。機械は 911MB しかなく交換領域も無い。11/19 の詰まりが入った 10 分 (sar) には
+ * 頁の回収が出ていた (2026-11-20)。詰まった時にそれが重なっていたかを、遅れの行に一緒に出す。読めなければ null
+ */
+function readMemoryPressure(): { majflt: number; pgscan: number } | null {
+  try {
+    // /proc/self/stat の 12 番目が majflt (名前に空白が入り得るので、閉じ括弧の後から数える)
+    const stat = readFileSync('/proc/self/stat', 'utf8')
+    const majflt = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[9])
+    let pgscan = 0
+    for (const line of readFileSync('/proc/vmstat', 'utf8').split('\n')) {
+      if (line.startsWith('pgscan_kswapd ') || line.startsWith('pgscan_direct ')) pgscan += Number(line.split(' ')[1])
+    }
+    return Number.isFinite(majflt) ? { majflt, pgscan } : null
+  } catch {
+    return null
+  }
+}
+let previousMemory = readMemoryPressure()
+
 /** 刻みが始まった時刻を受けて、予定より遅れていれば出す */
 export function noteTickStart(startedAt: number, previousStartedAt: number, tickMs: number, heapMb: () => number): void {
   const cpu = process.cpuUsage(previousCpu)
@@ -74,6 +123,12 @@ export function noteTickStart(startedAt: number, previousStartedAt: number, tick
   const steal = readSteal()
   const stolen = steal !== null && previousSteal !== null ? steal - previousSteal : null
   previousSteal = steal
+  const memory = readMemoryPressure()
+  const memoryLine =
+    memory && previousMemory
+      ? ` 読み直し ${memory.majflt - previousMemory.majflt} 回 頁の回収 ${memory.pgscan - previousMemory.pgscan} 頁`
+      : ''
+  previousMemory = memory
   if (previousStartedAt === 0) return
   const late = startedAt - previousStartedAt - tickMs
   if (late >= LATE_TICK_MS) {
@@ -82,7 +137,10 @@ export function noteTickStart(startedAt: number, previousStartedAt: number, tick
       'late',
       () =>
         `[刻み遅れ] ${Math.round(late)}ms 遅れて始まった (刻みの外で止まっていた) heap ${heapMb()}MB` +
-        ` その間の CPU ${used}ms${stolen !== null ? ` steal ${stolen}ms` : ''}`,
+        ` その間の CPU ${used}ms${stolen !== null ? ` steal ${stolen}ms` : ''}` +
+        memoryLine +
+        workLine(used),
     )
   }
+  work.clear()
 }

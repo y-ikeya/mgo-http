@@ -5,6 +5,7 @@ import { damp } from '../util/math'
 import { rootMotionStore, type RootMotionTrack } from '../assets'
 import { ROLL_TIME_SCALE } from '../../../domain/player/poseCurve'
 import { STEP_BACK_DISTANCE, STEP_BACK_SECONDS } from '../../../domain/player/step'
+import { PRONE_SPEED_SCALE } from '../../../domain/player/stance'
 // 状態そのものは共有の層が持つ。ここが持つのはクリップとの対応だけ
 import {
   CROUCH_WALK_TOP_SPEED,
@@ -335,6 +336,7 @@ const POSE_ONLY_CLIPS = new Set([
   'smg_crouch_relaxed', 'smg_crouch_aim', 'smg_prone_relaxed', 'smg_prone_aim',
   'sniper_relaxed_idle', 'sniper_aim', 'sniper_crouch_relaxed', 'sniper_crouch_aim', 'sniper_prone_relaxed', 'sniper_prone_aim',
   'pistol_crouch_relaxed', 'handgun_crouch_aim', 'handgun_relaxed_idle', 'handgun_aim', 'handgun_prone_relaxed', 'handgun_prone_aim',
+  'rifle_relaxed_idle', 'rifle_aim', 'rifle_crouch_relaxed', 'rifle_crouch_aim', 'rifle_prone_relaxed', 'rifle_prone_aim',
 ])
 
 const CROUCH_LOCOMOTIONS = new Set<Locomotion>([
@@ -815,8 +817,20 @@ const pistolKey = (state: Locomotion) => `pistol_relaxed:${state}`
 const WEAPON_RELAXED: Readonly<Record<string, Partial<Record<Locomotion, string>>>> = {
   // しゃがんで動く (深く倒した crouch_f) は P90 専用のしゃがみ走り。立って走る型から作った (本人 2026-11-16)
   smg: { ...ownRelaxed('smg_relaxed_idle', 'smg_crouch_relaxed', 'smg_prone_relaxed'), ...crouchRun('smg_crouch_run') },
-  // 狙撃銃 (本人 2026-11-16)
-  sniper: ownRelaxed('sniper_relaxed_idle', 'sniper_crouch_relaxed', 'sniper_prone_relaxed'),
+  /*
+   * 狙撃銃 (本人 2026-11-16)。しゃがみ走りは**体は P90 のしゃがみ走り**、腕は狙撃銃のしゃがみ止まりの形
+   * (tools/compose_clip.js)。共通のしゃがみ走りのままで、P90 と動きが違った (2026-11-20 本人「snipe を
+   * もったまま chrouch run する motion が p90 と違うよね？」)。拳銃 (pistol_crouch_run) と同じ作り
+   */
+  sniper: { ...ownRelaxed('sniper_relaxed_idle', 'sniper_crouch_relaxed', 'sniper_prone_relaxed'), ...crouchRun('sniper_crouch_run') },
+  /*
+   * AK (本人 2026-11-20)。weapon_poses.blend の Freya の見本 (preview_ak_*) から入れた。止まっている間 (立ち・しゃがみ・伏せ) と
+   * 構え。しゃがみ走り (rifle_crouch_run) は狙撃銃と同じく、体は P90 のしゃがみ走り・腕は AK のしゃがみ止まり
+   * (tools/compose_clip.js)。立って歩く・走る間は共通の型のまま
+   */
+  rifle: { idle: 'rifle_relaxed_idle', crouch_idle: 'rifle_crouch_relaxed', prone_idle: 'rifle_prone_relaxed', ...crouchRun('rifle_crouch_run') },
+  // M4 も体は AK と同じ型 (本人 2026-11-20「ak も m4 も両方やってね」)。持ち方だけ M4 の見本 (preview_m4_*)
+  m4: { idle: 'rifle_relaxed_idle', crouch_idle: 'rifle_crouch_relaxed', prone_idle: 'rifle_prone_relaxed', ...crouchRun('rifle_crouch_run') },
   /*
    * 拳銃のしゃがみ走り。**体は P90 のしゃがみ走りと同じ** (頭の高さを揃える。銃の持ち替えで頭の位置が
    * 変わると、持ち替えが頭の高さを変える手になる、本人 2026-11-16)。両手を前に、拳銃を右手・左手を添える
@@ -879,6 +893,8 @@ const WEAPON_AIM: Readonly<Record<string, string>> = {
   // 拳銃も P90 の構えの胴体に拳銃の腕 (本人 2026-11-16)。共通の拳銃の構え (pistol_aim) より先に引く
   m9: 'handgun_aim',
   m1911: 'handgun_aim',
+  rifle: 'rifle_aim',
+  m4: 'rifle_aim',
 }
 const weaponAimKey = (weapon: string) => `aim:${weapon}`
 /** **銃ごとの、しゃがんで構えた時の上半身の型。** 無い銃は共通のしゃがみ構え (CROUCH_AIM_KEY = knee_ready) */
@@ -888,6 +904,8 @@ const WEAPON_CROUCH_AIM: Readonly<Record<string, string>> = {
   // 拳銃のしゃがみ構え。胸を真横近くまで回した共通の型 (pistol_crouch_aim) をやめ、P90 の構えくらいの半身に (本人 2026-11-16)
   m9: 'handgun_crouch_aim',
   m1911: 'handgun_crouch_aim',
+  rifle: 'rifle_crouch_aim',
+  m4: 'rifle_crouch_aim',
 }
 const weaponCrouchAimKey = (weapon: string) => `crouch_aim:${weapon}`
 /**
@@ -912,6 +930,9 @@ const WEAPON_PRONE_AIM: Readonly<Record<string, string>> = {
   // 拳銃は伏せの脱力 (handgun_prone_relaxed) を元に本人が詰めた (2026-11-16)
   m9: 'handgun_prone_aim',
   m1911: 'handgun_prone_aim',
+  // AK は狙撃銃の伏せ構えを元に本人が Freya の見本で詰めた (2026-11-20)
+  rifle: 'rifle_prone_aim',
+  m4: 'rifle_prone_aim',
 }
 const weaponProneAimKey = (weapon: string) => `prone_aim:${weapon}`
 /**
@@ -1357,6 +1378,9 @@ const LEAN_STATES = new Set<Locomotion>(['lean_left', 'lean_right', 'lean_crouch
  */
 const CRAWL_RATE = 0.75
 
+/** 這う速さ (m/s)。人の走り (soldier.ts の MOVE_SPEED 2.74) × 伏せの倍率。練習の的も同じ (server/match.ts) */
+const CRAWL_TOP_SPEED = 2.74 * PRONE_SPEED_SCALE
+
 /**
  * 起き上がる型の再生倍率。**1 より大きい = 速く流す。**
  *
@@ -1405,6 +1429,9 @@ const CLIP_NATIVE_SPEED: Record<string, number> = {
   smg_crouch_run: 2.06,
   // 体は P90 のしゃがみ走りと同じ
   pistol_crouch_run: 2.06,
+  sniper_crouch_run: 2.06,
+  // 体は P90 のしゃがみ走り (smg_crouch_run) そのもの
+  rifle_crouch_run: 2.06,
 }
 /**
  * 歩きの再生の上限 (m/s)。**他人の型には速さが届かない** (moveSpeed は走りの値の
@@ -1413,6 +1440,13 @@ const CLIP_NATIVE_SPEED: Record<string, number> = {
 const WALK_TOPS: Partial<Record<Locomotion, number>> = {
   walk: WALK_TOP_SPEED,
   crouch_walk: CROUCH_WALK_TOP_SPEED,
+  /*
+   * 這う。他人は走りの値 (remoteSoldier.ts の REMOTE_MOVE_SPEED 3.8) のまま来るので、切らないと
+   * 自分の 5 倍ほどの速さで手足が回った (2026-11-20 本人「他人が prone をしてるのを見るとめっちゃ素早く
+   * ガチャガチャ動いてる」)
+   */
+  crawl_f: CRAWL_TOP_SPEED,
+  crawl_b: CRAWL_TOP_SPEED,
 }
 
 const CLIP_SPEED: Partial<Record<Locomotion, number>> = {
@@ -1632,11 +1666,16 @@ const RUN_HANDLING_UPRIGHT = 0.45
 const CROUCH_HANDLING_UPRIGHT = -0.3
 /**
  * しゃがみ止まりで装填・コッキングしている間、上体を前へ倒し足す角度 (lean に足す)。立って作った装填の型へ
- * 上半身を替えると、しゃがみの前傾が抜けて頭が 9〜15cm 後ろへ反った (2026-11-19 本人「chrouch で run
- * してない時も reload とかするとちょっと上半身そってる」)。30° で頭の前への出方が 14〜21cm (しゃがみ止まりは
- * 21〜22cm)。背骨の合わせ直し (CROUCH_HANDLING_UPRIGHT) は長物で効かなかったので、こちらで倒す
+ * 上半身を替えると、しゃがみの前傾が抜けて上体が後ろへ反った (2026-11-19 本人「chrouch で run
+ * してない時も reload とかするとちょっと上半身そってる」)。背骨の合わせ直し (CROUCH_HANDLING_UPRIGHT) は
+ * 長物で効かなかったので、こちらで倒す。
+ *
+ * **負で前へ倒れる。** しゃがみ止まりの装填では背骨の合わせ直しの後なので、lean の正が後ろへ効く
+ * (脱力の relaxedLean とは向きが逆)。最初 +30° を入れて逆に反らせていた (2026-11-20 本人「sniper の
+ * cocking / reload 時に上半身が上向いちゃってる」。胸 +10.5°・頭が腰より 13〜16cm 後ろ)。-30° で胸 -29°
+ * (しゃがみ止まりは -20〜-33°)、頭は腰より 3〜6cm 前 (名無し、狙撃銃・小銃とも)
  */
-const CROUCH_IDLE_HANDLING_LEAN = THREE.MathUtils.degToRad(30)
+const CROUCH_IDLE_HANDLING_LEAN = THREE.MathUtils.degToRad(-30)
 const CROUCH_MOVE_STATES = new Set<Locomotion>(MOVE_DIRECTIONS.map((d) => `crouch_${d}` as Locomotion))
 const RELAXED_LOWER_STATES = new Set<Locomotion>([...RUN_STATES, 'idle', 'walk'])
 

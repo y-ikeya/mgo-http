@@ -131,6 +131,11 @@ export interface Projectile {
   rolling?: boolean
   /** 水に入ったか。**入ったら二度と跳ねない** */
   sunk?: boolean
+  /**
+   * 最後に当たった面の向き (外向きの法線)。予測線の落下点の光を、当たった面 (床・壁) に貼るため
+   * (presentation/scene/arms/grenades.ts)。軌道の計算には使わない
+   */
+  normal?: { x: number; y: number; z: number }
 }
 
 /**
@@ -143,6 +148,15 @@ export interface Projectile {
 export const SINK_SPEED = 1.1
 /** 水に入った瞬間、横向きの速さをどれだけ残すか */
 export const WATER_DRAG = 0.12
+
+/** 当たった面の向きを控える。転がる間は毎刻み触れ直すので、入れ物は使い回す (サーバーでも回る) */
+function setNormal(p: Projectile, x: number, y: number, z: number): void {
+  if (p.normal) {
+    p.normal.x = x
+    p.normal.y = y
+    p.normal.z = z
+  } else p.normal = { x, y, z }
+}
 
 /**
  * 1 刻み進める。
@@ -198,6 +212,7 @@ export function stepProjectile(
       p.vz *= WATER_DRAG
       p.vy = -SINK_SPEED
       p.sunk = true
+      setNormal(p, 0, 1, 0)
       p.rolling = false
       /*
        * **跳ねた回数に数える。** 呼ぶ側はこれを見て音と水しぶきを出している
@@ -215,6 +230,8 @@ export function stepProjectile(
     p.rolling = false
     return
   }
+
+  setNormal(p, hit.nx, hit.ny, hit.nz)
 
   // 当たった面の少し手前へ置く
   p.x = hit.x + hit.nx * SURFACE_OFFSET
